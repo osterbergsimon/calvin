@@ -1,56 +1,51 @@
 <template>
   <LayoutManager>
     <div class="dashboard">
-      <div
-        v-if="configStore.showUI"
-        class="dashboard-header"
-      >
+      <div v-if="configStore.showUI" class="dashboard-header">
         <h1>Calvin Dashboard</h1>
         <div class="header-controls">
           <div class="status-indicator">
             <span :class="['status-dot', statusClass]" />
             <span>{{ statusText }}</span>
           </div>
-          <button 
-            class="btn-orientation" 
+          <button
+            class="btn-orientation"
             :title="`Switch to ${configStore.orientation === 'landscape' ? 'portrait' : 'landscape'} view`"
             @click="toggleOrientation"
           >
-            {{ configStore.orientation === 'landscape' ? '📱' : '🖥️' }}
-            {{ configStore.orientation === 'landscape' ? 'Portrait' : 'Landscape' }}
+            {{ configStore.orientation === "landscape" ? "📱" : "🖥️" }}
+            {{
+              configStore.orientation === "landscape" ? "Portrait" : "Landscape"
+            }}
           </button>
-          <button 
-            v-if="modeStore.currentMode !== modeStore.MODES.WEB_SERVICES" 
-            class="btn-web-services" 
+          <button
+            v-if="modeStore.currentMode !== modeStore.MODES.WEB_SERVICES"
+            class="btn-web-services"
             title="Show Web Services"
             @click="showWebServices"
           >
             Web Services
           </button>
-          <button 
+          <button
             v-else
-            class="btn-web-services" 
+            class="btn-web-services"
             title="Show Photos"
             @click="showPhotos"
           >
             Photos
           </button>
-          <button 
-            class="btn-side-position" 
+          <button
+            class="btn-side-position"
             :title="sideViewPositionTitle"
             @click="toggleSideViewPosition"
           >
             {{ sideViewPositionIcon }}
           </button>
-          <button 
-            class="btn-settings" 
-            title="Settings"
-            @click="goToSettings"
-          >
+          <button class="btn-settings" title="Settings" @click="goToSettings">
             ⚙️ Settings
           </button>
-          <button 
-            class="btn-minimal" 
+          <button
+            class="btn-minimal"
             title="Hide UI"
             @click="configStore.toggleUI"
           >
@@ -58,20 +53,14 @@
           </button>
         </div>
       </div>
-      
+
       <!-- Minimal UI overlay (shown when UI is hidden) -->
       <MinimalUIOverlay />
       <ModeIndicator />
 
-      <div
-        class="dashboard-main"
-        :class="mainLayoutClass"
-      >
+      <div class="dashboard-main" :class="mainLayoutClass">
         <!-- Fullscreen Mode (Photos or Web Services) -->
-        <div
-          v-if="modeStore.isFullscreen"
-          class="mode-content fullscreen-mode"
-        >
+        <div v-if="modeStore.isFullscreen" class="mode-content fullscreen-mode">
           <!-- Fullscreen Photos -->
           <PhotoSlideshow
             v-if="modeStore.fullscreenMode === modeStore.MODES.PHOTOS"
@@ -81,7 +70,9 @@
           />
           <!-- Fullscreen Web Services -->
           <WebServiceViewer
-            v-else-if="modeStore.fullscreenMode === modeStore.MODES.WEB_SERVICES"
+            v-else-if="
+              modeStore.fullscreenMode === modeStore.MODES.WEB_SERVICES
+            "
             :is-fullscreen="true"
           />
         </div>
@@ -131,129 +122,134 @@
 </template>
 
 <script setup>
-import { ref, onMounted, computed } from 'vue'
-import axios from 'axios'
-import LayoutManager from '../components/LayoutManager.vue'
-import CalendarView from '../components/CalendarView.vue'
-import PhotoSlideshow from '../components/PhotoSlideshow.vue'
-import WebServiceViewer from '../components/WebServiceViewer.vue'
-import MinimalUIOverlay from '../components/MinimalUIOverlay.vue'
-import ModeIndicator from '../components/ModeIndicator.vue'
-import { useConfigStore } from '../stores/config'
-import { useModeStore } from '../stores/mode'
-import { useRouter } from 'vue-router'
+import { ref, onMounted, computed } from "vue";
+import axios from "axios";
+import LayoutManager from "../components/LayoutManager.vue";
+import CalendarView from "../components/CalendarView.vue";
+import PhotoSlideshow from "../components/PhotoSlideshow.vue";
+import WebServiceViewer from "../components/WebServiceViewer.vue";
+import MinimalUIOverlay from "../components/MinimalUIOverlay.vue";
+import ModeIndicator from "../components/ModeIndicator.vue";
+import { useConfigStore } from "../stores/config";
+import { useModeStore } from "../stores/mode";
+import { useRouter } from "vue-router";
 
-const configStore = useConfigStore()
-const modeStore = useModeStore()
-const router = useRouter()
+const configStore = useConfigStore();
+const modeStore = useModeStore();
+const router = useRouter();
 
-const status = ref('checking...')
+const status = ref("checking...");
 const statusClass = computed(() => {
-  if (status.value === 'healthy') return 'healthy'
-  if (status.value === 'checking...') return 'checking'
-  return 'error'
-})
+  if (status.value === "healthy") return "healthy";
+  if (status.value === "checking...") return "checking";
+  return "error";
+});
 
 const statusText = computed(() => {
-  return status.value.charAt(0).toUpperCase() + status.value.slice(1)
-})
+  return status.value.charAt(0).toUpperCase() + status.value.slice(1);
+});
 
-const isLandscape = computed(() => configStore.orientation === 'landscape')
-const isPortrait = computed(() => configStore.orientation === 'portrait')
+const isLandscape = computed(() => configStore.orientation === "landscape");
+const isPortrait = computed(() => configStore.orientation === "portrait");
 
 const calendarWidth = computed(() => {
-  return isLandscape.value ? configStore.calendarWidth : '100%'
-})
+  return isLandscape.value ? configStore.calendarWidth : "100%";
+});
 
 const calendarHeight = computed(() => {
-  return isPortrait.value ? configStore.calendarWidth : '100%'
-})
+  return isPortrait.value ? configStore.calendarWidth : "100%";
+});
 
 const secondaryWidth = computed(() => {
-  return isLandscape.value ? configStore.photosWidth : '100%'
-})
+  return isLandscape.value ? configStore.photosWidth : "100%";
+});
 
 const secondaryHeight = computed(() => {
-  return isPortrait.value ? configStore.photosWidth : '100%'
-})
+  return isPortrait.value ? configStore.photosWidth : "100%";
+});
 
 const mainLayoutClass = computed(() => {
-  return `layout-${configStore.orientation}`
-})
+  return `layout-${configStore.orientation}`;
+});
 
 const sideViewPositionClass = computed(() => {
-  return `side-${configStore.sideViewPosition}`
-})
+  return `side-${configStore.sideViewPosition}`;
+});
 
 const sideViewPositionTitle = computed(() => {
-  if (configStore.orientation === 'landscape') {
-    return configStore.sideViewPosition === 'right' ? 'Move Side View to Left' : 'Move Side View to Right'
+  if (configStore.orientation === "landscape") {
+    return configStore.sideViewPosition === "right"
+      ? "Move Side View to Left"
+      : "Move Side View to Right";
   } else {
-    return configStore.sideViewPosition === 'bottom' ? 'Move Side View to Top' : 'Move Side View to Bottom'
+    return configStore.sideViewPosition === "bottom"
+      ? "Move Side View to Top"
+      : "Move Side View to Bottom";
   }
-})
+});
 
 const sideViewPositionIcon = computed(() => {
-  if (configStore.orientation === 'landscape') {
-    return configStore.sideViewPosition === 'right' ? '←' : '→'
+  if (configStore.orientation === "landscape") {
+    return configStore.sideViewPosition === "right" ? "←" : "→";
   } else {
-    return configStore.sideViewPosition === 'bottom' ? '↑' : '↓'
+    return configStore.sideViewPosition === "bottom" ? "↑" : "↓";
   }
-})
+});
 
 const toggleOrientation = () => {
-  const newOrientation = configStore.orientation === 'landscape' ? 'portrait' : 'landscape'
-  configStore.setOrientation(newOrientation)
+  const newOrientation =
+    configStore.orientation === "landscape" ? "portrait" : "landscape";
+  configStore.setOrientation(newOrientation);
   // Reset side view position to default when switching orientation
-  if (newOrientation === 'landscape') {
-    configStore.setSideViewPosition('right')
+  if (newOrientation === "landscape") {
+    configStore.setSideViewPosition("right");
   } else {
-    configStore.setSideViewPosition('bottom')
+    configStore.setSideViewPosition("bottom");
   }
-}
+};
 
 const toggleSideViewPosition = async () => {
-  configStore.toggleSideViewPosition()
+  configStore.toggleSideViewPosition();
   // Save the config change
   try {
     await configStore.updateConfig({
       sideViewPosition: configStore.sideViewPosition,
-    })
+    });
   } catch (error) {
-    console.error('Failed to save side view position:', error)
+    console.error("Failed to save side view position:", error);
   }
-}
+};
 
 const showWebServices = () => {
-  modeStore.setMode(modeStore.MODES.WEB_SERVICES)
-}
+  modeStore.setMode(modeStore.MODES.WEB_SERVICES);
+};
 
 const showPhotos = () => {
-  modeStore.setMode(modeStore.MODES.PHOTOS)
-}
+  modeStore.setMode(modeStore.MODES.PHOTOS);
+};
 
 const goToSettings = () => {
-  modeStore.setMode(modeStore.MODES.SETTINGS)
-  router.push('/settings')
-}
+  modeStore.setMode(modeStore.MODES.SETTINGS);
+  router.push("/settings");
+};
 
 const checkHealth = async () => {
   try {
-    const response = await axios.get('/api/health')
-    if (response.data.status === 'healthy') {
-      status.value = 'healthy'
+    const response = await axios.get("/api/health");
+    if (response.data.status === "healthy") {
+      status.value = "healthy";
     } else {
-      status.value = 'unhealthy'
+      status.value = "unhealthy";
     }
   } catch (error) {
-    status.value = 'error'
-    console.error('Health check failed:', error)
+    status.value = "error";
+    console.error("Health check failed:", error);
   }
-}
+};
 
 onMounted(() => {
-  checkHealth()
-})
+  checkHealth();
+});
 </script>
 
 <style scoped>
@@ -323,7 +319,8 @@ onMounted(() => {
 }
 
 @keyframes pulse {
-  0%, 100% {
+  0%,
+  100% {
     opacity: 1;
   }
   50% {
@@ -519,4 +516,3 @@ onMounted(() => {
   border-radius: 0;
 }
 </style>
-

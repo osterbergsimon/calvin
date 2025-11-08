@@ -1,133 +1,140 @@
 <template>
-  <div
-    class="mode-indicator"
-    :class="{ 'hidden': !show }"
-  >
-    <div
-      class="mode-icon"
-      :class="modeClass"
-      :title="modeLabel"
-    >
+  <div class="mode-indicator" :class="{ hidden: !show }">
+    <div class="mode-icon" :class="modeClass" :title="modeLabel">
       <span class="icon-text">{{ modeIcon }}</span>
     </div>
   </div>
 </template>
 
 <script setup>
-import { ref, computed, watch, onUnmounted } from 'vue'
-import { useModeStore } from '../stores/mode'
-import { useConfigStore } from '../stores/config'
+import { ref, computed, watch, onUnmounted } from "vue";
+import { useModeStore } from "../stores/mode";
+import { useConfigStore } from "../stores/config";
 
-const modeStore = useModeStore()
-const configStore = useConfigStore()
+const modeStore = useModeStore();
+const configStore = useConfigStore();
 
-const isVisible = ref(false)
-let hideTimer = null
+const isVisible = ref(false);
+let hideTimer = null;
 
 // Show indicator when mode changes
 const showIndicator = () => {
   if (!configStore.showModeIndicator) {
-    isVisible.value = false
-    return
+    isVisible.value = false;
+    return;
   }
-  
+
   // Clear any existing timer
   if (hideTimer) {
-    clearTimeout(hideTimer)
-    hideTimer = null
+    clearTimeout(hideTimer);
+    hideTimer = null;
   }
-  
+
   // Show the indicator
-  isVisible.value = true
-  
+  isVisible.value = true;
+
   // Hide after timeout (if timeout > 0)
-  const timeout = configStore.modeIndicatorTimeout || 0
+  const timeout = configStore.modeIndicatorTimeout || 0;
   if (timeout > 0) {
     hideTimer = setTimeout(() => {
-      isVisible.value = false
-      hideTimer = null
-    }, timeout * 1000) // Convert seconds to milliseconds
+      isVisible.value = false;
+      hideTimer = null;
+    }, timeout * 1000); // Convert seconds to milliseconds
   }
-}
+};
 
 // Watch for mode changes
-watch(() => [modeStore.currentMode, modeStore.isFullscreen, modeStore.fullscreenMode], () => {
-  showIndicator()
-}, { immediate: true })
+watch(
+  () => [
+    modeStore.currentMode,
+    modeStore.isFullscreen,
+    modeStore.fullscreenMode,
+  ],
+  () => {
+    showIndicator();
+  },
+  { immediate: true },
+);
 
 // Watch for config changes
-watch(() => configStore.showModeIndicator, (newVal) => {
-  if (newVal) {
-    showIndicator()
-  } else {
-    isVisible.value = false
-    if (hideTimer) {
-      clearTimeout(hideTimer)
-      hideTimer = null
+watch(
+  () => configStore.showModeIndicator,
+  (newVal) => {
+    if (newVal) {
+      showIndicator();
+    } else {
+      isVisible.value = false;
+      if (hideTimer) {
+        clearTimeout(hideTimer);
+        hideTimer = null;
+      }
     }
-  }
-})
+  },
+);
 
 // Watch for timeout changes
-watch(() => configStore.modeIndicatorTimeout, () => {
-  if (isVisible.value) {
-    showIndicator() // Restart timer with new timeout
-  }
-})
+watch(
+  () => configStore.modeIndicatorTimeout,
+  () => {
+    if (isVisible.value) {
+      showIndicator(); // Restart timer with new timeout
+    }
+  },
+);
 
 onUnmounted(() => {
   if (hideTimer) {
-    clearTimeout(hideTimer)
-    hideTimer = null
+    clearTimeout(hideTimer);
+    hideTimer = null;
   }
-})
+});
 
-const show = computed(() => configStore.showModeIndicator && isVisible.value)
+const show = computed(() => configStore.showModeIndicator && isVisible.value);
 
 const modeClass = computed(() => {
   if (modeStore.isFullscreen) {
-    return `mode-${modeStore.fullscreenMode}`
+    return `mode-${modeStore.fullscreenMode}`;
   }
-  return `mode-${modeStore.currentMode}`
-})
+  return `mode-${modeStore.currentMode}`;
+});
 
 const modeIcon = computed(() => {
   if (modeStore.isFullscreen) {
     if (modeStore.fullscreenMode === modeStore.MODES.PHOTOS) {
-      return '📷'
+      return "📷";
     } else if (modeStore.fullscreenMode === modeStore.MODES.WEB_SERVICES) {
-      return '🌐'
+      return "🌐";
     }
   } else {
     if (modeStore.currentMode === modeStore.MODES.CALENDAR) {
-      return '📅'
+      return "📅";
     } else if (modeStore.currentMode === modeStore.MODES.PHOTOS) {
-      return '📷'
+      return "📷";
     } else if (modeStore.currentMode === modeStore.MODES.WEB_SERVICES) {
-      return '🌐'
+      return "🌐";
     }
   }
-  return '•'
-})
+  return "•";
+});
 
 const modeLabel = computed(() => {
   if (modeStore.isFullscreen) {
     if (modeStore.fullscreenMode === modeStore.MODES.PHOTOS) {
-      return 'Fullscreen Photos'
+      return "Fullscreen Photos";
     } else if (modeStore.fullscreenMode === modeStore.MODES.WEB_SERVICES) {
-      return 'Fullscreen Web Services'
+      return "Fullscreen Web Services";
     }
   } else {
     if (modeStore.currentMode === modeStore.MODES.CALENDAR) {
-      return 'Calendar Mode'
+      return "Calendar Mode";
     } else if (modeStore.currentMode === modeStore.MODES.PHOTOS) {
-      return 'Photos Mode'
+      return "Photos Mode";
     } else if (modeStore.currentMode === modeStore.MODES.WEB_SERVICES) {
-      return 'Web Services Mode'
+      return "Web Services Mode";
     }
   }
-  return 'Dashboard'
-})
+  return "Dashboard";
+});
 </script>
 
 <style scoped>
@@ -184,4 +191,3 @@ const modeLabel = computed(() => {
   border-color: rgba(255, 152, 0, 0.5);
 }
 </style>
-

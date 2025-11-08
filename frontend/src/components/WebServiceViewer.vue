@@ -1,13 +1,7 @@
 <template>
-  <div
-    class="web-service-viewer"
-    :class="{ 'fullscreen': isFullscreen }"
-  >
+  <div class="web-service-viewer" :class="{ fullscreen: isFullscreen }">
     <!-- Fullscreen Close Button (only in fullscreen mode) -->
-    <div
-      v-if="isFullscreen"
-      class="fullscreen-close-overlay"
-    >
+    <div v-if="isFullscreen" class="fullscreen-close-overlay">
       <button
         class="btn-close-fullscreen"
         title="Close Fullscreen (ESC)"
@@ -16,18 +10,12 @@
         ×
       </button>
     </div>
-    
+
     <!-- Header (hidden in fullscreen mode) -->
-    <div
-      v-if="showHeader && !isFullscreen"
-      class="viewer-header"
-    >
+    <div v-if="showHeader && !isFullscreen" class="viewer-header">
       <div class="header-left">
-        <h2>{{ currentService?.name || 'Web Services' }}</h2>
-        <div
-          v-if="services.length > 1"
-          class="service-indicator"
-        >
+        <h2>{{ currentService?.name || "Web Services" }}</h2>
+        <div v-if="services.length > 1" class="service-indicator">
           Service {{ currentServiceIndex + 1 }} of {{ services.length }}
         </div>
       </div>
@@ -53,18 +41,12 @@
           :title="isFullscreen ? 'Exit Fullscreen' : 'Enter Fullscreen'"
           @click="toggleFullscreen"
         >
-          {{ isFullscreen ? '⤓' : '⤢' }}
+          {{ isFullscreen ? "⤓" : "⤢" }}
         </button>
-        <button
-          class="btn-close"
-          title="Close"
-          @click="close"
-        >
-          ×
-        </button>
+        <button class="btn-close" title="Close" @click="close">×</button>
       </div>
     </div>
-    
+
     <!-- Service Selection (if multiple services) -->
     <div
       v-if="showHeader && !isFullscreen && services.length > 1"
@@ -74,7 +56,7 @@
         v-for="(service, index) in services"
         :key="service.id"
         class="service-btn"
-        :class="{ 'active': index === currentServiceIndex }"
+        :class="{ active: index === currentServiceIndex }"
         @click="setServiceIndex(index)"
       >
         {{ service.name }}
@@ -84,30 +66,19 @@
     <!-- Viewer Content -->
     <div class="viewer-content">
       <!-- Loading State -->
-      <div
-        v-if="loading"
-        class="loading-state"
-      >
+      <div v-if="loading" class="loading-state">
         <div class="spinner" />
         <p>Loading service...</p>
       </div>
 
       <!-- No Services -->
-      <div
-        v-else-if="services.length === 0"
-        class="no-services"
-      >
+      <div v-else-if="services.length === 0" class="no-services">
         <p>No web services configured</p>
-        <p class="help-text">
-          Add web services in Settings
-        </p>
+        <p class="help-text">Add web services in Settings</p>
       </div>
 
       <!-- Service Iframe -->
-      <div
-        v-else-if="currentService"
-        class="service-container"
-      >
+      <div v-else-if="currentService" class="service-container">
         <iframe
           ref="serviceIframe"
           :src="currentService.url"
@@ -118,15 +89,15 @@
           @load="handleIframeLoad"
           @error="handleIframeError"
         />
-        
+
         <!-- CORS/Iframe Error Message -->
-        <div
-          v-if="iframeError"
-          class="iframe-error-message"
-        >
+        <div v-if="iframeError" class="iframe-error-message">
           <div class="error-content">
             <h3>⚠️ Cannot Display Service</h3>
-            <p>This service cannot be embedded in an iframe due to security restrictions (CORS/X-Frame-Options).</p>
+            <p>
+              This service cannot be embedded in an iframe due to security
+              restrictions (CORS/X-Frame-Options).
+            </p>
             <p class="service-url">
               {{ currentService.url }}
             </p>
@@ -139,12 +110,7 @@
               >
                 Open in New Window
               </a>
-              <button
-                class="btn-retry"
-                @click="retryLoad"
-              >
-                Retry
-              </button>
+              <button class="btn-retry" @click="retryLoad">Retry</button>
             </div>
           </div>
         </div>
@@ -154,160 +120,168 @@
 </template>
 
 <script setup>
-import { ref, computed, onMounted, watch, onUnmounted } from 'vue'
-import { useConfigStore } from '../stores/config'
-import { useWebServicesStore } from '../stores/webServices'
-import { useModeStore } from '../stores/mode'
+import { ref, computed, onMounted, watch, onUnmounted } from "vue";
+import { useConfigStore } from "../stores/config";
+import { useWebServicesStore } from "../stores/webServices";
+import { useModeStore } from "../stores/mode";
 
 const props = defineProps({
   isFullscreen: {
     type: Boolean,
     default: false,
   },
-})
+});
 
-const configStore = useConfigStore()
-const webServicesStore = useWebServicesStore()
-const modeStore = useModeStore()
+const configStore = useConfigStore();
+const webServicesStore = useWebServicesStore();
+const modeStore = useModeStore();
 
-const showHeader = computed(() => configStore.showUI)
-const services = computed(() => webServicesStore.services)
-const currentServiceIndex = computed(() => webServicesStore.currentServiceIndex)
-const currentService = computed(() => webServicesStore.getCurrentService())
-const loading = computed(() => webServicesStore.loading)
+const showHeader = computed(() => configStore.showUI);
+const services = computed(() => webServicesStore.services);
+const currentServiceIndex = computed(
+  () => webServicesStore.currentServiceIndex,
+);
+const currentService = computed(() => webServicesStore.getCurrentService());
+const loading = computed(() => webServicesStore.loading);
 
-const serviceIframe = ref(null)
-const iframeError = ref(false)
-const iframeLoadTimeout = ref(null)
+const serviceIframe = ref(null);
+const iframeError = ref(false);
+const iframeLoadTimeout = ref(null);
 
 const close = () => {
   if (props.isFullscreen) {
     // Exit fullscreen mode - return to dashboard
-    modeStore.exitFullscreen()
+    modeStore.exitFullscreen();
   } else {
     // Return to calendar mode (home view)
-    modeStore.setMode(modeStore.MODES.CALENDAR)
+    modeStore.setMode(modeStore.MODES.CALENDAR);
   }
-}
+};
 
 const toggleFullscreen = () => {
   if (props.isFullscreen) {
     // Exit fullscreen - return to dashboard
-    modeStore.exitFullscreen()
+    modeStore.exitFullscreen();
   } else {
     // Enter fullscreen web services
-    modeStore.enterFullscreen(modeStore.MODES.WEB_SERVICES)
+    modeStore.enterFullscreen(modeStore.MODES.WEB_SERVICES);
   }
-}
+};
 
 const nextService = () => {
-  webServicesStore.nextService()
-  iframeError.value = false
-}
+  webServicesStore.nextService();
+  iframeError.value = false;
+};
 
 const previousService = () => {
-  webServicesStore.previousService()
-  iframeError.value = false
-}
+  webServicesStore.previousService();
+  iframeError.value = false;
+};
 
 const setServiceIndex = (index) => {
-  webServicesStore.setServiceIndex(index)
-  iframeError.value = false
-}
+  webServicesStore.setServiceIndex(index);
+  iframeError.value = false;
+};
 
 const handleIframeLoad = () => {
   // Clear any timeout
   if (iframeLoadTimeout.value) {
-    clearTimeout(iframeLoadTimeout.value)
-    iframeLoadTimeout.value = null
+    clearTimeout(iframeLoadTimeout.value);
+    iframeLoadTimeout.value = null;
   }
-  
+
   // Check if iframe actually loaded content
   // Some sites block iframes but still trigger load event
   try {
     // Try to access iframe content (will fail if blocked by CORS)
-    const iframe = serviceIframe.value
+    const iframe = serviceIframe.value;
     if (iframe && iframe.contentWindow) {
       // If we can access contentWindow, it might be loaded
       // But we can't reliably check content due to CORS
       // So we'll assume it's loaded unless we get an error
-      iframeError.value = false
+      iframeError.value = false;
     }
   } catch (e) {
     // CORS error - can't access iframe content
     // This is expected for cross-origin iframes, not necessarily an error
-    console.log('Cannot access iframe content (CORS):', e.message)
+    console.log("Cannot access iframe content (CORS):", e.message);
   }
-}
+};
 
 const handleIframeError = () => {
-  iframeError.value = true
+  iframeError.value = true;
   if (iframeLoadTimeout.value) {
-    clearTimeout(iframeLoadTimeout.value)
-    iframeLoadTimeout.value = null
+    clearTimeout(iframeLoadTimeout.value);
+    iframeLoadTimeout.value = null;
   }
-}
+};
 
 const retryLoad = () => {
-  iframeError.value = false
+  iframeError.value = false;
   if (serviceIframe.value && currentService.value) {
     // Force reload by setting src again
-    const url = currentService.value.url
-    serviceIframe.value.src = ''
+    const url = currentService.value.url;
+    serviceIframe.value.src = "";
     setTimeout(() => {
       if (serviceIframe.value) {
-        serviceIframe.value.src = url
+        serviceIframe.value.src = url;
       }
-    }, 100)
+    }, 100);
   }
-}
+};
 
 // Watch for service changes to reset error state
-watch(() => currentService.value?.id, () => {
-  iframeError.value = false
-  // Set a timeout to detect if iframe doesn't load
-  if (iframeLoadTimeout.value) {
-    clearTimeout(iframeLoadTimeout.value)
-  }
-  iframeLoadTimeout.value = setTimeout(() => {
-    // If iframe hasn't loaded after 5 seconds, show error
-    // This is a fallback for services that silently fail
-    if (serviceIframe.value) {
-      try {
-        // Try to check if iframe has content
-        const iframe = serviceIframe.value
-        if (iframe.contentDocument === null && iframe.contentWindow === null) {
-          iframeError.value = true
-        }
-      } catch (e) {
-        // CORS error is expected, not necessarily a problem
-        console.log('Cannot check iframe content (CORS):', e.message)
-      }
+watch(
+  () => currentService.value?.id,
+  () => {
+    iframeError.value = false;
+    // Set a timeout to detect if iframe doesn't load
+    if (iframeLoadTimeout.value) {
+      clearTimeout(iframeLoadTimeout.value);
     }
-  }, 5000)
-})
+    iframeLoadTimeout.value = setTimeout(() => {
+      // If iframe hasn't loaded after 5 seconds, show error
+      // This is a fallback for services that silently fail
+      if (serviceIframe.value) {
+        try {
+          // Try to check if iframe has content
+          const iframe = serviceIframe.value;
+          if (
+            iframe.contentDocument === null &&
+            iframe.contentWindow === null
+          ) {
+            iframeError.value = true;
+          }
+        } catch (e) {
+          // CORS error is expected, not necessarily a problem
+          console.log("Cannot check iframe content (CORS):", e.message);
+        }
+      }
+    }, 5000);
+  },
+);
 
 // Handle Escape key to close fullscreen
 const handleKeydown = (event) => {
-  if (event.key === 'Escape' && props.isFullscreen) {
-    close()
-    event.preventDefault()
+  if (event.key === "Escape" && props.isFullscreen) {
+    close();
+    event.preventDefault();
   }
-}
+};
 
 onMounted(async () => {
-  await webServicesStore.fetchServices()
+  await webServicesStore.fetchServices();
   // Add keyboard listener for Escape key
-  window.addEventListener('keydown', handleKeydown)
-})
+  window.addEventListener("keydown", handleKeydown);
+});
 
 onUnmounted(() => {
   if (iframeLoadTimeout.value) {
-    clearTimeout(iframeLoadTimeout.value)
+    clearTimeout(iframeLoadTimeout.value);
   }
   // Remove keyboard listener
-  window.removeEventListener('keydown', handleKeydown)
-})
+  window.removeEventListener("keydown", handleKeydown);
+});
 </script>
 
 <style scoped>
@@ -451,8 +425,12 @@ onUnmounted(() => {
 }
 
 @keyframes spin {
-  0% { transform: rotate(0deg); }
-  100% { transform: rotate(360deg); }
+  0% {
+    transform: rotate(0deg);
+  }
+  100% {
+    transform: rotate(360deg);
+  }
 }
 
 .help-text {
@@ -597,4 +575,3 @@ onUnmounted(() => {
   transform: scale(1.1);
 }
 </style>
-

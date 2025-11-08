@@ -1,59 +1,41 @@
 <template>
-  <div
-    class="photo-slideshow"
-    :class="{ 'fullscreen': isFullscreen }"
-  >
-    <div
-      v-if="!isFullscreen && showHeader"
-      class="slideshow-header"
-    >
+  <div class="photo-slideshow" :class="{ fullscreen: isFullscreen }">
+    <div v-if="!isFullscreen && showHeader" class="slideshow-header">
       <h2>Photos</h2>
-      <div
-        v-if="imagesStore.error"
-        class="error-message"
-      >
+      <div v-if="imagesStore.error" class="error-message">
         {{ imagesStore.error }}
       </div>
     </div>
     <div class="slideshow-content">
-      <div
-        v-if="imagesStore.loading"
-        class="loading"
-      >
+      <div v-if="imagesStore.loading" class="loading">
         <p>Loading images...</p>
       </div>
-      <div
-        v-else-if="!currentImageUrl"
-        class="photo-placeholder"
-      >
+      <div v-else-if="!currentImageUrl" class="photo-placeholder">
         <p>No images available</p>
         <p class="photo-info">
           Add images to <code>data/images</code> directory
         </p>
       </div>
-      <div
-        v-else
-        class="photo-container"
-      >
+      <div v-else class="photo-container">
         <img
           :src="currentImageUrl"
           :alt="imagesStore.currentImage?.filename || 'Photo'"
           class="photo-image"
           @load="onImageLoad"
           @error="onImageError"
-        >
+        />
       </div>
     </div>
   </div>
 </template>
 
 <script setup>
-import { computed, onMounted, onUnmounted, watch } from 'vue'
-import { useImagesStore } from '../stores/images'
-import { useConfigStore } from '../stores/config'
+import { computed, onMounted, onUnmounted, watch } from "vue";
+import { useImagesStore } from "../stores/images";
+import { useConfigStore } from "../stores/config";
 
-const configStore = useConfigStore()
-const showHeader = computed(() => configStore.showUI)
+const configStore = useConfigStore();
+const showHeader = computed(() => configStore.showUI);
 
 const props = defineProps({
   isFullscreen: {
@@ -68,65 +50,68 @@ const props = defineProps({
     type: Number,
     default: 30000, // 30 seconds
   },
-})
+});
 
-const imagesStore = useImagesStore()
+const imagesStore = useImagesStore();
 
-const currentImageUrl = computed(() => imagesStore.getCurrentImageUrl)
+const currentImageUrl = computed(() => imagesStore.getCurrentImageUrl);
 
-let rotationTimer = null
+let rotationTimer = null;
 
 const onImageLoad = () => {
   // Image loaded successfully
-}
+};
 
 const onImageError = () => {
-  console.error('Failed to load image:', currentImageUrl.value)
-}
+  console.error("Failed to load image:", currentImageUrl.value);
+};
 
 const startAutoRotation = () => {
   if (props.autoRotate && imagesStore.images.length > 1) {
     rotationTimer = setInterval(() => {
-      imagesStore.nextImage()
-    }, props.rotationInterval)
+      imagesStore.nextImage();
+    }, props.rotationInterval);
   }
-}
+};
 
 const stopAutoRotation = () => {
   if (rotationTimer) {
-    clearInterval(rotationTimer)
-    rotationTimer = null
+    clearInterval(rotationTimer);
+    rotationTimer = null;
   }
-}
+};
 
 onMounted(async () => {
   // Fetch images and current image
   try {
-    await imagesStore.fetchImages()
+    await imagesStore.fetchImages();
     if (imagesStore.images.length > 0 && !imagesStore.currentImage) {
-      await imagesStore.fetchCurrentImage()
+      await imagesStore.fetchCurrentImage();
     }
   } catch (error) {
-    console.error('Failed to load images:', error)
+    console.error("Failed to load images:", error);
   }
 
   // Start auto-rotation if enabled
   if (props.autoRotate) {
-    startAutoRotation()
+    startAutoRotation();
   }
-})
+});
 
 onUnmounted(() => {
-  stopAutoRotation()
-})
+  stopAutoRotation();
+});
 
-watch(() => props.autoRotate, (newVal) => {
-  if (newVal) {
-    startAutoRotation()
-  } else {
-    stopAutoRotation()
-  }
-})
+watch(
+  () => props.autoRotate,
+  (newVal) => {
+    if (newVal) {
+      startAutoRotation();
+    } else {
+      stopAutoRotation();
+    }
+  },
+);
 </script>
 
 <style scoped>

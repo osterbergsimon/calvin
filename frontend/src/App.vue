@@ -6,21 +6,21 @@
 </template>
 
 <script setup>
-import { onMounted } from 'vue'
-import { RouterView } from 'vue-router'
-import KeyboardHandler from './components/KeyboardHandler.vue'
+import { onMounted } from "vue";
+import { RouterView } from "vue-router";
+import KeyboardHandler from "./components/KeyboardHandler.vue";
 // Initialize photo frame mode globally
-import { usePhotoFrameMode } from './composables/usePhotoFrameMode'
+import { usePhotoFrameMode } from "./composables/usePhotoFrameMode";
 // Initialize theme globally
-import { useTheme } from './composables/useTheme'
+import { useTheme } from "./composables/useTheme";
 
-usePhotoFrameMode()
-const theme = useTheme()
+usePhotoFrameMode();
+const theme = useTheme();
 
 // Ensure theme is initialized immediately
 onMounted(() => {
-  theme.loadTheme()
-})
+  theme.loadTheme();
+});
 </script>
 
 <style>
@@ -31,4 +31,3 @@ onMounted(() => {
   padding: 0;
 }
 </style>
-

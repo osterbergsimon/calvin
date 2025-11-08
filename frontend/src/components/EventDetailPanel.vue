@@ -1,18 +1,8 @@
 <template>
-  <div
-    v-if="event"
-    class="event-detail-panel"
-    @keydown.esc="close"
-  >
+  <div v-if="event" class="event-detail-panel" @keydown.esc="close">
     <div class="event-detail-header">
       <h3>{{ event.title }}</h3>
-      <button
-        class="btn-close"
-        aria-label="Close"
-        @click="close"
-      >
-        ×
-      </button>
+      <button class="btn-close" aria-label="Close" @click="close">×</button>
     </div>
     <div class="event-detail-content">
       <!-- Show all events for the day if expanding "today" via keyboard -->
@@ -21,37 +11,42 @@
         class="all-day-events-details"
       >
         <div class="day-events-header">
-          <span class="label">All Events for {{ formatDate(event.start) }} ({{ dayEvents.length }})</span>
+          <span class="label"
+            >All Events for {{ formatDate(event.start) }} ({{
+              dayEvents.length
+            }})</span
+          >
         </div>
         <div class="all-events-list">
           <div
             v-for="dayEvent in dayEvents"
             :key="dayEvent.id"
             class="day-event-detail-card"
-            :class="{ 'active': dayEvent.id === event.id }"
+            :class="{ active: dayEvent.id === event.id }"
           >
             <div class="day-event-detail-header">
               <h4>{{ dayEvent.title }}</h4>
             </div>
             <div class="day-event-detail-content">
-              <div
-                v-if="isEventMultiDay(dayEvent)"
-                class="event-detail-row"
-              >
+              <div v-if="isEventMultiDay(dayEvent)" class="event-detail-row">
                 <span class="label">Start:</span>
-                <span class="value">{{ formatDate(dayEvent.start) }}<span v-if="!dayEvent.all_day"> {{ formatTime(dayEvent.start) }}</span></span>
+                <span class="value"
+                  >{{ formatDate(dayEvent.start)
+                  }}<span v-if="!dayEvent.all_day">
+                    {{ formatTime(dayEvent.start) }}</span
+                  ></span
+                >
               </div>
-              <div
-                v-if="isEventMultiDay(dayEvent)"
-                class="event-detail-row"
-              >
+              <div v-if="isEventMultiDay(dayEvent)" class="event-detail-row">
                 <span class="label">End:</span>
-                <span class="value">{{ formatDate(dayEvent.end) }}<span v-if="!dayEvent.all_day"> {{ formatTime(dayEvent.end) }}</span></span>
+                <span class="value"
+                  >{{ formatDate(dayEvent.end)
+                  }}<span v-if="!dayEvent.all_day">
+                    {{ formatTime(dayEvent.end) }}</span
+                  ></span
+                >
               </div>
-              <div
-                v-if="!isEventMultiDay(dayEvent)"
-                class="event-detail-row"
-              >
+              <div v-if="!isEventMultiDay(dayEvent)" class="event-detail-row">
                 <span class="label">Date:</span>
                 <span class="value">{{ formatDate(dayEvent.start) }}</span>
               </div>
@@ -60,7 +55,10 @@
                 class="event-detail-row"
               >
                 <span class="label">Time:</span>
-                <span class="value">{{ formatTime(dayEvent.start) }} - {{ formatTime(dayEvent.end) }}</span>
+                <span class="value"
+                  >{{ formatTime(dayEvent.start) }} -
+                  {{ formatTime(dayEvent.end) }}</span
+                >
               </div>
               <div
                 v-if="dayEvent.all_day && !isEventMultiDay(dayEvent)"
@@ -69,17 +67,11 @@
                 <span class="label">Time:</span>
                 <span class="value">All Day</span>
               </div>
-              <div
-                v-if="dayEvent.location"
-                class="event-detail-row"
-              >
+              <div v-if="dayEvent.location" class="event-detail-row">
                 <span class="label">Location:</span>
                 <span class="value">{{ dayEvent.location }}</span>
               </div>
-              <div
-                v-if="dayEvent.description"
-                class="event-detail-row"
-              >
+              <div v-if="dayEvent.description" class="event-detail-row">
                 <span class="label">Description:</span>
                 <div class="value description">
                   {{ dayEvent.description }}
@@ -90,10 +82,7 @@
         </div>
       </div>
       <!-- Show clickable list if not keyboard expand -->
-      <div
-        v-else-if="dayEvents.length > 1"
-        class="day-events-list"
-      >
+      <div v-else-if="dayEvents.length > 1" class="day-events-list">
         <div class="day-events-header">
           <span class="label">All Events ({{ dayEvents.length }})</span>
         </div>
@@ -102,11 +91,13 @@
             v-for="dayEvent in dayEvents"
             :key="dayEvent.id"
             class="day-event-item"
-            :class="{ 'active': dayEvent.id === event.id }"
+            :class="{ active: dayEvent.id === event.id }"
             @click="selectEvent(dayEvent)"
           >
             <div class="day-event-time">
-              <span v-if="!dayEvent.all_day">{{ formatTime(dayEvent.start) }}</span>
+              <span v-if="!dayEvent.all_day">{{
+                formatTime(dayEvent.start)
+              }}</span>
               <span v-else>All Day</span>
             </div>
             <div class="day-event-title">
@@ -120,45 +111,39 @@
         v-if="!showAllDayEvents || dayEvents.length === 1"
         class="current-event-details"
       >
-        <div
-          v-if="isMultiDay"
-          class="event-detail-row"
-        >
+        <div v-if="isMultiDay" class="event-detail-row">
           <span class="label">Start:</span>
-          <span class="value">{{ formatDate(event.start) }}<span v-if="!event.all_day"> {{ formatTime(event.start) }}</span></span>
+          <span class="value"
+            >{{ formatDate(event.start)
+            }}<span v-if="!event.all_day">
+              {{ formatTime(event.start) }}</span
+            ></span
+          >
         </div>
-        <div
-          v-if="isMultiDay"
-          class="event-detail-row"
-        >
+        <div v-if="isMultiDay" class="event-detail-row">
           <span class="label">End:</span>
-          <span class="value">{{ formatDate(event.end) }}<span v-if="!event.all_day"> {{ formatTime(event.end) }}</span></span>
+          <span class="value"
+            >{{ formatDate(event.end)
+            }}<span v-if="!event.all_day">
+              {{ formatTime(event.end) }}</span
+            ></span
+          >
         </div>
-        <div
-          v-if="!isMultiDay"
-          class="event-detail-row"
-        >
+        <div v-if="!isMultiDay" class="event-detail-row">
           <span class="label">Date:</span>
           <span class="value">{{ formatDate(event.start) }}</span>
         </div>
-        <div
-          v-if="!isMultiDay && !event.all_day"
-          class="event-detail-row"
-        >
+        <div v-if="!isMultiDay && !event.all_day" class="event-detail-row">
           <span class="label">Time:</span>
-          <span class="value">{{ formatTime(event.start) }} - {{ formatTime(event.end) }}</span>
+          <span class="value"
+            >{{ formatTime(event.start) }} - {{ formatTime(event.end) }}</span
+          >
         </div>
-        <div
-          v-if="event.location"
-          class="event-detail-row"
-        >
+        <div v-if="event.location" class="event-detail-row">
           <span class="label">Location:</span>
           <span class="value">{{ event.location }}</span>
         </div>
-        <div
-          v-if="event.description"
-          class="event-detail-row"
-        >
+        <div v-if="event.description" class="event-detail-row">
           <span class="label">Description:</span>
           <div class="value description">
             {{ event.description }}
@@ -174,71 +159,76 @@
 </template>
 
 <script setup>
-import { defineProps, defineEmits, computed } from 'vue'
-import { useConfigStore } from '../stores/config'
-import { useCalendarStore } from '../stores/calendar'
+import { defineProps, defineEmits, computed } from "vue";
+import { useConfigStore } from "../stores/config";
+import { useCalendarStore } from "../stores/calendar";
 
 const props = defineProps({
   event: {
     type: Object,
     default: null,
   },
-})
+});
 
-const emit = defineEmits(['close'])
-const configStore = useConfigStore()
-const calendarStore = useCalendarStore()
+const emit = defineEmits(["close"]);
+const configStore = useConfigStore();
+const calendarStore = useCalendarStore();
 
-const dayEvents = computed(() => calendarStore.dayEvents)
-const showAllDayEvents = computed(() => calendarStore.showAllDayEvents)
+const dayEvents = computed(() => calendarStore.dayEvents);
+const showAllDayEvents = computed(() => calendarStore.showAllDayEvents);
 
 const selectEvent = (event) => {
-  calendarStore.selectEvent(event)
-}
+  calendarStore.selectEvent(event);
+};
 
 const isEventMultiDay = (event) => {
-  if (!event) return false
-  const start = new Date(event.start)
-  const end = new Date(event.end)
+  if (!event) return false;
+  const start = new Date(event.start);
+  const end = new Date(event.end);
   // Compare calendar dates (year, month, day)
-  return start.getFullYear() !== end.getFullYear() ||
-         start.getMonth() !== end.getMonth() ||
-         start.getDate() !== end.getDate()
-}
+  return (
+    start.getFullYear() !== end.getFullYear() ||
+    start.getMonth() !== end.getMonth() ||
+    start.getDate() !== end.getDate()
+  );
+};
 
 const close = () => {
-  emit('close')
-}
+  emit("close");
+};
 
 const formatDate = (dateString) => {
-  const date = new Date(dateString)
-  return date.toLocaleDateString('en-US', {
-    weekday: 'long',
-    year: 'numeric',
-    month: 'long',
-    day: 'numeric',
-  })
-}
+  const date = new Date(dateString);
+  return date.toLocaleDateString("en-US", {
+    weekday: "long",
+    year: "numeric",
+    month: "long",
+    day: "numeric",
+  });
+};
 
 const formatTime = (dateString) => {
-  const date = new Date(dateString)
-  const timeFormat = configStore.timeFormat || '24h'
-  const timeOptions = timeFormat === '24h'
-    ? { hour: '2-digit', minute: '2-digit', hour12: false }
-    : { hour: 'numeric', minute: '2-digit', hour12: true }
-  return date.toLocaleTimeString('en-US', timeOptions)
-}
+  const date = new Date(dateString);
+  const timeFormat = configStore.timeFormat || "24h";
+  const timeOptions =
+    timeFormat === "24h"
+      ? { hour: "2-digit", minute: "2-digit", hour12: false }
+      : { hour: "numeric", minute: "2-digit", hour12: true };
+  return date.toLocaleTimeString("en-US", timeOptions);
+};
 
 // Check if event is multi-day
 const isMultiDay = computed(() => {
-  if (!props.event) return false
-  const start = new Date(props.event.start)
-  const end = new Date(props.event.end)
+  if (!props.event) return false;
+  const start = new Date(props.event.start);
+  const end = new Date(props.event.end);
   // Compare calendar dates (year, month, day)
-  return start.getFullYear() !== end.getFullYear() ||
-         start.getMonth() !== end.getMonth() ||
-         start.getDate() !== end.getDate()
-})
+  return (
+    start.getFullYear() !== end.getFullYear() ||
+    start.getMonth() !== end.getMonth() ||
+    start.getDate() !== end.getDate()
+  );
+});
 </script>
 
 <style scoped>
@@ -438,4 +428,3 @@ const isMultiDay = computed(() => {
   gap: 0.5rem;
 }
 </style>
-

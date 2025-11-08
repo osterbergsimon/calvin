@@ -1,8 +1,5 @@
 <template>
-  <div
-    v-if="!configStore.showUI"
-    class="minimal-ui-overlay"
-  >
+  <div v-if="!configStore.showUI" class="minimal-ui-overlay">
     <button
       class="ui-toggle-btn"
       title="Show UI"
@@ -15,9 +12,9 @@
 </template>
 
 <script setup>
-import { useConfigStore } from '../stores/config'
+import { useConfigStore } from "../stores/config";
 
-const configStore = useConfigStore()
+const configStore = useConfigStore();
 </script>
 
 <style scoped>
@@ -53,4 +50,3 @@ const configStore = useConfigStore()
   transform: scale(0.95);
 }
 </style>
-
