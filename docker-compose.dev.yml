@@ -1,0 +1,46 @@
+version: '3.8'
+
+# Development compose with hot-reload (no auto-pull, uses local code)
+services:
+  calvin-backend-dev:
+    build:
+      context: ./backend
+      dockerfile: ../docker/Dockerfile.backend-dev
+    container_name: calvin-backend-dev
+    ports:
+      - "8000:8000"
+    volumes:
+      - ./backend:/app
+      - calvin-data:/app/data
+      - calvin-logs:/app/logs
+    restart: unless-stopped
+    environment:
+      - DATABASE_URL=sqlite:///app/data/db/calvin.db
+      - IMAGE_DIR=/app/data/images
+    command: uv run uvicorn app.main:app --reload --host 0.0.0.0 --port 8000
+    networks:
+      - calvin-network
+
+  calvin-frontend-dev:
+    build:
+      context: ./frontend
+      dockerfile: ../docker/Dockerfile.frontend-dev
+    container_name: calvin-frontend-dev
+    ports:
+      - "5173:5173"
+    volumes:
+      - ./frontend:/app
+      - /app/node_modules
+    restart: unless-stopped
+    command: npm run dev
+    networks:
+      - calvin-network
+
+volumes:
+  calvin-data:
+  calvin-logs:
+
+networks:
+  calvin-network:
+    driver: bridge
+

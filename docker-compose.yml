@@ -1,0 +1,67 @@
+version: '3.8'
+
+services:
+  calvin-prod:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: calvin-prod
+    ports:
+      - "8000:8000"
+    volumes:
+      - calvin-data:/app/data
+      - calvin-logs:/app/logs
+    restart: unless-stopped
+    environment:
+      - DATABASE_URL=sqlite:///app/data/db/calvin.db
+      - IMAGE_DIR=/app/data/images
+    networks:
+      - calvin-network
+
+  calvin-dev:
+    build:
+      context: .
+      dockerfile: Dockerfile.dev
+    container_name: calvin-dev
+    ports:
+      - "8000:8000"
+    volumes:
+      - .:/app
+      - calvin-data:/app/data
+      - calvin-logs:/app/logs
+      - /app/backend/.venv  # Exclude venv from volume mount
+      - /app/frontend/node_modules  # Exclude node_modules from volume mount
+    restart: unless-stopped
+    environment:
+      - DATABASE_URL=sqlite:///app/data/db/calvin.db
+      - IMAGE_DIR=/app/data/images
+      - GIT_REPO=https://github.com/osterbergsimon/calvin.git
+      - GIT_BRANCH=main
+      - AUTO_UPDATE_INTERVAL=300  # 5 minutes
+    networks:
+      - calvin-network
+    command: >
+      sh -c "
+        # Clone repo if not exists
+        if [ ! -d .git ]; then
+          git clone ${GIT_REPO:-https://github.com/osterbergsimon/calvin.git} /tmp/calvin
+          cp -r /tmp/calvin/* /tmp/calvin/.* /app/ 2>/dev/null || true
+        fi
+        # Install dependencies
+        cd /app/backend && uv sync --extra dev
+        cd /app/frontend && npm ci
+        # Start auto-update cron
+        echo '*/${AUTO_UPDATE_INTERVAL:-300} * * * * /usr/local/bin/update-calvin.sh >> /app/logs/update.log 2>&1' | crontab -
+        service cron start
+        # Start supervisor
+        /usr/local/bin/supervisord -c /etc/supervisor/conf.d/supervisord.conf
+      "
+
+volumes:
+  calvin-data:
+  calvin-logs:
+
+networks:
+  calvin-network:
+    driver: bridge
+

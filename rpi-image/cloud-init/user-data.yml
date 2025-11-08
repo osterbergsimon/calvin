@@ -1,0 +1,63 @@
+#cloud-config
+# Calvin Dashboard - Cloud-init configuration
+# This file configures WiFi, SSH, and initial setup
+
+hostname: calvin-dashboard
+manage_etc_hosts: true
+
+# Create calvin user
+users:
+  - name: calvin
+    groups: sudo, audio, video, input
+    shell: /bin/bash
+    sudo: ALL=(ALL) NOPASSWD:ALL
+    lock_passwd: false
+    # Set default password (change on first login!)
+    # Generate password hash with: openssl passwd -6
+    # Or leave commented to disable password login (use SSH keys only)
+    # passwd: $6$rounds=4096$salt$hashed_password_here
+    # Or use SSH keys (recommended):
+    ssh_authorized_keys:
+      # Add your SSH public key here:
+      # - ssh-rsa AAAAB3NzaC1yc2EAAAADAQABAAABAQ... your-key-here
+      # - ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAI... your-key-here
+
+# WiFi configuration
+# Uncomment and configure for your network:
+# wifi:
+#   networks:
+#     - name: "YourWiFiSSID"
+#       password: "YourWiFiPassword"
+#       priority: 1
+
+# Enable SSH
+ssh:
+  allow_public_ssh_keys: true
+  disable_root: true
+
+# Write files
+write_files:
+  - path: /home/calvin/calvin/first-boot/setup.sh
+    content: |
+      #!/bin/bash
+      set -e
+      echo "Starting Calvin first-boot setup..."
+      /home/calvin/calvin/first-boot/setup.sh
+    permissions: '0755'
+    owner: calvin:calvin
+
+# Run commands on first boot
+runcmd:
+  - systemctl enable ssh
+  - systemctl start ssh
+  - chmod +x /home/calvin/calvin/first-boot/setup.sh
+  - /home/calvin/calvin/first-boot/setup.sh
+
+# Power management
+power:
+  delay: "+1"
+  mode: reboot
+  message: "Calvin setup complete. Rebooting..."
+  timeout: 30
+  condition: True
+

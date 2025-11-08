@@ -1,0 +1,31 @@
+[Unit]
+Description=Calvin Dashboard Backend
+After=network.target
+Wants=network-online.target
+
+[Service]
+Type=simple
+User=calvin
+Group=calvin
+WorkingDirectory=/home/calvin/calvin/backend
+Environment="PATH=/home/calvin/.local/bin:/usr/local/bin:/usr/bin:/bin"
+Environment="DATABASE_URL=sqlite:///home/calvin/calvin/backend/data/db/calvin.db"
+Environment="IMAGE_DIR=/home/calvin/calvin/backend/data/images"
+# Use python3 -m to find uv if PATH doesn't work
+ExecStart=/bin/bash -c 'export PATH="/home/calvin/.local/bin:$PATH" && uv run uvicorn app.main:app --host 0.0.0.0 --port 8000'
+Restart=always
+RestartSec=10
+StandardOutput=journal
+StandardError=journal
+SyslogIdentifier=calvin-backend
+
+# Security settings
+NoNewPrivileges=true
+PrivateTmp=true
+ProtectSystem=strict
+ProtectHome=read-only
+ReadWritePaths=/home/calvin/calvin/backend/data /home/calvin/calvin/backend/logs
+
+[Install]
+WantedBy=multi-user.target
+

@@ -1,0 +1,58 @@
+# Development Dockerfile with auto-pull from GitHub
+FROM python:3.11-slim
+
+# Install system dependencies
+RUN apt-get update && apt-get install -y \
+    git \
+    curl \
+    cron \
+    && rm -rf /var/lib/apt/lists/*
+
+# Install UV
+RUN pip install uv
+
+# Install Node.js
+RUN curl -fsSL https://deb.nodesource.com/setup_20.x | bash - \
+    && apt-get install -y nodejs
+
+WORKDIR /app
+
+# Create update script
+RUN echo '#!/bin/bash\n\
+set -e\n\
+cd /app\n\
+if [ -d ".git" ]; then\n\
+    echo "Pulling latest code from GitHub..."\n\
+    git fetch origin\n\
+    git reset --hard origin/main\n\
+    echo "Updating backend dependencies..."\n\
+    cd backend && uv sync --extra dev && cd ..\n\
+    echo "Updating frontend dependencies..."\n\
+    cd frontend && npm ci && cd ..\n\
+    echo "Rebuilding frontend..."\n\
+    cd frontend && npm run build && cd ..\n\
+    echo "Restarting services..."\n\
+    supervisorctl restart calvin-backend || true\n\
+    supervisorctl restart calvin-frontend || true\n\
+    echo "Update complete!"\n\
+else\n\
+    echo "Not a git repository. Cloning..."\n\
+    git clone https://github.com/osterbergsimon/calvin.git /app\n\
+    cd /app/backend && uv sync --extra dev\n\
+    cd /app/frontend && npm ci && npm run build\n\
+fi\n\
+' > /usr/local/bin/update-calvin.sh && \
+    chmod +x /usr/local/bin/update-calvin.sh
+
+# Install supervisor for process management
+RUN pip install supervisor
+
+# Copy supervisor config
+COPY docker/supervisord.conf /etc/supervisor/conf.d/supervisord.conf
+
+# Expose port
+EXPOSE 8000
+
+# Start supervisor
+CMD ["/usr/local/bin/supervisord", "-c", "/etc/supervisor/conf.d/supervisord.conf"]
+

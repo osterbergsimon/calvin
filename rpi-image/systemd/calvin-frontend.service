@@ -1,0 +1,51 @@
+[Unit]
+Description=Calvin Dashboard Frontend (Kiosk Mode)
+After=network.target calvin-backend.service display-manager.service
+Requires=calvin-backend.service
+Wants=graphical.target
+
+[Service]
+Type=simple
+User=calvin
+Group=calvin
+Environment="DISPLAY=:0"
+Environment="HOME=/home/calvin"
+Environment="XAUTHORITY=/home/calvin/.Xauthority"
+ExecStartPre=/bin/sleep 10
+ExecStartPre=/bin/bash -c 'until curl -s http://localhost:8000/api/health > /dev/null; do sleep 1; done'
+ExecStart=/usr/bin/chromium-browser \
+    --kiosk \
+    --noerrdialogs \
+    --disable-infobars \
+    --autoplay-policy=no-user-gesture-required \
+    --disable-features=TranslateUI \
+    --disable-ipc-flooding-protection \
+    --disable-background-networking \
+    --disable-background-timer-throttling \
+    --disable-renderer-backgrounding \
+    --disable-backgrounding-occluded-windows \
+    --disable-breakpad \
+    --disable-component-update \
+    --disable-domain-reliability \
+    --disable-features=AudioServiceOutOfProcess \
+    --disable-hang-monitor \
+    --disable-prompt-on-repost \
+    --disable-sync \
+    --disable-web-resources \
+    --metrics-recording-only \
+    --mute-audio \
+    --no-first-run \
+    --no-default-browser-check \
+    --no-pings \
+    --no-zygote \
+    --use-mock-keychain \
+    http://localhost:8000
+Restart=always
+RestartSec=10
+StandardOutput=journal
+StandardError=journal
+SyslogIdentifier=calvin-frontend
+
+[Install]
+WantedBy=graphical.target
+

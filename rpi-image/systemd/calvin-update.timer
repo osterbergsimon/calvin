@@ -1,0 +1,16 @@
+[Unit]
+Description=Calvin Dashboard Auto-Update Timer
+Requires=calvin-update.service
+
+[Timer]
+# Run every 5 minutes (configurable via OnUnitActiveSec)
+# OnCalendar format doesn't support arbitrary seconds, so we use OnUnitActiveSec
+OnUnitActiveSec=300s
+# Also run 5 minutes after boot
+OnBootSec=5min
+# Run immediately if missed
+Persistent=true
+
+[Install]
+WantedBy=timers.target
+

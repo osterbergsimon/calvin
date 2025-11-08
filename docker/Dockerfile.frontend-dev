@@ -1,0 +1,15 @@
+FROM node:20-slim
+
+WORKDIR /app
+
+# Install dependencies
+COPY package*.json ./
+RUN npm ci
+
+# Copy app code (will be mounted as volume in dev)
+COPY . .
+
+EXPOSE 5173
+
+CMD ["npm", "run", "dev"]
+

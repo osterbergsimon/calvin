@@ -1,0 +1,18 @@
+[Unit]
+Description=Calvin Dashboard Auto-Update Service
+After=network.target
+
+[Service]
+Type=oneshot
+User=calvin
+Group=calvin
+EnvironmentFile=/etc/default/calvin-update
+WorkingDirectory=/home/calvin/calvin
+ExecStart=/usr/local/bin/update-calvin.sh
+StandardOutput=journal
+StandardError=journal
+SyslogIdentifier=calvin-update
+
+[Install]
+WantedBy=multi-user.target
+
