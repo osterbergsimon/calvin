@@ -1,41 +1,100 @@
 <template>
-  <div class="calendar-view" @keydown="handleKeydown" tabindex="0" ref="calendarView">
-    <div v-if="showHeader" class="calendar-header">
+  <div
+    ref="calendarView"
+    class="calendar-view"
+    tabindex="0"
+    @keydown="handleKeydown"
+  >
+    <div
+      v-if="showHeader"
+      class="calendar-header"
+    >
       <h2>Calendar</h2>
       <div class="calendar-controls">
-        <button @click="previousMonth" class="btn-icon" @keydown.enter="previousMonth">‹</button>
+        <button
+          class="btn-icon"
+          @click="previousMonth"
+          @keydown.enter="previousMonth"
+        >
+          ‹
+        </button>
         <span class="current-month">{{ currentMonthYear }}</span>
-        <button @click="nextMonth" class="btn-icon" @keydown.enter="nextMonth">›</button>
+        <button
+          class="btn-icon"
+          @click="nextMonth"
+          @keydown.enter="nextMonth"
+        >
+          ›
+        </button>
       </div>
     </div>
-    <div v-else class="calendar-header-minimal">
-      <button @click="previousMonth" class="btn-icon-minimal" @keydown.enter="previousMonth" title="Previous Month">‹</button>
+    <div
+      v-else
+      class="calendar-header-minimal"
+    >
+      <button
+        class="btn-icon-minimal"
+        title="Previous Month"
+        @click="previousMonth"
+        @keydown.enter="previousMonth"
+      >
+        ‹
+      </button>
       <span class="current-month-minimal">{{ currentMonthYear }}</span>
-      <button @click="nextMonth" class="btn-icon-minimal" @keydown.enter="nextMonth" title="Next Month">›</button>
+      <button
+        class="btn-icon-minimal"
+        title="Next Month"
+        @click="nextMonth"
+        @keydown.enter="nextMonth"
+      >
+        ›
+      </button>
     </div>
     <div class="calendar-content">
       <!-- Loading indicator -->
-      <div v-if="loading" class="loading-overlay">
+      <div
+        v-if="loading"
+        class="loading-overlay"
+      >
         <div class="loading-spinner">
-          <div class="spinner"></div>
-          <div class="loading-text">Loading events...</div>
+          <div class="spinner" />
+          <div class="loading-text">
+            Loading events...
+          </div>
         </div>
       </div>
-      <div class="calendar-grid" :class="{ 'rolling-view': viewMode === 'rolling', 'loading': loading }">
+      <div
+        class="calendar-grid"
+        :class="{ 'rolling-view': viewMode === 'rolling', 'loading': loading }"
+      >
         <!-- Day headers -->
         <div class="calendar-weekdays">
-          <div v-for="day in weekDays" :key="day" class="weekday">{{ day }}</div>
+          <div
+            v-for="day in weekDays"
+            :key="day"
+            class="weekday"
+          >
+            {{ day }}
+          </div>
         </div>
         <!-- Calendar days -->
-        <div class="calendar-days" :class="{ 'rolling-days': viewMode === 'rolling' }">
+        <div
+          class="calendar-days"
+          :class="{ 'rolling-days': viewMode === 'rolling' }"
+        >
           <div
             v-for="(day, dayIndex) in calendarDays"
             :key="day.date.toISOString()"
             :class="['calendar-day', { 'other-month': day.otherMonth, 'today': day.isToday, 'week-start': isWeekStart(dayIndex) }]"
           >
             <div class="day-header">
-              <div class="day-number">{{ day.date.getDate() }}</div>
-              <div v-if="showWeekNumbers && isWeekStart(dayIndex)" class="week-number">
+              <div class="day-number">
+                {{ day.date.getDate() }}
+              </div>
+              <div
+                v-if="showWeekNumbers && isWeekStart(dayIndex)"
+                class="week-number"
+              >
                 {{ getWeekNumberForDay(dayIndex) }}
               </div>
             </div>
@@ -62,10 +121,16 @@
                 @keydown.space.prevent="selectEvent(event)"
                 @focus="setFocusedEvent(dayIndex, eventIndex)"
               >
-                <span v-if="event._isStart || !event._isMultiDay" class="event-text">
+                <span
+                  v-if="event._isStart || !event._isMultiDay"
+                  class="event-text"
+                >
                   {{ getEventDisplayText(event) }}
                 </span>
-                <span v-else class="event-continuation">
+                <span
+                  v-else
+                  class="event-continuation"
+                >
                   <span class="continuation-arrow">←</span>
                   <span class="continuation-text">{{ truncateEventTitle(event.title, 15) }}</span>
                 </span>
@@ -86,7 +151,7 @@
       v-if="calendarStore.selectedEvent"
       class="event-detail-backdrop"
       @click="closeEventDetail"
-    ></div>
+    />
   </div>
 </template>
 

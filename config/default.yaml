@@ -1,0 +1,40 @@
+app:
+  name: "Calvin"
+  version: "0.1.0"
+  debug: false
+
+display:
+  orientation: "landscape"  # landscape | portrait
+  refresh_interval: 60      # seconds
+
+calendar:
+  refresh_interval: 300     # 5 minutes
+  sources: []
+
+images:
+  directory: "data/images"
+  rotation_interval: 30     # seconds
+  supported_formats: ["jpg", "jpeg", "png", "webp"]
+  max_size_mb: 10
+
+keyboard:
+  device: "auto"  # "auto" or "/dev/input/event0"
+  type: "7-button"  # "7-button" or "standard"
+  mappings:
+    # 7-button keyboard mappings (primary)
+    "KEY_1": "calendar_next_month"
+    "KEY_2": "calendar_prev_month"
+    "KEY_3": "calendar_expand_today"
+    "KEY_4": "images_next"
+    "KEY_5": "images_prev"
+    "KEY_6": "web_service_1"
+    "KEY_7": "web_service_2"
+    # Standard keyboard mappings (fallback/secondary)
+    "KEY_RIGHT": "calendar_next_month"
+    "KEY_LEFT": "calendar_prev_month"
+    "KEY_UP": "calendar_expand_today"
+    "KEY_DOWN": "calendar_collapse"
+    "KEY_SPACE": "images_next"
+
+web_services: []
+

@@ -87,10 +87,12 @@ class CalendarService:
                     print(f"Fetching events from {source.name} using URL: {ical_url[:80]}...")
                     ical_events = await parse_ical_from_url(ical_url)
                     # Filter events by date range and apply calendar source color and ID
-                    # Note: Events can span across the date range, so check if event overlaps with range
+                    # Note: Events can span across the date range,
+                    # so check if event overlaps with range
                     filtered_events = []
                     for e in ical_events:
-                        # Event overlaps if: event starts before range ends AND event ends after range starts
+                        # Event overlaps if: event starts before range ends AND
+                        # event ends after range starts
                         if e.start <= end_date and e.end >= start_date:
                             # Create a new event with the correct source ID
                             # Use model_copy to create a new instance with updated source
@@ -151,14 +153,17 @@ class CalendarService:
 
                 # Fetch from Proton Calendar iCal URL
                 try:
+                    url_preview = ical_url[:80]
                     print(
-                        f"Fetching events from {source.name} (Proton Calendar) using URL: {ical_url[:80]}..."
+                        f"Fetching events from {source.name} (Proton Calendar) "
+                        f"using URL: {url_preview}..."
                     )
                     ical_events = await parse_ical_from_url(ical_url)
                     # Filter events by date range and apply calendar source color and ID
                     filtered_events = []
                     for e in ical_events:
-                        # Event overlaps if: event starts before range ends AND event ends after range starts
+                        # Event overlaps if: event starts before range ends AND
+                        # event ends after range starts
                         if e.start <= end_date and e.end >= start_date:
                             # Create a new event with the correct source ID
                             updated_event = e.model_copy(update={"source": source.id})
@@ -167,8 +172,10 @@ class CalendarService:
                                 updated_event.color = source.color
                             filtered_events.append(updated_event)
                     events.extend(filtered_events)
+                    event_count = len(filtered_events)
                     print(
-                        f"Successfully fetched {len(filtered_events)} events from {source.name} (Proton Calendar)"
+                        f"Successfully fetched {event_count} events from "
+                        f"{source.name} (Proton Calendar)"
                     )
 
                     # Cache the results
@@ -207,12 +214,16 @@ class CalendarService:
             if not has_enabled_sources:
                 print(f"Added {len(mock_events)} mock events (no calendar sources configured)")
             else:
+                mock_count = len(mock_events)
                 print(
-                    f"Added {len(mock_events)} mock events (no real events found from configured calendars)"
+                    f"Added {mock_count} mock events "
+                    "(no real events found from configured calendars)"
                 )
         else:
+            event_count = len(events)
             print(
-                f"Returning {len(events)} real events from configured calendars (mock events skipped)"
+                f"Returning {event_count} real events from configured calendars "
+                "(mock events skipped)"
             )
 
         return events

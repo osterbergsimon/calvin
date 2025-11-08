@@ -2,103 +2,172 @@
   <div class="settings-page">
     <div class="settings-header">
       <h1>Settings & Configuration</h1>
-      <button @click="goBack" class="btn-back">← Back to Dashboard</button>
+      <button
+        class="btn-back"
+        @click="goBack"
+      >
+        ← Back to Dashboard
+      </button>
     </div>
 
     <div class="settings-content">
       <!-- Display Settings -->
-      <section class="settings-section collapsible" :class="{ 'expanded': expandedSections.display }">
-        <div class="section-header" @click="toggleSection('display')">
+      <section
+        class="settings-section collapsible"
+        :class="{ 'expanded': expandedSections.display }"
+      >
+        <div
+          class="section-header"
+          @click="toggleSection('display')"
+        >
           <h2>Display Settings</h2>
           <span class="toggle-icon">{{ expandedSections.display ? '▼' : '▶' }}</span>
         </div>
-        <div v-show="expandedSections.display" class="section-content">
-        <div class="setting-item">
-          <label>Screen Orientation</label>
-          <select v-model="localConfig.orientation" @change="updateOrientation">
-            <option value="landscape">Landscape</option>
-            <option value="portrait">Portrait</option>
-          </select>
-        </div>
-        <div class="setting-item">
-          <label>Calendar Split (%)</label>
-          <input
-            type="number"
-            v-model.number="localConfig.calendarSplit"
-            min="66"
-            max="75"
-            @change="updateCalendarSplit"
-          />
-          <span class="help-text">Calendar width percentage (66-75%)</span>
-        </div>
-        <div class="setting-item">
-          <label>Side View Position</label>
-          <select v-model="localConfig.sideViewPosition" @change="updateSideViewPosition" class="setting-select">
-            <option v-if="localConfig.orientation === 'landscape'" value="left">Left</option>
-            <option v-if="localConfig.orientation === 'landscape'" value="right">Right</option>
-            <option v-if="localConfig.orientation === 'portrait'" value="top">Top</option>
-            <option v-if="localConfig.orientation === 'portrait'" value="bottom">Bottom</option>
-          </select>
-          <span class="help-text">
-            <span v-if="localConfig.orientation === 'landscape'">Position of side view (left or right of calendar)</span>
-            <span v-else>Position of side view (top or bottom of calendar)</span>
-          </span>
-        </div>
-        <div class="setting-item">
-          <label>Theme Mode</label>
-          <select v-model="localConfig.themeMode" @change="updateThemeMode" class="setting-select">
-            <option value="light">Light</option>
-            <option value="dark">Dark</option>
-            <option value="auto">Auto (System)</option>
-            <option value="time">Time-based</option>
-          </select>
-          <span class="help-text">Theme selection mode</span>
-        </div>
-        <div v-if="localConfig.themeMode === 'time'" class="setting-item">
-          <label>Dark Mode Time Range</label>
-          <div class="time-range-inputs">
-            <div class="time-input-group">
-              <label>Start (hour):</label>
-              <input
-                type="number"
-                v-model.number="localConfig.darkModeStart"
-                min="0"
-                max="23"
-                @change="updateDarkModeTime"
-                class="time-input"
-              />
-            </div>
-            <div class="time-input-group">
-              <label>End (hour):</label>
-              <input
-                type="number"
-                v-model.number="localConfig.darkModeEnd"
-                min="0"
-                max="23"
-                @change="updateDarkModeTime"
-                class="time-input"
-              />
-            </div>
+        <div
+          v-show="expandedSections.display"
+          class="section-content"
+        >
+          <div class="setting-item">
+            <label>Screen Orientation</label>
+            <select
+              v-model="localConfig.orientation"
+              @change="updateOrientation"
+            >
+              <option value="landscape">
+                Landscape
+              </option>
+              <option value="portrait">
+                Portrait
+              </option>
+            </select>
           </div>
-          <span class="help-text">Dark mode active between these hours (0-23)</span>
-        </div>
+          <div class="setting-item">
+            <label>Calendar Split (%)</label>
+            <input
+              v-model.number="localConfig.calendarSplit"
+              type="number"
+              min="66"
+              max="75"
+              @change="updateCalendarSplit"
+            >
+            <span class="help-text">Calendar width percentage (66-75%)</span>
+          </div>
+          <div class="setting-item">
+            <label>Side View Position</label>
+            <select
+              v-model="localConfig.sideViewPosition"
+              class="setting-select"
+              @change="updateSideViewPosition"
+            >
+              <option
+                v-if="localConfig.orientation === 'landscape'"
+                value="left"
+              >
+                Left
+              </option>
+              <option
+                v-if="localConfig.orientation === 'landscape'"
+                value="right"
+              >
+                Right
+              </option>
+              <option
+                v-if="localConfig.orientation === 'portrait'"
+                value="top"
+              >
+                Top
+              </option>
+              <option
+                v-if="localConfig.orientation === 'portrait'"
+                value="bottom"
+              >
+                Bottom
+              </option>
+            </select>
+            <span class="help-text">
+              <span v-if="localConfig.orientation === 'landscape'">Position of side view (left or right of calendar)</span>
+              <span v-else>Position of side view (top or bottom of calendar)</span>
+            </span>
+          </div>
+          <div class="setting-item">
+            <label>Theme Mode</label>
+            <select
+              v-model="localConfig.themeMode"
+              class="setting-select"
+              @change="updateThemeMode"
+            >
+              <option value="light">
+                Light
+              </option>
+              <option value="dark">
+                Dark
+              </option>
+              <option value="auto">
+                Auto (System)
+              </option>
+              <option value="time">
+                Time-based
+              </option>
+            </select>
+            <span class="help-text">Theme selection mode</span>
+          </div>
+          <div
+            v-if="localConfig.themeMode === 'time'"
+            class="setting-item"
+          >
+            <label>Dark Mode Time Range</label>
+            <div class="time-range-inputs">
+              <div class="time-input-group">
+                <label>Start (hour):</label>
+                <input
+                  v-model.number="localConfig.darkModeStart"
+                  type="number"
+                  min="0"
+                  max="23"
+                  class="time-input"
+                  @change="updateDarkModeTime"
+                >
+              </div>
+              <div class="time-input-group">
+                <label>End (hour):</label>
+                <input
+                  v-model.number="localConfig.darkModeEnd"
+                  type="number"
+                  min="0"
+                  max="23"
+                  class="time-input"
+                  @change="updateDarkModeTime"
+                >
+              </div>
+            </div>
+            <span class="help-text">Dark mode active between these hours (0-23)</span>
+          </div>
         </div>
       </section>
 
       <!-- UI Settings -->
-      <section class="settings-section collapsible" :class="{ 'expanded': expandedSections.ui }">
-        <div class="section-header" @click="toggleSection('ui')">
+      <section
+        class="settings-section collapsible"
+        :class="{ 'expanded': expandedSections.ui }"
+      >
+        <div
+          class="section-header"
+          @click="toggleSection('ui')"
+        >
           <h2>UI Settings</h2>
           <span class="toggle-icon">{{ expandedSections.ui ? '▼' : '▶' }}</span>
         </div>
-        <div v-show="expandedSections.ui" class="section-content">
+        <div
+          v-show="expandedSections.ui"
+          class="section-content"
+        >
           <div class="setting-item">
             <label>
               <input
-                type="checkbox"
                 v-model="localConfig.showUI"
+                type="checkbox"
                 @change="updateShowUI"
-              />
+              >
               Show Headers and UI Controls
             </label>
             <span class="help-text">Hide headers to maximize content space (kiosk mode)</span>
@@ -106,393 +175,500 @@
           <div class="setting-item">
             <label>
               <input
-                type="checkbox"
                 v-model="localConfig.showModeIndicator"
+                type="checkbox"
                 @change="updateShowModeIndicator"
-              />
+              >
               Show Mode Indicator Icon
             </label>
             <span class="help-text">Show mode indicator icon when UI is hidden (top-left corner)</span>
           </div>
-          <div v-if="localConfig.showModeIndicator" class="setting-item">
+          <div
+            v-if="localConfig.showModeIndicator"
+            class="setting-item"
+          >
             <label>Mode Indicator Auto-Hide Timeout (seconds)</label>
             <input
-              type="number"
               v-model.number="localConfig.modeIndicatorTimeout"
+              type="number"
               min="0"
               max="60"
               @change="updateModeIndicatorTimeout"
-            />
+            >
             <span class="help-text">Time before indicator auto-hides after mode change (0 = never hide)</span>
           </div>
         </div>
       </section>
 
       <!-- Photo Settings -->
-      <section class="settings-section collapsible" :class="{ 'expanded': expandedSections.photos }">
-        <div class="section-header" @click="toggleSection('photos')">
+      <section
+        class="settings-section collapsible"
+        :class="{ 'expanded': expandedSections.photos }"
+      >
+        <div
+          class="section-header"
+          @click="toggleSection('photos')"
+        >
           <h2>Photo Settings</h2>
           <span class="toggle-icon">{{ expandedSections.photos ? '▼' : '▶' }}</span>
         </div>
-        <div v-show="expandedSections.photos" class="section-content">
-        <div class="setting-item">
-          <label>Photo Rotation Interval (seconds)</label>
-          <input
-            type="number"
-            v-model.number="localConfig.photoRotationInterval"
-            min="5"
-            max="3600"
-            @change="updatePhotoRotationInterval"
-          />
-          <span class="help-text">How often to switch photos (5-3600 seconds)</span>
-        </div>
+        <div
+          v-show="expandedSections.photos"
+          class="section-content"
+        >
+          <div class="setting-item">
+            <label>Photo Rotation Interval (seconds)</label>
+            <input
+              v-model.number="localConfig.photoRotationInterval"
+              type="number"
+              min="5"
+              max="3600"
+              @change="updatePhotoRotationInterval"
+            >
+            <span class="help-text">How often to switch photos (5-3600 seconds)</span>
+          </div>
         </div>
       </section>
 
       <!-- Photo Frame Mode Settings -->
-      <section class="settings-section collapsible" :class="{ 'expanded': expandedSections.photoFrame }">
-        <div class="section-header" @click="toggleSection('photoFrame')">
+      <section
+        class="settings-section collapsible"
+        :class="{ 'expanded': expandedSections.photoFrame }"
+      >
+        <div
+          class="section-header"
+          @click="toggleSection('photoFrame')"
+        >
           <h2>Photo Frame Mode</h2>
           <span class="toggle-icon">{{ expandedSections.photoFrame ? '▼' : '▶' }}</span>
         </div>
-        <div v-show="expandedSections.photoFrame" class="section-content">
-        <div class="setting-item">
-          <label>
+        <div
+          v-show="expandedSections.photoFrame"
+          class="section-content"
+        >
+          <div class="setting-item">
+            <label>
+              <input
+                v-model="localConfig.photoFrameEnabled"
+                type="checkbox"
+                @change="updatePhotoFrameEnabled"
+              >
+              Enable Photo Frame Mode
+            </label>
+            <span class="help-text">Automatically show photos full-screen after inactivity</span>
+          </div>
+          <div
+            v-if="localConfig.photoFrameEnabled"
+            class="setting-item"
+          >
+            <label>Inactivity Timeout (seconds)</label>
             <input
-              type="checkbox"
-              v-model="localConfig.photoFrameEnabled"
-              @change="updatePhotoFrameEnabled"
-            />
-            Enable Photo Frame Mode
-          </label>
-          <span class="help-text">Automatically show photos full-screen after inactivity</span>
-        </div>
-        <div v-if="localConfig.photoFrameEnabled" class="setting-item">
-          <label>Inactivity Timeout (seconds)</label>
-          <input
-            type="number"
-            v-model.number="localConfig.photoFrameTimeout"
-            min="60"
-            max="3600"
-            @change="updatePhotoFrameTimeout"
-          />
-          <span class="help-text">Time before switching to photo frame mode (60-3600 seconds)</span>
-        </div>
+              v-model.number="localConfig.photoFrameTimeout"
+              type="number"
+              min="60"
+              max="3600"
+              @change="updatePhotoFrameTimeout"
+            >
+            <span class="help-text">Time before switching to photo frame mode (60-3600 seconds)</span>
+          </div>
         </div>
       </section>
 
       <!-- Keyboard Settings -->
-      <section class="settings-section collapsible" :class="{ 'expanded': expandedSections.keyboard }">
-        <div class="section-header" @click="toggleSection('keyboard')">
+      <section
+        class="settings-section collapsible"
+        :class="{ 'expanded': expandedSections.keyboard }"
+      >
+        <div
+          class="section-header"
+          @click="toggleSection('keyboard')"
+        >
           <h2>Keyboard Settings</h2>
           <span class="toggle-icon">{{ expandedSections.keyboard ? '▼' : '▶' }}</span>
         </div>
-        <div v-show="expandedSections.keyboard" class="section-content">
-        <div class="setting-item">
-          <label>Keyboard Type</label>
-          <select v-model="localConfig.keyboardType" @change="updateKeyboardType">
-            <option value="7-button">7-Button Keyboard</option>
-            <option value="standard">Standard Keyboard</option>
-          </select>
-        </div>
-
-        <div class="keyboard-mappings">
-          <h3>Keyboard Mappings</h3>
-          <div class="mappings-list">
-            <div
-              v-for="(action, key) in currentMappings"
-              :key="key"
-              class="mapping-item"
+        <div
+          v-show="expandedSections.keyboard"
+          class="section-content"
+        >
+          <div class="setting-item">
+            <label>Keyboard Type</label>
+            <select
+              v-model="localConfig.keyboardType"
+              @change="updateKeyboardType"
             >
-              <div class="mapping-key">
-                <strong>{{ formatKeyName(key) }}</strong>
-              </div>
-              <select
-                v-model="currentMappings[key]"
-                @change="updateMapping(key, $event.target.value)"
-                class="mapping-action"
+              <option value="7-button">
+                7-Button Keyboard
+              </option>
+              <option value="standard">
+                Standard Keyboard
+              </option>
+            </select>
+          </div>
+
+          <div class="keyboard-mappings">
+            <h3>Keyboard Mappings</h3>
+            <div class="mappings-list">
+              <div
+                v-for="(action, key) in currentMappings"
+                :key="key"
+                class="mapping-item"
               >
-                <option
-                  v-for="availableAction in availableActions"
-                  :key="availableAction.value"
-                  :value="availableAction.value"
+                <div class="mapping-key">
+                  <strong>{{ formatKeyName(key) }}</strong>
+                </div>
+                <select
+                  v-model="currentMappings[key]"
+                  class="mapping-action"
+                  @change="updateMapping(key, $event.target.value)"
                 >
-                  {{ availableAction.label }}
-                </option>
-              </select>
-              <button
-                @click="clearMapping(key)"
-                class="btn-clear"
-                title="Clear mapping"
-              >
-                ×
-              </button>
+                  <option
+                    v-for="availableAction in availableActions"
+                    :key="availableAction.value"
+                    :value="availableAction.value"
+                  >
+                    {{ availableAction.label }}
+                  </option>
+                </select>
+                <button
+                  class="btn-clear"
+                  title="Clear mapping"
+                  @click="clearMapping(key)"
+                >
+                  ×
+                </button>
+              </div>
             </div>
           </div>
-        </div>
         </div>
       </section>
 
       <!-- Calendar Settings -->
-      <section class="settings-section collapsible" :class="{ 'expanded': expandedSections.calendar }">
-        <div class="section-header" @click="toggleSection('calendar')">
+      <section
+        class="settings-section collapsible"
+        :class="{ 'expanded': expandedSections.calendar }"
+      >
+        <div
+          class="section-header"
+          @click="toggleSection('calendar')"
+        >
           <h2>Calendar Settings</h2>
           <span class="toggle-icon">{{ expandedSections.calendar ? '▼' : '▶' }}</span>
         </div>
-        <div v-show="expandedSections.calendar" class="section-content">
-        <div class="setting-item">
-          <label>Calendar View Mode</label>
-          <select
-            v-model="localConfig.calendarViewMode"
-            @change="updateCalendarViewMode"
-            class="setting-select"
-          >
-            <option value="month">Month View</option>
-            <option value="rolling">Rolling Weeks View</option>
-          </select>
-          <span class="help-text">Display full month or rolling weeks</span>
-        </div>
-        <div class="setting-item">
-          <label>Time Format</label>
-          <select
-            v-model="localConfig.timeFormat"
-            @change="updateTimeFormat"
-            class="setting-select"
-          >
-            <option value="24h">24-hour (14:30)</option>
-            <option value="12h">12-hour (2:30 PM)</option>
-          </select>
-          <span class="help-text">Time display format for events</span>
-        </div>
-        <div class="setting-item">
-          <label>Week Starting Day</label>
-          <select v-model.number="localConfig.weekStartDay" @change="updateWeekStartDay" class="setting-select">
-            <option :value="0">Sunday</option>
-            <option :value="1">Monday</option>
-            <option :value="2">Tuesday</option>
-            <option :value="3">Wednesday</option>
-            <option :value="4">Thursday</option>
-            <option :value="5">Friday</option>
-            <option :value="6">Saturday</option>
-          </select>
-          <span class="help-text">First day of the week in the calendar</span>
-        </div>
-        <div class="setting-item">
-          <label>
-            <input
-              type="checkbox"
-              v-model="localConfig.showWeekNumbers"
-              @change="updateShowWeekNumbers"
-            />
-            Show Week Numbers
-          </label>
-          <span class="help-text">Display ISO 8601 week numbers in the calendar</span>
-        </div>
-        <div class="setting-item">
-          <label>Calendar Sources</label>
-          <!-- Add Calendar Source Form -->
-          <div class="add-calendar-form">
-            <h3>Add Calendar Source</h3>
-            <div class="form-group">
-              <label>Calendar Type</label>
-              <select v-model="newCalendarSource.type" class="form-select">
-                <option value="google">Google Calendar</option>
-                <option value="proton">Proton Calendar</option>
-              </select>
-            </div>
-            <div class="form-group">
-              <label>Calendar Name</label>
-              <input
-                type="text"
-                v-model="newCalendarSource.name"
-                placeholder="My Calendar"
-                class="form-input"
-              />
-            </div>
-            <div class="form-group">
-              <label>Calendar URL</label>
-              <input
-                type="text"
-                v-model="newCalendarSource.ical_url"
-                :placeholder="newCalendarSource.type === 'google' ? 'https://calendar.google.com/calendar/u/0?cid=...' : 'https://calendar.proton.me/api/calendar/v1/url/.../calendar.ics?CacheKey=...&PassphraseKey=...'"
-                class="form-input"
-              />
-              <span class="help-text">
-                <span v-if="newCalendarSource.type === 'google'">
-                  Google Calendar: Share link or iCal URL from Google Calendar settings
-                </span>
-                <span v-else>
-                  Proton Calendar: iCal feed URL from Proton Calendar sharing settings (includes CacheKey and PassphraseKey)
-                </span>
-              </span>
-            </div>
-            <button @click="addCalendarSource" class="btn-add" :disabled="!canAddCalendar">
-              Add Calendar
-            </button>
-          </div>
-          <!-- Existing Calendar Sources -->
-          <div class="calendar-sources-list">
-            <div
-              v-for="source in calendarSources"
-              :key="source.id"
-              class="source-item"
+        <div
+          v-show="expandedSections.calendar"
+          class="section-content"
+        >
+          <div class="setting-item">
+            <label>Calendar View Mode</label>
+            <select
+              v-model="localConfig.calendarViewMode"
+              class="setting-select"
+              @change="updateCalendarViewMode"
             >
-              <div class="source-info">
-                <strong>{{ source.name }}</strong>
-                <span class="source-type">{{ source.type }}</span>
+              <option value="month">
+                Month View
+              </option>
+              <option value="rolling">
+                Rolling Weeks View
+              </option>
+            </select>
+            <span class="help-text">Display full month or rolling weeks</span>
+          </div>
+          <div class="setting-item">
+            <label>Time Format</label>
+            <select
+              v-model="localConfig.timeFormat"
+              class="setting-select"
+              @change="updateTimeFormat"
+            >
+              <option value="24h">
+                24-hour (14:30)
+              </option>
+              <option value="12h">
+                12-hour (2:30 PM)
+              </option>
+            </select>
+            <span class="help-text">Time display format for events</span>
+          </div>
+          <div class="setting-item">
+            <label>Week Starting Day</label>
+            <select
+              v-model.number="localConfig.weekStartDay"
+              class="setting-select"
+              @change="updateWeekStartDay"
+            >
+              <option :value="0">
+                Sunday
+              </option>
+              <option :value="1">
+                Monday
+              </option>
+              <option :value="2">
+                Tuesday
+              </option>
+              <option :value="3">
+                Wednesday
+              </option>
+              <option :value="4">
+                Thursday
+              </option>
+              <option :value="5">
+                Friday
+              </option>
+              <option :value="6">
+                Saturday
+              </option>
+            </select>
+            <span class="help-text">First day of the week in the calendar</span>
+          </div>
+          <div class="setting-item">
+            <label>
+              <input
+                v-model="localConfig.showWeekNumbers"
+                type="checkbox"
+                @change="updateShowWeekNumbers"
+              >
+              Show Week Numbers
+            </label>
+            <span class="help-text">Display ISO 8601 week numbers in the calendar</span>
+          </div>
+          <div class="setting-item">
+            <label>Calendar Sources</label>
+            <!-- Add Calendar Source Form -->
+            <div class="add-calendar-form">
+              <h3>Add Calendar Source</h3>
+              <div class="form-group">
+                <label>Calendar Type</label>
+                <select
+                  v-model="newCalendarSource.type"
+                  class="form-select"
+                >
+                  <option value="google">
+                    Google Calendar
+                  </option>
+                  <option value="proton">
+                    Proton Calendar
+                  </option>
+                </select>
               </div>
-              <div class="source-settings">
-                <div class="source-setting">
-                  <label>Color:</label>
-                  <input
-                    type="color"
-                    :value="source.color || '#2196f3'"
-                    @change="updateSourceColor(source.id, $event.target.value)"
-                    class="color-input"
-                  />
+              <div class="form-group">
+                <label>Calendar Name</label>
+                <input
+                  v-model="newCalendarSource.name"
+                  type="text"
+                  placeholder="My Calendar"
+                  class="form-input"
+                >
+              </div>
+              <div class="form-group">
+                <label>Calendar URL</label>
+                <input
+                  v-model="newCalendarSource.ical_url"
+                  type="text"
+                  :placeholder="newCalendarSource.type === 'google' ? 'https://calendar.google.com/calendar/u/0?cid=...' : 'https://calendar.proton.me/api/calendar/v1/url/.../calendar.ics?CacheKey=...&PassphraseKey=...'"
+                  class="form-input"
+                >
+                <span class="help-text">
+                  <span v-if="newCalendarSource.type === 'google'">
+                    Google Calendar: Share link or iCal URL from Google Calendar settings
+                  </span>
+                  <span v-else>
+                    Proton Calendar: iCal feed URL from Proton Calendar sharing settings (includes CacheKey and PassphraseKey)
+                  </span>
+                </span>
+              </div>
+              <button
+                class="btn-add"
+                :disabled="!canAddCalendar"
+                @click="addCalendarSource"
+              >
+                Add Calendar
+              </button>
+            </div>
+            <!-- Existing Calendar Sources -->
+            <div class="calendar-sources-list">
+              <div
+                v-for="source in calendarSources"
+                :key="source.id"
+                class="source-item"
+              >
+                <div class="source-info">
+                  <strong>{{ source.name }}</strong>
+                  <span class="source-type">{{ source.type }}</span>
                 </div>
-                <div class="source-setting">
-                  <label>
+                <div class="source-settings">
+                  <div class="source-setting">
+                    <label>Color:</label>
+                    <input
+                      type="color"
+                      :value="source.color || '#2196f3'"
+                      class="color-input"
+                      @change="updateSourceColor(source.id, $event.target.value)"
+                    >
+                  </div>
+                  <div class="source-setting">
+                    <label>
+                      <input
+                        type="checkbox"
+                        :checked="source.show_time !== false"
+                        @change="updateSourceShowTime(source.id, $event.target.checked)"
+                      >
+                      Show Event Times
+                    </label>
+                  </div>
+                </div>
+                <div class="source-actions">
+                  <label class="toggle-switch">
                     <input
                       type="checkbox"
-                      :checked="source.show_time !== false"
-                      @change="updateSourceShowTime(source.id, $event.target.checked)"
-                    />
-                    Show Event Times
+                      :checked="source.enabled"
+                      @change="toggleSource(source.id, $event.target.checked)"
+                    >
+                    <span class="slider" />
                   </label>
+                  <button
+                    class="btn-remove"
+                    title="Remove calendar"
+                    @click="removeSource(source.id)"
+                  >
+                    Remove
+                  </button>
                 </div>
-              </div>
-              <div class="source-actions">
-                <label class="toggle-switch">
-                  <input
-                    type="checkbox"
-                    :checked="source.enabled"
-                    @change="toggleSource(source.id, $event.target.checked)"
-                  />
-                  <span class="slider"></span>
-                </label>
-                <button
-                  @click="removeSource(source.id)"
-                  class="btn-remove"
-                  title="Remove calendar"
-                >
-                  Remove
-                </button>
               </div>
             </div>
           </div>
-        </div>
         </div>
       </section>
 
       <!-- Web Services Settings -->
-      <section class="settings-section collapsible" :class="{ 'expanded': expandedSections.webServices }">
-        <div class="section-header" @click="toggleSection('webServices')">
+      <section
+        class="settings-section collapsible"
+        :class="{ 'expanded': expandedSections.webServices }"
+      >
+        <div
+          class="section-header"
+          @click="toggleSection('webServices')"
+        >
           <h2>Web Services</h2>
           <span class="toggle-icon">{{ expandedSections.webServices ? '▼' : '▶' }}</span>
         </div>
-        <div v-show="expandedSections.webServices" class="section-content">
-        <!-- Add Web Service Form -->
-        <div class="add-web-service-form">
-          <h3>Add Web Service</h3>
-          <div class="form-group">
-            <label>Service Name</label>
-            <input
-              type="text"
-              v-model="newWebService.name"
-              placeholder="Shopping List"
-              class="form-input"
-            />
-          </div>
-          <div class="form-group">
-            <label>Service URL</label>
-            <input
-              type="text"
-              v-model="newWebService.url"
-              placeholder="https://example.com/shopping"
-              class="form-input"
-            />
-            <span class="help-text">
-              Note: Some websites block embedding in iframes due to security restrictions (CORS/X-Frame-Options).
-              If a service cannot be embedded, you'll see an error message with an option to open it in a new window.
-            </span>
-          </div>
-          <div class="form-group">
-            <label>
+        <div
+          v-show="expandedSections.webServices"
+          class="section-content"
+        >
+          <!-- Add Web Service Form -->
+          <div class="add-web-service-form">
+            <h3>Add Web Service</h3>
+            <div class="form-group">
+              <label>Service Name</label>
               <input
-                type="checkbox"
-                v-model="newWebService.fullscreen"
-              />
-              Prefer Fullscreen Mode
-            </label>
-            <span class="help-text">Open this service in fullscreen by default</span>
-          </div>
-          <button @click="addWebService" class="btn-add" :disabled="!canAddWebService">
-            Add Web Service
-          </button>
-        </div>
-
-        <!-- Web Services List -->
-        <div class="web-services-list">
-          <h3>Configured Web Services</h3>
-          <div v-if="webServices.length === 0" class="empty-state">
-            <p>No web services configured</p>
-            <p class="help-text">Add a web service above to get started</p>
-          </div>
-          <div v-else class="services-list">
-            <div
-              v-for="service in webServices"
-              :key="service.id"
-              class="service-item"
-            >
-              <div class="service-info">
-                <div class="service-header">
-                  <h4>{{ service.name }}</h4>
-                  <span class="service-url-display">{{ service.url }}</span>
-                </div>
-                <div class="service-settings">
-                  <div class="service-setting">
-                    <label>Display Order:</label>
-                    <input
-                      type="number"
-                      :value="service.display_order"
-                      @change="updateServiceOrder(service.id, parseInt($event.target.value))"
-                      class="order-input"
-                      min="0"
-                    />
-                  </div>
-                  <div class="service-setting">
-                    <label>
-                      <input
-                        type="checkbox"
-                        :checked="service.fullscreen"
-                        @change="updateServiceFullscreen(service.id, $event.target.checked)"
-                      />
-                      Prefer Fullscreen
-                    </label>
-                  </div>
-                </div>
-              </div>
-              <div class="service-actions">
-                <label class="toggle-switch">
-                  <input
-                    type="checkbox"
-                    :checked="service.enabled"
-                    @change="toggleWebService(service.id, $event.target.checked)"
-                  />
-                  <span class="slider"></span>
-                </label>
-                <button
-                  @click="removeWebService(service.id)"
-                  class="btn-remove"
-                  title="Remove web service"
+                v-model="newWebService.name"
+                type="text"
+                placeholder="Shopping List"
+                class="form-input"
+              >
+            </div>
+            <div class="form-group">
+              <label>Service URL</label>
+              <input
+                v-model="newWebService.url"
+                type="text"
+                placeholder="https://example.com/shopping"
+                class="form-input"
+              >
+              <span class="help-text">
+                Note: Some websites block embedding in iframes due to security restrictions (CORS/X-Frame-Options).
+                If a service cannot be embedded, you'll see an error message with an option to open it in a new window.
+              </span>
+            </div>
+            <div class="form-group">
+              <label>
+                <input
+                  v-model="newWebService.fullscreen"
+                  type="checkbox"
                 >
-                  Remove
-                </button>
+                Prefer Fullscreen Mode
+              </label>
+              <span class="help-text">Open this service in fullscreen by default</span>
+            </div>
+            <button
+              class="btn-add"
+              :disabled="!canAddWebService"
+              @click="addWebService"
+            >
+              Add Web Service
+            </button>
+          </div>
+
+          <!-- Web Services List -->
+          <div class="web-services-list">
+            <h3>Configured Web Services</h3>
+            <div
+              v-if="webServices.length === 0"
+              class="empty-state"
+            >
+              <p>No web services configured</p>
+              <p class="help-text">
+                Add a web service above to get started
+              </p>
+            </div>
+            <div
+              v-else
+              class="services-list"
+            >
+              <div
+                v-for="service in webServices"
+                :key="service.id"
+                class="service-item"
+              >
+                <div class="service-info">
+                  <div class="service-header">
+                    <h4>{{ service.name }}</h4>
+                    <span class="service-url-display">{{ service.url }}</span>
+                  </div>
+                  <div class="service-settings">
+                    <div class="service-setting">
+                      <label>Display Order:</label>
+                      <input
+                        type="number"
+                        :value="service.display_order"
+                        class="order-input"
+                        min="0"
+                        @change="updateServiceOrder(service.id, parseInt($event.target.value))"
+                      >
+                    </div>
+                    <div class="service-setting">
+                      <label>
+                        <input
+                          type="checkbox"
+                          :checked="service.fullscreen"
+                          @change="updateServiceFullscreen(service.id, $event.target.checked)"
+                        >
+                        Prefer Fullscreen
+                      </label>
+                    </div>
+                  </div>
+                </div>
+                <div class="service-actions">
+                  <label class="toggle-switch">
+                    <input
+                      type="checkbox"
+                      :checked="service.enabled"
+                      @change="toggleWebService(service.id, $event.target.checked)"
+                    >
+                    <span class="slider" />
+                  </label>
+                  <button
+                    class="btn-remove"
+                    title="Remove web service"
+                    @click="removeWebService(service.id)"
+                  >
+                    Remove
+                  </button>
+                </div>
               </div>
             </div>
           </div>
-        </div>
         </div>
       </section>
 
@@ -500,8 +676,18 @@
       <section class="settings-section">
         <h2>Actions</h2>
         <div class="actions-list">
-          <button @click="saveAllSettings" class="btn-save">Save All Settings</button>
-          <button @click="resetToDefaults" class="btn-reset">Reset to Defaults</button>
+          <button
+            class="btn-save"
+            @click="saveAllSettings"
+          >
+            Save All Settings
+          </button>
+          <button
+            class="btn-reset"
+            @click="resetToDefaults"
+          >
+            Reset to Defaults
+          </button>
         </div>
       </section>
     </div>

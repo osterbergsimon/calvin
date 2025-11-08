@@ -1,54 +1,81 @@
 <template>
-  <div class="web-service-viewer" :class="{ 'fullscreen': isFullscreen }">
+  <div
+    class="web-service-viewer"
+    :class="{ 'fullscreen': isFullscreen }"
+  >
     <!-- Fullscreen Close Button (only in fullscreen mode) -->
-    <div v-if="isFullscreen" class="fullscreen-close-overlay">
-      <button @click="close" class="btn-close-fullscreen" title="Close Fullscreen (ESC)">×</button>
+    <div
+      v-if="isFullscreen"
+      class="fullscreen-close-overlay"
+    >
+      <button
+        class="btn-close-fullscreen"
+        title="Close Fullscreen (ESC)"
+        @click="close"
+      >
+        ×
+      </button>
     </div>
     
     <!-- Header (hidden in fullscreen mode) -->
-    <div v-if="showHeader && !isFullscreen" class="viewer-header">
+    <div
+      v-if="showHeader && !isFullscreen"
+      class="viewer-header"
+    >
       <div class="header-left">
         <h2>{{ currentService?.name || 'Web Services' }}</h2>
-        <div v-if="services.length > 1" class="service-indicator">
+        <div
+          v-if="services.length > 1"
+          class="service-indicator"
+        >
           Service {{ currentServiceIndex + 1 }} of {{ services.length }}
         </div>
       </div>
       <div class="header-right">
         <button
           v-if="services.length > 1"
-          @click="previousService"
           class="btn-nav"
           title="Previous Service"
+          @click="previousService"
         >
           ‹
         </button>
         <button
           v-if="services.length > 1"
-          @click="nextService"
           class="btn-nav"
           title="Next Service"
+          @click="nextService"
         >
           ›
         </button>
         <button
-          @click="toggleFullscreen"
           class="btn-fullscreen"
           :title="isFullscreen ? 'Exit Fullscreen' : 'Enter Fullscreen'"
+          @click="toggleFullscreen"
         >
           {{ isFullscreen ? '⤓' : '⤢' }}
         </button>
-        <button @click="close" class="btn-close" title="Close">×</button>
+        <button
+          class="btn-close"
+          title="Close"
+          @click="close"
+        >
+          ×
+        </button>
       </div>
     </div>
     
     <!-- Service Selection (if multiple services) -->
-    <div v-if="showHeader && !isFullscreen && services.length > 1" class="service-selector">
+    <div
+      v-if="showHeader && !isFullscreen && services.length > 1"
+      class="service-selector"
+    >
       <button
         v-for="(service, index) in services"
         :key="service.id"
-        @click="setServiceIndex(index)"
         class="service-btn"
         :class="{ 'active': index === currentServiceIndex }"
+        @click="setServiceIndex(index)"
       >
         {{ service.name }}
       </button>
@@ -57,19 +84,30 @@
     <!-- Viewer Content -->
     <div class="viewer-content">
       <!-- Loading State -->
-      <div v-if="loading" class="loading-state">
-        <div class="spinner"></div>
+      <div
+        v-if="loading"
+        class="loading-state"
+      >
+        <div class="spinner" />
         <p>Loading service...</p>
       </div>
 
       <!-- No Services -->
-      <div v-else-if="services.length === 0" class="no-services">
+      <div
+        v-else-if="services.length === 0"
+        class="no-services"
+      >
         <p>No web services configured</p>
-        <p class="help-text">Add web services in Settings</p>
+        <p class="help-text">
+          Add web services in Settings
+        </p>
       </div>
 
       <!-- Service Iframe -->
-      <div v-else-if="currentService" class="service-container">
+      <div
+        v-else-if="currentService"
+        class="service-container"
+      >
         <iframe
           ref="serviceIframe"
           :src="currentService.url"
@@ -79,14 +117,19 @@
           allowfullscreen
           @load="handleIframeLoad"
           @error="handleIframeError"
-        ></iframe>
+        />
         
         <!-- CORS/Iframe Error Message -->
-        <div v-if="iframeError" class="iframe-error-message">
+        <div
+          v-if="iframeError"
+          class="iframe-error-message"
+        >
           <div class="error-content">
             <h3>⚠️ Cannot Display Service</h3>
             <p>This service cannot be embedded in an iframe due to security restrictions (CORS/X-Frame-Options).</p>
-            <p class="service-url">{{ currentService.url }}</p>
+            <p class="service-url">
+              {{ currentService.url }}
+            </p>
             <div class="error-actions">
               <a
                 :href="currentService.url"
@@ -96,7 +139,12 @@
               >
                 Open in New Window
               </a>
-              <button @click="retryLoad" class="btn-retry">Retry</button>
+              <button
+                class="btn-retry"
+                @click="retryLoad"
+              >
+                Retry
+              </button>
             </div>
           </div>
         </div>

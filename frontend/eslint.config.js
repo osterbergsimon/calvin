@@ -13,7 +13,15 @@ export default [
       },
     },
     rules: {
-      // Add custom rules here
+      // Allow single-word component names for views
+      'vue/multi-word-component-names': ['error', {
+        ignores: ['Dashboard', 'Settings']
+      }],
+      // Allow unused variables that start with underscore
+      'no-unused-vars': ['error', {
+        argsIgnorePattern: '^_',
+        varsIgnorePattern: '^_'
+      }]
     },
   },
 ];

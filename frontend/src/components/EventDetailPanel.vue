@@ -1,12 +1,25 @@
 <template>
-  <div v-if="event" class="event-detail-panel" @keydown.esc="close">
+  <div
+    v-if="event"
+    class="event-detail-panel"
+    @keydown.esc="close"
+  >
     <div class="event-detail-header">
       <h3>{{ event.title }}</h3>
-      <button @click="close" class="btn-close" aria-label="Close">×</button>
+      <button
+        class="btn-close"
+        aria-label="Close"
+        @click="close"
+      >
+        ×
+      </button>
     </div>
     <div class="event-detail-content">
       <!-- Show all events for the day if expanding "today" via keyboard -->
-      <div v-if="showAllDayEvents && dayEvents.length > 1" class="all-day-events-details">
+      <div
+        v-if="showAllDayEvents && dayEvents.length > 1"
+        class="all-day-events-details"
+      >
         <div class="day-events-header">
           <span class="label">All Events for {{ formatDate(event.start) }} ({{ dayEvents.length }})</span>
         </div>
@@ -21,40 +34,66 @@
               <h4>{{ dayEvent.title }}</h4>
             </div>
             <div class="day-event-detail-content">
-              <div v-if="isEventMultiDay(dayEvent)" class="event-detail-row">
+              <div
+                v-if="isEventMultiDay(dayEvent)"
+                class="event-detail-row"
+              >
                 <span class="label">Start:</span>
                 <span class="value">{{ formatDate(dayEvent.start) }}<span v-if="!dayEvent.all_day"> {{ formatTime(dayEvent.start) }}</span></span>
               </div>
-              <div v-if="isEventMultiDay(dayEvent)" class="event-detail-row">
+              <div
+                v-if="isEventMultiDay(dayEvent)"
+                class="event-detail-row"
+              >
                 <span class="label">End:</span>
                 <span class="value">{{ formatDate(dayEvent.end) }}<span v-if="!dayEvent.all_day"> {{ formatTime(dayEvent.end) }}</span></span>
               </div>
-              <div v-if="!isEventMultiDay(dayEvent)" class="event-detail-row">
+              <div
+                v-if="!isEventMultiDay(dayEvent)"
+                class="event-detail-row"
+              >
                 <span class="label">Date:</span>
                 <span class="value">{{ formatDate(dayEvent.start) }}</span>
               </div>
-              <div v-if="!isEventMultiDay(dayEvent) && !dayEvent.all_day" class="event-detail-row">
+              <div
+                v-if="!isEventMultiDay(dayEvent) && !dayEvent.all_day"
+                class="event-detail-row"
+              >
                 <span class="label">Time:</span>
                 <span class="value">{{ formatTime(dayEvent.start) }} - {{ formatTime(dayEvent.end) }}</span>
               </div>
-              <div v-if="dayEvent.all_day && !isEventMultiDay(dayEvent)" class="event-detail-row">
+              <div
+                v-if="dayEvent.all_day && !isEventMultiDay(dayEvent)"
+                class="event-detail-row"
+              >
                 <span class="label">Time:</span>
                 <span class="value">All Day</span>
               </div>
-              <div v-if="dayEvent.location" class="event-detail-row">
+              <div
+                v-if="dayEvent.location"
+                class="event-detail-row"
+              >
                 <span class="label">Location:</span>
                 <span class="value">{{ dayEvent.location }}</span>
               </div>
-              <div v-if="dayEvent.description" class="event-detail-row">
+              <div
+                v-if="dayEvent.description"
+                class="event-detail-row"
+              >
                 <span class="label">Description:</span>
-                <div class="value description">{{ dayEvent.description }}</div>
+                <div class="value description">
+                  {{ dayEvent.description }}
+                </div>
               </div>
             </div>
           </div>
         </div>
       </div>
       <!-- Show clickable list if not keyboard expand -->
-      <div v-else-if="dayEvents.length > 1" class="day-events-list">
+      <div
+        v-else-if="dayEvents.length > 1"
+        class="day-events-list"
+      >
         <div class="day-events-header">
           <span class="label">All Events ({{ dayEvents.length }})</span>
         </div>
@@ -70,40 +109,65 @@
               <span v-if="!dayEvent.all_day">{{ formatTime(dayEvent.start) }}</span>
               <span v-else>All Day</span>
             </div>
-            <div class="day-event-title">{{ dayEvent.title }}</div>
+            <div class="day-event-title">
+              {{ dayEvent.title }}
+            </div>
           </div>
         </div>
       </div>
       <!-- Current event details (only show if not showing all events) -->
-      <div v-if="!showAllDayEvents || dayEvents.length === 1" class="current-event-details">
-      <div v-if="isMultiDay" class="event-detail-row">
-        <span class="label">Start:</span>
-        <span class="value">{{ formatDate(event.start) }}<span v-if="!event.all_day"> {{ formatTime(event.start) }}</span></span>
-      </div>
-      <div v-if="isMultiDay" class="event-detail-row">
-        <span class="label">End:</span>
-        <span class="value">{{ formatDate(event.end) }}<span v-if="!event.all_day"> {{ formatTime(event.end) }}</span></span>
-      </div>
-      <div v-if="!isMultiDay" class="event-detail-row">
-        <span class="label">Date:</span>
-        <span class="value">{{ formatDate(event.start) }}</span>
-      </div>
-      <div v-if="!isMultiDay && !event.all_day" class="event-detail-row">
-        <span class="label">Time:</span>
-        <span class="value">{{ formatTime(event.start) }} - {{ formatTime(event.end) }}</span>
-      </div>
-      <div v-if="event.location" class="event-detail-row">
-        <span class="label">Location:</span>
-        <span class="value">{{ event.location }}</span>
-      </div>
-      <div v-if="event.description" class="event-detail-row">
-        <span class="label">Description:</span>
-        <div class="value description">{{ event.description }}</div>
-      </div>
-      <div class="event-detail-row">
-        <span class="label">Source:</span>
-        <span class="value">{{ event.source }}</span>
-      </div>
+      <div
+        v-if="!showAllDayEvents || dayEvents.length === 1"
+        class="current-event-details"
+      >
+        <div
+          v-if="isMultiDay"
+          class="event-detail-row"
+        >
+          <span class="label">Start:</span>
+          <span class="value">{{ formatDate(event.start) }}<span v-if="!event.all_day"> {{ formatTime(event.start) }}</span></span>
+        </div>
+        <div
+          v-if="isMultiDay"
+          class="event-detail-row"
+        >
+          <span class="label">End:</span>
+          <span class="value">{{ formatDate(event.end) }}<span v-if="!event.all_day"> {{ formatTime(event.end) }}</span></span>
+        </div>
+        <div
+          v-if="!isMultiDay"
+          class="event-detail-row"
+        >
+          <span class="label">Date:</span>
+          <span class="value">{{ formatDate(event.start) }}</span>
+        </div>
+        <div
+          v-if="!isMultiDay && !event.all_day"
+          class="event-detail-row"
+        >
+          <span class="label">Time:</span>
+          <span class="value">{{ formatTime(event.start) }} - {{ formatTime(event.end) }}</span>
+        </div>
+        <div
+          v-if="event.location"
+          class="event-detail-row"
+        >
+          <span class="label">Location:</span>
+          <span class="value">{{ event.location }}</span>
+        </div>
+        <div
+          v-if="event.description"
+          class="event-detail-row"
+        >
+          <span class="label">Description:</span>
+          <div class="value description">
+            {{ event.description }}
+          </div>
+        </div>
+        <div class="event-detail-row">
+          <span class="label">Source:</span>
+          <span class="value">{{ event.source }}</span>
+        </div>
       </div>
     </div>
   </div>

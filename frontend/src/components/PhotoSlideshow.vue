@@ -1,27 +1,47 @@
 <template>
-  <div class="photo-slideshow" :class="{ 'fullscreen': isFullscreen }">
-    <div v-if="!isFullscreen && showHeader" class="slideshow-header">
+  <div
+    class="photo-slideshow"
+    :class="{ 'fullscreen': isFullscreen }"
+  >
+    <div
+      v-if="!isFullscreen && showHeader"
+      class="slideshow-header"
+    >
       <h2>Photos</h2>
-      <div v-if="imagesStore.error" class="error-message">
+      <div
+        v-if="imagesStore.error"
+        class="error-message"
+      >
         {{ imagesStore.error }}
       </div>
     </div>
     <div class="slideshow-content">
-      <div v-if="imagesStore.loading" class="loading">
+      <div
+        v-if="imagesStore.loading"
+        class="loading"
+      >
         <p>Loading images...</p>
       </div>
-      <div v-else-if="!currentImageUrl" class="photo-placeholder">
+      <div
+        v-else-if="!currentImageUrl"
+        class="photo-placeholder"
+      >
         <p>No images available</p>
-        <p class="photo-info">Add images to <code>data/images</code> directory</p>
+        <p class="photo-info">
+          Add images to <code>data/images</code> directory
+        </p>
       </div>
-      <div v-else class="photo-container">
+      <div
+        v-else
+        class="photo-container"
+      >
         <img
           :src="currentImageUrl"
           :alt="imagesStore.currentImage?.filename || 'Photo'"
           class="photo-image"
           @load="onImageLoad"
           @error="onImageError"
-        />
+        >
       </div>
     </div>
   </div>

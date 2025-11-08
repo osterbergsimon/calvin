@@ -102,7 +102,8 @@ def _parse_vevent(component) -> CalendarEvent | None:
                 end = end_dt
         else:
             # Date-only (all-day event)
-            # IMPORTANT: In iCal RFC 5545, DTEND for all-day events is EXCLUSIVE (the day after the event ends)
+            # IMPORTANT: In iCal RFC 5545, DTEND for all-day events is EXCLUSIVE
+            # (the day after the event ends)
             # So if DTEND is 2024-01-04, the event actually ends on 2024-01-03 (inclusive)
             # Example: A 3-day event Jan 1-3 has DTSTART=2024-01-01, DTEND=2024-01-04
             # We need to subtract one day to get the actual last day of the event

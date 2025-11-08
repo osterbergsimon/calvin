@@ -111,6 +111,7 @@ export function useKeyboardActions() {
               const eEndComponents = getDateComponents(eEndDate)
               
               const startCompare = compareDateComponents(eStartComponents, todayComponents)
+               
               const endCompare = compareDateComponents(todayComponents, eEndComponents)
               return startCompare <= 0 && endCompare <= 0
             } else {

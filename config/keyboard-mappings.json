@@ -1,0 +1,21 @@
+{
+  "7-button": {
+    "KEY_1": "calendar_next_month",
+    "KEY_2": "calendar_prev_month",
+    "KEY_3": "calendar_expand_today",
+    "KEY_4": "images_next",
+    "KEY_5": "images_prev",
+    "KEY_6": "web_service_1",
+    "KEY_7": "web_service_2"
+  },
+  "standard": {
+    "KEY_RIGHT": "calendar_next_month",
+    "KEY_LEFT": "calendar_prev_month",
+    "KEY_UP": "calendar_expand_today",
+    "KEY_DOWN": "calendar_collapse",
+    "KEY_SPACE": "images_next",
+    "KEY_1": "web_service_1",
+    "KEY_2": "web_service_2"
+  }
+}
+

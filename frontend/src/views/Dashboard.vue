@@ -1,55 +1,58 @@
 <template>
   <LayoutManager>
     <div class="dashboard">
-      <div v-if="configStore.showUI" class="dashboard-header">
+      <div
+        v-if="configStore.showUI"
+        class="dashboard-header"
+      >
         <h1>Calvin Dashboard</h1>
         <div class="header-controls">
           <div class="status-indicator">
-            <span :class="['status-dot', statusClass]"></span>
+            <span :class="['status-dot', statusClass]" />
             <span>{{ statusText }}</span>
           </div>
           <button 
-            @click="toggleOrientation" 
-            class="btn-orientation"
+            class="btn-orientation" 
             :title="`Switch to ${configStore.orientation === 'landscape' ? 'portrait' : 'landscape'} view`"
+            @click="toggleOrientation"
           >
             {{ configStore.orientation === 'landscape' ? '📱' : '🖥️' }}
             {{ configStore.orientation === 'landscape' ? 'Portrait' : 'Landscape' }}
           </button>
           <button 
             v-if="modeStore.currentMode !== modeStore.MODES.WEB_SERVICES" 
-            @click="showWebServices" 
-            class="btn-web-services"
+            class="btn-web-services" 
             title="Show Web Services"
+            @click="showWebServices"
           >
             Web Services
           </button>
           <button 
             v-else
-            @click="showPhotos" 
-            class="btn-web-services"
+            class="btn-web-services" 
             title="Show Photos"
+            @click="showPhotos"
           >
             Photos
           </button>
           <button 
-            @click="toggleSideViewPosition" 
-            class="btn-side-position"
+            class="btn-side-position" 
             :title="sideViewPositionTitle"
+            @click="toggleSideViewPosition"
           >
             {{ sideViewPositionIcon }}
           </button>
           <button 
-            @click="goToSettings" 
-            class="btn-settings"
+            class="btn-settings" 
             title="Settings"
+            @click="goToSettings"
           >
             ⚙️ Settings
           </button>
           <button 
-            @click="configStore.toggleUI" 
-            class="btn-minimal"
+            class="btn-minimal" 
             title="Hide UI"
+            @click="configStore.toggleUI"
           >
             ⊖
           </button>
@@ -60,9 +63,15 @@
       <MinimalUIOverlay />
       <ModeIndicator />
 
-      <div class="dashboard-main" :class="mainLayoutClass">
+      <div
+        class="dashboard-main"
+        :class="mainLayoutClass"
+      >
         <!-- Fullscreen Mode (Photos or Web Services) -->
-        <div v-if="modeStore.isFullscreen" class="mode-content fullscreen-mode">
+        <div
+          v-if="modeStore.isFullscreen"
+          class="mode-content fullscreen-mode"
+        >
           <!-- Fullscreen Photos -->
           <PhotoSlideshow
             v-if="modeStore.fullscreenMode === modeStore.MODES.PHOTOS"
@@ -78,14 +87,24 @@
         </div>
 
         <!-- Dashboard View (Home) - Always shows calendar + side view -->
-        <div v-else class="mode-content dashboard-view" :class="[mainLayoutClass, sideViewPositionClass]">
+        <div
+          v-else
+          class="mode-content dashboard-view"
+          :class="[mainLayoutClass, sideViewPositionClass]"
+        >
           <!-- Calendar Section (66-75%) -->
-          <div class="calendar-section" :style="{ width: calendarWidth, height: calendarHeight }">
+          <div
+            class="calendar-section"
+            :style="{ width: calendarWidth, height: calendarHeight }"
+          >
             <CalendarView />
           </div>
 
           <!-- Right/Bottom Section (25-33%) - Shows current mode content -->
-          <div class="secondary-section" :style="{ width: secondaryWidth, height: secondaryHeight }">
+          <div
+            class="secondary-section"
+            :style="{ width: secondaryWidth, height: secondaryHeight }"
+          >
             <!-- Show content based on current mode -->
             <WebServiceViewer
               v-if="modeStore.currentMode === modeStore.MODES.WEB_SERVICES"

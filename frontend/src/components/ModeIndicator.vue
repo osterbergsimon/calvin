@@ -1,6 +1,13 @@
 <template>
-  <div class="mode-indicator" :class="{ 'hidden': !show }">
-    <div class="mode-icon" :class="modeClass" :title="modeLabel">
+  <div
+    class="mode-indicator"
+    :class="{ 'hidden': !show }"
+  >
+    <div
+      class="mode-icon"
+      :class="modeClass"
+      :title="modeLabel"
+    >
       <span class="icon-text">{{ modeIcon }}</span>
     </div>
   </div>

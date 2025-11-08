@@ -1,10 +1,13 @@
 <template>
-  <div v-if="!configStore.showUI" class="minimal-ui-overlay">
+  <div
+    v-if="!configStore.showUI"
+    class="minimal-ui-overlay"
+  >
     <button
-      @click="configStore.toggleUI"
       class="ui-toggle-btn"
       title="Show UI"
       aria-label="Show UI"
+      @click="configStore.toggleUI"
     >
       ⚙️
     </button>
