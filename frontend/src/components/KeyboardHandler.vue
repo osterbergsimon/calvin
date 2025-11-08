@@ -1,18 +1,18 @@
 <template>
-  <!-- This component handles keyboard events globally -->
+  <div style="display: none;">
+    <!-- This component handles keyboard events globally -->
+  </div>
 </template>
 
 <script setup>
 import { onMounted, onUnmounted } from 'vue'
 import { useKeyboardStore } from '../stores/keyboard'
 import { useKeyboardActions } from '../composables/useKeyboardActions'
-import { useModeStore } from '../stores/mode'
 import { usePhotoFrameMode } from '../composables/usePhotoFrameMode'
 
 const keyboardStore = useKeyboardStore()
 const { handleAction } = useKeyboardActions()
-const modeStore = useModeStore()
-const { exitPhotoFrameMode, resetInactivityTimer } = usePhotoFrameMode()
+const { resetInactivityTimer } = usePhotoFrameMode()
 
 // Map browser key codes to our key codes
 const keyCodeMap = {

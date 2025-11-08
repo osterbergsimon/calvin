@@ -154,7 +154,7 @@
 </template>
 
 <script setup>
-import { ref, computed, onMounted, watch, onUnmounted, onUpdated } from 'vue'
+import { ref, computed, onMounted, watch, onUnmounted } from 'vue'
 import { useConfigStore } from '../stores/config'
 import { useWebServicesStore } from '../stores/webServices'
 import { useModeStore } from '../stores/mode'
@@ -168,6 +168,7 @@ const props = defineProps({
 
 const configStore = useConfigStore()
 const webServicesStore = useWebServicesStore()
+const modeStore = useModeStore()
 
 const showHeader = computed(() => configStore.showUI)
 const services = computed(() => webServicesStore.services)

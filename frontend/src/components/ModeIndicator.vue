@@ -14,7 +14,7 @@
 </template>
 
 <script setup>
-import { ref, computed, watch, onMounted, onUnmounted } from 'vue'
+import { ref, computed, watch, onUnmounted } from 'vue'
 import { useModeStore } from '../stores/mode'
 import { useConfigStore } from '../stores/config'
 

@@ -25,7 +25,7 @@
         </div>
         <div class="all-events-list">
           <div
-            v-for="(dayEvent, index) in dayEvents"
+            v-for="(dayEvent, _index) in dayEvents"
             :key="dayEvent.id"
             class="day-event-detail-card"
             :class="{ 'active': dayEvent.id === event.id }"
@@ -99,7 +99,7 @@
         </div>
         <div class="day-events-items">
           <div
-            v-for="(dayEvent, index) in dayEvents"
+            v-for="(dayEvent, _index) in dayEvents"
             :key="dayEvent.id"
             class="day-event-item"
             :class="{ 'active': dayEvent.id === event.id }"
