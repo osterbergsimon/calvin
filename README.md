@@ -131,5 +131,5 @@ See [PROJECT_PLAN.md](PROJECT_PLAN.md) for detailed architecture and implementat
 
 ## License
 
-MIT
+GPLv3 - See [LICENSE](LICENSE) file for details.
 
