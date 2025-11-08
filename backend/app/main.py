@@ -54,7 +54,8 @@ async def lifespan(app: FastAPI):
         await keyboard_mapping_service.set_mappings("7-button", default_7button)
 
         # Set default standard keyboard mappings
-        # Layout: 3 generic buttons (next, prev, expand/close) + 4 mode buttons (calendar, photos, services, spare)
+        # Layout: 3 generic buttons (next, prev, expand/close) +
+        # 4 mode buttons (calendar, photos, services, spare)
         default_standard = {
             "KEY_RIGHT": "generic_next",  # Generic Next (context-aware)
             "KEY_LEFT": "generic_prev",  # Generic Previous (context-aware)
@@ -72,9 +73,8 @@ async def lifespan(app: FastAPI):
     image_service_module.image_service = ImageService(settings.image_dir)
     # Do initial scan
     image_service_module.image_service.scan_images()
-    print(
-        f"Image service initialized: {len(image_service_module.image_service.get_images())} images found"
-    )
+    image_count = len(image_service_module.image_service.get_images())
+    print(f"Image service initialized: {image_count} images found")
 
     # Initialize default config if not present
     orientation = await config_service.get_value("orientation")

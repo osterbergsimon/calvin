@@ -34,7 +34,7 @@ async def test_add_source():
     # Clean up any existing source with this ID first
     try:
         await calendar_service.remove_source("test-calendar-1")
-    except:
+    except Exception:
         pass  # Ignore if it doesn't exist
 
     source = CalendarSource(
@@ -78,7 +78,7 @@ async def test_get_events_with_mock_ical():
     # Clean up any existing source with this ID first
     try:
         await calendar_service.remove_source("test-calendar-3")
-    except:
+    except Exception:
         pass  # Ignore if it doesn't exist
 
     # Mock the iCal parser
