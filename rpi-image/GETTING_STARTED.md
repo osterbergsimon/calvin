@@ -48,11 +48,13 @@ This guide will help you get Calvin Dashboard running on your Raspberry Pi. Choo
 
 ---
 
-## Dev Image Setup
+## Dev Image Setup (Auto-Update from GitHub)
 
 **Best for:** Development, testing, single device
 
-**Time:** 5-10 minutes first boot, then auto-updates
+**Time:** 5-10 minutes first boot, then auto-updates every 5 minutes
+
+> **Quick Start:** For a condensed version, see [QUICK_START_DEV.md](QUICK_START_DEV.md)
 
 ### Step 1: Download Raspberry Pi Imager
 
@@ -194,11 +196,13 @@ This guide will help you get Calvin Dashboard running on your Raspberry Pi. Choo
 
 ---
 
-## Pre-built Image Setup
+## Pre-built Image Setup (Flash and Go)
 
 **Best for:** Production, multiple devices, offline deployment
 
 **Time:** 10-15 minutes to create image, then instant deployment
+
+> **Quick Start:** For a condensed version, see [QUICK_START_PREBUILT.md](QUICK_START_PREBUILT.md)
 
 ### Step 1: Create Pre-built Image
 

@@ -7,9 +7,15 @@ This directory contains scripts and configurations for building flashable Raspbe
 ## 🚀 Quick Start
 
 **New to this?** Start here:
-- **[GETTING_STARTED.md](GETTING_STARTED.md)** - Complete step-by-step guide
-- **[QUICK_START_DEV.md](QUICK_START_DEV.md)** - Dev image quick start
-- **[QUICK_START_PREBUILT.md](QUICK_START_PREBUILT.md)** - Pre-built image quick start
+
+1. **[GETTING_STARTED.md](GETTING_STARTED.md)** - **Main guide** with complete step-by-step instructions
+   - Choose dev image or pre-built image
+   - Follow detailed instructions
+   - Includes troubleshooting
+
+2. **Quick Start Guides** (condensed versions):
+   - **[QUICK_START_DEV.md](QUICK_START_DEV.md)** - Dev image quick start
+   - **[QUICK_START_PREBUILT.md](QUICK_START_PREBUILT.md)** - Pre-built image quick start
 
 ## Image Types
 

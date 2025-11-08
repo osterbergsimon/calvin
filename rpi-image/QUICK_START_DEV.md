@@ -65,5 +65,5 @@ sudo cat /var/log/calvin-setup.log
 
 ---
 
-**Troubleshooting:** See `GETTING_STARTED.md` for detailed help
+**For detailed instructions and troubleshooting, see:** [GETTING_STARTED.md](GETTING_STARTED.md)
 

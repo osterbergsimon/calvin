@@ -23,8 +23,9 @@
 
 ### Setup Guides
 
-- **[FLASH_DEV_IMAGE.md](FLASH_DEV_IMAGE.md)** - Detailed dev image flashing guide
-- **[PREBUILT_IMAGE.md](PREBUILT_IMAGE.md)** - Pre-built image creation guide
+- **[GETTING_STARTED.md](GETTING_STARTED.md)** - **Main guide** with complete instructions for both image types
+- **[QUICK_START_DEV.md](QUICK_START_DEV.md)** - Quick start for dev image
+- **[QUICK_START_PREBUILT.md](QUICK_START_PREBUILT.md)** - Quick start for pre-built image
 - **[HOW_IT_WORKS.md](HOW_IT_WORKS.md)** - How the image setup process works
 
 ### Testing
@@ -43,14 +44,12 @@
 ## 🎯 Choose Your Path
 
 ### For Development/Testing
-1. Read: [QUICK_START_DEV.md](QUICK_START_DEV.md)
-2. Follow: [GETTING_STARTED.md](GETTING_STARTED.md) - Dev Image Setup section
-3. Reference: [FLASH_DEV_IMAGE.md](FLASH_DEV_IMAGE.md) for details
+1. **Quick Start:** [QUICK_START_DEV.md](QUICK_START_DEV.md) - Fast setup guide
+2. **Complete Guide:** [GETTING_STARTED.md](GETTING_STARTED.md) - Dev Image Setup section (detailed instructions)
 
 ### For Production/Multiple Devices
-1. Read: [QUICK_START_PREBUILT.md](QUICK_START_PREBUILT.md)
-2. Follow: [GETTING_STARTED.md](GETTING_STARTED.md) - Pre-built Image Setup section
-3. Reference: [PREBUILT_IMAGE.md](PREBUILT_IMAGE.md) for details
+1. **Quick Start:** [QUICK_START_PREBUILT.md](QUICK_START_PREBUILT.md) - Fast setup guide
+2. **Complete Guide:** [GETTING_STARTED.md](GETTING_STARTED.md) - Pre-built Image Setup section (detailed instructions)
 
 ### Need Help?
 1. Check: [GETTING_STARTED.md](GETTING_STARTED.md) - Troubleshooting section
