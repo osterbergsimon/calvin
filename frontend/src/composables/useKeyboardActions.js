@@ -1,9 +1,7 @@
 import { useModeStore } from '../stores/mode'
-import { useConfigStore } from '../stores/config'
 import { useCalendarStore } from '../stores/calendar'
 import { useImagesStore } from '../stores/images'
 import { useWebServicesStore } from '../stores/webServices'
-import { usePhotoFrameMode } from '../composables/usePhotoFrameMode'
 import { useRouter } from 'vue-router'
 
 /**
