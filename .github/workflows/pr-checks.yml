@@ -1,0 +1,42 @@
+name: PR Checks
+
+on:
+  pull_request:
+    types: [opened, synchronize, reopened]
+
+jobs:
+  pr-summary:
+    name: PR Summary Checks
+    runs-on: ubuntu-latest
+    
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0  # Fetch all history for better analysis
+      
+      - name: Check for large files
+        run: |
+          # Check for files larger than 10MB
+          find . -type f -size +10M -not -path "./.git/*" -not -path "./node_modules/*" -not -path "./.venv/*" | while read file; do
+            echo "::warning file=$file::Large file detected (>10MB)"
+          done
+      
+      - name: Check for common issues
+        run: |
+          # Check for hardcoded secrets (basic check)
+          if grep -r "password.*=.*['\"].*[a-zA-Z0-9]" --include="*.py" --include="*.js" --include="*.vue" . | grep -v node_modules | grep -v ".venv" | grep -v ".git"; then
+            echo "::warning::Potential hardcoded password detected"
+          fi
+          
+          # Check for TODO/FIXME comments
+          echo "## TODO/FIXME Comments"
+          grep -r "TODO\|FIXME" --include="*.py" --include="*.js" --include="*.vue" . | grep -v node_modules | grep -v ".venv" | grep -v ".git" | head -20 || echo "None found"
+      
+      - name: Check file permissions
+        run: |
+          # Ensure scripts are executable
+          find . -name "*.sh" -not -perm +111 | while read file; do
+            echo "::warning file=$file::Script should be executable"
+          done
+

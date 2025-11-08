@@ -1,0 +1,87 @@
+name: Code Quality
+
+on:
+  push:
+    branches: [main, develop]
+  pull_request:
+    branches: [main, develop]
+  schedule:
+    # Run weekly on Monday at 00:00 UTC
+    - cron: '0 0 * * 1'
+
+jobs:
+  backend-quality:
+    name: Backend Code Quality
+    runs-on: ubuntu-latest
+    
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+      
+      - name: Install UV
+        uses: astral-sh/setup-uv@v3
+        with:
+          version: "latest"
+      
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      
+      - name: Install backend dependencies
+        working-directory: ./backend
+        run: uv sync --extra dev
+      
+      - name: Run Ruff linter (strict)
+        working-directory: ./backend
+        run: uv run ruff check . --output-format=github
+      
+      - name: Run Ruff formatter check
+        working-directory: ./backend
+        run: uv run ruff format --check . --diff
+      
+      - name: Run MyPy type checker
+        working-directory: ./backend
+        run: uv run mypy app --show-error-codes
+        continue-on-error: true  # Don't fail CI on type errors yet
+      
+      - name: Run Bandit security scan
+        working-directory: ./backend
+        run: uv run bandit -r app -f json -o bandit-report.json
+        continue-on-error: true
+      
+      - name: Upload Bandit report
+        uses: actions/upload-artifact@v3
+        if: always()
+        with:
+          name: bandit-security-report
+          path: backend/bandit-report.json
+
+  frontend-quality:
+    name: Frontend Code Quality
+    runs-on: ubuntu-latest
+    
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+      
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+          cache: 'npm'
+          cache-dependency-path: frontend/package-lock.json
+      
+      - name: Install frontend dependencies
+        working-directory: ./frontend
+        run: npm ci
+      
+      - name: Run ESLint
+        working-directory: ./frontend
+        run: npm run lint
+      
+      - name: Check Prettier formatting
+        working-directory: ./frontend
+        run: npx prettier --check "src/**/*.{js,jsx,vue,json,css}"
+        continue-on-error: true
+

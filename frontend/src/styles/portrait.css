@@ -1,0 +1,18 @@
+/* Portrait layout styles */
+.layout-portrait {
+  display: flex;
+  flex-direction: column;
+  gap: 1rem;
+  padding: 1rem;
+}
+
+.layout-portrait .dashboard-content {
+  display: flex;
+  flex-direction: column;
+  gap: 1rem;
+}
+
+.layout-portrait .dashboard-section {
+  flex: 1;
+}
+

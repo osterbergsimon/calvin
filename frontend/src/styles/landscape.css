@@ -1,0 +1,19 @@
+/* Landscape layout styles */
+.layout-landscape {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  grid-template-rows: auto 1fr;
+  gap: 1rem;
+  padding: 1rem;
+}
+
+.layout-landscape .dashboard-header {
+  grid-column: 1 / -1;
+}
+
+.layout-landscape .dashboard-content {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 1rem;
+}
+
