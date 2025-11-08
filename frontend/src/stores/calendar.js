@@ -119,7 +119,6 @@ export const useCalendarStore = defineStore('calendar', () => {
     // Also collect all events for the same day using the same logic as CalendarView
     if (event) {
       const eventStart = new Date(event.start)
-      const eventEnd = new Date(event.end)
       
       // Get the calendar date of the selected event
       let eventDateComponents
@@ -138,7 +137,6 @@ export const useCalendarStore = defineStore('calendar', () => {
         if (e.all_day) {
           // All-day events: compare calendar date components
           const eStartComponents = getDateComponents(eStart, false)
-          const eEndComponents = getDateComponents(eEnd, false)
           
           // Calculate end date from start + duration for all-day events
           const durationMs = eEnd.getTime() - eStart.getTime()

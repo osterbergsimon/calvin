@@ -1,6 +1,7 @@
 <template>
   <div style="display: none;">
     <!-- This component handles keyboard events globally -->
+    <span />
   </div>
 </template>
 

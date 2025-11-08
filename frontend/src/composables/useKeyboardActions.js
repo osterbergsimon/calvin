@@ -12,11 +12,9 @@ import { useRouter } from 'vue-router'
  */
 export function useKeyboardActions() {
   const modeStore = useModeStore()
-  const configStore = useConfigStore()
   const calendarStore = useCalendarStore()
   const imagesStore = useImagesStore()
   const webServicesStore = useWebServicesStore()
-  const { isPhotoFrameActive, enterPhotoFrameMode, exitPhotoFrameMode } = usePhotoFrameMode()
   const router = useRouter()
 
   const handleAction = (action) => {
