@@ -1,7 +1,8 @@
 """Database configuration and session management."""
 
-from sqlalchemy.ext.asyncio import AsyncSession, create_async_engine, async_sessionmaker
+from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker, create_async_engine
 from sqlalchemy.orm import declarative_base
+
 from app.config import settings
 
 # Create async engine
@@ -35,4 +36,3 @@ async def init_db():
     """Initialize database (create tables)."""
     async with engine.begin() as conn:
         await conn.run_sync(Base.metadata.create_all)
-

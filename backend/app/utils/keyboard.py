@@ -1,7 +1,6 @@
 """Keyboard input handling with platform support."""
 
 import platform
-from typing import Optional
 
 # Platform detection
 IS_LINUX = platform.system() == "Linux"
@@ -12,6 +11,7 @@ if IS_LINUX:
     try:
         import evdev
         from evdev import InputDevice, categorize, ecodes
+
         EVDEV_AVAILABLE = True
     except ImportError:
         EVDEV_AVAILABLE = False
@@ -30,7 +30,7 @@ else:
 class KeyboardHandler:
     """Keyboard input handler with platform support."""
 
-    def __init__(self, device_path: Optional[str] = None):
+    def __init__(self, device_path: str | None = None):
         """Initialize keyboard handler."""
         self.device_path = device_path
         self.device = None
@@ -55,7 +55,7 @@ class KeyboardHandler:
             else:
                 # Auto-detect keyboard
                 self.device = self._auto_detect_keyboard()
-            
+
             if self.device:
                 self.is_available = True
         except Exception as e:
@@ -79,8 +79,9 @@ class KeyboardHandler:
 
         try:
             import glob
+
             devices = glob.glob("/dev/input/event*")
-            
+
             for device_path in devices:
                 try:
                     device = InputDevice(device_path)
@@ -91,14 +92,14 @@ class KeyboardHandler:
                     continue
         except Exception:
             pass
-        
+
         return None
 
     def read_events(self):
         """Read keyboard events (Linux only)."""
         if not self.is_available or not self.device:
             return
-        
+
         try:
             for event in self.device.read_loop():
                 if event.type == ecodes.EV_KEY:
@@ -117,7 +118,7 @@ class KeyboardHandler:
 class MockKeyboardHandler:
     """Mock keyboard handler for Windows development."""
 
-    def __init__(self, device_path: Optional[str] = None):
+    def __init__(self, device_path: str | None = None):
         """Initialize mock keyboard handler."""
         self.device_path = device_path
         self.is_available = False
@@ -132,10 +133,9 @@ class MockKeyboardHandler:
         pass
 
 
-def get_keyboard_handler(device_path: Optional[str] = None):
+def get_keyboard_handler(device_path: str | None = None):
     """Get appropriate keyboard handler for current platform."""
     if IS_LINUX and EVDEV_AVAILABLE:
         return KeyboardHandler(device_path)
     else:
         return MockKeyboardHandler(device_path)
-

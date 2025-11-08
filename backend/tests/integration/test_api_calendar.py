@@ -1,7 +1,8 @@
 """Integration tests for calendar API endpoints."""
 
+from datetime import UTC, datetime, timedelta
+
 import pytest
-from datetime import datetime, timezone, timedelta
 from fastapi.testclient import TestClient
 
 
@@ -9,9 +10,9 @@ from fastapi.testclient import TestClient
 def test_get_calendar_events(test_client: TestClient):
     """Test getting calendar events."""
     # Get events for the next 30 days
-    start_date = datetime.now(timezone.utc)
+    start_date = datetime.now(UTC)
     end_date = start_date + timedelta(days=30)
-    
+
     response = test_client.get(
         "/api/calendar/events",
         params={
@@ -40,7 +41,7 @@ def test_add_calendar_source(test_client: TestClient):
     """Test adding a calendar source."""
     # Clean up any existing source with this ID first
     test_client.delete("/api/calendar/sources/test-calendar-1")  # Ignore 404
-    
+
     source_data = {
         "id": "test-calendar-1",
         "type": "google",
@@ -68,14 +69,13 @@ def test_remove_calendar_source(test_client: TestClient):
         "ical_url": "https://calendar.google.com/calendar/ical/test2/basic.ics",
     }
     test_client.post("/api/calendar/sources", json=source_data)
-    
+
     # Then remove it
     response = test_client.delete("/api/calendar/sources/test-calendar-2")
     assert response.status_code == 200
-    
+
     # Verify it's gone
     sources_response = test_client.get("/api/calendar/sources")
     sources = sources_response.json()["sources"]
     source_ids = [s["id"] for s in sources]
     assert "test-calendar-2" not in source_ids
-

@@ -1,10 +1,9 @@
 """Service for managing keyboard mappings."""
 
-from typing import Dict, List, Optional
-from sqlalchemy.ext.asyncio import AsyncSession
-from sqlalchemy import select, delete
-from app.models.db_models import KeyboardMappingDB
+from sqlalchemy import delete, select
+
 from app.database import AsyncSessionLocal
+from app.models.db_models import KeyboardMappingDB
 
 
 class KeyboardMappingService:
@@ -12,9 +11,9 @@ class KeyboardMappingService:
 
     def __init__(self):
         """Initialize keyboard mapping service."""
-        self._cache: Dict[str, Dict[str, str]] = {}
+        self._cache: dict[str, dict[str, str]] = {}
 
-    async def get_mappings(self, keyboard_type: str) -> Dict[str, str]:
+    async def get_mappings(self, keyboard_type: str) -> dict[str, str]:
         """
         Get keyboard mappings for a specific keyboard type.
 
@@ -27,20 +26,18 @@ class KeyboardMappingService:
         cache_key = f"mappings_{keyboard_type}"
         if cache_key in self._cache:
             return self._cache[cache_key]
-        
+
         async with AsyncSessionLocal() as session:
             result = await session.execute(
-                select(KeyboardMappingDB).where(
-                    KeyboardMappingDB.keyboard_type == keyboard_type
-                )
+                select(KeyboardMappingDB).where(KeyboardMappingDB.keyboard_type == keyboard_type)
             )
             mappings_db = result.scalars().all()
-            
+
             mappings = {item.key_code: item.action for item in mappings_db}
             self._cache[cache_key] = mappings
             return mappings
 
-    async def get_all_mappings(self) -> Dict[str, Dict[str, str]]:
+    async def get_all_mappings(self) -> dict[str, dict[str, str]]:
         """
         Get all keyboard mappings for all keyboard types.
 
@@ -50,16 +47,16 @@ class KeyboardMappingService:
         async with AsyncSessionLocal() as session:
             result = await session.execute(select(KeyboardMappingDB))
             mappings_db = result.scalars().all()
-            
+
             all_mappings = {}
             for item in mappings_db:
                 if item.keyboard_type not in all_mappings:
                     all_mappings[item.keyboard_type] = {}
                 all_mappings[item.keyboard_type][item.key_code] = item.action
-            
+
             return all_mappings
 
-    async def set_mappings(self, keyboard_type: str, mappings: Dict[str, str]) -> None:
+    async def set_mappings(self, keyboard_type: str, mappings: dict[str, str]) -> None:
         """
         Set keyboard mappings for a specific keyboard type.
 
@@ -70,11 +67,9 @@ class KeyboardMappingService:
         async with AsyncSessionLocal() as session:
             # Delete existing mappings for this keyboard type
             await session.execute(
-                delete(KeyboardMappingDB).where(
-                    KeyboardMappingDB.keyboard_type == keyboard_type
-                )
+                delete(KeyboardMappingDB).where(KeyboardMappingDB.keyboard_type == keyboard_type)
             )
-            
+
             # Add new mappings
             for key_code, action in mappings.items():
                 mapping = KeyboardMappingDB(
@@ -83,9 +78,9 @@ class KeyboardMappingService:
                     action=action,
                 )
                 session.add(mapping)
-            
+
             await session.commit()
-            
+
             # Update cache
             cache_key = f"mappings_{keyboard_type}"
             self._cache[cache_key] = mappings.copy()
@@ -107,7 +102,7 @@ class KeyboardMappingService:
                 )
             )
             mapping = result.scalar_one_or_none()
-            
+
             if mapping:
                 mapping.action = action
             else:
@@ -117,9 +112,9 @@ class KeyboardMappingService:
                     action=action,
                 )
                 session.add(mapping)
-            
+
             await session.commit()
-            
+
             # Update cache
             cache_key = f"mappings_{keyboard_type}"
             if cache_key in self._cache:
@@ -127,7 +122,7 @@ class KeyboardMappingService:
             else:
                 self._cache[cache_key] = {key_code: action}
 
-    async def get_available_actions(self) -> List[str]:
+    async def get_available_actions(self) -> list[str]:
         """
         Get list of available keyboard actions.
 
@@ -165,4 +160,3 @@ class KeyboardMappingService:
 
 # Global keyboard mapping service instance
 keyboard_mapping_service = KeyboardMappingService()
-

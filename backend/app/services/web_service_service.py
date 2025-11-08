@@ -1,11 +1,10 @@
 """Web service management service."""
 
-from typing import List, Optional
-from sqlalchemy.ext.asyncio import AsyncSession
-from sqlalchemy import select, delete
+from sqlalchemy import select
+
+from app.database import AsyncSessionLocal
 from app.models.db_models import WebServiceDB
 from app.models.web_service import WebService, WebServiceCreate, WebServiceUpdate
-from app.database import AsyncSessionLocal
 
 
 class WebServiceService:
@@ -13,9 +12,9 @@ class WebServiceService:
 
     def __init__(self):
         """Initialize web service service."""
-        self._services: List[WebService] = []
+        self._services: list[WebService] = []
 
-    async def get_services(self) -> List[WebService]:
+    async def get_services(self) -> list[WebService]:
         """
         Get all web services, ordered by display_order.
 
@@ -27,22 +26,24 @@ class WebServiceService:
                 select(WebServiceDB).order_by(WebServiceDB.display_order, WebServiceDB.name)
             )
             db_services = result.scalars().all()
-            
+
             services = []
             for db_service in db_services:
-                services.append(WebService(
-                    id=db_service.id,
-                    name=db_service.name,
-                    url=db_service.url,
-                    enabled=db_service.enabled,
-                    display_order=db_service.display_order,
-                    fullscreen=db_service.fullscreen,
-                ))
-            
+                services.append(
+                    WebService(
+                        id=db_service.id,
+                        name=db_service.name,
+                        url=db_service.url,
+                        enabled=db_service.enabled,
+                        display_order=db_service.display_order,
+                        fullscreen=db_service.fullscreen,
+                    )
+                )
+
             self._services = services
             return services
 
-    async def get_service(self, service_id: str) -> Optional[WebService]:
+    async def get_service(self, service_id: str) -> WebService | None:
         """
         Get a web service by ID.
 
@@ -57,7 +58,7 @@ class WebServiceService:
                 select(WebServiceDB).where(WebServiceDB.id == service_id)
             )
             db_service = result.scalar_one_or_none()
-            
+
             if db_service:
                 return WebService(
                     id=db_service.id,
@@ -81,7 +82,7 @@ class WebServiceService:
         """
         # Generate ID if not provided
         service_id = f"web-service-{len(self._services) + 1}-{hash(service.url) % 10000}"
-        
+
         async with AsyncSessionLocal() as session:
             db_service = WebServiceDB(
                 id=service_id,
@@ -94,7 +95,7 @@ class WebServiceService:
             session.add(db_service)
             await session.commit()
             await session.refresh(db_service)
-            
+
             return WebService(
                 id=db_service.id,
                 name=db_service.name,
@@ -104,7 +105,7 @@ class WebServiceService:
                 fullscreen=db_service.fullscreen,
             )
 
-    async def update_service(self, service_id: str, updates: WebServiceUpdate) -> Optional[WebService]:
+    async def update_service(self, service_id: str, updates: WebServiceUpdate) -> WebService | None:
         """
         Update a web service.
 
@@ -120,10 +121,10 @@ class WebServiceService:
                 select(WebServiceDB).where(WebServiceDB.id == service_id)
             )
             db_service = result.scalar_one_or_none()
-            
+
             if not db_service:
                 return None
-            
+
             # Update fields if provided
             if updates.name is not None:
                 db_service.name = updates.name
@@ -135,10 +136,10 @@ class WebServiceService:
                 db_service.display_order = updates.display_order
             if updates.fullscreen is not None:
                 db_service.fullscreen = updates.fullscreen
-            
+
             await session.commit()
             await session.refresh(db_service)
-            
+
             return WebService(
                 id=db_service.id,
                 name=db_service.name,
@@ -163,15 +164,15 @@ class WebServiceService:
                 select(WebServiceDB).where(WebServiceDB.id == service_id)
             )
             db_service = result.scalar_one_or_none()
-            
+
             if not db_service:
                 return False
-            
+
             await session.delete(db_service)
             await session.commit()
             return True
 
-    async def get_enabled_services(self) -> List[WebService]:
+    async def get_enabled_services(self) -> list[WebService]:
         """
         Get all enabled web services, ordered by display_order.
 
@@ -184,4 +185,3 @@ class WebServiceService:
 
 # Global web service instance
 web_service_service = WebServiceService()
-

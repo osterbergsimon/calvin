@@ -1,33 +1,38 @@
 """Configuration endpoints."""
 
-from typing import Optional, Dict, Any
-from fastapi import APIRouter, HTTPException
+from fastapi import APIRouter
 from pydantic import BaseModel
-from app.services.config_service import config_service
 
+from app.services.config_service import config_service
 
 router = APIRouter()
 
 
 class ConfigUpdate(BaseModel):
     """Configuration update model."""
-    orientation: Optional[str] = None
-    calendarSplit: Optional[float] = None
-    keyboardType: Optional[str] = None
-    photoFrameEnabled: Optional[bool] = None
-    photoFrameTimeout: Optional[int] = None
-    showUI: Optional[bool] = None
-    photoRotationInterval: Optional[int] = None  # Photo rotation interval in seconds
-    calendarViewMode: Optional[str] = None  # 'month' or 'rolling'
-    timeFormat: Optional[str] = None  # '12h' or '24h' (default: '24h')
-    showModeIndicator: Optional[bool] = None  # Show mode indicator icon
-    modeIndicatorTimeout: Optional[int] = None  # Mode indicator auto-hide timeout in seconds (0 = never hide)
-    weekStartDay: Optional[int] = None  # Week starting day (0=Sunday, 1=Monday, ..., 6=Saturday)
-    showWeekNumbers: Optional[bool] = None  # Show week numbers in calendar
-    sideViewPosition: Optional[str] = None  # Side view position: 'left' | 'right' for landscape, 'top' | 'bottom' for portrait
-    themeMode: Optional[str] = None  # Theme mode: 'light' | 'dark' | 'auto' | 'time'
-    darkModeStart: Optional[int] = None  # Dark mode start hour (0-23)
-    darkModeEnd: Optional[int] = None  # Dark mode end hour (0-23)
+
+    orientation: str | None = None
+    calendarSplit: float | None = None
+    keyboardType: str | None = None
+    photoFrameEnabled: bool | None = None
+    photoFrameTimeout: int | None = None
+    showUI: bool | None = None
+    photoRotationInterval: int | None = None  # Photo rotation interval in seconds
+    calendarViewMode: str | None = None  # 'month' or 'rolling'
+    timeFormat: str | None = None  # '12h' or '24h' (default: '24h')
+    showModeIndicator: bool | None = None  # Show mode indicator icon
+    modeIndicatorTimeout: int | None = (
+        None  # Mode indicator auto-hide timeout in seconds (0 = never hide)
+    )
+    weekStartDay: int | None = None  # Week starting day (0=Sunday, 1=Monday, ..., 6=Saturday)
+    showWeekNumbers: bool | None = None  # Show week numbers in calendar
+    sideViewPosition: str | None = (
+        None  # Side view position: 'left' | 'right' for landscape, 'top' | 'bottom' for portrait
+    )
+    themeMode: str | None = None  # Theme mode: 'light' | 'dark' | 'auto' | 'time'
+    darkModeStart: int | None = None  # Dark mode start hour (0-23)
+    darkModeEnd: int | None = None  # Dark mode end hour (0-23)
+
     # Allow arbitrary fields for extensibility
     class Config:
         extra = "allow"
@@ -37,7 +42,7 @@ class ConfigUpdate(BaseModel):
 async def get_config():
     """Get current configuration."""
     config = await config_service.get_config()
-    
+
     # Set defaults if not present
     if "orientation" not in config:
         config["orientation"] = "landscape"
@@ -105,7 +110,7 @@ async def get_config():
         config["darkModeEnd"] = 6  # 6 AM default
     elif "dark_mode_end" in config and "darkModeEnd" not in config:
         config["darkModeEnd"] = config["dark_mode_end"]
-    
+
     return config
 
 
@@ -113,7 +118,7 @@ async def get_config():
 async def update_config(config_update: ConfigUpdate):
     """Update configuration."""
     update_dict = config_update.model_dump(exclude_unset=True)
-    
+
     # Convert camelCase to snake_case for storage
     if "calendarSplit" in update_dict:
         update_dict["calendar_split"] = update_dict.pop("calendarSplit")
@@ -147,9 +152,8 @@ async def update_config(config_update: ConfigUpdate):
         update_dict["dark_mode_start"] = update_dict.pop("darkModeStart")
     if "darkModeEnd" in update_dict:
         update_dict["dark_mode_end"] = update_dict.pop("darkModeEnd")
-    
+
     await config_service.update_config(update_dict)
-    
+
     # Return updated config
     return await get_config()
-

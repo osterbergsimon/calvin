@@ -1,12 +1,12 @@
 """Web services API endpoints."""
 
-from typing import List
 from fastapi import APIRouter, HTTPException
+
 from app.models.web_service import (
     WebService,
     WebServiceCreate,
-    WebServiceUpdate,
     WebServicesResponse,
+    WebServiceUpdate,
 )
 from app.services.web_service_service import web_service_service
 
@@ -33,7 +33,7 @@ async def get_web_service(service_id: str):
 async def add_web_service(service: WebServiceCreate):
     """
     Add a new web service.
-    
+
     Note: Some websites block embedding in iframes due to CORS/X-Frame-Options.
     If a service cannot be embedded, you'll see an error message in the viewer.
     You can still open the service in a new window using the provided link.
@@ -57,4 +57,3 @@ async def remove_web_service(service_id: str):
     if not removed:
         raise HTTPException(status_code=404, detail="Web service not found")
     return {"message": "Web service removed", "service_id": service_id}
-

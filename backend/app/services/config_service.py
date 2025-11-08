@@ -1,11 +1,12 @@
 """Configuration service for managing application settings."""
 
-from typing import Optional, Dict, Any
-from sqlalchemy.ext.asyncio import AsyncSession
-from sqlalchemy import select
-from app.models.db_models import ConfigDB
-from app.database import AsyncSessionLocal
 import json
+from typing import Any
+
+from sqlalchemy import select
+
+from app.database import AsyncSessionLocal
+from app.models.db_models import ConfigDB
 
 
 class ConfigService:
@@ -13,9 +14,9 @@ class ConfigService:
 
     def __init__(self):
         """Initialize config service."""
-        self._cache: Dict[str, Any] = {}
+        self._cache: dict[str, Any] = {}
 
-    async def get_config(self) -> Dict[str, Any]:
+    async def get_config(self) -> dict[str, Any]:
         """
         Get all configuration values.
 
@@ -25,11 +26,11 @@ class ConfigService:
         async with AsyncSessionLocal() as session:
             result = await session.execute(select(ConfigDB))
             config_items = result.scalars().all()
-            
+
             config = {}
             for item in config_items:
                 config[item.key] = self._parse_value(item.value, item.value_type)
-            
+
             return config
 
     async def get_value(self, key: str, default: Any = None) -> Any:
@@ -44,16 +45,14 @@ class ConfigService:
             Configuration value or default
         """
         async with AsyncSessionLocal() as session:
-            result = await session.execute(
-                select(ConfigDB).where(ConfigDB.key == key)
-            )
+            result = await session.execute(select(ConfigDB).where(ConfigDB.key == key))
             item = result.scalar_one_or_none()
-            
+
             if item:
                 return self._parse_value(item.value, item.value_type)
             return default
 
-    async def set_value(self, key: str, value: Any, value_type: Optional[str] = None) -> None:
+    async def set_value(self, key: str, value: Any, value_type: str | None = None) -> None:
         """
         Set a configuration value.
 
@@ -64,28 +63,26 @@ class ConfigService:
         """
         if value_type is None:
             value_type = self._detect_type(value)
-        
+
         serialized_value = self._serialize_value(value, value_type)
-        
+
         async with AsyncSessionLocal() as session:
-            result = await session.execute(
-                select(ConfigDB).where(ConfigDB.key == key)
-            )
+            result = await session.execute(select(ConfigDB).where(ConfigDB.key == key))
             item = result.scalar_one_or_none()
-            
+
             if item:
                 item.value = serialized_value
                 item.value_type = value_type
             else:
                 item = ConfigDB(key=key, value=serialized_value, value_type=value_type)
                 session.add(item)
-            
+
             await session.commit()
-            
+
             # Update cache
             self._cache[key] = value
 
-    async def update_config(self, config: Dict[str, Any]) -> None:
+    async def update_config(self, config: dict[str, Any]) -> None:
         """
         Update multiple configuration values.
 
@@ -119,7 +116,7 @@ class ConfigService:
         """Parse a stored value based on its type."""
         if value is None:
             return None
-        
+
         if value_type == "bool":
             return value.lower() in ("true", "1", "yes", "on")
         elif value_type == "int":
@@ -134,4 +131,3 @@ class ConfigService:
 
 # Global config service instance
 config_service = ConfigService()
-

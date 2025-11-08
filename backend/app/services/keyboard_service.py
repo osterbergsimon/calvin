@@ -1,7 +1,6 @@
 """Keyboard service with platform support."""
 
 import platform
-from typing import Dict, Optional
 
 from app.utils.keyboard import get_keyboard_handler
 
@@ -11,18 +10,18 @@ IS_LINUX = platform.system() == "Linux"
 class KeyboardService:
     """Keyboard service for handling keyboard input."""
 
-    def __init__(self, device_path: Optional[str] = None):
+    def __init__(self, device_path: str | None = None):
         """Initialize keyboard service."""
         self.device_path = device_path
         self.handler = get_keyboard_handler(device_path)
-        self.mappings: Dict[str, str] = {}
+        self.mappings: dict[str, str] = {}
         self.is_available = self.handler.is_available
 
-    def set_mappings(self, mappings: Dict[str, str]):
+    def set_mappings(self, mappings: dict[str, str]):
         """Set keyboard key mappings."""
         self.mappings = mappings
 
-    def get_mappings(self) -> Dict[str, str]:
+    def get_mappings(self) -> dict[str, str]:
         """Get current keyboard mappings."""
         return self.mappings
 
@@ -38,4 +37,3 @@ class KeyboardService:
             "device_path": self.device_path,
             "mappings_count": len(self.mappings),
         }
-

@@ -1,8 +1,10 @@
 """Scheduler service for periodic calendar updates."""
 
 from datetime import datetime, timedelta
+
 from apscheduler.schedulers.asyncio import AsyncIOScheduler
 from apscheduler.triggers.interval import IntervalTrigger
+
 from app.services.calendar_service import calendar_service
 
 
@@ -22,7 +24,7 @@ class CalendarScheduler:
             self.scheduler.add_job(
                 self.refresh_calendars,
                 trigger=IntervalTrigger(minutes=15),
-                id='refresh_calendars',
+                id="refresh_calendars",
                 replace_existing=True,
             )
 
@@ -42,15 +44,14 @@ class CalendarScheduler:
         self.refresh_interval = timedelta(minutes=minutes)
         if self.scheduler.running:
             # Reschedule with new interval
-            self.scheduler.remove_job('refresh_calendars')
+            self.scheduler.remove_job("refresh_calendars")
             self.scheduler.add_job(
                 self.refresh_calendars,
                 trigger=IntervalTrigger(minutes=minutes),
-                id='refresh_calendars',
+                id="refresh_calendars",
                 replace_existing=True,
             )
 
 
 # Global scheduler instance
 calendar_scheduler = CalendarScheduler()
-

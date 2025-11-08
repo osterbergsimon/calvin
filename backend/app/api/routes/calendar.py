@@ -1,33 +1,34 @@
 """Calendar API endpoints."""
 
-from datetime import datetime, timedelta, timezone
-from typing import Optional
-from fastapi import APIRouter, Query, HTTPException
+from datetime import UTC, datetime, timedelta
+
+from fastapi import APIRouter, HTTPException, Query
+
 from app.models.calendar import (
     CalendarEventsResponse,
-    CalendarSourcesResponse,
     CalendarSource,
+    CalendarSourcesResponse,
 )
 from app.services.calendar_service import calendar_service
 
 router = APIRouter()
 
 
-def normalize_datetime(dt: Optional[datetime]) -> Optional[datetime]:
+def normalize_datetime(dt: datetime | None) -> datetime | None:
     """Normalize datetime to timezone-aware (UTC if naive)."""
     if dt is None:
         return None
     if dt.tzinfo is None:
-        return dt.replace(tzinfo=timezone.utc)
+        return dt.replace(tzinfo=UTC)
     return dt
 
 
 @router.get("/calendar/events", response_model=CalendarEventsResponse)
 async def get_calendar_events(
-    start_date: Optional[datetime] = Query(None, description="Start date for events"),
-    end_date: Optional[datetime] = Query(None, description="End date for events"),
-    source_ids: Optional[str] = Query(None, description="Comma-separated source IDs"),
-    refresh: Optional[bool] = Query(False, description="Force refresh (clear cache)"),
+    start_date: datetime | None = Query(None, description="Start date for events"),
+    end_date: datetime | None = Query(None, description="End date for events"),
+    source_ids: str | None = Query(None, description="Comma-separated source IDs"),
+    refresh: bool | None = Query(False, description="Force refresh (clear cache)"),
 ):
     """
     Get calendar events for a date range.
@@ -37,25 +38,27 @@ async def get_calendar_events(
     # Normalize datetimes to timezone-aware (UTC if naive)
     start_date = normalize_datetime(start_date)
     end_date = normalize_datetime(end_date)
-    
+
     # Default to current month if not provided
     if not start_date:
-        now = datetime.now(timezone.utc)
-        start_date = datetime(now.year, now.month, 1, tzinfo=timezone.utc)
-    
+        now = datetime.now(UTC)
+        start_date = datetime(now.year, now.month, 1, tzinfo=UTC)
+
     if not end_date:
         if start_date:
             # End of month
             if start_date.month == 12:
-                end_date = datetime(start_date.year + 1, 1, 1, tzinfo=timezone.utc) - timedelta(days=1)
+                end_date = datetime(start_date.year + 1, 1, 1, tzinfo=UTC) - timedelta(days=1)
             else:
-                end_date = datetime(start_date.year, start_date.month + 1, 1, tzinfo=timezone.utc) - timedelta(days=1)
+                end_date = datetime(
+                    start_date.year, start_date.month + 1, 1, tzinfo=UTC
+                ) - timedelta(days=1)
         else:
-            now = datetime.now(timezone.utc)
+            now = datetime.now(UTC)
             if now.month == 12:
-                end_date = datetime(now.year + 1, 1, 1, tzinfo=timezone.utc) - timedelta(days=1)
+                end_date = datetime(now.year + 1, 1, 1, tzinfo=UTC) - timedelta(days=1)
             else:
-                end_date = datetime(now.year, now.month + 1, 1, tzinfo=timezone.utc) - timedelta(days=1)
+                end_date = datetime(now.year, now.month + 1, 1, tzinfo=UTC) - timedelta(days=1)
 
     # Parse source IDs if provided
     source_id_list = None
@@ -88,41 +91,42 @@ async def get_calendar_sources():
 async def add_calendar_source(source: CalendarSource):
     """
     Add a new calendar source.
-    
+
     For Google Calendar:
     - type: "google"
     - ical_url: The public iCal URL or share URL from Google Calendar
     - Share URL example: https://calendar.google.com/calendar/u/0?cid=...
     - iCal URL example: https://calendar.google.com/calendar/ical/.../basic.ics
     - The service will automatically convert share URLs to iCal format.
-    
+
     For Proton Calendar:
     - type: "proton"
     - ical_url: The iCal feed URL from Proton Calendar
     - URL format: https://calendar.proton.me/api/calendar/v1/url/{calendar_id}/calendar.ics?CacheKey=...&PassphraseKey=...
     - You can get this URL from Proton Calendar's sharing settings.
     - The URL includes authentication parameters (CacheKey and PassphraseKey) in the query string.
-    
+
     Calendar events are cached for 5 minutes and automatically refreshed.
     """
     # Normalize Google Calendar URLs if needed
-    if source.type == 'google' and source.ical_url:
+    if source.type == "google" and source.ical_url:
         from app.utils.google_calendar import normalize_google_calendar_url
+
         source.ical_url = normalize_google_calendar_url(source.ical_url)
-    
+
     # Validate Proton Calendar URL format
-    if source.type == 'proton' and source.ical_url:
-        if not source.ical_url.startswith('https://calendar.proton.me/api/calendar/v1/url/'):
+    if source.type == "proton" and source.ical_url:
+        if not source.ical_url.startswith("https://calendar.proton.me/api/calendar/v1/url/"):
             raise HTTPException(
                 status_code=400,
-                detail="Invalid Proton Calendar URL. Expected format: https://calendar.proton.me/api/calendar/v1/url/{calendar_id}/calendar.ics?CacheKey=...&PassphraseKey=..."
+                detail="Invalid Proton Calendar URL. Expected format: https://calendar.proton.me/api/calendar/v1/url/{calendar_id}/calendar.ics?CacheKey=...&PassphraseKey=...",
             )
-        if '/calendar.ics' not in source.ical_url:
+        if "/calendar.ics" not in source.ical_url:
             raise HTTPException(
                 status_code=400,
-                detail="Invalid Proton Calendar URL. Must include '/calendar.ics' endpoint."
+                detail="Invalid Proton Calendar URL. Must include '/calendar.ics' endpoint.",
             )
-    
+
     return await calendar_service.add_source(source)
 
 
@@ -142,4 +146,3 @@ async def remove_calendar_source(source_id: str):
     if not removed:
         raise HTTPException(status_code=404, detail="Calendar source not found")
     return {"message": "Calendar source removed", "source_id": source_id}
-

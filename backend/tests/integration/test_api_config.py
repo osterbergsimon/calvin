@@ -21,7 +21,7 @@ def test_update_config(test_client: TestClient):
     # Get current config
     get_response = test_client.get("/api/config")
     assert get_response.status_code == 200
-    
+
     # Update config
     update_data = {
         "orientation": "portrait",
@@ -29,7 +29,7 @@ def test_update_config(test_client: TestClient):
     }
     update_response = test_client.post("/api/config", json=update_data)
     assert update_response.status_code == 200
-    
+
     # Verify update
     updated_config = update_response.json()
     assert updated_config.get("orientation") == "portrait"
@@ -43,7 +43,7 @@ def test_update_config_partial(test_client: TestClient):
     update_data = {"orientation": "landscape"}
     response = test_client.post("/api/config", json=update_data)
     assert response.status_code == 200
-    
+
     # Verify only that field changed
     config = response.json()
     assert config.get("orientation") == "landscape"

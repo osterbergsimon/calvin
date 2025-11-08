@@ -20,4 +20,3 @@ async def detailed_health_check():
             "api": "running",
         },
     }
-

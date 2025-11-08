@@ -1,6 +1,7 @@
 """Database models for calendar sources and configuration."""
 
-from sqlalchemy import Column, String, Boolean, Text, Integer, Float
+from sqlalchemy import Boolean, Column, Integer, String, Text
+
 from app.database import Base
 
 
@@ -38,10 +39,8 @@ class KeyboardMappingDB(Base):
     keyboard_type = Column(String, nullable=False)  # '7-button' or 'standard'
     key_code = Column(String, nullable=False)  # e.g., 'KEY_1', 'KEY_RIGHT'
     action = Column(String, nullable=False)  # e.g., 'calendar_next_month'
-    
-    __table_args__ = (
-        {"sqlite_autoincrement": True},
-    )
+
+    __table_args__ = ({"sqlite_autoincrement": True},)
 
 
 class WebServiceDB(Base):

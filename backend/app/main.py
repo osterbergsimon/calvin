@@ -1,16 +1,17 @@
 """Main FastAPI application entry point."""
 
 from contextlib import asynccontextmanager
+
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
-from app.api.routes import calendar, config, health, keyboard, images, web_services
-from app.services.scheduler import calendar_scheduler
-from app.database import init_db
-from app.services.calendar_service import calendar_service
-from app.services import image_service as image_service_module
-from app.services.image_service import ImageService
+from app.api.routes import calendar, config, health, images, keyboard, web_services
 from app.config import settings
+from app.database import init_db
+from app.services import image_service as image_service_module
+from app.services.calendar_service import calendar_service
+from app.services.image_service import ImageService
+from app.services.scheduler import calendar_scheduler
 
 
 @asynccontextmanager
@@ -20,20 +21,21 @@ async def lifespan(app: FastAPI):
     # Initialize database
     await init_db()
     print("Database initialized")
-    
+
     # Run migrations
     from app.utils.migrations import migrate_database
+
     await migrate_database()
     print("Database migrations completed")
-    
+
     # Load calendar sources from database
     await calendar_service.load_sources_from_db()
     print(f"Loaded {len(calendar_service.sources)} calendar sources from database")
-    
+
     # Initialize default keyboard mappings if none exist
-    from app.services.keyboard_mapping_service import keyboard_mapping_service
     from app.services.config_service import config_service
-    
+    from app.services.keyboard_mapping_service import keyboard_mapping_service
+
     # Check if keyboard mappings exist, if not, create defaults
     mappings = await keyboard_mapping_service.get_all_mappings()
     if not mappings:
@@ -50,28 +52,30 @@ async def lifespan(app: FastAPI):
             "KEY_7": "mode_spare",
         }
         await keyboard_mapping_service.set_mappings("7-button", default_7button)
-        
+
         # Set default standard keyboard mappings
         # Layout: 3 generic buttons (next, prev, expand/close) + 4 mode buttons (calendar, photos, services, spare)
         default_standard = {
-            "KEY_RIGHT": "generic_next",           # Generic Next (context-aware)
-            "KEY_LEFT": "generic_prev",            # Generic Previous (context-aware)
-            "KEY_UP": "generic_expand_close",      # Generic Expand/Close (context-aware)
-            "KEY_DOWN": "mode_calendar",            # Mode: Calendar
-            "KEY_SPACE": "mode_photos",            # Mode: Photos
-            "KEY_1": "mode_web_services",          # Mode: Web Services
-            "KEY_2": "mode_spare",                 # Mode: Spare
-            "KEY_S": "mode_settings",              # Settings (separate)
+            "KEY_RIGHT": "generic_next",  # Generic Next (context-aware)
+            "KEY_LEFT": "generic_prev",  # Generic Previous (context-aware)
+            "KEY_UP": "generic_expand_close",  # Generic Expand/Close (context-aware)
+            "KEY_DOWN": "mode_calendar",  # Mode: Calendar
+            "KEY_SPACE": "mode_photos",  # Mode: Photos
+            "KEY_1": "mode_web_services",  # Mode: Web Services
+            "KEY_2": "mode_spare",  # Mode: Spare
+            "KEY_S": "mode_settings",  # Settings (separate)
         }
         await keyboard_mapping_service.set_mappings("standard", default_standard)
         print("Initialized default keyboard mappings")
-    
+
     # Initialize image service
     image_service_module.image_service = ImageService(settings.image_dir)
     # Do initial scan
     image_service_module.image_service.scan_images()
-    print(f"Image service initialized: {len(image_service_module.image_service.get_images())} images found")
-    
+    print(
+        f"Image service initialized: {len(image_service_module.image_service.get_images())} images found"
+    )
+
     # Initialize default config if not present
     orientation = await config_service.get_value("orientation")
     if orientation is None:
@@ -112,7 +116,7 @@ async def lifespan(app: FastAPI):
     side_view_position = await config_service.get_value("side_view_position")
     if side_view_position is None:
         await config_service.set_value("side_view_position", "right")  # Right/bottom default
-    
+
     # Start scheduler
     calendar_scheduler.start()
     print("Calendar scheduler started - refreshing every 15 minutes")
@@ -151,4 +155,3 @@ app.include_router(web_services.router, prefix="/api", tags=["web-services"])
 async def root():
     """Root endpoint."""
     return {"message": "Calvin Dashboard API", "version": "0.1.0"}
-

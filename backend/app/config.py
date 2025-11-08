@@ -1,8 +1,6 @@
 """Configuration management."""
 
-import os
 from pathlib import Path
-from typing import Optional
 
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
@@ -28,7 +26,7 @@ class Settings(BaseSettings):
     # Image Storage
     image_dir: Path = Path("./data/images")
     image_cache_dir: Path = Path("./data/cache/images")
-    
+
     # Photo Frame Mode
     photo_frame_enabled: bool = False
     photo_frame_timeout: int = 300  # seconds (5 minutes default)
@@ -47,11 +45,8 @@ class Settings(BaseSettings):
         self.log_dir.mkdir(parents=True, exist_ok=True)
         self.image_dir.mkdir(parents=True, exist_ok=True)
         self.image_cache_dir.mkdir(parents=True, exist_ok=True)
-        Path(self.database_url.replace("sqlite:///", "")).parent.mkdir(
-            parents=True, exist_ok=True
-        )
+        Path(self.database_url.replace("sqlite:///", "")).parent.mkdir(parents=True, exist_ok=True)
 
 
 # Global settings instance
 settings = Settings()
-

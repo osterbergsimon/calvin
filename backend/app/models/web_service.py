@@ -1,7 +1,6 @@
 """Web service data models."""
 
-from typing import Optional
-from pydantic import BaseModel, Field, HttpUrl
+from pydantic import BaseModel, Field
 
 
 class WebService(BaseModel):
@@ -28,11 +27,11 @@ class WebServiceCreate(BaseModel):
 class WebServiceUpdate(BaseModel):
     """Model for updating a web service."""
 
-    name: Optional[str] = None
-    url: Optional[str] = None
-    enabled: Optional[bool] = None
-    display_order: Optional[int] = None
-    fullscreen: Optional[bool] = None
+    name: str | None = None
+    url: str | None = None
+    enabled: bool | None = None
+    display_order: int | None = None
+    fullscreen: bool | None = None
 
 
 class WebServicesResponse(BaseModel):
@@ -40,4 +39,3 @@ class WebServicesResponse(BaseModel):
 
     services: list[WebService] = Field(default_factory=list)
     total: int = 0
-

@@ -1,7 +1,7 @@
 """Calendar data models."""
 
 from datetime import datetime
-from typing import Optional
+
 from pydantic import BaseModel, Field
 
 
@@ -12,10 +12,10 @@ class CalendarEvent(BaseModel):
     title: str
     start: datetime
     end: datetime
-    description: Optional[str] = None
-    location: Optional[str] = None
+    description: str | None = None
+    location: str | None = None
     source: str  # 'google' or 'proton'
-    color: Optional[str] = None
+    color: str | None = None
     all_day: bool = False
 
 
@@ -26,9 +26,9 @@ class CalendarSource(BaseModel):
     type: str  # 'google' or 'proton'
     name: str
     enabled: bool = True
-    ical_url: Optional[str] = None  # For Google Calendar share links
-    api_key: Optional[str] = None  # For API-based sources
-    color: Optional[str] = None  # Hex color code for calendar events (e.g., "#2196f3")
+    ical_url: str | None = None  # For Google Calendar share links
+    api_key: str | None = None  # For API-based sources
+    color: str | None = None  # Hex color code for calendar events (e.g., "#2196f3")
     show_time: bool = True  # Show event times in calendar
 
 
@@ -46,4 +46,3 @@ class CalendarSourcesResponse(BaseModel):
 
     sources: list[CalendarSource] = Field(default_factory=list)
     total: int = 0
-
