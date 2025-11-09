@@ -72,24 +72,39 @@ const onKeyDown = async (event) => {
   }
 };
 
-onMounted(async () => {
-  // Load keyboard mappings and config
+const loadKeyboardConfig = async () => {
   try {
     await keyboardStore.fetchMappings();
     // Load keyboard type from config API
     const response = await fetch("/api/config");
     if (response.ok) {
       const config = await response.json();
-      if (config.keyboardType) {
-        keyboardStore.setKeyboardType(config.keyboardType);
+      if (config.keyboardType || config.keyboard_type) {
+        keyboardStore.setKeyboardType(config.keyboardType || config.keyboard_type);
       }
     }
   } catch (error) {
     console.error("Failed to load keyboard mappings:", error);
   }
+};
+
+onMounted(async () => {
+  // Load keyboard mappings and config
+  await loadKeyboardConfig();
+  
+  // Poll for keyboard config updates (every 30 seconds, same as dashboard config polling)
+  // This allows keyboard settings changed from another device to take effect
+  const keyboardConfigInterval = setInterval(async () => {
+    await loadKeyboardConfig();
+  }, 30000);
 
   // Add global keyboard listener
   window.addEventListener("keydown", onKeyDown);
+  
+  // Clean up interval on unmount
+  onUnmounted(() => {
+    clearInterval(keyboardConfigInterval);
+  });
 });
 
 onUnmounted(() => {

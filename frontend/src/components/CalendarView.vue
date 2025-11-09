@@ -805,8 +805,7 @@ onActivated(() => {
 }
 
 .calendar-view:focus {
-  outline: 2px solid var(--accent-primary);
-  outline-offset: -2px;
+  outline: none;
 }
 
 .calendar-header {
@@ -915,7 +914,7 @@ onActivated(() => {
 .calendar-content {
   flex: 1;
   padding: 1rem;
-  overflow-y: auto;
+  overflow: hidden;
   display: flex;
   flex-direction: column;
   min-height: 0;
