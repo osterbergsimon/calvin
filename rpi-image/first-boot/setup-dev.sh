@@ -105,14 +105,20 @@ if ! command -v uv &> /dev/null; then
         export PATH="/home/calvin/.local/bin:/home/calvin/.cargo/bin:$PATH"
     fi
 fi
+# Fix ownership of Calvin directory (in case script was run as root)
+chown -R calvin:calvin "$CALVIN_DIR"
 # Use lower concurrency to reduce memory usage on Pi 3B+
 export UV_CONCURRENCY=1
-uv sync --extra dev --extra linux
+# Run UV as calvin user to ensure proper permissions
+sudo -u calvin bash -c "cd '$CALVIN_DIR/backend' && export PATH='/home/calvin/.local/bin:/home/calvin/.cargo/bin:\$PATH' && export UV_CONCURRENCY=1 && uv sync --extra dev --extra linux"
 
 # Install frontend dependencies
 echo "[$(date)] Installing frontend dependencies..." | tee -a "$LOG_FILE"
 cd "$CALVIN_DIR/frontend"
-npm ci
+# Fix ownership before npm install
+chown -R calvin:calvin "$CALVIN_DIR/frontend"
+# Run npm as calvin user
+sudo -u calvin bash -c "cd '$CALVIN_DIR/frontend' && npm ci"
 
 # Build frontend
 echo "[$(date)] Building frontend..." | tee -a "$LOG_FILE"
