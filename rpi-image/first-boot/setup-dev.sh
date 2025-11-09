@@ -263,13 +263,19 @@ free -h | tee -a "$LOG_FILE"
 # Install frontend dependencies
 echo "[$(date)] Installing frontend dependencies..." | tee -a "$LOG_FILE"
 cd "$CALVIN_DIR/frontend"
-# Fix ownership before npm install
+# Fix ownership before npm install (including dist directory if it exists)
 chown -R calvin:calvin "$CALVIN_DIR/frontend"
+# Remove dist directory if it exists and has wrong permissions
+if [ -d "$CALVIN_DIR/frontend/dist" ]; then
+    rm -rf "$CALVIN_DIR/frontend/dist"
+fi
 # Clean and reinstall dependencies to ensure all transitive dependencies are installed
 echo "[$(date)] Cleaning and installing frontend dependencies..." | tee -a "$LOG_FILE"
 sudo -u calvin bash -c "cd '$CALVIN_DIR/frontend' && rm -rf node_modules package-lock.json && npm install"
 # Build frontend
 echo "[$(date)] Building frontend..." | tee -a "$LOG_FILE"
+# Ensure dist directory ownership is correct before build
+chown -R calvin:calvin "$CALVIN_DIR/frontend" 2>/dev/null || true
 sudo -u calvin bash -c "cd '$CALVIN_DIR/frontend' && npm run build"
 
 # Create data directories
