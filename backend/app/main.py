@@ -160,8 +160,14 @@ project_root = Path(__file__).parent.parent.parent
 frontend_dist = project_root / "frontend" / "dist"
 
 # Mount static assets (JS, CSS, images, etc.)
+# This must be mounted BEFORE the catch-all route to take precedence
 if frontend_dist.exists():
-    app.mount("/assets", StaticFiles(directory=str(frontend_dist / "assets")), name="assets")
+    assets_dir = frontend_dist / "assets"
+    if assets_dir.exists():
+        app.mount("/assets", StaticFiles(directory=str(assets_dir)), name="assets")
+        print(f"Mounted static assets from: {assets_dir}")
+    else:
+        print(f"WARNING: Assets directory not found: {assets_dir}")
     
     # Serve index.html for root path
     @app.get("/")
@@ -173,16 +179,18 @@ if frontend_dist.exists():
         return {"message": "Calvin Dashboard API", "version": "0.1.0"}
     
     # Serve index.html for all other non-API routes (SPA routing)
-    # This must come after API routes to avoid intercepting them
+    # This must come after API routes and asset mounts to avoid intercepting them
     @app.get("/{full_path:path}")
     async def serve_frontend(full_path: str):
         """Serve frontend index.html for SPA routing."""
-        # Skip API routes, docs, and static assets (already handled)
+        # Don't handle API routes, docs, or assets (already handled by mounts/routers)
         if (full_path.startswith("api/") or 
             full_path.startswith("docs") or 
             full_path.startswith("openapi.json") or
             full_path.startswith("assets/")):
-            return {"message": "Calvin Dashboard API", "version": "0.1.0"}
+            # Return 404 for assets that don't exist (let StaticFiles handle it)
+            from fastapi import HTTPException
+            raise HTTPException(status_code=404, detail="Not found")
         
         index_path = frontend_dist / "index.html"
         if index_path.exists():
