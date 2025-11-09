@@ -23,8 +23,8 @@ SyslogIdentifier=calvin-backend
 NoNewPrivileges=true
 PrivateTmp=true
 ProtectSystem=strict
-ProtectHome=read-only
-ReadWritePaths=/home/calvin/calvin/backend/data /home/calvin/calvin/backend/logs
+# Allow writes to Calvin directory (needed for database and data)
+ReadWritePaths=/home/calvin/calvin/backend/data /home/calvin/calvin/backend/logs /home/calvin/calvin/backend
 
 [Install]
 WantedBy=multi-user.target

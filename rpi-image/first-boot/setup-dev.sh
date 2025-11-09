@@ -278,8 +278,16 @@ mkdir -p "$CALVIN_DIR/backend/data/db"
 mkdir -p "$CALVIN_DIR/backend/data/images"
 mkdir -p "$CALVIN_DIR/backend/data/cache/images"
 mkdir -p "$CALVIN_DIR/backend/logs"
+# Ensure all directories have correct ownership and permissions
 chown -R calvin:calvin "$CALVIN_DIR/backend/data"
 chown -R calvin:calvin "$CALVIN_DIR/backend/logs"
+chmod -R 755 "$CALVIN_DIR/backend/data"
+chmod -R 755 "$CALVIN_DIR/backend/logs"
+# Verify directories exist
+if [ ! -d "$CALVIN_DIR/backend/data/db" ]; then
+    echo "[$(date)] ERROR: Failed to create data directories!" | tee -a "$LOG_FILE"
+    exit 1
+fi
 
 # Install update script
 echo "[$(date)] Installing update script..." | tee -a "$LOG_FILE"
