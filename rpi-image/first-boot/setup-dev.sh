@@ -275,11 +275,23 @@ sudo -u calvin bash -c "cd '$CALVIN_DIR/frontend' && rm -rf node_modules package
     echo "[$(date)] ERROR: npm install failed. Retrying..." | tee -a "$LOG_FILE"
     sudo -u calvin bash -c "cd '$CALVIN_DIR/frontend' && npm cache clean --force && npm install"
 }
-# Verify axios is installed
+# Verify axios is installed - if not, install it explicitly
 if [ ! -d "$CALVIN_DIR/frontend/node_modules/axios" ]; then
-    echo "[$(date)] ERROR: axios not found in node_modules. Reinstalling..." | tee -a "$LOG_FILE"
-    sudo -u calvin bash -c "cd '$CALVIN_DIR/frontend' && npm install axios"
+    echo "[$(date)] WARNING: axios not found in node_modules after npm install. Installing explicitly..." | tee -a "$LOG_FILE"
+    sudo -u calvin bash -c "cd '$CALVIN_DIR/frontend' && npm install axios" || {
+        echo "[$(date)] ERROR: Failed to install axios. Retrying with cache clean..." | tee -a "$LOG_FILE"
+        sudo -u calvin bash -c "cd '$CALVIN_DIR/frontend' && npm cache clean --force && npm install axios"
+    }
 fi
+# Verify axios is now installed
+if [ ! -d "$CALVIN_DIR/frontend/node_modules/axios" ]; then
+    echo "[$(date)] ERROR: axios still not found after explicit install. Checking package.json..." | tee -a "$LOG_FILE"
+    cat "$CALVIN_DIR/frontend/package.json" | grep -i axios | tee -a "$LOG_FILE"
+    echo "[$(date)] Listing node_modules contents..." | tee -a "$LOG_FILE"
+    ls -la "$CALVIN_DIR/frontend/node_modules" | head -20 | tee -a "$LOG_FILE"
+    exit 1
+fi
+echo "[$(date)] Verified axios is installed" | tee -a "$LOG_FILE"
 # Build frontend
 echo "[$(date)] Building frontend..." | tee -a "$LOG_FILE"
 # Ensure dist directory ownership is correct before build
