@@ -1,6 +1,7 @@
 """System management endpoints."""
 
 import asyncio
+import os
 import subprocess
 from pathlib import Path
 
@@ -24,31 +25,57 @@ async def trigger_update():
         )
     
     try:
-        # Run update script in background (non-blocking)
-        # Use subprocess.Popen to run asynchronously
-        process = subprocess.Popen(
-            ["/bin/bash", str(update_script)],
-            stdout=subprocess.PIPE,
-            stderr=subprocess.PIPE,
-            text=True,
-        )
+        # Ensure log directory exists
+        log_dir = Path("/home/calvin/calvin/backend/logs")
+        log_dir.mkdir(parents=True, exist_ok=True)
+        log_file = log_dir / "calvin-update.log"
         
-        # Don't wait for completion - return immediately
-        # Try to determine log file location
-        log_locations = [
-            "/home/calvin/calvin/backend/logs/calvin-update.log",
-            "/home/calvin/calvin-update.log",
-            "/tmp/calvin-update.log",
-            "/var/log/calvin-update.log",
-        ]
-        log_location = log_locations[0]  # Default to first location
+        # Run update script in background (non-blocking)
+        # Redirect both stdout and stderr to log file AND keep them for error checking
+        with open(log_file, "a") as log_f:
+            process = subprocess.Popen(
+                ["/bin/bash", str(update_script)],
+                stdout=log_f,
+                stderr=subprocess.STDOUT,  # Merge stderr into stdout
+                text=True,
+                cwd="/home/calvin/calvin",  # Set working directory
+                env={
+                    **os.environ,
+                    "PATH": "/home/calvin/.local/bin:/usr/local/bin:/usr/bin:/bin",
+                },
+            )
+        
+        # Wait a moment to see if process starts successfully
+        import time
+        time.sleep(0.5)
+        
+        # Check if process is still running (didn't immediately fail)
+        if process.poll() is not None:
+            # Process already finished (likely an error)
+            error_msg = "Update script exited immediately. "
+            if log_file.exists():
+                try:
+                    with open(log_file, "r") as f:
+                        last_lines = f.readlines()[-5:]
+                        error_msg += "Last log: " + "".join(last_lines)
+                except:
+                    error_msg += "Check log file for details."
+            else:
+                error_msg += "Log file not created. Script may not be executable or may have failed."
+            
+            raise HTTPException(
+                status_code=500,
+                detail=error_msg
+            )
         
         return {
             "status": "started",
-            "message": f"Update process started (PID: {process.pid}). Check logs at {log_location} or /tmp/calvin-update.log",
+            "message": f"Update process started (PID: {process.pid})",
             "pid": process.pid,
-            "log_file": log_location,
+            "log_file": str(log_file),
         }
+    except HTTPException:
+        raise
     except Exception as e:
         raise HTTPException(
             status_code=500,
@@ -83,24 +110,49 @@ async def get_update_status():
         }
     
     try:
-        # Read last 20 lines of log
+        # Read last 30 lines of log for better context
         with open(log_file, "r") as f:
             lines = f.readlines()
-            last_lines = lines[-20:] if len(lines) > 20 else lines
+            last_lines = lines[-30:] if len(lines) > 30 else lines
         
         # Check if update is currently running
         # Look for "Starting Calvin update" without "Update complete!"
         log_content = "".join(last_lines)
-        is_running = "Starting Calvin update" in log_content and "Update complete!" not in log_content[-500:]
+        has_started = "Starting Calvin update" in log_content
+        has_completed = "Update complete!" in log_content
+        
+        # Check if process is still running by checking for recent activity
+        # If log was updated in last 30 seconds, assume it's running
+        import time
+        log_mtime = log_file.stat().st_mtime
+        recently_updated = (time.time() - log_mtime) < 30
+        
+        if has_started and not has_completed and recently_updated:
+            status = "running"
+            message = "Update in progress..."
+        elif has_completed:
+            status = "idle"
+            message = "Update completed successfully"
+        elif has_started and not has_completed and not recently_updated:
+            status = "error"
+            message = "Update appears to have stalled or failed"
+        else:
+            status = "unknown"
+            message = "Update status unknown"
+        
+        # Get last 15 lines for display
+        display_lines = "".join(last_lines[-15:])
         
         return {
-            "status": "running" if is_running else "idle",
-            "last_log": "".join(last_lines[-10:]),  # Last 10 lines
-            "message": "Update in progress" if is_running else "Last update completed",
+            "status": status,
+            "last_log": display_lines,
+            "message": message,
+            "log_file": str(log_file),
         }
     except Exception as e:
         return {
             "status": "error",
             "message": f"Failed to read update log: {str(e)}",
+            "last_log": "",
         }
 

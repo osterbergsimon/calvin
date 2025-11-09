@@ -1242,39 +1242,72 @@ const triggerUpdate = async () => {
   
   try {
     const response = await axios.post("/api/system/update");
-    updateMessage.value = response.data.message || "Update started successfully. Check logs at /var/log/calvin-update.log";
-    updateMessageClass.value = "success";
+    updateMessage.value = response.data.message || "Update started successfully";
+    updateMessageClass.value = "info";
     
     // Poll for update status
+    let pollCount = 0;
+    const maxPolls = 120; // 10 minutes max (120 * 5 seconds)
+    
     const checkStatus = async () => {
+      pollCount++;
+      
+      // Safety timeout
+      if (pollCount > maxPolls) {
+        updateInProgress.value = false;
+        updateMessage.value = "Update is taking longer than expected. Please check the logs manually.";
+        updateMessageClass.value = "error";
+        return;
+      }
+      
       try {
         const statusResponse = await axios.get("/api/system/update/status");
-        if (statusResponse.data.status === "idle") {
+        const status = statusResponse.data.status;
+        const lastLog = statusResponse.data.last_log || "";
+        const message = statusResponse.data.message || "";
+        
+        if (status === "idle" || status === "completed") {
           updateInProgress.value = false;
-          updateMessage.value = "Update completed! The system will restart services automatically.";
+          updateMessage.value = "✅ Update completed successfully! Reloading page...";
           updateMessageClass.value = "success";
           // Reload page after a delay to show updated frontend
           setTimeout(() => {
             window.location.reload();
-          }, 3000);
-        } else if (statusResponse.data.status === "running") {
-          updateMessage.value = "Update in progress... " + (statusResponse.data.last_log || "");
+          }, 2000);
+        } else if (status === "error") {
+          updateInProgress.value = false;
+          updateMessage.value = `❌ Update failed: ${message}\n\nLast log:\n${lastLog}`;
+          updateMessageClass.value = "error";
+        } else if (status === "running") {
+          // Show progress with last log lines
+          const logLines = lastLog.split('\n').filter(line => line.trim()).slice(-3);
+          const progressText = logLines.length > 0 
+            ? logLines.join('\n') 
+            : message || "Update in progress...";
+          updateMessage.value = `🔄 ${progressText}`;
           updateMessageClass.value = "info";
-          // Check again in 5 seconds
-          setTimeout(checkStatus, 5000);
+          // Check again in 3 seconds for more responsive updates
+          setTimeout(checkStatus, 3000);
+        } else {
+          // Unknown status, keep checking
+          updateMessage.value = `⏳ ${message || "Checking update status..."}`;
+          updateMessageClass.value = "info";
+          setTimeout(checkStatus, 3000);
         }
       } catch (error) {
         console.error("Failed to check update status:", error);
-        // Continue checking
+        // Continue checking, but show error
+        updateMessage.value = `⚠️ Error checking status: ${error.message}. Retrying...`;
+        updateMessageClass.value = "info";
         setTimeout(checkStatus, 5000);
       }
     };
     
-    // Start checking status after 2 seconds
-    setTimeout(checkStatus, 2000);
+    // Start checking status after 1 second
+    setTimeout(checkStatus, 1000);
   } catch (error) {
     updateInProgress.value = false;
-    updateMessage.value = error.response?.data?.detail || "Failed to start update. Please check the logs.";
+    updateMessage.value = `❌ Failed to start update: ${error.response?.data?.detail || error.message || "Unknown error"}`;
     updateMessageClass.value = "error";
     console.error("Failed to trigger update:", error);
   }
