@@ -72,11 +72,8 @@ export const useImagesStore = defineStore("images", () => {
     try {
       const formData = new FormData();
       formData.append("file", file);
-      const response = await axios.post("/api/images/upload", formData, {
-        headers: {
-          "Content-Type": "multipart/form-data",
-        },
-      });
+      // Don't set Content-Type header - let axios set it automatically with boundary
+      const response = await axios.post("/api/images/upload", formData);
       // Refresh images list
       await fetchImages();
       return response.data;
