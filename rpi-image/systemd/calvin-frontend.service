@@ -3,7 +3,8 @@ Description=Calvin Dashboard Frontend (Kiosk Mode)
 After=network.target calvin-backend.service
 Requires=calvin-backend.service
 Wants=graphical.target
-# Don't fail if X isn't available yet - it will start via .bash_profile on tty1
+# Start after X server is available (via .bash_profile on tty1)
+# The service will wait for X server in ExecStartPre
 
 [Service]
 Type=simple
