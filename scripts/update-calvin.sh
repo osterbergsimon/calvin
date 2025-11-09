@@ -57,6 +57,14 @@ else
     fi
 fi
 
+# Update the update script itself if it exists in the repo
+if [ -f "$REPO_DIR/scripts/update-calvin.sh" ] && [ -f "/usr/local/bin/update-calvin.sh" ]; then
+    echo "Updating update script..." | tee -a "$LOG_FILE"
+    cp "$REPO_DIR/scripts/update-calvin.sh" /usr/local/bin/update-calvin.sh
+    chmod +x /usr/local/bin/update-calvin.sh
+    chown calvin:calvin /usr/local/bin/update-calvin.sh 2>/dev/null || true
+fi
+
 # Update backend dependencies
 echo "Updating backend dependencies..." | tee -a "$LOG_FILE"
 cd "$REPO_DIR/backend" || {
