@@ -32,6 +32,9 @@ class ConfigUpdate(BaseModel):
     themeMode: str | None = None  # Theme mode: 'light' | 'dark' | 'auto' | 'time'
     darkModeStart: int | None = None  # Dark mode start hour (0-23)
     darkModeEnd: int | None = None  # Dark mode end hour (0-23)
+    displayScheduleEnabled: bool | None = None  # Enable display power schedule
+    displayOffTime: str | None = None  # Display off time (format: "HH:MM")
+    displayOnTime: str | None = None  # Display on time (format: "HH:MM")
 
     # Allow arbitrary fields for extensibility
     class Config:
@@ -110,6 +113,18 @@ async def get_config():
         config["darkModeEnd"] = 6  # 6 AM default
     elif "dark_mode_end" in config and "darkModeEnd" not in config:
         config["darkModeEnd"] = config["dark_mode_end"]
+    if "displayScheduleEnabled" not in config and "display_schedule_enabled" not in config:
+        config["displayScheduleEnabled"] = False  # Disabled by default
+    elif "display_schedule_enabled" in config and "displayScheduleEnabled" not in config:
+        config["displayScheduleEnabled"] = config["display_schedule_enabled"]
+    if "displayOffTime" not in config and "display_off_time" not in config:
+        config["displayOffTime"] = "22:00"  # 10 PM default
+    elif "display_off_time" in config and "displayOffTime" not in config:
+        config["displayOffTime"] = config["display_off_time"]
+    if "displayOnTime" not in config and "display_on_time" not in config:
+        config["displayOnTime"] = "06:00"  # 6 AM default
+    elif "display_on_time" in config and "displayOnTime" not in config:
+        config["displayOnTime"] = config["display_on_time"]
 
     return config
 
@@ -152,6 +167,12 @@ async def update_config(config_update: ConfigUpdate):
         update_dict["dark_mode_start"] = update_dict.pop("darkModeStart")
     if "darkModeEnd" in update_dict:
         update_dict["dark_mode_end"] = update_dict.pop("darkModeEnd")
+    if "displayScheduleEnabled" in update_dict:
+        update_dict["display_schedule_enabled"] = update_dict.pop("displayScheduleEnabled")
+    if "displayOffTime" in update_dict:
+        update_dict["display_off_time"] = update_dict.pop("displayOffTime")
+    if "displayOnTime" in update_dict:
+        update_dict["display_on_time"] = update_dict.pop("displayOnTime")
 
     await config_service.update_config(update_dict)
 

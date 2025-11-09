@@ -20,6 +20,9 @@ export const useConfigStore = defineStore("config", () => {
   const themeMode = ref("auto"); // Theme mode: 'light' | 'dark' | 'auto' | 'time'
   const darkModeStart = ref(18); // Dark mode start hour (0-23, default 18 = 6 PM)
   const darkModeEnd = ref(6); // Dark mode end hour (0-23, default 6 = 6 AM)
+  const displayScheduleEnabled = ref(false); // Enable display power schedule
+  const displayOffTime = ref("22:00"); // Display off time (format: "HH:MM")
+  const displayOnTime = ref("06:00"); // Display on time (format: "HH:MM")
   const loading = ref(false);
   const error = ref(null);
 
@@ -137,6 +140,24 @@ export const useConfigStore = defineStore("config", () => {
       }
       if (response.data.dark_mode_end !== undefined) {
         darkModeEnd.value = response.data.dark_mode_end;
+      }
+      if (response.data.displayScheduleEnabled !== undefined) {
+        displayScheduleEnabled.value = response.data.displayScheduleEnabled;
+      }
+      if (response.data.display_schedule_enabled !== undefined) {
+        displayScheduleEnabled.value = response.data.display_schedule_enabled;
+      }
+      if (response.data.displayOffTime !== undefined) {
+        displayOffTime.value = response.data.displayOffTime;
+      }
+      if (response.data.display_off_time !== undefined) {
+        displayOffTime.value = response.data.display_off_time;
+      }
+      if (response.data.displayOnTime !== undefined) {
+        displayOnTime.value = response.data.displayOnTime;
+      }
+      if (response.data.display_on_time !== undefined) {
+        displayOnTime.value = response.data.display_on_time;
       }
       return response.data;
     } catch (err) {
@@ -256,6 +277,9 @@ export const useConfigStore = defineStore("config", () => {
     themeMode,
     darkModeStart,
     darkModeEnd,
+    displayScheduleEnabled,
+    displayOffTime,
+    displayOnTime,
     loading,
     error,
     calendarWidth,

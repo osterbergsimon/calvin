@@ -120,12 +120,29 @@ async def lifespan(app: FastAPI):
     side_view_position = await config_service.get_value("side_view_position")
     if side_view_position is None:
         await config_service.set_value("side_view_position", "right")  # Right/bottom default
+    display_schedule_enabled = await config_service.get_value("display_schedule_enabled")
+    if display_schedule_enabled is None:
+        await config_service.set_value("display_schedule_enabled", False)  # Disabled by default
+    display_off_time = await config_service.get_value("display_off_time")
+    if display_off_time is None:
+        await config_service.set_value("display_off_time", "22:00")  # 10 PM default
+    display_on_time = await config_service.get_value("display_on_time")
+    if display_on_time is None:
+        await config_service.set_value("display_on_time", "06:00")  # 6 AM default
 
-    # Start scheduler
+    # Start schedulers
     calendar_scheduler.start()
     print("Calendar scheduler started - refreshing every 15 minutes")
+    
+    # Start display power scheduler
+    from app.services.display_power_service import display_power_service
+    await display_power_service.start()
+    print("Display power scheduler started")
+    
     yield
     # Shutdown
+    await display_power_service.stop()
+    print("Display power scheduler stopped")
     calendar_scheduler.stop()
     print("Calendar scheduler stopped")
 

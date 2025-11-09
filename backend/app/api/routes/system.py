@@ -7,6 +7,8 @@ from pathlib import Path
 
 from fastapi import APIRouter, HTTPException
 
+from app.services.display_power_service import display_power_service
+
 router = APIRouter()
 
 
@@ -155,4 +157,34 @@ async def get_update_status():
             "message": f"Failed to read update log: {str(e)}",
             "last_log": "",
         }
+
+
+@router.post("/display/power/on")
+async def turn_display_on():
+    """Turn display on."""
+    try:
+        await display_power_service.turn_display_on()
+        return {"status": "success", "message": "Display turned on"}
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Failed to turn display on: {str(e)}")
+
+
+@router.post("/display/power/off")
+async def turn_display_off():
+    """Turn display off."""
+    try:
+        await display_power_service.turn_display_off()
+        return {"status": "success", "message": "Display turned off"}
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Failed to turn display off: {str(e)}")
+
+
+@router.get("/display/power/state")
+async def get_display_state():
+    """Get current display power state."""
+    try:
+        state = await display_power_service.get_display_state()
+        return state
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Failed to get display state: {str(e)}")
 

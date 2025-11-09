@@ -83,6 +83,7 @@ htmlcov/
 
 # Data
 data/images/
+backend/data/images/
 data/db/
 
 # Build

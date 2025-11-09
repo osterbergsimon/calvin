@@ -619,6 +619,64 @@
         </div>
       </section>
 
+      <!-- Display Power Settings -->
+      <section
+        class="settings-section collapsible"
+        :class="{ expanded: expandedSections.displayPower }"
+      >
+        <div class="section-header" @click="toggleSection('displayPower')">
+          <h2>Display Power Settings</h2>
+          <span class="toggle-icon">{{
+            expandedSections.displayPower ? "▼" : "▶"
+          }}</span>
+        </div>
+        <div v-show="expandedSections.displayPower" class="section-content">
+          <div class="setting-item">
+            <label>
+              <input
+                v-model="localConfig.displayScheduleEnabled"
+                type="checkbox"
+                @change="updateDisplayScheduleEnabled"
+              />
+              Enable Display Power Schedule
+            </label>
+            <span class="help-text"
+              >Automatically turn display off/on at specified times</span
+            >
+          </div>
+          <div v-if="localConfig.displayScheduleEnabled" class="setting-item">
+            <label>Display Off Time</label>
+            <input
+              v-model="localConfig.displayOffTime"
+              type="time"
+              @change="updateDisplaySchedule"
+            />
+            <span class="help-text">Time to turn display off (e.g., 22:00 for 10 PM)</span>
+          </div>
+          <div v-if="localConfig.displayScheduleEnabled" class="setting-item">
+            <label>Display On Time</label>
+            <input
+              v-model="localConfig.displayOnTime"
+              type="time"
+              @change="updateDisplaySchedule"
+            />
+            <span class="help-text">Time to turn display on (e.g., 06:00 for 6 AM)</span>
+          </div>
+          <div class="setting-item">
+            <label>Manual Display Control</label>
+            <div class="button-group">
+              <button class="btn-secondary" @click="turnDisplayOn">
+                Turn Display On
+              </button>
+              <button class="btn-secondary" @click="turnDisplayOff">
+                Turn Display Off
+              </button>
+            </div>
+            <span class="help-text">Manually control display power</span>
+          </div>
+        </div>
+      </section>
+
       <!-- Actions -->
       <section class="settings-section">
         <h2>Actions</h2>
@@ -677,6 +735,9 @@ const localConfig = ref({
   themeMode: "auto",
   darkModeStart: 18,
   darkModeEnd: 6,
+  displayScheduleEnabled: false,
+  displayOffTime: "22:00",
+  displayOnTime: "06:00",
 });
 
 // Collapsible sections state
@@ -688,6 +749,7 @@ const expandedSections = ref({
   keyboard: false,
   calendar: false,
   webServices: false,
+  displayPower: false,
 });
 
 const toggleSection = (section) => {
@@ -872,6 +934,38 @@ const updateDarkModeTime = async () => {
   saveConfig();
 };
 
+const updateDisplayScheduleEnabled = () => {
+  saveConfig();
+};
+
+const updateDisplaySchedule = () => {
+  saveConfig();
+};
+
+const turnDisplayOn = async () => {
+  try {
+    await axios.post("/api/system/display/power/on");
+    alert("Display turned on");
+  } catch (error) {
+    console.error("Failed to turn display on:", error);
+    alert(
+      `Error: ${error.response?.data?.detail || error.message || "Failed to turn display on"}`,
+    );
+  }
+};
+
+const turnDisplayOff = async () => {
+  try {
+    await axios.post("/api/system/display/power/off");
+    alert("Display turned off");
+  } catch (error) {
+    console.error("Failed to turn display off:", error);
+    alert(
+      `Error: ${error.response?.data?.detail || error.message || "Failed to turn display off"}`,
+    );
+  }
+};
+
 const updateSourceColor = async (sourceId, color) => {
   const source = calendarSources.value.find((s) => s.id === sourceId);
   if (source) {
@@ -971,6 +1065,14 @@ const loadConfig = async () => {
         response.data.sideViewPosition ??
         response.data.side_view_position ??
         "right";
+      localConfig.value.displayScheduleEnabled =
+        response.data.displayScheduleEnabled ??
+        response.data.display_schedule_enabled ??
+        false;
+      localConfig.value.displayOffTime =
+        response.data.displayOffTime ?? response.data.display_off_time ?? "22:00";
+      localConfig.value.displayOnTime =
+        response.data.displayOnTime ?? response.data.display_on_time ?? "06:00";
       keyboardStore.setKeyboardType(localConfig.value.keyboardType);
     }
   } catch (error) {
