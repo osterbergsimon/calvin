@@ -189,6 +189,16 @@ async def get_display_state():
         raise HTTPException(status_code=500, detail=f"Failed to get display state: {str(e)}")
 
 
+@router.post("/display/timeout/configure")
+async def configure_display_timeout():
+    """Apply display timeout settings immediately."""
+    try:
+        await display_power_service.configure_display_timeout()
+        return {"status": "success", "message": "Display timeout configured"}
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Failed to configure display timeout: {str(e)}")
+
+
 @router.post("/reboot")
 async def reboot_system():
     """Reboot the Raspberry Pi."""

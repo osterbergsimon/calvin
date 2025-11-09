@@ -35,6 +35,8 @@ class ConfigUpdate(BaseModel):
     displayScheduleEnabled: bool | None = None  # Enable display power schedule
     displayOffTime: str | None = None  # Display off time (format: "HH:MM")
     displayOnTime: str | None = None  # Display on time (format: "HH:MM")
+    displayTimeoutEnabled: bool | None = None  # Enable display timeout (screensaver)
+    displayTimeout: int | None = None  # Display timeout in seconds (0 = never, default: 0)
     rebootComboKey1: str | None = None  # First key for reboot combo (e.g., "KEY_1")
     rebootComboKey2: str | None = None  # Second key for reboot combo (e.g., "KEY_7")
     rebootComboDuration: int | None = None  # Reboot combo duration in milliseconds (default: 10000)
@@ -140,6 +142,14 @@ async def get_config():
         config["rebootComboDuration"] = 10000  # 10 seconds default
     elif "reboot_combo_duration" in config and "rebootComboDuration" not in config:
         config["rebootComboDuration"] = config["reboot_combo_duration"]
+    if "displayTimeoutEnabled" not in config and "display_timeout_enabled" not in config:
+        config["displayTimeoutEnabled"] = False  # Disabled by default
+    elif "display_timeout_enabled" in config and "displayTimeoutEnabled" not in config:
+        config["displayTimeoutEnabled"] = config["display_timeout_enabled"]
+    if "displayTimeout" not in config and "display_timeout" not in config:
+        config["displayTimeout"] = 0  # 0 = never (disabled by default)
+    elif "display_timeout" in config and "displayTimeout" not in config:
+        config["displayTimeout"] = config["display_timeout"]
 
     return config
 

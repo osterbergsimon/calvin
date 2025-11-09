@@ -23,6 +23,8 @@ export const useConfigStore = defineStore("config", () => {
   const displayScheduleEnabled = ref(false); // Enable display power schedule
   const displayOffTime = ref("22:00"); // Display off time (format: "HH:MM")
   const displayOnTime = ref("06:00"); // Display on time (format: "HH:MM")
+  const displayTimeoutEnabled = ref(false); // Enable display timeout (screensaver)
+  const displayTimeout = ref(0); // Display timeout in seconds (0 = never)
   const rebootComboKey1 = ref("KEY_1"); // First key for reboot combo
   const rebootComboKey2 = ref("KEY_7"); // Second key for reboot combo
   const rebootComboDuration = ref(10000); // Reboot combo duration in milliseconds
@@ -301,6 +303,8 @@ export const useConfigStore = defineStore("config", () => {
     displayScheduleEnabled,
     displayOffTime,
     displayOnTime,
+    displayTimeoutEnabled,
+    displayTimeout,
     rebootComboKey1,
     rebootComboKey2,
     rebootComboDuration,
