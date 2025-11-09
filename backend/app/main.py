@@ -9,7 +9,7 @@ from fastapi.middleware.cors import CORSMiddleware
 from fastapi.staticfiles import StaticFiles
 from fastapi.responses import FileResponse
 
-from app.api.routes import calendar, config, health, images, keyboard, web_services
+from app.api.routes import calendar, config, health, images, keyboard, system, web_services
 from app.config import settings
 from app.database import init_db
 from app.services import image_service as image_service_module
