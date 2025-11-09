@@ -32,19 +32,19 @@ git pull origin main
 
 ## Step 3: Run the Setup Script
 
-**Option A: Use UV (default, faster but may cause OOM on Pi 3B+)**
+**Default: Use pip (stable on Pi 3B+, avoids OOM and segfaults)**
 ```bash
 cd /home/calvin/calvin
 sudo bash rpi-image/first-boot/setup-dev.sh
 ```
 
-**Option B: Use pip instead (slower but more stable on Pi 3B+)**
+**Option: Use UV instead (faster but may cause OOM or segfaults on Pi 3B+)**
 ```bash
 cd /home/calvin/calvin
-sudo bash rpi-image/first-boot/setup-dev.sh --use-pip
+sudo bash rpi-image/first-boot/setup-dev.sh --use-uv
 ```
 
-> **Note:** If UV causes reboots due to OOM, use the `--use-pip` flag. Pip uses less memory during installation.
+> **Note:** The script now defaults to pip because UV can cause reboots (OOM) or segfaults on Pi 3B+. Pip is slower but more stable.
 
 That's it! The setup script will:
 - Install all system dependencies
