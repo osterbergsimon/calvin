@@ -250,59 +250,44 @@ async def reboot_system():
         except Exception as e:
             print(f"systemctl reboot error: {e}")
         
-        # Method 2: sudo reboot (if systemctl didn't work and sudo is available)
+        # Method 2: Use dbus to call systemd-logind (alternative to systemctl)
+        # This might work if polkit rules are configured
         if not reboot_attempted:
             try:
                 result = subprocess.run(
-                    ["sudo", "reboot"],
+                    ["dbus-send", "--system", "--print-reply", "--dest=org.freedesktop.login1",
+                     "/org/freedesktop/login1", "org.freedesktop.login1.Manager.Reboot",
+                     "boolean:false"],
                     stdout=subprocess.PIPE,
                     stderr=subprocess.PIPE,
                     timeout=5,
                 )
                 if result.returncode == 0:
-                    print("Reboot initiated via sudo reboot")
+                    print("Reboot initiated via dbus")
                     reboot_attempted = True
                 else:
-                    print(f"sudo reboot failed: {result.stderr.decode()}")
+                    error_msg = result.stderr.decode()
+                    print(f"dbus reboot failed: {error_msg}")
             except FileNotFoundError:
-                print("sudo not found")
+                print("dbus-send not found")
             except subprocess.TimeoutExpired:
-                print("sudo reboot timed out (but may have initiated)")
+                print("dbus reboot timed out (but may have initiated)")
                 reboot_attempted = True
             except Exception as e:
-                print(f"sudo reboot error: {e}")
-        
-        # Method 3: Direct reboot command (if both failed)
-        if not reboot_attempted:
-            try:
-                # Try /sbin/reboot directly (might work if user has permissions)
-                result = subprocess.run(
-                    ["/sbin/reboot"],
-                    stdout=subprocess.PIPE,
-                    stderr=subprocess.PIPE,
-                    timeout=5,
-                )
-                if result.returncode == 0:
-                    print("Reboot initiated via /sbin/reboot")
-                    reboot_attempted = True
-                else:
-                    print(f"/sbin/reboot failed: {result.stderr.decode()}")
-            except FileNotFoundError:
-                print("/sbin/reboot not found")
-            except subprocess.TimeoutExpired:
-                print("/sbin/reboot timed out (but may have initiated)")
-                reboot_attempted = True
-            except Exception as e:
-                print(f"/sbin/reboot error: {e}")
+                print(f"dbus reboot error: {e}")
         
         if reboot_attempted:
             return {"status": "success", "message": "System reboot initiated"}
         else:
             # If all methods failed, return error with details
-            raise HTTPException(
-                status_code=500,
-                detail="Failed to reboot system: All reboot methods failed. Check logs for details."
+            error_detail = (
+                "Failed to reboot system: All reboot methods failed.\n"
+                "Note: Polkit rules must be configured to allow calvin user to reboot.\n"
+                "Check /etc/polkit-1/rules.d/50-calvin-reboot.rules exists.\n"
+                "Check logs for details."
             )
+            print(error_detail)
+            raise HTTPException(status_code=500, detail=error_detail)
     except HTTPException:
         raise
     except Exception as e:
