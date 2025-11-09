@@ -1762,6 +1762,61 @@ onMounted(async () => {
   font-style: italic;
 }
 
+.schedule-days {
+  display: flex;
+  flex-direction: column;
+  gap: 0.75rem;
+  margin-top: 0.5rem;
+}
+
+.schedule-day {
+  padding: 0.75rem;
+  background: var(--bg-tertiary);
+  border-radius: 4px;
+  border: 1px solid var(--border-color);
+}
+
+.schedule-day-header {
+  margin-bottom: 0.5rem;
+}
+
+.schedule-day-header label {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  font-weight: 600;
+  color: var(--text-primary);
+  cursor: pointer;
+}
+
+.schedule-day-times {
+  display: flex;
+  gap: 1rem;
+  flex-wrap: wrap;
+  margin-top: 0.5rem;
+}
+
+.schedule-time {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+}
+
+.schedule-time label {
+  font-size: 0.9rem;
+  color: var(--text-secondary);
+  min-width: 40px;
+}
+
+.schedule-time input[type="time"] {
+  padding: 0.5rem;
+  border: 1px solid var(--border-color);
+  border-radius: 4px;
+  font-size: 0.9rem;
+  background: var(--bg-primary);
+  color: var(--text-primary);
+}
+
 .keyboard-mappings {
   margin-top: 2rem;
 }
