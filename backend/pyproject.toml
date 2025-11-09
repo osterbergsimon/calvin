@@ -22,6 +22,7 @@ dependencies = [
     # Note: websockets 15.0.1 is fine - it's a Python package, not npm
     "icalendar>=5.0.0", # For parsing iCal/ICS files (Google Calendar share links)
     "httpx>=0.25.0",
+    "python-multipart>=0.0.6", # Required for FastAPI file uploads (UploadFile)
 ]
 
 # Platform-specific dependencies
