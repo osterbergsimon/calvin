@@ -76,8 +76,8 @@ cd "$REPO_DIR/backend" || {
 if [ -f .venv/bin/activate ]; then
     source .venv/bin/activate
     pip install --upgrade pip
-    # Install dependencies directly (same as setup script)
-    pip install fastapi uvicorn[standard] python-dotenv google-api-python-client google-auth-httplib2 google-auth-oauthlib APScheduler Pillow aiofiles sqlalchemy aiosqlite pydantic pydantic-settings websockets icalendar httpx evdev pytest pytest-asyncio pytest-cov pytest-mock faker factory-boy ruff mypy bandit pre-commit 2>&1 | tee -a "$LOG_FILE"
+    # Install from pyproject.toml with linux and dev extras
+    pip install .[linux,dev] 2>&1 | tee -a "$LOG_FILE"
 else
     export PATH="/home/calvin/.local/bin:/home/calvin/.cargo/bin:$PATH"
     if ! uv sync --extra dev --extra linux 2>&1 | tee -a "$LOG_FILE"; then
@@ -87,7 +87,8 @@ else
         python3 -m venv .venv
         source .venv/bin/activate
         pip install --upgrade pip
-        pip install fastapi uvicorn[standard] python-dotenv google-api-python-client google-auth-httplib2 google-auth-oauthlib APScheduler Pillow aiofiles sqlalchemy aiosqlite pydantic pydantic-settings websockets icalendar httpx evdev pytest pytest-asyncio pytest-cov pytest-mock faker factory-boy ruff mypy bandit pre-commit 2>&1 | tee -a "$LOG_FILE"
+        # Install from pyproject.toml with linux and dev extras
+        pip install .[linux,dev] 2>&1 | tee -a "$LOG_FILE"
     fi
 fi
 
