@@ -379,5 +379,8 @@ chown calvin:calvin /home/calvin/.bash_profile
 
 echo "[$(date)] Calvin development setup complete!" | tee -a "$LOG_FILE"
 echo "[$(date)] Auto-update enabled (every $UPDATE_INTERVAL seconds)" | tee -a "$LOG_FILE"
-echo "[$(date)] System will reboot in 30 seconds..." | tee -a "$LOG_FILE"
+echo "[$(date)] To start the dashboard:" | tee -a "$LOG_FILE"
+echo "[$(date)]   1. Reboot: sudo reboot" | tee -a "$LOG_FILE"
+echo "[$(date)]   2. Or start X manually: sudo -u calvin startx" | tee -a "$LOG_FILE"
+echo "[$(date)] The dashboard will appear automatically after reboot or when X starts." | tee -a "$LOG_FILE"
 
