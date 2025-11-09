@@ -163,12 +163,25 @@ frontend_dist = project_root / "frontend" / "dist"
 if frontend_dist.exists():
     app.mount("/assets", StaticFiles(directory=str(frontend_dist / "assets")), name="assets")
     
-    # Serve index.html for root and all non-API routes (SPA routing)
+    # Serve index.html for root path
+    @app.get("/")
+    async def serve_frontend_root():
+        """Serve frontend index.html for root path."""
+        index_path = frontend_dist / "index.html"
+        if index_path.exists():
+            return FileResponse(str(index_path))
+        return {"message": "Calvin Dashboard API", "version": "0.1.0"}
+    
+    # Serve index.html for all other non-API routes (SPA routing)
+    # This must come after API routes to avoid intercepting them
     @app.get("/{full_path:path}")
     async def serve_frontend(full_path: str):
         """Serve frontend index.html for SPA routing."""
-        # Don't serve frontend for API routes
-        if full_path.startswith("api") or full_path.startswith("docs") or full_path.startswith("openapi.json"):
+        # Skip API routes, docs, and static assets (already handled)
+        if (full_path.startswith("api/") or 
+            full_path.startswith("docs") or 
+            full_path.startswith("openapi.json") or
+            full_path.startswith("assets/")):
             return {"message": "Calvin Dashboard API", "version": "0.1.0"}
         
         index_path = frontend_dist / "index.html"
