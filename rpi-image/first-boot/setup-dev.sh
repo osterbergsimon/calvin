@@ -265,12 +265,8 @@ echo "[$(date)] Installing frontend dependencies..." | tee -a "$LOG_FILE"
 cd "$CALVIN_DIR/frontend"
 # Fix ownership before npm install
 chown -R calvin:calvin "$CALVIN_DIR/frontend"
-# Run npm as calvin user
-sudo -u calvin bash -c "cd '$CALVIN_DIR/frontend' && npm ci"
-
-# Build frontend
-echo "[$(date)] Building frontend..." | tee -a "$LOG_FILE"
-npm run build
+# Run npm install and build as calvin user
+sudo -u calvin bash -c "cd '$CALVIN_DIR/frontend' && npm ci && npm run build"
 
 # Create data directories
 echo "[$(date)] Creating data directories..." | tee -a "$LOG_FILE"
