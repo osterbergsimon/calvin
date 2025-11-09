@@ -159,11 +159,11 @@ async def get_config():
     elif "reboot_combo_duration" in config and "rebootComboDuration" not in config:
         config["rebootComboDuration"] = config["reboot_combo_duration"]
     if "displayTimeoutEnabled" not in config and "display_timeout_enabled" not in config:
-        config["displayTimeoutEnabled"] = False  # Disabled by default
+        config["displayTimeoutEnabled"] = False  # Disabled by default - keep display on
     elif "display_timeout_enabled" in config and "displayTimeoutEnabled" not in config:
         config["displayTimeoutEnabled"] = config["display_timeout_enabled"]
     if "displayTimeout" not in config and "display_timeout" not in config:
-        config["displayTimeout"] = 0  # 0 = never (disabled by default)
+        config["displayTimeout"] = 0  # 0 = never (disabled by default - keep display on)
     elif "display_timeout" in config and "displayTimeout" not in config:
         config["displayTimeout"] = config["display_timeout"]
 

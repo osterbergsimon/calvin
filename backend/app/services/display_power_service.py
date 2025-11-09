@@ -231,11 +231,17 @@ class DisplayPowerService:
         return {"state": "unknown", "method": "unknown"}
 
     async def configure_display_timeout(self):
-        """Configure display timeout (screensaver) based on settings."""
+        """Configure display timeout (screensaver) based on settings.
+        
+        Default behavior: Keep display on (disable timeout) unless explicitly enabled.
+        Only enables timeout if both timeout_enabled is True AND timeout_seconds > 0.
+        """
         timeout_enabled = await config_service.get_value("display_timeout_enabled")
         timeout_seconds = await config_service.get_value("display_timeout")
         
-        if timeout_enabled and timeout_seconds and timeout_seconds > 0:
+        # Only enable timeout if explicitly enabled AND timeout > 0
+        # Default: keep display on (disable timeout)
+        if timeout_enabled is True and timeout_seconds is not None and timeout_seconds > 0:
             # Enable DPMS and set timeout
             try:
                 # Set screen saver timeout (xset uses seconds for 's' command)
@@ -263,20 +269,24 @@ class DisplayPowerService:
             except (subprocess.TimeoutExpired, FileNotFoundError):
                 pass
         else:
-            # Disable display timeout (keep display on)
+            # Disable display timeout (keep display on) - this is the default behavior
+            # Always ensure timeout is disabled unless explicitly enabled above
             try:
+                # Disable screensaver
                 subprocess.run(
                     ["xset", "s", "off"],
                     capture_output=True,
                     timeout=5,
                     env={"DISPLAY": ":0"},
                 )
+                # Disable DPMS (Display Power Management Signaling)
                 subprocess.run(
                     ["xset", "-dpms"],
                     capture_output=True,
                     timeout=5,
                     env={"DISPLAY": ":0"},
                 )
+                # Prevent screen blanking
                 subprocess.run(
                     ["xset", "s", "noblank"],
                     capture_output=True,

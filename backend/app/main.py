@@ -148,12 +148,13 @@ async def lifespan(app: FastAPI):
     reboot_combo_duration = await config_service.get_value("reboot_combo_duration")
     if reboot_combo_duration is None:
         await config_service.set_value("reboot_combo_duration", 10000)  # 10 seconds default
+    # Initialize display timeout settings (default: disabled - keep display on)
     display_timeout_enabled = await config_service.get_value("display_timeout_enabled")
     if display_timeout_enabled is None:
-        await config_service.set_value("display_timeout_enabled", False)  # Disabled by default
+        await config_service.set_value("display_timeout_enabled", False)  # Disabled by default - keep display on
     display_timeout = await config_service.get_value("display_timeout")
     if display_timeout is None:
-        await config_service.set_value("display_timeout", 0)  # 0 = never (disabled by default)
+        await config_service.set_value("display_timeout", 0)  # 0 = never (disabled by default - keep display on)
 
     # Start schedulers
     calendar_scheduler.start()
