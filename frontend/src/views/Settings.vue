@@ -1260,6 +1260,9 @@ const saveConfig = async () => {
       themeMode: localConfig.value.themeMode,
       darkModeStart: localConfig.value.darkModeStart,
       darkModeEnd: localConfig.value.darkModeEnd,
+      displayScheduleEnabled: localConfig.value.displayScheduleEnabled,
+      displayOffTime: localConfig.value.displayOffTime,
+      displayOnTime: localConfig.value.displayOnTime,
     });
   } catch (error) {
     console.error("Failed to save config:", error);
