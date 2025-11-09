@@ -317,6 +317,13 @@ class DisplayPowerService:
         Default behavior: Keep display on (disable timeout) unless explicitly enabled.
         Only enables timeout if both timeout_enabled is True AND timeout_seconds > 0.
         """
+        # Set up X11 environment
+        x11_env = {
+            "DISPLAY": ":0",
+            "HOME": "/home/calvin",
+            "XAUTHORITY": "/home/calvin/.Xauthority",
+        }
+        
         timeout_enabled = await config_service.get_value("display_timeout_enabled")
         timeout_seconds = await config_service.get_value("display_timeout")
         
