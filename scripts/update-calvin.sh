@@ -14,12 +14,27 @@ REPO_DIR="${REPO_DIR:-/home/calvin/calvin}"
 GIT_REPO="${GIT_REPO:-https://github.com/osterbergsimon/calvin.git}"
 GIT_BRANCH="${GIT_BRANCH:-main}"
 
-LOG_FILE="/var/log/calvin-update.log"
+# Use user-writable log location
+LOG_FILE="${REPO_DIR}/backend/logs/calvin-update.log"
+mkdir -p "$(dirname "$LOG_FILE")"
 
 # Ensure PATH includes UV
 export PATH="/home/calvin/.local/bin:$PATH"
 
-cd "$REPO_DIR"
+# Ensure we can write to the log file
+touch "$LOG_FILE" 2>/dev/null || {
+    # Fallback to home directory if logs directory not writable
+    LOG_FILE="${HOME}/calvin-update.log"
+    touch "$LOG_FILE" 2>/dev/null || {
+        # Last resort: use /tmp
+        LOG_FILE="/tmp/calvin-update.log"
+    }
+}
+
+cd "$REPO_DIR" || {
+    echo "[$(date)] ERROR: Cannot cd to $REPO_DIR" | tee -a "$LOG_FILE"
+    exit 1
+}
 
 echo "[$(date)] Starting Calvin update..." | tee -a "$LOG_FILE"
 
@@ -78,9 +93,17 @@ if ! npm run build; then
 fi
 
 # Restart services via systemd (non-blocking)
-if systemctl is-active --quiet calvin-backend.service; then
+# Use sudo if available, otherwise try without (might fail if not running as root)
+if systemctl is-active --quiet calvin-backend.service 2>/dev/null || sudo systemctl is-active --quiet calvin-backend.service 2>/dev/null; then
     echo "Restarting services via systemd..." | tee -a "$LOG_FILE"
-    systemctl restart calvin-backend || echo "Warning: Failed to restart backend" | tee -a "$LOG_FILE"
+    if sudo systemctl restart calvin-backend 2>/dev/null; then
+        echo "Backend service restarted successfully" | tee -a "$LOG_FILE"
+    elif systemctl --user restart calvin-backend 2>/dev/null; then
+        echo "Backend service restarted successfully (user service)" | tee -a "$LOG_FILE"
+    else
+        echo "Warning: Failed to restart backend (may need sudo permissions)" | tee -a "$LOG_FILE"
+        echo "Please restart manually: sudo systemctl restart calvin-backend" | tee -a "$LOG_FILE"
+    fi
     # Frontend doesn't need restart (Chromium will reload)
     # But we can restart it if needed
     # systemctl restart calvin-frontend || true

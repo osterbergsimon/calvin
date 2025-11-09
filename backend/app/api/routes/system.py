@@ -34,10 +34,20 @@ async def trigger_update():
         )
         
         # Don't wait for completion - return immediately
+        # Try to determine log file location
+        log_locations = [
+            "/home/calvin/calvin/backend/logs/calvin-update.log",
+            "/home/calvin/calvin-update.log",
+            "/tmp/calvin-update.log",
+            "/var/log/calvin-update.log",
+        ]
+        log_location = log_locations[0]  # Default to first location
+        
         return {
             "status": "started",
-            "message": "Update process started. Check logs at /var/log/calvin-update.log",
+            "message": f"Update process started (PID: {process.pid}). Check logs at {log_location} or /tmp/calvin-update.log",
             "pid": process.pid,
+            "log_file": log_location,
         }
     except Exception as e:
         raise HTTPException(
@@ -52,9 +62,21 @@ async def get_update_status():
     Get the status of the last update.
     Reads the last few lines from the update log.
     """
-    log_file = Path("/var/log/calvin-update.log")
+    # Try multiple possible log file locations
+    log_locations = [
+        Path("/home/calvin/calvin/backend/logs/calvin-update.log"),
+        Path("/home/calvin/calvin-update.log"),
+        Path("/tmp/calvin-update.log"),
+        Path("/var/log/calvin-update.log"),
+    ]
     
-    if not log_file.exists():
+    log_file = None
+    for loc in log_locations:
+        if loc.exists():
+            log_file = loc
+            break
+    
+    if not log_file or not log_file.exists():
         return {
             "status": "unknown",
             "message": "Update log not found. No updates have been run yet.",
