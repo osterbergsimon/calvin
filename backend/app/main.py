@@ -1,9 +1,13 @@
 """Main FastAPI application entry point."""
 
+import os
+from pathlib import Path
 from contextlib import asynccontextmanager
 
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
+from fastapi.staticfiles import StaticFiles
+from fastapi.responses import FileResponse
 
 from app.api.routes import calendar, config, health, images, keyboard, web_services
 from app.config import settings
@@ -150,8 +154,30 @@ app.include_router(keyboard.router, prefix="/api", tags=["keyboard"])
 app.include_router(images.router, prefix="/api", tags=["images"])
 app.include_router(web_services.router, prefix="/api", tags=["web-services"])
 
+# Serve static files from frontend dist directory
+# Get the project root (parent of backend directory)
+project_root = Path(__file__).parent.parent.parent
+frontend_dist = project_root / "frontend" / "dist"
 
-@app.get("/")
-async def root():
-    """Root endpoint."""
-    return {"message": "Calvin Dashboard API", "version": "0.1.0"}
+# Mount static assets (JS, CSS, images, etc.)
+if frontend_dist.exists():
+    app.mount("/assets", StaticFiles(directory=str(frontend_dist / "assets")), name="assets")
+    
+    # Serve index.html for root and all non-API routes (SPA routing)
+    @app.get("/{full_path:path}")
+    async def serve_frontend(full_path: str):
+        """Serve frontend index.html for SPA routing."""
+        # Don't serve frontend for API routes
+        if full_path.startswith("api") or full_path.startswith("docs") or full_path.startswith("openapi.json"):
+            return {"message": "Calvin Dashboard API", "version": "0.1.0"}
+        
+        index_path = frontend_dist / "index.html"
+        if index_path.exists():
+            return FileResponse(str(index_path))
+        return {"message": "Calvin Dashboard API", "version": "0.1.0"}
+else:
+    # Fallback if frontend dist doesn't exist (development mode)
+    @app.get("/")
+    async def root():
+        """Root endpoint."""
+        return {"message": "Calvin Dashboard API", "version": "0.1.0"}
