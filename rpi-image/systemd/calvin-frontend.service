@@ -12,10 +12,12 @@ Group=calvin
 Environment="DISPLAY=:0"
 Environment="HOME=/home/calvin"
 Environment="XAUTHORITY=/home/calvin/.Xauthority"
-ExecStartPre=/bin/sleep 10
-ExecStartPre=/bin/bash -c 'until curl -s http://localhost:8000/api/health > /dev/null; do sleep 1; done'
+# Wait for backend to be ready (with timeout)
+ExecStartPre=/bin/bash -c 'timeout=60; elapsed=0; until curl -s http://localhost:8000/api/health > /dev/null 2>&1; do if [ $elapsed -ge $timeout ]; then echo "Backend not ready after $timeout seconds"; exit 1; fi; sleep 1; elapsed=$((elapsed+1)); done'
 # Wait for X server to be available (with timeout to prevent infinite wait)
 ExecStartPre=/bin/bash -c 'timeout=60; elapsed=0; until [ -S /tmp/.X11-unix/X0 ] || pgrep -x Xorg > /dev/null 2>&1; do if [ $elapsed -ge $timeout ]; then echo "X server not available after $timeout seconds"; exit 1; fi; sleep 1; elapsed=$((elapsed+1)); done'
+# Small delay to ensure X is fully ready
+ExecStartPre=/bin/sleep 2
 ExecStart=/usr/bin/chromium \
     --kiosk \
     --noerrdialogs \
