@@ -138,9 +138,18 @@ async def get_update_status():
         recently_updated = (time.time() - log_mtime) < 60
         
         # Determine status based on log content and recent activity
-        if has_completed:
+        # Only mark as complete if we have BOTH the build completion AND the update complete message
+        # This ensures the build actually finished before we mark it as done
+        if has_completed and has_build_complete:
             status = "idle"
             message = "Update completed successfully"
+        elif has_completed and not has_build_complete and recently_updated:
+            # Update complete message exists but build hasn't finished yet - still running
+            status = "running"
+            if has_building:
+                message = "Building frontend... (this may take a few minutes)"
+            else:
+                message = "Update in progress..."
         elif has_error and not recently_updated:
             status = "error"
             message = "Update failed. Check logs for details."
@@ -151,7 +160,7 @@ async def get_update_status():
                 message = "Restarting services..."
             elif has_building and not has_build_complete:
                 message = "Building frontend... (this may take a few minutes)"
-            elif has_build_complete:
+            elif has_build_complete and not has_completed:
                 message = "Frontend build complete, restarting services..."
             elif has_updating_deps:
                 message = "Updating dependencies..."
