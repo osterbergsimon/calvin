@@ -127,7 +127,8 @@ async def get_update_status():
         # Check for specific update steps
         has_pulling = "Pulling latest code" in log_content or "git pull" in log_content.lower() or "git fetch" in log_content.lower()
         has_updating_deps = "Updating backend dependencies" in log_content or "Updating frontend dependencies" in log_content or "Installing" in log_content
-        has_building = "Building frontend" in log_content or "npm run build" in log_content.lower()
+        has_building = "Building frontend" in log_content or "Rebuilding frontend" in log_content or "npm run build" in log_content.lower() or "vite build" in log_content.lower() or "transforming" in log_content.lower()
+        has_build_complete = "Frontend build completed successfully" in log_content or "build completed" in log_content.lower()
         has_restarting = "Restarting services" in log_content or "systemctl restart" in log_content.lower()
         
         # Check if process is still running by checking for recent activity
@@ -148,8 +149,10 @@ async def get_update_status():
             # Provide more specific message based on what's happening
             if has_restarting:
                 message = "Restarting services..."
-            elif has_building:
-                message = "Building frontend..."
+            elif has_building and not has_build_complete:
+                message = "Building frontend... (this may take a few minutes)"
+            elif has_build_complete:
+                message = "Frontend build complete, restarting services..."
             elif has_updating_deps:
                 message = "Updating dependencies..."
             elif has_pulling:

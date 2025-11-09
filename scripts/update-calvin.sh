@@ -101,10 +101,11 @@ fi
 
 # Rebuild frontend
 echo "Rebuilding frontend..." | tee -a "$LOG_FILE"
-if ! npm run build; then
+if ! npm run build 2>&1 | tee -a "$LOG_FILE"; then
     echo "Warning: Failed to build frontend" | tee -a "$LOG_FILE"
     exit 0  # Don't fail the service
 fi
+echo "Frontend build completed successfully" | tee -a "$LOG_FILE"
 
 # Restart services via systemd (non-blocking)
 # Use sudo if available, otherwise try without (might fail if not running as root)
