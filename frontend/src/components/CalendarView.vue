@@ -1034,14 +1034,19 @@ onActivated(() => {
   background: var(--bg-secondary) !important;
 }
 
-/* Reset any inherited backgrounds */
-.calendar-day > * {
+/* Reset any inherited backgrounds - but allow week-number to have its own background */
+.calendar-day > *:not(.week-number) {
   background: transparent !important;
 }
 
 .calendar-day.other-month {
   opacity: 0.4;
   background: var(--bg-tertiary) !important;
+}
+
+/* Force reset background for all calendar days (except other-month and today) */
+.calendar-day:not(.other-month):not(.today) {
+  background: var(--calendar-bg) !important;
 }
 
 .calendar-day.today {
