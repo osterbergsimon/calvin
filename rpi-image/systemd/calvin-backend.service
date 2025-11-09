@@ -20,16 +20,14 @@ StandardError=journal
 SyslogIdentifier=calvin-backend
 
 # Security settings
-# Note: NoNewPrivileges=true prevents sudo from working, but we need it for reboot
-# We'll try systemctl reboot first (which might work without sudo)
+# Note: NoNewPrivileges=true prevents sudo from working
+# We'll use systemctl reboot which should work if user has proper permissions
+# Or use a helper script with setuid/sudo permissions
 NoNewPrivileges=true
 PrivateTmp=true
 ProtectSystem=strict
 # Allow writes to Calvin directory (needed for database and data)
 ReadWritePaths=/home/calvin/calvin/backend/data /home/calvin/calvin/backend/logs /home/calvin/calvin/backend
-# Allow reboot capability (needed for system reboot)
-CapabilityBoundingSet=CAP_SYS_BOOT
-AmbientCapabilities=CAP_SYS_BOOT
 
 [Install]
 WantedBy=multi-user.target
