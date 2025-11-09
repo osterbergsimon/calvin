@@ -20,7 +20,8 @@
         <img
           :src="currentImageUrl"
           :alt="imagesStore.currentImage?.filename || 'Photo'"
-          class="photo-image"
+          :class="['photo-image', `photo-image-${displayMode}`]"
+          :style="imageStyle"
           @load="onImageLoad"
           @error="onImageError"
         />
@@ -55,6 +56,60 @@ const props = defineProps({
 const imagesStore = useImagesStore();
 
 const currentImageUrl = computed(() => imagesStore.getCurrentImageUrl);
+
+// Get display mode from config
+const displayMode = computed(() => {
+  return configStore.imageDisplayMode || "smart";
+});
+
+// Calculate smart display mode based on image and container dimensions
+const imageStyle = computed(() => {
+  const mode = displayMode.value;
+  const image = imagesStore.currentImage;
+  
+  if (!image || mode !== "smart") {
+    return {};
+  }
+
+  // For smart mode, we need to determine the best fit based on:
+  // - Image aspect ratio (width/height)
+  // - Container aspect ratio (from orientation and layout)
+  // - Screen orientation
+  
+  const imageAspect = image.width / image.height;
+  const isLandscape = configStore.orientation === "landscape";
+  
+  // Estimate container aspect ratio based on layout
+  // In landscape: side view is typically narrower (30% width)
+  // In portrait: side view is typically shorter (30% height)
+  let containerAspect;
+  if (isLandscape) {
+    // Side view in landscape: ~30% width, full height
+    // Assuming 16:9 screen, side view would be ~5.3:9 = ~0.59:1
+    containerAspect = 0.59;
+  } else {
+    // Side view in portrait: full width, ~30% height
+    // Assuming 9:16 screen, side view would be ~9:5.3 = ~1.7:1
+    containerAspect = 1.7;
+  }
+  
+  // Smart mode logic:
+  // - If image is wider than container (imageAspect > containerAspect): use fill/crop
+  // - If image is taller than container (imageAspect < containerAspect): use fit
+  // - If similar aspect ratios: use fill
+  const aspectDiff = Math.abs(imageAspect - containerAspect) / containerAspect;
+  
+  if (aspectDiff < 0.1) {
+    // Very similar aspect ratios: use fill
+    return { objectFit: "cover", objectPosition: "center" };
+  } else if (imageAspect > containerAspect) {
+    // Image is wider: use fill with center crop
+    return { objectFit: "cover", objectPosition: "center" };
+  } else {
+    // Image is taller: use fit to show entire image
+    return { objectFit: "contain", objectPosition: "center" };
+  }
+});
 
 let rotationTimer = null;
 
@@ -201,7 +256,39 @@ watch(
 .photo-image {
   max-width: 100%;
   max-height: 100%;
-  object-fit: contain;
   transition: opacity 0.3s ease-in-out;
+}
+
+/* Display mode styles */
+.photo-image-fit {
+  object-fit: contain;
+  object-position: center;
+}
+
+.photo-image-fill {
+  object-fit: cover;
+  object-position: center;
+}
+
+.photo-image-crop {
+  object-fit: cover;
+  object-position: center;
+  width: 100%;
+  height: 100%;
+}
+
+.photo-image-center {
+  object-fit: none;
+  object-position: center;
+  width: auto;
+  height: auto;
+  max-width: 100%;
+  max-height: 100%;
+}
+
+.photo-image-smart {
+  /* Smart mode uses computed style, but default to cover */
+  object-fit: cover;
+  object-position: center;
 }
 </style>

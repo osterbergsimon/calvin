@@ -37,6 +37,7 @@ export const useConfigStore = defineStore("config", () => {
   const rebootComboKey1 = ref("KEY_1"); // First key for reboot combo
   const rebootComboKey2 = ref("KEY_7"); // Second key for reboot combo
   const rebootComboDuration = ref(10000); // Reboot combo duration in milliseconds
+  const imageDisplayMode = ref("smart"); // Image display mode: 'fit', 'fill', 'crop', 'center', 'smart' (default: 'smart')
   const loading = ref(false);
   const error = ref(null);
 
@@ -217,6 +218,12 @@ export const useConfigStore = defineStore("config", () => {
       if (response.data.reboot_combo_duration !== undefined) {
         rebootComboDuration.value = response.data.reboot_combo_duration;
       }
+      if (response.data.imageDisplayMode !== undefined) {
+        imageDisplayMode.value = response.data.imageDisplayMode;
+      }
+      if (response.data.image_display_mode !== undefined) {
+        imageDisplayMode.value = response.data.image_display_mode;
+      }
       return response.data;
     } catch (err) {
       error.value = err.message;
@@ -317,6 +324,10 @@ export const useConfigStore = defineStore("config", () => {
     darkModeEnd.value = end;
   };
 
+  const setImageDisplayMode = (mode) => {
+    imageDisplayMode.value = mode;
+  };
+
   return {
     orientation,
     calendarSplit,
@@ -344,6 +355,7 @@ export const useConfigStore = defineStore("config", () => {
     rebootComboKey1,
     rebootComboKey2,
     rebootComboDuration,
+    imageDisplayMode,
     loading,
     error,
     calendarWidth,
@@ -366,6 +378,7 @@ export const useConfigStore = defineStore("config", () => {
     toggleSideViewPosition,
     setThemeMode,
     setDarkModeTime,
+    setImageDisplayMode,
     fetchConfig,
     updateConfig,
   };

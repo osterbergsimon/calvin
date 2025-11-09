@@ -155,6 +155,9 @@ async def lifespan(app: FastAPI):
     display_timeout = await config_service.get_value("display_timeout")
     if display_timeout is None:
         await config_service.set_value("display_timeout", 0)  # 0 = never (disabled by default - keep display on)
+    image_display_mode = await config_service.get_value("image_display_mode")
+    if image_display_mode is None:
+        await config_service.set_value("image_display_mode", "smart")  # Smart mode by default
 
     # Start schedulers
     calendar_scheduler.start()

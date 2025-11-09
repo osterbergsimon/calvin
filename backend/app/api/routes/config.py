@@ -41,6 +41,7 @@ class ConfigUpdate(BaseModel):
     rebootComboKey1: str | None = None  # First key for reboot combo (e.g., "KEY_1")
     rebootComboKey2: str | None = None  # Second key for reboot combo (e.g., "KEY_7")
     rebootComboDuration: int | None = None  # Reboot combo duration in milliseconds (default: 10000)
+    imageDisplayMode: str | None = None  # Image display mode: 'fit', 'fill', 'crop', 'center', 'smart' (default: 'smart')
 
     # Allow arbitrary fields for extensibility
     class Config:
@@ -166,6 +167,10 @@ async def get_config():
         config["displayTimeout"] = 0  # 0 = never (disabled by default - keep display on)
     elif "display_timeout" in config and "displayTimeout" not in config:
         config["displayTimeout"] = config["display_timeout"]
+    if "imageDisplayMode" not in config and "image_display_mode" not in config:
+        config["imageDisplayMode"] = "smart"  # Smart mode by default
+    elif "image_display_mode" in config and "imageDisplayMode" not in config:
+        config["imageDisplayMode"] = config["image_display_mode"]
 
     return config
 
@@ -232,6 +237,8 @@ async def update_config(config_update: ConfigUpdate):
         update_dict["display_timeout_enabled"] = update_dict.pop("displayTimeoutEnabled")
     if "displayTimeout" in update_dict:
         update_dict["display_timeout"] = update_dict.pop("displayTimeout")
+    if "imageDisplayMode" in update_dict:
+        update_dict["image_display_mode"] = update_dict.pop("imageDisplayMode")
 
     await config_service.update_config(update_dict)
 

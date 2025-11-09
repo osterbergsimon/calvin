@@ -66,6 +66,50 @@ export const useImagesStore = defineStore("images", () => {
     return `/api/images/${currentImage.value.id}`;
   });
 
+  const uploadImage = async (file) => {
+    loading.value = true;
+    error.value = null;
+    try {
+      const formData = new FormData();
+      formData.append("file", file);
+      const response = await axios.post("/api/images/upload", formData, {
+        headers: {
+          "Content-Type": "multipart/form-data",
+        },
+      });
+      // Refresh images list
+      await fetchImages();
+      return response.data;
+    } catch (err) {
+      error.value = err.message;
+      console.error("Failed to upload image:", err);
+      throw err;
+    } finally {
+      loading.value = false;
+    }
+  };
+
+  const deleteImage = async (imageId) => {
+    loading.value = true;
+    error.value = null;
+    try {
+      const response = await axios.delete(`/api/images/${imageId}`);
+      // Refresh images list
+      await fetchImages();
+      // If we deleted the current image, fetch a new one
+      if (currentImage.value && currentImage.value.id === imageId) {
+        await fetchCurrentImage();
+      }
+      return response.data;
+    } catch (err) {
+      error.value = err.message;
+      console.error("Failed to delete image:", err);
+      throw err;
+    } finally {
+      loading.value = false;
+    }
+  };
+
   return {
     images,
     currentImage,
@@ -76,5 +120,7 @@ export const useImagesStore = defineStore("images", () => {
     nextImage,
     previousImage,
     getCurrentImageUrl,
+    uploadImage,
+    deleteImage,
   };
 });

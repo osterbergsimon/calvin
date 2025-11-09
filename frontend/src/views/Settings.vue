@@ -205,6 +205,79 @@
               >How often to switch photos (5-3600 seconds)</span
             >
           </div>
+          <div class="setting-item">
+            <label>Image Display Mode</label>
+            <select
+              v-model="localConfig.imageDisplayMode"
+              class="setting-select"
+              @change="updateImageDisplayMode"
+            >
+              <option value="smart">Smart (Auto-detect best fit)</option>
+              <option value="fit">Fit (Show entire image)</option>
+              <option value="fill">Fill (Fill container, may crop)</option>
+              <option value="crop">Crop (Center crop to fill)</option>
+              <option value="center">Center (Center image, no scaling)</option>
+            </select>
+            <span class="help-text"
+              >How images are displayed. Smart mode automatically chooses the best fit based on image and screen dimensions.</span
+            >
+          </div>
+          <div class="setting-item">
+            <label>Upload Images</label>
+            <div class="upload-section">
+              <input
+                ref="fileInput"
+                type="file"
+                accept="image/*"
+                multiple
+                style="display: none"
+                @change="handleFileSelect"
+              />
+              <button
+                class="btn-upload"
+                @click="$refs.fileInput.click()"
+                :disabled="uploading"
+              >
+                {{ uploading ? "Uploading..." : "Choose Images" }}
+              </button>
+              <span class="help-text"
+                >Select one or more image files to upload (JPG, PNG, WebP, GIF)</span
+              >
+              <div v-if="uploadError" class="error-message">
+                {{ uploadError }}
+              </div>
+              <div v-if="uploadSuccess" class="success-message">
+                {{ uploadSuccess }}
+              </div>
+            </div>
+          </div>
+          <div class="setting-item">
+            <label>Manage Images</label>
+            <div class="images-list">
+              <div
+                v-for="image in imagesList"
+                :key="image.id"
+                class="image-item"
+              >
+                <div class="image-info">
+                  <strong>{{ image.filename }}</strong>
+                  <span class="image-details"
+                    >{{ image.width }}×{{ image.height }} • {{ formatFileSize(image.size) }}</span
+                  >
+                </div>
+                <button
+                  class="btn-remove"
+                  title="Delete image"
+                  @click="deleteImage(image.id)"
+                >
+                  Delete
+                </button>
+              </div>
+              <div v-if="imagesList.length === 0" class="empty-state">
+                <p>No images uploaded yet</p>
+              </div>
+            </div>
+          </div>
         </div>
       </section>
 
@@ -827,6 +900,7 @@ import { useKeyboardStore } from "../stores/keyboard";
 import { useCalendarStore } from "../stores/calendar";
 import { useWebServicesStore } from "../stores/webServices";
 import { useModeStore } from "../stores/mode";
+import { useImagesStore } from "../stores/images";
 import axios from "axios";
 
 const router = useRouter();
@@ -835,6 +909,7 @@ const keyboardStore = useKeyboardStore();
 const calendarStore = useCalendarStore();
 const webServicesStore = useWebServicesStore();
 const modeStore = useModeStore();
+const imagesStore = useImagesStore();
 
 const localConfig = ref({
   orientation: "landscape",
@@ -868,6 +943,7 @@ const localConfig = ref({
   rebootComboKey1: "KEY_1",
   rebootComboKey2: "KEY_7",
   rebootComboDuration: 10000,
+  imageDisplayMode: "smart",
 });
 
 // Collapsible sections state
@@ -890,6 +966,10 @@ const toggleSection = (section) => {
 const currentMappings = ref({});
 const calendarSources = ref([]);
 const webServices = ref([]);
+const imagesList = ref([]);
+const uploading = ref(false);
+const uploadError = ref("");
+const uploadSuccess = ref("");
 
 const newCalendarSource = ref({
   type: "google",
@@ -1008,6 +1088,11 @@ const updateShowUI = () => {
 
 const updatePhotoRotationInterval = () => {
   configStore.setPhotoRotationInterval(localConfig.value.photoRotationInterval);
+  saveConfig();
+};
+
+const updateImageDisplayMode = () => {
+  configStore.setImageDisplayMode(localConfig.value.imageDisplayMode);
   saveConfig();
 };
 
@@ -1249,6 +1334,8 @@ const loadConfig = async () => {
         response.data.rebootComboKey2 ?? response.data.reboot_combo_key2 ?? "KEY_7";
       localConfig.value.rebootComboDuration =
         response.data.rebootComboDuration ?? response.data.reboot_combo_duration ?? 10000;
+      localConfig.value.imageDisplayMode =
+        response.data.imageDisplayMode ?? response.data.image_display_mode ?? "smart";
       keyboardStore.setKeyboardType(localConfig.value.keyboardType);
     }
   } catch (error) {
@@ -1287,6 +1374,70 @@ const loadWebServices = async () => {
   } catch (error) {
     console.error("Failed to load web services:", error);
   }
+};
+
+const loadImages = async () => {
+  try {
+    await imagesStore.fetchImages();
+    imagesList.value = imagesStore.images;
+  } catch (error) {
+    console.error("Failed to load images:", error);
+  }
+};
+
+const handleFileSelect = async (event) => {
+  const files = event.target.files;
+  if (!files || files.length === 0) return;
+
+  uploading.value = true;
+  uploadError.value = "";
+  uploadSuccess.value = "";
+
+  try {
+    const uploadPromises = Array.from(files).map((file) => imagesStore.uploadImage(file));
+    await Promise.all(uploadPromises);
+    uploadSuccess.value = `Successfully uploaded ${files.length} image(s)`;
+    await loadImages();
+    // Clear file input
+    event.target.value = "";
+    // Clear success message after 3 seconds
+    setTimeout(() => {
+      uploadSuccess.value = "";
+    }, 3000);
+  } catch (error) {
+    uploadError.value = error.response?.data?.detail || error.message || "Failed to upload images";
+    console.error("Failed to upload images:", error);
+    // Clear error message after 5 seconds
+    setTimeout(() => {
+      uploadError.value = "";
+    }, 5000);
+  } finally {
+    uploading.value = false;
+  }
+};
+
+const deleteImage = async (imageId) => {
+  if (!confirm("Are you sure you want to delete this image?")) {
+    return;
+  }
+
+  try {
+    await imagesStore.deleteImage(imageId);
+    await loadImages();
+  } catch (error) {
+    console.error("Failed to delete image:", error);
+    alert(
+      `Error: ${error.response?.data?.detail || error.message || "Failed to delete image"}`,
+    );
+  }
+};
+
+const formatFileSize = (bytes) => {
+  if (bytes === 0) return "0 Bytes";
+  const k = 1024;
+  const sizes = ["Bytes", "KB", "MB", "GB"];
+  const i = Math.floor(Math.log(bytes) / Math.log(k));
+  return Math.round((bytes / Math.pow(k, i)) * 100) / 100 + " " + sizes[i];
 };
 
 const addCalendarSource = async () => {
@@ -1445,6 +1596,7 @@ const saveConfig = async () => {
       rebootComboKey1: localConfig.value.rebootComboKey1,
       rebootComboKey2: localConfig.value.rebootComboKey2,
       rebootComboDuration: localConfig.value.rebootComboDuration,
+      imageDisplayMode: localConfig.value.imageDisplayMode,
     });
   } catch (error) {
     console.error("Failed to save config:", error);
@@ -1605,6 +1757,7 @@ onMounted(async () => {
   await loadKeyboardMappings();
   await loadCalendarSources();
   await loadWebServices();
+  await loadImages();
 });
 </script>
 
@@ -2288,5 +2441,80 @@ input:checked + .slider:before {
   background: #f44336;
   color: #fff;
   border: 1px solid #f44336;
+}
+
+.upload-section {
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+}
+
+.btn-upload {
+  background: var(--accent-secondary);
+  color: #fff;
+  border: none;
+  border-radius: 4px;
+  padding: 0.75rem 1.5rem;
+  font-size: 1rem;
+  font-weight: 600;
+  cursor: pointer;
+  transition: background 0.2s;
+  max-width: 200px;
+}
+
+.btn-upload:hover:not(:disabled) {
+  background: var(--accent-secondary);
+  opacity: 0.9;
+}
+
+.btn-upload:disabled {
+  background: var(--text-tertiary);
+  cursor: not-allowed;
+  opacity: 0.6;
+}
+
+.success-message {
+  color: #4caf50;
+  font-size: 0.9rem;
+  padding: 0.5rem;
+  background: rgba(76, 175, 80, 0.1);
+  border-radius: 4px;
+  border: 1px solid rgba(76, 175, 80, 0.3);
+}
+
+.images-list {
+  display: flex;
+  flex-direction: column;
+  gap: 0.75rem;
+  margin-top: 0.5rem;
+}
+
+.image-item {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 0.75rem;
+  background: var(--bg-tertiary);
+  border-radius: 4px;
+  border: 1px solid var(--border-color);
+  gap: 1rem;
+}
+
+.image-info {
+  display: flex;
+  flex-direction: column;
+  gap: 0.25rem;
+  flex: 1;
+}
+
+.image-info strong {
+  font-size: 1rem;
+  color: var(--text-primary);
+}
+
+.image-details {
+  font-size: 0.85rem;
+  color: var(--text-secondary);
+  font-family: monospace;
 }
 </style>
