@@ -238,6 +238,7 @@ runcmd:
     
     systemctl daemon-reload
     systemctl enable calvin-backend.service
+    systemctl enable calvin-x.service
     systemctl enable calvin-frontend.service
     systemctl enable calvin-update.timer
     
@@ -245,7 +246,8 @@ runcmd:
     echo "[$(date)] Starting services..." | tee -a "$LOG_FILE"
     systemctl start calvin-backend.service
     systemctl start calvin-update.timer
-    sleep 5  # Wait for backend to start
+    systemctl start calvin-x.service
+    sleep 10  # Wait for X to start
     systemctl start calvin-frontend.service
     
     # Configure display (same as production)

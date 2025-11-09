@@ -1,0 +1,22 @@
+[Unit]
+Description=Calvin X Server
+After=network.target getty@tty1.service
+Before=calvin-frontend.service
+
+[Service]
+Type=simple
+User=calvin
+Group=calvin
+StandardInput=tty
+StandardOutput=tty
+StandardError=tty
+TTYPath=/dev/tty1
+TTYReset=yes
+TTYVHangup=yes
+ExecStart=/bin/bash -c 'export DISPLAY=:0 && export XAUTHORITY=/home/calvin/.Xauthority && /usr/bin/startx -- :0 -nolisten tcp vt1'
+Restart=always
+RestartSec=10
+
+[Install]
+WantedBy=graphical.target
+

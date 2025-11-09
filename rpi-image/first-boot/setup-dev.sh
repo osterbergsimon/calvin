@@ -305,6 +305,7 @@ EOF
 # Install systemd services
 echo "[$(date)] Installing systemd services..." | tee -a "$LOG_FILE"
 cp "$CALVIN_DIR/rpi-image/systemd/calvin-backend.service" /etc/systemd/system/
+cp "$CALVIN_DIR/rpi-image/systemd/calvin-x.service" /etc/systemd/system/
 cp "$CALVIN_DIR/rpi-image/systemd/calvin-frontend.service" /etc/systemd/system/
 cp "$CALVIN_DIR/rpi-image/systemd/calvin-update.service" /etc/systemd/system/
 cp "$CALVIN_DIR/rpi-image/systemd/calvin-update.timer" /etc/systemd/system/
@@ -319,6 +320,7 @@ sed -i "s|OnUnitActiveSec=.*|OnUnitActiveSec=${UPDATE_INTERVAL}s|" /etc/systemd/
 
 systemctl daemon-reload
 systemctl enable calvin-backend.service
+systemctl enable calvin-x.service
 systemctl enable calvin-frontend.service
 systemctl enable calvin-update.timer
 
@@ -326,7 +328,8 @@ systemctl enable calvin-update.timer
 echo "[$(date)] Starting services..." | tee -a "$LOG_FILE"
 systemctl start calvin-backend.service
 systemctl start calvin-update.timer
-sleep 5  # Wait for backend to start
+systemctl start calvin-x.service
+sleep 10  # Wait for X to start
 systemctl start calvin-frontend.service
 
 # Configure display (same as production)

@@ -1,7 +1,7 @@
 [Unit]
 Description=Calvin Dashboard Frontend (Kiosk Mode)
-After=network.target calvin-backend.service display-manager.service
-Requires=calvin-backend.service
+After=network.target calvin-backend.service calvin-x.service
+Requires=calvin-backend.service calvin-x.service
 Wants=graphical.target
 
 [Service]
