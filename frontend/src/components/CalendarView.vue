@@ -1061,6 +1061,11 @@ onActivated(() => {
   background: transparent !important;
 }
 
+/* Ensure day-header doesn't affect day background */
+.calendar-day .day-header {
+  background: transparent !important;
+}
+
 .day-header {
   display: flex;
   justify-content: space-between;
