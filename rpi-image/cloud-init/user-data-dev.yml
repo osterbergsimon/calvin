@@ -47,7 +47,7 @@ runcmd:
     # This script is embedded in cloud-init because the Calvin code
     # doesn't exist yet - it will be cloned by this script!
     
-    set -e
+    # Don't use set -e here - we have fallback logic that needs to handle errors
     
     LOG_FILE="/var/log/calvin-setup.log"
     CALVIN_DIR="/home/calvin/calvin"
