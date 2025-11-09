@@ -181,7 +181,9 @@ if frontend_dist.exists():
     
     # Serve index.html for all other non-API routes (SPA routing)
     # This must come after API routes and asset mounts to avoid intercepting them
+    # Use both GET and POST to handle SPA routing, but exclude API routes
     @app.get("/{full_path:path}")
+    @app.post("/{full_path:path}")
     async def serve_frontend(full_path: str):
         """Serve frontend index.html for SPA routing."""
         # Don't handle API routes, docs, or assets (already handled by mounts/routers)
