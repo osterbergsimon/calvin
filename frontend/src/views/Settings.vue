@@ -677,6 +677,73 @@
         </div>
       </section>
 
+      <!-- Reboot Combo Settings -->
+      <section
+        class="settings-section collapsible"
+        :class="{ expanded: expandedSections.rebootCombo }"
+      >
+        <div class="section-header" @click="toggleSection('rebootCombo')">
+          <h2>Reboot Combo Settings</h2>
+          <span class="toggle-icon">{{
+            expandedSections.rebootCombo ? "▼" : "▶"
+          }}</span>
+        </div>
+        <div v-show="expandedSections.rebootCombo" class="section-content">
+          <div class="setting-item">
+            <label>First Key</label>
+            <select
+              v-model="localConfig.rebootComboKey1"
+              class="setting-select"
+              @change="updateRebootCombo"
+            >
+              <option value="KEY_1">KEY_1</option>
+              <option value="KEY_2">KEY_2</option>
+              <option value="KEY_3">KEY_3</option>
+              <option value="KEY_4">KEY_4</option>
+              <option value="KEY_5">KEY_5</option>
+              <option value="KEY_6">KEY_6</option>
+              <option value="KEY_7">KEY_7</option>
+            </select>
+            <span class="help-text">First key for reboot combo</span>
+          </div>
+          <div class="setting-item">
+            <label>Second Key</label>
+            <select
+              v-model="localConfig.rebootComboKey2"
+              class="setting-select"
+              @change="updateRebootCombo"
+            >
+              <option value="KEY_1">KEY_1</option>
+              <option value="KEY_2">KEY_2</option>
+              <option value="KEY_3">KEY_3</option>
+              <option value="KEY_4">KEY_4</option>
+              <option value="KEY_5">KEY_5</option>
+              <option value="KEY_6">KEY_6</option>
+              <option value="KEY_7">KEY_7</option>
+            </select>
+            <span class="help-text">Second key for reboot combo</span>
+          </div>
+          <div class="setting-item">
+            <label>Combo Duration (milliseconds)</label>
+            <input
+              v-model.number="localConfig.rebootComboDuration"
+              type="number"
+              min="1000"
+              max="60000"
+              step="1000"
+              @change="updateRebootCombo"
+            />
+            <span class="help-text">How long to hold both keys to trigger reboot (1000-60000 ms)</span>
+          </div>
+          <div class="setting-item">
+            <span class="help-text"
+              >Hold {{ localConfig.rebootComboKey1 }} + {{ localConfig.rebootComboKey2 }} for
+              {{ (localConfig.rebootComboDuration / 1000).toFixed(1) }} seconds to reboot</span
+            >
+          </div>
+        </div>
+      </section>
+
       <!-- Actions -->
       <section class="settings-section">
         <h2>Actions</h2>
@@ -943,6 +1010,10 @@ const updateDisplayScheduleEnabled = () => {
 };
 
 const updateDisplaySchedule = () => {
+  saveConfig();
+};
+
+const updateRebootCombo = () => {
   saveConfig();
 };
 
@@ -1273,6 +1344,9 @@ const saveConfig = async () => {
       displayScheduleEnabled: localConfig.value.displayScheduleEnabled,
       displayOffTime: localConfig.value.displayOffTime,
       displayOnTime: localConfig.value.displayOnTime,
+      rebootComboKey1: localConfig.value.rebootComboKey1,
+      rebootComboKey2: localConfig.value.rebootComboKey2,
+      rebootComboDuration: localConfig.value.rebootComboDuration,
     });
   } catch (error) {
     console.error("Failed to save config:", error);

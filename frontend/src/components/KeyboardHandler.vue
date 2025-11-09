@@ -152,6 +152,15 @@ const loadKeyboardConfig = async () => {
       if (config.keyboardType || config.keyboard_type) {
         keyboardStore.setKeyboardType(config.keyboardType || config.keyboard_type);
       }
+      // Load reboot combo settings
+      if (config.rebootComboKey1 || config.reboot_combo_key1) {
+        const key1 = config.rebootComboKey1 || config.reboot_combo_key1;
+        const key2 = config.rebootComboKey2 || config.reboot_combo_key2 || "KEY_7";
+        rebootComboKeys = [key1, key2];
+      }
+      if (config.rebootComboDuration !== undefined || config.reboot_combo_duration !== undefined) {
+        rebootComboDuration = config.rebootComboDuration || config.reboot_combo_duration || 10000;
+      }
     }
   } catch (error) {
     console.error("Failed to load keyboard mappings:", error);
