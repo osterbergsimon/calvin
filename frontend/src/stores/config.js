@@ -21,8 +21,17 @@ export const useConfigStore = defineStore("config", () => {
   const darkModeStart = ref(18); // Dark mode start hour (0-23, default 18 = 6 PM)
   const darkModeEnd = ref(6); // Dark mode end hour (0-23, default 6 = 6 AM)
   const displayScheduleEnabled = ref(false); // Enable display power schedule
-  const displayOffTime = ref("22:00"); // Display off time (format: "HH:MM")
-  const displayOnTime = ref("06:00"); // Display on time (format: "HH:MM")
+  const displayOffTime = ref("22:00"); // Display off time (format: "HH:MM") - deprecated
+  const displayOnTime = ref("06:00"); // Display on time (format: "HH:MM") - deprecated
+  const displaySchedule = ref([
+    { day: 0, enabled: true, onTime: "06:00", offTime: "22:00" }, // Monday
+    { day: 1, enabled: true, onTime: "06:00", offTime: "22:00" }, // Tuesday
+    { day: 2, enabled: true, onTime: "06:00", offTime: "22:00" }, // Wednesday
+    { day: 3, enabled: true, onTime: "06:00", offTime: "22:00" }, // Thursday
+    { day: 4, enabled: true, onTime: "06:00", offTime: "22:00" }, // Friday
+    { day: 5, enabled: true, onTime: "06:00", offTime: "22:00" }, // Saturday
+    { day: 6, enabled: true, onTime: "06:00", offTime: "22:00" }, // Sunday
+  ]); // Display schedule per day of week
   const displayTimeoutEnabled = ref(false); // Enable display timeout (screensaver)
   const displayTimeout = ref(0); // Display timeout in seconds (0 = never)
   const rebootComboKey1 = ref("KEY_1"); // First key for reboot combo
@@ -163,6 +172,20 @@ export const useConfigStore = defineStore("config", () => {
       }
       if (response.data.display_on_time !== undefined) {
         displayOnTime.value = response.data.display_on_time;
+      }
+      if (response.data.displaySchedule !== undefined) {
+        if (typeof response.data.displaySchedule === "string") {
+          displaySchedule.value = JSON.parse(response.data.displaySchedule);
+        } else {
+          displaySchedule.value = response.data.displaySchedule;
+        }
+      }
+      if (response.data.display_schedule !== undefined) {
+        if (typeof response.data.display_schedule === "string") {
+          displaySchedule.value = JSON.parse(response.data.display_schedule);
+        } else {
+          displaySchedule.value = response.data.display_schedule;
+        }
       }
       if (response.data.displayTimeoutEnabled !== undefined) {
         displayTimeoutEnabled.value = response.data.displayTimeoutEnabled;
@@ -315,6 +338,7 @@ export const useConfigStore = defineStore("config", () => {
     displayScheduleEnabled,
     displayOffTime,
     displayOnTime,
+    displaySchedule,
     displayTimeoutEnabled,
     displayTimeout,
     rebootComboKey1,

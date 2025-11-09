@@ -33,8 +33,9 @@ class ConfigUpdate(BaseModel):
     darkModeStart: int | None = None  # Dark mode start hour (0-23)
     darkModeEnd: int | None = None  # Dark mode end hour (0-23)
     displayScheduleEnabled: bool | None = None  # Enable display power schedule
-    displayOffTime: str | None = None  # Display off time (format: "HH:MM")
-    displayOnTime: str | None = None  # Display on time (format: "HH:MM")
+    displayOffTime: str | None = None  # Display off time (format: "HH:MM") - deprecated, use displaySchedule
+    displayOnTime: str | None = None  # Display on time (format: "HH:MM") - deprecated, use displaySchedule
+    displaySchedule: str | None = None  # Display schedule as JSON: [{"day": 0-6, "enabled": bool, "onTime": "HH:MM", "offTime": "HH:MM"}, ...]
     displayTimeoutEnabled: bool | None = None  # Enable display timeout (screensaver)
     displayTimeout: int | None = None  # Display timeout in seconds (0 = never, default: 0)
     rebootComboKey1: str | None = None  # First key for reboot combo (e.g., "KEY_1")
@@ -130,6 +131,21 @@ async def get_config():
         config["displayOnTime"] = "06:00"  # 6 AM default
     elif "display_on_time" in config and "displayOnTime" not in config:
         config["displayOnTime"] = config["display_on_time"]
+    # Handle display schedule (per-day schedule)
+    if "displaySchedule" not in config and "display_schedule" not in config:
+        # Default: all days enabled, 06:00-22:00
+        default_schedule = [
+            {"day": i, "enabled": True, "onTime": "06:00", "offTime": "22:00"}
+            for i in range(7)
+        ]
+        config["displaySchedule"] = default_schedule
+    elif "display_schedule" in config and "displaySchedule" not in config:
+        # Parse JSON string if needed
+        import json
+        if isinstance(config["display_schedule"], str):
+            config["displaySchedule"] = json.loads(config["display_schedule"])
+        else:
+            config["displaySchedule"] = config["display_schedule"]
     if "rebootComboKey1" not in config and "reboot_combo_key1" not in config:
         config["rebootComboKey1"] = "KEY_1"  # Default first key
     elif "reboot_combo_key1" in config and "rebootComboKey1" not in config:
@@ -198,6 +214,14 @@ async def update_config(config_update: ConfigUpdate):
         update_dict["display_off_time"] = update_dict.pop("displayOffTime")
     if "displayOnTime" in update_dict:
         update_dict["display_on_time"] = update_dict.pop("displayOnTime")
+    if "displaySchedule" in update_dict:
+        # Store as JSON string
+        import json
+        schedule = update_dict.pop("displaySchedule")
+        if isinstance(schedule, str):
+            update_dict["display_schedule"] = schedule
+        else:
+            update_dict["display_schedule"] = json.dumps(schedule)
     if "rebootComboKey1" in update_dict:
         update_dict["reboot_combo_key1"] = update_dict.pop("rebootComboKey1")
     if "rebootComboKey2" in update_dict:

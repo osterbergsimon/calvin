@@ -1,6 +1,7 @@
 """Display power management service."""
 
 import asyncio
+import json
 import subprocess
 from datetime import datetime, time
 from typing import Optional
@@ -57,6 +58,62 @@ class DisplayPowerService:
             await self.turn_display_on()
             return
 
+        # Try to get per-day schedule first (new format)
+        display_schedule_str = await config_service.get_value("display_schedule")
+        if display_schedule_str:
+            try:
+                # Parse JSON schedule
+                if isinstance(display_schedule_str, str):
+                    schedule = json.loads(display_schedule_str)
+                else:
+                    schedule = display_schedule_str
+                
+                # Get current day of week (0=Monday, 6=Sunday in Python)
+                now = datetime.now()
+                current_day = now.weekday()  # 0=Monday, 6=Sunday
+                
+                # Find schedule for current day
+                day_schedule = None
+                for day_config in schedule:
+                    if day_config.get("day") == current_day:
+                        day_schedule = day_config
+                        break
+                
+                if day_schedule and day_schedule.get("enabled", False):
+                    # Parse times for this day
+                    on_time_str = day_schedule.get("onTime", "06:00")
+                    off_time_str = day_schedule.get("offTime", "22:00")
+                    
+                    try:
+                        on_hour, on_minute = map(int, on_time_str.split(":"))
+                        off_hour, off_minute = map(int, off_time_str.split(":"))
+                        display_on_time = time(on_hour, on_minute)
+                        display_off_time = time(off_hour, off_minute)
+                        
+                        # Get current time
+                        current_time = now.time()
+                        
+                        # Determine if display should be on or off
+                        should_be_on = self._should_display_be_on(current_time, display_on_time, display_off_time)
+                        
+                        if should_be_on:
+                            await self.turn_display_on()
+                        else:
+                            await self.turn_display_off()
+                        return
+                    except (ValueError, AttributeError):
+                        # Invalid time format, keep display on
+                        await self.turn_display_on()
+                        return
+                else:
+                    # Day not enabled or not found, keep display on
+                    await self.turn_display_on()
+                    return
+            except (json.JSONDecodeError, TypeError, AttributeError):
+                # Invalid schedule format, fall back to old format
+                pass
+
+        # Fall back to old format (single on/off time for all days)
         display_off_time_str = await config_service.get_value("display_off_time")
         display_on_time_str = await config_service.get_value("display_on_time")
 

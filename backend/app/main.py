@@ -129,6 +129,16 @@ async def lifespan(app: FastAPI):
     display_on_time = await config_service.get_value("display_on_time")
     if display_on_time is None:
         await config_service.set_value("display_on_time", "06:00")  # 6 AM default
+    # Initialize display schedule if not exists (per-day schedule)
+    display_schedule = await config_service.get_value("display_schedule")
+    if display_schedule is None:
+        # Default: all days enabled, 06:00-22:00
+        import json
+        default_schedule = [
+            {"day": i, "enabled": True, "onTime": "06:00", "offTime": "22:00"}
+            for i in range(7)  # 0=Monday, 6=Sunday
+        ]
+        await config_service.set_value("display_schedule", json.dumps(default_schedule))
     reboot_combo_key1 = await config_service.get_value("reboot_combo_key1")
     if reboot_combo_key1 is None:
         await config_service.set_value("reboot_combo_key1", "KEY_1")  # Default first key

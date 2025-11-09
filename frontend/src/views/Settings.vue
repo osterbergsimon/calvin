@@ -645,22 +645,46 @@
             >
           </div>
           <div v-if="localConfig.displayScheduleEnabled" class="setting-item">
-            <label>Display Off Time</label>
-            <input
-              v-model="localConfig.displayOffTime"
-              type="time"
-              @change="updateDisplaySchedule"
-            />
-            <span class="help-text">Time to turn display off (e.g., 22:00 for 10 PM)</span>
-          </div>
-          <div v-if="localConfig.displayScheduleEnabled" class="setting-item">
-            <label>Display On Time</label>
-            <input
-              v-model="localConfig.displayOnTime"
-              type="time"
-              @change="updateDisplaySchedule"
-            />
-            <span class="help-text">Time to turn display on (e.g., 06:00 for 6 AM)</span>
+            <label>Daily Schedule</label>
+            <div class="schedule-days">
+              <div
+                v-for="(dayConfig, index) in localConfig.displaySchedule"
+                :key="index"
+                class="schedule-day"
+              >
+                <div class="schedule-day-header">
+                  <label>
+                    <input
+                      v-model="dayConfig.enabled"
+                      type="checkbox"
+                      @change="updateDisplaySchedule"
+                    />
+                    {{ getDayName(dayConfig.day) }}
+                  </label>
+                </div>
+                <div v-if="dayConfig.enabled" class="schedule-day-times">
+                  <div class="schedule-time">
+                    <label>On:</label>
+                    <input
+                      v-model="dayConfig.onTime"
+                      type="time"
+                      @change="updateDisplaySchedule"
+                    />
+                  </div>
+                  <div class="schedule-time">
+                    <label>Off:</label>
+                    <input
+                      v-model="dayConfig.offTime"
+                      type="time"
+                      @change="updateDisplaySchedule"
+                    />
+                  </div>
+                </div>
+              </div>
+            </div>
+            <span class="help-text"
+              >Configure on/off times for each day of the week. Display will be on during the specified time range.</span
+            >
           </div>
           <div class="setting-item">
             <label>
@@ -830,6 +854,15 @@ const localConfig = ref({
   displayScheduleEnabled: false,
   displayOffTime: "22:00",
   displayOnTime: "06:00",
+  displaySchedule: [
+    { day: 0, enabled: true, onTime: "06:00", offTime: "22:00" }, // Monday
+    { day: 1, enabled: true, onTime: "06:00", offTime: "22:00" }, // Tuesday
+    { day: 2, enabled: true, onTime: "06:00", offTime: "22:00" }, // Wednesday
+    { day: 3, enabled: true, onTime: "06:00", offTime: "22:00" }, // Thursday
+    { day: 4, enabled: true, onTime: "06:00", offTime: "22:00" }, // Friday
+    { day: 5, enabled: true, onTime: "06:00", offTime: "22:00" }, // Saturday
+    { day: 6, enabled: true, onTime: "06:00", offTime: "22:00" }, // Sunday
+  ],
   displayTimeoutEnabled: false,
   displayTimeout: 0,
   rebootComboKey1: "KEY_1",
@@ -1040,6 +1073,11 @@ const updateDisplaySchedule = () => {
   saveConfig();
 };
 
+const getDayName = (day) => {
+  const days = ["Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday", "Sunday"];
+  return days[day] || `Day ${day}`;
+};
+
 const updateDisplayTimeout = async () => {
   await saveConfig();
   // Apply timeout settings immediately
@@ -1191,6 +1229,20 @@ const loadConfig = async () => {
         false;
       localConfig.value.displayTimeout =
         response.data.displayTimeout ?? response.data.display_timeout ?? 0;
+      if (response.data.displaySchedule !== undefined) {
+        if (typeof response.data.displaySchedule === "string") {
+          localConfig.value.displaySchedule = JSON.parse(response.data.displaySchedule);
+        } else {
+          localConfig.value.displaySchedule = response.data.displaySchedule;
+        }
+      }
+      if (response.data.display_schedule !== undefined) {
+        if (typeof response.data.display_schedule === "string") {
+          localConfig.value.displaySchedule = JSON.parse(response.data.display_schedule);
+        } else {
+          localConfig.value.displaySchedule = response.data.display_schedule;
+        }
+      }
       localConfig.value.rebootComboKey1 =
         response.data.rebootComboKey1 ?? response.data.reboot_combo_key1 ?? "KEY_1";
       localConfig.value.rebootComboKey2 =
@@ -1387,6 +1439,7 @@ const saveConfig = async () => {
       displayScheduleEnabled: localConfig.value.displayScheduleEnabled,
       displayOffTime: localConfig.value.displayOffTime,
       displayOnTime: localConfig.value.displayOnTime,
+      displaySchedule: localConfig.value.displaySchedule,
       displayTimeoutEnabled: localConfig.value.displayTimeoutEnabled,
       displayTimeout: localConfig.value.displayTimeout,
       rebootComboKey1: localConfig.value.rebootComboKey1,
