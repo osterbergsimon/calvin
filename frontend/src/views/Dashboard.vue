@@ -122,7 +122,7 @@
 </template>
 
 <script setup>
-import { ref, onMounted, computed } from "vue";
+import { ref, onMounted, onUnmounted, computed } from "vue";
 import axios from "axios";
 import LayoutManager from "../components/LayoutManager.vue";
 import CalendarView from "../components/CalendarView.vue";
@@ -148,6 +148,9 @@ const statusClass = computed(() => {
 const statusText = computed(() => {
   return status.value.charAt(0).toUpperCase() + status.value.slice(1);
 });
+
+// Polling interval for config updates (30 seconds)
+let configPollInterval = null;
 
 const isLandscape = computed(() => configStore.orientation === "landscape");
 const isPortrait = computed(() => configStore.orientation === "portrait");
@@ -247,8 +250,27 @@ const checkHealth = async () => {
   }
 };
 
-onMounted(() => {
+onMounted(async () => {
   checkHealth();
+  // Fetch config on mount
+  await configStore.fetchConfig();
+  // Set up polling for config updates (every 30 seconds)
+  // This allows changes made from another device to appear on the Pi's display
+  configPollInterval = setInterval(async () => {
+    try {
+      await configStore.fetchConfig();
+    } catch (error) {
+      console.error("Failed to fetch config updates:", error);
+    }
+  }, 30000); // Poll every 30 seconds
+});
+
+onUnmounted(() => {
+  // Clean up polling interval
+  if (configPollInterval) {
+    clearInterval(configPollInterval);
+    configPollInterval = null;
+  }
 });
 </script>
 
