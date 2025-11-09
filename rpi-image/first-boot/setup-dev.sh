@@ -116,6 +116,9 @@ if ! command -v uv &> /dev/null; then
 fi
 # Fix ownership of Calvin directory (in case script was run as root)
 chown -R calvin:calvin "$CALVIN_DIR"
+# Clear UV cache to fix corrupted wheels
+echo "[$(date)] Clearing UV cache to fix corrupted wheels..." | tee -a "$LOG_FILE"
+sudo -u calvin bash -c "export PATH='/home/calvin/.local/bin:/home/calvin/.cargo/bin:\$PATH' && uv cache clean" || true
 # Use lower concurrency to reduce memory usage on Pi 3B+
 export UV_CONCURRENCY=1
 # Run UV as calvin user to ensure proper permissions
