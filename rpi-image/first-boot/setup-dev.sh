@@ -6,9 +6,18 @@ set -e
 
 # Parse command-line arguments
 USE_PIP=false
+USE_UV=false
 if [[ "$*" == *"--use-pip"* ]]; then
     USE_PIP=true
     echo "Using pip instead of UV for package installation"
+elif [[ "$*" == *"--use-uv"* ]]; then
+    USE_UV=true
+    USE_PIP=false
+    echo "Using UV for package installation (may cause issues on Pi 3B+)"
+else
+    # Default to pip on Pi 3B+ due to UV segfault issues
+    USE_PIP=true
+    echo "Defaulting to pip (use --use-uv to force UV, but it may segfault on Pi 3B+)"
 fi
 
 LOG_FILE="/var/log/calvin-setup.log"
@@ -134,82 +143,117 @@ fi
 # Install backend dependencies
 echo "[$(date)] Installing backend dependencies..." | tee -a "$LOG_FILE"
 cd "$CALVIN_DIR/backend"
-# Verify UV is installed for calvin user
-if [ ! -f "/home/calvin/.local/bin/uv" ] && [ ! -f "/home/calvin/.cargo/bin/uv" ]; then
-    echo "[$(date)] ERROR: UV not found for calvin user. Installing..." | tee -a "$LOG_FILE"
-    sudo -u calvin bash << 'UV_INSTALL_EOF'
-        curl -LsSf https://astral.sh/uv/install.sh | sh
-        echo 'export PATH="$HOME/.local/bin:$PATH"' >> ~/.bashrc
-        echo 'export PATH="$HOME/.local/bin:$PATH"' >> ~/.profile
-UV_INSTALL_EOF
-fi
 # Fix ownership of Calvin directory (in case script was run as root)
 chown -R calvin:calvin "$CALVIN_DIR"
-# Clear UV cache to fix corrupted wheels
-echo "[$(date)] Clearing UV cache to fix corrupted wheels..." | tee -a "$LOG_FILE"
-sudo -u calvin bash -c "export PATH='/home/calvin/.local/bin:/home/calvin/.cargo/bin:\$PATH' && uv cache clean" || true
 
-# Install backend dependencies
-# Run UV as calvin user to ensure proper permissions
-# Use lower concurrency to reduce memory usage on Pi 3B+
-echo "[$(date)] Installing backend dependencies (production + linux + dev)..." | tee -a "$LOG_FILE"
-echo "[$(date)] Using aggressive memory management: 4GB swap + single package installs..." | tee -a "$LOG_FILE"
-
-# Try full sync first (fastest if it works)
-echo "[$(date)] Attempting full sync (production + linux + dev)..." | tee -a "$LOG_FILE"
-sudo -u calvin bash << 'UV_SYNC_EOF'
-    export PATH="/home/calvin/.local/bin:/home/calvin/.cargo/bin:$PATH"
-    export UV_CONCURRENCY=1
-    cd /home/calvin/calvin/backend
-    uv sync --extra dev --extra linux
-UV_SYNC_EOF
-
-# Check if it succeeded
-if [ $? -ne 0 ]; then
-    echo "[$(date)] Full sync failed, trying production + linux only..." | tee -a "$LOG_FILE"
-    sudo -u calvin bash << 'UV_SYNC_EOF'
-        export PATH="/home/calvin/.local/bin:/home/calvin/.cargo/bin:$PATH"
-        export UV_CONCURRENCY=1
+if [ "$USE_PIP" = true ]; then
+    # Use pip instead of UV
+    echo "[$(date)] Installing backend dependencies with pip..." | tee -a "$LOG_FILE"
+    echo "[$(date)] Creating virtual environment..." | tee -a "$LOG_FILE"
+    sudo -u calvin bash << 'PIP_INSTALL_EOF'
         cd /home/calvin/calvin/backend
-        uv sync --extra linux
-UV_SYNC_EOF
+        python3 -m venv .venv
+        source .venv/bin/activate
+        pip install --upgrade pip
+        # Install production dependencies
+        pip install fastapi uvicorn[standard] python-dotenv google-api-python-client google-auth-httplib2 google-auth-oauthlib APScheduler Pillow aiofiles sqlalchemy aiosqlite pydantic pydantic-settings websockets icalendar httpx
+        # Install linux extras (evdev)
+        pip install evdev
+        # Install dev dependencies
+        pip install pytest pytest-asyncio pytest-cov pytest-mock faker factory-boy ruff mypy bandit pre-commit
+PIP_INSTALL_EOF
+else
+    # Use UV (may segfault on Pi 3B+)
+    # Verify UV is installed for calvin user
+    if [ ! -f "/home/calvin/.local/bin/uv" ] && [ ! -f "/home/calvin/.cargo/bin/uv" ]; then
+        echo "[$(date)] ERROR: UV not found for calvin user. Installing..." | tee -a "$LOG_FILE"
+        sudo -u calvin bash << 'UV_INSTALL_EOF'
+            curl -LsSf https://astral.sh/uv/install.sh | sh
+            echo 'export PATH="$HOME/.local/bin:$PATH"' >> ~/.bashrc
+            echo 'export PATH="$HOME/.local/bin:$PATH"' >> ~/.profile
+UV_INSTALL_EOF
+    fi
     
-    if [ $? -ne 0 ]; then
-        echo "[$(date)] Production + linux failed, trying production only..." | tee -a "$LOG_FILE"
-        sudo -u calvin bash << 'UV_SYNC_EOF'
-            export PATH="/home/calvin/.local/bin:/home/calvin/.cargo/bin:$PATH"
-            export UV_CONCURRENCY=1
+    # Clear UV cache to fix corrupted wheels (skip if UV segfaults)
+    echo "[$(date)] Clearing UV cache to fix corrupted wheels..." | tee -a "$LOG_FILE"
+    UV_OUTPUT=$(sudo -u calvin bash -c "export PATH='/home/calvin/.local/bin:/home/calvin/.cargo/bin:\$PATH' && uv cache clean 2>&1" 2>&1) || true
+    echo "$UV_OUTPUT" | tee -a "$LOG_FILE"
+    
+    # Check if UV segfaulted
+    if echo "$UV_OUTPUT" | grep -q "Segmentation fault"; then
+        echo "[$(date)] ERROR: UV is segfaulting. Switching to pip..." | tee -a "$LOG_FILE"
+        USE_PIP=true
+        # Re-run with pip
+        sudo -u calvin bash << 'PIP_INSTALL_EOF'
             cd /home/calvin/calvin/backend
-            uv sync
-UV_SYNC_EOF
-        
-        if [ $? -ne 0 ]; then
-            echo "[$(date)] ERROR: All installation attempts failed. Check logs and memory." | tee -a "$LOG_FILE"
-            echo "[$(date)] Current memory status:" | tee -a "$LOG_FILE"
-            free -h | tee -a "$LOG_FILE"
-            echo "[$(date)] UV location check:" | tee -a "$LOG_FILE"
-            which uv || echo "UV not found in PATH" | tee -a "$LOG_FILE"
-            ls -la /home/calvin/.local/bin/uv || echo "UV not in .local/bin" | tee -a "$LOG_FILE"
-            exit 1
-        else
-            # If production worked, try adding dev dependencies
-            echo "[$(date)] Production installed. Now adding dev dependencies..." | tee -a "$LOG_FILE"
-            sudo -u calvin bash << 'UV_SYNC_EOF'
-                export PATH="/home/calvin/.local/bin:/home/calvin/.cargo/bin:$PATH"
-                export UV_CONCURRENCY=1
-                cd /home/calvin/calvin/backend
-                uv sync --extra dev --extra linux || echo "Dev dependencies failed, but production should work"
-UV_SYNC_EOF
-        fi
+            python3 -m venv .venv
+            source .venv/bin/activate
+            pip install --upgrade pip
+            pip install fastapi uvicorn[standard] python-dotenv google-api-python-client google-auth-httplib2 google-auth-oauthlib APScheduler Pillow aiofiles sqlalchemy aiosqlite pydantic pydantic-settings websockets icalendar httpx evdev pytest pytest-asyncio pytest-cov pytest-mock faker factory-boy ruff mypy bandit pre-commit
+PIP_INSTALL_EOF
     else
-        # If production + linux worked, try adding dev dependencies
-        echo "[$(date)] Production + linux installed. Now adding dev dependencies..." | tee -a "$LOG_FILE"
-        sudo -u calvin bash << 'UV_SYNC_EOF'
+        # Install backend dependencies with UV
+        # Run UV as calvin user to ensure proper permissions
+        # Use lower concurrency to reduce memory usage on Pi 3B+
+        echo "[$(date)] Installing backend dependencies (production + linux + dev)..." | tee -a "$LOG_FILE"
+        echo "[$(date)] Using aggressive memory management: 4GB swap + single package installs..." | tee -a "$LOG_FILE"
+
+        # Try full sync first (fastest if it works)
+        echo "[$(date)] Attempting full sync (production + linux + dev)..." | tee -a "$LOG_FILE"
+        UV_SYNC_OUTPUT=$(sudo -u calvin bash << 'UV_SYNC_EOF'
             export PATH="/home/calvin/.local/bin:/home/calvin/.cargo/bin:$PATH"
             export UV_CONCURRENCY=1
             cd /home/calvin/calvin/backend
-            uv sync --extra dev --extra linux || echo "Dev dependencies failed, but production should work"
+            uv sync --extra dev --extra linux 2>&1
 UV_SYNC_EOF
+        ) 2>&1
+        UV_SYNC_EXIT=$?
+        echo "$UV_SYNC_OUTPUT" | tee -a "$LOG_FILE"
+        
+        # Check if UV segfaulted
+        if echo "$UV_SYNC_OUTPUT" | grep -q "Segmentation fault" || [ $UV_SYNC_EXIT -ne 0 ]; then
+            if echo "$UV_SYNC_OUTPUT" | grep -q "Segmentation fault"; then
+                echo "[$(date)] ERROR: UV segfaulted during sync. Switching to pip..." | tee -a "$LOG_FILE"
+                USE_PIP=true
+                # Re-run with pip
+                sudo -u calvin bash << 'PIP_INSTALL_EOF'
+                    cd /home/calvin/calvin/backend
+                    python3 -m venv .venv
+                    source .venv/bin/activate
+                    pip install --upgrade pip
+                    pip install fastapi uvicorn[standard] python-dotenv google-api-python-client google-auth-httplib2 google-auth-oauthlib APScheduler Pillow aiofiles sqlalchemy aiosqlite pydantic pydantic-settings websockets icalendar httpx evdev pytest pytest-asyncio pytest-cov pytest-mock faker factory-boy ruff mypy bandit pre-commit
+PIP_INSTALL_EOF
+            else
+                # UV failed but didn't segfault - try fallback
+                echo "[$(date)] Full sync failed, trying production + linux only..." | tee -a "$LOG_FILE"
+                sudo -u calvin bash << 'UV_SYNC_EOF'
+                    export PATH="/home/calvin/.local/bin:/home/calvin/.cargo/bin:$PATH"
+                    export UV_CONCURRENCY=1
+                    cd /home/calvin/calvin/backend
+                    uv sync --extra linux
+UV_SYNC_EOF
+                if [ $? -ne 0 ]; then
+                    echo "[$(date)] Production + linux failed, trying production only..." | tee -a "$LOG_FILE"
+                    sudo -u calvin bash << 'UV_SYNC_EOF'
+                        export PATH="/home/calvin/.local/bin:/home/calvin/.cargo/bin:$PATH"
+                        export UV_CONCURRENCY=1
+                        cd /home/calvin/calvin/backend
+                        uv sync
+UV_SYNC_EOF
+                    if [ $? -ne 0 ]; then
+                        echo "[$(date)] ERROR: All UV installation attempts failed. Switching to pip..." | tee -a "$LOG_FILE"
+                        USE_PIP=true
+                        sudo -u calvin bash << 'PIP_INSTALL_EOF'
+                            cd /home/calvin/calvin/backend
+                            python3 -m venv .venv
+                            source .venv/bin/activate
+                            pip install --upgrade pip
+                            pip install fastapi uvicorn[standard] python-dotenv google-api-python-client google-auth-httplib2 google-auth-oauthlib APScheduler Pillow aiofiles sqlalchemy aiosqlite pydantic pydantic-settings websockets icalendar httpx evdev pytest pytest-asyncio pytest-cov pytest-mock faker factory-boy ruff mypy bandit pre-commit
+PIP_INSTALL_EOF
+                    fi
+                fi
+            fi
+        fi
     fi
 fi
 
