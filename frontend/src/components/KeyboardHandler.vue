@@ -15,6 +15,13 @@ const keyboardStore = useKeyboardStore();
 const { handleAction } = useKeyboardActions();
 const { resetInactivityTimer } = usePhotoFrameMode();
 
+// Reboot combo tracking
+const pressedKeys = new Set();
+let rebootComboStartTime = null;
+const REBOOT_COMBO_KEYS = ["KEY_1", "KEY_7"];
+const REBOOT_COMBO_DURATION = 10000; // 10 seconds in milliseconds
+let rebootComboCheckInterval = null;
+
 // Map browser key codes to our key codes
 const keyCodeMap = {
   ArrowRight: "KEY_RIGHT",
