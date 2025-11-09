@@ -53,13 +53,13 @@ const checkRebootCombo = () => {
     // Start tracking combo duration
     if (!rebootComboStartTime) {
       rebootComboStartTime = Date.now();
-      console.log("Reboot combo started (KEY_1 + KEY_7)...");
+      console.log(`Reboot combo started (${rebootComboKeys.join(" + ")})...`);
     } else {
       // Check if combo has been held for required duration
       const elapsed = Date.now() - rebootComboStartTime;
-      if (elapsed >= REBOOT_COMBO_DURATION) {
+      if (elapsed >= rebootComboDuration) {
         // Trigger reboot
-        console.log("Reboot combo held for 10 seconds - rebooting system");
+        console.log(`Reboot combo held for ${rebootComboDuration / 1000} seconds - rebooting system`);
         triggerReboot();
         // Reset combo tracking
         rebootComboStartTime = null;
@@ -137,7 +137,7 @@ const onKeyUp = (event) => {
   pressedKeys.delete(keyCode);
   
   // Reset reboot combo if any combo key is released
-  if (REBOOT_COMBO_KEYS.includes(keyCode)) {
+  if (rebootComboKeys.includes(keyCode)) {
     rebootComboStartTime = null;
   }
 };
