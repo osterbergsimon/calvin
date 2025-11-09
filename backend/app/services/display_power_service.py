@@ -173,6 +173,62 @@ class DisplayPowerService:
         # Fallback: assume on if we can't determine
         return {"state": "unknown", "method": "unknown"}
 
+    async def configure_display_timeout(self):
+        """Configure display timeout (screensaver) based on settings."""
+        timeout_enabled = await config_service.get_value("display_timeout_enabled")
+        timeout_seconds = await config_service.get_value("display_timeout")
+        
+        if timeout_enabled and timeout_seconds and timeout_seconds > 0:
+            # Enable DPMS and set timeout
+            try:
+                # Set screen saver timeout (xset uses seconds for 's' command)
+                subprocess.run(
+                    ["xset", "s", str(timeout_seconds)],
+                    capture_output=True,
+                    timeout=5,
+                    env={"DISPLAY": ":0"},
+                )
+                # Enable DPMS (Display Power Management Signaling)
+                subprocess.run(
+                    ["xset", "+dpms"],
+                    capture_output=True,
+                    timeout=5,
+                    env={"DISPLAY": ":0"},
+                )
+                # Set DPMS standby, suspend, and off times (in seconds)
+                # Format: standby suspend off (all in seconds)
+                subprocess.run(
+                    ["xset", "dpms", str(timeout_seconds), str(timeout_seconds), str(timeout_seconds)],
+                    capture_output=True,
+                    timeout=5,
+                    env={"DISPLAY": ":0"},
+                )
+            except (subprocess.TimeoutExpired, FileNotFoundError):
+                pass
+        else:
+            # Disable display timeout (keep display on)
+            try:
+                subprocess.run(
+                    ["xset", "s", "off"],
+                    capture_output=True,
+                    timeout=5,
+                    env={"DISPLAY": ":0"},
+                )
+                subprocess.run(
+                    ["xset", "-dpms"],
+                    capture_output=True,
+                    timeout=5,
+                    env={"DISPLAY": ":0"},
+                )
+                subprocess.run(
+                    ["xset", "s", "noblank"],
+                    capture_output=True,
+                    timeout=5,
+                    env={"DISPLAY": ":0"},
+                )
+            except (subprocess.TimeoutExpired, FileNotFoundError):
+                pass
+
 
 # Global instance
 display_power_service = DisplayPowerService()
