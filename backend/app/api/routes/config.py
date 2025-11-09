@@ -188,6 +188,12 @@ async def update_config(config_update: ConfigUpdate):
         update_dict["display_off_time"] = update_dict.pop("displayOffTime")
     if "displayOnTime" in update_dict:
         update_dict["display_on_time"] = update_dict.pop("displayOnTime")
+    if "rebootComboKey1" in update_dict:
+        update_dict["reboot_combo_key1"] = update_dict.pop("rebootComboKey1")
+    if "rebootComboKey2" in update_dict:
+        update_dict["reboot_combo_key2"] = update_dict.pop("rebootComboKey2")
+    if "rebootComboDuration" in update_dict:
+        update_dict["reboot_combo_duration"] = update_dict.pop("rebootComboDuration")
 
     await config_service.update_config(update_dict)
 
