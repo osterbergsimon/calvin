@@ -74,7 +74,8 @@ async def lifespan(app: FastAPI):
         print("Initialized default keyboard mappings")
 
     # Initialize image service
-    image_service_module.image_service = ImageService(settings.image_dir)
+    thumbnail_dir = settings.image_cache_dir / "thumbnails"
+    image_service_module.image_service = ImageService(settings.image_dir, thumbnail_dir)
     # Do initial scan
     image_service_module.image_service.scan_images()
     image_count = len(image_service_module.image_service.get_images())

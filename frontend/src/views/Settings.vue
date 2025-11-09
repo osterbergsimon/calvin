@@ -259,6 +259,14 @@
                 :key="image.id"
                 class="image-item"
               >
+                <div class="image-thumbnail">
+                  <img
+                    :src="`/api/images/${image.id}/thumbnail`"
+                    :alt="image.filename"
+                    class="thumbnail-img"
+                    @error="handleThumbnailError"
+                  />
+                </div>
                 <div class="image-info">
                   <strong>{{ image.filename }}</strong>
                   <span class="image-details"
@@ -1440,6 +1448,11 @@ const formatFileSize = (bytes) => {
   return Math.round((bytes / Math.pow(k, i)) * 100) / 100 + " " + sizes[i];
 };
 
+const handleThumbnailError = (event) => {
+  // Hide broken thumbnail images
+  event.target.style.display = "none";
+};
+
 const addCalendarSource = async () => {
   if (!canAddCalendar.value) {
     alert("Please fill in calendar name and URL");
@@ -2498,6 +2511,24 @@ input:checked + .slider:before {
   border-radius: 4px;
   border: 1px solid var(--border-color);
   gap: 1rem;
+}
+
+.image-thumbnail {
+  width: 80px;
+  height: 80px;
+  flex-shrink: 0;
+  border-radius: 4px;
+  overflow: hidden;
+  background: var(--bg-secondary);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.thumbnail-img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
 }
 
 .image-info {

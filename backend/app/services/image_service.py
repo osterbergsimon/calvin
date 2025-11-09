@@ -4,21 +4,25 @@ import hashlib
 from datetime import datetime
 from pathlib import Path
 
-from PIL import Image
+from PIL import Image, ImageOps
 
 
 class ImageService:
     """Service for managing images for slideshow."""
 
-    def __init__(self, image_dir: Path):
+    def __init__(self, image_dir: Path, thumbnail_dir: Path | None = None):
         """
         Initialize image service.
 
         Args:
             image_dir: Directory containing images
+            thumbnail_dir: Directory for storing thumbnails (defaults to image_dir/thumbnails)
         """
         self.image_dir = Path(image_dir)
         self.image_dir.mkdir(parents=True, exist_ok=True)
+        self.thumbnail_dir = Path(thumbnail_dir) if thumbnail_dir else self.image_dir / "thumbnails"
+        self.thumbnail_dir.mkdir(parents=True, exist_ok=True)
+        self.thumbnail_size = (200, 200)  # Thumbnail size in pixels
         self.supported_formats = {".jpg", ".jpeg", ".png", ".webp", ".gif"}
         self._images: list[dict] = []
         self._current_index = 0
@@ -54,6 +58,11 @@ class ImageService:
 
                         # Generate image ID from file path hash
                         image_id = hashlib.md5(str(file_path).encode()).hexdigest()
+
+                        # Generate thumbnail if it doesn't exist
+                        thumbnail_path = self._get_thumbnail_path(image_id)
+                        if not thumbnail_path.exists():
+                            self._generate_thumbnail(file_path, thumbnail_path)
 
                         images.append(
                             {
@@ -172,6 +181,65 @@ class ImageService:
 
         return None
 
+    def _get_thumbnail_path(self, image_id: str) -> Path:
+        """
+        Get thumbnail path for an image ID.
+
+        Args:
+            image_id: Image ID
+
+        Returns:
+            Path to thumbnail file
+        """
+        return self.thumbnail_dir / f"{image_id}.jpg"
+
+    def _generate_thumbnail(self, image_path: Path, thumbnail_path: Path) -> None:
+        """
+        Generate a thumbnail for an image.
+
+        Args:
+            image_path: Path to source image
+            thumbnail_path: Path to save thumbnail
+        """
+        try:
+            with Image.open(image_path) as img:
+                # Handle EXIF orientation
+                img = ImageOps.exif_transpose(img)
+                
+                # Create thumbnail maintaining aspect ratio
+                img.thumbnail(self.thumbnail_size, Image.Resampling.LANCZOS)
+                
+                # Convert to RGB if necessary (for JPEG)
+                if img.mode in ("RGBA", "LA", "P"):
+                    # Create white background
+                    background = Image.new("RGB", img.size, (255, 255, 255))
+                    if img.mode == "P":
+                        img = img.convert("RGBA")
+                    background.paste(img, mask=img.split()[-1] if img.mode in ("RGBA", "LA") else None)
+                    img = background
+                elif img.mode != "RGB":
+                    img = img.convert("RGB")
+                
+                # Save thumbnail as JPEG
+                img.save(thumbnail_path, "JPEG", quality=85, optimize=True)
+        except Exception as e:
+            print(f"Error generating thumbnail for {image_path}: {e}")
+
+    def get_thumbnail_path(self, image_id: str) -> Path | None:
+        """
+        Get thumbnail path for an image by ID.
+
+        Args:
+            image_id: Image ID
+
+        Returns:
+            Path to thumbnail file or None if not found
+        """
+        thumbnail_path = self._get_thumbnail_path(image_id)
+        if thumbnail_path.exists():
+            return thumbnail_path
+        return None
+
     def get_config(self) -> dict:
         """
         Get image service configuration.
@@ -181,6 +249,7 @@ class ImageService:
         """
         return {
             "image_dir": str(self.image_dir),
+            "thumbnail_dir": str(self.thumbnail_dir),
             "total_images": len(self._images),
             "current_index": self._current_index,
             "supported_formats": list(self.supported_formats),

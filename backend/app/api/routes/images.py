@@ -1,5 +1,6 @@
 """Image endpoints."""
 
+import hashlib
 from pathlib import Path
 
 from fastapi import APIRouter, HTTPException, UploadFile, File
@@ -78,6 +79,47 @@ async def get_image_file(image_id: str):
         media_type=f"image/{image['format'].lstrip('.')}",
         headers={
             "Cache-Control": "public, max-age=3600",  # Cache for 1 hour
+        },
+    )
+
+
+@router.get("/images/{image_id}/thumbnail")
+async def get_image_thumbnail(image_id: str):
+    """
+    Get thumbnail for an image by ID.
+
+    Args:
+        image_id: Image ID
+
+    Returns:
+        Thumbnail image file
+    """
+    image_service = get_image_service()
+    if not image_service:
+        raise HTTPException(status_code=503, detail="Image service not initialized")
+
+    image = image_service.get_image_by_id(image_id)
+    if not image:
+        raise HTTPException(status_code=404, detail="Image not found")
+
+    thumbnail_path = image_service.get_thumbnail_path(image_id)
+    if not thumbnail_path or not thumbnail_path.exists():
+        # Generate thumbnail if it doesn't exist
+        image_path = Path(image["path"])
+        if not image_path.exists():
+            raise HTTPException(status_code=404, detail="Image file not found")
+        
+        thumbnail_path = image_service._get_thumbnail_path(image_id)
+        image_service._generate_thumbnail(image_path, thumbnail_path)
+        
+        if not thumbnail_path.exists():
+            raise HTTPException(status_code=500, detail="Failed to generate thumbnail")
+
+    return FileResponse(
+        thumbnail_path,
+        media_type="image/jpeg",
+        headers={
+            "Cache-Control": "public, max-age=86400",  # Cache for 1 day
         },
     )
 
@@ -182,6 +224,11 @@ async def upload_image(file: UploadFile = File(...)):
         with open(image_path, "wb") as f:
             f.write(file_content)
 
+        # Generate thumbnail for uploaded image
+        image_id = hashlib.md5(str(image_path).encode()).hexdigest()
+        thumbnail_path = image_service._get_thumbnail_path(image_id)
+        image_service._generate_thumbnail(image_path, thumbnail_path)
+
         # Force rescan to include new image
         image_service._last_scan = None
         images = image_service.scan_images()
@@ -229,7 +276,14 @@ async def delete_image(image_id: str):
     image_path = Path(image["path"])
     if image_path.exists():
         try:
+            # Delete image file
             image_path.unlink()
+            
+            # Delete thumbnail if it exists
+            thumbnail_path = image_service.get_thumbnail_path(image_id)
+            if thumbnail_path and thumbnail_path.exists():
+                thumbnail_path.unlink()
+            
             # Force rescan to remove deleted image
             image_service._last_scan = None
             image_service.scan_images()
