@@ -271,12 +271,25 @@ if [ -d "$CALVIN_DIR/frontend/dist" ]; then
 fi
 # Clean and reinstall dependencies to ensure all transitive dependencies are installed
 echo "[$(date)] Cleaning and installing frontend dependencies..." | tee -a "$LOG_FILE"
-sudo -u calvin bash -c "cd '$CALVIN_DIR/frontend' && rm -rf node_modules package-lock.json && npm install"
+sudo -u calvin bash -c "cd '$CALVIN_DIR/frontend' && rm -rf node_modules package-lock.json && npm install" || {
+    echo "[$(date)] ERROR: npm install failed. Retrying..." | tee -a "$LOG_FILE"
+    sudo -u calvin bash -c "cd '$CALVIN_DIR/frontend' && npm cache clean --force && npm install"
+}
+# Verify axios is installed
+if [ ! -d "$CALVIN_DIR/frontend/node_modules/axios" ]; then
+    echo "[$(date)] ERROR: axios not found in node_modules. Reinstalling..." | tee -a "$LOG_FILE"
+    sudo -u calvin bash -c "cd '$CALVIN_DIR/frontend' && npm install axios"
+fi
 # Build frontend
 echo "[$(date)] Building frontend..." | tee -a "$LOG_FILE"
 # Ensure dist directory ownership is correct before build
 chown -R calvin:calvin "$CALVIN_DIR/frontend" 2>/dev/null || true
-sudo -u calvin bash -c "cd '$CALVIN_DIR/frontend' && npm run build"
+sudo -u calvin bash -c "cd '$CALVIN_DIR/frontend' && npm run build" || {
+    echo "[$(date)] ERROR: Frontend build failed. Checking dependencies..." | tee -a "$LOG_FILE"
+    # List installed packages
+    sudo -u calvin bash -c "cd '$CALVIN_DIR/frontend' && npm list --depth=0" | tee -a "$LOG_FILE"
+    exit 1
+}
 
 # Create data directories
 echo "[$(date)] Creating data directories..." | tee -a "$LOG_FILE"
