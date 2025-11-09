@@ -132,10 +132,17 @@ This guide will help you get Calvin Dashboard running on your Raspberry Pi. Choo
      - **Keyboard layout:** Your keyboard layout
 
 6. **Edit Custom Cloud-init User-data:**
-   - Click "Edit custom cloud-init user-data"
-   - **Copy entire contents** from `rpi-image/cloud-init/user-data-dev.yml`
-   - **Paste** into the editor
-   - **Save** and close
+   - **Option A:** If available, click "Edit custom cloud-init user-data"
+     - Copy entire contents from `rpi-image/cloud-init/user-data-dev.yml`
+     - Paste into the editor
+     - Save and close
+   - **Option B:** If not available, you can add it manually after flashing:
+     - Flash the image first (skip this step)
+     - After flashing, open the boot partition on the SD card
+     - Create a file named `user-data` (no extension)
+     - Copy contents from `rpi-image/cloud-init/user-data-dev.yml` into it
+     - Save and eject SD card
+     - See [FLASH_ALTERNATIVE.md](FLASH_ALTERNATIVE.md) for detailed instructions
 
 7. **Write Image:**
    - Click "Write"

@@ -26,7 +26,8 @@ env/
 
 # UV
 .uv/
-uv.lock
+# uv.lock should be committed for reproducible builds
+# uv.lock
 **/.venv/
 **/venv/
 backend/.venv/

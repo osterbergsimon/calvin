@@ -33,8 +33,8 @@ Edit `rpi-image/cloud-init/user-data-dev.yml`:
    - Enable SSH
    - Username: `calvin`
    - Configure WiFi
-   - Click "Edit custom cloud-init user-data"
-   - Copy/paste contents from `rpi-image/cloud-init/user-data-dev.yml`
+   - **If available:** Click "Edit custom cloud-init user-data" and paste contents from `rpi-image/cloud-init/user-data-dev.yml`
+   - **If not available:** Flash first, then manually add `user-data` file to boot partition (see [FLASH_ALTERNATIVE.md](FLASH_ALTERNATIVE.md))
 5. Click **Write**
 
 ## Step 3: Boot Pi

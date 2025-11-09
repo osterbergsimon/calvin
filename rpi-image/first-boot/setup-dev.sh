@@ -17,6 +17,20 @@ echo "[$(date)] Updating system packages..." | tee -a "$LOG_FILE"
 apt-get update -qq
 apt-get upgrade -y -qq
 
+# Add swap space to prevent OOM (Pi 3B+ only has 1GB RAM)
+echo "[$(date)] Adding swap space to prevent OOM..." | tee -a "$LOG_FILE"
+if [ ! -f /swapfile ]; then
+    fallocate -l 1G /swapfile
+    chmod 600 /swapfile
+    mkswap /swapfile
+    swapon /swapfile
+    echo '/swapfile none swap sw 0 0' >> /etc/fstab
+    echo "Swap file created and activated" | tee -a "$LOG_FILE"
+else
+    echo "Swap file already exists" | tee -a "$LOG_FILE"
+    swapon /swapfile 2>/dev/null || echo "Swap already active" | tee -a "$LOG_FILE"
+fi
+
 # Install system dependencies
 echo "[$(date)] Installing system dependencies..." | tee -a "$LOG_FILE"
 apt-get install -y -qq \
@@ -39,10 +53,15 @@ apt-get install -y -qq \
 echo "[$(date)] Installing UV..." | tee -a "$LOG_FILE"
 if ! command -v uv &> /dev/null; then
     curl -LsSf https://astral.sh/uv/install.sh | sh
-    export PATH="/home/calvin/.local/bin:$PATH"
     # Add to PATH permanently
     echo 'export PATH="$HOME/.local/bin:$PATH"' >> /home/calvin/.bashrc
     echo 'export PATH="$HOME/.local/bin:$PATH"' >> /home/calvin/.profile
+fi
+# Ensure UV is in PATH for this script
+export PATH="/home/calvin/.local/bin:$PATH"
+# Also check ~/.cargo/bin (alternative install location)
+if [ -d "/home/calvin/.cargo/bin" ]; then
+    export PATH="/home/calvin/.cargo/bin:$PATH"
 fi
 
 # Install Node.js 20+
@@ -69,7 +88,23 @@ fi
 # Install backend dependencies
 echo "[$(date)] Installing backend dependencies..." | tee -a "$LOG_FILE"
 cd "$CALVIN_DIR/backend"
-export PATH="/home/calvin/.local/bin:$PATH"
+# Ensure UV is in PATH
+export PATH="/home/calvin/.local/bin:/home/calvin/.cargo/bin:$PATH"
+# Verify UV is available
+if ! command -v uv &> /dev/null; then
+    echo "ERROR: UV not found in PATH. Trying to locate..." | tee -a "$LOG_FILE"
+    if [ -f "/home/calvin/.local/bin/uv" ]; then
+        export PATH="/home/calvin/.local/bin:$PATH"
+    elif [ -f "/home/calvin/.cargo/bin/uv" ]; then
+        export PATH="/home/calvin/.cargo/bin:$PATH"
+    else
+        echo "ERROR: UV not found. Reinstalling..." | tee -a "$LOG_FILE"
+        curl -LsSf https://astral.sh/uv/install.sh | sh
+        export PATH="/home/calvin/.local/bin:/home/calvin/.cargo/bin:$PATH"
+    fi
+fi
+# Use lower concurrency to reduce memory usage on Pi 3B+
+export UV_CONCURRENCY=1
 uv sync --extra dev --extra linux
 
 # Install frontend dependencies
