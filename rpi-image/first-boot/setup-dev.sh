@@ -35,8 +35,10 @@ fi
 echo "[$(date)] Installing system dependencies..." | tee -a "$LOG_FILE"
 apt-get install -y -qq \
     python3 \
+    python3-dev \
     python3-venv \
     python3-pip \
+    build-essential \
     curl \
     git \
     xserver-xorg \
