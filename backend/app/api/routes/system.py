@@ -203,22 +203,88 @@ async def configure_display_timeout():
 async def reboot_system():
     """Reboot the Raspberry Pi."""
     try:
-        # Try sudo reboot first (calvin user should have NOPASSWD sudo)
-        # If that fails, try systemctl reboot (might work if user has permissions)
+        # Try multiple methods to reboot
+        # Note: The backend service runs with NoNewPrivileges=true, so sudo might not work
+        # Try systemctl reboot first (might work if user has permissions)
+        reboot_attempted = False
+        
+        # Method 1: systemctl reboot (might work without sudo)
         try:
-            subprocess.Popen(
-                ["sudo", "reboot"],
-                stdout=subprocess.PIPE,
-                stderr=subprocess.PIPE,
-            )
-        except FileNotFoundError:
-            # sudo not found, try systemctl reboot directly
-            subprocess.Popen(
+            result = subprocess.run(
                 ["systemctl", "reboot"],
                 stdout=subprocess.PIPE,
                 stderr=subprocess.PIPE,
+                timeout=5,
             )
-        return {"status": "success", "message": "System reboot initiated"}
+            if result.returncode == 0:
+                print("Reboot initiated via systemctl reboot")
+                reboot_attempted = True
+            else:
+                print(f"systemctl reboot failed: {result.stderr.decode()}")
+        except FileNotFoundError:
+            print("systemctl not found")
+        except subprocess.TimeoutExpired:
+            print("systemctl reboot timed out (but may have initiated)")
+            reboot_attempted = True
+        except Exception as e:
+            print(f"systemctl reboot error: {e}")
+        
+        # Method 2: sudo reboot (if systemctl didn't work and sudo is available)
+        if not reboot_attempted:
+            try:
+                result = subprocess.run(
+                    ["sudo", "reboot"],
+                    stdout=subprocess.PIPE,
+                    stderr=subprocess.PIPE,
+                    timeout=5,
+                )
+                if result.returncode == 0:
+                    print("Reboot initiated via sudo reboot")
+                    reboot_attempted = True
+                else:
+                    print(f"sudo reboot failed: {result.stderr.decode()}")
+            except FileNotFoundError:
+                print("sudo not found")
+            except subprocess.TimeoutExpired:
+                print("sudo reboot timed out (but may have initiated)")
+                reboot_attempted = True
+            except Exception as e:
+                print(f"sudo reboot error: {e}")
+        
+        # Method 3: Direct reboot command (if both failed)
+        if not reboot_attempted:
+            try:
+                # Try /sbin/reboot directly (might work if user has permissions)
+                result = subprocess.run(
+                    ["/sbin/reboot"],
+                    stdout=subprocess.PIPE,
+                    stderr=subprocess.PIPE,
+                    timeout=5,
+                )
+                if result.returncode == 0:
+                    print("Reboot initiated via /sbin/reboot")
+                    reboot_attempted = True
+                else:
+                    print(f"/sbin/reboot failed: {result.stderr.decode()}")
+            except FileNotFoundError:
+                print("/sbin/reboot not found")
+            except subprocess.TimeoutExpired:
+                print("/sbin/reboot timed out (but may have initiated)")
+                reboot_attempted = True
+            except Exception as e:
+                print(f"/sbin/reboot error: {e}")
+        
+        if reboot_attempted:
+            return {"status": "success", "message": "System reboot initiated"}
+        else:
+            # If all methods failed, return error with details
+            raise HTTPException(
+                status_code=500,
+                detail="Failed to reboot system: All reboot methods failed. Check logs for details."
+            )
+    except HTTPException:
+        raise
     except Exception as e:
+        print(f"Reboot error: {e}")
         raise HTTPException(status_code=500, detail=f"Failed to reboot system: {str(e)}")
 
