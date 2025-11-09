@@ -1027,10 +1027,16 @@ onActivated(() => {
   flex-direction: column;
   background: var(--calendar-bg) !important;
   transition: background 0.2s;
+  position: relative;
 }
 
 .calendar-day:hover {
   background: var(--bg-secondary) !important;
+}
+
+/* Reset any inherited backgrounds */
+.calendar-day > * {
+  background: transparent !important;
 }
 
 .calendar-day.other-month {
