@@ -23,6 +23,9 @@ export const useConfigStore = defineStore("config", () => {
   const displayScheduleEnabled = ref(false); // Enable display power schedule
   const displayOffTime = ref("22:00"); // Display off time (format: "HH:MM")
   const displayOnTime = ref("06:00"); // Display on time (format: "HH:MM")
+  const rebootComboKey1 = ref("KEY_1"); // First key for reboot combo
+  const rebootComboKey2 = ref("KEY_7"); // Second key for reboot combo
+  const rebootComboDuration = ref(10000); // Reboot combo duration in milliseconds
   const loading = ref(false);
   const error = ref(null);
 
@@ -159,6 +162,24 @@ export const useConfigStore = defineStore("config", () => {
       if (response.data.display_on_time !== undefined) {
         displayOnTime.value = response.data.display_on_time;
       }
+      if (response.data.rebootComboKey1 !== undefined) {
+        rebootComboKey1.value = response.data.rebootComboKey1;
+      }
+      if (response.data.reboot_combo_key1 !== undefined) {
+        rebootComboKey1.value = response.data.reboot_combo_key1;
+      }
+      if (response.data.rebootComboKey2 !== undefined) {
+        rebootComboKey2.value = response.data.rebootComboKey2;
+      }
+      if (response.data.reboot_combo_key2 !== undefined) {
+        rebootComboKey2.value = response.data.reboot_combo_key2;
+      }
+      if (response.data.rebootComboDuration !== undefined) {
+        rebootComboDuration.value = response.data.rebootComboDuration;
+      }
+      if (response.data.reboot_combo_duration !== undefined) {
+        rebootComboDuration.value = response.data.reboot_combo_duration;
+      }
       return response.data;
     } catch (err) {
       error.value = err.message;
@@ -280,6 +301,9 @@ export const useConfigStore = defineStore("config", () => {
     displayScheduleEnabled,
     displayOffTime,
     displayOnTime,
+    rebootComboKey1,
+    rebootComboKey2,
+    rebootComboDuration,
     loading,
     error,
     calendarWidth,

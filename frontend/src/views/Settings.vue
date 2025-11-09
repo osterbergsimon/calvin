@@ -738,6 +738,9 @@ const localConfig = ref({
   displayScheduleEnabled: false,
   displayOffTime: "22:00",
   displayOnTime: "06:00",
+  rebootComboKey1: "KEY_1",
+  rebootComboKey2: "KEY_7",
+  rebootComboDuration: 10000,
 });
 
 // Collapsible sections state
@@ -750,6 +753,7 @@ const expandedSections = ref({
   calendar: false,
   webServices: false,
   displayPower: false,
+  rebootCombo: false,
 });
 
 const toggleSection = (section) => {
@@ -1073,6 +1077,12 @@ const loadConfig = async () => {
         response.data.displayOffTime ?? response.data.display_off_time ?? "22:00";
       localConfig.value.displayOnTime =
         response.data.displayOnTime ?? response.data.display_on_time ?? "06:00";
+      localConfig.value.rebootComboKey1 =
+        response.data.rebootComboKey1 ?? response.data.reboot_combo_key1 ?? "KEY_1";
+      localConfig.value.rebootComboKey2 =
+        response.data.rebootComboKey2 ?? response.data.reboot_combo_key2 ?? "KEY_7";
+      localConfig.value.rebootComboDuration =
+        response.data.rebootComboDuration ?? response.data.reboot_combo_duration ?? 10000;
       keyboardStore.setKeyboardType(localConfig.value.keyboardType);
     }
   } catch (error) {

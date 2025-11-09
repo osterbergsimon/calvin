@@ -129,6 +129,15 @@ async def lifespan(app: FastAPI):
     display_on_time = await config_service.get_value("display_on_time")
     if display_on_time is None:
         await config_service.set_value("display_on_time", "06:00")  # 6 AM default
+    reboot_combo_key1 = await config_service.get_value("reboot_combo_key1")
+    if reboot_combo_key1 is None:
+        await config_service.set_value("reboot_combo_key1", "KEY_1")  # Default first key
+    reboot_combo_key2 = await config_service.get_value("reboot_combo_key2")
+    if reboot_combo_key2 is None:
+        await config_service.set_value("reboot_combo_key2", "KEY_7")  # Default second key
+    reboot_combo_duration = await config_service.get_value("reboot_combo_duration")
+    if reboot_combo_duration is None:
+        await config_service.set_value("reboot_combo_duration", 10000)  # 10 seconds default
 
     # Start schedulers
     calendar_scheduler.start()

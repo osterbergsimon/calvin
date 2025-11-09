@@ -35,6 +35,9 @@ class ConfigUpdate(BaseModel):
     displayScheduleEnabled: bool | None = None  # Enable display power schedule
     displayOffTime: str | None = None  # Display off time (format: "HH:MM")
     displayOnTime: str | None = None  # Display on time (format: "HH:MM")
+    rebootComboKey1: str | None = None  # First key for reboot combo (e.g., "KEY_1")
+    rebootComboKey2: str | None = None  # Second key for reboot combo (e.g., "KEY_7")
+    rebootComboDuration: int | None = None  # Reboot combo duration in milliseconds (default: 10000)
 
     # Allow arbitrary fields for extensibility
     class Config:
@@ -125,6 +128,18 @@ async def get_config():
         config["displayOnTime"] = "06:00"  # 6 AM default
     elif "display_on_time" in config and "displayOnTime" not in config:
         config["displayOnTime"] = config["display_on_time"]
+    if "rebootComboKey1" not in config and "reboot_combo_key1" not in config:
+        config["rebootComboKey1"] = "KEY_1"  # Default first key
+    elif "reboot_combo_key1" in config and "rebootComboKey1" not in config:
+        config["rebootComboKey1"] = config["reboot_combo_key1"]
+    if "rebootComboKey2" not in config and "reboot_combo_key2" not in config:
+        config["rebootComboKey2"] = "KEY_7"  # Default second key
+    elif "reboot_combo_key2" in config and "rebootComboKey2" not in config:
+        config["rebootComboKey2"] = config["reboot_combo_key2"]
+    if "rebootComboDuration" not in config and "reboot_combo_duration" not in config:
+        config["rebootComboDuration"] = 10000  # 10 seconds default
+    elif "reboot_combo_duration" in config and "rebootComboDuration" not in config:
+        config["rebootComboDuration"] = config["reboot_combo_duration"]
 
     return config
 

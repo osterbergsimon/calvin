@@ -18,8 +18,8 @@ const { resetInactivityTimer } = usePhotoFrameMode();
 // Reboot combo tracking
 const pressedKeys = new Set();
 let rebootComboStartTime = null;
-const REBOOT_COMBO_KEYS = ["KEY_1", "KEY_7"];
-const REBOOT_COMBO_DURATION = 10000; // 10 seconds in milliseconds
+let rebootComboKeys = ["KEY_1", "KEY_7"]; // Will be loaded from config
+let rebootComboDuration = 10000; // Will be loaded from config (10 seconds default)
 let rebootComboCheckInterval = null;
 
 // Map browser key codes to our key codes
@@ -47,7 +47,7 @@ const keyCodeMap = {
 
 const checkRebootCombo = () => {
   // Check if both reboot combo keys are pressed
-  const comboKeysPressed = REBOOT_COMBO_KEYS.every((key) => pressedKeys.has(key));
+  const comboKeysPressed = rebootComboKeys.every((key) => pressedKeys.has(key));
   
   if (comboKeysPressed) {
     // Start tracking combo duration
