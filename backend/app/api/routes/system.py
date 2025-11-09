@@ -118,29 +118,50 @@ async def get_update_status():
             last_lines = lines[-30:] if len(lines) > 30 else lines
         
         # Check if update is currently running
-        # Look for "Starting Calvin update" without "Update complete!"
+        # Look for various indicators of update activity
         log_content = "".join(last_lines)
-        has_started = "Starting Calvin update" in log_content
-        has_completed = "Update complete!" in log_content
+        has_started = "Starting Calvin update" in log_content or "Starting update" in log_content
+        has_completed = "Update complete!" in log_content or "Update completed" in log_content or "Calvin update complete" in log_content
+        has_error = "ERROR" in log_content or "error" in log_content or "failed" in log_content.lower()
+        
+        # Check for specific update steps
+        has_pulling = "Pulling latest code" in log_content or "git pull" in log_content.lower() or "git fetch" in log_content.lower()
+        has_updating_deps = "Updating backend dependencies" in log_content or "Updating frontend dependencies" in log_content or "Installing" in log_content
+        has_building = "Building frontend" in log_content or "npm run build" in log_content.lower()
+        has_restarting = "Restarting services" in log_content or "systemctl restart" in log_content.lower()
         
         # Check if process is still running by checking for recent activity
-        # If log was updated in last 30 seconds, assume it's running
+        # If log was updated in last 60 seconds, assume it's running
         import time
         log_mtime = log_file.stat().st_mtime
-        recently_updated = (time.time() - log_mtime) < 30
+        recently_updated = (time.time() - log_mtime) < 60
         
-        if has_started and not has_completed and recently_updated:
-            status = "running"
-            message = "Update in progress..."
-        elif has_completed:
+        # Determine status based on log content and recent activity
+        if has_completed:
             status = "idle"
             message = "Update completed successfully"
-        elif has_started and not has_completed and not recently_updated:
+        elif has_error and not recently_updated:
+            status = "error"
+            message = "Update failed. Check logs for details."
+        elif has_started and (has_pulling or has_updating_deps or has_building or has_restarting or recently_updated):
+            status = "running"
+            # Provide more specific message based on what's happening
+            if has_restarting:
+                message = "Restarting services..."
+            elif has_building:
+                message = "Building frontend..."
+            elif has_updating_deps:
+                message = "Updating dependencies..."
+            elif has_pulling:
+                message = "Pulling latest code..."
+            else:
+                message = "Update in progress..."
+        elif has_started and not recently_updated:
             status = "error"
             message = "Update appears to have stalled or failed"
         else:
             status = "unknown"
-            message = "Update status unknown"
+            message = "Update status unknown. Check logs for details."
         
         # Get last 15 lines for display
         display_lines = "".join(last_lines[-15:])
