@@ -20,15 +20,24 @@ apt-get upgrade -y -qq
 # Add swap space to prevent OOM (Pi 3B+ only has 1GB RAM)
 echo "[$(date)] Adding swap space to prevent OOM..." | tee -a "$LOG_FILE"
 if [ ! -f /swapfile ]; then
-    fallocate -l 1G /swapfile
+    # Create 2GB swap (more than 1GB to handle full sync)
+    fallocate -l 2G /swapfile || dd if=/dev/zero of=/swapfile bs=1M count=2048
     chmod 600 /swapfile
     mkswap /swapfile
     swapon /swapfile
     echo '/swapfile none swap sw 0 0' >> /etc/fstab
     echo "Swap file created and activated" | tee -a "$LOG_FILE"
+    free -h | tee -a "$LOG_FILE"
 else
     echo "Swap file already exists" | tee -a "$LOG_FILE"
-    swapon /swapfile 2>/dev/null || echo "Swap already active" | tee -a "$LOG_FILE"
+    # Ensure swap is active
+    if ! swapon --show | grep -q swapfile; then
+        swapon /swapfile
+        echo "Swap activated" | tee -a "$LOG_FILE"
+    else
+        echo "Swap already active" | tee -a "$LOG_FILE"
+    fi
+    free -h | tee -a "$LOG_FILE"
 fi
 
 # Install system dependencies
@@ -110,7 +119,23 @@ chown -R calvin:calvin "$CALVIN_DIR"
 # Use lower concurrency to reduce memory usage on Pi 3B+
 export UV_CONCURRENCY=1
 # Run UV as calvin user to ensure proper permissions
-sudo -u calvin bash -c "cd '$CALVIN_DIR/backend' && export PATH='/home/calvin/.local/bin:/home/calvin/.cargo/bin:\$PATH' && export UV_CONCURRENCY=1 && uv sync --extra dev --extra linux"
+# Install in stages to reduce memory pressure
+echo "[$(date)] Installing backend dependencies (stage 1: production)..." | tee -a "$LOG_FILE"
+sudo -u calvin bash -c "cd '$CALVIN_DIR/backend' && export PATH='/home/calvin/.local/bin:/home/calvin/.cargo/bin:\$PATH' && export UV_CONCURRENCY=1 && uv sync" || {
+    echo "[$(date)] WARNING: Production dependencies failed, continuing..." | tee -a "$LOG_FILE"
+}
+echo "[$(date)] Installing backend dependencies (stage 2: linux extras)..." | tee -a "$LOG_FILE"
+sudo -u calvin bash -c "cd '$CALVIN_DIR/backend' && export PATH='/home/calvin/.local/bin:/home/calvin/.cargo/bin:\$PATH' && export UV_CONCURRENCY=1 && uv sync --extra linux" || {
+    echo "[$(date)] WARNING: Linux extras failed, continuing..." | tee -a "$LOG_FILE"
+}
+echo "[$(date)] Installing backend dependencies (stage 3: dev extras)..." | tee -a "$LOG_FILE"
+sudo -u calvin bash -c "cd '$CALVIN_DIR/backend' && export PATH='/home/calvin/.local/bin:/home/calvin/.cargo/bin:\$PATH' && export UV_CONCURRENCY=1 && uv sync --extra dev --extra linux" || {
+    echo "[$(date)] ERROR: Full sync failed. Trying individual packages..." | tee -a "$LOG_FILE"
+    # Last resort: install dev packages one by one
+    sudo -u calvin bash -c "cd '$CALVIN_DIR/backend' && export PATH='/home/calvin/.local/bin:/home/calvin/.cargo/bin:\$PATH' && export UV_CONCURRENCY=1 && uv pip install pytest pytest-asyncio pytest-cov pytest-mock httpx faker factory-boy ruff mypy bandit pre-commit" || {
+        echo "[$(date)] WARNING: Some dev packages may have failed. Continuing..." | tee -a "$LOG_FILE"
+    }
+}
 
 # Install frontend dependencies
 echo "[$(date)] Installing frontend dependencies..." | tee -a "$LOG_FILE"
