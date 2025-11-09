@@ -339,6 +339,24 @@ fi
     else
         echo "[$(date)] WARNING: Reboot script not found at $CALVIN_DIR/scripts/reboot-calvin.sh" | tee -a "$LOG_FILE"
     fi
+    
+    # Configure polkit to allow calvin user to reboot without password
+    echo "[$(date)] Configuring polkit for reboot..." | tee -a "$LOG_FILE"
+    mkdir -p /etc/polkit-1/rules.d
+    cat > /etc/polkit-1/rules.d/50-calvin-reboot.rules << 'POLKIT_EOF'
+polkit.addRule(function(action, subject) {
+    if (action.id == "org.freedesktop.login1.reboot" ||
+        action.id == "org.freedesktop.login1.reboot-multiple-sessions" ||
+        action.id == "org.freedesktop.login1.power-off" ||
+        action.id == "org.freedesktop.login1.power-off-multiple-sessions") {
+        if (subject.user == "calvin") {
+            return polkit.Result.YES;
+        }
+    }
+});
+POLKIT_EOF
+    chmod 644 /etc/polkit-1/rules.d/50-calvin-reboot.rules
+    echo "[$(date)] Polkit configured to allow calvin user to reboot" | tee -a "$LOG_FILE"
 
 # Configure update script with environment variables
 cat > /etc/default/calvin-update << EOF
