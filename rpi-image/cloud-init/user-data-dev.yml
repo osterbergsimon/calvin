@@ -224,6 +224,7 @@ runcmd:
     # Install systemd services
     echo "[$(date)] Installing systemd services..." | tee -a "$LOG_FILE"
     cp "$CALVIN_DIR/rpi-image/systemd/calvin-backend.service" /etc/systemd/system/
+    # Don't install calvin-x.service - X will start via .bash_profile on tty1
     cp "$CALVIN_DIR/rpi-image/systemd/calvin-frontend.service" /etc/systemd/system/
     cp "$CALVIN_DIR/rpi-image/systemd/calvin-update.service" /etc/systemd/system/
     cp "$CALVIN_DIR/rpi-image/systemd/calvin-update.timer" /etc/systemd/system/
