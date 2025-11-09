@@ -4,6 +4,13 @@
 
 set -e
 
+# Parse command-line arguments
+USE_PIP=false
+if [[ "$*" == *"--use-pip"* ]]; then
+    USE_PIP=true
+    echo "Using pip instead of UV for package installation"
+fi
+
 LOG_FILE="/var/log/calvin-setup.log"
 CALVIN_DIR="/home/calvin/calvin"
 GIT_REPO="${GIT_REPO:-https://github.com/osterbergsimon/calvin.git}"
@@ -11,6 +18,9 @@ GIT_BRANCH="${GIT_BRANCH:-main}"
 UPDATE_INTERVAL="${UPDATE_INTERVAL:-300}"  # 5 minutes default
 
 echo "[$(date)] Starting Calvin development setup..." | tee -a "$LOG_FILE"
+if [ "$USE_PIP" = true ]; then
+    echo "[$(date)] Using pip instead of UV (--use-pip flag set)" | tee -a "$LOG_FILE"
+fi
 
 # Update system
 echo "[$(date)] Updating system packages..." | tee -a "$LOG_FILE"
@@ -74,26 +84,30 @@ apt-get install -y -qq \
     cron \
     || echo "Some packages may already be installed" | tee -a "$LOG_FILE"
 
-# Install UV (Python package manager) as calvin user
-echo "[$(date)] Installing UV..." | tee -a "$LOG_FILE"
-# Install UV as calvin user, not root
-sudo -u calvin bash << 'UV_INSTALL_EOF'
-    if ! command -v uv &> /dev/null; then
-        curl -LsSf https://astral.sh/uv/install.sh | sh
-        # Add to PATH permanently
-        echo 'export PATH="$HOME/.local/bin:$PATH"' >> ~/.bashrc
-        echo 'export PATH="$HOME/.local/bin:$PATH"' >> ~/.profile
-    fi
+# Install UV (Python package manager) as calvin user (unless using pip)
+if [ "$USE_PIP" = false ]; then
+    echo "[$(date)] Installing UV..." | tee -a "$LOG_FILE"
+    # Install UV as calvin user, not root
+    sudo -u calvin bash << 'UV_INSTALL_EOF'
+        if ! command -v uv &> /dev/null; then
+            curl -LsSf https://astral.sh/uv/install.sh | sh
+            # Add to PATH permanently
+            echo 'export PATH="$HOME/.local/bin:$PATH"' >> ~/.bashrc
+            echo 'export PATH="$HOME/.local/bin:$PATH"' >> ~/.profile
+        fi
 UV_INSTALL_EOF
 
-# Verify UV is installed for calvin user
-if [ ! -f "/home/calvin/.local/bin/uv" ] && [ ! -f "/home/calvin/.cargo/bin/uv" ]; then
-    echo "[$(date)] WARNING: UV not found in calvin user's PATH. Reinstalling..." | tee -a "$LOG_FILE"
-    sudo -u calvin bash << 'UV_INSTALL_EOF'
-        curl -LsSf https://astral.sh/uv/install.sh | sh
-        echo 'export PATH="$HOME/.local/bin:$PATH"' >> ~/.bashrc
-        echo 'export PATH="$HOME/.local/bin:$PATH"' >> ~/.profile
+    # Verify UV is installed for calvin user
+    if [ ! -f "/home/calvin/.local/bin/uv" ] && [ ! -f "/home/calvin/.cargo/bin/uv" ]; then
+        echo "[$(date)] WARNING: UV not found in calvin user's PATH. Reinstalling..." | tee -a "$LOG_FILE"
+        sudo -u calvin bash << 'UV_INSTALL_EOF'
+            curl -LsSf https://astral.sh/uv/install.sh | sh
+            echo 'export PATH="$HOME/.local/bin:$PATH"' >> ~/.bashrc
+            echo 'export PATH="$HOME/.local/bin:$PATH"' >> ~/.profile
 UV_INSTALL_EOF
+    fi
+else
+    echo "[$(date)] Skipping UV installation (using pip instead)" | tee -a "$LOG_FILE"
 fi
 
 # Install Node.js 20+
