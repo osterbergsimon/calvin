@@ -164,6 +164,18 @@ export const useConfigStore = defineStore("config", () => {
       if (response.data.display_on_time !== undefined) {
         displayOnTime.value = response.data.display_on_time;
       }
+      if (response.data.displayTimeoutEnabled !== undefined) {
+        displayTimeoutEnabled.value = response.data.displayTimeoutEnabled;
+      }
+      if (response.data.display_timeout_enabled !== undefined) {
+        displayTimeoutEnabled.value = response.data.display_timeout_enabled;
+      }
+      if (response.data.displayTimeout !== undefined) {
+        displayTimeout.value = response.data.displayTimeout;
+      }
+      if (response.data.display_timeout !== undefined) {
+        displayTimeout.value = response.data.display_timeout;
+      }
       if (response.data.rebootComboKey1 !== undefined) {
         rebootComboKey1.value = response.data.rebootComboKey1;
       }

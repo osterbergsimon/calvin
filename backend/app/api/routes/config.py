@@ -204,6 +204,10 @@ async def update_config(config_update: ConfigUpdate):
         update_dict["reboot_combo_key2"] = update_dict.pop("rebootComboKey2")
     if "rebootComboDuration" in update_dict:
         update_dict["reboot_combo_duration"] = update_dict.pop("rebootComboDuration")
+    if "displayTimeoutEnabled" in update_dict:
+        update_dict["display_timeout_enabled"] = update_dict.pop("displayTimeoutEnabled")
+    if "displayTimeout" in update_dict:
+        update_dict["display_timeout"] = update_dict.pop("displayTimeout")
 
     await config_service.update_config(update_dict)
 

@@ -47,6 +47,9 @@ class DisplayPowerService:
 
     async def _check_and_update_display(self):
         """Check current time and update display power state."""
+        # Configure display timeout first (screensaver settings)
+        await self.configure_display_timeout()
+        
         # Get schedule settings
         schedule_enabled = await config_service.get_value("display_schedule_enabled")
         if not schedule_enabled:

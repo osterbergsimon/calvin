@@ -663,6 +663,31 @@
             <span class="help-text">Time to turn display on (e.g., 06:00 for 6 AM)</span>
           </div>
           <div class="setting-item">
+            <label>
+              <input
+                v-model="localConfig.displayTimeoutEnabled"
+                type="checkbox"
+                @change="updateDisplayTimeout"
+              />
+              Enable Display Timeout (Screensaver)
+            </label>
+            <span class="help-text"
+              >Turn display off after period of inactivity</span
+            >
+          </div>
+          <div v-if="localConfig.displayTimeoutEnabled" class="setting-item">
+            <label>Display Timeout (seconds)</label>
+            <input
+              v-model.number="localConfig.displayTimeout"
+              type="number"
+              min="0"
+              max="3600"
+              step="60"
+              @change="updateDisplayTimeout"
+            />
+            <span class="help-text">Turn display off after this many seconds of inactivity (0 = never, max 3600)</span>
+          </div>
+          <div class="setting-item">
             <label>Manual Display Control</label>
             <div class="button-group">
               <button class="btn-secondary" @click="turnDisplayOn">
@@ -805,6 +830,8 @@ const localConfig = ref({
   displayScheduleEnabled: false,
   displayOffTime: "22:00",
   displayOnTime: "06:00",
+  displayTimeoutEnabled: false,
+  displayTimeout: 0,
   rebootComboKey1: "KEY_1",
   rebootComboKey2: "KEY_7",
   rebootComboDuration: 10000,
@@ -1013,6 +1040,16 @@ const updateDisplaySchedule = () => {
   saveConfig();
 };
 
+const updateDisplayTimeout = async () => {
+  await saveConfig();
+  // Apply timeout settings immediately
+  try {
+    await axios.post("/api/system/display/timeout/configure");
+  } catch (error) {
+    console.error("Failed to apply display timeout:", error);
+  }
+};
+
 const updateRebootCombo = () => {
   saveConfig();
 };
@@ -1148,6 +1185,12 @@ const loadConfig = async () => {
         response.data.displayOffTime ?? response.data.display_off_time ?? "22:00";
       localConfig.value.displayOnTime =
         response.data.displayOnTime ?? response.data.display_on_time ?? "06:00";
+      localConfig.value.displayTimeoutEnabled =
+        response.data.displayTimeoutEnabled ??
+        response.data.display_timeout_enabled ??
+        false;
+      localConfig.value.displayTimeout =
+        response.data.displayTimeout ?? response.data.display_timeout ?? 0;
       localConfig.value.rebootComboKey1 =
         response.data.rebootComboKey1 ?? response.data.reboot_combo_key1 ?? "KEY_1";
       localConfig.value.rebootComboKey2 =
@@ -1344,6 +1387,8 @@ const saveConfig = async () => {
       displayScheduleEnabled: localConfig.value.displayScheduleEnabled,
       displayOffTime: localConfig.value.displayOffTime,
       displayOnTime: localConfig.value.displayOnTime,
+      displayTimeoutEnabled: localConfig.value.displayTimeoutEnabled,
+      displayTimeout: localConfig.value.displayTimeout,
       rebootComboKey1: localConfig.value.rebootComboKey1,
       rebootComboKey2: localConfig.value.rebootComboKey2,
       rebootComboDuration: localConfig.value.rebootComboDuration,
