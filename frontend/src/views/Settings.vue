@@ -629,6 +629,16 @@
           <button class="btn-reset" @click="resetToDefaults">
             Reset to Defaults
           </button>
+          <button 
+            class="btn-update" 
+            :disabled="updateInProgress"
+            @click="triggerUpdate"
+          >
+            {{ updateInProgress ? "Updating..." : "🔄 Update from GitHub" }}
+          </button>
+          <div v-if="updateMessage" class="update-message" :class="updateMessageClass">
+            {{ updateMessage }}
+          </div>
         </div>
       </section>
     </div>
@@ -699,6 +709,11 @@ const newWebService = ref({
   url: "",
   fullscreen: false,
 });
+
+// Update from GitHub state
+const updateInProgress = ref(false);
+const updateMessage = ref("");
+const updateMessageClass = ref("");
 
 const canAddCalendar = computed(() => {
   return (
@@ -1215,6 +1230,53 @@ const resetToDefaults = async () => {
       ...defaultMappings[localConfig.value.keyboardType],
     };
     await saveAllSettings();
+  }
+};
+
+const triggerUpdate = async () => {
+  if (updateInProgress.value) return;
+  
+  updateInProgress.value = true;
+  updateMessage.value = "Starting update...";
+  updateMessageClass.value = "info";
+  
+  try {
+    const response = await axios.post("/api/system/update");
+    updateMessage.value = response.data.message || "Update started successfully. Check logs at /var/log/calvin-update.log";
+    updateMessageClass.value = "success";
+    
+    // Poll for update status
+    const checkStatus = async () => {
+      try {
+        const statusResponse = await axios.get("/api/system/update/status");
+        if (statusResponse.data.status === "idle") {
+          updateInProgress.value = false;
+          updateMessage.value = "Update completed! The system will restart services automatically.";
+          updateMessageClass.value = "success";
+          // Reload page after a delay to show updated frontend
+          setTimeout(() => {
+            window.location.reload();
+          }, 3000);
+        } else if (statusResponse.data.status === "running") {
+          updateMessage.value = "Update in progress... " + (statusResponse.data.last_log || "");
+          updateMessageClass.value = "info";
+          // Check again in 5 seconds
+          setTimeout(checkStatus, 5000);
+        }
+      } catch (error) {
+        console.error("Failed to check update status:", error);
+        // Continue checking
+        setTimeout(checkStatus, 5000);
+      }
+    };
+    
+    // Start checking status after 2 seconds
+    setTimeout(checkStatus, 2000);
+  } catch (error) {
+    updateInProgress.value = false;
+    updateMessage.value = error.response?.data?.detail || "Failed to start update. Please check the logs.";
+    updateMessageClass.value = "error";
+    console.error("Failed to trigger update:", error);
   }
 };
 
@@ -1776,5 +1838,51 @@ input:checked + .slider:before {
 .btn-reset:hover {
   background: var(--accent-warning);
   opacity: 0.9;
+}
+
+.btn-update {
+  background: var(--accent-primary);
+  color: #fff;
+  border: none;
+  border-radius: 4px;
+  padding: 0.75rem 2rem;
+  font-size: 1rem;
+  cursor: pointer;
+  transition: background 0.2s;
+}
+
+.btn-update:hover:not(:disabled) {
+  background: var(--accent-primary);
+  opacity: 0.9;
+}
+
+.btn-update:disabled {
+  opacity: 0.6;
+  cursor: not-allowed;
+}
+
+.update-message {
+  margin-top: 1rem;
+  padding: 0.75rem 1rem;
+  border-radius: 4px;
+  font-size: 0.9rem;
+}
+
+.update-message.info {
+  background: var(--bg-tertiary);
+  color: var(--text-primary);
+  border: 1px solid var(--border-color);
+}
+
+.update-message.success {
+  background: #4caf50;
+  color: #fff;
+  border: 1px solid #4caf50;
+}
+
+.update-message.error {
+  background: #f44336;
+  color: #fff;
+  border: 1px solid #f44336;
 }
 </style>

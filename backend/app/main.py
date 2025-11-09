@@ -153,6 +153,7 @@ app.include_router(calendar.router, prefix="/api", tags=["calendar"])
 app.include_router(keyboard.router, prefix="/api", tags=["keyboard"])
 app.include_router(images.router, prefix="/api", tags=["images"])
 app.include_router(web_services.router, prefix="/api", tags=["web-services"])
+app.include_router(system.router, prefix="/api", tags=["system"])
 
 # Serve static files from frontend dist directory
 # Get the project root (parent of backend directory)
