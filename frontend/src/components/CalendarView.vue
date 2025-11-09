@@ -1025,12 +1025,12 @@ onActivated(() => {
   min-height: 80px;
   display: flex;
   flex-direction: column;
-  background: var(--calendar-bg);
+  background: var(--calendar-bg) !important;
   transition: background 0.2s;
 }
 
 .calendar-day:hover {
-  background: var(--bg-secondary);
+  background: var(--bg-secondary) !important;
 }
 
 .calendar-day.other-month {
@@ -1041,12 +1041,19 @@ onActivated(() => {
 .calendar-day.today {
   border: 2px solid var(--accent-primary);
   background: var(--calendar-today-bg) !important;
+  opacity: 1 !important;
 }
 
 /* Ensure today's day doesn't have other-month styling */
 .calendar-day.today.other-month {
-  opacity: 1;
+  opacity: 1 !important;
   background: var(--calendar-today-bg) !important;
+}
+
+/* Ensure current month days don't have grey background */
+.calendar-day:not(.other-month) {
+  background: var(--calendar-bg) !important;
+  opacity: 1 !important;
 }
 
 .day-header {
