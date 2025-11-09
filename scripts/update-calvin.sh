@@ -44,16 +44,30 @@ if [ ! -d ".git" ]; then
     git clone "$GIT_REPO" "$REPO_DIR"
     cd "$REPO_DIR"
     git checkout "$GIT_BRANCH"
+    HAS_CHANGES=true
 else
+    # Check current commit before fetching
+    CURRENT_COMMIT=$(git rev-parse HEAD 2>/dev/null || echo "")
+    
     # Pull latest code
     echo "Pulling latest code from $GIT_BRANCH..." | tee -a "$LOG_FILE"
     if ! git fetch origin; then
         echo "Warning: Failed to fetch from origin" | tee -a "$LOG_FILE"
         exit 0  # Don't fail the service, just skip this update
     fi
-    if ! git reset --hard "origin/$GIT_BRANCH"; then
-        echo "Warning: Failed to reset to $GIT_BRANCH" | tee -a "$LOG_FILE"
-        exit 0  # Don't fail the service, just skip this update
+    
+    # Check if there are any changes
+    NEW_COMMIT=$(git rev-parse "origin/$GIT_BRANCH" 2>/dev/null || echo "")
+    if [ "$CURRENT_COMMIT" = "$NEW_COMMIT" ]; then
+        echo "No changes detected. Already up to date at commit $CURRENT_COMMIT" | tee -a "$LOG_FILE"
+        HAS_CHANGES=false
+    else
+        echo "Changes detected. Updating from $CURRENT_COMMIT to $NEW_COMMIT..." | tee -a "$LOG_FILE"
+        if ! git reset --hard "origin/$GIT_BRANCH"; then
+            echo "Warning: Failed to reset to $GIT_BRANCH" | tee -a "$LOG_FILE"
+            exit 0  # Don't fail the service, just skip this update
+        fi
+        HAS_CHANGES=true
     fi
 fi
 
@@ -65,48 +79,69 @@ if [ -f "$REPO_DIR/scripts/update-calvin.sh" ] && [ -f "/usr/local/bin/update-ca
     chown calvin:calvin /usr/local/bin/update-calvin.sh 2>/dev/null || true
 fi
 
-# Update backend dependencies
-echo "Updating backend dependencies..." | tee -a "$LOG_FILE"
-cd "$REPO_DIR/backend" || {
-    echo "ERROR: Cannot cd to backend directory" | tee -a "$LOG_FILE"
-    exit 1
-}
+# Only update dependencies and rebuild if there are changes
+if [ "$HAS_CHANGES" = true ]; then
+    # Update backend dependencies
+    echo "Updating backend dependencies..." | tee -a "$LOG_FILE"
+    cd "$REPO_DIR/backend" || {
+        echo "ERROR: Cannot cd to backend directory" | tee -a "$LOG_FILE"
+        exit 1
+    }
 
-# Use venv if it exists (pip installation), otherwise use UV
-if [ -f .venv/bin/activate ]; then
-    source .venv/bin/activate
-    pip install --upgrade pip
-    # Install from pyproject.toml with linux and dev extras
-    pip install .[linux,dev] 2>&1 | tee -a "$LOG_FILE"
-else
-    export PATH="/home/calvin/.local/bin:/home/calvin/.cargo/bin:$PATH"
-    if ! uv sync --extra dev --extra linux 2>&1 | tee -a "$LOG_FILE"; then
-        echo "Warning: Failed to update backend dependencies with UV" | tee -a "$LOG_FILE"
-        # Try with pip as fallback
-        echo "Trying pip as fallback..." | tee -a "$LOG_FILE"
-        python3 -m venv .venv
+    # Use venv if it exists (pip installation), otherwise use UV
+    if [ -f .venv/bin/activate ]; then
         source .venv/bin/activate
         pip install --upgrade pip
         # Install from pyproject.toml with linux and dev extras
         pip install .[linux,dev] 2>&1 | tee -a "$LOG_FILE"
+    else
+        export PATH="/home/calvin/.local/bin:/home/calvin/.cargo/bin:$PATH"
+        if ! uv sync --extra dev --extra linux 2>&1 | tee -a "$LOG_FILE"; then
+            echo "Warning: Failed to update backend dependencies with UV" | tee -a "$LOG_FILE"
+            # Try with pip as fallback
+            echo "Trying pip as fallback..." | tee -a "$LOG_FILE"
+            python3 -m venv .venv
+            source .venv/bin/activate
+            pip install --upgrade pip
+            # Install from pyproject.toml with linux and dev extras
+            pip install .[linux,dev] 2>&1 | tee -a "$LOG_FILE"
+        fi
     fi
-fi
 
-# Update frontend dependencies
-echo "Updating frontend dependencies..." | tee -a "$LOG_FILE"
-cd "$REPO_DIR/frontend"
-if ! npm ci; then
-    echo "Warning: Failed to update frontend dependencies" | tee -a "$LOG_FILE"
-    exit 0  # Don't fail the service
-fi
+    # Check if frontend files changed
+    FRONTEND_CHANGED=false
+    if [ -n "$CURRENT_COMMIT" ] && [ -n "$NEW_COMMIT" ]; then
+        # Check if any frontend files changed
+        if git diff --name-only "$CURRENT_COMMIT" "$NEW_COMMIT" | grep -q "^frontend/"; then
+            FRONTEND_CHANGED=true
+        fi
+    else
+        # If we don't have commit info, assume frontend changed
+        FRONTEND_CHANGED=true
+    fi
 
-# Rebuild frontend
-echo "Rebuilding frontend..." | tee -a "$LOG_FILE"
-if ! npm run build 2>&1 | tee -a "$LOG_FILE"; then
-    echo "Warning: Failed to build frontend" | tee -a "$LOG_FILE"
-    exit 0  # Don't fail the service
+    if [ "$FRONTEND_CHANGED" = true ]; then
+        # Update frontend dependencies
+        echo "Frontend files changed. Updating frontend dependencies..." | tee -a "$LOG_FILE"
+        cd "$REPO_DIR/frontend"
+        if ! npm ci; then
+            echo "Warning: Failed to update frontend dependencies" | tee -a "$LOG_FILE"
+            exit 0  # Don't fail the service
+        fi
+
+        # Rebuild frontend
+        echo "Rebuilding frontend..." | tee -a "$LOG_FILE"
+        if ! npm run build 2>&1 | tee -a "$LOG_FILE"; then
+            echo "Warning: Failed to build frontend" | tee -a "$LOG_FILE"
+            exit 0  # Don't fail the service
+        fi
+        echo "Frontend build completed successfully" | tee -a "$LOG_FILE"
+    else
+        echo "No frontend changes detected. Skipping frontend rebuild." | tee -a "$LOG_FILE"
+    fi
+else
+    echo "No changes detected. Skipping dependency updates and rebuilds." | tee -a "$LOG_FILE"
 fi
-echo "Frontend build completed successfully" | tee -a "$LOG_FILE"
 
 # Restart services via systemd (non-blocking)
 # Use sudo if available, otherwise try without (might fail if not running as root)
