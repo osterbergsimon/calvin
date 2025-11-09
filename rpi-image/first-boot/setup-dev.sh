@@ -296,7 +296,7 @@ while ! curl -s http://localhost:8000/api/health > /dev/null; do
 done
 
 # Start Chromium in kiosk mode
-chromium-browser \
+chromium \
     --kiosk \
     --noerrdialogs \
     --disable-infobars \

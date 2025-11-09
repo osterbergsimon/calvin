@@ -93,7 +93,7 @@ runcmd:
         xserver-xorg \
         xinit \
         openbox \
-        chromium-browser \
+        chromium \
         unclutter \
         xdotool \
         x11-xserver-utils \
