@@ -67,26 +67,33 @@ apt-get install -y -qq \
     xserver-xorg \
     xinit \
     openbox \
-    chromium-browser \
+    chromium \
     unclutter \
     xdotool \
     x11-xserver-utils \
     cron \
     || echo "Some packages may already be installed" | tee -a "$LOG_FILE"
 
-# Install UV (Python package manager)
+# Install UV (Python package manager) as calvin user
 echo "[$(date)] Installing UV..." | tee -a "$LOG_FILE"
-if ! command -v uv &> /dev/null; then
-    curl -LsSf https://astral.sh/uv/install.sh | sh
-    # Add to PATH permanently
-    echo 'export PATH="$HOME/.local/bin:$PATH"' >> /home/calvin/.bashrc
-    echo 'export PATH="$HOME/.local/bin:$PATH"' >> /home/calvin/.profile
-fi
-# Ensure UV is in PATH for this script
-export PATH="/home/calvin/.local/bin:$PATH"
-# Also check ~/.cargo/bin (alternative install location)
-if [ -d "/home/calvin/.cargo/bin" ]; then
-    export PATH="/home/calvin/.cargo/bin:$PATH"
+# Install UV as calvin user, not root
+sudo -u calvin bash << 'UV_INSTALL_EOF'
+    if ! command -v uv &> /dev/null; then
+        curl -LsSf https://astral.sh/uv/install.sh | sh
+        # Add to PATH permanently
+        echo 'export PATH="$HOME/.local/bin:$PATH"' >> ~/.bashrc
+        echo 'export PATH="$HOME/.local/bin:$PATH"' >> ~/.profile
+    fi
+UV_INSTALL_EOF
+
+# Verify UV is installed for calvin user
+if [ ! -f "/home/calvin/.local/bin/uv" ] && [ ! -f "/home/calvin/.cargo/bin/uv" ]; then
+    echo "[$(date)] WARNING: UV not found in calvin user's PATH. Reinstalling..." | tee -a "$LOG_FILE"
+    sudo -u calvin bash << 'UV_INSTALL_EOF'
+        curl -LsSf https://astral.sh/uv/install.sh | sh
+        echo 'export PATH="$HOME/.local/bin:$PATH"' >> ~/.bashrc
+        echo 'export PATH="$HOME/.local/bin:$PATH"' >> ~/.profile
+UV_INSTALL_EOF
 fi
 
 # Install Node.js 20+
@@ -113,20 +120,14 @@ fi
 # Install backend dependencies
 echo "[$(date)] Installing backend dependencies..." | tee -a "$LOG_FILE"
 cd "$CALVIN_DIR/backend"
-# Ensure UV is in PATH
-export PATH="/home/calvin/.local/bin:/home/calvin/.cargo/bin:$PATH"
-# Verify UV is available
-if ! command -v uv &> /dev/null; then
-    echo "ERROR: UV not found in PATH. Trying to locate..." | tee -a "$LOG_FILE"
-    if [ -f "/home/calvin/.local/bin/uv" ]; then
-        export PATH="/home/calvin/.local/bin:$PATH"
-    elif [ -f "/home/calvin/.cargo/bin/uv" ]; then
-        export PATH="/home/calvin/.cargo/bin:$PATH"
-    else
-        echo "ERROR: UV not found. Reinstalling..." | tee -a "$LOG_FILE"
+# Verify UV is installed for calvin user
+if [ ! -f "/home/calvin/.local/bin/uv" ] && [ ! -f "/home/calvin/.cargo/bin/uv" ]; then
+    echo "[$(date)] ERROR: UV not found for calvin user. Installing..." | tee -a "$LOG_FILE"
+    sudo -u calvin bash << 'UV_INSTALL_EOF'
         curl -LsSf https://astral.sh/uv/install.sh | sh
-        export PATH="/home/calvin/.local/bin:/home/calvin/.cargo/bin:$PATH"
-    fi
+        echo 'export PATH="$HOME/.local/bin:$PATH"' >> ~/.bashrc
+        echo 'export PATH="$HOME/.local/bin:$PATH"' >> ~/.profile
+UV_INSTALL_EOF
 fi
 # Fix ownership of Calvin directory (in case script was run as root)
 chown -R calvin:calvin "$CALVIN_DIR"
