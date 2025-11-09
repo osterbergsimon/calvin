@@ -225,18 +225,37 @@ if frontend_dist.exists():
     # This must come after API routes and asset mounts to avoid intercepting them
     # Use both GET and POST to handle SPA routing, but exclude API routes
     @app.get("/{full_path:path}")
-    @app.post("/{full_path:path}")
-    async def serve_frontend(full_path: str):
-        """Serve frontend index.html for SPA routing."""
+    async def serve_frontend_get(full_path: str):
+        """Serve frontend index.html for SPA routing (GET only)."""
         # Don't handle API routes, docs, or assets (already handled by mounts/routers)
         if (full_path.startswith("api/") or 
             full_path.startswith("docs") or 
             full_path.startswith("openapi.json") or
             full_path.startswith("assets/")):
-            # Return 404 for assets that don't exist (let StaticFiles handle it)
+            # Return 404 for API routes that don't exist (let routers handle it)
             from fastapi import HTTPException
             raise HTTPException(status_code=404, detail="Not found")
         
+        index_path = frontend_dist / "index.html"
+        if index_path.exists():
+            return FileResponse(str(index_path))
+        return {"message": "Calvin Dashboard API", "version": "0.1.0"}
+    
+    # Only handle POST for non-API routes (API routes should be handled by routers)
+    # This is a fallback for SPA routing, but API routes should match first
+    @app.post("/{full_path:path}")
+    async def serve_frontend_post(full_path: str):
+        """Serve frontend index.html for SPA routing (POST only, fallback)."""
+        # Don't handle API routes - they should be handled by routers first
+        # If we reach here, it means no router matched, so return 404
+        if (full_path.startswith("api/") or 
+            full_path.startswith("docs") or 
+            full_path.startswith("openapi.json") or
+            full_path.startswith("assets/")):
+            from fastapi import HTTPException
+            raise HTTPException(status_code=404, detail="Not found")
+        
+        # For non-API POST requests, serve index.html (SPA routing)
         index_path = frontend_dist / "index.html"
         if index_path.exists():
             return FileResponse(str(index_path))
