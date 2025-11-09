@@ -305,7 +305,7 @@ EOF
 # Install systemd services
 echo "[$(date)] Installing systemd services..." | tee -a "$LOG_FILE"
 cp "$CALVIN_DIR/rpi-image/systemd/calvin-backend.service" /etc/systemd/system/
-cp "$CALVIN_DIR/rpi-image/systemd/calvin-x.service" /etc/systemd/system/
+# Don't install calvin-x.service - X will start via .bash_profile on tty1
 cp "$CALVIN_DIR/rpi-image/systemd/calvin-frontend.service" /etc/systemd/system/
 cp "$CALVIN_DIR/rpi-image/systemd/calvin-update.service" /etc/systemd/system/
 cp "$CALVIN_DIR/rpi-image/systemd/calvin-update.timer" /etc/systemd/system/
@@ -320,7 +320,7 @@ sed -i "s|OnUnitActiveSec=.*|OnUnitActiveSec=${UPDATE_INTERVAL}s|" /etc/systemd/
 
 systemctl daemon-reload
 systemctl enable calvin-backend.service
-systemctl enable calvin-x.service
+# Don't enable calvin-x.service - X will start via .bash_profile on tty1
 systemctl enable calvin-frontend.service
 systemctl enable calvin-update.timer
 
@@ -328,9 +328,9 @@ systemctl enable calvin-update.timer
 echo "[$(date)] Starting services..." | tee -a "$LOG_FILE"
 systemctl start calvin-backend.service
 systemctl start calvin-update.timer
-systemctl start calvin-x.service
-sleep 10  # Wait for X to start
-systemctl start calvin-frontend.service
+# Don't start X service - it will start automatically on tty1 via .bash_profile
+# Don't start frontend service yet - wait for X to start after reboot
+echo "[$(date)] Note: X server and frontend will start automatically after reboot" | tee -a "$LOG_FILE"
 
 # Configure display (same as production)
 echo "[$(date)] Configuring display..." | tee -a "$LOG_FILE"

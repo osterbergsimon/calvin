@@ -1,7 +1,7 @@
 [Unit]
 Description=Calvin Dashboard Frontend (Kiosk Mode)
-After=network.target calvin-backend.service calvin-x.service
-Requires=calvin-backend.service calvin-x.service
+After=network.target calvin-backend.service
+Requires=calvin-backend.service
 Wants=graphical.target
 
 [Service]
@@ -13,6 +13,7 @@ Environment="HOME=/home/calvin"
 Environment="XAUTHORITY=/home/calvin/.Xauthority"
 ExecStartPre=/bin/sleep 10
 ExecStartPre=/bin/bash -c 'until curl -s http://localhost:8000/api/health > /dev/null; do sleep 1; done'
+ExecStartPre=/bin/bash -c 'until [ -f /tmp/.X0-lock ] || pgrep -x Xorg > /dev/null; do sleep 1; done'
 ExecStart=/usr/bin/chromium \
     --kiosk \
     --noerrdialogs \

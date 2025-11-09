@@ -1,6 +1,8 @@
 [Unit]
 Description=Calvin Dashboard Auto-Update Service
 After=network.target
+# Don't block boot if update fails
+OnFailure=calvin-update-failure.service
 
 [Service]
 Type=oneshot
@@ -12,6 +14,10 @@ ExecStart=/usr/local/bin/update-calvin.sh
 StandardOutput=journal
 StandardError=journal
 SyslogIdentifier=calvin-update
+# Don't fail the service if script exits with non-zero
+SuccessExitStatus=0 1 2
+# Timeout after 10 minutes to prevent hanging
+TimeoutSec=600
 
 [Install]
 WantedBy=multi-user.target

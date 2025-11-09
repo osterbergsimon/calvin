@@ -2,7 +2,8 @@
 # Auto-update script for Calvin Dashboard
 # Pulls latest code from GitHub and restarts services
 
-set -e
+# Don't use set -e - we want to continue even if some steps fail
+set +e
 
 # Source environment file if it exists
 if [ -f /etc/default/calvin-update ]; then
@@ -31,8 +32,14 @@ if [ ! -d ".git" ]; then
 else
     # Pull latest code
     echo "Pulling latest code from $GIT_BRANCH..." | tee -a "$LOG_FILE"
-    git fetch origin || { echo "Failed to fetch from origin" | tee -a "$LOG_FILE"; exit 1; }
-    git reset --hard "origin/$GIT_BRANCH" || { echo "Failed to reset to $GIT_BRANCH" | tee -a "$LOG_FILE"; exit 1; }
+    if ! git fetch origin; then
+        echo "Warning: Failed to fetch from origin" | tee -a "$LOG_FILE"
+        exit 0  # Don't fail the service, just skip this update
+    fi
+    if ! git reset --hard "origin/$GIT_BRANCH"; then
+        echo "Warning: Failed to reset to $GIT_BRANCH" | tee -a "$LOG_FILE"
+        exit 0  # Don't fail the service, just skip this update
+    fi
 fi
 
 # Update backend dependencies
@@ -45,22 +52,35 @@ if [ -f .venv/bin/activate ]; then
     pip install -r <(python -c "import tomli; import tomllib; f=open('pyproject.toml','rb'); d=tomllib.load(f); [print(f'{p}{v}') for p,v in d['project']['dependencies']]") 2>/dev/null || pip install fastapi uvicorn[standard] python-dotenv google-api-python-client google-auth-httplib2 google-auth-oauthlib APScheduler Pillow aiofiles sqlalchemy aiosqlite pydantic pydantic-settings websockets icalendar httpx evdev pytest pytest-asyncio pytest-cov pytest-mock faker factory-boy ruff mypy bandit pre-commit
 else
     export PATH="/home/calvin/.local/bin:/home/calvin/.cargo/bin:$PATH"
-    uv sync --extra dev --extra linux || { echo "Failed to update backend dependencies" | tee -a "$LOG_FILE"; exit 1; }
+    if ! uv sync --extra dev --extra linux; then
+        echo "Warning: Failed to update backend dependencies with UV" | tee -a "$LOG_FILE"
+        # Try with pip as fallback
+        if [ -f .venv/bin/activate ]; then
+            source .venv/bin/activate
+            pip install -r requirements.txt 2>/dev/null || echo "Warning: pip install also failed" | tee -a "$LOG_FILE"
+        fi
+    fi
 fi
 
 # Update frontend dependencies
 echo "Updating frontend dependencies..." | tee -a "$LOG_FILE"
 cd "$REPO_DIR/frontend"
-npm ci || { echo "Failed to update frontend dependencies" | tee -a "$LOG_FILE"; exit 1; }
+if ! npm ci; then
+    echo "Warning: Failed to update frontend dependencies" | tee -a "$LOG_FILE"
+    exit 0  # Don't fail the service
+fi
 
 # Rebuild frontend
 echo "Rebuilding frontend..." | tee -a "$LOG_FILE"
-npm run build || { echo "Failed to build frontend" | tee -a "$LOG_FILE"; exit 1; }
+if ! npm run build; then
+    echo "Warning: Failed to build frontend" | tee -a "$LOG_FILE"
+    exit 0  # Don't fail the service
+fi
 
-# Restart services via systemd
+# Restart services via systemd (non-blocking)
 if systemctl is-active --quiet calvin-backend.service; then
     echo "Restarting services via systemd..." | tee -a "$LOG_FILE"
-    systemctl restart calvin-backend || { echo "Failed to restart backend" | tee -a "$LOG_FILE"; exit 1; }
+    systemctl restart calvin-backend || echo "Warning: Failed to restart backend" | tee -a "$LOG_FILE"
     # Frontend doesn't need restart (Chromium will reload)
     # But we can restart it if needed
     # systemctl restart calvin-frontend || true
