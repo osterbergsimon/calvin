@@ -21,6 +21,8 @@ class DisplayPowerService:
         if self._running:
             return
         self._running = True
+        # Ensure display timeout is disabled on startup (default: keep display on)
+        await self.configure_display_timeout()
         self._task = asyncio.create_task(self._scheduler_loop())
 
     async def stop(self):
