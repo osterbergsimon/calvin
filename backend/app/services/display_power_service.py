@@ -300,14 +300,14 @@ class DisplayPowerService:
                     ["xset", "s", str(timeout_seconds)],
                     capture_output=True,
                     timeout=5,
-                    env={"DISPLAY": ":0"},
+                    env={"DISPLAY": ":0", "HOME": "/home/calvin"},
                 )
                 # Enable DPMS (Display Power Management Signaling)
                 subprocess.run(
                     ["xset", "+dpms"],
                     capture_output=True,
                     timeout=5,
-                    env={"DISPLAY": ":0"},
+                    env={"DISPLAY": ":0", "HOME": "/home/calvin"},
                 )
                 # Set DPMS standby, suspend, and off times (in seconds)
                 # Format: standby suspend off (all in seconds)
@@ -315,7 +315,7 @@ class DisplayPowerService:
                     ["xset", "dpms", str(timeout_seconds), str(timeout_seconds), str(timeout_seconds)],
                     capture_output=True,
                     timeout=5,
-                    env={"DISPLAY": ":0"},
+                    env={"DISPLAY": ":0", "HOME": "/home/calvin"},
                 )
             except (subprocess.TimeoutExpired, FileNotFoundError):
                 pass
@@ -328,21 +328,21 @@ class DisplayPowerService:
                     ["xset", "s", "off"],
                     capture_output=True,
                     timeout=5,
-                    env={"DISPLAY": ":0"},
+                    env={"DISPLAY": ":0", "HOME": "/home/calvin"},
                 )
                 # Disable DPMS (Display Power Management Signaling)
                 subprocess.run(
                     ["xset", "-dpms"],
                     capture_output=True,
                     timeout=5,
-                    env={"DISPLAY": ":0"},
+                    env={"DISPLAY": ":0", "HOME": "/home/calvin"},
                 )
                 # Prevent screen blanking
                 subprocess.run(
                     ["xset", "s", "noblank"],
                     capture_output=True,
                     timeout=5,
-                    env={"DISPLAY": ":0"},
+                    env={"DISPLAY": ":0", "HOME": "/home/calvin"},
                 )
             except (subprocess.TimeoutExpired, FileNotFoundError):
                 pass
