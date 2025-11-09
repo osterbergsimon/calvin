@@ -59,21 +59,27 @@ fi
 
 # Update backend dependencies
 echo "Updating backend dependencies..." | tee -a "$LOG_FILE"
-cd "$REPO_DIR/backend"
+cd "$REPO_DIR/backend" || {
+    echo "ERROR: Cannot cd to backend directory" | tee -a "$LOG_FILE"
+    exit 1
+}
+
 # Use venv if it exists (pip installation), otherwise use UV
 if [ -f .venv/bin/activate ]; then
     source .venv/bin/activate
     pip install --upgrade pip
-    pip install -r <(python -c "import tomli; import tomllib; f=open('pyproject.toml','rb'); d=tomllib.load(f); [print(f'{p}{v}') for p,v in d['project']['dependencies']]") 2>/dev/null || pip install fastapi uvicorn[standard] python-dotenv google-api-python-client google-auth-httplib2 google-auth-oauthlib APScheduler Pillow aiofiles sqlalchemy aiosqlite pydantic pydantic-settings websockets icalendar httpx evdev pytest pytest-asyncio pytest-cov pytest-mock faker factory-boy ruff mypy bandit pre-commit
+    # Install dependencies directly (same as setup script)
+    pip install fastapi uvicorn[standard] python-dotenv google-api-python-client google-auth-httplib2 google-auth-oauthlib APScheduler Pillow aiofiles sqlalchemy aiosqlite pydantic pydantic-settings websockets icalendar httpx evdev pytest pytest-asyncio pytest-cov pytest-mock faker factory-boy ruff mypy bandit pre-commit 2>&1 | tee -a "$LOG_FILE"
 else
     export PATH="/home/calvin/.local/bin:/home/calvin/.cargo/bin:$PATH"
-    if ! uv sync --extra dev --extra linux; then
+    if ! uv sync --extra dev --extra linux 2>&1 | tee -a "$LOG_FILE"; then
         echo "Warning: Failed to update backend dependencies with UV" | tee -a "$LOG_FILE"
         # Try with pip as fallback
-        if [ -f .venv/bin/activate ]; then
-            source .venv/bin/activate
-            pip install -r requirements.txt 2>/dev/null || echo "Warning: pip install also failed" | tee -a "$LOG_FILE"
-        fi
+        echo "Trying pip as fallback..." | tee -a "$LOG_FILE"
+        python3 -m venv .venv
+        source .venv/bin/activate
+        pip install --upgrade pip
+        pip install fastapi uvicorn[standard] python-dotenv google-api-python-client google-auth-httplib2 google-auth-oauthlib APScheduler Pillow aiofiles sqlalchemy aiosqlite pydantic pydantic-settings websockets icalendar httpx evdev pytest pytest-asyncio pytest-cov pytest-mock faker factory-boy ruff mypy bandit pre-commit 2>&1 | tee -a "$LOG_FILE"
     fi
 fi
 
