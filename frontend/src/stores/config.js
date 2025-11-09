@@ -44,7 +44,8 @@ export const useConfigStore = defineStore("config", () => {
     error.value = null;
     try {
       const response = await axios.get("/api/config");
-      if (response.data.orientation) {
+      // Update all config values to ensure reactivity
+      if (response.data.orientation !== undefined) {
         orientation.value = response.data.orientation;
       }
       if (response.data.calendarSplit !== undefined) {

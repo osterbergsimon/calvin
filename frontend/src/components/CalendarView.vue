@@ -497,10 +497,13 @@ const calendarDays = computed(() => {
       const date = new Date(year, month, day);
       const dateOnly = new Date(date);
       dateOnly.setHours(0, 0, 0, 0);
+      
+      // Ensure current month days are never marked as otherMonth
+      const isCurrentMonth = date.getMonth() === month && date.getFullYear() === year;
 
       days.push({
         date,
-        otherMonth: false,
+        otherMonth: !isCurrentMonth, // Explicitly check month/year
         isToday: dateOnly.getTime() === today.getTime(),
         events: getEventsForDate(date),
       });
@@ -1032,12 +1035,18 @@ onActivated(() => {
 
 .calendar-day.other-month {
   opacity: 0.4;
-  background: var(--bg-tertiary);
+  background: var(--bg-tertiary) !important;
 }
 
 .calendar-day.today {
   border: 2px solid var(--accent-primary);
-  background: var(--calendar-today-bg);
+  background: var(--calendar-today-bg) !important;
+}
+
+/* Ensure today's day doesn't have other-month styling */
+.calendar-day.today.other-month {
+  opacity: 1;
+  background: var(--calendar-today-bg) !important;
 }
 
 .day-header {
