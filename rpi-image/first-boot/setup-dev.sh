@@ -155,8 +155,8 @@ if [ "$USE_PIP" = true ]; then
         python3 -m venv .venv
         source .venv/bin/activate
         pip install --upgrade pip
-        # Install production dependencies
-        pip install fastapi uvicorn[standard] python-dotenv google-api-python-client google-auth-httplib2 google-auth-oauthlib APScheduler Pillow aiofiles sqlalchemy aiosqlite pydantic pydantic-settings websockets icalendar httpx
+        # Install from pyproject.toml (production dependencies)
+        pip install .
         # Install linux extras (evdev)
         pip install evdev
         # Install dev dependencies
@@ -189,7 +189,8 @@ UV_INSTALL_EOF
             python3 -m venv .venv
             source .venv/bin/activate
             pip install --upgrade pip
-            pip install fastapi uvicorn[standard] python-dotenv google-api-python-client google-auth-httplib2 google-auth-oauthlib APScheduler Pillow aiofiles sqlalchemy aiosqlite pydantic pydantic-settings websockets icalendar httpx evdev pytest pytest-asyncio pytest-cov pytest-mock faker factory-boy ruff mypy bandit pre-commit
+            # Install from pyproject.toml with linux and dev extras
+            pip install .[linux,dev]
 PIP_INSTALL_EOF
     else
         # Install backend dependencies with UV
@@ -248,7 +249,8 @@ UV_SYNC_EOF
                             python3 -m venv .venv
                             source .venv/bin/activate
                             pip install --upgrade pip
-                            pip install fastapi uvicorn[standard] python-dotenv google-api-python-client google-auth-httplib2 google-auth-oauthlib APScheduler Pillow aiofiles sqlalchemy aiosqlite pydantic pydantic-settings websockets icalendar httpx evdev pytest pytest-asyncio pytest-cov pytest-mock faker factory-boy ruff mypy bandit pre-commit
+                            # Install from pyproject.toml with linux and dev extras
+                            pip install .[linux,dev]
 PIP_INSTALL_EOF
                     fi
                 fi
