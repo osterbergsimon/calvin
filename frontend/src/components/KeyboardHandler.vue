@@ -38,6 +38,52 @@ const keyCodeMap = {
   KeyS: "KEY_S",
 };
 
+const checkRebootCombo = () => {
+  // Check if both reboot combo keys are pressed
+  const comboKeysPressed = REBOOT_COMBO_KEYS.every((key) => pressedKeys.has(key));
+  
+  if (comboKeysPressed) {
+    // Start tracking combo duration
+    if (!rebootComboStartTime) {
+      rebootComboStartTime = Date.now();
+      console.log("Reboot combo started (KEY_1 + KEY_7)...");
+    } else {
+      // Check if combo has been held for required duration
+      const elapsed = Date.now() - rebootComboStartTime;
+      if (elapsed >= REBOOT_COMBO_DURATION) {
+        // Trigger reboot
+        console.log("Reboot combo held for 10 seconds - rebooting system");
+        triggerReboot();
+        // Reset combo tracking
+        rebootComboStartTime = null;
+        pressedKeys.clear();
+      }
+    }
+  } else {
+    // Combo not complete, reset tracking
+    if (rebootComboStartTime) {
+      rebootComboStartTime = null;
+    }
+  }
+};
+
+const triggerReboot = async () => {
+  try {
+    const response = await fetch("/api/system/reboot", {
+      method: "POST",
+    });
+    if (response.ok) {
+      console.log("Reboot command sent successfully");
+      // Show a message (if possible before reboot)
+      alert("System rebooting in 3 seconds...");
+    } else {
+      console.error("Failed to trigger reboot:", await response.text());
+    }
+  } catch (error) {
+    console.error("Error triggering reboot:", error);
+  }
+};
+
 const onKeyDown = async (event) => {
   // Don't handle if user is typing in an input/textarea
   if (
@@ -50,6 +96,10 @@ const onKeyDown = async (event) => {
 
   // Map browser key to our key code
   const keyCode = keyCodeMap[event.code] || event.code;
+
+  // Track pressed keys for reboot combo
+  pressedKeys.add(keyCode);
+  checkRebootCombo();
 
   // Get keyboard type from store
   const keyboardType = keyboardStore.keyboardType || "7-button";
@@ -69,6 +119,19 @@ const onKeyDown = async (event) => {
   } else {
     // Even if no mapped action, reset timer on any keypress
     resetInactivityTimer();
+  }
+};
+
+const onKeyUp = (event) => {
+  // Map browser key to our key code
+  const keyCode = keyCodeMap[event.code] || event.code;
+  
+  // Remove from pressed keys
+  pressedKeys.delete(keyCode);
+  
+  // Reset reboot combo if any combo key is released
+  if (REBOOT_COMBO_KEYS.includes(keyCode)) {
+    rebootComboStartTime = null;
   }
 };
 
@@ -98,17 +161,28 @@ onMounted(async () => {
     await loadKeyboardConfig();
   }, 30000);
 
-  // Add global keyboard listener
+  // Add global keyboard listeners
   window.addEventListener("keydown", onKeyDown);
+  window.addEventListener("keyup", onKeyUp);
+  
+  // Start checking reboot combo periodically
+  rebootComboCheckInterval = setInterval(checkRebootCombo, 100); // Check every 100ms
   
   // Clean up interval on unmount
   onUnmounted(() => {
     clearInterval(keyboardConfigInterval);
+    if (rebootComboCheckInterval) {
+      clearInterval(rebootComboCheckInterval);
+    }
   });
 });
 
 onUnmounted(() => {
-  // Remove keyboard listener
+  // Remove keyboard listeners
   window.removeEventListener("keydown", onKeyDown);
+  window.removeEventListener("keyup", onKeyUp);
+  if (rebootComboCheckInterval) {
+    clearInterval(rebootComboCheckInterval);
+  }
 });
 </script>

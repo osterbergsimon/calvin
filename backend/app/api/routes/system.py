@@ -188,3 +188,18 @@ async def get_display_state():
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"Failed to get display state: {str(e)}")
 
+
+@router.post("/reboot")
+async def reboot_system():
+    """Reboot the Raspberry Pi."""
+    try:
+        # Use sudo to reboot (requires proper permissions)
+        subprocess.Popen(
+            ["sudo", "reboot"],
+            stdout=subprocess.PIPE,
+            stderr=subprocess.PIPE,
+        )
+        return {"status": "success", "message": "System reboot initiated"}
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Failed to reboot system: {str(e)}")
+
