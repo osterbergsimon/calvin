@@ -407,9 +407,23 @@ echo "[$(date)] Note: Automatic updates are disabled. Use the 'Update from GitHu
 
 # Configure display (same as production)
 echo "[$(date)] Configuring display..." | tee -a "$LOG_FILE"
-echo "xset s off" >> /home/calvin/.xprofile
-echo "xset -dpms" >> /home/calvin/.xprofile
-echo "xset s noblank" >> /home/calvin/.xprofile
+# Create .xprofile with display settings and frontend service starter
+cat > /home/calvin/.xprofile << 'XPROFILE_EOF'
+#!/bin/bash
+# Display power management settings
+xset s off
+xset -dpms
+xset s noblank
+
+# Start frontend service when X is ready
+# Wait a bit for X to fully initialize
+sleep 2
+# Start the frontend service if it's not already running
+if ! systemctl is-active --quiet calvin-frontend.service; then
+    systemctl --user start calvin-frontend.service 2>/dev/null || sudo systemctl start calvin-frontend.service 2>/dev/null || true
+fi
+XPROFILE_EOF
+chmod +x /home/calvin/.xprofile
 chown calvin:calvin /home/calvin/.xprofile
 
 # Configure auto-login
