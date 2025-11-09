@@ -320,11 +320,25 @@ if [ ! -d "$CALVIN_DIR/backend/data/db" ]; then
     exit 1
 fi
 
-# Install update script
-echo "[$(date)] Installing update script..." | tee -a "$LOG_FILE"
-cp "$CALVIN_DIR/scripts/update-calvin.sh" /usr/local/bin/update-calvin.sh
-chmod +x /usr/local/bin/update-calvin.sh
-chown calvin:calvin /usr/local/bin/update-calvin.sh
+    # Install update script
+    echo "[$(date)] Installing update script..." | tee -a "$LOG_FILE"
+    cp "$CALVIN_DIR/scripts/update-calvin.sh" /usr/local/bin/update-calvin.sh
+    chmod +x /usr/local/bin/update-calvin.sh
+    chown calvin:calvin /usr/local/bin/update-calvin.sh
+    
+    # Install reboot script
+    echo "[$(date)] Installing reboot script..." | tee -a "$LOG_FILE"
+    if [ -f "$CALVIN_DIR/scripts/reboot-calvin.sh" ]; then
+        cp "$CALVIN_DIR/scripts/reboot-calvin.sh" /usr/local/bin/reboot-calvin.sh
+        chmod +x /usr/local/bin/reboot-calvin.sh
+        chown calvin:calvin /usr/local/bin/reboot-calvin.sh
+        # Allow calvin user to run reboot script with sudo without password
+        echo "calvin ALL=(ALL) NOPASSWD: /usr/local/bin/reboot-calvin.sh" > /etc/sudoers.d/calvin-reboot
+        chmod 0440 /etc/sudoers.d/calvin-reboot
+        echo "[$(date)] Reboot script installed with sudo permissions" | tee -a "$LOG_FILE"
+    else
+        echo "[$(date)] WARNING: Reboot script not found at $CALVIN_DIR/scripts/reboot-calvin.sh" | tee -a "$LOG_FILE"
+    fi
 
 # Configure update script with environment variables
 cat > /etc/default/calvin-update << EOF
