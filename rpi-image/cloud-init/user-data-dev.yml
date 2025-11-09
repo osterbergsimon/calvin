@@ -62,12 +62,32 @@ runcmd:
     apt-get update -qq
     apt-get upgrade -y -qq
     
+    # Add swap space to prevent OOM (Pi 3B+ only has 1GB RAM)
+    echo "[$(date)] Adding swap space to prevent OOM..." | tee -a "$LOG_FILE"
+    if [ ! -f /swapfile ]; then
+        # Create 4GB swap (aggressive to handle full sync with all dependencies)
+        echo "[$(date)] Creating 4GB swap file (this may take a few minutes)..." | tee -a "$LOG_FILE"
+        fallocate -l 4G /swapfile 2>/dev/null || dd if=/dev/zero of=/swapfile bs=1M count=4096 status=progress
+        chmod 600 /swapfile
+        mkswap /swapfile
+        swapon /swapfile
+        echo '/swapfile none swap sw 0 0' >> /etc/fstab
+        echo "Swap file created and activated" | tee -a "$LOG_FILE"
+        free -h | tee -a "$LOG_FILE"
+    else
+        echo "Swap file already exists" | tee -a "$LOG_FILE"
+        swapon /swapfile 2>/dev/null || echo "Swap already active" | tee -a "$LOG_FILE"
+        free -h | tee -a "$LOG_FILE"
+    fi
+    
     # Install system dependencies
     echo "[$(date)] Installing system dependencies..." | tee -a "$LOG_FILE"
     apt-get install -y -qq \
         python3 \
+        python3-dev \
         python3-venv \
         python3-pip \
+        build-essential \
         curl \
         git \
         xserver-xorg \
@@ -84,9 +104,15 @@ runcmd:
     echo "[$(date)] Installing UV..." | tee -a "$LOG_FILE"
     if ! command -v uv &> /dev/null; then
         curl -LsSf https://astral.sh/uv/install.sh | sh
-        export PATH="/home/calvin/.local/bin:$PATH"
+        # Add to PATH permanently
         echo 'export PATH="$HOME/.local/bin:$PATH"' >> /home/calvin/.bashrc
         echo 'export PATH="$HOME/.local/bin:$PATH"' >> /home/calvin/.profile
+    fi
+    # Ensure UV is in PATH for this script
+    export PATH="/home/calvin/.local/bin:$PATH"
+    # Also check ~/.cargo/bin (alternative install location)
+    if [ -d "/home/calvin/.cargo/bin" ]; then
+        export PATH="/home/calvin/.cargo/bin:$PATH"
     fi
     
     # Install Node.js 20+
@@ -96,26 +122,82 @@ runcmd:
         apt-get install -y -qq nodejs
     fi
     
-    # Clone Calvin repository
-    echo "[$(date)] Cloning Calvin repository from GitHub..." | tee -a "$LOG_FILE"
-    git clone "$GIT_REPO" "$CALVIN_DIR"
-    cd "$CALVIN_DIR"
-    git checkout "$GIT_BRANCH"
+    # Clone Calvin repository if not exists
+    echo "[$(date)] Setting up Calvin application..." | tee -a "$LOG_FILE"
+    if [ ! -d "$CALVIN_DIR" ]; then
+        echo "Cloning Calvin repository..." | tee -a "$LOG_FILE"
+        git clone "$GIT_REPO" "$CALVIN_DIR"
+        cd "$CALVIN_DIR"
+        git checkout "$GIT_BRANCH"
+    else
+        echo "Calvin directory exists. Updating..." | tee -a "$LOG_FILE"
+        cd "$CALVIN_DIR"
+        git fetch origin
+        git reset --hard "origin/$GIT_BRANCH"
+    fi
     
     # Install backend dependencies
     echo "[$(date)] Installing backend dependencies..." | tee -a "$LOG_FILE"
     cd "$CALVIN_DIR/backend"
-    export PATH="/home/calvin/.local/bin:$PATH"
-    uv sync --extra dev --extra linux
+    # Ensure UV is in PATH
+    export PATH="/home/calvin/.local/bin:/home/calvin/.cargo/bin:$PATH"
+    # Verify UV is available
+    if ! command -v uv &> /dev/null; then
+        echo "ERROR: UV not found in PATH. Trying to locate..." | tee -a "$LOG_FILE"
+        if [ -f "/home/calvin/.local/bin/uv" ]; then
+            export PATH="/home/calvin/.local/bin:$PATH"
+        elif [ -f "/home/calvin/.cargo/bin/uv" ]; then
+            export PATH="/home/calvin/.cargo/bin:$PATH"
+        else
+            echo "ERROR: UV not found. Reinstalling..." | tee -a "$LOG_FILE"
+            curl -LsSf https://astral.sh/uv/install.sh | sh
+            export PATH="/home/calvin/.local/bin:/home/calvin/.cargo/bin:$PATH"
+        fi
+    fi
+    # Fix ownership of Calvin directory (in case script was run as root)
+    chown -R calvin:calvin "$CALVIN_DIR"
+    # Clear UV cache to fix corrupted wheels
+    echo "[$(date)] Clearing UV cache to fix corrupted wheels..." | tee -a "$LOG_FILE"
+    sudo -u calvin bash -c "export PATH='/home/calvin/.local/bin:/home/calvin/.cargo/bin:\$PATH' && uv cache clean" || true
+    # Use lower concurrency to reduce memory usage on Pi 3B+
+    export UV_CONCURRENCY=1
+    # Run UV as calvin user to ensure proper permissions
+    echo "[$(date)] Installing backend dependencies (production + linux + dev)..." | tee -a "$LOG_FILE"
+    echo "[$(date)] Using aggressive memory management: 4GB swap + single package installs..." | tee -a "$LOG_FILE"
+    # Try full sync first (fastest if it works)
+    echo "[$(date)] Attempting full sync (production + linux + dev)..." | tee -a "$LOG_FILE"
+    sudo -u calvin bash -c "cd '$CALVIN_DIR/backend' && export PATH='/home/calvin/.local/bin:/home/calvin/.cargo/bin:\$PATH' && export UV_CONCURRENCY=1 && uv sync --extra dev --extra linux" || {
+        echo "[$(date)] Full sync failed, trying production + linux only..." | tee -a "$LOG_FILE"
+        sudo -u calvin bash -c "cd '$CALVIN_DIR/backend' && export PATH='/home/calvin/.local/bin:/home/calvin/.cargo/bin:\$PATH' && export UV_CONCURRENCY=1 && uv sync --extra linux" || {
+            echo "[$(date)] Production + linux failed, trying production only..." | tee -a "$LOG_FILE"
+            sudo -u calvin bash -c "cd '$CALVIN_DIR/backend' && export PATH='/home/calvin/.local/bin:/home/calvin/.cargo/bin:\$PATH' && export UV_CONCURRENCY=1 && uv sync" || {
+                echo "[$(date)] ERROR: All installation attempts failed. Check logs and memory." | tee -a "$LOG_FILE"
+                echo "[$(date)] Current memory status:" | tee -a "$LOG_FILE"
+                free -h | tee -a "$LOG_FILE"
+                exit 1
+            }
+        }
+        # If production + linux worked, try adding dev dependencies
+        echo "[$(date)] Production + linux installed. Now adding dev dependencies..." | tee -a "$LOG_FILE"
+        sudo -u calvin bash -c "cd '$CALVIN_DIR/backend' && export PATH='/home/calvin/.local/bin:/home/calvin/.cargo/bin:\$PATH' && export UV_CONCURRENCY=1 && uv sync --extra dev --extra linux" || {
+            echo "[$(date)] WARNING: Dev dependencies failed, but production should work" | tee -a "$LOG_FILE"
+        }
+    }
+    echo "[$(date)] Backend dependencies installation complete" | tee -a "$LOG_FILE"
+    free -h | tee -a "$LOG_FILE"
     
     # Install frontend dependencies
     echo "[$(date)] Installing frontend dependencies..." | tee -a "$LOG_FILE"
     cd "$CALVIN_DIR/frontend"
-    npm ci
+    # Fix ownership before npm install
+    chown -R calvin:calvin "$CALVIN_DIR/frontend"
+    # Run npm as calvin user
+    sudo -u calvin bash -c "cd '$CALVIN_DIR/frontend' && npm ci"
     
     # Build frontend
     echo "[$(date)] Building frontend..." | tee -a "$LOG_FILE"
-    npm run build
+    # Run npm build as calvin user
+    sudo -u calvin bash -c "cd '$CALVIN_DIR/frontend' && npm run build"
     
     # Create data directories
     echo "[$(date)] Creating data directories..." | tee -a "$LOG_FILE"
@@ -139,14 +221,19 @@ runcmd:
     REPO_DIR=$CALVIN_DIR
     EOF
     
-    # Install systemd services (now that code is cloned)
+    # Install systemd services
     echo "[$(date)] Installing systemd services..." | tee -a "$LOG_FILE"
     cp "$CALVIN_DIR/rpi-image/systemd/calvin-backend.service" /etc/systemd/system/
     cp "$CALVIN_DIR/rpi-image/systemd/calvin-frontend.service" /etc/systemd/system/
     cp "$CALVIN_DIR/rpi-image/systemd/calvin-update.service" /etc/systemd/system/
     cp "$CALVIN_DIR/rpi-image/systemd/calvin-update.timer" /etc/systemd/system/
     
-    # Configure update timer
+    # Configure update timer - use OnUnitActiveSec for arbitrary intervals
+    # Convert seconds to minutes for OnUnitActiveSec
+    UPDATE_MINUTES=$((UPDATE_INTERVAL / 60))
+    if [ "$UPDATE_MINUTES" -lt 1 ]; then
+        UPDATE_MINUTES=1
+    fi
     sed -i "s|OnUnitActiveSec=.*|OnUnitActiveSec=${UPDATE_INTERVAL}s|" /etc/systemd/system/calvin-update.timer
     
     systemctl daemon-reload
@@ -161,7 +248,7 @@ runcmd:
     sleep 5  # Wait for backend to start
     systemctl start calvin-frontend.service
     
-    # Configure display
+    # Configure display (same as production)
     echo "[$(date)] Configuring display..." | tee -a "$LOG_FILE"
     echo "xset s off" >> /home/calvin/.xprofile
     echo "xset -dpms" >> /home/calvin/.xprofile
@@ -170,23 +257,23 @@ runcmd:
     
     # Configure auto-login
     mkdir -p /etc/systemd/system/getty@tty1.service.d
-    cat > /etc/systemd/system/getty@tty1.service.d/autologin.conf << 'AUTOLOGINEOF'
+    cat > /etc/systemd/system/getty@tty1.service.d/autologin.conf << EOF
     [Service]
     ExecStart=
-    ExecStart=-/sbin/agetty --autologin calvin --noclear %I $TERM
-    AUTOLOGINEOF
+    ExecStart=-/sbin/agetty --autologin calvin --noclear %I \$TERM
+    EOF
     
     # Configure X to start automatically
-    cat > /home/calvin/.xinitrc << 'XINITEOF'
+    cat > /home/calvin/.xinitrc << 'EOF'
     #!/bin/sh
     exec openbox-session
-    XINITEOF
+    EOF
     chmod +x /home/calvin/.xinitrc
     chown calvin:calvin /home/calvin/.xinitrc
     
     # Configure autostart
     mkdir -p /home/calvin/.config/openbox
-    cat > /home/calvin/.config/openbox/autostart << 'AUTOSTARTEOF'
+    cat > /home/calvin/.config/openbox/autostart << 'EOF'
     #!/bin/bash
     # Wait for backend to be ready
     while ! curl -s http://localhost:8000/api/health > /dev/null; do
@@ -205,16 +292,16 @@ runcmd:
     
     # Hide cursor after 3 seconds
     unclutter -idle 3 -root &
-    AUTOSTARTEOF
+    EOF
     chmod +x /home/calvin/.config/openbox/autostart
     chown -R calvin:calvin /home/calvin/.config
     
     # Enable auto-start X on boot
-    cat > /home/calvin/.bash_profile << 'BASHPROFILEEOF'
+    cat > /home/calvin/.bash_profile << 'EOF'
     if [ -z "$DISPLAY" ] && [ -n "$XDG_VTNR" ] && [ "$XDG_VTNR" -eq 1 ]; then
         exec startx
     fi
-    BASHPROFILEEOF
+    EOF
     chown calvin:calvin /home/calvin/.bash_profile
     
     echo "[$(date)] Calvin development setup complete!" | tee -a "$LOG_FILE"
