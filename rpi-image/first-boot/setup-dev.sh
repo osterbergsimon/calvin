@@ -360,15 +360,18 @@ fi
 
 systemctl enable calvin-backend.service
 systemctl enable calvin-frontend.service
-systemctl enable calvin-update.timer
+# Don't enable calvin-update.timer - updates are now manual via the settings page
+# systemctl enable calvin-update.timer
 
 # Start services
 echo "[$(date)] Starting services..." | tee -a "$LOG_FILE"
 systemctl start calvin-backend.service
-systemctl start calvin-update.timer
+# Don't start calvin-update.timer - updates are now manual via the settings page
+# systemctl start calvin-update.timer
 # Don't start frontend service yet - it will start after X is available (via .bash_profile on tty1)
 echo "[$(date)] Note: X server will start automatically on tty1 login via .bash_profile" | tee -a "$LOG_FILE"
 echo "[$(date)] Frontend service will start automatically after X server is available" | tee -a "$LOG_FILE"
+echo "[$(date)] Note: Automatic updates are disabled. Use the 'Update from GitHub' button in Settings to update manually." | tee -a "$LOG_FILE"
 
 # Configure display (same as production)
 echo "[$(date)] Configuring display..." | tee -a "$LOG_FILE"
