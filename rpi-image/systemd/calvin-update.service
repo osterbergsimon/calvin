@@ -1,8 +1,9 @@
 [Unit]
 Description=Calvin Dashboard Auto-Update Service
-After=network.target
+After=network.target calvin-backend.service
 # Don't block boot if update fails
 OnFailure=calvin-update-failure.service
+# Don't require the service to succeed
 
 [Service]
 Type=oneshot

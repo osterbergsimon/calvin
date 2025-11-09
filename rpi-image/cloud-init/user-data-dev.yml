@@ -238,8 +238,15 @@ runcmd:
     sed -i "s|OnUnitActiveSec=.*|OnUnitActiveSec=${UPDATE_INTERVAL}s|" /etc/systemd/system/calvin-update.timer
     
     systemctl daemon-reload
+    
+    # Disable and stop X service if it exists (it causes boot loops)
+    if systemctl list-unit-files | grep -q calvin-x.service; then
+        systemctl stop calvin-x.service 2>/dev/null || true
+        systemctl disable calvin-x.service 2>/dev/null || true
+        echo "[$(date)] Disabled problematic calvin-x.service" | tee -a "$LOG_FILE"
+    fi
+    
     systemctl enable calvin-backend.service
-    # Don't enable calvin-x.service - X will start via .bash_profile on tty1
     systemctl enable calvin-frontend.service
     systemctl enable calvin-update.timer
     
@@ -247,9 +254,9 @@ runcmd:
     echo "[$(date)] Starting services..." | tee -a "$LOG_FILE"
     systemctl start calvin-backend.service
     systemctl start calvin-update.timer
-    # Don't start X service - it will start automatically on tty1 via .bash_profile
-    # Don't start frontend service yet - wait for X to start after reboot
-    echo "[$(date)] Note: X server and frontend will start automatically after reboot" | tee -a "$LOG_FILE"
+    # Don't start frontend service yet - it will start after X is available (via .bash_profile on tty1)
+    echo "[$(date)] Note: X server will start automatically on tty1 login via .bash_profile" | tee -a "$LOG_FILE"
+    echo "[$(date)] Frontend service will start automatically after X server is available" | tee -a "$LOG_FILE"
     
     # Configure display (same as production)
     echo "[$(date)] Configuring display..." | tee -a "$LOG_FILE"
