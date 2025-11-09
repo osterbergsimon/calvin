@@ -193,12 +193,21 @@ async def get_display_state():
 async def reboot_system():
     """Reboot the Raspberry Pi."""
     try:
-        # Use sudo to reboot (requires proper permissions)
-        subprocess.Popen(
-            ["sudo", "reboot"],
-            stdout=subprocess.PIPE,
-            stderr=subprocess.PIPE,
-        )
+        # Try sudo reboot first (calvin user should have NOPASSWD sudo)
+        # If that fails, try systemctl reboot (might work if user has permissions)
+        try:
+            subprocess.Popen(
+                ["sudo", "reboot"],
+                stdout=subprocess.PIPE,
+                stderr=subprocess.PIPE,
+            )
+        except FileNotFoundError:
+            # sudo not found, try systemctl reboot directly
+            subprocess.Popen(
+                ["systemctl", "reboot"],
+                stdout=subprocess.PIPE,
+                stderr=subprocess.PIPE,
+            )
         return {"status": "success", "message": "System reboot initiated"}
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"Failed to reboot system: {str(e)}")
