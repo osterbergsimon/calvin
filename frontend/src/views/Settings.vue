@@ -1899,6 +1899,13 @@ input:checked + .slider:before {
   padding: 0.75rem 1rem;
   border-radius: 4px;
   font-size: 0.9rem;
+  white-space: pre-wrap;
+  word-wrap: break-word;
+  max-height: 300px;
+  overflow-y: auto;
+  font-family: 'Courier New', monospace;
+  font-size: 0.85rem;
+  line-height: 1.4;
 }
 
 .update-message.info {
