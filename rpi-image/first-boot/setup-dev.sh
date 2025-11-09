@@ -133,63 +133,70 @@ chown -R calvin:calvin "$CALVIN_DIR"
 # Clear UV cache to fix corrupted wheels
 echo "[$(date)] Clearing UV cache to fix corrupted wheels..." | tee -a "$LOG_FILE"
 sudo -u calvin bash -c "export PATH='/home/calvin/.local/bin:/home/calvin/.cargo/bin:\$PATH' && uv cache clean" || true
-# Use lower concurrency to reduce memory usage on Pi 3B+
-export UV_CONCURRENCY=1
+
+# Install backend dependencies
 # Run UV as calvin user to ensure proper permissions
-# Install in stages to reduce memory pressure
-# Strategy: Install packages one at a time to minimize peak memory usage
+# Use lower concurrency to reduce memory usage on Pi 3B+
 echo "[$(date)] Installing backend dependencies (production + linux + dev)..." | tee -a "$LOG_FILE"
 echo "[$(date)] Using aggressive memory management: 4GB swap + single package installs..." | tee -a "$LOG_FILE"
 
-# Function to install packages one at a time
-install_packages_sequentially() {
-    local extra_flags="$1"
-    cd "$CALVIN_DIR/backend"
-    export PATH="/home/calvin/.local/bin:/home/calvin/.cargo/bin:$PATH"
-    export UV_CONCURRENCY=1
-    
-    # First, sync to get the lock file and resolve dependencies
-    echo "[$(date)] Resolving dependencies..." | tee -a "$LOG_FILE"
-    uv sync --no-install $extra_flags || {
-        echo "[$(date)] WARNING: Dependency resolution failed, trying direct install..." | tee -a "$LOG_FILE"
-        return 1
-    }
-    
-    # Get list of packages to install from lock file
-    echo "[$(date)] Installing packages one at a time to minimize memory usage..." | tee -a "$LOG_FILE"
-    
-    # Install production dependencies first
-    uv sync $extra_flags || {
-        echo "[$(date)] ERROR: uv sync failed. Trying alternative approach..." | tee -a "$LOG_FILE"
-        # Fallback: try with pip for problematic packages
-        uv pip install --system -r <(uv pip compile pyproject.toml $extra_flags 2>/dev/null || echo "") || {
-            echo "[$(date)] ERROR: All installation methods failed" | tee -a "$LOG_FILE"
-            return 1
-        }
-    }
-    
-    return 0
-}
-
 # Try full sync first (fastest if it works)
 echo "[$(date)] Attempting full sync (production + linux + dev)..." | tee -a "$LOG_FILE"
-sudo -u calvin bash -c "$(declare -f install_packages_sequentially); install_packages_sequentially '--extra dev --extra linux'" || {
+sudo -u calvin bash << 'UV_SYNC_EOF'
+    export PATH="/home/calvin/.local/bin:/home/calvin/.cargo/bin:$PATH"
+    export UV_CONCURRENCY=1
+    cd /home/calvin/calvin/backend
+    uv sync --extra dev --extra linux
+UV_SYNC_EOF
+
+# Check if it succeeded
+if [ $? -ne 0 ]; then
     echo "[$(date)] Full sync failed, trying production + linux only..." | tee -a "$LOG_FILE"
-    sudo -u calvin bash -c "$(declare -f install_packages_sequentially); install_packages_sequentially '--extra linux'" || {
+    sudo -u calvin bash << 'UV_SYNC_EOF'
+        export PATH="/home/calvin/.local/bin:/home/calvin/.cargo/bin:$PATH"
+        export UV_CONCURRENCY=1
+        cd /home/calvin/calvin/backend
+        uv sync --extra linux
+UV_SYNC_EOF
+    
+    if [ $? -ne 0 ]; then
         echo "[$(date)] Production + linux failed, trying production only..." | tee -a "$LOG_FILE"
-        sudo -u calvin bash -c "$(declare -f install_packages_sequentially); install_packages_sequentially ''" || {
+        sudo -u calvin bash << 'UV_SYNC_EOF'
+            export PATH="/home/calvin/.local/bin:/home/calvin/.cargo/bin:$PATH"
+            export UV_CONCURRENCY=1
+            cd /home/calvin/calvin/backend
+            uv sync
+UV_SYNC_EOF
+        
+        if [ $? -ne 0 ]; then
             echo "[$(date)] ERROR: All installation attempts failed. Check logs and memory." | tee -a "$LOG_FILE"
             echo "[$(date)] Current memory status:" | tee -a "$LOG_FILE"
             free -h | tee -a "$LOG_FILE"
+            echo "[$(date)] UV location check:" | tee -a "$LOG_FILE"
+            which uv || echo "UV not found in PATH" | tee -a "$LOG_FILE"
+            ls -la /home/calvin/.local/bin/uv || echo "UV not in .local/bin" | tee -a "$LOG_FILE"
             exit 1
-        }
-    }
-    # If production + linux worked, try adding dev dependencies
-    echo "[$(date)] Production + linux installed. Now adding dev dependencies..." | tee -a "$LOG_FILE"
-    sudo -u calvin bash -c "cd '$CALVIN_DIR/backend' && export PATH='/home/calvin/.local/bin:/home/calvin/.cargo/bin:\$PATH' && export UV_CONCURRENCY=1 && uv sync --extra dev --extra linux" || {
-        echo "[$(date)] WARNING: Dev dependencies failed, but production should work" | tee -a "$LOG_FILE"
-    }
-}
+        else
+            # If production worked, try adding dev dependencies
+            echo "[$(date)] Production installed. Now adding dev dependencies..." | tee -a "$LOG_FILE"
+            sudo -u calvin bash << 'UV_SYNC_EOF'
+                export PATH="/home/calvin/.local/bin:/home/calvin/.cargo/bin:$PATH"
+                export UV_CONCURRENCY=1
+                cd /home/calvin/calvin/backend
+                uv sync --extra dev --extra linux || echo "Dev dependencies failed, but production should work"
+UV_SYNC_EOF
+        fi
+    else
+        # If production + linux worked, try adding dev dependencies
+        echo "[$(date)] Production + linux installed. Now adding dev dependencies..." | tee -a "$LOG_FILE"
+        sudo -u calvin bash << 'UV_SYNC_EOF'
+            export PATH="/home/calvin/.local/bin:/home/calvin/.cargo/bin:$PATH"
+            export UV_CONCURRENCY=1
+            cd /home/calvin/calvin/backend
+            uv sync --extra dev --extra linux || echo "Dev dependencies failed, but production should work"
+UV_SYNC_EOF
+    fi
+fi
 
 echo "[$(date)] Backend dependencies installation complete" | tee -a "$LOG_FILE"
 free -h | tee -a "$LOG_FILE"
