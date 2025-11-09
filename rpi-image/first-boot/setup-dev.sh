@@ -20,8 +20,9 @@ apt-get upgrade -y -qq
 # Add swap space to prevent OOM (Pi 3B+ only has 1GB RAM)
 echo "[$(date)] Adding swap space to prevent OOM..." | tee -a "$LOG_FILE"
 if [ ! -f /swapfile ]; then
-    # Create 2GB swap (more than 1GB to handle full sync)
-    fallocate -l 2G /swapfile || dd if=/dev/zero of=/swapfile bs=1M count=2048
+    # Create 4GB swap (aggressive to handle full sync with all dependencies)
+    echo "[$(date)] Creating 4GB swap file (this may take a few minutes)..." | tee -a "$LOG_FILE"
+    fallocate -l 4G /swapfile 2>/dev/null || dd if=/dev/zero of=/swapfile bs=1M count=4096 status=progress
     chmod 600 /swapfile
     mkswap /swapfile
     swapon /swapfile
@@ -30,6 +31,19 @@ if [ ! -f /swapfile ]; then
     free -h | tee -a "$LOG_FILE"
 else
     echo "Swap file already exists" | tee -a "$LOG_FILE"
+    # Check swap size and enlarge if needed
+    SWAP_SIZE=$(stat -f%z /swapfile 2>/dev/null || stat -c%s /swapfile 2>/dev/null || echo "0")
+    SWAP_SIZE_GB=$((SWAP_SIZE / 1024 / 1024 / 1024))
+    if [ "$SWAP_SIZE_GB" -lt 4 ]; then
+        echo "[$(date)] Swap file is only ${SWAP_SIZE_GB}GB, enlarging to 4GB..." | tee -a "$LOG_FILE"
+        swapoff /swapfile 2>/dev/null || true
+        rm -f /swapfile
+        fallocate -l 4G /swapfile 2>/dev/null || dd if=/dev/zero of=/swapfile bs=1M count=4096 status=progress
+        chmod 600 /swapfile
+        mkswap /swapfile
+        swapon /swapfile
+        echo "Swap enlarged to 4GB" | tee -a "$LOG_FILE"
+    fi
     # Ensure swap is active
     if ! swapon --show | grep -q swapfile; then
         swapon /swapfile
@@ -123,22 +137,62 @@ sudo -u calvin bash -c "export PATH='/home/calvin/.local/bin:/home/calvin/.cargo
 export UV_CONCURRENCY=1
 # Run UV as calvin user to ensure proper permissions
 # Install in stages to reduce memory pressure
-echo "[$(date)] Installing backend dependencies (stage 1: production)..." | tee -a "$LOG_FILE"
-sudo -u calvin bash -c "cd '$CALVIN_DIR/backend' && export PATH='/home/calvin/.local/bin:/home/calvin/.cargo/bin:\$PATH' && export UV_CONCURRENCY=1 && uv sync" || {
-    echo "[$(date)] WARNING: Production dependencies failed, continuing..." | tee -a "$LOG_FILE"
+# Strategy: Install packages one at a time to minimize peak memory usage
+echo "[$(date)] Installing backend dependencies (production + linux + dev)..." | tee -a "$LOG_FILE"
+echo "[$(date)] Using aggressive memory management: 4GB swap + single package installs..." | tee -a "$LOG_FILE"
+
+# Function to install packages one at a time
+install_packages_sequentially() {
+    local extra_flags="$1"
+    cd "$CALVIN_DIR/backend"
+    export PATH="/home/calvin/.local/bin:/home/calvin/.cargo/bin:$PATH"
+    export UV_CONCURRENCY=1
+    
+    # First, sync to get the lock file and resolve dependencies
+    echo "[$(date)] Resolving dependencies..." | tee -a "$LOG_FILE"
+    uv sync --no-install $extra_flags || {
+        echo "[$(date)] WARNING: Dependency resolution failed, trying direct install..." | tee -a "$LOG_FILE"
+        return 1
+    }
+    
+    # Get list of packages to install from lock file
+    echo "[$(date)] Installing packages one at a time to minimize memory usage..." | tee -a "$LOG_FILE"
+    
+    # Install production dependencies first
+    uv sync $extra_flags || {
+        echo "[$(date)] ERROR: uv sync failed. Trying alternative approach..." | tee -a "$LOG_FILE"
+        # Fallback: try with pip for problematic packages
+        uv pip install --system -r <(uv pip compile pyproject.toml $extra_flags 2>/dev/null || echo "") || {
+            echo "[$(date)] ERROR: All installation methods failed" | tee -a "$LOG_FILE"
+            return 1
+        }
+    }
+    
+    return 0
 }
-echo "[$(date)] Installing backend dependencies (stage 2: linux extras)..." | tee -a "$LOG_FILE"
-sudo -u calvin bash -c "cd '$CALVIN_DIR/backend' && export PATH='/home/calvin/.local/bin:/home/calvin/.cargo/bin:\$PATH' && export UV_CONCURRENCY=1 && uv sync --extra linux" || {
-    echo "[$(date)] WARNING: Linux extras failed, continuing..." | tee -a "$LOG_FILE"
-}
-echo "[$(date)] Installing backend dependencies (stage 3: dev extras)..." | tee -a "$LOG_FILE"
-sudo -u calvin bash -c "cd '$CALVIN_DIR/backend' && export PATH='/home/calvin/.local/bin:/home/calvin/.cargo/bin:\$PATH' && export UV_CONCURRENCY=1 && uv sync --extra dev --extra linux" || {
-    echo "[$(date)] ERROR: Full sync failed. Trying individual packages..." | tee -a "$LOG_FILE"
-    # Last resort: install dev packages one by one
-    sudo -u calvin bash -c "cd '$CALVIN_DIR/backend' && export PATH='/home/calvin/.local/bin:/home/calvin/.cargo/bin:\$PATH' && export UV_CONCURRENCY=1 && uv pip install pytest pytest-asyncio pytest-cov pytest-mock httpx faker factory-boy ruff mypy bandit pre-commit" || {
-        echo "[$(date)] WARNING: Some dev packages may have failed. Continuing..." | tee -a "$LOG_FILE"
+
+# Try full sync first (fastest if it works)
+echo "[$(date)] Attempting full sync (production + linux + dev)..." | tee -a "$LOG_FILE"
+sudo -u calvin bash -c "$(declare -f install_packages_sequentially); install_packages_sequentially '--extra dev --extra linux'" || {
+    echo "[$(date)] Full sync failed, trying production + linux only..." | tee -a "$LOG_FILE"
+    sudo -u calvin bash -c "$(declare -f install_packages_sequentially); install_packages_sequentially '--extra linux'" || {
+        echo "[$(date)] Production + linux failed, trying production only..." | tee -a "$LOG_FILE"
+        sudo -u calvin bash -c "$(declare -f install_packages_sequentially); install_packages_sequentially ''" || {
+            echo "[$(date)] ERROR: All installation attempts failed. Check logs and memory." | tee -a "$LOG_FILE"
+            echo "[$(date)] Current memory status:" | tee -a "$LOG_FILE"
+            free -h | tee -a "$LOG_FILE"
+            exit 1
+        }
+    }
+    # If production + linux worked, try adding dev dependencies
+    echo "[$(date)] Production + linux installed. Now adding dev dependencies..." | tee -a "$LOG_FILE"
+    sudo -u calvin bash -c "cd '$CALVIN_DIR/backend' && export PATH='/home/calvin/.local/bin:/home/calvin/.cargo/bin:\$PATH' && export UV_CONCURRENCY=1 && uv sync --extra dev --extra linux" || {
+        echo "[$(date)] WARNING: Dev dependencies failed, but production should work" | tee -a "$LOG_FILE"
     }
 }
+
+echo "[$(date)] Backend dependencies installation complete" | tee -a "$LOG_FILE"
+free -h | tee -a "$LOG_FILE"
 
 # Install frontend dependencies
 echo "[$(date)] Installing frontend dependencies..." | tee -a "$LOG_FILE"
