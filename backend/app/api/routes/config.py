@@ -135,20 +135,42 @@ async def get_config():
     elif "display_on_time" in config and "displayOnTime" not in config:
         config["displayOnTime"] = config["display_on_time"]
     # Handle display schedule (per-day schedule)
-    if "displaySchedule" not in config and "display_schedule" not in config:
+    # Check if we have a valid schedule (not None, not empty string, not empty list)
+    has_schedule = False
+    schedule_value = None
+    
+    if "displaySchedule" in config:
+        schedule_value = config["displaySchedule"]
+        if schedule_value is not None and schedule_value != "" and (not isinstance(schedule_value, list) or len(schedule_value) > 0):
+            has_schedule = True
+    elif "display_schedule" in config:
+        schedule_value = config["display_schedule"]
+        if schedule_value is not None and schedule_value != "":
+            # Parse JSON string if needed
+            import json
+            if isinstance(schedule_value, str):
+                try:
+                    parsed = json.loads(schedule_value)
+                    if parsed is not None and (not isinstance(parsed, list) or len(parsed) > 0):
+                        config["displaySchedule"] = parsed
+                        has_schedule = True
+                except (json.JSONDecodeError, TypeError):
+                    pass
+            elif isinstance(schedule_value, list) and len(schedule_value) > 0:
+                config["displaySchedule"] = schedule_value
+                has_schedule = True
+            elif schedule_value is not None:
+                config["displaySchedule"] = schedule_value
+                has_schedule = True
+    
+    # If no valid schedule found, use default
+    if not has_schedule:
         # Default: all days enabled, 06:00-22:00
         default_schedule = [
             {"day": i, "enabled": True, "onTime": "06:00", "offTime": "22:00"}
             for i in range(7)
         ]
         config["displaySchedule"] = default_schedule
-    elif "display_schedule" in config and "displaySchedule" not in config:
-        # Parse JSON string if needed
-        import json
-        if isinstance(config["display_schedule"], str):
-            config["displaySchedule"] = json.loads(config["display_schedule"])
-        else:
-            config["displaySchedule"] = config["display_schedule"]
     if "rebootComboKey1" not in config and "reboot_combo_key1" not in config:
         config["rebootComboKey1"] = "KEY_1"  # Default first key
     elif "reboot_combo_key1" in config and "rebootComboKey1" not in config:
