@@ -1,5 +1,6 @@
 """Image service using plugin architecture."""
 
+import random
 from typing import Any
 
 from app.plugins.base import PluginType
@@ -15,10 +16,14 @@ class PluginImageService:
         self._current_image_id: str | None = None
         self._current_plugin_id: str | None = None
         self._all_images: list[dict[str, Any]] = []
+        self._randomized_order: list[dict[str, Any]] = []
 
-    async def get_images(self) -> list[dict[str, Any]]:
+    async def get_images(self, randomize: bool = False) -> list[dict[str, Any]]:
         """
         Get list of all images from all enabled image plugins.
+
+        Args:
+            randomize: Whether to randomize the order of images
 
         Returns:
             List of image metadata dictionaries
@@ -28,10 +33,42 @@ class PluginImageService:
         # Get all enabled image plugins
         plugins = plugin_manager.get_plugins(PluginType.IMAGE, enabled_only=True)
 
-        # Fetch images from all plugins
+        # Also check if plugin types are enabled
+        from app.database import AsyncSessionLocal
+        from app.models.db_models import PluginTypeDB, PluginDB
+        from sqlalchemy import select
+        
+        # Get enabled plugin types
+        async with AsyncSessionLocal() as session:
+            # Get all image plugin types and their enabled status
+            result = await session.execute(
+                select(PluginTypeDB).where(PluginTypeDB.plugin_type == "image")
+            )
+            plugin_types = result.scalars().all()
+            # Create a map of type_id -> enabled status (default to True if not in DB)
+            enabled_type_map = {pt.type_id: pt.enabled for pt in plugin_types}
+            
+            # Get type_id for each plugin instance
+            result = await session.execute(
+                select(PluginDB).where(PluginDB.plugin_type == "image")
+            )
+            db_plugins = result.scalars().all()
+            # Create a map of plugin_id -> type_id
+            plugin_type_map = {db_plugin.id: db_plugin.type_id for db_plugin in db_plugins}
+        
+        # Fetch images from all plugins, but only if plugin type is enabled
         for plugin in plugins:
             if not isinstance(plugin, ImagePlugin):
                 continue
+            
+            # Check if this plugin's type is enabled
+            type_id = plugin_type_map.get(plugin.plugin_id)
+            if type_id:
+                # Check if plugin type is enabled (default to True if not in map)
+                type_enabled = enabled_type_map.get(type_id, True)
+                if not type_enabled:
+                    print(f"[ImageService] Skipping plugin {plugin.plugin_id} - plugin type {type_id} is disabled")
+                    continue
 
             try:
                 plugin_images = await plugin.get_images()
@@ -39,87 +76,118 @@ class PluginImageService:
             except Exception as e:
                 print(f"Error fetching images from image plugin {plugin.plugin_id}: {e}")
 
-        # Store all images for navigation
-        self._all_images = images
+        # Store original order
+        self._all_images = images.copy()
 
+        # Randomize if requested
+        if randomize and images:
+            randomized = images.copy()
+            random.shuffle(randomized)
+            self._randomized_order = randomized
+            return randomized
+
+        # Store original order as randomized order when not randomizing
+        self._randomized_order = images.copy()
         return images
 
-    async def get_current_image(self) -> dict[str, Any] | None:
+    async def get_current_image(self, randomize: bool = False) -> dict[str, Any] | None:
         """
         Get current image metadata.
+
+        Args:
+            randomize: Whether to use randomized order
 
         Returns:
             Current image metadata or None if no images
         """
+        # Get images (with randomization if requested)
         if not self._all_images:
-            await self.get_images()
+            await self.get_images(randomize=randomize)
+        elif randomize and not self._randomized_order:
+            # Re-randomize if requested
+            await self.get_images(randomize=True)
 
-        if not self._all_images:
+        # Use randomized order if randomize is True, otherwise use original order
+        images = self._randomized_order if randomize else self._all_images
+
+        if not images:
             return None
 
         # Find current image by ID
         if self._current_image_id:
-            for img in self._all_images:
+            for img in images:
                 if img["id"] == self._current_image_id:
                     return img
 
         # Return first image if no current image set
-        return self._all_images[0]
+        return images[0]
 
-    async def next_image(self) -> dict[str, Any] | None:
+    async def next_image(self, randomize: bool = False) -> dict[str, Any] | None:
         """
         Move to next image and return it.
+
+        Args:
+            randomize: Whether to use randomized order
 
         Returns:
             Next image metadata or None if no images
         """
-        if not self._all_images:
-            await self.get_images()
+        # Always refresh images to ensure we have the latest from enabled plugins
+        await self.get_images(randomize=randomize)
 
-        if not self._all_images:
+        # Use randomized order if randomize is True, otherwise use original order
+        images = self._randomized_order if randomize else self._all_images
+
+        if not images:
             return None
 
         # Find current index
         current_index = 0
         if self._current_image_id:
-            for i, img in enumerate(self._all_images):
+            for i, img in enumerate(images):
                 if img["id"] == self._current_image_id:
                     current_index = i
                     break
 
         # Move to next image
-        next_index = (current_index + 1) % len(self._all_images)
-        next_image = self._all_images[next_index]
+        next_index = (current_index + 1) % len(images)
+        next_image = images[next_index]
 
         self._current_image_id = next_image["id"]
         self._current_plugin_id = next_image.get("source")
 
         return next_image
 
-    async def previous_image(self) -> dict[str, Any] | None:
+    async def previous_image(self, randomize: bool = False) -> dict[str, Any] | None:
         """
         Move to previous image and return it.
+
+        Args:
+            randomize: Whether to use randomized order
 
         Returns:
             Previous image metadata or None if no images
         """
-        if not self._all_images:
-            await self.get_images()
+        # Always refresh images to ensure we have the latest from enabled plugins
+        await self.get_images(randomize=randomize)
 
-        if not self._all_images:
+        # Use randomized order if randomize is True, otherwise use original order
+        images = self._randomized_order if randomize else self._all_images
+
+        if not images:
             return None
 
         # Find current index
         current_index = 0
         if self._current_image_id:
-            for i, img in enumerate(self._all_images):
+            for i, img in enumerate(images):
                 if img["id"] == self._current_image_id:
                     current_index = i
                     break
 
         # Move to previous image
-        prev_index = (current_index - 1) % len(self._all_images)
-        prev_image = self._all_images[prev_index]
+        prev_index = (current_index - 1) % len(images)
+        prev_image = images[prev_index]
 
         self._current_image_id = prev_image["id"]
         self._current_plugin_id = prev_image.get("source")

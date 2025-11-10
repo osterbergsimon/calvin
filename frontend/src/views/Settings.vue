@@ -180,13 +180,13 @@
         </div>
       </section>
 
-      <!-- Photo Settings -->
+      <!-- Image Settings -->
       <section
         class="settings-section collapsible"
         :class="{ expanded: expandedSections.photos }"
       >
         <div class="section-header" @click="toggleSection('photos')">
-          <h2>Photo Settings</h2>
+          <h2>Image Settings</h2>
           <span class="toggle-icon">{{
             expandedSections.photos ? "▼" : "▶"
           }}</span>
@@ -223,68 +223,24 @@
             >
           </div>
           <div class="setting-item">
-            <label>Upload Images</label>
-            <div class="upload-section">
+            <label>
               <input
-                ref="fileInput"
-                type="file"
-                accept="image/*"
-                multiple
-                style="display: none"
-                @change="handleFileSelect"
+                v-model="localConfig.randomizeImages"
+                type="checkbox"
+                @change="updateRandomizeImages"
               />
-              <button
-                class="btn-upload"
-                @click="$refs.fileInput.click()"
-                :disabled="uploading"
-              >
-                {{ uploading ? "Uploading..." : "Choose Images" }}
-              </button>
-              <span class="help-text"
-                >Select one or more image files to upload (JPG, PNG, WebP, GIF)</span
-              >
-              <div v-if="uploadError" class="error-message">
-                {{ uploadError }}
-              </div>
-              <div v-if="uploadSuccess" class="success-message">
-                {{ uploadSuccess }}
-              </div>
-            </div>
+              Randomize Image Order
+            </label>
+            <span class="help-text"
+              >When enabled, images from all plugins (local, Unsplash, etc.) will be displayed in random order. 
+              The order is randomized each time images are loaded.</span
+            >
           </div>
           <div class="setting-item">
-            <label>Manage Images</label>
-            <div class="images-list">
-              <div
-                v-for="image in imagesList"
-                :key="image.id"
-                class="image-item"
-              >
-                <div class="image-thumbnail">
-                  <img
-                    :src="`/api/images/${image.id}/thumbnail`"
-                    :alt="image.filename"
-                    class="thumbnail-img"
-                    @error="handleThumbnailError"
-                  />
-                </div>
-                <div class="image-info">
-                  <strong>{{ image.filename }}</strong>
-                  <span class="image-details"
-                    >{{ image.width }}×{{ image.height }} • {{ formatFileSize(image.size) }}</span
-                  >
-                </div>
-                <button
-                  class="btn-remove"
-                  title="Delete image"
-                  @click="deleteImage(image.id)"
-                >
-                  Delete
-                </button>
-              </div>
-              <div v-if="imagesList.length === 0" class="empty-state">
-                <p>No images uploaded yet</p>
-              </div>
-            </div>
+            <p class="help-text">
+              <strong>Note:</strong> Image upload and management have been moved to the Local Images plugin settings. 
+              Enable the Local Images plugin and expand its settings to upload and manage images.
+            </p>
           </div>
         </div>
       </section>
@@ -464,8 +420,13 @@
               <div class="form-group">
                 <label>Calendar Type</label>
                 <select v-model="newCalendarSource.type" class="form-select">
-                  <option value="google">Google Calendar</option>
-                  <option value="proton">Proton Calendar</option>
+                  <option
+                    v-for="type in calendarPluginTypes"
+                    :key="type.id"
+                    :value="type.id"
+                  >
+                    {{ type.name }}
+                  </option>
                 </select>
               </div>
               <div class="form-group">
@@ -482,22 +443,11 @@
                 <input
                   v-model="newCalendarSource.ical_url"
                   type="text"
-                  :placeholder="
-                    newCalendarSource.type === 'google'
-                      ? 'https://calendar.google.com/calendar/u/0?cid=...'
-                      : 'https://calendar.proton.me/api/calendar/v1/url/.../calendar.ics?CacheKey=...&PassphraseKey=...'
-                  "
+                  :placeholder="getCalendarTypePlaceholder(newCalendarSource.type)"
                   class="form-input"
                 />
                 <span class="help-text">
-                  <span v-if="newCalendarSource.type === 'google'">
-                    Google Calendar: Share link or iCal URL from Google Calendar
-                    settings
-                  </span>
-                  <span v-else>
-                    Proton Calendar: iCal feed URL from Proton Calendar sharing
-                    settings (includes CacheKey and PassphraseKey)
-                  </span>
+                  {{ getCalendarTypeHelpText(newCalendarSource.type) }}
                 </span>
               </div>
               <button
@@ -561,6 +511,249 @@
                     Remove
                   </button>
                 </div>
+              </div>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      <!-- Plugins Settings -->
+      <section
+        class="settings-section collapsible"
+        :class="{ expanded: expandedSections.plugins }"
+      >
+        <div class="section-header" @click="toggleSection('plugins')">
+          <h2>Plugins</h2>
+          <span class="toggle-icon">{{
+            expandedSections.plugins ? "▼" : "▶"
+          }}</span>
+        </div>
+        <div v-show="expandedSections.plugins" class="section-content">
+          <div class="setting-item">
+            <label>Plugin Management</label>
+            <p class="help-text">
+              Enable or disable plugin types. Disabled plugins won't appear in their respective sections.
+            </p>
+          </div>
+          <div v-if="loadingPlugins" class="loading-state">
+            <p>Loading plugins...</p>
+          </div>
+          <div v-else-if="plugins.length === 0" class="empty-state">
+            <p>No plugins found</p>
+          </div>
+          <div v-else class="plugins-list">
+            <div
+              v-for="plugin in plugins"
+              :key="plugin.id"
+              class="plugin-item"
+              :class="{ disabled: !plugin.enabled }"
+            >
+              <div class="plugin-header">
+                <div class="plugin-info">
+                  <div class="plugin-title-row">
+                    <strong>{{ plugin.name }}</strong>
+                    <span class="plugin-type-badge" :class="`type-${plugin.type}`">
+                      {{ plugin.type }}
+                    </span>
+                    <button
+                      v-if="Object.keys(plugin.config_schema || {}).length > 0"
+                      class="btn-settings-icon"
+                      :class="{ active: expandedPlugins[plugin.id] }"
+                      @click="togglePluginSettings(plugin.id)"
+                      title="Show settings"
+                    >
+                      ⚙️
+                    </button>
+                  </div>
+                  <p class="plugin-description">{{ plugin.description }}</p>
+                </div>
+                <label class="toggle-switch">
+                  <input
+                    type="checkbox"
+                    :checked="plugin.enabled"
+                    @change="togglePlugin(plugin.id, $event.target.checked)"
+                  />
+                  <span class="slider" />
+                </label>
+              </div>
+              <div
+                v-if="plugin.enabled && expandedPlugins[plugin.id]"
+                class="plugin-config"
+              >
+                <!-- Common Settings (for plugin type) -->
+                <div v-if="Object.keys(plugin.config_schema || {}).length > 0">
+                  <h4 class="config-section-title">Common Settings</h4>
+                  <p v-if="plugin.id === 'unsplash'" class="help-text" style="margin-bottom: 1rem; padding: 0.75rem; background: var(--bg-secondary); border-radius: 4px;">
+                    <strong>Note:</strong> Unsplash requires an API key to fetch images. 
+                    <a href="https://unsplash.com/developers" target="_blank" rel="noopener noreferrer" style="color: var(--accent-color); text-decoration: underline;">Get your free API key here</a> 
+                    (requires Unsplash account).
+                  </p>
+                  <div
+                    v-for="(schema, key) in plugin.config_schema"
+                    :key="key"
+                    class="plugin-setting"
+                  >
+                    <label>{{ (schema && typeof schema === 'object' && schema.description) || key }}:</label>
+                    <div v-if="plugin.id === 'local' && (key === 'image_dir' || key === 'thumbnail_dir')" style="display: flex; gap: 0.5rem; align-items: center;">
+                      <input
+                        v-if="schema && typeof schema === 'object' && schema.type === 'string'"
+                        type="text"
+                        :value="getFormValue(plugin.id, key, schema)"
+                        class="form-input"
+                        style="flex: 1;"
+                        @input="updateFormValue(plugin.id, key, $event.target.value)"
+                      />
+                      <input
+                        type="file"
+                        style="display: none;"
+                        :data-plugin-id="plugin.id"
+                        :data-config-key="key"
+                        @change="handleDirectorySelect(plugin.id, key, $event)"
+                      />
+                      <button
+                        type="button"
+                        class="btn-secondary"
+                        style="white-space: nowrap;"
+                        @click="browseDirectory(plugin.id, key)"
+                      >
+                        Browse
+                      </button>
+                    </div>
+                    <input
+                      v-else-if="schema && typeof schema === 'object' && schema.type === 'string'"
+                      type="text"
+                      :value="getFormValue(plugin.id, key, schema)"
+                      class="form-input"
+                      @input="updateFormValue(plugin.id, key, $event.target.value)"
+                    />
+                    <input
+                      v-else-if="schema && typeof schema === 'object' && schema.type === 'password'"
+                      type="password"
+                      :value="getFormValue(plugin.id, key, schema)"
+                      class="form-input"
+                      :placeholder="plugin.id === 'unsplash' ? 'Enter your Unsplash API key' : plugin.id === 'imap' && key === 'email_password' ? 'Enter email password or App Password' : 'Enter API key or credentials'"
+                      @input="updateFormValue(plugin.id, key, $event.target.value)"
+                    />
+                    <span v-if="plugin.id === 'unsplash' && key === 'api_key'" class="help-text" style="display: block; margin-top: 0.5rem;">
+                      Get your free API key at <a href="https://unsplash.com/developers" target="_blank" rel="noopener noreferrer" style="color: var(--accent-color); text-decoration: underline;">https://unsplash.com/developers</a>
+                    </span>
+                  </div>
+                  
+                  <!-- Save button and test button for IMAP -->
+                  <div v-if="plugin.id === 'imap'" class="plugin-actions" style="margin-top: 1rem; display: flex; gap: 1rem; align-items: center; flex-wrap: wrap;">
+                    <button
+                      class="btn-primary"
+                      :disabled="savingPlugin === plugin.id"
+                      @click="savePluginConfig(plugin.id)"
+                    >
+                      {{ savingPlugin === plugin.id ? "Saving..." : "Save Settings" }}
+                    </button>
+                    <button
+                      class="btn-secondary"
+                      :disabled="testingPlugin[plugin.id] || savingPlugin === plugin.id"
+                      @click="testPluginConnection(plugin.id)"
+                    >
+                      {{ testingPlugin[plugin.id] ? "Testing..." : "Test Connection" }}
+                    </button>
+                    <button
+                      class="btn-secondary"
+                      :disabled="fetchingPlugin[plugin.id] || savingPlugin === plugin.id"
+                      @click="fetchPluginNow(plugin.id)"
+                    >
+                      {{ fetchingPlugin[plugin.id] ? "Fetching..." : "Fetch Now" }}
+                    </button>
+                    <span v-if="pluginSaveStatus[plugin.id]" :class="pluginSaveStatus[plugin.id].success ? 'success-message' : 'error-message'" style="margin-left: 0.5rem; padding: 0.5rem 1rem; border-radius: 4px;">
+                      {{ pluginSaveStatus[plugin.id].message }}
+                    </span>
+                    <span v-if="pluginTestStatus[plugin.id]" :class="pluginTestStatus[plugin.id].success ? 'success-message' : 'error-message'" style="margin-left: 0.5rem; padding: 0.5rem 1rem; border-radius: 4px;">
+                      {{ pluginTestStatus[plugin.id].message }}
+                    </span>
+                    <span v-if="pluginFetchStatus[plugin.id]" :class="pluginFetchStatus[plugin.id].success ? 'success-message' : 'error-message'" style="margin-left: 0.5rem; padding: 0.5rem 1rem; border-radius: 4px;">
+                      {{ pluginFetchStatus[plugin.id].message }}
+                    </span>
+                  </div>
+                </div>
+                
+                <!-- Local Images Plugin: Upload and Manage Images -->
+                <div v-if="plugin.id === 'local' && plugin.enabled">
+                  <h4 class="config-section-title">Upload Images</h4>
+                  <div class="upload-section">
+                    <input
+                      ref="fileInput"
+                      type="file"
+                      accept="image/*"
+                      multiple
+                      style="display: none"
+                      @change="handleFileSelect"
+                    />
+                    <button
+                      class="btn-upload"
+                      @click="$refs.fileInput.click()"
+                      :disabled="uploading"
+                    >
+                      {{ uploading ? "Uploading..." : "Choose Images" }}
+                    </button>
+                    <span class="help-text"
+                      >Select one or more image files to upload (JPG, PNG, WebP, GIF)</span
+                    >
+                    <div v-if="uploadError" class="error-message">
+                      {{ uploadError }}
+                    </div>
+                    <div v-if="uploadSuccess" class="success-message">
+                      {{ uploadSuccess }}
+                    </div>
+                  </div>
+                  
+                  <div class="manage-images-section" style="margin-top: 1.5rem;">
+                    <div 
+                      class="config-section-title collapsible-header" 
+                      style="cursor: pointer; display: flex; justify-content: space-between; align-items: center; padding: 0.5rem 0;"
+                      @click="expandedManageImages[plugin.id] = !expandedManageImages[plugin.id]"
+                    >
+                      <h4 style="margin: 0;">Manage Images ({{ imagesList.filter(img => img.source === 'local-images').length }})</h4>
+                      <span style="font-size: 0.9rem; color: var(--text-secondary);">
+                        {{ expandedManageImages[plugin.id] ? "▼" : "▶" }}
+                      </span>
+                    </div>
+                    <div v-show="expandedManageImages[plugin.id]" class="images-list" style="margin-top: 1rem; max-height: 400px; overflow-y: auto;">
+                      <div
+                        v-for="image in imagesList.filter(img => img.source === 'local-images')"
+                        :key="image.id"
+                        class="image-item"
+                      >
+                        <div class="image-thumbnail">
+                          <img
+                            :src="`/api/images/${image.id}/thumbnail`"
+                            :alt="image.filename"
+                            class="thumbnail-img"
+                            @error="handleThumbnailError"
+                          />
+                        </div>
+                        <div class="image-info">
+                          <strong>{{ image.filename }}</strong>
+                          <span class="image-details"
+                            >{{ image.width }}×{{ image.height }} • {{ formatFileSize(image.size) }}</span
+                          >
+                        </div>
+                        <button
+                          class="btn-remove"
+                          title="Delete image"
+                          @click="deleteImage(image.id)"
+                        >
+                          Delete
+                        </button>
+                      </div>
+                      <div v-if="imagesList.filter(img => img.source === 'local-images').length === 0" class="empty-state">
+                        <p>No images uploaded yet</p>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+              </div>
+              <div v-else-if="!plugin.enabled" class="plugin-disabled-message">
+                <p class="help-text">
+                  This plugin type is disabled. It won't appear in dropdowns and existing instances will be hidden (but not deleted).
+                </p>
               </div>
             </div>
           </div>
@@ -1004,6 +1197,7 @@ const localConfig = ref({
       rebootComboKey2: "KEY_7",
       rebootComboDuration: 10000,
       imageDisplayMode: "smart",
+      randomizeImages: false,
       gitBranch: "main",
 });
 
@@ -1016,6 +1210,7 @@ const expandedSections = ref({
   keyboard: false,
   calendar: false,
   webServices: false,
+  plugins: false,
   displayPower: false,
   rebootCombo: false,
   update: false,
@@ -1032,6 +1227,21 @@ const imagesList = ref([]);
 const uploading = ref(false);
 const uploadError = ref("");
 const uploadSuccess = ref("");
+
+// Plugin management
+const plugins = ref([]);
+const pluginConfigs = ref({}); // Store configs by plugin type ID
+const expandedPlugins = ref({}); // Track which plugin settings are expanded
+const expandedManageImages = ref({}); // Track which plugins have manage images expanded
+const pluginFormData = ref({}); // Store form data before saving
+const pluginSaveStatus = ref({}); // Store save status per plugin (success/error messages)
+const pluginTestStatus = ref({}); // Store test status per plugin
+const pluginFetchStatus = ref({}); // Store fetch status per plugin
+const testingPlugin = ref({}); // Track which plugins are being tested
+const fetchingPlugin = ref({}); // Track which plugins are being fetched
+const savingPlugin = ref(null); // Track which plugin is being saved
+const calendarPluginTypes = ref([]);
+const loadingPlugins = ref(false);
 
 const newCalendarSource = ref({
   type: "google",
@@ -1155,6 +1365,10 @@ const updatePhotoRotationInterval = () => {
 
 const updateImageDisplayMode = () => {
   configStore.setImageDisplayMode(localConfig.value.imageDisplayMode);
+  saveConfig();
+};
+
+const updateRandomizeImages = () => {
   saveConfig();
 };
 
@@ -1866,12 +2080,435 @@ const triggerUpdate = async () => {
   }
 };
 
+const loadPlugins = async () => {
+  loadingPlugins.value = true;
+  try {
+    const response = await axios.get("/api/plugins");
+    plugins.value = (response.data.plugins || []).map(plugin => {
+      // Ensure config_schema is always an object
+      if (plugin.config_schema && typeof plugin.config_schema === 'string') {
+        try {
+          plugin.config_schema = JSON.parse(plugin.config_schema);
+        } catch (e) {
+          console.error(`Failed to parse config_schema for plugin ${plugin.id}:`, e);
+          plugin.config_schema = {};
+        }
+      } else if (!plugin.config_schema || typeof plugin.config_schema !== 'object') {
+        plugin.config_schema = {};
+      }
+      return plugin;
+    });
+    
+    // Load configs for each plugin type
+    for (const plugin of plugins.value) {
+      try {
+        const configResponse = await axios.get(`/api/plugins/${plugin.id}/config`);
+        const rawConfig = configResponse.data.config || {};
+        console.log(`[Frontend] Loaded config for ${plugin.id}:`, rawConfig);
+        
+        // Clean config values - ensure all are strings, not objects
+        const cleanedConfig = {};
+        for (const [key, value] of Object.entries(rawConfig)) {
+          if (value === null || value === undefined) {
+            cleanedConfig[key] = "";
+          } else if (typeof value === 'object') {
+            // If it's an object, try to extract the actual value
+            console.warn(`[Frontend] Found object value for ${plugin.id}.${key}:`, value);
+            cleanedConfig[key] = value.value || value.default || "";
+          } else {
+            cleanedConfig[key] = String(value);
+          }
+        }
+        console.log(`[Frontend] Cleaned config for ${plugin.id}:`, cleanedConfig);
+        
+        pluginConfigs.value[plugin.id] = cleanedConfig;
+        // Initialize form data with saved config for IMAP and local plugins
+        if (plugin.id === 'imap' || plugin.id === 'local') {
+          pluginFormData.value[plugin.id] = { ...cleanedConfig };
+        }
+      } catch (error) {
+        console.error(`Failed to load config for plugin ${plugin.id}:`, error);
+        pluginConfigs.value[plugin.id] = {};
+      }
+    }
+  } catch (error) {
+    console.error("Failed to load plugins:", error);
+  } finally {
+    loadingPlugins.value = false;
+  }
+};
+
+const loadCalendarPluginTypes = async () => {
+  try {
+    const response = await axios.get("/api/plugins/types/calendar");
+    calendarPluginTypes.value = response.data.types || [];
+    // Set default type if none selected
+    if (calendarPluginTypes.value.length > 0 && !newCalendarSource.value.type) {
+      newCalendarSource.value.type = calendarPluginTypes.value[0].id;
+    }
+  } catch (error) {
+    console.error("Failed to load calendar plugin types:", error);
+    // Fallback to hardcoded types
+    calendarPluginTypes.value = [
+      { id: "google", name: "Google Calendar" },
+      { id: "proton", name: "Proton Calendar" },
+    ];
+  }
+};
+
+const togglePlugin = async (pluginId, enabled) => {
+  try {
+    await axios.put(`/api/plugins/${pluginId}`, { enabled });
+    // Update local state
+    const plugin = plugins.value.find((p) => p.id === pluginId);
+    if (plugin) {
+      plugin.enabled = enabled;
+    }
+    // Reload calendar sources and types if it's a calendar plugin
+    if (plugin && plugin.type === "calendar") {
+      await loadCalendarPluginTypes();
+      await loadCalendarSources();
+    }
+  } catch (error) {
+    console.error("Failed to toggle plugin:", error);
+    alert(`Error: ${error.response?.data?.detail || error.message || "Failed to toggle plugin"}`);
+  }
+};
+
+const togglePluginSettings = (pluginId) => {
+  expandedPlugins.value[pluginId] = !expandedPlugins.value[pluginId];
+};
+
+const getConfigValue = (pluginId, key, schema) => {
+  const config = pluginConfigs.value[pluginId];
+  if (config && config[key] !== undefined && config[key] !== null) {
+    const value = config[key];
+    // Ensure value is a string, not an object
+    if (typeof value === 'string') {
+      return value;
+    } else if (typeof value === 'object' && value !== null) {
+      // If it's an object, try to extract the actual value
+      console.warn(`Config value for ${pluginId}.${key} is an object:`, value);
+      // Try to extract value from object (could be schema object with value/default)
+      return value.value || value.default || '';
+    }
+    return String(value);
+  }
+  // Fallback to schema default
+  if (schema && typeof schema === 'object' && schema.default !== undefined) {
+    return String(schema.default || '');
+  }
+  return '';
+};
+
+const getFormValue = (pluginId, key, schema) => {
+  // For IMAP and local plugins, use form data if available, otherwise use saved config
+  if ((pluginId === 'imap' || pluginId === 'local') && pluginFormData.value[pluginId] && pluginFormData.value[pluginId][key] !== undefined) {
+    const value = pluginFormData.value[pluginId][key];
+    // Ensure value is a string, not an object
+    if (typeof value === 'string') {
+      return value;
+    } else if (typeof value === 'object' && value !== null) {
+      // If it's an object, try to extract the actual value
+      return value.value || value.default || '';
+    }
+    return String(value);
+  }
+  return getConfigValue(pluginId, key, schema);
+};
+
+const updateFormValue = (pluginId, key, value) => {
+  // Store form data for IMAP plugin
+  if (!pluginFormData.value[pluginId]) {
+    pluginFormData.value[pluginId] = {};
+  }
+  pluginFormData.value[pluginId][key] = value;
+  // Clear save status when form changes
+  if (pluginSaveStatus.value[pluginId]) {
+    delete pluginSaveStatus.value[pluginId];
+  }
+};
+
+const browseDirectory = (pluginId, key) => {
+  // Find the file input with matching data attributes
+  const targetInput = document.querySelector(
+    `input[type="file"][data-plugin-id="${pluginId}"][data-config-key="${key}"]`
+  );
+  if (targetInput) {
+    targetInput.click();
+  } else {
+    console.error(`Could not find file input for ${pluginId}.${key}`);
+  }
+};
+
+const handleDirectorySelect = (pluginId, key, event) => {
+  const file = event.target.files?.[0];
+  if (file) {
+    // Extract directory path from file path
+    // Note: Browsers don't allow access to full file paths for security reasons
+    // We'll use webkitRelativePath if available (when using webkitdirectory attribute)
+    // Otherwise, we'll prompt the user to enter the path manually
+    
+    let directoryPath = '';
+    
+    // Try to get the full path (works in Electron, not in regular browsers)
+    if (file.path) {
+      // Electron environment - extract directory from path string
+      const pathString = file.path;
+      const lastSlash = Math.max(pathString.lastIndexOf('/'), pathString.lastIndexOf('\\'));
+      if (lastSlash !== -1) {
+        directoryPath = pathString.substring(0, lastSlash);
+      }
+    } else if (file.webkitRelativePath) {
+      // When using webkitdirectory, we get relative paths
+      const parts = file.webkitRelativePath.split('/');
+      parts.pop(); // Remove filename
+      directoryPath = parts.join('/');
+    } else {
+      // Fallback: show a message that user needs to enter path manually
+      alert('Browser security restrictions prevent automatic directory selection. Please enter the directory path manually, or use the file picker to select a file from the desired directory.');
+      event.target.value = ''; // Reset input
+      return;
+    }
+    
+    // Update the form value with the directory path
+    if (directoryPath) {
+      updateFormValue(pluginId, key, directoryPath);
+    }
+    
+    // Reset the input so the same file can be selected again if needed
+    event.target.value = '';
+  }
+};
+
+const updatePluginConfig = async (pluginId, config) => {
+  try {
+    // Merge with existing config
+    const currentConfig = pluginConfigs.value[pluginId] || {};
+    const updatedConfig = { ...currentConfig, ...config };
+    
+    await axios.put(`/api/plugins/${pluginId}`, updatedConfig);
+    
+    // Update local config
+    pluginConfigs.value[pluginId] = updatedConfig;
+    
+    // Reload relevant data based on plugin type
+    const plugin = plugins.value.find((p) => p.id === pluginId);
+    if (plugin) {
+      if (plugin.type === "calendar") {
+        await loadCalendarSources();
+      } else if (plugin.type === "image") {
+        // Reload images when image plugin config is updated
+        await loadImages();
+      }
+    }
+  } catch (error) {
+    console.error("Failed to update plugin:", error);
+    alert(`Error: ${error.response?.data?.detail || error.message || "Failed to update plugin"}`);
+  }
+};
+
+const savePluginConfig = async (pluginId) => {
+  savingPlugin.value = pluginId;
+  pluginSaveStatus.value[pluginId] = null;
+  pluginTestStatus.value[pluginId] = null;
+  
+  try {
+    // Get form data or use current config
+    const formData = pluginFormData.value[pluginId] || {};
+    const currentConfig = pluginConfigs.value[pluginId] || {};
+    const updatedConfig = { ...currentConfig, ...formData };
+    
+    // Debug logging
+    console.log(`[Frontend] Saving plugin config for ${pluginId}:`, updatedConfig);
+    console.log(`[Frontend] Form data:`, formData);
+    console.log(`[Frontend] Current config:`, currentConfig);
+    
+    // Ensure all values are strings, not objects
+    const cleanedConfig = {};
+    for (const [key, value] of Object.entries(updatedConfig)) {
+      if (value === null || value === undefined) {
+        cleanedConfig[key] = "";
+      } else if (typeof value === 'object') {
+        // If it's an object, try to extract the actual value
+        console.warn(`[Frontend] Found object value for ${key}:`, value);
+        cleanedConfig[key] = value.value || value.default || "";
+      } else {
+        cleanedConfig[key] = String(value);
+      }
+    }
+    console.log(`[Frontend] Cleaned config:`, cleanedConfig);
+    
+    await axios.put(`/api/plugins/${pluginId}`, cleanedConfig);
+    
+    // Update local config with cleaned config
+    pluginConfigs.value[pluginId] = cleanedConfig;
+    // Clear form data after successful save
+    if (pluginFormData.value[pluginId]) {
+      delete pluginFormData.value[pluginId];
+    }
+    
+    // Show success message
+    pluginSaveStatus.value[pluginId] = {
+      success: true,
+      message: "Settings saved successfully!",
+    };
+    
+    // Clear success message after 3 seconds
+    setTimeout(() => {
+      if (pluginSaveStatus.value[pluginId] && pluginSaveStatus.value[pluginId].success) {
+        delete pluginSaveStatus.value[pluginId];
+      }
+    }, 3000);
+    
+    // Reload relevant data based on plugin type
+    const plugin = plugins.value.find((p) => p.id === pluginId);
+    if (plugin) {
+      if (plugin.type === "calendar") {
+        await loadCalendarSources();
+      } else if (plugin.type === "image") {
+        // Reload images when image plugin config is updated
+        await loadImages();
+      }
+    }
+  } catch (error) {
+    console.error("Failed to save plugin config:", error);
+    pluginSaveStatus.value[pluginId] = {
+      success: false,
+      message: error.response?.data?.detail || error.message || "Failed to save settings",
+    };
+  } finally {
+    savingPlugin.value = null;
+  }
+};
+
+const testPluginConnection = async (pluginId) => {
+  testingPlugin.value[pluginId] = true;
+  pluginTestStatus.value[pluginId] = null;
+  
+  try {
+    // Get current form data or saved config
+    const formData = pluginFormData.value[pluginId] || {};
+    const currentConfig = pluginConfigs.value[pluginId] || {};
+    const testConfig = { ...currentConfig, ...formData };
+    
+    // Save config first if there are unsaved changes
+    if (Object.keys(formData).length > 0) {
+      await axios.put(`/api/plugins/${pluginId}`, testConfig);
+      pluginConfigs.value[pluginId] = testConfig;
+      delete pluginFormData.value[pluginId];
+    }
+    
+    // Test connection
+    const response = await axios.post(`/api/plugins/${pluginId}/test`);
+    
+    pluginTestStatus.value[pluginId] = {
+      success: response.data.success,
+      message: response.data.message,
+    };
+    
+    // Clear test status after 5 seconds
+    setTimeout(() => {
+      if (pluginTestStatus.value[pluginId]) {
+        delete pluginTestStatus.value[pluginId];
+      }
+    }, 5000);
+  } catch (error) {
+    console.error("Failed to test plugin connection:", error);
+    pluginTestStatus.value[pluginId] = {
+      success: false,
+      message: error.response?.data?.detail || error.message || "Failed to test connection",
+    };
+  } finally {
+    testingPlugin.value[pluginId] = false;
+  }
+};
+
+const fetchPluginNow = async (pluginId) => {
+  fetchingPlugin.value[pluginId] = true;
+  pluginFetchStatus.value[pluginId] = null;
+  
+  try {
+    // Fetch now
+    const response = await axios.post(`/api/plugins/${pluginId}/fetch`);
+    
+    const result = response.data;
+    let message = result.message;
+    
+    // Add image count info if available
+    if (result.images_downloaded && result.image_count !== undefined) {
+      message += ` (${result.image_count} images available)`;
+    } else if (result.image_count !== undefined) {
+      message += ` (${result.image_count} images available)`;
+    }
+    
+    pluginFetchStatus.value[pluginId] = {
+      success: result.success,
+      message: message,
+      images_downloaded: result.images_downloaded || false,
+      image_count: result.image_count || 0,
+    };
+    
+    // Reload images if any were downloaded
+    if (result.images_downloaded) {
+      await loadImages();
+    }
+    
+    // Clear fetch status after 5 seconds
+    setTimeout(() => {
+      if (pluginFetchStatus.value[pluginId]) {
+        delete pluginFetchStatus.value[pluginId];
+      }
+    }, 5000);
+  } catch (error) {
+    console.error("Failed to fetch plugin:", error);
+    pluginFetchStatus.value[pluginId] = {
+      success: false,
+      message: error.response?.data?.detail || error.message || "Failed to fetch emails",
+      images_downloaded: false,
+      image_count: 0,
+    };
+  } finally {
+    fetchingPlugin.value[pluginId] = false;
+  }
+};
+
+const getCalendarTypePlaceholder = (type) => {
+  const typeInfo = calendarPluginTypes.value.find((t) => t.id === type);
+  if (typeInfo) {
+    if (type === "google") {
+      return "https://calendar.google.com/calendar/u/0?cid=...";
+    } else if (type === "proton") {
+      return "https://calendar.proton.me/api/calendar/v1/url/.../calendar.ics?CacheKey=...&PassphraseKey=...";
+    } else {
+      return "https://example.com/calendar.ics";
+    }
+  }
+  return "Calendar iCal URL";
+};
+
+const getCalendarTypeHelpText = (type) => {
+  const typeInfo = calendarPluginTypes.value.find((t) => t.id === type);
+  if (typeInfo) {
+    if (type === "google") {
+      return "Google Calendar: Share link or iCal URL from Google Calendar settings";
+    } else if (type === "proton") {
+      return "Proton Calendar: iCal feed URL from Proton Calendar sharing settings (includes CacheKey and PassphraseKey)";
+    } else {
+      return typeInfo.description || "iCal feed URL";
+    }
+  }
+  return "Calendar iCal URL";
+};
+
 onMounted(async () => {
   await loadConfig();
   await loadKeyboardMappings();
+  await loadCalendarPluginTypes();
   await loadCalendarSources();
   await loadWebServices();
   await loadImages();
+  await loadPlugins();
 });
 </script>
 
@@ -2435,20 +3072,47 @@ input:checked + .slider:before {
   margin-top: 0.5rem;
 }
 
+.btn-primary {
+  background: var(--accent-secondary);
+  color: #fff;
+  border: none;
+  border-radius: 4px;
+  padding: 0.75rem 1.5rem;
+  cursor: pointer;
+  font-size: 0.9rem;
+  font-weight: 500;
+  transition: all 0.2s;
+}
+
+.btn-primary:hover:not(:disabled) {
+  opacity: 0.9;
+  transform: translateY(-1px);
+}
+
+.btn-primary:disabled {
+  opacity: 0.6;
+  cursor: not-allowed;
+}
+
 .btn-secondary {
   background: var(--bg-tertiary);
   color: var(--text-primary);
   border: 1px solid var(--border-color);
   border-radius: 4px;
-  padding: 0.5rem 1rem;
+  padding: 0.75rem 1.5rem;
   cursor: pointer;
   font-size: 0.9rem;
   transition: all 0.2s;
 }
 
-.btn-secondary:hover {
+.btn-secondary:hover:not(:disabled) {
   background: var(--bg-secondary);
   border-color: var(--accent-primary);
+}
+
+.btn-secondary:disabled {
+  opacity: 0.6;
+  cursor: not-allowed;
 }
 
 .btn-remove {
@@ -2587,13 +3251,22 @@ input:checked + .slider:before {
   opacity: 0.6;
 }
 
-.success-message {
-  color: #4caf50;
-  font-size: 0.9rem;
-  padding: 0.5rem;
-  background: rgba(76, 175, 80, 0.1);
+.error-message {
+  background: #f8d7da;
+  color: #721c24;
+  border: 1px solid #f5c6cb;
+  padding: 0.5rem 1rem;
   border-radius: 4px;
-  border: 1px solid rgba(76, 175, 80, 0.3);
+  font-size: 0.9rem;
+}
+
+.success-message {
+  background: #d4edda;
+  color: #155724;
+  border: 1px solid #c3e6cb;
+  padding: 0.5rem 1rem;
+  border-radius: 4px;
+  font-size: 0.9rem;
 }
 
 .images-list {
@@ -2648,5 +3321,142 @@ input:checked + .slider:before {
   font-size: 0.85rem;
   color: var(--text-secondary);
   font-family: monospace;
+}
+
+/* Plugin Management Styles */
+.plugins-list {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(320px, 1fr));
+  gap: 1.5rem;
+  margin-top: 1rem;
+}
+
+.plugin-item {
+  background: var(--bg-primary);
+  border: 1px solid var(--border-color);
+  border-radius: 8px;
+  padding: 1.5rem;
+  transition: all 0.2s ease;
+}
+
+.plugin-item:hover {
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
+}
+
+.plugin-item.disabled {
+  opacity: 0.6;
+  background: var(--bg-secondary);
+}
+
+.plugin-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+  margin-bottom: 1rem;
+  padding-bottom: 1rem;
+  border-bottom: 1px solid var(--border-color);
+}
+
+.plugin-info {
+  flex: 1;
+}
+
+.plugin-title-row {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+  margin-bottom: 0.5rem;
+}
+
+.plugin-type-badge {
+  padding: 0.25rem 0.75rem;
+  border-radius: 12px;
+  font-size: 0.75rem;
+  font-weight: 600;
+  text-transform: uppercase;
+  background: var(--bg-secondary);
+  color: var(--text-secondary);
+}
+
+.plugin-type-badge.type-calendar {
+  background: #e3f2fd;
+  color: #1976d2;
+}
+
+.plugin-type-badge.type-image {
+  background: #f3e5f5;
+  color: #7b1fa2;
+}
+
+.plugin-type-badge.type-service {
+  background: #e8f5e9;
+  color: #388e3c;
+}
+
+.plugin-description {
+  font-size: 0.875rem;
+  color: var(--text-secondary);
+  margin: 0;
+  line-height: 1.4;
+}
+
+.plugin-config {
+  margin-top: 1rem;
+}
+
+.config-section-title {
+  font-size: 0.875rem;
+  font-weight: 600;
+  margin-bottom: 0.75rem;
+  color: var(--text-primary);
+}
+
+.plugin-setting {
+  margin-bottom: 1rem;
+}
+
+.plugin-setting label {
+  display: block;
+  margin-bottom: 0.5rem;
+  font-size: 0.875rem;
+  font-weight: 500;
+  color: var(--text-primary);
+}
+
+.plugin-disabled-message {
+  margin-top: 1rem;
+  padding: 0.75rem;
+  background: var(--bg-secondary);
+  border-radius: 4px;
+}
+
+.plugin-disabled-message .help-text {
+  margin: 0;
+  font-size: 0.875rem;
+  color: var(--text-secondary);
+}
+
+.btn-settings-icon {
+  background: transparent;
+  border: 1px solid var(--border-color);
+  border-radius: 4px;
+  padding: 0.25rem 0.5rem;
+  font-size: 1rem;
+  cursor: pointer;
+  transition: all 0.2s ease;
+  color: var(--text-secondary);
+  margin-left: auto;
+}
+
+.btn-settings-icon:hover {
+  background: var(--bg-secondary);
+  border-color: var(--accent-primary);
+  color: var(--accent-primary);
+}
+
+.btn-settings-icon.active {
+  background: var(--accent-primary);
+  border-color: var(--accent-primary);
+  color: #fff;
 }
 </style>

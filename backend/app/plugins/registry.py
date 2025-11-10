@@ -1,4 +1,4 @@
-"""Plugin registry service for loading and managing plugins from database."""
+"""Plugin registry service using unified plugins table and pluggy."""
 
 import json
 from typing import Any
@@ -6,268 +6,184 @@ from typing import Any
 from sqlalchemy import select
 
 from app.database import AsyncSessionLocal
-from app.models.db_models import CalendarSourceDB, WebServiceDB
+from app.models.db_models import PluginDB, PluginTypeDB
 from app.plugins.base import PluginType
-from app.plugins.calendar.google import GoogleCalendarPlugin
-from app.plugins.calendar.ical import ICalCalendarPlugin
-from app.plugins.image.local import LocalImagePlugin
-from app.plugins.manager import plugin_manager
-from app.plugins.protocols import CalendarPlugin, ImagePlugin, ServicePlugin
-from app.plugins.service.iframe import IframeServicePlugin
+from app.plugins.hooks import plugin_manager
+from app.plugins.loader import plugin_loader
+from app.plugins.manager import plugin_manager as instance_manager
 
 
 class PluginRegistry:
-    """Registry service for loading and managing plugins from database."""
+    """Plugin registry using unified plugins table and pluggy."""
 
     def __init__(self):
         """Initialize plugin registry."""
         self._initialized = False
+        # Note: plugin_registration is already registered via import in __init__.py
 
     async def load_plugins_from_db(self) -> None:
         """Load all plugins from database and register them."""
-        # Load calendar plugins
-        await self._load_calendar_plugins()
+        # Load plugin types from pluggy hooks first
+        plugin_loader.load_all_plugins()
+        
+        # Then, load plugin types from database (or register defaults)
+        await self._load_plugin_types()
 
-        # Load image plugins
-        await self._load_image_plugins()
-
-        # Load service plugins
-        await self._load_service_plugins()
+        # Load plugin instances from database
+        await self._load_plugin_instances()
 
         # Initialize all plugins
         if not self._initialized:
-            await plugin_manager.initialize_all()
+            await instance_manager.initialize_all()
             self._initialized = True
 
-    async def _load_calendar_plugins(self) -> None:
-        """Load calendar plugins from database."""
+    async def _load_plugin_types(self) -> None:
+        """Load plugin types from database or register defaults."""
+        # Get plugin types from pluggy hooks
+        plugin_types = plugin_loader.get_plugin_types()
+
         async with AsyncSessionLocal() as session:
-            result = await session.execute(select(CalendarSourceDB))
-            db_sources = result.scalars().all()
+            for type_info in plugin_types:
+                # Check if plugin type exists in database
+                result = await session.execute(
+                    select(PluginTypeDB).where(PluginTypeDB.type_id == type_info["type_id"])
+                )
+                db_type = result.scalar_one_or_none()
 
-            for db_source in db_sources:
-                # Check if plugin already registered
-                existing = plugin_manager.get_plugin(db_source.id)
-                if existing:
-                    continue
-
-                # Create plugin based on type
-                if db_source.type == "google":
-                    plugin = GoogleCalendarPlugin(
-                        plugin_id=db_source.id,
-                        name=db_source.name,
-                        ical_url=db_source.ical_url or "",
-                        enabled=db_source.enabled,
+                if not db_type:
+                    # Create new plugin type in database
+                    db_type = PluginTypeDB(
+                        type_id=type_info["type_id"],
+                        plugin_type=type_info["plugin_type"].value,
+                        name=type_info["name"],
+                        description=type_info.get("description"),
+                        version=type_info.get("version"),
+                        common_config_schema=type_info.get("common_config_schema", {}),
+                        enabled=True,  # Default to enabled
                     )
-                elif db_source.type == "proton" or db_source.type == "ical":
-                    plugin = ICalCalendarPlugin(
-                        plugin_id=db_source.id,
-                        name=db_source.name,
-                        ical_url=db_source.ical_url or "",
-                        enabled=db_source.enabled,
-                    )
+                    session.add(db_type)
                 else:
-                    # Default to iCal for unknown types
-                    plugin = ICalCalendarPlugin(
-                        plugin_id=db_source.id,
-                        name=db_source.name,
-                        ical_url=db_source.ical_url or "",
-                        enabled=db_source.enabled,
-                    )
+                    # Update existing plugin type if needed
+                    db_type.name = type_info["name"]
+                    db_type.description = type_info.get("description")
+                    db_type.version = type_info.get("version")
+                    db_type.common_config_schema = type_info.get("common_config_schema", {})
+                    db_type.plugin_type = type_info["plugin_type"].value
 
-                # Configure plugin with additional settings
-                await plugin.configure({
-                    "color": db_source.color,
-                    "show_time": db_source.show_time,
-                })
+            await session.commit()
 
-                # Register plugin
-                plugin_manager.register(plugin)
-
-    async def _load_image_plugins(self) -> None:
-        """Load image plugins from database."""
-        # For now, we'll create a default local image plugin
-        # In the future, we can load multiple image plugins from database
-        from app.config import settings
-
-        default_plugin_id = "local-images"
-        existing = plugin_manager.get_plugin(default_plugin_id)
-        if not existing:
-            plugin = LocalImagePlugin(
-                plugin_id=default_plugin_id,
-                name="Local Images",
-                image_dir=settings.image_dir,
-                thumbnail_dir=settings.image_cache_dir / "thumbnails",
-                enabled=True,
-            )
-            plugin_manager.register(plugin)
-
-    async def _load_service_plugins(self) -> None:
-        """Load service plugins from database."""
+    async def _load_plugin_instances(self) -> None:
+        """Load plugin instances from database."""
         async with AsyncSessionLocal() as session:
-            result = await session.execute(select(WebServiceDB).order_by(WebServiceDB.display_order))
-            db_services = result.scalars().all()
+            result = await session.execute(select(PluginDB))
+            db_plugins = result.scalars().all()
 
-            for db_service in db_services:
+            for db_plugin in db_plugins:
                 # Check if plugin already registered
-                existing = plugin_manager.get_plugin(db_service.id)
+                existing = instance_manager.get_plugin(db_plugin.id)
                 if existing:
+                    # Update existing plugin config
+                    await existing.configure(db_plugin.config or {})
+                    if db_plugin.enabled:
+                        existing.enable()
+                    else:
+                        existing.disable()
                     continue
 
-                # Create iframe service plugin
-                plugin = IframeServicePlugin(
-                    plugin_id=db_service.id,
-                    name=db_service.name,
-                    url=db_service.url,
-                    enabled=db_service.enabled,
-                    fullscreen=db_service.fullscreen,
+                # Create plugin instance using pluggy hooks
+                plugin = plugin_loader.create_plugin_instance(
+                    plugin_id=db_plugin.id,
+                    type_id=db_plugin.type_id,
+                    name=db_plugin.name,
+                    config=db_plugin.config or {},
                 )
 
-                # Configure plugin with additional settings
-                await plugin.configure({
-                    "display_order": db_service.display_order,
-                })
+                if plugin:
+                    # Configure plugin with additional settings
+                    # Clean config to ensure all values are actual values, not schema objects
+                    plugin_config = db_plugin.config or {}
+                    cleaned_config = {}
+                    for key, value in plugin_config.items():
+                        if isinstance(value, dict) and ("type" in value or "description" in value):
+                            # This is a schema object, extract the actual value
+                            cleaned_config[key] = value.get("value") or value.get("default") or ""
+                        else:
+                            cleaned_config[key] = value
+                    await plugin.configure(cleaned_config)
 
-                # Register plugin
-                plugin_manager.register(plugin)
+                    # Set enabled status
+                    if db_plugin.enabled:
+                        plugin.enable()
+                    else:
+                        plugin.disable()
 
-    async def register_calendar_plugin(
+                    # Register plugin
+                    instance_manager.register(plugin)
+
+    async def register_plugin(
         self,
         plugin_id: str,
+        type_id: str,
         name: str,
-        plugin_type: str,
         config: dict[str, Any],
-    ) -> CalendarPlugin:
+        enabled: bool = True,
+    ) -> Any:
         """
-        Register a new calendar plugin.
+        Register a new plugin instance.
 
         Args:
-            plugin_id: Unique identifier for the plugin
+            plugin_id: Unique identifier for the plugin instance
+            type_id: Plugin type ID (e.g., 'google', 'local')
             name: Human-readable name
-            plugin_type: Plugin type ('google', 'ical', 'proton', etc.)
-            config: Plugin configuration
+            config: Plugin configuration dictionary
+            enabled: Whether the plugin is enabled
 
         Returns:
-            Registered calendar plugin
+            Registered plugin instance
         """
-        # Create plugin based on type
-        ical_url = config.get("ical_url", "")
-        enabled = config.get("enabled", True)
+        # Create plugin instance using pluggy hooks
+        plugin = plugin_loader.create_plugin_instance(
+            plugin_id=plugin_id,
+            type_id=type_id,
+            name=name,
+            config={**config, "enabled": enabled},
+        )
 
-        if plugin_type == "google":
-            plugin = GoogleCalendarPlugin(
-                plugin_id=plugin_id,
-                name=name,
-                ical_url=ical_url,
-                enabled=enabled,
-            )
+        if not plugin:
+            raise ValueError(f"Failed to create plugin instance for type_id: {type_id}")
+
+        # Configure plugin
+        await plugin.configure(config)
+
+        # Set enabled status
+        if enabled:
+            plugin.enable()
         else:
-            # Default to iCal for other types
-            plugin = ICalCalendarPlugin(
-                plugin_id=plugin_id,
-                name=name,
-                ical_url=ical_url,
-                enabled=enabled,
+            plugin.disable()
+
+        # Register plugin
+        instance_manager.register(plugin)
+
+        # Save to database
+        async with AsyncSessionLocal() as session:
+            # Get plugin type to determine plugin_type
+            result = await session.execute(
+                select(PluginTypeDB).where(PluginTypeDB.type_id == type_id)
             )
+            db_type = result.scalar_one_or_none()
+            plugin_type = db_type.plugin_type if db_type else "unknown"
 
-        # Configure plugin
-        await plugin.configure(config)
-
-        # Register plugin
-        plugin_manager.register(plugin)
-
-        # Initialize plugin
-        await plugin.initialize()
-
-        return plugin
-
-    async def register_image_plugin(
-        self,
-        plugin_id: str,
-        name: str,
-        plugin_type: str,
-        config: dict[str, Any],
-    ) -> ImagePlugin:
-        """
-        Register a new image plugin.
-
-        Args:
-            plugin_id: Unique identifier for the plugin
-            name: Human-readable name
-            plugin_type: Plugin type ('local', etc.)
-            config: Plugin configuration
-
-        Returns:
-            Registered image plugin
-        """
-        # For now, only support local image plugin
-        if plugin_type != "local":
-            raise ValueError(f"Unsupported image plugin type: {plugin_type}")
-
-        from pathlib import Path
-
-        image_dir = Path(config.get("image_dir", ""))
-        thumbnail_dir = config.get("thumbnail_dir")
-        if thumbnail_dir:
-            thumbnail_dir = Path(thumbnail_dir)
-        enabled = config.get("enabled", True)
-
-        plugin = LocalImagePlugin(
-            plugin_id=plugin_id,
-            name=name,
-            image_dir=image_dir,
-            thumbnail_dir=thumbnail_dir,
-            enabled=enabled,
-        )
-
-        # Register plugin
-        plugin_manager.register(plugin)
-
-        # Initialize plugin
-        await plugin.initialize()
-
-        return plugin
-
-    async def register_service_plugin(
-        self,
-        plugin_id: str,
-        name: str,
-        plugin_type: str,
-        config: dict[str, Any],
-    ) -> ServicePlugin:
-        """
-        Register a new service plugin.
-
-        Args:
-            plugin_id: Unique identifier for the plugin
-            name: Human-readable name
-            plugin_type: Plugin type ('iframe', etc.)
-            config: Plugin configuration
-
-        Returns:
-            Registered service plugin
-        """
-        # For now, only support iframe service plugin
-        if plugin_type != "iframe":
-            raise ValueError(f"Unsupported service plugin type: {plugin_type}")
-
-        url = config.get("url", "")
-        enabled = config.get("enabled", True)
-        fullscreen = config.get("fullscreen", False)
-
-        plugin = IframeServicePlugin(
-            plugin_id=plugin_id,
-            name=name,
-            url=url,
-            enabled=enabled,
-            fullscreen=fullscreen,
-        )
-
-        # Configure plugin
-        await plugin.configure(config)
-
-        # Register plugin
-        plugin_manager.register(plugin)
+            db_plugin = PluginDB(
+                id=plugin_id,
+                type_id=type_id,
+                plugin_type=plugin_type,
+                name=name,
+                enabled=enabled,
+                config=config,
+            )
+            session.add(db_plugin)
+            await session.commit()
+            await session.refresh(db_plugin)
 
         # Initialize plugin
         await plugin.initialize()
@@ -284,10 +200,19 @@ class PluginRegistry:
         Returns:
             True if unregistered, False if not found
         """
-        plugin = plugin_manager.get_plugin(plugin_id)
+        plugin = instance_manager.get_plugin(plugin_id)
         if plugin:
             await plugin.cleanup()
-        return plugin_manager.unregister(plugin_id)
+
+        # Remove from database
+        async with AsyncSessionLocal() as session:
+            result = await session.execute(select(PluginDB).where(PluginDB.id == plugin_id))
+            db_plugin = result.scalar_one_or_none()
+            if db_plugin:
+                await session.delete(db_plugin)
+                await session.commit()
+
+        return instance_manager.unregister(plugin_id)
 
 
 # Global plugin registry instance

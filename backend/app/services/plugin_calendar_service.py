@@ -120,18 +120,17 @@ class PluginCalendarService:
 
     def _get_plugin_type_name(self, plugin: CalendarPlugin) -> str:
         """Get plugin type name for backward compatibility."""
-        if isinstance(plugin, type):
-            # If it's a class, check the class name
-            if "Google" in plugin.__class__.__name__:
-                return "google"
-            elif "ICal" in plugin.__class__.__name__:
-                return "ical"
-        else:
-            # If it's an instance, check the class name
-            if "Google" in plugin.__class__.__name__:
-                return "google"
-            elif "ICal" in plugin.__class__.__name__:
-                return "ical"
+        # Check the class name
+        class_name = plugin.__class__.__name__
+        if "Google" in class_name:
+            return "google"
+        elif "ICal" in class_name:
+            # Check if it's a Proton calendar by looking at the plugin_id or name
+            plugin_id = getattr(plugin, "plugin_id", "")
+            plugin_name = getattr(plugin, "name", "").lower()
+            if "proton" in plugin_id.lower() or "proton" in plugin_name:
+                return "proton"
+            return "ical"
 
         # Default to ical for unknown types
         return "ical"

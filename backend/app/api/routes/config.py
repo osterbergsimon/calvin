@@ -44,6 +44,7 @@ class ConfigUpdate(BaseModel):
     rebootComboKey2: str | None = None  # Second key for reboot combo (e.g., "KEY_7")
     rebootComboDuration: int | None = None  # Reboot combo duration in milliseconds (default: 10000)
     imageDisplayMode: str | None = None  # Image display mode: 'fit', 'fill', 'crop', 'center', 'smart' (default: 'smart')
+    randomizeImages: bool | None = None  # Randomize image order (default: False)
     timezone: str | None = None  # Timezone (e.g., "America/New_York", "Europe/London", "UTC") - null = system timezone
     gitBranch: str | None = None  # Git branch to use for updates (default: 'main')
 
@@ -222,6 +223,11 @@ async def get_config():
         config["imageDisplayMode"] = "smart"  # Smart mode by default
     elif "image_display_mode" in config and "imageDisplayMode" not in config:
         config["imageDisplayMode"] = config["image_display_mode"]
+    if "randomizeImages" not in config and "randomize_images" not in config:
+        config["randomizeImages"] = False  # Don't randomize by default
+    elif "randomize_images" in config and "randomizeImages" not in config:
+        randomize_value = config["randomize_images"]
+        config["randomizeImages"] = randomize_value == "true" if isinstance(randomize_value, str) else bool(randomize_value)
     if "timezone" not in config:
         config["timezone"] = None  # No timezone set by default (use system timezone)
     # Note: timezone is stored as-is (no camelCase conversion needed)
@@ -306,6 +312,10 @@ async def update_config(config_update: ConfigUpdate):
         update_dict["display_timeout"] = update_dict.pop("displayTimeout")
     if "imageDisplayMode" in update_dict:
         update_dict["image_display_mode"] = update_dict.pop("imageDisplayMode")
+    if "randomizeImages" in update_dict:
+        # Convert boolean to string for storage
+        randomize_value = update_dict.pop("randomizeImages")
+        update_dict["randomize_images"] = "true" if randomize_value else "false"
     if "timezone" in update_dict:
         # Store timezone as-is (no camelCase conversion needed)
         update_dict["timezone"] = update_dict.pop("timezone")

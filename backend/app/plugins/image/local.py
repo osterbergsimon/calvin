@@ -49,6 +49,49 @@ class LocalImagePlugin(ImagePlugin):
         # Nothing to cleanup for local filesystem
         pass
 
+    async def configure(self, config: dict[str, Any]) -> None:
+        """
+        Configure the plugin with new settings.
+
+        Args:
+            config: Configuration dictionary
+        """
+        await super().configure(config)
+
+        if "image_dir" in config and config["image_dir"]:
+            # Extract actual value from config (handle schema objects)
+            image_dir_value = config["image_dir"]
+            # If it's a dict (schema object), extract the value or default
+            if isinstance(image_dir_value, dict):
+                image_dir_str = image_dir_value.get("value") or image_dir_value.get("default") or ""
+            else:
+                image_dir_str = str(image_dir_value)
+            
+            # Only update if we have a valid string value
+            if image_dir_str and image_dir_str.strip():
+                self.image_dir = Path(image_dir_str)
+                self.image_dir.mkdir(parents=True, exist_ok=True)
+        
+        if "thumbnail_dir" in config and config["thumbnail_dir"]:
+            # Extract actual value from config (handle schema objects)
+            thumbnail_dir_value = config["thumbnail_dir"]
+            # If it's a dict (schema object), extract the value or default
+            if isinstance(thumbnail_dir_value, dict):
+                thumbnail_dir_str = thumbnail_dir_value.get("value") or thumbnail_dir_value.get("default") or ""
+            else:
+                thumbnail_dir_str = str(thumbnail_dir_value)
+            
+            # Only update if we have a valid string value
+            if thumbnail_dir_str and thumbnail_dir_str.strip():
+                self.thumbnail_dir = Path(thumbnail_dir_str)
+                self.thumbnail_dir.mkdir(parents=True, exist_ok=True)
+        elif "image_dir" in config and config["image_dir"]:
+            # If thumbnail_dir not provided but image_dir is, use default
+            # Only if image_dir was successfully updated
+            if hasattr(self, 'image_dir') and self.image_dir:
+                self.thumbnail_dir = self.image_dir / "thumbnails"
+                self.thumbnail_dir.mkdir(parents=True, exist_ok=True)
+
     async def get_images(self) -> list[dict[str, Any]]:
         """
         Get list of all available images.
