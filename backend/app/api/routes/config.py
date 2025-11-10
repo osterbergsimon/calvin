@@ -42,6 +42,7 @@ class ConfigUpdate(BaseModel):
     rebootComboKey2: str | None = None  # Second key for reboot combo (e.g., "KEY_7")
     rebootComboDuration: int | None = None  # Reboot combo duration in milliseconds (default: 10000)
     imageDisplayMode: str | None = None  # Image display mode: 'fit', 'fill', 'crop', 'center', 'smart' (default: 'smart')
+    timezone: str | None = None  # Timezone (e.g., "America/New_York", "Europe/London", "UTC") - null = system timezone
 
     # Allow arbitrary fields for extensibility
     class Config:
