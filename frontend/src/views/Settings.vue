@@ -972,6 +972,7 @@ const localConfig = ref({
   ],
   displayTimeoutEnabled: false,
   displayTimeout: 0,
+  timezone: null,
   rebootComboKey1: "KEY_1",
   rebootComboKey2: "KEY_7",
   rebootComboDuration: 10000,
