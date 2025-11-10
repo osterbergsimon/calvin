@@ -1337,10 +1337,15 @@ const loadConfig = async () => {
         response.data.sideViewPosition ??
         response.data.side_view_position ??
         "right";
-      localConfig.value.displayScheduleEnabled =
-        response.data.displayScheduleEnabled ??
-        response.data.display_schedule_enabled ??
-        false;
+      // Handle displayScheduleEnabled - check for both camelCase and snake_case
+      // Use !== undefined to properly handle false values
+      if (response.data.displayScheduleEnabled !== undefined) {
+        localConfig.value.displayScheduleEnabled = response.data.displayScheduleEnabled;
+      } else if (response.data.display_schedule_enabled !== undefined) {
+        localConfig.value.displayScheduleEnabled = response.data.display_schedule_enabled;
+      } else {
+        localConfig.value.displayScheduleEnabled = false;
+      }
       localConfig.value.displayOffTime =
         response.data.displayOffTime ?? response.data.display_off_time ?? "22:00";
       localConfig.value.displayOnTime =

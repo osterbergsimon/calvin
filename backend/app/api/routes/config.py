@@ -146,7 +146,8 @@ async def get_config():
     elif "display_schedule" in config:
         schedule_value = config["display_schedule"]
         if schedule_value is not None and schedule_value != "":
-            # Parse JSON string if needed
+            # Parse JSON string if needed (if stored as string)
+            # If stored with value_type="json", it's already parsed by _parse_value()
             import json
             if isinstance(schedule_value, str):
                 try:
@@ -156,10 +157,13 @@ async def get_config():
                         has_schedule = True
                 except (json.JSONDecodeError, TypeError):
                     pass
-            elif isinstance(schedule_value, list) and len(schedule_value) > 0:
-                config["displaySchedule"] = schedule_value
-                has_schedule = True
+            elif isinstance(schedule_value, list):
+                # Already parsed (stored with value_type="json")
+                if len(schedule_value) > 0:
+                    config["displaySchedule"] = schedule_value
+                    has_schedule = True
             elif schedule_value is not None:
+                # Fallback for other types
                 config["displaySchedule"] = schedule_value
                 has_schedule = True
     
@@ -247,19 +251,17 @@ async def update_config(config_update: ConfigUpdate):
     if "displayOnTime" in update_dict:
         update_dict["display_on_time"] = update_dict.pop("displayOnTime")
     if "displaySchedule" in update_dict:
-        # Store as JSON string with explicit type
+        # Store schedule with explicit type
+        # Pass the schedule directly (list/array) to set_value, which will serialize it
         import json
         schedule = update_dict.pop("displaySchedule")
         if isinstance(schedule, str):
-            # Already a JSON string, store it directly
-            schedule_value = schedule
-        else:
-            # Convert list/array to JSON string
-            schedule_value = json.dumps(schedule)
+            # If it's already a JSON string, parse it first so we store the actual data structure
+            schedule = json.loads(schedule)
         
         # Store with explicit value_type="json" so it gets parsed correctly on retrieval
-        # We need to call set_value directly with the type, not use update_config
-        await config_service.set_value("display_schedule", schedule_value, value_type="json")
+        # Pass the list directly - set_value will serialize it with json.dumps()
+        await config_service.set_value("display_schedule", schedule, value_type="json")
     if "rebootComboKey1" in update_dict:
         update_dict["reboot_combo_key1"] = update_dict.pop("rebootComboKey1")
     if "rebootComboKey2" in update_dict:
