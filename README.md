@@ -36,6 +36,55 @@ The backend automatically handles platform differences:
 
 **Detailed instructions:** See [QUICKSTART_WINDOWS.md](QUICKSTART_WINDOWS.md)
 
+### Raspberry Pi Setup
+
+**Production Setup:**
+```bash
+wget -O- https://raw.githubusercontent.com/osterbergsimon/calvin/main/scripts/setup.sh | sudo sh
+```
+
+**Development Setup (with hot reload):**
+```bash
+wget -O- https://raw.githubusercontent.com/osterbergsimon/calvin/main/scripts/setup-dev.sh | sudo sh
+```
+
+Or using curl:
+```bash
+curl -fsSL https://raw.githubusercontent.com/osterbergsimon/calvin/main/scripts/setup.sh | sudo sh
+curl -fsSL https://raw.githubusercontent.com/osterbergsimon/calvin/main/scripts/setup-dev.sh | sudo sh
+```
+
+**Using a Different Branch:**
+
+To use a different branch (e.g., `develop` or a feature branch), set the `GIT_BRANCH` environment variable:
+
+```bash
+# Production setup with develop branch
+GIT_BRANCH=develop wget -O- https://raw.githubusercontent.com/osterbergsimon/calvin/main/scripts/setup.sh | sudo sh
+
+# Development setup with develop branch
+GIT_BRANCH=develop curl -fsSL https://raw.githubusercontent.com/osterbergsimon/calvin/main/scripts/setup-dev.sh | sudo sh
+```
+
+**Using a Different Repository:**
+
+To use a fork or different repository:
+
+```bash
+GIT_REPO=https://github.com/yourusername/calvin.git GIT_BRANCH=your-branch wget -O- ... | sudo sh
+```
+
+**Note:** 
+- The selected branch is automatically saved and will be used by the update script
+- When you update from GitHub (via Settings or update script), it will use the same branch
+- These scripts will:
+  - Install all system dependencies (Python, Node.js, etc.)
+  - Clone the Calvin repository (from the specified branch)
+  - Install backend and frontend dependencies
+  - Set up systemd services
+  - Configure display and kiosk mode
+  - For dev mode: Enable hot reload for both backend and frontend
+
 ### Development Setup
 
 **Windows (PowerShell):**

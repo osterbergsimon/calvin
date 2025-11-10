@@ -1,6 +1,5 @@
 """System management endpoints."""
 
-import asyncio
 import os
 import subprocess
 from pathlib import Path

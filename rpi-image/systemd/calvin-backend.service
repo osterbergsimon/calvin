@@ -12,7 +12,9 @@ Environment="PATH=/home/calvin/.local/bin:/usr/local/bin:/usr/bin:/bin"
 Environment="DATABASE_URL=sqlite:///home/calvin/calvin/backend/data/db/calvin.db"
 Environment="IMAGE_DIR=/home/calvin/calvin/backend/data/images"
 # Use venv if it exists (pip installation), otherwise use UV
-ExecStart=/bin/bash -c 'cd /home/calvin/calvin/backend && if [ -f .venv/bin/activate ]; then source .venv/bin/activate && uvicorn app.main:app --host 0.0.0.0 --port 8000; else export PATH="/home/calvin/.local/bin:/home/calvin/.cargo/bin:$PATH" && uv run uvicorn app.main:app --host 0.0.0.0 --port 8000; fi'
+# For dev mode, use --reload flag for hot reload
+# Check if .dev file exists to enable dev mode
+ExecStart=/bin/bash -c 'cd /home/calvin/calvin/backend && if [ -f .venv/bin/activate ]; then source .venv/bin/activate && if [ -f .dev ]; then uvicorn app.main:app --host 0.0.0.0 --port 8000 --reload; else uvicorn app.main:app --host 0.0.0.0 --port 8000; fi; else export PATH="/home/calvin/.local/bin:/home/calvin/.cargo/bin:$PATH" && if [ -f .dev ]; then uv run uvicorn app.main:app --host 0.0.0.0 --port 8000 --reload; else uv run uvicorn app.main:app --host 0.0.0.0 --port 8000; fi; fi'
 Restart=always
 RestartSec=10
 StandardOutput=journal

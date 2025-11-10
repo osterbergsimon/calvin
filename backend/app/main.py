@@ -1,6 +1,5 @@
 """Main FastAPI application entry point."""
 
-import os
 from pathlib import Path
 from contextlib import asynccontextmanager
 

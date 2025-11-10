@@ -37,6 +37,8 @@ cd "$REPO_DIR" || {
 }
 
 echo "[$(date)] Starting Calvin update..." | tee -a "$LOG_FILE"
+echo "[$(date)] Repository: $GIT_REPO" | tee -a "$LOG_FILE"
+echo "[$(date)] Branch: $GIT_BRANCH" | tee -a "$LOG_FILE"
 
 # Check if git repo exists
 if [ ! -d ".git" ]; then
