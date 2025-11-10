@@ -6,6 +6,11 @@ import subprocess
 from datetime import datetime, time
 from typing import Optional
 
+try:
+    import pytz
+except ImportError:
+    pytz = None  # pytz not available, will use system timezone
+
 from app.services.config_service import config_service
 
 
@@ -62,7 +67,7 @@ class DisplayPowerService:
 
         # Get timezone setting (default to system timezone)
         timezone_str = await config_service.get_value("timezone")
-        if timezone_str:
+        if timezone_str and pytz:
             try:
                 tz = pytz.timezone(timezone_str)
             except (pytz.exceptions.UnknownTimeZoneError, AttributeError):
