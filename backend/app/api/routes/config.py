@@ -110,18 +110,30 @@ async def get_config():
         config["sideViewPosition"] = "right"  # Right/bottom default
     elif "side_view_position" in config and "sideViewPosition" not in config:
         config["sideViewPosition"] = config["side_view_position"]
-    if "themeMode" not in config and "theme_mode" not in config:
-        config["themeMode"] = "auto"  # Auto theme by default
-    elif "theme_mode" in config and "themeMode" not in config:
+    # Handle themeMode - prioritize saved value from database
+    if "theme_mode" in config:
         config["themeMode"] = config["theme_mode"]
-    if "darkModeStart" not in config and "dark_mode_start" not in config:
-        config["darkModeStart"] = 18  # 6 PM default
-    elif "dark_mode_start" in config and "darkModeStart" not in config:
+    elif "themeMode" in config:
+        # Already in camelCase, keep it
+        pass
+    else:
+        config["themeMode"] = "auto"  # Auto theme by default
+    # Handle darkModeStart - prioritize saved value from database
+    if "dark_mode_start" in config:
         config["darkModeStart"] = config["dark_mode_start"]
-    if "darkModeEnd" not in config and "dark_mode_end" not in config:
-        config["darkModeEnd"] = 6  # 6 AM default
-    elif "dark_mode_end" in config and "darkModeEnd" not in config:
+    elif "darkModeStart" in config:
+        # Already in camelCase, keep it
+        pass
+    else:
+        config["darkModeStart"] = 18  # 6 PM default
+    # Handle darkModeEnd - prioritize saved value from database
+    if "dark_mode_end" in config:
         config["darkModeEnd"] = config["dark_mode_end"]
+    elif "darkModeEnd" in config:
+        # Already in camelCase, keep it
+        pass
+    else:
+        config["darkModeEnd"] = 6  # 6 AM default
     if "displayScheduleEnabled" not in config and "display_schedule_enabled" not in config:
         config["displayScheduleEnabled"] = False  # Disabled by default
     elif "display_schedule_enabled" in config and "displayScheduleEnabled" not in config:
