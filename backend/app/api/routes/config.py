@@ -1,5 +1,6 @@
 """Configuration endpoints."""
 
+from pathlib import Path
 from typing import Union, List, Dict, Any
 from fastapi import APIRouter
 from pydantic import BaseModel
@@ -44,6 +45,7 @@ class ConfigUpdate(BaseModel):
     rebootComboDuration: int | None = None  # Reboot combo duration in milliseconds (default: 10000)
     imageDisplayMode: str | None = None  # Image display mode: 'fit', 'fill', 'crop', 'center', 'smart' (default: 'smart')
     timezone: str | None = None  # Timezone (e.g., "America/New_York", "Europe/London", "UTC") - null = system timezone
+    gitBranch: str | None = None  # Git branch to use for updates (default: 'main')
 
     # Allow arbitrary fields for extensibility
     class Config:
@@ -223,6 +225,10 @@ async def get_config():
     if "timezone" not in config:
         config["timezone"] = None  # No timezone set by default (use system timezone)
     # Note: timezone is stored as-is (no camelCase conversion needed)
+    if "gitBranch" not in config and "git_branch" not in config:
+        config["gitBranch"] = "main"  # Default to main branch
+    elif "git_branch" in config and "gitBranch" not in config:
+        config["gitBranch"] = config["git_branch"]
 
     return config
 
@@ -303,6 +309,37 @@ async def update_config(config_update: ConfigUpdate):
     if "timezone" in update_dict:
         # Store timezone as-is (no camelCase conversion needed)
         update_dict["timezone"] = update_dict.pop("timezone")
+    if "gitBranch" in update_dict:
+        update_dict["git_branch"] = update_dict.pop("gitBranch")
+        # Also update /etc/default/calvin-update file
+        import os
+        calvin_update_file = Path("/etc/default/calvin-update")
+        if calvin_update_file.exists():
+            try:
+                # Read existing file
+                with open(calvin_update_file, "r") as f:
+                    lines = f.readlines()
+                
+                # Update or add GIT_BRANCH line
+                updated = False
+                new_lines = []
+                for line in lines:
+                    if line.startswith("GIT_BRANCH="):
+                        new_lines.append(f"GIT_BRANCH={update_dict['git_branch']}\n")
+                        updated = True
+                    else:
+                        new_lines.append(line)
+                
+                if not updated:
+                    # Add GIT_BRANCH if it doesn't exist
+                    new_lines.append(f"GIT_BRANCH={update_dict['git_branch']}\n")
+                
+                # Write back
+                with open(calvin_update_file, "w") as f:
+                    f.writelines(new_lines)
+            except Exception as e:
+                # Log error but don't fail the config update
+                print(f"Warning: Failed to update /etc/default/calvin-update: {e}")
 
     await config_service.update_config(update_dict)
 

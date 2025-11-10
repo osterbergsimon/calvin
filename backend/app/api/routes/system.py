@@ -17,6 +17,8 @@ async def trigger_update():
     Trigger manual update from GitHub.
     Runs the update script asynchronously and returns immediately.
     """
+    from app.services.config_service import config_service
+    
     update_script = Path("/usr/local/bin/update-calvin.sh")
     
     if not update_script.exists():
@@ -26,6 +28,9 @@ async def trigger_update():
         )
     
     try:
+        # Get git branch from config
+        git_branch = await config_service.get_value("git_branch", "main")
+        
         # Ensure log directory exists
         log_dir = Path("/home/calvin/calvin/backend/logs")
         log_dir.mkdir(parents=True, exist_ok=True)
@@ -43,6 +48,7 @@ async def trigger_update():
                 env={
                     **os.environ,
                     "PATH": "/home/calvin/.local/bin:/usr/local/bin:/usr/bin:/bin",
+                    "GIT_BRANCH": git_branch,  # Pass git branch to update script
                 },
             )
         

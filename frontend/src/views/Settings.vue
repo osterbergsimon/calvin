@@ -898,6 +898,33 @@
         </div>
       </section>
 
+      <!-- Update Settings -->
+      <section
+        class="settings-section collapsible"
+        :class="{ expanded: expandedSections.update }"
+      >
+        <div class="section-header" @click="toggleSection('update')">
+          <h2>Update Settings</h2>
+          <span class="toggle-icon">{{
+            expandedSections.update ? "▼" : "▶"
+          }}</span>
+        </div>
+        <div v-show="expandedSections.update" class="section-content">
+          <div class="setting-item">
+            <label>Git Branch</label>
+            <input
+              v-model="localConfig.gitBranch"
+              type="text"
+              placeholder="main"
+              @change="updateGitBranch"
+            />
+            <span class="help-text"
+              >Git branch to use when updating from GitHub (e.g., main, develop, feature/xyz)</span
+            >
+          </div>
+        </div>
+      </section>
+
       <!-- Actions -->
       <section class="settings-section">
         <h2>Actions</h2>
@@ -973,10 +1000,11 @@ const localConfig = ref({
   displayTimeoutEnabled: false,
   displayTimeout: 0,
   timezone: null,
-  rebootComboKey1: "KEY_1",
-  rebootComboKey2: "KEY_7",
-  rebootComboDuration: 10000,
-  imageDisplayMode: "smart",
+      rebootComboKey1: "KEY_1",
+      rebootComboKey2: "KEY_7",
+      rebootComboDuration: 10000,
+      imageDisplayMode: "smart",
+      gitBranch: "main",
 });
 
 // Collapsible sections state
@@ -990,6 +1018,7 @@ const expandedSections = ref({
   webServices: false,
   displayPower: false,
   rebootCombo: false,
+  update: false,
 });
 
 const toggleSection = (section) => {
@@ -1205,6 +1234,10 @@ const updateRebootCombo = () => {
   saveConfig();
 };
 
+const updateGitBranch = () => {
+  saveConfig();
+};
+
 const turnDisplayOn = async () => {
   try {
     await axios.post("/api/system/display/power/on");
@@ -1407,6 +1440,8 @@ const loadConfig = async () => {
       localConfig.value.imageDisplayMode =
         response.data.imageDisplayMode ?? response.data.image_display_mode ?? "smart";
       localConfig.value.timezone = response.data.timezone ?? null;
+      localConfig.value.gitBranch =
+        response.data.gitBranch ?? response.data.git_branch ?? "main";
       keyboardStore.setKeyboardType(localConfig.value.keyboardType);
     }
   } catch (error) {
@@ -1674,6 +1709,7 @@ const saveConfig = async () => {
       rebootComboDuration: localConfig.value.rebootComboDuration,
       imageDisplayMode: localConfig.value.imageDisplayMode,
       timezone: localConfig.value.timezone,
+      gitBranch: localConfig.value.gitBranch,
     });
   } catch (error) {
     console.error("Failed to save config:", error);
@@ -1718,6 +1754,7 @@ const resetToDefaults = async () => {
       themeMode: "auto",
       darkModeStart: 18,
       darkModeEnd: 6,
+      gitBranch: "main",
     };
     keyboardStore.setKeyboardType("7-button");
     // Reset mappings to defaults
