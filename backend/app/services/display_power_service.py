@@ -55,18 +55,24 @@ class DisplayPowerService:
 
     async def _check_and_update_display(self):
         """Check current time and update display power state."""
-        # Configure display timeout first (screensaver settings)
-        await self.configure_display_timeout()
+        # Get all display-related config values in one query (more efficient)
+        config = await config_service.get_config()
         
-        # Get schedule settings
-        schedule_enabled = await config_service.get_value("display_schedule_enabled")
+        # Configure display timeout first (screensaver settings)
+        # Use the config we just fetched instead of fetching again
+        timeout_enabled = config.get("display_timeout_enabled", False)
+        timeout_seconds = config.get("display_timeout", 0)
+        await self._apply_display_timeout(timeout_enabled, timeout_seconds)
+        
+        schedule_enabled = config.get("display_schedule_enabled", False)
+        
         if not schedule_enabled:
             # Schedule disabled, keep display on
             await self.turn_display_on()
             return
 
         # Get timezone setting (default to system timezone)
-        timezone_str = await config_service.get_value("timezone")
+        timezone_str = config.get("timezone")
         if timezone_str and pytz:
             try:
                 tz = pytz.timezone(timezone_str)
@@ -83,7 +89,7 @@ class DisplayPowerService:
             now = datetime.now()
         
         # Try to get per-day schedule first (new format)
-        display_schedule_str = await config_service.get_value("display_schedule")
+        display_schedule_str = config.get("display_schedule")
         if display_schedule_str:
             try:
                 # Parse JSON schedule
@@ -137,8 +143,8 @@ class DisplayPowerService:
                 pass
 
         # Fall back to old format (single on/off time for all days)
-        display_off_time_str = await config_service.get_value("display_off_time")
-        display_on_time_str = await config_service.get_value("display_on_time")
+        display_off_time_str = config.get("display_off_time")
+        display_on_time_str = config.get("display_on_time")
 
         if not display_off_time_str or not display_on_time_str:
             # No schedule set, keep display on
@@ -341,15 +347,25 @@ class DisplayPowerService:
         Default behavior: Keep display on (disable timeout) unless explicitly enabled.
         Only enables timeout if both timeout_enabled is True AND timeout_seconds > 0.
         """
+        # Get config values (can be called independently, so fetch here)
+        config = await config_service.get_config()
+        timeout_enabled = config.get("display_timeout_enabled", False)
+        timeout_seconds = config.get("display_timeout", 0)
+        await self._apply_display_timeout(timeout_enabled, timeout_seconds)
+    
+    async def _apply_display_timeout(self, timeout_enabled: bool, timeout_seconds: int):
+        """Apply display timeout settings (internal method).
+        
+        Args:
+            timeout_enabled: Whether timeout is enabled
+            timeout_seconds: Timeout in seconds (0 = never)
+        """
         # Set up X11 environment
         x11_env = {
             "DISPLAY": ":0",
             "HOME": "/home/calvin",
             "XAUTHORITY": "/home/calvin/.Xauthority",
         }
-        
-        timeout_enabled = await config_service.get_value("display_timeout_enabled")
-        timeout_seconds = await config_service.get_value("display_timeout")
         
         # Only enable timeout if explicitly enabled AND timeout > 0
         # Default: keep display on (disable timeout)
