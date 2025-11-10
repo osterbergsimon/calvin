@@ -247,13 +247,19 @@ async def update_config(config_update: ConfigUpdate):
     if "displayOnTime" in update_dict:
         update_dict["display_on_time"] = update_dict.pop("displayOnTime")
     if "displaySchedule" in update_dict:
-        # Store as JSON string
+        # Store as JSON string with explicit type
         import json
         schedule = update_dict.pop("displaySchedule")
         if isinstance(schedule, str):
-            update_dict["display_schedule"] = schedule
+            # Already a JSON string, store it directly
+            schedule_value = schedule
         else:
-            update_dict["display_schedule"] = json.dumps(schedule)
+            # Convert list/array to JSON string
+            schedule_value = json.dumps(schedule)
+        
+        # Store with explicit value_type="json" so it gets parsed correctly on retrieval
+        # We need to call set_value directly with the type, not use update_config
+        await config_service.set_value("display_schedule", schedule_value, value_type="json")
     if "rebootComboKey1" in update_dict:
         update_dict["reboot_combo_key1"] = update_dict.pop("rebootComboKey1")
     if "rebootComboKey2" in update_dict:
