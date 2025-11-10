@@ -121,6 +121,15 @@ async def lifespan(app: FastAPI):
     side_view_position = await config_service.get_value("side_view_position")
     if side_view_position is None:
         await config_service.set_value("side_view_position", "right")  # Right/bottom default
+    theme_mode = await config_service.get_value("theme_mode")
+    if theme_mode is None:
+        await config_service.set_value("theme_mode", "auto")  # Auto theme by default
+    dark_mode_start = await config_service.get_value("dark_mode_start")
+    if dark_mode_start is None:
+        await config_service.set_value("dark_mode_start", 18)  # 6 PM default
+    dark_mode_end = await config_service.get_value("dark_mode_end")
+    if dark_mode_end is None:
+        await config_service.set_value("dark_mode_end", 6)  # 6 AM default
     display_schedule_enabled = await config_service.get_value("display_schedule_enabled")
     if display_schedule_enabled is None:
         await config_service.set_value("display_schedule_enabled", False)  # Disabled by default
