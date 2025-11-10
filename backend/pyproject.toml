@@ -23,6 +23,7 @@ dependencies = [
     "icalendar>=5.0.0", # For parsing iCal/ICS files (Google Calendar share links)
     "httpx>=0.25.0",
     "python-multipart>=0.0.6", # Required for FastAPI file uploads (UploadFile)
+    "pytz>=2023.3", # For timezone support in display schedule
 ]
 
 # Platform-specific dependencies

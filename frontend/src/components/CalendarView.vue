@@ -143,7 +143,7 @@
 </template>
 
 <script setup>
-import { ref, computed, watch, onMounted, onActivated, nextTick } from "vue";
+import { ref, computed, watch, onMounted, onUnmounted, onActivated, nextTick } from "vue";
 import { useRoute } from "vue-router";
 import { useCalendarStore } from "../stores/calendar";
 import { useConfigStore } from "../stores/config";
@@ -158,9 +158,25 @@ const weekStartDay = computed(() => configStore.weekStartDay || 0);
 const calendarStore = useCalendarStore();
 const route = useRoute();
 
+// Reactive today date that updates periodically to refresh the calendar
+const today = ref(new Date());
+let todayRefreshInterval = null;
+
 // Load calendar sources on mount
 onMounted(async () => {
   await calendarStore.fetchSources();
+  
+  // Update today's date every minute to refresh the calendar
+  // This ensures the "today" highlight updates automatically
+  todayRefreshInterval = setInterval(() => {
+    today.value = new Date();
+  }, 60000); // Update every minute
+});
+
+onUnmounted(() => {
+  if (todayRefreshInterval) {
+    clearInterval(todayRefreshInterval);
+  }
 });
 
 const currentDate = computed(() => calendarStore.currentDate);
@@ -438,11 +454,11 @@ const getWeekStart = (date) => {
 const calendarDays = computed(() => {
   if (viewMode.value === "rolling") {
     // Rolling weeks view: show 4 weeks starting from today
-    const today = new Date();
-    today.setHours(0, 0, 0, 0);
+    const todayDate = new Date(today.value);
+    todayDate.setHours(0, 0, 0, 0);
 
     const days = [];
-    const startDate = getWeekStart(today);
+    const startDate = getWeekStart(todayDate);
 
     // Generate 4 weeks (28 days)
     for (let i = 0; i < 28; i++) {
@@ -453,8 +469,8 @@ const calendarDays = computed(() => {
 
       days.push({
         date,
-        otherMonth: date.getMonth() !== today.getMonth(),
-        isToday: dateOnly.getTime() === today.getTime(),
+        otherMonth: date.getMonth() !== todayDate.getMonth(),
+        isToday: dateOnly.getTime() === todayDate.getTime(),
         events: getEventsForDate(date),
       });
     }
@@ -490,8 +506,8 @@ const calendarDays = computed(() => {
     }
 
     // Current month days
-    const today = new Date();
-    today.setHours(0, 0, 0, 0);
+    const todayDate = new Date(today.value);
+    todayDate.setHours(0, 0, 0, 0);
 
     for (let day = 1; day <= lastDate; day++) {
       const date = new Date(year, month, day);
@@ -504,7 +520,7 @@ const calendarDays = computed(() => {
       days.push({
         date,
         otherMonth: !isCurrentMonth, // Explicitly check month/year
-        isToday: dateOnly.getTime() === today.getTime(),
+        isToday: dateOnly.getTime() === todayDate.getTime(),
         events: getEventsForDate(date),
       });
     }

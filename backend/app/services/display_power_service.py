@@ -60,6 +60,23 @@ class DisplayPowerService:
             await self.turn_display_on()
             return
 
+        # Get timezone setting (default to system timezone)
+        timezone_str = await config_service.get_value("timezone")
+        if timezone_str:
+            try:
+                tz = pytz.timezone(timezone_str)
+            except (pytz.exceptions.UnknownTimeZoneError, AttributeError):
+                # Invalid timezone, use system timezone
+                tz = None
+        else:
+            tz = None
+
+        # Get current time in configured timezone
+        if tz:
+            now = datetime.now(tz)
+        else:
+            now = datetime.now()
+        
         # Try to get per-day schedule first (new format)
         display_schedule_str = await config_service.get_value("display_schedule")
         if display_schedule_str:
@@ -71,7 +88,6 @@ class DisplayPowerService:
                     schedule = display_schedule_str
                 
                 # Get current day of week (0=Monday, 6=Sunday in Python)
-                now = datetime.now()
                 current_day = now.weekday()  # 0=Monday, 6=Sunday
                 
                 # Find schedule for current day
@@ -135,8 +151,11 @@ class DisplayPowerService:
             await self.turn_display_on()
             return
 
-        # Get current time
-        now = datetime.now().time()
+        # Get current time in configured timezone
+        if tz:
+            now = datetime.now(tz).time()
+        else:
+            now = datetime.now().time()
 
         # Determine if display should be on or off
         should_be_on = self._should_display_be_on(now, display_on_time, display_off_time)

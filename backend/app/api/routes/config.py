@@ -171,6 +171,9 @@ async def get_config():
         config["imageDisplayMode"] = "smart"  # Smart mode by default
     elif "image_display_mode" in config and "imageDisplayMode" not in config:
         config["imageDisplayMode"] = config["image_display_mode"]
+    if "timezone" not in config:
+        config["timezone"] = None  # No timezone set by default (use system timezone)
+    # Note: timezone is stored as-is (no camelCase conversion needed)
 
     return config
 
@@ -239,6 +242,9 @@ async def update_config(config_update: ConfigUpdate):
         update_dict["display_timeout"] = update_dict.pop("displayTimeout")
     if "imageDisplayMode" in update_dict:
         update_dict["image_display_mode"] = update_dict.pop("imageDisplayMode")
+    if "timezone" in update_dict:
+        # Store timezone as-is (no camelCase conversion needed)
+        update_dict["timezone"] = update_dict.pop("timezone")
 
     await config_service.update_config(update_dict)
 

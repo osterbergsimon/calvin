@@ -224,6 +224,9 @@ export const useConfigStore = defineStore("config", () => {
       if (response.data.image_display_mode !== undefined) {
         imageDisplayMode.value = response.data.image_display_mode;
       }
+      if (response.data.timezone !== undefined) {
+        timezone.value = response.data.timezone;
+      }
       return response.data;
     } catch (err) {
       error.value = err.message;
@@ -356,6 +359,7 @@ export const useConfigStore = defineStore("config", () => {
     rebootComboKey2,
     rebootComboDuration,
     imageDisplayMode,
+    timezone,
     loading,
     error,
     calendarWidth,

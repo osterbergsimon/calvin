@@ -768,6 +768,30 @@
             >
           </div>
           <div class="setting-item">
+            <label>Timezone</label>
+            <select
+              v-model="localConfig.timezone"
+              @change="updateTimezone"
+            >
+              <option :value="null">System Timezone (Default)</option>
+              <option value="UTC">UTC</option>
+              <option value="America/New_York">America/New_York (EST/EDT)</option>
+              <option value="America/Chicago">America/Chicago (CST/CDT)</option>
+              <option value="America/Denver">America/Denver (MST/MDT)</option>
+              <option value="America/Los_Angeles">America/Los_Angeles (PST/PDT)</option>
+              <option value="Europe/London">Europe/London (GMT/BST)</option>
+              <option value="Europe/Paris">Europe/Paris (CET/CEST)</option>
+              <option value="Europe/Berlin">Europe/Berlin (CET/CEST)</option>
+              <option value="Europe/Stockholm">Europe/Stockholm (CET/CEST)</option>
+              <option value="Asia/Tokyo">Asia/Tokyo (JST)</option>
+              <option value="Asia/Shanghai">Asia/Shanghai (CST)</option>
+              <option value="Australia/Sydney">Australia/Sydney (AEDT/AEST)</option>
+            </select>
+            <span class="help-text"
+              >Timezone for display schedule. Leave as "System Timezone" to use the Pi's timezone.</span
+            >
+          </div>
+          <div class="setting-item">
             <label>
               <input
                 v-model="localConfig.displayTimeoutEnabled"
@@ -1181,6 +1205,10 @@ const updateDisplayTimeout = async () => {
   }
 };
 
+const updateTimezone = () => {
+  saveConfig();
+};
+
 const updateRebootCombo = () => {
   saveConfig();
 };
@@ -1344,6 +1372,7 @@ const loadConfig = async () => {
         response.data.rebootComboDuration ?? response.data.reboot_combo_duration ?? 10000;
       localConfig.value.imageDisplayMode =
         response.data.imageDisplayMode ?? response.data.image_display_mode ?? "smart";
+      localConfig.value.timezone = response.data.timezone ?? null;
       keyboardStore.setKeyboardType(localConfig.value.keyboardType);
     }
   } catch (error) {
@@ -1610,6 +1639,7 @@ const saveConfig = async () => {
       rebootComboKey2: localConfig.value.rebootComboKey2,
       rebootComboDuration: localConfig.value.rebootComboDuration,
       imageDisplayMode: localConfig.value.imageDisplayMode,
+      timezone: localConfig.value.timezone,
     });
   } catch (error) {
     console.error("Failed to save config:", error);
