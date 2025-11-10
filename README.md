@@ -29,12 +29,16 @@ The backend automatically handles platform differences:
 
 ### Windows Setup
 
-**Quick Start:**
-1. Install Node.js: https://nodejs.org/ (LTS version)
-2. Install UV: Run `pip install uv` or use the installer script
-3. Run setup script: `.\setup-windows.ps1`
+**Quick Start (Develop Branch):**
+1. Clone repository: `git clone https://github.com/osterbergsimon/calvin.git`
+2. Switch to develop: `git checkout develop`
+3. Install Node.js: https://nodejs.org/ (LTS version)
+4. Run setup script: `.\setup-windows.ps1`
+5. Start development: `.\make.ps1 dev`
 
-**Detailed instructions:** See [QUICKSTART_WINDOWS.md](QUICKSTART_WINDOWS.md)
+**Detailed instructions:** 
+- **Development (develop branch)**: See [QUICKSTART_DEVELOP.md](QUICKSTART_DEVELOP.md)
+- **General Windows setup**: See [QUICKSTART_WINDOWS.md](QUICKSTART_WINDOWS.md)
 
 ### Raspberry Pi Setup
 

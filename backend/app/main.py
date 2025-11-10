@@ -31,9 +31,14 @@ async def lifespan(app: FastAPI):
     await migrate_database()
     print("Database migrations completed")
 
-    # Load calendar sources from database
+    # Load plugins from database
+    from app.plugins.registry import plugin_registry
+    await plugin_registry.load_plugins_from_db()
+    print(f"Loaded plugins from database")
+    
+    # Also load calendar sources from database (for backward compatibility during migration)
     await calendar_service.load_sources_from_db()
-    print(f"Loaded {len(calendar_service.sources)} calendar sources from database")
+    print(f"Loaded {len(calendar_service.sources)} calendar sources from database (legacy)")
 
     # Initialize default keyboard mappings if none exist
     from app.services.config_service import config_service
@@ -72,13 +77,21 @@ async def lifespan(app: FastAPI):
         await keyboard_mapping_service.set_mappings("standard", default_standard)
         print("Initialized default keyboard mappings")
 
-    # Initialize image service
+    # Initialize image service (legacy - will be replaced by plugin system)
     thumbnail_dir = settings.image_cache_dir / "thumbnails"
     image_service_module.image_service = ImageService(settings.image_dir, thumbnail_dir)
     # Do initial scan
     image_service_module.image_service.scan_images()
     image_count = len(image_service_module.image_service.get_images())
-    print(f"Image service initialized: {image_count} images found")
+    print(f"Image service initialized: {image_count} images found (legacy)")
+    
+    # Initialize plugin image service
+    from app.services.plugin_image_service import PluginImageService
+    plugin_image_service = PluginImageService()
+    # Do initial scan
+    await plugin_image_service.scan_images()
+    plugin_image_count = len(await plugin_image_service.get_images())
+    print(f"Plugin image service initialized: {plugin_image_count} images found")
 
     # Initialize default config if not present
     orientation = await config_service.get_value("orientation")
@@ -183,6 +196,11 @@ async def lifespan(app: FastAPI):
     print("Display power scheduler stopped")
     calendar_scheduler.stop()
     print("Calendar scheduler stopped")
+    
+    # Cleanup plugins
+    from app.plugins.manager import plugin_manager
+    await plugin_manager.cleanup_all()
+    print("Plugins cleaned up")
 
 
 app = FastAPI(
