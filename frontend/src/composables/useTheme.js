@@ -163,6 +163,32 @@ export function useTheme() {
     saveTheme();
   });
 
+  // Watch config store for theme changes (so changes from Settings page apply immediately)
+  watch(() => configStore.themeMode, (newMode) => {
+    if (newMode !== undefined && newMode !== themeMode.value) {
+      themeMode.value = newMode;
+      updateTheme();
+    }
+  });
+
+  watch(() => configStore.darkModeStart, (newStart) => {
+    if (newStart !== undefined && newStart !== darkModeStart.value) {
+      darkModeStart.value = newStart;
+      if (themeMode.value === "time") {
+        updateTheme();
+      }
+    }
+  });
+
+  watch(() => configStore.darkModeEnd, (newEnd) => {
+    if (newEnd !== undefined && newEnd !== darkModeEnd.value) {
+      darkModeEnd.value = newEnd;
+      if (themeMode.value === "time") {
+        updateTheme();
+      }
+    }
+  });
+
   // Initialize theme immediately and on mount
   if (typeof window !== "undefined") {
     // Initial theme update (before mount)

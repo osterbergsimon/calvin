@@ -51,6 +51,32 @@ class Settings(BaseSettings):
         # If path starts with /, it's absolute; otherwise resolve relative to current working directory
         db_path = Path(db_path_str) if db_path_str.startswith("/") else Path(db_path_str).resolve()
         db_path.parent.mkdir(parents=True, exist_ok=True)
+        
+        # Migrate database from old incorrect location if it exists
+        # Check for common incorrect paths (double path issue)
+        if not db_path.exists():
+            # Check for database in wrong location (double path)
+            wrong_paths = [
+                Path("/home/calvin/calvin/backend/home/calvin/calvin/backend/data/db/calvin.db"),
+                Path.cwd() / "home" / "calvin" / "calvin" / "backend" / "data" / "db" / "calvin.db",
+            ]
+            for wrong_path in wrong_paths:
+                if wrong_path.exists():
+                    print(f"Found database at incorrect location: {wrong_path}")
+                    print(f"Migrating to correct location: {db_path}")
+                    try:
+                        # Ensure target directory exists
+                        db_path.parent.mkdir(parents=True, exist_ok=True)
+                        # Copy database file
+                        import shutil
+                        shutil.copy2(wrong_path, db_path)
+                        print(f"Database migrated successfully to {db_path}")
+                        # Optionally remove old file (commented out for safety)
+                        # wrong_path.unlink()
+                        # print(f"Removed old database file: {wrong_path}")
+                    except Exception as e:
+                        print(f"Warning: Failed to migrate database: {e}")
+                    break
 
 
 # Global settings instance
