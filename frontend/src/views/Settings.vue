@@ -1159,27 +1159,18 @@ const updateShowWeekNumbers = () => {
   saveConfig();
 };
 
-const updateThemeMode = async () => {
+const updateThemeMode = () => {
   configStore.setThemeMode(localConfig.value.themeMode);
-  // Trigger theme update
-  const { useTheme } = await import("../composables/useTheme");
-  const theme = useTheme();
-  theme.setThemeMode(localConfig.value.themeMode);
+  // Theme composable in App.vue will watch config store and update automatically
   saveConfig();
 };
 
-const updateDarkModeTime = async () => {
+const updateDarkModeTime = () => {
   configStore.setDarkModeTime(
     localConfig.value.darkModeStart,
     localConfig.value.darkModeEnd,
   );
-  // Trigger theme update
-  const { useTheme } = await import("../composables/useTheme");
-  const theme = useTheme();
-  theme.setDarkModeTime(
-    localConfig.value.darkModeStart,
-    localConfig.value.darkModeEnd,
-  );
+  // Theme composable in App.vue will watch config store and update automatically
   saveConfig();
 };
 
