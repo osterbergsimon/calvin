@@ -1328,6 +1328,30 @@ const loadConfig = async () => {
         response.data.sideViewPosition ??
         response.data.side_view_position ??
         "right";
+      // Handle themeMode - check for both camelCase and snake_case
+      if (response.data.themeMode !== undefined) {
+        localConfig.value.themeMode = response.data.themeMode;
+      } else if (response.data.theme_mode !== undefined) {
+        localConfig.value.themeMode = response.data.theme_mode;
+      } else {
+        localConfig.value.themeMode = "auto";
+      }
+      // Handle darkModeStart - check for both camelCase and snake_case
+      if (response.data.darkModeStart !== undefined) {
+        localConfig.value.darkModeStart = response.data.darkModeStart;
+      } else if (response.data.dark_mode_start !== undefined) {
+        localConfig.value.darkModeStart = response.data.dark_mode_start;
+      } else {
+        localConfig.value.darkModeStart = 18;
+      }
+      // Handle darkModeEnd - check for both camelCase and snake_case
+      if (response.data.darkModeEnd !== undefined) {
+        localConfig.value.darkModeEnd = response.data.darkModeEnd;
+      } else if (response.data.dark_mode_end !== undefined) {
+        localConfig.value.darkModeEnd = response.data.dark_mode_end;
+      } else {
+        localConfig.value.darkModeEnd = 6;
+      }
       // Handle displayScheduleEnabled - check for both camelCase and snake_case
       // Use !== undefined to properly handle false values
       if (response.data.displayScheduleEnabled !== undefined) {
