@@ -16,7 +16,10 @@ async def migrate_database():
 
 def _migrate_database_sync():
     """Synchronous database migration."""
-    db_path = Path(settings.database_url.replace("sqlite:///", ""))
+    # Extract database path and handle both absolute and relative paths
+    db_path_str = settings.database_url.replace("sqlite:///", "")
+    # If path starts with /, it's absolute; otherwise resolve relative to current working directory
+    db_path = Path(db_path_str) if db_path_str.startswith("/") else Path(db_path_str).resolve()
     if not db_path.exists():
         # Database doesn't exist yet, will be created by init_db
         return

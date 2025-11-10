@@ -45,7 +45,12 @@ class Settings(BaseSettings):
         self.log_dir.mkdir(parents=True, exist_ok=True)
         self.image_dir.mkdir(parents=True, exist_ok=True)
         self.image_cache_dir.mkdir(parents=True, exist_ok=True)
-        Path(self.database_url.replace("sqlite:///", "")).parent.mkdir(parents=True, exist_ok=True)
+        # Extract database path and ensure directory exists
+        # Handle both absolute paths (sqlite:///path) and relative paths (sqlite:///./path)
+        db_path_str = self.database_url.replace("sqlite:///", "")
+        # If path starts with /, it's absolute; otherwise resolve relative to current working directory
+        db_path = Path(db_path_str) if db_path_str.startswith("/") else Path(db_path_str).resolve()
+        db_path.parent.mkdir(parents=True, exist_ok=True)
 
 
 # Global settings instance
