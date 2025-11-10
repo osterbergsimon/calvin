@@ -224,8 +224,12 @@ export const useConfigStore = defineStore("config", () => {
       if (response.data.image_display_mode !== undefined) {
         imageDisplayMode.value = response.data.image_display_mode;
       }
+      // Handle timezone - can be null, undefined, or a string
       if (response.data.timezone !== undefined) {
-        timezone.value = response.data.timezone;
+        timezone.value = response.data.timezone ?? null;
+      } else {
+        // Ensure timezone is always set (default to null if not provided)
+        timezone.value = null;
       }
       return response.data;
     } catch (err) {
