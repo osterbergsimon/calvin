@@ -1351,18 +1351,31 @@ const loadConfig = async () => {
         false;
       localConfig.value.displayTimeout =
         response.data.displayTimeout ?? response.data.display_timeout ?? 0;
+      // Handle display schedule - ensure it's always set
       if (response.data.displaySchedule !== undefined) {
         if (typeof response.data.displaySchedule === "string") {
           localConfig.value.displaySchedule = JSON.parse(response.data.displaySchedule);
         } else {
           localConfig.value.displaySchedule = response.data.displaySchedule;
         }
-      }
-      if (response.data.display_schedule !== undefined) {
+      } else if (response.data.display_schedule !== undefined) {
         if (typeof response.data.display_schedule === "string") {
           localConfig.value.displaySchedule = JSON.parse(response.data.display_schedule);
         } else {
           localConfig.value.displaySchedule = response.data.display_schedule;
+        }
+      } else {
+        // Ensure default schedule is set if not provided
+        if (!localConfig.value.displaySchedule || localConfig.value.displaySchedule.length === 0) {
+          localConfig.value.displaySchedule = [
+            { day: 0, enabled: true, onTime: "06:00", offTime: "22:00" }, // Monday
+            { day: 1, enabled: true, onTime: "06:00", offTime: "22:00" }, // Tuesday
+            { day: 2, enabled: true, onTime: "06:00", offTime: "22:00" }, // Wednesday
+            { day: 3, enabled: true, onTime: "06:00", offTime: "22:00" }, // Thursday
+            { day: 4, enabled: true, onTime: "06:00", offTime: "22:00" }, // Friday
+            { day: 5, enabled: true, onTime: "06:00", offTime: "22:00" }, // Saturday
+            { day: 6, enabled: true, onTime: "06:00", offTime: "22:00" }, // Sunday
+          ];
         }
       }
       localConfig.value.rebootComboKey1 =
