@@ -38,6 +38,7 @@ export const useConfigStore = defineStore("config", () => {
   const rebootComboKey2 = ref("KEY_7"); // Second key for reboot combo
   const rebootComboDuration = ref(10000); // Reboot combo duration in milliseconds
   const imageDisplayMode = ref("smart"); // Image display mode: 'fit', 'fill', 'crop', 'center', 'smart' (default: 'smart')
+  const timezone = ref(null); // Timezone (e.g., "America/New_York", "Europe/London", "UTC") - null = system timezone
   const loading = ref(false);
   const error = ref(null);
 
