@@ -4,6 +4,57 @@ Write-Host "Calvin Dashboard - Windows Setup" -ForegroundColor Cyan
 Write-Host "================================" -ForegroundColor Cyan
 Write-Host ""
 
+# Check if git is available
+Write-Host "Checking Git..." -ForegroundColor Yellow
+try {
+    $gitVersion = git --version 2>&1
+    Write-Host "✓ Git found: $gitVersion" -ForegroundColor Green
+    
+    # Check current branch and switch to develop if needed
+    $currentBranch = git rev-parse --abbrev-ref HEAD 2>&1
+    if ($LASTEXITCODE -eq 0) {
+        Write-Host "Current branch: $currentBranch" -ForegroundColor Gray
+        
+        # Fetch latest changes
+        Write-Host "Fetching latest changes from remote..." -ForegroundColor Yellow
+        git fetch origin develop 2>&1 | Out-Null
+        
+        # Check if develop branch exists locally
+        $developExists = git show-ref --verify --quiet refs/heads/develop 2>&1
+        if ($LASTEXITCODE -ne 0) {
+            Write-Host "Creating develop branch from origin/develop..." -ForegroundColor Yellow
+            git checkout -b develop origin/develop 2>&1 | Out-Null
+            if ($LASTEXITCODE -ne 0) {
+                Write-Host "⚠ Could not create develop branch. Continuing with current branch." -ForegroundColor Yellow
+            } else {
+                Write-Host "✓ Switched to develop branch" -ForegroundColor Green
+            }
+        } elseif ($currentBranch -ne "develop") {
+            Write-Host "Switching to develop branch..." -ForegroundColor Yellow
+            git checkout develop 2>&1 | Out-Null
+            if ($LASTEXITCODE -eq 0) {
+                Write-Host "✓ Switched to develop branch" -ForegroundColor Green
+                git pull origin develop 2>&1 | Out-Null
+            } else {
+                Write-Host "⚠ Could not switch to develop branch. Continuing with current branch." -ForegroundColor Yellow
+            }
+        } else {
+            # Already on develop, pull latest
+            Write-Host "Pulling latest changes from develop..." -ForegroundColor Yellow
+            git pull origin develop 2>&1 | Out-Null
+            if ($LASTEXITCODE -eq 0) {
+                Write-Host "✓ Up to date with develop" -ForegroundColor Green
+            } else {
+                Write-Host "⚠ Could not pull latest changes. Continuing anyway." -ForegroundColor Yellow
+            }
+        }
+    }
+} catch {
+    Write-Host "⚠ Git not found. Skipping branch checkout." -ForegroundColor Yellow
+    Write-Host "  Install Git from https://git-scm.com/download/win if you want branch management" -ForegroundColor Gray
+}
+Write-Host ""
+
 # Check Python
 Write-Host "Checking Python..." -ForegroundColor Yellow
 try {
@@ -44,7 +95,7 @@ Write-Host ""
 Write-Host "Installing backend dependencies..." -ForegroundColor Yellow
 Write-Host "Note: evdev (keyboard support) is Linux-only and will be skipped on Windows" -ForegroundColor Yellow
 Set-Location backend
-uv sync
+uv sync --extra dev
 if ($LASTEXITCODE -ne 0) {
     Write-Host "✗ Backend dependencies installation failed" -ForegroundColor Red
     Set-Location ..

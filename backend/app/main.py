@@ -8,13 +8,14 @@ from fastapi.middleware.cors import CORSMiddleware
 from fastapi.staticfiles import StaticFiles
 from fastapi.responses import FileResponse
 
-from app.api.routes import calendar, config, health, images, keyboard, system, web_services
+from app.api.routes import calendar, config, health, images, keyboard, plugins, system, web_services
 from app.config import settings
 from app.database import init_db
 from app.services import image_service as image_service_module
-from app.services.calendar_service import calendar_service
 from app.services.image_service import ImageService
 from app.services.scheduler import calendar_scheduler
+
+# Plugins are auto-discovered via pluggy hooks when modules are imported
 
 
 @asynccontextmanager
@@ -31,9 +32,114 @@ async def lifespan(app: FastAPI):
     await migrate_database()
     print("Database migrations completed")
 
-    # Load calendar sources from database
-    await calendar_service.load_sources_from_db()
-    print(f"Loaded {len(calendar_service.sources)} calendar sources from database")
+    # Load plugins from database using unified system
+    from app.plugins.registry import plugin_registry
+    await plugin_registry.load_plugins_from_db()
+    print(f"Loaded plugins from database")
+    
+    # Auto-create default instances for image plugins if enabled and no instance exists
+    from app.plugins.manager import plugin_manager
+    from app.plugins.base import PluginType
+    from app.database import AsyncSessionLocal
+    from app.models.db_models import PluginDB, PluginTypeDB
+    from sqlalchemy import select
+    
+    async with AsyncSessionLocal() as session:
+        # Check for Unsplash plugin type (default to enabled if not in DB)
+        result = await session.execute(
+            select(PluginTypeDB).where(PluginTypeDB.type_id == "unsplash")
+        )
+        unsplash_type = result.scalar_one_or_none()
+        unsplash_enabled = unsplash_type.enabled if unsplash_type else True  # Default to enabled
+        
+        if unsplash_enabled:
+            # Check if an Unsplash instance exists
+            result = await session.execute(
+                select(PluginDB).where(PluginDB.type_id == "unsplash")
+            )
+            unsplash_instance = result.scalar_one_or_none()
+            
+            if not unsplash_instance:
+                # Create default Unsplash instance
+                print("Creating default Unsplash plugin instance...")
+                try:
+                    await plugin_registry.register_plugin(
+                        plugin_id="unsplash-images",
+                        type_id="unsplash",
+                        name="Unsplash Images",
+                        config={
+                            "api_key": "",
+                            "category": "popular",
+                            "count": 30,
+                        },
+                        enabled=True,
+                    )
+                    print("Default Unsplash plugin instance created")
+                except Exception as e:
+                    print(f"Warning: Failed to create default Unsplash instance: {e}")
+        
+        # Check for Picsum plugin type (default to enabled if not in DB)
+        result = await session.execute(
+            select(PluginTypeDB).where(PluginTypeDB.type_id == "picsum")
+        )
+        picsum_type = result.scalar_one_or_none()
+        picsum_enabled = picsum_type.enabled if picsum_type else True  # Default to enabled
+        
+        if picsum_enabled:
+            # Check if a Picsum instance exists
+            result = await session.execute(
+                select(PluginDB).where(PluginDB.type_id == "picsum")
+            )
+            picsum_instance = result.scalar_one_or_none()
+            
+            if not picsum_instance:
+                # Create default Picsum instance
+                print("Creating default Picsum plugin instance...")
+                try:
+                    await plugin_registry.register_plugin(
+                        plugin_id="picsum-images",
+                        type_id="picsum",
+                        name="Picsum Photos",
+                        config={
+                            "count": 30,
+                        },
+                        enabled=True,
+                    )
+                    print("Default Picsum plugin instance created")
+                except Exception as e:
+                    print(f"Warning: Failed to create default Picsum instance: {e}")
+        
+        # Check for local images plugin type (default to enabled if not in DB)
+        result = await session.execute(
+            select(PluginTypeDB).where(PluginTypeDB.type_id == "local")
+        )
+        local_type = result.scalar_one_or_none()
+        local_enabled = local_type.enabled if local_type else True  # Default to enabled
+        
+        if local_enabled:
+            # Check if a local images instance exists
+            result = await session.execute(
+                select(PluginDB).where(PluginDB.type_id == "local")
+            )
+            local_instance = result.scalar_one_or_none()
+            
+            if not local_instance:
+                # Create default local images instance
+                print("Creating default local images plugin instance...")
+                try:
+                    await plugin_registry.register_plugin(
+                        plugin_id="local-images",
+                        type_id="local",
+                        name="Local Images",
+                        config={
+                            "image_dir": "./data/images",
+                            "thumbnail_dir": "./data/images/thumbnails",
+                        },
+                        enabled=True,
+                    )
+                    print("Default local images plugin instance created")
+                except Exception as e:
+                    print(f"Warning: Failed to create default local images instance: {e}")
 
     # Initialize default keyboard mappings if none exist
     from app.services.config_service import config_service
@@ -72,13 +178,21 @@ async def lifespan(app: FastAPI):
         await keyboard_mapping_service.set_mappings("standard", default_standard)
         print("Initialized default keyboard mappings")
 
-    # Initialize image service
+    # Initialize image service (legacy - will be replaced by plugin system)
     thumbnail_dir = settings.image_cache_dir / "thumbnails"
     image_service_module.image_service = ImageService(settings.image_dir, thumbnail_dir)
     # Do initial scan
     image_service_module.image_service.scan_images()
     image_count = len(image_service_module.image_service.get_images())
-    print(f"Image service initialized: {image_count} images found")
+    print(f"Image service initialized: {image_count} images found (legacy)")
+    
+    # Initialize plugin image service
+    from app.services.plugin_image_service import PluginImageService
+    plugin_image_service = PluginImageService()
+    # Do initial scan
+    await plugin_image_service.scan_images()
+    plugin_image_count = len(await plugin_image_service.get_images())
+    print(f"Plugin image service initialized: {plugin_image_count} images found")
 
     # Initialize default config if not present
     orientation = await config_service.get_value("orientation")
@@ -167,6 +281,9 @@ async def lifespan(app: FastAPI):
     image_display_mode = await config_service.get_value("image_display_mode")
     if image_display_mode is None:
         await config_service.set_value("image_display_mode", "smart")  # Smart mode by default
+    randomize_images = await config_service.get_value("randomize_images")
+    if randomize_images is None:
+        await config_service.set_value("randomize_images", "false")  # Don't randomize by default
 
     # Start schedulers
     calendar_scheduler.start()
@@ -183,6 +300,11 @@ async def lifespan(app: FastAPI):
     print("Display power scheduler stopped")
     calendar_scheduler.stop()
     print("Calendar scheduler stopped")
+    
+    # Cleanup plugins
+    from app.plugins.manager import plugin_manager
+    await plugin_manager.cleanup_all()
+    print("Plugins cleaned up")
 
 
 app = FastAPI(
@@ -208,6 +330,7 @@ app.include_router(calendar.router, prefix="/api", tags=["calendar"])
 app.include_router(keyboard.router, prefix="/api", tags=["keyboard"])
 app.include_router(images.router, prefix="/api", tags=["images"])
 app.include_router(web_services.router, prefix="/api", tags=["web-services"])
+app.include_router(plugins.router, prefix="/api", tags=["plugins"])
 app.include_router(system.router, prefix="/api/system", tags=["system"])
 
 # Serve static files from frontend dist directory

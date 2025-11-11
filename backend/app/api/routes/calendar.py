@@ -9,7 +9,7 @@ from app.models.calendar import (
     CalendarSource,
     CalendarSourcesResponse,
 )
-from app.services.calendar_service import calendar_service
+from app.services import plugin_calendar_service
 
 router = APIRouter()
 
@@ -67,10 +67,10 @@ async def get_calendar_events(
 
     # Clear cache if refresh is requested
     if refresh:
-        calendar_service.clear_cache()
+        plugin_calendar_service.clear_cache()
 
-    # Get events
-    events = await calendar_service.get_events(start_date, end_date, source_id_list)
+    # Get events from plugin service (aggregates from all calendar plugins)
+    events = await plugin_calendar_service.get_events(start_date, end_date, source_id_list)
 
     return CalendarEventsResponse(
         events=events,
@@ -82,15 +82,66 @@ async def get_calendar_events(
 
 @router.get("/calendar/sources", response_model=CalendarSourcesResponse)
 async def get_calendar_sources():
-    """Get all calendar sources."""
-    sources = await calendar_service.get_sources()
-    return CalendarSourcesResponse(sources=sources, total=len(sources))
+    """Get all calendar sources from plugins (only from enabled plugin types)."""
+    from app.plugins.loader import plugin_loader
+    from app.database import AsyncSessionLocal
+    from app.models.db_models import PluginTypeDB
+    from app.plugins.base import PluginType
+    from sqlalchemy import select
+
+    try:
+        sources = await plugin_calendar_service.get_sources()
+        
+        # Filter out sources from disabled plugin types
+        enabled_plugin_types = set()
+        # Get plugin types from pluggy hooks
+        plugin_types = plugin_loader.get_plugin_types()
+        calendar_types = [t for t in plugin_types if t.get("plugin_type") == PluginType.CALENDAR]
+        
+        # Check enabled status from database
+        async with AsyncSessionLocal() as session:
+            for type_info in calendar_types:
+                type_id = type_info.get("type_id")
+                result = await session.execute(
+                    select(PluginTypeDB).where(PluginTypeDB.type_id == type_id)
+                )
+                db_type = result.scalar_one_or_none()
+                enabled = db_type.enabled if db_type else True  # Default to enabled
+                if enabled:
+                    enabled_plugin_types.add(type_id)
+        
+        # Filter sources to only include enabled plugin types
+        filtered_sources = [
+            s for s in sources
+            if s.get("type") in enabled_plugin_types or s.get("type") in ["google", "proton", "ical"]  # Legacy support
+        ]
+        
+        # Convert to CalendarSource models for response
+        from app.models.calendar import CalendarSource as CalendarSourceModel
+        source_models = [
+            CalendarSourceModel(
+                id=s["id"],
+                type=s["type"],
+                name=s["name"],
+                enabled=s["enabled"],
+                ical_url=s.get("ical_url"),
+                api_key=s.get("api_key"),
+                color=s.get("color"),
+                show_time=s.get("show_time", True),
+            )
+            for s in filtered_sources
+        ]
+        return CalendarSourcesResponse(sources=source_models, total=len(source_models))
+    except Exception as e:
+        import traceback
+        traceback.print_exc()
+        raise HTTPException(status_code=500, detail=f"Error fetching calendar sources: {str(e)}")
 
 
 @router.post("/calendar/sources", response_model=CalendarSource)
 async def add_calendar_source(source: CalendarSource):
     """
-    Add a new calendar source.
+    Add a new calendar source plugin.
 
     For Google Calendar:
     - type: "google"
@@ -99,19 +150,20 @@ async def add_calendar_source(source: CalendarSource):
     - iCal URL example: https://calendar.google.com/calendar/ical/.../basic.ics
     - The service will automatically convert share URLs to iCal format.
 
-    For Proton Calendar:
-    - type: "proton"
-    - ical_url: The iCal feed URL from Proton Calendar
+    For Proton Calendar or other iCal sources:
+    - type: "proton" or "ical"
+    - ical_url: The iCal feed URL
     - URL format: https://calendar.proton.me/api/calendar/v1/url/{calendar_id}/calendar.ics?CacheKey=...&PassphraseKey=...
     - You can get this URL from Proton Calendar's sharing settings.
     - The URL includes authentication parameters (CacheKey and PassphraseKey) in the query string.
 
     Calendar events are cached for 5 minutes and automatically refreshed.
     """
+    from app.plugins.registry import plugin_registry
+
     # Normalize Google Calendar URLs if needed
     if source.type == "google" and source.ical_url:
         from app.utils.google_calendar import normalize_google_calendar_url
-
         source.ical_url = normalize_google_calendar_url(source.ical_url)
 
     # Validate Proton Calendar URL format
@@ -127,22 +179,86 @@ async def add_calendar_source(source: CalendarSource):
                 detail="Invalid Proton Calendar URL. Must include '/calendar.ics' endpoint.",
             )
 
-    return await calendar_service.add_source(source)
+    # Determine plugin type_id
+    type_id = "google" if source.type == "google" else ("proton" if source.type == "proton" else "ical")
+
+    # Register plugin using unified system
+    plugin = await plugin_registry.register_plugin(
+        plugin_id=source.id,
+        type_id=type_id,
+        name=source.name,
+        config={
+            "ical_url": source.ical_url,
+            "api_key": source.api_key,
+            "color": source.color,
+            "show_time": source.show_time,
+        },
+        enabled=source.enabled,
+    )
+
+    return source
 
 
 @router.put("/calendar/sources/{source_id}", response_model=CalendarSource)
 async def update_calendar_source(source_id: str, source: CalendarSource):
-    """Update a calendar source (e.g., color, show_time)."""
-    updated = await calendar_service.update_source(source_id, source)
-    if not updated:
+    """Update a calendar source plugin (e.g., color, show_time)."""
+    from app.plugins.manager import plugin_manager
+    from app.plugins.protocols import CalendarPlugin
+    from app.database import AsyncSessionLocal
+    from app.models.db_models import PluginDB
+    from sqlalchemy import select
+
+    # Get plugin
+    plugin = plugin_manager.get_plugin(source_id)
+    if not plugin or not isinstance(plugin, CalendarPlugin):
         raise HTTPException(status_code=404, detail="Calendar source not found")
-    return updated
+
+    # Update plugin configuration
+    await plugin.configure({
+        "ical_url": source.ical_url,
+        "api_key": source.api_key,
+        "enabled": source.enabled,
+        "color": source.color,
+        "show_time": source.show_time,
+    })
+
+    # Update enabled status
+    if source.enabled:
+        plugin.enable()
+    else:
+        plugin.disable()
+
+    # Update in database
+    async with AsyncSessionLocal() as session:
+        result = await session.execute(
+            select(PluginDB).where(PluginDB.id == source_id)
+        )
+        db_plugin = result.scalar_one_or_none()
+        if db_plugin:
+            db_plugin.name = source.name
+            db_plugin.enabled = source.enabled
+            config = db_plugin.config or {}
+            config.update({
+                "ical_url": source.ical_url,
+                "api_key": source.api_key,
+                "color": source.color,
+                "show_time": source.show_time,
+            })
+            db_plugin.config = config
+            await session.commit()
+            await session.refresh(db_plugin)
+
+    return source
 
 
 @router.delete("/calendar/sources/{source_id}")
 async def remove_calendar_source(source_id: str):
-    """Remove a calendar source."""
-    removed = await calendar_service.remove_source(source_id)
+    """Remove a calendar source plugin."""
+    from app.plugins.registry import plugin_registry
+
+    # Unregister plugin using unified system
+    removed = await plugin_registry.unregister_plugin(source_id)
     if not removed:
         raise HTTPException(status_code=404, detail="Calendar source not found")
+
     return {"message": "Calendar source removed", "source_id": source_id}

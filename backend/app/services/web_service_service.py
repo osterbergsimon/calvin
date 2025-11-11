@@ -3,7 +3,7 @@
 from sqlalchemy import select
 
 from app.database import AsyncSessionLocal
-from app.models.db_models import WebServiceDB
+from app.models.db_models import PluginDB
 from app.models.web_service import WebService, WebServiceCreate, WebServiceUpdate
 
 
@@ -23,24 +23,54 @@ class WebServiceService:
         """
         async with AsyncSessionLocal() as session:
             result = await session.execute(
-                select(WebServiceDB).order_by(WebServiceDB.display_order, WebServiceDB.name)
+                select(PluginDB).where(PluginDB.plugin_type == "service")
             )
-            db_services = result.scalars().all()
+            db_plugins = result.scalars().all()
+            print(f"[WebServiceService] Found {len(db_plugins)} service plugin instances in database")
 
             services = []
-            for db_service in db_services:
-                services.append(
-                    WebService(
-                        id=db_service.id,
-                        name=db_service.name,
-                        url=db_service.url,
-                        enabled=db_service.enabled,
-                        display_order=db_service.display_order,
-                        fullscreen=db_service.fullscreen,
-                    )
+            from app.plugins.loader import plugin_loader
+            
+            # Get plugin types to access display_schema
+            plugin_types = plugin_loader.get_plugin_types()
+            plugin_types_by_id = {t.get("type_id"): t for t in plugin_types}
+            
+            for db_plugin in db_plugins:
+                print(f"[WebServiceService] Processing service: id={db_plugin.id}, type_id={db_plugin.type_id}, name={db_plugin.name}, enabled={db_plugin.enabled}")
+                config = db_plugin.config or {}
+                # Get URL from config - for iframe it's "url", for mealie it's also "url" (from get_config)
+                url = config.get("url", "")
+                # If no URL in config, try to get it from the plugin instance
+                if not url:
+                    from app.plugins.manager import plugin_manager
+                    plugin = plugin_manager.get_plugin(db_plugin.id)
+                    if plugin and hasattr(plugin, "get_config"):
+                        plugin_config = plugin.get_config()
+                        url = plugin_config.get("url", "") if plugin_config else ""
+                
+                # Get display_schema from plugin type metadata
+                type_id = db_plugin.type_id
+                display_schema = None
+                if type_id and type_id in plugin_types_by_id:
+                    display_schema = plugin_types_by_id[type_id].get("display_schema")
+                
+                service = WebService(
+                    id=db_plugin.id,
+                    name=db_plugin.name,
+                    url=url,
+                    enabled=db_plugin.enabled,
+                    display_order=config.get("display_order", 0),
+                    fullscreen=config.get("fullscreen", False),
+                    type_id=type_id,
+                    display_schema=display_schema,
                 )
+                print(f"[WebServiceService] Created service: id={service.id}, name={service.name}, enabled={service.enabled}, url={service.url[:50] if service.url else 'None'}...")
+                services.append(service)
 
+            # Sort by display_order (fallback if SQL ordering didn't work)
+            services.sort(key=lambda s: (s.display_order, s.name))
             self._services = services
+            print(f"[WebServiceService] Returning {len(services)} services: {[s.id for s in services]}")
             return services
 
     async def get_service(self, service_id: str) -> WebService | None:
@@ -55,18 +85,19 @@ class WebServiceService:
         """
         async with AsyncSessionLocal() as session:
             result = await session.execute(
-                select(WebServiceDB).where(WebServiceDB.id == service_id)
+                select(PluginDB).where(PluginDB.id == service_id, PluginDB.plugin_type == "service")
             )
-            db_service = result.scalar_one_or_none()
+            db_plugin = result.scalar_one_or_none()
 
-            if db_service:
+            if db_plugin:
+                config = db_plugin.config or {}
                 return WebService(
-                    id=db_service.id,
-                    name=db_service.name,
-                    url=db_service.url,
-                    enabled=db_service.enabled,
-                    display_order=db_service.display_order,
-                    fullscreen=db_service.fullscreen,
+                    id=db_plugin.id,
+                    name=db_plugin.name,
+                    url=config.get("url", ""),
+                    enabled=db_plugin.enabled,
+                    display_order=config.get("display_order", 0),
+                    fullscreen=config.get("fullscreen", False),
                 )
             return None
 
@@ -80,30 +111,32 @@ class WebServiceService:
         Returns:
             Created web service
         """
+        from app.plugins.registry import plugin_registry
+
         # Generate ID if not provided
-        service_id = f"web-service-{len(self._services) + 1}-{hash(service.url) % 10000}"
+        service_id = f"iframe-service-{hash(service.url) % 10000}-{len(self._services)}"
 
-        async with AsyncSessionLocal() as session:
-            db_service = WebServiceDB(
-                id=service_id,
-                name=service.name,
-                url=service.url,
-                enabled=service.enabled,
-                display_order=service.display_order,
-                fullscreen=service.fullscreen,
-            )
-            session.add(db_service)
-            await session.commit()
-            await session.refresh(db_service)
+        # Register plugin using unified system
+        plugin = await plugin_registry.register_plugin(
+            plugin_id=service_id,
+            type_id="iframe",
+            name=service.name,
+            config={
+                "url": service.url,
+                "fullscreen": service.fullscreen,
+                "display_order": service.display_order,
+            },
+            enabled=service.enabled,
+        )
 
-            return WebService(
-                id=db_service.id,
-                name=db_service.name,
-                url=db_service.url,
-                enabled=db_service.enabled,
-                display_order=db_service.display_order,
-                fullscreen=db_service.fullscreen,
-            )
+        return WebService(
+            id=plugin.plugin_id,
+            name=plugin.name,
+            url=getattr(plugin, "url", ""),
+            enabled=plugin.enabled,
+            display_order=plugin.get_config().get("display_order", 0),
+            fullscreen=getattr(plugin, "fullscreen", False),
+        )
 
     async def update_service(self, service_id: str, updates: WebServiceUpdate) -> WebService | None:
         """
@@ -116,38 +149,61 @@ class WebServiceService:
         Returns:
             Updated web service or None if not found
         """
+        from app.plugins.manager import plugin_manager
+        from app.plugins.protocols import ServicePlugin
+        from app.database import AsyncSessionLocal
+        from app.models.db_models import PluginDB
+        from sqlalchemy import select
+
+        # Get plugin
+        plugin = plugin_manager.get_plugin(service_id)
+        if not plugin or not isinstance(plugin, ServicePlugin):
+            return None
+
+        # Update plugin configuration
+        config = plugin.get_config() or {}
+        if updates.name is not None:
+            plugin.name = updates.name
+        if updates.url is not None:
+            config["url"] = updates.url
+            setattr(plugin, "url", updates.url)
+        if updates.enabled is not None:
+            config["enabled"] = updates.enabled
+            if updates.enabled:
+                plugin.enable()
+            else:
+                plugin.disable()
+        if updates.display_order is not None:
+            config["display_order"] = updates.display_order
+        if updates.fullscreen is not None:
+            config["fullscreen"] = updates.fullscreen
+            setattr(plugin, "fullscreen", updates.fullscreen)
+
+        await plugin.configure(config)
+
+        # Update in database
         async with AsyncSessionLocal() as session:
             result = await session.execute(
-                select(WebServiceDB).where(WebServiceDB.id == service_id)
+                select(PluginDB).where(PluginDB.id == service_id)
             )
-            db_service = result.scalar_one_or_none()
+            db_plugin = result.scalar_one_or_none()
+            if db_plugin:
+                if updates.name is not None:
+                    db_plugin.name = updates.name
+                if updates.enabled is not None:
+                    db_plugin.enabled = updates.enabled
+                db_plugin.config = config
+                await session.commit()
+                await session.refresh(db_plugin)
 
-            if not db_service:
-                return None
-
-            # Update fields if provided
-            if updates.name is not None:
-                db_service.name = updates.name
-            if updates.url is not None:
-                db_service.url = updates.url
-            if updates.enabled is not None:
-                db_service.enabled = updates.enabled
-            if updates.display_order is not None:
-                db_service.display_order = updates.display_order
-            if updates.fullscreen is not None:
-                db_service.fullscreen = updates.fullscreen
-
-            await session.commit()
-            await session.refresh(db_service)
-
-            return WebService(
-                id=db_service.id,
-                name=db_service.name,
-                url=db_service.url,
-                enabled=db_service.enabled,
-                display_order=db_service.display_order,
-                fullscreen=db_service.fullscreen,
-            )
+        return WebService(
+            id=plugin.plugin_id,
+            name=plugin.name,
+            url=getattr(plugin, "url", ""),
+            enabled=plugin.enabled,
+            display_order=config.get("display_order", 0),
+            fullscreen=getattr(plugin, "fullscreen", False),
+        )
 
     async def remove_service(self, service_id: str) -> bool:
         """
@@ -159,18 +215,10 @@ class WebServiceService:
         Returns:
             True if removed, False if not found
         """
-        async with AsyncSessionLocal() as session:
-            result = await session.execute(
-                select(WebServiceDB).where(WebServiceDB.id == service_id)
-            )
-            db_service = result.scalar_one_or_none()
+        from app.plugins.registry import plugin_registry
 
-            if not db_service:
-                return False
-
-            await session.delete(db_service)
-            await session.commit()
-            return True
+        # Unregister plugin using unified system
+        return await plugin_registry.unregister_plugin(service_id)
 
     async def get_enabled_services(self) -> list[WebService]:
         """
