@@ -14,9 +14,6 @@ from app.plugins.protocols import (
     ServicePlugin,
 )
 
-# Import plugin registration to ensure it's registered with pluggy
-from app.plugins.registration import plugin_registration  # noqa: F401
-
 __all__ = [
     "BasePlugin",
     "PluginType",
@@ -24,6 +21,5 @@ __all__ = [
     "CalendarPlugin",
     "ImagePlugin",
     "ServicePlugin",
-    "plugin_registration",
 ]
 

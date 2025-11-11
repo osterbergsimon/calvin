@@ -15,8 +15,7 @@ from app.services import image_service as image_service_module
 from app.services.image_service import ImageService
 from app.services.scheduler import calendar_scheduler
 
-# Import plugin registration to ensure it's registered with pluggy
-from app.plugins import plugin_registration  # noqa: F401
+# Plugins are auto-discovered via pluggy hooks when modules are imported
 
 
 @asynccontextmanager

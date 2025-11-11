@@ -19,7 +19,6 @@ class PluginRegistry:
     def __init__(self):
         """Initialize plugin registry."""
         self._initialized = False
-        # Note: plugin_registration is already registered via import in __init__.py
 
     async def load_plugins_from_db(self) -> None:
         """Load all plugins from database and register them."""
