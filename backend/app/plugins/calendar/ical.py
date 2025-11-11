@@ -1,14 +1,30 @@
 """Generic iCal calendar plugin (for Proton, etc.)."""
 
 from datetime import datetime
+from typing import Any
 
 from app.models.calendar import CalendarEvent
+from app.plugins.base import PluginType
+from app.plugins.hooks import hookimpl, plugin_manager
 from app.plugins.protocols import CalendarPlugin
 from app.utils.ical_parser import parse_ical_from_url
 
 
 class ICalCalendarPlugin(CalendarPlugin):
     """Generic iCal calendar plugin for any iCal-compatible source."""
+
+    @classmethod
+    def get_plugin_metadata(cls) -> dict[str, Any]:
+        """Get plugin metadata for registration."""
+        return {
+            "type_id": "ical",
+            "plugin_type": PluginType.CALENDAR,
+            "name": "iCal Feed",
+            "description": "Generic iCal feed (Proton, Outlook, etc.)",
+            "version": "1.0.0",
+            "common_config_schema": {},
+            "plugin_class": cls,
+        }
 
     def __init__(self, plugin_id: str, name: str, ical_url: str, enabled: bool = True):
         """
@@ -86,4 +102,44 @@ class ICalCalendarPlugin(CalendarPlugin):
 
         # Check if it's a valid HTTP(S) URL
         return url.startswith("http://") or url.startswith("https://")
+
+
+# Register this plugin with pluggy (for ical and proton types)
+@hookimpl
+def register_plugin_types() -> list[dict[str, Any]]:
+    """Register ICalCalendarPlugin types (ical and proton)."""
+    ical_metadata = ICalCalendarPlugin.get_plugin_metadata()
+    # Also register as proton (same plugin, different type_id)
+    proton_metadata = {
+        "type_id": "proton",
+        "plugin_type": PluginType.CALENDAR,
+        "name": "Proton Calendar",
+        "description": "Proton Calendar via iCal feed",
+        "version": "1.0.0",
+        "common_config_schema": {},
+        "plugin_class": ICalCalendarPlugin,
+    }
+    return [ical_metadata, proton_metadata]
+
+
+@hookimpl
+def create_plugin_instance(
+    plugin_id: str,
+    type_id: str,
+    name: str,
+    config: dict[str, Any],
+) -> ICalCalendarPlugin | None:
+    """Create an ICalCalendarPlugin instance."""
+    if type_id not in ("ical", "proton"):
+        return None
+    
+    enabled = config.get("enabled", True)
+    ical_url = config.get("ical_url", "")
+    
+    return ICalCalendarPlugin(
+        plugin_id=plugin_id,
+        name=name,
+        ical_url=ical_url,
+        enabled=enabled,
+    )
 

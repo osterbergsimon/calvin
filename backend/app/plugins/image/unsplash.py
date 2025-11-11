@@ -6,11 +6,65 @@ from typing import Any
 
 import httpx
 
+from app.plugins.base import PluginType
+from app.plugins.hooks import hookimpl, plugin_manager
 from app.plugins.protocols import ImagePlugin
 
 
 class UnsplashImagePlugin(ImagePlugin):
     """Unsplash image plugin for fetching popular photos."""
+
+    @classmethod
+    def get_plugin_metadata(cls) -> dict[str, Any]:
+        """Get plugin metadata for registration."""
+        return {
+            "type_id": "unsplash",
+            "plugin_type": PluginType.IMAGE,
+            "name": "Unsplash",
+            "description": "Popular photos from Unsplash. Requires an API key from https://unsplash.com/developers",
+            "version": "1.0.0",
+            "common_config_schema": {
+                "api_key": {
+                    "type": "password",
+                    "description": "Unsplash API key (required). Get one at https://unsplash.com/developers",
+                    "default": "",
+                    "ui": {
+                        "component": "password",
+                        "placeholder": "Enter your Unsplash API key",
+                        "help_text": "Get your free API key at https://unsplash.com/developers",
+                        "help_link": "https://unsplash.com/developers",
+                        "validation": {
+                            "required": True,
+                        },
+                    },
+                },
+                "category": {
+                    "type": "string",
+                    "description": "Photo category: popular, latest, or oldest",
+                    "default": "popular",
+                    "ui": {
+                        "component": "select",
+                        "options": [
+                            {"value": "popular", "label": "Popular"},
+                            {"value": "latest", "label": "Latest"},
+                            {"value": "oldest", "label": "Oldest"},
+                        ],
+                    },
+                },
+                "count": {
+                    "type": "string",
+                    "description": "Number of photos to fetch (1-100)",
+                    "default": "30",
+                    "ui": {
+                        "component": "number",
+                        "min": 1,
+                        "max": 100,
+                        "placeholder": "30",
+                    },
+                },
+            },
+            "plugin_class": cls,
+        }
 
     def __init__(
         self,
@@ -256,4 +310,55 @@ class UnsplashImagePlugin(ImagePlugin):
 
         # Reset scan cache when config changes
         self._last_scan = None
+
+
+# Register this plugin with pluggy
+@hookimpl
+def register_plugin_types() -> list[dict[str, Any]]:
+    """Register UnsplashImagePlugin type."""
+    return [UnsplashImagePlugin.get_plugin_metadata()]
+
+
+@hookimpl
+def create_plugin_instance(
+    plugin_id: str,
+    type_id: str,
+    name: str,
+    config: dict[str, Any],
+) -> UnsplashImagePlugin | None:
+    """Create an UnsplashImagePlugin instance."""
+    if type_id != "unsplash":
+        return None
+    
+    enabled = config.get("enabled", True)
+    
+    # Extract config values
+    api_key = config.get("api_key", "")
+    category = config.get("category", "popular")
+    count = config.get("count", 30)
+    
+    # Handle schema objects
+    if isinstance(api_key, dict):
+        api_key = api_key.get("value") or api_key.get("default") or ""
+    api_key = str(api_key) if api_key else None
+    
+    if isinstance(category, dict):
+        category = category.get("value") or category.get("default") or "popular"
+    category = str(category) if category else "popular"
+    
+    if isinstance(count, dict):
+        count = count.get("value") or count.get("default") or 30
+    try:
+        count = int(count) if count else 30
+    except (ValueError, TypeError):
+        count = 30
+    
+    return UnsplashImagePlugin(
+        plugin_id=plugin_id,
+        name=name,
+        api_key=api_key,
+        category=category,
+        count=count,
+        enabled=enabled,
+    )
 

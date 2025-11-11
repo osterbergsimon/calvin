@@ -34,11 +34,20 @@ class PluginLoader:
                         if full_module_name not in self._loaded_modules:
                             try:
                                 module = importlib.import_module(full_module_name)
-                                # Register the module as a plugin if it has hook implementations
-                                if hasattr(module, "plugin_manager"):
-                                    plugin_manager.register(module)
-                                    self._loaded_modules.add(full_module_name)
-                                    print(f"Loaded plugin module: {full_module_name}")
+                                # Check if module has hook implementations (register_plugin_types or create_plugin_instance)
+                                has_hooks = (
+                                    hasattr(module, "register_plugin_types") or
+                                    hasattr(module, "create_plugin_instance")
+                                )
+                                if has_hooks:
+                                    # Register the module with pluggy so it can discover hook implementations
+                                    try:
+                                        plugin_manager.register(module)
+                                        self._loaded_modules.add(full_module_name)
+                                        print(f"Registered plugin module: {full_module_name}")
+                                    except ValueError:
+                                        # Already registered (e.g., if module is imported multiple times)
+                                        pass
                             except Exception as e:
                                 print(f"Error loading plugin module {full_module_name}: {e}")
 

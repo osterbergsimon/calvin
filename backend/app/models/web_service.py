@@ -12,6 +12,8 @@ class WebService(BaseModel):
     enabled: bool = True
     display_order: int = 0  # Order for display/switching
     fullscreen: bool = False  # Prefer fullscreen mode
+    type_id: str | None = None  # Plugin type ID (e.g., 'iframe', 'mealie')
+    display_schema: dict | None = None  # Display configuration from plugin metadata
 
 
 class WebServiceCreate(BaseModel):

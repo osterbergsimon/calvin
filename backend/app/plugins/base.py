@@ -35,6 +35,26 @@ class BasePlugin(ABC):
         """Return the type of this plugin."""
         pass
 
+    @classmethod
+    @abstractmethod
+    def get_plugin_metadata(cls) -> dict[str, Any]:
+        """
+        Get plugin metadata for registration.
+        
+        This method should be overridden by each plugin class to return:
+        - type_id: Unique identifier (e.g., 'google', 'local')
+        - name: Human-readable name
+        - description: Plugin type description
+        - version: Plugin type version (optional, default: "1.0.0")
+        - common_config_schema: Common config schema (dict, optional)
+        - ui_actions: Plugin-specific actions/buttons (list, optional)
+        - ui_sections: Plugin-specific sections (list, optional)
+        
+        Returns:
+            Dictionary with plugin metadata
+        """
+        pass
+
     @abstractmethod
     async def initialize(self) -> None:
         """Initialize the plugin (e.g., load configuration, connect to services)."""

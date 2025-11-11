@@ -10,11 +10,117 @@ from typing import Any
 
 from PIL import Image
 
+from app.plugins.base import PluginType
+from app.plugins.hooks import hookimpl, plugin_manager
 from app.plugins.protocols import ImagePlugin
 
 
 class ImapImagePlugin(ImagePlugin):
     """IMAP email image plugin for downloading images from email attachments."""
+
+    @classmethod
+    def get_plugin_metadata(cls) -> dict[str, Any]:
+        """Get plugin metadata for registration."""
+        return {
+            "type_id": "imap",
+            "plugin_type": PluginType.IMAGE,
+            "name": "Email (IMAP)",
+            "description": "Download images from email attachments. Works with Gmail, Outlook, and any IMAP provider. Share photos from Android using Share → Email.",
+            "version": "1.0.0",
+            "common_config_schema": {
+                "email_address": {
+                    "type": "string",
+                    "description": "Email address to check for images",
+                    "default": "",
+                    "ui": {
+                        "component": "input",
+                        "placeholder": "your.email@example.com",
+                        "validation": {
+                            "required": True,
+                            "type": "email",
+                        },
+                    },
+                },
+                "email_password": {
+                    "type": "password",
+                    "description": "Email password or app-specific password (for Gmail, use App Password)",
+                    "default": "",
+                    "ui": {
+                        "component": "password",
+                        "placeholder": "Enter password or App Password",
+                        "help_text": "For Gmail, use an App Password instead of your regular password",
+                        "validation": {
+                            "required": True,
+                        },
+                    },
+                },
+                "imap_server": {
+                    "type": "string",
+                    "description": "IMAP server address (e.g., imap.gmail.com, imap-mail.outlook.com)",
+                    "default": "imap.gmail.com",
+                    "ui": {
+                        "component": "input",
+                        "placeholder": "imap.gmail.com",
+                    },
+                },
+                "imap_port": {
+                    "type": "string",
+                    "description": "IMAP server port (usually 993 for SSL)",
+                    "default": "993",
+                    "ui": {
+                        "component": "number",
+                        "min": 1,
+                        "max": 65535,
+                        "placeholder": "993",
+                    },
+                },
+                "check_interval": {
+                    "type": "string",
+                    "description": "How often to check for new emails (seconds, default: 300 = 5 minutes)",
+                    "default": "300",
+                    "ui": {
+                        "component": "number",
+                        "min": 60,
+                        "max": 3600,
+                        "placeholder": "300",
+                        "help_text": "How often to check for new emails (60-3600 seconds)",
+                    },
+                },
+                "mark_as_read": {
+                    "type": "string",
+                    "description": "Mark processed emails as read (true/false, default: true)",
+                    "default": "true",
+                    "ui": {
+                        "component": "select",
+                        "options": [
+                            {"value": "true", "label": "Yes"},
+                            {"value": "false", "label": "No"},
+                        ],
+                    },
+                },
+            },
+            "ui_actions": [
+                {
+                    "id": "save",
+                    "type": "save",
+                    "label": "Save Settings",
+                    "style": "primary",
+                },
+                {
+                    "id": "test",
+                    "type": "test",
+                    "label": "Test Connection",
+                    "style": "secondary",
+                },
+                {
+                    "id": "fetch",
+                    "type": "fetch",
+                    "label": "Fetch Now",
+                    "style": "secondary",
+                },
+            ],
+            "plugin_class": cls,
+        }
 
     def __init__(
         self,
@@ -453,4 +559,84 @@ class ImapImagePlugin(ImagePlugin):
         if self.enabled:
             self._running = True
             self._check_task = asyncio.create_task(self._check_emails_loop())
+
+
+# Register this plugin with pluggy
+@hookimpl
+def register_plugin_types() -> list[dict[str, Any]]:
+    """Register ImapImagePlugin type."""
+    return [ImapImagePlugin.get_plugin_metadata()]
+
+
+@hookimpl
+def create_plugin_instance(
+    plugin_id: str,
+    type_id: str,
+    name: str,
+    config: dict[str, Any],
+) -> ImapImagePlugin | None:
+    """Create an ImapImagePlugin instance."""
+    if type_id != "imap":
+        return None
+    
+    from pathlib import Path
+    
+    enabled = config.get("enabled", True)
+    
+    # Extract config values
+    email_address = config.get("email_address", "")
+    email_password = config.get("email_password", "")
+    imap_server = config.get("imap_server", "imap.gmail.com")
+    imap_port = config.get("imap_port", 993)
+    image_dir = config.get("image_dir")
+    check_interval = config.get("check_interval", 300)
+    mark_as_read = config.get("mark_as_read", True)
+    
+    # Handle schema objects
+    if isinstance(email_address, dict):
+        email_address = email_address.get("value") or email_address.get("default") or ""
+    email_address = str(email_address) if email_address else ""
+    
+    if isinstance(email_password, dict):
+        email_password = email_password.get("value") or email_password.get("default") or ""
+    email_password = str(email_password) if email_password else ""
+    
+    if isinstance(imap_server, dict):
+        imap_server = imap_server.get("value") or imap_server.get("default") or "imap.gmail.com"
+    imap_server = str(imap_server) if imap_server else "imap.gmail.com"
+    
+    if isinstance(imap_port, dict):
+        imap_port = imap_port.get("value") or imap_port.get("default") or 993
+    try:
+        imap_port = int(imap_port) if imap_port else 993
+    except (ValueError, TypeError):
+        imap_port = 993
+    
+    if isinstance(image_dir, dict):
+        image_dir = image_dir.get("value") or image_dir.get("default")
+    image_dir = Path(image_dir) if image_dir else None
+    
+    if isinstance(check_interval, dict):
+        check_interval = check_interval.get("value") or check_interval.get("default") or 300
+    try:
+        check_interval = int(check_interval) if check_interval else 300
+    except (ValueError, TypeError):
+        check_interval = 300
+    
+    if isinstance(mark_as_read, dict):
+        mark_as_read = mark_as_read.get("value") or mark_as_read.get("default") or True
+    mark_as_read = str(mark_as_read).lower() in ("true", "1", "yes") if isinstance(mark_as_read, str) else bool(mark_as_read)
+    
+    return ImapImagePlugin(
+        plugin_id=plugin_id,
+        name=name,
+        email_address=email_address,
+        email_password=email_password,
+        imap_server=imap_server,
+        imap_port=imap_port,
+        image_dir=image_dir,
+        check_interval=check_interval,
+        mark_as_read=mark_as_read,
+        enabled=enabled,
+    )
 

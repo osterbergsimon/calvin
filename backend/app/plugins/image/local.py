@@ -6,11 +6,53 @@ from typing import Any
 
 from PIL import Image, ImageOps
 
+from app.plugins.base import PluginType
+from app.plugins.hooks import hookimpl, plugin_manager
 from app.plugins.protocols import ImagePlugin
 
 
 class LocalImagePlugin(ImagePlugin):
     """Local filesystem image plugin."""
+
+    @classmethod
+    def get_plugin_metadata(cls) -> dict[str, Any]:
+        """Get plugin metadata for registration."""
+        return {
+            "type_id": "local",
+            "plugin_type": PluginType.IMAGE,
+            "name": "Local Images",
+            "description": "Local filesystem image storage",
+            "version": "1.0.0",
+            "common_config_schema": {
+                "image_dir": {
+                    "type": "string",
+                    "description": "Image directory path (thumbnails will be stored in image_dir/thumbnails)",
+                    "default": "",
+                    "ui": {
+                        "component": "directory",
+                        "browse_button": True,
+                        "placeholder": "Select image directory...",
+                    },
+                },
+            },
+            "ui_sections": [
+                {
+                    "id": "upload",
+                    "type": "upload",
+                    "title": "Upload Images",
+                    "accept": "image/*",
+                    "multiple": True,
+                    "help_text": "Select one or more image files to upload (JPG, PNG, WebP, GIF)",
+                },
+                {
+                    "id": "manage",
+                    "type": "manage_images",
+                    "title": "Manage Images",
+                    "collapsible": True,
+                },
+            ],
+            "plugin_class": cls,
+        }
 
     def __init__(
         self,
@@ -71,24 +113,7 @@ class LocalImagePlugin(ImagePlugin):
             if image_dir_str and image_dir_str.strip():
                 self.image_dir = Path(image_dir_str)
                 self.image_dir.mkdir(parents=True, exist_ok=True)
-        
-        if "thumbnail_dir" in config and config["thumbnail_dir"]:
-            # Extract actual value from config (handle schema objects)
-            thumbnail_dir_value = config["thumbnail_dir"]
-            # If it's a dict (schema object), extract the value or default
-            if isinstance(thumbnail_dir_value, dict):
-                thumbnail_dir_str = thumbnail_dir_value.get("value") or thumbnail_dir_value.get("default") or ""
-            else:
-                thumbnail_dir_str = str(thumbnail_dir_value)
-            
-            # Only update if we have a valid string value
-            if thumbnail_dir_str and thumbnail_dir_str.strip():
-                self.thumbnail_dir = Path(thumbnail_dir_str)
-                self.thumbnail_dir.mkdir(parents=True, exist_ok=True)
-        elif "image_dir" in config and config["image_dir"]:
-            # If thumbnail_dir not provided but image_dir is, use default
-            # Only if image_dir was successfully updated
-            if hasattr(self, 'image_dir') and self.image_dir:
+                # Always set thumbnail_dir to image_dir/thumbnails
                 self.thumbnail_dir = self.image_dir / "thumbnails"
                 self.thumbnail_dir.mkdir(parents=True, exist_ok=True)
 
@@ -280,4 +305,54 @@ class LocalImagePlugin(ImagePlugin):
         if thumbnail_path.exists():
             return thumbnail_path
         return None
+
+
+# Register this plugin with pluggy
+@hookimpl
+def register_plugin_types() -> list[dict[str, Any]]:
+    """Register LocalImagePlugin type."""
+    return [LocalImagePlugin.get_plugin_metadata()]
+
+
+@hookimpl
+def create_plugin_instance(
+    plugin_id: str,
+    type_id: str,
+    name: str,
+    config: dict[str, Any],
+) -> LocalImagePlugin | None:
+    """Create a LocalImagePlugin instance."""
+    if type_id != "local":
+        return None
+    
+    from pathlib import Path
+    
+    enabled = config.get("enabled", True)
+    
+    # Extract actual values from config (handle case where schema objects might be stored)
+    image_dir = config.get("image_dir", "")
+    
+    # If image_dir is a dict (schema object), extract the default or actual value
+    if isinstance(image_dir, dict):
+        image_dir = image_dir.get("default", "") or image_dir.get("value", "")
+    # Ensure it's a string
+    image_dir = str(image_dir) if image_dir else ""
+    
+    # Use default directory if image_dir is empty
+    if not image_dir:
+        image_dir = "./data/images"
+    
+    # Thumbnail directory is always image_dir/thumbnails
+    # We pass None and let the plugin set it automatically
+    return LocalImagePlugin(
+        plugin_id=plugin_id,
+        name=name,
+        image_dir=Path(image_dir),
+        thumbnail_dir=None,  # Will be set to image_dir/thumbnails automatically
+        enabled=enabled,
+    )
+
+
+# Auto-register this module with pluggy when imported
+# The loader will discover and register this module automatically
 

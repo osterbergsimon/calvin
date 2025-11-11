@@ -5,11 +5,38 @@ from typing import Any
 
 import httpx
 
+from app.plugins.base import PluginType
+from app.plugins.hooks import hookimpl, plugin_manager
 from app.plugins.protocols import ImagePlugin
 
 
 class PicsumImagePlugin(ImagePlugin):
     """Picsum Photos image plugin for fetching random images without API key."""
+
+    @classmethod
+    def get_plugin_metadata(cls) -> dict[str, Any]:
+        """Get plugin metadata for registration."""
+        return {
+            "type_id": "picsum",
+            "plugin_type": PluginType.IMAGE,
+            "name": "Picsum Photos",
+            "description": "Random high-quality images from Picsum Photos (no API key required)",
+            "version": "1.0.0",
+            "common_config_schema": {
+                "count": {
+                    "type": "string",
+                    "description": "Number of photos to fetch (1-100)",
+                    "default": "30",
+                    "ui": {
+                        "component": "number",
+                        "min": 1,
+                        "max": 100,
+                        "placeholder": "30",
+                    },
+                },
+            },
+            "plugin_class": cls,
+        }
 
     def __init__(
         self,
@@ -215,4 +242,43 @@ class PicsumImagePlugin(ImagePlugin):
 
         # Reset scan cache when config changes
         self._last_scan = None
+
+
+# Register this plugin with pluggy
+@hookimpl
+def register_plugin_types() -> list[dict[str, Any]]:
+    """Register PicsumImagePlugin type."""
+    return [PicsumImagePlugin.get_plugin_metadata()]
+
+
+@hookimpl
+def create_plugin_instance(
+    plugin_id: str,
+    type_id: str,
+    name: str,
+    config: dict[str, Any],
+) -> PicsumImagePlugin | None:
+    """Create a PicsumImagePlugin instance."""
+    if type_id != "picsum":
+        return None
+    
+    enabled = config.get("enabled", True)
+    
+    # Extract config values
+    count = config.get("count", 30)
+    
+    # Handle schema objects
+    if isinstance(count, dict):
+        count = count.get("value") or count.get("default") or 30
+    try:
+        count = int(count) if count else 30
+    except (ValueError, TypeError):
+        count = 30
+    
+    return PicsumImagePlugin(
+        plugin_id=plugin_id,
+        name=name,
+        count=count,
+        enabled=enabled,
+    )
 

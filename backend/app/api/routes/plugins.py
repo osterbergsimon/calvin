@@ -106,6 +106,8 @@ async def get_plugins(plugin_type: str | None = None):
             "description": type_info.get("description", ""),
             "config_schema": type_info.get("common_config_schema", {}),
             "enabled": enabled,
+            "ui_actions": type_info.get("ui_actions", []),  # Plugin-specific actions (buttons)
+            "ui_sections": type_info.get("ui_sections", []),  # Plugin-specific sections (upload, manage, etc.)
         }
         result.append(plugin_info)
 
@@ -151,12 +153,18 @@ async def update_plugin(plugin_id: str, config: dict[str, Any]):
         plugin_id: Plugin type ID (e.g., 'google', 'ical', 'local')
         config: Configuration dictionary with common settings and/or enabled status
     """
+    print(f"[Plugin Update] Received update for plugin {plugin_id}")
+    print(f"[Plugin Update] Config keys: {list(config.keys())}")
+    
     # Get plugin types from pluggy hooks
     plugin_types = plugin_loader.get_plugin_types()
     type_info = next((t for t in plugin_types if t.get("type_id") == plugin_id), None)
     
     if not type_info:
+        print(f"[Plugin Update] Plugin type {plugin_id} not found")
         raise HTTPException(status_code=404, detail="Plugin type not found")
+    
+    print(f"[Plugin Update] Found plugin type: {type_info.get('name')}")
 
     # Store common configuration in database
     from app.plugins.manager import plugin_manager
@@ -347,6 +355,109 @@ async def update_plugin(plugin_id: str, config: dict[str, Any]):
                         print(f"[IMAP] WARNING: Plugin instance {imap_instance.id} not found in plugin manager")
             else:
                 print(f"[IMAP] Skipping instance creation - missing email or password")
+        
+        # Create or update Mealie plugin instance if settings are saved
+        if plugin_id == "mealie" and config:
+            print(f"[Mealie] Starting Mealie instance creation/update process")
+            from app.plugins.registry import plugin_registry
+            from app.plugins.base import PluginType
+            from app.plugins.protocols import ServicePlugin
+            
+            # Check if Mealie instance exists
+            result = await session.execute(
+                select(PluginDB).where(PluginDB.type_id == "mealie")
+            )
+            mealie_instance = result.scalar_one_or_none()
+            print(f"[Mealie] Checking for existing Mealie instance: {mealie_instance.id if mealie_instance else 'None'}")
+            
+            # Check if we have required config (URL and API token)
+            # Note: config has already been cleaned, so values should be strings
+            mealie_url = config.get("mealie_url", "")
+            api_token = config.get("api_token", "")
+            
+            print(f"[Mealie] Extracted URL: {mealie_url[:50] if mealie_url else 'None'}...")
+            print(f"[Mealie] Extracted API token: {'***' if api_token else 'None'}")
+            print(f"[Mealie] Config has URL: {bool(mealie_url)}, API token: {bool(api_token)}")
+            
+            if mealie_url and api_token:
+                # Create or update Mealie instance
+                if not mealie_instance:
+                    # Create new Mealie instance
+                    plugin_instance_id = f"mealie-{abs(hash(mealie_url)) % 10000}"
+                    print(f"[Mealie] Creating new Mealie instance with ID: {plugin_instance_id}")
+                    try:
+                        # Use cleaned config values for instance creation
+                        # Get days_ahead from config, default to 7
+                        days_ahead = config.get("days_ahead", "7")
+                        try:
+                            days_ahead = int(days_ahead) if days_ahead else 7
+                        except (ValueError, TypeError):
+                            days_ahead = 7
+                        
+                        instance_config = {
+                            "mealie_url": mealie_url,
+                            "api_token": api_token,
+                            "group_id": config.get("group_id", ""),
+                            "days_ahead": days_ahead,
+                            "display_order": 0,
+                            "fullscreen": False,
+                        }
+                        print(f"[Mealie] Instance config: mealie_url={instance_config['mealie_url'][:50]}..., api_token={'***' if instance_config['api_token'] else 'None'}")
+                        plugin = await plugin_registry.register_plugin(
+                            plugin_id=plugin_instance_id,
+                            type_id="mealie",
+                            name="Mealie Meal Plan",
+                            config=instance_config,
+                            enabled=enabled if enabled is not None else True,
+                        )
+                        print(f"[Mealie] Successfully created Mealie instance: {plugin_instance_id}, plugin: {plugin.plugin_id if plugin else 'None'}")
+                    except Exception as e:
+                        print(f"[Mealie] ERROR: Failed to create Mealie instance: {e}")
+                        import traceback
+                        traceback.print_exc()
+                else:
+                    # Update existing Mealie instance
+                    print(f"[Mealie] Updating existing Mealie instance: {mealie_instance.id}")
+                    plugin = plugin_manager.get_plugin(mealie_instance.id)
+                    if plugin:
+                        print(f"[Mealie] Found plugin in manager: {plugin.plugin_id}, class: {plugin.__class__.__name__}")
+                        # Use cleaned config values for update
+                        # Get days_ahead from config, default to existing value or 7
+                        days_ahead = config.get("days_ahead", "")
+                        if days_ahead:
+                            try:
+                                days_ahead = int(days_ahead) if days_ahead else 7
+                            except (ValueError, TypeError):
+                                days_ahead = mealie_instance.config.get("days_ahead", 7) if mealie_instance.config else 7
+                        else:
+                            days_ahead = mealie_instance.config.get("days_ahead", 7) if mealie_instance.config else 7
+                        
+                        instance_config = {
+                            "mealie_url": mealie_url,
+                            "api_token": api_token,
+                            "group_id": config.get("group_id", ""),
+                            "days_ahead": days_ahead,
+                            "display_order": mealie_instance.config.get("display_order", 0) if mealie_instance.config else 0,
+                            "fullscreen": mealie_instance.config.get("fullscreen", False) if mealie_instance.config else False,
+                        }
+                        await plugin.configure(instance_config)
+                        if enabled is not None:
+                            if enabled:
+                                plugin.enable()
+                            else:
+                                plugin.disable()
+                        # Update in database
+                        mealie_instance.config = instance_config
+                        if enabled is not None:
+                            mealie_instance.enabled = enabled
+                        await session.commit()
+                        print(f"[Mealie] Updated Mealie instance in database")
+                    else:
+                        print(f"[Mealie] WARNING: Plugin instance {mealie_instance.id} not found in plugin manager")
+            else:
+                print(f"[Mealie] Skipping instance creation - missing URL or API token")
+                print(f"[Mealie]   mealie_url: {repr(mealie_url)}")
+                print(f"[Mealie]   api_token: {'***' if api_token else 'None'}")
 
     return {"message": "Plugin type configuration updated", "plugin_id": plugin_id}
 
@@ -627,9 +738,10 @@ async def test_plugin(plugin_id: str):
     
     Currently supports:
     - IMAP: Tests email connection
+    - Mealie: Tests Mealie API connection
     
     Args:
-        plugin_id: Plugin type ID (e.g., 'imap')
+        plugin_id: Plugin type ID (e.g., 'imap', 'mealie')
     
     Returns:
         Test result with success status and message
@@ -699,6 +811,73 @@ async def test_plugin(plugin_id: str):
                     "success": False,
                     "message": f"Connection error: {error_msg}",
                 }
+        except Exception as e:
+            return {
+                "success": False,
+                "message": f"Error: {str(e)}",
+            }
+    elif plugin_id == "mealie":
+        # Test Mealie API connection
+        import httpx
+        mealie_url = config.get("mealie_url", "").rstrip("/")
+        api_token = config.get("api_token", "")
+        
+        if not mealie_url or not api_token:
+            return {
+                "success": False,
+                "message": "Mealie URL and API token are required",
+            }
+        
+        try:
+            # Test connection by fetching user info or recipes endpoint
+            headers = {"Authorization": f"Bearer {api_token}"}
+            async with httpx.AsyncClient(timeout=10.0) as client:
+                # Try to fetch user info or a simple endpoint
+                response = await client.get(
+                    f"{mealie_url}/api/users/self",
+                    headers=headers,
+                )
+                if response.status_code == 200:
+                    return {
+                        "success": True,
+                        "message": f"Successfully connected to Mealie at {mealie_url}",
+                    }
+                elif response.status_code == 401:
+                    return {
+                        "success": False,
+                        "message": "Authentication failed. Please check your API token.",
+                    }
+                elif response.status_code == 404:
+                    # Try alternative endpoint
+                    response = await client.get(
+                        f"{mealie_url}/api/recipes",
+                        headers=headers,
+                    )
+                    if response.status_code == 200:
+                        return {
+                            "success": True,
+                            "message": f"Successfully connected to Mealie at {mealie_url}",
+                        }
+                    else:
+                        return {
+                            "success": False,
+                            "message": f"Could not connect to Mealie API. Status: {response.status_code}",
+                        }
+                else:
+                    return {
+                        "success": False,
+                        "message": f"Mealie API returned status {response.status_code}",
+                    }
+        except httpx.ConnectError:
+            return {
+                "success": False,
+                "message": f"Could not connect to {mealie_url}. Please check the URL.",
+            }
+        except httpx.TimeoutException:
+            return {
+                "success": False,
+                "message": f"Connection to {mealie_url} timed out. Please check the URL and network.",
+            }
         except Exception as e:
             return {
                 "success": False,

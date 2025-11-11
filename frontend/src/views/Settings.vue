@@ -593,162 +593,45 @@
                     :key="key"
                     class="plugin-setting"
                   >
-                    <label>{{ (schema && typeof schema === 'object' && schema.description) || key }}:</label>
-                    <div v-if="plugin.id === 'local' && (key === 'image_dir' || key === 'thumbnail_dir')" style="display: flex; gap: 0.5rem; align-items: center;">
-                      <input
-                        v-if="schema && typeof schema === 'object' && schema.type === 'string'"
-                        type="text"
-                        :value="getFormValue(plugin.id, key, schema)"
-                        class="form-input"
-                        style="flex: 1;"
-                        @input="updateFormValue(plugin.id, key, $event.target.value)"
-                      />
-                      <input
-                        type="file"
-                        style="display: none;"
-                        :data-plugin-id="plugin.id"
-                        :data-config-key="key"
-                        @change="handleDirectorySelect(plugin.id, key, $event)"
-                      />
-                      <button
-                        type="button"
-                        class="btn-secondary"
-                        style="white-space: nowrap;"
-                        @click="browseDirectory(plugin.id, key)"
-                      >
-                        Browse
-                      </button>
-                    </div>
-                    <input
-                      v-else-if="schema && typeof schema === 'object' && schema.type === 'string'"
-                      type="text"
+                    <PluginFieldRenderer
+                      :key="key"
+                      :plugin-id="plugin.id"
+                      :field-key="key"
+                      :schema="schema"
                       :value="getFormValue(plugin.id, key, schema)"
-                      class="form-input"
-                      @input="updateFormValue(plugin.id, key, $event.target.value)"
+                      @update="updateFormValue(plugin.id, key, $event)"
                     />
-                    <input
-                      v-else-if="schema && typeof schema === 'object' && schema.type === 'password'"
-                      type="password"
-                      :value="getFormValue(plugin.id, key, schema)"
-                      class="form-input"
-                      :placeholder="plugin.id === 'unsplash' ? 'Enter your Unsplash API key' : plugin.id === 'imap' && key === 'email_password' ? 'Enter email password or App Password' : 'Enter API key or credentials'"
-                      @input="updateFormValue(plugin.id, key, $event.target.value)"
-                    />
-                    <span v-if="plugin.id === 'unsplash' && key === 'api_key'" class="help-text" style="display: block; margin-top: 0.5rem;">
-                      Get your free API key at <a href="https://unsplash.com/developers" target="_blank" rel="noopener noreferrer" style="color: var(--accent-color); text-decoration: underline;">https://unsplash.com/developers</a>
-                    </span>
                   </div>
                   
-                  <!-- Save button and test button for IMAP -->
-                  <div v-if="plugin.id === 'imap'" class="plugin-actions" style="margin-top: 1rem; display: flex; gap: 1rem; align-items: center; flex-wrap: wrap;">
-                    <button
-                      class="btn-primary"
-                      :disabled="savingPlugin === plugin.id"
-                      @click="savePluginConfig(plugin.id)"
-                    >
-                      {{ savingPlugin === plugin.id ? "Saving..." : "Save Settings" }}
-                    </button>
-                    <button
-                      class="btn-secondary"
-                      :disabled="testingPlugin[plugin.id] || savingPlugin === plugin.id"
-                      @click="testPluginConnection(plugin.id)"
-                    >
-                      {{ testingPlugin[plugin.id] ? "Testing..." : "Test Connection" }}
-                    </button>
-                    <button
-                      class="btn-secondary"
-                      :disabled="fetchingPlugin[plugin.id] || savingPlugin === plugin.id"
-                      @click="fetchPluginNow(plugin.id)"
-                    >
-                      {{ fetchingPlugin[plugin.id] ? "Fetching..." : "Fetch Now" }}
-                    </button>
-                    <span v-if="pluginSaveStatus[plugin.id]" :class="pluginSaveStatus[plugin.id].success ? 'success-message' : 'error-message'" style="margin-left: 0.5rem; padding: 0.5rem 1rem; border-radius: 4px;">
-                      {{ pluginSaveStatus[plugin.id].message }}
-                    </span>
-                    <span v-if="pluginTestStatus[plugin.id]" :class="pluginTestStatus[plugin.id].success ? 'success-message' : 'error-message'" style="margin-left: 0.5rem; padding: 0.5rem 1rem; border-radius: 4px;">
-                      {{ pluginTestStatus[plugin.id].message }}
-                    </span>
-                    <span v-if="pluginFetchStatus[plugin.id]" :class="pluginFetchStatus[plugin.id].success ? 'success-message' : 'error-message'" style="margin-left: 0.5rem; padding: 0.5rem 1rem; border-radius: 4px;">
-                      {{ pluginFetchStatus[plugin.id].message }}
-                    </span>
-                  </div>
+                  <!-- Plugin Actions (buttons like Save, Test, Fetch) -->
+                  <PluginActions
+                    v-if="plugin.ui_actions && plugin.ui_actions.length > 0"
+                    :plugin-id="plugin.id"
+                    :actions="plugin.ui_actions"
+                    :saving="savingPlugin === plugin.id"
+                    :testing="testingPlugin[plugin.id] || false"
+                    :fetching="fetchingPlugin[plugin.id] || false"
+                    :save-status="pluginSaveStatus[plugin.id] || null"
+                    :test-status="pluginTestStatus[plugin.id] || null"
+                    :fetch-status="pluginFetchStatus[plugin.id] || null"
+                    @save="savePluginConfig(plugin.id)"
+                    @test="testPluginConnection(plugin.id)"
+                    @fetch="fetchPluginNow(plugin.id)"
+                  />
                 </div>
                 
-                <!-- Local Images Plugin: Upload and Manage Images -->
-                <div v-if="plugin.id === 'local' && plugin.enabled">
-                  <h4 class="config-section-title">Upload Images</h4>
-                  <div class="upload-section">
-                    <input
-                      ref="fileInput"
-                      type="file"
-                      accept="image/*"
-                      multiple
-                      style="display: none"
-                      @change="handleFileSelect"
-                    />
-                    <button
-                      class="btn-upload"
-                      @click="$refs.fileInput.click()"
-                      :disabled="uploading"
-                    >
-                      {{ uploading ? "Uploading..." : "Choose Images" }}
-                    </button>
-                    <span class="help-text"
-                      >Select one or more image files to upload (JPG, PNG, WebP, GIF)</span
-                    >
-                    <div v-if="uploadError" class="error-message">
-                      {{ uploadError }}
-                    </div>
-                    <div v-if="uploadSuccess" class="success-message">
-                      {{ uploadSuccess }}
-                    </div>
-                  </div>
-                  
-                  <div class="manage-images-section" style="margin-top: 1.5rem;">
-                    <div 
-                      class="config-section-title collapsible-header" 
-                      style="cursor: pointer; display: flex; justify-content: space-between; align-items: center; padding: 0.5rem 0;"
-                      @click="expandedManageImages[plugin.id] = !expandedManageImages[plugin.id]"
-                    >
-                      <h4 style="margin: 0;">Manage Images ({{ imagesList.filter(img => img.source === 'local-images').length }})</h4>
-                      <span style="font-size: 0.9rem; color: var(--text-secondary);">
-                        {{ expandedManageImages[plugin.id] ? "▼" : "▶" }}
-                      </span>
-                    </div>
-                    <div v-show="expandedManageImages[plugin.id]" class="images-list" style="margin-top: 1rem; max-height: 400px; overflow-y: auto;">
-                      <div
-                        v-for="image in imagesList.filter(img => img.source === 'local-images')"
-                        :key="image.id"
-                        class="image-item"
-                      >
-                        <div class="image-thumbnail">
-                          <img
-                            :src="`/api/images/${image.id}/thumbnail`"
-                            :alt="image.filename"
-                            class="thumbnail-img"
-                            @error="handleThumbnailError"
-                          />
-                        </div>
-                        <div class="image-info">
-                          <strong>{{ image.filename }}</strong>
-                          <span class="image-details"
-                            >{{ image.width }}×{{ image.height }} • {{ formatFileSize(image.size) }}</span
-                          >
-                        </div>
-                        <button
-                          class="btn-remove"
-                          title="Delete image"
-                          @click="deleteImage(image.id)"
-                        >
-                          Delete
-                        </button>
-                      </div>
-                      <div v-if="imagesList.filter(img => img.source === 'local-images').length === 0" class="empty-state">
-                        <p>No images uploaded yet</p>
-                      </div>
-                    </div>
-                  </div>
-                </div>
+                <!-- Plugin Sections (upload, manage images, etc.) -->
+                <PluginSections
+                  v-if="plugin.ui_sections && plugin.ui_sections.length > 0 && plugin.enabled"
+                  :plugin-id="plugin.id"
+                  :sections="plugin.ui_sections"
+                  :images="imagesList.filter(img => img.source === 'local-images')"
+                  :uploading="uploading"
+                  :upload-error="uploadError"
+                  :upload-success="uploadSuccess"
+                  @upload="handleFileSelectFromSection"
+                  @delete-image="deleteImage"
+                />
               </div>
               <div v-else-if="!plugin.enabled" class="plugin-disabled-message">
                 <p class="help-text">
@@ -1154,6 +1037,9 @@ import { useWebServicesStore } from "../stores/webServices";
 import { useModeStore } from "../stores/mode";
 import { useImagesStore } from "../stores/images";
 import axios from "axios";
+import PluginFieldRenderer from "../components/PluginFieldRenderer.vue";
+import PluginActions from "../components/PluginActions.vue";
+import PluginSections from "../components/PluginSections.vue";
 
 const router = useRouter();
 const configStore = useConfigStore();
@@ -1705,6 +1591,35 @@ const loadImages = async () => {
   }
 };
 
+const handleFileSelectFromSection = async (files, section) => {
+  // Handle file upload from PluginSections component
+  if (!files || files.length === 0) return;
+  
+  uploading.value = true;
+  uploadError.value = "";
+  uploadSuccess.value = "";
+  
+  try {
+    const uploadPromises = Array.from(files).map((file) => imagesStore.uploadImage(file));
+    await Promise.all(uploadPromises);
+    uploadSuccess.value = `Successfully uploaded ${files.length} image(s)`;
+    await loadImages();
+    // Clear success message after 3 seconds
+    setTimeout(() => {
+      uploadSuccess.value = "";
+    }, 3000);
+  } catch (error) {
+    uploadError.value = error.response?.data?.detail || error.message || "Failed to upload images";
+    console.error("Failed to upload images:", error);
+    // Clear error message after 5 seconds
+    setTimeout(() => {
+      uploadError.value = "";
+    }, 5000);
+  } finally {
+    uploading.value = false;
+  }
+};
+
 const handleFileSelect = async (event) => {
   const files = event.target.files;
   if (!files || files.length === 0) return;
@@ -2095,6 +2010,13 @@ const loadPlugins = async () => {
         }
       } else if (!plugin.config_schema || typeof plugin.config_schema !== 'object') {
         plugin.config_schema = {};
+      }
+      // Ensure ui_actions and ui_sections are arrays
+      if (!plugin.ui_actions || !Array.isArray(plugin.ui_actions)) {
+        plugin.ui_actions = [];
+      }
+      if (!plugin.ui_sections || !Array.isArray(plugin.ui_sections)) {
+        plugin.ui_sections = [];
       }
       return plugin;
     });

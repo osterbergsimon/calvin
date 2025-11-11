@@ -26,24 +26,51 @@ class WebServiceService:
                 select(PluginDB).where(PluginDB.plugin_type == "service")
             )
             db_plugins = result.scalars().all()
+            print(f"[WebServiceService] Found {len(db_plugins)} service plugin instances in database")
 
             services = []
+            from app.plugins.loader import plugin_loader
+            
+            # Get plugin types to access display_schema
+            plugin_types = plugin_loader.get_plugin_types()
+            plugin_types_by_id = {t.get("type_id"): t for t in plugin_types}
+            
             for db_plugin in db_plugins:
+                print(f"[WebServiceService] Processing service: id={db_plugin.id}, type_id={db_plugin.type_id}, name={db_plugin.name}, enabled={db_plugin.enabled}")
                 config = db_plugin.config or {}
-                services.append(
-                    WebService(
-                        id=db_plugin.id,
-                        name=db_plugin.name,
-                        url=config.get("url", ""),
-                        enabled=db_plugin.enabled,
-                        display_order=config.get("display_order", 0),
-                        fullscreen=config.get("fullscreen", False),
-                    )
+                # Get URL from config - for iframe it's "url", for mealie it's also "url" (from get_config)
+                url = config.get("url", "")
+                # If no URL in config, try to get it from the plugin instance
+                if not url:
+                    from app.plugins.manager import plugin_manager
+                    plugin = plugin_manager.get_plugin(db_plugin.id)
+                    if plugin and hasattr(plugin, "get_config"):
+                        plugin_config = plugin.get_config()
+                        url = plugin_config.get("url", "") if plugin_config else ""
+                
+                # Get display_schema from plugin type metadata
+                type_id = db_plugin.type_id
+                display_schema = None
+                if type_id and type_id in plugin_types_by_id:
+                    display_schema = plugin_types_by_id[type_id].get("display_schema")
+                
+                service = WebService(
+                    id=db_plugin.id,
+                    name=db_plugin.name,
+                    url=url,
+                    enabled=db_plugin.enabled,
+                    display_order=config.get("display_order", 0),
+                    fullscreen=config.get("fullscreen", False),
+                    type_id=type_id,
+                    display_schema=display_schema,
                 )
+                print(f"[WebServiceService] Created service: id={service.id}, name={service.name}, enabled={service.enabled}, url={service.url[:50] if service.url else 'None'}...")
+                services.append(service)
 
             # Sort by display_order (fallback if SQL ordering didn't work)
             services.sort(key=lambda s: (s.display_order, s.name))
             self._services = services
+            print(f"[WebServiceService] Returning {len(services)} services: {[s.id for s in services]}")
             return services
 
     async def get_service(self, service_id: str) -> WebService | None:
