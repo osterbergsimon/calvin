@@ -177,6 +177,82 @@
               hide)</span
             >
           </div>
+          <div class="setting-item">
+            <label>
+              <input
+                v-model="localConfig.clockEnabled"
+                type="checkbox"
+                @change="updateClockSettings"
+              />
+              Enable Clock
+            </label>
+            <span class="help-text">Show clock on dashboard</span>
+          </div>
+          <div v-if="localConfig.clockEnabled" class="setting-item">
+            <label>Clock Display Mode</label>
+            <select
+              v-model="localConfig.clockDisplayMode"
+              @change="updateClockSettings"
+            >
+              <option value="always">When UI is Off (Kiosk Mode)</option>
+              <option value="header">Only When Header is Visible</option>
+              <option value="off">Off</option>
+            </select>
+            <span class="help-text"
+              >When to display the clock on the dashboard. "When UI is Off" shows clock in corner when headers are hidden.</span
+            >
+          </div>
+          <div v-if="localConfig.clockEnabled && localConfig.clockDisplayMode === 'always'" class="setting-item">
+            <label>Clock Position</label>
+            <select
+              v-model="localConfig.clockPosition"
+              @change="updateClockSettings"
+            >
+              <option value="top-left">Top Left</option>
+              <option value="top-right">Top Right</option>
+              <option value="bottom-left">Bottom Left</option>
+              <option value="bottom-right">Bottom Right</option>
+            </select>
+            <span class="help-text"
+              >Position of the clock when UI is off</span
+            >
+          </div>
+          <div v-if="localConfig.clockEnabled" class="setting-item">
+            <label>Clock Size</label>
+            <select
+              v-model="localConfig.clockSize"
+              @change="updateClockSettings"
+            >
+              <option value="small">Small</option>
+              <option value="medium">Medium</option>
+              <option value="large">Large</option>
+            </select>
+            <span class="help-text"
+              >Size of the clock display</span
+            >
+          </div>
+          <div v-if="localConfig.clockEnabled" class="setting-item">
+            <label>
+              <input
+                v-model="localConfig.clockShowDate"
+                type="checkbox"
+                @change="updateClockSettings"
+              />
+              Show Date in Clock
+            </label>
+            <span class="help-text">Display date below the time</span>
+          </div>
+          <div v-if="localConfig.clockEnabled" class="setting-item">
+            <label>
+              <input
+                v-model="localConfig.clockShowSeconds"
+                type="checkbox"
+                @change="updateClockSettings"
+              />
+              Show Seconds in Clock
+            </label>
+            <span class="help-text">Display seconds in the time (updates every second)</span>
+          </div>
         </div>
       </section>
 
@@ -1085,6 +1161,12 @@ const localConfig = ref({
       imageDisplayMode: "smart",
       randomizeImages: false,
       gitBranch: "main",
+      clockEnabled: true,
+      clockDisplayMode: "header",
+      clockShowDate: false,
+      clockShowSeconds: false,
+      clockPosition: "top-right",
+      clockSize: "medium",
 });
 
 // Collapsible sections state
@@ -1276,6 +1358,21 @@ const updateShowModeIndicator = () => {
 const updateModeIndicatorTimeout = () => {
   configStore.setModeIndicatorTimeout(localConfig.value.modeIndicatorTimeout);
   saveConfig();
+};
+
+const updateClockSettings = async () => {
+  try {
+    await configStore.updateConfig({
+      clockEnabled: localConfig.value.clockEnabled,
+      clockDisplayMode: localConfig.value.clockDisplayMode,
+      clockShowDate: localConfig.value.clockShowDate,
+      clockShowSeconds: localConfig.value.clockShowSeconds,
+      clockPosition: localConfig.value.clockPosition,
+      clockSize: localConfig.value.clockSize,
+    });
+  } catch (error) {
+    console.error("Failed to update clock settings:", error);
+  }
 };
 
 const updateWeekStartDay = () => {
@@ -1540,6 +1637,49 @@ const loadConfig = async () => {
       localConfig.value.imageDisplayMode =
         response.data.imageDisplayMode ?? response.data.image_display_mode ?? "smart";
       localConfig.value.timezone = response.data.timezone ?? null;
+      // Handle clock settings
+      if (response.data.clockEnabled !== undefined) {
+        localConfig.value.clockEnabled = response.data.clockEnabled;
+      } else if (response.data.clock_enabled !== undefined) {
+        localConfig.value.clockEnabled = response.data.clock_enabled;
+      } else {
+        localConfig.value.clockEnabled = true; // Default
+      }
+      if (response.data.clockDisplayMode !== undefined) {
+        localConfig.value.clockDisplayMode = response.data.clockDisplayMode;
+      } else if (response.data.clock_display_mode !== undefined) {
+        localConfig.value.clockDisplayMode = response.data.clock_display_mode;
+      } else {
+        localConfig.value.clockDisplayMode = "header"; // Default
+      }
+      if (response.data.clockShowDate !== undefined) {
+        localConfig.value.clockShowDate = response.data.clockShowDate;
+      } else if (response.data.clock_show_date !== undefined) {
+        localConfig.value.clockShowDate = response.data.clock_show_date;
+      } else {
+        localConfig.value.clockShowDate = false; // Default
+      }
+      if (response.data.clockShowSeconds !== undefined) {
+        localConfig.value.clockShowSeconds = response.data.clockShowSeconds;
+      } else if (response.data.clock_show_seconds !== undefined) {
+        localConfig.value.clockShowSeconds = response.data.clock_show_seconds;
+      } else {
+        localConfig.value.clockShowSeconds = false; // Default
+      }
+      if (response.data.clockPosition !== undefined) {
+        localConfig.value.clockPosition = response.data.clockPosition;
+      } else if (response.data.clock_position !== undefined) {
+        localConfig.value.clockPosition = response.data.clock_position;
+      } else {
+        localConfig.value.clockPosition = "top-right"; // Default
+      }
+      if (response.data.clockSize !== undefined) {
+        localConfig.value.clockSize = response.data.clockSize;
+      } else if (response.data.clock_size !== undefined) {
+        localConfig.value.clockSize = response.data.clock_size;
+      } else {
+        localConfig.value.clockSize = "medium"; // Default
+      }
       localConfig.value.gitBranch =
         response.data.gitBranch ?? response.data.git_branch ?? "main";
       keyboardStore.setKeyboardType(localConfig.value.keyboardType);

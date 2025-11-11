@@ -231,6 +231,31 @@ async def get_config():
     if "timezone" not in config:
         config["timezone"] = None  # No timezone set by default (use system timezone)
     # Note: timezone is stored as-is (no camelCase conversion needed)
+    # Handle clock settings
+    if "clockEnabled" not in config and "clock_enabled" not in config:
+        config["clockEnabled"] = True  # Clock enabled by default
+    elif "clock_enabled" in config and "clockEnabled" not in config:
+        config["clockEnabled"] = config["clock_enabled"]
+    if "clockDisplayMode" not in config and "clock_display_mode" not in config:
+        config["clockDisplayMode"] = "header"  # Default: show only when header is visible
+    elif "clock_display_mode" in config and "clockDisplayMode" not in config:
+        config["clockDisplayMode"] = config["clock_display_mode"]
+    if "clockShowDate" not in config and "clock_show_date" not in config:
+        config["clockShowDate"] = False  # Don't show date by default
+    elif "clock_show_date" in config and "clockShowDate" not in config:
+        config["clockShowDate"] = config["clock_show_date"]
+    if "clockShowSeconds" not in config and "clock_show_seconds" not in config:
+        config["clockShowSeconds"] = False  # Don't show seconds by default
+    elif "clock_show_seconds" in config and "clockShowSeconds" not in config:
+        config["clockShowSeconds"] = config["clock_show_seconds"]
+    if "clockPosition" not in config and "clock_position" not in config:
+        config["clockPosition"] = "top-right"  # Default position
+    elif "clock_position" in config and "clockPosition" not in config:
+        config["clockPosition"] = config["clock_position"]
+    if "clockSize" not in config and "clock_size" not in config:
+        config["clockSize"] = "medium"  # Default size
+    elif "clock_size" in config and "clockSize" not in config:
+        config["clockSize"] = config["clock_size"]
     if "gitBranch" not in config and "git_branch" not in config:
         config["gitBranch"] = "main"  # Default to main branch
     elif "git_branch" in config and "gitBranch" not in config:

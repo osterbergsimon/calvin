@@ -39,6 +39,12 @@ export const useConfigStore = defineStore("config", () => {
   const rebootComboDuration = ref(10000); // Reboot combo duration in milliseconds
   const imageDisplayMode = ref("smart"); // Image display mode: 'fit', 'fill', 'crop', 'center', 'smart' (default: 'smart')
   const timezone = ref(null); // Timezone (e.g., "America/New_York", "Europe/London", "UTC") - null = system timezone
+  const clockEnabled = ref(true); // Clock enabled/disabled
+  const clockDisplayMode = ref("header"); // Clock display mode: 'always' | 'header' | 'off'
+  const clockShowDate = ref(false); // Show date in clock
+  const clockShowSeconds = ref(false); // Show seconds in clock
+  const clockPosition = ref("top-right"); // Clock position: 'top-left' | 'top-right' | 'bottom-left' | 'bottom-right'
+  const clockSize = ref("medium"); // Clock size: 'small' | 'medium' | 'large'
   const loading = ref(false);
   const error = ref(null);
 
@@ -232,6 +238,43 @@ export const useConfigStore = defineStore("config", () => {
         // Ensure timezone is always set (default to null if not provided)
         timezone.value = null;
       }
+      // Handle clock settings
+      if (response.data.clockEnabled !== undefined) {
+        clockEnabled.value = response.data.clockEnabled;
+      } else if (response.data.clock_enabled !== undefined) {
+        clockEnabled.value = response.data.clock_enabled;
+      }
+      if (response.data.clockDisplayMode !== undefined) {
+        clockDisplayMode.value = response.data.clockDisplayMode;
+      } else if (response.data.clock_display_mode !== undefined) {
+        clockDisplayMode.value = response.data.clock_display_mode;
+      } else {
+        clockDisplayMode.value = "header"; // Default
+      }
+      if (response.data.clockShowDate !== undefined) {
+        clockShowDate.value = response.data.clockShowDate;
+      } else if (response.data.clock_show_date !== undefined) {
+        clockShowDate.value = response.data.clock_show_date;
+      }
+      if (response.data.clockShowSeconds !== undefined) {
+        clockShowSeconds.value = response.data.clockShowSeconds;
+      } else if (response.data.clock_show_seconds !== undefined) {
+        clockShowSeconds.value = response.data.clock_show_seconds;
+      }
+      if (response.data.clockPosition !== undefined) {
+        clockPosition.value = response.data.clockPosition;
+      } else if (response.data.clock_position !== undefined) {
+        clockPosition.value = response.data.clock_position;
+      } else {
+        clockPosition.value = "top-right"; // Default
+      }
+      if (response.data.clockSize !== undefined) {
+        clockSize.value = response.data.clockSize;
+      } else if (response.data.clock_size !== undefined) {
+        clockSize.value = response.data.clock_size;
+      } else {
+        clockSize.value = "medium"; // Default
+      }
       return response.data;
     } catch (err) {
       error.value = err.message;
@@ -365,6 +408,12 @@ export const useConfigStore = defineStore("config", () => {
     rebootComboDuration,
     imageDisplayMode,
     timezone,
+    clockEnabled,
+    clockDisplayMode,
+    clockShowDate,
+    clockShowSeconds,
+    clockPosition,
+    clockSize,
     loading,
     error,
     calendarWidth,

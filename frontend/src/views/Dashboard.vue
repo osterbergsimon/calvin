@@ -3,6 +3,11 @@
     <div class="dashboard">
       <div v-if="configStore.showUI" class="dashboard-header">
         <h1>Calvin Dashboard</h1>
+        <Clock
+          v-if="configStore.clockEnabled"
+          :display-mode="configStore.clockDisplayMode"
+          :show-date="configStore.clockShowDate"
+        />
         <div class="header-controls">
           <div class="status-indicator">
             <span :class="['status-dot', statusClass]" />
@@ -57,6 +62,14 @@
       <!-- Minimal UI overlay (shown when UI is hidden) -->
       <MinimalUIOverlay />
       <ModeIndicator />
+      
+      <!-- Clock (when display mode is 'always' - only shown when UI is off) -->
+      <Clock
+        v-if="configStore.clockEnabled && configStore.clockDisplayMode === 'always'"
+        :display-mode="configStore.clockDisplayMode"
+        :show-date="configStore.clockShowDate"
+        :class="['clock-overlay', `position-${configStore.clockPosition || 'top-right'}`]"
+      />
 
       <div class="dashboard-main" :class="mainLayoutClass">
         <!-- Fullscreen Mode (Photos or Web Services) -->
@@ -130,6 +143,7 @@ import PhotoSlideshow from "../components/PhotoSlideshow.vue";
 import WebServiceViewer from "../components/WebServiceViewer.vue";
 import MinimalUIOverlay from "../components/MinimalUIOverlay.vue";
 import ModeIndicator from "../components/ModeIndicator.vue";
+import Clock from "../components/Clock.vue";
 import { useConfigStore } from "../stores/config";
 import { useModeStore } from "../stores/mode";
 import { useRouter } from "vue-router";
@@ -238,20 +252,30 @@ const goToSettings = () => {
 
 const checkHealth = async () => {
   try {
-    const response = await axios.get("/api/health");
-    if (response.data.status === "healthy") {
+    const response = await axios.get("/api/health", { timeout: 5000 });
+    if (response.data && response.data.status === "healthy") {
       status.value = "healthy";
     } else {
       status.value = "unhealthy";
     }
   } catch (error) {
-    status.value = "error";
+    // Only set error if it's not a timeout or network error (might be temporary)
+    if (error.code === "ECONNABORTED" || error.message?.includes("timeout")) {
+      status.value = "checking...";
+    } else {
+      status.value = "error";
+    }
     console.error("Health check failed:", error);
   }
 };
 
+let healthInterval = null;
+
 onMounted(async () => {
+  // Check health immediately and then periodically
   checkHealth();
+  healthInterval = setInterval(checkHealth, 30000); // Check every 30 seconds
+  
   // Fetch config on mount
   await configStore.fetchConfig();
   // Set up polling for config updates (every 30 seconds)
@@ -266,10 +290,14 @@ onMounted(async () => {
 });
 
 onUnmounted(() => {
-  // Clean up polling interval
+  // Clean up polling intervals
   if (configPollInterval) {
     clearInterval(configPollInterval);
     configPollInterval = null;
+  }
+  if (healthInterval) {
+    clearInterval(healthInterval);
+    healthInterval = null;
   }
 });
 </script>
@@ -298,6 +326,8 @@ onUnmounted(() => {
   background: var(--bg-primary);
   border-radius: 8px;
   box-shadow: 0 2px 4px var(--shadow);
+  gap: 1rem;
+  flex-wrap: wrap;
 }
 
 .dashboard-header h1 {
@@ -536,5 +566,36 @@ onUnmounted(() => {
 
 .dashboard:not(:has(.dashboard-header)) .secondary-section {
   border-radius: 0;
+}
+
+.clock-overlay {
+  position: fixed;
+  z-index: 1000;
+  background: var(--bg-primary);
+  padding: 0.75rem 1rem;
+  border-radius: 8px;
+  box-shadow: 0 2px 8px var(--shadow);
+  /* Offset from edges to avoid covering calendar elements */
+}
+
+.clock-overlay.position-top-left {
+  top: 0.5rem;
+  left: 0.5rem;
+}
+
+.clock-overlay.position-top-right {
+  top: 0.5rem;
+  right: 1rem;
+  /* Additional offset for top-right to avoid calendar day markers */
+}
+
+.clock-overlay.position-bottom-left {
+  bottom: 0.5rem;
+  left: 0.5rem;
+}
+
+.clock-overlay.position-bottom-right {
+  bottom: 0.5rem;
+  right: 0.5rem;
 }
 </style>
