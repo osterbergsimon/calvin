@@ -5,7 +5,27 @@
       <button class="btn-back" @click="goBack">← Back to Dashboard</button>
     </div>
 
-    <div class="settings-content">
+    <div class="settings-layout">
+      <!-- Sidebar Navigation -->
+      <aside class="settings-sidebar">
+        <nav class="category-nav">
+          <button
+            v-for="category in categories"
+            :key="category.id"
+            class="category-btn"
+            :class="{ active: activeCategory === category.id }"
+            @click="activeCategory = category.id"
+          >
+            <span class="category-icon">{{ category.icon }}</span>
+            <span class="category-label">{{ category.label }}</span>
+          </button>
+        </nav>
+      </aside>
+
+      <!-- Main Content -->
+      <div class="settings-content">
+      <!-- Layout & Display Category -->
+      <template v-if="activeCategory === 'layout'">
       <!-- Display Settings -->
       <section
         class="settings-section collapsible"
@@ -266,7 +286,10 @@
           </div>
         </div>
       </section>
+      </template>
 
+      <!-- Content Category -->
+      <template v-if="activeCategory === 'content'">
       <!-- Image Settings -->
       <section
         class="settings-section collapsible"
@@ -372,7 +395,10 @@
           </div>
         </div>
       </section>
+      </template>
 
+      <!-- System Category -->
+      <template v-if="activeCategory === 'system'">
       <!-- Keyboard Settings -->
       <section
         class="settings-section collapsible"
@@ -432,7 +458,10 @@
           </div>
         </div>
       </section>
+      </template>
 
+      <!-- Content Category (continued) -->
+      <template v-if="activeCategory === 'content'">
       <!-- Calendar Settings -->
       <section
         class="settings-section collapsible"
@@ -878,7 +907,10 @@
           </div>
         </div>
       </section>
+      </template>
 
+      <!-- System Category (continued) -->
+      <template v-if="activeCategory === 'system'">
       <!-- Display Power Settings -->
       <section
         class="settings-section collapsible"
@@ -1103,8 +1135,12 @@
           </div>
         </div>
       </section>
+      </template>
+      </div>
+    </div>
 
-      <!-- Actions -->
+    <!-- Actions (Always visible at bottom) -->
+    <div class="settings-actions">
       <section class="settings-section">
         <h2>Actions</h2>
         <div class="actions-list">
@@ -1197,6 +1233,15 @@ const localConfig = ref({
       mealPlanCardSize: "medium",
       orientationFlipped: false,
 });
+
+// Category navigation
+const categories = [
+  { id: 'layout', label: 'Layout & Display', icon: '📐' },
+  { id: 'content', label: 'Content', icon: '📦' },
+  { id: 'system', label: 'System', icon: '⚙️' },
+];
+
+const activeCategory = ref('layout');
 
 // Collapsible sections state
 const expandedSections = ref({
@@ -2665,12 +2710,77 @@ onMounted(async () => {
   background: var(--text-primary);
 }
 
-.settings-content {
-  max-width: 1200px;
+.settings-layout {
+  display: grid;
+  grid-template-columns: 250px 1fr;
+  gap: 2rem;
+  max-width: 1400px;
   margin: 0 auto;
+}
+
+.settings-sidebar {
+  background: var(--bg-primary);
+  border-radius: 8px;
+  padding: 1rem;
+  box-shadow: 0 2px 4px var(--shadow);
+  height: fit-content;
+  position: sticky;
+  top: 2rem;
+}
+
+.category-nav {
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+}
+
+.category-btn {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+  padding: 0.875rem 1rem;
+  background: transparent;
+  border: none;
+  border-radius: 6px;
+  cursor: pointer;
+  transition: all 0.2s;
+  text-align: left;
+  color: var(--text-primary);
+  font-size: 1rem;
+  font-weight: 500;
+}
+
+.category-btn:hover {
+  background: var(--bg-secondary);
+}
+
+.category-btn.active {
+  background: var(--accent-primary);
+  color: #fff;
+  font-weight: 600;
+  box-shadow: 0 2px 4px rgba(33, 150, 243, 0.3);
+}
+
+.category-icon {
+  font-size: 1.25rem;
+  line-height: 1;
+}
+
+.category-label {
+  flex: 1;
+}
+
+.settings-content {
   display: flex;
   flex-direction: column;
   gap: 2rem;
+  min-width: 0; /* Prevent grid overflow */
+}
+
+.settings-actions {
+  max-width: 1400px;
+  margin: 2rem auto 0;
+  padding: 0 2rem;
 }
 
 .settings-section {
@@ -3571,5 +3681,59 @@ input:checked + .slider:before {
   background: var(--accent-primary);
   border-color: var(--accent-primary);
   color: #fff;
+}
+
+/* Responsive styles */
+@media (max-width: 1024px) {
+  .settings-layout {
+    grid-template-columns: 200px 1fr;
+    gap: 1.5rem;
+  }
+  
+  .category-label {
+    font-size: 0.9rem;
+  }
+}
+
+@media (max-width: 768px) {
+  .settings-page {
+    padding: 1rem;
+  }
+  
+  .settings-layout {
+    grid-template-columns: 1fr;
+    gap: 1rem;
+  }
+  
+  .settings-sidebar {
+    position: static;
+    order: -1;
+  }
+  
+  .category-nav {
+    flex-direction: row;
+    flex-wrap: wrap;
+    gap: 0.5rem;
+  }
+  
+  .category-btn {
+    flex: 1;
+    min-width: calc(33.333% - 0.5rem);
+    justify-content: center;
+    padding: 0.75rem 0.5rem;
+  }
+  
+  .category-icon {
+    display: none;
+  }
+  
+  .category-label {
+    font-size: 0.85rem;
+    text-align: center;
+  }
+  
+  .settings-actions {
+    padding: 0 1rem;
+  }
 }
 </style>
