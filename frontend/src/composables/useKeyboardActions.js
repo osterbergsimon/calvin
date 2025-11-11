@@ -2,6 +2,7 @@ import { useModeStore } from "../stores/mode";
 import { useCalendarStore } from "../stores/calendar";
 import { useImagesStore } from "../stores/images";
 import { useWebServicesStore } from "../stores/webServices";
+import { useConfigStore } from "../stores/config";
 import { useRouter } from "vue-router";
 
 /**
@@ -13,7 +14,41 @@ export function useKeyboardActions() {
   const calendarStore = useCalendarStore();
   const imagesStore = useImagesStore();
   const webServicesStore = useWebServicesStore();
+  const configStore = useConfigStore();
   const router = useRouter();
+
+  // Handle calendar mode key press - cycle view mode if already in calendar mode
+  const handleCalendarModePress = () => {
+    // If we're not in calendar mode, switch to it
+    if (modeStore.currentMode !== modeStore.MODES.CALENDAR) {
+      modeStore.setMode(modeStore.MODES.CALENDAR);
+      router.push("/");
+      return;
+    }
+
+    // We're already in calendar mode - cycle to next view mode
+    if (typeof configStore.cycleCalendarViewMode === 'function') {
+      configStore.cycleCalendarViewMode().then((newMode) => {
+        console.log(`Calendar view mode cycled to: ${newMode}`);
+      }).catch((err) => {
+        console.error("Failed to cycle calendar view mode:", err);
+      });
+    } else {
+      // Fallback: manually cycle if function doesn't exist (hot-reload issue)
+      const modes = ["month", "week", "day"];
+      const currentIndex = modes.indexOf(configStore.calendarViewMode);
+      const nextIndex = (currentIndex + 1) % modes.length;
+      const newMode = modes[nextIndex];
+      configStore.setCalendarViewMode(newMode);
+      // Try to persist to backend
+      if (typeof configStore.updateConfig === 'function') {
+        configStore.updateConfig({ calendarViewMode: newMode }).catch((err) => {
+          console.error("Failed to save calendar view mode:", err);
+        });
+      }
+      console.log(`Calendar view mode cycled to: ${newMode} (fallback)`);
+    }
+  };
 
   // Helper to get calendar date components
   const getDateComponents = (date, useUTC = false) => {
@@ -163,8 +198,7 @@ export function useKeyboardActions() {
     switch (action) {
       // Mode switching
       case "mode_calendar":
-        modeStore.setMode(modeStore.MODES.CALENDAR);
-        router.push("/");
+        handleCalendarModePress();
         break;
       case "mode_photos":
         modeStore.setMode(modeStore.MODES.PHOTOS);

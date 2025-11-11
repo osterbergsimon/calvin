@@ -15,7 +15,7 @@ export const useConfigStore = defineStore("config", () => {
   const showModeIndicator = ref(true); // Show mode indicator icon (when UI is hidden)
   const modeIndicatorTimeout = ref(5); // Mode indicator auto-hide timeout in seconds (0 = never hide, default 5)
   const photoRotationInterval = ref(30); // Photo rotation interval in seconds (default 30)
-  const calendarViewMode = ref("month"); // Calendar view mode: 'month' or 'rolling'
+  const calendarViewMode = ref("month"); // Calendar view mode: 'month' | 'week' | 'day' | 'rolling'
   const timeFormat = ref("24h"); // Time format: '12h' or '24h' (default: '24h')
   const weekStartDay = ref(0); // Week starting day (0=Sunday, 1=Monday, ..., 6=Saturday, default 0)
   const showWeekNumbers = ref(false); // Show week numbers in calendar (default false)
@@ -366,6 +366,24 @@ export const useConfigStore = defineStore("config", () => {
     calendarViewMode.value = mode;
   };
 
+  const cycleCalendarViewMode = async () => {
+    // Cycle through: month -> week -> day -> month
+    const modes = ["month", "week", "day"];
+    const currentIndex = modes.indexOf(calendarViewMode.value);
+    const nextIndex = (currentIndex + 1) % modes.length;
+    const newMode = modes[nextIndex];
+    calendarViewMode.value = newMode;
+    
+    // Persist to backend
+    try {
+      await updateConfig({ calendarViewMode: newMode });
+    } catch (err) {
+      console.error("Failed to save calendar view mode:", err);
+    }
+    
+    return newMode;
+  };
+
   const setTimeFormat = (format) => {
     timeFormat.value = format;
   };
@@ -470,6 +488,7 @@ export const useConfigStore = defineStore("config", () => {
     setModeIndicatorTimeout,
     setPhotoRotationInterval,
     setCalendarViewMode,
+    cycleCalendarViewMode,
     setTimeFormat,
     setWeekStartDay,
     setShowWeekNumbers,
