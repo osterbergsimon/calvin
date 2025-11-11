@@ -1,5 +1,5 @@
 <template>
-  <div v-if="event" class="event-detail-panel" @keydown.esc="close">
+  <div v-if="event" class="event-detail-panel" @keydown="handleKeydown">
     <div class="event-detail-header">
       <h3>{{ event.title }}</h3>
       <button class="btn-close" aria-label="Close" @click="close">×</button>
@@ -176,6 +176,16 @@ const calendarStore = useCalendarStore();
 
 const dayEvents = computed(() => calendarStore.dayEvents);
 const showAllDayEvents = computed(() => calendarStore.showAllDayEvents);
+
+// Handle keyboard navigation - only handle Escape here
+// Arrow keys are handled by the global keyboard mapping system via generic_next/generic_prev
+const handleKeydown = (event) => {
+  if (event.key === "Escape") {
+    close();
+    event.preventDefault();
+  }
+  // Let ArrowLeft/ArrowRight be handled by the keyboard mapping system
+};
 
 const selectEvent = (event) => {
   calendarStore.selectEvent(event);

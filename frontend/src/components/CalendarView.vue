@@ -104,9 +104,9 @@
                 :style="{ backgroundColor: getEventColor(event) }"
                 :title="getEventTitle(event)"
                 tabindex="0"
-                @click="selectEvent(event)"
-                @keydown.enter="selectEvent(event)"
-                @keydown.space.prevent="selectEvent(event)"
+                @click="selectEvent(event, day.date)"
+                @keydown.enter="selectEvent(event, day.date)"
+                @keydown.space.prevent="selectEvent(event, day.date)"
                 @focus="setFocusedEvent(dayIndex, eventIndex)"
               >
                 <span
@@ -609,8 +609,18 @@ const focusEvent = (dayIndex, eventIndex) => {
   }
 };
 
-const selectEvent = (event) => {
-  calendarStore.selectEvent(event);
+const selectEvent = (event, dayDate = null) => {
+  // If dayDate is not provided, try to find it from the calendar days
+  if (!dayDate) {
+    // Find which day this event belongs to in the calendar
+    for (const day of calendarDays.value) {
+      if (day.events.some(e => e.id === event.id)) {
+        dayDate = day.date;
+        break;
+      }
+    }
+  }
+  calendarStore.selectEvent(event, dayDate);
 };
 
 const closeEventDetail = () => {
@@ -690,10 +700,10 @@ const handleKeydown = (event) => {
             focusedEventIndex.value < day.events.length
           ) {
             // Expand the focused event
-            selectEvent(day.events[focusedEventIndex.value]);
+            selectEvent(day.events[focusedEventIndex.value], day.date);
           } else {
             // Expand the first event of the day
-            selectEvent(day.events[0]);
+            selectEvent(day.events[0], day.date);
           }
         }
       }

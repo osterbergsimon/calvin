@@ -14,7 +14,9 @@ class ConfigUpdate(BaseModel):
     """Configuration update model."""
 
     orientation: str | None = None
+    orientationFlipped: bool | None = None  # Whether orientation is flipped (180° rotation)
     calendarSplit: float | None = None
+    lastSideViewMode: str | None = None  # Last side view mode ('photos' | 'web_services')
     keyboardType: str | None = None
     photoFrameEnabled: bool | None = None
     photoFrameTimeout: int | None = None
@@ -61,6 +63,14 @@ async def get_config():
     # Set defaults if not present
     if "orientation" not in config:
         config["orientation"] = "landscape"
+    if "orientationFlipped" not in config and "orientation_flipped" not in config:
+        config["orientationFlipped"] = False  # Default to not flipped
+    elif "orientation_flipped" in config and "orientationFlipped" not in config:
+        config["orientationFlipped"] = config["orientation_flipped"]
+    if "lastSideViewMode" not in config and "last_side_view_mode" not in config:
+        config["lastSideViewMode"] = "photos"  # Default to photos
+    elif "last_side_view_mode" in config and "lastSideViewMode" not in config:
+        config["lastSideViewMode"] = config["last_side_view_mode"]
     if "calendarSplit" not in config and "calendar_split" not in config:
         config["calendarSplit"] = 70.0
     elif "calendar_split" in config and "calendarSplit" not in config:
@@ -256,6 +266,10 @@ async def get_config():
         config["clockSize"] = "medium"  # Default size
     elif "clock_size" in config and "clockSize" not in config:
         config["clockSize"] = config["clock_size"]
+    if "mealPlanCardSize" not in config and "meal_plan_card_size" not in config:
+        config["mealPlanCardSize"] = "medium"  # Default size
+    elif "meal_plan_card_size" in config and "mealPlanCardSize" not in config:
+        config["mealPlanCardSize"] = config["meal_plan_card_size"]
     if "gitBranch" not in config and "git_branch" not in config:
         config["gitBranch"] = "main"  # Default to main branch
     elif "git_branch" in config and "gitBranch" not in config:
@@ -270,6 +284,10 @@ async def update_config(config_update: ConfigUpdate):
     update_dict = config_update.model_dump(exclude_unset=True)
 
     # Convert camelCase to snake_case for storage
+    if "orientationFlipped" in update_dict:
+        update_dict["orientation_flipped"] = update_dict.pop("orientationFlipped")
+    if "lastSideViewMode" in update_dict:
+        update_dict["last_side_view_mode"] = update_dict.pop("lastSideViewMode")
     if "calendarSplit" in update_dict:
         update_dict["calendar_split"] = update_dict.pop("calendarSplit")
     if "keyboardType" in update_dict:

@@ -90,7 +90,7 @@
         </div>
         <div v-else-if="mealPlanData" class="service-data-content">
           <!-- Render based on display_schema render_template -->
-          <div v-if="currentService.display_schema?.render_template === 'meal_plan'" class="meal-plan-content">
+          <div v-if="currentService.display_schema?.render_template === 'meal_plan'" class="meal-plan-content" :class="`card-size-${mealPlanCardSize}`">
             <div class="meal-plan-header">
               <h3>Meal Plan</h3>
               <span class="meal-plan-dates" v-if="getMealPlanDateRange()">
@@ -193,6 +193,7 @@ const webServicesStore = useWebServicesStore();
 const modeStore = useModeStore();
 
 const showHeader = computed(() => configStore.showUI);
+const mealPlanCardSize = computed(() => configStore.mealPlanCardSize || "medium");
 const services = computed(() => webServicesStore.services);
 const currentServiceIndex = computed(
   () => webServicesStore.currentServiceIndex,
@@ -980,13 +981,44 @@ onUnmounted(() => {
 
 .meal-plan-items {
   display: grid;
-  grid-template-columns: repeat(auto-fill, minmax(300px, 1fr));
-  gap: 1.5rem;
+  gap: 1rem;
 }
 
+/* Card size variants */
+.meal-plan-content.card-size-small .meal-plan-items {
+  grid-template-columns: repeat(auto-fill, minmax(200px, 1fr));
+}
+
+.meal-plan-content.card-size-medium .meal-plan-items {
+  grid-template-columns: repeat(auto-fill, minmax(240px, 1fr));
+}
+
+.meal-plan-content.card-size-large .meal-plan-items {
+  grid-template-columns: repeat(auto-fill, minmax(300px, 1fr));
+}
+
+/* Portrait mode: stack cards vertically */
+@media (orientation: portrait) {
+  .meal-plan-items {
+    grid-template-columns: 1fr !important;
+    gap: 0.75rem;
+  }
+  
+  .meal-plan-item {
+    padding: 1rem;
+  }
+  
+  .meal-plan-header {
+    margin-bottom: 1rem;
+    padding-bottom: 1rem;
+  }
+}
+
+/* Smaller screens */
 @media (max-width: 768px) {
   .meal-plan-items {
-    grid-template-columns: 1fr;
+    grid-template-columns: 1fr !important;
+    gap: 0.75rem;
   }
 }
 

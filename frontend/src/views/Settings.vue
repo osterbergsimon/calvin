@@ -29,6 +29,17 @@
             </select>
           </div>
           <div class="setting-item">
+            <label>
+              <input
+                v-model="localConfig.orientationFlipped"
+                type="checkbox"
+                @change="updateOrientationFlipped"
+              />
+              Flip Orientation (180°)
+            </label>
+            <span class="help-text">Rotate the display 180 degrees (useful for mounted displays)</span>
+          </div>
+          <div class="setting-item">
             <label>Calendar Split (%)</label>
             <input
               v-model.number="localConfig.calendarSplit"
@@ -731,6 +742,22 @@
           }}</span>
         </div>
         <div v-show="expandedSections.webServices" class="section-content">
+          <!-- Meal Plan Settings -->
+          <div class="setting-item">
+            <label>Meal Plan Card Size</label>
+            <select
+              v-model="localConfig.mealPlanCardSize"
+              @change="updateMealPlanCardSize"
+            >
+              <option value="small">Small (fit 7+ cards)</option>
+              <option value="medium">Medium (default)</option>
+              <option value="large">Large</option>
+            </select>
+            <span class="help-text"
+              >Size of meal plan cards. Smaller size allows more cards to fit on screen.</span
+            >
+          </div>
+          
           <!-- Add Web Service Form -->
           <div class="add-web-service-form">
             <h3>Add Web Service</h3>
@@ -1167,6 +1194,8 @@ const localConfig = ref({
       clockShowSeconds: false,
       clockPosition: "top-right",
       clockSize: "medium",
+      mealPlanCardSize: "medium",
+      orientationFlipped: false,
 });
 
 // Collapsible sections state
@@ -1293,6 +1322,21 @@ const goBack = () => {
 const updateOrientation = () => {
   configStore.setOrientation(localConfig.value.orientation);
   saveConfig();
+};
+
+const updateOrientationFlipped = () => {
+  configStore.setOrientationFlipped(localConfig.value.orientationFlipped);
+  saveConfig();
+};
+
+const updateMealPlanCardSize = async () => {
+  try {
+    await configStore.updateConfig({
+      mealPlanCardSize: localConfig.value.mealPlanCardSize,
+    });
+  } catch (error) {
+    console.error("Failed to update meal plan card size:", error);
+  }
 };
 
 const updateCalendarSplit = () => {
@@ -1518,6 +1562,13 @@ const loadConfig = async () => {
     const response = await axios.get("/api/config");
     if (response.data) {
       localConfig.value.orientation = response.data.orientation || "landscape";
+      if (response.data.orientationFlipped !== undefined) {
+        localConfig.value.orientationFlipped = response.data.orientationFlipped;
+      } else if (response.data.orientation_flipped !== undefined) {
+        localConfig.value.orientationFlipped = response.data.orientation_flipped;
+      } else {
+        localConfig.value.orientationFlipped = false; // Default
+      }
       localConfig.value.calendarSplit = response.data.calendarSplit || 70;
       localConfig.value.keyboardType = response.data.keyboardType || "7-button";
       localConfig.value.photoFrameEnabled =

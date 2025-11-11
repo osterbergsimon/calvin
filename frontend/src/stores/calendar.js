@@ -9,6 +9,7 @@ export const useCalendarStore = defineStore("calendar", () => {
   const error = ref(null);
   const currentDate = ref(new Date());
   const selectedEvent = ref(null); // Currently selected/expanded event
+  const selectedDate = ref(null); // The actual date that was selected (for multi-day events)
   const dayEvents = ref([]); // All events for the expanded day
   const showAllDayEvents = ref(false); // Flag to show all events' details when expanding "today"
 
@@ -124,19 +125,32 @@ export const useCalendarStore = defineStore("calendar", () => {
     return date1.day - date2.day;
   };
 
-  const selectEvent = (event) => {
+  const selectEvent = (event, selectedDayDate = null) => {
     selectedEvent.value = event;
+    // Store the selected date (the actual day that was clicked, not the event's start date)
+    // This is important for multi-day events
+    if (selectedDayDate) {
+      selectedDate.value = new Date(selectedDayDate);
+    } else if (event) {
+      // Fallback to event's start date if no day date provided
+      selectedDate.value = new Date(event.start);
+    } else {
+      selectedDate.value = null;
+    }
+    
     // Also collect all events for the same day using the same logic as CalendarView
     if (event) {
-      const eventStart = new Date(event.start);
+      // Use the selected date (the actual day clicked) instead of event's start date
+      const dateToUse = selectedDate.value || new Date(event.start);
+      const eventStart = dateToUse;
 
-      // Get the calendar date of the selected event
+      // Get the calendar date of the selected day
       let eventDateComponents;
       if (event.all_day) {
-        // For all-day events, use the start date components
+        // For all-day events, use the selected date components
         eventDateComponents = getDateComponents(eventStart, false);
       } else {
-        // For timed events, use the start date
+        // For timed events, use the selected date
         eventDateComponents = getDateComponents(eventStart, false);
       }
 
@@ -195,6 +209,7 @@ export const useCalendarStore = defineStore("calendar", () => {
 
   const clearSelectedEvent = () => {
     selectedEvent.value = null;
+    selectedDate.value = null;
     dayEvents.value = [];
     showAllDayEvents.value = false;
   };
@@ -206,6 +221,7 @@ export const useCalendarStore = defineStore("calendar", () => {
     error,
     currentDate,
     selectedEvent,
+    selectedDate,
     dayEvents,
     showAllDayEvents,
     fetchEvents,

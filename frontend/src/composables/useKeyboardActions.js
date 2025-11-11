@@ -15,6 +15,141 @@ export function useKeyboardActions() {
   const webServicesStore = useWebServicesStore();
   const router = useRouter();
 
+  // Helper to get calendar date components
+  const getDateComponents = (date, useUTC = false) => {
+    const d = new Date(date);
+    if (useUTC) {
+      return {
+        year: d.getUTCFullYear(),
+        month: d.getUTCMonth(),
+        day: d.getUTCDate(),
+      };
+    } else {
+      return { year: d.getFullYear(), month: d.getMonth(), day: d.getDate() };
+    }
+  };
+
+  // Helper to compare date components
+  const compareDateComponents = (date1, date2) => {
+    if (date1.year !== date2.year) return date1.year - date2.year;
+    if (date1.month !== date2.month) return date1.month - date2.month;
+    return date1.day - date2.day;
+  };
+
+  // Helper to get events for a specific date (handles multi-day events)
+  const getEventsForDate = (date) => {
+    if (!calendarStore.events || calendarStore.events.length === 0) return [];
+    
+    const dateComponents = getDateComponents(date, false);
+    
+    return calendarStore.events.filter((event) => {
+      const eventStart = new Date(event.start);
+      const eventEnd = new Date(event.end);
+
+      if (event.all_day) {
+        // All-day events: compare calendar date components
+        const eStartComponents = getDateComponents(eventStart, false);
+        const durationMs = eventEnd.getTime() - eventStart.getTime();
+        const durationDays = Math.floor(durationMs / (1000 * 60 * 60 * 24));
+        const eEndDate = new Date(eventStart);
+        eEndDate.setDate(eventStart.getDate() + durationDays);
+        const eEndComponents = getDateComponents(eEndDate, false);
+
+        const startCompare = compareDateComponents(
+          eStartComponents,
+          dateComponents,
+        );
+        const endCompare = compareDateComponents(
+          dateComponents,
+          eEndComponents,
+        );
+        return startCompare <= 0 && endCompare <= 0;
+      } else {
+        // Timed events: check if event overlaps with the date
+        const eStartComponents = getDateComponents(eventStart, false);
+        const eEndComponents = getDateComponents(eventEnd, false);
+
+        const startCompare = compareDateComponents(
+          eStartComponents,
+          dateComponents,
+        );
+        const endCompare = compareDateComponents(
+          dateComponents,
+          eEndComponents,
+        );
+        return startCompare <= 0 && endCompare <= 0;
+      }
+    });
+  };
+
+  // Navigate to next day with events (skips days without events)
+  const navigateToNextDayWithEvents = () => {
+    if (!calendarStore.selectedEvent) return;
+    
+    // Use the selectedDate (the actual day that was clicked) instead of event's start date
+    // This correctly handles multi-day events
+    let currentDate;
+    if (calendarStore.selectedDate) {
+      currentDate = new Date(calendarStore.selectedDate);
+    } else if (calendarStore.dayEvents && calendarStore.dayEvents.length > 0) {
+      // Fallback: use the first event in dayEvents
+      const firstDayEvent = calendarStore.dayEvents[0];
+      currentDate = new Date(firstDayEvent.start);
+    } else {
+      // Last fallback: use selected event's start date
+      currentDate = new Date(calendarStore.selectedEvent.start);
+    }
+    
+    // Start from the next day
+    let searchDate = new Date(currentDate);
+    searchDate.setDate(searchDate.getDate() + 1);
+    
+    // Search up to 30 days ahead for a day with events
+    for (let i = 0; i < 30; i++) {
+      const eventsForDay = getEventsForDate(searchDate);
+      if (eventsForDay.length > 0) {
+        // Pass the searchDate so the calendar store knows which day was selected
+        calendarStore.selectEvent(eventsForDay[0], searchDate);
+        return;
+      }
+      searchDate.setDate(searchDate.getDate() + 1);
+    }
+  };
+
+  // Navigate to previous day with events (skips days without events)
+  const navigateToPreviousDayWithEvents = () => {
+    if (!calendarStore.selectedEvent) return;
+    
+    // Use the selectedDate (the actual day that was clicked) instead of event's start date
+    // This correctly handles multi-day events
+    let currentDate;
+    if (calendarStore.selectedDate) {
+      currentDate = new Date(calendarStore.selectedDate);
+    } else if (calendarStore.dayEvents && calendarStore.dayEvents.length > 0) {
+      // Fallback: use the first event in dayEvents
+      const firstDayEvent = calendarStore.dayEvents[0];
+      currentDate = new Date(firstDayEvent.start);
+    } else {
+      // Last fallback: use selected event's start date
+      currentDate = new Date(calendarStore.selectedEvent.start);
+    }
+    
+    // Start from the previous day
+    let searchDate = new Date(currentDate);
+    searchDate.setDate(searchDate.getDate() - 1);
+    
+    // Search up to 30 days back for a day with events
+    for (let i = 0; i < 30; i++) {
+      const eventsForDay = getEventsForDate(searchDate);
+      if (eventsForDay.length > 0) {
+        // Pass the searchDate so the calendar store knows which day was selected
+        calendarStore.selectEvent(eventsForDay[0], searchDate);
+        return;
+      }
+      searchDate.setDate(searchDate.getDate() - 1);
+    }
+  };
+
   const handleAction = (action) => {
     // Handle generic actions that adapt to current mode
     if (action === "generic_next") {
@@ -143,13 +278,26 @@ export function useKeyboardActions() {
             // Set flag to show all events' details
             calendarStore.setShowAllDayEvents(true);
             // Expand the first event (the panel will show all events' details)
-            calendarStore.selectEvent(todayEvents[0]);
+            // Pass today's date so it knows which day was selected
+            calendarStore.selectEvent(todayEvents[0], today);
           }
         }
         break;
       case "calendar_collapse":
         if (modeStore.currentMode === modeStore.MODES.CALENDAR) {
           calendarStore.clearSelectedEvent();
+        }
+        break;
+      case "calendar_next_day":
+        // Navigate to next day when event detail panel is open
+        if (modeStore.currentMode === modeStore.MODES.CALENDAR && calendarStore.selectedEvent) {
+          navigateToNextDayWithEvents();
+        }
+        break;
+      case "calendar_prev_day":
+        // Navigate to previous day when event detail panel is open
+        if (modeStore.currentMode === modeStore.MODES.CALENDAR && calendarStore.selectedEvent) {
+          navigateToPreviousDayWithEvents();
         }
         break;
 
@@ -279,6 +427,10 @@ export function useKeyboardActions() {
       : modeStore.currentMode;
 
     if (activeMode === modeStore.MODES.CALENDAR) {
+      // If event detail panel is open, navigate to next day; otherwise next month
+      if (calendarStore.selectedEvent) {
+        return "calendar_next_day";
+      }
       return "calendar_next_month";
     } else if (activeMode === modeStore.MODES.PHOTOS) {
       return "images_next";
@@ -297,6 +449,10 @@ export function useKeyboardActions() {
       : modeStore.currentMode;
 
     if (activeMode === modeStore.MODES.CALENDAR) {
+      // If event detail panel is open, navigate to previous day; otherwise previous month
+      if (calendarStore.selectedEvent) {
+        return "calendar_prev_day";
+      }
       return "calendar_prev_month";
     } else if (activeMode === modeStore.MODES.PHOTOS) {
       return "images_prev";

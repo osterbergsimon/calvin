@@ -4,8 +4,10 @@ import axios from "axios";
 
 export const useConfigStore = defineStore("config", () => {
   const orientation = ref("landscape"); // 'landscape' | 'portrait'
+  const orientationFlipped = ref(false); // Whether orientation is flipped (180° rotation)
   const calendarSplit = ref(70); // Percentage for calendar (66-75%, default 70%)
   const sideViewPosition = ref("right"); // 'left' | 'right' for landscape, 'top' | 'bottom' for portrait
+  const lastSideViewMode = ref("photos"); // Track last side view mode ('photos' | 'web_services')
   const showWebServices = ref(false); // Toggle for web services view
   const photoFrameEnabled = ref(false); // Photo frame mode enabled
   const photoFrameTimeout = ref(300); // Photo frame timeout in seconds (5 minutes default)
@@ -45,11 +47,20 @@ export const useConfigStore = defineStore("config", () => {
   const clockShowSeconds = ref(false); // Show seconds in clock
   const clockPosition = ref("top-right"); // Clock position: 'top-left' | 'top-right' | 'bottom-left' | 'bottom-right'
   const clockSize = ref("medium"); // Clock size: 'small' | 'medium' | 'large'
+  const mealPlanCardSize = ref("medium"); // Meal plan card size: 'small' | 'medium' | 'large'
   const loading = ref(false);
   const error = ref(null);
 
   const setOrientation = (newOrientation) => {
     orientation.value = newOrientation;
+  };
+
+  const setOrientationFlipped = (flipped) => {
+    orientationFlipped.value = flipped;
+  };
+
+  const setLastSideViewMode = (mode) => {
+    lastSideViewMode.value = mode;
   };
 
   const setCalendarSplit = (percentage) => {
@@ -72,6 +83,18 @@ export const useConfigStore = defineStore("config", () => {
       // Update all config values to ensure reactivity
       if (response.data.orientation !== undefined) {
         orientation.value = response.data.orientation;
+      }
+      if (response.data.orientationFlipped !== undefined) {
+        orientationFlipped.value = response.data.orientationFlipped;
+      } else if (response.data.orientation_flipped !== undefined) {
+        orientationFlipped.value = response.data.orientation_flipped;
+      }
+      if (response.data.lastSideViewMode !== undefined) {
+        lastSideViewMode.value = response.data.lastSideViewMode;
+      } else if (response.data.last_side_view_mode !== undefined) {
+        lastSideViewMode.value = response.data.last_side_view_mode;
+      } else {
+        lastSideViewMode.value = "photos"; // Default
       }
       if (response.data.calendarSplit !== undefined) {
         calendarSplit.value = response.data.calendarSplit;
@@ -275,6 +298,13 @@ export const useConfigStore = defineStore("config", () => {
       } else {
         clockSize.value = "medium"; // Default
       }
+      if (response.data.mealPlanCardSize !== undefined) {
+        mealPlanCardSize.value = response.data.mealPlanCardSize;
+      } else if (response.data.meal_plan_card_size !== undefined) {
+        mealPlanCardSize.value = response.data.meal_plan_card_size;
+      } else {
+        mealPlanCardSize.value = "medium"; // Default
+      }
       return response.data;
     } catch (err) {
       error.value = err.message;
@@ -292,6 +322,12 @@ export const useConfigStore = defineStore("config", () => {
       // TODO: Update local config from response
       if (config.orientation) {
         orientation.value = config.orientation;
+      }
+      if (config.orientationFlipped !== undefined) {
+        orientationFlipped.value = config.orientationFlipped;
+      }
+      if (config.lastSideViewMode) {
+        lastSideViewMode.value = config.lastSideViewMode;
       }
       if (config.calendarSplit) {
         calendarSplit.value = config.calendarSplit;
@@ -381,8 +417,10 @@ export const useConfigStore = defineStore("config", () => {
 
   return {
     orientation,
+    orientationFlipped,
     calendarSplit,
     showWebServices,
+    lastSideViewMode,
     photoFrameEnabled,
     photoFrameTimeout,
     showUI,
@@ -414,11 +452,14 @@ export const useConfigStore = defineStore("config", () => {
     clockShowSeconds,
     clockPosition,
     clockSize,
+    mealPlanCardSize,
     loading,
     error,
     calendarWidth,
     photosWidth,
     setOrientation,
+    setOrientationFlipped,
+    setLastSideViewMode,
     setCalendarSplit,
     toggleWebServices,
     setPhotoFrameEnabled,

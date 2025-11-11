@@ -120,7 +120,11 @@
               :auto-rotate="true"
               :rotation-interval="configStore.photoRotationInterval * 1000"
             />
-            <!-- Default: show photos when in calendar mode -->
+            <!-- When in calendar mode, show last side view mode (preserve state) -->
+            <WebServiceViewer
+              v-else-if="configStore.lastSideViewMode === 'web_services'"
+              :is-fullscreen="false"
+            />
             <PhotoSlideshow
               v-else
               :is-fullscreen="false"
@@ -238,10 +242,12 @@ const toggleSideViewPosition = async () => {
 };
 
 const showWebServices = () => {
+  configStore.setLastSideViewMode("web_services");
   modeStore.setMode(modeStore.MODES.WEB_SERVICES);
 };
 
 const showPhotos = () => {
+  configStore.setLastSideViewMode("photos");
   modeStore.setMode(modeStore.MODES.PHOTOS);
 };
 
