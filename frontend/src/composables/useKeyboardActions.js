@@ -2,6 +2,7 @@ import { useModeStore } from "../stores/mode";
 import { useCalendarStore } from "../stores/calendar";
 import { useImagesStore } from "../stores/images";
 import { useWebServicesStore } from "../stores/webServices";
+import { useConfigStore } from "../stores/config";
 import { useRouter } from "vue-router";
 
 /**
@@ -13,7 +14,48 @@ export function useKeyboardActions() {
   const calendarStore = useCalendarStore();
   const imagesStore = useImagesStore();
   const webServicesStore = useWebServicesStore();
+  const configStore = useConfigStore();
   const router = useRouter();
+
+  // Handle calendar mode key press - cycle view mode if already in calendar mode
+  const handleCalendarModePress = () => {
+    // If we're not in calendar mode, switch to it
+    if (modeStore.currentMode !== modeStore.MODES.CALENDAR) {
+      // When switching to calendar mode, preserve the current side view
+      const currentMode = modeStore.currentMode;
+      if (currentMode === modeStore.MODES.WEB_SERVICES) {
+        configStore.setLastSideViewMode("web_services");
+      } else if (currentMode === modeStore.MODES.PHOTOS) {
+        configStore.setLastSideViewMode("photos");
+      }
+      modeStore.setMode(modeStore.MODES.CALENDAR);
+      router.push("/");
+      return;
+    }
+
+    // We're already in calendar mode - cycle to next view mode
+    if (typeof configStore.cycleCalendarViewMode === 'function') {
+      configStore.cycleCalendarViewMode().then((newMode) => {
+        console.log(`Calendar view mode cycled to: ${newMode}`);
+      }).catch((err) => {
+        console.error("Failed to cycle calendar view mode:", err);
+      });
+    } else {
+      // Fallback: manually cycle if function doesn't exist (hot-reload issue)
+      const modes = ["month", "week", "day"];
+      const currentIndex = modes.indexOf(configStore.calendarViewMode);
+      const nextIndex = (currentIndex + 1) % modes.length;
+      const newMode = modes[nextIndex];
+      configStore.setCalendarViewMode(newMode);
+      // Try to persist to backend
+      if (typeof configStore.updateConfig === 'function') {
+        configStore.updateConfig({ calendarViewMode: newMode }).catch((err) => {
+          console.error("Failed to save calendar view mode:", err);
+        });
+      }
+      console.log(`Calendar view mode cycled to: ${newMode} (fallback)`);
+    }
+  };
 
   // Helper to get calendar date components
   const getDateComponents = (date, useUTC = false) => {
@@ -151,11 +193,14 @@ export function useKeyboardActions() {
   };
 
   const handleAction = (action) => {
+    console.log("[Keyboard] handleAction called with:", action, "currentMode:", modeStore.currentMode);
     // Handle generic actions that adapt to current mode
     if (action === "generic_next") {
       action = getGenericNextAction();
+      console.log("[Keyboard] generic_next resolved to:", action);
     } else if (action === "generic_prev") {
       action = getGenericPrevAction();
+      console.log("[Keyboard] generic_prev resolved to:", action);
     } else if (action === "generic_expand_close") {
       action = getGenericExpandCloseAction();
     }
@@ -163,8 +208,7 @@ export function useKeyboardActions() {
     switch (action) {
       // Mode switching
       case "mode_calendar":
-        modeStore.setMode(modeStore.MODES.CALENDAR);
-        router.push("/");
+        handleCalendarModePress();
         break;
       case "mode_photos":
         modeStore.setMode(modeStore.MODES.PHOTOS);
@@ -371,7 +415,9 @@ export function useKeyboardActions() {
           (modeStore.isFullscreen &&
             modeStore.fullscreenMode === modeStore.MODES.WEB_SERVICES)
         ) {
+          console.log("[Keyboard] web_service_next: current index", webServicesStore.currentServiceIndex, "services count", webServicesStore.services.length);
           webServicesStore.nextService();
+          console.log("[Keyboard] web_service_next: new index", webServicesStore.currentServiceIndex);
         } else {
           // Switch to web services mode (side view)
           modeStore.setMode(modeStore.MODES.WEB_SERVICES);
@@ -385,7 +431,9 @@ export function useKeyboardActions() {
           (modeStore.isFullscreen &&
             modeStore.fullscreenMode === modeStore.MODES.WEB_SERVICES)
         ) {
+          console.log("[Keyboard] web_service_prev: current index", webServicesStore.currentServiceIndex, "services count", webServicesStore.services.length);
           webServicesStore.previousService();
+          console.log("[Keyboard] web_service_prev: new index", webServicesStore.currentServiceIndex);
         } else {
           // Switch to web services mode (side view)
           modeStore.setMode(modeStore.MODES.WEB_SERVICES);

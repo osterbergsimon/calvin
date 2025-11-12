@@ -77,109 +77,20 @@
         <p class="help-text">Add web services in Settings</p>
       </div>
 
-      <!-- API-based Service (e.g., Mealie) -->
-      <div v-else-if="currentService && getServiceDisplayType(currentService) === 'api'" class="service-container api-service-container">
-        <div v-if="mealPlanLoading" class="loading-state">
-          <div class="spinner" />
-          <p>Loading service data...</p>
-        </div>
-        <div v-else-if="mealPlanError" class="error-state">
-          <h3>⚠️ Error Loading Service Data</h3>
-          <p>{{ mealPlanError }}</p>
-          <button class="btn-retry" @click="loadServiceData">Retry</button>
-        </div>
-        <div v-else-if="mealPlanData" class="service-data-content">
-          <!-- Render based on display_schema render_template -->
-          <div v-if="currentService.display_schema?.render_template === 'meal_plan'" class="meal-plan-content" :class="`card-size-${mealPlanCardSize}`">
-            <div class="meal-plan-header">
-              <h3>Meal Plan</h3>
-              <span class="meal-plan-dates" v-if="getMealPlanDateRange()">
-                {{ getMealPlanDateRange() }}
-              </span>
-            </div>
-            <div v-if="getMealPlanItems().length > 0" class="meal-plan-items">
-              <div
-                v-for="item in getMealPlanItems()"
-                :key="item.id || item.date"
-                class="meal-plan-item"
-              >
-                <div class="meal-plan-date" v-if="item.date">{{ formatDate(item.date) }}</div>
-                <div class="meal-plan-meals" v-if="item.meals && item.meals.length > 0">
-                  <div 
-                    v-for="meal in item.meals" 
-                    :key="meal.id || `${item.date}-${meal.type}`" 
-                    class="meal-item"
-                    :class="{ 'clickable': getRecipeUrl(meal) }"
-                    @click="openRecipe(meal)"
-                  >
-                    <span class="meal-type">{{ formatMealType(meal.type) }}</span>
-                    <span class="meal-name">{{ meal.recipeName || meal.recipe?.name || meal.title || 'No recipe' }}</span>
-                  </div>
-                </div>
-                <div v-else class="no-meals-day">
-                  <p>No meals planned</p>
-                </div>
-              </div>
-            </div>
-            <div v-else class="no-meals">
-              <p>No meals planned for this week</p>
-            </div>
-          </div>
-          <!-- Generic API data display (fallback) -->
-          <div v-else class="generic-api-content">
-            <pre>{{ JSON.stringify(mealPlanData, null, 2) }}</pre>
-          </div>
-        </div>
-      </div>
-
-      <!-- Service Iframe (for non-Mealie services) -->
+      <!-- Service Content (uses ServiceViewer for routing) -->
       <div v-else-if="currentService" class="service-container">
-        <iframe
-          ref="serviceIframe"
-          :src="currentService.url"
-          class="service-iframe"
-          :class="{ 'iframe-error': iframeError }"
-          frameborder="0"
-          allowfullscreen
-          @load="handleIframeLoad"
-          @error="handleIframeError"
-        />
-
-        <!-- CORS/Iframe Error Message -->
-        <div v-if="iframeError" class="iframe-error-message">
-          <div class="error-content">
-            <h3>⚠️ Cannot Display Service</h3>
-            <p>
-              This service cannot be embedded in an iframe due to security
-              restrictions (CORS/X-Frame-Options).
-            </p>
-            <p class="service-url">
-              {{ currentService.url }}
-            </p>
-            <div class="error-actions">
-              <a
-                :href="currentService.url"
-                target="_blank"
-                rel="noopener noreferrer"
-                class="btn-open-new"
-              >
-                Open in New Window
-              </a>
-              <button class="btn-retry" @click="retryLoad">Retry</button>
-            </div>
-          </div>
-        </div>
+        <ServiceViewer :key="currentService.id" :service="currentService" />
       </div>
     </div>
   </div>
 </template>
 
 <script setup>
-import { ref, computed, onMounted, watch, onUnmounted } from "vue";
-import axios from "axios";
+import { computed, onMounted, onUnmounted } from "vue";
 import { useConfigStore } from "../stores/config";
 import { useWebServicesStore } from "../stores/webServices";
 import { useModeStore } from "../stores/mode";
+import ServiceViewer from "./service/ServiceViewer.vue";
 
 const props = defineProps({
   isFullscreen: {
@@ -193,7 +104,6 @@ const webServicesStore = useWebServicesStore();
 const modeStore = useModeStore();
 
 const showHeader = computed(() => configStore.showUI);
-const mealPlanCardSize = computed(() => configStore.mealPlanCardSize || "medium");
 const services = computed(() => webServicesStore.services);
 const currentServiceIndex = computed(
   () => webServicesStore.currentServiceIndex,
@@ -201,14 +111,7 @@ const currentServiceIndex = computed(
 const currentService = computed(() => webServicesStore.getCurrentService());
 const loading = computed(() => webServicesStore.loading);
 
-const serviceIframe = ref(null);
-const iframeError = ref(false);
-const iframeLoadTimeout = ref(null);
-
-// Mealie meal plan state
-const mealPlanLoading = ref(false);
-const mealPlanError = ref(null);
-const mealPlanData = ref(null);
+// ServiceViewer now handles all service rendering logic
 
 const close = () => {
   if (props.isFullscreen) {
@@ -232,391 +135,17 @@ const toggleFullscreen = () => {
 
 const nextService = () => {
   webServicesStore.nextService();
-  iframeError.value = false;
 };
 
 const previousService = () => {
   webServicesStore.previousService();
-  iframeError.value = false;
 };
 
 const setServiceIndex = (index) => {
   webServicesStore.setServiceIndex(index);
-  iframeError.value = false;
-  // Load data if it's an API-based service
-  if (currentService.value && getServiceDisplayType(currentService.value) === "api") {
-    loadServiceData();
-  }
 };
 
-const getServiceDisplayType = (service) => {
-  // Get display type from service's display_schema
-  if (service.display_schema && service.display_schema.type) {
-    return service.display_schema.type;
-  }
-  // Fallback: check URL pattern for backward compatibility
-  if (service.url && service.url.includes("/api/web-services/") && service.url.includes("/mealplan")) {
-    return "api";
-  }
-  // Default to iframe
-  return "iframe";
-};
-
-const getServiceApiEndpoint = (service) => {
-  // Get API endpoint from display_schema, replacing {service_id} placeholder
-  if (service.display_schema && service.display_schema.api_endpoint) {
-    return service.display_schema.api_endpoint.replace("{service_id}", service.id);
-  }
-  // Fallback: use URL directly
-  return service.url;
-};
-
-const loadServiceData = async () => {
-  if (!currentService.value || getServiceDisplayType(currentService.value) !== "api") {
-    return;
-  }
-
-  mealPlanLoading.value = true;
-  mealPlanError.value = null;
-
-  try {
-    // Request a full week (7 days) from today
-    const today = new Date();
-    const endDate = new Date(today);
-    endDate.setDate(endDate.getDate() + 7);
-    
-    const startDateStr = today.toISOString().split('T')[0];
-    const endDateStr = endDate.toISOString().split('T')[0];
-    
-    const endpoint = getServiceApiEndpoint(currentService.value);
-    const response = await axios.get(endpoint, {
-      params: {
-        start_date: startDateStr,
-        end_date: endDateStr
-      }
-    });
-    mealPlanData.value = response.data;
-    console.log("[Mealie Frontend] Received meal plan data:", mealPlanData.value);
-    console.log("[Mealie Frontend] Requested date range:", startDateStr, "to", endDateStr);
-    if (mealPlanData.value && mealPlanData.value.items) {
-      console.log("[Mealie Frontend] Items count:", mealPlanData.value.items.length);
-      if (mealPlanData.value.items.length > 0) {
-        console.log("[Mealie Frontend] First item:", mealPlanData.value.items[0]);
-      }
-    }
-  } catch (error) {
-    mealPlanError.value = error.response?.data?.detail || error.message || "Failed to load service data";
-    console.error("Error loading service data:", error);
-  } finally {
-    mealPlanLoading.value = false;
-  }
-};
-
-// Helper functions to handle different Mealie API response structures
-const getMealPlanItems = () => {
-  if (!mealPlanData.value) return [];
-  
-  // Get raw items from response
-  let rawItems = [];
-  
-  // Handle paginated response: { items: [...], total: N }
-  if (mealPlanData.value.items && Array.isArray(mealPlanData.value.items)) {
-    rawItems = mealPlanData.value.items;
-  }
-  // Handle direct array response: [...]
-  else if (Array.isArray(mealPlanData.value)) {
-    rawItems = mealPlanData.value;
-  }
-  // Handle single item: { date: "...", meals: [...] }
-  else if (mealPlanData.value.date && mealPlanData.value.meals) {
-    return [mealPlanData.value];
-  }
-  
-  if (rawItems.length === 0) return [];
-  
-  // Mealie API returns individual meal entries, not grouped by day
-  // Each item has: date, entryType, title, recipe, etc.
-  // We need to group by date and create a structure like:
-  // [{ date: "2025-11-10", meals: [{ type: "breakfast", recipe: {...} }] }]
-  
-  // Group meals by date
-  const mealsByDate = {};
-  rawItems.forEach(item => {
-    const date = item.date;
-    if (!date) return;
-    
-    if (!mealsByDate[date]) {
-      mealsByDate[date] = {
-        date: date,
-        meals: []
-      };
-    }
-    
-    // Add meal entry - preserve all recipe data for URL construction
-    mealsByDate[date].meals.push({
-      id: item.id,
-      type: item.entryType || item.type || 'meal',
-      title: item.title,
-      text: item.text,
-      recipe: item.recipe, // Full recipe object (may contain slug, id, etc.)
-      recipeId: item.recipeId, // Recipe ID from meal plan entry
-      recipeName: item.recipe?.name || item.title || 'No recipe'
-    });
-  });
-  
-  // Convert to array and sort by date
-  const groupedItems = Object.values(mealsByDate).sort((a, b) => {
-    return new Date(a.date) - new Date(b.date);
-  });
-  
-  // Fill in missing days in the week range
-  const startDate = getStartDate();
-  const endDate = getEndDate();
-  const allDays = [];
-  
-  if (startDate && endDate) {
-    const current = new Date(startDate);
-    const end = new Date(endDate);
-    
-    while (current <= end) {
-      const dateStr = current.toISOString().split('T')[0];
-      const existingDay = groupedItems.find(item => item.date === dateStr);
-      
-      if (existingDay) {
-        allDays.push(existingDay);
-      } else {
-        // Add empty day
-        allDays.push({
-          date: dateStr,
-          meals: []
-        });
-      }
-      
-      current.setDate(current.getDate() + 1);
-    }
-  } else {
-    // If we can't determine the range, just return grouped items
-    return groupedItems;
-  }
-  
-  return allDays;
-};
-
-const getStartDate = () => {
-  if (!mealPlanData.value) return null;
-  
-  // Try to get from response metadata
-  if (mealPlanData.value.start_date) {
-    return mealPlanData.value.start_date;
-  }
-  
-  // Calculate from items
-  const items = mealPlanData.value.items || (Array.isArray(mealPlanData.value) ? mealPlanData.value : []);
-  if (items.length > 0) {
-    const dates = items.map(item => item.date).filter(Boolean).sort();
-    if (dates.length > 0) {
-      return dates[0];
-    }
-  }
-  
-  // Default to today
-  return new Date().toISOString().split('T')[0];
-};
-
-const getEndDate = () => {
-  if (!mealPlanData.value) return null;
-  
-  // Try to get from response metadata
-  if (mealPlanData.value.end_date) {
-    return mealPlanData.value.end_date;
-  }
-  
-  // Calculate from items
-  const items = mealPlanData.value.items || (Array.isArray(mealPlanData.value) ? mealPlanData.value : []);
-  if (items.length > 0) {
-    const dates = items.map(item => item.date).filter(Boolean).sort();
-    if (dates.length > 0) {
-      return dates[dates.length - 1];
-    }
-  }
-  
-  // Default to 7 days from today
-  const date = new Date();
-  date.setDate(date.getDate() + 7);
-  return date.toISOString().split('T')[0];
-};
-
-const getMealPlanDateRange = () => {
-  if (!mealPlanData.value) return "";
-  
-  // Try to get date range from response metadata
-  if (mealPlanData.value.start_date && mealPlanData.value.end_date) {
-    return formatDateRange(mealPlanData.value.start_date, mealPlanData.value.end_date);
-  }
-  
-  // Calculate from items if available
-  const items = getMealPlanItems();
-  if (items.length > 0) {
-    const dates = items.map(item => item.date).filter(Boolean).sort();
-    if (dates.length > 0) {
-      return formatDateRange(dates[0], dates[dates.length - 1]);
-    }
-  }
-  
-  return "";
-};
-
-const formatMealType = (type) => {
-  if (!type) return "Meal";
-  // Capitalize first letter
-  return type.charAt(0).toUpperCase() + type.slice(1).toLowerCase();
-};
-
-const formatDate = (dateString) => {
-  if (!dateString) return "";
-  const date = new Date(dateString);
-  return date.toLocaleDateString("en-US", { weekday: "short", month: "short", day: "numeric" });
-};
-
-const getMealieUrl = () => {
-  // Get mealie_url from response metadata
-  if (mealPlanData.value && mealPlanData.value._metadata) {
-    return mealPlanData.value._metadata.mealie_url;
-  }
-  return null;
-};
-
-const getRecipeUrl = (meal) => {
-  if (!meal) return null;
-  
-  const mealieUrl = getMealieUrl();
-  if (!mealieUrl) return null;
-  
-  // Mealie recipe URLs are: {mealie_url}/g/home/r/{slug}
-  // Or: {mealie_url}/g/{group_id}/r/{slug}
-  let slug = null;
-  
-  if (meal.recipe) {
-    // Check for slug (most common)
-    if (meal.recipe.slug) {
-      slug = meal.recipe.slug;
-    }
-    // Fallback to recipe ID if slug not available
-    else if (meal.recipe.id) {
-      slug = meal.recipe.id;
-    }
-  }
-  
-  // Fallback to recipeId from meal entry
-  if (!slug && meal.recipeId) {
-    slug = meal.recipeId;
-  }
-  
-  if (!slug) return null;
-  
-  // Use /g/home/r/{slug} format (home is the default group view)
-  return `${mealieUrl}/g/home/r/${slug}`;
-};
-
-const openRecipe = (meal) => {
-  const url = getRecipeUrl(meal);
-  if (url) {
-    window.open(url, '_blank');
-  }
-};
-
-const formatDateRange = (startDate, endDate) => {
-  if (!startDate || !endDate) return "";
-  const start = new Date(startDate);
-  const end = new Date(endDate);
-  return `${start.toLocaleDateString("en-US", { month: "short", day: "numeric" })} - ${end.toLocaleDateString("en-US", { month: "short", day: "numeric" })}`;
-};
-
-const handleIframeLoad = () => {
-  // Clear any timeout
-  if (iframeLoadTimeout.value) {
-    clearTimeout(iframeLoadTimeout.value);
-    iframeLoadTimeout.value = null;
-  }
-
-  // Check if iframe actually loaded content
-  // Some sites block iframes but still trigger load event
-  try {
-    // Try to access iframe content (will fail if blocked by CORS)
-    const iframe = serviceIframe.value;
-    if (iframe && iframe.contentWindow) {
-      // If we can access contentWindow, it might be loaded
-      // But we can't reliably check content due to CORS
-      // So we'll assume it's loaded unless we get an error
-      iframeError.value = false;
-    }
-  } catch (e) {
-    // CORS error - can't access iframe content
-    // This is expected for cross-origin iframes, not necessarily an error
-    console.log("Cannot access iframe content (CORS):", e.message);
-  }
-};
-
-const handleIframeError = () => {
-  iframeError.value = true;
-  if (iframeLoadTimeout.value) {
-    clearTimeout(iframeLoadTimeout.value);
-    iframeLoadTimeout.value = null;
-  }
-};
-
-const retryLoad = () => {
-  iframeError.value = false;
-  if (serviceIframe.value && currentService.value) {
-    // Force reload by setting src again
-    const url = currentService.value.url;
-    serviceIframe.value.src = "";
-    setTimeout(() => {
-      if (serviceIframe.value) {
-        serviceIframe.value.src = url;
-      }
-    }, 100);
-  }
-};
-
-// Watch for service changes to reset error state and load meal plan
-watch(
-  () => currentService.value?.id,
-  () => {
-    iframeError.value = false;
-    mealPlanData.value = null;
-    mealPlanError.value = null;
-    
-    // Load data if it's an API-based service
-    if (currentService.value && getServiceDisplayType(currentService.value) === "api") {
-      loadServiceData();
-    } else {
-      // Set a timeout to detect if iframe doesn't load
-      if (iframeLoadTimeout.value) {
-        clearTimeout(iframeLoadTimeout.value);
-      }
-      iframeLoadTimeout.value = setTimeout(() => {
-        // If iframe hasn't loaded after 5 seconds, show error
-        // This is a fallback for services that silently fail
-        if (serviceIframe.value) {
-          try {
-            // Try to check if iframe has content
-            const iframe = serviceIframe.value;
-            if (
-              iframe.contentDocument === null &&
-              iframe.contentWindow === null
-            ) {
-              iframeError.value = true;
-            }
-          } catch (e) {
-            // CORS error is expected, not necessarily a problem
-            console.log("Cannot check iframe content (CORS):", e.message);
-          }
-        }
-      }, 5000);
-    }
-  },
-);
+// ServiceViewer handles all service rendering logic
 
 // Handle Escape key to close fullscreen
 const handleKeydown = (event) => {
@@ -628,18 +157,11 @@ const handleKeydown = (event) => {
 
 onMounted(async () => {
   await webServicesStore.fetchServices();
-  // Load data if current service is API-based
-  if (currentService.value && getServiceDisplayType(currentService.value) === "api") {
-    loadServiceData();
-  }
   // Add keyboard listener for Escape key
   window.addEventListener("keydown", handleKeydown);
 });
 
 onUnmounted(() => {
-  if (iframeLoadTimeout.value) {
-    clearTimeout(iframeLoadTimeout.value);
-  }
   // Remove keyboard listener
   window.removeEventListener("keydown", handleKeydown);
 });

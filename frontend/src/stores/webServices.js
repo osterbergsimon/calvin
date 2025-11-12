@@ -13,7 +13,10 @@ export const useWebServicesStore = defineStore("webServices", () => {
     error.value = null;
     try {
       const response = await axios.get("/api/web-services");
-      services.value = (response.data.services || []).filter((s) => s.enabled);
+      const allServices = response.data.services || [];
+      console.log("[WebServicesStore] All services from API:", allServices.map(s => ({ id: s.id, name: s.name, enabled: s.enabled })));
+      services.value = allServices.filter((s) => s.enabled);
+      console.log("[WebServicesStore] Enabled services:", services.value.map(s => ({ id: s.id, name: s.name })));
       // Sort by display_order
       services.value.sort((a, b) => a.display_order - b.display_order);
       // Reset current index if out of bounds

@@ -110,23 +110,13 @@
             :style="{ width: secondaryWidth, height: secondaryHeight }"
           >
             <!-- Show content based on current mode -->
-            <WebServiceViewer
-              v-if="modeStore.currentMode === modeStore.MODES.WEB_SERVICES"
-              :is-fullscreen="false"
-            />
-            <PhotoSlideshow
-              v-else-if="modeStore.currentMode === modeStore.MODES.PHOTOS"
-              :is-fullscreen="false"
-              :auto-rotate="true"
-              :rotation-interval="configStore.photoRotationInterval * 1000"
-            />
             <!-- When in calendar mode, show last side view mode (preserve state) -->
             <WebServiceViewer
-              v-else-if="configStore.lastSideViewMode === 'web_services'"
+              v-if="modeStore.currentMode === modeStore.MODES.WEB_SERVICES || (modeStore.currentMode === modeStore.MODES.CALENDAR && configStore.lastSideViewMode === 'web_services')"
               :is-fullscreen="false"
             />
             <PhotoSlideshow
-              v-else
+              v-else-if="modeStore.currentMode === modeStore.MODES.PHOTOS || (modeStore.currentMode === modeStore.MODES.CALENDAR && configStore.lastSideViewMode !== 'web_services')"
               :is-fullscreen="false"
               :auto-rotate="true"
               :rotation-interval="configStore.photoRotationInterval * 1000"
