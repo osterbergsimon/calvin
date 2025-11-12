@@ -730,9 +730,11 @@
                     :save-status="pluginSaveStatus[plugin.id] || null"
                     :test-status="pluginTestStatus[plugin.id] || null"
                     :fetch-status="pluginFetchStatus[plugin.id] || null"
+                    :form-data="pluginFormData[plugin.id] || {}"
                     @save="savePluginConfig(plugin.id)"
                     @test="testPluginConnection(plugin.id)"
                     @fetch="fetchPluginNow(plugin.id)"
+                    @custom-action="handleCustomAction"
                   />
                 </div>
                 
@@ -2262,7 +2264,8 @@ const loadPlugins = async () => {
       try {
         const configResponse = await axios.get(`/api/plugins/${plugin.id}/config`);
         const rawConfig = configResponse.data.config || {};
-        console.log(`[Frontend] Loaded config for ${plugin.id}:`, rawConfig);
+        // Don't log sensitive data - configs from backend should already have sensitive fields removed
+        console.log(`[Frontend] Loaded config for ${plugin.id}:`, Object.keys(rawConfig));
         
         // Clean config values - ensure all are strings, not objects
         const cleanedConfig = {};
@@ -2281,7 +2284,8 @@ const loadPlugins = async () => {
         
         pluginConfigs.value[plugin.id] = cleanedConfig;
         // Initialize form data with saved config for IMAP and local plugins
-        if (plugin.id === 'imap' || plugin.id === 'local') {
+        // Also initialize for plugins that need form data (like yr_weather for geocoding)
+        if (plugin.id === 'imap' || plugin.id === 'local' || plugin.id === 'yr_weather') {
           pluginFormData.value[plugin.id] = { ...cleanedConfig };
         }
       } catch (error) {
@@ -2360,8 +2364,8 @@ const getConfigValue = (pluginId, key, schema) => {
 };
 
 const getFormValue = (pluginId, key, schema) => {
-  // For IMAP and local plugins, use form data if available, otherwise use saved config
-  if ((pluginId === 'imap' || pluginId === 'local') && pluginFormData.value[pluginId] && pluginFormData.value[pluginId][key] !== undefined) {
+  // For IMAP, local, and yr_weather plugins, use form data if available, otherwise use saved config
+  if ((pluginId === 'imap' || pluginId === 'local' || pluginId === 'yr_weather') && pluginFormData.value[pluginId] && pluginFormData.value[pluginId][key] !== undefined) {
     const value = pluginFormData.value[pluginId][key];
     // Ensure value is a string, not an object
     if (typeof value === 'string') {
@@ -2369,6 +2373,10 @@ const getFormValue = (pluginId, key, schema) => {
     } else if (typeof value === 'object' && value !== null) {
       // If it's an object, try to extract the actual value
       return value.value || value.default || '';
+    }
+    // For numbers, convert to string (PluginFieldRenderer expects strings)
+    if (typeof value === 'number') {
+      return String(value);
     }
     return String(value);
   }
@@ -2579,6 +2587,102 @@ const testPluginConnection = async (pluginId) => {
     };
   } finally {
     testingPlugin.value[pluginId] = false;
+  }
+};
+
+const handleCustomAction = async (action) => {
+  console.log("[Settings] handleCustomAction called with:", action);
+  
+  const pluginId = action.pluginId;
+  const endpoint = action.endpoint;
+  
+  if (!pluginId || !endpoint) {
+    console.error("Custom action missing pluginId or endpoint:", action);
+    pluginTestStatus.value[pluginId || 'unknown'] = {
+      success: false,
+      message: "Action configuration error: missing plugin ID or endpoint",
+    };
+    return;
+  }
+  
+  // Extract action path from endpoint (e.g., "geocode" from "/api/plugins/{plugin_id}/geocode")
+  const actionPath = endpoint.split('/').pop();
+  console.log("[Settings] Action path:", actionPath, "Plugin ID:", pluginId);
+  
+  // Get form data for this plugin
+  const formData = pluginFormData.value[pluginId] || {};
+  console.log("[Settings] Form data for plugin:", formData);
+  console.log("[Settings] All pluginFormData:", pluginFormData.value);
+  
+  try {
+    if (actionPath === "geocode") {
+      // Geocode action - get location from form data
+      // Try to get from formData first, then from current config as fallback
+      let location = formData.location || "";
+      
+      // If not in formData, try to get from current plugin config
+      if (!location && pluginConfigs.value[pluginId]) {
+        const config = pluginConfigs.value[pluginId];
+        location = config.location || "";
+        console.log("[Settings] Got location from plugin config:", location);
+      }
+      
+      console.log("[Settings] Location from form:", location);
+      
+      if (!location || location.trim() === "") {
+        pluginTestStatus.value[pluginId] = {
+          success: false,
+          message: "Please enter a location name in the 'Location' field above first",
+        };
+        return;
+      }
+      
+      // Call geocode endpoint (replace {plugin_id} placeholder)
+      const actualEndpoint = endpoint.replace("{plugin_id}", pluginId);
+      console.log("[Settings] Calling geocode endpoint:", actualEndpoint, "with location:", location);
+      const response = await axios.post(actualEndpoint, { location });
+      
+      const result = response.data;
+      
+      if (result.success) {
+        // Update form data with coordinates and display name
+        if (!pluginFormData.value[pluginId]) {
+          pluginFormData.value[pluginId] = {};
+        }
+        
+        // Update coordinates - use updateFormValue to ensure reactivity
+        updateFormValue(pluginId, "latitude", result.latitude);
+        updateFormValue(pluginId, "longitude", result.longitude);
+        
+        // Update location field with the geocoded display name for better UX
+        if (result.display_name) {
+          updateFormValue(pluginId, "location", result.display_name);
+        }
+        
+        // Show success message
+        pluginTestStatus.value[pluginId] = {
+          success: true,
+          message: result.message || `Coordinates found: ${result.latitude}, ${result.longitude}`,
+        };
+        
+        // Clear message after 5 seconds
+        setTimeout(() => {
+          pluginTestStatus.value[pluginId] = null;
+        }, 5000);
+      } else {
+        pluginTestStatus.value[pluginId] = {
+          success: false,
+          message: result.message || "Failed to geocode location",
+        };
+      }
+    } else {
+      console.warn("Unknown custom action:", actionPath);
+    }
+  } catch (error) {
+    pluginTestStatus.value[pluginId] = {
+      success: false,
+      message: error.response?.data?.detail || error.message || "Error performing action",
+    };
   }
 };
 

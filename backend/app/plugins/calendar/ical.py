@@ -133,7 +133,7 @@ def create_plugin_instance(
     if type_id not in ("ical", "proton"):
         return None
     
-    enabled = config.get("enabled", True)
+    enabled = config.get("enabled", False)  # Default to disabled
     ical_url = config.get("ical_url", "")
     
     return ICalCalendarPlugin(

@@ -91,6 +91,7 @@ class MealieServicePlugin(ServicePlugin):
                 "type": "api",
                 "api_endpoint": "/api/web-services/{service_id}/mealplan",
                 "method": "GET",
+                "component": "mealie/MealPlanViewer.vue",  # Plugin-provided frontend component
                 "data_schema": {
                     "items": {
                         "type": "array",
@@ -138,7 +139,7 @@ class MealieServicePlugin(ServicePlugin):
                         "description": "End date of the meal plan",
                     },
                 },
-                "render_template": "meal_plan",
+                "render_template": "meal_plan",  # Legacy: kept for backward compatibility
             },
             "plugin_class": cls,
         }
@@ -413,7 +414,7 @@ def create_plugin_instance(
     if type_id != "mealie":
         return None
 
-    enabled = config.get("enabled", True)
+    enabled = config.get("enabled", False)  # Default to disabled
     display_order = config.get("display_order", 0)
     fullscreen = config.get("fullscreen", False)
 

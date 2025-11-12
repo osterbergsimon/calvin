@@ -6,6 +6,7 @@
       :class="action.style === 'primary' ? 'btn-primary' : 'btn-secondary'"
       :disabled="isActionDisabled(action)"
       @click="handleAction(action)"
+      :title="action.type === 'custom' ? `Custom action: ${action.id}` : ''"
     >
       {{ getActionLabel(action) }}
     </button>
@@ -71,14 +72,28 @@ const props = defineProps({
     type: Object,
     default: null,
   },
+  // Pass form data for custom actions that need it
+  formData: {
+    type: Object,
+    default: () => ({}),
+  },
 });
 
-const emit = defineEmits(['save', 'test', 'fetch']);
+const emit = defineEmits(['save', 'test', 'fetch', 'custom-action']);
+
+// Helper to get plugin ID - always use prop since endpoint may have placeholder
+const getPluginIdFromAction = (action) => {
+  // Always use the prop pluginId - the endpoint may contain {plugin_id} placeholder
+  // that needs to be replaced later
+  console.log("[PluginActions] Using pluginId from prop:", props.pluginId);
+  return props.pluginId;
+};
 
 const isActionDisabled = (action) => {
   if (props.saving) return true;
   if (action.type === 'test' && props.testing) return true;
   if (action.type === 'fetch' && props.fetching) return true;
+  if (action.type === 'custom' && action.loading) return true;
   return false;
 };
 
@@ -86,10 +101,12 @@ const getActionLabel = (action) => {
   if (action.type === 'save' && props.saving) return 'Saving...';
   if (action.type === 'test' && props.testing) return 'Testing...';
   if (action.type === 'fetch' && props.fetching) return 'Fetching...';
+  if (action.type === 'custom' && action.loading) return 'Loading...';
   return action.label || action.id;
 };
 
 const handleAction = (action) => {
+  console.log("[PluginActions] handleAction called with:", action);
   switch (action.type) {
     case 'save':
       emit('save');
@@ -100,8 +117,13 @@ const handleAction = (action) => {
     case 'fetch':
       emit('fetch');
       break;
+    case 'custom':
+      const actionWithPluginId = { ...action, pluginId: getPluginIdFromAction(action) };
+      console.log("[PluginActions] Emitting custom-action with:", actionWithPluginId);
+      emit('custom-action', actionWithPluginId);
+      break;
     default:
-      console.warn(`Unknown action type: ${action.type}`);
+      console.warn(`[PluginActions] Unknown action type: ${action.type}`, action);
   }
 };
 </script>

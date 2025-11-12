@@ -581,7 +581,7 @@ def create_plugin_instance(
     
     from pathlib import Path
     
-    enabled = config.get("enabled", True)
+    enabled = config.get("enabled", False)  # Default to disabled
     
     # Extract config values
     email_address = config.get("email_address", "")

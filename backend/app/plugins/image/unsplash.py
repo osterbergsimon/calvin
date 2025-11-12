@@ -330,7 +330,7 @@ def create_plugin_instance(
     if type_id != "unsplash":
         return None
     
-    enabled = config.get("enabled", True)
+    enabled = config.get("enabled", False)  # Default to disabled
     
     # Extract config values
     api_key = config.get("api_key", "")

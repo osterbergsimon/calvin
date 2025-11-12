@@ -3,7 +3,7 @@
 from pathlib import Path
 from typing import Any
 
-from fastapi import APIRouter, HTTPException
+from fastapi import APIRouter, HTTPException, Body
 
 from app.plugins.base import PluginType
 from app.plugins.loader import plugin_loader
@@ -13,11 +13,12 @@ from sqlalchemy import select
 
 router = APIRouter()
 
-# Sensitive fields that should be masked in logs
+# Sensitive fields that should be masked in logs and never sent to frontend
 SENSITIVE_FIELDS = {
     "email_password",
     "password",
     "api_key",
+    "api_token",
     "secret",
     "token",
     "access_token",
@@ -25,31 +26,42 @@ SENSITIVE_FIELDS = {
 }
 
 
-def mask_sensitive_config(config: dict[str, Any]) -> dict[str, Any]:
+def mask_sensitive_config(config: dict[str, Any], mask_for_frontend: bool = False) -> dict[str, Any]:
     """
-    Create a copy of config with sensitive fields masked for logging.
+    Create a copy of config with sensitive fields masked for logging or frontend.
     
     Args:
         config: Configuration dictionary
+        mask_for_frontend: If True, completely remove sensitive fields instead of masking
         
     Returns:
-        Dictionary with sensitive fields masked
+        Dictionary with sensitive fields masked or removed
     """
     masked = {}
     for key, value in config.items():
-        if key.lower() in SENSITIVE_FIELDS or any(
+        is_sensitive = key.lower() in SENSITIVE_FIELDS or any(
             field in key.lower() for field in SENSITIVE_FIELDS
-        ):
-            if value:
-                # Mask the value, showing only first and last character if length > 2
-                if len(str(value)) > 2:
-                    masked[key] = f"{str(value)[0]}***{str(value)[-1]}"
-                else:
-                    masked[key] = "***"
+        )
+        
+        if is_sensitive:
+            if mask_for_frontend:
+                # Don't include sensitive fields at all when sending to frontend
+                continue
             else:
-                masked[key] = ""
+                # Mask for logging
+                if value:
+                    # Mask the value, showing only first and last character if length > 2
+                    if len(str(value)) > 2:
+                        masked[key] = f"{str(value)[0]}***{str(value)[-1]}"
+                    else:
+                        masked[key] = "***"
+                else:
+                    masked[key] = ""
         else:
-            masked[key] = value
+            if isinstance(value, dict):
+                masked[key] = mask_sensitive_config(value, mask_for_frontend)
+            else:
+                masked[key] = value
     return masked
 
 
@@ -249,6 +261,33 @@ async def update_plugin(plugin_id: str, config: dict[str, Any]):
         await session.commit()
         await session.refresh(db_type)
         
+        # Sync plugin type and instance enabled states - they should always be the same
+        # From user's perspective, plugin type IS the plugin instance
+        if enabled is not None and db_type:
+            # Update plugin type enabled state
+            db_type.enabled = enabled
+            await session.commit()
+            
+            # Find all instances of this plugin type and sync them
+            result = await session.execute(
+                select(PluginDB).where(PluginDB.type_id == plugin_id)
+            )
+            instances = result.scalars().all()
+            
+            for instance in instances:
+                instance.enabled = enabled
+                # Also update the plugin instance in memory
+                plugin = plugin_manager.get_plugin(instance.id)
+                if plugin:
+                    if enabled:
+                        plugin.enable()
+                    else:
+                        plugin.disable()
+            
+            if instances:
+                await session.commit()
+                print(f"[Plugin Update] Synced plugin type and {len(instances)} instance(s) enabled state to {enabled} for {plugin_id}")
+        
         # Save common config to config service for backward compatibility
         if config:
             from app.services.config_service import config_service
@@ -321,12 +360,14 @@ async def update_plugin(plugin_id: str, config: dict[str, Any]):
                     plugin_instance_id = f"imap-{abs(hash(email_address)) % 10000}"
                     print(f"[IMAP] Creating new IMAP instance with ID: {plugin_instance_id}")
                     try:
+                        # Use plugin type enabled state if no explicit enabled value provided
+                        instance_enabled = enabled if enabled is not None else (db_type.enabled if db_type else True)
                         plugin = await plugin_registry.register_plugin(
                             plugin_id=plugin_instance_id,
                             type_id="imap",
                             name="IMAP Email",
                             config=config,
-                            enabled=enabled if enabled is not None else True,
+                            enabled=instance_enabled,
                         )
                         print(f"[IMAP] Successfully created IMAP instance: {plugin_instance_id}, plugin: {plugin.plugin_id if plugin else 'None'}")
                     except Exception as e:
@@ -340,15 +381,18 @@ async def update_plugin(plugin_id: str, config: dict[str, Any]):
                     if plugin:
                         print(f"[IMAP] Found plugin in manager: {plugin.plugin_id}, class: {plugin.__class__.__name__}")
                         await plugin.configure(config)
-                        if enabled is not None:
-                            if enabled:
-                                plugin.enable()
-                            else:
-                                plugin.disable()
-                        # Update in database
+                        # Sync enabled state: use explicit enabled, or plugin type enabled state
+                        # Also update plugin type enabled state to match instance
+                        instance_enabled = enabled if enabled is not None else (db_type.enabled if db_type else imap_instance.enabled)
+                        if instance_enabled:
+                            plugin.enable()
+                        else:
+                            plugin.disable()
+                        # Update in database - sync both instance and plugin type
                         imap_instance.config = config
-                        if enabled is not None:
-                            imap_instance.enabled = enabled
+                        imap_instance.enabled = instance_enabled
+                        if db_type:
+                            db_type.enabled = instance_enabled
                         await session.commit()
                         print(f"[IMAP] Updated IMAP instance in database")
                     else:
@@ -403,12 +447,14 @@ async def update_plugin(plugin_id: str, config: dict[str, Any]):
                             "fullscreen": False,
                         }
                         print(f"[Mealie] Instance config: mealie_url={instance_config['mealie_url'][:50]}..., api_token={'***' if instance_config['api_token'] else 'None'}")
+                        # Use plugin type enabled state if no explicit enabled value provided
+                        instance_enabled = enabled if enabled is not None else (db_type.enabled if db_type else True)
                         plugin = await plugin_registry.register_plugin(
                             plugin_id=plugin_instance_id,
                             type_id="mealie",
                             name="Mealie Meal Plan",
                             config=instance_config,
-                            enabled=enabled if enabled is not None else True,
+                            enabled=instance_enabled,
                         )
                         print(f"[Mealie] Successfully created Mealie instance: {plugin_instance_id}, plugin: {plugin.plugin_id if plugin else 'None'}")
                     except Exception as e:
@@ -441,15 +487,18 @@ async def update_plugin(plugin_id: str, config: dict[str, Any]):
                             "fullscreen": mealie_instance.config.get("fullscreen", False) if mealie_instance.config else False,
                         }
                         await plugin.configure(instance_config)
-                        if enabled is not None:
-                            if enabled:
-                                plugin.enable()
-                            else:
-                                plugin.disable()
-                        # Update in database
+                        # Sync enabled state: use explicit enabled, or plugin type enabled state
+                        # Also update plugin type enabled state to match instance
+                        instance_enabled = enabled if enabled is not None else (db_type.enabled if db_type else mealie_instance.enabled)
+                        if instance_enabled:
+                            plugin.enable()
+                        else:
+                            plugin.disable()
+                        # Update in database - sync both instance and plugin type
                         mealie_instance.config = instance_config
-                        if enabled is not None:
-                            mealie_instance.enabled = enabled
+                        mealie_instance.enabled = instance_enabled
+                        if db_type:
+                            db_type.enabled = instance_enabled
                         await session.commit()
                         print(f"[Mealie] Updated Mealie instance in database")
                     else:
@@ -458,6 +507,122 @@ async def update_plugin(plugin_id: str, config: dict[str, Any]):
                 print(f"[Mealie] Skipping instance creation - missing URL or API token")
                 print(f"[Mealie]   mealie_url: {repr(mealie_url)}")
                 print(f"[Mealie]   api_token: {'***' if api_token else 'None'}")
+        
+        # Create or update Yr.no weather plugin instance if settings are saved
+        if plugin_id == "yr_weather" and config:
+            print(f"[YrWeather] Starting Yr.no weather instance creation/update process")
+            from app.plugins.registry import plugin_registry
+            from app.plugins.base import PluginType
+            from app.plugins.protocols import ServicePlugin
+            
+            # Check if Yr.no weather instance exists
+            result = await session.execute(
+                select(PluginDB).where(PluginDB.type_id == "yr_weather")
+            )
+            yr_weather_instance = result.scalar_one_or_none()
+            print(f"[YrWeather] Checking for existing Yr.no weather instance: {yr_weather_instance.id if yr_weather_instance else 'None'}")
+            
+            # Check if we have required config (latitude and longitude)
+            latitude = config.get("latitude", "")
+            longitude = config.get("longitude", "")
+            location = config.get("location", "")
+            altitude = config.get("altitude", "0")
+            forecast_days = config.get("forecast_days", "5")
+            
+            # Convert to proper types
+            try:
+                latitude = float(latitude) if latitude else None
+            except (ValueError, TypeError):
+                latitude = None
+            try:
+                longitude = float(longitude) if longitude else None
+            except (ValueError, TypeError):
+                longitude = None
+            try:
+                altitude = int(altitude) if altitude else 0
+            except (ValueError, TypeError):
+                altitude = 0
+            try:
+                forecast_days = min(max(int(forecast_days), 1), 9) if forecast_days else 5
+            except (ValueError, TypeError):
+                forecast_days = 5
+            
+            print(f"[YrWeather] Extracted latitude: {latitude}, longitude: {longitude}")
+            print(f"[YrWeather] Config has coordinates: {bool(latitude and longitude)}")
+            print(f"[YrWeather] Plugin type enabled state: {enabled}, db_type enabled: {db_type.enabled if db_type else 'N/A'}")
+            
+            if latitude is not None and longitude is not None:
+                # Validate coordinates
+                if -90 <= latitude <= 90 and -180 <= longitude <= 180:
+                    # Determine enabled state: use explicit enabled param, or plugin type enabled state, or default to False
+                    instance_enabled = enabled if enabled is not None else (db_type.enabled if db_type else False)
+                    print(f"[YrWeather] Instance will be created with enabled={instance_enabled}")
+                    
+                    # Create or update Yr.no weather instance
+                    if not yr_weather_instance:
+                        # Create new Yr.no weather instance
+                        plugin_instance_id = f"yr_weather-{abs(hash(f'{latitude},{longitude}')) % 10000}"
+                        print(f"[YrWeather] Creating new Yr.no weather instance with ID: {plugin_instance_id}")
+                        try:
+                            instance_config = {
+                                "latitude": latitude,
+                                "longitude": longitude,
+                                "altitude": altitude,
+                                "forecast_days": forecast_days,
+                                "location": location,
+                                "display_order": 0,
+                                "fullscreen": False,
+                            }
+                            print(f"[YrWeather] Instance config: latitude={latitude}, longitude={longitude}, location={location}")
+                            plugin = await plugin_registry.register_plugin(
+                                plugin_id=plugin_instance_id,
+                                type_id="yr_weather",
+                                name="Yr.no Weather",
+                                config=instance_config,
+                                enabled=instance_enabled,
+                            )
+                            print(f"[YrWeather] Successfully created Yr.no weather instance: {plugin_instance_id}, enabled={instance_enabled}, plugin: {plugin.plugin_id if plugin else 'None'}")
+                        except Exception as e:
+                            print(f"[YrWeather] ERROR: Failed to create Yr.no weather instance: {e}")
+                            import traceback
+                            traceback.print_exc()
+                    else:
+                        # Update existing Yr.no weather instance
+                        print(f"[YrWeather] Updating existing Yr.no weather instance: {yr_weather_instance.id}")
+                        plugin = plugin_manager.get_plugin(yr_weather_instance.id)
+                        if plugin:
+                            print(f"[YrWeather] Found plugin in manager: {plugin.plugin_id}, class: {plugin.__class__.__name__}")
+                            instance_config = {
+                                "latitude": latitude,
+                                "longitude": longitude,
+                                "altitude": altitude,
+                                "forecast_days": forecast_days,
+                                "location": location,
+                                "display_order": yr_weather_instance.config.get("display_order", 0) if yr_weather_instance.config else 0,
+                                "fullscreen": yr_weather_instance.config.get("fullscreen", False) if yr_weather_instance.config else False,
+                            }
+                            await plugin.configure(instance_config)
+                            # Sync enabled state: use explicit enabled, or plugin type enabled state
+                            # Also update plugin type enabled state to match instance
+                            instance_enabled = enabled if enabled is not None else (db_type.enabled if db_type else yr_weather_instance.enabled)
+                            if instance_enabled:
+                                plugin.enable()
+                            else:
+                                plugin.disable()
+                            # Update in database - sync both instance and plugin type
+                            yr_weather_instance.config = instance_config
+                            yr_weather_instance.enabled = instance_enabled
+                            if db_type:
+                                db_type.enabled = instance_enabled
+                            await session.commit()
+                            print(f"[YrWeather] Updated Yr.no weather instance in database, enabled={yr_weather_instance.enabled}")
+                        else:
+                            print(f"[YrWeather] WARNING: Plugin instance {yr_weather_instance.id} not found in plugin manager")
+                else:
+                    print(f"[YrWeather] Skipping instance creation - invalid coordinates")
+            else:
+                print(f"[YrWeather] Skipping instance creation - missing latitude or longitude")
+                print(f"[YrWeather]   latitude: {repr(latitude)}, longitude: {repr(longitude)}")
 
     return {"message": "Plugin type configuration updated", "plugin_id": plugin_id}
 
@@ -607,9 +772,15 @@ async def get_plugin_config(plugin_id: str):
             else:
                 print(f"[Plugin Config]     Converted to string: {cleaned_config[key]}")
     
-    masked_final = mask_sensitive_config(cleaned_config)
-    print(f"[Plugin Config] Final cleaned config: {masked_final}")
-    return {"plugin_id": plugin_id, "config": cleaned_config}
+    # Remove sensitive fields before sending to frontend (don't send passwords, API keys, etc.)
+    safe_config = mask_sensitive_config(cleaned_config, mask_for_frontend=True)
+    
+    # Log masked version for debugging
+    masked_final = mask_sensitive_config(cleaned_config, mask_for_frontend=False)
+    print(f"[Plugin Config] Final cleaned config (masked for logs): {masked_final}")
+    print(f"[Plugin Config] Sending safe config to frontend (sensitive fields removed): {list(safe_config.keys())}")
+    
+    return {"plugin_id": plugin_id, "config": safe_config}
 
 
 @router.post("/plugins/{plugin_id}/fetch")
@@ -731,6 +902,168 @@ async def fetch_plugin(plugin_id: str):
     }
 
 
+@router.post("/plugins/{plugin_id}/geocode")
+async def geocode_location(plugin_id: str, request: dict[str, Any] = Body(...)):
+    """
+    Geocode a location name to coordinates using OpenStreetMap Nominatim API.
+    
+    This endpoint is used by plugins (e.g., Yr.no weather) to convert location
+    names to latitude/longitude coordinates.
+    
+    Args:
+        plugin_id: Plugin instance ID
+        request: Request body with "location" field
+        
+    Returns:
+        Dictionary with latitude, longitude, and display_name
+    """
+    from app.database import AsyncSessionLocal
+    from app.models.db_models import PluginDB
+    from sqlalchemy import select
+    import httpx
+    
+    location = request.get("location", "").strip()
+    if not location:
+        raise HTTPException(status_code=400, detail="Location is required")
+    
+    # Verify plugin type (optional - allow geocoding even if plugin instance doesn't exist yet)
+    # This allows users to geocode before saving the plugin configuration
+    async with AsyncSessionLocal() as session:
+        # Check if plugin exists and is yr_weather type
+        result = await session.execute(
+            select(PluginDB).where(PluginDB.id == plugin_id)
+        )
+        db_plugin = result.scalar_one_or_none()
+        
+        # If plugin exists, verify it's the right type
+        if db_plugin and db_plugin.type_id != "yr_weather":
+            raise HTTPException(
+                status_code=400, 
+                detail="Geocoding is only available for Yr.no weather plugins"
+            )
+        
+        # If plugin doesn't exist, check if the plugin_id matches the expected pattern
+        # This allows geocoding for new plugin instances before they're saved
+        # We'll allow it if the plugin_id looks like it could be a yr_weather plugin
+        # (starts with 'yr_weather' or is just 'yr_weather')
+        if not db_plugin:
+            # Allow geocoding for new instances - we'll validate the location instead
+            pass
+    
+    try:
+        # Use OpenStreetMap Nominatim API (free, no API key required)
+        # Per usage policy: https://operations.osmfoundation.org/policies/nominatim/
+        # We must include a User-Agent header
+        headers = {
+            "User-Agent": "Calvin-Dashboard/1.0 (https://github.com/osterbergsimon/calvin)",
+        }
+        
+        params = {
+            "q": location,
+            "format": "json",
+            "limit": 5,  # Get more results to find the best match
+            "addressdetails": 1,
+        }
+        
+        async with httpx.AsyncClient(timeout=10.0) as client:
+            response = await client.get(
+                "https://nominatim.openstreetmap.org/search",
+                params=params,
+                headers=headers,
+            )
+            response.raise_for_status()
+            results = response.json()
+            
+            if not results:
+                return {
+                    "success": False,
+                    "message": f"Location '{location}' not found. Please try a more specific location.",
+                }
+            
+            # Try to find the best match
+            # Prefer results that match the input location name more closely
+            best_result = None
+            best_score = -1
+            location_lower = location.lower()
+            # Extract the main location name (before comma if present)
+            main_location = location_lower.split(',')[0].strip()
+            
+            for result in results:
+                display_name = result.get("display_name", "").lower()
+                place_type = result.get("type", "")
+                importance = result.get("importance", 0)
+                score = 0
+                
+                # Score based on how well it matches
+                # 1. If the main location name appears at the start of display_name, high score
+                if display_name.startswith(main_location):
+                    score += 100
+                # 2. If main location name appears early in display_name
+                elif main_location in display_name[:len(main_location) + 30]:
+                    score += 50
+                # 3. If main location name appears anywhere
+                elif main_location in display_name:
+                    score += 25
+                
+                # Prefer actual places over administrative boundaries
+                if place_type in ("city", "town", "village", "municipality", "island"):
+                    score += 30
+                elif place_type in ("administrative", "boundary"):
+                    score -= 20  # Penalize administrative boundaries
+                
+                # Boost by importance
+                score += importance * 10
+                
+                # Prefer results where the input location name is the primary name
+                # (check if it's in the name field, not just display_name)
+                name = result.get("name", "").lower()
+                if main_location in name:
+                    score += 40
+                
+                if score > best_score:
+                    best_score = score
+                    best_result = result
+            
+            # Fallback to first result if no better match found
+            if best_result is None:
+                best_result = results[0]
+            
+            result = best_result
+            lat = float(result["lat"])
+            lon = float(result["lon"])
+            
+            # Round to 4 decimals as per Yr.no API requirements
+            lat = round(lat, 4)
+            lon = round(lon, 4)
+            
+            # Get display name
+            display_name = result.get("display_name", location)
+            
+            return {
+                "success": True,
+                "latitude": lat,
+                "longitude": lon,
+                "display_name": display_name,
+                "message": f"Found coordinates for '{display_name}'",
+            }
+            
+    except httpx.HTTPStatusError as e:
+        return {
+            "success": False,
+            "message": f"Geocoding service error: {e.response.status_code}",
+        }
+    except httpx.HTTPError as e:
+        return {
+            "success": False,
+            "message": f"Network error: {str(e)}",
+        }
+    except Exception as e:
+        return {
+            "success": False,
+            "message": f"Error: {str(e)}",
+        }
+
+
 @router.post("/plugins/{plugin_id}/test")
 async def test_plugin(plugin_id: str):
     """
@@ -739,6 +1072,7 @@ async def test_plugin(plugin_id: str):
     Currently supports:
     - IMAP: Tests email connection
     - Mealie: Tests Mealie API connection
+    - yr_weather: Tests Yr.no weather API connection
     
     Args:
         plugin_id: Plugin type ID (e.g., 'imap', 'mealie')
@@ -811,6 +1145,105 @@ async def test_plugin(plugin_id: str):
                     "success": False,
                     "message": f"Connection error: {error_msg}",
                 }
+        except Exception as e:
+            return {
+                "success": False,
+                "message": f"Error: {str(e)}",
+            }
+    elif plugin_id == "yr_weather":
+        # Test Yr.no weather API connection
+        import httpx
+        
+        latitude = config.get("latitude")
+        longitude = config.get("longitude")
+        
+        # Handle schema objects
+        if isinstance(latitude, dict):
+            latitude = latitude.get("value") or latitude.get("default")
+        if isinstance(longitude, dict):
+            longitude = longitude.get("value") or longitude.get("default")
+        
+        try:
+            latitude = float(latitude) if latitude else None
+            longitude = float(longitude) if longitude else None
+        except (ValueError, TypeError):
+            latitude = None
+            longitude = None
+        
+        if latitude is None or longitude is None:
+            return {
+                "success": False,
+                "message": "Latitude and longitude are required. Use 'Get Coordinates' to find them.",
+            }
+        
+        # Validate coordinates
+        if not (-90 <= latitude <= 90) or not (-180 <= longitude <= 180):
+            return {
+                "success": False,
+                "message": "Invalid coordinates. Latitude must be between -90 and 90, longitude between -180 and 180.",
+            }
+        
+        # Round to 4 decimals as per Yr.no API requirements
+        latitude = round(latitude, 4)
+        longitude = round(longitude, 4)
+        
+        try:
+            # Test connection by making a simple API call to Yr.no
+            headers = {
+                "User-Agent": "Calvin-Dashboard/1.0 (https://github.com/osterbergsimon/calvin)",
+            }
+            
+            params = {
+                "lat": latitude,
+                "lon": longitude,
+            }
+            
+            async with httpx.AsyncClient(timeout=10.0) as client:
+                response = await client.get(
+                    "https://api.met.no/weatherapi/locationforecast/2.0/compact",
+                    params=params,
+                    headers=headers,
+                )
+                
+                if response.status_code == 200:
+                    data = response.json()
+                    # Check if we got valid weather data
+                    if data.get("properties") and data.get("properties", {}).get("timeseries"):
+                        return {
+                            "success": True,
+                            "message": f"Successfully connected to Yr.no API. Weather data available for coordinates ({latitude}, {longitude}).",
+                        }
+                    else:
+                        return {
+                            "success": False,
+                            "message": "Connected to Yr.no API but received invalid data format.",
+                        }
+                elif response.status_code == 422:
+                    return {
+                        "success": False,
+                        "message": f"Location ({latitude}, {longitude}) is not covered by Yr.no weather service. Please try different coordinates.",
+                    }
+                else:
+                    return {
+                        "success": False,
+                        "message": f"Yr.no API returned status {response.status_code}. Please check your coordinates.",
+                    }
+                    
+        except httpx.TimeoutException:
+            return {
+                "success": False,
+                "message": "Connection to Yr.no API timed out. Please check your internet connection.",
+            }
+        except httpx.ConnectError:
+            return {
+                "success": False,
+                "message": "Could not connect to Yr.no API. Please check your internet connection.",
+            }
+        except httpx.HTTPError as e:
+            return {
+                "success": False,
+                "message": f"Network error: {str(e)}",
+            }
         except Exception as e:
             return {
                 "success": False,

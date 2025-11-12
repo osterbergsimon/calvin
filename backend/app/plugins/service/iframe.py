@@ -111,7 +111,7 @@ def create_plugin_instance(
     if type_id != "iframe":
         return None
     
-    enabled = config.get("enabled", True)
+    enabled = config.get("enabled", False)  # Default to disabled
     url = config.get("url", "")
     fullscreen = config.get("fullscreen", False)
     

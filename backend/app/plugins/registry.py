@@ -58,7 +58,7 @@ class PluginRegistry:
                         description=type_info.get("description"),
                         version=type_info.get("version"),
                         common_config_schema=type_info.get("common_config_schema", {}),
-                        enabled=True,  # Default to enabled
+                        enabled=False,  # Default to disabled - user must explicitly enable
                     )
                     session.add(db_type)
                 else:
@@ -125,7 +125,7 @@ class PluginRegistry:
         type_id: str,
         name: str,
         config: dict[str, Any],
-        enabled: bool = True,
+        enabled: bool = False,  # Default to disabled - user must explicitly enable
     ) -> Any:
         """
         Register a new plugin instance.

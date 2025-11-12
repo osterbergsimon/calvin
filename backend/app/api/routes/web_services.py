@@ -63,6 +63,77 @@ async def remove_web_service(service_id: str):
     return {"message": "Web service removed", "service_id": service_id}
 
 
+@router.get("/web-services/{service_id}/weather")
+async def get_weather_data(service_id: str):
+    """
+    Get weather data from Weather service (supports multiple providers).
+    
+    This endpoint proxies requests to weather APIs (OpenWeatherMap, Yr.no, etc.)
+    to avoid CORS issues and handle authentication properly.
+    Uses caching to reduce API calls (10 minute TTL).
+    
+    Args:
+        service_id: Service ID (Weather plugin instance ID - weather or yr_weather)
+    
+    Returns:
+        Weather data in format compatible with WeatherWidget component
+    """
+    from app.plugins.manager import plugin_manager
+    from app.plugins.protocols import ServicePlugin
+    from app.database import AsyncSessionLocal
+    from app.models.db_models import PluginDB
+    from app.services.weather_cache import weather_cache
+    from sqlalchemy import select
+    
+    # Check cache first
+    cached_data = weather_cache.get(service_id)
+    if cached_data is not None:
+        print(f"[Weather API] Returning cached data for {service_id}")
+        return cached_data
+    
+    # Get the Weather plugin instance (supports both "weather" and "yr_weather" type_ids)
+    async with AsyncSessionLocal() as session:
+        result = await session.execute(
+            select(PluginDB).where(
+                PluginDB.id == service_id,
+                PluginDB.type_id.in_(["weather", "yr_weather"])
+            )
+        )
+        db_plugin = result.scalar_one_or_none()
+        
+        if not db_plugin:
+            raise HTTPException(status_code=404, detail="Weather service not found")
+        
+        # Get plugin instance from manager
+        plugin_instance = plugin_manager.get_plugin(service_id)
+        if not plugin_instance or not isinstance(plugin_instance, ServicePlugin):
+            raise HTTPException(status_code=404, detail="Weather plugin instance not found")
+        
+        # Ensure plugin is initialized
+        if hasattr(plugin_instance, "initialize") and not hasattr(plugin_instance, "_initialized"):
+            try:
+                await plugin_instance.initialize()
+            except Exception as e:
+                print(f"[Weather API] Error initializing plugin {service_id}: {e}")
+                raise HTTPException(status_code=500, detail=f"Failed to initialize weather plugin: {str(e)}")
+        
+        # Call the plugin's fetch method (both plugins use _fetch_weather)
+        if hasattr(plugin_instance, "_fetch_weather"):
+            try:
+                weather_data = await plugin_instance._fetch_weather()
+                # Cache the result
+                weather_cache.set(service_id, weather_data)
+                print(f"[Weather API] Fetched and cached weather data for {service_id}")
+                return weather_data
+            except Exception as e:
+                print(f"[Weather API] Error fetching weather data from {service_id}: {e}")
+                import traceback
+                traceback.print_exc()
+                raise HTTPException(status_code=500, detail=f"Failed to fetch weather data: {str(e)}")
+        else:
+            raise HTTPException(status_code=500, detail="Weather plugin does not support fetching")
+
+
 @router.get("/web-services/{service_id}/mealplan")
 async def get_mealie_mealplan(
     service_id: str,

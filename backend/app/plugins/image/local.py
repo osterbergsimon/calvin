@@ -327,7 +327,7 @@ def create_plugin_instance(
     
     from pathlib import Path
     
-    enabled = config.get("enabled", True)
+    enabled = config.get("enabled", False)  # Default to disabled
     
     # Extract actual values from config (handle case where schema objects might be stored)
     image_dir = config.get("image_dir", "")

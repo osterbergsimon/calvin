@@ -262,7 +262,7 @@ def create_plugin_instance(
     if type_id != "picsum":
         return None
     
-    enabled = config.get("enabled", True)
+    enabled = config.get("enabled", False)  # Default to disabled
     
     # Extract config values
     count = config.get("count", 30)

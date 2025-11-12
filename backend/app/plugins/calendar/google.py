@@ -129,7 +129,7 @@ def create_plugin_instance(
     if type_id != "google":
         return None
     
-    enabled = config.get("enabled", True)
+    enabled = config.get("enabled", False)  # Default to disabled
     ical_url = config.get("ical_url", "")
     
     return GoogleCalendarPlugin(
