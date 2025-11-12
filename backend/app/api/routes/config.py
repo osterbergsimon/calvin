@@ -22,7 +22,7 @@ class ConfigUpdate(BaseModel):
     photoFrameTimeout: int | None = None
     showUI: bool | None = None
     photoRotationInterval: int | None = None  # Photo rotation interval in seconds
-    calendarViewMode: str | None = None  # 'month' or 'rolling'
+    calendarViewMode: str | None = None  # 'month' | 'week' | 'day' | 'rolling'
     timeFormat: str | None = None  # '12h' or '24h' (default: '24h')
     showModeIndicator: bool | None = None  # Show mode indicator icon
     modeIndicatorTimeout: int | None = (
@@ -96,7 +96,7 @@ async def get_config():
     elif "photo_rotation_interval" in config and "photoRotationInterval" not in config:
         config["photoRotationInterval"] = config["photo_rotation_interval"]
     if "calendarViewMode" not in config and "calendar_view_mode" not in config:
-        config["calendarViewMode"] = "month"  # 'month' or 'rolling'
+        config["calendarViewMode"] = "month"  # 'month' | 'week' | 'day' | 'rolling'
     elif "calendar_view_mode" in config and "calendarViewMode" not in config:
         config["calendarViewMode"] = config["calendar_view_mode"]
     if "timeFormat" not in config and "time_format" not in config:

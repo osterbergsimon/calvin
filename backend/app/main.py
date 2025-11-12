@@ -218,7 +218,7 @@ async def lifespan(app: FastAPI):
         await config_service.set_value("photo_rotation_interval", 30)  # 30 seconds
     calendar_view_mode = await config_service.get_value("calendar_view_mode")
     if calendar_view_mode is None:
-        await config_service.set_value("calendar_view_mode", "month")  # 'month' or 'rolling'
+        await config_service.set_value("calendar_view_mode", "month")  # 'month' | 'week' | 'day' | 'rolling'
     time_format = await config_service.get_value("time_format")
     if time_format is None:
         await config_service.set_value("time_format", "24h")  # '12h' or '24h' (default: '24h')

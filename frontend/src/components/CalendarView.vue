@@ -15,7 +15,10 @@
         >
           ‹
         </button>
-        <span class="current-month">{{ currentMonthYear }}</span>
+        <div class="calendar-title-group">
+          <span class="current-month">{{ currentMonthYear }}</span>
+          <span class="view-mode-indicator">{{ viewModeLabel }}</span>
+        </div>
         <button class="btn-icon" @click="nextMonth" @keydown.enter="nextMonth">
           ›
         </button>
@@ -30,7 +33,10 @@
       >
         ‹
       </button>
-      <span class="current-month-minimal">{{ currentMonthYear }}</span>
+      <div class="calendar-title-group-minimal">
+        <span class="current-month-minimal">{{ currentMonthYear }}</span>
+        <span class="view-mode-indicator-minimal">{{ viewModeLabel }}</span>
+      </div>
       <button
         class="btn-icon-minimal"
         title="Next Month"
@@ -50,7 +56,12 @@
       </div>
       <div
         class="calendar-grid"
-        :class="{ 'rolling-view': viewMode === 'rolling', loading: loading }"
+        :class="{ 
+          'rolling-view': viewMode === 'rolling',
+          'week-view': viewMode === 'week',
+          'day-view': viewMode === 'day',
+          loading: loading 
+        }"
       >
         <!-- Day headers -->
         <div class="calendar-weekdays">
@@ -155,6 +166,16 @@ const viewMode = computed(() => configStore.calendarViewMode);
 const showWeekNumbers = computed(() => configStore.showWeekNumbers);
 const weekStartDay = computed(() => configStore.weekStartDay || 0);
 
+const viewModeLabel = computed(() => {
+  const labels = {
+    month: "Month",
+    week: "Week",
+    day: "Day",
+    rolling: "Rolling",
+  };
+  return labels[viewMode.value] || "Month";
+});
+
 const calendarStore = useCalendarStore();
 const route = useRoute();
 
@@ -203,10 +224,34 @@ const weekDays = computed(() => {
 });
 
 const currentMonthYear = computed(() => {
-  return currentDate.value.toLocaleDateString("en-US", {
-    month: "long",
-    year: "numeric",
-  });
+  if (viewMode.value === "week") {
+    // Show week range for week view
+    const startDate = getWeekStart(currentDate.value);
+    const endDate = new Date(startDate);
+    endDate.setDate(startDate.getDate() + 6);
+    
+    // If same month, show: "Jan 1-7, 2024", otherwise "Dec 31 - Jan 6, 2024"
+    if (startDate.getMonth() === endDate.getMonth() && startDate.getFullYear() === endDate.getFullYear()) {
+      return `${startDate.toLocaleDateString("en-US", { month: "long", day: "numeric" })} - ${endDate.toLocaleDateString("en-US", { day: "numeric", year: "numeric" })}`;
+    } else {
+      const startMonth = startDate.toLocaleDateString("en-US", { month: "short", day: "numeric" });
+      const endMonth = endDate.toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric" });
+      return `${startMonth} - ${endMonth}`;
+    }
+  } else if (viewMode.value === "day") {
+    // Show full date for day view
+    return currentDate.value.toLocaleDateString("en-US", {
+      weekday: "long",
+      month: "long",
+      day: "numeric",
+      year: "numeric",
+    });
+  } else {
+    return currentDate.value.toLocaleDateString("en-US", {
+      month: "long",
+      year: "numeric",
+    });
+  }
 });
 
 // Helper function to normalize a date to calendar date (year, month, day only)
@@ -452,11 +497,46 @@ const getWeekStart = (date) => {
 };
 
 const calendarDays = computed(() => {
-  if (viewMode.value === "rolling") {
-    // Rolling weeks view: show 4 weeks starting from today
-    const todayDate = new Date(today.value);
-    todayDate.setHours(0, 0, 0, 0);
+  const todayDate = new Date(today.value);
+  todayDate.setHours(0, 0, 0, 0);
 
+  if (viewMode.value === "week") {
+    // Week view: show 7 days starting from week start of current date
+    const days = [];
+    const startDate = getWeekStart(currentDate.value);
+    startDate.setHours(0, 0, 0, 0);
+
+    // Generate 7 days for the week
+    for (let i = 0; i < 7; i++) {
+      const date = new Date(startDate);
+      date.setDate(startDate.getDate() + i);
+      const dateOnly = new Date(date);
+      dateOnly.setHours(0, 0, 0, 0);
+
+      days.push({
+        date,
+        otherMonth: false, // In week view, we show all days regardless of month
+        isToday: dateOnly.getTime() === todayDate.getTime(),
+        events: getEventsForDate(date),
+      });
+    }
+
+    return days;
+  } else if (viewMode.value === "day") {
+    // Day view: show only the current day
+    const date = new Date(currentDate.value);
+    date.setHours(0, 0, 0, 0);
+    const dateOnly = new Date(date);
+    dateOnly.setHours(0, 0, 0, 0);
+
+    return [{
+      date,
+      otherMonth: false,
+      isToday: dateOnly.getTime() === todayDate.getTime(),
+      events: getEventsForDate(date),
+    }];
+  } else if (viewMode.value === "rolling") {
+    // Rolling weeks view: show 4 weeks starting from today
     const days = [];
     const startDate = getWeekStart(todayDate);
 
@@ -730,20 +810,32 @@ const handleKeydown = (event) => {
 
 const previousMonth = () => {
   const newDate = new Date(currentDate.value);
-  newDate.setMonth(newDate.getMonth() - 1);
+  if (viewMode.value === "week") {
+    newDate.setDate(newDate.getDate() - 7);
+  } else if (viewMode.value === "day") {
+    newDate.setDate(newDate.getDate() - 1);
+  } else {
+    newDate.setMonth(newDate.getMonth() - 1);
+  }
   calendarStore.setCurrentDate(newDate);
   loadEvents();
-  // Clear focus when month changes
+  // Clear focus when view changes
   focusedDayIndex.value = null;
   focusedEventIndex.value = null;
 };
 
 const nextMonth = () => {
   const newDate = new Date(currentDate.value);
-  newDate.setMonth(newDate.getMonth() + 1);
+  if (viewMode.value === "week") {
+    newDate.setDate(newDate.getDate() + 7);
+  } else if (viewMode.value === "day") {
+    newDate.setDate(newDate.getDate() + 1);
+  } else {
+    newDate.setMonth(newDate.getMonth() + 1);
+  }
   calendarStore.setCurrentDate(newDate);
   loadEvents();
-  // Clear focus when month changes
+  // Clear focus when view changes
   focusedDayIndex.value = null;
   focusedEventIndex.value = null;
 };
@@ -903,12 +995,45 @@ onActivated(() => {
   gap: 1rem;
 }
 
+.calendar-title-group {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 0.25rem;
+  min-width: 150px;
+}
+
 .current-month {
   font-size: 1.1rem;
   font-weight: 500;
   color: var(--text-primary);
-  min-width: 150px;
   text-align: center;
+}
+
+.view-mode-indicator {
+  font-size: 0.75rem;
+  font-weight: 600;
+  color: var(--accent-primary);
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+  opacity: 0.8;
+}
+
+.calendar-title-group-minimal {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 0.125rem;
+  min-width: 120px;
+}
+
+.view-mode-indicator-minimal {
+  font-size: 0.65rem;
+  font-weight: 600;
+  color: var(--accent-primary);
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+  opacity: 0.7;
 }
 
 .btn-icon {
@@ -1042,6 +1167,20 @@ onActivated(() => {
   grid-template-columns: repeat(7, 1fr);
   gap: 0.5rem;
   flex: 1;
+}
+
+/* Week view: taller day cells */
+.calendar-grid.week-view .calendar-day {
+  min-height: 120px;
+}
+
+/* Day view: single column, very tall */
+.calendar-grid.day-view .calendar-days {
+  grid-template-columns: 1fr;
+}
+
+.calendar-grid.day-view .calendar-day {
+  min-height: 400px;
 }
 
 .calendar-day {
