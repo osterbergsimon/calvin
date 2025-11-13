@@ -25,7 +25,8 @@ class CalendarSource(BaseModel):
     id: str
     type: str  # 'google' or 'proton'
     name: str
-    enabled: bool = True
+    enabled: bool = True  # Whether plugin is enabled (persisted in database)
+    running: bool = False  # Whether plugin instance is currently running (runtime state)
     ical_url: str | None = None  # For Google Calendar share links
     api_key: str | None = None  # For API-based sources
     color: str | None = None  # Hex color code for calendar events (e.g., "#2196f3")

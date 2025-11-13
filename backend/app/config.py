@@ -26,6 +26,9 @@ class Settings(BaseSettings):
     # Image Storage
     image_dir: Path = Path("./data/images")
     image_cache_dir: Path = Path("./data/cache/images")
+    
+    # Plugin Storage
+    plugins_dir: Path = Path("./data/plugins")
 
     # Photo Frame Mode
     photo_frame_enabled: bool = False
@@ -45,6 +48,7 @@ class Settings(BaseSettings):
         self.log_dir.mkdir(parents=True, exist_ok=True)
         self.image_dir.mkdir(parents=True, exist_ok=True)
         self.image_cache_dir.mkdir(parents=True, exist_ok=True)
+        self.plugins_dir.mkdir(parents=True, exist_ok=True)
         # Extract database path and ensure directory exists
         # Handle both absolute paths (sqlite:///path) and relative paths (sqlite:///./path)
         db_path_str = self.database_url.replace("sqlite:///", "")

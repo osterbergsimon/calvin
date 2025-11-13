@@ -54,14 +54,6 @@ const displayType = computed(() => {
   if (props.service.display_schema?.type) {
     return props.service.display_schema.type;
   }
-  // Fallback: check URL pattern for backward compatibility
-  if (
-    props.service.url &&
-    props.service.url.includes("/api/web-services/") &&
-    props.service.url.includes("/mealplan")
-  ) {
-    return "api";
-  }
   // Default to iframe
   return "iframe";
 });

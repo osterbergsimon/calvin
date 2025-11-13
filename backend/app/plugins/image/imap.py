@@ -640,3 +640,224 @@ def create_plugin_instance(
         enabled=enabled,
     )
 
+
+@hookimpl
+async def test_plugin_connection(
+    type_id: str,
+    config: dict[str, Any],
+) -> dict[str, Any] | None:
+    """Test IMAP connection."""
+    if type_id != "imap":
+        return None
+    
+    import imaplib
+    
+    email_address = config.get("email_address", "")
+    email_password = config.get("email_password", "")
+    imap_server = config.get("imap_server", "imap.gmail.com")
+    imap_port = int(config.get("imap_port", 993))
+    
+    if not email_address or not email_password:
+        return {
+            "success": False,
+            "message": "Email address and password are required",
+        }
+    
+    try:
+        # Test connection
+        mail = imaplib.IMAP4_SSL(imap_server, imap_port)
+        mail.login(email_address, email_password)
+        mail.select("INBOX")
+        mail.close()
+        mail.logout()
+        
+        return {
+            "success": True,
+            "message": f"Successfully connected to {imap_server}",
+        }
+    except imaplib.IMAP4.error as e:
+        error_msg = str(e)
+        if "authentication failed" in error_msg.lower() or "invalid credentials" in error_msg.lower():
+            return {
+                "success": False,
+                "message": "Authentication failed. Please check your email address and password.",
+            }
+        elif "connection refused" in error_msg.lower() or "timeout" in error_msg.lower():
+            return {
+                "success": False,
+                "message": f"Could not connect to {imap_server}. Please check the server address and port.",
+            }
+        else:
+            return {
+                "success": False,
+                "message": f"Connection error: {error_msg}",
+            }
+    except Exception as e:
+        return {
+            "success": False,
+            "message": f"Error: {str(e)}",
+        }
+
+
+@hookimpl
+async def fetch_plugin_data(
+    type_id: str,
+    instance_id: str | None = None,
+) -> dict[str, Any] | None:
+    """Manually trigger IMAP email check."""
+    if type_id != "imap":
+        return None
+    
+    from app.plugins.manager import plugin_manager
+    from app.plugins.base import PluginType
+    from app.plugins.protocols import ImagePlugin
+    from app.database import AsyncSessionLocal
+    from app.models.db_models import PluginDB
+    from sqlalchemy import select
+    
+    # Find IMAP plugin instance
+    async with AsyncSessionLocal() as session:
+        result = await session.execute(
+            select(PluginDB).where(PluginDB.type_id == "imap")
+        )
+        imap_plugins_db = result.scalars().all()
+    
+    if not imap_plugins_db:
+        return {
+            "success": False,
+            "message": "IMAP plugin instance not found. Please configure and enable the IMAP plugin first.",
+            "images_downloaded": False,
+            "image_count": 0,
+        }
+    
+    # Try to find the plugin instance from plugin manager
+    imap_plugin = None
+    for db_plugin in imap_plugins_db:
+        plugin = plugin_manager.get_plugin(db_plugin.id)
+        if plugin and isinstance(plugin, ImagePlugin) and plugin.__class__.__name__ == "ImapImagePlugin":
+            imap_plugin = plugin
+            break
+    
+    # If not found by ID, try to find by class name
+    if not imap_plugin:
+        plugins = plugin_manager.get_plugins(PluginType.IMAGE, enabled_only=False)
+        for plugin in plugins:
+            if plugin.__class__.__name__ == "ImapImagePlugin":
+                imap_plugin = plugin
+                break
+    
+    if not imap_plugin:
+        return {
+            "success": False,
+            "message": "IMAP plugin instance found in database but not loaded. Please restart the application.",
+            "images_downloaded": False,
+            "image_count": 0,
+        }
+    
+    # Check if plugin has fetch_now method
+    if hasattr(imap_plugin, 'fetch_now'):
+        result = await imap_plugin.fetch_now()
+        return result
+    else:
+        return {
+            "success": False,
+            "message": "IMAP plugin does not support manual fetch",
+            "images_downloaded": False,
+            "image_count": 0,
+        }
+
+
+@hookimpl
+async def handle_plugin_config_update(
+    type_id: str,
+    config: dict[str, Any],
+    enabled: bool | None,
+    db_type: Any,
+    session: Any,
+) -> dict[str, Any] | None:
+    """Handle IMAP plugin configuration update and instance management."""
+    if type_id != "imap":
+        return None
+    
+    from app.plugins.registry import plugin_registry
+    from app.plugins.manager import plugin_manager
+    from app.models.db_models import PluginDB
+    from sqlalchemy import select
+    import logging
+    
+    logger = logging.getLogger(__name__)
+    
+    # Check if we have required config (email and password)
+    email_address = config.get("email_address", "")
+    email_password = config.get("email_password", "")
+    
+    if not email_address or not email_password:
+        logger.info("[IMAP] Skipping instance creation - missing email or password")
+        return {"instance_created": False, "instance_updated": False}
+    
+    # Check if IMAP instance exists
+    result = session.execute(
+        select(PluginDB).where(PluginDB.type_id == "imap")
+    )
+    imap_instance = result.scalar_one_or_none()
+    
+    if not imap_instance:
+        # Create new IMAP instance
+        plugin_instance_id = f"imap-{abs(hash(email_address)) % 10000}"
+        logger.info(f"[IMAP] Creating new instance: {plugin_instance_id}")
+        try:
+            instance_enabled = enabled if enabled is not None else (db_type.enabled if db_type else True)
+            plugin = await plugin_registry.register_plugin(
+                plugin_id=plugin_instance_id,
+                type_id="imap",
+                name="IMAP Email",
+                config=config,
+                enabled=instance_enabled,
+            )
+            return {
+                "instance_created": True,
+                "instance_id": plugin_instance_id,
+            }
+        except Exception as e:
+            logger.error(f"[IMAP] Failed to create instance: {e}", exc_info=True)
+            return {"instance_created": False, "error": str(e)}
+    else:
+        # Update existing IMAP instance
+        logger.info(f"[IMAP] Updating existing instance: {imap_instance.id}")
+        plugin = plugin_manager.get_plugin(imap_instance.id)
+        if plugin:
+            await plugin.configure(config)
+            instance_enabled = enabled if enabled is not None else (db_type.enabled if db_type else imap_instance.enabled)
+            
+            if instance_enabled:
+                plugin.enable()
+                if not plugin.is_running():
+                    try:
+                        await plugin.initialize()
+                        plugin.start()
+                    except Exception as e:
+                        logger.error(f"[IMAP] Error starting plugin: {e}", exc_info=True)
+            else:
+                plugin.disable()
+                if plugin.is_running():
+                    try:
+                        plugin.stop()
+                        await plugin.cleanup()
+                    except Exception as e:
+                        logger.warning(f"[IMAP] Error stopping plugin: {e}", exc_info=True)
+            
+            # Update in database
+            imap_instance.config = config
+            imap_instance.enabled = instance_enabled
+            if db_type:
+                db_type.enabled = instance_enabled
+            session.commit()
+            
+            return {
+                "instance_updated": True,
+                "instance_id": imap_instance.id,
+            }
+        else:
+            logger.warning(f"[IMAP] Plugin instance {imap_instance.id} not found in manager")
+            return {"instance_updated": False, "error": "Plugin instance not found"}
+

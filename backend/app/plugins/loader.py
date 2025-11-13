@@ -1,11 +1,14 @@
 """Dynamic plugin loader using pluggy."""
 
 import importlib
+import importlib.util
 import pkgutil
+import sys
 from pathlib import Path
 from typing import Any
 
 from app.plugins.hooks import PluginHookSpec, hookimpl, plugin_manager
+from app.services.plugin_installer import plugin_installer
 
 
 class PluginLoader:
@@ -60,25 +63,89 @@ class PluginLoader:
         except Exception as e:
             print(f"Error loading plugins from package {package_name}: {e}")
 
+    def load_installed_plugins(self) -> None:
+        """
+        Load plugins from the installed plugins directory.
+        
+        Installed plugins are stored in data/plugins/{plugin_id}/ and contain
+        a plugin.py file with pluggy hooks.
+        """
+        installed_plugins = plugin_installer.get_installed_plugins()
+        
+        for plugin_manifest in installed_plugins:
+            plugin_id = plugin_manifest["id"]
+            plugin_path = plugin_installer.get_plugin_path(plugin_id)
+            plugin_py = plugin_path / "plugin.py"
+            
+            if not plugin_py.exists():
+                print(f"Warning: plugin.py not found for installed plugin {plugin_id}")
+                continue
+            
+            try:
+                # Add plugin directory to Python path temporarily
+                plugin_dir_str = str(plugin_path)
+                if plugin_dir_str not in sys.path:
+                    sys.path.insert(0, plugin_dir_str)
+                
+                # Import the plugin module
+                # Use a unique module name to avoid conflicts
+                module_name = f"installed_plugin_{plugin_id}"
+                
+                # Load the plugin.py file as a module
+                spec = importlib.util.spec_from_file_location(module_name, plugin_py)
+                if spec and spec.loader:
+                    module = importlib.util.module_from_spec(spec)
+                    sys.modules[module_name] = module
+                    spec.loader.exec_module(module)
+                    
+                    # Register with pluggy if it has hooks
+                    has_hooks = (
+                        hasattr(module, "register_plugin_types") or
+                        hasattr(module, "create_plugin_instance")
+                    )
+                    if has_hooks:
+                        try:
+                            plugin_manager.register(module)
+                            self._loaded_modules.add(module_name)
+                            print(f"Registered installed plugin: {plugin_id}")
+                        except ValueError:
+                            # Already registered
+                            pass
+                
+            except Exception as e:
+                print(f"Error loading installed plugin {plugin_id}: {e}")
+                import traceback
+                traceback.print_exc()
+
     def load_all_plugins(self) -> None:
-        """Load all plugins from the plugins package."""
-        # Load plugins from calendar, image, and service subpackages
+        """Load all plugins from the plugins package and installed plugins."""
+        # Load built-in plugins from calendar, image, and service subpackages
         self.load_plugins_from_package("app.plugins.calendar")
         self.load_plugins_from_package("app.plugins.image")
         self.load_plugins_from_package("app.plugins.service")
+        
+        # Load installed plugins
+        self.load_installed_plugins()
 
     def get_plugin_types(self) -> list[dict[str, Any]]:
         """
         Get all registered plugin types.
 
         Returns:
-            List of plugin type dictionaries
+            List of plugin type dictionaries with error information if loading failed
         """
         plugin_types = []
         results = plugin_manager.hook.register_plugin_types()
         for result in results:
             if result:
-                plugin_types.extend(result if isinstance(result, list) else [result])
+                try:
+                    plugin_types.extend(result if isinstance(result, list) else [result])
+                except Exception as e:
+                    # If a plugin's register_plugin_types hook raises an exception,
+                    # we can't include it but we should log the error
+                    import logging
+                    logger = logging.getLogger(__name__)
+                    logger.error(f"Error getting plugin types from hook result: {e}", exc_info=True)
         return plugin_types
 
     def create_plugin_instance(
