@@ -584,6 +584,14 @@
                 <div class="source-info">
                   <strong>{{ source.name }}</strong>
                   <span class="source-type">{{ source.type }}</span>
+                  <span
+                    v-if="source.running !== undefined"
+                    class="running-indicator"
+                    :class="{ running: source.running, stopped: !source.running }"
+                    :title="source.running ? 'Running' : 'Stopped'"
+                  >
+                    {{ source.running ? '●' : '○' }}
+                  </span>
                 </div>
                 <div class="source-settings">
                   <div class="source-setting">
@@ -619,6 +627,16 @@
                     />
                     <span class="slider" />
                   </label>
+                  <button
+                    v-if="source.enabled && source.running !== undefined"
+                    class="btn-secondary"
+                    :class="{ 'btn-stop': source.running }"
+                    :title="source.running ? 'Stop plugin' : 'Start plugin'"
+                    @click="source.running ? stopPluginInstance(source.id) : startPluginInstance(source.id)"
+                    :disabled="!source.enabled"
+                  >
+                    {{ source.running ? 'Stop' : 'Start' }}
+                  </button>
                   <button
                     class="btn-remove"
                     title="Remove calendar"
@@ -657,53 +675,76 @@
           <div v-else-if="plugins.length === 0" class="empty-state">
             <p>No plugins found</p>
           </div>
-          <div v-else class="plugins-list">
-            <div
-              v-for="plugin in plugins"
-              :key="plugin.id"
-              class="plugin-item"
-              :class="{ disabled: !plugin.enabled }"
-            >
-              <div class="plugin-header">
-                <div class="plugin-info">
-                  <div class="plugin-title-row">
-                    <strong>{{ plugin.name }}</strong>
-                    <span class="plugin-type-badge" :class="`type-${plugin.type}`">
-                      {{ plugin.type }}
-                    </span>
-                    <button
-                      v-if="Object.keys(plugin.config_schema || {}).length > 0"
-                      class="btn-settings-icon"
-                      :class="{ active: expandedPlugins[plugin.id] }"
-                      @click="togglePluginSettings(plugin.id)"
-                      title="Show settings"
-                    >
-                      ⚙️
-                    </button>
-                  </div>
-                  <p class="plugin-description">{{ plugin.description }}</p>
-                </div>
-                <label class="toggle-switch">
-                  <input
-                    type="checkbox"
-                    :checked="plugin.enabled"
-                    @change="togglePlugin(plugin.id, $event.target.checked)"
-                  />
-                  <span class="slider" />
-                </label>
-              </div>
-              <div
-                v-if="plugin.enabled && expandedPlugins[plugin.id]"
-                class="plugin-config"
+          <div v-else class="plugins-container">
+            <!-- Plugin Type Tabs -->
+            <div class="plugin-tabs">
+              <button
+                v-for="category in sortedPluginCategories"
+                :key="category.type"
+                class="plugin-tab"
+                :class="{ active: activePluginTab === category.type }"
+                @click="activePluginTab = category.type"
               >
+                {{ category.label }}
+              </button>
+            </div>
+            
+            <!-- Plugin Cards for Active Tab -->
+            <div class="plugins-list">
+              <div
+                v-for="plugin in activePluginCategory?.plugins || []"
+                :key="plugin.id"
+                class="plugin-item"
+                :class="{ disabled: !plugin.enabled }"
+              >
+                <div class="plugin-header">
+                  <div class="plugin-header-top">
+                    <div class="plugin-info">
+                      <div class="plugin-title-row">
+                        <strong>{{ plugin.name }}</strong>
+                        <span class="plugin-type-badge" :class="`type-${plugin.type}`">
+                          {{ plugin.type }}
+                        </span>
+                        <!-- Aggregated running indicator -->
+                        <span
+                          v-if="pluginInstances[plugin.id] && pluginInstances[plugin.id].length > 0"
+                          class="running-indicator-aggregate"
+                          :class="getAggregatedRunningClass(pluginInstances[plugin.id])"
+                          :title="getAggregatedRunningTitle(pluginInstances[plugin.id])"
+                        >
+                          {{ getAggregatedRunningSymbol(pluginInstances[plugin.id]) }}
+                        </span>
+                        <button
+                          v-if="Object.keys(plugin.config_schema || {}).length > 0"
+                          class="btn-settings-icon"
+                          :class="{ active: expandedPlugins[plugin.id] }"
+                          @click="togglePluginSettings(plugin.id)"
+                          title="Show settings"
+                        >
+                          ⚙️
+                        </button>
+                      </div>
+                      <p class="plugin-description">{{ plugin.description }}</p>
+                    </div>
+                    <div class="plugin-header-actions">
+                      <label class="toggle-switch">
+                        <input
+                          type="checkbox"
+                          :checked="plugin.enabled"
+                          @change="togglePlugin(plugin.id, $event.target.checked)"
+                        />
+                        <span class="slider" />
+                      </label>
+                    </div>
+                  </div>
+                </div>
+                <div
+                  v-if="plugin.enabled && expandedPlugins[plugin.id]"
+                  class="plugin-config"
+                >
                 <!-- Common Settings (for plugin type) -->
                 <div v-if="Object.keys(plugin.config_schema || {}).length > 0">
                   <h4 class="config-section-title">Common Settings</h4>
-                  <p v-if="plugin.id === 'unsplash'" class="help-text" style="margin-bottom: 1rem; padding: 0.75rem; background: var(--bg-secondary); border-radius: 4px;">
-                    <strong>Note:</strong> Unsplash requires an API key to fetch images. 
-                    <a href="https://unsplash.com/developers" target="_blank" rel="noopener noreferrer" style="color: var(--accent-color); text-decoration: underline;">Get your free API key here</a> 
-                    (requires Unsplash account).
-                  </p>
                   <div
                     v-for="(schema, key) in plugin.config_schema"
                     :key="key"
@@ -750,11 +791,12 @@
                   @upload="handleFileSelectFromSection"
                   @delete-image="deleteImage"
                 />
-              </div>
-              <div v-else-if="!plugin.enabled" class="plugin-disabled-message">
-                <p class="help-text">
-                  This plugin type is disabled. It won't appear in dropdowns and existing instances will be hidden (but not deleted).
-                </p>
+                </div>
+                <div v-else-if="!plugin.enabled" class="plugin-disabled-message">
+                  <p class="help-text">
+                    This plugin type is disabled. It won't appear in dropdowns and existing instances will be hidden (but not deleted).
+                  </p>
+                </div>
               </div>
             </div>
           </div>
@@ -1169,7 +1211,7 @@
 </template>
 
 <script setup>
-import { ref, computed, onMounted } from "vue";
+import { ref, computed, onMounted, watch } from "vue";
 import { useRouter } from "vue-router";
 import { useConfigStore } from "../stores/config";
 import { useKeyboardStore } from "../stores/keyboard";
@@ -1274,6 +1316,7 @@ const uploadSuccess = ref("");
 
 // Plugin management
 const plugins = ref([]);
+const pluginInstances = ref({}); // Store instances by plugin type ID: { [pluginId]: [{ id, name, enabled, running, config }] }
 const pluginConfigs = ref({}); // Store configs by plugin type ID
 const expandedPlugins = ref({}); // Track which plugin settings are expanded
 const expandedManageImages = ref({}); // Track which plugins have manage images expanded
@@ -1589,6 +1632,218 @@ const toggleSource = async (sourceId, enabled) => {
   } catch (error) {
     console.error("Failed to toggle source:", error);
     alert("Failed to update calendar source");
+  }
+};
+
+const startPluginInstance = async (instanceId) => {
+  try {
+    const response = await axios.post(`/api/plugins/instances/${instanceId}/start`);
+    if (response.data.success) {
+      // Update local state immediately
+      const running = response.data.running || false;
+      
+      // Find and update the instance in pluginInstances
+      for (const [pluginId, instances] of Object.entries(pluginInstances.value)) {
+        const instance = instances.find(i => i.id === instanceId);
+        if (instance) {
+          instance.running = running;
+          break;
+        }
+      }
+      
+      // Also reload calendar sources if it's a calendar plugin
+      await loadCalendarSources();
+    }
+  } catch (error) {
+    console.error("Failed to start plugin instance:", error);
+    alert(`Failed to start plugin: ${error.response?.data?.detail || error.message}`);
+  }
+};
+
+const stopPluginInstance = async (instanceId) => {
+  try {
+    const response = await axios.post(`/api/plugins/instances/${instanceId}/stop`);
+    if (response.data.success) {
+      // Update local state immediately
+      const running = response.data.running || false;
+      
+      // Find and update the instance in pluginInstances
+      for (const [pluginId, instances] of Object.entries(pluginInstances.value)) {
+        const instance = instances.find(i => i.id === instanceId);
+        if (instance) {
+          instance.running = running;
+          break;
+        }
+      }
+      
+      // Also reload calendar sources if it's a calendar plugin
+      await loadCalendarSources();
+    }
+  } catch (error) {
+    console.error("Failed to stop plugin instance:", error);
+    alert(`Failed to stop plugin: ${error.response?.data?.detail || error.message}`);
+  }
+};
+
+// Helper functions for aggregated instance status
+const getRunningCount = (instances) => {
+  return instances.filter(i => i.running).length;
+};
+
+const getStoppedCount = (instances) => {
+  return instances.filter(i => !i.running).length;
+};
+
+const getAggregatedRunningSymbol = (instances) => {
+  const running = getRunningCount(instances);
+  const total = instances.length;
+  if (running === total) return '●';
+  if (running === 0) return '○';
+  return '◐'; // Partially running
+};
+
+const getAggregatedRunningClass = (instances) => {
+  const running = getRunningCount(instances);
+  const total = instances.length;
+  if (running === total) return 'running';
+  if (running === 0) return 'stopped';
+  return 'partial';
+};
+
+const getAggregatedRunningTitle = (instances) => {
+  const running = getRunningCount(instances);
+  const total = instances.length;
+  const stopped = total - running;
+  if (running === total) {
+    return `All ${total} instance${total !== 1 ? 's' : ''} running`;
+  } else if (running === 0) {
+    return `All ${total} instance${total !== 1 ? 's' : ''} stopped`;
+  } else {
+    return `${running} running, ${stopped} stopped`;
+  }
+};
+
+// Sort and group plugins by type
+const sortedPluginCategories = computed(() => {
+  const typeOrder = ['calendar', 'image', 'service'];
+  const typeLabels = {
+    calendar: 'Calendar',
+    image: 'Image',
+    service: 'Service',
+  };
+  
+  const grouped = {};
+  
+  // Group plugins by type
+  for (const plugin of plugins.value) {
+    const type = plugin.type || 'service';
+    if (!grouped[type]) {
+      grouped[type] = [];
+    }
+    grouped[type].push(plugin);
+  }
+  
+  // Sort each group by name
+  for (const type in grouped) {
+    grouped[type].sort((a, b) => a.name.localeCompare(b.name));
+  }
+  
+  // Create categories in order
+  const categories = [];
+  for (const type of typeOrder) {
+    if (grouped[type] && grouped[type].length > 0) {
+      categories.push({
+        type,
+        label: typeLabels[type] || `${type.charAt(0).toUpperCase() + type.slice(1)}`,
+        plugins: grouped[type],
+      });
+    }
+  }
+  
+  // Add any remaining types not in the order list
+  for (const type in grouped) {
+    if (!typeOrder.includes(type)) {
+      categories.push({
+        type,
+        label: typeLabels[type] || `${type.charAt(0).toUpperCase() + type.slice(1)}`,
+        plugins: grouped[type],
+      });
+    }
+  }
+  
+  return categories;
+});
+
+// Active plugin tab
+const activePluginTab = ref(null);
+
+// Active plugin category based on tab
+const activePluginCategory = computed(() => {
+  if (!activePluginTab.value && sortedPluginCategories.value.length > 0) {
+    return sortedPluginCategories.value[0];
+  }
+  return sortedPluginCategories.value.find(cat => cat.type === activePluginTab.value) || sortedPluginCategories.value[0];
+});
+
+// Set initial tab when categories are loaded
+watch(sortedPluginCategories, (categories) => {
+  if (categories.length > 0 && !activePluginTab.value) {
+    activePluginTab.value = categories[0].type;
+  }
+}, { immediate: true });
+
+
+
+const toggleInstanceEnabled = async (instanceId, enabled) => {
+  try {
+    // Find which plugin type this instance belongs to
+    let pluginType = null;
+    let instance = null;
+    for (const [pluginId, instances] of Object.entries(pluginInstances.value)) {
+      const found = instances.find(i => i.id === instanceId);
+      if (found) {
+        pluginType = pluginId;
+        instance = found;
+        break;
+      }
+    }
+    
+    if (!pluginType || !instance) {
+      console.error(`Could not find plugin type for instance ${instanceId}`);
+      return;
+    }
+    
+    // For calendar plugins, use the calendar API
+    if (pluginType === 'google' || pluginType === 'ical' || pluginType === 'proton') {
+      const source = calendarSources.value.find(s => s.id === instanceId);
+      if (source) {
+        await calendarStore.updateSource(instanceId, { ...source, enabled });
+        await loadCalendarSources();
+      }
+    } else {
+      // For other plugins, we need to update via the plugin instance API
+      // For now, just reload to get the updated state
+      await loadPlugins();
+    }
+    
+    // Start/stop the plugin based on enabled status
+    if (enabled) {
+      // If enabling and not running, start it
+      if (!instance.running) {
+        await startPluginInstance(instanceId);
+      }
+    } else {
+      // If disabling and running, stop it
+      if (instance.running) {
+        await stopPluginInstance(instanceId);
+      }
+    }
+    
+    // Reload plugins to update instance status
+    await loadPlugins();
+  } catch (error) {
+    console.error("Failed to toggle instance enabled:", error);
+    alert(`Failed to update instance: ${error.response?.data?.detail || error.message}`);
   }
 };
 
@@ -2259,6 +2514,17 @@ const loadPlugins = async () => {
       return plugin;
     });
     
+    // Load instances for each plugin type
+    for (const plugin of plugins.value) {
+      try {
+        const instancesResponse = await axios.get(`/api/plugins/${plugin.id}/instances`);
+        pluginInstances.value[plugin.id] = instancesResponse.data.instances || [];
+      } catch (error) {
+        console.error(`Failed to load instances for plugin ${plugin.id}:`, error);
+        pluginInstances.value[plugin.id] = [];
+      }
+    }
+    
     // Load configs for each plugin type
     for (const plugin of plugins.value) {
       try {
@@ -2283,11 +2549,9 @@ const loadPlugins = async () => {
         console.log(`[Frontend] Cleaned config for ${plugin.id}:`, cleanedConfig);
         
         pluginConfigs.value[plugin.id] = cleanedConfig;
-        // Initialize form data with saved config for IMAP and local plugins
-        // Also initialize for plugins that need form data (like yr_weather for geocoding)
-        if (plugin.id === 'imap' || plugin.id === 'local' || plugin.id === 'yr_weather') {
-          pluginFormData.value[plugin.id] = { ...cleanedConfig };
-        }
+        // Initialize form data with saved config for all plugins
+        // This allows plugins to track form state separately from saved config
+        pluginFormData.value[plugin.id] = { ...cleanedConfig };
       } catch (error) {
         console.error(`Failed to load config for plugin ${plugin.id}:`, error);
         pluginConfigs.value[plugin.id] = {};
@@ -2321,11 +2585,34 @@ const loadCalendarPluginTypes = async () => {
 const togglePlugin = async (pluginId, enabled) => {
   try {
     await axios.put(`/api/plugins/${pluginId}`, { enabled });
-    // Update local state
+    // Update local state immediately
     const plugin = plugins.value.find((p) => p.id === pluginId);
     if (plugin) {
       plugin.enabled = enabled;
     }
+    
+    // If enabling and there are instances, start them all
+    if (enabled && pluginInstances.value[pluginId] && pluginInstances.value[pluginId].length > 0) {
+      const instances = pluginInstances.value[pluginId];
+      const promises = instances.map(instance => startPluginInstance(instance.id));
+      await Promise.all(promises);
+    }
+    // If disabling and there are instances, stop them all
+    else if (!enabled && pluginInstances.value[pluginId] && pluginInstances.value[pluginId].length > 0) {
+      const instances = pluginInstances.value[pluginId];
+      const promises = instances.map(instance => stopPluginInstance(instance.id));
+      await Promise.all(promises);
+    }
+    
+    // Only reload instances for this specific plugin to update running status
+    // This avoids reloading the entire plugins list
+    try {
+      const instancesResponse = await axios.get(`/api/plugins/${pluginId}/instances`);
+      pluginInstances.value[pluginId] = instancesResponse.data.instances || [];
+    } catch (error) {
+      console.error(`Failed to reload instances for plugin ${pluginId}:`, error);
+    }
+    
     // Reload calendar sources and types if it's a calendar plugin
     if (plugin && plugin.type === "calendar") {
       await loadCalendarPluginTypes();
@@ -2364,8 +2651,9 @@ const getConfigValue = (pluginId, key, schema) => {
 };
 
 const getFormValue = (pluginId, key, schema) => {
-  // For IMAP, local, and yr_weather plugins, use form data if available, otherwise use saved config
-  if ((pluginId === 'imap' || pluginId === 'local' || pluginId === 'yr_weather') && pluginFormData.value[pluginId] && pluginFormData.value[pluginId][key] !== undefined) {
+  // Use form data if available, otherwise use saved config
+  // This allows plugins to track form state separately from saved config
+  if (pluginFormData.value[pluginId] && pluginFormData.value[pluginId][key] !== undefined) {
     const value = pluginFormData.value[pluginId][key];
     // Ensure value is a string, not an object
     if (typeof value === 'string') {
@@ -3342,6 +3630,20 @@ onMounted(async () => {
   text-transform: capitalize;
 }
 
+.running-indicator {
+  font-size: 0.9rem;
+  margin-left: 0.5rem;
+  display: inline-block;
+}
+
+.running-indicator.running {
+  color: #4caf50; /* Green for running */
+}
+
+.running-indicator.stopped {
+  color: #f44336; /* Red for stopped */
+}
+
 .source-actions {
   display: flex;
   align-items: center;
@@ -3455,6 +3757,16 @@ input:checked + .slider:before {
 
 .btn-remove:hover {
   background: var(--accent-error);
+  opacity: 0.9;
+}
+
+.btn-stop {
+  background: #f44336; /* Red for stop button */
+  color: #fff;
+}
+
+.btn-stop:hover {
+  background: #d32f2f;
   opacity: 0.9;
 }
 
@@ -3658,12 +3970,57 @@ input:checked + .slider:before {
   margin-top: 1rem;
 }
 
+.plugins-container {
+  display: flex;
+  flex-direction: column;
+  gap: 1.5rem;
+}
+
+.plugin-tabs {
+  display: flex;
+  gap: 0.5rem;
+  border-bottom: 2px solid var(--border-color);
+  margin-bottom: 1.5rem;
+}
+
+.plugin-tab {
+  padding: 0.75rem 1.5rem;
+  background: transparent;
+  border: none;
+  border-bottom: 3px solid transparent;
+  font-size: 1rem;
+  font-weight: 500;
+  color: var(--text-secondary);
+  cursor: pointer;
+  transition: all 0.2s ease;
+  margin-bottom: -2px;
+}
+
+.plugin-tab:hover {
+  color: var(--text-primary);
+  background: var(--bg-secondary);
+}
+
+.plugin-tab.active {
+  color: var(--accent-primary);
+  border-bottom-color: var(--accent-primary);
+  font-weight: 600;
+}
+
+.plugins-list {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(450px, 1fr));
+  gap: 1.5rem;
+}
+
 .plugin-item {
   background: var(--bg-primary);
   border: 1px solid var(--border-color);
-  border-radius: 8px;
-  padding: 1.5rem;
+  border-radius: 12px;
+  padding: 2rem;
   transition: all 0.2s ease;
+  display: flex;
+  flex-direction: column;
 }
 
 .plugin-item:hover {
@@ -3677,12 +4034,29 @@ input:checked + .slider:before {
 
 .plugin-header {
   display: flex;
-  justify-content: space-between;
-  align-items: flex-start;
-  margin-bottom: 1rem;
-  padding-bottom: 1rem;
+  flex-direction: column;
+  gap: 1rem;
+  margin-bottom: 1.5rem;
+  padding-bottom: 1.5rem;
   border-bottom: 1px solid var(--border-color);
 }
+
+.plugin-header-top {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 1.5rem;
+  width: 100%;
+}
+
+.plugin-header-actions {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+  flex-shrink: 0;
+  margin-top: 0.25rem;
+}
+
 
 .plugin-info {
   flex: 1;
@@ -3693,6 +4067,47 @@ input:checked + .slider:before {
   align-items: center;
   gap: 0.75rem;
   margin-bottom: 0.5rem;
+  flex-wrap: nowrap;
+  min-width: 0; /* Allow flex items to shrink */
+}
+
+.plugin-title-row strong {
+  flex-shrink: 1;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.plugin-title-row .btn-settings-icon {
+  flex-shrink: 0;
+  margin-left: auto;
+}
+
+.running-indicator-aggregate {
+  font-size: 1rem;
+  margin-left: 0.5rem;
+  font-weight: bold;
+}
+
+.running-indicator-aggregate.running {
+  color: #4caf50; /* Green for all running */
+}
+
+.running-indicator-aggregate.stopped {
+  color: #f44336; /* Red for all stopped */
+}
+
+.running-indicator-aggregate.partial {
+  color: #ff9800; /* Orange for partially running */
+}
+
+
+
+
+.plugin-title-row .running-indicator {
+  font-size: 0.9rem;
+  margin-left: 0.25rem;
 }
 
 .plugin-type-badge {
@@ -3772,7 +4187,7 @@ input:checked + .slider:before {
   cursor: pointer;
   transition: all 0.2s ease;
   color: var(--text-secondary);
-  margin-left: auto;
+  flex-shrink: 0;
 }
 
 .btn-settings-icon:hover {
