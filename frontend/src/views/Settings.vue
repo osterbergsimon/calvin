@@ -2174,7 +2174,7 @@ const loadImages = async () => {
   }
 };
 
-const handleFileSelectFromSection = async (files, section) => {
+const handleFileSelectFromSection = async (files, _section) => {
   // Handle file upload from PluginSections component
   if (!files || files.length === 0) return;
   
