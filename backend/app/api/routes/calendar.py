@@ -83,12 +83,13 @@ async def get_calendar_events(
 @router.get("/calendar/sources", response_model=CalendarSourcesResponse)
 async def get_calendar_sources():
     """Get all calendar sources from plugins (only from enabled plugin types)."""
+    from sqlalchemy import select
+
     from app.database import AsyncSessionLocal
     from app.models.calendar import CalendarSource as CalendarSourceModel
     from app.models.db_models import PluginTypeDB
     from app.plugins.base import PluginType
     from app.plugins.loader import plugin_loader
-    from sqlalchemy import select
 
     try:
         sources = await plugin_calendar_service.get_sources()
@@ -219,12 +220,13 @@ async def add_calendar_source(source: CalendarSource):
 @router.put("/calendar/sources/{source_id}", response_model=CalendarSource)
 async def update_calendar_source(source_id: str, source: CalendarSource):
     """Update a calendar source plugin (e.g., color, show_time)."""
+    from sqlalchemy import select
+
     from app.database import AsyncSessionLocal
     from app.models.db_models import PluginDB
     from app.plugins.loader import plugin_loader
     from app.plugins.manager import plugin_manager
     from app.plugins.protocols import CalendarPlugin
-    from sqlalchemy import select
 
     # Update in database first
     async with AsyncSessionLocal() as session:
