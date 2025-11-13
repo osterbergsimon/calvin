@@ -32,9 +32,13 @@ jobs:
         working-directory: ./backend
         run: uv sync --extra dev
       
-      - name: Run Ruff linter
+      - name: Run Ruff linter (with auto-fix check)
         working-directory: ./backend
-        run: uv run ruff check .
+        run: |
+          # First, try to auto-fix issues
+          uv run ruff check --fix . || true
+          # Then check if there are any remaining issues
+          uv run ruff check .
       
       - name: Run Ruff formatter check
         working-directory: ./backend

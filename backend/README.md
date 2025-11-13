@@ -40,11 +40,18 @@ uv run uvicorn app.main:app --reload --host 0.0.0.0 --port 8000
 # Run tests
 uv run pytest
 
-# Lint
-uv run ruff check .
+# Lint (with auto-fix)
+uv run ruff check --fix .
+uv run ruff check .  # Verify no issues remain
 
 # Format
 uv run ruff format .
+
+# Or use the convenience script (Linux/Mac)
+./scripts/fix-lint.sh
+
+# Or use the PowerShell script (Windows)
+./scripts/fix-lint.ps1
 
 # Type check
 uv run mypy app/

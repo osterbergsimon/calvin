@@ -61,6 +61,19 @@ target-version = "py311"
 [tool.ruff.lint]
 select = ["E", "F", "I", "N", "W", "UP"]
 ignore = ["N815"]  # Allow mixedCase for Pydantic model fields
+# Auto-fix issues when possible
+fixable = ["ALL"]
+unfixable = []
+
+[tool.ruff.format]
+# Use double quotes for strings (Black-compatible)
+quote-style = "double"
+# Use spaces for indentation
+indent-style = "space"
+# Respect magic trailing comma
+skip-magic-trailing-comma = false
+# Line ending style
+line-ending = "auto"
 
 [tool.mypy]
 python_version = "3.11"
