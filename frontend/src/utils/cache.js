@@ -47,10 +47,10 @@ export function getCachedData(key, ttl = 60 * 60 * 1000) {
  * @param {any} data - Data to cache (will be JSON stringified)
  */
 export function setCachedData(key, data) {
+  const cacheKey = `${CACHE_PREFIX}${key}`;
+  const timestampKey = `${CACHE_TIMESTAMP_PREFIX}${key}`;
+
   try {
-    const cacheKey = `${CACHE_PREFIX}${key}`;
-    const timestampKey = `${CACHE_TIMESTAMP_PREFIX}${key}`;
-    
     localStorage.setItem(cacheKey, JSON.stringify(data));
     localStorage.setItem(timestampKey, Date.now().toString());
   } catch (error) {

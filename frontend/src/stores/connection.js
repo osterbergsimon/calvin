@@ -33,7 +33,7 @@ export const useConnectionStore = defineStore("connection", () => {
         isBackendOnline.value = false;
         return false;
       }
-    } catch (error) {
+    } catch (_error) {
       // Network error or timeout
       isBackendOnline.value = false;
       return false;

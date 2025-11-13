@@ -1,5 +1,9 @@
 <template>
-  <div v-if="shouldShow" class="clock" :class="{ 'dark-mode': isDark, [`size-${clockSize}`]: true }">
+  <div
+    v-if="shouldShow"
+    class="clock"
+    :class="{ 'dark-mode': isDark, [`size-${clockSize}`]: true }"
+  >
     <div class="clock-time">{{ formattedTime }}</div>
     <div v-if="shouldShowDate" class="clock-date">{{ formattedDate }}</div>
   </div>
@@ -99,7 +103,7 @@ const formattedTime = computed(() => {
   
   try {
     return now.toLocaleTimeString(undefined, options);
-  } catch (_e) {
+  } catch {
     // Fallback if timezone is invalid
     const fallbackOptions = {
       hour: "2-digit",
@@ -131,7 +135,7 @@ const formattedDate = computed(() => {
   
   try {
     return now.toLocaleDateString(undefined, options);
-  } catch (_e) {
+  } catch {
     // Fallback if timezone is invalid
     return now.toLocaleDateString(undefined, {
       weekday: "short",

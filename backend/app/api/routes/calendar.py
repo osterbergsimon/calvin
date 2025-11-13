@@ -219,12 +219,11 @@ async def add_calendar_source(source: CalendarSource):
 @router.put("/calendar/sources/{source_id}", response_model=CalendarSource)
 async def update_calendar_source(source_id: str, source: CalendarSource):
     """Update a calendar source plugin (e.g., color, show_time)."""
-    from app.plugins.manager import plugin_manager
-    from app.plugins.protocols import CalendarPlugin
-    from app.plugins.registry import plugin_registry
-    from app.plugins.loader import plugin_loader
     from app.database import AsyncSessionLocal
     from app.models.db_models import PluginDB
+    from app.plugins.loader import plugin_loader
+    from app.plugins.manager import plugin_manager
+    from app.plugins.protocols import CalendarPlugin
     from sqlalchemy import select
 
     # Update in database first
@@ -235,10 +234,7 @@ async def update_calendar_source(source_id: str, source: CalendarSource):
         db_plugin = result.scalar_one_or_none()
         if not db_plugin:
             raise HTTPException(status_code=404, detail="Calendar source not found")
-        
-        # Store old enabled state
-        was_enabled = db_plugin.enabled
-        
+
         # Update database
         db_plugin.name = source.name
         db_plugin.enabled = source.enabled

@@ -77,7 +77,10 @@
         :class="['clock-overlay', `position-${configStore.clockPosition || 'top-right'}`]`
       />
 
-      <div class="dashboard-main" :class="mainLayoutClass">
+      <div
+        class="dashboard-main"
+        :class="mainLayoutClass"
+      >
         <!-- Fullscreen Mode (Photos or Web Services) -->
         <div v-if="modeStore.isFullscreen" class="mode-content fullscreen-mode">
           <!-- Fullscreen Photos -->

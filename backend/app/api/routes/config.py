@@ -1,7 +1,8 @@
 """Configuration endpoints."""
 
 from pathlib import Path
-from typing import Union, List, Dict, Any
+from typing import Any, Union
+
 from fastapi import APIRouter, HTTPException
 from pydantic import BaseModel
 
@@ -39,7 +40,7 @@ class ConfigUpdate(BaseModel):
     displayScheduleEnabled: bool | None = None  # Enable display power schedule
     displayOffTime: str | None = None  # Display off time (format: "HH:MM") - deprecated, use displaySchedule
     displayOnTime: str | None = None  # Display on time (format: "HH:MM") - deprecated, use displaySchedule
-    displaySchedule: Union[str, List[Dict[str, Any]], None] = None  # Display schedule as JSON string or array: [{"day": 0-6, "enabled": bool, "onTime": "HH:MM", "offTime": "HH:MM"}, ...]
+    displaySchedule: Union[str, list[dict[str, Any]], None] = None  # Display schedule as JSON string or array: [{"day": 0-6, "enabled": bool, "onTime": "HH:MM", "offTime": "HH:MM"}, ...]
     displayTimeoutEnabled: bool | None = None  # Enable display timeout (screensaver)
     displayTimeout: int | None = None  # Display timeout in seconds (0 = never, default: 0)
     rebootComboKey1: str | None = None  # First key for reboot combo (e.g., "KEY_1")

@@ -62,7 +62,10 @@
     </div>
     <div class="calendar-content">
       <!-- Loading indicator -->
-      <div v-if="loading" class="loading-overlay">
+      <div
+        v-if="loading"
+        class="loading-overlay"
+      >
         <div class="loading-spinner">
           <div class="spinner" />
           <div class="loading-text">Loading events...</div>
@@ -70,8 +73,7 @@
       </div>
       <div
         class="calendar-grid"
-        :class="
-          {
+        :class="{
           'rolling-view': viewMode === 'rolling',
           'week-view': viewMode === 'week',
           'day-view': viewMode === 'day',
