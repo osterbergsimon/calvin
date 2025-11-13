@@ -1,5 +1,9 @@
 <template>
-  <div v-if="event" class="event-detail-panel" @keydown="handleKeydown">
+  <div
+    v-if="event"
+    class="event-detail-panel"
+    @keydown="handleKeydown"
+  >
     <div class="event-detail-header">
       <h3>{{ event.title }}</h3>
       <button class="btn-close" aria-label="Close" @click="close">×</button>

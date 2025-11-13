@@ -5,10 +5,17 @@
     :class="{ 'offline': !isOnline, 'backend-offline': isOnline && !isBackendOnline }"
     :title="connectionTooltip"
   >
-    <span class="connection-icon">
+    <span
+      class="connection-icon"
+    >
       {{ connectionIcon }}
     </span>
-    <span v-if="showLabel" class="connection-label">{{ connectionLabel }}</span>
+    <span
+      v-if="showLabel"
+      class="connection-label"
+    >
+      {{ connectionLabel }}
+    </span>
   </div>
 </template>
 

@@ -1359,7 +1359,7 @@ const plugins = ref([]);
 const pluginInstances = ref({}); // Store instances by plugin type ID: { [pluginId]: [{ id, name, enabled, running, config }] }
 const pluginConfigs = ref({}); // Store configs by plugin type ID
 const expandedPlugins = ref({}); // Track which plugin settings are expanded
-const expandedManageImages = ref({}); // Track which plugins have manage images expanded
+// const expandedManageImages = ref({}); // Track which plugins have manage images expanded (unused for now)
 const pluginFormData = ref({}); // Store form data before saving
 const pluginSaveStatus = ref({}); // Store save status per plugin (success/error messages)
 const pluginTestStatus = ref({}); // Store test status per plugin
@@ -1733,7 +1733,7 @@ const startPluginInstance = async (instanceId) => {
       const running = response.data.running || false;
       
       // Find and update the instance in pluginInstances
-      for (const [pluginId, instances] of Object.entries(pluginInstances.value)) {
+      for (const [, instances] of Object.entries(pluginInstances.value)) {
         const instance = instances.find(i => i.id === instanceId);
         if (instance) {
           instance.running = running;
@@ -1758,7 +1758,7 @@ const stopPluginInstance = async (instanceId) => {
       const running = response.data.running || false;
       
       // Find and update the instance in pluginInstances
-      for (const [pluginId, instances] of Object.entries(pluginInstances.value)) {
+      for (const [, instances] of Object.entries(pluginInstances.value)) {
         const instance = instances.find(i => i.id === instanceId);
         if (instance) {
           instance.running = running;

@@ -4,8 +4,17 @@
     class="clock"
     :class="{ 'dark-mode': isDark, [`size-${clockSize}`]: true }"
   >
-    <div class="clock-time">{{ formattedTime }}</div>
-    <div v-if="shouldShowDate" class="clock-date">{{ formattedDate }}</div>
+    <div
+      class="clock-time"
+    >
+      {{ formattedTime }}
+    </div>
+    <div
+      v-if="shouldShowDate"
+      class="clock-date"
+    >
+      {{ formattedDate }}
+    </div>
   </div>
 </template>
 

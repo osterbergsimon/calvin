@@ -78,8 +78,7 @@
       />
 
       <div
-        class="dashboard-main"
-        :class="mainLayoutClass"
+        :class="['dashboard-main', mainLayoutClass]"
       >
         <!-- Fullscreen Mode (Photos or Web Services) -->
         <div v-if="modeStore.isFullscreen" class="mode-content fullscreen-mode">
