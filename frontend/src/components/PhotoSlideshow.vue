@@ -36,7 +36,7 @@ import { useImagesStore } from "../stores/images";
 import { useConfigStore } from "../stores/config";
 
 const configStore = useConfigStore();
-const showHeader = computed(() => configStore.showUI);
+const showHeader = computed(() => configStore.shouldShowUI);
 
 const props = defineProps({
   isFullscreen: {

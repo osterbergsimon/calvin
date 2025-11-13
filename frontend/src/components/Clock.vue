@@ -39,11 +39,11 @@ const shouldShow = computed(() => {
   if (mode === "off") return false;
   if (mode === "always") {
     // "always" mode means show only when UI is OFF (kiosk mode)
-    return !configStore.showUI;
+    return !configStore.shouldShowUI;
   }
   if (mode === "header") {
     // Show only when dashboard header is visible
-    return configStore.showUI;
+    return configStore.shouldShowUI;
   }
   return false;
 });

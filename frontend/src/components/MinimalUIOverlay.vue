@@ -1,10 +1,10 @@
 <template>
-  <div v-if="!configStore.showUI" class="minimal-ui-overlay" :class="buttonPositionClass">
+  <div v-if="!configStore.shouldShowUI" class="minimal-ui-overlay" :class="buttonPositionClass">
     <button
       class="ui-toggle-btn"
       title="Show UI"
       aria-label="Show UI"
-      @click="configStore.toggleUI"
+      @click="configStore.showUITemporarily(60)"
     >
       <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
         <circle cx="12" cy="12" r="3"></circle>

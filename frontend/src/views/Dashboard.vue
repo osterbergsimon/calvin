@@ -1,7 +1,7 @@
 <template>
   <LayoutManager>
     <div class="dashboard">
-      <div v-if="configStore.showUI" class="dashboard-header">
+      <div v-if="configStore.shouldShowUI" class="dashboard-header">
         <h1>Calvin Dashboard</h1>
         <Clock
           v-if="configStore.clockEnabled"
@@ -60,15 +60,21 @@
       </div>
 
       <!-- Minimal UI overlay (shown when UI is hidden) -->
-      <MinimalUIOverlay />
+      <MinimalUIOverlay v-if="!configStore.shouldShowUI" />
       <ModeIndicator />
+      
+      <!-- Connection indicator (shown when offline) -->
+      <ConnectionIndicator
+        class="connection-indicator-overlay"
+        :show-label="configStore.shouldShowUI"
+      />
       
       <!-- Clock (when display mode is 'always' - only shown when UI is off) -->
       <Clock
-        v-if="configStore.clockEnabled && configStore.clockDisplayMode === 'always'"
+        v-if="configStore.clockEnabled && configStore.clockDisplayMode === 'always' && !configStore.shouldShowUI"
         :display-mode="configStore.clockDisplayMode"
         :show-date="configStore.clockShowDate"
-        :class="['clock-overlay', `position-${configStore.clockPosition || 'top-right'}`]"
+        :class="['clock-overlay', `position-${configStore.clockPosition || 'top-right'}`]`
       />
 
       <div class="dashboard-main" :class="mainLayoutClass">
@@ -138,6 +144,7 @@ import WebServiceViewer from "../components/WebServiceViewer.vue";
 import MinimalUIOverlay from "../components/MinimalUIOverlay.vue";
 import ModeIndicator from "../components/ModeIndicator.vue";
 import Clock from "../components/Clock.vue";
+import ConnectionIndicator from "../components/ConnectionIndicator.vue";
 import { useConfigStore } from "../stores/config";
 import { useModeStore } from "../stores/mode";
 import { useRouter } from "vue-router";
@@ -593,5 +600,19 @@ onUnmounted(() => {
 .clock-overlay.position-bottom-right {
   bottom: 0.5rem;
   right: 0.5rem;
+}
+
+.connection-indicator-overlay {
+  position: fixed;
+  top: 1rem;
+  left: 1rem;
+  z-index: 10000;
+  pointer-events: none;
+}
+
+/* Adjust position when UI is hidden to avoid clock overlap */
+.dashboard:not(:has(.dashboard-header)) .connection-indicator-overlay {
+  top: 1rem;
+  left: 1rem;
 }
 </style>

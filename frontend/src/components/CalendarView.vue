@@ -161,7 +161,7 @@ import { useConfigStore } from "../stores/config";
 import EventDetailPanel from "./EventDetailPanel.vue";
 
 const configStore = useConfigStore();
-const showHeader = computed(() => configStore.showUI);
+const showHeader = computed(() => configStore.shouldShowUI);
 const viewMode = computed(() => configStore.calendarViewMode);
 const showWeekNumbers = computed(() => configStore.showWeekNumbers);
 const weekStartDay = computed(() => configStore.weekStartDay || 0);

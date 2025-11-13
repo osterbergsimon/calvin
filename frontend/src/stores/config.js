@@ -12,6 +12,8 @@ export const useConfigStore = defineStore("config", () => {
   const photoFrameEnabled = ref(false); // Photo frame mode enabled
   const photoFrameTimeout = ref(300); // Photo frame timeout in seconds (5 minutes default)
   const showUI = ref(true); // Show headers and UI controls (can be hidden for kiosk mode)
+  const showUITemporary = ref(false); // Temporary UI override (doesn't persist)
+  const temporaryUITimer = ref(null); // Timer for temporary UI override
   const showModeIndicator = ref(true); // Show mode indicator icon (when UI is hidden)
   const modeIndicatorTimeout = ref(5); // Mode indicator auto-hide timeout in seconds (0 = never hide, default 5)
   const photoRotationInterval = ref(30); // Photo rotation interval in seconds (default 30)
@@ -319,18 +321,21 @@ export const useConfigStore = defineStore("config", () => {
     error.value = null;
     try {
       const response = await axios.post("/api/config", config);
-      // TODO: Update local config from response
-      if (config.orientation) {
+      // Update local config from response or from the config object passed in
+      if (config.orientation !== undefined) {
         orientation.value = config.orientation;
       }
       if (config.orientationFlipped !== undefined) {
         orientationFlipped.value = config.orientationFlipped;
       }
-      if (config.lastSideViewMode) {
+      if (config.lastSideViewMode !== undefined) {
         lastSideViewMode.value = config.lastSideViewMode;
       }
-      if (config.calendarSplit) {
+      if (config.calendarSplit !== undefined) {
         calendarSplit.value = config.calendarSplit;
+      }
+      if (config.showUI !== undefined) {
+        showUI.value = config.showUI;
       }
       return response.data;
     } catch (err) {
@@ -354,9 +359,43 @@ export const useConfigStore = defineStore("config", () => {
     showUI.value = show;
   };
 
-  const toggleUI = () => {
-    showUI.value = !showUI.value;
+  const toggleUI = async () => {
+    const newValue = !showUI.value;
+    showUI.value = newValue;
+    // Persist the change to backend
+    try {
+      await updateConfig({ showUI: newValue });
+    } catch (err) {
+      console.error("Failed to save UI visibility:", err);
+      // Revert on error
+      showUI.value = !newValue;
+    }
   };
+
+  // Show UI temporarily (for accessing settings, etc.)
+  // This doesn't change the persistent showUI setting
+  const showUITemporarily = (durationSeconds = 60) => {
+    // Clear any existing timer
+    if (temporaryUITimer.value) {
+      clearTimeout(temporaryUITimer.value);
+      temporaryUITimer.value = null;
+    }
+
+    // Show UI temporarily
+    showUITemporary.value = true;
+
+    // Hide after duration
+    temporaryUITimer.value = setTimeout(() => {
+      showUITemporary.value = false;
+      temporaryUITimer.value = null;
+    }, durationSeconds * 1000);
+  };
+
+  // Computed property to determine if UI should be shown
+  // Shows UI if either persistent setting is on OR temporary override is active
+  const shouldShowUI = computed(() => {
+    return showUI.value || showUITemporary.value;
+  });
 
   const setPhotoRotationInterval = (interval) => {
     photoRotationInterval.value = interval;
@@ -484,6 +523,8 @@ export const useConfigStore = defineStore("config", () => {
     setPhotoFrameTimeout,
     setShowUI,
     toggleUI,
+    showUITemporarily,
+    shouldShowUI,
     setShowModeIndicator,
     setModeIndicatorTimeout,
     setPhotoRotationInterval,

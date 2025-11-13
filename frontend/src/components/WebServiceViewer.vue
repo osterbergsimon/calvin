@@ -103,7 +103,7 @@ const configStore = useConfigStore();
 const webServicesStore = useWebServicesStore();
 const modeStore = useModeStore();
 
-const showHeader = computed(() => configStore.showUI);
+const showHeader = computed(() => configStore.shouldShowUI);
 const services = computed(() => webServicesStore.services);
 const currentServiceIndex = computed(
   () => webServicesStore.currentServiceIndex,
