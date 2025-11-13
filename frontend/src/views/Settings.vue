@@ -1166,16 +1166,55 @@
         </div>
         <div v-show="expandedSections.update" class="section-content">
           <div class="setting-item">
-            <label>Git Branch</label>
+            <label>Repository URL</label>
             <input
-              v-model="localConfig.gitBranch"
+              v-model="localConfig.gitRepoUrl"
               type="text"
-              placeholder="main"
-              @change="updateGitBranch"
+              placeholder="https://github.com/user/repo.git"
+              @change="updateGitRepoUrl"
             />
             <span class="help-text"
-              >Git branch to use when updating from GitHub (e.g., main, develop, feature/xyz)</span
+              >Git repository URL for updates (e.g., https://github.com/user/repo.git)</span
             >
+          </div>
+          <div class="setting-item">
+            <label>Git Branch</label>
+            <div class="branch-selector">
+              <select
+                v-if="availableBranches.length > 0"
+                v-model="localConfig.gitBranch"
+                @change="updateGitBranch"
+              >
+                <option
+                  v-for="branch in availableBranches"
+                  :key="branch"
+                  :value="branch"
+                >
+                  {{ branch }}
+                </option>
+              </select>
+              <input
+                v-else
+                v-model="localConfig.gitBranch"
+                type="text"
+                placeholder="main"
+                @change="updateGitBranch"
+                :disabled="fetchingBranches"
+              />
+              <button
+                class="btn-fetch-branches"
+                :disabled="fetchingBranches || !localConfig.gitRepoUrl"
+                @click="fetchBranches"
+              >
+                {{ fetchingBranches ? "Fetching..." : "🔄 Fetch Branches" }}
+              </button>
+            </div>
+            <span class="help-text"
+              >Git branch to use when updating. Click "Fetch Branches" to load available branches from the repository.</span
+            >
+            <div v-if="branchFetchError" class="error-message">
+              {{ branchFetchError }}
+            </div>
           </div>
         </div>
       </section>
@@ -1262,20 +1301,21 @@ const localConfig = ref({
   displayTimeoutEnabled: false,
   displayTimeout: 0,
   timezone: null,
-      rebootComboKey1: "KEY_1",
-      rebootComboKey2: "KEY_7",
-      rebootComboDuration: 10000,
-      imageDisplayMode: "smart",
-      randomizeImages: false,
-      gitBranch: "main",
-      clockEnabled: true,
-      clockDisplayMode: "header",
-      clockShowDate: false,
-      clockShowSeconds: false,
-      clockPosition: "top-right",
-      clockSize: "medium",
-      mealPlanCardSize: "medium",
-      orientationFlipped: false,
+  gitRepoUrl: "https://github.com/osterbergsimon/calvin.git",
+  gitBranch: "main",
+  rebootComboKey1: "KEY_1",
+  rebootComboKey2: "KEY_7",
+  rebootComboDuration: 10000,
+  imageDisplayMode: "smart",
+  randomizeImages: false,
+  clockEnabled: true,
+  clockDisplayMode: "header",
+  clockShowDate: false,
+  clockShowSeconds: false,
+  clockPosition: "top-right",
+  clockSize: "medium",
+  mealPlanCardSize: "medium",
+  orientationFlipped: false,
 });
 
 // Category navigation
@@ -1568,6 +1608,56 @@ const updateRebootCombo = () => {
 const updateGitBranch = () => {
   saveConfig();
 };
+
+const updateGitRepoUrl = () => {
+  saveConfig();
+  // Clear branches when repo URL changes
+  availableBranches.value = [];
+  branchFetchError.value = null;
+};
+
+// Branch fetching state
+const availableBranches = ref([]);
+const fetchingBranches = ref(false);
+const branchFetchError = ref(null);
+
+const fetchBranches = async () => {
+  if (!localConfig.value.gitRepoUrl) {
+    branchFetchError.value = "Please enter a repository URL first";
+    return;
+  }
+  
+  fetchingBranches.value = true;
+  branchFetchError.value = null;
+  
+  try {
+    const response = await axios.get("/api/config/git/branches", {
+      params: {
+        repo_url: localConfig.value.gitRepoUrl,
+      },
+    });
+    
+    availableBranches.value = response.data.branches || [];
+    
+    // If current branch is not in the list, keep it as custom
+    if (localConfig.value.gitBranch && !availableBranches.value.includes(localConfig.value.gitBranch)) {
+      // Keep the current branch value
+    }
+  } catch (error) {
+    branchFetchError.value = error.response?.data?.detail || error.message || "Failed to fetch branches";
+    console.error("Failed to fetch branches:", error);
+  } finally {
+    fetchingBranches.value = false;
+  }
+};
+
+// Auto-fetch branches when expanding the update section
+watch(() => expandedSections.value.update, (isExpanded) => {
+  if (isExpanded && localConfig.value.gitRepoUrl && availableBranches.value.length === 0 && !fetchingBranches.value) {
+    // Auto-fetch when section is expanded (but only if we haven't fetched yet)
+    fetchBranches();
+  }
+});
 
 const turnDisplayOn = async () => {
   try {
@@ -3890,6 +3980,38 @@ input:checked + .slider:before {
   opacity: 0.6;
 }
 
+.branch-selector {
+  display: flex;
+  gap: 0.5rem;
+  align-items: center;
+}
+
+.branch-selector select {
+  flex: 1;
+  min-width: 0;
+}
+
+.btn-fetch-branches {
+  padding: 0.5rem 1rem;
+  background: var(--accent-primary);
+  color: white;
+  border: none;
+  border-radius: 4px;
+  cursor: pointer;
+  font-size: 0.875rem;
+  white-space: nowrap;
+  transition: background 0.2s ease;
+}
+
+.btn-fetch-branches:hover:not(:disabled) {
+  background: var(--accent-primary-hover, #0056b3);
+}
+
+.btn-fetch-branches:disabled {
+  opacity: 0.6;
+  cursor: not-allowed;
+}
+
 .error-message {
   background: #f8d7da;
   color: #721c24;
@@ -3897,6 +4019,7 @@ input:checked + .slider:before {
   padding: 0.5rem 1rem;
   border-radius: 4px;
   font-size: 0.9rem;
+  margin-top: 0.5rem;
 }
 
 .success-message {

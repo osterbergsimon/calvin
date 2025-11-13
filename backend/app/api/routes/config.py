@@ -2,7 +2,7 @@
 
 from pathlib import Path
 from typing import Union, List, Dict, Any
-from fastapi import APIRouter
+from fastapi import APIRouter, HTTPException
 from pydantic import BaseModel
 
 from app.services.config_service import config_service
@@ -48,6 +48,7 @@ class ConfigUpdate(BaseModel):
     imageDisplayMode: str | None = None  # Image display mode: 'fit', 'fill', 'crop', 'center', 'smart' (default: 'smart')
     randomizeImages: bool | None = None  # Randomize image order (default: False)
     timezone: str | None = None  # Timezone (e.g., "America/New_York", "Europe/London", "UTC") - null = system timezone
+    gitRepoUrl: str | None = None  # Git repository URL for updates (default: 'https://github.com/osterbergsimon/calvin.git')
     gitBranch: str | None = None  # Git branch to use for updates (default: 'main')
 
     # Allow arbitrary fields for extensibility
@@ -270,6 +271,10 @@ async def get_config():
         config["mealPlanCardSize"] = "medium"  # Default size
     elif "meal_plan_card_size" in config and "mealPlanCardSize" not in config:
         config["mealPlanCardSize"] = config["meal_plan_card_size"]
+    if "gitRepoUrl" not in config and "git_repo_url" not in config:
+        config["gitRepoUrl"] = "https://github.com/osterbergsimon/calvin.git"  # Default repo
+    elif "git_repo_url" in config and "gitRepoUrl" not in config:
+        config["gitRepoUrl"] = config["git_repo_url"]
     if "gitBranch" not in config and "git_branch" not in config:
         config["gitBranch"] = "main"  # Default to main branch
     elif "git_branch" in config and "gitBranch" not in config:
@@ -362,6 +367,37 @@ async def update_config(config_update: ConfigUpdate):
     if "timezone" in update_dict:
         # Store timezone as-is (no camelCase conversion needed)
         update_dict["timezone"] = update_dict.pop("timezone")
+    if "gitRepoUrl" in update_dict:
+        update_dict["git_repo_url"] = update_dict.pop("gitRepoUrl")
+        # Also update /etc/default/calvin-update file
+        import os
+        calvin_update_file = Path("/etc/default/calvin-update")
+        if calvin_update_file.exists():
+            try:
+                # Read existing file
+                with open(calvin_update_file, "r") as f:
+                    lines = f.readlines()
+                
+                # Update or add GIT_REPO line
+                updated = False
+                new_lines = []
+                for line in lines:
+                    if line.startswith("GIT_REPO="):
+                        new_lines.append(f"GIT_REPO={update_dict['git_repo_url']}\n")
+                        updated = True
+                    else:
+                        new_lines.append(line)
+                
+                if not updated:
+                    # Add GIT_REPO if it doesn't exist
+                    new_lines.append(f"GIT_REPO={update_dict['git_repo_url']}\n")
+                
+                # Write back
+                with open(calvin_update_file, "w") as f:
+                    f.writelines(new_lines)
+            except Exception as e:
+                # Log error but don't fail the config update
+                print(f"Warning: Failed to update /etc/default/calvin-update: {e}")
     if "gitBranch" in update_dict:
         update_dict["git_branch"] = update_dict.pop("gitBranch")
         # Also update /etc/default/calvin-update file
@@ -398,3 +434,78 @@ async def update_config(config_update: ConfigUpdate):
 
     # Return updated config
     return await get_config()
+
+
+@router.get("/config/git/branches")
+async def get_git_branches(repo_url: str | None = None):
+    """
+    Fetch available branches from a git repository.
+    
+    Args:
+        repo_url: Git repository URL (e.g., https://github.com/user/repo.git)
+                 If not provided, uses the configured git_repo_url or default
+    
+    Returns:
+        List of branch names
+    """
+    import subprocess
+    import re
+    
+    # Get repo URL from parameter, config, or default
+    if not repo_url:
+        from app.services.config_service import config_service
+        repo_url = await config_service.get_value("git_repo_url")
+        if not repo_url:
+            repo_url = "https://github.com/osterbergsimon/calvin.git"
+    
+    try:
+        # Use git ls-remote to fetch branches without cloning
+        # This works for public repos and doesn't require authentication
+        result = subprocess.run(
+            ["git", "ls-remote", "--heads", repo_url],
+            capture_output=True,
+            text=True,
+            timeout=10,
+        )
+        
+        if result.returncode != 0:
+            raise HTTPException(
+                status_code=400,
+                detail=f"Failed to fetch branches: {result.stderr}"
+            )
+        
+        # Parse branch names from output
+        # Format: <commit_hash>	refs/heads/branch_name
+        branches = []
+        for line in result.stdout.strip().split("\n"):
+            if line:
+                # Extract branch name from refs/heads/branch_name
+                match = re.search(r"refs/heads/(.+)$", line)
+                if match:
+                    branches.append(match.group(1))
+        
+        # Sort branches (main/master first, then alphabetically)
+        def sort_key(branch):
+            if branch in ["main", "master"]:
+                return (0, branch)
+            return (1, branch)
+        
+        branches.sort(key=sort_key)
+        
+        return {"branches": branches, "repo_url": repo_url}
+        
+    except subprocess.TimeoutExpired:
+        raise HTTPException(
+            status_code=408,
+            detail="Request timeout while fetching branches"
+        )
+    except FileNotFoundError:
+        raise HTTPException(
+            status_code=500,
+            detail="Git is not installed on this system"
+        )
+    except Exception as e:
+        raise HTTPException(
+            status_code=500,
+            detail=f"Failed to fetch branches: {str(e)}"
+        )
