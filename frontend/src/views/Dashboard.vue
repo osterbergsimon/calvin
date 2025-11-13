@@ -215,6 +215,10 @@ const sideViewPositionIcon = computed(() => {
   }
 });
 
+const clockClass = computed(() => {
+  return ['clock-overlay', 'position-' + (configStore.clockPosition || 'top-right')];
+});
+
 const toggleOrientation = () => {
   const newOrientation =
     configStore.orientation === "landscape" ? "portrait" : "landscape";
