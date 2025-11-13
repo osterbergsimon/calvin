@@ -151,7 +151,10 @@
                 >
                   {{ getEventDisplayText(event) }}
                 </span>
-                <span v-else class="event-continuation">
+                <span
+                  v-else
+                  class="event-continuation"
+                >
                   <span class="continuation-arrow">←</span>
                   <span class="continuation-text">{{
                     truncateEventTitle(event.title, 15)
