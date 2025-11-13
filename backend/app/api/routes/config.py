@@ -197,7 +197,9 @@ async def get_config():
                         # Migrate old format to new format (update value_type to "json")
                         # This ensures future retrievals work correctly
                         try:
-                            await config_service.set_value("display_schedule", parsed, value_type="json")
+                            await config_service.set_value(
+                                "display_schedule", parsed, value_type="json"
+                            )
                         except Exception:
                             # Migration failed, but we can still use the parsed value
                             pass
@@ -213,7 +215,7 @@ async def get_config():
                 # Fallback for other types
                 config["displaySchedule"] = schedule_value
                 has_schedule = True
-    
+
     # If no valid schedule found, use default
     if not has_schedule:
         # Default: all days enabled, 06:00-22:00
@@ -250,7 +252,12 @@ async def get_config():
         config["randomizeImages"] = False  # Don't randomize by default
     elif "randomize_images" in config and "randomizeImages" not in config:
         randomize_value = config["randomize_images"]
-        config["randomizeImages"] = randomize_value == "true" if isinstance(randomize_value, str) else bool(randomize_value)
+        is_randomize = (
+            randomize_value == "true"
+            if isinstance(randomize_value, str)
+            else bool(randomize_value)
+        )
+        config["randomizeImages"] = is_randomize
     if "timezone" not in config:
         config["timezone"] = None  # No timezone set by default (use system timezone)
     # Note: timezone is stored as-is (no camelCase conversion needed)
@@ -355,7 +362,7 @@ async def update_config(config_update: ConfigUpdate):
             except json.JSONDecodeError:
                 # Invalid JSON, skip storing
                 pass
-        
+
         # Store with explicit value_type="json" so it gets parsed correctly on retrieval
         # Pass the list directly - set_value will serialize it with json.dumps()
         # This will also update any old entries that were stored with value_type="string"
@@ -387,9 +394,9 @@ async def update_config(config_update: ConfigUpdate):
         if calvin_update_file.exists():
             try:
                 # Read existing file
-                with open(calvin_update_file, "r") as f:
+                with open(calvin_update_file) as f:
                     lines = f.readlines()
-                
+
                 # Update or add GIT_REPO line
                 updated = False
                 new_lines = []
@@ -399,11 +406,11 @@ async def update_config(config_update: ConfigUpdate):
                         updated = True
                     else:
                         new_lines.append(line)
-                
+
                 if not updated:
                     # Add GIT_REPO if it doesn't exist
                     new_lines.append(f"GIT_REPO={update_dict['git_repo_url']}\n")
-                
+
                 # Write back
                 with open(calvin_update_file, "w") as f:
                     f.writelines(new_lines)
