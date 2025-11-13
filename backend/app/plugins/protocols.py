@@ -1,7 +1,20 @@
-"""Plugin protocols/interfaces for each plugin type."""
+"""
+Plugin protocols/interfaces for each plugin type.
+
+This module defines the well-defined interface between core and plugins.
+Core code MUST ONLY use methods defined in these protocols.
+Plugins MUST implement all abstract methods and CAN implement optional methods.
+
+Protocol Design Principles:
+- MUST methods: Abstract methods that plugins MUST implement
+- CAN methods: Non-abstract methods with default implementations that plugins CAN override
+- No ad-hoc method checking: Core code should never use hasattr() or getattr() to access plugin functionality
+- Type safety: Use isinstance() checks to ensure plugins conform to protocols
+"""
 
 from abc import abstractmethod
 from datetime import datetime
+from pathlib import Path
 from typing import Any
 
 from app.models.calendar import CalendarEvent
@@ -9,7 +22,13 @@ from app.plugins.base import BasePlugin, PluginType
 
 
 class CalendarPlugin(BasePlugin):
-    """Protocol for calendar source plugins."""
+    """
+    Protocol for calendar source plugins.
+    
+    MUST implement:
+    - fetch_events()
+    - validate_config()
+    """
 
     @property
     def plugin_type(self) -> PluginType:
@@ -49,7 +68,21 @@ class CalendarPlugin(BasePlugin):
 
 
 class ImagePlugin(BasePlugin):
-    """Protocol for image source plugins."""
+    """
+    Protocol for image source plugins.
+    
+    MUST implement:
+    - get_images()
+    - get_image()
+    - get_image_data()
+    - scan_images()
+    - validate_config()
+    
+    CAN implement (optional):
+    - upload_image()
+    - delete_image()
+    - get_thumbnail_path()
+    """
 
     @property
     def plugin_type(self) -> PluginType:
@@ -135,9 +168,32 @@ class ImagePlugin(BasePlugin):
         """
         return False
 
+    def get_thumbnail_path(self, image_id: str) -> Path | None:
+        """
+        Get thumbnail file path for an image (optional - not all plugins support thumbnails).
+
+        Args:
+            image_id: Image identifier
+
+        Returns:
+            Path to thumbnail file or None if thumbnail not available
+        """
+        return None
+
 
 class ServicePlugin(BasePlugin):
-    """Protocol for service plugins (webhooks, APIs, iframes, etc.)."""
+    """
+    Protocol for service plugins (webhooks, APIs, iframes, etc.).
+    
+    MUST implement:
+    - get_content()
+    - validate_config()
+    
+    CAN implement (optional):
+    - handle_webhook()
+    - handle_api_request()
+    - fetch_service_data()
+    """
 
     @property
     def plugin_type(self) -> PluginType:
@@ -181,6 +237,28 @@ class ServicePlugin(BasePlugin):
 
         Returns:
             Response dictionary or None if API not supported
+        """
+        return None
+
+    async def fetch_service_data(
+        self,
+        start_date: str | None = None,
+        end_date: str | None = None,
+    ) -> dict[str, Any] | None:
+        """
+        Fetch service data for display (optional - not all services support data fetching).
+        
+        This method is called by the core when fetching data via /web-services/{service_id}/data.
+        Plugins can implement this to provide their own data fetching logic.
+        Alternatively, plugins can use the fetch_service_data hook for more complex scenarios.
+        
+        Args:
+            start_date: Optional start date (YYYY-MM-DD format, plugin-specific)
+            end_date: Optional end date (YYYY-MM-DD format, plugin-specific)
+            
+        Returns:
+            Dictionary with service data, or None if data fetching not supported.
+            The dict can contain any plugin-specific data structure.
         """
         return None
 
