@@ -52,7 +52,10 @@
                   ></span
                 >
               </div>
-              <div v-if="isEventMultiDay(dayEvent)" class="event-detail-row">
+              <div
+                v-if="isEventMultiDay(dayEvent)"
+                class="event-detail-row"
+              >
                 <span class="label">End:</span>
                 <span class="value"
                   >{{ formatDate(dayEvent.end)
