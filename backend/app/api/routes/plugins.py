@@ -3,12 +3,13 @@
 from pathlib import Path
 from typing import Any
 
-from fastapi import APIRouter, HTTPException, Body
+from fastapi import APIRouter, HTTPException, Body, UploadFile, File
 
 from app.plugins.base import PluginType
 from app.plugins.loader import plugin_loader
 from app.database import AsyncSessionLocal
 from app.models.db_models import PluginTypeDB, PluginDB
+from app.services.plugin_installer import plugin_installer
 from sqlalchemy import select
 
 router = APIRouter()
@@ -90,11 +91,18 @@ async def get_plugins(plugin_type: str | None = None):
     # Get plugin types from pluggy hooks
     plugin_types = plugin_loader.get_plugin_types()
     
+    # Filter out test plugins
+    plugin_types = [t for t in plugin_types if not t.get("type_id", "").startswith("test_")]
+    
     # Filter by plugin type if specified
     if pt:
         plugin_types = [t for t in plugin_types if t.get("plugin_type") == pt]
 
-    # Load enabled status from database
+    # Load enabled status and error messages from database
+    async with AsyncSessionLocal() as session:
+        result = await session.execute(select(PluginTypeDB))
+        db_types = {db_type.type_id: db_type for db_type in result.scalars().all()}
+    
     from app.services.config_service import config_service
 
     # Convert to response format
@@ -103,13 +111,10 @@ async def get_plugins(plugin_type: str | None = None):
         type_id = type_info.get("type_id")
         plugin_type = type_info.get("plugin_type")
         
-        # Check if plugin type is enabled from database
-        async with AsyncSessionLocal() as session:
-            result_db = await session.execute(
-                select(PluginTypeDB).where(PluginTypeDB.type_id == type_id)
-            )
-            db_type = result_db.scalar_one_or_none()
-            enabled = db_type.enabled if db_type else True  # Default to enabled
+        # Get plugin type info from database (including error messages)
+        db_type = db_types.get(type_id)
+        enabled = db_type.enabled if db_type else True  # Default to enabled
+        error_message = db_type.error_message if db_type else None
 
         plugin_info: dict[str, Any] = {
             "id": type_id,
@@ -121,9 +126,149 @@ async def get_plugins(plugin_type: str | None = None):
             "ui_actions": type_info.get("ui_actions", []),  # Plugin-specific actions (buttons)
             "ui_sections": type_info.get("ui_sections", []),  # Plugin-specific sections (upload, manage, etc.)
         }
+        
+        # Include error message if plugin is broken
+        if error_message:
+            plugin_info["error_message"] = error_message
+        
         result.append(plugin_info)
 
     return {"plugins": result, "total": len(result)}
+
+
+# Instance routes must come before generic plugin routes to avoid path conflicts
+@router.post("/plugins/instances/{instance_id}/start")
+async def start_plugin_instance(instance_id: str):
+    """
+    Start a plugin instance (if enabled).
+
+    Args:
+        instance_id: Plugin instance ID
+
+    Returns:
+        Success status and message
+    """
+    from app.plugins.manager import plugin_manager
+    from app.plugins.registry import plugin_registry
+    
+    # Check if instance exists in database first
+    async with AsyncSessionLocal() as session:
+        result = await session.execute(
+            select(PluginDB).where(PluginDB.id == instance_id)
+        )
+        db_plugin = result.scalar_one_or_none()
+        
+        if not db_plugin:
+            raise HTTPException(
+                status_code=404,
+                detail=f"Plugin instance {instance_id} not found in database"
+            )
+        
+        if not db_plugin.enabled:
+            raise HTTPException(
+                status_code=400,
+                detail=f"Cannot start disabled plugin {instance_id}. Enable it first."
+            )
+    
+    # Try to get plugin from manager
+    plugin = plugin_manager.get_plugin(instance_id)
+    
+    # If plugin doesn't exist in manager, create it (shouldn't happen if enabled, but handle it)
+    if not plugin:
+        # Create and register the plugin instance
+        plugin = plugin_loader.create_plugin_instance(
+            plugin_id=instance_id,
+            type_id=db_plugin.type_id,
+            name=db_plugin.name,
+            config=db_plugin.config or {},
+        )
+        if plugin:
+            await plugin.configure(db_plugin.config or {})
+            plugin.enabled = db_plugin.enabled
+            plugin_manager.register(plugin)
+        else:
+            raise HTTPException(
+                status_code=500,
+                detail=f"Failed to create plugin instance {instance_id}. Plugin type {db_plugin.type_id} may not be available."
+            )
+    
+    if plugin.is_running():
+        return {
+            "success": True,
+            "message": f"Plugin {instance_id} is already running",
+            "running": True
+        }
+    
+    success = await plugin_manager.start_plugin(instance_id)
+    if success:
+        return {
+            "success": True,
+            "message": f"Plugin {instance_id} started successfully",
+            "running": plugin.is_running()
+        }
+    else:
+        raise HTTPException(
+            status_code=500,
+            detail=f"Failed to start plugin {instance_id}"
+        )
+
+
+@router.post("/plugins/instances/{instance_id}/stop")
+async def stop_plugin_instance(instance_id: str):
+    """
+    Stop a plugin instance.
+
+    Args:
+        instance_id: Plugin instance ID
+
+    Returns:
+        Success status and message
+    """
+    from app.plugins.manager import plugin_manager
+    
+    # Check if instance exists in database first
+    async with AsyncSessionLocal() as session:
+        result = await session.execute(
+            select(PluginDB).where(PluginDB.id == instance_id)
+        )
+        db_plugin = result.scalar_one_or_none()
+        
+        if not db_plugin:
+            raise HTTPException(
+                status_code=404,
+                detail=f"Plugin instance {instance_id} not found in database"
+            )
+    
+    # Try to get plugin from manager
+    plugin = plugin_manager.get_plugin(instance_id)
+    
+    # If plugin doesn't exist in manager, it's already stopped
+    if not plugin:
+        return {
+            "success": True,
+            "message": f"Plugin {instance_id} is already stopped (not loaded)",
+            "running": False
+        }
+    
+    if not plugin.is_running():
+        return {
+            "success": True,
+            "message": f"Plugin {instance_id} is already stopped",
+            "running": False
+        }
+    
+    success = await plugin_manager.stop_plugin(instance_id)
+    if success:
+        return {
+            "success": True,
+            "message": f"Plugin {instance_id} stopped successfully",
+            "running": False
+        }
+    else:
+        raise HTTPException(
+            status_code=500,
+            detail=f"Failed to stop plugin {instance_id}"
+        )
 
 
 @router.get("/plugins/{plugin_id}")
@@ -136,13 +281,14 @@ async def get_plugin(plugin_id: str):
     if not type_info:
         raise HTTPException(status_code=404, detail="Plugin type not found")
 
-    # Get enabled status from database
+    # Get enabled status and error message from database
     async with AsyncSessionLocal() as session:
         result = await session.execute(
             select(PluginTypeDB).where(PluginTypeDB.type_id == plugin_id)
         )
         db_type = result.scalar_one_or_none()
         enabled = db_type.enabled if db_type else True
+        error_message = db_type.error_message if db_type else None
 
     plugin_info: dict[str, Any] = {
         "id": type_info.get("type_id"),
@@ -152,8 +298,49 @@ async def get_plugin(plugin_id: str):
         "config_schema": type_info.get("common_config_schema", {}),
         "enabled": enabled,
     }
+    
+    # Include error message if plugin is broken
+    if error_message:
+        plugin_info["error_message"] = error_message
 
     return plugin_info
+
+
+@router.get("/plugins/{plugin_id}/instances")
+async def get_plugin_instances(plugin_id: str):
+    """
+    Get all plugin instances for a plugin type, including running status.
+    
+    Args:
+        plugin_id: Plugin type ID
+        
+    Returns:
+        List of plugin instances with their running status
+    """
+    from app.plugins.manager import plugin_manager
+    
+    # Get instances from database
+    async with AsyncSessionLocal() as session:
+        result = await session.execute(
+            select(PluginDB).where(PluginDB.type_id == plugin_id)
+        )
+        db_plugins = result.scalars().all()
+    
+    instances = []
+    for db_plugin in db_plugins:
+        # Try to get plugin instance if it exists (only enabled plugins have instances)
+        plugin = plugin_manager.get_plugin(db_plugin.id)
+        running = plugin.is_running() if plugin else False
+        
+        instances.append({
+            "id": db_plugin.id,
+            "name": db_plugin.name,
+            "enabled": db_plugin.enabled,
+            "running": running,
+            "config": mask_sensitive_config(db_plugin.config or {}, mask_for_frontend=True),
+        })
+    
+    return {"instances": instances, "total": len(instances)}
 
 
 @router.put("/plugins/{plugin_id}")
@@ -281,8 +468,32 @@ async def update_plugin(plugin_id: str, config: dict[str, Any]):
                 if plugin:
                     if enabled:
                         plugin.enable()
+                        # Start the plugin if it's not running
+                        if not plugin.is_running():
+                            try:
+                                await plugin.initialize()
+                                plugin.start()
+                            except Exception as e:
+                                import logging
+                                logger = logging.getLogger(__name__)
+                                logger.error(
+                                    f"Error starting plugin {instance.id}: {e}",
+                                    exc_info=True
+                                )
                     else:
                         plugin.disable()
+                        # Stop the plugin if it's running
+                        if plugin.is_running():
+                            try:
+                                plugin.stop()
+                                await plugin.cleanup()
+                            except Exception as e:
+                                import logging
+                                logger = logging.getLogger(__name__)
+                                logger.warning(
+                                    f"Error stopping plugin {instance.id}: {e}",
+                                    exc_info=True
+                                )
             
             if instances:
                 await session.commit()
@@ -310,319 +521,38 @@ async def update_plugin(plugin_id: str, config: dict[str, Any]):
             print(f"[Plugin Update] Saving config to service: {masked_json}")
             await config_service.set_value(config_key, config_json)
         
-        # Update existing plugin instances if this is a local image plugin
-        if plugin_id == "local" and config:
-            # Find and update the local image plugin instance
-            from app.plugins.base import PluginType
-            from app.plugins.protocols import ImagePlugin
-            
-            plugins = plugin_manager.get_plugins(PluginType.IMAGE, enabled_only=False)
-            for plugin in plugins:
-                if isinstance(plugin, ImagePlugin) and plugin.plugin_id == "local-images":
-                    # Update plugin directories if provided - use configure method
-                    # Ensure all values are strings before passing to configure
-                    update_config = {}
-                    if "image_dir" in config and config["image_dir"]:
-                        update_config["image_dir"] = str(config["image_dir"])
-                    if "thumbnail_dir" in config and config["thumbnail_dir"]:
-                        update_config["thumbnail_dir"] = str(config["thumbnail_dir"])
-                    
-                    if update_config:
-                        print(f"[Plugin Update] Configuring local plugin with: {update_config}")
-                        await plugin.configure(update_config)
-                    # Rescan images after directory change
-                    await plugin.scan_images()
-                    break
+        # Call plugin-specific config update handlers (if any)
+        # This allows plugins to handle their own instance creation/update logic
+        # Plugins are self-contained and should implement handle_plugin_config_update hook
+        from app.plugins.hooks import plugin_manager as hook_manager
+        import asyncio
         
-        # Create or update IMAP plugin instance if settings are saved
-        if plugin_id == "imap" and config:
-            from app.plugins.registry import plugin_registry
-            from app.plugins.base import PluginType
-            from app.plugins.protocols import ImagePlugin
-            
-            # Check if IMAP instance exists
-            result = await session.execute(
-                select(PluginDB).where(PluginDB.type_id == "imap")
-            )
-            imap_instance = result.scalar_one_or_none()
-            print(f"[IMAP] Checking for existing IMAP instance: {imap_instance.id if imap_instance else 'None'}")
-            
-            # Check if we have required config (email and password)
-            email_address = config.get("email_address", "")
-            email_password = config.get("email_password", "")
-            
-            print(f"[IMAP] Config has email: {bool(email_address)}, password: {bool(email_password)}")
-            
-            if email_address and email_password:
-                # Create or update IMAP instance
-                if not imap_instance:
-                    # Create new IMAP instance
-                    plugin_instance_id = f"imap-{abs(hash(email_address)) % 10000}"
-                    print(f"[IMAP] Creating new IMAP instance with ID: {plugin_instance_id}")
-                    try:
-                        # Use plugin type enabled state if no explicit enabled value provided
-                        instance_enabled = enabled if enabled is not None else (db_type.enabled if db_type else True)
-                        plugin = await plugin_registry.register_plugin(
-                            plugin_id=plugin_instance_id,
-                            type_id="imap",
-                            name="IMAP Email",
-                            config=config,
-                            enabled=instance_enabled,
-                        )
-                        print(f"[IMAP] Successfully created IMAP instance: {plugin_instance_id}, plugin: {plugin.plugin_id if plugin else 'None'}")
-                    except Exception as e:
-                        print(f"[IMAP] ERROR: Failed to create IMAP instance: {e}")
-                        import traceback
-                        traceback.print_exc()
-                else:
-                    # Update existing IMAP instance
-                    print(f"[IMAP] Updating existing IMAP instance: {imap_instance.id}")
-                    plugin = plugin_manager.get_plugin(imap_instance.id)
-                    if plugin:
-                        print(f"[IMAP] Found plugin in manager: {plugin.plugin_id}, class: {plugin.__class__.__name__}")
-                        await plugin.configure(config)
-                        # Sync enabled state: use explicit enabled, or plugin type enabled state
-                        # Also update plugin type enabled state to match instance
-                        instance_enabled = enabled if enabled is not None else (db_type.enabled if db_type else imap_instance.enabled)
-                        if instance_enabled:
-                            plugin.enable()
-                        else:
-                            plugin.disable()
-                        # Update in database - sync both instance and plugin type
-                        imap_instance.config = config
-                        imap_instance.enabled = instance_enabled
-                        if db_type:
-                            db_type.enabled = instance_enabled
-                        await session.commit()
-                        print(f"[IMAP] Updated IMAP instance in database")
-                    else:
-                        print(f"[IMAP] WARNING: Plugin instance {imap_instance.id} not found in plugin manager")
-            else:
-                print(f"[IMAP] Skipping instance creation - missing email or password")
+        # Pluggy returns a list of coroutines for async hooks, we need to await them
+        update_coroutines = hook_manager.hook.handle_plugin_config_update(
+            type_id=plugin_id,
+            config=cleaned_config,
+            enabled=enabled,
+            db_type=db_type,
+            session=session,
+        )
         
-        # Create or update Mealie plugin instance if settings are saved
-        if plugin_id == "mealie" and config:
-            print(f"[Mealie] Starting Mealie instance creation/update process")
-            from app.plugins.registry import plugin_registry
-            from app.plugins.base import PluginType
-            from app.plugins.protocols import ServicePlugin
-            
-            # Check if Mealie instance exists
-            result = await session.execute(
-                select(PluginDB).where(PluginDB.type_id == "mealie")
-            )
-            mealie_instance = result.scalar_one_or_none()
-            print(f"[Mealie] Checking for existing Mealie instance: {mealie_instance.id if mealie_instance else 'None'}")
-            
-            # Check if we have required config (URL and API token)
-            # Note: config has already been cleaned, so values should be strings
-            mealie_url = config.get("mealie_url", "")
-            api_token = config.get("api_token", "")
-            
-            print(f"[Mealie] Extracted URL: {mealie_url[:50] if mealie_url else 'None'}...")
-            print(f"[Mealie] Extracted API token: {'***' if api_token else 'None'}")
-            print(f"[Mealie] Config has URL: {bool(mealie_url)}, API token: {bool(api_token)}")
-            
-            if mealie_url and api_token:
-                # Create or update Mealie instance
-                if not mealie_instance:
-                    # Create new Mealie instance
-                    plugin_instance_id = f"mealie-{abs(hash(mealie_url)) % 10000}"
-                    print(f"[Mealie] Creating new Mealie instance with ID: {plugin_instance_id}")
-                    try:
-                        # Use cleaned config values for instance creation
-                        # Get days_ahead from config, default to 7
-                        days_ahead = config.get("days_ahead", "7")
-                        try:
-                            days_ahead = int(days_ahead) if days_ahead else 7
-                        except (ValueError, TypeError):
-                            days_ahead = 7
-                        
-                        instance_config = {
-                            "mealie_url": mealie_url,
-                            "api_token": api_token,
-                            "group_id": config.get("group_id", ""),
-                            "days_ahead": days_ahead,
-                            "display_order": 0,
-                            "fullscreen": False,
-                        }
-                        print(f"[Mealie] Instance config: mealie_url={instance_config['mealie_url'][:50]}..., api_token={'***' if instance_config['api_token'] else 'None'}")
-                        # Use plugin type enabled state if no explicit enabled value provided
-                        instance_enabled = enabled if enabled is not None else (db_type.enabled if db_type else True)
-                        plugin = await plugin_registry.register_plugin(
-                            plugin_id=plugin_instance_id,
-                            type_id="mealie",
-                            name="Mealie Meal Plan",
-                            config=instance_config,
-                            enabled=instance_enabled,
-                        )
-                        print(f"[Mealie] Successfully created Mealie instance: {plugin_instance_id}, plugin: {plugin.plugin_id if plugin else 'None'}")
-                    except Exception as e:
-                        print(f"[Mealie] ERROR: Failed to create Mealie instance: {e}")
-                        import traceback
-                        traceback.print_exc()
-                else:
-                    # Update existing Mealie instance
-                    print(f"[Mealie] Updating existing Mealie instance: {mealie_instance.id}")
-                    plugin = plugin_manager.get_plugin(mealie_instance.id)
-                    if plugin:
-                        print(f"[Mealie] Found plugin in manager: {plugin.plugin_id}, class: {plugin.__class__.__name__}")
-                        # Use cleaned config values for update
-                        # Get days_ahead from config, default to existing value or 7
-                        days_ahead = config.get("days_ahead", "")
-                        if days_ahead:
-                            try:
-                                days_ahead = int(days_ahead) if days_ahead else 7
-                            except (ValueError, TypeError):
-                                days_ahead = mealie_instance.config.get("days_ahead", 7) if mealie_instance.config else 7
-                        else:
-                            days_ahead = mealie_instance.config.get("days_ahead", 7) if mealie_instance.config else 7
-                        
-                        instance_config = {
-                            "mealie_url": mealie_url,
-                            "api_token": api_token,
-                            "group_id": config.get("group_id", ""),
-                            "days_ahead": days_ahead,
-                            "display_order": mealie_instance.config.get("display_order", 0) if mealie_instance.config else 0,
-                            "fullscreen": mealie_instance.config.get("fullscreen", False) if mealie_instance.config else False,
-                        }
-                        await plugin.configure(instance_config)
-                        # Sync enabled state: use explicit enabled, or plugin type enabled state
-                        # Also update plugin type enabled state to match instance
-                        instance_enabled = enabled if enabled is not None else (db_type.enabled if db_type else mealie_instance.enabled)
-                        if instance_enabled:
-                            plugin.enable()
-                        else:
-                            plugin.disable()
-                        # Update in database - sync both instance and plugin type
-                        mealie_instance.config = instance_config
-                        mealie_instance.enabled = instance_enabled
-                        if db_type:
-                            db_type.enabled = instance_enabled
-                        await session.commit()
-                        print(f"[Mealie] Updated Mealie instance in database")
-                    else:
-                        print(f"[Mealie] WARNING: Plugin instance {mealie_instance.id} not found in plugin manager")
-            else:
-                print(f"[Mealie] Skipping instance creation - missing URL or API token")
-                print(f"[Mealie]   mealie_url: {repr(mealie_url)}")
-                print(f"[Mealie]   api_token: {'***' if api_token else 'None'}")
+        # Await all hook implementations
+        update_results = await asyncio.gather(*update_coroutines, return_exceptions=True)
         
-        # Create or update Yr.no weather plugin instance if settings are saved
-        if plugin_id == "yr_weather" and config:
-            print(f"[YrWeather] Starting Yr.no weather instance creation/update process")
-            from app.plugins.registry import plugin_registry
-            from app.plugins.base import PluginType
-            from app.plugins.protocols import ServicePlugin
-            
-            # Check if Yr.no weather instance exists
-            result = await session.execute(
-                select(PluginDB).where(PluginDB.type_id == "yr_weather")
-            )
-            yr_weather_instance = result.scalar_one_or_none()
-            print(f"[YrWeather] Checking for existing Yr.no weather instance: {yr_weather_instance.id if yr_weather_instance else 'None'}")
-            
-            # Check if we have required config (latitude and longitude)
-            latitude = config.get("latitude", "")
-            longitude = config.get("longitude", "")
-            location = config.get("location", "")
-            altitude = config.get("altitude", "0")
-            forecast_days = config.get("forecast_days", "5")
-            
-            # Convert to proper types
-            try:
-                latitude = float(latitude) if latitude else None
-            except (ValueError, TypeError):
-                latitude = None
-            try:
-                longitude = float(longitude) if longitude else None
-            except (ValueError, TypeError):
-                longitude = None
-            try:
-                altitude = int(altitude) if altitude else 0
-            except (ValueError, TypeError):
-                altitude = 0
-            try:
-                forecast_days = min(max(int(forecast_days), 1), 9) if forecast_days else 5
-            except (ValueError, TypeError):
-                forecast_days = 5
-            
-            print(f"[YrWeather] Extracted latitude: {latitude}, longitude: {longitude}")
-            print(f"[YrWeather] Config has coordinates: {bool(latitude and longitude)}")
-            print(f"[YrWeather] Plugin type enabled state: {enabled}, db_type enabled: {db_type.enabled if db_type else 'N/A'}")
-            
-            if latitude is not None and longitude is not None:
-                # Validate coordinates
-                if -90 <= latitude <= 90 and -180 <= longitude <= 180:
-                    # Determine enabled state: use explicit enabled param, or plugin type enabled state, or default to False
-                    instance_enabled = enabled if enabled is not None else (db_type.enabled if db_type else False)
-                    print(f"[YrWeather] Instance will be created with enabled={instance_enabled}")
-                    
-                    # Create or update Yr.no weather instance
-                    if not yr_weather_instance:
-                        # Create new Yr.no weather instance
-                        plugin_instance_id = f"yr_weather-{abs(hash(f'{latitude},{longitude}')) % 10000}"
-                        print(f"[YrWeather] Creating new Yr.no weather instance with ID: {plugin_instance_id}")
-                        try:
-                            instance_config = {
-                                "latitude": latitude,
-                                "longitude": longitude,
-                                "altitude": altitude,
-                                "forecast_days": forecast_days,
-                                "location": location,
-                                "display_order": 0,
-                                "fullscreen": False,
-                            }
-                            print(f"[YrWeather] Instance config: latitude={latitude}, longitude={longitude}, location={location}")
-                            plugin = await plugin_registry.register_plugin(
-                                plugin_id=plugin_instance_id,
-                                type_id="yr_weather",
-                                name="Yr.no Weather",
-                                config=instance_config,
-                                enabled=instance_enabled,
-                            )
-                            print(f"[YrWeather] Successfully created Yr.no weather instance: {plugin_instance_id}, enabled={instance_enabled}, plugin: {plugin.plugin_id if plugin else 'None'}")
-                        except Exception as e:
-                            print(f"[YrWeather] ERROR: Failed to create Yr.no weather instance: {e}")
-                            import traceback
-                            traceback.print_exc()
-                    else:
-                        # Update existing Yr.no weather instance
-                        print(f"[YrWeather] Updating existing Yr.no weather instance: {yr_weather_instance.id}")
-                        plugin = plugin_manager.get_plugin(yr_weather_instance.id)
-                        if plugin:
-                            print(f"[YrWeather] Found plugin in manager: {plugin.plugin_id}, class: {plugin.__class__.__name__}")
-                            instance_config = {
-                                "latitude": latitude,
-                                "longitude": longitude,
-                                "altitude": altitude,
-                                "forecast_days": forecast_days,
-                                "location": location,
-                                "display_order": yr_weather_instance.config.get("display_order", 0) if yr_weather_instance.config else 0,
-                                "fullscreen": yr_weather_instance.config.get("fullscreen", False) if yr_weather_instance.config else False,
-                            }
-                            await plugin.configure(instance_config)
-                            # Sync enabled state: use explicit enabled, or plugin type enabled state
-                            # Also update plugin type enabled state to match instance
-                            instance_enabled = enabled if enabled is not None else (db_type.enabled if db_type else yr_weather_instance.enabled)
-                            if instance_enabled:
-                                plugin.enable()
-                            else:
-                                plugin.disable()
-                            # Update in database - sync both instance and plugin type
-                            yr_weather_instance.config = instance_config
-                            yr_weather_instance.enabled = instance_enabled
-                            if db_type:
-                                db_type.enabled = instance_enabled
-                            await session.commit()
-                            print(f"[YrWeather] Updated Yr.no weather instance in database, enabled={yr_weather_instance.enabled}")
-                        else:
-                            print(f"[YrWeather] WARNING: Plugin instance {yr_weather_instance.id} not found in plugin manager")
-                else:
-                    print(f"[YrWeather] Skipping instance creation - invalid coordinates")
-            else:
-                print(f"[YrWeather] Skipping instance creation - missing latitude or longitude")
-                print(f"[YrWeather]   latitude: {repr(latitude)}, longitude: {repr(longitude)}")
+        # Check if any plugin handled the update
+        handled = False
+        for result in update_results:
+            # Skip exceptions (they're wrapped in the result)
+            if isinstance(result, Exception):
+                continue
+            if result is not None:
+                handled = True
+                print(f"[Plugin Update] Plugin {plugin_id} handled config update: {result}")
+                break
+        
+        if not handled and cleaned_config:
+            # If no plugin handled it and we have config, log a warning
+            print(f"[Plugin Update] No plugin handler found for {plugin_id}, config saved but no instance management performed")
 
     return {"message": "Plugin type configuration updated", "plugin_id": plugin_id}
 
@@ -665,122 +595,9 @@ async def get_plugin_config(plugin_id: str):
             config = {}
     else:
         config = {}
-        print(f"[Plugin Config] No config found, using empty dict")
     
-    # For local image plugin, always get current plugin instance directories
-    # This ensures we show the actual values being used, not just what's stored in config
-    if plugin_id == "local":
-        from app.plugins.manager import plugin_manager
-        from app.plugins.base import PluginType
-        from app.plugins.protocols import ImagePlugin
-        
-        plugins = plugin_manager.get_plugins(PluginType.IMAGE, enabled_only=False)
-        for plugin in plugins:
-            if isinstance(plugin, ImagePlugin) and plugin.plugin_id == "local-images":
-                # Always use current plugin instance directories (source of truth)
-                # Ensure we convert Path objects to strings
-                image_dir = plugin.image_dir
-                thumbnail_dir = plugin.thumbnail_dir
-                print(f"[Plugin Config] Found local plugin instance:")
-                print(f"[Plugin Config]   image_dir: {image_dir} (type: {type(image_dir)})")
-                print(f"[Plugin Config]   thumbnail_dir: {thumbnail_dir} (type: {type(thumbnail_dir)})")
-                
-                # Convert Path objects to strings properly
-                if image_dir:
-                    if isinstance(image_dir, Path):
-                        # Use resolve() to get absolute path, then convert to string
-                        try:
-                            resolved = image_dir.resolve()
-                            config["image_dir"] = str(resolved)
-                            print(f"[Plugin Config]   image_dir resolved: {resolved}")
-                        except Exception as e:
-                            print(f"[Plugin Config]   ERROR resolving image_dir: {e}")
-                            config["image_dir"] = str(image_dir)
-                    else:
-                        config["image_dir"] = str(image_dir)
-                else:
-                    config["image_dir"] = "./data/images"
-                
-                if thumbnail_dir:
-                    if isinstance(thumbnail_dir, Path):
-                        # Use resolve() to get absolute path, then convert to string
-                        try:
-                            # First, let's check what the Path object actually is
-                            print(f"[Plugin Config]   thumbnail_dir repr: {repr(thumbnail_dir)}")
-                            print(f"[Plugin Config]   thumbnail_dir str: {str(thumbnail_dir)}")
-                            print(f"[Plugin Config]   thumbnail_dir parts: {thumbnail_dir.parts}")
-                            resolved = thumbnail_dir.resolve()
-                            print(f"[Plugin Config]   thumbnail_dir resolved: {resolved}")
-                            config["thumbnail_dir"] = str(resolved)
-                            print(f"[Plugin Config]   thumbnail_dir final string: {config['thumbnail_dir']}")
-                        except Exception as e:
-                            print(f"[Plugin Config]   ERROR resolving thumbnail_dir: {e}")
-                            import traceback
-                            traceback.print_exc()
-                            # Fallback: try direct string conversion
-                            try:
-                                config["thumbnail_dir"] = str(thumbnail_dir)
-                            except Exception as e2:
-                                print(f"[Plugin Config]   ERROR converting thumbnail_dir to string: {e2}")
-                                config["thumbnail_dir"] = "./data/images/thumbnails"
-                    else:
-                        config["thumbnail_dir"] = str(thumbnail_dir)
-                        print(f"[Plugin Config]   thumbnail_dir is not Path, converted to: {config['thumbnail_dir']}")
-                else:
-                    config["thumbnail_dir"] = "./data/images/thumbnails"
-                
-                print(f"[Plugin Config]   Final image_dir: {config['image_dir']} (type: {type(config['image_dir'])})")
-                print(f"[Plugin Config]   Final thumbnail_dir: {config['thumbnail_dir']} (type: {type(config['thumbnail_dir'])})")
-                break
-        else:
-            # Plugin instance doesn't exist yet, use defaults
-            print(f"[Plugin Config] Local plugin instance not found, using defaults")
-            if "image_dir" not in config or not config["image_dir"]:
-                config["image_dir"] = "./data/images"
-            if "thumbnail_dir" not in config or not config["thumbnail_dir"]:
-                config["thumbnail_dir"] = "./data/images/thumbnails"
-    
-    # Clean up any schema objects that might have been stored incorrectly
-    # Ensure all values are strings, not objects
-    cleaned_config = {}
-    print(f"[Plugin Config] Cleaning config values...")
-    for key, value in config.items():
-        # Mask sensitive values in logs
-        if key.lower() in SENSITIVE_FIELDS or any(field in key.lower() for field in SENSITIVE_FIELDS):
-            masked_value = f"{str(value)[0]}***{str(value)[-1]}" if len(str(value)) > 2 else "***" if value else ""
-            print(f"[Plugin Config]   Key '{key}': type={type(value)}, value={masked_value}")
-        else:
-            print(f"[Plugin Config]   Key '{key}': type={type(value)}, value={value}")
-        if isinstance(value, dict):
-            # If it's a schema object, extract the actual value or default
-            cleaned_value = value.get("value") or value.get("default") or ""
-            print(f"[Plugin Config]     Extracted from dict: {cleaned_value}")
-            cleaned_config[key] = cleaned_value
-        elif value is None:
-            cleaned_config[key] = ""
-            print(f"[Plugin Config]     Set to empty string (was None)")
-        elif isinstance(value, Path):
-            # Handle Path objects - convert to string
-            cleaned_config[key] = str(value)
-            print(f"[Plugin Config]     Converted Path to string: {cleaned_config[key]}")
-        else:
-            cleaned_config[key] = str(value)
-            # Mask sensitive values in logs
-            if key.lower() in SENSITIVE_FIELDS or any(field in key.lower() for field in SENSITIVE_FIELDS):
-                masked_value = f"{str(cleaned_config[key])[0]}***{str(cleaned_config[key])[-1]}" if len(str(cleaned_config[key])) > 2 else "***" if cleaned_config[key] else ""
-                print(f"[Plugin Config]     Converted to string: {masked_value}")
-            else:
-                print(f"[Plugin Config]     Converted to string: {cleaned_config[key]}")
-    
-    # Remove sensitive fields before sending to frontend (don't send passwords, API keys, etc.)
-    safe_config = mask_sensitive_config(cleaned_config, mask_for_frontend=True)
-    
-    # Log masked version for debugging
-    masked_final = mask_sensitive_config(cleaned_config, mask_for_frontend=False)
-    print(f"[Plugin Config] Final cleaned config (masked for logs): {masked_final}")
-    print(f"[Plugin Config] Sending safe config to frontend (sensitive fields removed): {list(safe_config.keys())}")
-    
-    return {"plugin_id": plugin_id, "config": safe_config}
+    # Mask sensitive fields before returning
+    return mask_sensitive_config(config, mask_for_frontend=True)
 
 
 @router.post("/plugins/{plugin_id}/fetch")
@@ -788,8 +605,7 @@ async def fetch_plugin(plugin_id: str):
     """
     Manually trigger plugin fetch/check operation.
     
-    Currently supports:
-    - IMAP: Checks for new emails and downloads images
+    Uses plugin hooks to allow plugins to implement their own fetch logic.
     
     Args:
         plugin_id: Plugin type ID (e.g., 'imap')
@@ -804,94 +620,24 @@ async def fetch_plugin(plugin_id: str):
     if not type_info:
         raise HTTPException(status_code=404, detail="Plugin type not found")
     
-    # Get plugin instance from plugin manager
-    from app.plugins.manager import plugin_manager
-    from app.plugins.base import PluginType
-    from app.plugins.protocols import ImagePlugin
-    from app.database import AsyncSessionLocal
-    from app.models.db_models import PluginDB
-    from sqlalchemy import select
+    # Call plugin-specific fetch handlers via hooks
+    from app.plugins.hooks import plugin_manager as hook_manager
+    import asyncio
     
-    # Find IMAP plugin instance
-    if plugin_id == "imap":
-        print(f"[IMAP Fetch] Starting fetch operation...")
-        
-        # First, find IMAP plugin instances from database
-        async with AsyncSessionLocal() as session:
-            result = await session.execute(
-                select(PluginDB).where(PluginDB.type_id == "imap")
-            )
-            imap_plugins_db = result.scalars().all()
-        
-        print(f"[IMAP Fetch] Found {len(imap_plugins_db)} IMAP instances in database")
-        for db_plugin in imap_plugins_db:
-            print(f"[IMAP Fetch] DB instance: id={db_plugin.id}, enabled={db_plugin.enabled}, name={db_plugin.name}")
-        
-        if not imap_plugins_db:
-            print(f"[IMAP Fetch] No IMAP instances found in database")
-            return {
-                "success": False,
-                "message": "IMAP plugin instance not found. Please configure and enable the IMAP plugin first.",
-                "images_downloaded": False,
-                "image_count": 0,
-            }
-        
-        # Try to find the plugin instance from plugin manager
-        imap_plugin = None
-        print(f"[IMAP Fetch] Looking for plugin instances in plugin manager...")
-        for db_plugin in imap_plugins_db:
-            # Try to get plugin by its ID
-            print(f"[IMAP Fetch] Trying to get plugin by ID: {db_plugin.id}")
-            plugin = plugin_manager.get_plugin(db_plugin.id)
-            if plugin:
-                print(f"[IMAP Fetch] Found plugin: id={plugin.plugin_id}, class={plugin.__class__.__name__}, enabled={plugin.enabled}")
-                if isinstance(plugin, ImagePlugin):
-                    # Check if it's an ImapImagePlugin
-                    if plugin.__class__.__name__ == "ImapImagePlugin":
-                        print(f"[IMAP Fetch] Found ImapImagePlugin instance!")
-                        imap_plugin = plugin
-                        break
-            else:
-                print(f"[IMAP Fetch] Plugin {db_plugin.id} not found in plugin manager")
-        
-        # If not found by ID, try to find by class name
-        if not imap_plugin:
-            print(f"[IMAP Fetch] Not found by ID, searching all IMAGE plugins by class name...")
-            plugins = plugin_manager.get_plugins(PluginType.IMAGE, enabled_only=False)
-            print(f"[IMAP Fetch] Found {len(plugins)} IMAGE plugins total")
-            for plugin in plugins:
-                print(f"[IMAP Fetch] Checking plugin: id={plugin.plugin_id}, class={plugin.__class__.__name__}")
-                if plugin.__class__.__name__ == "ImapImagePlugin":
-                    print(f"[IMAP Fetch] Found ImapImagePlugin by class name!")
-                    imap_plugin = plugin
-                    break
-        
-        if not imap_plugin:
-            print(f"[IMAP Fetch] ERROR: IMAP plugin instance not found in plugin manager")
-            print(f"[IMAP Fetch] All registered plugins: {list(plugin_manager._plugins.keys())}")
-            return {
-                "success": False,
-                "message": "IMAP plugin instance found in database but not loaded. Please restart the application.",
-                "images_downloaded": False,
-                "image_count": 0,
-            }
-        
-        print(f"[IMAP Fetch] Using IMAP plugin: {imap_plugin.plugin_id}")
-        
-        # Check if plugin has fetch_now method
-        if hasattr(imap_plugin, 'fetch_now'):
-            print(f"[IMAP Fetch] Calling fetch_now()...")
-            result = await imap_plugin.fetch_now()
-            print(f"[IMAP Fetch] Fetch result: success={result.get('success')}, images_downloaded={result.get('images_downloaded')}, image_count={result.get('image_count')}")
+    # Pluggy returns a list of coroutines for async hooks, we need to await them
+    fetch_coroutines = hook_manager.hook.fetch_plugin_data(
+        type_id=plugin_id,
+        instance_id=None,
+    )
+    fetch_results = await asyncio.gather(*fetch_coroutines, return_exceptions=True)
+    
+    # Check if any plugin handled the fetch
+    for result in fetch_results:
+        # Skip exceptions (they're wrapped in the result)
+        if isinstance(result, Exception):
+            continue
+        if result is not None:
             return result
-        else:
-            print(f"[IMAP Fetch] ERROR: Plugin does not have fetch_now method")
-            return {
-                "success": False,
-                "message": "IMAP plugin does not support manual fetch",
-                "images_downloaded": False,
-                "image_count": 0,
-            }
     
     # Default: plugin doesn't support fetching
     return {
@@ -1069,10 +815,7 @@ async def test_plugin(plugin_id: str):
     """
     Test plugin connection/configuration.
     
-    Currently supports:
-    - IMAP: Tests email connection
-    - Mealie: Tests Mealie API connection
-    - yr_weather: Tests Yr.no weather API connection
+    Uses plugin hooks to allow plugins to implement their own connection testing logic.
     
     Args:
         plugin_id: Plugin type ID (e.g., 'imap', 'mealie')
@@ -1101,221 +844,24 @@ async def test_plugin(plugin_id: str):
     else:
         config = {}
     
-    # Test based on plugin type
-    if plugin_id == "imap":
-        # Test IMAP connection
-        import imaplib
-        email_address = config.get("email_address", "")
-        email_password = config.get("email_password", "")
-        imap_server = config.get("imap_server", "imap.gmail.com")
-        imap_port = int(config.get("imap_port", 993))
-        
-        if not email_address or not email_password:
-            return {
-                "success": False,
-                "message": "Email address and password are required",
-            }
-        
-        try:
-            # Test connection
-            mail = imaplib.IMAP4_SSL(imap_server, imap_port)
-            mail.login(email_address, email_password)
-            mail.select("INBOX")
-            mail.close()
-            mail.logout()
-            
-            return {
-                "success": True,
-                "message": f"Successfully connected to {imap_server}",
-            }
-        except imaplib.IMAP4.error as e:
-            error_msg = str(e)
-            if "authentication failed" in error_msg.lower() or "invalid credentials" in error_msg.lower():
-                return {
-                    "success": False,
-                    "message": "Authentication failed. Please check your email address and password.",
-                }
-            elif "connection refused" in error_msg.lower() or "timeout" in error_msg.lower():
-                return {
-                    "success": False,
-                    "message": f"Could not connect to {imap_server}. Please check the server address and port.",
-                }
-            else:
-                return {
-                    "success": False,
-                    "message": f"Connection error: {error_msg}",
-                }
-        except Exception as e:
-            return {
-                "success": False,
-                "message": f"Error: {str(e)}",
-            }
-    elif plugin_id == "yr_weather":
-        # Test Yr.no weather API connection
-        import httpx
-        
-        latitude = config.get("latitude")
-        longitude = config.get("longitude")
-        
-        # Handle schema objects
-        if isinstance(latitude, dict):
-            latitude = latitude.get("value") or latitude.get("default")
-        if isinstance(longitude, dict):
-            longitude = longitude.get("value") or longitude.get("default")
-        
-        try:
-            latitude = float(latitude) if latitude else None
-            longitude = float(longitude) if longitude else None
-        except (ValueError, TypeError):
-            latitude = None
-            longitude = None
-        
-        if latitude is None or longitude is None:
-            return {
-                "success": False,
-                "message": "Latitude and longitude are required. Use 'Get Coordinates' to find them.",
-            }
-        
-        # Validate coordinates
-        if not (-90 <= latitude <= 90) or not (-180 <= longitude <= 180):
-            return {
-                "success": False,
-                "message": "Invalid coordinates. Latitude must be between -90 and 90, longitude between -180 and 180.",
-            }
-        
-        # Round to 4 decimals as per Yr.no API requirements
-        latitude = round(latitude, 4)
-        longitude = round(longitude, 4)
-        
-        try:
-            # Test connection by making a simple API call to Yr.no
-            headers = {
-                "User-Agent": "Calvin-Dashboard/1.0 (https://github.com/osterbergsimon/calvin)",
-            }
-            
-            params = {
-                "lat": latitude,
-                "lon": longitude,
-            }
-            
-            async with httpx.AsyncClient(timeout=10.0) as client:
-                response = await client.get(
-                    "https://api.met.no/weatherapi/locationforecast/2.0/compact",
-                    params=params,
-                    headers=headers,
-                )
-                
-                if response.status_code == 200:
-                    data = response.json()
-                    # Check if we got valid weather data
-                    if data.get("properties") and data.get("properties", {}).get("timeseries"):
-                        return {
-                            "success": True,
-                            "message": f"Successfully connected to Yr.no API. Weather data available for coordinates ({latitude}, {longitude}).",
-                        }
-                    else:
-                        return {
-                            "success": False,
-                            "message": "Connected to Yr.no API but received invalid data format.",
-                        }
-                elif response.status_code == 422:
-                    return {
-                        "success": False,
-                        "message": f"Location ({latitude}, {longitude}) is not covered by Yr.no weather service. Please try different coordinates.",
-                    }
-                else:
-                    return {
-                        "success": False,
-                        "message": f"Yr.no API returned status {response.status_code}. Please check your coordinates.",
-                    }
-                    
-        except httpx.TimeoutException:
-            return {
-                "success": False,
-                "message": "Connection to Yr.no API timed out. Please check your internet connection.",
-            }
-        except httpx.ConnectError:
-            return {
-                "success": False,
-                "message": "Could not connect to Yr.no API. Please check your internet connection.",
-            }
-        except httpx.HTTPError as e:
-            return {
-                "success": False,
-                "message": f"Network error: {str(e)}",
-            }
-        except Exception as e:
-            return {
-                "success": False,
-                "message": f"Error: {str(e)}",
-            }
-    elif plugin_id == "mealie":
-        # Test Mealie API connection
-        import httpx
-        mealie_url = config.get("mealie_url", "").rstrip("/")
-        api_token = config.get("api_token", "")
-        
-        if not mealie_url or not api_token:
-            return {
-                "success": False,
-                "message": "Mealie URL and API token are required",
-            }
-        
-        try:
-            # Test connection by fetching user info or recipes endpoint
-            headers = {"Authorization": f"Bearer {api_token}"}
-            async with httpx.AsyncClient(timeout=10.0) as client:
-                # Try to fetch user info or a simple endpoint
-                response = await client.get(
-                    f"{mealie_url}/api/users/self",
-                    headers=headers,
-                )
-                if response.status_code == 200:
-                    return {
-                        "success": True,
-                        "message": f"Successfully connected to Mealie at {mealie_url}",
-                    }
-                elif response.status_code == 401:
-                    return {
-                        "success": False,
-                        "message": "Authentication failed. Please check your API token.",
-                    }
-                elif response.status_code == 404:
-                    # Try alternative endpoint
-                    response = await client.get(
-                        f"{mealie_url}/api/recipes",
-                        headers=headers,
-                    )
-                    if response.status_code == 200:
-                        return {
-                            "success": True,
-                            "message": f"Successfully connected to Mealie at {mealie_url}",
-                        }
-                    else:
-                        return {
-                            "success": False,
-                            "message": f"Could not connect to Mealie API. Status: {response.status_code}",
-                        }
-                else:
-                    return {
-                        "success": False,
-                        "message": f"Mealie API returned status {response.status_code}",
-                    }
-        except httpx.ConnectError:
-            return {
-                "success": False,
-                "message": f"Could not connect to {mealie_url}. Please check the URL.",
-            }
-        except httpx.TimeoutException:
-            return {
-                "success": False,
-                "message": f"Connection to {mealie_url} timed out. Please check the URL and network.",
-            }
-        except Exception as e:
-            return {
-                "success": False,
-                "message": f"Error: {str(e)}",
-            }
+    # Call plugin-specific test handlers via hooks
+    from app.plugins.hooks import plugin_manager as hook_manager
+    import asyncio
+    
+    # Pluggy returns a list of coroutines for async hooks, we need to await them
+    test_coroutines = hook_manager.hook.test_plugin_connection(
+        type_id=plugin_id,
+        config=config,
+    )
+    test_results = await asyncio.gather(*test_coroutines, return_exceptions=True)
+    
+    # Check if any plugin handled the test
+    for result in test_results:
+        # Skip exceptions (they're wrapped in the result)
+        if isinstance(result, Exception):
+            continue
+        if result is not None:
+            return result
     
     # Default: plugin doesn't support testing
     return {
@@ -1361,4 +907,125 @@ async def get_calendar_plugin_types():
             for t in enabled_types
         ]
     }
+
+
+@router.get("/plugins/installed")
+async def get_installed_plugins():
+    """
+    Get list of installed plugins.
+
+    Returns:
+        List of installed plugin manifests
+    """
+    try:
+        plugins = plugin_installer.get_installed_plugins()
+        # Remove internal path from response
+        for plugin in plugins:
+            plugin.pop("_installed_path", None)
+        return {"plugins": plugins}
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Failed to get installed plugins: {str(e)}")
+
+
+@router.post("/plugins/install")
+async def install_plugin(
+    file: UploadFile = File(...),
+    plugin_id: str | None = None,
+):
+    """
+    Install a plugin from a zip file or directory.
+
+    Args:
+        file: Plugin package zip file
+        plugin_id: Optional plugin ID override
+
+    Returns:
+        Plugin manifest
+    """
+    import tempfile
+    import shutil
+    
+    if not file.filename:
+        raise HTTPException(status_code=400, detail="No file provided")
+    
+    # Save uploaded file to temporary location
+    temp_path = None
+    try:
+        with tempfile.NamedTemporaryFile(delete=False, suffix=".zip") as temp_file:
+            # Write uploaded file to temp file
+            shutil.copyfileobj(file.file, temp_file)
+            temp_path = Path(temp_file.name)
+        
+        # Install plugin
+        try:
+            manifest = plugin_installer.install_plugin(temp_path, plugin_id)
+            
+            # Reload plugins to include the newly installed one
+            plugin_loader.load_installed_plugins()
+            
+            return {
+                "success": True,
+                "message": f"Plugin {manifest['id']} installed successfully",
+                "manifest": manifest,
+            }
+        except ValueError as e:
+            raise HTTPException(status_code=400, detail=str(e))
+        except Exception as e:
+            raise HTTPException(status_code=500, detail=f"Failed to install plugin: {str(e)}")
+    finally:
+        # Clean up temp file
+        if temp_path and temp_path.exists():
+            try:
+                temp_path.unlink()
+            except (PermissionError, OSError):
+                # File might be locked on Windows, ignore
+                pass
+
+
+@router.delete("/plugins/installed/{plugin_id}")
+async def uninstall_plugin(plugin_id: str):
+    """
+    Uninstall a plugin.
+
+    Args:
+        plugin_id: Plugin identifier
+
+    Returns:
+        Success message
+    """
+    try:
+        plugin_installer.uninstall_plugin(plugin_id)
+        
+        # Reload plugins to remove the uninstalled one
+        # Note: We can't easily unload a module from Python, but it won't be loaded on next restart
+        plugin_loader._loaded_modules = {
+            m for m in plugin_loader._loaded_modules 
+            if not m.startswith(f"installed_plugin_{plugin_id}")
+        }
+        
+        return {
+            "success": True,
+            "message": f"Plugin {plugin_id} uninstalled successfully",
+        }
+    except ValueError as e:
+        raise HTTPException(status_code=404, detail=str(e))
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Failed to uninstall plugin: {str(e)}")
+
+
+@router.get("/plugins/installed/{plugin_id}")
+async def get_installed_plugin(plugin_id: str):
+    """
+    Get manifest for an installed plugin.
+
+    Args:
+        plugin_id: Plugin identifier
+
+    Returns:
+        Plugin manifest
+    """
+    manifest = plugin_installer.get_plugin_manifest(plugin_id)
+    if not manifest:
+        raise HTTPException(status_code=404, detail=f"Plugin {plugin_id} not found")
+    return manifest
 

@@ -87,16 +87,69 @@ class PluginManager:
             if plugin.enabled:
                 try:
                     await plugin.initialize()
+                    # Mark as running after successful initialization
+                    plugin.start()
                 except Exception as e:
                     print(f"Error initializing plugin {plugin.plugin_id}: {e}")
+                    # Plugin failed to initialize, so it's not running
+                    plugin.stop()
 
     async def cleanup_all(self) -> None:
         """Cleanup all registered plugins."""
         for plugin in self._plugins.values():
             try:
+                # Stop plugin before cleanup
+                plugin.stop()
                 await plugin.cleanup()
             except Exception as e:
                 print(f"Error cleaning up plugin {plugin.plugin_id}: {e}")
+    
+    async def start_plugin(self, plugin_id: str) -> bool:
+        """
+        Start a plugin (if enabled).
+        
+        Args:
+            plugin_id: ID of plugin to start
+            
+        Returns:
+            True if started, False if not found or not enabled
+        """
+        plugin = self.get_plugin(plugin_id)
+        if not plugin or not plugin.enabled:
+            return False
+        
+        try:
+            if not plugin.is_running():
+                await plugin.initialize()
+                plugin.start()
+            return True
+        except Exception as e:
+            print(f"Error starting plugin {plugin_id}: {e}")
+            plugin.stop()
+            return False
+    
+    async def stop_plugin(self, plugin_id: str) -> bool:
+        """
+        Stop a plugin.
+        
+        Args:
+            plugin_id: ID of plugin to stop
+            
+        Returns:
+            True if stopped, False if not found
+        """
+        plugin = self.get_plugin(plugin_id)
+        if not plugin:
+            return False
+        
+        try:
+            if plugin.is_running():
+                plugin.stop()
+                await plugin.cleanup()
+            return True
+        except Exception as e:
+            print(f"Error stopping plugin {plugin_id}: {e}")
+            return False
 
     def get_plugin_count(self, plugin_type: PluginType | None = None) -> int:
         """

@@ -92,6 +92,7 @@ class PluginTypeDB(Base):
     version = Column(String, nullable=True)  # Plugin type version
     common_config_schema = Column(JSONEncodedDict, nullable=True)  # Common config schema (JSON)
     enabled = Column(Boolean, default=True, nullable=False)  # Whether plugin type is enabled
+    error_message = Column(Text, nullable=True)  # Error message if plugin failed to load
     created_at = Column(DateTime, default=datetime.utcnow, nullable=False)
     updated_at = Column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow, nullable=False)
 

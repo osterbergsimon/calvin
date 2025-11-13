@@ -28,6 +28,7 @@ class BasePlugin(ABC):
         self.plugin_id = plugin_id
         self.name = name
         self.enabled = enabled
+        self._running = False  # Runtime state: whether plugin is currently running
 
     @property
     @abstractmethod
@@ -57,12 +58,22 @@ class BasePlugin(ABC):
 
     @abstractmethod
     async def initialize(self) -> None:
-        """Initialize the plugin (e.g., load configuration, connect to services)."""
+        """
+        Initialize the plugin (e.g., load configuration, connect to services).
+        
+        Note: This method should call start() when initialization is complete
+        to mark the plugin as running.
+        """
         pass
 
     @abstractmethod
     async def cleanup(self) -> None:
-        """Cleanup plugin resources (e.g., close connections, save state)."""
+        """
+        Cleanup plugin resources (e.g., close connections, save state).
+        
+        Note: This method should call stop() before cleanup to mark the plugin
+        as not running.
+        """
         pass
 
     async def configure(self, config: dict[str, Any]) -> None:
@@ -92,7 +103,41 @@ class BasePlugin(ABC):
         """Disable the plugin."""
         self.enabled = False
 
+    def start(self) -> None:
+        """
+        Start the plugin (mark as running).
+        
+        This should be called after successful initialization.
+        Plugins can override this to add custom start logic.
+        """
+        if not self.enabled:
+            raise RuntimeError(f"Cannot start disabled plugin {self.plugin_id}")
+        self._running = True
+
+    def stop(self) -> None:
+        """
+        Stop the plugin (mark as not running).
+        
+        This should be called before cleanup.
+        Plugins can override this to add custom stop logic.
+        """
+        self._running = False
+
+    def is_running(self) -> bool:
+        """
+        Check if the plugin is currently running.
+        
+        Returns:
+            True if plugin is running, False otherwise
+        """
+        return self._running
+
+    @property
+    def running(self) -> bool:
+        """Property to access running state."""
+        return self._running
+
     def __repr__(self) -> str:
         """String representation of the plugin."""
-        return f"{self.__class__.__name__}(id={self.plugin_id}, name={self.name}, enabled={self.enabled})"
+        return f"{self.__class__.__name__}(id={self.plugin_id}, name={self.name}, enabled={self.enabled}, running={self._running})"
 

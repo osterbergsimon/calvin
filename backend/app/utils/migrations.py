@@ -119,12 +119,24 @@ def _migrate_database_sync():
                     version TEXT,
                     common_config_schema TEXT,
                     enabled BOOLEAN DEFAULT 1 NOT NULL,
+                    error_message TEXT,
                     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
                     updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
                 )
             """)
             conn.commit()
             print("Created 'plugin_types' table")
+        else:
+            # Check if error_message column exists
+            cursor.execute("PRAGMA table_info(plugin_types)")
+            columns = [row[1] for row in cursor.fetchall()]
+            
+            # Add error_message column if it doesn't exist
+            if "error_message" not in columns:
+                print("Adding 'error_message' column to plugin_types table...")
+                cursor.execute("ALTER TABLE plugin_types ADD COLUMN error_message TEXT")
+                conn.commit()
+                print("Added 'error_message' column")
 
         # Migrate existing data to new tables
         _migrate_existing_data(cursor, conn)
