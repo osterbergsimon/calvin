@@ -74,7 +74,7 @@
         v-if="configStore.clockEnabled && configStore.clockDisplayMode === 'always' && !configStore.shouldShowUI"
         :display-mode="configStore.clockDisplayMode"
         :show-date="configStore.clockShowDate"
-        :class="['clock-overlay', `position-${configStore.clockPosition || 'top-right'}`]`
+        :class="clockClass"
       />
 
       <div
