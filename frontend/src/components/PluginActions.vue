@@ -37,7 +37,7 @@
 </template>
 
 <script setup>
-import { computed } from 'vue';
+// No imports needed
 
 const props = defineProps({
   pluginId: {
@@ -82,7 +82,7 @@ const props = defineProps({
 const emit = defineEmits(['save', 'test', 'fetch', 'custom-action']);
 
 // Helper to get plugin ID - always use prop since endpoint may have placeholder
-const getPluginIdFromAction = (action) => {
+const getPluginIdFromAction = () => {
   // Always use the prop pluginId - the endpoint may contain {plugin_id} placeholder
   // that needs to be replaced later
   console.log("[PluginActions] Using pluginId from prop:", props.pluginId);
@@ -105,9 +105,9 @@ const getActionLabel = (action) => {
   return action.label || action.id;
 };
 
-const handleAction = (action) => {
-  console.log("[PluginActions] handleAction called with:", action);
-  switch (action.type) {
+const handleAction = (_action) => {
+  console.log("[PluginActions] handleAction called with:", _action);
+  switch (_action.type) {
     case 'save':
       emit('save');
       break;
@@ -117,13 +117,17 @@ const handleAction = (action) => {
     case 'fetch':
       emit('fetch');
       break;
-    case 'custom':
-      const actionWithPluginId = { ...action, pluginId: getPluginIdFromAction(action) };
+    case 'custom': {
+      const actionWithPluginId = {
+        ..._action,
+        pluginId: getPluginIdFromAction(),
+      };
       console.log("[PluginActions] Emitting custom-action with:", actionWithPluginId);
       emit('custom-action', actionWithPluginId);
       break;
+    }
     default:
-      console.warn(`[PluginActions] Unknown action type: ${action.type}`, action);
+      console.warn(`[PluginActions] Unknown action type: ${_action.type}`, _action);
   }
 };
 </script>

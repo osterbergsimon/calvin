@@ -48,7 +48,7 @@ export function useWeatherData(serviceId, enabled = true) {
     enabled: enabled && !!serviceId,
     staleTime: 5 * 60 * 1000, // 5 minutes - data is fresh for 5 minutes
     gcTime: 10 * 60 * 1000, // 10 minutes - keep in cache for 10 minutes
-    refetchInterval: (query) => {
+    refetchInterval: (_query) => {
       // Only refetch when online
       return connectionStore.isFullyOnline() ? 10 * 60 * 1000 : false;
     },

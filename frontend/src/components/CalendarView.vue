@@ -5,7 +5,10 @@
     tabindex="0"
     @keydown="handleKeydown"
   >
-    <div v-if="showHeader" class="calendar-header">
+    <div
+      v-if="showHeader"
+      class="calendar-header"
+    >
       <h2>Calendar</h2>
       <div class="calendar-controls">
         <button
@@ -15,16 +18,25 @@
         >
           ‹
         </button>
-        <div class="calendar-title-group">
+        <div
+          class="calendar-title-group"
+        >
           <span class="current-month">{{ currentMonthYear }}</span>
           <span class="view-mode-indicator">{{ viewModeLabel }}</span>
         </div>
-        <button class="btn-icon" @click="nextMonth" @keydown.enter="nextMonth">
+        <button
+          class="btn-icon"
+          @click="nextMonth"
+          @keydown.enter="nextMonth"
+        >
           ›
         </button>
       </div>
     </div>
-    <div v-else class="calendar-header-minimal">
+    <div
+      v-else
+      class="calendar-header-minimal"
+    >
       <button
         class="btn-icon-minimal"
         title="Previous Month"
@@ -33,7 +45,9 @@
       >
         ‹
       </button>
-      <div class="calendar-title-group-minimal">
+      <div
+        class="calendar-title-group-minimal"
+      >
         <span class="current-month-minimal">{{ currentMonthYear }}</span>
         <span class="view-mode-indicator-minimal">{{ viewModeLabel }}</span>
       </div>
@@ -56,23 +70,30 @@
       </div>
       <div
         class="calendar-grid"
-        :class="{ 
+        :class="
+          {
           'rolling-view': viewMode === 'rolling',
           'week-view': viewMode === 'week',
           'day-view': viewMode === 'day',
-          loading: loading 
+          loading: loading
         }"
       >
         <!-- Day headers -->
         <div class="calendar-weekdays">
-          <div v-for="day in weekDays" :key="day" class="weekday">
+          <div
+            v-for="day in weekDays"
+            :key="day"
+            class="weekday"
+          >
             {{ day }}
           </div>
         </div>
         <!-- Calendar days -->
         <div
           class="calendar-days"
-          :class="{ 'rolling-days': viewMode === 'rolling' }"
+          :class="{
+            'rolling-days': viewMode === 'rolling'
+          }"
         >
           <div
             v-for="(day, dayIndex) in calendarDays"
@@ -104,14 +125,16 @@
                 :key="`${event.id}-${day.date.toISOString()}-${eventIndex}`"
                 :ref="(el) => setEventRef(el, dayIndex, eventIndex)"
                 class="event-item"
-                :class="{
-                  focused: isFocused(dayIndex, eventIndex),
-                  selected: isSelected(event),
-                  'event-start': event._isStart,
-                  'event-end': event._isEnd,
-                  'event-middle': event._isMiddle,
-                  'event-multi-day': event._isMultiDay,
-                }"
+                :class="
+                  {
+                    focused: isFocused(dayIndex, eventIndex),
+                    selected: isSelected(event),
+                    'event-start': event._isStart,
+                    'event-end': event._isEnd,
+                    'event-middle': event._isMiddle,
+                    'event-multi-day': event._isMultiDay,
+                  }
+                "
                 :style="{ backgroundColor: getEventColor(event) }"
                 :title="getEventTitle(event)"
                 tabindex="0"

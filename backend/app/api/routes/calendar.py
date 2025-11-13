@@ -83,21 +83,24 @@ async def get_calendar_events(
 @router.get("/calendar/sources", response_model=CalendarSourcesResponse)
 async def get_calendar_sources():
     """Get all calendar sources from plugins (only from enabled plugin types)."""
-    from app.plugins.loader import plugin_loader
     from app.database import AsyncSessionLocal
+    from app.models.calendar import CalendarSource as CalendarSourceModel
     from app.models.db_models import PluginTypeDB
     from app.plugins.base import PluginType
+    from app.plugins.loader import plugin_loader
     from sqlalchemy import select
 
     try:
         sources = await plugin_calendar_service.get_sources()
-        
+
         # Filter out sources from disabled plugin types
         enabled_plugin_types = set()
         # Get plugin types from pluggy hooks
         plugin_types = plugin_loader.get_plugin_types()
-        calendar_types = [t for t in plugin_types if t.get("plugin_type") == PluginType.CALENDAR]
-        
+        calendar_types = [
+            t for t in plugin_types if t.get("plugin_type") == PluginType.CALENDAR
+        ]
+
         # Check enabled status from database
         async with AsyncSessionLocal() as session:
             for type_info in calendar_types:
@@ -109,15 +112,17 @@ async def get_calendar_sources():
                 enabled = db_type.enabled if db_type else True  # Default to enabled
                 if enabled:
                     enabled_plugin_types.add(type_id)
-        
+
         # Filter sources to only include enabled plugin types
+        legacy_types = ["google", "proton", "ical"]
         filtered_sources = [
-            s for s in sources
-            if s.get("type") in enabled_plugin_types or s.get("type") in ["google", "proton", "ical"]  # Legacy support
+            s
+            for s in sources
+            if s.get("type") in enabled_plugin_types
+            or s.get("type") in legacy_types
         ]
-        
+
         # Convert to CalendarSource models for response
-        from app.models.calendar import CalendarSource as CalendarSourceModel
         source_models = [
             CalendarSourceModel(
                 id=s["id"],
@@ -160,8 +165,6 @@ async def add_calendar_source(source: CalendarSource):
 
     Calendar events are cached for 5 minutes and automatically refreshed.
     """
-    from app.plugins.registry import plugin_registry
-
     # Normalize Google Calendar URLs if needed
     if source.type == "google" and source.ical_url:
         from app.utils.google_calendar import normalize_google_calendar_url
@@ -169,10 +172,17 @@ async def add_calendar_source(source: CalendarSource):
 
     # Validate Proton Calendar URL format
     if source.type == "proton" and source.ical_url:
-        if not source.ical_url.startswith("https://calendar.proton.me/api/calendar/v1/url/"):
+        proton_url_prefix = (
+            "https://calendar.proton.me/api/calendar/v1/url/"
+        )
+        if not source.ical_url.startswith(proton_url_prefix):
             raise HTTPException(
                 status_code=400,
-                detail="Invalid Proton Calendar URL. Expected format: https://calendar.proton.me/api/calendar/v1/url/{calendar_id}/calendar.ics?CacheKey=...&PassphraseKey=...",
+                detail=(
+                    "Invalid Proton Calendar URL. Expected format: "
+                    "https://calendar.proton.me/api/calendar/v1/url/"
+                    "{calendar_id}/calendar.ics?CacheKey=...&PassphraseKey=..."
+                ),
             )
         if "/calendar.ics" not in source.ical_url:
             raise HTTPException(
@@ -181,10 +191,16 @@ async def add_calendar_source(source: CalendarSource):
             )
 
     # Determine plugin type_id
-    type_id = "google" if source.type == "google" else ("proton" if source.type == "proton" else "ical")
+    type_id = (
+        "google"
+        if source.type == "google"
+        else ("proton" if source.type == "proton" else "ical")
+    )
 
     # Register plugin using unified system
-    plugin = await plugin_registry.register_plugin(
+    from app.plugins.registry import plugin_registry
+
+    await plugin_registry.register_plugin(
         plugin_id=source.id,
         type_id=type_id,
         name=source.name,

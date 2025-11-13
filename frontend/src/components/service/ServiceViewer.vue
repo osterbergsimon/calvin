@@ -37,7 +37,7 @@
 </template>
 
 <script setup>
-import { computed, watch } from "vue";
+import { computed } from "vue";
 import IframeViewer from "./IframeViewer.vue";
 import WeatherViewer from "./WeatherViewer.vue";
 import GenericApiViewer from "./GenericApiViewer.vue";

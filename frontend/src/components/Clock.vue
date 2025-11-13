@@ -10,6 +10,11 @@ import { ref, computed, onMounted, onUnmounted, watch } from "vue";
 import { useConfigStore } from "../stores/config";
 import { useTheme } from "../composables/useTheme";
 
+// Component name for linting
+defineOptions({
+  name: "ClockDisplay",
+});
+
 const props = defineProps({
   displayMode: {
     type: String,
@@ -94,7 +99,7 @@ const formattedTime = computed(() => {
   
   try {
     return now.toLocaleTimeString(undefined, options);
-  } catch (e) {
+  } catch (_e) {
     // Fallback if timezone is invalid
     const fallbackOptions = {
       hour: "2-digit",
@@ -126,7 +131,7 @@ const formattedDate = computed(() => {
   
   try {
     return now.toLocaleDateString(undefined, options);
-  } catch (e) {
+  } catch (_e) {
     // Fallback if timezone is invalid
     return now.toLocaleDateString(undefined, {
       weekday: "short",

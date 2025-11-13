@@ -16,12 +16,13 @@
 import { computed } from "vue";
 import { useConnectionStore } from "../stores/connection";
 
-const props = defineProps({
+defineProps({
   showLabel: {
     type: Boolean,
     default: false,
   },
 });
+// Props are used in template via v-if="showLabel"
 
 const connectionStore = useConnectionStore();
 
