@@ -1,6 +1,5 @@
 """Image endpoints."""
 
-import hashlib
 from pathlib import Path
 
 from fastapi import APIRouter, HTTPException, UploadFile, File
@@ -29,7 +28,7 @@ async def list_images():
     from app.services.config_service import config_service
     randomize_value = await config_service.get_value("randomize_images")
     randomize = randomize_value == "true" if randomize_value else False
-    
+
     # Use plugin service to aggregate images from all plugins
     images = await plugin_image_service.get_images(randomize=randomize)
     return {"images": images, "total": len(images)}
@@ -47,7 +46,7 @@ async def get_current_image():
     from app.services.config_service import config_service
     randomize_value = await config_service.get_value("randomize_images")
     randomize = randomize_value == "true" if randomize_value else False
-    
+
     image = await plugin_image_service.get_current_image(randomize=randomize)
     if not image:
         return {"image": None, "message": "No images available"}
@@ -59,7 +58,7 @@ async def get_current_image():
 async def get_image_file(image_id: str):
     """
     Get image file by ID from plugin service.
-    
+
     For remote images (like Unsplash), redirects to the image URL.
     For local images, serves the file directly.
 
@@ -78,7 +77,7 @@ async def get_image_file(image_id: str):
     # For remote images, redirect to the URL instead of downloading
     image_url = image.get("url") or image.get("raw_url")
     image_path = image.get("path")
-    
+
     # If it's a remote URL (starts with http), redirect to it
     if image_url and image_url.startswith("http"):
         from fastapi.responses import RedirectResponse
@@ -89,7 +88,7 @@ async def get_image_file(image_id: str):
                 "Cache-Control": "public, max-age=3600",  # Cache for 1 hour
             },
         )
-    
+
     # For local images, check if path exists
     if image_path and Path(image_path).exists():
         image_path_obj = Path(image_path)
@@ -100,7 +99,7 @@ async def get_image_file(image_id: str):
                 "Cache-Control": "public, max-age=3600",  # Cache for 1 hour
             },
         )
-    
+
     # Fallback: Get image data from plugin (download if needed)
     image_data = await plugin_image_service.get_image_data(image_id)
     if not image_data:
@@ -129,7 +128,6 @@ async def get_image_thumbnail(image_id: str):
         Thumbnail image file
     """
     from app.plugins.manager import plugin_manager
-    from app.plugins.base import PluginType
     from app.plugins.protocols import ImagePlugin
 
     # Get image metadata
@@ -164,13 +162,14 @@ async def get_image_thumbnail(image_id: str):
         raise HTTPException(status_code=404, detail="Image file not found")
 
     # Generate thumbnail on the fly
-    from PIL import Image as PILImage, ImageOps
     from io import BytesIO
+
+    from PIL import Image as PILImage, ImageOps
     try:
         img = PILImage.open(BytesIO(image_data))
         img = ImageOps.exif_transpose(img)
         img.thumbnail((200, 200), PILImage.Resampling.LANCZOS)
-        
+
         # Convert to RGB if necessary
         if img.mode in ("RGBA", "LA", "P"):
             background = PILImage.new("RGB", img.size, (255, 255, 255))
@@ -180,12 +179,12 @@ async def get_image_thumbnail(image_id: str):
             img = background
         elif img.mode != "RGB":
             img = img.convert("RGB")
-        
+
         # Save to bytes
         thumbnail_bytes = BytesIO()
         img.save(thumbnail_bytes, "JPEG", quality=85, optimize=True)
         thumbnail_bytes.seek(0)
-        
+
         from fastapi.responses import Response
         return Response(
             content=thumbnail_bytes.read(),
@@ -210,7 +209,7 @@ async def next_image():
     from app.services.config_service import config_service
     randomize_value = await config_service.get_value("randomize_images")
     randomize = randomize_value == "true" if randomize_value else False
-    
+
     image = await plugin_image_service.next_image(randomize=randomize)
     if not image:
         return {"image": None, "message": "No images available"}
@@ -230,7 +229,7 @@ async def previous_image():
     from app.services.config_service import config_service
     randomize_value = await config_service.get_value("randomize_images")
     randomize = randomize_value == "true" if randomize_value else False
-    
+
     image = await plugin_image_service.previous_image(randomize=randomize)
     if not image:
         return {"image": None, "message": "No images available"}
@@ -246,12 +245,12 @@ async def get_image_config():
     Returns:
         Configuration dictionary
     """
-    from app.plugins.manager import plugin_manager
     from app.plugins.base import PluginType
+    from app.plugins.manager import plugin_manager
 
     # Get all image plugins
     plugins = plugin_manager.get_plugins(PluginType.IMAGE, enabled_only=True)
-    
+
     # Return plugin count and basic info
     return {
         "plugin_count": len(plugins),
@@ -298,7 +297,10 @@ async def upload_image(file: UploadFile = File(...)):
     # Upload to plugin service (will try first plugin that supports upload)
     uploaded_image = await plugin_image_service.upload_image(file_content, file.filename)
     if not uploaded_image:
-        raise HTTPException(status_code=500, detail="Failed to upload image: No plugin supports upload")
+        raise HTTPException(
+            status_code=500,
+            detail="Failed to upload image: No plugin supports upload"
+        )
 
     return {
         "message": "Image uploaded successfully",

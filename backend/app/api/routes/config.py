@@ -420,14 +420,13 @@ async def update_config(config_update: ConfigUpdate):
     if "gitBranch" in update_dict:
         update_dict["git_branch"] = update_dict.pop("gitBranch")
         # Also update /etc/default/calvin-update file
-        import os
         calvin_update_file = Path("/etc/default/calvin-update")
         if calvin_update_file.exists():
             try:
                 # Read existing file
-                with open(calvin_update_file, "r") as f:
+                with open(calvin_update_file) as f:
                     lines = f.readlines()
-                
+
                 # Update or add GIT_BRANCH line
                 updated = False
                 new_lines = []
@@ -437,11 +436,11 @@ async def update_config(config_update: ConfigUpdate):
                         updated = True
                     else:
                         new_lines.append(line)
-                
+
                 if not updated:
                     # Add GIT_BRANCH if it doesn't exist
                     new_lines.append(f"GIT_BRANCH={update_dict['git_branch']}\n")
-                
+
                 # Write back
                 with open(calvin_update_file, "w") as f:
                     f.writelines(new_lines)
@@ -459,17 +458,17 @@ async def update_config(config_update: ConfigUpdate):
 async def get_git_branches(repo_url: str | None = None):
     """
     Fetch available branches from a git repository.
-    
+
     Args:
         repo_url: Git repository URL (e.g., https://github.com/user/repo.git)
                  If not provided, uses the configured git_repo_url or default
-    
+
     Returns:
         List of branch names
     """
-    import subprocess
     import re
-    
+    import subprocess
+
     # Get repo URL from parameter, config, or default
     if not repo_url:
         from app.services.config_service import config_service
@@ -486,13 +485,13 @@ async def get_git_branches(repo_url: str | None = None):
             text=True,
             timeout=10,
         )
-        
+
         if result.returncode != 0:
             raise HTTPException(
                 status_code=400,
                 detail=f"Failed to fetch branches: {result.stderr}"
             )
-        
+
         # Parse branch names from output
         # Format: <commit_hash>	refs/heads/branch_name
         branches = []
@@ -502,17 +501,17 @@ async def get_git_branches(repo_url: str | None = None):
                 match = re.search(r"refs/heads/(.+)$", line)
                 if match:
                     branches.append(match.group(1))
-        
+
         # Sort branches (main/master first, then alphabetically)
         def sort_key(branch):
             if branch in ["main", "master"]:
                 return (0, branch)
             return (1, branch)
-        
+
         branches.sort(key=sort_key)
-        
+
         return {"branches": branches, "repo_url": repo_url}
-        
+
     except subprocess.TimeoutExpired:
         raise HTTPException(
             status_code=408,

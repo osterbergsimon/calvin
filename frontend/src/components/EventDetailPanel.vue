@@ -45,8 +45,10 @@
                 class="event-detail-row"
               >
                 <span class="label">Start:</span>
-                <span class="value"
-                  >{{ formatDate(dayEvent.start)
+                <span
+                  class="value"
+                >
+                  {{ formatDate(dayEvent.start)
                   }}<span v-if="!dayEvent.all_day">
                     {{ formatTime(dayEvent.start) }}</span
                   ></span
@@ -57,8 +59,10 @@
                 class="event-detail-row"
               >
                 <span class="label">End:</span>
-                <span class="value"
-                  >{{ formatDate(dayEvent.end)
+                <span
+                  class="value"
+                >
+                  {{ formatDate(dayEvent.end)
                   }}<span v-if="!dayEvent.all_day">
                     {{ formatTime(dayEvent.end) }}</span
                   ></span
