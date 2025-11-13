@@ -228,6 +228,23 @@ class WeatherServicePlugin(ServicePlugin):
             "fullscreen": self.fullscreen,
         }
 
+    async def fetch_service_data(
+        self,
+        start_date: str | None = None,
+        end_date: str | None = None,
+    ) -> dict[str, Any]:
+        """
+        Fetch weather data from OpenWeatherMap API (protocol-defined method).
+        
+        Args:
+            start_date: Not used for weather (kept for protocol compatibility)
+            end_date: Not used for weather (kept for protocol compatibility)
+        
+        Returns:
+            Dictionary with weather data in format compatible with WeatherWidget
+        """
+        return await self._fetch_weather()
+    
     async def _fetch_weather(self) -> dict[str, Any]:
         """
         Fetch weather data from OpenWeatherMap API.

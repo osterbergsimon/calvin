@@ -348,6 +348,23 @@ class YrWeatherServicePlugin(ServicePlugin):
         
         return descriptions.get(base_code, "unknown")
 
+    async def fetch_service_data(
+        self,
+        start_date: str | None = None,
+        end_date: str | None = None,
+    ) -> dict[str, Any]:
+        """
+        Fetch weather data from Yr.no API (protocol-defined method).
+        
+        Args:
+            start_date: Not used for weather (kept for protocol compatibility)
+            end_date: Not used for weather (kept for protocol compatibility)
+        
+        Returns:
+            Dictionary with weather data in format compatible with WeatherWidget
+        """
+        return await self._fetch_weather()
+    
     async def _fetch_weather(self) -> dict[str, Any]:
         """
         Fetch weather data from Yr.no API.
@@ -643,4 +660,237 @@ def create_plugin_instance(
         display_order=display_order,
         fullscreen=fullscreen,
     )
+
+
+@hookimpl
+async def test_plugin_connection(
+    type_id: str,
+    config: dict[str, Any],
+) -> dict[str, Any] | None:
+    """Test Yr.no weather API connection."""
+    if type_id != "yr_weather":
+        return None
+    
+    latitude = config.get("latitude")
+    longitude = config.get("longitude")
+    
+    # Handle schema objects
+    if isinstance(latitude, dict):
+        latitude = latitude.get("value") or latitude.get("default")
+    if isinstance(longitude, dict):
+        longitude = longitude.get("value") or longitude.get("default")
+    
+    try:
+        latitude = float(latitude) if latitude else None
+        longitude = float(longitude) if longitude else None
+    except (ValueError, TypeError):
+        latitude = None
+        longitude = None
+    
+    if latitude is None or longitude is None:
+        return {
+            "success": False,
+            "message": "Latitude and longitude are required. Use 'Get Coordinates' to find them.",
+        }
+    
+    # Validate coordinates
+    if not (-90 <= latitude <= 90) or not (-180 <= longitude <= 180):
+        return {
+            "success": False,
+            "message": "Invalid coordinates. Latitude must be between -90 and 90, longitude between -180 and 180.",
+        }
+    
+    # Round to 4 decimals as per Yr.no API requirements
+    latitude = round(latitude, 4)
+    longitude = round(longitude, 4)
+    
+    try:
+        headers = {
+            "User-Agent": "Calvin-Dashboard/1.0 (https://github.com/osterbergsimon/calvin)",
+        }
+        params = {
+            "lat": latitude,
+            "lon": longitude,
+        }
+        
+        async with httpx.AsyncClient(timeout=10.0) as client:
+            response = await client.get(
+                "https://api.met.no/weatherapi/locationforecast/2.0/compact",
+                params=params,
+                headers=headers,
+            )
+            
+            if response.status_code == 200:
+                data = response.json()
+                if data.get("properties") and data.get("properties", {}).get("timeseries"):
+                    return {
+                        "success": True,
+                        "message": f"Successfully connected to Yr.no API. Weather data available for coordinates ({latitude}, {longitude}).",
+                    }
+                else:
+                    return {
+                        "success": False,
+                        "message": "Connected to Yr.no API but received invalid data format.",
+                    }
+            elif response.status_code == 422:
+                return {
+                    "success": False,
+                    "message": f"Location ({latitude}, {longitude}) is not covered by Yr.no weather service. Please try different coordinates.",
+                }
+            else:
+                return {
+                    "success": False,
+                    "message": f"Yr.no API returned status {response.status_code}. Please check your coordinates.",
+                }
+    except httpx.TimeoutException:
+        return {
+            "success": False,
+            "message": "Connection to Yr.no API timed out. Please check your internet connection.",
+        }
+    except httpx.ConnectError:
+        return {
+            "success": False,
+            "message": "Could not connect to Yr.no API. Please check your internet connection.",
+        }
+    except httpx.HTTPError as e:
+        return {
+            "success": False,
+            "message": f"Network error: {str(e)}",
+        }
+    except Exception as e:
+        return {
+            "success": False,
+            "message": f"Error: {str(e)}",
+        }
+
+
+@hookimpl
+async def handle_plugin_config_update(
+    type_id: str,
+    config: dict[str, Any],
+    enabled: bool | None,
+    db_type: Any,
+    session: Any,
+) -> dict[str, Any] | None:
+    """Handle YrWeather plugin configuration update and instance management."""
+    if type_id != "yr_weather":
+        return None
+    
+    from app.plugins.registry import plugin_registry
+    from app.plugins.manager import plugin_manager
+    from app.models.db_models import PluginDB
+    from sqlalchemy import select
+    import logging
+    
+    logger = logging.getLogger(__name__)
+    
+    # Check if we have required config (latitude and longitude)
+    latitude = config.get("latitude", "")
+    longitude = config.get("longitude", "")
+    location = config.get("location", "")
+    altitude = config.get("altitude", "0")
+    forecast_days = config.get("forecast_days", "5")
+    
+    # Convert to proper types
+    try:
+        latitude = float(latitude) if latitude else None
+    except (ValueError, TypeError):
+        latitude = None
+    try:
+        longitude = float(longitude) if longitude else None
+    except (ValueError, TypeError):
+        longitude = None
+    try:
+        altitude = int(altitude) if altitude else 0
+    except (ValueError, TypeError):
+        altitude = 0
+    try:
+        forecast_days = min(max(int(forecast_days), 1), 9) if forecast_days else 5
+    except (ValueError, TypeError):
+        forecast_days = 5
+    
+    if latitude is None or longitude is None:
+        logger.info("[YrWeather] Skipping instance creation - missing coordinates")
+        return {"instance_created": False, "instance_updated": False}
+    
+    # Validate coordinates
+    if not (-90 <= latitude <= 90 and -180 <= longitude <= 180):
+        logger.info("[YrWeather] Skipping instance creation - invalid coordinates")
+        return {"instance_created": False, "instance_updated": False}
+    
+    # Check if YrWeather instance exists
+    result = session.execute(
+        select(PluginDB).where(PluginDB.type_id == "yr_weather")
+    )
+    yr_weather_instance = result.scalar_one_or_none()
+    
+    instance_config = {
+        "latitude": latitude,
+        "longitude": longitude,
+        "altitude": altitude,
+        "forecast_days": forecast_days,
+        "location": location,
+        "display_order": 0,
+        "fullscreen": False,
+    }
+    
+    if not yr_weather_instance:
+        # Create new YrWeather instance
+        plugin_instance_id = f"yr_weather-{abs(hash(f'{latitude},{longitude}')) % 10000}"
+        logger.info(f"[YrWeather] Creating new instance: {plugin_instance_id}")
+        try:
+            instance_enabled = enabled if enabled is not None else (db_type.enabled if db_type else False)
+            plugin = await plugin_registry.register_plugin(
+                plugin_id=plugin_instance_id,
+                type_id="yr_weather",
+                name="Yr.no Weather",
+                config=instance_config,
+                enabled=instance_enabled,
+            )
+            return {
+                "instance_created": True,
+                "instance_id": plugin_instance_id,
+            }
+        except Exception as e:
+            logger.error(f"[YrWeather] Failed to create instance: {e}", exc_info=True)
+            return {"instance_created": False, "error": str(e)}
+    else:
+        # Update existing YrWeather instance
+        logger.info(f"[YrWeather] Updating existing instance: {yr_weather_instance.id}")
+        plugin = plugin_manager.get_plugin(yr_weather_instance.id)
+        if plugin:
+            await plugin.configure(instance_config)
+            instance_enabled = enabled if enabled is not None else (db_type.enabled if db_type else yr_weather_instance.enabled)
+            
+            if instance_enabled:
+                plugin.enable()
+                if not plugin.is_running():
+                    try:
+                        await plugin.initialize()
+                        plugin.start()
+                    except Exception as e:
+                        logger.error(f"[YrWeather] Error starting plugin: {e}", exc_info=True)
+            else:
+                plugin.disable()
+                if plugin.is_running():
+                    try:
+                        plugin.stop()
+                        await plugin.cleanup()
+                    except Exception as e:
+                        logger.warning(f"[YrWeather] Error stopping plugin: {e}", exc_info=True)
+            
+            # Update in database
+            yr_weather_instance.config = instance_config
+            yr_weather_instance.enabled = instance_enabled
+            if db_type:
+                db_type.enabled = instance_enabled
+            session.commit()
+            
+            return {
+                "instance_updated": True,
+                "instance_id": yr_weather_instance.id,
+            }
+        else:
+            logger.warning(f"[YrWeather] Plugin instance {yr_weather_instance.id} not found in manager")
+            return {"instance_updated": False, "error": "Plugin instance not found"}
 

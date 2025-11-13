@@ -89,7 +89,7 @@ class MealieServicePlugin(ServicePlugin):
             ],
             "display_schema": {
                 "type": "api",
-                "api_endpoint": "/api/web-services/{service_id}/mealplan",
+                "api_endpoint": "/api/web-services/{service_id}/data",
                 "method": "GET",
                 "component": "mealie/MealPlanViewer.vue",  # Plugin-provided frontend component
                 "data_schema": {
@@ -211,7 +211,8 @@ class MealieServicePlugin(ServicePlugin):
         # Return a special URL that points to our backend endpoint
         # The frontend will detect "mealie" type and fetch data from our API
         # This avoids CORS issues and handles authentication properly
-        meal_plan_api_url = f"/api/web-services/{self.plugin_id}/mealplan"
+        # Use generic /data endpoint for forward compatibility
+        meal_plan_api_url = f"/api/web-services/{self.plugin_id}/data"
         
         return {
             "type": "mealie",
@@ -235,7 +236,7 @@ class MealieServicePlugin(ServicePlugin):
         """
         # Store the meal plan API URL in config so web_service_service can read it
         # This points to our backend endpoint that proxies Mealie API calls
-        meal_plan_api_url = f"/api/web-services/{self.plugin_id}/mealplan"
+        meal_plan_api_url = f"/api/web-services/{self.plugin_id}/data"
         return {
             "url": meal_plan_api_url,
             "mealie_url": self.mealie_url,
@@ -246,9 +247,46 @@ class MealieServicePlugin(ServicePlugin):
             "fullscreen": self.fullscreen,
         }
 
-    async def _fetch_meal_plan(self) -> dict[str, Any]:
+    async def fetch_service_data(
+        self,
+        start_date: str | None = None,
+        end_date: str | None = None,
+    ) -> dict[str, Any]:
+        """
+        Fetch meal plan data from Mealie API (protocol-defined method).
+        
+        Args:
+            start_date: Optional start date (YYYY-MM-DD), defaults to today
+            end_date: Optional end date (YYYY-MM-DD), defaults to today + days_ahead
+        
+        Returns:
+            Dictionary with meal plan data, including metadata for frontend
+        """
+        data = await self._fetch_meal_plan(start_date=start_date, end_date=end_date)
+        
+        # Add mealie_url to response metadata for frontend
+        if self.mealie_url:
+            if isinstance(data, dict):
+                if "_metadata" not in data:
+                    data["_metadata"] = {}
+                data["_metadata"]["mealie_url"] = self.mealie_url.rstrip("/")
+            elif isinstance(data, list):
+                data = {
+                    "items": data,
+                    "_metadata": {
+                        "mealie_url": self.mealie_url.rstrip("/")
+                    }
+                }
+        
+        return data
+    
+    async def _fetch_meal_plan(self, start_date: str | None = None, end_date: str | None = None) -> dict[str, Any]:
         """
         Fetch meal plan data from Mealie API.
+
+        Args:
+            start_date: Optional start date (YYYY-MM-DD), defaults to today
+            end_date: Optional end date (YYYY-MM-DD), defaults to today + days_ahead
 
         Returns:
             Dictionary with meal plan data
@@ -257,9 +295,22 @@ class MealieServicePlugin(ServicePlugin):
             await self.initialize()
 
         try:
-            # Calculate date range for the week (today to 7 days from now)
-            today = datetime.now().date()
-            week_end = today + timedelta(days=7)
+            # Calculate date range
+            if start_date:
+                try:
+                    today = datetime.fromisoformat(start_date).date()
+                except (ValueError, TypeError):
+                    today = datetime.now().date()
+            else:
+                today = datetime.now().date()
+            
+            if end_date:
+                try:
+                    week_end = datetime.fromisoformat(end_date).date()
+                except (ValueError, TypeError):
+                    week_end = today + timedelta(days=self.days_ahead)
+            else:
+                week_end = today + timedelta(days=self.days_ahead)
 
             # Mealie API endpoint for meal plans
             # Based on typical REST API patterns, this might be /api/meal-plans or /api/mealplan
@@ -456,4 +507,190 @@ def create_plugin_instance(
         display_order=display_order,
         fullscreen=fullscreen,
     )
+
+
+
+
+@hookimpl
+async def test_plugin_connection(
+    type_id: str,
+    config: dict[str, Any],
+) -> dict[str, Any] | None:
+    """Test Mealie API connection."""
+    if type_id != "mealie":
+        return None
+    
+    mealie_url = config.get("mealie_url", "").rstrip("/")
+    api_token = config.get("api_token", "")
+    
+    if not mealie_url or not api_token:
+        return {
+            "success": False,
+            "message": "Mealie URL and API token are required",
+        }
+    
+    try:
+        headers = {"Authorization": f"Bearer {api_token}"}
+        async with httpx.AsyncClient(timeout=10.0) as client:
+            response = await client.get(
+                f"{mealie_url}/api/users/self",
+                headers=headers,
+            )
+            if response.status_code == 200:
+                return {
+                    "success": True,
+                    "message": f"Successfully connected to Mealie at {mealie_url}",
+                }
+            elif response.status_code == 401:
+                return {
+                    "success": False,
+                    "message": "Authentication failed. Please check your API token.",
+                }
+            elif response.status_code == 404:
+                # Try alternative endpoint
+                response = await client.get(
+                    f"{mealie_url}/api/recipes",
+                    headers=headers,
+                )
+                if response.status_code == 200:
+                    return {
+                        "success": True,
+                        "message": f"Successfully connected to Mealie at {mealie_url}",
+                    }
+                else:
+                    return {
+                        "success": False,
+                        "message": f"Could not connect to Mealie API. Status: {response.status_code}",
+                    }
+            else:
+                return {
+                    "success": False,
+                    "message": f"Mealie API returned status {response.status_code}",
+                }
+    except httpx.ConnectError:
+        return {
+            "success": False,
+            "message": f"Could not connect to {mealie_url}. Please check the URL.",
+        }
+    except httpx.TimeoutException:
+        return {
+            "success": False,
+            "message": f"Connection to {mealie_url} timed out. Please check the URL and network.",
+        }
+    except Exception as e:
+        return {
+            "success": False,
+            "message": f"Error: {str(e)}",
+        }
+
+
+@hookimpl
+async def handle_plugin_config_update(
+    type_id: str,
+    config: dict[str, Any],
+    enabled: bool | None,
+    db_type: Any,
+    session: Any,
+) -> dict[str, Any] | None:
+    """Handle Mealie plugin configuration update and instance management."""
+    if type_id != "mealie":
+        return None
+    
+    from app.plugins.registry import plugin_registry
+    from app.plugins.manager import plugin_manager
+    from app.models.db_models import PluginDB
+    from sqlalchemy import select
+    import logging
+    
+    logger = logging.getLogger(__name__)
+    
+    # Check if we have required config (URL and API token)
+    mealie_url = config.get("mealie_url", "")
+    api_token = config.get("api_token", "")
+    
+    if not mealie_url or not api_token:
+        logger.info("[Mealie] Skipping instance creation - missing URL or API token")
+        return {"instance_created": False, "instance_updated": False}
+    
+    # Check if Mealie instance exists
+    result = session.execute(
+        select(PluginDB).where(PluginDB.type_id == "mealie")
+    )
+    mealie_instance = result.scalar_one_or_none()
+    
+    # Get days_ahead from config, default to 7
+    days_ahead = config.get("days_ahead", "7")
+    try:
+        days_ahead = int(days_ahead) if days_ahead else 7
+    except (ValueError, TypeError):
+        days_ahead = 7
+    
+    instance_config = {
+        "mealie_url": mealie_url,
+        "api_token": api_token,
+        "group_id": config.get("group_id", ""),
+        "days_ahead": days_ahead,
+        "display_order": 0,
+        "fullscreen": False,
+    }
+    
+    if not mealie_instance:
+        # Create new Mealie instance
+        plugin_instance_id = f"mealie-{abs(hash(mealie_url)) % 10000}"
+        logger.info(f"[Mealie] Creating new instance: {plugin_instance_id}")
+        try:
+            instance_enabled = enabled if enabled is not None else (db_type.enabled if db_type else True)
+            plugin = await plugin_registry.register_plugin(
+                plugin_id=plugin_instance_id,
+                type_id="mealie",
+                name="Mealie Meal Plan",
+                config=instance_config,
+                enabled=instance_enabled,
+            )
+            return {
+                "instance_created": True,
+                "instance_id": plugin_instance_id,
+            }
+        except Exception as e:
+            logger.error(f"[Mealie] Failed to create instance: {e}", exc_info=True)
+            return {"instance_created": False, "error": str(e)}
+    else:
+        # Update existing Mealie instance
+        logger.info(f"[Mealie] Updating existing instance: {mealie_instance.id}")
+        plugin = plugin_manager.get_plugin(mealie_instance.id)
+        if plugin:
+            await plugin.configure(instance_config)
+            instance_enabled = enabled if enabled is not None else (db_type.enabled if db_type else mealie_instance.enabled)
+            
+            if instance_enabled:
+                plugin.enable()
+                if not plugin.is_running():
+                    try:
+                        await plugin.initialize()
+                        plugin.start()
+                    except Exception as e:
+                        logger.error(f"[Mealie] Error starting plugin: {e}", exc_info=True)
+            else:
+                plugin.disable()
+                if plugin.is_running():
+                    try:
+                        plugin.stop()
+                        await plugin.cleanup()
+                    except Exception as e:
+                        logger.warning(f"[Mealie] Error stopping plugin: {e}", exc_info=True)
+            
+            # Update in database
+            mealie_instance.config = instance_config
+            mealie_instance.enabled = instance_enabled
+            if db_type:
+                db_type.enabled = instance_enabled
+            session.commit()
+            
+            return {
+                "instance_updated": True,
+                "instance_id": mealie_instance.id,
+            }
+        else:
+            logger.warning(f"[Mealie] Plugin instance {mealie_instance.id} not found in manager")
+            return {"instance_updated": False, "error": "Plugin instance not found"}
 

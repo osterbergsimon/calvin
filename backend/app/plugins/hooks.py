@@ -53,6 +53,108 @@ class PluginHookSpec:
         """
         pass
 
+    @hookspec
+    async def handle_plugin_config_update(
+        self,
+        type_id: str,
+        config: dict[str, Any],
+        enabled: bool | None,
+        db_type: Any,  # PluginTypeDB
+        session: Any,  # AsyncSession
+    ) -> dict[str, Any] | None:
+        """
+        Handle plugin-specific configuration update and instance management.
+        
+        This hook allows plugins to handle their own instance creation/update logic
+        when the plugin type configuration is updated. This keeps plugins self-contained.
+        
+        Args:
+            type_id: Plugin type ID (e.g., 'mealie', 'yr_weather')
+            config: Updated configuration dictionary (already cleaned)
+            enabled: New enabled state (None if not changed)
+            db_type: PluginTypeDB instance from database
+            session: Database session for queries/updates
+            
+        Returns:
+            Dictionary with status information, or None if this plugin doesn't handle the update.
+            The dict can contain keys like:
+            - 'instance_created': bool - whether a new instance was created
+            - 'instance_updated': bool - whether an existing instance was updated
+            - 'instance_id': str - ID of the created/updated instance
+        """
+        pass
+
+    @hookspec
+    async def test_plugin_connection(
+        self,
+        type_id: str,
+        config: dict[str, Any],
+    ) -> dict[str, Any] | None:
+        """
+        Test plugin connection/configuration.
+        
+        This hook allows plugins to implement their own connection testing logic.
+        
+        Args:
+            type_id: Plugin type ID (e.g., 'imap', 'mealie', 'yr_weather')
+            config: Plugin configuration dictionary
+            
+        Returns:
+            Dictionary with test result, or None if this plugin doesn't support testing.
+            The dict should contain:
+            - 'success': bool - whether the test succeeded
+            - 'message': str - test result message
+        """
+        pass
+
+    @hookspec
+    async def fetch_plugin_data(
+        self,
+        type_id: str,
+        instance_id: str | None = None,
+    ) -> dict[str, Any] | None:
+        """
+        Manually trigger plugin fetch/check operation.
+        
+        This hook allows plugins to implement their own fetch logic (e.g., check for new emails).
+        
+        Args:
+            type_id: Plugin type ID (e.g., 'imap')
+            instance_id: Optional plugin instance ID (if None, use first instance)
+            
+        Returns:
+            Dictionary with fetch result, or None if this plugin doesn't support fetching.
+            The dict should contain:
+            - 'success': bool - whether the fetch succeeded
+            - 'message': str - fetch result message
+            - Additional plugin-specific fields (e.g., 'images_downloaded', 'image_count')
+        """
+        pass
+
+    @hookspec
+    async def fetch_service_data(
+        self,
+        instance_id: str,
+        start_date: str | None = None,
+        end_date: str | None = None,
+    ) -> dict[str, Any] | None:
+        """
+        Fetch service data from a service plugin instance.
+        
+        This hook allows service plugins to implement their own data fetching logic
+        for the generic /web-services/{service_id}/data endpoint.
+        
+        Args:
+            instance_id: Plugin instance ID
+            start_date: Optional start date (YYYY-MM-DD format, plugin-specific)
+            end_date: Optional end date (YYYY-MM-DD format, plugin-specific)
+            
+        Returns:
+            Dictionary with service data, or None if this plugin doesn't handle this instance.
+            The dict can contain any plugin-specific data structure.
+        """
+        pass
+
 
 # Create plugin manager
 plugin_manager = pluggy.PluginManager("calvin")
