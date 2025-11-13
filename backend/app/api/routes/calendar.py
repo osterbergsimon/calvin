@@ -251,7 +251,7 @@ async def update_calendar_source(source_id: str, source: CalendarSource):
 
     # Handle instance creation/removal based on enabled status
     existing_plugin = plugin_manager.get_plugin(source_id)
-    
+
     if source.enabled:
         # Plugin is being enabled - create instance if it doesn't exist
         if not existing_plugin or not isinstance(existing_plugin, CalendarPlugin):
