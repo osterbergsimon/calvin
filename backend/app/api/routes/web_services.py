@@ -109,50 +109,55 @@ async def get_weather_data(service_id: str):
         if not plugin_instance or not isinstance(plugin_instance, ServicePlugin):
             raise HTTPException(status_code=404, detail="Weather plugin instance not found")
         
-        # Ensure plugin is initialized
-        if hasattr(plugin_instance, "initialize") and not hasattr(plugin_instance, "_initialized"):
+        # Ensure plugin is initialized and running
+        if not plugin_instance.is_running():
             try:
                 await plugin_instance.initialize()
+                plugin_instance.start()
             except Exception as e:
                 print(f"[Weather API] Error initializing plugin {service_id}: {e}")
                 raise HTTPException(status_code=500, detail=f"Failed to initialize weather plugin: {str(e)}")
         
-        # Call the plugin's fetch method (both plugins use _fetch_weather)
-        if hasattr(plugin_instance, "_fetch_weather"):
-            try:
-                weather_data = await plugin_instance._fetch_weather()
-                # Cache the result
-                weather_cache.set(service_id, weather_data)
-                print(f"[Weather API] Fetched and cached weather data for {service_id}")
-                return weather_data
-            except Exception as e:
-                print(f"[Weather API] Error fetching weather data from {service_id}: {e}")
-                import traceback
-                traceback.print_exc()
-                raise HTTPException(status_code=500, detail=f"Failed to fetch weather data: {str(e)}")
-        else:
-            raise HTTPException(status_code=500, detail="Weather plugin does not support fetching")
+        # Call the plugin's fetch_service_data method (protocol-defined)
+        try:
+            weather_data = await plugin_instance.fetch_service_data()
+            if weather_data is None:
+                raise HTTPException(status_code=501, detail="Weather plugin does not support data fetching")
+            # Cache the result
+            weather_cache.set(service_id, weather_data)
+            print(f"[Weather API] Fetched and cached weather data for {service_id}")
+            return weather_data
+        except HTTPException:
+            raise
+        except Exception as e:
+            print(f"[Weather API] Error fetching weather data from {service_id}: {e}")
+            import traceback
+            traceback.print_exc()
+            raise HTTPException(status_code=500, detail=f"Failed to fetch weather data: {str(e)}")
 
 
-@router.get("/web-services/{service_id}/mealplan")
-async def get_mealie_mealplan(
+@router.get("/web-services/{service_id}/data")
+async def get_service_data(
     service_id: str,
     start_date: str | None = Query(None, description="Start date (YYYY-MM-DD)"),
     end_date: str | None = Query(None, description="End date (YYYY-MM-DD)"),
 ):
     """
-    Get meal plan data from Mealie service.
+    Get service data from a service plugin.
     
-    This endpoint proxies requests to Mealie API to avoid CORS issues
-    and handle authentication properly.
+    This is a generic endpoint that proxies requests to service plugin APIs
+    to avoid CORS issues and handle authentication properly.
+    
+    The endpoint path is determined by the plugin's get_content() method,
+    which returns a URL like "/api/web-services/{service_id}/data".
     
     Args:
-        service_id: Service ID (Mealie plugin instance ID)
-        start_date: Optional start date (defaults to today)
-        end_date: Optional end date (defaults to 7 days from today)
+        service_id: Service ID (plugin instance ID)
+        start_date: Optional start date (plugin-specific)
+        end_date: Optional end date (plugin-specific)
     
     Returns:
-        Meal plan data from Mealie API
+        Service data from the plugin
     """
     from app.plugins.manager import plugin_manager
     from app.plugins.protocols import ServicePlugin
@@ -160,118 +165,45 @@ async def get_mealie_mealplan(
     from app.models.db_models import PluginDB
     from sqlalchemy import select
     
-    # Get the Mealie plugin instance
+    # Get the plugin instance
     async with AsyncSessionLocal() as session:
         result = await session.execute(
-            select(PluginDB).where(PluginDB.id == service_id, PluginDB.type_id == "mealie")
+            select(PluginDB).where(PluginDB.id == service_id)
         )
         db_plugin = result.scalar_one_or_none()
         
         if not db_plugin:
-            raise HTTPException(status_code=404, detail="Mealie service not found")
+            raise HTTPException(status_code=404, detail="Service not found")
         
-        config = db_plugin.config or {}
-        mealie_url = config.get("mealie_url", "").rstrip("/")
-        api_token = config.get("api_token", "")
-        days_ahead = config.get("days_ahead", 7)
+        # Get plugin instance from manager
+        plugin_instance = plugin_manager.get_plugin(service_id)
+        if not plugin_instance or not isinstance(plugin_instance, ServicePlugin):
+            raise HTTPException(status_code=404, detail="Service plugin instance not found")
         
-        if not mealie_url or not api_token:
-            raise HTTPException(
-                status_code=400,
-                detail="Mealie URL and API token are required",
-            )
+        # Ensure plugin is initialized and running
+        if not plugin_instance.is_running():
+            try:
+                await plugin_instance.initialize()
+                plugin_instance.start()
+            except Exception as e:
+                print(f"[Service API] Error initializing plugin {service_id}: {e}")
+                raise HTTPException(status_code=500, detail=f"Failed to initialize service plugin: {str(e)}")
         
-        # Convert days_ahead to int if it's a string
+        # Use protocol-defined method (plugins CAN implement this if they support data fetching)
         try:
-            days_ahead = int(days_ahead) if days_ahead else 7
-        except (ValueError, TypeError):
-            days_ahead = 7
-    
-    # Calculate date range
-    if not start_date:
-        start_date = datetime.now().date().isoformat()
-    if not end_date:
-        # Use days_ahead from config, default to 7
-        end_date = (datetime.now().date() + timedelta(days=days_ahead)).isoformat()
-    
-    # Fetch meal plan from Mealie API
-    try:
-        headers = {"Authorization": f"Bearer {api_token}"}
-        params = {
-            "start_date": start_date,
-            "end_date": end_date,
-            "page": 1,
-            "perPage": -1,
-        }
-        
-        async with httpx.AsyncClient(timeout=30.0) as client:
-            # Try the correct Mealie API endpoint
-            response = await client.get(
-                f"{mealie_url}/api/households/mealplans",
-                headers=headers,
-                params=params,
-            )
-            
-            if response.status_code == 200:
-                data = response.json()
-                # Log the response structure for debugging
-                print(f"[Mealie API] Response structure: {type(data)}")
-                if isinstance(data, dict):
-                    print(f"[Mealie API] Response keys: {list(data.keys())}")
-                    if "items" in data:
-                        print(f"[Mealie API] Items count: {len(data.get('items', []))}")
-                        if data.get('items'):
-                            print(f"[Mealie API] First item structure: {list(data['items'][0].keys()) if isinstance(data['items'][0], dict) else type(data['items'][0])}")
-                            # Log recipe structure if available
-                            if isinstance(data['items'][0], dict) and 'recipe' in data['items'][0]:
-                                recipe = data['items'][0]['recipe']
-                                if isinstance(recipe, dict):
-                                    print(f"[Mealie API] Recipe structure: {list(recipe.keys())}")
-                elif isinstance(data, list):
-                    print(f"[Mealie API] Response is a list with {len(data)} items")
-                    if data:
-                        print(f"[Mealie API] First item structure: {list(data[0].keys()) if isinstance(data[0], dict) else type(data[0])}")
-                
-                # Add mealie_url to response metadata so frontend can construct recipe URLs
-                if isinstance(data, dict):
-                    data["_metadata"] = {
-                        "mealie_url": mealie_url
-                    }
-                elif isinstance(data, list):
-                    # Wrap list response in dict to add metadata
-                    data = {
-                        "items": data,
-                        "_metadata": {
-                            "mealie_url": mealie_url
-                        }
-                    }
-                
+            data = await plugin_instance.fetch_service_data(start_date=start_date, end_date=end_date)
+            if data is not None:
                 return data
-            elif response.status_code == 401:
-                raise HTTPException(
-                    status_code=401,
-                    detail="Mealie API authentication failed. Please check your API token.",
-                )
-            else:
-                response.raise_for_status()
-                
-    except httpx.ConnectError:
+        except Exception as e:
+            print(f"[Service API] Error calling fetch_service_data for {service_id}: {e}")
+            import traceback
+            traceback.print_exc()
+            raise HTTPException(status_code=500, detail=f"Failed to fetch service data: {str(e)}")
+        
+        # If plugin returned None, it doesn't support data fetching
         raise HTTPException(
-            status_code=503,
-            detail=f"Could not connect to Mealie at {mealie_url}",
+            status_code=501,
+            detail="This service plugin does not support data fetching via this endpoint",
         )
-    except httpx.TimeoutException:
-        raise HTTPException(
-            status_code=504,
-            detail=f"Connection to Mealie timed out",
-        )
-    except httpx.HTTPStatusError as e:
-        raise HTTPException(
-            status_code=e.response.status_code,
-            detail=f"Mealie API error: {e.response.text}",
-        )
-    except Exception as e:
-        raise HTTPException(
-            status_code=500,
-            detail=f"Error fetching meal plan: {str(e)}",
-        )
+
+

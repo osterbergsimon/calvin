@@ -124,6 +124,7 @@ async def get_calendar_sources():
                 type=s["type"],
                 name=s["name"],
                 enabled=s["enabled"],
+                running=s.get("running", False),  # Include running state
                 ical_url=s.get("ical_url"),
                 api_key=s.get("api_key"),
                 color=s.get("color"),
@@ -204,49 +205,84 @@ async def update_calendar_source(source_id: str, source: CalendarSource):
     """Update a calendar source plugin (e.g., color, show_time)."""
     from app.plugins.manager import plugin_manager
     from app.plugins.protocols import CalendarPlugin
+    from app.plugins.registry import plugin_registry
+    from app.plugins.loader import plugin_loader
     from app.database import AsyncSessionLocal
     from app.models.db_models import PluginDB
     from sqlalchemy import select
 
-    # Get plugin
-    plugin = plugin_manager.get_plugin(source_id)
-    if not plugin or not isinstance(plugin, CalendarPlugin):
-        raise HTTPException(status_code=404, detail="Calendar source not found")
-
-    # Update plugin configuration
-    await plugin.configure({
-        "ical_url": source.ical_url,
-        "api_key": source.api_key,
-        "enabled": source.enabled,
-        "color": source.color,
-        "show_time": source.show_time,
-    })
-
-    # Update enabled status
-    if source.enabled:
-        plugin.enable()
-    else:
-        plugin.disable()
-
-    # Update in database
+    # Update in database first
     async with AsyncSessionLocal() as session:
         result = await session.execute(
             select(PluginDB).where(PluginDB.id == source_id)
         )
         db_plugin = result.scalar_one_or_none()
-        if db_plugin:
-            db_plugin.name = source.name
-            db_plugin.enabled = source.enabled
-            config = db_plugin.config or {}
-            config.update({
-                "ical_url": source.ical_url,
-                "api_key": source.api_key,
-                "color": source.color,
-                "show_time": source.show_time,
-            })
-            db_plugin.config = config
-            await session.commit()
-            await session.refresh(db_plugin)
+        if not db_plugin:
+            raise HTTPException(status_code=404, detail="Calendar source not found")
+        
+        # Store old enabled state
+        was_enabled = db_plugin.enabled
+        
+        # Update database
+        db_plugin.name = source.name
+        db_plugin.enabled = source.enabled
+        config = db_plugin.config or {}
+        config.update({
+            "ical_url": source.ical_url,
+            "api_key": source.api_key,
+            "color": source.color,
+            "show_time": source.show_time,
+        })
+        db_plugin.config = config
+        await session.commit()
+        await session.refresh(db_plugin)
+
+    # Handle instance creation/removal based on enabled status
+    existing_plugin = plugin_manager.get_plugin(source_id)
+    
+    if source.enabled:
+        # Plugin is being enabled - create instance if it doesn't exist
+        if not existing_plugin or not isinstance(existing_plugin, CalendarPlugin):
+            # Create and register the plugin instance
+            plugin = plugin_loader.create_plugin_instance(
+                plugin_id=source_id,
+                type_id=db_plugin.type_id,
+                name=source.name,
+                config={**config, "enabled": True},
+            )
+            if plugin:
+                await plugin.configure(config)
+                plugin.enable()
+                plugin_manager.register(plugin)
+                # Initialize and start the plugin
+                await plugin.initialize()
+                plugin.start()
+        else:
+            # Plugin exists, just update it
+            await existing_plugin.configure(config)
+            if not existing_plugin.enabled:
+                existing_plugin.enable()
+            # Start the plugin if it's not running
+            if not existing_plugin.is_running():
+                await existing_plugin.initialize()
+                existing_plugin.start()
+    else:
+        # Plugin is being disabled - stop and remove instance
+        if existing_plugin and isinstance(existing_plugin, CalendarPlugin):
+            try:
+                # Stop the plugin first
+                if existing_plugin.is_running():
+                    existing_plugin.stop()
+                    await existing_plugin.cleanup()
+                # Then unregister it
+                plugin_manager.unregister(source_id)
+            except Exception as e:
+                import logging
+                logger = logging.getLogger(__name__)
+                logger.warning(
+                    f"Error cleaning up disabled plugin {source_id}: {e}",
+                    exc_info=True
+                )
 
     return source
 

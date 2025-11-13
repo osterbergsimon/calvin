@@ -147,11 +147,10 @@ async def get_image_thumbnail(image_id: str):
     if not plugin or not isinstance(plugin, ImagePlugin):
         raise HTTPException(status_code=404, detail="Image plugin not found")
 
-    # For local image plugin, get thumbnail path
-    if hasattr(plugin, "get_thumbnail_path"):
-        thumbnail_path = plugin.get_thumbnail_path(image_id)
-        if thumbnail_path and thumbnail_path.exists():
-            return FileResponse(
+    # Get thumbnail path using protocol-defined method
+    thumbnail_path = plugin.get_thumbnail_path(image_id)
+    if thumbnail_path and thumbnail_path.exists():
+        return FileResponse(
                 thumbnail_path,
                 media_type="image/jpeg",
                 headers={

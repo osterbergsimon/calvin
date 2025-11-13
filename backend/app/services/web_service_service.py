@@ -38,15 +38,23 @@ class WebServiceService:
             for db_plugin in db_plugins:
                 print(f"[WebServiceService] Processing service: id={db_plugin.id}, type_id={db_plugin.type_id}, name={db_plugin.name}, enabled={db_plugin.enabled}")
                 config = db_plugin.config or {}
-                # Get URL from config - for iframe it's "url", for mealie it's also "url" (from get_config)
+                # Get URL from config
                 url = config.get("url", "")
-                # If no URL in config, try to get it from the plugin instance
+                # If no URL in config, try to get it from the plugin instance using protocol methods
                 if not url:
                     from app.plugins.manager import plugin_manager
+                    from app.plugins.protocols import ServicePlugin
                     plugin = plugin_manager.get_plugin(db_plugin.id)
-                    if plugin and hasattr(plugin, "get_config"):
-                        plugin_config = plugin.get_config()
-                        url = plugin_config.get("url", "") if plugin_config else ""
+                    if plugin and isinstance(plugin, ServicePlugin):
+                        # Use protocol-defined method to get content
+                        import asyncio
+                        try:
+                            content = await plugin.get_content()
+                            url = content.get("url", "")
+                        except Exception:
+                            # If async call fails, fall back to config
+                            plugin_config = plugin.get_config()
+                            url = plugin_config.get("url", "") if plugin_config else ""
                 
                 # Get display_schema from plugin type metadata
                 type_id = db_plugin.type_id
@@ -116,11 +124,14 @@ class WebServiceService:
         # Generate ID if not provided
         service_id = f"iframe-service-{hash(service.url) % 10000}-{len(self._services)}"
 
+        # Ensure name is set - use URL if name is empty
+        service_name = service.name.strip() if service.name else service.url[:50] if service.url else "Web Service"
+
         # Register plugin using unified system
         plugin = await plugin_registry.register_plugin(
             plugin_id=service_id,
             type_id="iframe",
-            name=service.name,
+            name=service_name,
             config={
                 "url": service.url,
                 "fullscreen": service.fullscreen,
@@ -129,13 +140,17 @@ class WebServiceService:
             enabled=service.enabled,
         )
 
+        # Get service info from plugin using protocol-defined methods
+        config = plugin.get_config()
+        content = await plugin.get_content()
+        
         return WebService(
             id=plugin.plugin_id,
             name=plugin.name,
-            url=getattr(plugin, "url", ""),
+            url=content.get("url", config.get("url", "")),
             enabled=plugin.enabled,
-            display_order=plugin.get_config().get("display_order", 0),
-            fullscreen=getattr(plugin, "fullscreen", False),
+            display_order=config.get("display_order", 0),
+            fullscreen=config.get("fullscreen", False),
         )
 
     async def update_service(self, service_id: str, updates: WebServiceUpdate) -> WebService | None:
@@ -160,13 +175,12 @@ class WebServiceService:
         if not plugin or not isinstance(plugin, ServicePlugin):
             return None
 
-        # Update plugin configuration
+        # Update plugin configuration using protocol-defined methods
         config = plugin.get_config() or {}
         if updates.name is not None:
             plugin.name = updates.name
         if updates.url is not None:
             config["url"] = updates.url
-            setattr(plugin, "url", updates.url)
         if updates.enabled is not None:
             config["enabled"] = updates.enabled
             if updates.enabled:
@@ -177,7 +191,6 @@ class WebServiceService:
             config["display_order"] = updates.display_order
         if updates.fullscreen is not None:
             config["fullscreen"] = updates.fullscreen
-            setattr(plugin, "fullscreen", updates.fullscreen)
 
         await plugin.configure(config)
 
@@ -196,13 +209,16 @@ class WebServiceService:
                 await session.commit()
                 await session.refresh(db_plugin)
 
+        # Get service info from plugin using protocol-defined methods
+        content = await plugin.get_content()
+        
         return WebService(
             id=plugin.plugin_id,
             name=plugin.name,
-            url=getattr(plugin, "url", ""),
+            url=content.get("url", config.get("url", "")),
             enabled=plugin.enabled,
             display_order=config.get("display_order", 0),
-            fullscreen=getattr(plugin, "fullscreen", False),
+            fullscreen=config.get("fullscreen", False),
         )
 
     async def remove_service(self, service_id: str) -> bool:
