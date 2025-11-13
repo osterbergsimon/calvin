@@ -29,6 +29,8 @@
 <script setup>
 import { ref, computed, watch } from "vue";
 import axios from "axios";
+import { getCachedData, setCachedData } from "../../utils/cache";
+import { useConnectionStore } from "../../stores/connection";
 
 const props = defineProps({
   service: {
@@ -68,11 +70,40 @@ const loadData = async () => {
   loading.value = true;
   error.value = null;
 
+  const connectionStore = useConnectionStore();
+  const cacheKey = `service_data_${props.service.id}`;
+  const cacheTTL = 10 * 60 * 1000; // 10 minutes
+
+  // Try to load from cache first if offline
+  if (!connectionStore.isFullyOnline()) {
+    const cachedData = getCachedData(cacheKey, cacheTTL);
+    if (cachedData) {
+      console.log(`[ServiceViewer] Using cached data for ${props.service.id}`);
+      data.value = cachedData;
+      loading.value = false;
+      return;
+    }
+  }
+
   try {
     const apiEndpoint = getApiEndpoint();
     const response = await axios.get(apiEndpoint);
     data.value = response.data;
+    
+    // Cache the response
+    setCachedData(cacheKey, response.data);
   } catch (err) {
+    // If online but request failed, try cache
+    if (connectionStore.isFullyOnline()) {
+      const cachedData = getCachedData(cacheKey, cacheTTL);
+      if (cachedData) {
+        console.log(`[ServiceViewer] Request failed, using cached data for ${props.service.id}`);
+        data.value = cachedData;
+        loading.value = false;
+        return;
+      }
+    }
+    
     error.value = err.response?.data?.detail || err.message || "Failed to load service data";
     console.error("Error loading service data:", err);
     data.value = { error: error.value };

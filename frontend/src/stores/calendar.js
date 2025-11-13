@@ -1,6 +1,8 @@
 import { defineStore } from "pinia";
 import { ref } from "vue";
 import axios from "axios";
+import { getCachedData, setCachedData } from "../utils/cache";
+import { useConnectionStore } from "./connection";
 
 export const useCalendarStore = defineStore("calendar", () => {
   const events = ref([]);
@@ -16,11 +18,43 @@ export const useCalendarStore = defineStore("calendar", () => {
   const fetchSources = async () => {
     loading.value = true;
     error.value = null;
+    
+    const connectionStore = useConnectionStore();
+    const cacheKey = "calendar_sources";
+    const cacheTTL = 60 * 60 * 1000; // 1 hour
+    
+    // Try to load from cache first if offline
+    if (!connectionStore.isFullyOnline()) {
+      const cachedSources = getCachedData(cacheKey, cacheTTL);
+      if (cachedSources) {
+        console.log(`[Calendar] Using cached sources (${cachedSources.sources?.length || 0} sources)`);
+        sources.value = cachedSources.sources || [];
+        loading.value = false;
+        return cachedSources;
+      }
+    }
+    
     try {
       const response = await axios.get("/api/calendar/sources");
-      sources.value = response.data.sources || [];
-      return response.data;
+      const responseData = response.data;
+      sources.value = responseData.sources || [];
+      
+      // Cache the response
+      setCachedData(cacheKey, responseData);
+      
+      return responseData;
     } catch (err) {
+      // If online but request failed, try cache
+      if (connectionStore.isFullyOnline()) {
+        const cachedSources = getCachedData(cacheKey, cacheTTL);
+        if (cachedSources) {
+          console.log(`[Calendar] Request failed, using cached sources (${cachedSources.sources?.length || 0} sources)`);
+          sources.value = cachedSources.sources || [];
+          loading.value = false;
+          return cachedSources;
+        }
+      }
+      
       error.value = err.message;
       console.error("Failed to fetch calendar sources:", err);
       throw err;
@@ -61,6 +95,22 @@ export const useCalendarStore = defineStore("calendar", () => {
   const fetchEvents = async (startDate, endDate, refreshParam = "") => {
     loading.value = true;
     error.value = null;
+    
+    const connectionStore = useConnectionStore();
+    const cacheKey = `calendar_events_${startDate?.toISOString()}_${endDate?.toISOString()}`;
+    const cacheTTL = 30 * 60 * 1000; // 30 minutes
+    
+    // Try to load from cache first if offline
+    if (!connectionStore.isFullyOnline()) {
+      const cachedEvents = getCachedData(cacheKey, cacheTTL);
+      if (cachedEvents) {
+        console.log(`[Calendar] Using cached events (${cachedEvents.events?.length || 0} events)`);
+        events.value = cachedEvents.events || [];
+        loading.value = false;
+        return cachedEvents;
+      }
+    }
+    
     try {
       const params = {
         start_date: startDate?.toISOString(),
@@ -85,13 +135,29 @@ export const useCalendarStore = defineStore("calendar", () => {
       }
 
       const response = await axios.get("/api/calendar/events", { params });
-      events.value = response.data.events || [];
+      const responseData = response.data;
+      events.value = responseData.events || [];
+      
+      // Cache the response
+      setCachedData(cacheKey, responseData);
+      
       console.log(`Fetched ${events.value.length} events from API`);
       if (events.value.length > 0) {
         console.log("Sample event:", events.value[0]);
       }
-      return response.data;
+      return responseData;
     } catch (err) {
+      // If online but request failed, try cache
+      if (connectionStore.isFullyOnline()) {
+        const cachedEvents = getCachedData(cacheKey, cacheTTL);
+        if (cachedEvents) {
+          console.log(`[Calendar] Request failed, using cached events (${cachedEvents.events?.length || 0} events)`);
+          events.value = cachedEvents.events || [];
+          loading.value = false;
+          return cachedEvents;
+        }
+      }
+      
       error.value = err.message;
       console.error("Failed to fetch events:", err);
       throw err;
