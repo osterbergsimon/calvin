@@ -6,7 +6,13 @@
   >
     <div class="event-detail-header">
       <h3>{{ event.title }}</h3>
-      <button class="btn-close" aria-label="Close" @click="close">×</button>
+      <button
+        class="btn-close"
+        aria-label="Close"
+        @click="close"
+      >
+        ×
+      </button>
     </div>
     <div class="event-detail-content">
       <!-- Show all events for the day if expanding "today" via keyboard -->
@@ -15,11 +21,13 @@
         class="all-day-events-details"
       >
         <div class="day-events-header">
-          <span class="label"
-            >All Events for {{ formatDate(event.start) }} ({{
-              dayEvents.length
-            }})</span
+          <span
+            class="label"
           >
+            All Events for {{ formatDate(event.start) }} ({{
+              dayEvents.length
+            }})
+          </span>
         </div>
         <div class="all-events-list">
           <div
@@ -32,7 +40,10 @@
               <h4>{{ dayEvent.title }}</h4>
             </div>
             <div class="day-event-detail-content">
-              <div v-if="isEventMultiDay(dayEvent)" class="event-detail-row">
+              <div
+                v-if="isEventMultiDay(dayEvent)"
+                class="event-detail-row"
+              >
                 <span class="label">Start:</span>
                 <span class="value"
                   >{{ formatDate(dayEvent.start)

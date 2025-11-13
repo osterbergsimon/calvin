@@ -1,7 +1,7 @@
 """Configuration endpoints."""
 
 from pathlib import Path
-from typing import Any, Union
+from typing import Any
 
 from fastapi import APIRouter, HTTPException
 from pydantic import BaseModel
@@ -38,17 +38,23 @@ class ConfigUpdate(BaseModel):
     darkModeStart: int | None = None  # Dark mode start hour (0-23)
     darkModeEnd: int | None = None  # Dark mode end hour (0-23)
     displayScheduleEnabled: bool | None = None  # Enable display power schedule
-    displayOffTime: str | None = None  # Display off time (format: "HH:MM") - deprecated, use displaySchedule
-    displayOnTime: str | None = None  # Display on time (format: "HH:MM") - deprecated, use displaySchedule
-    displaySchedule: Union[str, list[dict[str, Any]], None] = None  # Display schedule as JSON string or array: [{"day": 0-6, "enabled": bool, "onTime": "HH:MM", "offTime": "HH:MM"}, ...]
+    # Display off time (format: "HH:MM") - deprecated, use displaySchedule
+    displayOffTime: str | None = None
+    # Display on time (format: "HH:MM") - deprecated, use displaySchedule
+    displayOnTime: str | None = None
+    # Display schedule as JSON string or array:
+    # [{"day": 0-6, "enabled": bool, "onTime": "HH:MM", "offTime": "HH:MM"}, ...]
+    displaySchedule: str | list[dict[str, Any]] | None = None
     displayTimeoutEnabled: bool | None = None  # Enable display timeout (screensaver)
     displayTimeout: int | None = None  # Display timeout in seconds (0 = never, default: 0)
     rebootComboKey1: str | None = None  # First key for reboot combo (e.g., "KEY_1")
     rebootComboKey2: str | None = None  # Second key for reboot combo (e.g., "KEY_7")
     rebootComboDuration: int | None = None  # Reboot combo duration in milliseconds (default: 10000)
-    imageDisplayMode: str | None = None  # Image display mode: 'fit', 'fill', 'crop', 'center', 'smart' (default: 'smart')
+    # Image display mode: 'fit', 'fill', 'crop', 'center', 'smart' (default: 'smart')
+    imageDisplayMode: str | None = None
     randomizeImages: bool | None = None  # Randomize image order (default: False)
-    timezone: str | None = None  # Timezone (e.g., "America/New_York", "Europe/London", "UTC") - null = system timezone
+    # Timezone (e.g., "America/New_York", "Europe/London", "UTC") - null = system timezone
+    timezone: str | None = None
     gitRepoUrl: str | None = None  # Git repository URL for updates (default: 'https://github.com/osterbergsimon/calvin.git')
     gitBranch: str | None = None  # Git branch to use for updates (default: 'main')
 
@@ -165,10 +171,15 @@ async def get_config():
     # Check if we have a valid schedule (not None, not empty string, not empty list)
     has_schedule = False
     schedule_value = None
-    
+
     if "displaySchedule" in config:
         schedule_value = config["displaySchedule"]
-        if schedule_value is not None and schedule_value != "" and (not isinstance(schedule_value, list) or len(schedule_value) > 0):
+        is_valid = (
+            schedule_value is not None
+            and schedule_value != ""
+            and (not isinstance(schedule_value, list) or len(schedule_value) > 0)
+        )
+        if is_valid:
             has_schedule = True
     elif "display_schedule" in config:
         schedule_value = config["display_schedule"]
