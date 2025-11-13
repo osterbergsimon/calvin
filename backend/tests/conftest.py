@@ -79,6 +79,10 @@ def test_client(temp_db_path: Path) -> Generator[TestClient, None, None]:
     try:
         loop.run_until_complete(init_db())
         loop.run_until_complete(migrate_database())
+        
+        # Load plugins so they're available for tests
+        from app.plugins.loader import plugin_loader
+        plugin_loader.load_all_plugins()
     finally:
         loop.close()
 
@@ -87,7 +91,7 @@ def test_client(temp_db_path: Path) -> Generator[TestClient, None, None]:
     from fastapi import FastAPI
     from fastapi.middleware.cors import CORSMiddleware
 
-    from app.api.routes import calendar, config, health, images, keyboard, web_services
+    from app.api.routes import calendar, config, health, images, keyboard, plugins, web_services
 
     test_app = FastAPI(title="Calvin Test API")
     test_app.add_middleware(
@@ -103,6 +107,7 @@ def test_client(temp_db_path: Path) -> Generator[TestClient, None, None]:
     test_app.include_router(keyboard.router, prefix="/api", tags=["keyboard"])
     test_app.include_router(images.router, prefix="/api", tags=["images"])
     test_app.include_router(web_services.router, prefix="/api", tags=["web-services"])
+    test_app.include_router(plugins.router, prefix="/api", tags=["plugins"])
 
     @test_app.get("/")
     async def root():
