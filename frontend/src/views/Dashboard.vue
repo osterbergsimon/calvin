@@ -101,8 +101,7 @@
         <!-- Dashboard View (Home) - Always shows calendar + side view -->
         <div
           v-else
-          class="mode-content dashboard-view"
-          :class="[mainLayoutClass, sideViewPositionClass]"
+          :class="['mode-content', 'dashboard-view', mainLayoutClass, sideViewPositionClass]"
         >
           <!-- Calendar Section (66-75%) -->
           <div

@@ -1780,9 +1780,9 @@ const getRunningCount = (instances) => {
   return instances.filter(i => i.running).length;
 };
 
-const getStoppedCount = (instances) => {
-  return instances.filter(i => !i.running).length;
-};
+// const getStoppedCount = (instances) => {
+//   return instances.filter(i => !i.running).length;
+// };
 
 const getAggregatedRunningSymbol = (instances) => {
   const running = getRunningCount(instances);
@@ -1884,58 +1884,58 @@ watch(sortedPluginCategories, (categories) => {
 
 
 
-const toggleInstanceEnabled = async (instanceId, enabled) => {
-  try {
-    // Find which plugin type this instance belongs to
-    let pluginType = null;
-    let instance = null;
-    for (const [pluginId, instances] of Object.entries(pluginInstances.value)) {
-      const found = instances.find(i => i.id === instanceId);
-      if (found) {
-        pluginType = pluginId;
-        instance = found;
-        break;
-      }
-    }
-    
-    if (!pluginType || !instance) {
-      console.error(`Could not find plugin type for instance ${instanceId}`);
-      return;
-    }
-    
-    // For calendar plugins, use the calendar API
-    if (pluginType === 'google' || pluginType === 'ical' || pluginType === 'proton') {
-      const source = calendarSources.value.find(s => s.id === instanceId);
-      if (source) {
-        await calendarStore.updateSource(instanceId, { ...source, enabled });
-        await loadCalendarSources();
-      }
-    } else {
-      // For other plugins, we need to update via the plugin instance API
-      // For now, just reload to get the updated state
-      await loadPlugins();
-    }
-    
-    // Start/stop the plugin based on enabled status
-    if (enabled) {
-      // If enabling and not running, start it
-      if (!instance.running) {
-        await startPluginInstance(instanceId);
-      }
-    } else {
-      // If disabling and running, stop it
-      if (instance.running) {
-        await stopPluginInstance(instanceId);
-      }
-    }
-    
-    // Reload plugins to update instance status
-    await loadPlugins();
-  } catch (error) {
-    console.error("Failed to toggle instance enabled:", error);
-    alert(`Failed to update instance: ${error.response?.data?.detail || error.message}`);
-  }
-};
+// const toggleInstanceEnabled = async (instanceId, enabled) => {
+//   try {
+//     // Find which plugin type this instance belongs to
+//     let pluginType = null;
+//     let instance = null;
+//     for (const [pluginId, instances] of Object.entries(pluginInstances.value)) {
+//       const found = instances.find(i => i.id === instanceId);
+//       if (found) {
+//         pluginType = pluginId;
+//         instance = found;
+//         break;
+//       }
+//     }
+//     
+//     if (!pluginType || !instance) {
+//       console.error(`Could not find plugin type for instance ${instanceId}`);
+//       return;
+//     }
+//     
+//     // For calendar plugins, use the calendar API
+//     if (pluginType === 'google' || pluginType === 'ical' || pluginType === 'proton') {
+//       const source = calendarSources.value.find(s => s.id === instanceId);
+//       if (source) {
+//         await calendarStore.updateSource(instanceId, { ...source, enabled });
+//         await loadCalendarSources();
+//       }
+//     } else {
+//       // For other plugins, we need to update via the plugin instance API
+//       // For now, just reload to get the updated state
+//       await loadPlugins();
+//     }
+//     
+//     // Start/stop the plugin based on enabled status
+//     if (enabled) {
+//       // If enabling and not running, start it
+//       if (!instance.running) {
+//         await startPluginInstance(instanceId);
+//       }
+//     } else {
+//       // If disabling and running, stop it
+//       if (instance.running) {
+//         await stopPluginInstance(instanceId);
+//       }
+//     }
+//     
+//     // Reload plugins to update instance status
+//     await loadPlugins();
+//   } catch (error) {
+//     console.error("Failed to toggle instance enabled:", error);
+//     alert(`Failed to update instance: ${error.response?.data?.detail || error.message}`);
+//   }
+// };
 
 const removeSource = async (sourceId) => {
   if (confirm("Are you sure you want to remove this calendar source?")) {
@@ -2203,36 +2203,36 @@ const handleFileSelectFromSection = async (files, section) => {
   }
 };
 
-const handleFileSelect = async (event) => {
-  const files = event.target.files;
-  if (!files || files.length === 0) return;
-
-  uploading.value = true;
-  uploadError.value = "";
-  uploadSuccess.value = "";
-
-  try {
-    const uploadPromises = Array.from(files).map((file) => imagesStore.uploadImage(file));
-    await Promise.all(uploadPromises);
-    uploadSuccess.value = `Successfully uploaded ${files.length} image(s)`;
-    await loadImages();
-    // Clear file input
-    event.target.value = "";
-    // Clear success message after 3 seconds
-    setTimeout(() => {
-      uploadSuccess.value = "";
-    }, 3000);
-  } catch (error) {
-    uploadError.value = error.response?.data?.detail || error.message || "Failed to upload images";
-    console.error("Failed to upload images:", error);
-    // Clear error message after 5 seconds
-    setTimeout(() => {
-      uploadError.value = "";
-    }, 5000);
-  } finally {
-    uploading.value = false;
-  }
-};
+// const handleFileSelect = async (event) => {
+//   const files = event.target.files;
+//   if (!files || files.length === 0) return;
+//
+//   uploading.value = true;
+//   uploadError.value = "";
+//   uploadSuccess.value = "";
+//
+//   try {
+//     const uploadPromises = Array.from(files).map((file) => imagesStore.uploadImage(file));
+//     await Promise.all(uploadPromises);
+//     uploadSuccess.value = `Successfully uploaded ${files.length} image(s)`;
+//     await loadImages();
+//     // Clear file input
+//     event.target.value = "";
+//     // Clear success message after 3 seconds
+//     setTimeout(() => {
+//       uploadSuccess.value = "";
+//     }, 3000);
+//   } catch (error) {
+//     uploadError.value = error.response?.data?.detail || error.message || "Failed to upload images";
+//     console.error("Failed to upload images:", error);
+//     // Clear error message after 5 seconds
+//     setTimeout(() => {
+//       uploadError.value = "";
+//     }, 5000);
+//   } finally {
+//     uploading.value = false;
+//   }
+// };
 
 const deleteImage = async (imageId) => {
   if (!confirm("Are you sure you want to delete this image?")) {
@@ -2250,18 +2250,18 @@ const deleteImage = async (imageId) => {
   }
 };
 
-const formatFileSize = (bytes) => {
-  if (bytes === 0) return "0 Bytes";
-  const k = 1024;
-  const sizes = ["Bytes", "KB", "MB", "GB"];
-  const i = Math.floor(Math.log(bytes) / Math.log(k));
-  return Math.round((bytes / Math.pow(k, i)) * 100) / 100 + " " + sizes[i];
-};
+// const formatFileSize = (bytes) => {
+//   if (bytes === 0) return "0 Bytes";
+//   const k = 1024;
+//   const sizes = ["Bytes", "KB", "MB", "GB"];
+//   const i = Math.floor(Math.log(bytes) / Math.log(k));
+//   return Math.round((bytes / Math.pow(k, i)) * 100) / 100 + " " + sizes[i];
+// };
 
-const handleThumbnailError = (event) => {
-  // Hide broken thumbnail images
-  event.target.style.display = "none";
-};
+// const handleThumbnailError = (event) => {
+//   // Hide broken thumbnail images
+//   event.target.style.display = "none";
+// };
 
 const addCalendarSource = async () => {
   if (!canAddCalendar.value) {
@@ -2773,84 +2773,84 @@ const updateFormValue = (pluginId, key, value) => {
   }
 };
 
-const browseDirectory = (pluginId, key) => {
-  // Find the file input with matching data attributes
-  const targetInput = document.querySelector(
-    `input[type="file"][data-plugin-id="${pluginId}"][data-config-key="${key}"]`
-  );
-  if (targetInput) {
-    targetInput.click();
-  } else {
-    console.error(`Could not find file input for ${pluginId}.${key}`);
-  }
-};
+// const browseDirectory = (pluginId, key) => {
+//   // Find the file input with matching data attributes
+//   const targetInput = document.querySelector(
+//     `input[type="file"][data-plugin-id="${pluginId}"][data-config-key="${key}"]`
+//   );
+//   if (targetInput) {
+//     targetInput.click();
+//   } else {
+//     console.error(`Could not find file input for ${pluginId}.${key}`);
+//   }
+// };
 
-const handleDirectorySelect = (pluginId, key, event) => {
-  const file = event.target.files?.[0];
-  if (file) {
-    // Extract directory path from file path
-    // Note: Browsers don't allow access to full file paths for security reasons
-    // We'll use webkitRelativePath if available (when using webkitdirectory attribute)
-    // Otherwise, we'll prompt the user to enter the path manually
-    
-    let directoryPath = '';
-    
-    // Try to get the full path (works in Electron, not in regular browsers)
-    if (file.path) {
-      // Electron environment - extract directory from path string
-      const pathString = file.path;
-      const lastSlash = Math.max(pathString.lastIndexOf('/'), pathString.lastIndexOf('\\'));
-      if (lastSlash !== -1) {
-        directoryPath = pathString.substring(0, lastSlash);
-      }
-    } else if (file.webkitRelativePath) {
-      // When using webkitdirectory, we get relative paths
-      const parts = file.webkitRelativePath.split('/');
-      parts.pop(); // Remove filename
-      directoryPath = parts.join('/');
-    } else {
-      // Fallback: show a message that user needs to enter path manually
-      alert('Browser security restrictions prevent automatic directory selection. Please enter the directory path manually, or use the file picker to select a file from the desired directory.');
-      event.target.value = ''; // Reset input
-      return;
-    }
-    
-    // Update the form value with the directory path
-    if (directoryPath) {
-      updateFormValue(pluginId, key, directoryPath);
-    }
-    
-    // Reset the input so the same file can be selected again if needed
-    event.target.value = '';
-  }
-};
+// const handleDirectorySelect = (pluginId, key, event) => {
+//   const file = event.target.files?.[0];
+//   if (file) {
+//     // Extract directory path from file path
+//     // Note: Browsers don't allow access to full file paths for security reasons
+//     // We'll use webkitRelativePath if available (when using webkitdirectory attribute)
+//     // Otherwise, we'll prompt the user to enter the path manually
+//     
+//     let directoryPath = '';
+//     
+//     // Try to get the full path (works in Electron, not in regular browsers)
+//     if (file.path) {
+//       // Electron environment - extract directory from path string
+//       const pathString = file.path;
+//       const lastSlash = Math.max(pathString.lastIndexOf('/'), pathString.lastIndexOf('\\'));
+//       if (lastSlash !== -1) {
+//         directoryPath = pathString.substring(0, lastSlash);
+//       }
+//     } else if (file.webkitRelativePath) {
+//       // When using webkitdirectory, we get relative paths
+//       const parts = file.webkitRelativePath.split('/');
+//       parts.pop(); // Remove filename
+//       directoryPath = parts.join('/');
+//     } else {
+//       // Fallback: show a message that user needs to enter path manually
+//       alert('Browser security restrictions prevent automatic directory selection. Please enter the directory path manually, or use the file picker to select a file from the desired directory.');
+//       event.target.value = ''; // Reset input
+//       return;
+//     }
+//     
+//     // Update the form value with the directory path
+//     if (directoryPath) {
+//       updateFormValue(pluginId, key, directoryPath);
+//     }
+//     
+//     // Reset the input so the same file can be selected again if needed
+//     event.target.value = '';
+//   }
+// };
 
-const updatePluginConfig = async (pluginId, config) => {
-  try {
-    // Merge with existing config
-    const currentConfig = pluginConfigs.value[pluginId] || {};
-    const updatedConfig = { ...currentConfig, ...config };
-    
-    await axios.put(`/api/plugins/${pluginId}`, updatedConfig);
-    
-    // Update local config
-    pluginConfigs.value[pluginId] = updatedConfig;
-    
-    // Reload relevant data based on plugin type
-    const plugin = plugins.value.find((p) => p.id === pluginId);
-    if (plugin) {
-      if (plugin.type === "calendar") {
-        await loadCalendarSources();
-      } else if (plugin.type === "image") {
-        // Reload images when image plugin config is updated
-        await loadImages();
-      }
-    }
-  } catch (error) {
-    console.error("Failed to update plugin:", error);
-    alert(`Error: ${error.response?.data?.detail || error.message || "Failed to update plugin"}`);
-  }
-};
+// const updatePluginConfig = async (pluginId, config) => {
+//   try {
+//     // Merge with existing config
+//     const currentConfig = pluginConfigs.value[pluginId] || {};
+//     const updatedConfig = { ...currentConfig, ...config };
+//     
+//     await axios.put(`/api/plugins/${pluginId}`, updatedConfig);
+//     
+//     // Update local config
+//     pluginConfigs.value[pluginId] = updatedConfig;
+//     
+//     // Reload relevant data based on plugin type
+//     const plugin = plugins.value.find((p) => p.id === pluginId);
+//     if (plugin) {
+//       if (plugin.type === "calendar") {
+//         await loadCalendarSources();
+//       } else if (plugin.type === "image") {
+//         // Reload images when image plugin config is updated
+//         await loadImages();
+//       }
+//     }
+//   } catch (error) {
+//     console.error("Failed to update plugin:", error);
+//     alert(`Error: ${error.response?.data?.detail || error.message || "Failed to update plugin"}`);
+//   }
+// };
 
 const savePluginConfig = async (pluginId) => {
   savingPlugin.value = pluginId;

@@ -48,8 +48,16 @@
       <div
         class="calendar-title-group-minimal"
       >
-        <span class="current-month-minimal">{{ currentMonthYear }}</span>
-        <span class="view-mode-indicator-minimal">{{ viewModeLabel }}</span>
+        <span
+          class="current-month-minimal"
+        >
+          {{ currentMonthYear }}
+        </span>
+        <span
+          class="view-mode-indicator-minimal"
+        >
+          {{ viewModeLabel }}
+        </span>
       </div>
       <button
         class="btn-icon-minimal"
@@ -66,9 +74,17 @@
         v-if="loading"
         class="loading-overlay"
       >
-        <div class="loading-spinner">
-          <div class="spinner" />
-          <div class="loading-text">Loading events...</div>
+        <div
+          class="loading-spinner"
+        >
+          <div
+            class="spinner"
+          />
+          <div
+            class="loading-text"
+          >
+            Loading events...
+          </div>
         </div>
       </div>
       <div
