@@ -98,9 +98,8 @@ def register_plugin_types() -> list[dict[str, Any]]:
             pytest.skip("Plugin installation route not available in test client")
         else:
             # Unexpected error
-            assert (
-                False
-            ), f"Unexpected status code: {response.status_code}, response: {response.text}"
+            error_msg = f"Unexpected status code: {response.status_code}, response: {response.text}"
+            assert False, error_msg
 
     def test_install_plugin_invalid_zip(self, test_client, tmp_path):
         """Test installing an invalid plugin zip file."""
