@@ -4,7 +4,7 @@ from typing import Any
 
 import pluggy
 
-from app.plugins.base import BasePlugin, PluginType
+from app.plugins.base import BasePlugin
 
 # Create pluggy hook specification manager
 hookspec = pluggy.HookspecMarker("calvin")
@@ -64,17 +64,17 @@ class PluginHookSpec:
     ) -> dict[str, Any] | None:
         """
         Handle plugin-specific configuration update and instance management.
-        
+
         This hook allows plugins to handle their own instance creation/update logic
         when the plugin type configuration is updated. This keeps plugins self-contained.
-        
+
         Args:
             type_id: Plugin type ID (e.g., 'mealie', 'yr_weather')
             config: Updated configuration dictionary (already cleaned)
             enabled: New enabled state (None if not changed)
             db_type: PluginTypeDB instance from database
             session: Database session for queries/updates
-            
+
         Returns:
             Dictionary with status information, or None if this plugin doesn't handle the update.
             The dict can contain keys like:
@@ -92,13 +92,13 @@ class PluginHookSpec:
     ) -> dict[str, Any] | None:
         """
         Test plugin connection/configuration.
-        
+
         This hook allows plugins to implement their own connection testing logic.
-        
+
         Args:
             type_id: Plugin type ID (e.g., 'imap', 'mealie', 'yr_weather')
             config: Plugin configuration dictionary
-            
+
         Returns:
             Dictionary with test result, or None if this plugin doesn't support testing.
             The dict should contain:
@@ -115,13 +115,13 @@ class PluginHookSpec:
     ) -> dict[str, Any] | None:
         """
         Manually trigger plugin fetch/check operation.
-        
+
         This hook allows plugins to implement their own fetch logic (e.g., check for new emails).
-        
+
         Args:
             type_id: Plugin type ID (e.g., 'imap')
             instance_id: Optional plugin instance ID (if None, use first instance)
-            
+
         Returns:
             Dictionary with fetch result, or None if this plugin doesn't support fetching.
             The dict should contain:
@@ -140,15 +140,15 @@ class PluginHookSpec:
     ) -> dict[str, Any] | None:
         """
         Fetch service data from a service plugin instance.
-        
+
         This hook allows service plugins to implement their own data fetching logic
         for the generic /web-services/{service_id}/data endpoint.
-        
+
         Args:
             instance_id: Plugin instance ID
             start_date: Optional start date (YYYY-MM-DD format, plugin-specific)
             end_date: Optional end date (YYYY-MM-DD format, plugin-specific)
-            
+
         Returns:
             Dictionary with service data, or None if this plugin doesn't handle this instance.
             The dict can contain any plugin-specific data structure.
@@ -159,4 +159,3 @@ class PluginHookSpec:
 # Create plugin manager
 plugin_manager = pluggy.PluginManager("calvin")
 plugin_manager.add_hookspecs(PluginHookSpec)
-

@@ -5,7 +5,7 @@ from typing import Any
 
 from app.models.calendar import CalendarEvent
 from app.plugins.base import PluginType
-from app.plugins.hooks import hookimpl, plugin_manager
+from app.plugins.hooks import hookimpl
 from app.plugins.protocols import CalendarPlugin
 from app.utils.ical_parser import parse_ical_from_url
 
@@ -72,7 +72,8 @@ class ICalCalendarPlugin(CalendarPlugin):
             # Filter events by date range
             filtered_events = []
             for event in ical_events:
-                # Event overlaps if: event starts before range ends AND event ends after range starts
+                # Event overlaps if: event starts before range ends
+                # AND event ends after range starts
                 if event.start <= end_date and event.end >= start_date:
                     # Update source ID to match plugin ID
                     updated_event = event.model_copy(update={"source": self.plugin_id})
@@ -132,14 +133,13 @@ def create_plugin_instance(
     """Create an ICalCalendarPlugin instance."""
     if type_id not in ("ical", "proton"):
         return None
-    
+
     enabled = config.get("enabled", False)  # Default to disabled
     ical_url = config.get("ical_url", "")
-    
+
     return ICalCalendarPlugin(
         plugin_id=plugin_id,
         name=name,
         ical_url=ical_url,
         enabled=enabled,
     )
-

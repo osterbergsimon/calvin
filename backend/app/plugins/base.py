@@ -41,7 +41,7 @@ class BasePlugin(ABC):
     def get_plugin_metadata(cls) -> dict[str, Any]:
         """
         Get plugin metadata for registration.
-        
+
         This method should be overridden by each plugin class to return:
         - type_id: Unique identifier (e.g., 'google', 'local')
         - name: Human-readable name
@@ -50,7 +50,7 @@ class BasePlugin(ABC):
         - common_config_schema: Common config schema (dict, optional)
         - ui_actions: Plugin-specific actions/buttons (list, optional)
         - ui_sections: Plugin-specific sections (list, optional)
-        
+
         Returns:
             Dictionary with plugin metadata
         """
@@ -60,7 +60,7 @@ class BasePlugin(ABC):
     async def initialize(self) -> None:
         """
         Initialize the plugin (e.g., load configuration, connect to services).
-        
+
         Note: This method should call start() when initialization is complete
         to mark the plugin as running.
         """
@@ -70,7 +70,7 @@ class BasePlugin(ABC):
     async def cleanup(self) -> None:
         """
         Cleanup plugin resources (e.g., close connections, save state).
-        
+
         Note: This method should call stop() before cleanup to mark the plugin
         as not running.
         """
@@ -106,7 +106,7 @@ class BasePlugin(ABC):
     def start(self) -> None:
         """
         Start the plugin (mark as running).
-        
+
         This should be called after successful initialization.
         Plugins can override this to add custom start logic.
         """
@@ -117,7 +117,7 @@ class BasePlugin(ABC):
     def stop(self) -> None:
         """
         Stop the plugin (mark as not running).
-        
+
         This should be called before cleanup.
         Plugins can override this to add custom stop logic.
         """
@@ -126,7 +126,7 @@ class BasePlugin(ABC):
     def is_running(self) -> bool:
         """
         Check if the plugin is currently running.
-        
+
         Returns:
             True if plugin is running, False otherwise
         """
@@ -139,5 +139,7 @@ class BasePlugin(ABC):
 
     def __repr__(self) -> str:
         """String representation of the plugin."""
-        return f"{self.__class__.__name__}(id={self.plugin_id}, name={self.name}, enabled={self.enabled}, running={self._running})"
-
+        return (
+            f"{self.__class__.__name__}(id={self.plugin_id}, name={self.name}, "
+            f"enabled={self.enabled}, running={self._running})"
+        )

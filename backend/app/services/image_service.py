@@ -205,21 +205,23 @@ class ImageService:
             with Image.open(image_path) as img:
                 # Handle EXIF orientation
                 img = ImageOps.exif_transpose(img)
-                
+
                 # Create thumbnail maintaining aspect ratio
                 img.thumbnail(self.thumbnail_size, Image.Resampling.LANCZOS)
-                
+
                 # Convert to RGB if necessary (for JPEG)
                 if img.mode in ("RGBA", "LA", "P"):
                     # Create white background
                     background = Image.new("RGB", img.size, (255, 255, 255))
                     if img.mode == "P":
                         img = img.convert("RGBA")
-                    background.paste(img, mask=img.split()[-1] if img.mode in ("RGBA", "LA") else None)
+                    background.paste(
+                        img, mask=img.split()[-1] if img.mode in ("RGBA", "LA") else None
+                    )
                     img = background
                 elif img.mode != "RGB":
                     img = img.convert("RGB")
-                
+
                 # Save thumbnail as JPEG
                 img.save(thumbnail_path, "JPEG", quality=85, optimize=True)
         except Exception as e:

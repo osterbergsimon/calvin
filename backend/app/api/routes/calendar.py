@@ -98,9 +98,7 @@ async def get_calendar_sources():
         enabled_plugin_types = set()
         # Get plugin types from pluggy hooks
         plugin_types = plugin_loader.get_plugin_types()
-        calendar_types = [
-            t for t in plugin_types if t.get("plugin_type") == PluginType.CALENDAR
-        ]
+        calendar_types = [t for t in plugin_types if t.get("plugin_type") == PluginType.CALENDAR]
 
         # Check enabled status from database
         async with AsyncSessionLocal() as session:
@@ -119,8 +117,7 @@ async def get_calendar_sources():
         filtered_sources = [
             s
             for s in sources
-            if s.get("type") in enabled_plugin_types
-            or s.get("type") in legacy_types
+            if s.get("type") in enabled_plugin_types or s.get("type") in legacy_types
         ]
 
         # Convert to CalendarSource models for response
@@ -141,6 +138,7 @@ async def get_calendar_sources():
         return CalendarSourcesResponse(sources=source_models, total=len(source_models))
     except Exception as e:
         import traceback
+
         traceback.print_exc()
         raise HTTPException(status_code=500, detail=f"Error fetching calendar sources: {str(e)}")
 
@@ -169,13 +167,12 @@ async def add_calendar_source(source: CalendarSource):
     # Normalize Google Calendar URLs if needed
     if source.type == "google" and source.ical_url:
         from app.utils.google_calendar import normalize_google_calendar_url
+
         source.ical_url = normalize_google_calendar_url(source.ical_url)
 
     # Validate Proton Calendar URL format
     if source.type == "proton" and source.ical_url:
-        proton_url_prefix = (
-            "https://calendar.proton.me/api/calendar/v1/url/"
-        )
+        proton_url_prefix = "https://calendar.proton.me/api/calendar/v1/url/"
         if not source.ical_url.startswith(proton_url_prefix):
             raise HTTPException(
                 status_code=400,
@@ -193,9 +190,7 @@ async def add_calendar_source(source: CalendarSource):
 
     # Determine plugin type_id
     type_id = (
-        "google"
-        if source.type == "google"
-        else ("proton" if source.type == "proton" else "ical")
+        "google" if source.type == "google" else ("proton" if source.type == "proton" else "ical")
     )
 
     # Register plugin using unified system
@@ -230,9 +225,7 @@ async def update_calendar_source(source_id: str, source: CalendarSource):
 
     # Update in database first
     async with AsyncSessionLocal() as session:
-        result = await session.execute(
-            select(PluginDB).where(PluginDB.id == source_id)
-        )
+        result = await session.execute(select(PluginDB).where(PluginDB.id == source_id))
         db_plugin = result.scalar_one_or_none()
         if not db_plugin:
             raise HTTPException(status_code=404, detail="Calendar source not found")
@@ -241,12 +234,14 @@ async def update_calendar_source(source_id: str, source: CalendarSource):
         db_plugin.name = source.name
         db_plugin.enabled = source.enabled
         config = db_plugin.config or {}
-        config.update({
-            "ical_url": source.ical_url,
-            "api_key": source.api_key,
-            "color": source.color,
-            "show_time": source.show_time,
-        })
+        config.update(
+            {
+                "ical_url": source.ical_url,
+                "api_key": source.api_key,
+                "color": source.color,
+                "show_time": source.show_time,
+            }
+        )
         db_plugin.config = config
         await session.commit()
         await session.refresh(db_plugin)
@@ -292,11 +287,9 @@ async def update_calendar_source(source_id: str, source: CalendarSource):
                 plugin_manager.unregister(source_id)
             except Exception as e:
                 import logging
+
                 logger = logging.getLogger(__name__)
-                logger.warning(
-                    f"Error cleaning up disabled plugin {source_id}: {e}",
-                    exc_info=True
-                )
+                logger.warning(f"Error cleaning up disabled plugin {source_id}: {e}", exc_info=True)
 
     return source
 

@@ -18,24 +18,24 @@ async def trigger_update():
     Runs the update script asynchronously and returns immediately.
     """
     from app.services.config_service import config_service
-    
+
     update_script = Path("/usr/local/bin/update-calvin.sh")
-    
+
     if not update_script.exists():
         raise HTTPException(
             status_code=404,
-            detail="Update script not found. Make sure the system is properly configured."
+            detail="Update script not found. Make sure the system is properly configured.",
         )
-    
+
     try:
         # Get git branch from config
         git_branch = await config_service.get_value("git_branch", "main")
-        
+
         # Ensure log directory exists
         log_dir = Path("/home/calvin/calvin/backend/logs")
         log_dir.mkdir(parents=True, exist_ok=True)
         log_file = log_dir / "calvin-update.log"
-        
+
         # Run update script in background (non-blocking)
         # Redirect both stdout and stderr to log file AND keep them for error checking
         with open(log_file, "a") as log_f:
@@ -51,30 +51,30 @@ async def trigger_update():
                     "GIT_BRANCH": git_branch,  # Pass git branch to update script
                 },
             )
-        
+
         # Wait a moment to see if process starts successfully
         import time
+
         time.sleep(0.5)
-        
+
         # Check if process is still running (didn't immediately fail)
         if process.poll() is not None:
             # Process already finished (likely an error)
             error_msg = "Update script exited immediately. "
             if log_file.exists():
                 try:
-                    with open(log_file, "r") as f:
+                    with open(log_file) as f:
                         last_lines = f.readlines()[-5:]
                         error_msg += "Last log: " + "".join(last_lines)
-                except:
+                except Exception:
                     error_msg += "Check log file for details."
             else:
-                error_msg += "Log file not created. Script may not be executable or may have failed."
-            
-            raise HTTPException(
-                status_code=500,
-                detail=error_msg
-            )
-        
+                error_msg += (
+                    "Log file not created. Script may not be executable or may have failed."
+                )
+
+            raise HTTPException(status_code=500, detail=error_msg)
+
         return {
             "status": "started",
             "message": f"Update process started (PID: {process.pid})",
@@ -84,10 +84,7 @@ async def trigger_update():
     except HTTPException:
         raise
     except Exception as e:
-        raise HTTPException(
-            status_code=500,
-            detail=f"Failed to start update process: {str(e)}"
-        )
+        raise HTTPException(status_code=500, detail=f"Failed to start update process: {str(e)}")
 
 
 @router.get("/update/status")
@@ -103,45 +100,71 @@ async def get_update_status():
         Path("/tmp/calvin-update.log"),
         Path("/var/log/calvin-update.log"),
     ]
-    
+
     log_file = None
     for loc in log_locations:
         if loc.exists():
             log_file = loc
             break
-    
+
     if not log_file or not log_file.exists():
         return {
             "status": "unknown",
             "message": "Update log not found. No updates have been run yet.",
         }
-    
+
     try:
         # Read last 30 lines of log for better context
-        with open(log_file, "r") as f:
+        with open(log_file) as f:
             lines = f.readlines()
             last_lines = lines[-30:] if len(lines) > 30 else lines
-        
+
         # Check if update is currently running
         # Look for various indicators of update activity
         log_content = "".join(last_lines)
         has_started = "Starting Calvin update" in log_content or "Starting update" in log_content
-        has_completed = "Update complete!" in log_content or "Update completed" in log_content or "Calvin update complete" in log_content
-        has_error = "ERROR" in log_content or "error" in log_content or "failed" in log_content.lower()
-        
+        has_completed = (
+            "Update complete!" in log_content
+            or "Update completed" in log_content
+            or "Calvin update complete" in log_content
+        )
+        has_error = (
+            "ERROR" in log_content or "error" in log_content or "failed" in log_content.lower()
+        )
+
         # Check for specific update steps
-        has_pulling = "Pulling latest code" in log_content or "git pull" in log_content.lower() or "git fetch" in log_content.lower()
-        has_updating_deps = "Updating backend dependencies" in log_content or "Updating frontend dependencies" in log_content or "Installing" in log_content
-        has_building = "Building frontend" in log_content or "Rebuilding frontend" in log_content or "npm run build" in log_content.lower() or "vite build" in log_content.lower() or "transforming" in log_content.lower()
-        has_build_complete = "Frontend build completed successfully" in log_content or "build completed" in log_content.lower()
-        has_restarting = "Restarting services" in log_content or "systemctl restart" in log_content.lower()
-        
+        has_pulling = (
+            "Pulling latest code" in log_content
+            or "git pull" in log_content.lower()
+            or "git fetch" in log_content.lower()
+        )
+        has_updating_deps = (
+            "Updating backend dependencies" in log_content
+            or "Updating frontend dependencies" in log_content
+            or "Installing" in log_content
+        )
+        has_building = (
+            "Building frontend" in log_content
+            or "Rebuilding frontend" in log_content
+            or "npm run build" in log_content.lower()
+            or "vite build" in log_content.lower()
+            or "transforming" in log_content.lower()
+        )
+        has_build_complete = (
+            "Frontend build completed successfully" in log_content
+            or "build completed" in log_content.lower()
+        )
+        has_restarting = (
+            "Restarting services" in log_content or "systemctl restart" in log_content.lower()
+        )
+
         # Check if process is still running by checking for recent activity
         # If log was updated in last 60 seconds, assume it's running
         import time
+
         log_mtime = log_file.stat().st_mtime
         recently_updated = (time.time() - log_mtime) < 60
-        
+
         # Determine status based on log content and recent activity
         # Only mark as complete if we have BOTH the build completion AND the update complete message
         # This ensures the build actually finished before we mark it as done
@@ -158,7 +181,9 @@ async def get_update_status():
         elif has_error and not recently_updated:
             status = "error"
             message = "Update failed. Check logs for details."
-        elif has_started and (has_pulling or has_updating_deps or has_building or has_restarting or recently_updated):
+        elif has_started and (
+            has_pulling or has_updating_deps or has_building or has_restarting or recently_updated
+        ):
             status = "running"
             # Provide more specific message based on what's happening
             if has_restarting:
@@ -179,10 +204,10 @@ async def get_update_status():
         else:
             status = "unknown"
             message = "Update status unknown. Check logs for details."
-        
+
         # Get last 15 lines for display
         display_lines = "".join(last_lines[-15:])
-        
+
         return {
             "status": status,
             "last_log": display_lines,
@@ -234,7 +259,9 @@ async def configure_display_timeout():
         await display_power_service.configure_display_timeout()
         return {"status": "success", "message": "Display timeout configured"}
     except Exception as e:
-        raise HTTPException(status_code=500, detail=f"Failed to configure display timeout: {str(e)}")
+        raise HTTPException(
+            status_code=500, detail=f"Failed to configure display timeout: {str(e)}"
+        )
 
 
 @router.post("/reboot")
@@ -245,13 +272,12 @@ async def reboot_system():
         # Note: The backend service runs with NoNewPrivileges=true, so sudo might not work
         # Try systemctl reboot first (might work if user has permissions)
         reboot_attempted = False
-        
+
         # Method 1: systemctl reboot (might work without sudo)
         try:
             result = subprocess.run(
                 ["systemctl", "reboot"],
-                stdout=subprocess.PIPE,
-                stderr=subprocess.PIPE,
+                capture_output=True,
                 timeout=5,
             )
             if result.returncode == 0:
@@ -266,17 +292,22 @@ async def reboot_system():
             reboot_attempted = True
         except Exception as e:
             print(f"systemctl reboot error: {e}")
-        
+
         # Method 2: Use dbus to call systemd-logind (alternative to systemctl)
         # This might work if polkit rules are configured
         if not reboot_attempted:
             try:
                 result = subprocess.run(
-                    ["dbus-send", "--system", "--print-reply", "--dest=org.freedesktop.login1",
-                     "/org/freedesktop/login1", "org.freedesktop.login1.Manager.Reboot",
-                     "boolean:false"],
-                    stdout=subprocess.PIPE,
-                    stderr=subprocess.PIPE,
+                    [
+                        "dbus-send",
+                        "--system",
+                        "--print-reply",
+                        "--dest=org.freedesktop.login1",
+                        "/org/freedesktop/login1",
+                        "org.freedesktop.login1.Manager.Reboot",
+                        "boolean:false",
+                    ],
+                    capture_output=True,
                     timeout=5,
                 )
                 if result.returncode == 0:
@@ -292,7 +323,7 @@ async def reboot_system():
                 reboot_attempted = True
             except Exception as e:
                 print(f"dbus reboot error: {e}")
-        
+
         if reboot_attempted:
             return {"status": "success", "message": "System reboot initiated"}
         else:
@@ -310,4 +341,3 @@ async def reboot_system():
     except Exception as e:
         print(f"Reboot error: {e}")
         raise HTTPException(status_code=500, detail=f"Failed to reboot system: {str(e)}")
-

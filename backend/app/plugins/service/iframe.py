@@ -3,7 +3,7 @@
 from typing import Any
 
 from app.plugins.base import PluginType
-from app.plugins.hooks import hookimpl, plugin_manager
+from app.plugins.hooks import hookimpl
 from app.plugins.protocols import ServicePlugin
 
 
@@ -30,7 +30,9 @@ class IframeServicePlugin(ServicePlugin):
             "plugin_class": cls,
         }
 
-    def __init__(self, plugin_id: str, name: str, url: str, enabled: bool = True, fullscreen: bool = False):
+    def __init__(
+        self, plugin_id: str, name: str, url: str, enabled: bool = True, fullscreen: bool = False
+    ):
         """
         Initialize iframe service plugin.
 
@@ -110,20 +112,20 @@ def create_plugin_instance(
     """Create an IframeServicePlugin instance."""
     if type_id != "iframe":
         return None
-    
+
     enabled = config.get("enabled", False)  # Default to disabled
     url = config.get("url", "")
     fullscreen = config.get("fullscreen", False)
-    
+
     # Handle schema objects
     if isinstance(url, dict):
         url = url.get("value") or url.get("default") or ""
     url = str(url) if url else ""
-    
+
     if isinstance(fullscreen, dict):
         fullscreen = fullscreen.get("value") or fullscreen.get("default") or False
     fullscreen = bool(fullscreen) if not isinstance(fullscreen, bool) else fullscreen
-    
+
     return IframeServicePlugin(
         plugin_id=plugin_id,
         name=name,
@@ -131,4 +133,3 @@ def create_plugin_instance(
         enabled=enabled,
         fullscreen=fullscreen,
     )
-

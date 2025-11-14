@@ -3,11 +3,11 @@
 from unittest.mock import AsyncMock, MagicMock, patch
 
 import pytest
-
-from app.plugins.registry import PluginRegistry
-from app.models.db_models import PluginTypeDB, PluginDB
-from app.database import AsyncSessionLocal
 from sqlalchemy import select
+
+from app.database import AsyncSessionLocal
+from app.models.db_models import PluginDB, PluginTypeDB
+from app.plugins.registry import PluginRegistry
 
 
 @pytest.fixture
@@ -32,11 +32,11 @@ class TestPluginErrorHandling:
     ):
         """Test that broken plugin types are disabled and error is stored."""
         from app.plugins.base import PluginType
-        
+
         # Mock a plugin type that raises an exception
         def broken_plugin_type():
             raise ValueError("Plugin metadata is invalid")
-        
+
         # Mock plugin loader to return a broken plugin type
         mock_plugin_loader.get_plugin_types.return_value = [
             {
@@ -45,20 +45,20 @@ class TestPluginErrorHandling:
                 # Missing required "name" field will cause error
             }
         ]
-        
+
         mock_instance_manager.initialize_all = AsyncMock(return_value=None)
         mock_instance_manager.get_plugin.return_value = None
-        
+
         # Should not raise exception, but disable the plugin
         await plugin_registry_instance.load_plugins_from_db()
-        
+
         # Verify broken plugin was marked as disabled with error
         async with AsyncSessionLocal() as session:
             result = await session.execute(
                 select(PluginTypeDB).where(PluginTypeDB.type_id == "broken_plugin")
             )
-            db_type = result.scalar_one_or_none()
-            
+            result.scalar_one_or_none()
+
             # Plugin should exist but be disabled
             # Note: The current implementation will skip invalid plugins, so they may not be in DB
             # But if they are, they should be disabled
@@ -74,7 +74,7 @@ class TestPluginErrorHandling:
     ):
         """Test that plugin types with missing name are handled gracefully."""
         from app.plugins.base import PluginType
-        
+
         # Mock plugin loader to return plugin type without name
         mock_plugin_loader.get_plugin_types.return_value = [
             {
@@ -83,20 +83,20 @@ class TestPluginErrorHandling:
                 # No "name" field
             }
         ]
-        
+
         mock_instance_manager.initialize_all = AsyncMock(return_value=None)
         mock_instance_manager.get_plugin.return_value = None
-        
+
         # Should not raise exception
         await plugin_registry_instance.load_plugins_from_db()
-        
+
         # Verify plugin was created with fallback name
         async with AsyncSessionLocal() as session:
             result = await session.execute(
                 select(PluginTypeDB).where(PluginTypeDB.type_id == "no_name_plugin")
             )
             db_type = result.scalar_one_or_none()
-            
+
             # Plugin should use type_id as name fallback
             if db_type:
                 assert db_type.name == "no_name_plugin" or db_type.name == "Unknown Plugin"
@@ -123,16 +123,16 @@ class TestPluginErrorHandling:
             )
             session.add(db_plugin)
             await session.commit()
-        
+
         # Mock plugin loader to fail creating instance
         mock_plugin_loader.create_plugin_instance.side_effect = Exception("Failed to create plugin")
         mock_plugin_loader.get_plugin_types.return_value = []
         mock_instance_manager.initialize_all = AsyncMock(return_value=None)
         mock_instance_manager.get_plugin.return_value = None
-        
+
         # Should not raise exception
         await plugin_registry_instance.load_plugins_from_db()
-        
+
         # Verify plugin instance was disabled
         # Note: The plugin may not be in the database if creation failed before DB update
         # The important thing is that the server didn't crash
@@ -141,7 +141,7 @@ class TestPluginErrorHandling:
                 select(PluginDB).where(PluginDB.id == "broken-instance-1")
             )
             db_plugin = result.scalar_one_or_none()
-            
+
             # Plugin should exist (was created in test setup)
             # It should be disabled if error handling worked
             if db_plugin:
@@ -169,21 +169,21 @@ class TestPluginErrorHandling:
             )
             session.add(db_plugin)
             await session.commit()
-        
+
         # Mock plugin that fails during configure
         mock_plugin = MagicMock()
         mock_plugin.configure = AsyncMock(side_effect=Exception("Configuration failed"))
         mock_plugin.enable = MagicMock()
         mock_plugin.disable = MagicMock()
-        
+
         mock_plugin_loader.create_plugin_instance.return_value = mock_plugin
         mock_plugin_loader.get_plugin_types.return_value = []
         mock_instance_manager.initialize_all = AsyncMock(return_value=None)
         mock_instance_manager.get_plugin.return_value = None
-        
+
         # Should not raise exception
         await plugin_registry_instance.load_plugins_from_db()
-        
+
         # Verify plugin instance was disabled
         # The important thing is that the server didn't crash
         async with AsyncSessionLocal() as session:
@@ -191,7 +191,7 @@ class TestPluginErrorHandling:
                 select(PluginDB).where(PluginDB.id == "configure-fail-1")
             )
             db_plugin = result.scalar_one_or_none()
-            
+
             # Plugin should exist (was created in test setup)
             # It should be disabled if error handling worked
             if db_plugin:
@@ -205,11 +205,10 @@ class TestPluginErrorHandling:
         test_db,
     ):
         """Test that exceptions during plugin type loading are caught and logged."""
-        from app.plugins.base import PluginType
-        
+
         # Mock plugin loader to raise exception when getting types
         mock_plugin_loader.get_plugin_types.side_effect = Exception("Plugin loader error")
-        
+
         # Should not raise exception, but should handle gracefully
         try:
             await plugin_registry_instance._load_plugin_types()
@@ -229,7 +228,7 @@ class TestPluginErrorHandling:
     ):
         """Test that multiple broken plugins don't prevent others from loading."""
         from app.plugins.base import PluginType
-        
+
         # Mock plugin loader with mix of working and broken plugins
         mock_plugin_loader.get_plugin_types.return_value = [
             {
@@ -248,20 +247,21 @@ class TestPluginErrorHandling:
                 "name": "Another Working Plugin",
             },
         ]
-        
+
         mock_instance_manager.initialize_all = AsyncMock(return_value=None)
         mock_instance_manager.get_plugin.return_value = None
-        
+
         # Should not raise exception
         await plugin_registry_instance.load_plugins_from_db()
-        
+
         # Verify working plugins were loaded
         async with AsyncSessionLocal() as session:
             result = await session.execute(
-                select(PluginTypeDB).where(PluginTypeDB.type_id.in_(["working_plugin", "working_plugin_2"]))
+                select(PluginTypeDB).where(
+                    PluginTypeDB.type_id.in_(["working_plugin", "working_plugin_2"])
+                )
             )
             working_plugins = result.scalars().all()
-            
+
             # At least one working plugin should be loaded
             assert len(working_plugins) >= 1
-

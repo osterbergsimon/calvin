@@ -1,12 +1,12 @@
 """Main FastAPI application entry point."""
 
-from pathlib import Path
 from contextlib import asynccontextmanager
+from pathlib import Path
 
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
-from fastapi.staticfiles import StaticFiles
 from fastapi.responses import FileResponse
+from fastapi.staticfiles import StaticFiles
 
 from app.api.routes import calendar, config, health, images, keyboard, plugins, system, web_services
 from app.config import settings
@@ -34,16 +34,17 @@ async def lifespan(app: FastAPI):
 
     # Load plugins from database using unified system
     from app.plugins.registry import plugin_registry
+
     await plugin_registry.load_plugins_from_db()
-    print(f"Loaded plugins from database")
-    
+    print("Loaded plugins from database")
+
     # Auto-create default instances for image plugins if enabled and no instance exists
-    from app.plugins.manager import plugin_manager
-    from app.plugins.base import PluginType
+    from sqlalchemy import select
+
     from app.database import AsyncSessionLocal
     from app.models.db_models import PluginDB, PluginTypeDB
-    from sqlalchemy import select
-    
+    from app.plugins.manager import plugin_manager
+
     async with AsyncSessionLocal() as session:
         # Check for Unsplash plugin type (default to enabled if not in DB)
         result = await session.execute(
@@ -51,14 +52,12 @@ async def lifespan(app: FastAPI):
         )
         unsplash_type = result.scalar_one_or_none()
         unsplash_enabled = unsplash_type.enabled if unsplash_type else True  # Default to enabled
-        
+
         if unsplash_enabled:
             # Check if an Unsplash instance exists
-            result = await session.execute(
-                select(PluginDB).where(PluginDB.type_id == "unsplash")
-            )
+            result = await session.execute(select(PluginDB).where(PluginDB.type_id == "unsplash"))
             unsplash_instance = result.scalar_one_or_none()
-            
+
             if not unsplash_instance:
                 # Create default Unsplash instance
                 print("Creating default Unsplash plugin instance...")
@@ -77,21 +76,17 @@ async def lifespan(app: FastAPI):
                     print("Default Unsplash plugin instance created")
                 except Exception as e:
                     print(f"Warning: Failed to create default Unsplash instance: {e}")
-        
+
         # Check for Picsum plugin type (default to enabled if not in DB)
-        result = await session.execute(
-            select(PluginTypeDB).where(PluginTypeDB.type_id == "picsum")
-        )
+        result = await session.execute(select(PluginTypeDB).where(PluginTypeDB.type_id == "picsum"))
         picsum_type = result.scalar_one_or_none()
         picsum_enabled = picsum_type.enabled if picsum_type else True  # Default to enabled
-        
+
         if picsum_enabled:
             # Check if a Picsum instance exists
-            result = await session.execute(
-                select(PluginDB).where(PluginDB.type_id == "picsum")
-            )
+            result = await session.execute(select(PluginDB).where(PluginDB.type_id == "picsum"))
             picsum_instance = result.scalar_one_or_none()
-            
+
             if not picsum_instance:
                 # Create default Picsum instance
                 print("Creating default Picsum plugin instance...")
@@ -108,21 +103,17 @@ async def lifespan(app: FastAPI):
                     print("Default Picsum plugin instance created")
                 except Exception as e:
                     print(f"Warning: Failed to create default Picsum instance: {e}")
-        
+
         # Check for local images plugin type (default to enabled if not in DB)
-        result = await session.execute(
-            select(PluginTypeDB).where(PluginTypeDB.type_id == "local")
-        )
+        result = await session.execute(select(PluginTypeDB).where(PluginTypeDB.type_id == "local"))
         local_type = result.scalar_one_or_none()
         local_enabled = local_type.enabled if local_type else True  # Default to enabled
-        
+
         if local_enabled:
             # Check if a local images instance exists
-            result = await session.execute(
-                select(PluginDB).where(PluginDB.type_id == "local")
-            )
+            result = await session.execute(select(PluginDB).where(PluginDB.type_id == "local"))
             local_instance = result.scalar_one_or_none()
-            
+
             if not local_instance:
                 # Create default local images instance
                 print("Creating default local images plugin instance...")
@@ -185,9 +176,10 @@ async def lifespan(app: FastAPI):
     image_service_module.image_service.scan_images()
     image_count = len(image_service_module.image_service.get_images())
     print(f"Image service initialized: {image_count} images found (legacy)")
-    
+
     # Initialize plugin image service
     from app.services.plugin_image_service import PluginImageService
+
     plugin_image_service = PluginImageService()
     # Do initial scan
     await plugin_image_service.scan_images()
@@ -218,7 +210,9 @@ async def lifespan(app: FastAPI):
         await config_service.set_value("photo_rotation_interval", 30)  # 30 seconds
     calendar_view_mode = await config_service.get_value("calendar_view_mode")
     if calendar_view_mode is None:
-        await config_service.set_value("calendar_view_mode", "month")  # 'month' | 'week' | 'day' | 'rolling'
+        await config_service.set_value(
+            "calendar_view_mode", "month"
+        )  # 'month' | 'week' | 'day' | 'rolling'
     time_format = await config_service.get_value("time_format")
     if time_format is None:
         await config_service.set_value("time_format", "24h")  # '12h' or '24h' (default: '24h')
@@ -257,6 +251,7 @@ async def lifespan(app: FastAPI):
     if display_schedule is None:
         # Default: all days enabled, 06:00-22:00
         import json
+
         default_schedule = [
             {"day": i, "enabled": True, "onTime": "06:00", "offTime": "22:00"}
             for i in range(7)  # 0=Monday, 6=Sunday
@@ -274,10 +269,14 @@ async def lifespan(app: FastAPI):
     # Initialize display timeout settings (default: disabled - keep display on)
     display_timeout_enabled = await config_service.get_value("display_timeout_enabled")
     if display_timeout_enabled is None:
-        await config_service.set_value("display_timeout_enabled", False)  # Disabled by default - keep display on
+        await config_service.set_value(
+            "display_timeout_enabled", False
+        )  # Disabled by default - keep display on
     display_timeout = await config_service.get_value("display_timeout")
     if display_timeout is None:
-        await config_service.set_value("display_timeout", 0)  # 0 = never (disabled by default - keep display on)
+        await config_service.set_value(
+            "display_timeout", 0
+        )  # 0 = never (disabled by default - keep display on)
     image_display_mode = await config_service.get_value("image_display_mode")
     if image_display_mode is None:
         await config_service.set_value("image_display_mode", "smart")  # Smart mode by default
@@ -288,21 +287,21 @@ async def lifespan(app: FastAPI):
     # Start schedulers
     calendar_scheduler.start()
     print("Calendar scheduler started - refreshing every 15 minutes")
-    
+
     # Start display power scheduler
     from app.services.display_power_service import display_power_service
+
     await display_power_service.start()
     print("Display power scheduler started")
-    
+
     yield
     # Shutdown
     await display_power_service.stop()
     print("Display power scheduler stopped")
     calendar_scheduler.stop()
     print("Calendar scheduler stopped")
-    
+
     # Cleanup plugins
-    from app.plugins.manager import plugin_manager
     await plugin_manager.cleanup_all()
     print("Plugins cleaned up")
 
@@ -347,7 +346,7 @@ if frontend_dist.exists():
         print(f"Mounted static assets from: {assets_dir}")
     else:
         print(f"WARNING: Assets directory not found: {assets_dir}")
-    
+
     # Serve index.html for root path
     @app.get("/")
     async def serve_frontend_root():
@@ -356,7 +355,7 @@ if frontend_dist.exists():
         if index_path.exists():
             return FileResponse(str(index_path))
         return {"message": "Calvin Dashboard API", "version": "0.1.0"}
-    
+
     # Serve index.html for all other non-API routes (SPA routing)
     # This must come after API routes and asset mounts to avoid intercepting them
     # Only handle GET requests for SPA routing - POST requests should only go to API routes
@@ -364,14 +363,17 @@ if frontend_dist.exists():
     async def serve_frontend_get(full_path: str):
         """Serve frontend index.html for SPA routing (GET only)."""
         # Don't handle API routes, docs, or assets (already handled by mounts/routers)
-        if (full_path.startswith("api/") or 
-            full_path.startswith("docs") or 
-            full_path.startswith("openapi.json") or
-            full_path.startswith("assets/")):
+        if (
+            full_path.startswith("api/")
+            or full_path.startswith("docs")
+            or full_path.startswith("openapi.json")
+            or full_path.startswith("assets/")
+        ):
             # Return 404 for API routes that don't exist (let routers handle it)
             from fastapi import HTTPException
+
             raise HTTPException(status_code=404, detail="Not found")
-        
+
         index_path = frontend_dist / "index.html"
         if index_path.exists():
             return FileResponse(str(index_path))

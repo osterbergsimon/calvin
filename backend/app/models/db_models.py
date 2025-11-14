@@ -5,7 +5,7 @@ from datetime import datetime
 from typing import Any
 
 from sqlalchemy import Boolean, Column, DateTime, Integer, String, Text
-from sqlalchemy.types import TypeDecorator, VARCHAR
+from sqlalchemy.types import VARCHAR, TypeDecorator
 
 from app.database import Base
 
@@ -104,7 +104,9 @@ class PluginDB(Base):
 
     id = Column(String, primary_key=True, index=True)  # Plugin instance ID
     type_id = Column(String, nullable=False, index=True)  # Plugin type ID (e.g., 'google', 'local')
-    plugin_type = Column(String, nullable=False, index=True)  # Plugin category ('calendar', 'image', 'service')
+    plugin_type = Column(
+        String, nullable=False, index=True
+    )  # Plugin category ('calendar', 'image', 'service')
     name = Column(String, nullable=False)  # Instance name
     version = Column(String, nullable=True)  # Plugin version (optional)
     enabled = Column(Boolean, default=True, nullable=False)  # Whether plugin instance is enabled

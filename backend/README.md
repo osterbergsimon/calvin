@@ -53,6 +53,12 @@ uv run ruff format .
 # Or use the PowerShell script (Windows)
 ./scripts/fix-lint.ps1
 
+# Setup pre-commit hooks (one-time)
+# Note: Pre-commit will run ruff-format (Black-compatible) and ruff check automatically
+# Ruff format handles formatting (whitespace, indentation, quotes) - it's Black-compatible
+# Ruff check handles linting (including line length) - some E501 errors may need manual fixes
+uv run pre-commit install
+
 # Type check
 uv run mypy app/
 ```

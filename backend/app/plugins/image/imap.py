@@ -3,7 +3,6 @@
 import asyncio
 import email
 import imaplib
-from datetime import datetime
 from email.header import decode_header
 from pathlib import Path
 from typing import Any
@@ -11,7 +10,7 @@ from typing import Any
 from PIL import Image
 
 from app.plugins.base import PluginType
-from app.plugins.hooks import hookimpl, plugin_manager
+from app.plugins.hooks import hookimpl
 from app.plugins.protocols import ImagePlugin
 
 
@@ -25,7 +24,7 @@ class ImapImagePlugin(ImagePlugin):
             "type_id": "imap",
             "plugin_type": PluginType.IMAGE,
             "name": "Email (IMAP)",
-            "description": "Download images from email attachments. Works with Gmail, Outlook, and any IMAP provider. Share photos from Android using Share → Email.",
+            "description": "Download images from email attachments. Works with Gmail, Outlook, and any IMAP provider. Share photos from Android using Share → Email.",  # noqa: E501
             "version": "1.0.0",
             "common_config_schema": {
                 "email_address": {
@@ -43,12 +42,12 @@ class ImapImagePlugin(ImagePlugin):
                 },
                 "email_password": {
                     "type": "password",
-                    "description": "Email password or app-specific password (for Gmail, use App Password)",
+                    "description": "Email password or app-specific password (for Gmail, use App Password)",  # noqa: E501
                     "default": "",
                     "ui": {
                         "component": "password",
                         "placeholder": "Enter password or App Password",
-                        "help_text": "For Gmail, use an App Password instead of your regular password",
+                        "help_text": "For Gmail, use an App Password instead of your regular password",  # noqa: E501
                         "validation": {
                             "required": True,
                         },
@@ -56,7 +55,7 @@ class ImapImagePlugin(ImagePlugin):
                 },
                 "imap_server": {
                     "type": "string",
-                    "description": "IMAP server address (e.g., imap.gmail.com, imap-mail.outlook.com)",
+                    "description": "IMAP server address (e.g., imap.gmail.com, imap-mail.outlook.com)",  # noqa: E501
                     "default": "imap.gmail.com",
                     "ui": {
                         "component": "input",
@@ -76,7 +75,7 @@ class ImapImagePlugin(ImagePlugin):
                 },
                 "check_interval": {
                     "type": "string",
-                    "description": "How often to check for new emails (seconds, default: 300 = 5 minutes)",
+                    "description": "How often to check for new emails (seconds, default: 300 = 5 minutes)",  # noqa: E501
                     "default": "300",
                     "ui": {
                         "component": "number",
@@ -211,47 +210,50 @@ class ImapImagePlugin(ImagePlugin):
     async def fetch_now(self) -> dict[str, Any]:
         """
         Manually trigger email check and return result.
-        
+
         Returns:
             Dictionary with success status, message, and number of images downloaded
         """
         try:
             # Run IMAP operations in thread pool (imaplib is synchronous)
             images_downloaded = await asyncio.to_thread(self._check_emails_sync)
-            
+
             # Always rescan images to get accurate count
-            print(f"[IMAP] Rescanning images after fetch...")
-            scanned_images = await self.scan_images()
+            print("[IMAP] Rescanning images after fetch...")
+            await self.scan_images()
             image_count = len(self._images)
             print(f"[IMAP] Scan complete. Found {image_count} images in {self.image_dir}")
-            
+
             if images_downloaded:
                 return {
                     "success": True,
-                    "message": f"Successfully checked for new emails. {image_count} images available.",
+                    "message": f"Successfully checked for new emails. {image_count} images available.",  # noqa: E501
                     "images_downloaded": True,
                     "image_count": image_count,
                 }
             else:
                 return {
                     "success": True,
-                    "message": f"No new emails with image attachments found. {image_count} images available.",
+                    "message": f"No new emails with image attachments found. {image_count} images available.",  # noqa: E501
                     "images_downloaded": False,
                     "image_count": image_count,
                 }
         except Exception as e:
             error_msg = str(e)
-            if "authentication failed" in error_msg.lower() or "invalid credentials" in error_msg.lower():
+            if (
+                "authentication failed" in error_msg.lower()
+                or "invalid credentials" in error_msg.lower()
+            ):
                 return {
                     "success": False,
-                    "message": "Authentication failed. Please check your email address and password.",
+                    "message": "Authentication failed. Please check your email address and password.",  # noqa: E501
                     "images_downloaded": False,
                     "image_count": len(self._images),
                 }
             elif "connection refused" in error_msg.lower() or "timeout" in error_msg.lower():
                 return {
                     "success": False,
-                    "message": f"Could not connect to {self.imap_server}. Please check the server address and port.",
+                    "message": f"Could not connect to {self.imap_server}. Please check the server address and port.",  # noqa: E501
                     "images_downloaded": False,
                     "image_count": len(self._images),
                 }
@@ -265,7 +267,7 @@ class ImapImagePlugin(ImagePlugin):
 
     def _check_emails_sync(self) -> bool:
         """Synchronous email checking (runs in thread pool).
-        
+
         Returns:
             True if any images were downloaded, False otherwise
         """
@@ -475,7 +477,7 @@ class ImapImagePlugin(ImagePlugin):
             List of image metadata dictionaries
         """
         images = []
-        
+
         print(f"[IMAP] Scanning images in directory: {self.image_dir}")
         print(f"[IMAP] Directory exists: {self.image_dir.exists()}")
 
@@ -518,6 +520,7 @@ class ImapImagePlugin(ImagePlugin):
             except Exception as e:
                 print(f"[IMAP] Error scanning image {image_path}: {e}")
                 import traceback
+
                 traceback.print_exc()
                 continue
 
@@ -578,11 +581,11 @@ def create_plugin_instance(
     """Create an ImapImagePlugin instance."""
     if type_id != "imap":
         return None
-    
+
     from pathlib import Path
-    
+
     enabled = config.get("enabled", False)  # Default to disabled
-    
+
     # Extract config values
     email_address = config.get("email_address", "")
     email_password = config.get("email_password", "")
@@ -591,42 +594,46 @@ def create_plugin_instance(
     image_dir = config.get("image_dir")
     check_interval = config.get("check_interval", 300)
     mark_as_read = config.get("mark_as_read", True)
-    
+
     # Handle schema objects
     if isinstance(email_address, dict):
         email_address = email_address.get("value") or email_address.get("default") or ""
     email_address = str(email_address) if email_address else ""
-    
+
     if isinstance(email_password, dict):
         email_password = email_password.get("value") or email_password.get("default") or ""
     email_password = str(email_password) if email_password else ""
-    
+
     if isinstance(imap_server, dict):
         imap_server = imap_server.get("value") or imap_server.get("default") or "imap.gmail.com"
     imap_server = str(imap_server) if imap_server else "imap.gmail.com"
-    
+
     if isinstance(imap_port, dict):
         imap_port = imap_port.get("value") or imap_port.get("default") or 993
     try:
         imap_port = int(imap_port) if imap_port else 993
     except (ValueError, TypeError):
         imap_port = 993
-    
+
     if isinstance(image_dir, dict):
         image_dir = image_dir.get("value") or image_dir.get("default")
     image_dir = Path(image_dir) if image_dir else None
-    
+
     if isinstance(check_interval, dict):
         check_interval = check_interval.get("value") or check_interval.get("default") or 300
     try:
         check_interval = int(check_interval) if check_interval else 300
     except (ValueError, TypeError):
         check_interval = 300
-    
+
     if isinstance(mark_as_read, dict):
         mark_as_read = mark_as_read.get("value") or mark_as_read.get("default") or True
-    mark_as_read = str(mark_as_read).lower() in ("true", "1", "yes") if isinstance(mark_as_read, str) else bool(mark_as_read)
-    
+    mark_as_read = (
+        str(mark_as_read).lower() in ("true", "1", "yes")
+        if isinstance(mark_as_read, str)
+        else bool(mark_as_read)
+    )
+
     return ImapImagePlugin(
         plugin_id=plugin_id,
         name=name,
@@ -649,20 +656,20 @@ async def test_plugin_connection(
     """Test IMAP connection."""
     if type_id != "imap":
         return None
-    
+
     import imaplib
-    
+
     email_address = config.get("email_address", "")
     email_password = config.get("email_password", "")
     imap_server = config.get("imap_server", "imap.gmail.com")
     imap_port = int(config.get("imap_port", 993))
-    
+
     if not email_address or not email_password:
         return {
             "success": False,
             "message": "Email address and password are required",
         }
-    
+
     try:
         # Test connection
         mail = imaplib.IMAP4_SSL(imap_server, imap_port)
@@ -670,14 +677,17 @@ async def test_plugin_connection(
         mail.select("INBOX")
         mail.close()
         mail.logout()
-        
+
         return {
             "success": True,
             "message": f"Successfully connected to {imap_server}",
         }
     except imaplib.IMAP4.error as e:
         error_msg = str(e)
-        if "authentication failed" in error_msg.lower() or "invalid credentials" in error_msg.lower():
+        if (
+            "authentication failed" in error_msg.lower()
+            or "invalid credentials" in error_msg.lower()
+        ):
             return {
                 "success": False,
                 "message": "Authentication failed. Please check your email address and password.",
@@ -685,7 +695,7 @@ async def test_plugin_connection(
         elif "connection refused" in error_msg.lower() or "timeout" in error_msg.lower():
             return {
                 "success": False,
-                "message": f"Could not connect to {imap_server}. Please check the server address and port.",
+                "message": f"Could not connect to {imap_server}. Please check the server address and port.",  # noqa: E501
             }
         else:
             return {
@@ -707,37 +717,40 @@ async def fetch_plugin_data(
     """Manually trigger IMAP email check."""
     if type_id != "imap":
         return None
-    
-    from app.plugins.manager import plugin_manager
-    from app.plugins.base import PluginType
-    from app.plugins.protocols import ImagePlugin
+
+    from sqlalchemy import select
+
     from app.database import AsyncSessionLocal
     from app.models.db_models import PluginDB
-    from sqlalchemy import select
-    
+    from app.plugins.base import PluginType
+    from app.plugins.manager import plugin_manager
+    from app.plugins.protocols import ImagePlugin
+
     # Find IMAP plugin instance
     async with AsyncSessionLocal() as session:
-        result = await session.execute(
-            select(PluginDB).where(PluginDB.type_id == "imap")
-        )
+        result = await session.execute(select(PluginDB).where(PluginDB.type_id == "imap"))
         imap_plugins_db = result.scalars().all()
-    
+
     if not imap_plugins_db:
         return {
             "success": False,
-            "message": "IMAP plugin instance not found. Please configure and enable the IMAP plugin first.",
+            "message": "IMAP plugin instance not found. Please configure and enable the IMAP plugin first.",  # noqa: E501
             "images_downloaded": False,
             "image_count": 0,
         }
-    
+
     # Try to find the plugin instance from plugin manager
     imap_plugin = None
     for db_plugin in imap_plugins_db:
         plugin = plugin_manager.get_plugin(db_plugin.id)
-        if plugin and isinstance(plugin, ImagePlugin) and plugin.__class__.__name__ == "ImapImagePlugin":
+        if (
+            plugin
+            and isinstance(plugin, ImagePlugin)
+            and plugin.__class__.__name__ == "ImapImagePlugin"
+        ):
             imap_plugin = plugin
             break
-    
+
     # If not found by ID, try to find by class name
     if not imap_plugin:
         plugins = plugin_manager.get_plugins(PluginType.IMAGE, enabled_only=False)
@@ -745,17 +758,17 @@ async def fetch_plugin_data(
             if plugin.__class__.__name__ == "ImapImagePlugin":
                 imap_plugin = plugin
                 break
-    
+
     if not imap_plugin:
         return {
             "success": False,
-            "message": "IMAP plugin instance found in database but not loaded. Please restart the application.",
+            "message": "IMAP plugin instance found in database but not loaded. Please restart the application.",  # noqa: E501
             "images_downloaded": False,
             "image_count": 0,
         }
-    
+
     # Check if plugin has fetch_now method
-    if hasattr(imap_plugin, 'fetch_now'):
+    if hasattr(imap_plugin, "fetch_now"):
         result = await imap_plugin.fetch_now()
         return result
     else:
@@ -778,35 +791,37 @@ async def handle_plugin_config_update(
     """Handle IMAP plugin configuration update and instance management."""
     if type_id != "imap":
         return None
-    
-    from app.plugins.registry import plugin_registry
-    from app.plugins.manager import plugin_manager
-    from app.models.db_models import PluginDB
-    from sqlalchemy import select
+
     import logging
-    
+
+    from sqlalchemy import select
+
+    from app.models.db_models import PluginDB
+    from app.plugins.manager import plugin_manager
+    from app.plugins.registry import plugin_registry
+
     logger = logging.getLogger(__name__)
-    
+
     # Check if we have required config (email and password)
     email_address = config.get("email_address", "")
     email_password = config.get("email_password", "")
-    
+
     if not email_address or not email_password:
         logger.info("[IMAP] Skipping instance creation - missing email or password")
         return {"instance_created": False, "instance_updated": False}
-    
+
     # Check if IMAP instance exists
-    result = session.execute(
-        select(PluginDB).where(PluginDB.type_id == "imap")
-    )
+    result = session.execute(select(PluginDB).where(PluginDB.type_id == "imap"))
     imap_instance = result.scalar_one_or_none()
-    
+
     if not imap_instance:
         # Create new IMAP instance
         plugin_instance_id = f"imap-{abs(hash(email_address)) % 10000}"
         logger.info(f"[IMAP] Creating new instance: {plugin_instance_id}")
         try:
-            instance_enabled = enabled if enabled is not None else (db_type.enabled if db_type else True)
+            instance_enabled = (
+                enabled if enabled is not None else (db_type.enabled if db_type else True)
+            )
             plugin = await plugin_registry.register_plugin(
                 plugin_id=plugin_instance_id,
                 type_id="imap",
@@ -827,8 +842,12 @@ async def handle_plugin_config_update(
         plugin = plugin_manager.get_plugin(imap_instance.id)
         if plugin:
             await plugin.configure(config)
-            instance_enabled = enabled if enabled is not None else (db_type.enabled if db_type else imap_instance.enabled)
-            
+            instance_enabled = (
+                enabled
+                if enabled is not None
+                else (db_type.enabled if db_type else imap_instance.enabled)
+            )
+
             if instance_enabled:
                 plugin.enable()
                 if not plugin.is_running():
@@ -845,14 +864,14 @@ async def handle_plugin_config_update(
                         await plugin.cleanup()
                     except Exception as e:
                         logger.warning(f"[IMAP] Error stopping plugin: {e}", exc_info=True)
-            
+
             # Update in database
             imap_instance.config = config
             imap_instance.enabled = instance_enabled
             if db_type:
                 db_type.enabled = instance_enabled
             session.commit()
-            
+
             return {
                 "instance_updated": True,
                 "instance_id": imap_instance.id,
@@ -860,4 +879,3 @@ async def handle_plugin_config_update(
         else:
             logger.warning(f"[IMAP] Plugin instance {imap_instance.id} not found in manager")
             return {"instance_updated": False, "error": "Plugin instance not found"}
-

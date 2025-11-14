@@ -66,4 +66,3 @@ class WeatherCache:
 
 # Global weather cache instance (10 minute TTL)
 weather_cache = WeatherCache(ttl_minutes=10)
-

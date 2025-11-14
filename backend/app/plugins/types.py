@@ -98,7 +98,10 @@ class PluginTypeRegistry:
                     },
                     "thumbnail_dir": {
                         "type": "string",
-                        "description": "Thumbnail directory path (optional, defaults to image_dir/thumbnails)",
+                        "description": (
+                            "Thumbnail directory path "
+                            "(optional, defaults to image_dir/thumbnails)"
+                        ),
                         "default": "",
                     },
                 },
@@ -148,4 +151,3 @@ class PluginTypeRegistry:
 
 # Global plugin type registry
 plugin_type_registry = PluginTypeRegistry()
-

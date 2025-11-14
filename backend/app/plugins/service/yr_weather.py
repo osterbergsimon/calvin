@@ -19,7 +19,7 @@ class YrWeatherServicePlugin(ServicePlugin):
             "type_id": "yr_weather",
             "plugin_type": PluginType.SERVICE,
             "name": "Yr.no Weather",
-            "description": "Display current weather conditions and forecast from Yr.no (Norwegian Meteorological Institute)",
+            "description": "Display current weather conditions and forecast from Yr.no (Norwegian Meteorological Institute)",  # noqa: E501
             "version": "1.0.0",
             "common_config_schema": {
                 "location": {
@@ -29,7 +29,7 @@ class YrWeatherServicePlugin(ServicePlugin):
                     "ui": {
                         "component": "input",
                         "placeholder": "Oslo, Norway or London, UK",
-                        "help_text": "Enter a city name or address to automatically get coordinates. Or enter coordinates manually below.",
+                        "help_text": "Enter a city name or address to automatically get coordinates. Or enter coordinates manually below.",  # noqa: E501
                     },
                 },
                 "latitude": {
@@ -39,7 +39,7 @@ class YrWeatherServicePlugin(ServicePlugin):
                     "ui": {
                         "component": "number",
                         "placeholder": "59.9139",
-                        "help_text": "Latitude in decimal degrees. Will be auto-filled when using location search above.",
+                        "help_text": "Latitude in decimal degrees. Will be auto-filled when using location search above.",  # noqa: E501
                         "validation": {
                             "required": True,
                             "min": -90,
@@ -54,7 +54,7 @@ class YrWeatherServicePlugin(ServicePlugin):
                     "ui": {
                         "component": "number",
                         "placeholder": "10.7522",
-                        "help_text": "Longitude in decimal degrees. Will be auto-filled when using location search above.",
+                        "help_text": "Longitude in decimal degrees. Will be auto-filled when using location search above.",  # noqa: E501
                         "validation": {
                             "required": True,
                             "min": -180,
@@ -82,7 +82,7 @@ class YrWeatherServicePlugin(ServicePlugin):
                     "ui": {
                         "component": "number",
                         "placeholder": "5",
-                        "help_text": "Number of days to show in forecast (1-9 days, Yr.no provides up to 9 days)",
+                        "help_text": "Number of days to show in forecast (1-9 days, Yr.no provides up to 9 days)",  # noqa: E501
                         "validation": {
                             "min": 1,
                             "max": 9,
@@ -221,7 +221,7 @@ class YrWeatherServicePlugin(ServicePlugin):
             Dictionary with content information
         """
         weather_api_url = f"/api/web-services/{self.plugin_id}/weather"
-        
+
         return {
             "type": "weather",
             "url": weather_api_url,
@@ -234,7 +234,7 @@ class YrWeatherServicePlugin(ServicePlugin):
                 "allowFullscreen": True,
             },
         }
-    
+
     def get_config(self) -> dict[str, Any]:
         """
         Get plugin configuration.
@@ -256,13 +256,13 @@ class YrWeatherServicePlugin(ServicePlugin):
     def _map_symbol_code_to_icon(self, symbol_code: str) -> str:
         """
         Map Yr.no symbol codes to OpenWeatherMap icon format.
-        
+
         Yr.no uses symbol codes like 'clearsky_day', 'partlycloudy_night', etc.
         We map these to OpenWeatherMap icon IDs for compatibility with WeatherWidget.
-        
+
         Args:
             symbol_code: Yr.no symbol code
-            
+
         Returns:
             OpenWeatherMap icon ID (e.g., '01d', '02n')
         """
@@ -317,14 +317,16 @@ class YrWeatherServicePlugin(ServicePlugin):
             "heavyrainshowersandthunder_polartwilight": "11d",
             "heavyrainshowersandthunder_night": "11n",
         }
-        
+
         return symbol_mapping.get(symbol_code, "01d")  # Default to clear sky day
 
     def _get_description_from_symbol(self, symbol_code: str) -> str:
         """Convert symbol code to human-readable description."""
         # Remove time of day suffixes
-        base_code = symbol_code.replace("_day", "").replace("_night", "").replace("_polartwilight", "")
-        
+        base_code = (
+            symbol_code.replace("_day", "").replace("_night", "").replace("_polartwilight", "")
+        )
+
         descriptions = {
             "clearsky": "clear sky",
             "fair": "fair",
@@ -345,7 +347,7 @@ class YrWeatherServicePlugin(ServicePlugin):
             "thunder": "thunder",
             "heavyrainshowersandthunder": "heavy rain showers and thunder",
         }
-        
+
         return descriptions.get(base_code, "unknown")
 
     async def fetch_service_data(
@@ -355,16 +357,16 @@ class YrWeatherServicePlugin(ServicePlugin):
     ) -> dict[str, Any]:
         """
         Fetch weather data from Yr.no API (protocol-defined method).
-        
+
         Args:
             start_date: Not used for weather (kept for protocol compatibility)
             end_date: Not used for weather (kept for protocol compatibility)
-        
+
         Returns:
             Dictionary with weather data in format compatible with WeatherWidget
         """
         return await self._fetch_weather()
-    
+
     async def _fetch_weather(self) -> dict[str, Any]:
         """
         Fetch weather data from Yr.no API.
@@ -392,7 +394,7 @@ class YrWeatherServicePlugin(ServicePlugin):
             # Parse Yr.no response format
             # Structure: { "properties": { "timeseries": [...] } }
             timeseries = data.get("properties", {}).get("timeseries", [])
-            
+
             if not timeseries:
                 return {
                     "error": "No weather data available",
@@ -405,11 +407,17 @@ class YrWeatherServicePlugin(ServicePlugin):
             next_6h = current_entry.get("data", {}).get("next_6_hours", {})
 
             # Extract current weather
-            symbol_code = next_1h.get("summary", {}).get("symbol_code") or next_6h.get("summary", {}).get("symbol_code") or "clearsky_day"
-            
+            symbol_code = (
+                next_1h.get("summary", {}).get("symbol_code")
+                or next_6h.get("summary", {}).get("symbol_code")
+                or "clearsky_day"
+            )
+
             current = {
                 "temperature": instant.get("air_temperature", 0),
-                "feels_like": instant.get("air_temperature", 0),  # Yr.no doesn't provide feels_like, use air temp
+                "feels_like": instant.get(
+                    "air_temperature", 0
+                ),  # Yr.no doesn't provide feels_like, use air temp
                 "humidity": instant.get("relative_humidity", 0),
                 "pressure": instant.get("air_pressure_at_sea_level", 0) / 100,  # Convert Pa to hPa
                 "description": self._get_description_from_symbol(symbol_code),
@@ -419,68 +427,76 @@ class YrWeatherServicePlugin(ServicePlugin):
             }
 
             # Process forecast - group by day
-            from datetime import datetime, timedelta
             from collections import defaultdict
-            
+            from datetime import datetime, timedelta
+
             forecast_by_date = defaultdict(lambda: {"temps": [], "symbols": [], "descriptions": []})
-            
+
             # Process timeseries to group by day
             today = datetime.now().date()
             for entry in timeseries:
                 time_str = entry.get("time", "")
                 if not time_str:
                     continue
-                
+
                 # Parse ISO 8601 timestamp
                 entry_time = datetime.fromisoformat(time_str.replace("Z", "+00:00"))
                 entry_date = entry_time.date()
-                
+
                 # Only include future dates up to forecast_days
                 days_ahead = (entry_date - today).days
                 if days_ahead < 1 or days_ahead > self.forecast_days:
                     continue
-                
+
                 # Get temperature and symbol from available time periods
                 instant_data = entry.get("data", {}).get("instant", {}).get("details", {})
                 temp = instant_data.get("air_temperature")
-                
+
                 # Try to get symbol from next_1_hours, next_6_hours, or next_12_hours
                 next_1h = entry.get("data", {}).get("next_1_hours", {})
                 next_6h = entry.get("data", {}).get("next_6_hours", {})
                 next_12h = entry.get("data", {}).get("next_12_hours", {})
-                
+
                 symbol_code = (
-                    next_1h.get("summary", {}).get("symbol_code") or
-                    next_6h.get("summary", {}).get("symbol_code") or
-                    next_12h.get("summary", {}).get("symbol_code") or
-                    "clearsky_day"
+                    next_1h.get("summary", {}).get("symbol_code")
+                    or next_6h.get("summary", {}).get("symbol_code")
+                    or next_12h.get("summary", {}).get("symbol_code")
+                    or "clearsky_day"
                 )
-                
+
                 if temp is not None:
                     date_str = entry_date.isoformat()
                     forecast_by_date[date_str]["temps"].append(temp)
                     forecast_by_date[date_str]["symbols"].append(symbol_code)
-                    forecast_by_date[date_str]["descriptions"].append(self._get_description_from_symbol(symbol_code))
+                    forecast_by_date[date_str]["descriptions"].append(
+                        self._get_description_from_symbol(symbol_code)
+                    )
 
             # Build forecast list
             forecast = []
             for i in range(1, self.forecast_days + 1):
                 forecast_date = today + timedelta(days=i)
                 date_str = forecast_date.isoformat()
-                
+
                 if date_str in forecast_by_date:
                     day_data = forecast_by_date[date_str]
                     if day_data["temps"]:
-                        forecast.append({
-                            "date": date_str,
-                            "temperature": sum(day_data["temps"]) / len(day_data["temps"]),
-                            "temp_min": min(day_data["temps"]),
-                            "temp_max": max(day_data["temps"]),
-                            "description": day_data["descriptions"][0] if day_data["descriptions"] else "unknown",
-                            "icon": self._map_symbol_code_to_icon(day_data["symbols"][0]) if day_data["symbols"] else "01d",
-                        })
+                        forecast.append(
+                            {
+                                "date": date_str,
+                                "temperature": sum(day_data["temps"]) / len(day_data["temps"]),
+                                "temp_min": min(day_data["temps"]),
+                                "temp_max": max(day_data["temps"]),
+                                "description": day_data["descriptions"][0]
+                                if day_data["descriptions"]
+                                else "unknown",
+                                "icon": self._map_symbol_code_to_icon(day_data["symbols"][0])
+                                if day_data["symbols"]
+                                else "01d",
+                            }
+                        )
 
-            # Create location string - use stored location name if available, otherwise show coordinates
+            # Create location string - use stored location name if available, otherwise show coordinates  # noqa: E501
             if self.location:
                 location_name = self.location
             else:
@@ -497,7 +513,7 @@ class YrWeatherServicePlugin(ServicePlugin):
             print(f"[Yr.no Weather] HTTP error fetching weather: {e.response.status_code} - {e}")
             return {
                 "error": f"HTTP error: {e.response.status_code}",
-                "message": e.response.text if hasattr(e.response, 'text') else str(e),
+                "message": e.response.text if hasattr(e.response, "text") else str(e),
             }
         except httpx.HTTPError as e:
             print(f"[Yr.no Weather] Error fetching weather: {e}")
@@ -507,6 +523,7 @@ class YrWeatherServicePlugin(ServicePlugin):
         except Exception as e:
             print(f"[Yr.no Weather] Unexpected error fetching weather: {e}")
             import traceback
+
             traceback.print_exc()
             return {
                 "error": str(e),
@@ -571,9 +588,13 @@ class YrWeatherServicePlugin(ServicePlugin):
         if "forecast_days" in config:
             forecast_days_value = config["forecast_days"]
             if isinstance(forecast_days_value, dict):
-                forecast_days_value = forecast_days_value.get("value") or forecast_days_value.get("default") or 5
+                forecast_days_value = (
+                    forecast_days_value.get("value") or forecast_days_value.get("default") or 5
+                )
             try:
-                self.forecast_days = min(max(int(forecast_days_value), 1), 9) if forecast_days_value else 5
+                self.forecast_days = (
+                    min(max(int(forecast_days_value), 1), 9) if forecast_days_value else 5
+                )
             except (ValueError, TypeError):
                 self.forecast_days = 5
         if "location" in config:
@@ -670,40 +691,40 @@ async def test_plugin_connection(
     """Test Yr.no weather API connection."""
     if type_id != "yr_weather":
         return None
-    
+
     latitude = config.get("latitude")
     longitude = config.get("longitude")
-    
+
     # Handle schema objects
     if isinstance(latitude, dict):
         latitude = latitude.get("value") or latitude.get("default")
     if isinstance(longitude, dict):
         longitude = longitude.get("value") or longitude.get("default")
-    
+
     try:
         latitude = float(latitude) if latitude else None
         longitude = float(longitude) if longitude else None
     except (ValueError, TypeError):
         latitude = None
         longitude = None
-    
+
     if latitude is None or longitude is None:
         return {
             "success": False,
             "message": "Latitude and longitude are required. Use 'Get Coordinates' to find them.",
         }
-    
+
     # Validate coordinates
     if not (-90 <= latitude <= 90) or not (-180 <= longitude <= 180):
         return {
             "success": False,
-            "message": "Invalid coordinates. Latitude must be between -90 and 90, longitude between -180 and 180.",
+            "message": "Invalid coordinates. Latitude must be between -90 and 90, longitude between -180 and 180.",  # noqa: E501
         }
-    
+
     # Round to 4 decimals as per Yr.no API requirements
     latitude = round(latitude, 4)
     longitude = round(longitude, 4)
-    
+
     try:
         headers = {
             "User-Agent": "Calvin-Dashboard/1.0 (https://github.com/osterbergsimon/calvin)",
@@ -712,20 +733,20 @@ async def test_plugin_connection(
             "lat": latitude,
             "lon": longitude,
         }
-        
+
         async with httpx.AsyncClient(timeout=10.0) as client:
             response = await client.get(
                 "https://api.met.no/weatherapi/locationforecast/2.0/compact",
                 params=params,
                 headers=headers,
             )
-            
+
             if response.status_code == 200:
                 data = response.json()
                 if data.get("properties") and data.get("properties", {}).get("timeseries"):
                     return {
                         "success": True,
-                        "message": f"Successfully connected to Yr.no API. Weather data available for coordinates ({latitude}, {longitude}).",
+                        "message": f"Successfully connected to Yr.no API. Weather data available for coordinates ({latitude}, {longitude}).",  # noqa: E501
                     }
                 else:
                     return {
@@ -735,12 +756,12 @@ async def test_plugin_connection(
             elif response.status_code == 422:
                 return {
                     "success": False,
-                    "message": f"Location ({latitude}, {longitude}) is not covered by Yr.no weather service. Please try different coordinates.",
+                    "message": f"Location ({latitude}, {longitude}) is not covered by Yr.no weather service. Please try different coordinates.",  # noqa: E501
                 }
             else:
                 return {
                     "success": False,
-                    "message": f"Yr.no API returned status {response.status_code}. Please check your coordinates.",
+                    "message": f"Yr.no API returned status {response.status_code}. Please check your coordinates.",  # noqa: E501
                 }
     except httpx.TimeoutException:
         return {
@@ -775,22 +796,24 @@ async def handle_plugin_config_update(
     """Handle YrWeather plugin configuration update and instance management."""
     if type_id != "yr_weather":
         return None
-    
-    from app.plugins.registry import plugin_registry
-    from app.plugins.manager import plugin_manager
-    from app.models.db_models import PluginDB
-    from sqlalchemy import select
+
     import logging
-    
+
+    from sqlalchemy import select
+
+    from app.models.db_models import PluginDB
+    from app.plugins.manager import plugin_manager
+    from app.plugins.registry import plugin_registry
+
     logger = logging.getLogger(__name__)
-    
+
     # Check if we have required config (latitude and longitude)
     latitude = config.get("latitude", "")
     longitude = config.get("longitude", "")
     location = config.get("location", "")
     altitude = config.get("altitude", "0")
     forecast_days = config.get("forecast_days", "5")
-    
+
     # Convert to proper types
     try:
         latitude = float(latitude) if latitude else None
@@ -808,22 +831,20 @@ async def handle_plugin_config_update(
         forecast_days = min(max(int(forecast_days), 1), 9) if forecast_days else 5
     except (ValueError, TypeError):
         forecast_days = 5
-    
+
     if latitude is None or longitude is None:
         logger.info("[YrWeather] Skipping instance creation - missing coordinates")
         return {"instance_created": False, "instance_updated": False}
-    
+
     # Validate coordinates
     if not (-90 <= latitude <= 90 and -180 <= longitude <= 180):
         logger.info("[YrWeather] Skipping instance creation - invalid coordinates")
         return {"instance_created": False, "instance_updated": False}
-    
+
     # Check if YrWeather instance exists
-    result = session.execute(
-        select(PluginDB).where(PluginDB.type_id == "yr_weather")
-    )
+    result = session.execute(select(PluginDB).where(PluginDB.type_id == "yr_weather"))
     yr_weather_instance = result.scalar_one_or_none()
-    
+
     instance_config = {
         "latitude": latitude,
         "longitude": longitude,
@@ -833,13 +854,15 @@ async def handle_plugin_config_update(
         "display_order": 0,
         "fullscreen": False,
     }
-    
+
     if not yr_weather_instance:
         # Create new YrWeather instance
         plugin_instance_id = f"yr_weather-{abs(hash(f'{latitude},{longitude}')) % 10000}"
         logger.info(f"[YrWeather] Creating new instance: {plugin_instance_id}")
         try:
-            instance_enabled = enabled if enabled is not None else (db_type.enabled if db_type else False)
+            instance_enabled = (
+                enabled if enabled is not None else (db_type.enabled if db_type else False)
+            )
             plugin = await plugin_registry.register_plugin(
                 plugin_id=plugin_instance_id,
                 type_id="yr_weather",
@@ -860,8 +883,12 @@ async def handle_plugin_config_update(
         plugin = plugin_manager.get_plugin(yr_weather_instance.id)
         if plugin:
             await plugin.configure(instance_config)
-            instance_enabled = enabled if enabled is not None else (db_type.enabled if db_type else yr_weather_instance.enabled)
-            
+            instance_enabled = (
+                enabled
+                if enabled is not None
+                else (db_type.enabled if db_type else yr_weather_instance.enabled)
+            )
+
             if instance_enabled:
                 plugin.enable()
                 if not plugin.is_running():
@@ -878,19 +905,20 @@ async def handle_plugin_config_update(
                         await plugin.cleanup()
                     except Exception as e:
                         logger.warning(f"[YrWeather] Error stopping plugin: {e}", exc_info=True)
-            
+
             # Update in database
             yr_weather_instance.config = instance_config
             yr_weather_instance.enabled = instance_enabled
             if db_type:
                 db_type.enabled = instance_enabled
             session.commit()
-            
+
             return {
                 "instance_updated": True,
                 "instance_id": yr_weather_instance.id,
             }
         else:
-            logger.warning(f"[YrWeather] Plugin instance {yr_weather_instance.id} not found in manager")
+            logger.warning(
+                f"[YrWeather] Plugin instance {yr_weather_instance.id} not found in manager"
+            )
             return {"instance_updated": False, "error": "Plugin instance not found"}
-

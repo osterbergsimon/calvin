@@ -6,7 +6,7 @@ from typing import Any
 import httpx
 
 from app.plugins.base import PluginType
-from app.plugins.hooks import hookimpl, plugin_manager
+from app.plugins.hooks import hookimpl
 from app.plugins.protocols import ImagePlugin
 
 
@@ -185,7 +185,9 @@ class PicsumImagePlugin(ImagePlugin):
                     "photographer": author,
                     "photographer_url": author_url,
                     "picsum_id": photo["id"],
-                    "created_at": photo.get("download_url", ""),  # Picsum doesn't provide created_at
+                    "created_at": photo.get(
+                        "download_url", ""
+                    ),  # Picsum doesn't provide created_at
                 }
                 images.append(image_metadata)
 
@@ -204,6 +206,7 @@ class PicsumImagePlugin(ImagePlugin):
         except Exception as e:
             print(f"Unexpected error in Picsum plugin: {e}")
             import traceback
+
             traceback.print_exc()
             return self._images.copy()
 
@@ -261,12 +264,12 @@ def create_plugin_instance(
     """Create a PicsumImagePlugin instance."""
     if type_id != "picsum":
         return None
-    
+
     enabled = config.get("enabled", False)  # Default to disabled
-    
+
     # Extract config values
     count = config.get("count", 30)
-    
+
     # Handle schema objects
     if isinstance(count, dict):
         count = count.get("value") or count.get("default") or 30
@@ -274,11 +277,10 @@ def create_plugin_instance(
         count = int(count) if count else 30
     except (ValueError, TypeError):
         count = 30
-    
+
     return PicsumImagePlugin(
         plugin_id=plugin_id,
         name=name,
         count=count,
         enabled=enabled,
     )
-

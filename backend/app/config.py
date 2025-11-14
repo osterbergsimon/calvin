@@ -26,7 +26,7 @@ class Settings(BaseSettings):
     # Image Storage
     image_dir: Path = Path("./data/images")
     image_cache_dir: Path = Path("./data/cache/images")
-    
+
     # Plugin Storage
     plugins_dir: Path = Path("./data/plugins")
 
@@ -52,10 +52,11 @@ class Settings(BaseSettings):
         # Extract database path and ensure directory exists
         # Handle both absolute paths (sqlite:///path) and relative paths (sqlite:///./path)
         db_path_str = self.database_url.replace("sqlite:///", "")
-        # If path starts with /, it's absolute; otherwise resolve relative to current working directory
+        # If path starts with /, it's absolute;
+        # otherwise resolve relative to current working directory
         db_path = Path(db_path_str) if db_path_str.startswith("/") else Path(db_path_str).resolve()
         db_path.parent.mkdir(parents=True, exist_ok=True)
-        
+
         # Migrate database from old incorrect location if it exists
         # Check for common incorrect paths (double path issue)
         if not db_path.exists():
@@ -73,6 +74,7 @@ class Settings(BaseSettings):
                         db_path.parent.mkdir(parents=True, exist_ok=True)
                         # Copy database file
                         import shutil
+
                         shutil.copy2(wrong_path, db_path)
                         print(f"Database migrated successfully to {db_path}")
                         # Optionally remove old file (commented out for safety)

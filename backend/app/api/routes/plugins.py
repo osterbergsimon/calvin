@@ -3,7 +3,7 @@
 from pathlib import Path
 from typing import Any
 
-from fastapi import APIRouter, HTTPException, Body, UploadFile, File
+from fastapi import APIRouter, Body, File, HTTPException, UploadFile
 from sqlalchemy import select
 
 from app.database import AsyncSessionLocal
@@ -105,8 +105,6 @@ async def get_plugins(plugin_type: str | None = None):
         result = await session.execute(select(PluginTypeDB))
         db_types = {db_type.type_id: db_type for db_type in result.scalars().all()}
 
-    from app.services.config_service import config_service
-
     # Convert to response format
     result = []
     for type_info in plugin_types:
@@ -152,25 +150,21 @@ async def start_plugin_instance(instance_id: str):
         Success status and message
     """
     from app.plugins.manager import plugin_manager
-    from app.plugins.registry import plugin_registry
 
     # Check if instance exists in database first
     async with AsyncSessionLocal() as session:
-        result = await session.execute(
-            select(PluginDB).where(PluginDB.id == instance_id)
-        )
+        result = await session.execute(select(PluginDB).where(PluginDB.id == instance_id))
         db_plugin = result.scalar_one_or_none()
 
         if not db_plugin:
             raise HTTPException(
-                status_code=404,
-                detail=f"Plugin instance {instance_id} not found in database"
+                status_code=404, detail=f"Plugin instance {instance_id} not found in database"
             )
 
         if not db_plugin.enabled:
             raise HTTPException(
                 status_code=400,
-                detail=f"Cannot start disabled plugin {instance_id}. Enable it first."
+                detail=f"Cannot start disabled plugin {instance_id}. Enable it first.",
             )
 
     # Try to get plugin from manager
@@ -192,14 +186,17 @@ async def start_plugin_instance(instance_id: str):
         else:
             raise HTTPException(
                 status_code=500,
-                detail=f"Failed to create plugin instance {instance_id}. Plugin type {db_plugin.type_id} may not be available."
+                detail=(
+                    f"Failed to create plugin instance {instance_id}. "
+                    f"Plugin type {db_plugin.type_id} may not be available."
+                ),
             )
 
     if plugin.is_running():
         return {
             "success": True,
             "message": f"Plugin {instance_id} is already running",
-            "running": True
+            "running": True,
         }
 
     success = await plugin_manager.start_plugin(instance_id)
@@ -207,13 +204,10 @@ async def start_plugin_instance(instance_id: str):
         return {
             "success": True,
             "message": f"Plugin {instance_id} started successfully",
-            "running": plugin.is_running()
+            "running": plugin.is_running(),
         }
     else:
-        raise HTTPException(
-            status_code=500,
-            detail=f"Failed to start plugin {instance_id}"
-        )
+        raise HTTPException(status_code=500, detail=f"Failed to start plugin {instance_id}")
 
 
 @router.post("/plugins/instances/{instance_id}/stop")
@@ -231,15 +225,12 @@ async def stop_plugin_instance(instance_id: str):
 
     # Check if instance exists in database first
     async with AsyncSessionLocal() as session:
-        result = await session.execute(
-            select(PluginDB).where(PluginDB.id == instance_id)
-        )
+        result = await session.execute(select(PluginDB).where(PluginDB.id == instance_id))
         db_plugin = result.scalar_one_or_none()
 
         if not db_plugin:
             raise HTTPException(
-                status_code=404,
-                detail=f"Plugin instance {instance_id} not found in database"
+                status_code=404, detail=f"Plugin instance {instance_id} not found in database"
             )
 
     # Try to get plugin from manager
@@ -250,14 +241,14 @@ async def stop_plugin_instance(instance_id: str):
         return {
             "success": True,
             "message": f"Plugin {instance_id} is already stopped (not loaded)",
-            "running": False
+            "running": False,
         }
 
     if not plugin.is_running():
         return {
             "success": True,
             "message": f"Plugin {instance_id} is already stopped",
-            "running": False
+            "running": False,
         }
 
     success = await plugin_manager.stop_plugin(instance_id)
@@ -265,13 +256,10 @@ async def stop_plugin_instance(instance_id: str):
         return {
             "success": True,
             "message": f"Plugin {instance_id} stopped successfully",
-            "running": False
+            "running": False,
         }
     else:
-        raise HTTPException(
-            status_code=500,
-            detail=f"Failed to stop plugin {instance_id}"
-        )
+        raise HTTPException(status_code=500, detail=f"Failed to stop plugin {instance_id}")
 
 
 @router.get("/plugins/{plugin_id}")
@@ -296,7 +284,9 @@ async def get_plugin(plugin_id: str):
     plugin_info: dict[str, Any] = {
         "id": type_info.get("type_id"),
         "name": type_info.get("name", ""),
-        "type": type_info.get("plugin_type").value if hasattr(type_info.get("plugin_type"), "value") else str(type_info.get("plugin_type")),
+        "type": type_info.get("plugin_type").value
+        if hasattr(type_info.get("plugin_type"), "value")
+        else str(type_info.get("plugin_type")),
         "description": type_info.get("description", ""),
         "config_schema": type_info.get("common_config_schema", {}),
         "enabled": enabled,
@@ -324,9 +314,7 @@ async def get_plugin_instances(plugin_id: str):
 
     # Get instances from database
     async with AsyncSessionLocal() as session:
-        result = await session.execute(
-            select(PluginDB).where(PluginDB.type_id == plugin_id)
-        )
+        result = await session.execute(select(PluginDB).where(PluginDB.type_id == plugin_id))
         db_plugins = result.scalars().all()
 
     instances = []
@@ -335,13 +323,15 @@ async def get_plugin_instances(plugin_id: str):
         plugin = plugin_manager.get_plugin(db_plugin.id)
         running = plugin.is_running() if plugin else False
 
-        instances.append({
-            "id": db_plugin.id,
-            "name": db_plugin.name,
-            "enabled": db_plugin.enabled,
-            "running": running,
-            "config": mask_sensitive_config(db_plugin.config or {}, mask_for_frontend=True),
-        })
+        instances.append(
+            {
+                "id": db_plugin.id,
+                "name": db_plugin.name,
+                "enabled": db_plugin.enabled,
+                "running": running,
+                "config": mask_sensitive_config(db_plugin.config or {}, mask_for_frontend=True),
+            }
+        )
 
     return {"instances": instances, "total": len(instances)}
 
@@ -369,8 +359,9 @@ async def update_plugin(plugin_id: str, config: dict[str, Any]):
     print(f"[Plugin Update] Found plugin type: {type_info.get('name')}")
 
     # Store common configuration in database
-    from app.plugins.manager import plugin_manager
     from pathlib import Path
+
+    from app.plugins.manager import plugin_manager
 
     # Handle enabled status separately
     enabled = None
@@ -385,14 +376,27 @@ async def update_plugin(plugin_id: str, config: dict[str, Any]):
 
     # Clean config values - ensure all values are strings, not objects
     cleaned_config = {}
-    print(f"[Plugin Update] Cleaning config values...")
+    print("[Plugin Update] Cleaning config values...")
     for key, value in config.items():
         # Mask sensitive values in logs
-        if key.lower() in SENSITIVE_FIELDS or any(field in key.lower() for field in SENSITIVE_FIELDS):
-            masked_value = f"{str(value)[0]}***{str(value)[-1]}" if len(str(value)) > 2 else "***" if value else ""
-            print(f"[Plugin Update] Processing config key '{key}': type={type(value)}, value={masked_value}")
+        if key.lower() in SENSITIVE_FIELDS or any(
+            field in key.lower() for field in SENSITIVE_FIELDS
+        ):
+            masked_value = (
+                f"{str(value)[0]}***{str(value)[-1]}"
+                if len(str(value)) > 2
+                else "***"
+                if value
+                else ""
+            )
+            print(
+                f"[Plugin Update] Processing config key '{key}': "
+                f"type={type(value)}, value={masked_value}"
+            )
         else:
-            print(f"[Plugin Update] Processing config key '{key}': type={type(value)}, value={value}")
+            print(
+                f"[Plugin Update] Processing config key '{key}': type={type(value)}, value={value}"
+            )
         if isinstance(value, dict):
             # If it's a schema object, extract the actual value or default
             cleaned_value = value.get("value") or value.get("default") or ""
@@ -404,15 +408,29 @@ async def update_plugin(plugin_id: str, config: dict[str, Any]):
             print(f"[Plugin Update] Converted Path to string: {cleaned_config[key]}")
         elif value is None:
             cleaned_config[key] = ""
-            print(f"[Plugin Update] Set to empty string (was None)")
+            print("[Plugin Update] Set to empty string (was None)")
         else:
             cleaned_config[key] = str(value)
         # Mask sensitive values in logs
-        if key.lower() in SENSITIVE_FIELDS or any(field in key.lower() for field in SENSITIVE_FIELDS):
-            masked_value = f"{str(cleaned_config[key])[0]}***{str(cleaned_config[key])[-1]}" if len(str(cleaned_config[key])) > 2 else "***" if cleaned_config[key] else ""
-            print(f"[Plugin Update] Final value for '{key}': {masked_value} (type: {type(cleaned_config[key])})")
+        if key.lower() in SENSITIVE_FIELDS or any(
+            field in key.lower() for field in SENSITIVE_FIELDS
+        ):
+            masked_value = (
+                f"{str(cleaned_config[key])[0]}***{str(cleaned_config[key])[-1]}"
+                if len(str(cleaned_config[key])) > 2
+                else "***"
+                if cleaned_config[key]
+                else ""
+            )
+            print(
+                f"[Plugin Update] Final value for '{key}': {masked_value} "
+                f"(type: {type(cleaned_config[key])})"
+            )
         else:
-            print(f"[Plugin Update] Final value for '{key}': {cleaned_config[key]} (type: {type(cleaned_config[key])})")
+            print(
+                f"[Plugin Update] Final value for '{key}': {cleaned_config[key]} "
+                f"(type: {type(cleaned_config[key])})"
+            )
 
     config = cleaned_config
     masked_cleaned_config = mask_sensitive_config(config)
@@ -430,7 +448,9 @@ async def update_plugin(plugin_id: str, config: dict[str, Any]):
             plugin_type = type_info.get("plugin_type")
             db_type = PluginTypeDB(
                 type_id=plugin_id,
-                plugin_type=plugin_type.value if hasattr(plugin_type, "value") else str(plugin_type),
+                plugin_type=plugin_type.value
+                if hasattr(plugin_type, "value")
+                else str(plugin_type),
                 name=type_info.get("name", ""),
                 description=type_info.get("description", ""),
                 version=type_info.get("version"),
@@ -459,9 +479,7 @@ async def update_plugin(plugin_id: str, config: dict[str, Any]):
             await session.commit()
 
             # Find all instances of this plugin type and sync them
-            result = await session.execute(
-                select(PluginDB).where(PluginDB.type_id == plugin_id)
-            )
+            result = await session.execute(select(PluginDB).where(PluginDB.type_id == plugin_id))
             instances = result.scalars().all()
 
             for instance in instances:
@@ -478,10 +496,10 @@ async def update_plugin(plugin_id: str, config: dict[str, Any]):
                                 plugin.start()
                             except Exception as e:
                                 import logging
+
                                 logger = logging.getLogger(__name__)
                                 logger.error(
-                                    f"Error starting plugin {instance.id}: {e}",
-                                    exc_info=True
+                                    f"Error starting plugin {instance.id}: {e}", exc_info=True
                                 )
                     else:
                         plugin.disable()
@@ -492,21 +510,26 @@ async def update_plugin(plugin_id: str, config: dict[str, Any]):
                                 await plugin.cleanup()
                             except Exception as e:
                                 import logging
+
                                 logger = logging.getLogger(__name__)
                                 logger.warning(
-                                    f"Error stopping plugin {instance.id}: {e}",
-                                    exc_info=True
+                                    f"Error stopping plugin {instance.id}: {e}", exc_info=True
                                 )
 
             if instances:
                 await session.commit()
-                print(f"[Plugin Update] Synced plugin type and {len(instances)} instance(s) enabled state to {enabled} for {plugin_id}")
+                print(
+                    f"[Plugin Update] Synced plugin type and {len(instances)} "
+                    f"instance(s) enabled state to {enabled} for {plugin_id}"
+                )
 
         # Save common config to config service for backward compatibility
         if config:
             from app.services.config_service import config_service
+
             config_key = f"plugin_{plugin_id}_config"
             import json
+
             # Ensure all values in config are JSON-serializable (strings, not Path objects)
             serializable_config = {}
             for key, value in config.items():
@@ -527,8 +550,9 @@ async def update_plugin(plugin_id: str, config: dict[str, Any]):
         # Call plugin-specific config update handlers (if any)
         # This allows plugins to handle their own instance creation/update logic
         # Plugins are self-contained and should implement handle_plugin_config_update hook
-        from app.plugins.hooks import plugin_manager as hook_manager
         import asyncio
+
+        from app.plugins.hooks import plugin_manager as hook_manager
 
         # Pluggy returns a list of coroutines for async hooks, we need to await them
         update_coroutines = hook_manager.hook.handle_plugin_config_update(
@@ -555,7 +579,10 @@ async def update_plugin(plugin_id: str, config: dict[str, Any]):
 
         if not handled and cleaned_config:
             # If no plugin handled it and we have config, log a warning
-            print(f"[Plugin Update] No plugin handler found for {plugin_id}, config saved but no instance management performed")
+            print(
+                f"[Plugin Update] No plugin handler found for {plugin_id}, "
+                f"config saved but no instance management performed"
+            )
 
     return {"message": "Plugin type configuration updated", "plugin_id": plugin_id}
 
@@ -574,21 +601,24 @@ async def get_plugin_config(plugin_id: str):
 
     # Load actual config values from config service (not schema)
     from app.services.config_service import config_service
+
     config_key = f"plugin_{plugin_id}_config"
     config_json = await config_service.get_value(config_key)
 
     # Mask sensitive fields in raw config before logging
     if config_json:
         import json
+
         try:
             temp_config = json.loads(config_json)
             masked_temp = mask_sensitive_config(temp_config)
             print(f"[Plugin Config] Raw config from service: {json.dumps(masked_temp)}")
-        except:
+        except Exception:
             pass
 
     if config_json:
         import json
+
         try:
             config = json.loads(config_json)
             masked_parsed = mask_sensitive_config(config)
@@ -624,8 +654,9 @@ async def fetch_plugin(plugin_id: str):
         raise HTTPException(status_code=404, detail="Plugin type not found")
 
     # Call plugin-specific fetch handlers via hooks
-    from app.plugins.hooks import plugin_manager as hook_manager
     import asyncio
+
+    from app.plugins.hooks import plugin_manager as hook_manager
 
     # Pluggy returns a list of coroutines for async hooks, we need to await them
     fetch_coroutines = hook_manager.hook.fetch_plugin_data(
@@ -666,10 +697,11 @@ async def geocode_location(plugin_id: str, request: dict[str, Any] = Body(...)):
     Returns:
         Dictionary with latitude, longitude, and display_name
     """
+    import httpx
+    from sqlalchemy import select
+
     from app.database import AsyncSessionLocal
     from app.models.db_models import PluginDB
-    from sqlalchemy import select
-    import httpx
 
     location = request.get("location", "").strip()
     if not location:
@@ -679,16 +711,13 @@ async def geocode_location(plugin_id: str, request: dict[str, Any] = Body(...)):
     # This allows users to geocode before saving the plugin configuration
     async with AsyncSessionLocal() as session:
         # Check if plugin exists and is yr_weather type
-        result = await session.execute(
-            select(PluginDB).where(PluginDB.id == plugin_id)
-        )
+        result = await session.execute(select(PluginDB).where(PluginDB.id == plugin_id))
         db_plugin = result.scalar_one_or_none()
 
         # If plugin exists, verify it's the right type
         if db_plugin and db_plugin.type_id != "yr_weather":
             raise HTTPException(
-                status_code=400,
-                detail="Geocoding is only available for Yr.no weather plugins"
+                status_code=400, detail="Geocoding is only available for Yr.no weather plugins"
             )
 
         # If plugin doesn't exist, check if the plugin_id matches the expected pattern
@@ -726,7 +755,9 @@ async def geocode_location(plugin_id: str, request: dict[str, Any] = Body(...)):
             if not results:
                 return {
                     "success": False,
-                    "message": f"Location '{location}' not found. Please try a more specific location.",
+                    "message": (
+                        f"Location '{location}' not found. " "Please try a more specific location."
+                    ),
                 }
 
             # Try to find the best match
@@ -735,7 +766,7 @@ async def geocode_location(plugin_id: str, request: dict[str, Any] = Body(...)):
             best_score = -1
             location_lower = location.lower()
             # Extract the main location name (before comma if present)
-            main_location = location_lower.split(',')[0].strip()
+            main_location = location_lower.split(",")[0].strip()
 
             for result in results:
                 display_name = result.get("display_name", "").lower()
@@ -748,7 +779,7 @@ async def geocode_location(plugin_id: str, request: dict[str, Any] = Body(...)):
                 if display_name.startswith(main_location):
                     score += 100
                 # 2. If main location name appears early in display_name
-                elif main_location in display_name[:len(main_location) + 30]:
+                elif main_location in display_name[: len(main_location) + 30]:
                     score += 50
                 # 3. If main location name appears anywhere
                 elif main_location in display_name:
@@ -835,11 +866,13 @@ async def test_plugin(plugin_id: str):
 
     # Get plugin config
     from app.services.config_service import config_service
+
     config_key = f"plugin_{plugin_id}_config"
     config_json = await config_service.get_value(config_key)
 
     if config_json:
         import json
+
         try:
             config = json.loads(config_json)
         except json.JSONDecodeError:
@@ -848,8 +881,9 @@ async def test_plugin(plugin_id: str):
         config = {}
 
     # Call plugin-specific test handlers via hooks
-    from app.plugins.hooks import plugin_manager as hook_manager
     import asyncio
+
+    from app.plugins.hooks import plugin_manager as hook_manager
 
     # Pluggy returns a list of coroutines for async hooks, we need to await them
     test_coroutines = hook_manager.hook.test_plugin_connection(
@@ -945,8 +979,8 @@ async def install_plugin(
     Returns:
         Plugin manifest
     """
-    import tempfile
     import shutil
+    import tempfile
 
     if not file.filename:
         raise HTTPException(status_code=400, detail="No file provided")
@@ -1002,7 +1036,8 @@ async def uninstall_plugin(plugin_id: str):
         # Reload plugins to remove the uninstalled one
         # Note: We can't easily unload a module from Python, but it won't be loaded on next restart
         plugin_loader._loaded_modules = {
-            m for m in plugin_loader._loaded_modules
+            m
+            for m in plugin_loader._loaded_modules
             if not m.startswith(f"installed_plugin_{plugin_id}")
         }
 
@@ -1031,4 +1066,3 @@ async def get_installed_plugin(plugin_id: str):
     if not manifest:
         raise HTTPException(status_code=404, detail=f"Plugin {plugin_id} not found")
     return manifest
-

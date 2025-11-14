@@ -26,17 +26,23 @@ class WebServiceService:
                 select(PluginDB).where(PluginDB.plugin_type == "service")
             )
             db_plugins = result.scalars().all()
-            print(f"[WebServiceService] Found {len(db_plugins)} service plugin instances in database")
+            print(
+                f"[WebServiceService] Found {len(db_plugins)} service plugin instances in database"
+            )
 
             services = []
             from app.plugins.loader import plugin_loader
-            
+
             # Get plugin types to access display_schema
             plugin_types = plugin_loader.get_plugin_types()
             plugin_types_by_id = {t.get("type_id"): t for t in plugin_types}
-            
+
             for db_plugin in db_plugins:
-                print(f"[WebServiceService] Processing service: id={db_plugin.id}, type_id={db_plugin.type_id}, name={db_plugin.name}, enabled={db_plugin.enabled}")
+                print(
+                    f"[WebServiceService] Processing service: "
+                    f"id={db_plugin.id}, type_id={db_plugin.type_id}, "
+                    f"name={db_plugin.name}, enabled={db_plugin.enabled}"
+                )
                 config = db_plugin.config or {}
                 # Get URL from config
                 url = config.get("url", "")
@@ -44,10 +50,10 @@ class WebServiceService:
                 if not url:
                     from app.plugins.manager import plugin_manager
                     from app.plugins.protocols import ServicePlugin
+
                     plugin = plugin_manager.get_plugin(db_plugin.id)
                     if plugin and isinstance(plugin, ServicePlugin):
                         # Use protocol-defined method to get content
-                        import asyncio
                         try:
                             content = await plugin.get_content()
                             url = content.get("url", "")
@@ -55,13 +61,13 @@ class WebServiceService:
                             # If async call fails, fall back to config
                             plugin_config = plugin.get_config()
                             url = plugin_config.get("url", "") if plugin_config else ""
-                
+
                 # Get display_schema from plugin type metadata
                 type_id = db_plugin.type_id
                 display_schema = None
                 if type_id and type_id in plugin_types_by_id:
                     display_schema = plugin_types_by_id[type_id].get("display_schema")
-                
+
                 service = WebService(
                     id=db_plugin.id,
                     name=db_plugin.name,
@@ -72,13 +78,20 @@ class WebServiceService:
                     type_id=type_id,
                     display_schema=display_schema,
                 )
-                print(f"[WebServiceService] Created service: id={service.id}, name={service.name}, enabled={service.enabled}, url={service.url[:50] if service.url else 'None'}...")
+                print(
+                    f"[WebServiceService] Created service: "
+                    f"id={service.id}, name={service.name}, enabled={service.enabled}, "
+                    f"url={service.url[:50] if service.url else 'None'}..."
+                )
                 services.append(service)
 
             # Sort by display_order (fallback if SQL ordering didn't work)
             services.sort(key=lambda s: (s.display_order, s.name))
             self._services = services
-            print(f"[WebServiceService] Returning {len(services)} services: {[s.id for s in services]}")
+            print(
+                f"[WebServiceService] Returning {len(services)} services: "
+                f"{[s.id for s in services]}"
+            )
             return services
 
     async def get_service(self, service_id: str) -> WebService | None:
@@ -125,7 +138,13 @@ class WebServiceService:
         service_id = f"iframe-service-{hash(service.url) % 10000}-{len(self._services)}"
 
         # Ensure name is set - use URL if name is empty
-        service_name = service.name.strip() if service.name else service.url[:50] if service.url else "Web Service"
+        service_name = (
+            service.name.strip()
+            if service.name
+            else service.url[:50]
+            if service.url
+            else "Web Service"
+        )
 
         # Register plugin using unified system
         plugin = await plugin_registry.register_plugin(
@@ -143,7 +162,7 @@ class WebServiceService:
         # Get service info from plugin using protocol-defined methods
         config = plugin.get_config()
         content = await plugin.get_content()
-        
+
         return WebService(
             id=plugin.plugin_id,
             name=plugin.name,
@@ -164,11 +183,12 @@ class WebServiceService:
         Returns:
             Updated web service or None if not found
         """
-        from app.plugins.manager import plugin_manager
-        from app.plugins.protocols import ServicePlugin
+        from sqlalchemy import select
+
         from app.database import AsyncSessionLocal
         from app.models.db_models import PluginDB
-        from sqlalchemy import select
+        from app.plugins.manager import plugin_manager
+        from app.plugins.protocols import ServicePlugin
 
         # Get plugin
         plugin = plugin_manager.get_plugin(service_id)
@@ -196,9 +216,7 @@ class WebServiceService:
 
         # Update in database
         async with AsyncSessionLocal() as session:
-            result = await session.execute(
-                select(PluginDB).where(PluginDB.id == service_id)
-            )
+            result = await session.execute(select(PluginDB).where(PluginDB.id == service_id))
             db_plugin = result.scalar_one_or_none()
             if db_plugin:
                 if updates.name is not None:
@@ -211,7 +229,7 @@ class WebServiceService:
 
         # Get service info from plugin using protocol-defined methods
         content = await plugin.get_content()
-        
+
         return WebService(
             id=plugin.plugin_id,
             name=plugin.name,

@@ -55,7 +55,9 @@ class ConfigUpdate(BaseModel):
     randomizeImages: bool | None = None  # Randomize image order (default: False)
     # Timezone (e.g., "America/New_York", "Europe/London", "UTC") - null = system timezone
     timezone: str | None = None
-    gitRepoUrl: str | None = None  # Git repository URL for updates (default: 'https://github.com/osterbergsimon/calvin.git')
+    gitRepoUrl: str | None = (
+        None  # Git repository URL for updates (default: 'https://github.com/osterbergsimon/calvin.git')
+    )
     gitBranch: str | None = None  # Git branch to use for updates (default: 'main')
 
     # Allow arbitrary fields for extensibility
@@ -187,6 +189,7 @@ async def get_config():
             # Parse JSON string if needed (if stored as string - old format)
             # If stored with value_type="json", it's already parsed by _parse_value()
             import json
+
             if isinstance(schedule_value, str):
                 try:
                     # Old format: stored as string, need to parse
@@ -220,8 +223,7 @@ async def get_config():
     if not has_schedule:
         # Default: all days enabled, 06:00-22:00
         default_schedule = [
-            {"day": i, "enabled": True, "onTime": "06:00", "offTime": "22:00"}
-            for i in range(7)
+            {"day": i, "enabled": True, "onTime": "06:00", "offTime": "22:00"} for i in range(7)
         ]
         config["displaySchedule"] = default_schedule
     if "rebootComboKey1" not in config and "reboot_combo_key1" not in config:
@@ -253,9 +255,7 @@ async def get_config():
     elif "randomize_images" in config and "randomizeImages" not in config:
         randomize_value = config["randomize_images"]
         is_randomize = (
-            randomize_value == "true"
-            if isinstance(randomize_value, str)
-            else bool(randomize_value)
+            randomize_value == "true" if isinstance(randomize_value, str) else bool(randomize_value)
         )
         config["randomizeImages"] = is_randomize
     if "timezone" not in config:
@@ -354,6 +354,7 @@ async def update_config(config_update: ConfigUpdate):
         # Store schedule with explicit type
         # Pass the schedule directly (list/array) to set_value, which will serialize it
         import json
+
         schedule = update_dict.pop("displaySchedule")
         if isinstance(schedule, str):
             # If it's already a JSON string, parse it first so we store the actual data structure
@@ -389,7 +390,6 @@ async def update_config(config_update: ConfigUpdate):
     if "gitRepoUrl" in update_dict:
         update_dict["git_repo_url"] = update_dict.pop("gitRepoUrl")
         # Also update /etc/default/calvin-update file
-        import os
         calvin_update_file = Path("/etc/default/calvin-update")
         if calvin_update_file.exists():
             try:
@@ -472,10 +472,11 @@ async def get_git_branches(repo_url: str | None = None):
     # Get repo URL from parameter, config, or default
     if not repo_url:
         from app.services.config_service import config_service
+
         repo_url = await config_service.get_value("git_repo_url")
         if not repo_url:
             repo_url = "https://github.com/osterbergsimon/calvin.git"
-    
+
     try:
         # Use git ls-remote to fetch branches without cloning
         # This works for public repos and doesn't require authentication
@@ -488,8 +489,7 @@ async def get_git_branches(repo_url: str | None = None):
 
         if result.returncode != 0:
             raise HTTPException(
-                status_code=400,
-                detail=f"Failed to fetch branches: {result.stderr}"
+                status_code=400, detail=f"Failed to fetch branches: {result.stderr}"
             )
 
         # Parse branch names from output
@@ -513,17 +513,8 @@ async def get_git_branches(repo_url: str | None = None):
         return {"branches": branches, "repo_url": repo_url}
 
     except subprocess.TimeoutExpired:
-        raise HTTPException(
-            status_code=408,
-            detail="Request timeout while fetching branches"
-        )
+        raise HTTPException(status_code=408, detail="Request timeout while fetching branches")
     except FileNotFoundError:
-        raise HTTPException(
-            status_code=500,
-            detail="Git is not installed on this system"
-        )
+        raise HTTPException(status_code=500, detail="Git is not installed on this system")
     except Exception as e:
-        raise HTTPException(
-            status_code=500,
-            detail=f"Failed to fetch branches: {str(e)}"
-        )
+        raise HTTPException(status_code=500, detail=f"Failed to fetch branches: {str(e)}")

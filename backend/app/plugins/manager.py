@@ -1,7 +1,5 @@
 """Plugin manager for registering and managing plugins."""
 
-from typing import Any
-
 from app.plugins.base import BasePlugin, PluginType
 
 
@@ -60,7 +58,9 @@ class PluginManager:
         """
         return self._plugins.get(plugin_id)
 
-    def get_plugins(self, plugin_type: PluginType | None = None, enabled_only: bool = True) -> list[BasePlugin]:
+    def get_plugins(
+        self, plugin_type: PluginType | None = None, enabled_only: bool = True
+    ) -> list[BasePlugin]:
         """
         Get plugins, optionally filtered by type and enabled status.
 
@@ -103,21 +103,21 @@ class PluginManager:
                 await plugin.cleanup()
             except Exception as e:
                 print(f"Error cleaning up plugin {plugin.plugin_id}: {e}")
-    
+
     async def start_plugin(self, plugin_id: str) -> bool:
         """
         Start a plugin (if enabled).
-        
+
         Args:
             plugin_id: ID of plugin to start
-            
+
         Returns:
             True if started, False if not found or not enabled
         """
         plugin = self.get_plugin(plugin_id)
         if not plugin or not plugin.enabled:
             return False
-        
+
         try:
             if not plugin.is_running():
                 await plugin.initialize()
@@ -127,21 +127,21 @@ class PluginManager:
             print(f"Error starting plugin {plugin_id}: {e}")
             plugin.stop()
             return False
-    
+
     async def stop_plugin(self, plugin_id: str) -> bool:
         """
         Stop a plugin.
-        
+
         Args:
             plugin_id: ID of plugin to stop
-            
+
         Returns:
             True if stopped, False if not found
         """
         plugin = self.get_plugin(plugin_id)
         if not plugin:
             return False
-        
+
         try:
             if plugin.is_running():
                 plugin.stop()
@@ -168,4 +168,3 @@ class PluginManager:
 
 # Global plugin manager instance
 plugin_manager = PluginManager()
-

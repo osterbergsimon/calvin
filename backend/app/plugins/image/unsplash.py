@@ -1,13 +1,12 @@
 """Unsplash image plugin."""
 
-import hashlib
 from datetime import datetime
 from typing import Any
 
 import httpx
 
 from app.plugins.base import PluginType
-from app.plugins.hooks import hookimpl, plugin_manager
+from app.plugins.hooks import hookimpl
 from app.plugins.protocols import ImagePlugin
 
 
@@ -183,7 +182,7 @@ class UnsplashImagePlugin(ImagePlugin):
             headers = {
                 "Accept-Version": "v1",
             }
-            
+
             # Add API key if provided
             if self.api_key:
                 headers["Authorization"] = f"Client-ID {self.api_key}"
@@ -229,7 +228,9 @@ class UnsplashImagePlugin(ImagePlugin):
                     "size": 0,  # Size not available from API
                     "format": "jpg",
                     "source": self.plugin_id,
-                    "title": photo.get("description") or photo.get("alt_description") or f"Photo by {photographer}",
+                    "title": photo.get("description")
+                    or photo.get("alt_description")
+                    or f"Photo by {photographer}",
                     "photographer": photographer,
                     "photographer_url": photographer_url,
                     "unsplash_id": photo["id"],
@@ -243,9 +244,11 @@ class UnsplashImagePlugin(ImagePlugin):
 
         except httpx.HTTPStatusError as e:
             if e.response.status_code == 401:
-                print(f"Error: Unsplash API requires authentication. Please provide an API key in plugin settings.")
+                print(
+                    "Error: Unsplash API requires authentication. Please provide an API key in plugin settings."  # noqa: E501
+                )
             elif e.response.status_code == 403:
-                print(f"Error: Unsplash API access forbidden. Check your API key.")
+                print("Error: Unsplash API access forbidden. Check your API key.")
             else:
                 print(f"HTTP error fetching photos from Unsplash: {e.response.status_code} - {e}")
             # Return cached images if available
@@ -257,6 +260,7 @@ class UnsplashImagePlugin(ImagePlugin):
         except Exception as e:
             print(f"Unexpected error in Unsplash plugin: {e}")
             import traceback
+
             traceback.print_exc()
             return self._images.copy()
 
@@ -329,30 +333,30 @@ def create_plugin_instance(
     """Create an UnsplashImagePlugin instance."""
     if type_id != "unsplash":
         return None
-    
+
     enabled = config.get("enabled", False)  # Default to disabled
-    
+
     # Extract config values
     api_key = config.get("api_key", "")
     category = config.get("category", "popular")
     count = config.get("count", 30)
-    
+
     # Handle schema objects
     if isinstance(api_key, dict):
         api_key = api_key.get("value") or api_key.get("default") or ""
     api_key = str(api_key) if api_key else None
-    
+
     if isinstance(category, dict):
         category = category.get("value") or category.get("default") or "popular"
     category = str(category) if category else "popular"
-    
+
     if isinstance(count, dict):
         count = count.get("value") or count.get("default") or 30
     try:
         count = int(count) if count else 30
     except (ValueError, TypeError):
         count = 30
-    
+
     return UnsplashImagePlugin(
         plugin_id=plugin_id,
         name=name,
@@ -361,4 +365,3 @@ def create_plugin_instance(
         count=count,
         enabled=enabled,
     )
-

@@ -34,10 +34,11 @@ class PluginImageService:
         plugins = plugin_manager.get_plugins(PluginType.IMAGE, enabled_only=True)
 
         # Also check if plugin types are enabled
-        from app.database import AsyncSessionLocal
-        from app.models.db_models import PluginTypeDB, PluginDB
         from sqlalchemy import select
-        
+
+        from app.database import AsyncSessionLocal
+        from app.models.db_models import PluginDB, PluginTypeDB
+
         # Get enabled plugin types
         async with AsyncSessionLocal() as session:
             # Get all image plugin types and their enabled status
@@ -47,27 +48,28 @@ class PluginImageService:
             plugin_types = result.scalars().all()
             # Create a map of type_id -> enabled status (default to True if not in DB)
             enabled_type_map = {pt.type_id: pt.enabled for pt in plugin_types}
-            
+
             # Get type_id for each plugin instance
-            result = await session.execute(
-                select(PluginDB).where(PluginDB.plugin_type == "image")
-            )
+            result = await session.execute(select(PluginDB).where(PluginDB.plugin_type == "image"))
             db_plugins = result.scalars().all()
             # Create a map of plugin_id -> type_id
             plugin_type_map = {db_plugin.id: db_plugin.type_id for db_plugin in db_plugins}
-        
+
         # Fetch images from all plugins, but only if plugin type is enabled
         for plugin in plugins:
             if not isinstance(plugin, ImagePlugin):
                 continue
-            
+
             # Check if this plugin's type is enabled
             type_id = plugin_type_map.get(plugin.plugin_id)
             if type_id:
                 # Check if plugin type is enabled (default to True if not in map)
                 type_enabled = enabled_type_map.get(type_id, True)
                 if not type_enabled:
-                    print(f"[ImageService] Skipping plugin {plugin.plugin_id} - plugin type {type_id} is disabled")
+                    print(
+                        f"[ImageService] Skipping plugin {plugin.plugin_id} - "
+                        f"plugin type {type_id} is disabled"
+                    )
                     continue
 
             try:
@@ -346,4 +348,3 @@ class PluginImageService:
         self._all_images = images
 
         return images
-

@@ -79,9 +79,10 @@ def test_client(temp_db_path: Path) -> Generator[TestClient, None, None]:
     try:
         loop.run_until_complete(init_db())
         loop.run_until_complete(migrate_database())
-        
+
         # Load plugins so they're available for tests
         from app.plugins.loader import plugin_loader
+
         plugin_loader.load_all_plugins()
     finally:
         loop.close()

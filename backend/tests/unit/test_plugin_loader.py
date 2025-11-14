@@ -1,8 +1,6 @@
 """Tests for plugin loader."""
 
 import json
-import sys
-from pathlib import Path
 from unittest.mock import MagicMock, patch
 
 import pytest
@@ -30,7 +28,7 @@ def installed_plugin_package(tmp_path):
     """Create a mock installed plugin package."""
     plugin_dir = tmp_path / "test_plugin"
     plugin_dir.mkdir()
-    
+
     plugin_py = plugin_dir / "plugin.py"
     plugin_py.write_text(
         '''"""Test installed plugin."""
@@ -60,7 +58,7 @@ def create_plugin_instance(
     return MagicMock(plugin_id=plugin_id, type_id=type_id, name=name)
 '''
     )
-    
+
     manifest = {
         "id": "test_plugin",
         "name": "Test Plugin",
@@ -68,7 +66,7 @@ def create_plugin_instance(
         "type": "service",
     }
     (plugin_dir / "plugin.json").write_text(json.dumps(manifest))
-    
+
     return plugin_dir
 
 
@@ -96,17 +94,17 @@ class TestPluginLoader:
         # Mock package module
         mock_package = MagicMock()
         mock_package.__file__ = "/path/to/package/__init__.py"
-        
+
         # Mock plugin module with hooks
         mock_plugin_module = MagicMock()
         mock_plugin_module.register_plugin_types = MagicMock()
-        
+
         # Mock Path operations
         mock_path_instance = MagicMock()
         mock_path_instance.parent = MagicMock()
         mock_path_instance.parent.__str__ = lambda x: "/path/to/package"
         mock_path.return_value = mock_path_instance
-        
+
         # Setup mocks
         def import_side_effect(name):
             if name == "app.plugins.test":
@@ -114,14 +112,14 @@ class TestPluginLoader:
             elif name == "app.plugins.test.test_plugin":
                 return mock_plugin_module
             return MagicMock()
-        
+
         mock_import_module.side_effect = import_side_effect
         mock_iter_modules.return_value = [
             ("", "test_plugin", False),
         ]
-        
+
         plugin_loader_instance.load_plugins_from_package("app.plugins.test")
-        
+
         # Verify module was registered (if hooks were found)
         # Note: The actual registration depends on has_hooks check
         # We verify the method was called at least once
@@ -134,9 +132,9 @@ class TestPluginLoader:
                 [{"type_id": "test1", "name": "Test 1"}],
                 {"type_id": "test2", "name": "Test 2"},
             ]
-            
+
             types = plugin_loader_instance.get_plugin_types()
-            
+
             assert len(types) == 2
             assert types[0]["type_id"] == "test1"
             assert types[1]["type_id"] == "test2"
@@ -145,43 +143,43 @@ class TestPluginLoader:
         """Test getting plugin types when none are registered."""
         with patch("app.plugins.loader.plugin_manager") as mock_manager:
             mock_manager.hook.register_plugin_types.return_value = []
-            
+
             types = plugin_loader_instance.get_plugin_types()
-            
+
             assert types == []
 
     def test_create_plugin_instance(self, plugin_loader_instance):
         """Test creating a plugin instance."""
         mock_plugin = MagicMock()
-        
+
         with patch("app.plugins.loader.plugin_manager") as mock_manager:
             mock_manager.hook.create_plugin_instance.return_value = [
                 None,
                 mock_plugin,
                 None,
             ]
-            
+
             result = plugin_loader_instance.create_plugin_instance(
                 plugin_id="test-1",
                 type_id="test",
                 name="Test Plugin",
                 config={},
             )
-            
+
             assert result == mock_plugin
 
     def test_create_plugin_instance_not_found(self, plugin_loader_instance):
         """Test creating a plugin instance when not found."""
         with patch("app.plugins.loader.plugin_manager") as mock_manager:
             mock_manager.hook.create_plugin_instance.return_value = [None, None]
-            
+
             result = plugin_loader_instance.create_plugin_instance(
                 plugin_id="test-1",
                 type_id="test",
                 name="Test Plugin",
                 config={},
             )
-            
+
             assert result is None
 
     @patch("app.plugins.loader.plugin_installer")
@@ -199,10 +197,10 @@ class TestPluginLoader:
             {"id": "test_plugin"},
         ]
         mock_installer.get_plugin_path.return_value = installed_plugin_package
-        
+
         # Load installed plugins
         plugin_loader_instance.load_installed_plugins()
-        
+
         # Verify plugin was registered
         assert mock_plugin_manager.register.called
         assert "installed_plugin_test_plugin" in plugin_loader_instance._loaded_modules
@@ -217,12 +215,12 @@ class TestPluginLoader:
         """Test loading installed plugin without plugin.py."""
         plugin_dir = tmp_path / "test_plugin"
         plugin_dir.mkdir()
-        
+
         mock_installer.get_installed_plugins.return_value = [
             {"id": "test_plugin"},
         ]
         mock_installer.get_plugin_path.return_value = plugin_dir
-        
+
         # Should not raise an error, just skip
         plugin_loader_instance.load_installed_plugins()
 
@@ -239,12 +237,12 @@ class TestPluginLoader:
         plugin_dir = tmp_path / "test_plugin"
         plugin_dir.mkdir()
         (plugin_dir / "plugin.py").write_text("invalid python code !!!")
-        
+
         mock_installer.get_installed_plugins.return_value = [
             {"id": "test_plugin"},
         ]
         mock_installer.get_plugin_path.return_value = plugin_dir
-        
+
         # Should not raise an error, just log and continue
         plugin_loader_instance.load_installed_plugins()
 
@@ -259,15 +257,15 @@ class TestPluginLoader:
         plugin_dir = tmp_path / "test_plugin"
         plugin_dir.mkdir()
         (plugin_dir / "plugin.py").write_text("# No hooks here")
-        
+
         mock_installer.get_installed_plugins.return_value = [
             {"id": "test_plugin"},
         ]
         mock_installer.get_plugin_path.return_value = plugin_dir
-        
+
         # Should not register if no hooks
         plugin_loader_instance.load_installed_plugins()
-        
+
         assert "installed_plugin_test_plugin" not in plugin_loader_instance._loaded_modules
 
     @patch("app.plugins.loader.plugin_installer")
@@ -278,12 +276,13 @@ class TestPluginLoader:
     ):
         """Test loading all plugins (built-in and installed)."""
         mock_installer.get_installed_plugins.return_value = []
-        
+
         with patch.object(plugin_loader_instance, "load_plugins_from_package") as mock_load_package:
-            with patch.object(plugin_loader_instance, "load_installed_plugins") as mock_load_installed:
+            with patch.object(
+                plugin_loader_instance, "load_installed_plugins"
+            ) as mock_load_installed:
                 plugin_loader_instance.load_all_plugins()
-                
+
                 # Verify built-in packages are loaded
                 assert mock_load_package.call_count == 3
                 assert mock_load_installed.called
-

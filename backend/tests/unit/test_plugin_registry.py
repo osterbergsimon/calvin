@@ -34,7 +34,7 @@ class TestPluginRegistry:
         """Test loading plugins from database."""
         # Mock plugin types
         from app.plugins.base import PluginType
-        
+
         mock_plugin_loader.get_plugin_types.return_value = [
             {
                 "type_id": "test_plugin",
@@ -45,16 +45,16 @@ class TestPluginRegistry:
                 "common_config_schema": {},
             }
         ]
-        
+
         # Mock plugin instances - return None so no instances are created
         mock_plugin_loader.create_plugin_instance.return_value = None
         # Ensure no existing plugins
         mock_instance_manager.get_plugin.return_value = None
         # Mock initialize_all as async
         mock_instance_manager.initialize_all = AsyncMock(return_value=None)
-        
+
         await plugin_registry_instance.load_plugins_from_db()
-        
+
         # Verify plugins were loaded
         assert mock_plugin_loader.load_all_plugins.called
         # initialize_all is async, so it should be AsyncMock
@@ -82,10 +82,10 @@ class TestPluginRegistry:
         mock_instance_manager.get_plugin.return_value = mock_plugin
         # Mock initialize_all as async
         mock_instance_manager.initialize_all = AsyncMock(return_value=None)
-        
+
         # Mock database plugin
         from app.models.db_models import PluginDB
-        
+
         async with test_db as session:
             db_plugin = PluginDB(
                 id="test-1",
@@ -97,10 +97,10 @@ class TestPluginRegistry:
             )
             session.add(db_plugin)
             await session.commit()
-        
+
         # Mock plugin types
         from app.plugins.base import PluginType
-        
+
         mock_plugin_loader.get_plugin_types.return_value = [
             {
                 "type_id": "test_plugin",
@@ -108,9 +108,9 @@ class TestPluginRegistry:
                 "name": "Test Plugin",
             }
         ]
-        
+
         await plugin_registry_instance.load_plugins_from_db()
-        
+
         # Verify existing plugin was updated
         # Note: configure() may not be called if plugin instance already exists
         # and no new instance is created. The test verifies the method completes
@@ -134,10 +134,10 @@ class TestPluginRegistry:
         mock_plugin.configure = AsyncMock()
         mock_plugin.initialize = AsyncMock()
         mock_plugin_loader.create_plugin_instance.return_value = mock_plugin
-        
+
         # Mock plugin types
         from app.plugins.base import PluginType
-        
+
         mock_plugin_loader.get_plugin_types.return_value = [
             {
                 "type_id": "test_plugin",
@@ -145,10 +145,10 @@ class TestPluginRegistry:
                 "name": "Test Plugin",
             }
         ]
-        
+
         # Create plugin type in database first
         from app.models.db_models import PluginTypeDB
-        
+
         async with test_db as session:
             db_type = PluginTypeDB(
                 type_id="test_plugin",
@@ -158,7 +158,7 @@ class TestPluginRegistry:
             )
             session.add(db_type)
             await session.commit()
-        
+
         # Register plugin
         plugin = await plugin_registry_instance.register_plugin(
             plugin_id="test-1",
@@ -167,21 +167,20 @@ class TestPluginRegistry:
             config={"key": "value"},
             enabled=True,
         )
-        
+
         assert plugin == mock_plugin
         assert mock_plugin.configure.called
         assert mock_plugin.initialize.called
         assert mock_instance_manager.register.called
-        
+
         # Verify plugin was saved to database
-        from app.models.db_models import PluginDB
         from sqlalchemy import select
+
         from app.database import AsyncSessionLocal
-        
+        from app.models.db_models import PluginDB
+
         async with AsyncSessionLocal() as session:
-            result = await session.execute(
-                select(PluginDB).where(PluginDB.id == "test-1")
-            )
+            result = await session.execute(select(PluginDB).where(PluginDB.id == "test-1"))
             db_plugin = result.scalar_one_or_none()
             assert db_plugin is not None
             assert db_plugin.name == "Test Plugin Instance"
@@ -195,7 +194,7 @@ class TestPluginRegistry:
     ):
         """Test registering a plugin when creation fails."""
         mock_plugin_loader.create_plugin_instance.return_value = None
-        
+
         with pytest.raises(ValueError, match="Failed to create plugin instance"):
             await plugin_registry_instance.register_plugin(
                 plugin_id="test-1",
@@ -214,7 +213,7 @@ class TestPluginRegistry:
         """Test unregistering a plugin."""
         # Create a plugin in database
         from app.models.db_models import PluginDB
-        
+
         async with test_db as session:
             db_plugin = PluginDB(
                 id="test-1",
@@ -226,28 +225,27 @@ class TestPluginRegistry:
             )
             session.add(db_plugin)
             await session.commit()
-        
+
         # Mock plugin instance
         mock_plugin = MagicMock()
         mock_plugin.cleanup = AsyncMock()
         mock_instance_manager.get_plugin.return_value = mock_plugin
         mock_instance_manager.unregister.return_value = True
-        
+
         # Unregister plugin
         result = await plugin_registry_instance.unregister_plugin("test-1")
-        
+
         assert result is True
         assert mock_plugin.cleanup.called
         assert mock_instance_manager.unregister.called
-        
+
         # Verify plugin was removed from database
         from sqlalchemy import select
+
         from app.database import AsyncSessionLocal
-        
+
         async with AsyncSessionLocal() as session:
-            result = await session.execute(
-                select(PluginDB).where(PluginDB.id == "test-1")
-            )
+            result = await session.execute(select(PluginDB).where(PluginDB.id == "test-1"))
             db_plugin = result.scalar_one_or_none()
             assert db_plugin is None
 
@@ -260,9 +258,9 @@ class TestPluginRegistry:
         """Test unregistering a non-existent plugin."""
         mock_instance_manager.get_plugin.return_value = None
         mock_instance_manager.unregister.return_value = False
-        
+
         result = await plugin_registry_instance.unregister_plugin("nonexistent")
-        
+
         assert result is False
 
     @patch("app.plugins.registry.plugin_loader")
@@ -274,7 +272,7 @@ class TestPluginRegistry:
     ):
         """Test loading new plugin types."""
         from app.plugins.base import PluginType
-        
+
         mock_plugin_loader.get_plugin_types.return_value = [
             {
                 "type_id": "new_plugin",
@@ -285,14 +283,15 @@ class TestPluginRegistry:
                 "common_config_schema": {},
             }
         ]
-        
+
         await plugin_registry_instance._load_plugin_types()
-        
+
         # Verify plugin type was created in database
-        from app.models.db_models import PluginTypeDB
         from sqlalchemy import select
+
         from app.database import AsyncSessionLocal
-        
+        from app.models.db_models import PluginTypeDB
+
         async with AsyncSessionLocal() as session:
             result = await session.execute(
                 select(PluginTypeDB).where(PluginTypeDB.type_id == "new_plugin")
@@ -312,7 +311,7 @@ class TestPluginRegistry:
         """Test updating existing plugin types."""
         # Create existing plugin type
         from app.models.db_models import PluginTypeDB
-        
+
         async with test_db as session:
             db_type = PluginTypeDB(
                 type_id="existing_plugin",
@@ -322,10 +321,10 @@ class TestPluginRegistry:
             )
             session.add(db_type)
             await session.commit()
-        
+
         # Mock updated plugin type
         from app.plugins.base import PluginType
-        
+
         mock_plugin_loader.get_plugin_types.return_value = [
             {
                 "type_id": "existing_plugin",
@@ -336,13 +335,14 @@ class TestPluginRegistry:
                 "common_config_schema": {"new_field": "value"},
             }
         ]
-        
+
         await plugin_registry_instance._load_plugin_types()
-        
+
         # Verify plugin type was updated
         from sqlalchemy import select
+
         from app.database import AsyncSessionLocal
-        
+
         async with AsyncSessionLocal() as session:
             result = await session.execute(
                 select(PluginTypeDB).where(PluginTypeDB.type_id == "existing_plugin")
@@ -352,4 +352,3 @@ class TestPluginRegistry:
             assert db_type.name == "New Name"
             assert db_type.description == "Updated description"
             assert db_type.version == "2.0.0"
-

@@ -7,7 +7,7 @@ from typing import Any
 from PIL import Image, ImageOps
 
 from app.plugins.base import PluginType
-from app.plugins.hooks import hookimpl, plugin_manager
+from app.plugins.hooks import hookimpl
 from app.plugins.protocols import ImagePlugin
 
 
@@ -26,7 +26,7 @@ class LocalImagePlugin(ImagePlugin):
             "common_config_schema": {
                 "image_dir": {
                     "type": "string",
-                    "description": "Image directory path (thumbnails will be stored in image_dir/thumbnails)",
+                    "description": "Image directory path (thumbnails will be stored in image_dir/thumbnails)",  # noqa: E501
                     "default": "",
                     "ui": {
                         "component": "directory",
@@ -108,7 +108,7 @@ class LocalImagePlugin(ImagePlugin):
                 image_dir_str = image_dir_value.get("value") or image_dir_value.get("default") or ""
             else:
                 image_dir_str = str(image_dir_value)
-            
+
             # Only update if we have a valid string value
             if image_dir_str and image_dir_str.strip():
                 self.image_dir = Path(image_dir_str)
@@ -289,7 +289,9 @@ class LocalImagePlugin(ImagePlugin):
                     background = Image.new("RGB", img.size, (255, 255, 255))
                     if img.mode == "P":
                         img = img.convert("RGBA")
-                    background.paste(img, mask=img.split()[-1] if img.mode in ("RGBA", "LA") else None)
+                    background.paste(
+                        img, mask=img.split()[-1] if img.mode in ("RGBA", "LA") else None
+                    )
                     img = background
                 elif img.mode != "RGB":
                     img = img.convert("RGB")
@@ -324,24 +326,24 @@ def create_plugin_instance(
     """Create a LocalImagePlugin instance."""
     if type_id != "local":
         return None
-    
+
     from pathlib import Path
-    
+
     enabled = config.get("enabled", False)  # Default to disabled
-    
+
     # Extract actual values from config (handle case where schema objects might be stored)
     image_dir = config.get("image_dir", "")
-    
+
     # If image_dir is a dict (schema object), extract the default or actual value
     if isinstance(image_dir, dict):
         image_dir = image_dir.get("default", "") or image_dir.get("value", "")
     # Ensure it's a string
     image_dir = str(image_dir) if image_dir else ""
-    
+
     # Use default directory if image_dir is empty
     if not image_dir:
         image_dir = "./data/images"
-    
+
     # Thumbnail directory is always image_dir/thumbnails
     # We pass None and let the plugin set it automatically
     return LocalImagePlugin(
@@ -355,4 +357,3 @@ def create_plugin_instance(
 
 # Auto-register this module with pluggy when imported
 # The loader will discover and register this module automatically
-

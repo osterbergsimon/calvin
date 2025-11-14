@@ -2,19 +2,17 @@ repos:
   - repo: https://github.com/astral-sh/ruff-pre-commit
     rev: v0.6.9
     hooks:
-      # Run the linter
+      # Run the formatter first (Black-compatible)
+      - id: ruff-format
+      # Then run the linter (will auto-fix what it can)
       - id: ruff
         args: [--fix, --exit-non-zero-on-fix]
-      # Run the formatter
-      - id: ruff-format
 
   - repo: https://github.com/pre-commit/mirrors-eslint
     rev: v9.15.0
     hooks:
       - id: eslint
-        files: ^frontend/
-        types: [file]
-        types_or: [js, vue]
+        files: ^frontend/.*\.(js|vue)$
         additional_dependencies:
           - eslint@9.15.0
           - '@eslint/js@9.15.0'

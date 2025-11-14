@@ -130,7 +130,7 @@ def _migrate_database_sync():
             # Check if error_message column exists
             cursor.execute("PRAGMA table_info(plugin_types)")
             columns = [row[1] for row in cursor.fetchall()]
-            
+
             # Add error_message column if it doesn't exist
             if "error_message" not in columns:
                 print("Adding 'error_message' column to plugin_types table...")
@@ -168,7 +168,7 @@ def _migrate_existing_data(cursor, conn):
             # Get column names
             cursor.execute("PRAGMA table_info(calendar_sources)")
             columns = [col[1] for col in cursor.fetchall()]
-            
+
             for row in calendar_sources:
                 source_dict = dict(zip(columns, row))
 
@@ -192,19 +192,25 @@ def _migrate_existing_data(cursor, conn):
                 # Check if plugin already exists
                 cursor.execute("SELECT id FROM plugins WHERE id = ?", (source_dict["id"],))
                 if not cursor.fetchone():
-                    cursor.execute("""
-                        INSERT INTO plugins (id, type_id, plugin_type, name, enabled, config, created_at, updated_at)
+                    cursor.execute(
+                        """
+                        INSERT INTO plugins (
+                            id, type_id, plugin_type, name, enabled, config,
+                            created_at, updated_at
+                        )
                         VALUES (?, ?, ?, ?, ?, ?, ?, ?)
-                    """, (
-                        source_dict["id"],
-                        type_id,
-                        "calendar",
-                        source_dict.get("name", ""),
-                        source_dict.get("enabled", True),
-                        json.dumps(config),
-                        datetime.utcnow().isoformat(),
-                        datetime.utcnow().isoformat(),
-                    ))
+                    """,
+                        (
+                            source_dict["id"],
+                            type_id,
+                            "calendar",
+                            source_dict.get("name", ""),
+                            source_dict.get("enabled", True),
+                            json.dumps(config),
+                            datetime.utcnow().isoformat(),
+                            datetime.utcnow().isoformat(),
+                        ),
+                    )
             conn.commit()
             print("Migrated calendar sources to plugins table")
 
@@ -221,7 +227,7 @@ def _migrate_existing_data(cursor, conn):
             # Get column names
             cursor.execute("PRAGMA table_info(web_services)")
             columns = [col[1] for col in cursor.fetchall()]
-            
+
             for row in web_services:
                 service_dict = dict(zip(columns, row))
 
@@ -235,19 +241,25 @@ def _migrate_existing_data(cursor, conn):
                 # Check if plugin already exists
                 cursor.execute("SELECT id FROM plugins WHERE id = ?", (service_dict["id"],))
                 if not cursor.fetchone():
-                    cursor.execute("""
-                        INSERT INTO plugins (id, type_id, plugin_type, name, enabled, config, created_at, updated_at)
+                    cursor.execute(
+                        """
+                        INSERT INTO plugins (
+                            id, type_id, plugin_type, name, enabled, config,
+                            created_at, updated_at
+                        )
                         VALUES (?, ?, ?, ?, ?, ?, ?, ?)
-                    """, (
-                        service_dict["id"],
-                        "iframe",
-                        "service",
-                        service_dict.get("name", ""),
-                        service_dict.get("enabled", True),
-                        json.dumps(config),
-                        datetime.utcnow().isoformat(),
-                        datetime.utcnow().isoformat(),
-                    ))
+                    """,
+                        (
+                            service_dict["id"],
+                            "iframe",
+                            "service",
+                            service_dict.get("name", ""),
+                            service_dict.get("enabled", True),
+                            json.dumps(config),
+                            datetime.utcnow().isoformat(),
+                            datetime.utcnow().isoformat(),
+                        ),
+                    )
             conn.commit()
             print("Migrated web services to plugins table")
 
@@ -266,19 +278,25 @@ def _migrate_existing_data(cursor, conn):
                 # Check if local-images plugin already exists
                 cursor.execute("SELECT id FROM plugins WHERE id = 'local-images'")
                 if not cursor.fetchone():
-                    cursor.execute("""
-                        INSERT INTO plugins (id, type_id, plugin_type, name, enabled, config, created_at, updated_at)
+                    cursor.execute(
+                        """
+                        INSERT INTO plugins (
+                            id, type_id, plugin_type, name, enabled, config,
+                            created_at, updated_at
+                        )
                         VALUES (?, ?, ?, ?, ?, ?, ?, ?)
-                    """, (
-                        "local-images",
-                        "local",
-                        "image",
-                        "Local Images",
-                        True,
-                        json.dumps(config_dict),
-                        datetime.utcnow().isoformat(),
-                        datetime.utcnow().isoformat(),
-                    ))
+                    """,
+                        (
+                            "local-images",
+                            "local",
+                            "image",
+                            "Local Images",
+                            True,
+                            json.dumps(config_dict),
+                            datetime.utcnow().isoformat(),
+                            datetime.utcnow().isoformat(),
+                        ),
+                    )
                     conn.commit()
                     print("Migrated local image plugin config to plugins table")
             except json.JSONDecodeError:

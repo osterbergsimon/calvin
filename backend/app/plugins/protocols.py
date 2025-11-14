@@ -8,7 +8,8 @@ Plugins MUST implement all abstract methods and CAN implement optional methods.
 Protocol Design Principles:
 - MUST methods: Abstract methods that plugins MUST implement
 - CAN methods: Non-abstract methods with default implementations that plugins CAN override
-- No ad-hoc method checking: Core code should never use hasattr() or getattr() to access plugin functionality
+- No ad-hoc method checking: Core code should never use hasattr() or
+  getattr() to access plugin functionality
 - Type safety: Use isinstance() checks to ensure plugins conform to protocols
 """
 
@@ -24,7 +25,7 @@ from app.plugins.base import BasePlugin, PluginType
 class CalendarPlugin(BasePlugin):
     """
     Protocol for calendar source plugins.
-    
+
     MUST implement:
     - fetch_events()
     - validate_config()
@@ -70,14 +71,14 @@ class CalendarPlugin(BasePlugin):
 class ImagePlugin(BasePlugin):
     """
     Protocol for image source plugins.
-    
+
     MUST implement:
     - get_images()
     - get_image()
     - get_image_data()
     - scan_images()
     - validate_config()
-    
+
     CAN implement (optional):
     - upload_image()
     - delete_image()
@@ -184,11 +185,11 @@ class ImagePlugin(BasePlugin):
 class ServicePlugin(BasePlugin):
     """
     Protocol for service plugins (webhooks, APIs, iframes, etc.).
-    
+
     MUST implement:
     - get_content()
     - validate_config()
-    
+
     CAN implement (optional):
     - handle_webhook()
     - handle_api_request()
@@ -226,7 +227,9 @@ class ServicePlugin(BasePlugin):
         """
         return None
 
-    async def handle_api_request(self, method: str, path: str, data: dict[str, Any] | None = None) -> dict[str, Any] | None:
+    async def handle_api_request(
+        self, method: str, path: str, data: dict[str, Any] | None = None
+    ) -> dict[str, Any] | None:
         """
         Handle API request (optional - not all services support API).
 
@@ -247,15 +250,15 @@ class ServicePlugin(BasePlugin):
     ) -> dict[str, Any] | None:
         """
         Fetch service data for display (optional - not all services support data fetching).
-        
+
         This method is called by the core when fetching data via /web-services/{service_id}/data.
         Plugins can implement this to provide their own data fetching logic.
         Alternatively, plugins can use the fetch_service_data hook for more complex scenarios.
-        
+
         Args:
             start_date: Optional start date (YYYY-MM-DD format, plugin-specific)
             end_date: Optional end date (YYYY-MM-DD format, plugin-specific)
-            
+
         Returns:
             Dictionary with service data, or None if data fetching not supported.
             The dict can contain any plugin-specific data structure.
@@ -274,4 +277,3 @@ class ServicePlugin(BasePlugin):
             True if configuration is valid
         """
         pass
-

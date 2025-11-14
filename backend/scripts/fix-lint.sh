@@ -1,15 +1,11 @@
 #!/bin/bash
-# Script to automatically fix linting issues
+# Auto-fix linting issues using Ruff
+# This script runs both formatting and linting with auto-fix
 
-set -e
-
-echo "🔍 Running Ruff linter with auto-fix..."
-uv run ruff check --fix .
-
-echo "📝 Running Ruff formatter..."
+echo "Running Ruff formatter (Black-compatible)..."
 uv run ruff format .
 
-echo "✅ All linting issues fixed!"
-echo ""
-echo "💡 Tip: Run 'uv run ruff check .' to verify no issues remain"
+echo "Running Ruff linter with auto-fix..."
+uv run ruff check --fix --unsafe-fixes .
 
+echo "Done! Some issues (like E501 - line too long) may require manual fixes."

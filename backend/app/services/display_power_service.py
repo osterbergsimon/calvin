@@ -4,7 +4,6 @@ import asyncio
 import json
 import subprocess
 from datetime import datetime, time
-from typing import Optional
 
 try:
     import pytz
@@ -19,7 +18,7 @@ class DisplayPowerService:
 
     def __init__(self):
         self._running = False
-        self._task: Optional[asyncio.Task] = None
+        self._task: asyncio.Task | None = None
 
     async def start(self):
         """Start the display power scheduler."""
@@ -57,15 +56,15 @@ class DisplayPowerService:
         """Check current time and update display power state."""
         # Get all display-related config values in one query (more efficient)
         config = await config_service.get_config()
-        
+
         # Configure display timeout first (screensaver settings)
         # Use the config we just fetched instead of fetching again
         timeout_enabled = config.get("display_timeout_enabled", False)
         timeout_seconds = config.get("display_timeout", 0)
         await self._apply_display_timeout(timeout_enabled, timeout_seconds)
-        
+
         schedule_enabled = config.get("display_schedule_enabled", False)
-        
+
         if not schedule_enabled:
             # Schedule disabled, keep display on
             await self.turn_display_on()
@@ -87,7 +86,7 @@ class DisplayPowerService:
             now = datetime.now(tz)
         else:
             now = datetime.now()
-        
+
         # Try to get per-day schedule first (new format)
         display_schedule_str = config.get("display_schedule")
         if display_schedule_str:
@@ -97,34 +96,36 @@ class DisplayPowerService:
                     schedule = json.loads(display_schedule_str)
                 else:
                     schedule = display_schedule_str
-                
+
                 # Get current day of week (0=Monday, 6=Sunday in Python)
                 current_day = now.weekday()  # 0=Monday, 6=Sunday
-                
+
                 # Find schedule for current day
                 day_schedule = None
                 for day_config in schedule:
                     if day_config.get("day") == current_day:
                         day_schedule = day_config
                         break
-                
+
                 if day_schedule and day_schedule.get("enabled", False):
                     # Parse times for this day
                     on_time_str = day_schedule.get("onTime", "06:00")
                     off_time_str = day_schedule.get("offTime", "22:00")
-                    
+
                     try:
                         on_hour, on_minute = map(int, on_time_str.split(":"))
                         off_hour, off_minute = map(int, off_time_str.split(":"))
                         display_on_time = time(on_hour, on_minute)
                         display_off_time = time(off_hour, off_minute)
-                        
+
                         # Get current time
                         current_time = now.time()
-                        
+
                         # Determine if display should be on or off
-                        should_be_on = self._should_display_be_on(current_time, display_on_time, display_off_time)
-                        
+                        should_be_on = self._should_display_be_on(
+                            current_time, display_on_time, display_off_time
+                        )
+
                         if should_be_on:
                             await self.turn_display_on()
                         else:
@@ -176,9 +177,7 @@ class DisplayPowerService:
         else:
             await self.turn_display_off()
 
-    def _should_display_be_on(
-        self, current_time: time, on_time: time, off_time: time
-    ) -> bool:
+    def _should_display_be_on(self, current_time: time, on_time: time, off_time: time) -> bool:
         """Determine if display should be on based on current time and schedule."""
         # Handle case where off_time is before on_time (e.g., 22:00 to 06:00)
         if off_time < on_time:
@@ -196,9 +195,9 @@ class DisplayPowerService:
             "HOME": "/home/calvin",
             "XAUTHORITY": "/home/calvin/.Xauthority",
         }
-        
+
         # Try multiple methods to ensure display turns on
-        
+
         # Method 1: vcgencmd (Raspberry Pi HDMI power control)
         try:
             result = subprocess.run(
@@ -285,9 +284,9 @@ class DisplayPowerService:
             "HOME": "/home/calvin",
             "XAUTHORITY": "/home/calvin/.Xauthority",
         }
-        
+
         # Try multiple methods to ensure display turns off
-        
+
         # Method 1: vcgencmd (Raspberry Pi HDMI power control)
         try:
             result = subprocess.run(
@@ -343,7 +342,7 @@ class DisplayPowerService:
 
     async def configure_display_timeout(self):
         """Configure display timeout (screensaver) based on settings.
-        
+
         Default behavior: Keep display on (disable timeout) unless explicitly enabled.
         Only enables timeout if both timeout_enabled is True AND timeout_seconds > 0.
         """
@@ -352,10 +351,10 @@ class DisplayPowerService:
         timeout_enabled = config.get("display_timeout_enabled", False)
         timeout_seconds = config.get("display_timeout", 0)
         await self._apply_display_timeout(timeout_enabled, timeout_seconds)
-    
+
     async def _apply_display_timeout(self, timeout_enabled: bool, timeout_seconds: int):
         """Apply display timeout settings (internal method).
-        
+
         Args:
             timeout_enabled: Whether timeout is enabled
             timeout_seconds: Timeout in seconds (0 = never)
@@ -366,7 +365,7 @@ class DisplayPowerService:
             "HOME": "/home/calvin",
             "XAUTHORITY": "/home/calvin/.Xauthority",
         }
-        
+
         # Only enable timeout if explicitly enabled AND timeout > 0
         # Default: keep display on (disable timeout)
         if timeout_enabled is True and timeout_seconds is not None and timeout_seconds > 0:
@@ -389,7 +388,13 @@ class DisplayPowerService:
                 # Set DPMS standby, suspend, and off times (in seconds)
                 # Format: standby suspend off (all in seconds)
                 subprocess.run(
-                    ["xset", "dpms", str(timeout_seconds), str(timeout_seconds), str(timeout_seconds)],
+                    [
+                        "xset",
+                        "dpms",
+                        str(timeout_seconds),
+                        str(timeout_seconds),
+                        str(timeout_seconds),
+                    ],
                     capture_output=True,
                     timeout=5,
                     env=x11_env,
@@ -427,4 +432,3 @@ class DisplayPowerService:
 
 # Global instance
 display_power_service = DisplayPowerService()
-

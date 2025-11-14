@@ -42,7 +42,7 @@ class WeatherServicePlugin(ServicePlugin):
                     "ui": {
                         "component": "input",
                         "placeholder": "London, UK or New York, US",
-                        "help_text": "City name with optional state/country code (e.g., 'London, UK' or 'New York, US')",
+                        "help_text": "City name with optional state/country code (e.g., 'London, UK' or 'New York, US')",  # noqa: E501
                         "validation": {
                             "required": True,
                         },
@@ -196,7 +196,7 @@ class WeatherServicePlugin(ServicePlugin):
         """
         # Return a special URL that points to our backend endpoint
         weather_api_url = f"/api/web-services/{self.plugin_id}/weather"
-        
+
         return {
             "type": "weather",
             "url": weather_api_url,
@@ -209,7 +209,7 @@ class WeatherServicePlugin(ServicePlugin):
                 "allowFullscreen": True,
             },
         }
-    
+
     def get_config(self) -> dict[str, Any]:
         """
         Get plugin configuration.
@@ -235,16 +235,16 @@ class WeatherServicePlugin(ServicePlugin):
     ) -> dict[str, Any]:
         """
         Fetch weather data from OpenWeatherMap API (protocol-defined method).
-        
+
         Args:
             start_date: Not used for weather (kept for protocol compatibility)
             end_date: Not used for weather (kept for protocol compatibility)
-        
+
         Returns:
             Dictionary with weather data in format compatible with WeatherWidget
         """
         return await self._fetch_weather()
-    
+
     async def _fetch_weather(self) -> dict[str, Any]:
         """
         Fetch weather data from OpenWeatherMap API.
@@ -262,7 +262,7 @@ class WeatherServicePlugin(ServicePlugin):
                 "appid": self.api_key,
                 "units": self.units,
             }
-            
+
             current_response = await self._client.get("/weather", params=current_params)
             current_response.raise_for_status()
             current_data = current_response.json()
@@ -274,7 +274,7 @@ class WeatherServicePlugin(ServicePlugin):
                 "units": self.units,
                 "cnt": self.forecast_days * 8,  # 8 forecasts per day (3-hour intervals)
             }
-            
+
             forecast_response = await self._client.get("/forecast", params=forecast_params)
             forecast_response.raise_for_status()
             forecast_data = forecast_response.json()
@@ -292,15 +292,15 @@ class WeatherServicePlugin(ServicePlugin):
             }
 
             # Process forecast - group by day and get daily min/max
-            from datetime import datetime, timedelta
             from collections import defaultdict
-            
+            from datetime import datetime, timedelta
+
             forecast_by_date = defaultdict(lambda: {"temps": [], "descriptions": [], "icons": []})
-            
+
             for item in forecast_data.get("list", []):
                 dt = datetime.fromtimestamp(item["dt"])
                 date_str = dt.date().isoformat()
-                
+
                 forecast_by_date[date_str]["temps"].append(item["main"]["temp"])
                 forecast_by_date[date_str]["descriptions"].append(item["weather"][0]["description"])
                 forecast_by_date[date_str]["icons"].append(item["weather"][0]["icon"])
@@ -311,19 +311,23 @@ class WeatherServicePlugin(ServicePlugin):
             for i in range(1, self.forecast_days + 1):
                 forecast_date = today + timedelta(days=i)
                 date_str = forecast_date.isoformat()
-                
+
                 if date_str in forecast_by_date:
                     day_data = forecast_by_date[date_str]
-                    forecast.append({
-                        "date": date_str,
-                        "temperature": sum(day_data["temps"]) / len(day_data["temps"]),
-                        "temp_min": min(day_data["temps"]),
-                        "temp_max": max(day_data["temps"]),
-                        "description": day_data["descriptions"][0],  # Use first description
-                        "icon": day_data["icons"][0],  # Use first icon
-                    })
+                    forecast.append(
+                        {
+                            "date": date_str,
+                            "temperature": sum(day_data["temps"]) / len(day_data["temps"]),
+                            "temp_min": min(day_data["temps"]),
+                            "temp_max": max(day_data["temps"]),
+                            "description": day_data["descriptions"][0],  # Use first description
+                            "icon": day_data["icons"][0],  # Use first icon
+                        }
+                    )
 
-            location_name = f"{current_data['name']}, {current_data.get('sys', {}).get('country', '')}"
+            location_name = (
+                f"{current_data['name']}, {current_data.get('sys', {}).get('country', '')}"
+            )
 
             return {
                 "current": current,
@@ -336,7 +340,7 @@ class WeatherServicePlugin(ServicePlugin):
             print(f"[Weather] HTTP error fetching weather: {e.response.status_code} - {e}")
             return {
                 "error": f"HTTP error: {e.response.status_code}",
-                "message": e.response.text if hasattr(e.response, 'text') else str(e),
+                "message": e.response.text if hasattr(e.response, "text") else str(e),
             }
         except httpx.HTTPError as e:
             print(f"[Weather] Error fetching weather: {e}")
@@ -346,6 +350,7 @@ class WeatherServicePlugin(ServicePlugin):
         except Exception as e:
             print(f"[Weather] Unexpected error fetching weather: {e}")
             import traceback
+
             traceback.print_exc()
             return {
                 "error": str(e),
@@ -399,9 +404,13 @@ class WeatherServicePlugin(ServicePlugin):
         if "forecast_days" in config:
             forecast_days_value = config["forecast_days"]
             if isinstance(forecast_days_value, dict):
-                forecast_days_value = forecast_days_value.get("value") or forecast_days_value.get("default") or 3
+                forecast_days_value = (
+                    forecast_days_value.get("value") or forecast_days_value.get("default") or 3
+                )
             try:
-                self.forecast_days = min(max(int(forecast_days_value), 1), 5) if forecast_days_value else 3
+                self.forecast_days = (
+                    min(max(int(forecast_days_value), 1), 5) if forecast_days_value else 3
+                )
             except (ValueError, TypeError):
                 self.forecast_days = 3
         if "display_order" in config:
@@ -473,4 +482,3 @@ def create_plugin_instance(
         display_order=display_order,
         fullscreen=fullscreen,
     )
-

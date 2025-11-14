@@ -2,7 +2,7 @@
 
 from pathlib import Path
 
-from fastapi import APIRouter, HTTPException, UploadFile, File
+from fastapi import APIRouter, File, HTTPException, UploadFile
 from fastapi.responses import FileResponse
 
 from app.services import image_service as image_service_module
@@ -26,6 +26,7 @@ async def list_images():
     """
     # Get randomize setting from config
     from app.services.config_service import config_service
+
     randomize_value = await config_service.get_value("randomize_images")
     randomize = randomize_value == "true" if randomize_value else False
 
@@ -44,6 +45,7 @@ async def get_current_image():
     """
     # Get randomize setting from config
     from app.services.config_service import config_service
+
     randomize_value = await config_service.get_value("randomize_images")
     randomize = randomize_value == "true" if randomize_value else False
 
@@ -81,6 +83,7 @@ async def get_image_file(image_id: str):
     # If it's a remote URL (starts with http), redirect to it
     if image_url and image_url.startswith("http"):
         from fastapi.responses import RedirectResponse
+
         return RedirectResponse(
             url=image_url,
             status_code=302,
@@ -107,6 +110,7 @@ async def get_image_file(image_id: str):
 
     # Return image data directly
     from fastapi.responses import Response
+
     return Response(
         content=image_data,
         media_type=f"image/{image.get('format', 'jpeg').lstrip('.')}",
@@ -149,12 +153,12 @@ async def get_image_thumbnail(image_id: str):
     thumbnail_path = plugin.get_thumbnail_path(image_id)
     if thumbnail_path and thumbnail_path.exists():
         return FileResponse(
-                thumbnail_path,
-                media_type="image/jpeg",
-                headers={
-                    "Cache-Control": "public, max-age=86400",  # Cache for 1 day
-                },
-            )
+            thumbnail_path,
+            media_type="image/jpeg",
+            headers={
+                "Cache-Control": "public, max-age=86400",  # Cache for 1 day
+            },
+        )
 
     # Fallback: generate thumbnail from image data
     image_data = await plugin_image_service.get_image_data(image_id)
@@ -164,7 +168,9 @@ async def get_image_thumbnail(image_id: str):
     # Generate thumbnail on the fly
     from io import BytesIO
 
-    from PIL import Image as PILImage, ImageOps
+    from PIL import Image as PILImage
+    from PIL import ImageOps
+
     try:
         img = PILImage.open(BytesIO(image_data))
         img = ImageOps.exif_transpose(img)
@@ -186,6 +192,7 @@ async def get_image_thumbnail(image_id: str):
         thumbnail_bytes.seek(0)
 
         from fastapi.responses import Response
+
         return Response(
             content=thumbnail_bytes.read(),
             media_type="image/jpeg",
@@ -207,6 +214,7 @@ async def next_image():
     """
     # Get randomize setting from config
     from app.services.config_service import config_service
+
     randomize_value = await config_service.get_value("randomize_images")
     randomize = randomize_value == "true" if randomize_value else False
 
@@ -227,6 +235,7 @@ async def previous_image():
     """
     # Get randomize setting from config
     from app.services.config_service import config_service
+
     randomize_value = await config_service.get_value("randomize_images")
     randomize = randomize_value == "true" if randomize_value else False
 
@@ -298,8 +307,7 @@ async def upload_image(file: UploadFile = File(...)):
     uploaded_image = await plugin_image_service.upload_image(file_content, file.filename)
     if not uploaded_image:
         raise HTTPException(
-            status_code=500,
-            detail="Failed to upload image: No plugin supports upload"
+            status_code=500, detail="Failed to upload image: No plugin supports upload"
         )
 
     return {

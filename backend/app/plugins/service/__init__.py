@@ -1,11 +1,12 @@
 """Service plugins."""
 
 # Import all plugins to trigger their auto-registration
-from app.plugins.service import iframe  # noqa: F401
-from app.plugins.service import mealie  # noqa: F401
-from app.plugins.service import weather  # noqa: F401
-from app.plugins.service import yr_weather  # noqa: F401
-
+from app.plugins.service import (
+    iframe,  # noqa: F401
+    mealie,  # noqa: F401
+    weather,  # noqa: F401
+    yr_weather,  # noqa: F401
+)
 from app.plugins.service.iframe import IframeServicePlugin
 from app.plugins.service.mealie import MealieServicePlugin
 from app.plugins.service.weather import WeatherServicePlugin
@@ -17,4 +18,3 @@ __all__ = [
     "WeatherServicePlugin",
     "YrWeatherServicePlugin",
 ]
-

@@ -17,7 +17,7 @@ class PluginInstaller:
         # Plugin installation directory (from config)
         self.plugins_dir = settings.plugins_dir.resolve()
         self.plugins_dir.mkdir(parents=True, exist_ok=True)
-        
+
         # Frontend plugins directory (relative to backend directory)
         # Backend is typically in backend/, frontend is in frontend/
         backend_dir = Path(__file__).parent.parent.parent
@@ -65,6 +65,7 @@ class PluginInstaller:
         # If it's a zip file, extract to temp location first
         if plugin_path.suffix == ".zip":
             import tempfile
+
             with tempfile.TemporaryDirectory() as temp_dir:
                 with zipfile.ZipFile(plugin_path, "r") as zip_ref:
                     zip_ref.extractall(temp_dir)
@@ -75,10 +76,10 @@ class PluginInstaller:
                 for path in extracted_path.rglob("plugin.json"):
                     plugin_json = path
                     break
-                
+
                 if not plugin_json:
                     raise ValueError("plugin.json not found in plugin package")
-                
+
                 plugin_dir = plugin_json.parent
                 return self._validate_plugin_directory(plugin_dir)
         else:
@@ -104,7 +105,7 @@ class PluginInstaller:
 
         # Load and validate manifest
         try:
-            with open(manifest_path, "r", encoding="utf-8") as f:
+            with open(manifest_path, encoding="utf-8") as f:
                 manifest = json.load(f)
         except json.JSONDecodeError as e:
             raise ValueError(f"Invalid JSON in plugin.json: {e}")
@@ -118,7 +119,9 @@ class PluginInstaller:
         # Validate plugin type
         valid_types = ["calendar", "image", "service"]
         if manifest["type"] not in valid_types:
-            raise ValueError(f"Invalid plugin type: {manifest['type']}. Must be one of {valid_types}")
+            raise ValueError(
+                f"Invalid plugin type: {manifest['type']}. Must be one of {valid_types}"
+            )
 
         # Check for plugin.py
         plugin_py = plugin_dir / "plugin.py"
@@ -143,10 +146,10 @@ class PluginInstaller:
         """
         # Validate plugin package
         manifest = self.validate_plugin_package(source_path)
-        
+
         # Use provided plugin_id or manifest ID
         install_id = plugin_id or manifest["id"]
-        
+
         # Check if plugin already installed
         plugin_path = self.get_plugin_path(install_id)
         if plugin_path.exists():
@@ -165,13 +168,13 @@ class PluginInstaller:
                         if name.endswith("plugin.json"):
                             plugin_json_path = name
                             break
-                    
+
                     if not plugin_json_path:
                         raise ValueError("plugin.json not found in plugin package")
-                    
+
                     # Extract all files
                     zip_ref.extractall(plugin_path)
-                    
+
                     # If files were extracted to a subdirectory, move them up
                     # (some zip files contain a root directory)
                     subdirs = [d for d in plugin_path.iterdir() if d.is_dir()]
@@ -261,7 +264,7 @@ class PluginInstaller:
                 continue
 
             try:
-                with open(manifest_path, "r", encoding="utf-8") as f:
+                with open(manifest_path, encoding="utf-8") as f:
                     manifest = json.load(f)
                 manifest["_installed_path"] = str(plugin_dir)
                 plugins.append(manifest)
@@ -283,12 +286,12 @@ class PluginInstaller:
         """
         plugin_path = self.get_plugin_path(plugin_id)
         manifest_path = plugin_path / "plugin.json"
-        
+
         if not manifest_path.exists():
             return None
 
         try:
-            with open(manifest_path, "r", encoding="utf-8") as f:
+            with open(manifest_path, encoding="utf-8") as f:
                 return json.load(f)
         except (json.JSONDecodeError, Exception):
             return None
@@ -296,4 +299,3 @@ class PluginInstaller:
 
 # Global plugin installer instance
 plugin_installer = PluginInstaller()
-
