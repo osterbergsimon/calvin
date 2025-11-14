@@ -12,7 +12,14 @@ help:
 	@echo "  make clean      - Clean build artifacts"
 
 install:
-	cd backend && uv sync --extra dev
+	@echo "Installing dependencies..."
+	@if [ "$$(uname -s)" = "Linux" ]; then \
+		echo "Linux detected - installing with evdev support..."; \
+		cd backend && uv sync --extra linux --extra dev; \
+	else \
+		echo "Installing dependencies (no evdev on non-Linux systems)..."; \
+		cd backend && uv sync --extra dev; \
+	fi
 	cd frontend && npm install
 
 dev:
