@@ -756,7 +756,7 @@ async def geocode_location(plugin_id: str, request: dict[str, Any] = Body(...)):
                 return {
                     "success": False,
                     "message": (
-                        f"Location '{location}' not found. " "Please try a more specific location."
+                        f"Location '{location}' not found. Please try a more specific location."
                     ),
                 }
 
