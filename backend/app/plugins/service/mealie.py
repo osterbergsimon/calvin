@@ -323,32 +323,82 @@ class MealieServicePlugin(ServicePlugin):
             if self.group_id:
                 params["group_id"] = self.group_id
 
-            # Mealie API endpoints - based on the errors, it seems to use /api/households/mealplans
+            # Mealie API endpoints - based on Mealie docs, use /api/households/mealplans
+            # Try with date range parameters first
             endpoints_to_try = [
-                "/api/households/mealplans",
-                "/api/meal-plans",
-                "/api/mealplan",
-                "/api/meal-plans/group",
-                "/api/groups/meal-plans",
+                ("/api/households/mealplans", params),
+                # Try without group_id if it was specified
+                ("/api/households/mealplans", {k: v for k, v in params.items() if k != "group_id"}),
+                # Try alternative endpoints
+                ("/api/meal-plans", params),
+                ("/api/mealplan", params),
             ]
 
-            for endpoint in endpoints_to_try:
+            for endpoint, endpoint_params in endpoints_to_try:
                 try:
-                    response = await self._client.get(endpoint, params=params)
+                    print(f"[Mealie] Trying endpoint: {endpoint} with params: {endpoint_params}")
+                    response = await self._client.get(endpoint, params=endpoint_params)
+                    print(f"[Mealie] Response from {endpoint}: status={response.status_code}")
+
                     if response.status_code == 200:
-                        return response.json()
+                        data = response.json()
+                        # Log response structure for debugging
+                        if isinstance(data, dict):
+                            item_count = (
+                                len(data.get("items", []))
+                                if "items" in data
+                                else len(data)
+                                if isinstance(data, list)
+                                else 0
+                            )
+                            print(
+                                f"[Mealie] Successfully fetched meal plan from {endpoint}: "
+                                f"{item_count} items"
+                            )
+                        elif isinstance(data, list):
+                            print(
+                                f"[Mealie] Successfully fetched meal plan from {endpoint}: "
+                                f"{len(data)} items"
+                            )
+                        return data
                     elif response.status_code == 404:
                         # Try next endpoint
+                        print(f"[Mealie] Endpoint {endpoint} returned 404, trying next...")
                         continue
                     else:
+                        # Log non-200, non-404 responses
+                        try:
+                            error_body = response.text[:500]  # First 500 chars
+                            print(
+                                f"[Mealie] Endpoint {endpoint} returned "
+                                f"{response.status_code}: {error_body}"
+                            )
+                        except Exception:
+                            pass
                         response.raise_for_status()
                 except httpx.HTTPStatusError as e:
                     if e.response.status_code == 404:
+                        print(f"[Mealie] Endpoint {endpoint} not found (404), trying next...")
                         continue
+                    # Log other HTTP errors
+                    try:
+                        error_body = e.response.text[:500]
+                        print(
+                            f"[Mealie] HTTP error from {endpoint}: "
+                            f"{e.response.status_code} - {error_body}"
+                        )
+                    except Exception:
+                        print(f"[Mealie] HTTP error from {endpoint}: {e.response.status_code}")
+                    raise
+                except Exception as e:
+                    print(f"[Mealie] Unexpected error trying {endpoint}: {type(e).__name__}: {e}")
                     raise
 
             # If all endpoints failed, return empty meal plan
-            print(f"[Mealie] Could not find meal plan endpoint. Tried: {endpoints_to_try}")
+            tried_endpoints = [e[0] for e in endpoints_to_try]
+            print(f"[Mealie] ERROR: Could not find meal plan endpoint. Tried: {tried_endpoints}")
+            print(f"[Mealie] Date range: {today.isoformat()} to {week_end.isoformat()}")
+            print(f"[Mealie] Group ID: {self.group_id or 'not specified'}")
             return {
                 "items": [],
                 "start_date": today.isoformat(),
@@ -366,32 +416,62 @@ class MealieServicePlugin(ServicePlugin):
                 # Log response body for debugging (may contain useful error info)
                 try:
                     response_body = e.response.text
-                    print(f"[Mealie] 401 response body: {response_body[:200]}")  # First 200 chars
+                    print(f"[Mealie] 401 response body: {response_body[:500]}")  # First 500 chars
                 except Exception:
                     pass
-            print(f"[Mealie] HTTP error fetching meal plan: {e.response.status_code} - {e}")
+            elif e.response.status_code == 403:
+                error_detail = (
+                    "HTTP error: 403 - Forbidden. "
+                    "API token may not have permission to access meal plans."
+                )
+                try:
+                    response_body = e.response.text
+                    print(f"[Mealie] 403 response body: {response_body[:500]}")
+                except Exception:
+                    pass
+            elif e.response.status_code == 404:
+                error_detail = (
+                    "HTTP error: 404 - Meal plan endpoint not found. "
+                    "Check Mealie version and API documentation."
+                )
+            else:
+                # Log response body for other errors
+                try:
+                    response_body = e.response.text
+                    print(f"[Mealie] {e.response.status_code} response body: {response_body[:500]}")
+                except Exception:
+                    pass
+
+            print(f"[Mealie] HTTP error fetching meal plan: {e.response.status_code}")
+            print(f"[Mealie] Request URL: {e.request.url}")
+            print(f"[Mealie] Request method: {e.request.method}")
             # Log token status (without exposing the actual token)
             token_status = "present" if self.api_token else "missing"
             token_length = len(self.api_token) if self.api_token else 0
             print(f"[Mealie] API token status: {token_status} (length: {token_length})")
+            print(f"[Mealie] Mealie URL: {self.mealie_url}")
             return {
                 "items": [],
                 "error": error_detail,
             }
         except httpx.HTTPError as e:
-            print(f"[Mealie] Error fetching meal plan: {e}")
-            return {
-                "items": [],
-                "error": str(e),
-            }
-        except Exception as e:
-            print(f"[Mealie] Unexpected error fetching meal plan: {e}")
+            print(f"[Mealie] Network/HTTP error fetching meal plan: {type(e).__name__}: {e}")
+            print(f"[Mealie] Mealie URL: {self.mealie_url}")
             import traceback
 
             traceback.print_exc()
             return {
                 "items": [],
-                "error": str(e),
+                "error": f"Network error: {str(e)}",
+            }
+        except Exception as e:
+            print(f"[Mealie] Unexpected error fetching meal plan: {type(e).__name__}: {e}")
+            import traceback
+
+            traceback.print_exc()
+            return {
+                "items": [],
+                "error": f"Unexpected error: {str(e)}",
             }
 
     async def validate_config(self, config: dict[str, Any]) -> bool:
@@ -537,12 +617,13 @@ async def test_plugin_connection(
     type_id: str,
     config: dict[str, Any],
 ) -> dict[str, Any] | None:
-    """Test Mealie API connection."""
+    """Test Mealie API connection and verify API token permissions."""
     if type_id != "mealie":
         return None
 
     mealie_url = config.get("mealie_url", "").rstrip("/")
     api_token = config.get("api_token", "")
+    group_id = config.get("group_id", "")
 
     if not mealie_url or not api_token:
         return {
@@ -550,44 +631,162 @@ async def test_plugin_connection(
             "message": "Mealie URL and API token are required",
         }
 
+    headers = {"Authorization": f"Bearer {api_token}"}
+    test_results = []
+
     try:
-        headers = {"Authorization": f"Bearer {api_token}"}
         async with httpx.AsyncClient(timeout=10.0) as client:
-            response = await client.get(
-                f"{mealie_url}/api/users/self",
-                headers=headers,
-            )
-            if response.status_code == 200:
-                return {
-                    "success": True,
-                    "message": f"Successfully connected to Mealie at {mealie_url}",
-                }
-            elif response.status_code == 401:
-                return {
-                    "success": False,
-                    "message": "Authentication failed. Please check your API token.",
-                }
-            elif response.status_code == 404:
-                # Try alternative endpoint
+            # Test 1: Verify API token by checking user info
+            print(f"[Mealie Test] Testing connection to {mealie_url}...")
+            try:
                 response = await client.get(
-                    f"{mealie_url}/api/recipes",
+                    f"{mealie_url}/api/users/self",
                     headers=headers,
                 )
                 if response.status_code == 200:
+                    user_data = response.json()
+                    user_id = user_data.get("id", "unknown")
+                    username = user_data.get("username", "unknown")
+                    test_results.append(f"✓ Authentication successful (user: {username})")
+                    print(f"[Mealie Test] User authenticated: {username} (ID: {user_id})")
+                elif response.status_code == 401:
                     return {
-                        "success": True,
-                        "message": f"Successfully connected to Mealie at {mealie_url}",
+                        "success": False,
+                        "message": "Authentication failed. Please check your API token.",
                     }
                 else:
                     return {
                         "success": False,
-                        "message": f"Could not connect to Mealie API. Status: {response.status_code}",  # noqa: E501
+                        "message": f"Authentication check failed. Status: {response.status_code}",
                     }
-            else:
+            except httpx.HTTPStatusError as e:
+                if e.response.status_code == 401:
+                    return {
+                        "success": False,
+                        "message": "Authentication failed. Please check your API token.",
+                    }
                 return {
                     "success": False,
-                    "message": f"Mealie API returned status {response.status_code}",
+                    "message": f"Authentication check failed. Status: {e.response.status_code}",
                 }
+
+            # Test 2: Verify access to meal plans endpoint
+            print("[Mealie Test] Testing meal plan access...")
+            from datetime import datetime, timedelta
+
+            today = datetime.now().date()
+            end_date = today + timedelta(days=7)
+            meal_plan_params = {
+                "start_date": today.isoformat(),
+                "end_date": end_date.isoformat(),
+            }
+            if group_id:
+                meal_plan_params["group_id"] = group_id
+
+            # Try the meal plan endpoint
+            meal_plan_endpoints = [
+                "/api/households/mealplans",
+                "/api/meal-plans",
+                "/api/mealplan",
+            ]
+
+            meal_plan_accessible = False
+            for endpoint in meal_plan_endpoints:
+                try:
+                    response = await client.get(
+                        f"{mealie_url}{endpoint}",
+                        headers=headers,
+                        params=meal_plan_params,
+                    )
+                    if response.status_code == 200:
+                        meal_plan_accessible = True
+                        data = response.json()
+                        item_count = 0
+                        if isinstance(data, dict):
+                            item_count = len(data.get("items", [])) if "items" in data else 0
+                        elif isinstance(data, list):
+                            item_count = len(data)
+                        test_results.append(
+                            f"✓ Meal plan access successful "
+                            f"({endpoint}: {item_count} items found)"
+                        )
+                        print(
+                            f"[Mealie Test] Meal plan endpoint {endpoint} accessible: "
+                            f"{item_count} items"
+                        )
+                        break
+                    elif response.status_code == 404:
+                        continue  # Try next endpoint
+                    elif response.status_code == 403:
+                        test_results.append(
+                            "⚠ Meal plan endpoint accessible but permission denied (403)"
+                        )
+                        print(
+                            f"[Mealie Test] Meal plan endpoint {endpoint} returned 403 "
+                            "(permission denied)"
+                        )
+                        break
+                    else:
+                        print(
+                            f"[Mealie Test] Meal plan endpoint {endpoint} returned "
+                            f"{response.status_code}"
+                        )
+                except httpx.HTTPStatusError as e:
+                    if e.response.status_code == 404:
+                        continue
+                    elif e.response.status_code == 403:
+                        test_results.append(
+                            "⚠ Meal plan endpoint accessible but permission denied (403)"
+                        )
+                        print(f"[Mealie Test] Meal plan endpoint {endpoint} returned 403")
+                        break
+                    else:
+                        print(
+                            f"[Mealie Test] Meal plan endpoint {endpoint} error: "
+                            f"{e.response.status_code}"
+                        )
+
+            if not meal_plan_accessible:
+                test_results.append(
+                    "⚠ Could not access meal plan endpoint "
+                    "(may not have meal plans or wrong endpoint)"
+                )
+
+            # Test 3: Verify recipes endpoint (optional, to confirm API is working)
+            try:
+                response = await client.get(
+                    f"{mealie_url}/api/recipes",
+                    headers=headers,
+                    params={"perPage": 1},  # Just check if accessible
+                )
+                if response.status_code == 200:
+                    test_results.append("✓ Recipes API accessible")
+                    print("[Mealie Test] Recipes endpoint accessible")
+            except Exception:
+                pass  # Not critical for meal plan functionality
+
+            # Build success message
+            if meal_plan_accessible:
+                message = "Connection successful!\n" + "\n".join(test_results)
+                return {
+                    "success": True,
+                    "message": message,
+                }
+            else:
+                message = (
+                    "Connection successful, but meal plan access failed.\n"
+                    + "\n".join(test_results)
+                    + "\n\nPlease verify:"
+                    + "\n- API token has permission to access meal plans"
+                    + "\n- Meal plans exist for the date range "
+                    + f"({today.isoformat()} to {end_date.isoformat()})"
+                    + "\n- Group ID is correct (if specified)"
+                )
+                return {
+                    "success": False,
+                    "message": message,
+                }
+
     except httpx.ConnectError:
         return {
             "success": False,
@@ -599,6 +798,10 @@ async def test_plugin_connection(
             "message": f"Connection to {mealie_url} timed out. Please check the URL and network.",
         }
     except Exception as e:
+        import traceback
+
+        print(f"[Mealie Test] Unexpected error: {e}")
+        traceback.print_exc()
         return {
             "success": False,
             "message": f"Error: {str(e)}",
