@@ -1050,7 +1050,7 @@ async def handle_plugin_config_update(
                 f"API token: {saved_token_status} (length: {saved_token_length})"
             )
 
-            session.commit()
+            await session.commit()
 
             # Verify the config was actually saved by refreshing and checking
             session.refresh(mealie_instance)
