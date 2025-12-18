@@ -62,24 +62,26 @@
       <!-- Minimal UI overlay (shown when UI is hidden) -->
       <MinimalUIOverlay v-if="!configStore.shouldShowUI" />
       <ModeIndicator />
-      
+
       <!-- Connection indicator (shown when offline) -->
       <ConnectionIndicator
         class="connection-indicator-overlay"
         :show-label="configStore.shouldShowUI"
       />
-      
+
       <!-- Clock (when display mode is 'always' - only shown when UI is off) -->
       <Clock
-        v-if="configStore.clockEnabled && configStore.clockDisplayMode === 'always' && !configStore.shouldShowUI"
+        v-if="
+          configStore.clockEnabled &&
+          configStore.clockDisplayMode === 'always' &&
+          !configStore.shouldShowUI
+        "
         :display-mode="configStore.clockDisplayMode"
         :show-date="configStore.clockShowDate"
         :class="clockClass"
       />
 
-      <div
-        :class="['dashboard-main', mainLayoutClass]"
-      >
+      <div :class="['dashboard-main', mainLayoutClass]">
         <!-- Fullscreen Mode (Photos or Web Services) -->
         <div v-if="modeStore.isFullscreen" class="mode-content fullscreen-mode">
           <!-- Fullscreen Photos -->
@@ -101,7 +103,12 @@
         <!-- Dashboard View (Home) - Always shows calendar + side view -->
         <div
           v-else
-          :class="['mode-content', 'dashboard-view', mainLayoutClass, sideViewPositionClass]"
+          :class="[
+            'mode-content',
+            'dashboard-view',
+            mainLayoutClass,
+            sideViewPositionClass,
+          ]"
         >
           <!-- Calendar Section (66-75%) -->
           <div
@@ -119,11 +126,19 @@
             <!-- Show content based on current mode -->
             <!-- When in calendar mode, show last side view mode (preserve state) -->
             <WebServiceViewer
-              v-if="modeStore.currentMode === modeStore.MODES.WEB_SERVICES || (modeStore.currentMode === modeStore.MODES.CALENDAR && configStore.lastSideViewMode === 'web_services')"
+              v-if="
+                modeStore.currentMode === modeStore.MODES.WEB_SERVICES ||
+                (modeStore.currentMode === modeStore.MODES.CALENDAR &&
+                  configStore.lastSideViewMode === 'web_services')
+              "
               :is-fullscreen="false"
             />
             <PhotoSlideshow
-              v-else-if="modeStore.currentMode === modeStore.MODES.PHOTOS || (modeStore.currentMode === modeStore.MODES.CALENDAR && configStore.lastSideViewMode !== 'web_services')"
+              v-else-if="
+                modeStore.currentMode === modeStore.MODES.PHOTOS ||
+                (modeStore.currentMode === modeStore.MODES.CALENDAR &&
+                  configStore.lastSideViewMode !== 'web_services')
+              "
               :is-fullscreen="false"
               :auto-rotate="true"
               :rotation-interval="configStore.photoRotationInterval * 1000"
@@ -216,7 +231,10 @@ const sideViewPositionIcon = computed(() => {
 });
 
 const clockClass = computed(() => {
-  return ['clock-overlay', 'position-' + (configStore.clockPosition || 'top-right')];
+  return [
+    "clock-overlay",
+    "position-" + (configStore.clockPosition || "top-right"),
+  ];
 });
 
 const toggleOrientation = () => {
@@ -283,7 +301,7 @@ onMounted(async () => {
   // Check health immediately and then periodically
   checkHealth();
   healthInterval = setInterval(checkHealth, 30000); // Check every 30 seconds
-  
+
   // Fetch config on mount
   await configStore.fetchConfig();
   // Set up polling for config updates (every 30 seconds)
@@ -559,6 +577,8 @@ onUnmounted(() => {
   min-height: 0;
   border-radius: 8px;
   overflow: hidden;
+  display: flex;
+  flex-direction: column;
 }
 
 .dashboard:not(:has(.dashboard-header)) .calendar-section {

@@ -5,10 +5,7 @@
     tabindex="0"
     @keydown="handleKeydown"
   >
-    <div
-      v-if="showHeader"
-      class="calendar-header"
-    >
+    <div v-if="showHeader" class="calendar-header">
       <h2>Calendar</h2>
       <div class="calendar-controls">
         <button
@@ -18,25 +15,16 @@
         >
           ‹
         </button>
-        <div
-          class="calendar-title-group"
-        >
+        <div class="calendar-title-group">
           <span class="current-month">{{ currentMonthYear }}</span>
           <span class="view-mode-indicator">{{ viewModeLabel }}</span>
         </div>
-        <button
-          class="btn-icon"
-          @click="nextMonth"
-          @keydown.enter="nextMonth"
-        >
+        <button class="btn-icon" @click="nextMonth" @keydown.enter="nextMonth">
           ›
         </button>
       </div>
     </div>
-    <div
-      v-else
-      class="calendar-header-minimal"
-    >
+    <div v-else class="calendar-header-minimal">
       <button
         class="btn-icon-minimal"
         title="Previous Month"
@@ -45,17 +33,11 @@
       >
         ‹
       </button>
-      <div
-        class="calendar-title-group-minimal"
-      >
-        <span
-          class="current-month-minimal"
-        >
+      <div class="calendar-title-group-minimal">
+        <span class="current-month-minimal">
           {{ currentMonthYear }}
         </span>
-        <span
-          class="view-mode-indicator-minimal"
-        >
+        <span class="view-mode-indicator-minimal">
           {{ viewModeLabel }}
         </span>
       </div>
@@ -70,21 +52,10 @@
     </div>
     <div class="calendar-content">
       <!-- Loading indicator -->
-      <div
-        v-if="loading"
-        class="loading-overlay"
-      >
-        <div
-          class="loading-spinner"
-        >
-          <div
-            class="spinner"
-          />
-          <div
-            class="loading-text"
-          >
-            Loading events...
-          </div>
+      <div v-if="loading" class="loading-overlay">
+        <div class="loading-spinner">
+          <div class="spinner" />
+          <div class="loading-text">Loading events...</div>
         </div>
       </div>
       <div
@@ -93,16 +64,12 @@
           'rolling-view': viewMode === 'rolling',
           'week-view': viewMode === 'week',
           'day-view': viewMode === 'day',
-          loading: loading
+          loading: loading,
         }"
       >
         <!-- Day headers -->
         <div class="calendar-weekdays">
-          <div
-            v-for="day in weekDays"
-            :key="day"
-            class="weekday"
-          >
+          <div v-for="day in weekDays" :key="day" class="weekday">
             {{ day }}
           </div>
         </div>
@@ -110,7 +77,7 @@
         <div
           class="calendar-days"
           :class="{
-            'rolling-days': viewMode === 'rolling'
+            'rolling-days': viewMode === 'rolling',
           }"
         >
           <div
@@ -143,16 +110,14 @@
                 :key="`${event.id}-${day.date.toISOString()}-${eventIndex}`"
                 :ref="(el) => setEventRef(el, dayIndex, eventIndex)"
                 class="event-item"
-                :class="
-                  {
-                    focused: isFocused(dayIndex, eventIndex),
-                    selected: isSelected(event),
-                    'event-start': event._isStart,
-                    'event-end': event._isEnd,
-                    'event-middle': event._isMiddle,
-                    'event-multi-day': event._isMultiDay,
-                  }
-                "
+                :class="{
+                  focused: isFocused(dayIndex, eventIndex),
+                  selected: isSelected(event),
+                  'event-start': event._isStart,
+                  'event-end': event._isEnd,
+                  'event-middle': event._isMiddle,
+                  'event-multi-day': event._isMultiDay,
+                }"
                 :style="{ backgroundColor: getEventColor(event) }"
                 :title="getEventTitle(event)"
                 tabindex="0"
@@ -167,10 +132,7 @@
                 >
                   {{ getEventDisplayText(event) }}
                 </span>
-                <span
-                  v-else
-                  class="event-continuation"
-                >
+                <span v-else class="event-continuation">
                   <span class="continuation-arrow">←</span>
                   <span class="continuation-text">{{
                     truncateEventTitle(event.title, 15)
@@ -198,7 +160,15 @@
 </template>
 
 <script setup>
-import { ref, computed, watch, onMounted, onUnmounted, onActivated, nextTick } from "vue";
+import {
+  ref,
+  computed,
+  watch,
+  onMounted,
+  onUnmounted,
+  onActivated,
+  nextTick,
+} from "vue";
 import { useRoute } from "vue-router";
 import { useCalendarStore } from "../stores/calendar";
 import { useConfigStore } from "../stores/config";
@@ -230,7 +200,7 @@ let todayRefreshInterval = null;
 // Load calendar sources on mount
 onMounted(async () => {
   await calendarStore.fetchSources();
-  
+
   // Update today's date every minute to refresh the calendar
   // This ensures the "today" highlight updates automatically
   todayRefreshInterval = setInterval(() => {
@@ -273,13 +243,23 @@ const currentMonthYear = computed(() => {
     const startDate = getWeekStart(currentDate.value);
     const endDate = new Date(startDate);
     endDate.setDate(startDate.getDate() + 6);
-    
+
     // If same month, show: "Jan 1-7, 2024", otherwise "Dec 31 - Jan 6, 2024"
-    if (startDate.getMonth() === endDate.getMonth() && startDate.getFullYear() === endDate.getFullYear()) {
+    if (
+      startDate.getMonth() === endDate.getMonth() &&
+      startDate.getFullYear() === endDate.getFullYear()
+    ) {
       return `${startDate.toLocaleDateString("en-US", { month: "long", day: "numeric" })} - ${endDate.toLocaleDateString("en-US", { day: "numeric", year: "numeric" })}`;
     } else {
-      const startMonth = startDate.toLocaleDateString("en-US", { month: "short", day: "numeric" });
-      const endMonth = endDate.toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric" });
+      const startMonth = startDate.toLocaleDateString("en-US", {
+        month: "short",
+        day: "numeric",
+      });
+      const endMonth = endDate.toLocaleDateString("en-US", {
+        month: "short",
+        day: "numeric",
+        year: "numeric",
+      });
       return `${startMonth} - ${endMonth}`;
     }
   } else if (viewMode.value === "day") {
@@ -573,12 +553,14 @@ const calendarDays = computed(() => {
     const dateOnly = new Date(date);
     dateOnly.setHours(0, 0, 0, 0);
 
-    return [{
-      date,
-      otherMonth: false,
-      isToday: dateOnly.getTime() === todayDate.getTime(),
-      events: getEventsForDate(date),
-    }];
+    return [
+      {
+        date,
+        otherMonth: false,
+        isToday: dateOnly.getTime() === todayDate.getTime(),
+        events: getEventsForDate(date),
+      },
+    ];
   } else if (viewMode.value === "rolling") {
     // Rolling weeks view: show 4 weeks starting from today
     const days = [];
@@ -637,9 +619,10 @@ const calendarDays = computed(() => {
       const date = new Date(year, month, day);
       const dateOnly = new Date(date);
       dateOnly.setHours(0, 0, 0, 0);
-      
+
       // Ensure current month days are never marked as otherMonth
-      const isCurrentMonth = date.getMonth() === month && date.getFullYear() === year;
+      const isCurrentMonth =
+        date.getMonth() === month && date.getFullYear() === year;
 
       days.push({
         date,
@@ -738,7 +721,7 @@ const selectEvent = (event, dayDate = null) => {
   if (!dayDate) {
     // Find which day this event belongs to in the calendar
     for (const day of calendarDays.value) {
-      if (day.events.some(e => e.id === event.id)) {
+      if (day.events.some((e) => e.id === event.id)) {
         dayDate = day.date;
         break;
       }
@@ -967,6 +950,8 @@ onActivated(() => {
   border-radius: 8px;
   overflow: hidden;
   outline: none;
+  min-height: 0;
+  min-width: 0;
 }
 
 .calendar-view:focus {
@@ -1117,6 +1102,8 @@ onActivated(() => {
   flex-direction: column;
   min-height: 0;
   position: relative;
+  width: 100%;
+  box-sizing: border-box;
 }
 
 .calendar-view:has(.calendar-header-minimal) .calendar-content {
@@ -1176,6 +1163,9 @@ onActivated(() => {
   background: var(--calendar-bg);
   border-radius: 8px;
   padding: 1rem;
+  min-height: 0;
+  width: 100%;
+  box-sizing: border-box;
 }
 
 .calendar-grid.loading {
@@ -1193,9 +1183,10 @@ onActivated(() => {
 
 .calendar-weekdays {
   display: grid;
-  grid-template-columns: repeat(7, 1fr);
+  grid-template-columns: repeat(7, minmax(0, 1fr));
   gap: 0.5rem;
   margin-bottom: 0.5rem;
+  width: 100%;
 }
 
 .weekday {
@@ -1204,39 +1195,51 @@ onActivated(() => {
   font-size: 0.9rem;
   color: var(--text-secondary);
   padding: 0.5rem;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
 }
 
 .calendar-days {
   display: grid;
-  grid-template-columns: repeat(7, 1fr);
+  grid-template-columns: repeat(7, minmax(0, 1fr));
   gap: 0.5rem;
   flex: 1;
+  min-height: 0;
+  overflow: hidden;
+  width: 100%;
+  align-items: stretch;
 }
 
 /* Week view: taller day cells */
 .calendar-grid.week-view .calendar-day {
-  min-height: 120px;
+  min-height: 0;
 }
 
 /* Day view: single column, very tall */
 .calendar-grid.day-view .calendar-days {
-  grid-template-columns: 1fr;
+  grid-template-columns: minmax(0, 1fr);
 }
 
 .calendar-grid.day-view .calendar-day {
-  min-height: 400px;
+  min-height: 0;
 }
 
 .calendar-day {
   border: 1px solid var(--border-color);
   border-radius: 4px;
   padding: 0.5rem;
-  min-height: 80px;
+  min-height: 0;
+  min-width: 0;
+  width: 100%;
   display: flex;
   flex-direction: column;
   background: var(--calendar-bg) !important;
   transition: background 0.2s;
   position: relative;
+  overflow: hidden;
+  /* Allow content to expand within the cell */
+  align-items: stretch;
 }
 
 .calendar-day:hover {
@@ -1291,12 +1294,18 @@ onActivated(() => {
   justify-content: space-between;
   align-items: flex-start;
   margin-bottom: 0.25rem;
+  flex-shrink: 0;
+  min-height: 1.2em;
+  min-width: 0;
+  width: 100%;
 }
 
 .day-number {
   font-weight: 600;
   font-size: 0.9rem;
   color: var(--text-primary);
+  flex-shrink: 0;
+  white-space: nowrap;
 }
 
 .week-number {
@@ -1321,6 +1330,11 @@ onActivated(() => {
   flex-direction: column;
   gap: 0.25rem;
   overflow: hidden;
+  min-height: 0;
+  min-width: 0;
+  width: 100%;
+  /* Allow events to expand vertically when space is available */
+  align-content: flex-start;
 }
 
 .event-item {
@@ -1328,14 +1342,22 @@ onActivated(() => {
   padding: 0.25rem 0.5rem;
   border-radius: 3px;
   color: #fff;
-  white-space: nowrap;
+  white-space: normal;
+  overflow-wrap: break-word;
+  word-wrap: break-word;
+  word-break: break-word;
   overflow: hidden;
-  text-overflow: ellipsis;
   cursor: pointer;
   transition: all 0.2s;
   border: 2px solid transparent;
   outline: none;
   position: relative;
+  flex-shrink: 0;
+  flex-grow: 0;
+  max-width: 100%;
+  line-height: 1.3;
+  /* Allow event text to wrap and expand vertically when space is available */
+  /* The parent container will naturally limit the height */
 }
 
 .event-item.event-multi-day {
@@ -1389,16 +1411,22 @@ onActivated(() => {
 }
 
 .continuation-text {
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
+  overflow-wrap: break-word;
+  word-wrap: break-word;
+  word-break: break-word;
+  white-space: normal;
   flex: 1;
   text-align: left;
   font-weight: 500;
+  line-height: 1.3;
 }
 
 .event-text {
-  display: inline-block;
+  display: inline;
+  overflow-wrap: break-word;
+  word-wrap: break-word;
+  word-break: break-word;
+  max-width: 100%;
 }
 
 .event-item:hover {
@@ -1443,5 +1471,255 @@ onActivated(() => {
   bottom: 0;
   background: rgba(0, 0, 0, 0.5);
   z-index: 999;
+}
+
+/* Responsive styles for smaller screens and portrait mode */
+/* Use viewport units and scale everything proportionally */
+@media (max-width: 768px), (orientation: portrait) {
+  .calendar-content {
+    padding: clamp(0.25rem, 1vw, 0.75rem);
+    width: 100%;
+    box-sizing: border-box;
+  }
+
+  .calendar-grid {
+    padding: clamp(0.25rem, 1vw, 0.75rem);
+    width: 100%;
+    box-sizing: border-box;
+  }
+
+  .calendar-weekdays {
+    width: 100%;
+  }
+
+  .calendar-days {
+    width: 100%;
+  }
+
+  .calendar-day {
+    width: 100%;
+    box-sizing: border-box;
+  }
+
+  .calendar-weekdays {
+    gap: clamp(0.15rem, 0.5vw, 0.5rem);
+    margin-bottom: clamp(0.15rem, 0.5vw, 0.5rem);
+  }
+
+  .weekday {
+    font-size: clamp(0.6rem, 1.5vw, 0.9rem);
+    padding: clamp(0.15rem, 0.5vw, 0.5rem);
+  }
+
+  .calendar-days {
+    gap: clamp(0.15rem, 0.5vw, 0.5rem);
+  }
+
+  .calendar-day {
+    padding: clamp(0.15rem, 0.75vw, 0.5rem);
+  }
+
+  .day-number {
+    font-size: clamp(0.7rem, 2vw, 0.9rem);
+  }
+
+  .event-item {
+    font-size: clamp(0.55rem, 1.5vw, 0.75rem);
+    padding: clamp(0.1rem, 0.5vw, 0.25rem) clamp(0.2rem, 0.75vw, 0.5rem);
+    line-height: 1.2;
+  }
+
+  .calendar-header {
+    padding: clamp(0.5rem, 1.5vw, 1rem);
+  }
+
+  .calendar-header h2 {
+    font-size: clamp(1rem, 3vw, 1.5rem);
+  }
+
+  .current-month {
+    font-size: clamp(0.85rem, 2.5vw, 1.1rem);
+  }
+
+  .view-mode-indicator {
+    font-size: clamp(0.6rem, 1.5vw, 0.75rem);
+  }
+
+  .day-header {
+    margin-bottom: clamp(0.1rem, 0.5vw, 0.25rem);
+  }
+
+  .week-number {
+    font-size: clamp(0.55rem, 1.5vw, 0.7rem);
+    padding: clamp(0.05rem, 0.25vw, 0.125rem) clamp(0.2rem, 0.5vw, 0.375rem);
+  }
+}
+
+/* Extra small screens - more aggressive scaling */
+@media (max-width: 480px) {
+  .calendar-content {
+    padding: clamp(0.15rem, 1vw, 0.5rem);
+    width: 100%;
+    box-sizing: border-box;
+  }
+
+  .calendar-grid {
+    padding: clamp(0.15rem, 1vw, 0.5rem);
+    width: 100%;
+    box-sizing: border-box;
+  }
+
+  .calendar-weekdays {
+    width: 100%;
+  }
+
+  .calendar-days {
+    width: 100%;
+  }
+
+  .calendar-day {
+    width: 100%;
+    box-sizing: border-box;
+  }
+
+  .calendar-weekdays {
+    gap: clamp(0.1rem, 0.5vw, 0.25rem);
+  }
+
+  .weekday {
+    font-size: clamp(0.5rem, 2vw, 0.75rem);
+    padding: clamp(0.1rem, 0.5vw, 0.25rem);
+  }
+
+  .calendar-days {
+    gap: clamp(0.1rem, 0.5vw, 0.25rem);
+  }
+
+  .calendar-day {
+    padding: clamp(0.1rem, 0.75vw, 0.35rem);
+  }
+
+  .day-number {
+    font-size: clamp(0.6rem, 2.5vw, 0.8rem);
+  }
+
+  .event-item {
+    font-size: clamp(0.5rem, 1.8vw, 0.65rem);
+    padding: clamp(0.05rem, 0.5vw, 0.15rem) clamp(0.15rem, 0.75vw, 0.35rem);
+  }
+}
+
+/* Portrait mode with limited height - ensure everything fits */
+@media (orientation: portrait) and (max-height: 800px) {
+  .calendar-content {
+    padding: clamp(0.15rem, 1vh, 0.5rem);
+    width: 100%;
+    box-sizing: border-box;
+  }
+
+  .calendar-grid {
+    padding: clamp(0.15rem, 1vh, 0.5rem);
+    width: 100%;
+    box-sizing: border-box;
+  }
+
+  .calendar-weekdays {
+    width: 100%;
+  }
+
+  .calendar-days {
+    width: 100%;
+  }
+
+  .calendar-day {
+    width: 100%;
+    box-sizing: border-box;
+  }
+
+  .calendar-weekdays {
+    gap: clamp(0.1rem, 0.5vh, 0.25rem);
+    margin-bottom: clamp(0.1rem, 0.5vh, 0.25rem);
+  }
+
+  .weekday {
+    font-size: clamp(0.5rem, 2vh, 0.75rem);
+    padding: clamp(0.1rem, 0.5vh, 0.25rem);
+  }
+
+  .calendar-days {
+    gap: clamp(0.1rem, 0.5vh, 0.25rem);
+  }
+
+  .calendar-day {
+    padding: clamp(0.1rem, 0.75vh, 0.35rem);
+  }
+
+  .day-number {
+    font-size: clamp(0.6rem, 2.5vh, 0.8rem);
+  }
+
+  .event-item {
+    font-size: clamp(0.5rem, 1.8vh, 0.65rem);
+    padding: clamp(0.05rem, 0.5vh, 0.15rem) clamp(0.15rem, 0.75vh, 0.35rem);
+  }
+}
+
+/* Very small portrait screens - maximum compression */
+@media (orientation: portrait) and (max-height: 600px) {
+  .calendar-content {
+    padding: 0.15rem;
+    width: 100%;
+    box-sizing: border-box;
+  }
+
+  .calendar-grid {
+    padding: 0.15rem;
+    width: 100%;
+    box-sizing: border-box;
+  }
+
+  .calendar-weekdays {
+    width: 100%;
+  }
+
+  .calendar-days {
+    width: 100%;
+  }
+
+  .calendar-day {
+    width: 100%;
+    box-sizing: border-box;
+  }
+
+  .calendar-weekdays {
+    gap: 0.1rem;
+    margin-bottom: 0.1rem;
+  }
+
+  .weekday {
+    font-size: 0.5rem;
+    padding: 0.1rem;
+  }
+
+  .calendar-days {
+    gap: 0.1rem;
+  }
+
+  .calendar-day {
+    padding: 0.1rem;
+  }
+
+  .day-number {
+    font-size: 0.6rem;
+  }
+
+  .event-item {
+    font-size: 0.5rem;
+    padding: 0.05rem 0.15rem;
+  }
+
+  .day-events {
+    gap: 0.1rem;
+  }
 }
 </style>

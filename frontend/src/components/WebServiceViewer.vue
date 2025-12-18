@@ -5,7 +5,7 @@
       <button
         class="btn-close-fullscreen"
         title="Close Fullscreen (ESC)"
-        @click="close"
+        @click.stop="handleCloseFullscreen"
       >
         ×
       </button>
@@ -39,11 +39,13 @@
         <button
           class="btn-fullscreen"
           :title="isFullscreen ? 'Exit Fullscreen' : 'Enter Fullscreen'"
-          @click="toggleFullscreen"
+          @click.stop="handleToggleFullscreen"
         >
           {{ isFullscreen ? "⤓" : "⤢" }}
         </button>
-        <button class="btn-close" title="Close" @click="close">×</button>
+        <button class="btn-close" title="Close" @click.stop="handleClose">
+          ×
+        </button>
       </div>
     </div>
 
@@ -113,7 +115,14 @@ const loading = computed(() => webServicesStore.loading);
 
 // ServiceViewer now handles all service rendering logic
 
+// Prevent multiple rapid clicks
+let isHandlingClose = false;
+let isHandlingToggle = false;
+
 const close = () => {
+  if (isHandlingClose) return;
+  isHandlingClose = true;
+
   if (props.isFullscreen) {
     // Exit fullscreen mode - return to dashboard
     modeStore.exitFullscreen();
@@ -121,9 +130,29 @@ const close = () => {
     // Return to calendar mode (home view)
     modeStore.setMode(modeStore.MODES.CALENDAR);
   }
+
+  // Reset flag after a short delay
+  setTimeout(() => {
+    isHandlingClose = false;
+  }, 300);
+};
+
+const handleClose = (event) => {
+  event.preventDefault();
+  event.stopPropagation();
+  close();
+};
+
+const handleCloseFullscreen = (event) => {
+  event.preventDefault();
+  event.stopPropagation();
+  close();
 };
 
 const toggleFullscreen = () => {
+  if (isHandlingToggle) return;
+  isHandlingToggle = true;
+
   if (props.isFullscreen) {
     // Exit fullscreen - return to dashboard
     modeStore.exitFullscreen();
@@ -131,6 +160,17 @@ const toggleFullscreen = () => {
     // Enter fullscreen web services
     modeStore.enterFullscreen(modeStore.MODES.WEB_SERVICES);
   }
+
+  // Reset flag after a short delay
+  setTimeout(() => {
+    isHandlingToggle = false;
+  }, 300);
+};
+
+const handleToggleFullscreen = (event) => {
+  event.preventDefault();
+  event.stopPropagation();
+  toggleFullscreen();
 };
 
 const nextService = () => {
@@ -149,9 +189,10 @@ const setServiceIndex = (index) => {
 
 // Handle Escape key to close fullscreen
 const handleKeydown = (event) => {
-  if (event.key === "Escape" && props.isFullscreen) {
+  if (event.key === "Escape" && props.isFullscreen && !isHandlingClose) {
     close();
     event.preventDefault();
+    event.stopPropagation();
   }
 };
 
@@ -525,11 +566,11 @@ onUnmounted(() => {
     grid-template-columns: 1fr !important;
     gap: 0.75rem;
   }
-  
+
   .meal-plan-item {
     padding: 1rem;
   }
-  
+
   .meal-plan-header {
     margin-bottom: 1rem;
     padding-bottom: 1rem;
