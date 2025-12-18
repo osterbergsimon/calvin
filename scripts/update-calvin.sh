@@ -52,18 +52,53 @@ else
     CURRENT_COMMIT=$(git rev-parse HEAD 2>/dev/null || echo "")
     CURRENT_COMMIT_SHORT=$(git rev-parse --short HEAD 2>/dev/null || echo "")
     CURRENT_COMMIT_MSG=$(git log -1 --pretty=format:"%s" HEAD 2>/dev/null || echo "")
+    CURRENT_BRANCH=$(git rev-parse --abbrev-ref HEAD 2>/dev/null || echo "")
     
     if [ -n "$CURRENT_COMMIT" ]; then
         echo "Current commit: $CURRENT_COMMIT_SHORT ($CURRENT_COMMIT)" | tee -a "$LOG_FILE"
         echo "Current commit message: $CURRENT_COMMIT_MSG" | tee -a "$LOG_FILE"
     fi
+    if [ -n "$CURRENT_BRANCH" ]; then
+        echo "Current branch: $CURRENT_BRANCH" | tee -a "$LOG_FILE"
+    fi
     
-    # Pull latest code
-    echo "Fetching latest code from $GIT_BRANCH..." | tee -a "$LOG_FILE"
+    # Fetch latest code first to ensure we have remote branch info
+    echo "Fetching latest code from origin (will use branch: $GIT_BRANCH)..." | tee -a "$LOG_FILE"
     if ! git fetch origin; then
         echo "Warning: Failed to fetch from origin" | tee -a "$LOG_FILE"
         exit 0  # Don't fail the service, just skip this update
     fi
+    
+    # Ensure we're on the correct branch
+    if [ "$CURRENT_BRANCH" != "$GIT_BRANCH" ]; then
+        echo "Switching to branch $GIT_BRANCH (currently on $CURRENT_BRANCH)..." | tee -a "$LOG_FILE"
+        # Check if the branch exists locally
+        if git show-ref --verify --quiet refs/heads/"$GIT_BRANCH"; then
+            # Branch exists locally, just checkout
+            if ! git checkout "$GIT_BRANCH"; then
+                echo "Warning: Failed to checkout local branch $GIT_BRANCH" | tee -a "$LOG_FILE"
+                exit 0
+            fi
+        else
+            # Branch doesn't exist locally, create it from origin
+            if git show-ref --verify --quiet refs/remotes/origin/"$GIT_BRANCH"; then
+                # Remote branch exists, create local tracking branch
+                if ! git checkout -b "$GIT_BRANCH" "origin/$GIT_BRANCH"; then
+                    echo "Warning: Failed to create and checkout branch $GIT_BRANCH from origin" | tee -a "$LOG_FILE"
+                    exit 0
+                fi
+            else
+                echo "Warning: Branch $GIT_BRANCH does not exist on origin" | tee -a "$LOG_FILE"
+                exit 0
+            fi
+        fi
+        echo "Successfully switched to branch $GIT_BRANCH" | tee -a "$LOG_FILE"
+    fi
+    
+    # Update current commit info after branch switch
+    CURRENT_COMMIT=$(git rev-parse HEAD 2>/dev/null || echo "")
+    CURRENT_COMMIT_SHORT=$(git rev-parse --short HEAD 2>/dev/null || echo "")
+    CURRENT_COMMIT_MSG=$(git log -1 --pretty=format:"%s" HEAD 2>/dev/null || echo "")
     
     # Check if there are any changes
     NEW_COMMIT=$(git rev-parse "origin/$GIT_BRANCH" 2>/dev/null || echo "")
