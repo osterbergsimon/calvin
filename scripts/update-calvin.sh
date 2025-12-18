@@ -225,9 +225,18 @@ if systemctl is-active --quiet calvin-backend.service 2>/dev/null || sudo system
         echo "Warning: Failed to restart backend (may need sudo permissions)" | tee -a "$LOG_FILE"
         echo "Please restart manually: sudo systemctl restart calvin-backend" | tee -a "$LOG_FILE"
     fi
-    # Frontend doesn't need restart (Chromium will reload)
-    # But we can restart it if needed
-    # systemctl restart calvin-frontend || true
+    # Restart frontend (Chromium) to force cache clear and reload
+    # This is critical - Chromium in kiosk mode may cache files even with no-cache headers
+    echo "Restarting frontend service (Chromium) to clear cache and reload..." | tee -a "$LOG_FILE"
+    if sudo systemctl restart calvin-frontend 2>/dev/null; then
+        echo "Frontend service restarted successfully" | tee -a "$LOG_FILE"
+    elif systemctl --user restart calvin-frontend 2>/dev/null; then
+        echo "Frontend service restarted successfully (user service)" | tee -a "$LOG_FILE"
+    else
+        echo "Warning: Failed to restart frontend (may need sudo permissions)" | tee -a "$LOG_FILE"
+        echo "Please restart manually: sudo systemctl restart calvin-frontend" | tee -a "$LOG_FILE"
+        echo "Or clear Chromium cache: rm -rf ~/.cache/chromium" | tee -a "$LOG_FILE"
+    fi
 else
     echo "Services not running. Please start them manually." | tee -a "$LOG_FILE"
 fi

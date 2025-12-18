@@ -1082,10 +1082,10 @@ onActivated(() => {
 
 .calendar-weekdays {
   display: grid;
-  /* Explicitly set 7 columns - never allow fewer */
-  grid-template-columns: repeat(7, minmax(0, 1fr)) !important;
-  /* Reduce gap slightly to prevent overflow from fractional pixel rounding on RPI */
-  gap: 0.48rem;
+  /* Explicitly set 7 columns with explicit fractions for consistent calculation on RPI */
+  grid-template-columns: 1fr 1fr 1fr 1fr 1fr 1fr 1fr !important;
+  /* Use integer pixel gap to prevent fractional rounding issues on RPI */
+  gap: 0.5rem;
   margin-bottom: 0.5rem;
   width: 100%;
   max-width: 100%;
@@ -1110,9 +1110,10 @@ onActivated(() => {
 .calendar-days {
   display: grid;
   /* Explicitly set 7 columns - never allow fewer */
-  grid-template-columns: repeat(7, minmax(0, 1fr)) !important;
-  /* Reduce gap slightly to prevent overflow from fractional pixel rounding on RPI */
-  gap: 0.48rem;
+  /* Use explicit fractions to force consistent column width calculation on RPI */
+  grid-template-columns: 1fr 1fr 1fr 1fr 1fr 1fr 1fr !important;
+  /* Use integer pixel gap to prevent fractional rounding issues on RPI */
+  gap: 0.5rem;
   flex: 1;
   min-height: 0;
   overflow: hidden;
