@@ -381,7 +381,14 @@ if frontend_dist.exists():
         """Serve frontend index.html for root path."""
         index_path = frontend_dist / "index.html"
         if index_path.exists():
-            return FileResponse(str(index_path))
+            return FileResponse(
+                str(index_path),
+                headers={
+                    "Cache-Control": "no-cache, no-store, must-revalidate",
+                    "Pragma": "no-cache",
+                    "Expires": "0",
+                },
+            )
         return {"message": "Calvin Dashboard API", "version": "0.1.0"}
 
     # Serve index.html for all other non-API routes (SPA routing)
@@ -404,7 +411,14 @@ if frontend_dist.exists():
 
         index_path = frontend_dist / "index.html"
         if index_path.exists():
-            return FileResponse(str(index_path))
+            return FileResponse(
+                str(index_path),
+                headers={
+                    "Cache-Control": "no-cache, no-store, must-revalidate",
+                    "Pragma": "no-cache",
+                    "Expires": "0",
+                },
+            )
         return {"message": "Calvin Dashboard API", "version": "0.1.0"}
 else:
     # Fallback if frontend dist doesn't exist (development mode)

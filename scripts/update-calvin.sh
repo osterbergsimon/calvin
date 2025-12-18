@@ -110,37 +110,22 @@ if [ "$HAS_CHANGES" = true ]; then
         fi
     fi
 
-    # Check if frontend files changed
-    FRONTEND_CHANGED=false
-    if [ -n "$CURRENT_COMMIT" ] && [ -n "$NEW_COMMIT" ]; then
-        # Check if any frontend files changed
-        if git diff --name-only "$CURRENT_COMMIT" "$NEW_COMMIT" | grep -q "^frontend/"; then
-            FRONTEND_CHANGED=true
-        fi
-    else
-        # If we don't have commit info, assume frontend changed
-        FRONTEND_CHANGED=true
+    # Always rebuild frontend when there are any changes to ensure cache busting
+    # This ensures users get the latest version even if only backend changed
+    echo "Rebuilding frontend to force cache update..." | tee -a "$LOG_FILE"
+    cd "$REPO_DIR/frontend"
+    if ! npm ci; then
+        echo "Warning: Failed to update frontend dependencies" | tee -a "$LOG_FILE"
+        exit 0  # Don't fail the service
     fi
 
-    if [ "$FRONTEND_CHANGED" = true ]; then
-        # Update frontend dependencies
-        echo "Frontend files changed. Updating frontend dependencies..." | tee -a "$LOG_FILE"
-        cd "$REPO_DIR/frontend"
-        if ! npm ci; then
-            echo "Warning: Failed to update frontend dependencies" | tee -a "$LOG_FILE"
-            exit 0  # Don't fail the service
-        fi
-
-        # Rebuild frontend
-        echo "Rebuilding frontend..." | tee -a "$LOG_FILE"
-        if ! npm run build 2>&1 | tee -a "$LOG_FILE"; then
-            echo "Warning: Failed to build frontend" | tee -a "$LOG_FILE"
-            exit 0  # Don't fail the service
-        fi
-        echo "Frontend build completed successfully" | tee -a "$LOG_FILE"
-    else
-        echo "No frontend changes detected. Skipping frontend rebuild." | tee -a "$LOG_FILE"
+    # Rebuild frontend (this will update the build timestamp for cache busting)
+    echo "Rebuilding frontend..." | tee -a "$LOG_FILE"
+    if ! npm run build 2>&1 | tee -a "$LOG_FILE"; then
+        echo "Warning: Failed to build frontend" | tee -a "$LOG_FILE"
+        exit 0  # Don't fail the service
     fi
+    echo "Frontend build completed successfully" | tee -a "$LOG_FILE"
 else
     echo "No changes detected. Skipping dependency updates and rebuilds." | tee -a "$LOG_FILE"
 fi
