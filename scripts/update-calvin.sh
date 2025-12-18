@@ -5,9 +5,26 @@
 # Don't use set -e - we want to continue even if some steps fail
 set +e
 
+# Save environment variables before sourcing config file
+# This ensures environment variables (passed from API) take precedence over file values
+SAVED_GIT_BRANCH="${GIT_BRANCH:-}"
+SAVED_GIT_REPO="${GIT_REPO:-}"
+SAVED_REPO_DIR="${REPO_DIR:-}"
+
 # Source environment file if it exists
 if [ -f /etc/default/calvin-update ]; then
     . /etc/default/calvin-update
+fi
+
+# Restore environment variables if they were set (they take precedence)
+if [ -n "$SAVED_GIT_BRANCH" ]; then
+    GIT_BRANCH="$SAVED_GIT_BRANCH"
+fi
+if [ -n "$SAVED_GIT_REPO" ]; then
+    GIT_REPO="$SAVED_GIT_REPO"
+fi
+if [ -n "$SAVED_REPO_DIR" ]; then
+    REPO_DIR="$SAVED_REPO_DIR"
 fi
 
 REPO_DIR="${REPO_DIR:-/home/calvin/calvin}"
@@ -38,7 +55,11 @@ cd "$REPO_DIR" || {
 
 echo "[$(date)] Starting Calvin update..." | tee -a "$LOG_FILE"
 echo "[$(date)] Repository: $GIT_REPO" | tee -a "$LOG_FILE"
-echo "[$(date)] Branch: $GIT_BRANCH" | tee -a "$LOG_FILE"
+if [ -n "$SAVED_GIT_BRANCH" ]; then
+    echo "[$(date)] Branch: $GIT_BRANCH (from environment variable)" | tee -a "$LOG_FILE"
+else
+    echo "[$(date)] Branch: $GIT_BRANCH (from /etc/default/calvin-update or default)" | tee -a "$LOG_FILE"
+fi
 
 # Check if git repo exists
 if [ ! -d ".git" ]; then
