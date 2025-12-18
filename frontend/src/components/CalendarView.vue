@@ -1340,7 +1340,7 @@ onActivated(() => {
 .event-item {
   font-size: 0.75rem;
   padding: 0.25rem 0.5rem;
-  border-radius: 3px;
+  border-radius: clamp(2px, 0.3vw, 4px);
   color: #fff;
   white-space: normal;
   overflow-wrap: break-word;
@@ -1365,29 +1365,29 @@ onActivated(() => {
 }
 
 .event-item.event-start {
-  border-top-left-radius: 4px;
-  border-bottom-left-radius: 4px;
+  border-top-left-radius: clamp(2px, 0.3vw, 4px);
+  border-bottom-left-radius: clamp(2px, 0.3vw, 4px);
   border-top-right-radius: 0;
   border-bottom-right-radius: 0;
-  margin-right: -1px;
+  margin-right: calc(-1 * clamp(0.05rem, 0.2vw, 0.1rem));
   z-index: 1;
   border-right: 1px dashed rgba(255, 255, 255, 0.3);
 }
 
 .event-item.event-end {
-  border-top-right-radius: 4px;
-  border-bottom-right-radius: 4px;
+  border-top-right-radius: clamp(2px, 0.3vw, 4px);
+  border-bottom-right-radius: clamp(2px, 0.3vw, 4px);
   border-top-left-radius: 0;
   border-bottom-left-radius: 0;
-  margin-left: -1px;
+  margin-left: calc(-1 * clamp(0.05rem, 0.2vw, 0.1rem));
   z-index: 1;
   border-left: 1px dashed rgba(255, 255, 255, 0.3);
 }
 
 .event-item.event-middle {
   border-radius: 0;
-  margin-left: -1px;
-  margin-right: -1px;
+  margin-left: calc(-1 * clamp(0.05rem, 0.2vw, 0.1rem));
+  margin-right: calc(-1 * clamp(0.05rem, 0.2vw, 0.1rem));
   z-index: 1;
   border-left: 1px dashed rgba(255, 255, 255, 0.3);
   border-right: 1px dashed rgba(255, 255, 255, 0.3);
@@ -1397,17 +1397,19 @@ onActivated(() => {
   display: flex;
   align-items: center;
   justify-content: center;
-  gap: 4px;
+  gap: 0.25rem;
   width: 100%;
-  font-size: 0.85rem;
+  font-size: inherit;
   opacity: 0.9;
-  padding: 0 4px;
+  padding: 0;
+  line-height: inherit;
 }
 
 .continuation-arrow {
-  font-size: 0.9rem;
+  font-size: 1em;
   opacity: 0.7;
   flex-shrink: 0;
+  line-height: inherit;
 }
 
 .continuation-text {
@@ -1418,7 +1420,8 @@ onActivated(() => {
   flex: 1;
   text-align: left;
   font-weight: 500;
-  line-height: 1.3;
+  line-height: inherit;
+  font-size: inherit;
 }
 
 .event-text {
@@ -1529,6 +1532,23 @@ onActivated(() => {
     line-height: 1.2;
   }
 
+  .event-continuation {
+    gap: clamp(0.1rem, 0.3vw, 0.25rem);
+  }
+
+  .event-item.event-start {
+    margin-right: calc(-1 * clamp(0.03rem, 0.15vw, 0.08rem));
+  }
+
+  .event-item.event-end {
+    margin-left: calc(-1 * clamp(0.03rem, 0.15vw, 0.08rem));
+  }
+
+  .event-item.event-middle {
+    margin-left: calc(-1 * clamp(0.03rem, 0.15vw, 0.08rem));
+    margin-right: calc(-1 * clamp(0.03rem, 0.15vw, 0.08rem));
+  }
+
   .calendar-header {
     padding: clamp(0.5rem, 1.5vw, 1rem);
   }
@@ -1607,6 +1627,23 @@ onActivated(() => {
     font-size: clamp(0.5rem, 1.8vw, 0.65rem);
     padding: clamp(0.05rem, 0.5vw, 0.15rem) clamp(0.15rem, 0.75vw, 0.35rem);
   }
+
+  .event-continuation {
+    gap: clamp(0.05rem, 0.25vw, 0.15rem);
+  }
+
+  .event-item.event-start {
+    margin-right: calc(-1 * clamp(0.02rem, 0.1vw, 0.05rem));
+  }
+
+  .event-item.event-end {
+    margin-left: calc(-1 * clamp(0.02rem, 0.1vw, 0.05rem));
+  }
+
+  .event-item.event-middle {
+    margin-left: calc(-1 * clamp(0.02rem, 0.1vw, 0.05rem));
+    margin-right: calc(-1 * clamp(0.02rem, 0.1vw, 0.05rem));
+  }
 }
 
 /* Portrait mode with limited height - ensure everything fits */
@@ -1662,6 +1699,23 @@ onActivated(() => {
     font-size: clamp(0.5rem, 1.8vh, 0.65rem);
     padding: clamp(0.05rem, 0.5vh, 0.15rem) clamp(0.15rem, 0.75vh, 0.35rem);
   }
+
+  .event-continuation {
+    gap: clamp(0.05rem, 0.25vh, 0.15rem);
+  }
+
+  .event-item.event-start {
+    margin-right: calc(-1 * clamp(0.02rem, 0.1vh, 0.05rem));
+  }
+
+  .event-item.event-end {
+    margin-left: calc(-1 * clamp(0.02rem, 0.1vh, 0.05rem));
+  }
+
+  .event-item.event-middle {
+    margin-left: calc(-1 * clamp(0.02rem, 0.1vh, 0.05rem));
+    margin-right: calc(-1 * clamp(0.02rem, 0.1vh, 0.05rem));
+  }
 }
 
 /* Very small portrait screens - maximum compression */
@@ -1716,6 +1770,23 @@ onActivated(() => {
   .event-item {
     font-size: 0.5rem;
     padding: 0.05rem 0.15rem;
+  }
+
+  .event-continuation {
+    gap: 0.05rem;
+  }
+
+  .event-item.event-start {
+    margin-right: -0.02rem;
+  }
+
+  .event-item.event-end {
+    margin-left: -0.02rem;
+  }
+
+  .event-item.event-middle {
+    margin-left: -0.02rem;
+    margin-right: -0.02rem;
   }
 
   .day-events {
