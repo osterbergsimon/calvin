@@ -951,6 +951,20 @@
                   fit on screen.</span
                 >
               </div>
+              <div class="setting-item">
+                <label>
+                  <input
+                    v-model="localConfig.mealPlanDebug"
+                    type="checkbox"
+                    @change="updateMealPlanDebug"
+                  />
+                  Enable Meal Plan Debug Logging
+                </label>
+                <span class="help-text"
+                  >Enable detailed console logging for meal plan component to
+                  debug rendering issues. Check browser console for logs.</span
+                >
+              </div>
 
               <!-- Add Web Service Form -->
               <div class="add-web-service-form">
@@ -1521,10 +1535,24 @@ const localConfig = ref({
   clockPosition: "top-right",
   clockSize: "medium",
   mealPlanCardSize: "medium",
+  mealPlanDebug: false,
   orientationFlipped: false,
   version: null,
   frontendVersion: null,
 });
+
+// Get frontend version from meta tag in HTML (set at build time)
+const getFrontendVersionFromMeta = () => {
+  try {
+    const metaTag = document.querySelector('meta[name="frontend-version"]');
+    if (metaTag) {
+      return metaTag.getAttribute("content");
+    }
+  } catch (error) {
+    console.warn("Could not read frontend version from meta tag:", error);
+  }
+  return null;
+};
 
 // Category navigation
 const categories = [
@@ -1680,6 +1708,16 @@ const updateMealPlanCardSize = async () => {
     });
   } catch (error) {
     console.error("Failed to update meal plan card size:", error);
+  }
+};
+
+const updateMealPlanDebug = async () => {
+  try {
+    await configStore.updateConfig({
+      mealPlanDebug: localConfig.value.mealPlanDebug,
+    });
+  } catch (error) {
+    console.error("Failed to update meal plan debug setting:", error);
   }
 };
 
@@ -2403,11 +2441,29 @@ const loadConfig = async () => {
       } else {
         localConfig.value.clockSize = "medium"; // Default
       }
+      if (response.data.mealPlanCardSize !== undefined) {
+        localConfig.value.mealPlanCardSize = response.data.mealPlanCardSize;
+      } else if (response.data.meal_plan_card_size !== undefined) {
+        localConfig.value.mealPlanCardSize = response.data.meal_plan_card_size;
+      } else {
+        localConfig.value.mealPlanCardSize = "medium"; // Default
+      }
+      if (response.data.mealPlanDebug !== undefined) {
+        localConfig.value.mealPlanDebug = response.data.mealPlanDebug;
+      } else if (response.data.meal_plan_debug !== undefined) {
+        localConfig.value.mealPlanDebug = response.data.meal_plan_debug;
+      } else {
+        localConfig.value.mealPlanDebug = false; // Default
+      }
       localConfig.value.gitBranch =
         response.data.gitBranch ?? response.data.git_branch ?? "main";
       localConfig.value.version = response.data.version ?? null;
+      // Get frontend version from meta tag (most reliable) or fallback to API
       localConfig.value.frontendVersion =
-        response.data.frontendVersion ?? response.data.frontend_version ?? null;
+        getFrontendVersionFromMeta() ??
+        response.data.frontendVersion ??
+        response.data.frontend_version ??
+        null;
       keyboardStore.setKeyboardType(localConfig.value.keyboardType);
     }
   } catch (error) {

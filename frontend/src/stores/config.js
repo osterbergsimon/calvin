@@ -53,6 +53,7 @@ export const useConfigStore = defineStore("config", () => {
   const clockPosition = ref("top-right"); // Clock position: 'top-left' | 'top-right' | 'bottom-left' | 'bottom-right'
   const clockSize = ref("medium"); // Clock size: 'small' | 'medium' | 'large'
   const mealPlanCardSize = ref("medium"); // Meal plan card size: 'small' | 'medium' | 'large'
+  const mealPlanDebug = ref(false); // Enable debug logging for meal plan component
   const loading = ref(false);
   const error = ref(null);
 
@@ -326,6 +327,13 @@ export const useConfigStore = defineStore("config", () => {
       } else {
         mealPlanCardSize.value = "medium"; // Default
       }
+      if (response.data.mealPlanDebug !== undefined) {
+        mealPlanDebug.value = response.data.mealPlanDebug;
+      } else if (response.data.meal_plan_debug !== undefined) {
+        mealPlanDebug.value = response.data.meal_plan_debug;
+      } else {
+        mealPlanDebug.value = false; // Default
+      }
       return response.data;
     } catch (err) {
       error.value = err.message;
@@ -537,6 +545,7 @@ export const useConfigStore = defineStore("config", () => {
     clockPosition,
     clockSize,
     mealPlanCardSize,
+    mealPlanDebug,
     loading,
     error,
     calendarWidth,

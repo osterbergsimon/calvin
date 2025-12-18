@@ -53,23 +53,38 @@ def get_frontend_version() -> str | None:
         index_path = frontend_dist / "index.html"
 
         if not index_path.exists():
-            return None
+            # Try alternative path (in case backend is in a different location)
+            # This handles cases where the project structure might be different
+            alt_path = project_root / "dist" / "index.html"
+            if alt_path.exists():
+                index_path = alt_path
+            else:
+                return None
 
         # Read the HTML file
         html_content = index_path.read_text(encoding="utf-8")
 
         # Extract frontend version from meta tag
-        match = re.search(
+        # Try multiple patterns to be more flexible
+        patterns = [
             r'<meta\s+name=["\']frontend-version["\']\s+content=["\']([^"\']+)["\']',
-            html_content,
-            re.IGNORECASE,
-        )
-        if match:
-            return match.group(1)
+            r'<meta\s+content=["\']([^"\']+)["\']\s+name=["\']frontend-version["\']',
+        ]
+
+        for pattern in patterns:
+            match = re.search(pattern, html_content, re.IGNORECASE)
+            if match:
+                version = match.group(1).strip()
+                if version:
+                    return version
 
         return None
-    except Exception:
-        # File not found or error reading
+    except Exception as e:
+        # File not found or error reading - log in debug mode
+        import logging
+
+        logger = logging.getLogger(__name__)
+        logger.debug(f"Could not read frontend version: {e}")
         return None
 
 
@@ -367,6 +382,10 @@ async def get_config():
         config["mealPlanCardSize"] = "medium"  # Default size
     elif "meal_plan_card_size" in config and "mealPlanCardSize" not in config:
         config["mealPlanCardSize"] = config["meal_plan_card_size"]
+    if "mealPlanDebug" not in config and "meal_plan_debug" not in config:
+        config["mealPlanDebug"] = False  # Default to disabled
+    elif "meal_plan_debug" in config and "mealPlanDebug" not in config:
+        config["mealPlanDebug"] = config["meal_plan_debug"]
     if "gitRepoUrl" not in config and "git_repo_url" not in config:
         config["gitRepoUrl"] = "https://github.com/osterbergsimon/calvin.git"  # Default repo
     elif "git_repo_url" in config and "gitRepoUrl" not in config:

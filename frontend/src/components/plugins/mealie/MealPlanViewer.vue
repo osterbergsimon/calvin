@@ -96,8 +96,13 @@ const props = defineProps({
   },
 });
 
-// Enable debug mode in development or if explicitly enabled
-const DEBUG = props.debug || import.meta.env.DEV;
+const configStore = useConfigStore();
+
+// Enable debug mode if:
+// 1. Explicitly passed as prop
+// 2. Enabled in config store (mealPlanDebug setting)
+// 3. In development mode
+const DEBUG = props.debug || configStore.mealPlanDebug || import.meta.env.DEV;
 
 const configStore = useConfigStore();
 const cardSize = computed(() => configStore.mealPlanCardSize || "medium");
