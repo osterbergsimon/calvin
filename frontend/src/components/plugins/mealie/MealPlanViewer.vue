@@ -15,32 +15,52 @@
       </p>
       <button class="btn-retry" @click="query.refetch()">Retry</button>
     </div>
-    <div v-else-if="query.data.value" class="meal-plan-content" :class="`card-size-${cardSize}`">
+    <div
+      v-else-if="query.data.value"
+      class="meal-plan-content"
+      :class="[`card-size-${cardSize}`, { 'portrait-mode': isPortrait }]"
+    >
       <div class="meal-plan-header">
         <h3>Meal Plan</h3>
         <span class="meal-plan-dates" v-if="dateRange">
           {{ dateRange }}
         </span>
       </div>
-      <div v-if="mealPlanItems.length > 0" class="meal-plan-items">
+      <div
+        v-if="mealPlanItems.length > 0"
+        class="meal-plan-items"
+        :style="gridStyle"
+      >
         <div
           v-for="item in mealPlanItems"
           :key="item.id || item.date"
           class="meal-plan-item"
         >
-          <div class="meal-plan-date" :class="{ 'today': isToday(item.date) }" v-if="item.date">
+          <div
+            class="meal-plan-date"
+            :class="{ today: isToday(item.date) }"
+            v-if="item.date"
+          >
             {{ formatDate(item.date) }}
           </div>
-          <div class="meal-plan-meals" v-if="item.meals && item.meals.length > 0">
-            <div 
-              v-for="meal in item.meals" 
-              :key="meal.id || `${item.date}-${meal.type}`" 
+          <div
+            class="meal-plan-meals"
+            v-if="item.meals && item.meals.length > 0"
+          >
+            <div
+              v-for="meal in item.meals"
+              :key="meal.id || `${item.date}-${meal.type}`"
               class="meal-item"
-              :class="{ 'clickable': getRecipeUrl(meal) }"
+              :class="{ clickable: getRecipeUrl(meal) }"
               @click="openRecipe(meal)"
             >
               <span class="meal-type">{{ formatMealType(meal.type) }}</span>
-              <span class="meal-name">{{ meal.recipeName || meal.recipe?.name || meal.title || 'No recipe' }}</span>
+              <span class="meal-name">{{
+                meal.recipeName ||
+                meal.recipe?.name ||
+                meal.title ||
+                "No recipe"
+              }}</span>
             </div>
           </div>
           <div v-else class="no-meals-day">
@@ -74,6 +94,7 @@ const props = defineProps({
 
 const configStore = useConfigStore();
 const cardSize = computed(() => configStore.mealPlanCardSize || "medium");
+const isPortrait = computed(() => configStore.orientation === "portrait");
 
 // Fetch meal plan data with Vue Query
 const query = useQuery({
@@ -82,15 +103,15 @@ const query = useQuery({
     const today = new Date();
     const endDate = new Date(today);
     endDate.setDate(endDate.getDate() + 7);
-    
-    const startDateStr = today.toISOString().split('T')[0];
-    const endDateStr = endDate.toISOString().split('T')[0];
-    
+
+    const startDateStr = today.toISOString().split("T")[0];
+    const endDateStr = endDate.toISOString().split("T")[0];
+
     const response = await axios.get(props.apiEndpoint, {
       params: {
         start_date: startDateStr,
-        end_date: endDateStr
-      }
+        end_date: endDateStr,
+      },
     });
     return response.data;
   },
@@ -102,12 +123,12 @@ const query = useQuery({
 
 const mealPlanItems = computed(() => {
   if (!query.data.value) return [];
-  
+
   const serviceData = query.data.value;
-  
+
   // Get raw items from response
   let rawItems = [];
-  
+
   // Handle paginated response: { items: [...], total: N }
   if (serviceData.items && Array.isArray(serviceData.items)) {
     rawItems = serviceData.items;
@@ -118,143 +139,185 @@ const mealPlanItems = computed(() => {
   }
   // Handle single item: { date: "...", meals: [...] }
   else if (serviceData.date && serviceData.meals) {
-    return [serviceData];
+    // Filter out if it's a past day
+    const today = new Date();
+    today.setHours(0, 0, 0, 0);
+    const itemDate = new Date(serviceData.date);
+    itemDate.setHours(0, 0, 0, 0);
+    if (itemDate >= today) {
+      return [serviceData];
+    }
+    return [];
   }
-  
+
   if (rawItems.length === 0) return [];
-  
+
   // Mealie API returns individual meal entries, not grouped by day
   // Each item has: date, entryType, title, recipe, etc.
   // We need to group by date and create a structure like:
   // [{ date: "2025-11-10", meals: [{ type: "breakfast", recipe: {...} }] }]
-  
+
   // Group meals by date
   const mealsByDate = {};
-  rawItems.forEach(item => {
+  rawItems.forEach((item) => {
     const date = item.date;
     if (!date) return;
-    
+
     if (!mealsByDate[date]) {
       mealsByDate[date] = {
         date: date,
-        meals: []
+        meals: [],
       };
     }
-    
+
     // Add meal entry - preserve all recipe data for URL construction
     mealsByDate[date].meals.push({
       id: item.id,
-      type: item.entryType || item.type || 'meal',
+      type: item.entryType || item.type || "meal",
       title: item.title,
       text: item.text,
       recipe: item.recipe, // Full recipe object (may contain slug, id, etc.)
       recipeId: item.recipeId, // Recipe ID from meal plan entry
-      recipeName: item.recipe?.name || item.title || 'No recipe'
+      recipeName: item.recipe?.name || item.title || "No recipe",
     });
   });
-  
+
   // Convert to array and sort by date
   const groupedItems = Object.values(mealsByDate).sort((a, b) => {
     return new Date(a.date) - new Date(b.date);
   });
-  
+
   // Fill in missing days in the week range
   const startDate = getStartDate();
   const endDate = getEndDate();
   const allDays = [];
-  
+
+  // Get today's date at midnight for comparison
+  const today = new Date();
+  today.setHours(0, 0, 0, 0);
+
   if (startDate && endDate) {
     const current = new Date(startDate);
     const end = new Date(endDate);
-    
+
     while (current <= end) {
-      const dateStr = current.toISOString().split('T')[0];
-      const existingDay = groupedItems.find(item => item.date === dateStr);
-      
+      // Skip past days
+      const currentDate = new Date(current);
+      currentDate.setHours(0, 0, 0, 0);
+      if (currentDate < today) {
+        current.setDate(current.getDate() + 1);
+        continue;
+      }
+
+      const dateStr = current.toISOString().split("T")[0];
+      const existingDay = groupedItems.find((item) => item.date === dateStr);
+
       if (existingDay) {
         allDays.push(existingDay);
       } else {
         // Add empty day
         allDays.push({
           date: dateStr,
-          meals: []
+          meals: [],
         });
       }
-      
+
       current.setDate(current.getDate() + 1);
     }
   } else {
-    // If we can't determine the range, just return grouped items
-    return groupedItems;
+    // If we can't determine the range, filter grouped items to exclude past days
+    return groupedItems.filter((item) => {
+      if (!item.date) return false;
+      const itemDate = new Date(item.date);
+      itemDate.setHours(0, 0, 0, 0);
+      return itemDate >= today;
+    });
   }
-  
-  return allDays;
+
+  // Filter out any past days that might have been included
+  return allDays.filter((item) => {
+    if (!item.date) return false;
+    const itemDate = new Date(item.date);
+    itemDate.setHours(0, 0, 0, 0);
+    return itemDate >= today;
+  });
 });
 
 const getStartDate = () => {
   if (!query.data.value) return null;
-  
+
   const serviceData = query.data.value;
   // Try to get from response metadata
   if (serviceData.start_date) {
     return serviceData.start_date;
   }
-  
+
   // Calculate from items
-  const items = serviceData.items || (Array.isArray(serviceData) ? serviceData : []);
+  const items =
+    serviceData.items || (Array.isArray(serviceData) ? serviceData : []);
   if (items.length > 0) {
-    const dates = items.map(item => item.date).filter(Boolean).sort();
+    const dates = items
+      .map((item) => item.date)
+      .filter(Boolean)
+      .sort();
     if (dates.length > 0) {
       return dates[0];
     }
   }
-  
+
   // Default to today
-  return new Date().toISOString().split('T')[0];
+  return new Date().toISOString().split("T")[0];
 };
 
 const getEndDate = () => {
   if (!query.data.value) return null;
-  
+
   const serviceData = query.data.value;
   // Try to get from response metadata
   if (serviceData.end_date) {
     return serviceData.end_date;
   }
-  
+
   // Calculate from items
-  const items = serviceData.items || (Array.isArray(serviceData) ? serviceData : []);
+  const items =
+    serviceData.items || (Array.isArray(serviceData) ? serviceData : []);
   if (items.length > 0) {
-    const dates = items.map(item => item.date).filter(Boolean).sort();
+    const dates = items
+      .map((item) => item.date)
+      .filter(Boolean)
+      .sort();
     if (dates.length > 0) {
       return dates[dates.length - 1];
     }
   }
-  
+
   // Default to 7 days from today
   const date = new Date();
   date.setDate(date.getDate() + 7);
-  return date.toISOString().split('T')[0];
+  return date.toISOString().split("T")[0];
 };
 
 const dateRange = computed(() => {
   if (!query.data.value) return "";
-  
+
   const serviceData = query.data.value;
   // Try to get date range from response metadata
   if (serviceData.start_date && serviceData.end_date) {
     return formatDateRange(serviceData.start_date, serviceData.end_date);
   }
-  
+
   // Calculate from items if available
   const items = mealPlanItems.value;
   if (items.length > 0) {
-    const dates = items.map(item => item.date).filter(Boolean).sort();
+    const dates = items
+      .map((item) => item.date)
+      .filter(Boolean)
+      .sort();
     if (dates.length > 0) {
       return formatDateRange(dates[0], dates[dates.length - 1]);
     }
   }
-  
+
   return "";
 });
 
@@ -268,13 +331,13 @@ const getMealieUrl = () => {
 
 const getRecipeUrl = (meal) => {
   if (!meal) return null;
-  
+
   const mealieUrl = getMealieUrl();
   if (!mealieUrl) return null;
-  
+
   // Mealie recipe URLs are: {mealie_url}/g/home/r/{slug}
   let slug = null;
-  
+
   if (meal.recipe) {
     // Check for slug (most common)
     if (meal.recipe.slug) {
@@ -285,14 +348,14 @@ const getRecipeUrl = (meal) => {
       slug = meal.recipe.id;
     }
   }
-  
+
   // Fallback to recipeId from meal entry
   if (!slug && meal.recipeId) {
     slug = meal.recipeId;
   }
-  
+
   if (!slug) return null;
-  
+
   // Use /g/home/r/{slug} format (home is the default group view)
   return `${mealieUrl}/g/home/r/${slug}`;
 };
@@ -300,7 +363,7 @@ const getRecipeUrl = (meal) => {
 const openRecipe = (meal) => {
   const url = getRecipeUrl(meal);
   if (url) {
-    window.open(url, '_blank');
+    window.open(url, "_blank");
   }
 };
 
@@ -313,7 +376,11 @@ const formatMealType = (type) => {
 const formatDate = (dateString) => {
   if (!dateString) return "";
   const date = new Date(dateString);
-  return date.toLocaleDateString("en-US", { weekday: "short", month: "short", day: "numeric" });
+  return date.toLocaleDateString("en-US", {
+    weekday: "short",
+    month: "short",
+    day: "numeric",
+  });
 };
 
 const formatDateRange = (startDate, endDate) => {
@@ -331,6 +398,37 @@ const isToday = (dateString) => {
   date.setHours(0, 0, 0, 0);
   return date.getTime() === today.getTime();
 };
+
+// Calculate grid columns for portrait mode based on number of days
+const gridStyle = computed(() => {
+  if (!isPortrait.value) {
+    return { gridTemplateColumns: "1fr" };
+  }
+
+  const numDays = mealPlanItems.value.length;
+  if (numDays <= 0) {
+    return { gridTemplateColumns: "1fr" };
+  }
+
+  // For portrait mode on 24" monitor (1080px wide), use 2-3 columns
+  // Calculate optimal columns: aim for roughly square-ish layout
+  let columns = 2;
+  if (numDays <= 4) {
+    columns = 2; // 2x2 grid
+  } else if (numDays <= 6) {
+    columns = 2; // 2x3 grid
+  } else if (numDays <= 9) {
+    columns = 3; // 3x3 grid
+  } else if (numDays <= 12) {
+    columns = 3; // 3x4 grid
+  } else {
+    columns = 3; // 3 columns for more days
+  }
+
+  return {
+    gridTemplateColumns: `repeat(${columns}, 1fr)`,
+  };
+});
 </script>
 
 <style scoped>
@@ -396,10 +494,12 @@ const isToday = (dateString) => {
   width: 100%;
   height: 100%;
   padding: 1.5rem;
-  overflow-y: auto;
+  overflow: hidden;
   max-height: 100%;
   background: var(--bg-primary);
   box-sizing: border-box;
+  display: flex;
+  flex-direction: column;
 }
 
 .meal-plan-header {
@@ -436,31 +536,71 @@ const isToday = (dateString) => {
   width: 100%;
   min-width: 0; /* Prevent grid overflow */
   grid-template-columns: 1fr; /* Single column for landscape - full width cards */
+  flex: 1;
+  overflow: hidden;
+  align-content: start;
 }
 
-/* Portrait mode: stack cards vertically */
-@media (orientation: portrait) {
-  .meal-plan-content {
-    padding: 1rem;
-  }
-  
-  .meal-plan-items {
-    grid-template-columns: 1fr !important;
-    gap: 0.75rem;
-  }
-  
-  .meal-plan-item {
-    padding: 0.75rem;
-  }
-  
-  .meal-plan-header {
-    margin-bottom: 1rem;
-    padding-bottom: 0.75rem;
-  }
-  
-  .meal-plan-header h3 {
-    font-size: 1.25rem;
-  }
+/* Portrait mode: multi-column layout */
+.meal-plan-content.portrait-mode {
+  padding: 0.75rem;
+}
+
+.meal-plan-content.portrait-mode .meal-plan-header {
+  margin-bottom: 0.75rem;
+  padding-bottom: 0.5rem;
+}
+
+.meal-plan-content.portrait-mode .meal-plan-header h3 {
+  font-size: 1.1rem;
+}
+
+.meal-plan-content.portrait-mode .meal-plan-dates {
+  font-size: 0.8rem;
+}
+
+.meal-plan-content.portrait-mode .meal-plan-items {
+  gap: 0.5rem;
+  /* Grid columns set dynamically via inline style */
+}
+
+.meal-plan-content.portrait-mode .meal-plan-item {
+  padding: 0.5rem;
+  min-height: 0;
+  border-radius: 8px;
+  gap: 0.5rem;
+}
+
+.meal-plan-content.portrait-mode .meal-plan-date {
+  font-size: 0.75rem;
+  margin-bottom: 0.5rem;
+  padding-bottom: 0.35rem;
+}
+
+.meal-plan-content.portrait-mode .meal-plan-meals {
+  gap: 0.35rem;
+}
+
+.meal-plan-content.portrait-mode .meal-item {
+  padding: 0.5rem 0.75rem;
+  gap: 0.75rem;
+}
+
+.meal-plan-content.portrait-mode .meal-type {
+  min-width: 60px;
+  font-size: 0.75rem;
+  padding: 0.25rem 0.5rem;
+}
+
+.meal-plan-content.portrait-mode .meal-name {
+  font-size: 0.85rem;
+  line-height: 1.4;
+}
+
+.meal-plan-content.portrait-mode .no-meals-day,
+.meal-plan-content.portrait-mode .no-meals {
+  padding: 0.5rem;
+  font-size: 0.8rem;
 }
 
 .meal-plan-item {
@@ -475,6 +615,7 @@ const isToday = (dateString) => {
   box-shadow: 0 2px 4px rgba(0, 0, 0, 0.05);
   min-width: 0; /* Prevent flex item overflow */
   width: 100%;
+  overflow: hidden;
 }
 
 .meal-plan-item:hover {
@@ -586,4 +727,3 @@ const isToday = (dateString) => {
   }
 }
 </style>
-
