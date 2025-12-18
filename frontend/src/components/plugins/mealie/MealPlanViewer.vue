@@ -255,15 +255,35 @@ const mealPlanItems = computed(() => {
       return;
     }
 
-    if (!mealsByDate[date]) {
-      mealsByDate[date] = {
-        date: date,
+    // Normalize date string to YYYY-MM-DD format for consistent grouping
+    // Parse as local date to avoid timezone issues
+    let normalizedDate = date;
+    try {
+      // If date is in ISO format or has time component, extract just the date part
+      const dateObj = new Date(date);
+      if (!isNaN(dateObj.getTime())) {
+        // Format as YYYY-MM-DD in local timezone
+        const year = dateObj.getFullYear();
+        const month = String(dateObj.getMonth() + 1).padStart(2, "0");
+        const day = String(dateObj.getDate()).padStart(2, "0");
+        normalizedDate = `${year}-${month}-${day}`;
+      }
+    } catch (e) {
+      // If parsing fails, use original date string
+      if (DEBUG) {
+        console.warn("[MealPlanViewer] Failed to parse date:", date, e);
+      }
+    }
+
+    if (!mealsByDate[normalizedDate]) {
+      mealsByDate[normalizedDate] = {
+        date: normalizedDate,
         meals: [],
       };
     }
 
     // Add meal entry - preserve all recipe data for URL construction
-    mealsByDate[date].meals.push({
+    mealsByDate[normalizedDate].meals.push({
       id: item.id,
       type: item.entryType || item.type || "meal",
       title: item.title,
@@ -285,10 +305,24 @@ const mealPlanItems = computed(() => {
     );
   }
 
-  // Convert to array and sort by date
+  // Convert to array and sort by date (using Date objects for proper comparison)
   const groupedItems = Object.values(mealsByDate).sort((a, b) => {
-    return new Date(a.date) - new Date(b.date);
+    const dateA = new Date(a.date);
+    dateA.setHours(0, 0, 0, 0);
+    const dateB = new Date(b.date);
+    dateB.setHours(0, 0, 0, 0);
+    return dateA.getTime() - dateB.getTime();
   });
+
+  if (DEBUG) {
+    console.log(
+      "[MealPlanViewer] Grouped items after sorting:",
+      groupedItems.map((i) => ({
+        date: i.date,
+        mealCount: i.meals.length,
+      })),
+    );
+  }
 
   // Fill in missing days in the week range
   const startDate = getStartDate();
@@ -324,8 +358,18 @@ const mealPlanItems = computed(() => {
         continue;
       }
 
-      const dateStr = current.toISOString().split("T")[0];
-      const existingDay = groupedItems.find((item) => item.date === dateStr);
+      // Format date as YYYY-MM-DD in local timezone (not UTC)
+      const year = current.getFullYear();
+      const month = String(current.getMonth() + 1).padStart(2, "0");
+      const day = String(current.getDate()).padStart(2, "0");
+      const dateStr = `${year}-${month}-${day}`;
+
+      const existingDay = groupedItems.find((item) => {
+        // Compare dates using Date objects to avoid string comparison issues
+        const itemDate = new Date(item.date);
+        itemDate.setHours(0, 0, 0, 0);
+        return itemDate.getTime() === currentDate.getTime();
+      });
 
       if (existingDay) {
         allDays.push(existingDay);
