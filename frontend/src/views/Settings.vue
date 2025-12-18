@@ -1298,9 +1298,7 @@
                 <span class="help-text"
                   >Hold {{ localConfig.rebootComboKey1 }} +
                   {{ localConfig.rebootComboKey2 }} for
-                  {{
-                    (localConfig.rebootComboDuration / 1000).toFixed(1)
-                  }}
+                  {{ (localConfig.rebootComboDuration / 1000).toFixed(1) }}
                   seconds to reboot</span
                 >
               </div>
@@ -1618,6 +1616,11 @@ const updateOrientation = () => {
 
 const updateOrientationFlipped = () => {
   configStore.setOrientationFlipped(localConfig.value.orientationFlipped);
+  saveConfig();
+};
+
+const updateApplyDisplayRotation = () => {
+  configStore.setApplyDisplayRotation(localConfig.value.applyDisplayRotation);
   saveConfig();
 };
 
@@ -2627,6 +2630,8 @@ const saveConfig = async () => {
   try {
     await axios.post("/api/config", {
       orientation: localConfig.value.orientation,
+      orientationFlipped: localConfig.value.orientationFlipped,
+      applyDisplayRotation: localConfig.value.applyDisplayRotation,
       calendarSplit: localConfig.value.calendarSplit,
       keyboardType: localConfig.value.keyboardType,
       keyboardFeedbackEnabled: localConfig.value.keyboardFeedbackEnabled,

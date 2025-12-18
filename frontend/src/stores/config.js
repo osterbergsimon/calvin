@@ -5,6 +5,7 @@ import axios from "axios";
 export const useConfigStore = defineStore("config", () => {
   const orientation = ref("landscape"); // 'landscape' | 'portrait'
   const orientationFlipped = ref(false); // Whether orientation is flipped (180° rotation)
+  const applyDisplayRotation = ref(true); // Whether to physically rotate display on RPi (default: true)
   const calendarSplit = ref(70); // Percentage for calendar (66-75%, default 70%)
   const sideViewPosition = ref("right"); // 'left' | 'right' for landscape, 'top' | 'bottom' for portrait
   const lastSideViewMode = ref("photos"); // Track last side view mode ('photos' | 'web_services')
@@ -61,6 +62,10 @@ export const useConfigStore = defineStore("config", () => {
 
   const setOrientationFlipped = (flipped) => {
     orientationFlipped.value = flipped;
+  };
+
+  const setApplyDisplayRotation = (apply) => {
+    applyDisplayRotation.value = apply;
   };
 
   const setLastSideViewMode = (mode) => {
@@ -342,6 +347,11 @@ export const useConfigStore = defineStore("config", () => {
       if (config.orientationFlipped !== undefined) {
         orientationFlipped.value = config.orientationFlipped;
       }
+      if (config.applyDisplayRotation !== undefined) {
+        applyDisplayRotation.value = config.applyDisplayRotation;
+      } else if (config.apply_display_rotation !== undefined) {
+        applyDisplayRotation.value = config.apply_display_rotation;
+      }
       if (config.lastSideViewMode !== undefined) {
         lastSideViewMode.value = config.lastSideViewMode;
       }
@@ -489,6 +499,7 @@ export const useConfigStore = defineStore("config", () => {
   return {
     orientation,
     orientationFlipped,
+    applyDisplayRotation,
     calendarSplit,
     showWebServices,
     lastSideViewMode,
@@ -532,6 +543,7 @@ export const useConfigStore = defineStore("config", () => {
     photosWidth,
     setOrientation,
     setOrientationFlipped,
+    setApplyDisplayRotation,
     setLastSideViewMode,
     setCalendarSplit,
     toggleWebServices,

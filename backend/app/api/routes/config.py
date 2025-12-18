@@ -7,6 +7,7 @@ from fastapi import APIRouter, HTTPException
 from pydantic import BaseModel
 
 from app.services.config_service import config_service
+from app.services.display_orientation_service import display_orientation_service
 
 router = APIRouter()
 
@@ -16,6 +17,9 @@ class ConfigUpdate(BaseModel):
 
     orientation: str | None = None
     orientationFlipped: bool | None = None  # Whether orientation is flipped (180° rotation)
+    applyDisplayRotation: bool | None = (
+        None  # Whether to physically rotate display on RPi (default: True)
+    )
     calendarSplit: float | None = None
     lastSideViewMode: str | None = None  # Last side view mode ('photos' | 'web_services')
     keyboardType: str | None = None
@@ -322,6 +326,8 @@ async def update_config(config_update: ConfigUpdate):
     # Convert camelCase to snake_case for storage
     if "orientationFlipped" in update_dict:
         update_dict["orientation_flipped"] = update_dict.pop("orientationFlipped")
+    if "applyDisplayRotation" in update_dict:
+        update_dict["apply_display_rotation"] = update_dict.pop("applyDisplayRotation")
     if "lastSideViewMode" in update_dict:
         update_dict["last_side_view_mode"] = update_dict.pop("lastSideViewMode")
     if "calendarSplit" in update_dict:
@@ -466,8 +472,51 @@ async def update_config(config_update: ConfigUpdate):
 
     await config_service.update_config(update_dict)
 
+    # Apply display orientation if orientation settings changed and rotation is enabled
+    if (
+        "orientation" in update_dict
+        or "orientation_flipped" in update_dict
+        or "apply_display_rotation" in update_dict
+    ):
+        try:
+            # Get the final config values (after update)
+            config = await config_service.get_config()
+            apply_rotation = config.get("apply_display_rotation", True) or config.get(
+                "applyDisplayRotation", True
+            )
+
+            # Only apply physical rotation if enabled
+            if apply_rotation:
+                orientation = config.get("orientation", "landscape")
+                flipped = config.get("orientation_flipped", False) or config.get(
+                    "orientationFlipped", False
+                )
+
+                # Apply display rotation on RPi
+                result = await display_orientation_service.apply_orientation(orientation, flipped)
+                if result.get("success"):
+                    print(f"Display orientation applied: {result.get('message')}")
+                else:
+                    print(f"Display orientation update failed: {result.get('message')}")
+            else:
+                print("Display rotation is disabled - only UI layout will change")
+        except Exception as e:
+            # Don't fail the config update if orientation application fails
+            print(f"Warning: Failed to apply display orientation: {e}")
+
     # Return updated config
     return await get_config()
+
+
+@router.get("/config/display/orientation")
+async def get_display_orientation():
+    """
+    Get current display orientation (Raspberry Pi only).
+
+    Returns:
+        Dictionary with current display orientation info
+    """
+    return await display_orientation_service.get_current_orientation()
 
 
 @router.get("/config/git/branches")

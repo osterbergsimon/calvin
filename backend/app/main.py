@@ -190,6 +190,9 @@ async def lifespan(app: FastAPI):
     orientation = await config_service.get_value("orientation")
     if orientation is None:
         await config_service.set_value("orientation", "landscape")
+    apply_display_rotation = await config_service.get_value("apply_display_rotation")
+    if apply_display_rotation is None:
+        await config_service.set_value("apply_display_rotation", True)  # Default to enabled
     calendar_split = await config_service.get_value("calendar_split")
     if calendar_split is None:
         await config_service.set_value("calendar_split", 70.0)
@@ -299,6 +302,25 @@ async def lifespan(app: FastAPI):
 
     await display_power_service.start()
     print("Display power scheduler started")
+
+    # Sync display orientation with config (on Raspberry Pi, if enabled)
+    try:
+        from app.services.display_orientation_service import display_orientation_service
+
+        apply_rotation = await config_service.get_value("apply_display_rotation", True)
+        if apply_rotation:
+            result = await display_orientation_service.sync_with_config()
+            if result.get("success"):
+                print(f"Display orientation synced: {result.get('message')}")
+            elif result.get("message") and "Not running on Raspberry Pi" not in result.get(
+                "message", ""
+            ):
+                print(f"Display orientation sync: {result.get('message')}")
+        else:
+            print("Display rotation is disabled - skipping physical display rotation")
+    except Exception as e:
+        # Don't fail startup if orientation sync fails
+        print(f"Warning: Failed to sync display orientation on startup: {e}")
 
     yield
     # Shutdown
