@@ -104,7 +104,6 @@ const configStore = useConfigStore();
 // 3. In development mode
 const DEBUG = props.debug || configStore.mealPlanDebug || import.meta.env.DEV;
 
-const configStore = useConfigStore();
 const cardSize = computed(() => configStore.mealPlanCardSize || "medium");
 const isPortrait = computed(() => configStore.orientation === "portrait");
 
