@@ -1,5 +1,6 @@
 """Configuration endpoints."""
 
+import subprocess
 from pathlib import Path
 from typing import Any
 
@@ -10,6 +11,31 @@ from app.services.config_service import config_service
 from app.services.display_orientation_service import display_orientation_service
 
 router = APIRouter()
+
+
+def get_git_version() -> str | None:
+    """
+    Get the current git commit short hash.
+
+    Returns:
+        Short commit hash (7 characters) or None if git is not available
+    """
+    try:
+        # Get the project root (parent of backend directory)
+        project_root = Path(__file__).parent.parent.parent.parent
+        result = subprocess.run(
+            ["git", "rev-parse", "--short", "HEAD"],
+            cwd=project_root,
+            capture_output=True,
+            text=True,
+            timeout=5,
+        )
+        if result.returncode == 0:
+            return result.stdout.strip()
+        return None
+    except (subprocess.TimeoutExpired, FileNotFoundError, Exception):
+        # Git not available or error occurred
+        return None
 
 
 class ConfigUpdate(BaseModel):
@@ -314,6 +340,9 @@ async def get_config():
         config["gitBranch"] = "main"  # Default to main branch
     elif "git_branch" in config and "gitBranch" not in config:
         config["gitBranch"] = config["git_branch"]
+
+    # Add version (git commit short hash)
+    config["version"] = get_git_version()
 
     return config
 

@@ -1305,6 +1305,33 @@
             </div>
           </section>
 
+          <!-- System Information -->
+          <section
+            class="settings-section collapsible"
+            :class="{ expanded: expandedSections.systemInfo }"
+          >
+            <div class="section-header" @click="toggleSection('systemInfo')">
+              <h2>System Information</h2>
+              <span class="toggle-icon">{{
+                expandedSections.systemInfo ? "▼" : "▶"
+              }}</span>
+            </div>
+            <div v-show="expandedSections.systemInfo" class="section-content">
+              <div class="setting-item">
+                <label>Version</label>
+                <div class="version-display">
+                  <code v-if="localConfig.version">{{
+                    localConfig.version
+                  }}</code>
+                  <span v-else class="help-text"
+                    >Version information not available</span
+                  >
+                </div>
+                <span class="help-text">Current git commit short hash</span>
+              </div>
+            </div>
+          </section>
+
           <!-- Update Settings -->
           <section
             class="settings-section collapsible"
@@ -1476,6 +1503,7 @@ const localConfig = ref({
   clockSize: "medium",
   mealPlanCardSize: "medium",
   orientationFlipped: false,
+  version: null,
 });
 
 // Category navigation
@@ -1499,6 +1527,7 @@ const expandedSections = ref({
   plugins: false,
   displayPower: false,
   rebootCombo: false,
+  systemInfo: true,
   update: false,
 });
 
@@ -2356,6 +2385,7 @@ const loadConfig = async () => {
       }
       localConfig.value.gitBranch =
         response.data.gitBranch ?? response.data.git_branch ?? "main";
+      localConfig.value.version = response.data.version ?? null;
       keyboardStore.setKeyboardType(localConfig.value.keyboardType);
     }
   } catch (error) {
