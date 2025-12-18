@@ -575,10 +575,12 @@ onUnmounted(() => {
 .calendar-section {
   min-width: 0; /* Important for flex children */
   min-height: 0;
+  max-width: 100%; /* Ensure it doesn't exceed container */
   border-radius: 8px;
   overflow: hidden;
   display: flex;
   flex-direction: column;
+  box-sizing: border-box;
 }
 
 .dashboard:not(:has(.dashboard-header)) .calendar-section {

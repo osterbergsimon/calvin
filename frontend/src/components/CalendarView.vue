@@ -840,6 +840,7 @@ onActivated(() => {
 <style scoped>
 .calendar-view {
   width: 100%;
+  max-width: 100%;
   height: 100%;
   display: flex;
   flex-direction: column;
@@ -849,6 +850,7 @@ onActivated(() => {
   outline: none;
   min-height: 0;
   min-width: 0;
+  box-sizing: border-box;
 }
 
 .calendar-view:focus {
@@ -1000,7 +1002,10 @@ onActivated(() => {
   min-height: 0;
   position: relative;
   width: 100%;
+  max-width: 100%;
   box-sizing: border-box;
+  /* Force hardware acceleration for consistent rendering on RPI */
+  transform: translateZ(0);
 }
 
 .calendar-view:has(.calendar-header-minimal) .calendar-content {
@@ -1062,7 +1067,10 @@ onActivated(() => {
   padding: 1rem;
   min-height: 0;
   width: 100%;
+  max-width: 100%;
   box-sizing: border-box;
+  overflow: hidden;
+  contain: layout;
 }
 
 .calendar-grid.loading {
@@ -1070,13 +1078,7 @@ onActivated(() => {
   pointer-events: none;
 }
 
-.calendar-grid.rolling-view {
-  /* Rolling view specific styles if needed */
-}
-
-.calendar-days.rolling-days {
-  /* Rolling days specific styles if needed */
-}
+/* Rolling view styles can be added here if needed */
 
 .calendar-weekdays {
   display: grid;
@@ -1084,6 +1086,12 @@ onActivated(() => {
   gap: 0.5rem;
   margin-bottom: 0.5rem;
   width: 100%;
+  max-width: 100%;
+  box-sizing: border-box;
+  overflow: hidden;
+  /* Prevent fractional pixel overflow on RPI */
+  transform: translateZ(0);
+  min-width: 0;
 }
 
 .weekday {
@@ -1105,7 +1113,14 @@ onActivated(() => {
   min-height: 0;
   overflow: hidden;
   width: 100%;
+  max-width: 100%;
+  box-sizing: border-box;
   align-items: stretch;
+  contain: layout;
+  /* Prevent fractional pixel overflow on RPI */
+  transform: translateZ(0);
+  /* Ensure grid fits within container accounting for gaps */
+  min-width: 0;
 }
 
 /* Week view: taller day cells */
@@ -1250,44 +1265,42 @@ onActivated(() => {
   .calendar-content {
     padding: clamp(0.25rem, 1vw, 0.75rem);
     width: 100%;
+    max-width: 100%;
     box-sizing: border-box;
   }
 
   .calendar-grid {
     padding: clamp(0.25rem, 1vw, 0.75rem);
     width: 100%;
+    max-width: 100%;
     box-sizing: border-box;
   }
 
   .calendar-weekdays {
     width: 100%;
+    max-width: 100%;
+    box-sizing: border-box;
+    gap: clamp(0.15rem, 0.5vw, 0.5rem);
+    margin-bottom: clamp(0.15rem, 0.5vw, 0.5rem);
   }
 
   .calendar-days {
     width: 100%;
+    max-width: 100%;
+    box-sizing: border-box;
+    gap: clamp(0.15rem, 0.5vw, 0.5rem);
   }
 
   .calendar-day {
     width: 100%;
+    max-width: 100%;
     box-sizing: border-box;
-  }
-
-  .calendar-weekdays {
-    gap: clamp(0.15rem, 0.5vw, 0.5rem);
-    margin-bottom: clamp(0.15rem, 0.5vw, 0.5rem);
+    padding: clamp(0.15rem, 0.75vw, 0.5rem);
   }
 
   .weekday {
     font-size: clamp(0.6rem, 1.5vw, 0.9rem);
     padding: clamp(0.15rem, 0.5vw, 0.5rem);
-  }
-
-  .calendar-days {
-    gap: clamp(0.15rem, 0.5vw, 0.5rem);
-  }
-
-  .calendar-day {
-    padding: clamp(0.15rem, 0.75vw, 0.5rem);
   }
 
   .day-number {
@@ -1325,29 +1338,21 @@ onActivated(() => {
   .calendar-content {
     padding: clamp(0.15rem, 1vw, 0.5rem);
     width: 100%;
+    max-width: 100%;
     box-sizing: border-box;
   }
 
   .calendar-grid {
     padding: clamp(0.15rem, 1vw, 0.5rem);
     width: 100%;
+    max-width: 100%;
     box-sizing: border-box;
   }
 
   .calendar-weekdays {
     width: 100%;
-  }
-
-  .calendar-days {
-    width: 100%;
-  }
-
-  .calendar-day {
-    width: 100%;
+    max-width: 100%;
     box-sizing: border-box;
-  }
-
-  .calendar-weekdays {
     gap: clamp(0.1rem, 0.5vw, 0.25rem);
   }
 
@@ -1357,10 +1362,16 @@ onActivated(() => {
   }
 
   .calendar-days {
+    width: 100%;
+    max-width: 100%;
+    box-sizing: border-box;
     gap: clamp(0.1rem, 0.5vw, 0.25rem);
   }
 
   .calendar-day {
+    width: 100%;
+    max-width: 100%;
+    box-sizing: border-box;
     padding: clamp(0.1rem, 0.75vw, 0.35rem);
   }
 
@@ -1374,44 +1385,42 @@ onActivated(() => {
   .calendar-content {
     padding: clamp(0.15rem, 1vh, 0.5rem);
     width: 100%;
+    max-width: 100%;
     box-sizing: border-box;
   }
 
   .calendar-grid {
     padding: clamp(0.15rem, 1vh, 0.5rem);
     width: 100%;
+    max-width: 100%;
     box-sizing: border-box;
   }
 
   .calendar-weekdays {
     width: 100%;
+    max-width: 100%;
+    box-sizing: border-box;
+    gap: clamp(0.1rem, 0.5vh, 0.25rem);
+    margin-bottom: clamp(0.1rem, 0.5vh, 0.25rem);
   }
 
   .calendar-days {
     width: 100%;
+    max-width: 100%;
+    box-sizing: border-box;
+    gap: clamp(0.1rem, 0.5vh, 0.25rem);
   }
 
   .calendar-day {
     width: 100%;
+    max-width: 100%;
     box-sizing: border-box;
-  }
-
-  .calendar-weekdays {
-    gap: clamp(0.1rem, 0.5vh, 0.25rem);
-    margin-bottom: clamp(0.1rem, 0.5vh, 0.25rem);
+    padding: clamp(0.1rem, 0.75vh, 0.35rem);
   }
 
   .weekday {
     font-size: clamp(0.5rem, 2vh, 0.75rem);
     padding: clamp(0.1rem, 0.5vh, 0.25rem);
-  }
-
-  .calendar-days {
-    gap: clamp(0.1rem, 0.5vh, 0.25rem);
-  }
-
-  .calendar-day {
-    padding: clamp(0.1rem, 0.75vh, 0.35rem);
   }
 
   .day-number {
@@ -1424,29 +1433,21 @@ onActivated(() => {
   .calendar-content {
     padding: 0.15rem;
     width: 100%;
+    max-width: 100%;
     box-sizing: border-box;
   }
 
   .calendar-grid {
     padding: 0.15rem;
     width: 100%;
+    max-width: 100%;
     box-sizing: border-box;
   }
 
   .calendar-weekdays {
     width: 100%;
-  }
-
-  .calendar-days {
-    width: 100%;
-  }
-
-  .calendar-day {
-    width: 100%;
+    max-width: 100%;
     box-sizing: border-box;
-  }
-
-  .calendar-weekdays {
     gap: 0.1rem;
     margin-bottom: 0.1rem;
   }
@@ -1457,10 +1458,16 @@ onActivated(() => {
   }
 
   .calendar-days {
+    width: 100%;
+    max-width: 100%;
+    box-sizing: border-box;
     gap: 0.1rem;
   }
 
   .calendar-day {
+    width: 100%;
+    max-width: 100%;
+    box-sizing: border-box;
     padding: 0.1rem;
   }
 
