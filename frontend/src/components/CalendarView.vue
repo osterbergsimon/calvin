@@ -1147,6 +1147,7 @@ onActivated(() => {
   padding: 0.5rem;
   min-height: 0;
   min-width: 0;
+  max-width: 100%; /* Prevent cell from expanding beyond grid column */
   width: 100%;
   display: flex;
   flex-direction: column;
@@ -1154,8 +1155,10 @@ onActivated(() => {
   transition: background 0.2s;
   position: relative;
   overflow: hidden;
+  overflow-x: clip; /* Better clipping for event overflow on RPI */
   /* Allow content to expand within the cell */
   align-items: stretch;
+  box-sizing: border-box;
 }
 
 .calendar-day:hover {
@@ -1246,9 +1249,12 @@ onActivated(() => {
   flex-direction: column;
   gap: 0.25rem;
   overflow: hidden;
+  overflow-x: clip; /* Prevent horizontal overflow from event items */
   min-height: 0;
   min-width: 0;
+  max-width: 100%; /* Prevent events container from expanding beyond cell */
   width: 100%;
+  box-sizing: border-box;
   /* Allow events to expand vertically when space is available */
   align-content: flex-start;
 }

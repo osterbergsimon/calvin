@@ -112,6 +112,7 @@ const handleFocus = () => {
   word-wrap: break-word;
   word-break: break-word;
   overflow: hidden;
+  overflow-x: clip; /* Prevent horizontal overflow from long event names */
   cursor: pointer;
   transition: all 0.2s;
   border: 2px solid transparent;
@@ -120,14 +121,14 @@ const handleFocus = () => {
   flex-shrink: 0;
   flex-grow: 0;
   max-width: 100%;
+  width: 100%; /* Ensure event items don't exceed cell width */
+  box-sizing: border-box;
   line-height: 1.3;
   /* Allow event text to wrap and expand vertically when space is available */
   /* The parent container will naturally limit the height */
 }
 
-.event-item.event-multi-day {
-  /* Multi-day events get special styling */
-}
+/* Multi-day events get special styling via event-start, event-end, event-middle classes */
 
 .event-item.event-start {
   border-top-left-radius: clamp(2px, 0.3vw, 4px);
