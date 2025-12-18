@@ -135,9 +135,12 @@ const handleFocus = () => {
   border-bottom-left-radius: clamp(2px, 0.3vw, 4px);
   border-top-right-radius: 0;
   border-bottom-right-radius: 0;
-  margin-right: calc(-1 * clamp(0.05rem, 0.2vw, 0.1rem));
+  /* Reduce negative margin to prevent grid expansion */
+  margin-right: calc(-1 * clamp(0.02rem, 0.1vw, 0.05rem));
   z-index: 1;
   border-right: 1px dashed rgba(255, 255, 255, 0.3);
+  /* Ensure negative margin doesn't cause cell expansion */
+  position: relative;
 }
 
 .event-item.event-end {
@@ -145,18 +148,24 @@ const handleFocus = () => {
   border-bottom-right-radius: clamp(2px, 0.3vw, 4px);
   border-top-left-radius: 0;
   border-bottom-left-radius: 0;
-  margin-left: calc(-1 * clamp(0.05rem, 0.2vw, 0.1rem));
+  /* Reduce negative margin to prevent grid expansion */
+  margin-left: calc(-1 * clamp(0.02rem, 0.1vw, 0.05rem));
   z-index: 1;
   border-left: 1px dashed rgba(255, 255, 255, 0.3);
+  /* Ensure negative margin doesn't cause cell expansion */
+  position: relative;
 }
 
 .event-item.event-middle {
   border-radius: 0;
-  margin-left: calc(-1 * clamp(0.05rem, 0.2vw, 0.1rem));
-  margin-right: calc(-1 * clamp(0.05rem, 0.2vw, 0.1rem));
+  /* Reduce negative margins to prevent grid expansion */
+  margin-left: calc(-1 * clamp(0.02rem, 0.1vw, 0.05rem));
+  margin-right: calc(-1 * clamp(0.02rem, 0.1vw, 0.05rem));
   z-index: 1;
   border-left: 1px dashed rgba(255, 255, 255, 0.3);
   border-right: 1px dashed rgba(255, 255, 255, 0.3);
+  /* Ensure negative margins don't cause cell expansion */
+  position: relative;
 }
 
 .event-continuation {
@@ -245,16 +254,16 @@ const handleFocus = () => {
   }
 
   .event-item.event-start {
-    margin-right: calc(-1 * clamp(0.03rem, 0.15vw, 0.08rem));
+    margin-right: calc(-1 * clamp(0.01rem, 0.08vw, 0.04rem));
   }
 
   .event-item.event-end {
-    margin-left: calc(-1 * clamp(0.03rem, 0.15vw, 0.08rem));
+    margin-left: calc(-1 * clamp(0.01rem, 0.08vw, 0.04rem));
   }
 
   .event-item.event-middle {
-    margin-left: calc(-1 * clamp(0.03rem, 0.15vw, 0.08rem));
-    margin-right: calc(-1 * clamp(0.03rem, 0.15vw, 0.08rem));
+    margin-left: calc(-1 * clamp(0.01rem, 0.08vw, 0.04rem));
+    margin-right: calc(-1 * clamp(0.01rem, 0.08vw, 0.04rem));
   }
 }
 
@@ -270,16 +279,16 @@ const handleFocus = () => {
   }
 
   .event-item.event-start {
-    margin-right: calc(-1 * clamp(0.02rem, 0.1vw, 0.05rem));
+    margin-right: calc(-1 * clamp(0.01rem, 0.05vw, 0.03rem));
   }
 
   .event-item.event-end {
-    margin-left: calc(-1 * clamp(0.02rem, 0.1vw, 0.05rem));
+    margin-left: calc(-1 * clamp(0.01rem, 0.05vw, 0.03rem));
   }
 
   .event-item.event-middle {
-    margin-left: calc(-1 * clamp(0.02rem, 0.1vw, 0.05rem));
-    margin-right: calc(-1 * clamp(0.02rem, 0.1vw, 0.05rem));
+    margin-left: calc(-1 * clamp(0.01rem, 0.05vw, 0.03rem));
+    margin-right: calc(-1 * clamp(0.01rem, 0.05vw, 0.03rem));
   }
 }
 
@@ -295,16 +304,16 @@ const handleFocus = () => {
   }
 
   .event-item.event-start {
-    margin-right: calc(-1 * clamp(0.02rem, 0.1vh, 0.05rem));
+    margin-right: calc(-1 * clamp(0.01rem, 0.05vh, 0.03rem));
   }
 
   .event-item.event-end {
-    margin-left: calc(-1 * clamp(0.02rem, 0.1vh, 0.05rem));
+    margin-left: calc(-1 * clamp(0.01rem, 0.05vh, 0.03rem));
   }
 
   .event-item.event-middle {
-    margin-left: calc(-1 * clamp(0.02rem, 0.1vh, 0.05rem));
-    margin-right: calc(-1 * clamp(0.02rem, 0.1vh, 0.05rem));
+    margin-left: calc(-1 * clamp(0.01rem, 0.05vh, 0.03rem));
+    margin-right: calc(-1 * clamp(0.01rem, 0.05vh, 0.03rem));
   }
 }
 
@@ -320,16 +329,16 @@ const handleFocus = () => {
   }
 
   .event-item.event-start {
-    margin-right: -0.02rem;
+    margin-right: -0.01rem;
   }
 
   .event-item.event-end {
-    margin-left: -0.02rem;
+    margin-left: -0.01rem;
   }
 
   .event-item.event-middle {
-    margin-left: -0.02rem;
-    margin-right: -0.02rem;
+    margin-left: -0.01rem;
+    margin-right: -0.01rem;
   }
 }
 </style>

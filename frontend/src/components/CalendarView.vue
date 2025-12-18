@@ -1116,6 +1116,7 @@ onActivated(() => {
   flex: 1;
   min-height: 0;
   overflow: hidden;
+  overflow-x: clip; /* Prevent negative margins from expanding grid */
   width: 100%;
   max-width: 100%;
   box-sizing: border-box;
@@ -1125,6 +1126,8 @@ onActivated(() => {
   transform: translateZ(0);
   /* Ensure grid fits within container accounting for gaps */
   min-width: 0;
+  /* Prevent grid from expanding due to negative margins on events */
+  isolation: isolate;
 }
 
 /* Week view: taller day cells */
@@ -1156,6 +1159,8 @@ onActivated(() => {
   position: relative;
   overflow: hidden;
   overflow-x: clip; /* Better clipping for event overflow on RPI */
+  /* Prevent negative margins from causing progressive skew */
+  isolation: isolate;
   /* Allow content to expand within the cell */
   align-items: stretch;
   box-sizing: border-box;
