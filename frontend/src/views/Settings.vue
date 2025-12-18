@@ -1421,6 +1421,13 @@
           >
             {{ updateInProgress ? "Updating..." : "🔄 Update from GitHub" }}
           </button>
+          <button
+            class="btn-reload"
+            @click="reloadUI"
+            title="Force reload the UI on the remote machine"
+          >
+            🔄 Reload UI
+          </button>
           <div
             v-if="updateMessage"
             class="update-message"
@@ -2805,36 +2812,67 @@ const triggerUpdate = async () => {
         const lastLog = statusResponse.data.last_log || "";
         const message = statusResponse.data.message || "";
 
+        // Extract commit information
+        const currentCommit = statusResponse.data.current_commit_short;
+        const currentCommitMsg = statusResponse.data.current_commit_msg;
+        const newCommit = statusResponse.data.new_commit_short;
+        const newCommitMsg = statusResponse.data.new_commit_msg;
+        const backendRestarted = statusResponse.data.backend_restarted;
+
+        // Build commit info display
+        let commitInfo = "";
+        if (currentCommit && newCommit && currentCommit !== newCommit) {
+          commitInfo = `\n📦 Updating: ${currentCommit} → ${newCommit}`;
+          if (newCommitMsg) {
+            commitInfo += `\n   "${newCommitMsg}"`;
+          }
+        } else if (newCommit) {
+          commitInfo = `\n📦 Commit: ${newCommit}`;
+          if (newCommitMsg) {
+            commitInfo += `\n   "${newCommitMsg}"`;
+          }
+        }
+
         if (status === "idle" || status === "completed") {
-          updateInProgress.value = false;
-          updateMessage.value =
-            "✅ Update completed successfully! Reloading page...";
-          updateMessageClass.value = "success";
-          // Reload page after a delay to show updated frontend
-          setTimeout(() => {
-            window.location.reload();
-          }, 2000);
+          // Only reload if backend has restarted (ensures all changes are complete)
+          if (backendRestarted) {
+            updateInProgress.value = false;
+            updateMessage.value = `✅ Update completed successfully!${commitInfo}\n\nReloading page...`;
+            updateMessageClass.value = "success";
+            // Reload page after a delay to show updated frontend
+            setTimeout(() => {
+              window.location.reload();
+            }, 2000);
+          } else {
+            // Update complete but backend not restarted yet, keep checking
+            updateMessage.value = `✅ Update complete, waiting for backend restart...${commitInfo}`;
+            updateMessageClass.value = "info";
+            setTimeout(checkStatus, 3000);
+          }
         } else if (status === "error") {
           updateInProgress.value = false;
-          updateMessage.value = `❌ Update failed: ${message}\n\nLast log:\n${lastLog}`;
+          updateMessage.value = `❌ Update failed: ${message}${commitInfo}\n\nLast log:\n${lastLog}`;
           updateMessageClass.value = "error";
         } else if (status === "running") {
-          // Show progress with last log lines
+          // Show progress with commit info and last log lines
           const logLines = lastLog
             .split("\n")
             .filter((line) => line.trim())
             .slice(-3);
-          const progressText =
-            logLines.length > 0
-              ? logLines.join("\n")
-              : message || "Update in progress...";
+          let progressText = message || "Update in progress...";
+          if (commitInfo) {
+            progressText = `${progressText}${commitInfo}`;
+          }
+          if (logLines.length > 0) {
+            progressText += `\n\n${logLines.join("\n")}`;
+          }
           updateMessage.value = `🔄 ${progressText}`;
           updateMessageClass.value = "info";
           // Check again in 3 seconds for more responsive updates
           setTimeout(checkStatus, 3000);
         } else {
           // Unknown status, keep checking
-          updateMessage.value = `⏳ ${message || "Checking update status..."}`;
+          updateMessage.value = `⏳ ${message || "Checking update status..."}${commitInfo}`;
           updateMessageClass.value = "info";
           setTimeout(checkStatus, 3000);
         }
@@ -2854,6 +2892,20 @@ const triggerUpdate = async () => {
     updateMessage.value = `❌ Failed to start update: ${error.response?.data?.detail || error.message || "Unknown error"}`;
     updateMessageClass.value = "error";
     console.error("Failed to trigger update:", error);
+  }
+};
+
+const reloadUI = async () => {
+  try {
+    await axios.post("/api/system/reload-ui");
+    // Reload the page after a short delay
+    setTimeout(() => {
+      window.location.reload();
+    }, 500);
+  } catch (error) {
+    console.error("Failed to reload UI:", error);
+    // Still reload even if API call fails
+    window.location.reload();
   }
 };
 
@@ -4266,6 +4318,24 @@ input:checked + .slider:before {
 .btn-update:disabled {
   opacity: 0.6;
   cursor: not-allowed;
+}
+
+.btn-reload {
+  background: var(--accent-info, #17a2b8);
+  color: #fff;
+  border: none;
+  border-radius: 4px;
+  padding: 0.75rem 2rem;
+  font-size: 1rem;
+  font-weight: 500;
+  cursor: pointer;
+  transition: all 0.2s ease;
+  margin-left: 0.5rem;
+}
+
+.btn-reload:hover {
+  background: var(--accent-info, #17a2b8);
+  opacity: 0.9;
 }
 
 .update-message {

@@ -50,9 +50,16 @@ if [ ! -d ".git" ]; then
 else
     # Check current commit before fetching
     CURRENT_COMMIT=$(git rev-parse HEAD 2>/dev/null || echo "")
+    CURRENT_COMMIT_SHORT=$(git rev-parse --short HEAD 2>/dev/null || echo "")
+    CURRENT_COMMIT_MSG=$(git log -1 --pretty=format:"%s" HEAD 2>/dev/null || echo "")
+    
+    if [ -n "$CURRENT_COMMIT" ]; then
+        echo "Current commit: $CURRENT_COMMIT_SHORT ($CURRENT_COMMIT)" | tee -a "$LOG_FILE"
+        echo "Current commit message: $CURRENT_COMMIT_MSG" | tee -a "$LOG_FILE"
+    fi
     
     # Pull latest code
-    echo "Pulling latest code from $GIT_BRANCH..." | tee -a "$LOG_FILE"
+    echo "Fetching latest code from $GIT_BRANCH..." | tee -a "$LOG_FILE"
     if ! git fetch origin; then
         echo "Warning: Failed to fetch from origin" | tee -a "$LOG_FILE"
         exit 0  # Don't fail the service, just skip this update
@@ -60,15 +67,35 @@ else
     
     # Check if there are any changes
     NEW_COMMIT=$(git rev-parse "origin/$GIT_BRANCH" 2>/dev/null || echo "")
+    NEW_COMMIT_SHORT=$(git rev-parse --short "origin/$GIT_BRANCH" 2>/dev/null || echo "")
+    NEW_COMMIT_MSG=$(git log -1 --pretty=format:"%s" "origin/$GIT_BRANCH" 2>/dev/null || echo "")
+    
+    if [ -n "$NEW_COMMIT" ]; then
+        echo "Latest commit on remote: $NEW_COMMIT_SHORT ($NEW_COMMIT)" | tee -a "$LOG_FILE"
+        echo "Latest commit message: $NEW_COMMIT_MSG" | tee -a "$LOG_FILE"
+    fi
+    
     if [ "$CURRENT_COMMIT" = "$NEW_COMMIT" ]; then
-        echo "No changes detected. Already up to date at commit $CURRENT_COMMIT" | tee -a "$LOG_FILE"
+        echo "No changes detected. Already up to date at commit $CURRENT_COMMIT_SHORT" | tee -a "$LOG_FILE"
         HAS_CHANGES=false
     else
-        echo "Changes detected. Updating from $CURRENT_COMMIT to $NEW_COMMIT..." | tee -a "$LOG_FILE"
+        echo "Changes detected. Updating from $CURRENT_COMMIT_SHORT to $NEW_COMMIT_SHORT..." | tee -a "$LOG_FILE"
+        if [ -n "$CURRENT_COMMIT" ] && [ -n "$NEW_COMMIT" ]; then
+            # Show what files changed
+            CHANGED_FILES=$(git diff --name-only "$CURRENT_COMMIT" "$NEW_COMMIT" 2>/dev/null | head -20)
+            if [ -n "$CHANGED_FILES" ]; then
+                echo "Files to be updated:" | tee -a "$LOG_FILE"
+                echo "$CHANGED_FILES" | while read -r file; do
+                    echo "  - $file" | tee -a "$LOG_FILE"
+                done
+            fi
+        fi
+        
         if ! git reset --hard "origin/$GIT_BRANCH"; then
             echo "Warning: Failed to reset to $GIT_BRANCH" | tee -a "$LOG_FILE"
             exit 0  # Don't fail the service, just skip this update
         fi
+        echo "Successfully updated to commit $NEW_COMMIT_SHORT" | tee -a "$LOG_FILE"
         HAS_CHANGES=true
     fi
 fi

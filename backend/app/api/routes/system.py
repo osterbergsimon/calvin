@@ -1,6 +1,7 @@
 """System management endpoints."""
 
 import os
+import re
 import subprocess
 from pathlib import Path
 
@@ -111,13 +112,70 @@ async def get_update_status():
         return {
             "status": "unknown",
             "message": "Update log not found. No updates have been run yet.",
+            "current_commit": None,
+            "current_commit_short": None,
+            "current_commit_msg": None,
+            "new_commit": None,
+            "new_commit_short": None,
+            "new_commit_msg": None,
+            "backend_restarted": False,
         }
 
     try:
-        # Read last 30 lines of log for better context
+        # Read last 50 lines of log for better context (increased to capture commit info)
         with open(log_file) as f:
             lines = f.readlines()
-            last_lines = lines[-30:] if len(lines) > 30 else lines
+            last_lines = lines[-50:] if len(lines) > 50 else lines
+            all_lines = lines  # Keep all lines for commit extraction
+
+        # Extract commit information from logs
+        current_commit = None
+        current_commit_short = None
+        current_commit_msg = None
+        new_commit = None
+        new_commit_short = None
+        new_commit_msg = None
+
+        for line in all_lines:
+            # Extract current commit
+            match = re.search(r"Current commit: (\w+) \(([a-f0-9]+)\)", line)
+            if match:
+                current_commit_short = match.group(1)
+                current_commit = match.group(2)
+
+            match = re.search(r"Current commit message: (.+)", line)
+            if match:
+                current_commit_msg = match.group(1).strip()
+
+            # Extract new commit
+            match = re.search(r"Latest commit on remote: (\w+) \(([a-f0-9]+)\)", line)
+            if match:
+                new_commit_short = match.group(1)
+                new_commit = match.group(2)
+
+            match = re.search(r"Latest commit message: (.+)", line)
+            if match:
+                new_commit_msg = match.group(1).strip()
+
+            # Also check for "Successfully updated to commit"
+            match = re.search(r"Successfully updated to commit (\w+)", line)
+            if match:
+                new_commit_short = match.group(1)
+                # Try to get full commit hash
+                try:
+                    repo_path = Path("/home/calvin/calvin")
+                    if (repo_path / ".git").exists():
+                        result = subprocess.run(
+                            ["git", "rev-parse", new_commit_short],
+                            cwd=str(repo_path),
+                            capture_output=True,
+                            text=True,
+                            timeout=2,
+                        )
+                        if result.returncode == 0:
+                            new_commit = result.stdout.strip()
+                except Exception:
+                    pass
 
         # Check if update is currently running
         # Look for various indicators of update activity
@@ -208,17 +266,37 @@ async def get_update_status():
         # Get last 15 lines for display
         display_lines = "".join(last_lines[-15:])
 
+        # Check if backend has restarted (indicates update is fully complete)
+        has_backend_restarted = (
+            "Backend service restarted successfully" in log_content
+            or "restarted successfully" in log_content.lower()
+        )
+
         return {
             "status": status,
             "last_log": display_lines,
             "message": message,
             "log_file": str(log_file),
+            "current_commit": current_commit,
+            "current_commit_short": current_commit_short,
+            "current_commit_msg": current_commit_msg,
+            "new_commit": new_commit,
+            "new_commit_short": new_commit_short,
+            "new_commit_msg": new_commit_msg,
+            "backend_restarted": has_backend_restarted,
         }
     except Exception as e:
         return {
             "status": "error",
             "message": f"Failed to read update log: {str(e)}",
             "last_log": "",
+            "current_commit": None,
+            "current_commit_short": None,
+            "current_commit_msg": None,
+            "new_commit": None,
+            "new_commit_short": None,
+            "new_commit_msg": None,
+            "backend_restarted": False,
         }
 
 
@@ -262,6 +340,19 @@ async def configure_display_timeout():
         raise HTTPException(
             status_code=500, detail=f"Failed to configure display timeout: {str(e)}"
         )
+
+
+@router.post("/reload-ui")
+async def reload_ui():
+    """
+    Signal that the UI should be reloaded.
+    This endpoint doesn't actually reload anything server-side,
+    but can be used to trigger a client-side reload.
+    """
+    return {
+        "status": "success",
+        "message": "UI reload signal sent. Clients should reload.",
+    }
 
 
 @router.post("/reboot")
