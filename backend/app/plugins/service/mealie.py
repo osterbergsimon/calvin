@@ -831,8 +831,24 @@ async def handle_plugin_config_update(
     logger = logging.getLogger(__name__)
 
     # Check if we have required config (URL and API token)
+    # Handle both dict (schema object) and string values
     mealie_url = config.get("mealie_url", "")
+    if isinstance(mealie_url, dict):
+        mealie_url = mealie_url.get("value") or mealie_url.get("default") or ""
+    mealie_url = str(mealie_url).strip() if mealie_url else ""
+
     api_token = config.get("api_token", "")
+    if isinstance(api_token, dict):
+        api_token = api_token.get("value") or api_token.get("default") or ""
+    api_token = str(api_token).strip() if api_token else ""
+
+    # Log token status (without exposing actual token)
+    token_status = "present" if api_token else "missing"
+    token_length = len(api_token) if api_token else 0
+    logger.info(
+        f"[Mealie] Config update - URL: {mealie_url}, "
+        f"API token: {token_status} (length: {token_length})"
+    )
 
     if not mealie_url or not api_token:
         logger.info("[Mealie] Skipping instance creation - missing URL or API token")
@@ -842,21 +858,39 @@ async def handle_plugin_config_update(
     result = session.execute(select(PluginDB).where(PluginDB.type_id == "mealie"))
     mealie_instance = result.scalar_one_or_none()
 
-    # Get days_ahead from config, default to 7
+    # Get days_ahead from config, default to 7 (handle dict values)
     days_ahead = config.get("days_ahead", "7")
+    if isinstance(days_ahead, dict):
+        days_ahead = days_ahead.get("value") or days_ahead.get("default") or "7"
     try:
         days_ahead = int(days_ahead) if days_ahead else 7
     except (ValueError, TypeError):
         days_ahead = 7
 
+    # Extract group_id properly (handle dict values)
+    group_id = config.get("group_id", "")
+    if isinstance(group_id, dict):
+        group_id = group_id.get("value") or group_id.get("default") or ""
+    group_id = str(group_id).strip() if group_id else ""
+
     instance_config = {
         "mealie_url": mealie_url,
-        "api_token": api_token,
-        "group_id": config.get("group_id", ""),
+        "api_token": api_token,  # Ensure this is a string, not a dict
+        "group_id": group_id,
         "days_ahead": days_ahead,
         "display_order": 0,
         "fullscreen": False,
     }
+
+    # Log final config (masking sensitive values)
+    logger.info(
+        f"[Mealie] Instance config prepared - "
+        f"URL: {mealie_url}, "
+        f"API token: {'present' if api_token else 'missing'} "
+        f"(length: {len(api_token) if api_token else 0}), "
+        f"Group ID: {group_id or 'not specified'}, "
+        f"Days ahead: {days_ahead}"
+    )
 
     if not mealie_instance:
         # Create new Mealie instance
@@ -866,6 +900,14 @@ async def handle_plugin_config_update(
             instance_enabled = (
                 enabled if enabled is not None else (db_type.enabled if db_type else True)
             )
+
+            # Verify config before creating instance
+            logger.info(
+                f"[Mealie] Creating instance with config - "
+                f"API token: {'present' if instance_config.get('api_token') else 'missing'} "
+                f"(length: {len(instance_config.get('api_token', ''))})"
+            )
+
             plugin = await plugin_registry.register_plugin(
                 plugin_id=plugin_instance_id,
                 type_id="mealie",
@@ -873,6 +915,21 @@ async def handle_plugin_config_update(
                 config=instance_config,
                 enabled=instance_enabled,
             )
+
+            # Verify the instance was created with correct config
+            created_instance = session.execute(
+                select(PluginDB).where(PluginDB.id == plugin_instance_id)
+            ).scalar_one_or_none()
+            if created_instance:
+                saved_token = (
+                    created_instance.config.get("api_token", "") if created_instance.config else ""
+                )
+                logger.info(
+                    f"[Mealie] Instance created successfully - "
+                    f"API token in DB: {'present' if saved_token else 'missing'} "
+                    f"(length: {len(saved_token)})"
+                )
+
             return {
                 "instance_created": True,
                 "instance_id": plugin_instance_id,
@@ -914,7 +971,35 @@ async def handle_plugin_config_update(
             mealie_instance.enabled = instance_enabled
             if db_type:
                 db_type.enabled = instance_enabled
+
+            # Verify API token is in config before saving
+            saved_token_status = "present" if instance_config.get("api_token") else "missing"
+            saved_token_length = len(instance_config.get("api_token", ""))
+            logger.info(
+                f"[Mealie] Saving config to database - "
+                f"API token: {saved_token_status} (length: {saved_token_length})"
+            )
+
             session.commit()
+
+            # Verify the config was actually saved by refreshing and checking
+            session.refresh(mealie_instance)
+            saved_config = mealie_instance.config or {}
+            saved_token = saved_config.get("api_token", "")
+            logger.info(
+                f"[Mealie] Config successfully saved to database for {mealie_instance.id} - "
+                f"API token in DB: {'present' if saved_token else 'missing'} "
+                f"(length: {len(saved_token)})"
+            )
+
+            # Double-check that the saved token matches what we tried to save
+            if saved_token != api_token:
+                logger.warning(
+                    f"[Mealie] WARNING: Saved API token does not match input token! "
+                    f"Input length: {len(api_token)}, Saved length: {len(saved_token)}"
+                )
+            else:
+                logger.info("[Mealie] API token verified - matches saved value")
 
             return {
                 "instance_updated": True,
