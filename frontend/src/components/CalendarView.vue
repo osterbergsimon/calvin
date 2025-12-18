@@ -1082,8 +1082,10 @@ onActivated(() => {
 
 .calendar-weekdays {
   display: grid;
-  grid-template-columns: repeat(7, minmax(0, 1fr));
-  gap: 0.5rem;
+  /* Explicitly set 7 columns - never allow fewer */
+  grid-template-columns: repeat(7, minmax(0, 1fr)) !important;
+  /* Reduce gap slightly to prevent overflow from fractional pixel rounding on RPI */
+  gap: 0.48rem;
   margin-bottom: 0.5rem;
   width: 100%;
   max-width: 100%;
@@ -1107,8 +1109,10 @@ onActivated(() => {
 
 .calendar-days {
   display: grid;
-  grid-template-columns: repeat(7, minmax(0, 1fr));
-  gap: 0.5rem;
+  /* Explicitly set 7 columns - never allow fewer */
+  grid-template-columns: repeat(7, minmax(0, 1fr)) !important;
+  /* Reduce gap slightly to prevent overflow from fractional pixel rounding on RPI */
+  gap: 0.48rem;
   flex: 1;
   min-height: 0;
   overflow: hidden;

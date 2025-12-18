@@ -1814,8 +1814,8 @@ const updateRebootCombo = () => {
   saveConfig();
 };
 
-const updateGitBranch = () => {
-  saveConfig();
+const updateGitBranch = async () => {
+  await saveConfig();
 };
 
 const updateGitRepoUrl = () => {
@@ -2665,7 +2665,7 @@ const updateServiceFullscreen = async (serviceId, fullscreen) => {
 
 const saveConfig = async () => {
   try {
-    await axios.post("/api/config", {
+    const response = await axios.post("/api/config", {
       orientation: localConfig.value.orientation,
       orientationFlipped: localConfig.value.orientationFlipped,
       applyDisplayRotation: localConfig.value.applyDisplayRotation,
@@ -2700,8 +2700,14 @@ const saveConfig = async () => {
       timezone: localConfig.value.timezone,
       gitBranch: localConfig.value.gitBranch,
     });
+
+    // Refresh the config store to ensure all components have the latest settings
+    await configStore.fetchConfig();
+
+    return response.data;
   } catch (error) {
     console.error("Failed to save config:", error);
+    throw error;
   }
 };
 
@@ -2718,9 +2724,17 @@ const saveKeyboardMappings = async () => {
 };
 
 const saveAllSettings = async () => {
-  await saveConfig();
-  await saveKeyboardMappings();
-  alert("Settings saved successfully!");
+  try {
+    await saveConfig();
+    await saveKeyboardMappings();
+    alert(
+      "Settings saved successfully! The dashboard will update automatically.",
+    );
+  } catch (error) {
+    alert(
+      `Failed to save settings: ${error.response?.data?.detail || error.message || "Unknown error"}`,
+    );
+  }
 };
 
 const resetToDefaults = async () => {
@@ -2781,10 +2795,13 @@ const triggerUpdate = async () => {
   if (updateInProgress.value) return;
 
   updateInProgress.value = true;
-  updateMessage.value = "Starting update...";
+  updateMessage.value = "Saving settings and starting update...";
   updateMessageClass.value = "info";
 
   try {
+    // Ensure config is saved before triggering update (especially git branch)
+    await saveConfig();
+
     const response = await axios.post("/api/system/update");
     updateMessage.value =
       response.data.message || "Update started successfully";

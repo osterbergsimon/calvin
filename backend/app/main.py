@@ -6,7 +6,6 @@ from pathlib import Path
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import FileResponse
-from fastapi.staticfiles import StaticFiles
 
 from app.api.routes import calendar, config, health, images, keyboard, plugins, system, web_services
 from app.config import settings
@@ -342,9 +341,17 @@ app = FastAPI(
 )
 
 # CORS middleware
+# Parse CORS origins from config
+if settings.cors_allow_all:
+    # Allow all origins (development only)
+    cors_origins = ["*"]
+else:
+    # Parse comma-separated origins from config
+    cors_origins = [origin.strip() for origin in settings.cors_origins.split(",") if origin.strip()]
+
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["http://localhost:5173", "http://localhost:8000"],
+    allow_origins=cors_origins,
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
@@ -365,13 +372,32 @@ app.include_router(system.router, prefix="/api/system", tags=["system"])
 project_root = Path(__file__).parent.parent.parent
 frontend_dist = project_root / "frontend" / "dist"
 
-# Mount static assets (JS, CSS, images, etc.)
+# Mount static assets (JS, CSS, images, etc.) with cache control headers
 # This must be mounted BEFORE the catch-all route to take precedence
 if frontend_dist.exists():
     assets_dir = frontend_dist / "assets"
     if assets_dir.exists():
-        app.mount("/assets", StaticFiles(directory=str(assets_dir)), name="assets")
-        print(f"Mounted static assets from: {assets_dir}")
+        # Use custom static file handler to add cache control headers
+        @app.get("/assets/{file_path:path}")
+        async def serve_asset(file_path: str):
+            """Serve static assets with cache control headers for development."""
+            asset_path = assets_dir / file_path
+            if asset_path.exists() and asset_path.is_file():
+                # In development/debug mode, disable caching to ensure updates are visible
+                # In production, you might want to enable caching with a hash-based filename
+                return FileResponse(
+                    str(asset_path),
+                    headers={
+                        "Cache-Control": "no-cache, no-store, must-revalidate",
+                        "Pragma": "no-cache",
+                        "Expires": "0",
+                    },
+                )
+            from fastapi import HTTPException
+
+            raise HTTPException(status_code=404, detail="Asset not found")
+
+        print(f"Mounted static assets from: {assets_dir} (with no-cache headers)")
     else:
         print(f"WARNING: Assets directory not found: {assets_dir}")
 

@@ -73,6 +73,7 @@ git checkout develop
 **Detailed Instructions:**
 - **Development (develop branch)**: See [QUICKSTART_DEVELOP.md](QUICKSTART_DEVELOP.md)
 - **General Windows setup**: See [QUICKSTART_WINDOWS.md](QUICKSTART_WINDOWS.md)
+- **Remote Settings Configuration**: See [docs/REMOTE_SETTINGS.md](docs/REMOTE_SETTINGS.md) - Configure frontend to connect to remote dashboard backend
 
 ### Raspberry Pi Setup
 

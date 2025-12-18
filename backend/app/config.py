@@ -34,6 +34,14 @@ class Settings(BaseSettings):
     photo_frame_enabled: bool = False
     photo_frame_timeout: int = 300  # seconds (5 minutes default)
 
+    # CORS
+    cors_origins: str = (
+        "http://localhost:5173,http://localhost:8000"  # Comma-separated list of allowed origins
+    )
+    cors_allow_all: bool = (
+        False  # Allow all origins (development only, not recommended for production)
+    )
+
     model_config = SettingsConfigDict(
         env_file=".env",
         env_file_encoding="utf-8",
