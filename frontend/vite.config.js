@@ -22,6 +22,16 @@ export default defineConfig({
       "@": fileURLToPath(new URL("./src", import.meta.url)),
     },
   },
+  build: {
+    rollupOptions: {
+      // Ensure plugin components are included in the build
+      // Vite's glob will automatically include them, but we can be explicit
+      output: {
+        // Use consistent chunk naming for better caching
+        manualChunks: undefined, // Let Vite handle chunking automatically
+      },
+    },
+  },
   server: {
     proxy: {
       "/api": {

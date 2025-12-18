@@ -187,8 +187,12 @@ class MealieServicePlugin(ServicePlugin):
         ):
             raise ValueError(f"Invalid Mealie URL: {self.mealie_url}")
 
+        # Validate API token
+        if not self.api_token or not self.api_token.strip():
+            raise ValueError("Mealie API token is required but not set")
+
         # Create HTTP client with authentication
-        headers = {"Authorization": f"Bearer {self.api_token}"}
+        headers = {"Authorization": f"Bearer {self.api_token.strip()}"}
         self._client = httpx.AsyncClient(
             base_url=self.mealie_url,
             headers=headers,
@@ -353,10 +357,26 @@ class MealieServicePlugin(ServicePlugin):
             }
 
         except httpx.HTTPStatusError as e:
+            error_detail = f"HTTP error: {e.response.status_code}"
+            # Add more detail for 401 errors
+            if e.response.status_code == 401:
+                error_detail = (
+                    "HTTP error: 401 - Authentication failed. Please check your API token."
+                )
+                # Log response body for debugging (may contain useful error info)
+                try:
+                    response_body = e.response.text
+                    print(f"[Mealie] 401 response body: {response_body[:200]}")  # First 200 chars
+                except Exception:
+                    pass
             print(f"[Mealie] HTTP error fetching meal plan: {e.response.status_code} - {e}")
+            # Log token status (without exposing the actual token)
+            token_status = "present" if self.api_token else "missing"
+            token_length = len(self.api_token) if self.api_token else 0
+            print(f"[Mealie] API token status: {token_status} (length: {token_length})")
             return {
                 "items": [],
-                "error": f"HTTP error: {e.response.status_code}",
+                "error": error_detail,
             }
         except httpx.HTTPError as e:
             print(f"[Mealie] Error fetching meal plan: {e}")
