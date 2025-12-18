@@ -90,7 +90,14 @@ const props = defineProps({
     type: String,
     required: true,
   },
+  debug: {
+    type: Boolean,
+    default: false,
+  },
 });
+
+// Enable debug mode in development or if explicitly enabled
+const DEBUG = props.debug || import.meta.env.DEV;
 
 const configStore = useConfigStore();
 const cardSize = computed(() => configStore.mealPlanCardSize || "medium");
@@ -107,12 +114,42 @@ const query = useQuery({
     const startDateStr = today.toISOString().split("T")[0];
     const endDateStr = endDate.toISOString().split("T")[0];
 
+    if (DEBUG) {
+      console.log("[MealPlanViewer] Fetching meal plan data:", {
+        endpoint: props.apiEndpoint,
+        startDate: startDateStr,
+        endDate: endDateStr,
+      });
+    }
+
     const response = await axios.get(props.apiEndpoint, {
       params: {
         start_date: startDateStr,
         end_date: endDateStr,
       },
     });
+
+    if (DEBUG) {
+      console.log("[MealPlanViewer] API response status:", response.status);
+      console.log(
+        "[MealPlanViewer] Full Mealie API response data:",
+        JSON.parse(JSON.stringify(response.data)),
+      );
+      console.log("[MealPlanViewer] API response summary:", {
+        status: response.status,
+        dataType: typeof response.data,
+        isArray: Array.isArray(response.data),
+        hasItems: !!response.data?.items,
+        itemCount:
+          response.data?.items?.length ||
+          (Array.isArray(response.data) ? response.data.length : 0),
+        keys: response.data ? Object.keys(response.data) : [],
+        sampleItem:
+          response.data?.items?.[0] ||
+          (Array.isArray(response.data) ? response.data[0] : null),
+      });
+    }
+
     return response.data;
   },
   staleTime: 5 * 60 * 1000, // 5 minutes
@@ -122,9 +159,23 @@ const query = useQuery({
 });
 
 const mealPlanItems = computed(() => {
-  if (!query.data.value) return [];
+  if (!query.data.value) {
+    if (DEBUG) {
+      console.log("[MealPlanViewer] No data in query.data.value");
+    }
+    return [];
+  }
 
   const serviceData = query.data.value;
+  if (DEBUG) {
+    console.log("[MealPlanViewer] Processing service data:", {
+      hasItems: !!serviceData.items,
+      isArray: Array.isArray(serviceData),
+      hasDate: !!serviceData.date,
+      keys: Object.keys(serviceData),
+      fullData: JSON.parse(JSON.stringify(serviceData)),
+    });
+  }
 
   // Get raw items from response
   let rawItems = [];
@@ -132,25 +183,61 @@ const mealPlanItems = computed(() => {
   // Handle paginated response: { items: [...], total: N }
   if (serviceData.items && Array.isArray(serviceData.items)) {
     rawItems = serviceData.items;
+    if (DEBUG) {
+      console.log(
+        `[MealPlanViewer] Found ${rawItems.length} items in serviceData.items`,
+      );
+    }
   }
   // Handle direct array response: [...]
   else if (Array.isArray(serviceData)) {
     rawItems = serviceData;
+    if (DEBUG) {
+      console.log(
+        `[MealPlanViewer] Service data is array with ${rawItems.length} items`,
+      );
+    }
   }
   // Handle single item: { date: "...", meals: [...] }
   else if (serviceData.date && serviceData.meals) {
+    if (DEBUG) {
+      console.log(
+        "[MealPlanViewer] Single item format with date:",
+        serviceData.date,
+      );
+    }
     // Filter out if it's a past day
     const today = new Date();
     today.setHours(0, 0, 0, 0);
     const itemDate = new Date(serviceData.date);
     itemDate.setHours(0, 0, 0, 0);
+    if (DEBUG) {
+      console.log("[MealPlanViewer] Date comparison:", {
+        itemDate: itemDate.toISOString(),
+        today: today.toISOString(),
+        isPast: itemDate < today,
+        isTodayOrFuture: itemDate >= today,
+      });
+    }
     if (itemDate >= today) {
       return [serviceData];
+    }
+    if (DEBUG) {
+      console.log("[MealPlanViewer] Filtered out past day:", serviceData.date);
     }
     return [];
   }
 
-  if (rawItems.length === 0) return [];
+  if (rawItems.length === 0) {
+    if (DEBUG) {
+      console.log("[MealPlanViewer] No raw items found after parsing");
+    }
+    return [];
+  }
+
+  if (DEBUG) {
+    console.log(`[MealPlanViewer] Processing ${rawItems.length} raw items`);
+  }
 
   // Mealie API returns individual meal entries, not grouped by day
   // Each item has: date, entryType, title, recipe, etc.
@@ -161,7 +248,12 @@ const mealPlanItems = computed(() => {
   const mealsByDate = {};
   rawItems.forEach((item) => {
     const date = item.date;
-    if (!date) return;
+    if (!date) {
+      if (DEBUG) {
+        console.log("[MealPlanViewer] Item missing date:", item);
+      }
+      return;
+    }
 
     if (!mealsByDate[date]) {
       mealsByDate[date] = {
@@ -182,6 +274,17 @@ const mealPlanItems = computed(() => {
     });
   });
 
+  if (DEBUG) {
+    console.log(
+      `[MealPlanViewer] Grouped into ${Object.keys(mealsByDate).length} dates:`,
+      Object.keys(mealsByDate),
+    );
+    console.log(
+      "[MealPlanViewer] Meals by date:",
+      JSON.parse(JSON.stringify(mealsByDate)),
+    );
+  }
+
   // Convert to array and sort by date
   const groupedItems = Object.values(mealsByDate).sort((a, b) => {
     return new Date(a.date) - new Date(b.date);
@@ -192,18 +295,30 @@ const mealPlanItems = computed(() => {
   const endDate = getEndDate();
   const allDays = [];
 
-  // Get today's date at midnight for comparison
+  // Get today's date at midnight for comparison (local time)
   const today = new Date();
   today.setHours(0, 0, 0, 0);
+  if (DEBUG) {
+    console.log(
+      "[MealPlanViewer] Today's date for filtering:",
+      today.toISOString().split("T")[0],
+    );
+  }
 
   if (startDate && endDate) {
+    if (DEBUG) {
+      console.log("[MealPlanViewer] Using date range:", { startDate, endDate });
+    }
     const current = new Date(startDate);
     const end = new Date(endDate);
 
     while (current <= end) {
-      // Skip past days
+      // Create date object for comparison (set to midnight local time)
       const currentDate = new Date(current);
       currentDate.setHours(0, 0, 0, 0);
+
+      // Only filter out past days (not today or future)
+      // Use Date object comparison
       if (currentDate < today) {
         current.setDate(current.getDate() + 1);
         continue;
@@ -226,21 +341,54 @@ const mealPlanItems = computed(() => {
     }
   } else {
     // If we can't determine the range, filter grouped items to exclude past days
-    return groupedItems.filter((item) => {
+    if (DEBUG) {
+      console.log("[MealPlanViewer] No date range, filtering grouped items");
+    }
+    const filtered = groupedItems.filter((item) => {
       if (!item.date) return false;
+      // Use Date object comparison
       const itemDate = new Date(item.date);
       itemDate.setHours(0, 0, 0, 0);
       return itemDate >= today;
     });
+    if (DEBUG) {
+      console.log(
+        `[MealPlanViewer] Filtered ${groupedItems.length} items to ${filtered.length} items`,
+      );
+      if (filtered.length < groupedItems.length) {
+        const filteredOut = groupedItems.filter((item) => {
+          if (!item.date) return true;
+          const itemDate = new Date(item.date);
+          itemDate.setHours(0, 0, 0, 0);
+          return itemDate < today;
+        });
+        console.log(
+          "[MealPlanViewer] Filtered out dates:",
+          filteredOut.map((i) => i.date),
+        );
+      }
+    }
+    return filtered;
   }
 
-  // Filter out any past days that might have been included
-  return allDays.filter((item) => {
+  // Filter out any past days that might have been included (use Date object comparison)
+  const finalDays = allDays.filter((item) => {
     if (!item.date) return false;
     const itemDate = new Date(item.date);
     itemDate.setHours(0, 0, 0, 0);
     return itemDate >= today;
   });
+
+  if (DEBUG) {
+    console.log(
+      `[MealPlanViewer] Final result: ${finalDays.length} days (from ${allDays.length} total days)`,
+    );
+    console.log(
+      "[MealPlanViewer] Final meal plan items:",
+      JSON.parse(JSON.stringify(finalDays)),
+    );
+  }
+  return finalDays;
 });
 
 const getStartDate = () => {
