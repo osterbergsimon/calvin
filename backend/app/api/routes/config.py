@@ -50,6 +50,10 @@ class ConfigUpdate(BaseModel):
     rebootComboKey1: str | None = None  # First key for reboot combo (e.g., "KEY_1")
     rebootComboKey2: str | None = None  # Second key for reboot combo (e.g., "KEY_7")
     rebootComboDuration: int | None = None  # Reboot combo duration in milliseconds (default: 10000)
+    keyboardFeedbackEnabled: bool | None = None  # Enable visual keyboard feedback (default: True)
+    keyboardFeedbackMode: str | None = (
+        None  # Keyboard feedback mode: 'normal' | 'small' (default: 'normal')
+    )
     # Image display mode: 'fit', 'fill', 'crop', 'center', 'smart' (default: 'smart')
     imageDisplayMode: str | None = None
     randomizeImages: bool | None = None  # Randomize image order (default: False)
@@ -121,6 +125,14 @@ async def get_config():
         config["modeIndicatorTimeout"] = 5  # 5 seconds default
     elif "mode_indicator_timeout" in config and "modeIndicatorTimeout" not in config:
         config["modeIndicatorTimeout"] = config["mode_indicator_timeout"]
+    if "keyboardFeedbackEnabled" not in config and "keyboard_feedback_enabled" not in config:
+        config["keyboardFeedbackEnabled"] = True  # Enabled by default
+    elif "keyboard_feedback_enabled" in config and "keyboardFeedbackEnabled" not in config:
+        config["keyboardFeedbackEnabled"] = config["keyboard_feedback_enabled"]
+    if "keyboardFeedbackMode" not in config and "keyboard_feedback_mode" not in config:
+        config["keyboardFeedbackMode"] = "normal"  # Normal mode by default
+    elif "keyboard_feedback_mode" in config and "keyboardFeedbackMode" not in config:
+        config["keyboardFeedbackMode"] = config["keyboard_feedback_mode"]
     if "weekStartDay" not in config and "week_start_day" not in config:
         config["weekStartDay"] = 0  # Sunday default
     elif "week_start_day" in config and "weekStartDay" not in config:
@@ -332,6 +344,10 @@ async def update_config(config_update: ConfigUpdate):
         update_dict["show_mode_indicator"] = update_dict.pop("showModeIndicator")
     if "modeIndicatorTimeout" in update_dict:
         update_dict["mode_indicator_timeout"] = update_dict.pop("modeIndicatorTimeout")
+    if "keyboardFeedbackEnabled" in update_dict:
+        update_dict["keyboard_feedback_enabled"] = update_dict.pop("keyboardFeedbackEnabled")
+    if "keyboardFeedbackMode" in update_dict:
+        update_dict["keyboard_feedback_mode"] = update_dict.pop("keyboardFeedbackMode")
     if "weekStartDay" in update_dict:
         update_dict["week_start_day"] = update_dict.pop("weekStartDay")
     if "showWeekNumbers" in update_dict:

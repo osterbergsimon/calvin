@@ -41,6 +41,8 @@ export const useConfigStore = defineStore("config", () => {
   const rebootComboKey1 = ref("KEY_1"); // First key for reboot combo
   const rebootComboKey2 = ref("KEY_7"); // Second key for reboot combo
   const rebootComboDuration = ref(10000); // Reboot combo duration in milliseconds
+  const keyboardFeedbackEnabled = ref(true); // Enable visual keyboard feedback (default: true)
+  const keyboardFeedbackMode = ref("normal"); // Keyboard feedback mode: 'normal' | 'small' (default: 'normal')
   const imageDisplayMode = ref("smart"); // Image display mode: 'fit', 'fill', 'crop', 'center', 'smart' (default: 'smart')
   const timezone = ref(null); // Timezone (e.g., "America/New_York", "Europe/London", "UTC") - null = system timezone
   const clockEnabled = ref(true); // Clock enabled/disabled
@@ -151,6 +153,18 @@ export const useConfigStore = defineStore("config", () => {
       }
       if (response.data.mode_indicator_timeout !== undefined) {
         modeIndicatorTimeout.value = response.data.mode_indicator_timeout;
+      }
+      if (response.data.keyboardFeedbackEnabled !== undefined) {
+        keyboardFeedbackEnabled.value = response.data.keyboardFeedbackEnabled;
+      }
+      if (response.data.keyboard_feedback_enabled !== undefined) {
+        keyboardFeedbackEnabled.value = response.data.keyboard_feedback_enabled;
+      }
+      if (response.data.keyboardFeedbackMode !== undefined) {
+        keyboardFeedbackMode.value = response.data.keyboardFeedbackMode;
+      }
+      if (response.data.keyboard_feedback_mode !== undefined) {
+        keyboardFeedbackMode.value = response.data.keyboard_feedback_mode;
       }
       if (response.data.weekStartDay !== undefined) {
         weekStartDay.value = response.data.weekStartDay;
@@ -412,14 +426,14 @@ export const useConfigStore = defineStore("config", () => {
     const nextIndex = (currentIndex + 1) % modes.length;
     const newMode = modes[nextIndex];
     calendarViewMode.value = newMode;
-    
+
     // Persist to backend
     try {
       await updateConfig({ calendarViewMode: newMode });
     } catch (err) {
       console.error("Failed to save calendar view mode:", err);
     }
-    
+
     return newMode;
   };
 
@@ -483,6 +497,8 @@ export const useConfigStore = defineStore("config", () => {
     showUI,
     showModeIndicator,
     modeIndicatorTimeout,
+    keyboardFeedbackEnabled,
+    keyboardFeedbackMode,
     photoRotationInterval,
     calendarViewMode,
     timeFormat,

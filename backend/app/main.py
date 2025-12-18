@@ -219,6 +219,12 @@ async def lifespan(app: FastAPI):
     mode_indicator_timeout = await config_service.get_value("mode_indicator_timeout")
     if mode_indicator_timeout is None:
         await config_service.set_value("mode_indicator_timeout", 5)  # 5 seconds default
+    keyboard_feedback_enabled = await config_service.get_value("keyboard_feedback_enabled")
+    if keyboard_feedback_enabled is None:
+        await config_service.set_value("keyboard_feedback_enabled", True)  # Enabled by default
+    keyboard_feedback_mode = await config_service.get_value("keyboard_feedback_mode")
+    if keyboard_feedback_mode is None:
+        await config_service.set_value("keyboard_feedback_mode", "normal")  # Normal mode by default
     week_start_day = await config_service.get_value("week_start_day")
     if week_start_day is None:
         await config_service.set_value("week_start_day", 0)  # Sunday default

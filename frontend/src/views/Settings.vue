@@ -24,1201 +24,1357 @@
 
       <!-- Main Content -->
       <div class="settings-content">
-      <!-- Layout & Display Category -->
-      <template v-if="activeCategory === 'layout'">
-      <!-- Display Settings -->
-      <section
-        class="settings-section collapsible"
-        :class="{ expanded: expandedSections.display }"
-      >
-        <div class="section-header" @click="toggleSection('display')">
-          <h2>Display Settings</h2>
-          <span class="toggle-icon">{{
-            expandedSections.display ? "▼" : "▶"
-          }}</span>
-        </div>
-        <div v-show="expandedSections.display" class="section-content">
-          <div class="setting-item">
-            <label>Screen Orientation</label>
-            <select
-              v-model="localConfig.orientation"
-              @change="updateOrientation"
-            >
-              <option value="landscape">Landscape</option>
-              <option value="portrait">Portrait</option>
-            </select>
-          </div>
-          <div class="setting-item">
-            <label>
-              <input
-                v-model="localConfig.orientationFlipped"
-                type="checkbox"
-                @change="updateOrientationFlipped"
-              />
-              Flip Orientation (180°)
-            </label>
-            <span class="help-text">Rotate the display 180 degrees (useful for mounted displays)</span>
-          </div>
-          <div class="setting-item">
-            <label>Calendar Split (%)</label>
-            <input
-              v-model.number="localConfig.calendarSplit"
-              type="number"
-              min="66"
-              max="75"
-              @change="updateCalendarSplit"
-            />
-            <span class="help-text">Calendar width percentage (66-75%)</span>
-          </div>
-          <div class="setting-item">
-            <label>Side View Position</label>
-            <select
-              v-model="localConfig.sideViewPosition"
-              class="setting-select"
-              @change="updateSideViewPosition"
-            >
-              <option
-                v-if="localConfig.orientation === 'landscape'"
-                value="left"
-              >
-                Left
-              </option>
-              <option
-                v-if="localConfig.orientation === 'landscape'"
-                value="right"
-              >
-                Right
-              </option>
-              <option v-if="localConfig.orientation === 'portrait'" value="top">
-                Top
-              </option>
-              <option
-                v-if="localConfig.orientation === 'portrait'"
-                value="bottom"
-              >
-                Bottom
-              </option>
-            </select>
-            <span class="help-text">
-              <span v-if="localConfig.orientation === 'landscape'"
-                >Position of side view (left or right of calendar)</span
-              >
-              <span v-else
-                >Position of side view (top or bottom of calendar)</span
-              >
-            </span>
-          </div>
-          <div class="setting-item">
-            <label>Theme Mode</label>
-            <select
-              v-model="localConfig.themeMode"
-              class="setting-select"
-              @change="updateThemeMode"
-            >
-              <option value="light">Light</option>
-              <option value="dark">Dark</option>
-              <option value="auto">Auto (System)</option>
-              <option value="time">Time-based</option>
-            </select>
-            <span class="help-text">Theme selection mode</span>
-          </div>
-          <div v-if="localConfig.themeMode === 'time'" class="setting-item">
-            <label>Dark Mode Time Range</label>
-            <div class="time-range-inputs">
-              <div class="time-input-group">
-                <label>Start (hour):</label>
-                <input
-                  v-model.number="localConfig.darkModeStart"
-                  type="number"
-                  min="0"
-                  max="23"
-                  class="time-input"
-                  @change="updateDarkModeTime"
-                />
-              </div>
-              <div class="time-input-group">
-                <label>End (hour):</label>
-                <input
-                  v-model.number="localConfig.darkModeEnd"
-                  type="number"
-                  min="0"
-                  max="23"
-                  class="time-input"
-                  @change="updateDarkModeTime"
-                />
-              </div>
+        <!-- Layout & Display Category -->
+        <template v-if="activeCategory === 'layout'">
+          <!-- Display Settings -->
+          <section
+            class="settings-section collapsible"
+            :class="{ expanded: expandedSections.display }"
+          >
+            <div class="section-header" @click="toggleSection('display')">
+              <h2>Display Settings</h2>
+              <span class="toggle-icon">{{
+                expandedSections.display ? "▼" : "▶"
+              }}</span>
             </div>
-            <span class="help-text"
-              >Dark mode active between these hours (0-23)</span
-            >
-          </div>
-        </div>
-      </section>
-
-      <!-- UI Settings -->
-      <section
-        class="settings-section collapsible"
-        :class="{ expanded: expandedSections.ui }"
-      >
-        <div class="section-header" @click="toggleSection('ui')">
-          <h2>UI Settings</h2>
-          <span class="toggle-icon">{{
-            expandedSections.ui ? "▼" : "▶"
-          }}</span>
-        </div>
-        <div v-show="expandedSections.ui" class="section-content">
-          <div class="setting-item">
-            <label>
-              <input
-                v-model="localConfig.showUI"
-                type="checkbox"
-                @change="updateShowUI"
-              />
-              Show Headers and UI Controls
-            </label>
-            <span class="help-text"
-              >Hide headers to maximize content space (kiosk mode)</span
-            >
-          </div>
-          <div class="setting-item">
-            <label>
-              <input
-                v-model="localConfig.showModeIndicator"
-                type="checkbox"
-                @change="updateShowModeIndicator"
-              />
-              Show Mode Indicator Icon
-            </label>
-            <span class="help-text"
-              >Show mode indicator icon when UI is hidden (top-left
-              corner)</span
-            >
-          </div>
-          <div v-if="localConfig.showModeIndicator" class="setting-item">
-            <label>Mode Indicator Auto-Hide Timeout (seconds)</label>
-            <input
-              v-model.number="localConfig.modeIndicatorTimeout"
-              type="number"
-              min="0"
-              max="60"
-              @change="updateModeIndicatorTimeout"
-            />
-            <span class="help-text"
-              >Time before indicator auto-hides after mode change (0 = never
-              hide)</span
-            >
-          </div>
-          <div class="setting-item">
-            <label>
-              <input
-                v-model="localConfig.clockEnabled"
-                type="checkbox"
-                @change="updateClockSettings"
-              />
-              Enable Clock
-            </label>
-            <span class="help-text">Show clock on dashboard</span>
-          </div>
-          <div v-if="localConfig.clockEnabled" class="setting-item">
-            <label>Clock Display Mode</label>
-            <select
-              v-model="localConfig.clockDisplayMode"
-              @change="updateClockSettings"
-            >
-              <option value="always">When UI is Off (Kiosk Mode)</option>
-              <option value="header">Only When Header is Visible</option>
-              <option value="off">Off</option>
-            </select>
-            <span class="help-text"
-              >When to display the clock on the dashboard. "When UI is Off" shows clock in corner when headers are hidden.</span
-            >
-          </div>
-          <div v-if="localConfig.clockEnabled && localConfig.clockDisplayMode === 'always'" class="setting-item">
-            <label>Clock Position</label>
-            <select
-              v-model="localConfig.clockPosition"
-              @change="updateClockSettings"
-            >
-              <option value="top-left">Top Left</option>
-              <option value="top-right">Top Right</option>
-              <option value="bottom-left">Bottom Left</option>
-              <option value="bottom-right">Bottom Right</option>
-            </select>
-            <span class="help-text"
-              >Position of the clock when UI is off</span
-            >
-          </div>
-          <div v-if="localConfig.clockEnabled" class="setting-item">
-            <label>Clock Size</label>
-            <select
-              v-model="localConfig.clockSize"
-              @change="updateClockSettings"
-            >
-              <option value="small">Small</option>
-              <option value="medium">Medium</option>
-              <option value="large">Large</option>
-            </select>
-            <span class="help-text"
-              >Size of the clock display</span
-            >
-          </div>
-          <div v-if="localConfig.clockEnabled" class="setting-item">
-            <label>
-              <input
-                v-model="localConfig.clockShowDate"
-                type="checkbox"
-                @change="updateClockSettings"
-              />
-              Show Date in Clock
-            </label>
-            <span class="help-text">Display date below the time</span>
-          </div>
-          <div v-if="localConfig.clockEnabled" class="setting-item">
-            <label>
-              <input
-                v-model="localConfig.clockShowSeconds"
-                type="checkbox"
-                @change="updateClockSettings"
-              />
-              Show Seconds in Clock
-            </label>
-            <span class="help-text">Display seconds in the time (updates every second)</span>
-          </div>
-        </div>
-      </section>
-      </template>
-
-      <!-- Content Category -->
-      <template v-if="activeCategory === 'content'">
-      <!-- Image Settings -->
-      <section
-        class="settings-section collapsible"
-        :class="{ expanded: expandedSections.photos }"
-      >
-        <div class="section-header" @click="toggleSection('photos')">
-          <h2>Image Settings</h2>
-          <span class="toggle-icon">{{
-            expandedSections.photos ? "▼" : "▶"
-          }}</span>
-        </div>
-        <div v-show="expandedSections.photos" class="section-content">
-          <div class="setting-item">
-            <label>Photo Rotation Interval (seconds)</label>
-            <input
-              v-model.number="localConfig.photoRotationInterval"
-              type="number"
-              min="5"
-              max="3600"
-              @change="updatePhotoRotationInterval"
-            />
-            <span class="help-text"
-              >How often to switch photos (5-3600 seconds)</span
-            >
-          </div>
-          <div class="setting-item">
-            <label>Image Display Mode</label>
-            <select
-              v-model="localConfig.imageDisplayMode"
-              class="setting-select"
-              @change="updateImageDisplayMode"
-            >
-              <option value="smart">Smart (Auto-detect best fit)</option>
-              <option value="fit">Fit (Show entire image)</option>
-              <option value="fill">Fill (Fill container, may crop)</option>
-              <option value="crop">Crop (Center crop to fill)</option>
-              <option value="center">Center (Center image, no scaling)</option>
-            </select>
-            <span class="help-text"
-              >How images are displayed. Smart mode automatically chooses the best fit based on image and screen dimensions.</span
-            >
-          </div>
-          <div class="setting-item">
-            <label>
-              <input
-                v-model="localConfig.randomizeImages"
-                type="checkbox"
-                @change="updateRandomizeImages"
-              />
-              Randomize Image Order
-            </label>
-            <span class="help-text"
-              >When enabled, images from all plugins (local, Unsplash, etc.) will be displayed in random order. 
-              The order is randomized each time images are loaded.</span
-            >
-          </div>
-          <div class="setting-item">
-            <p class="help-text">
-              <strong>Note:</strong> Image upload and management have been moved to the Local Images plugin settings. 
-              Enable the Local Images plugin and expand its settings to upload and manage images.
-            </p>
-          </div>
-        </div>
-      </section>
-
-      <!-- Photo Frame Mode Settings -->
-      <section
-        class="settings-section collapsible"
-        :class="{ expanded: expandedSections.photoFrame }"
-      >
-        <div class="section-header" @click="toggleSection('photoFrame')">
-          <h2>Photo Frame Mode</h2>
-          <span class="toggle-icon">{{
-            expandedSections.photoFrame ? "▼" : "▶"
-          }}</span>
-        </div>
-        <div v-show="expandedSections.photoFrame" class="section-content">
-          <div class="setting-item">
-            <label>
-              <input
-                v-model="localConfig.photoFrameEnabled"
-                type="checkbox"
-                @change="updatePhotoFrameEnabled"
-              />
-              Enable Photo Frame Mode
-            </label>
-            <span class="help-text"
-              >Automatically show photos full-screen after inactivity</span
-            >
-          </div>
-          <div v-if="localConfig.photoFrameEnabled" class="setting-item">
-            <label>Inactivity Timeout (seconds)</label>
-            <input
-              v-model.number="localConfig.photoFrameTimeout"
-              type="number"
-              min="60"
-              max="3600"
-              @change="updatePhotoFrameTimeout"
-            />
-            <span class="help-text"
-              >Time before switching to photo frame mode (60-3600 seconds)</span
-            >
-          </div>
-        </div>
-      </section>
-      </template>
-
-      <!-- System Category -->
-      <template v-if="activeCategory === 'system'">
-      <!-- Keyboard Settings -->
-      <section
-        class="settings-section collapsible"
-        :class="{ expanded: expandedSections.keyboard }"
-      >
-        <div class="section-header" @click="toggleSection('keyboard')">
-          <h2>Keyboard Settings</h2>
-          <span class="toggle-icon">{{
-            expandedSections.keyboard ? "▼" : "▶"
-          }}</span>
-        </div>
-        <div v-show="expandedSections.keyboard" class="section-content">
-          <div class="setting-item">
-            <label>Keyboard Type</label>
-            <select
-              v-model="localConfig.keyboardType"
-              @change="updateKeyboardType"
-            >
-              <option value="7-button">7-Button Keyboard</option>
-              <option value="standard">Standard Keyboard</option>
-            </select>
-          </div>
-
-          <div class="keyboard-mappings">
-            <h3>Keyboard Mappings</h3>
-            <div class="mappings-list">
-              <div
-                v-for="(action, key) in currentMappings"
-                :key="key"
-                class="mapping-item"
-              >
-                <div class="mapping-key">
-                  <strong>{{ formatKeyName(key) }}</strong>
-                </div>
+            <div v-show="expandedSections.display" class="section-content">
+              <div class="setting-item">
+                <label>Screen Orientation</label>
                 <select
-                  v-model="currentMappings[key]"
-                  class="mapping-action"
-                  @change="updateMapping(key, $event.target.value)"
+                  v-model="localConfig.orientation"
+                  @change="updateOrientation"
                 >
-                  <option
-                    v-for="availableAction in availableActions"
-                    :key="availableAction.value"
-                    :value="availableAction.value"
-                  >
-                    {{ availableAction.label }}
-                  </option>
-                </select>
-                <button
-                  class="btn-clear"
-                  title="Clear mapping"
-                  @click="clearMapping(key)"
-                >
-                  ×
-                </button>
-              </div>
-            </div>
-          </div>
-        </div>
-      </section>
-      </template>
-
-      <!-- Content Category (continued) -->
-      <template v-if="activeCategory === 'content'">
-      <!-- Calendar Settings -->
-      <section
-        class="settings-section collapsible"
-        :class="{ expanded: expandedSections.calendar }"
-      >
-        <div class="section-header" @click="toggleSection('calendar')">
-          <h2>Calendar Settings</h2>
-          <span class="toggle-icon">{{
-            expandedSections.calendar ? "▼" : "▶"
-          }}</span>
-        </div>
-        <div v-show="expandedSections.calendar" class="section-content">
-          <div class="setting-item">
-            <label>Calendar View Mode</label>
-            <select
-              v-model="localConfig.calendarViewMode"
-              class="setting-select"
-              @change="updateCalendarViewMode"
-            >
-              <option value="month">Month View</option>
-              <option value="rolling">Rolling Weeks View</option>
-            </select>
-            <span class="help-text">Display full month or rolling weeks</span>
-          </div>
-          <div class="setting-item">
-            <label>Time Format</label>
-            <select
-              v-model="localConfig.timeFormat"
-              class="setting-select"
-              @change="updateTimeFormat"
-            >
-              <option value="24h">24-hour (14:30)</option>
-              <option value="12h">12-hour (2:30 PM)</option>
-            </select>
-            <span class="help-text">Time display format for events</span>
-          </div>
-          <div class="setting-item">
-            <label>Week Starting Day</label>
-            <select
-              v-model.number="localConfig.weekStartDay"
-              class="setting-select"
-              @change="updateWeekStartDay"
-            >
-              <option :value="0">Sunday</option>
-              <option :value="1">Monday</option>
-              <option :value="2">Tuesday</option>
-              <option :value="3">Wednesday</option>
-              <option :value="4">Thursday</option>
-              <option :value="5">Friday</option>
-              <option :value="6">Saturday</option>
-            </select>
-            <span class="help-text">First day of the week in the calendar</span>
-          </div>
-          <div class="setting-item">
-            <label>
-              <input
-                v-model="localConfig.showWeekNumbers"
-                type="checkbox"
-                @change="updateShowWeekNumbers"
-              />
-              Show Week Numbers
-            </label>
-            <span class="help-text"
-              >Display ISO 8601 week numbers in the calendar</span
-            >
-          </div>
-          <div class="setting-item">
-            <label>Calendar Sources</label>
-            <!-- Add Calendar Source Form -->
-            <div class="add-calendar-form">
-              <h3>Add Calendar Source</h3>
-              <div class="form-group">
-                <label>Calendar Type</label>
-                <select v-model="newCalendarSource.type" class="form-select">
-                  <option
-                    v-for="type in calendarPluginTypes"
-                    :key="type.id"
-                    :value="type.id"
-                  >
-                    {{ type.name }}
-                  </option>
+                  <option value="landscape">Landscape</option>
+                  <option value="portrait">Portrait</option>
                 </select>
               </div>
-              <div class="form-group">
-                <label>Calendar Name</label>
-                <input
-                  v-model="newCalendarSource.name"
-                  type="text"
-                  placeholder="My Calendar"
-                  class="form-input"
-                />
+              <div class="setting-item">
+                <label>
+                  <input
+                    v-model="localConfig.orientationFlipped"
+                    type="checkbox"
+                    @change="updateOrientationFlipped"
+                  />
+                  Flip Orientation (180°)
+                </label>
+                <span class="help-text"
+                  >Rotate the display 180 degrees (useful for mounted
+                  displays)</span
+                >
               </div>
-              <div class="form-group">
-                <label>Calendar URL</label>
+              <div class="setting-item">
+                <label>Calendar Split (%)</label>
                 <input
-                  v-model="newCalendarSource.ical_url"
-                  type="text"
-                  :placeholder="getCalendarTypePlaceholder(newCalendarSource.type)"
-                  class="form-input"
+                  v-model.number="localConfig.calendarSplit"
+                  type="number"
+                  min="66"
+                  max="75"
+                  @change="updateCalendarSplit"
                 />
+                <span class="help-text"
+                  >Calendar width percentage (66-75%)</span
+                >
+              </div>
+              <div class="setting-item">
+                <label>Side View Position</label>
+                <select
+                  v-model="localConfig.sideViewPosition"
+                  class="setting-select"
+                  @change="updateSideViewPosition"
+                >
+                  <option
+                    v-if="localConfig.orientation === 'landscape'"
+                    value="left"
+                  >
+                    Left
+                  </option>
+                  <option
+                    v-if="localConfig.orientation === 'landscape'"
+                    value="right"
+                  >
+                    Right
+                  </option>
+                  <option
+                    v-if="localConfig.orientation === 'portrait'"
+                    value="top"
+                  >
+                    Top
+                  </option>
+                  <option
+                    v-if="localConfig.orientation === 'portrait'"
+                    value="bottom"
+                  >
+                    Bottom
+                  </option>
+                </select>
                 <span class="help-text">
-                  {{ getCalendarTypeHelpText(newCalendarSource.type) }}
+                  <span v-if="localConfig.orientation === 'landscape'"
+                    >Position of side view (left or right of calendar)</span
+                  >
+                  <span v-else
+                    >Position of side view (top or bottom of calendar)</span
+                  >
                 </span>
               </div>
-              <button
-                class="btn-add"
-                :disabled="!canAddCalendar"
-                @click="addCalendarSource"
-              >
-                Add Calendar
-              </button>
+              <div class="setting-item">
+                <label>Theme Mode</label>
+                <select
+                  v-model="localConfig.themeMode"
+                  class="setting-select"
+                  @change="updateThemeMode"
+                >
+                  <option value="light">Light</option>
+                  <option value="dark">Dark</option>
+                  <option value="auto">Auto (System)</option>
+                  <option value="time">Time-based</option>
+                </select>
+                <span class="help-text">Theme selection mode</span>
+              </div>
+              <div v-if="localConfig.themeMode === 'time'" class="setting-item">
+                <label>Dark Mode Time Range</label>
+                <div class="time-range-inputs">
+                  <div class="time-input-group">
+                    <label>Start (hour):</label>
+                    <input
+                      v-model.number="localConfig.darkModeStart"
+                      type="number"
+                      min="0"
+                      max="23"
+                      class="time-input"
+                      @change="updateDarkModeTime"
+                    />
+                  </div>
+                  <div class="time-input-group">
+                    <label>End (hour):</label>
+                    <input
+                      v-model.number="localConfig.darkModeEnd"
+                      type="number"
+                      min="0"
+                      max="23"
+                      class="time-input"
+                      @change="updateDarkModeTime"
+                    />
+                  </div>
+                </div>
+                <span class="help-text"
+                  >Dark mode active between these hours (0-23)</span
+                >
+              </div>
             </div>
-            <!-- Existing Calendar Sources -->
-            <div class="calendar-sources-list">
+          </section>
+
+          <!-- UI Settings -->
+          <section
+            class="settings-section collapsible"
+            :class="{ expanded: expandedSections.ui }"
+          >
+            <div class="section-header" @click="toggleSection('ui')">
+              <h2>UI Settings</h2>
+              <span class="toggle-icon">{{
+                expandedSections.ui ? "▼" : "▶"
+              }}</span>
+            </div>
+            <div v-show="expandedSections.ui" class="section-content">
+              <div class="setting-item">
+                <label>
+                  <input
+                    v-model="localConfig.showUI"
+                    type="checkbox"
+                    @change="updateShowUI"
+                  />
+                  Show Headers and UI Controls
+                </label>
+                <span class="help-text"
+                  >Hide headers to maximize content space (kiosk mode)</span
+                >
+              </div>
+              <div class="setting-item">
+                <label>
+                  <input
+                    v-model="localConfig.showModeIndicator"
+                    type="checkbox"
+                    @change="updateShowModeIndicator"
+                  />
+                  Show Mode Indicator Icon
+                </label>
+                <span class="help-text"
+                  >Show mode indicator icon when UI is hidden (top-left
+                  corner)</span
+                >
+              </div>
+              <div v-if="localConfig.showModeIndicator" class="setting-item">
+                <label>Mode Indicator Auto-Hide Timeout (seconds)</label>
+                <input
+                  v-model.number="localConfig.modeIndicatorTimeout"
+                  type="number"
+                  min="0"
+                  max="60"
+                  @change="updateModeIndicatorTimeout"
+                />
+                <span class="help-text"
+                  >Time before indicator auto-hides after mode change (0 = never
+                  hide)</span
+                >
+              </div>
+              <div class="setting-item">
+                <label>
+                  <input
+                    v-model="localConfig.clockEnabled"
+                    type="checkbox"
+                    @change="updateClockSettings"
+                  />
+                  Enable Clock
+                </label>
+                <span class="help-text">Show clock on dashboard</span>
+              </div>
+              <div v-if="localConfig.clockEnabled" class="setting-item">
+                <label>Clock Display Mode</label>
+                <select
+                  v-model="localConfig.clockDisplayMode"
+                  @change="updateClockSettings"
+                >
+                  <option value="always">When UI is Off (Kiosk Mode)</option>
+                  <option value="header">Only When Header is Visible</option>
+                  <option value="off">Off</option>
+                </select>
+                <span class="help-text"
+                  >When to display the clock on the dashboard. "When UI is Off"
+                  shows clock in corner when headers are hidden.</span
+                >
+              </div>
               <div
-                v-for="source in calendarSources"
-                :key="source.id"
-                class="source-item"
+                v-if="
+                  localConfig.clockEnabled &&
+                  localConfig.clockDisplayMode === 'always'
+                "
+                class="setting-item"
               >
-                <div class="source-info">
-                  <strong>{{ source.name }}</strong>
-                  <span class="source-type">{{ source.type }}</span>
-                  <span
-                    v-if="source.running !== undefined"
-                    class="running-indicator"
-                    :class="{ running: source.running, stopped: !source.running }"
-                    :title="source.running ? 'Running' : 'Stopped'"
+                <label>Clock Position</label>
+                <select
+                  v-model="localConfig.clockPosition"
+                  @change="updateClockSettings"
+                >
+                  <option value="top-left">Top Left</option>
+                  <option value="top-right">Top Right</option>
+                  <option value="bottom-left">Bottom Left</option>
+                  <option value="bottom-right">Bottom Right</option>
+                </select>
+                <span class="help-text"
+                  >Position of the clock when UI is off</span
+                >
+              </div>
+              <div v-if="localConfig.clockEnabled" class="setting-item">
+                <label>Clock Size</label>
+                <select
+                  v-model="localConfig.clockSize"
+                  @change="updateClockSettings"
+                >
+                  <option value="small">Small</option>
+                  <option value="medium">Medium</option>
+                  <option value="large">Large</option>
+                </select>
+                <span class="help-text">Size of the clock display</span>
+              </div>
+              <div v-if="localConfig.clockEnabled" class="setting-item">
+                <label>
+                  <input
+                    v-model="localConfig.clockShowDate"
+                    type="checkbox"
+                    @change="updateClockSettings"
+                  />
+                  Show Date in Clock
+                </label>
+                <span class="help-text">Display date below the time</span>
+              </div>
+              <div v-if="localConfig.clockEnabled" class="setting-item">
+                <label>
+                  <input
+                    v-model="localConfig.clockShowSeconds"
+                    type="checkbox"
+                    @change="updateClockSettings"
+                  />
+                  Show Seconds in Clock
+                </label>
+                <span class="help-text"
+                  >Display seconds in the time (updates every second)</span
+                >
+              </div>
+            </div>
+          </section>
+        </template>
+
+        <!-- Content Category -->
+        <template v-if="activeCategory === 'content'">
+          <!-- Image Settings -->
+          <section
+            class="settings-section collapsible"
+            :class="{ expanded: expandedSections.photos }"
+          >
+            <div class="section-header" @click="toggleSection('photos')">
+              <h2>Image Settings</h2>
+              <span class="toggle-icon">{{
+                expandedSections.photos ? "▼" : "▶"
+              }}</span>
+            </div>
+            <div v-show="expandedSections.photos" class="section-content">
+              <div class="setting-item">
+                <label>Photo Rotation Interval (seconds)</label>
+                <input
+                  v-model.number="localConfig.photoRotationInterval"
+                  type="number"
+                  min="5"
+                  max="3600"
+                  @change="updatePhotoRotationInterval"
+                />
+                <span class="help-text"
+                  >How often to switch photos (5-3600 seconds)</span
+                >
+              </div>
+              <div class="setting-item">
+                <label>Image Display Mode</label>
+                <select
+                  v-model="localConfig.imageDisplayMode"
+                  class="setting-select"
+                  @change="updateImageDisplayMode"
+                >
+                  <option value="smart">Smart (Auto-detect best fit)</option>
+                  <option value="fit">Fit (Show entire image)</option>
+                  <option value="fill">Fill (Fill container, may crop)</option>
+                  <option value="crop">Crop (Center crop to fill)</option>
+                  <option value="center">
+                    Center (Center image, no scaling)
+                  </option>
+                </select>
+                <span class="help-text"
+                  >How images are displayed. Smart mode automatically chooses
+                  the best fit based on image and screen dimensions.</span
+                >
+              </div>
+              <div class="setting-item">
+                <label>
+                  <input
+                    v-model="localConfig.randomizeImages"
+                    type="checkbox"
+                    @change="updateRandomizeImages"
+                  />
+                  Randomize Image Order
+                </label>
+                <span class="help-text"
+                  >When enabled, images from all plugins (local, Unsplash, etc.)
+                  will be displayed in random order. The order is randomized
+                  each time images are loaded.</span
+                >
+              </div>
+              <div class="setting-item">
+                <p class="help-text">
+                  <strong>Note:</strong> Image upload and management have been
+                  moved to the Local Images plugin settings. Enable the Local
+                  Images plugin and expand its settings to upload and manage
+                  images.
+                </p>
+              </div>
+            </div>
+          </section>
+
+          <!-- Photo Frame Mode Settings -->
+          <section
+            class="settings-section collapsible"
+            :class="{ expanded: expandedSections.photoFrame }"
+          >
+            <div class="section-header" @click="toggleSection('photoFrame')">
+              <h2>Photo Frame Mode</h2>
+              <span class="toggle-icon">{{
+                expandedSections.photoFrame ? "▼" : "▶"
+              }}</span>
+            </div>
+            <div v-show="expandedSections.photoFrame" class="section-content">
+              <div class="setting-item">
+                <label>
+                  <input
+                    v-model="localConfig.photoFrameEnabled"
+                    type="checkbox"
+                    @change="updatePhotoFrameEnabled"
+                  />
+                  Enable Photo Frame Mode
+                </label>
+                <span class="help-text"
+                  >Automatically show photos full-screen after inactivity</span
+                >
+              </div>
+              <div v-if="localConfig.photoFrameEnabled" class="setting-item">
+                <label>Inactivity Timeout (seconds)</label>
+                <input
+                  v-model.number="localConfig.photoFrameTimeout"
+                  type="number"
+                  min="60"
+                  max="3600"
+                  @change="updatePhotoFrameTimeout"
+                />
+                <span class="help-text"
+                  >Time before switching to photo frame mode (60-3600
+                  seconds)</span
+                >
+              </div>
+            </div>
+          </section>
+        </template>
+
+        <!-- System Category -->
+        <template v-if="activeCategory === 'system'">
+          <!-- Keyboard Settings -->
+          <section
+            class="settings-section collapsible"
+            :class="{ expanded: expandedSections.keyboard }"
+          >
+            <div class="section-header" @click="toggleSection('keyboard')">
+              <h2>Keyboard Settings</h2>
+              <span class="toggle-icon">{{
+                expandedSections.keyboard ? "▼" : "▶"
+              }}</span>
+            </div>
+            <div v-show="expandedSections.keyboard" class="section-content">
+              <div class="setting-item">
+                <label>Keyboard Type</label>
+                <select
+                  v-model="localConfig.keyboardType"
+                  @change="updateKeyboardType"
+                >
+                  <option value="7-button">7-Button Keyboard</option>
+                  <option value="standard">Standard Keyboard</option>
+                </select>
+              </div>
+
+              <div class="setting-item">
+                <label>
+                  <input
+                    type="checkbox"
+                    v-model="localConfig.keyboardFeedbackEnabled"
+                    @change="saveConfig"
+                  />
+                  Enable Keyboard Feedback
+                </label>
+                <span class="help-text"
+                  >Show visual feedback when keys are pressed (helpful for
+                  7-button keyboards)</span
+                >
+              </div>
+
+              <div
+                class="setting-item"
+                v-if="localConfig.keyboardFeedbackEnabled"
+              >
+                <label>Feedback Mode</label>
+                <select
+                  v-model="localConfig.keyboardFeedbackMode"
+                  @change="saveConfig"
+                >
+                  <option value="normal">Normal (Center)</option>
+                  <option value="small">Small (Bottom-Right)</option>
+                </select>
+                <span class="help-text"
+                  >Small mode is less obtrusive and appears in the corner</span
+                >
+              </div>
+
+              <div class="keyboard-mappings">
+                <h3>Keyboard Mappings</h3>
+                <div class="mappings-list">
+                  <div
+                    v-for="(action, key) in currentMappings"
+                    :key="key"
+                    class="mapping-item"
                   >
-                    {{ source.running ? '●' : '○' }}
-                  </span>
-                </div>
-                <div class="source-settings">
-                  <div class="source-setting">
-                    <label>Color:</label>
-                    <input
-                      type="color"
-                      :value="source.color || '#2196f3'"
-                      class="color-input"
-                      @change="
-                        updateSourceColor(source.id, $event.target.value)
-                      "
-                    />
+                    <div class="mapping-key">
+                      <strong>{{ formatKeyName(key) }}</strong>
+                    </div>
+                    <select
+                      v-model="currentMappings[key]"
+                      class="mapping-action"
+                      @change="updateMapping(key, $event.target.value)"
+                    >
+                      <option
+                        v-for="availableAction in availableActions"
+                        :key="availableAction.value"
+                        :value="availableAction.value"
+                      >
+                        {{ availableAction.label }}
+                      </option>
+                    </select>
+                    <button
+                      class="btn-clear"
+                      title="Clear mapping"
+                      @click="clearMapping(key)"
+                    >
+                      ×
+                    </button>
                   </div>
-                  <div class="source-setting">
-                    <label>
-                      <input
-                        type="checkbox"
-                        :checked="source.show_time !== false"
-                        @change="
-                          updateSourceShowTime(source.id, $event.target.checked)
-                        "
-                      />
-                      Show Event Times
-                    </label>
-                  </div>
-                </div>
-                <div class="source-actions">
-                  <label class="toggle-switch">
-                    <input
-                      type="checkbox"
-                      :checked="source.enabled"
-                      @change="toggleSource(source.id, $event.target.checked)"
-                    />
-                    <span class="slider" />
-                  </label>
-                  <button
-                    v-if="source.enabled && source.running !== undefined"
-                    class="btn-secondary"
-                    :class="{ 'btn-stop': source.running }"
-                    :title="source.running ? 'Stop plugin' : 'Start plugin'"
-                    @click="source.running ? stopPluginInstance(source.id) : startPluginInstance(source.id)"
-                    :disabled="!source.enabled"
-                  >
-                    {{ source.running ? 'Stop' : 'Start' }}
-                  </button>
-                  <button
-                    class="btn-remove"
-                    title="Remove calendar"
-                    @click="removeSource(source.id)"
-                  >
-                    Remove
-                  </button>
                 </div>
               </div>
             </div>
-          </div>
-        </div>
-      </section>
+          </section>
+        </template>
 
-      <!-- Plugins Settings -->
-      <section
-        class="settings-section collapsible"
-        :class="{ expanded: expandedSections.plugins }"
-      >
-        <div class="section-header" @click="toggleSection('plugins')">
-          <h2>Plugins</h2>
-          <span class="toggle-icon">{{
-            expandedSections.plugins ? "▼" : "▶"
-          }}</span>
-        </div>
-        <div v-show="expandedSections.plugins" class="section-content">
-          <div class="setting-item">
-            <label>Plugin Management</label>
-            <p class="help-text">
-              Enable or disable plugin types. Disabled plugins won't appear in their respective sections.
-            </p>
-          </div>
-          <div v-if="loadingPlugins" class="loading-state">
-            <p>Loading plugins...</p>
-          </div>
-          <div v-else-if="plugins.length === 0" class="empty-state">
-            <p>No plugins found</p>
-          </div>
-          <div v-else class="plugins-container">
-            <!-- Plugin Type Tabs -->
-            <div class="plugin-tabs">
-              <button
-                v-for="category in sortedPluginCategories"
-                :key="category.type"
-                class="plugin-tab"
-                :class="{ active: activePluginTab === category.type }"
-                @click="activePluginTab = category.type"
-              >
-                {{ category.label }}
-              </button>
+        <!-- Content Category (continued) -->
+        <template v-if="activeCategory === 'content'">
+          <!-- Calendar Settings -->
+          <section
+            class="settings-section collapsible"
+            :class="{ expanded: expandedSections.calendar }"
+          >
+            <div class="section-header" @click="toggleSection('calendar')">
+              <h2>Calendar Settings</h2>
+              <span class="toggle-icon">{{
+                expandedSections.calendar ? "▼" : "▶"
+              }}</span>
             </div>
-            
-            <!-- Plugin Cards for Active Tab -->
-            <div class="plugins-list">
-              <div
-                v-for="plugin in activePluginCategory?.plugins || []"
-                :key="plugin.id"
-                class="plugin-item"
-                :class="{ disabled: !plugin.enabled }"
-              >
-                <div class="plugin-header">
-                  <div class="plugin-header-top">
-                    <div class="plugin-info">
-                      <div class="plugin-title-row">
-                        <strong>{{ plugin.name }}</strong>
-                        <span class="plugin-type-badge" :class="`type-${plugin.type}`">
-                          {{ plugin.type }}
-                        </span>
-                        <!-- Aggregated running indicator -->
-                        <span
-                          v-if="pluginInstances[plugin.id] && pluginInstances[plugin.id].length > 0"
-                          class="running-indicator-aggregate"
-                          :class="getAggregatedRunningClass(pluginInstances[plugin.id])"
-                          :title="getAggregatedRunningTitle(pluginInstances[plugin.id])"
-                        >
-                          {{ getAggregatedRunningSymbol(pluginInstances[plugin.id]) }}
-                        </span>
-                        <button
-                          v-if="Object.keys(plugin.config_schema || {}).length > 0"
-                          class="btn-settings-icon"
-                          :class="{ active: expandedPlugins[plugin.id] }"
-                          @click="togglePluginSettings(plugin.id)"
-                          title="Show settings"
-                        >
-                          ⚙️
-                        </button>
-                      </div>
-                      <p class="plugin-description">{{ plugin.description }}</p>
+            <div v-show="expandedSections.calendar" class="section-content">
+              <div class="setting-item">
+                <label>Calendar View Mode</label>
+                <select
+                  v-model="localConfig.calendarViewMode"
+                  class="setting-select"
+                  @change="updateCalendarViewMode"
+                >
+                  <option value="month">Month View</option>
+                  <option value="rolling">Rolling Weeks View</option>
+                </select>
+                <span class="help-text"
+                  >Display full month or rolling weeks</span
+                >
+              </div>
+              <div class="setting-item">
+                <label>Time Format</label>
+                <select
+                  v-model="localConfig.timeFormat"
+                  class="setting-select"
+                  @change="updateTimeFormat"
+                >
+                  <option value="24h">24-hour (14:30)</option>
+                  <option value="12h">12-hour (2:30 PM)</option>
+                </select>
+                <span class="help-text">Time display format for events</span>
+              </div>
+              <div class="setting-item">
+                <label>Week Starting Day</label>
+                <select
+                  v-model.number="localConfig.weekStartDay"
+                  class="setting-select"
+                  @change="updateWeekStartDay"
+                >
+                  <option :value="0">Sunday</option>
+                  <option :value="1">Monday</option>
+                  <option :value="2">Tuesday</option>
+                  <option :value="3">Wednesday</option>
+                  <option :value="4">Thursday</option>
+                  <option :value="5">Friday</option>
+                  <option :value="6">Saturday</option>
+                </select>
+                <span class="help-text"
+                  >First day of the week in the calendar</span
+                >
+              </div>
+              <div class="setting-item">
+                <label>
+                  <input
+                    v-model="localConfig.showWeekNumbers"
+                    type="checkbox"
+                    @change="updateShowWeekNumbers"
+                  />
+                  Show Week Numbers
+                </label>
+                <span class="help-text"
+                  >Display ISO 8601 week numbers in the calendar</span
+                >
+              </div>
+              <div class="setting-item">
+                <label>Calendar Sources</label>
+                <!-- Add Calendar Source Form -->
+                <div class="add-calendar-form">
+                  <h3>Add Calendar Source</h3>
+                  <div class="form-group">
+                    <label>Calendar Type</label>
+                    <select
+                      v-model="newCalendarSource.type"
+                      class="form-select"
+                    >
+                      <option
+                        v-for="type in calendarPluginTypes"
+                        :key="type.id"
+                        :value="type.id"
+                      >
+                        {{ type.name }}
+                      </option>
+                    </select>
+                  </div>
+                  <div class="form-group">
+                    <label>Calendar Name</label>
+                    <input
+                      v-model="newCalendarSource.name"
+                      type="text"
+                      placeholder="My Calendar"
+                      class="form-input"
+                    />
+                  </div>
+                  <div class="form-group">
+                    <label>Calendar URL</label>
+                    <input
+                      v-model="newCalendarSource.ical_url"
+                      type="text"
+                      :placeholder="
+                        getCalendarTypePlaceholder(newCalendarSource.type)
+                      "
+                      class="form-input"
+                    />
+                    <span class="help-text">
+                      {{ getCalendarTypeHelpText(newCalendarSource.type) }}
+                    </span>
+                  </div>
+                  <button
+                    class="btn-add"
+                    :disabled="!canAddCalendar"
+                    @click="addCalendarSource"
+                  >
+                    Add Calendar
+                  </button>
+                </div>
+                <!-- Existing Calendar Sources -->
+                <div class="calendar-sources-list">
+                  <div
+                    v-for="source in calendarSources"
+                    :key="source.id"
+                    class="source-item"
+                  >
+                    <div class="source-info">
+                      <strong>{{ source.name }}</strong>
+                      <span class="source-type">{{ source.type }}</span>
+                      <span
+                        v-if="source.running !== undefined"
+                        class="running-indicator"
+                        :class="{
+                          running: source.running,
+                          stopped: !source.running,
+                        }"
+                        :title="source.running ? 'Running' : 'Stopped'"
+                      >
+                        {{ source.running ? "●" : "○" }}
+                      </span>
                     </div>
-                    <div class="plugin-header-actions">
+                    <div class="source-settings">
+                      <div class="source-setting">
+                        <label>Color:</label>
+                        <input
+                          type="color"
+                          :value="source.color || '#2196f3'"
+                          class="color-input"
+                          @change="
+                            updateSourceColor(source.id, $event.target.value)
+                          "
+                        />
+                      </div>
+                      <div class="source-setting">
+                        <label>
+                          <input
+                            type="checkbox"
+                            :checked="source.show_time !== false"
+                            @change="
+                              updateSourceShowTime(
+                                source.id,
+                                $event.target.checked,
+                              )
+                            "
+                          />
+                          Show Event Times
+                        </label>
+                      </div>
+                    </div>
+                    <div class="source-actions">
                       <label class="toggle-switch">
                         <input
                           type="checkbox"
-                          :checked="plugin.enabled"
-                          @change="togglePlugin(plugin.id, $event.target.checked)"
+                          :checked="source.enabled"
+                          @change="
+                            toggleSource(source.id, $event.target.checked)
+                          "
                         />
                         <span class="slider" />
                       </label>
+                      <button
+                        v-if="source.enabled && source.running !== undefined"
+                        class="btn-secondary"
+                        :class="{ 'btn-stop': source.running }"
+                        :title="source.running ? 'Stop plugin' : 'Start plugin'"
+                        @click="
+                          source.running
+                            ? stopPluginInstance(source.id)
+                            : startPluginInstance(source.id)
+                        "
+                        :disabled="!source.enabled"
+                      >
+                        {{ source.running ? "Stop" : "Start" }}
+                      </button>
+                      <button
+                        class="btn-remove"
+                        title="Remove calendar"
+                        @click="removeSource(source.id)"
+                      >
+                        Remove
+                      </button>
                     </div>
                   </div>
-                </div>
-                <div
-                  v-if="plugin.enabled && expandedPlugins[plugin.id]"
-                  class="plugin-config"
-                >
-                <!-- Common Settings (for plugin type) -->
-                <div v-if="Object.keys(plugin.config_schema || {}).length > 0">
-                  <h4 class="config-section-title">Common Settings</h4>
-                  <div
-                    v-for="(schema, key) in plugin.config_schema"
-                    :key="key"
-                    class="plugin-setting"
-                  >
-                    <PluginFieldRenderer
-                      :key="key"
-                      :plugin-id="plugin.id"
-                      :field-key="key"
-                      :schema="schema"
-                      :value="getFormValue(plugin.id, key, schema)"
-                      @update="updateFormValue(plugin.id, key, $event)"
-                    />
-                  </div>
-                  
-                  <!-- Plugin Actions (buttons like Save, Test, Fetch) -->
-                  <PluginActions
-                    v-if="plugin.ui_actions && plugin.ui_actions.length > 0"
-                    :plugin-id="plugin.id"
-                    :actions="plugin.ui_actions"
-                    :saving="savingPlugin === plugin.id"
-                    :testing="testingPlugin[plugin.id] || false"
-                    :fetching="fetchingPlugin[plugin.id] || false"
-                    :save-status="pluginSaveStatus[plugin.id] || null"
-                    :test-status="pluginTestStatus[plugin.id] || null"
-                    :fetch-status="pluginFetchStatus[plugin.id] || null"
-                    :form-data="pluginFormData[plugin.id] || {}"
-                    @save="savePluginConfig(plugin.id)"
-                    @test="testPluginConnection(plugin.id)"
-                    @fetch="fetchPluginNow(plugin.id)"
-                    @custom-action="handleCustomAction"
-                  />
-                </div>
-                
-                <!-- Plugin Sections (upload, manage images, etc.) -->
-                <PluginSections
-                  v-if="plugin.ui_sections && plugin.ui_sections.length > 0 && plugin.enabled"
-                  :plugin-id="plugin.id"
-                  :sections="plugin.ui_sections"
-                  :images="imagesList.filter(img => img.source === 'local-images')"
-                  :uploading="uploading"
-                  :upload-error="uploadError"
-                  :upload-success="uploadSuccess"
-                  @upload="handleFileSelectFromSection"
-                  @delete-image="deleteImage"
-                />
-                </div>
-                <div v-else-if="!plugin.enabled" class="plugin-disabled-message">
-                  <p class="help-text">
-                    This plugin type is disabled. It won't appear in dropdowns and existing instances will be hidden (but not deleted).
-                  </p>
                 </div>
               </div>
             </div>
-          </div>
-        </div>
-      </section>
+          </section>
 
-      <!-- Web Services Settings -->
-      <section
-        class="settings-section collapsible"
-        :class="{ expanded: expandedSections.webServices }"
-      >
-        <div class="section-header" @click="toggleSection('webServices')">
-          <h2>Web Services</h2>
-          <span class="toggle-icon">{{
-            expandedSections.webServices ? "▼" : "▶"
-          }}</span>
-        </div>
-        <div v-show="expandedSections.webServices" class="section-content">
-          <!-- Meal Plan Settings -->
-          <div class="setting-item">
-            <label>Meal Plan Card Size</label>
-            <select
-              v-model="localConfig.mealPlanCardSize"
-              @change="updateMealPlanCardSize"
-            >
-              <option value="small">Small (fit 7+ cards)</option>
-              <option value="medium">Medium (default)</option>
-              <option value="large">Large</option>
-            </select>
-            <span class="help-text"
-              >Size of meal plan cards. Smaller size allows more cards to fit on screen.</span
-            >
-          </div>
-          
-          <!-- Add Web Service Form -->
-          <div class="add-web-service-form">
-            <h3>Add Web Service</h3>
-            <div class="form-group">
-              <label>Service Name</label>
-              <input
-                v-model="newWebService.name"
-                type="text"
-                placeholder="Shopping List"
-                class="form-input"
-              />
+          <!-- Plugins Settings -->
+          <section
+            class="settings-section collapsible"
+            :class="{ expanded: expandedSections.plugins }"
+          >
+            <div class="section-header" @click="toggleSection('plugins')">
+              <h2>Plugins</h2>
+              <span class="toggle-icon">{{
+                expandedSections.plugins ? "▼" : "▶"
+              }}</span>
             </div>
-            <div class="form-group">
-              <label>Service URL</label>
-              <input
-                v-model="newWebService.url"
-                type="text"
-                placeholder="https://example.com/shopping"
-                class="form-input"
-              />
-              <span class="help-text">
-                Note: Some websites block embedding in iframes due to security
-                restrictions (CORS/X-Frame-Options). If a service cannot be
-                embedded, you'll see an error message with an option to open it
-                in a new window.
-              </span>
-            </div>
-            <div class="form-group">
-              <label>
-                <input v-model="newWebService.fullscreen" type="checkbox" />
-                Prefer Fullscreen Mode
-              </label>
-              <span class="help-text"
-                >Open this service in fullscreen by default</span
-              >
-            </div>
-            <button
-              class="btn-add"
-              :disabled="!canAddWebService"
-              @click="addWebService"
-            >
-              Add Web Service
-            </button>
-          </div>
-
-          <!-- Web Services List -->
-          <div class="web-services-list">
-            <h3>Configured Web Services</h3>
-            <div v-if="webServices.length === 0" class="empty-state">
-              <p>No web services configured</p>
-              <p class="help-text">Add a web service above to get started</p>
-            </div>
-            <div v-else class="services-list">
-              <div
-                v-for="service in webServices"
-                :key="service.id"
-                class="service-item"
-              >
-                <div class="service-info">
-                  <div class="service-header">
-                    <h4>{{ service.name }}</h4>
-                    <span class="service-url-display">{{ service.url }}</span>
-                  </div>
-                  <div class="service-settings">
-                    <div class="service-setting">
-                      <label>Display Order:</label>
-                      <input
-                        type="number"
-                        :value="service.display_order"
-                        class="order-input"
-                        min="0"
-                        @change="
-                          updateServiceOrder(
-                            service.id,
-                            parseInt($event.target.value),
-                          )
-                        "
-                      />
-                    </div>
-                    <div class="service-setting">
-                      <label>
-                        <input
-                          type="checkbox"
-                          :checked="service.fullscreen"
-                          @change="
-                            updateServiceFullscreen(
-                              service.id,
-                              $event.target.checked,
-                            )
-                          "
-                        />
-                        Prefer Fullscreen
-                      </label>
-                    </div>
-                  </div>
-                </div>
-                <div class="service-actions">
-                  <label class="toggle-switch">
-                    <input
-                      type="checkbox"
-                      :checked="service.enabled"
-                      @change="
-                        toggleWebService(service.id, $event.target.checked)
-                      "
-                    />
-                    <span class="slider" />
-                  </label>
+            <div v-show="expandedSections.plugins" class="section-content">
+              <div class="setting-item">
+                <label>Plugin Management</label>
+                <p class="help-text">
+                  Enable or disable plugin types. Disabled plugins won't appear
+                  in their respective sections.
+                </p>
+              </div>
+              <div v-if="loadingPlugins" class="loading-state">
+                <p>Loading plugins...</p>
+              </div>
+              <div v-else-if="plugins.length === 0" class="empty-state">
+                <p>No plugins found</p>
+              </div>
+              <div v-else class="plugins-container">
+                <!-- Plugin Type Tabs -->
+                <div class="plugin-tabs">
                   <button
-                    class="btn-remove"
-                    title="Remove web service"
-                    @click="removeWebService(service.id)"
+                    v-for="category in sortedPluginCategories"
+                    :key="category.type"
+                    class="plugin-tab"
+                    :class="{ active: activePluginTab === category.type }"
+                    @click="activePluginTab = category.type"
                   >
-                    Remove
+                    {{ category.label }}
                   </button>
                 </div>
+
+                <!-- Plugin Cards for Active Tab -->
+                <div class="plugins-list">
+                  <div
+                    v-for="plugin in activePluginCategory?.plugins || []"
+                    :key="plugin.id"
+                    class="plugin-item"
+                    :class="{ disabled: !plugin.enabled }"
+                  >
+                    <div class="plugin-header">
+                      <div class="plugin-header-top">
+                        <div class="plugin-info">
+                          <div class="plugin-title-row">
+                            <strong>{{ plugin.name }}</strong>
+                            <span
+                              class="plugin-type-badge"
+                              :class="`type-${plugin.type}`"
+                            >
+                              {{ plugin.type }}
+                            </span>
+                            <!-- Aggregated running indicator -->
+                            <span
+                              v-if="
+                                pluginInstances[plugin.id] &&
+                                pluginInstances[plugin.id].length > 0
+                              "
+                              class="running-indicator-aggregate"
+                              :class="
+                                getAggregatedRunningClass(
+                                  pluginInstances[plugin.id],
+                                )
+                              "
+                              :title="
+                                getAggregatedRunningTitle(
+                                  pluginInstances[plugin.id],
+                                )
+                              "
+                            >
+                              {{
+                                getAggregatedRunningSymbol(
+                                  pluginInstances[plugin.id],
+                                )
+                              }}
+                            </span>
+                            <button
+                              v-if="
+                                Object.keys(plugin.config_schema || {}).length >
+                                0
+                              "
+                              class="btn-settings-icon"
+                              :class="{ active: expandedPlugins[plugin.id] }"
+                              @click="togglePluginSettings(plugin.id)"
+                              title="Show settings"
+                            >
+                              ⚙️
+                            </button>
+                          </div>
+                          <p class="plugin-description">
+                            {{ plugin.description }}
+                          </p>
+                        </div>
+                        <div class="plugin-header-actions">
+                          <label class="toggle-switch">
+                            <input
+                              type="checkbox"
+                              :checked="plugin.enabled"
+                              @change="
+                                togglePlugin(plugin.id, $event.target.checked)
+                              "
+                            />
+                            <span class="slider" />
+                          </label>
+                        </div>
+                      </div>
+                    </div>
+                    <div
+                      v-if="plugin.enabled && expandedPlugins[plugin.id]"
+                      class="plugin-config"
+                    >
+                      <!-- Common Settings (for plugin type) -->
+                      <div
+                        v-if="
+                          Object.keys(plugin.config_schema || {}).length > 0
+                        "
+                      >
+                        <h4 class="config-section-title">Common Settings</h4>
+                        <div
+                          v-for="(schema, key) in plugin.config_schema"
+                          :key="key"
+                          class="plugin-setting"
+                        >
+                          <PluginFieldRenderer
+                            :key="key"
+                            :plugin-id="plugin.id"
+                            :field-key="key"
+                            :schema="schema"
+                            :value="getFormValue(plugin.id, key, schema)"
+                            @update="updateFormValue(plugin.id, key, $event)"
+                          />
+                        </div>
+
+                        <!-- Plugin Actions (buttons like Save, Test, Fetch) -->
+                        <PluginActions
+                          v-if="
+                            plugin.ui_actions && plugin.ui_actions.length > 0
+                          "
+                          :plugin-id="plugin.id"
+                          :actions="plugin.ui_actions"
+                          :saving="savingPlugin === plugin.id"
+                          :testing="testingPlugin[plugin.id] || false"
+                          :fetching="fetchingPlugin[plugin.id] || false"
+                          :save-status="pluginSaveStatus[plugin.id] || null"
+                          :test-status="pluginTestStatus[plugin.id] || null"
+                          :fetch-status="pluginFetchStatus[plugin.id] || null"
+                          :form-data="pluginFormData[plugin.id] || {}"
+                          @save="savePluginConfig(plugin.id)"
+                          @test="testPluginConnection(plugin.id)"
+                          @fetch="fetchPluginNow(plugin.id)"
+                          @custom-action="handleCustomAction"
+                        />
+                      </div>
+
+                      <!-- Plugin Sections (upload, manage images, etc.) -->
+                      <PluginSections
+                        v-if="
+                          plugin.ui_sections &&
+                          plugin.ui_sections.length > 0 &&
+                          plugin.enabled
+                        "
+                        :plugin-id="plugin.id"
+                        :sections="plugin.ui_sections"
+                        :images="
+                          imagesList.filter(
+                            (img) => img.source === 'local-images',
+                          )
+                        "
+                        :uploading="uploading"
+                        :upload-error="uploadError"
+                        :upload-success="uploadSuccess"
+                        @upload="handleFileSelectFromSection"
+                        @delete-image="deleteImage"
+                      />
+                    </div>
+                    <div
+                      v-else-if="!plugin.enabled"
+                      class="plugin-disabled-message"
+                    >
+                      <p class="help-text">
+                        This plugin type is disabled. It won't appear in
+                        dropdowns and existing instances will be hidden (but not
+                        deleted).
+                      </p>
+                    </div>
+                  </div>
+                </div>
               </div>
             </div>
-          </div>
-        </div>
-      </section>
-      </template>
+          </section>
 
-      <!-- System Category (continued) -->
-      <template v-if="activeCategory === 'system'">
-      <!-- Display Power Settings -->
-      <section
-        class="settings-section collapsible"
-        :class="{ expanded: expandedSections.displayPower }"
-      >
-        <div class="section-header" @click="toggleSection('displayPower')">
-          <h2>Display Power Settings</h2>
-          <span class="toggle-icon">{{
-            expandedSections.displayPower ? "▼" : "▶"
-          }}</span>
-        </div>
-        <div v-show="expandedSections.displayPower" class="section-content">
-          <div class="setting-item">
-            <label>
-              <input
-                v-model="localConfig.displayScheduleEnabled"
-                type="checkbox"
-                @change="updateDisplayScheduleEnabled"
-              />
-              Enable Display Power Schedule
-            </label>
-            <span class="help-text"
-              >Automatically turn display off/on at specified times</span
-            >
-          </div>
-          <div v-if="localConfig.displayScheduleEnabled" class="setting-item">
-            <label>Daily Schedule</label>
-            <div class="schedule-days">
-              <div
-                v-for="(dayConfig, index) in localConfig.displaySchedule"
-                :key="index"
-                class="schedule-day"
-              >
-                <div class="schedule-day-header">
-                  <label>
-                    <input
-                      v-model="dayConfig.enabled"
-                      type="checkbox"
-                      @change="updateDisplaySchedule"
-                    />
-                    {{ getDayName(dayConfig.day) }}
-                  </label>
-                </div>
-                <div v-if="dayConfig.enabled" class="schedule-day-times">
-                  <div class="schedule-time">
-                    <label>On:</label>
-                    <input
-                      v-model="dayConfig.onTime"
-                      type="time"
-                      @change="updateDisplaySchedule"
-                    />
-                  </div>
-                  <div class="schedule-time">
-                    <label>Off:</label>
-                    <input
-                      v-model="dayConfig.offTime"
-                      type="time"
-                      @change="updateDisplaySchedule"
-                    />
-                  </div>
-                </div>
-              </div>
+          <!-- Web Services Settings -->
+          <section
+            class="settings-section collapsible"
+            :class="{ expanded: expandedSections.webServices }"
+          >
+            <div class="section-header" @click="toggleSection('webServices')">
+              <h2>Web Services</h2>
+              <span class="toggle-icon">{{
+                expandedSections.webServices ? "▼" : "▶"
+              }}</span>
             </div>
-            <span class="help-text"
-              >Configure on/off times for each day of the week. Display will be on during the specified time range.</span
-            >
-          </div>
-          <div class="setting-item">
-            <label>Timezone</label>
-            <select
-              v-model="localConfig.timezone"
-              @change="updateTimezone"
-            >
-              <option :value="null">System Timezone (Default)</option>
-              <option value="UTC">UTC</option>
-              <option value="America/New_York">America/New_York (EST/EDT)</option>
-              <option value="America/Chicago">America/Chicago (CST/CDT)</option>
-              <option value="America/Denver">America/Denver (MST/MDT)</option>
-              <option value="America/Los_Angeles">America/Los_Angeles (PST/PDT)</option>
-              <option value="Europe/London">Europe/London (GMT/BST)</option>
-              <option value="Europe/Paris">Europe/Paris (CET/CEST)</option>
-              <option value="Europe/Berlin">Europe/Berlin (CET/CEST)</option>
-              <option value="Europe/Stockholm">Europe/Stockholm (CET/CEST)</option>
-              <option value="Asia/Tokyo">Asia/Tokyo (JST)</option>
-              <option value="Asia/Shanghai">Asia/Shanghai (CST)</option>
-              <option value="Australia/Sydney">Australia/Sydney (AEDT/AEST)</option>
-            </select>
-            <span class="help-text"
-              >Timezone for display schedule. Leave as "System Timezone" to use the Pi's timezone.</span
-            >
-          </div>
-          <div class="setting-item">
-            <label>
-              <input
-                v-model="localConfig.displayTimeoutEnabled"
-                type="checkbox"
-                @change="updateDisplayTimeout"
-              />
-              Enable Display Timeout (Screensaver)
-            </label>
-            <span class="help-text"
-              >Turn display off after period of inactivity</span
-            >
-          </div>
-          <div v-if="localConfig.displayTimeoutEnabled" class="setting-item">
-            <label>Display Timeout (seconds)</label>
-            <input
-              v-model.number="localConfig.displayTimeout"
-              type="number"
-              min="0"
-              max="3600"
-              step="60"
-              @change="updateDisplayTimeout"
-            />
-            <span class="help-text">Turn display off after this many seconds of inactivity (0 = never, max 3600)</span>
-          </div>
-          <div class="setting-item">
-            <label>Manual Display Control</label>
-            <div class="button-group">
-              <button class="btn-secondary" @click="turnDisplayOn">
-                Turn Display On
-              </button>
-              <button class="btn-secondary" @click="turnDisplayOff">
-                Turn Display Off
-              </button>
-            </div>
-            <span class="help-text">Manually control display power</span>
-          </div>
-        </div>
-      </section>
-
-      <!-- Reboot Combo Settings -->
-      <section
-        class="settings-section collapsible"
-        :class="{ expanded: expandedSections.rebootCombo }"
-      >
-        <div class="section-header" @click="toggleSection('rebootCombo')">
-          <h2>Reboot Combo Settings</h2>
-          <span class="toggle-icon">{{
-            expandedSections.rebootCombo ? "▼" : "▶"
-          }}</span>
-        </div>
-        <div v-show="expandedSections.rebootCombo" class="section-content">
-          <div class="setting-item">
-            <label>First Key</label>
-            <select
-              v-model="localConfig.rebootComboKey1"
-              class="setting-select"
-              @change="updateRebootCombo"
-            >
-              <option value="KEY_1">KEY_1</option>
-              <option value="KEY_2">KEY_2</option>
-              <option value="KEY_3">KEY_3</option>
-              <option value="KEY_4">KEY_4</option>
-              <option value="KEY_5">KEY_5</option>
-              <option value="KEY_6">KEY_6</option>
-              <option value="KEY_7">KEY_7</option>
-            </select>
-            <span class="help-text">First key for reboot combo</span>
-          </div>
-          <div class="setting-item">
-            <label>Second Key</label>
-            <select
-              v-model="localConfig.rebootComboKey2"
-              class="setting-select"
-              @change="updateRebootCombo"
-            >
-              <option value="KEY_1">KEY_1</option>
-              <option value="KEY_2">KEY_2</option>
-              <option value="KEY_3">KEY_3</option>
-              <option value="KEY_4">KEY_4</option>
-              <option value="KEY_5">KEY_5</option>
-              <option value="KEY_6">KEY_6</option>
-              <option value="KEY_7">KEY_7</option>
-            </select>
-            <span class="help-text">Second key for reboot combo</span>
-          </div>
-          <div class="setting-item">
-            <label>Combo Duration (milliseconds)</label>
-            <input
-              v-model.number="localConfig.rebootComboDuration"
-              type="number"
-              min="1000"
-              max="60000"
-              step="1000"
-              @change="updateRebootCombo"
-            />
-            <span class="help-text">How long to hold both keys to trigger reboot (1000-60000 ms)</span>
-          </div>
-          <div class="setting-item">
-            <span class="help-text"
-              >Hold {{ localConfig.rebootComboKey1 }} + {{ localConfig.rebootComboKey2 }} for
-              {{ (localConfig.rebootComboDuration / 1000).toFixed(1) }} seconds to reboot</span
-            >
-          </div>
-        </div>
-      </section>
-
-      <!-- Update Settings -->
-      <section
-        class="settings-section collapsible"
-        :class="{ expanded: expandedSections.update }"
-      >
-        <div class="section-header" @click="toggleSection('update')">
-          <h2>Update Settings</h2>
-          <span class="toggle-icon">{{
-            expandedSections.update ? "▼" : "▶"
-          }}</span>
-        </div>
-        <div v-show="expandedSections.update" class="section-content">
-          <div class="setting-item">
-            <label>Repository URL</label>
-            <input
-              v-model="localConfig.gitRepoUrl"
-              type="text"
-              placeholder="https://github.com/user/repo.git"
-              @change="updateGitRepoUrl"
-            />
-            <span class="help-text"
-              >Git repository URL for updates (e.g., https://github.com/user/repo.git)</span
-            >
-          </div>
-          <div class="setting-item">
-            <label>Git Branch</label>
-            <div class="branch-selector">
-              <select
-                v-if="availableBranches.length > 0"
-                v-model="localConfig.gitBranch"
-                @change="updateGitBranch"
-              >
-                <option
-                  v-for="branch in availableBranches"
-                  :key="branch"
-                  :value="branch"
+            <div v-show="expandedSections.webServices" class="section-content">
+              <!-- Meal Plan Settings -->
+              <div class="setting-item">
+                <label>Meal Plan Card Size</label>
+                <select
+                  v-model="localConfig.mealPlanCardSize"
+                  @change="updateMealPlanCardSize"
                 >
-                  {{ branch }}
-                </option>
-              </select>
-              <input
-                v-else
-                v-model="localConfig.gitBranch"
-                type="text"
-                placeholder="main"
-                @change="updateGitBranch"
-                :disabled="fetchingBranches"
-              />
-              <button
-                class="btn-fetch-branches"
-                :disabled="fetchingBranches || !localConfig.gitRepoUrl"
-                @click="fetchBranches"
+                  <option value="small">Small (fit 7+ cards)</option>
+                  <option value="medium">Medium (default)</option>
+                  <option value="large">Large</option>
+                </select>
+                <span class="help-text"
+                  >Size of meal plan cards. Smaller size allows more cards to
+                  fit on screen.</span
+                >
+              </div>
+
+              <!-- Add Web Service Form -->
+              <div class="add-web-service-form">
+                <h3>Add Web Service</h3>
+                <div class="form-group">
+                  <label>Service Name</label>
+                  <input
+                    v-model="newWebService.name"
+                    type="text"
+                    placeholder="Shopping List"
+                    class="form-input"
+                  />
+                </div>
+                <div class="form-group">
+                  <label>Service URL</label>
+                  <input
+                    v-model="newWebService.url"
+                    type="text"
+                    placeholder="https://example.com/shopping"
+                    class="form-input"
+                  />
+                  <span class="help-text">
+                    Note: Some websites block embedding in iframes due to
+                    security restrictions (CORS/X-Frame-Options). If a service
+                    cannot be embedded, you'll see an error message with an
+                    option to open it in a new window.
+                  </span>
+                </div>
+                <div class="form-group">
+                  <label>
+                    <input v-model="newWebService.fullscreen" type="checkbox" />
+                    Prefer Fullscreen Mode
+                  </label>
+                  <span class="help-text"
+                    >Open this service in fullscreen by default</span
+                  >
+                </div>
+                <button
+                  class="btn-add"
+                  :disabled="!canAddWebService"
+                  @click="addWebService"
+                >
+                  Add Web Service
+                </button>
+              </div>
+
+              <!-- Web Services List -->
+              <div class="web-services-list">
+                <h3>Configured Web Services</h3>
+                <div v-if="webServices.length === 0" class="empty-state">
+                  <p>No web services configured</p>
+                  <p class="help-text">
+                    Add a web service above to get started
+                  </p>
+                </div>
+                <div v-else class="services-list">
+                  <div
+                    v-for="service in webServices"
+                    :key="service.id"
+                    class="service-item"
+                  >
+                    <div class="service-info">
+                      <div class="service-header">
+                        <h4>{{ service.name }}</h4>
+                        <span class="service-url-display">{{
+                          service.url
+                        }}</span>
+                      </div>
+                      <div class="service-settings">
+                        <div class="service-setting">
+                          <label>Display Order:</label>
+                          <input
+                            type="number"
+                            :value="service.display_order"
+                            class="order-input"
+                            min="0"
+                            @change="
+                              updateServiceOrder(
+                                service.id,
+                                parseInt($event.target.value),
+                              )
+                            "
+                          />
+                        </div>
+                        <div class="service-setting">
+                          <label>
+                            <input
+                              type="checkbox"
+                              :checked="service.fullscreen"
+                              @change="
+                                updateServiceFullscreen(
+                                  service.id,
+                                  $event.target.checked,
+                                )
+                              "
+                            />
+                            Prefer Fullscreen
+                          </label>
+                        </div>
+                      </div>
+                    </div>
+                    <div class="service-actions">
+                      <label class="toggle-switch">
+                        <input
+                          type="checkbox"
+                          :checked="service.enabled"
+                          @change="
+                            toggleWebService(service.id, $event.target.checked)
+                          "
+                        />
+                        <span class="slider" />
+                      </label>
+                      <button
+                        class="btn-remove"
+                        title="Remove web service"
+                        @click="removeWebService(service.id)"
+                      >
+                        Remove
+                      </button>
+                    </div>
+                  </div>
+                </div>
+              </div>
+            </div>
+          </section>
+        </template>
+
+        <!-- System Category (continued) -->
+        <template v-if="activeCategory === 'system'">
+          <!-- Display Power Settings -->
+          <section
+            class="settings-section collapsible"
+            :class="{ expanded: expandedSections.displayPower }"
+          >
+            <div class="section-header" @click="toggleSection('displayPower')">
+              <h2>Display Power Settings</h2>
+              <span class="toggle-icon">{{
+                expandedSections.displayPower ? "▼" : "▶"
+              }}</span>
+            </div>
+            <div v-show="expandedSections.displayPower" class="section-content">
+              <div class="setting-item">
+                <label>
+                  <input
+                    v-model="localConfig.displayScheduleEnabled"
+                    type="checkbox"
+                    @change="updateDisplayScheduleEnabled"
+                  />
+                  Enable Display Power Schedule
+                </label>
+                <span class="help-text"
+                  >Automatically turn display off/on at specified times</span
+                >
+              </div>
+              <div
+                v-if="localConfig.displayScheduleEnabled"
+                class="setting-item"
               >
-                {{ fetchingBranches ? "Fetching..." : "🔄 Fetch Branches" }}
-              </button>
+                <label>Daily Schedule</label>
+                <div class="schedule-days">
+                  <div
+                    v-for="(dayConfig, index) in localConfig.displaySchedule"
+                    :key="index"
+                    class="schedule-day"
+                  >
+                    <div class="schedule-day-header">
+                      <label>
+                        <input
+                          v-model="dayConfig.enabled"
+                          type="checkbox"
+                          @change="updateDisplaySchedule"
+                        />
+                        {{ getDayName(dayConfig.day) }}
+                      </label>
+                    </div>
+                    <div v-if="dayConfig.enabled" class="schedule-day-times">
+                      <div class="schedule-time">
+                        <label>On:</label>
+                        <input
+                          v-model="dayConfig.onTime"
+                          type="time"
+                          @change="updateDisplaySchedule"
+                        />
+                      </div>
+                      <div class="schedule-time">
+                        <label>Off:</label>
+                        <input
+                          v-model="dayConfig.offTime"
+                          type="time"
+                          @change="updateDisplaySchedule"
+                        />
+                      </div>
+                    </div>
+                  </div>
+                </div>
+                <span class="help-text"
+                  >Configure on/off times for each day of the week. Display will
+                  be on during the specified time range.</span
+                >
+              </div>
+              <div class="setting-item">
+                <label>Timezone</label>
+                <select v-model="localConfig.timezone" @change="updateTimezone">
+                  <option :value="null">System Timezone (Default)</option>
+                  <option value="UTC">UTC</option>
+                  <option value="America/New_York">
+                    America/New_York (EST/EDT)
+                  </option>
+                  <option value="America/Chicago">
+                    America/Chicago (CST/CDT)
+                  </option>
+                  <option value="America/Denver">
+                    America/Denver (MST/MDT)
+                  </option>
+                  <option value="America/Los_Angeles">
+                    America/Los_Angeles (PST/PDT)
+                  </option>
+                  <option value="Europe/London">Europe/London (GMT/BST)</option>
+                  <option value="Europe/Paris">Europe/Paris (CET/CEST)</option>
+                  <option value="Europe/Berlin">
+                    Europe/Berlin (CET/CEST)
+                  </option>
+                  <option value="Europe/Stockholm">
+                    Europe/Stockholm (CET/CEST)
+                  </option>
+                  <option value="Asia/Tokyo">Asia/Tokyo (JST)</option>
+                  <option value="Asia/Shanghai">Asia/Shanghai (CST)</option>
+                  <option value="Australia/Sydney">
+                    Australia/Sydney (AEDT/AEST)
+                  </option>
+                </select>
+                <span class="help-text"
+                  >Timezone for display schedule. Leave as "System Timezone" to
+                  use the Pi's timezone.</span
+                >
+              </div>
+              <div class="setting-item">
+                <label>
+                  <input
+                    v-model="localConfig.displayTimeoutEnabled"
+                    type="checkbox"
+                    @change="updateDisplayTimeout"
+                  />
+                  Enable Display Timeout (Screensaver)
+                </label>
+                <span class="help-text"
+                  >Turn display off after period of inactivity</span
+                >
+              </div>
+              <div
+                v-if="localConfig.displayTimeoutEnabled"
+                class="setting-item"
+              >
+                <label>Display Timeout (seconds)</label>
+                <input
+                  v-model.number="localConfig.displayTimeout"
+                  type="number"
+                  min="0"
+                  max="3600"
+                  step="60"
+                  @change="updateDisplayTimeout"
+                />
+                <span class="help-text"
+                  >Turn display off after this many seconds of inactivity (0 =
+                  never, max 3600)</span
+                >
+              </div>
+              <div class="setting-item">
+                <label>Manual Display Control</label>
+                <div class="button-group">
+                  <button class="btn-secondary" @click="turnDisplayOn">
+                    Turn Display On
+                  </button>
+                  <button class="btn-secondary" @click="turnDisplayOff">
+                    Turn Display Off
+                  </button>
+                </div>
+                <span class="help-text">Manually control display power</span>
+              </div>
             </div>
-            <span class="help-text"
-              >Git branch to use when updating. Click "Fetch Branches" to load available branches from the repository.</span
-            >
-            <div v-if="branchFetchError" class="error-message">
-              {{ branchFetchError }}
+          </section>
+
+          <!-- Reboot Combo Settings -->
+          <section
+            class="settings-section collapsible"
+            :class="{ expanded: expandedSections.rebootCombo }"
+          >
+            <div class="section-header" @click="toggleSection('rebootCombo')">
+              <h2>Reboot Combo Settings</h2>
+              <span class="toggle-icon">{{
+                expandedSections.rebootCombo ? "▼" : "▶"
+              }}</span>
             </div>
-          </div>
-        </div>
-      </section>
-      </template>
+            <div v-show="expandedSections.rebootCombo" class="section-content">
+              <div class="setting-item">
+                <label>First Key</label>
+                <select
+                  v-model="localConfig.rebootComboKey1"
+                  class="setting-select"
+                  @change="updateRebootCombo"
+                >
+                  <option value="KEY_1">KEY_1</option>
+                  <option value="KEY_2">KEY_2</option>
+                  <option value="KEY_3">KEY_3</option>
+                  <option value="KEY_4">KEY_4</option>
+                  <option value="KEY_5">KEY_5</option>
+                  <option value="KEY_6">KEY_6</option>
+                  <option value="KEY_7">KEY_7</option>
+                </select>
+                <span class="help-text">First key for reboot combo</span>
+              </div>
+              <div class="setting-item">
+                <label>Second Key</label>
+                <select
+                  v-model="localConfig.rebootComboKey2"
+                  class="setting-select"
+                  @change="updateRebootCombo"
+                >
+                  <option value="KEY_1">KEY_1</option>
+                  <option value="KEY_2">KEY_2</option>
+                  <option value="KEY_3">KEY_3</option>
+                  <option value="KEY_4">KEY_4</option>
+                  <option value="KEY_5">KEY_5</option>
+                  <option value="KEY_6">KEY_6</option>
+                  <option value="KEY_7">KEY_7</option>
+                </select>
+                <span class="help-text">Second key for reboot combo</span>
+              </div>
+              <div class="setting-item">
+                <label>Combo Duration (milliseconds)</label>
+                <input
+                  v-model.number="localConfig.rebootComboDuration"
+                  type="number"
+                  min="1000"
+                  max="60000"
+                  step="1000"
+                  @change="updateRebootCombo"
+                />
+                <span class="help-text"
+                  >How long to hold both keys to trigger reboot (1000-60000
+                  ms)</span
+                >
+              </div>
+              <div class="setting-item">
+                <span class="help-text"
+                  >Hold {{ localConfig.rebootComboKey1 }} +
+                  {{ localConfig.rebootComboKey2 }} for
+                  {{
+                    (localConfig.rebootComboDuration / 1000).toFixed(1)
+                  }}
+                  seconds to reboot</span
+                >
+              </div>
+            </div>
+          </section>
+
+          <!-- Update Settings -->
+          <section
+            class="settings-section collapsible"
+            :class="{ expanded: expandedSections.update }"
+          >
+            <div class="section-header" @click="toggleSection('update')">
+              <h2>Update Settings</h2>
+              <span class="toggle-icon">{{
+                expandedSections.update ? "▼" : "▶"
+              }}</span>
+            </div>
+            <div v-show="expandedSections.update" class="section-content">
+              <div class="setting-item">
+                <label>Repository URL</label>
+                <input
+                  v-model="localConfig.gitRepoUrl"
+                  type="text"
+                  placeholder="https://github.com/user/repo.git"
+                  @change="updateGitRepoUrl"
+                />
+                <span class="help-text"
+                  >Git repository URL for updates (e.g.,
+                  https://github.com/user/repo.git)</span
+                >
+              </div>
+              <div class="setting-item">
+                <label>Git Branch</label>
+                <div class="branch-selector">
+                  <select
+                    v-if="availableBranches.length > 0"
+                    v-model="localConfig.gitBranch"
+                    @change="updateGitBranch"
+                  >
+                    <option
+                      v-for="branch in availableBranches"
+                      :key="branch"
+                      :value="branch"
+                    >
+                      {{ branch }}
+                    </option>
+                  </select>
+                  <input
+                    v-else
+                    v-model="localConfig.gitBranch"
+                    type="text"
+                    placeholder="main"
+                    @change="updateGitBranch"
+                    :disabled="fetchingBranches"
+                  />
+                  <button
+                    class="btn-fetch-branches"
+                    :disabled="fetchingBranches || !localConfig.gitRepoUrl"
+                    @click="fetchBranches"
+                  >
+                    {{ fetchingBranches ? "Fetching..." : "🔄 Fetch Branches" }}
+                  </button>
+                </div>
+                <span class="help-text"
+                  >Git branch to use when updating. Click "Fetch Branches" to
+                  load available branches from the repository.</span
+                >
+                <div v-if="branchFetchError" class="error-message">
+                  {{ branchFetchError }}
+                </div>
+              </div>
+            </div>
+          </section>
+        </template>
       </div>
     </div>
 
@@ -1233,14 +1389,18 @@
           <button class="btn-reset" @click="resetToDefaults">
             Reset to Defaults
           </button>
-          <button 
-            class="btn-update" 
+          <button
+            class="btn-update"
             :disabled="updateInProgress"
             @click="triggerUpdate"
           >
             {{ updateInProgress ? "Updating..." : "🔄 Update from GitHub" }}
           </button>
-          <div v-if="updateMessage" class="update-message" :class="updateMessageClass">
+          <div
+            v-if="updateMessage"
+            class="update-message"
+            :class="updateMessageClass"
+          >
             {{ updateMessage }}
           </div>
         </div>
@@ -1276,6 +1436,8 @@ const localConfig = ref({
   calendarSplit: 70,
   sideViewPosition: "right",
   keyboardType: "7-button",
+  keyboardFeedbackEnabled: true,
+  keyboardFeedbackMode: "normal",
   photoFrameEnabled: false,
   photoFrameTimeout: 300,
   showUI: true,
@@ -1320,12 +1482,12 @@ const localConfig = ref({
 
 // Category navigation
 const categories = [
-  { id: 'layout', label: 'Layout & Display', icon: '📐' },
-  { id: 'content', label: 'Content', icon: '📦' },
-  { id: 'system', label: 'System', icon: '⚙️' },
+  { id: "layout", label: "Layout & Display", icon: "📐" },
+  { id: "content", label: "Content", icon: "📦" },
+  { id: "system", label: "System", icon: "⚙️" },
 ];
 
-const activeCategory = ref('layout');
+const activeCategory = ref("layout");
 
 // Collapsible sections state
 const expandedSections = ref({
@@ -1583,7 +1745,15 @@ const updateDisplaySchedule = () => {
 };
 
 const getDayName = (day) => {
-  const days = ["Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday", "Sunday"];
+  const days = [
+    "Monday",
+    "Tuesday",
+    "Wednesday",
+    "Thursday",
+    "Friday",
+    "Saturday",
+    "Sunday",
+  ];
   return days[day] || `Day ${day}`;
 };
 
@@ -1626,25 +1796,31 @@ const fetchBranches = async () => {
     branchFetchError.value = "Please enter a repository URL first";
     return;
   }
-  
+
   fetchingBranches.value = true;
   branchFetchError.value = null;
-  
+
   try {
     const response = await axios.get("/api/config/git/branches", {
       params: {
         repo_url: localConfig.value.gitRepoUrl,
       },
     });
-    
+
     availableBranches.value = response.data.branches || [];
-    
+
     // If current branch is not in the list, keep it as custom
-    if (localConfig.value.gitBranch && !availableBranches.value.includes(localConfig.value.gitBranch)) {
+    if (
+      localConfig.value.gitBranch &&
+      !availableBranches.value.includes(localConfig.value.gitBranch)
+    ) {
       // Keep the current branch value
     }
   } catch (error) {
-    branchFetchError.value = error.response?.data?.detail || error.message || "Failed to fetch branches";
+    branchFetchError.value =
+      error.response?.data?.detail ||
+      error.message ||
+      "Failed to fetch branches";
     console.error("Failed to fetch branches:", error);
   } finally {
     fetchingBranches.value = false;
@@ -1652,12 +1828,20 @@ const fetchBranches = async () => {
 };
 
 // Auto-fetch branches when expanding the update section
-watch(() => expandedSections.value.update, (isExpanded) => {
-  if (isExpanded && localConfig.value.gitRepoUrl && availableBranches.value.length === 0 && !fetchingBranches.value) {
-    // Auto-fetch when section is expanded (but only if we haven't fetched yet)
-    fetchBranches();
-  }
-});
+watch(
+  () => expandedSections.value.update,
+  (isExpanded) => {
+    if (
+      isExpanded &&
+      localConfig.value.gitRepoUrl &&
+      availableBranches.value.length === 0 &&
+      !fetchingBranches.value
+    ) {
+      // Auto-fetch when section is expanded (but only if we haven't fetched yet)
+      fetchBranches();
+    }
+  },
+);
 
 const turnDisplayOn = async () => {
   try {
@@ -1727,57 +1911,65 @@ const toggleSource = async (sourceId, enabled) => {
 
 const startPluginInstance = async (instanceId) => {
   try {
-    const response = await axios.post(`/api/plugins/instances/${instanceId}/start`);
+    const response = await axios.post(
+      `/api/plugins/instances/${instanceId}/start`,
+    );
     if (response.data.success) {
       // Update local state immediately
       const running = response.data.running || false;
-      
+
       // Find and update the instance in pluginInstances
       for (const [, instances] of Object.entries(pluginInstances.value)) {
-        const instance = instances.find(i => i.id === instanceId);
+        const instance = instances.find((i) => i.id === instanceId);
         if (instance) {
           instance.running = running;
           break;
         }
       }
-      
+
       // Also reload calendar sources if it's a calendar plugin
       await loadCalendarSources();
     }
   } catch (error) {
     console.error("Failed to start plugin instance:", error);
-    alert(`Failed to start plugin: ${error.response?.data?.detail || error.message}`);
+    alert(
+      `Failed to start plugin: ${error.response?.data?.detail || error.message}`,
+    );
   }
 };
 
 const stopPluginInstance = async (instanceId) => {
   try {
-    const response = await axios.post(`/api/plugins/instances/${instanceId}/stop`);
+    const response = await axios.post(
+      `/api/plugins/instances/${instanceId}/stop`,
+    );
     if (response.data.success) {
       // Update local state immediately
       const running = response.data.running || false;
-      
+
       // Find and update the instance in pluginInstances
       for (const [, instances] of Object.entries(pluginInstances.value)) {
-        const instance = instances.find(i => i.id === instanceId);
+        const instance = instances.find((i) => i.id === instanceId);
         if (instance) {
           instance.running = running;
           break;
         }
       }
-      
+
       // Also reload calendar sources if it's a calendar plugin
       await loadCalendarSources();
     }
   } catch (error) {
     console.error("Failed to stop plugin instance:", error);
-    alert(`Failed to stop plugin: ${error.response?.data?.detail || error.message}`);
+    alert(
+      `Failed to stop plugin: ${error.response?.data?.detail || error.message}`,
+    );
   }
 };
 
 // Helper functions for aggregated instance status
 const getRunningCount = (instances) => {
-  return instances.filter(i => i.running).length;
+  return instances.filter((i) => i.running).length;
 };
 
 // const getStoppedCount = (instances) => {
@@ -1787,17 +1979,17 @@ const getRunningCount = (instances) => {
 const getAggregatedRunningSymbol = (instances) => {
   const running = getRunningCount(instances);
   const total = instances.length;
-  if (running === total) return '●';
-  if (running === 0) return '○';
-  return '◐'; // Partially running
+  if (running === total) return "●";
+  if (running === 0) return "○";
+  return "◐"; // Partially running
 };
 
 const getAggregatedRunningClass = (instances) => {
   const running = getRunningCount(instances);
   const total = instances.length;
-  if (running === total) return 'running';
-  if (running === 0) return 'stopped';
-  return 'partial';
+  if (running === total) return "running";
+  if (running === 0) return "stopped";
+  return "partial";
 };
 
 const getAggregatedRunningTitle = (instances) => {
@@ -1805,9 +1997,9 @@ const getAggregatedRunningTitle = (instances) => {
   const total = instances.length;
   const stopped = total - running;
   if (running === total) {
-    return `All ${total} instance${total !== 1 ? 's' : ''} running`;
+    return `All ${total} instance${total !== 1 ? "s" : ""} running`;
   } else if (running === 0) {
-    return `All ${total} instance${total !== 1 ? 's' : ''} stopped`;
+    return `All ${total} instance${total !== 1 ? "s" : ""} stopped`;
   } else {
     return `${running} running, ${stopped} stopped`;
   }
@@ -1815,52 +2007,54 @@ const getAggregatedRunningTitle = (instances) => {
 
 // Sort and group plugins by type
 const sortedPluginCategories = computed(() => {
-  const typeOrder = ['calendar', 'image', 'service'];
+  const typeOrder = ["calendar", "image", "service"];
   const typeLabels = {
-    calendar: 'Calendar',
-    image: 'Image',
-    service: 'Service',
+    calendar: "Calendar",
+    image: "Image",
+    service: "Service",
   };
-  
+
   const grouped = {};
-  
+
   // Group plugins by type
   for (const plugin of plugins.value) {
-    const type = plugin.type || 'service';
+    const type = plugin.type || "service";
     if (!grouped[type]) {
       grouped[type] = [];
     }
     grouped[type].push(plugin);
   }
-  
+
   // Sort each group by name
   for (const type in grouped) {
     grouped[type].sort((a, b) => a.name.localeCompare(b.name));
   }
-  
+
   // Create categories in order
   const categories = [];
   for (const type of typeOrder) {
     if (grouped[type] && grouped[type].length > 0) {
       categories.push({
         type,
-        label: typeLabels[type] || `${type.charAt(0).toUpperCase() + type.slice(1)}`,
+        label:
+          typeLabels[type] || `${type.charAt(0).toUpperCase() + type.slice(1)}`,
         plugins: grouped[type],
       });
     }
   }
-  
+
   // Add any remaining types not in the order list
   for (const type in grouped) {
     if (!typeOrder.includes(type)) {
       categories.push({
         type,
-        label: typeLabels[type] || `${type.charAt(0).toUpperCase() + type.slice(1)}`,
+        label:
+          typeLabels[type] || `${type.charAt(0).toUpperCase() + type.slice(1)}`,
         plugins: grouped[type],
       });
     }
   }
-  
+
   return categories;
 });
 
@@ -1872,17 +2066,23 @@ const activePluginCategory = computed(() => {
   if (!activePluginTab.value && sortedPluginCategories.value.length > 0) {
     return sortedPluginCategories.value[0];
   }
-  return sortedPluginCategories.value.find(cat => cat.type === activePluginTab.value) || sortedPluginCategories.value[0];
+  return (
+    sortedPluginCategories.value.find(
+      (cat) => cat.type === activePluginTab.value,
+    ) || sortedPluginCategories.value[0]
+  );
 });
 
 // Set initial tab when categories are loaded
-watch(sortedPluginCategories, (categories) => {
-  if (categories.length > 0 && !activePluginTab.value) {
-    activePluginTab.value = categories[0].type;
-  }
-}, { immediate: true });
-
-
+watch(
+  sortedPluginCategories,
+  (categories) => {
+    if (categories.length > 0 && !activePluginTab.value) {
+      activePluginTab.value = categories[0].type;
+    }
+  },
+  { immediate: true },
+);
 
 // const toggleInstanceEnabled = async (instanceId, enabled) => {
 //   try {
@@ -1897,12 +2097,12 @@ watch(sortedPluginCategories, (categories) => {
 //         break;
 //       }
 //     }
-//     
+//
 //     if (!pluginType || !instance) {
 //       console.error(`Could not find plugin type for instance ${instanceId}`);
 //       return;
 //     }
-//     
+//
 //     // For calendar plugins, use the calendar API
 //     if (pluginType === 'google' || pluginType === 'ical' || pluginType === 'proton') {
 //       const source = calendarSources.value.find(s => s.id === instanceId);
@@ -1915,7 +2115,7 @@ watch(sortedPluginCategories, (categories) => {
 //       // For now, just reload to get the updated state
 //       await loadPlugins();
 //     }
-//     
+//
 //     // Start/stop the plugin based on enabled status
 //     if (enabled) {
 //       // If enabling and not running, start it
@@ -1928,7 +2128,7 @@ watch(sortedPluginCategories, (categories) => {
 //         await stopPluginInstance(instanceId);
 //       }
 //     }
-//     
+//
 //     // Reload plugins to update instance status
 //     await loadPlugins();
 //   } catch (error) {
@@ -1957,12 +2157,21 @@ const loadConfig = async () => {
       if (response.data.orientationFlipped !== undefined) {
         localConfig.value.orientationFlipped = response.data.orientationFlipped;
       } else if (response.data.orientation_flipped !== undefined) {
-        localConfig.value.orientationFlipped = response.data.orientation_flipped;
+        localConfig.value.orientationFlipped =
+          response.data.orientation_flipped;
       } else {
         localConfig.value.orientationFlipped = false; // Default
       }
       localConfig.value.calendarSplit = response.data.calendarSplit || 70;
       localConfig.value.keyboardType = response.data.keyboardType || "7-button";
+      localConfig.value.keyboardFeedbackEnabled =
+        response.data.keyboardFeedbackEnabled ??
+        response.data.keyboard_feedback_enabled ??
+        true;
+      localConfig.value.keyboardFeedbackMode =
+        response.data.keyboardFeedbackMode ??
+        response.data.keyboard_feedback_mode ??
+        "normal";
       localConfig.value.photoFrameEnabled =
         response.data.photoFrameEnabled ??
         response.data.photo_frame_enabled ??
@@ -2028,14 +2237,18 @@ const loadConfig = async () => {
       // Handle displayScheduleEnabled - check for both camelCase and snake_case
       // Use !== undefined to properly handle false values
       if (response.data.displayScheduleEnabled !== undefined) {
-        localConfig.value.displayScheduleEnabled = response.data.displayScheduleEnabled;
+        localConfig.value.displayScheduleEnabled =
+          response.data.displayScheduleEnabled;
       } else if (response.data.display_schedule_enabled !== undefined) {
-        localConfig.value.displayScheduleEnabled = response.data.display_schedule_enabled;
+        localConfig.value.displayScheduleEnabled =
+          response.data.display_schedule_enabled;
       } else {
         localConfig.value.displayScheduleEnabled = false;
       }
       localConfig.value.displayOffTime =
-        response.data.displayOffTime ?? response.data.display_off_time ?? "22:00";
+        response.data.displayOffTime ??
+        response.data.display_off_time ??
+        "22:00";
       localConfig.value.displayOnTime =
         response.data.displayOnTime ?? response.data.display_on_time ?? "06:00";
       localConfig.value.displayTimeoutEnabled =
@@ -2047,19 +2260,26 @@ const loadConfig = async () => {
       // Handle display schedule - ensure it's always set
       if (response.data.displaySchedule !== undefined) {
         if (typeof response.data.displaySchedule === "string") {
-          localConfig.value.displaySchedule = JSON.parse(response.data.displaySchedule);
+          localConfig.value.displaySchedule = JSON.parse(
+            response.data.displaySchedule,
+          );
         } else {
           localConfig.value.displaySchedule = response.data.displaySchedule;
         }
       } else if (response.data.display_schedule !== undefined) {
         if (typeof response.data.display_schedule === "string") {
-          localConfig.value.displaySchedule = JSON.parse(response.data.display_schedule);
+          localConfig.value.displaySchedule = JSON.parse(
+            response.data.display_schedule,
+          );
         } else {
           localConfig.value.displaySchedule = response.data.display_schedule;
         }
       } else {
         // Ensure default schedule is set if not provided
-        if (!localConfig.value.displaySchedule || localConfig.value.displaySchedule.length === 0) {
+        if (
+          !localConfig.value.displaySchedule ||
+          localConfig.value.displaySchedule.length === 0
+        ) {
           localConfig.value.displaySchedule = [
             { day: 0, enabled: true, onTime: "06:00", offTime: "22:00" }, // Monday
             { day: 1, enabled: true, onTime: "06:00", offTime: "22:00" }, // Tuesday
@@ -2072,13 +2292,21 @@ const loadConfig = async () => {
         }
       }
       localConfig.value.rebootComboKey1 =
-        response.data.rebootComboKey1 ?? response.data.reboot_combo_key1 ?? "KEY_1";
+        response.data.rebootComboKey1 ??
+        response.data.reboot_combo_key1 ??
+        "KEY_1";
       localConfig.value.rebootComboKey2 =
-        response.data.rebootComboKey2 ?? response.data.reboot_combo_key2 ?? "KEY_7";
+        response.data.rebootComboKey2 ??
+        response.data.reboot_combo_key2 ??
+        "KEY_7";
       localConfig.value.rebootComboDuration =
-        response.data.rebootComboDuration ?? response.data.reboot_combo_duration ?? 10000;
+        response.data.rebootComboDuration ??
+        response.data.reboot_combo_duration ??
+        10000;
       localConfig.value.imageDisplayMode =
-        response.data.imageDisplayMode ?? response.data.image_display_mode ?? "smart";
+        response.data.imageDisplayMode ??
+        response.data.image_display_mode ??
+        "smart";
       localConfig.value.timezone = response.data.timezone ?? null;
       // Handle clock settings
       if (response.data.clockEnabled !== undefined) {
@@ -2177,13 +2405,15 @@ const loadImages = async () => {
 const handleFileSelectFromSection = async (files, _section) => {
   // Handle file upload from PluginSections component
   if (!files || files.length === 0) return;
-  
+
   uploading.value = true;
   uploadError.value = "";
   uploadSuccess.value = "";
-  
+
   try {
-    const uploadPromises = Array.from(files).map((file) => imagesStore.uploadImage(file));
+    const uploadPromises = Array.from(files).map((file) =>
+      imagesStore.uploadImage(file),
+    );
     await Promise.all(uploadPromises);
     uploadSuccess.value = `Successfully uploaded ${files.length} image(s)`;
     await loadImages();
@@ -2192,7 +2422,10 @@ const handleFileSelectFromSection = async (files, _section) => {
       uploadSuccess.value = "";
     }, 3000);
   } catch (error) {
-    uploadError.value = error.response?.data?.detail || error.message || "Failed to upload images";
+    uploadError.value =
+      error.response?.data?.detail ||
+      error.message ||
+      "Failed to upload images";
     console.error("Failed to upload images:", error);
     // Clear error message after 5 seconds
     setTimeout(() => {
@@ -2396,6 +2629,8 @@ const saveConfig = async () => {
       orientation: localConfig.value.orientation,
       calendarSplit: localConfig.value.calendarSplit,
       keyboardType: localConfig.value.keyboardType,
+      keyboardFeedbackEnabled: localConfig.value.keyboardFeedbackEnabled,
+      keyboardFeedbackMode: localConfig.value.keyboardFeedbackMode,
       photoFrameEnabled: localConfig.value.photoFrameEnabled,
       photoFrameTimeout: localConfig.value.photoFrameTimeout,
       showUI: localConfig.value.showUI,
@@ -2452,6 +2687,8 @@ const resetToDefaults = async () => {
       orientation: "landscape",
       calendarSplit: 70,
       keyboardType: "7-button",
+      keyboardFeedbackEnabled: true,
+      keyboardFeedbackMode: "normal",
       photoFrameEnabled: false,
       photoFrameTimeout: 300,
       showUI: true,
@@ -2500,40 +2737,43 @@ const resetToDefaults = async () => {
 
 const triggerUpdate = async () => {
   if (updateInProgress.value) return;
-  
+
   updateInProgress.value = true;
   updateMessage.value = "Starting update...";
   updateMessageClass.value = "info";
-  
+
   try {
     const response = await axios.post("/api/system/update");
-    updateMessage.value = response.data.message || "Update started successfully";
+    updateMessage.value =
+      response.data.message || "Update started successfully";
     updateMessageClass.value = "info";
-    
+
     // Poll for update status
     let pollCount = 0;
     const maxPolls = 120; // 10 minutes max (120 * 5 seconds)
-    
+
     const checkStatus = async () => {
       pollCount++;
-      
+
       // Safety timeout
       if (pollCount > maxPolls) {
         updateInProgress.value = false;
-        updateMessage.value = "Update is taking longer than expected. Please check the logs manually.";
+        updateMessage.value =
+          "Update is taking longer than expected. Please check the logs manually.";
         updateMessageClass.value = "error";
         return;
       }
-      
+
       try {
         const statusResponse = await axios.get("/api/system/update/status");
         const status = statusResponse.data.status;
         const lastLog = statusResponse.data.last_log || "";
         const message = statusResponse.data.message || "";
-        
+
         if (status === "idle" || status === "completed") {
           updateInProgress.value = false;
-          updateMessage.value = "✅ Update completed successfully! Reloading page...";
+          updateMessage.value =
+            "✅ Update completed successfully! Reloading page...";
           updateMessageClass.value = "success";
           // Reload page after a delay to show updated frontend
           setTimeout(() => {
@@ -2545,10 +2785,14 @@ const triggerUpdate = async () => {
           updateMessageClass.value = "error";
         } else if (status === "running") {
           // Show progress with last log lines
-          const logLines = lastLog.split('\n').filter(line => line.trim()).slice(-3);
-          const progressText = logLines.length > 0 
-            ? logLines.join('\n') 
-            : message || "Update in progress...";
+          const logLines = lastLog
+            .split("\n")
+            .filter((line) => line.trim())
+            .slice(-3);
+          const progressText =
+            logLines.length > 0
+              ? logLines.join("\n")
+              : message || "Update in progress...";
           updateMessage.value = `🔄 ${progressText}`;
           updateMessageClass.value = "info";
           // Check again in 3 seconds for more responsive updates
@@ -2567,7 +2811,7 @@ const triggerUpdate = async () => {
         setTimeout(checkStatus, 5000);
       }
     };
-    
+
     // Start checking status after 1 second
     setTimeout(checkStatus, 1000);
   } catch (error) {
@@ -2582,16 +2826,22 @@ const loadPlugins = async () => {
   loadingPlugins.value = true;
   try {
     const response = await axios.get("/api/plugins");
-    plugins.value = (response.data.plugins || []).map(plugin => {
+    plugins.value = (response.data.plugins || []).map((plugin) => {
       // Ensure config_schema is always an object
-      if (plugin.config_schema && typeof plugin.config_schema === 'string') {
+      if (plugin.config_schema && typeof plugin.config_schema === "string") {
         try {
           plugin.config_schema = JSON.parse(plugin.config_schema);
         } catch (e) {
-          console.error(`Failed to parse config_schema for plugin ${plugin.id}:`, e);
+          console.error(
+            `Failed to parse config_schema for plugin ${plugin.id}:`,
+            e,
+          );
           plugin.config_schema = {};
         }
-      } else if (!plugin.config_schema || typeof plugin.config_schema !== 'object') {
+      } else if (
+        !plugin.config_schema ||
+        typeof plugin.config_schema !== "object"
+      ) {
         plugin.config_schema = {};
       }
       // Ensure ui_actions and ui_sections are arrays
@@ -2603,41 +2853,58 @@ const loadPlugins = async () => {
       }
       return plugin;
     });
-    
+
     // Load instances for each plugin type
     for (const plugin of plugins.value) {
       try {
-        const instancesResponse = await axios.get(`/api/plugins/${plugin.id}/instances`);
-        pluginInstances.value[plugin.id] = instancesResponse.data.instances || [];
+        const instancesResponse = await axios.get(
+          `/api/plugins/${plugin.id}/instances`,
+        );
+        pluginInstances.value[plugin.id] =
+          instancesResponse.data.instances || [];
       } catch (error) {
-        console.error(`Failed to load instances for plugin ${plugin.id}:`, error);
+        console.error(
+          `Failed to load instances for plugin ${plugin.id}:`,
+          error,
+        );
         pluginInstances.value[plugin.id] = [];
       }
     }
-    
+
     // Load configs for each plugin type
     for (const plugin of plugins.value) {
       try {
-        const configResponse = await axios.get(`/api/plugins/${plugin.id}/config`);
+        const configResponse = await axios.get(
+          `/api/plugins/${plugin.id}/config`,
+        );
         const rawConfig = configResponse.data.config || {};
         // Don't log sensitive data - configs from backend should already have sensitive fields removed
-        console.log(`[Frontend] Loaded config for ${plugin.id}:`, Object.keys(rawConfig));
-        
+        console.log(
+          `[Frontend] Loaded config for ${plugin.id}:`,
+          Object.keys(rawConfig),
+        );
+
         // Clean config values - ensure all are strings, not objects
         const cleanedConfig = {};
         for (const [key, value] of Object.entries(rawConfig)) {
           if (value === null || value === undefined) {
             cleanedConfig[key] = "";
-          } else if (typeof value === 'object') {
+          } else if (typeof value === "object") {
             // If it's an object, try to extract the actual value
-            console.warn(`[Frontend] Found object value for ${plugin.id}.${key}:`, value);
+            console.warn(
+              `[Frontend] Found object value for ${plugin.id}.${key}:`,
+              value,
+            );
             cleanedConfig[key] = value.value || value.default || "";
           } else {
             cleanedConfig[key] = String(value);
           }
         }
-        console.log(`[Frontend] Cleaned config for ${plugin.id}:`, cleanedConfig);
-        
+        console.log(
+          `[Frontend] Cleaned config for ${plugin.id}:`,
+          cleanedConfig,
+        );
+
         pluginConfigs.value[plugin.id] = cleanedConfig;
         // Initialize form data with saved config for all plugins
         // This allows plugins to track form state separately from saved config
@@ -2680,29 +2947,46 @@ const togglePlugin = async (pluginId, enabled) => {
     if (plugin) {
       plugin.enabled = enabled;
     }
-    
+
     // If enabling and there are instances, start them all
-    if (enabled && pluginInstances.value[pluginId] && pluginInstances.value[pluginId].length > 0) {
+    if (
+      enabled &&
+      pluginInstances.value[pluginId] &&
+      pluginInstances.value[pluginId].length > 0
+    ) {
       const instances = pluginInstances.value[pluginId];
-      const promises = instances.map(instance => startPluginInstance(instance.id));
+      const promises = instances.map((instance) =>
+        startPluginInstance(instance.id),
+      );
       await Promise.all(promises);
     }
     // If disabling and there are instances, stop them all
-    else if (!enabled && pluginInstances.value[pluginId] && pluginInstances.value[pluginId].length > 0) {
+    else if (
+      !enabled &&
+      pluginInstances.value[pluginId] &&
+      pluginInstances.value[pluginId].length > 0
+    ) {
       const instances = pluginInstances.value[pluginId];
-      const promises = instances.map(instance => stopPluginInstance(instance.id));
+      const promises = instances.map((instance) =>
+        stopPluginInstance(instance.id),
+      );
       await Promise.all(promises);
     }
-    
+
     // Only reload instances for this specific plugin to update running status
     // This avoids reloading the entire plugins list
     try {
-      const instancesResponse = await axios.get(`/api/plugins/${pluginId}/instances`);
+      const instancesResponse = await axios.get(
+        `/api/plugins/${pluginId}/instances`,
+      );
       pluginInstances.value[pluginId] = instancesResponse.data.instances || [];
     } catch (error) {
-      console.error(`Failed to reload instances for plugin ${pluginId}:`, error);
+      console.error(
+        `Failed to reload instances for plugin ${pluginId}:`,
+        error,
+      );
     }
-    
+
     // Reload calendar sources and types if it's a calendar plugin
     if (plugin && plugin.type === "calendar") {
       await loadCalendarPluginTypes();
@@ -2710,7 +2994,9 @@ const togglePlugin = async (pluginId, enabled) => {
     }
   } catch (error) {
     console.error("Failed to toggle plugin:", error);
-    alert(`Error: ${error.response?.data?.detail || error.message || "Failed to toggle plugin"}`);
+    alert(
+      `Error: ${error.response?.data?.detail || error.message || "Failed to toggle plugin"}`,
+    );
   }
 };
 
@@ -2723,37 +3009,40 @@ const getConfigValue = (pluginId, key, schema) => {
   if (config && config[key] !== undefined && config[key] !== null) {
     const value = config[key];
     // Ensure value is a string, not an object
-    if (typeof value === 'string') {
+    if (typeof value === "string") {
       return value;
-    } else if (typeof value === 'object' && value !== null) {
+    } else if (typeof value === "object" && value !== null) {
       // If it's an object, try to extract the actual value
       console.warn(`Config value for ${pluginId}.${key} is an object:`, value);
       // Try to extract value from object (could be schema object with value/default)
-      return value.value || value.default || '';
+      return value.value || value.default || "";
     }
     return String(value);
   }
   // Fallback to schema default
-  if (schema && typeof schema === 'object' && schema.default !== undefined) {
-    return String(schema.default || '');
+  if (schema && typeof schema === "object" && schema.default !== undefined) {
+    return String(schema.default || "");
   }
-  return '';
+  return "";
 };
 
 const getFormValue = (pluginId, key, schema) => {
   // Use form data if available, otherwise use saved config
   // This allows plugins to track form state separately from saved config
-  if (pluginFormData.value[pluginId] && pluginFormData.value[pluginId][key] !== undefined) {
+  if (
+    pluginFormData.value[pluginId] &&
+    pluginFormData.value[pluginId][key] !== undefined
+  ) {
     const value = pluginFormData.value[pluginId][key];
     // Ensure value is a string, not an object
-    if (typeof value === 'string') {
+    if (typeof value === "string") {
       return value;
-    } else if (typeof value === 'object' && value !== null) {
+    } else if (typeof value === "object" && value !== null) {
       // If it's an object, try to extract the actual value
-      return value.value || value.default || '';
+      return value.value || value.default || "";
     }
     // For numbers, convert to string (PluginFieldRenderer expects strings)
-    if (typeof value === 'number') {
+    if (typeof value === "number") {
       return String(value);
     }
     return String(value);
@@ -2792,9 +3081,9 @@ const updateFormValue = (pluginId, key, value) => {
 //     // Note: Browsers don't allow access to full file paths for security reasons
 //     // We'll use webkitRelativePath if available (when using webkitdirectory attribute)
 //     // Otherwise, we'll prompt the user to enter the path manually
-//     
+//
 //     let directoryPath = '';
-//     
+//
 //     // Try to get the full path (works in Electron, not in regular browsers)
 //     if (file.path) {
 //       // Electron environment - extract directory from path string
@@ -2814,12 +3103,12 @@ const updateFormValue = (pluginId, key, value) => {
 //       event.target.value = ''; // Reset input
 //       return;
 //     }
-//     
+//
 //     // Update the form value with the directory path
 //     if (directoryPath) {
 //       updateFormValue(pluginId, key, directoryPath);
 //     }
-//     
+//
 //     // Reset the input so the same file can be selected again if needed
 //     event.target.value = '';
 //   }
@@ -2830,12 +3119,12 @@ const updateFormValue = (pluginId, key, value) => {
 //     // Merge with existing config
 //     const currentConfig = pluginConfigs.value[pluginId] || {};
 //     const updatedConfig = { ...currentConfig, ...config };
-//     
+//
 //     await axios.put(`/api/plugins/${pluginId}`, updatedConfig);
-//     
+//
 //     // Update local config
 //     pluginConfigs.value[pluginId] = updatedConfig;
-//     
+//
 //     // Reload relevant data based on plugin type
 //     const plugin = plugins.value.find((p) => p.id === pluginId);
 //     if (plugin) {
@@ -2856,24 +3145,27 @@ const savePluginConfig = async (pluginId) => {
   savingPlugin.value = pluginId;
   pluginSaveStatus.value[pluginId] = null;
   pluginTestStatus.value[pluginId] = null;
-  
+
   try {
     // Get form data or use current config
     const formData = pluginFormData.value[pluginId] || {};
     const currentConfig = pluginConfigs.value[pluginId] || {};
     const updatedConfig = { ...currentConfig, ...formData };
-    
+
     // Debug logging
-    console.log(`[Frontend] Saving plugin config for ${pluginId}:`, updatedConfig);
+    console.log(
+      `[Frontend] Saving plugin config for ${pluginId}:`,
+      updatedConfig,
+    );
     console.log(`[Frontend] Form data:`, formData);
     console.log(`[Frontend] Current config:`, currentConfig);
-    
+
     // Ensure all values are strings, not objects
     const cleanedConfig = {};
     for (const [key, value] of Object.entries(updatedConfig)) {
       if (value === null || value === undefined) {
         cleanedConfig[key] = "";
-      } else if (typeof value === 'object') {
+      } else if (typeof value === "object") {
         // If it's an object, try to extract the actual value
         console.warn(`[Frontend] Found object value for ${key}:`, value);
         cleanedConfig[key] = value.value || value.default || "";
@@ -2882,29 +3174,32 @@ const savePluginConfig = async (pluginId) => {
       }
     }
     console.log(`[Frontend] Cleaned config:`, cleanedConfig);
-    
+
     await axios.put(`/api/plugins/${pluginId}`, cleanedConfig);
-    
+
     // Update local config with cleaned config
     pluginConfigs.value[pluginId] = cleanedConfig;
     // Clear form data after successful save
     if (pluginFormData.value[pluginId]) {
       delete pluginFormData.value[pluginId];
     }
-    
+
     // Show success message
     pluginSaveStatus.value[pluginId] = {
       success: true,
       message: "Settings saved successfully!",
     };
-    
+
     // Clear success message after 3 seconds
     setTimeout(() => {
-      if (pluginSaveStatus.value[pluginId] && pluginSaveStatus.value[pluginId].success) {
+      if (
+        pluginSaveStatus.value[pluginId] &&
+        pluginSaveStatus.value[pluginId].success
+      ) {
         delete pluginSaveStatus.value[pluginId];
       }
     }, 3000);
-    
+
     // Reload relevant data based on plugin type
     const plugin = plugins.value.find((p) => p.id === pluginId);
     if (plugin) {
@@ -2919,7 +3214,10 @@ const savePluginConfig = async (pluginId) => {
     console.error("Failed to save plugin config:", error);
     pluginSaveStatus.value[pluginId] = {
       success: false,
-      message: error.response?.data?.detail || error.message || "Failed to save settings",
+      message:
+        error.response?.data?.detail ||
+        error.message ||
+        "Failed to save settings",
     };
   } finally {
     savingPlugin.value = null;
@@ -2929,28 +3227,28 @@ const savePluginConfig = async (pluginId) => {
 const testPluginConnection = async (pluginId) => {
   testingPlugin.value[pluginId] = true;
   pluginTestStatus.value[pluginId] = null;
-  
+
   try {
     // Get current form data or saved config
     const formData = pluginFormData.value[pluginId] || {};
     const currentConfig = pluginConfigs.value[pluginId] || {};
     const testConfig = { ...currentConfig, ...formData };
-    
+
     // Save config first if there are unsaved changes
     if (Object.keys(formData).length > 0) {
       await axios.put(`/api/plugins/${pluginId}`, testConfig);
       pluginConfigs.value[pluginId] = testConfig;
       delete pluginFormData.value[pluginId];
     }
-    
+
     // Test connection
     const response = await axios.post(`/api/plugins/${pluginId}/test`);
-    
+
     pluginTestStatus.value[pluginId] = {
       success: response.data.success,
       message: response.data.message,
     };
-    
+
     // Clear test status after 5 seconds
     setTimeout(() => {
       if (pluginTestStatus.value[pluginId]) {
@@ -2961,7 +3259,10 @@ const testPluginConnection = async (pluginId) => {
     console.error("Failed to test plugin connection:", error);
     pluginTestStatus.value[pluginId] = {
       success: false,
-      message: error.response?.data?.detail || error.message || "Failed to test connection",
+      message:
+        error.response?.data?.detail ||
+        error.message ||
+        "Failed to test connection",
     };
   } finally {
     testingPlugin.value[pluginId] = false;
@@ -2970,79 +3271,87 @@ const testPluginConnection = async (pluginId) => {
 
 const handleCustomAction = async (action) => {
   console.log("[Settings] handleCustomAction called with:", action);
-  
+
   const pluginId = action.pluginId;
   const endpoint = action.endpoint;
-  
+
   if (!pluginId || !endpoint) {
     console.error("Custom action missing pluginId or endpoint:", action);
-    pluginTestStatus.value[pluginId || 'unknown'] = {
+    pluginTestStatus.value[pluginId || "unknown"] = {
       success: false,
       message: "Action configuration error: missing plugin ID or endpoint",
     };
     return;
   }
-  
+
   // Extract action path from endpoint (e.g., "geocode" from "/api/plugins/{plugin_id}/geocode")
-  const actionPath = endpoint.split('/').pop();
+  const actionPath = endpoint.split("/").pop();
   console.log("[Settings] Action path:", actionPath, "Plugin ID:", pluginId);
-  
+
   // Get form data for this plugin
   const formData = pluginFormData.value[pluginId] || {};
   console.log("[Settings] Form data for plugin:", formData);
   console.log("[Settings] All pluginFormData:", pluginFormData.value);
-  
+
   try {
     if (actionPath === "geocode") {
       // Geocode action - get location from form data
       // Try to get from formData first, then from current config as fallback
       let location = formData.location || "";
-      
+
       // If not in formData, try to get from current plugin config
       if (!location && pluginConfigs.value[pluginId]) {
         const config = pluginConfigs.value[pluginId];
         location = config.location || "";
         console.log("[Settings] Got location from plugin config:", location);
       }
-      
+
       console.log("[Settings] Location from form:", location);
-      
+
       if (!location || location.trim() === "") {
         pluginTestStatus.value[pluginId] = {
           success: false,
-          message: "Please enter a location name in the 'Location' field above first",
+          message:
+            "Please enter a location name in the 'Location' field above first",
         };
         return;
       }
-      
+
       // Call geocode endpoint (replace {plugin_id} placeholder)
       const actualEndpoint = endpoint.replace("{plugin_id}", pluginId);
-      console.log("[Settings] Calling geocode endpoint:", actualEndpoint, "with location:", location);
+      console.log(
+        "[Settings] Calling geocode endpoint:",
+        actualEndpoint,
+        "with location:",
+        location,
+      );
       const response = await axios.post(actualEndpoint, { location });
-      
+
       const result = response.data;
-      
+
       if (result.success) {
         // Update form data with coordinates and display name
         if (!pluginFormData.value[pluginId]) {
           pluginFormData.value[pluginId] = {};
         }
-        
+
         // Update coordinates - use updateFormValue to ensure reactivity
         updateFormValue(pluginId, "latitude", result.latitude);
         updateFormValue(pluginId, "longitude", result.longitude);
-        
+
         // Update location field with the geocoded display name for better UX
         if (result.display_name) {
           updateFormValue(pluginId, "location", result.display_name);
         }
-        
+
         // Show success message
         pluginTestStatus.value[pluginId] = {
           success: true,
-          message: result.message || `Coordinates found: ${result.latitude}, ${result.longitude}`,
+          message:
+            result.message ||
+            `Coordinates found: ${result.latitude}, ${result.longitude}`,
         };
-        
+
         // Clear message after 5 seconds
         setTimeout(() => {
           pluginTestStatus.value[pluginId] = null;
@@ -3059,7 +3368,10 @@ const handleCustomAction = async (action) => {
   } catch (error) {
     pluginTestStatus.value[pluginId] = {
       success: false,
-      message: error.response?.data?.detail || error.message || "Error performing action",
+      message:
+        error.response?.data?.detail ||
+        error.message ||
+        "Error performing action",
     };
   }
 };
@@ -3067,33 +3379,33 @@ const handleCustomAction = async (action) => {
 const fetchPluginNow = async (pluginId) => {
   fetchingPlugin.value[pluginId] = true;
   pluginFetchStatus.value[pluginId] = null;
-  
+
   try {
     // Fetch now
     const response = await axios.post(`/api/plugins/${pluginId}/fetch`);
-    
+
     const result = response.data;
     let message = result.message;
-    
+
     // Add image count info if available
     if (result.images_downloaded && result.image_count !== undefined) {
       message += ` (${result.image_count} images available)`;
     } else if (result.image_count !== undefined) {
       message += ` (${result.image_count} images available)`;
     }
-    
+
     pluginFetchStatus.value[pluginId] = {
       success: result.success,
       message: message,
       images_downloaded: result.images_downloaded || false,
       image_count: result.image_count || 0,
     };
-    
+
     // Reload images if any were downloaded
     if (result.images_downloaded) {
       await loadImages();
     }
-    
+
     // Clear fetch status after 5 seconds
     setTimeout(() => {
       if (pluginFetchStatus.value[pluginId]) {
@@ -3104,7 +3416,10 @@ const fetchPluginNow = async (pluginId) => {
     console.error("Failed to fetch plugin:", error);
     pluginFetchStatus.value[pluginId] = {
       success: false,
-      message: error.response?.data?.detail || error.message || "Failed to fetch emails",
+      message:
+        error.response?.data?.detail ||
+        error.message ||
+        "Failed to fetch emails",
       images_downloaded: false,
       image_count: 0,
     };
@@ -3927,7 +4242,7 @@ input:checked + .slider:before {
   word-wrap: break-word;
   max-height: 300px;
   overflow-y: auto;
-  font-family: 'Courier New', monospace;
+  font-family: "Courier New", monospace;
   font-size: 0.85rem;
   line-height: 1.4;
 }
@@ -4180,7 +4495,6 @@ input:checked + .slider:before {
   margin-top: 0.25rem;
 }
 
-
 .plugin-info {
   flex: 1;
 }
@@ -4224,9 +4538,6 @@ input:checked + .slider:before {
 .running-indicator-aggregate.partial {
   color: #ff9800; /* Orange for partially running */
 }
-
-
-
 
 .plugin-title-row .running-indicator {
   font-size: 0.9rem;
@@ -4331,7 +4642,7 @@ input:checked + .slider:before {
     grid-template-columns: 200px 1fr;
     gap: 1.5rem;
   }
-  
+
   .category-label {
     font-size: 0.9rem;
   }
@@ -4341,39 +4652,39 @@ input:checked + .slider:before {
   .settings-page {
     padding: 1rem;
   }
-  
+
   .settings-layout {
     grid-template-columns: 1fr;
     gap: 1rem;
   }
-  
+
   .settings-sidebar {
     position: static;
     order: -1;
   }
-  
+
   .category-nav {
     flex-direction: row;
     flex-wrap: wrap;
     gap: 0.5rem;
   }
-  
+
   .category-btn {
     flex: 1;
     min-width: calc(33.333% - 0.5rem);
     justify-content: center;
     padding: 0.75rem 0.5rem;
   }
-  
+
   .category-icon {
     display: none;
   }
-  
+
   .category-label {
     font-size: 0.85rem;
     text-align: center;
   }
-  
+
   .settings-actions {
     padding: 0 1rem;
   }
