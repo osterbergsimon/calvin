@@ -1,5 +1,6 @@
 """Configuration endpoints."""
 
+import re
 import subprocess
 from pathlib import Path
 from typing import Any
@@ -35,6 +36,40 @@ def get_git_version() -> str | None:
         return None
     except (subprocess.TimeoutExpired, FileNotFoundError, Exception):
         # Git not available or error occurred
+        return None
+
+
+def get_frontend_version() -> str | None:
+    """
+    Get the frontend version from the built HTML file.
+
+    Returns:
+        Frontend version (git commit short hash) or None if not available
+    """
+    try:
+        # Get the project root (parent of backend directory)
+        project_root = Path(__file__).parent.parent.parent.parent
+        frontend_dist = project_root / "frontend" / "dist"
+        index_path = frontend_dist / "index.html"
+
+        if not index_path.exists():
+            return None
+
+        # Read the HTML file
+        html_content = index_path.read_text(encoding="utf-8")
+
+        # Extract frontend version from meta tag
+        match = re.search(
+            r'<meta\s+name=["\']frontend-version["\']\s+content=["\']([^"\']+)["\']',
+            html_content,
+            re.IGNORECASE,
+        )
+        if match:
+            return match.group(1)
+
+        return None
+    except Exception:
+        # File not found or error reading
         return None
 
 
@@ -341,8 +376,11 @@ async def get_config():
     elif "git_branch" in config and "gitBranch" not in config:
         config["gitBranch"] = config["git_branch"]
 
-    # Add version (git commit short hash)
+    # Add backend version (git commit short hash)
     config["version"] = get_git_version()
+
+    # Add frontend version (from built HTML)
+    config["frontendVersion"] = get_frontend_version()
 
     return config
 

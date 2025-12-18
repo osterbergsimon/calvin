@@ -1318,7 +1318,7 @@
             </div>
             <div v-show="expandedSections.systemInfo" class="section-content">
               <div class="setting-item">
-                <label>Version</label>
+                <label>Backend Version</label>
                 <div class="version-display">
                   <code v-if="localConfig.version">{{
                     localConfig.version
@@ -1327,7 +1327,19 @@
                     >Version information not available</span
                   >
                 </div>
-                <span class="help-text">Current git commit short hash</span>
+                <span class="help-text">Backend git commit short hash</span>
+              </div>
+              <div class="setting-item">
+                <label>Frontend Version</label>
+                <div class="version-display">
+                  <code v-if="localConfig.frontendVersion">{{
+                    localConfig.frontendVersion
+                  }}</code>
+                  <span v-else class="help-text"
+                    >Version information not available</span
+                  >
+                </div>
+                <span class="help-text">Frontend git commit short hash</span>
               </div>
             </div>
           </section>
@@ -1511,6 +1523,7 @@ const localConfig = ref({
   mealPlanCardSize: "medium",
   orientationFlipped: false,
   version: null,
+  frontendVersion: null,
 });
 
 // Category navigation
@@ -2393,6 +2406,8 @@ const loadConfig = async () => {
       localConfig.value.gitBranch =
         response.data.gitBranch ?? response.data.git_branch ?? "main";
       localConfig.value.version = response.data.version ?? null;
+      localConfig.value.frontendVersion =
+        response.data.frontendVersion ?? response.data.frontend_version ?? null;
       keyboardStore.setKeyboardType(localConfig.value.keyboardType);
     }
   } catch (error) {

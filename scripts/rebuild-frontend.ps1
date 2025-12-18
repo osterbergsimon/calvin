@@ -87,3 +87,4 @@ if ($BackendRunning) {
 Write-Log "Frontend rebuild complete!"
 Write-Log "The new build is available in: $(Join-Path $FrontendDir 'dist')"
 
+
