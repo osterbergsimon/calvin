@@ -464,12 +464,39 @@ async def update_plugin(plugin_id: str, config: dict[str, Any]):
                 db_type.enabled = enabled
             if config:
                 # Update common config schema if provided
+                # Note: common_config_schema stores both schema AND values
                 current_schema = db_type.common_config_schema or {}
                 current_schema.update(config)
                 db_type.common_config_schema = current_schema
 
+                # Log API token status (if present) for verification
+                if "api_token" in config:
+                    token_value = config.get("api_token", "")
+                    token_status = "present" if token_value else "missing"
+                    token_length = len(str(token_value)) if token_value else 0
+                    print(
+                        f"[Plugin Update] Saving API token to PluginTypeDB.common_config_schema - "
+                        f"{token_status} (length: {token_length})"
+                    )
+
         await session.commit()
         await session.refresh(db_type)
+
+        # Verify API token was saved to common_config_schema
+        if config and "api_token" in config:
+            saved_schema = db_type.common_config_schema or {}
+            saved_token = saved_schema.get("api_token", "")
+            input_token = config.get("api_token", "")
+            if saved_token != input_token:
+                print(
+                    f"[Plugin Update] WARNING: API token mismatch in common_config_schema! "
+                    f"Input length: {len(str(input_token))}, Saved length: {len(str(saved_token))}"
+                )
+            else:
+                print(
+                    f"[Plugin Update] API token verified in PluginTypeDB.common_config_schema "
+                    f"(length: {len(str(saved_token))})"
+                )
 
         # Sync plugin type and instance enabled states - they should always be the same
         # From user's perspective, plugin type IS the plugin instance

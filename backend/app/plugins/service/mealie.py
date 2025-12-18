@@ -832,6 +832,7 @@ async def handle_plugin_config_update(
 
     # Check if we have required config (URL and API token)
     # Handle both dict (schema object) and string values
+    # Also check if config comes from common_config_schema (which stores values directly)
     mealie_url = config.get("mealie_url", "")
     if isinstance(mealie_url, dict):
         mealie_url = mealie_url.get("value") or mealie_url.get("default") or ""
@@ -846,9 +847,19 @@ async def handle_plugin_config_update(
     token_status = "present" if api_token else "missing"
     token_length = len(api_token) if api_token else 0
     logger.info(
-        f"[Mealie] Config update - URL: {mealie_url}, "
+        f"[Mealie] Config update received - URL: {mealie_url}, "
         f"API token: {token_status} (length: {token_length})"
     )
+
+    # Also check if we can get the token from db_type.common_config_schema as fallback
+    if not api_token and db_type and db_type.common_config_schema:
+        fallback_token = db_type.common_config_schema.get("api_token", "")
+        if fallback_token:
+            api_token = str(fallback_token).strip()
+            logger.info(
+                f"[Mealie] Retrieved API token from db_type.common_config_schema "
+                f"(length: {len(api_token)})"
+            )
 
     if not mealie_url or not api_token:
         logger.info("[Mealie] Skipping instance creation - missing URL or API token")
