@@ -87,7 +87,7 @@ def test_client(temp_db_path: Path) -> Generator[TestClient, None, None]:
     from fastapi import FastAPI
     from fastapi.middleware.cors import CORSMiddleware
 
-    from app.api.routes import calendar, config, health, images, keyboard, web_services
+    from app.api.routes import calendar, config, health, images, keyboard, system, web_services
 
     test_app = FastAPI(title="Calvin Test API")
     test_app.add_middleware(
@@ -103,6 +103,7 @@ def test_client(temp_db_path: Path) -> Generator[TestClient, None, None]:
     test_app.include_router(keyboard.router, prefix="/api", tags=["keyboard"])
     test_app.include_router(images.router, prefix="/api", tags=["images"])
     test_app.include_router(web_services.router, prefix="/api", tags=["web-services"])
+    test_app.include_router(system.router, prefix="/api/system", tags=["system"])
 
     @test_app.get("/")
     async def root():

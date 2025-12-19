@@ -58,180 +58,185 @@ export const useConfigStore = defineStore("config", () => {
   const calendarWidth = computed(() => `${calendarSplit.value}%`);
   const photosWidth = computed(() => `${100 - calendarSplit.value}%`);
 
+  // Helper function to update all config values from a response object
+  const updateConfigFromResponse = (data) => {
+    // Update all config values to ensure reactivity
+    if (data.orientation !== undefined) {
+      orientation.value = data.orientation;
+    }
+    if (data.calendarSplit !== undefined) {
+      calendarSplit.value = data.calendarSplit;
+    }
+    if (data.calendar_split !== undefined) {
+      calendarSplit.value = data.calendar_split;
+    }
+    if (data.photoFrameEnabled !== undefined) {
+      photoFrameEnabled.value = data.photoFrameEnabled;
+    }
+    if (data.photo_frame_enabled !== undefined) {
+      photoFrameEnabled.value = data.photo_frame_enabled;
+    }
+    if (data.photoFrameTimeout !== undefined) {
+      photoFrameTimeout.value = data.photoFrameTimeout;
+    }
+    if (data.photo_frame_timeout !== undefined) {
+      photoFrameTimeout.value = data.photo_frame_timeout;
+    }
+    if (data.showUI !== undefined) {
+      showUI.value = data.showUI;
+    }
+    if (data.show_ui !== undefined) {
+      showUI.value = data.show_ui;
+    }
+    if (data.photoRotationInterval !== undefined) {
+      photoRotationInterval.value = data.photoRotationInterval;
+    }
+    if (data.photo_rotation_interval !== undefined) {
+      photoRotationInterval.value = data.photo_rotation_interval;
+    }
+    if (data.calendarViewMode !== undefined) {
+      calendarViewMode.value = data.calendarViewMode;
+    }
+    if (data.calendar_view_mode !== undefined) {
+      calendarViewMode.value = data.calendar_view_mode;
+    }
+    if (data.timeFormat !== undefined) {
+      timeFormat.value = data.timeFormat;
+    }
+    if (data.time_format !== undefined) {
+      timeFormat.value = data.time_format;
+    }
+    if (data.showModeIndicator !== undefined) {
+      showModeIndicator.value = data.showModeIndicator;
+    }
+    if (data.show_mode_indicator !== undefined) {
+      showModeIndicator.value = data.show_mode_indicator;
+    }
+    if (data.modeIndicatorTimeout !== undefined) {
+      modeIndicatorTimeout.value = data.modeIndicatorTimeout;
+    }
+    if (data.mode_indicator_timeout !== undefined) {
+      modeIndicatorTimeout.value = data.mode_indicator_timeout;
+    }
+    if (data.weekStartDay !== undefined) {
+      weekStartDay.value = data.weekStartDay;
+    }
+    if (data.week_start_day !== undefined) {
+      weekStartDay.value = data.week_start_day;
+    }
+    if (data.showWeekNumbers !== undefined) {
+      showWeekNumbers.value = data.showWeekNumbers;
+    }
+    if (data.show_week_numbers !== undefined) {
+      showWeekNumbers.value = data.show_week_numbers;
+    }
+    if (data.sideViewPosition !== undefined) {
+      sideViewPosition.value = data.sideViewPosition;
+    }
+    if (data.side_view_position !== undefined) {
+      sideViewPosition.value = data.side_view_position;
+    }
+    if (data.themeMode !== undefined) {
+      themeMode.value = data.themeMode;
+    }
+    if (data.theme_mode !== undefined) {
+      themeMode.value = data.theme_mode;
+    }
+    if (data.darkModeStart !== undefined) {
+      darkModeStart.value = data.darkModeStart;
+    }
+    if (data.dark_mode_start !== undefined) {
+      darkModeStart.value = data.dark_mode_start;
+    }
+    if (data.darkModeEnd !== undefined) {
+      darkModeEnd.value = data.darkModeEnd;
+    }
+    if (data.dark_mode_end !== undefined) {
+      darkModeEnd.value = data.dark_mode_end;
+    }
+    if (data.displayScheduleEnabled !== undefined) {
+      displayScheduleEnabled.value = data.displayScheduleEnabled;
+    }
+    if (data.display_schedule_enabled !== undefined) {
+      displayScheduleEnabled.value = data.display_schedule_enabled;
+    }
+    if (data.displayOffTime !== undefined) {
+      displayOffTime.value = data.displayOffTime;
+    }
+    if (data.display_off_time !== undefined) {
+      displayOffTime.value = data.display_off_time;
+    }
+    if (data.displayOnTime !== undefined) {
+      displayOnTime.value = data.displayOnTime;
+    }
+    if (data.display_on_time !== undefined) {
+      displayOnTime.value = data.display_on_time;
+    }
+    if (data.displaySchedule !== undefined) {
+      if (typeof data.displaySchedule === "string") {
+        displaySchedule.value = JSON.parse(data.displaySchedule);
+      } else {
+        displaySchedule.value = data.displaySchedule;
+      }
+    }
+    if (data.display_schedule !== undefined) {
+      if (typeof data.display_schedule === "string") {
+        displaySchedule.value = JSON.parse(data.display_schedule);
+      } else {
+        displaySchedule.value = data.display_schedule;
+      }
+    }
+    if (data.displayTimeoutEnabled !== undefined) {
+      displayTimeoutEnabled.value = data.displayTimeoutEnabled;
+    }
+    if (data.display_timeout_enabled !== undefined) {
+      displayTimeoutEnabled.value = data.display_timeout_enabled;
+    }
+    if (data.displayTimeout !== undefined) {
+      displayTimeout.value = data.displayTimeout;
+    }
+    if (data.display_timeout !== undefined) {
+      displayTimeout.value = data.display_timeout;
+    }
+    if (data.rebootComboKey1 !== undefined) {
+      rebootComboKey1.value = data.rebootComboKey1;
+    }
+    if (data.reboot_combo_key1 !== undefined) {
+      rebootComboKey1.value = data.reboot_combo_key1;
+    }
+    if (data.rebootComboKey2 !== undefined) {
+      rebootComboKey2.value = data.rebootComboKey2;
+    }
+    if (data.reboot_combo_key2 !== undefined) {
+      rebootComboKey2.value = data.reboot_combo_key2;
+    }
+    if (data.rebootComboDuration !== undefined) {
+      rebootComboDuration.value = data.rebootComboDuration;
+    }
+    if (data.reboot_combo_duration !== undefined) {
+      rebootComboDuration.value = data.reboot_combo_duration;
+    }
+    if (data.imageDisplayMode !== undefined) {
+      imageDisplayMode.value = data.imageDisplayMode;
+    }
+    if (data.image_display_mode !== undefined) {
+      imageDisplayMode.value = data.image_display_mode;
+    }
+    // Handle timezone - can be null, undefined, or a string
+    if (data.timezone !== undefined) {
+      timezone.value = data.timezone ?? null;
+    } else {
+      // Ensure timezone is always set (default to null if not provided)
+      timezone.value = null;
+    }
+  };
+
   const fetchConfig = async () => {
     loading.value = true;
     error.value = null;
     try {
       const response = await axios.get("/api/config");
-      // Update all config values to ensure reactivity
-      if (response.data.orientation !== undefined) {
-        orientation.value = response.data.orientation;
-      }
-      if (response.data.calendarSplit !== undefined) {
-        calendarSplit.value = response.data.calendarSplit;
-      }
-      if (response.data.calendar_split !== undefined) {
-        calendarSplit.value = response.data.calendar_split;
-      }
-      if (response.data.photoFrameEnabled !== undefined) {
-        photoFrameEnabled.value = response.data.photoFrameEnabled;
-      }
-      if (response.data.photo_frame_enabled !== undefined) {
-        photoFrameEnabled.value = response.data.photo_frame_enabled;
-      }
-      if (response.data.photoFrameTimeout !== undefined) {
-        photoFrameTimeout.value = response.data.photoFrameTimeout;
-      }
-      if (response.data.photo_frame_timeout !== undefined) {
-        photoFrameTimeout.value = response.data.photo_frame_timeout;
-      }
-      if (response.data.showUI !== undefined) {
-        showUI.value = response.data.showUI;
-      }
-      if (response.data.show_ui !== undefined) {
-        showUI.value = response.data.show_ui;
-      }
-      if (response.data.photoRotationInterval !== undefined) {
-        photoRotationInterval.value = response.data.photoRotationInterval;
-      }
-      if (response.data.photo_rotation_interval !== undefined) {
-        photoRotationInterval.value = response.data.photo_rotation_interval;
-      }
-      if (response.data.calendarViewMode !== undefined) {
-        calendarViewMode.value = response.data.calendarViewMode;
-      }
-      if (response.data.calendar_view_mode !== undefined) {
-        calendarViewMode.value = response.data.calendar_view_mode;
-      }
-      if (response.data.timeFormat !== undefined) {
-        timeFormat.value = response.data.timeFormat;
-      }
-      if (response.data.time_format !== undefined) {
-        timeFormat.value = response.data.time_format;
-      }
-      if (response.data.showModeIndicator !== undefined) {
-        showModeIndicator.value = response.data.showModeIndicator;
-      }
-      if (response.data.show_mode_indicator !== undefined) {
-        showModeIndicator.value = response.data.show_mode_indicator;
-      }
-      if (response.data.modeIndicatorTimeout !== undefined) {
-        modeIndicatorTimeout.value = response.data.modeIndicatorTimeout;
-      }
-      if (response.data.mode_indicator_timeout !== undefined) {
-        modeIndicatorTimeout.value = response.data.mode_indicator_timeout;
-      }
-      if (response.data.weekStartDay !== undefined) {
-        weekStartDay.value = response.data.weekStartDay;
-      }
-      if (response.data.week_start_day !== undefined) {
-        weekStartDay.value = response.data.week_start_day;
-      }
-      if (response.data.showWeekNumbers !== undefined) {
-        showWeekNumbers.value = response.data.showWeekNumbers;
-      }
-      if (response.data.show_week_numbers !== undefined) {
-        showWeekNumbers.value = response.data.show_week_numbers;
-      }
-      if (response.data.sideViewPosition !== undefined) {
-        sideViewPosition.value = response.data.sideViewPosition;
-      }
-      if (response.data.side_view_position !== undefined) {
-        sideViewPosition.value = response.data.side_view_position;
-      }
-      if (response.data.themeMode !== undefined) {
-        themeMode.value = response.data.themeMode;
-      }
-      if (response.data.theme_mode !== undefined) {
-        themeMode.value = response.data.theme_mode;
-      }
-      if (response.data.darkModeStart !== undefined) {
-        darkModeStart.value = response.data.darkModeStart;
-      }
-      if (response.data.dark_mode_start !== undefined) {
-        darkModeStart.value = response.data.dark_mode_start;
-      }
-      if (response.data.darkModeEnd !== undefined) {
-        darkModeEnd.value = response.data.darkModeEnd;
-      }
-      if (response.data.dark_mode_end !== undefined) {
-        darkModeEnd.value = response.data.dark_mode_end;
-      }
-      if (response.data.displayScheduleEnabled !== undefined) {
-        displayScheduleEnabled.value = response.data.displayScheduleEnabled;
-      }
-      if (response.data.display_schedule_enabled !== undefined) {
-        displayScheduleEnabled.value = response.data.display_schedule_enabled;
-      }
-      if (response.data.displayOffTime !== undefined) {
-        displayOffTime.value = response.data.displayOffTime;
-      }
-      if (response.data.display_off_time !== undefined) {
-        displayOffTime.value = response.data.display_off_time;
-      }
-      if (response.data.displayOnTime !== undefined) {
-        displayOnTime.value = response.data.displayOnTime;
-      }
-      if (response.data.display_on_time !== undefined) {
-        displayOnTime.value = response.data.display_on_time;
-      }
-      if (response.data.displaySchedule !== undefined) {
-        if (typeof response.data.displaySchedule === "string") {
-          displaySchedule.value = JSON.parse(response.data.displaySchedule);
-        } else {
-          displaySchedule.value = response.data.displaySchedule;
-        }
-      }
-      if (response.data.display_schedule !== undefined) {
-        if (typeof response.data.display_schedule === "string") {
-          displaySchedule.value = JSON.parse(response.data.display_schedule);
-        } else {
-          displaySchedule.value = response.data.display_schedule;
-        }
-      }
-      if (response.data.displayTimeoutEnabled !== undefined) {
-        displayTimeoutEnabled.value = response.data.displayTimeoutEnabled;
-      }
-      if (response.data.display_timeout_enabled !== undefined) {
-        displayTimeoutEnabled.value = response.data.display_timeout_enabled;
-      }
-      if (response.data.displayTimeout !== undefined) {
-        displayTimeout.value = response.data.displayTimeout;
-      }
-      if (response.data.display_timeout !== undefined) {
-        displayTimeout.value = response.data.display_timeout;
-      }
-      if (response.data.rebootComboKey1 !== undefined) {
-        rebootComboKey1.value = response.data.rebootComboKey1;
-      }
-      if (response.data.reboot_combo_key1 !== undefined) {
-        rebootComboKey1.value = response.data.reboot_combo_key1;
-      }
-      if (response.data.rebootComboKey2 !== undefined) {
-        rebootComboKey2.value = response.data.rebootComboKey2;
-      }
-      if (response.data.reboot_combo_key2 !== undefined) {
-        rebootComboKey2.value = response.data.reboot_combo_key2;
-      }
-      if (response.data.rebootComboDuration !== undefined) {
-        rebootComboDuration.value = response.data.rebootComboDuration;
-      }
-      if (response.data.reboot_combo_duration !== undefined) {
-        rebootComboDuration.value = response.data.reboot_combo_duration;
-      }
-      if (response.data.imageDisplayMode !== undefined) {
-        imageDisplayMode.value = response.data.imageDisplayMode;
-      }
-      if (response.data.image_display_mode !== undefined) {
-        imageDisplayMode.value = response.data.image_display_mode;
-      }
-      // Handle timezone - can be null, undefined, or a string
-      if (response.data.timezone !== undefined) {
-        timezone.value = response.data.timezone ?? null;
-      } else {
-        // Ensure timezone is always set (default to null if not provided)
-        timezone.value = null;
-      }
+      updateConfigFromResponse(response.data);
       return response.data;
     } catch (err) {
       error.value = err.message;
@@ -246,13 +251,8 @@ export const useConfigStore = defineStore("config", () => {
     error.value = null;
     try {
       const response = await axios.post("/api/config", config);
-      // TODO: Update local config from response
-      if (config.orientation) {
-        orientation.value = config.orientation;
-      }
-      if (config.calendarSplit) {
-        calendarSplit.value = config.calendarSplit;
-      }
+      // Update local config from response to ensure all values are synced
+      updateConfigFromResponse(response.data);
       return response.data;
     } catch (err) {
       error.value = err.message;

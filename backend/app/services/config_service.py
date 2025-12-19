@@ -62,7 +62,10 @@ class ConfigService:
             value_type: Optional value type (auto-detected if not provided)
         """
         if value_type is None:
-            value_type = self._detect_type(value)
+            if value is None:
+                value_type = "string"  # Use string type for None values
+            else:
+                value_type = self._detect_type(value)
 
         serialized_value = self._serialize_value(value, value_type)
 
@@ -107,6 +110,8 @@ class ConfigService:
 
     def _serialize_value(self, value: Any, value_type: str) -> str:
         """Serialize a value to string for storage."""
+        if value is None:
+            return ""  # Store empty string for None values
         if value_type == "json":
             return json.dumps(value)
         else:
@@ -114,7 +119,10 @@ class ConfigService:
 
     def _parse_value(self, value: str, value_type: str) -> Any:
         """Parse a stored value based on its type."""
-        if value is None:
+        if value is None or value == "":
+            return None
+        # Handle legacy "None" string values
+        if value == "None":
             return None
 
         if value_type == "bool":

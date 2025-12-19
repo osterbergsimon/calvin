@@ -80,8 +80,12 @@ class WebServiceService:
         Returns:
             Created web service
         """
-        # Generate ID if not provided
-        service_id = f"web-service-{len(self._services) + 1}-{hash(service.url) % 10000}"
+        # Generate unique ID - use timestamp and hash to ensure uniqueness
+        import time
+        import hashlib
+        timestamp = int(time.time() * 1000000)  # microseconds for better uniqueness
+        url_hash = hashlib.md5(service.url.encode()).hexdigest()[:8]
+        service_id = f"web-service-{timestamp}-{url_hash}"
 
         async with AsyncSessionLocal() as session:
             db_service = WebServiceDB(
