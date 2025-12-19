@@ -5,6 +5,8 @@ import App from "./App.vue";
 import router from "./router";
 import "./styles/main.css";
 import "./styles/theme.css";
+import { initLogger } from "./utils/logger";
+import { useConfigStore } from "./stores/config";
 
 const app = createApp(App);
 const pinia = createPinia();
@@ -21,4 +23,8 @@ app.use(VueQueryPlugin, {
     },
   },
 });
+
+// Initialize logger with config store getter
+initLogger(() => useConfigStore());
+
 app.mount("#app");

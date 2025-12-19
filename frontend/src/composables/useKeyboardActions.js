@@ -4,6 +4,7 @@ import { useImagesStore } from "../stores/images";
 import { useWebServicesStore } from "../stores/webServices";
 import { useConfigStore } from "../stores/config";
 import { useRouter } from "vue-router";
+import { logInfo, logError, logWarn, logDebug } from "../utils/logger";
 
 /**
  * Composable for handling keyboard actions.
@@ -34,12 +35,15 @@ export function useKeyboardActions() {
     }
 
     // We're already in calendar mode - cycle to next view mode
-    if (typeof configStore.cycleCalendarViewMode === 'function') {
-      configStore.cycleCalendarViewMode().then((newMode) => {
-        console.log(`Calendar view mode cycled to: ${newMode}`);
-      }).catch((err) => {
-        console.error("Failed to cycle calendar view mode:", err);
-      });
+    if (typeof configStore.cycleCalendarViewMode === "function") {
+      configStore
+        .cycleCalendarViewMode()
+        .then((newMode) => {
+          logInfo("[Keyboard]", `Calendar view mode cycled to: ${newMode}`);
+        })
+        .catch((err) => {
+          logError("[Keyboard]", "Failed to cycle calendar view mode:", err);
+        });
     } else {
       // Fallback: manually cycle if function doesn't exist (hot-reload issue)
       const modes = ["month", "week", "day"];
@@ -48,12 +52,15 @@ export function useKeyboardActions() {
       const newMode = modes[nextIndex];
       configStore.setCalendarViewMode(newMode);
       // Try to persist to backend
-      if (typeof configStore.updateConfig === 'function') {
+      if (typeof configStore.updateConfig === "function") {
         configStore.updateConfig({ calendarViewMode: newMode }).catch((err) => {
-          console.error("Failed to save calendar view mode:", err);
+          logError("[Keyboard]", "Failed to save calendar view mode:", err);
         });
       }
-      console.log(`Calendar view mode cycled to: ${newMode} (fallback)`);
+      logInfo(
+        "[Keyboard]",
+        `Calendar view mode cycled to: ${newMode} (fallback)`,
+      );
     }
   };
 
@@ -81,9 +88,9 @@ export function useKeyboardActions() {
   // Helper to get events for a specific date (handles multi-day events)
   const getEventsForDate = (date) => {
     if (!calendarStore.events || calendarStore.events.length === 0) return [];
-    
+
     const dateComponents = getDateComponents(date, false);
-    
+
     return calendarStore.events.filter((event) => {
       const eventStart = new Date(event.start);
       const eventEnd = new Date(event.end);
@@ -127,7 +134,7 @@ export function useKeyboardActions() {
   // Navigate to next day with events (skips days without events)
   const navigateToNextDayWithEvents = () => {
     if (!calendarStore.selectedEvent) return;
-    
+
     // Use the selectedDate (the actual day that was clicked) instead of event's start date
     // This correctly handles multi-day events
     let currentDate;
@@ -141,11 +148,11 @@ export function useKeyboardActions() {
       // Last fallback: use selected event's start date
       currentDate = new Date(calendarStore.selectedEvent.start);
     }
-    
+
     // Start from the next day
     let searchDate = new Date(currentDate);
     searchDate.setDate(searchDate.getDate() + 1);
-    
+
     // Search up to 30 days ahead for a day with events
     for (let i = 0; i < 30; i++) {
       const eventsForDay = getEventsForDate(searchDate);
@@ -161,7 +168,7 @@ export function useKeyboardActions() {
   // Navigate to previous day with events (skips days without events)
   const navigateToPreviousDayWithEvents = () => {
     if (!calendarStore.selectedEvent) return;
-    
+
     // Use the selectedDate (the actual day that was clicked) instead of event's start date
     // This correctly handles multi-day events
     let currentDate;
@@ -175,11 +182,11 @@ export function useKeyboardActions() {
       // Last fallback: use selected event's start date
       currentDate = new Date(calendarStore.selectedEvent.start);
     }
-    
+
     // Start from the previous day
     let searchDate = new Date(currentDate);
     searchDate.setDate(searchDate.getDate() - 1);
-    
+
     // Search up to 30 days back for a day with events
     for (let i = 0; i < 30; i++) {
       const eventsForDay = getEventsForDate(searchDate);
@@ -193,14 +200,20 @@ export function useKeyboardActions() {
   };
 
   const handleAction = (action) => {
-    console.log("[Keyboard] handleAction called with:", action, "currentMode:", modeStore.currentMode);
+    logDebug(
+      "[Keyboard]",
+      "handleAction called with:",
+      action,
+      "currentMode:",
+      modeStore.currentMode,
+    );
     // Handle generic actions that adapt to current mode
     if (action === "generic_next") {
       action = getGenericNextAction();
-      console.log("[Keyboard] generic_next resolved to:", action);
+      logDebug("[Keyboard]", "generic_next resolved to:", action);
     } else if (action === "generic_prev") {
       action = getGenericPrevAction();
-      console.log("[Keyboard] generic_prev resolved to:", action);
+      logDebug("[Keyboard]", "generic_prev resolved to:", action);
     } else if (action === "generic_expand_close") {
       action = getGenericExpandCloseAction();
     }
@@ -334,13 +347,19 @@ export function useKeyboardActions() {
         break;
       case "calendar_next_day":
         // Navigate to next day when event detail panel is open
-        if (modeStore.currentMode === modeStore.MODES.CALENDAR && calendarStore.selectedEvent) {
+        if (
+          modeStore.currentMode === modeStore.MODES.CALENDAR &&
+          calendarStore.selectedEvent
+        ) {
           navigateToNextDayWithEvents();
         }
         break;
       case "calendar_prev_day":
         // Navigate to previous day when event detail panel is open
-        if (modeStore.currentMode === modeStore.MODES.CALENDAR && calendarStore.selectedEvent) {
+        if (
+          modeStore.currentMode === modeStore.MODES.CALENDAR &&
+          calendarStore.selectedEvent
+        ) {
           navigateToPreviousDayWithEvents();
         }
         break;
@@ -415,9 +434,19 @@ export function useKeyboardActions() {
           (modeStore.isFullscreen &&
             modeStore.fullscreenMode === modeStore.MODES.WEB_SERVICES)
         ) {
-          console.log("[Keyboard] web_service_next: current index", webServicesStore.currentServiceIndex, "services count", webServicesStore.services.length);
+          logDebug(
+            "[Keyboard]",
+            "web_service_next: current index",
+            webServicesStore.currentServiceIndex,
+            "services count",
+            webServicesStore.services.length,
+          );
           webServicesStore.nextService();
-          console.log("[Keyboard] web_service_next: new index", webServicesStore.currentServiceIndex);
+          logDebug(
+            "[Keyboard]",
+            "web_service_next: new index",
+            webServicesStore.currentServiceIndex,
+          );
         } else {
           // Switch to web services mode (side view)
           modeStore.setMode(modeStore.MODES.WEB_SERVICES);
@@ -431,9 +460,19 @@ export function useKeyboardActions() {
           (modeStore.isFullscreen &&
             modeStore.fullscreenMode === modeStore.MODES.WEB_SERVICES)
         ) {
-          console.log("[Keyboard] web_service_prev: current index", webServicesStore.currentServiceIndex, "services count", webServicesStore.services.length);
+          logDebug(
+            "[Keyboard]",
+            "web_service_prev: current index",
+            webServicesStore.currentServiceIndex,
+            "services count",
+            webServicesStore.services.length,
+          );
           webServicesStore.previousService();
-          console.log("[Keyboard] web_service_prev: new index", webServicesStore.currentServiceIndex);
+          logDebug(
+            "[Keyboard]",
+            "web_service_prev: new index",
+            webServicesStore.currentServiceIndex,
+          );
         } else {
           // Switch to web services mode (side view)
           modeStore.setMode(modeStore.MODES.WEB_SERVICES);
@@ -463,7 +502,7 @@ export function useKeyboardActions() {
         break;
 
       default:
-        console.warn(`Unknown keyboard action: ${action}`);
+        logWarn("[Keyboard]", `Unknown keyboard action: ${action}`);
     }
   };
 

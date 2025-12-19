@@ -2,6 +2,7 @@ import { useQuery } from "@tanstack/vue-query";
 import axios from "axios";
 import { getCachedData, setCachedData } from "../utils/cache";
 import { useConnectionStore } from "../stores/connection";
+import { logInfo } from "../utils/logger";
 
 /**
  * Composable for fetching weather data using Vue Query.
@@ -17,29 +18,34 @@ export function useWeatherData(serviceId, enabled = true) {
     queryKey: ["weather", serviceId],
     queryFn: async () => {
       if (!serviceId) return null;
-      
+
       // Try cache first if offline
       if (!connectionStore.isFullyOnline()) {
         const cachedData = getCachedData(cacheKey, cacheTTL);
         if (cachedData) {
-          console.log(`[Weather] Using cached data for ${serviceId}`);
+          logInfo("[Weather]", `Using cached data for ${serviceId}`);
           return cachedData;
         }
       }
-      
+
       try {
-        const response = await axios.get(`/api/web-services/${serviceId}/weather`);
+        const response = await axios.get(
+          `/api/web-services/${serviceId}/weather`,
+        );
         const data = response.data;
-        
+
         // Cache the response
         setCachedData(cacheKey, data);
-        
+
         return data;
       } catch (error) {
         // If request failed, try cache
         const cachedData = getCachedData(cacheKey, cacheTTL);
         if (cachedData) {
-          console.log(`[Weather] Request failed, using cached data for ${serviceId}`);
+          logInfo(
+            "[Weather]",
+            `Request failed, using cached data for ${serviceId}`,
+          );
           return cachedData;
         }
         throw error;
@@ -55,4 +61,3 @@ export function useWeatherData(serviceId, enabled = true) {
     retry: 1,
   });
 }
-

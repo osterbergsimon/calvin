@@ -382,10 +382,6 @@ async def get_config():
         config["mealPlanCardSize"] = "medium"  # Default size
     elif "meal_plan_card_size" in config and "mealPlanCardSize" not in config:
         config["mealPlanCardSize"] = config["meal_plan_card_size"]
-    if "mealPlanDebug" not in config and "meal_plan_debug" not in config:
-        config["mealPlanDebug"] = False  # Default to disabled
-    elif "meal_plan_debug" in config and "mealPlanDebug" not in config:
-        config["mealPlanDebug"] = config["meal_plan_debug"]
     if "gitRepoUrl" not in config and "git_repo_url" not in config:
         config["gitRepoUrl"] = "https://github.com/osterbergsimon/calvin.git"  # Default repo
     elif "git_repo_url" in config and "gitRepoUrl" not in config:
@@ -394,6 +390,14 @@ async def get_config():
         config["gitBranch"] = "main"  # Default to main branch
     elif "git_branch" in config and "gitBranch" not in config:
         config["gitBranch"] = config["git_branch"]
+    if "consoleLogEnabled" not in config and "console_log_enabled" not in config:
+        config["consoleLogEnabled"] = True  # Default to enabled for backwards compatibility
+    elif "console_log_enabled" in config and "consoleLogEnabled" not in config:
+        config["consoleLogEnabled"] = config["console_log_enabled"]
+    if "consoleLogLevel" not in config and "console_log_level" not in config:
+        config["consoleLogLevel"] = "info"  # Default to 'info' level
+    elif "console_log_level" in config and "consoleLogLevel" not in config:
+        config["consoleLogLevel"] = config["console_log_level"]
 
     # Add backend version (git commit short hash)
     config["version"] = get_git_version()
@@ -555,6 +559,10 @@ async def update_config(config_update: ConfigUpdate):
             except Exception as e:
                 # Log error but don't fail the config update
                 print(f"Warning: Failed to update /etc/default/calvin-update: {e}")
+    if "consoleLogEnabled" in update_dict:
+        update_dict["console_log_enabled"] = update_dict.pop("consoleLogEnabled")
+    if "consoleLogLevel" in update_dict:
+        update_dict["console_log_level"] = update_dict.pop("consoleLogLevel")
 
     await config_service.update_config(update_dict)
 

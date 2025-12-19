@@ -1,6 +1,7 @@
 import { defineStore } from "pinia";
 import { ref, computed } from "vue";
 import axios from "axios";
+import { logError, logInfo } from "../utils/logger";
 
 export const useConfigStore = defineStore("config", () => {
   const orientation = ref("landscape"); // 'landscape' | 'portrait'
@@ -53,7 +54,8 @@ export const useConfigStore = defineStore("config", () => {
   const clockPosition = ref("top-right"); // Clock position: 'top-left' | 'top-right' | 'bottom-left' | 'bottom-right'
   const clockSize = ref("medium"); // Clock size: 'small' | 'medium' | 'large'
   const mealPlanCardSize = ref("medium"); // Meal plan card size: 'small' | 'medium' | 'large'
-  const mealPlanDebug = ref(false); // Enable debug logging for meal plan component
+  const consoleLogEnabled = ref(true); // Enable console logging (default: true for backwards compatibility)
+  const consoleLogLevel = ref("info"); // Console log level: 'error' | 'warn' | 'info' | 'debug' (default: 'info')
   const loading = ref(false);
   const error = ref(null);
 
@@ -327,17 +329,24 @@ export const useConfigStore = defineStore("config", () => {
       } else {
         mealPlanCardSize.value = "medium"; // Default
       }
-      if (response.data.mealPlanDebug !== undefined) {
-        mealPlanDebug.value = response.data.mealPlanDebug;
-      } else if (response.data.meal_plan_debug !== undefined) {
-        mealPlanDebug.value = response.data.meal_plan_debug;
+      if (response.data.consoleLogEnabled !== undefined) {
+        consoleLogEnabled.value = response.data.consoleLogEnabled;
+      } else if (response.data.console_log_enabled !== undefined) {
+        consoleLogEnabled.value = response.data.console_log_enabled;
       } else {
-        mealPlanDebug.value = false; // Default
+        consoleLogEnabled.value = true; // Default to enabled for backwards compatibility
+      }
+      if (response.data.consoleLogLevel !== undefined) {
+        consoleLogLevel.value = response.data.consoleLogLevel;
+      } else if (response.data.console_log_level !== undefined) {
+        consoleLogLevel.value = response.data.console_log_level;
+      } else {
+        consoleLogLevel.value = "info"; // Default to 'info' level
       }
       return response.data;
     } catch (err) {
       error.value = err.message;
-      console.error("Failed to fetch config:", err);
+      logError("[ConfigStore]", "Failed to fetch config:", err);
     } finally {
       loading.value = false;
     }
@@ -372,7 +381,7 @@ export const useConfigStore = defineStore("config", () => {
       return response.data;
     } catch (err) {
       error.value = err.message;
-      console.error("Failed to update config:", err);
+      logError("[ConfigStore]", "Failed to update config:", err);
       throw err;
     } finally {
       loading.value = false;
@@ -398,7 +407,7 @@ export const useConfigStore = defineStore("config", () => {
     try {
       await updateConfig({ showUI: newValue });
     } catch (err) {
-      console.error("Failed to save UI visibility:", err);
+      logError("[ConfigStore]", "Failed to save UI visibility:", err);
       // Revert on error
       showUI.value = !newValue;
     }
@@ -449,7 +458,7 @@ export const useConfigStore = defineStore("config", () => {
     try {
       await updateConfig({ calendarViewMode: newMode });
     } catch (err) {
-      console.error("Failed to save calendar view mode:", err);
+      logError("[ConfigStore]", "Failed to save calendar view mode:", err);
     }
 
     return newMode;
@@ -545,7 +554,8 @@ export const useConfigStore = defineStore("config", () => {
     clockPosition,
     clockSize,
     mealPlanCardSize,
-    mealPlanDebug,
+    consoleLogEnabled,
+    consoleLogLevel,
     loading,
     error,
     calendarWidth,

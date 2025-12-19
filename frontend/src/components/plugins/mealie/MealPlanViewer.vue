@@ -80,6 +80,13 @@ import { computed } from "vue";
 import { useQuery } from "@tanstack/vue-query";
 import axios from "axios";
 import { useConfigStore } from "../../../stores/config";
+import {
+  logDebug,
+  logWarn,
+  logInfo,
+  logError,
+  isDebugEnabled,
+} from "../../../utils/logger";
 
 const props = defineProps({
   serviceId: {
@@ -100,9 +107,9 @@ const configStore = useConfigStore();
 
 // Enable debug mode if:
 // 1. Explicitly passed as prop
-// 2. Enabled in config store (mealPlanDebug setting)
+// 2. Global console log level is set to 'debug'
 // 3. In development mode
-const DEBUG = props.debug || configStore.mealPlanDebug || import.meta.env.DEV;
+const DEBUG = props.debug || isDebugEnabled() || import.meta.env.DEV;
 
 const cardSize = computed(() => configStore.mealPlanCardSize || "medium");
 const isPortrait = computed(() => configStore.orientation === "portrait");
@@ -119,7 +126,7 @@ const query = useQuery({
     const endDateStr = endDate.toISOString().split("T")[0];
 
     if (DEBUG) {
-      console.log("[MealPlanViewer] Fetching meal plan data:", {
+      logDebug("[MealPlanViewer]", "Fetching meal plan data:", {
         endpoint: props.apiEndpoint,
         startDate: startDateStr,
         endDate: endDateStr,
@@ -134,12 +141,13 @@ const query = useQuery({
     });
 
     if (DEBUG) {
-      console.log("[MealPlanViewer] API response status:", response.status);
-      console.log(
-        "[MealPlanViewer] Full Mealie API response data:",
+      logDebug("[MealPlanViewer]", "API response status:", response.status);
+      logDebug(
+        "[MealPlanViewer]",
+        "Full Mealie API response data:",
         JSON.parse(JSON.stringify(response.data)),
       );
-      console.log("[MealPlanViewer] API response summary:", {
+      logDebug("[MealPlanViewer]", "API response summary:", {
         status: response.status,
         dataType: typeof response.data,
         isArray: Array.isArray(response.data),
@@ -165,14 +173,14 @@ const query = useQuery({
 const mealPlanItems = computed(() => {
   if (!query.data.value) {
     if (DEBUG) {
-      console.log("[MealPlanViewer] No data in query.data.value");
+      logDebug("[MealPlanViewer]", "No data in query.data.value");
     }
     return [];
   }
 
   const serviceData = query.data.value;
   if (DEBUG) {
-    console.log("[MealPlanViewer] Processing service data:", {
+    logDebug("[MealPlanViewer]", "Processing service data:", {
       hasItems: !!serviceData.items,
       isArray: Array.isArray(serviceData),
       hasDate: !!serviceData.date,
@@ -188,8 +196,9 @@ const mealPlanItems = computed(() => {
   if (serviceData.items && Array.isArray(serviceData.items)) {
     rawItems = serviceData.items;
     if (DEBUG) {
-      console.log(
-        `[MealPlanViewer] Found ${rawItems.length} items in serviceData.items`,
+      logDebug(
+        "[MealPlanViewer]",
+        `Found ${rawItems.length} items in serviceData.items`,
       );
     }
   }
@@ -197,16 +206,18 @@ const mealPlanItems = computed(() => {
   else if (Array.isArray(serviceData)) {
     rawItems = serviceData;
     if (DEBUG) {
-      console.log(
-        `[MealPlanViewer] Service data is array with ${rawItems.length} items`,
+      logDebug(
+        "[MealPlanViewer]",
+        `Service data is array with ${rawItems.length} items`,
       );
     }
   }
   // Handle single item: { date: "...", meals: [...] }
   else if (serviceData.date && serviceData.meals) {
     if (DEBUG) {
-      console.log(
-        "[MealPlanViewer] Single item format with date:",
+      logDebug(
+        "[MealPlanViewer]",
+        "Single item format with date:",
         serviceData.date,
       );
     }
@@ -216,7 +227,7 @@ const mealPlanItems = computed(() => {
     const itemDate = new Date(serviceData.date);
     itemDate.setHours(0, 0, 0, 0);
     if (DEBUG) {
-      console.log("[MealPlanViewer] Date comparison:", {
+      logDebug("[MealPlanViewer]", "Date comparison:", {
         itemDate: itemDate.toISOString(),
         today: today.toISOString(),
         isPast: itemDate < today,
@@ -227,20 +238,20 @@ const mealPlanItems = computed(() => {
       return [serviceData];
     }
     if (DEBUG) {
-      console.log("[MealPlanViewer] Filtered out past day:", serviceData.date);
+      logDebug("[MealPlanViewer]", "Filtered out past day:", serviceData.date);
     }
     return [];
   }
 
   if (rawItems.length === 0) {
     if (DEBUG) {
-      console.log("[MealPlanViewer] No raw items found after parsing");
+      logDebug("[MealPlanViewer]", "No raw items found after parsing");
     }
     return [];
   }
 
   if (DEBUG) {
-    console.log(`[MealPlanViewer] Processing ${rawItems.length} raw items`);
+    logDebug(`[MealPlanViewer] Processing ${rawItems.length} raw items`);
   }
 
   // Mealie API returns individual meal entries, not grouped by day
@@ -254,7 +265,7 @@ const mealPlanItems = computed(() => {
     const date = item.date;
     if (!date) {
       if (DEBUG) {
-        console.log("[MealPlanViewer] Item missing date:", item);
+        logDebug("[MealPlanViewer]", "Item missing date:", item);
       }
       return;
     }
@@ -275,7 +286,7 @@ const mealPlanItems = computed(() => {
     } catch (e) {
       // If parsing fails, use original date string
       if (DEBUG) {
-        console.warn("[MealPlanViewer] Failed to parse date:", date, e);
+        logWarn("[MealPlanViewer]", "Failed to parse date:", date, e);
       }
     }
 
@@ -299,12 +310,14 @@ const mealPlanItems = computed(() => {
   });
 
   if (DEBUG) {
-    console.log(
-      `[MealPlanViewer] Grouped into ${Object.keys(mealsByDate).length} dates:`,
+    logDebug(
+      "[MealPlanViewer]",
+      `Grouped into ${Object.keys(mealsByDate).length} dates:`,
       Object.keys(mealsByDate),
     );
-    console.log(
-      "[MealPlanViewer] Meals by date:",
+    logDebug(
+      "[MealPlanViewer]",
+      "Meals by date:",
       JSON.parse(JSON.stringify(mealsByDate)),
     );
   }
@@ -319,8 +332,9 @@ const mealPlanItems = computed(() => {
   });
 
   if (DEBUG) {
-    console.log(
-      "[MealPlanViewer] Grouped items after sorting:",
+    logDebug(
+      "[MealPlanViewer]",
+      "Grouped items after sorting:",
       groupedItems.map((i) => ({
         date: i.date,
         mealCount: i.meals.length,
@@ -337,15 +351,16 @@ const mealPlanItems = computed(() => {
   const today = new Date();
   today.setHours(0, 0, 0, 0);
   if (DEBUG) {
-    console.log(
-      "[MealPlanViewer] Today's date for filtering:",
+    logDebug(
+      "[MealPlanViewer]",
+      "Today's date for filtering:",
       today.toISOString().split("T")[0],
     );
   }
 
   if (startDate && endDate) {
     if (DEBUG) {
-      console.log("[MealPlanViewer] Using date range:", { startDate, endDate });
+      logDebug("[MealPlanViewer]", "Using date range:", { startDate, endDate });
     }
     const current = new Date(startDate);
     const end = new Date(endDate);
@@ -390,7 +405,7 @@ const mealPlanItems = computed(() => {
   } else {
     // If we can't determine the range, filter grouped items to exclude past days
     if (DEBUG) {
-      console.log("[MealPlanViewer] No date range, filtering grouped items");
+      logDebug("[MealPlanViewer]", "No date range, filtering grouped items");
     }
     const filtered = groupedItems.filter((item) => {
       if (!item.date) return false;
@@ -400,8 +415,9 @@ const mealPlanItems = computed(() => {
       return itemDate >= today;
     });
     if (DEBUG) {
-      console.log(
-        `[MealPlanViewer] Filtered ${groupedItems.length} items to ${filtered.length} items`,
+      logDebug(
+        "[MealPlanViewer]",
+        `Filtered ${groupedItems.length} items to ${filtered.length} items`,
       );
       if (filtered.length < groupedItems.length) {
         const filteredOut = groupedItems.filter((item) => {
@@ -410,8 +426,9 @@ const mealPlanItems = computed(() => {
           itemDate.setHours(0, 0, 0, 0);
           return itemDate < today;
         });
-        console.log(
-          "[MealPlanViewer] Filtered out dates:",
+        logDebug(
+          "[MealPlanViewer]",
+          "Filtered out dates:",
           filteredOut.map((i) => i.date),
         );
       }
@@ -428,11 +445,13 @@ const mealPlanItems = computed(() => {
   });
 
   if (DEBUG) {
-    console.log(
-      `[MealPlanViewer] Final result: ${finalDays.length} days (from ${allDays.length} total days)`,
+    logDebug(
+      "[MealPlanViewer]",
+      `Final result: ${finalDays.length} days (from ${allDays.length} total days)`,
     );
-    console.log(
-      "[MealPlanViewer] Final meal plan items:",
+    logDebug(
+      "[MealPlanViewer]",
+      "Final meal plan items:",
       JSON.parse(JSON.stringify(finalDays)),
     );
   }

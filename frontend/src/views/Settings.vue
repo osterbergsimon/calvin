@@ -951,20 +951,6 @@
                   fit on screen.</span
                 >
               </div>
-              <div class="setting-item">
-                <label>
-                  <input
-                    v-model="localConfig.mealPlanDebug"
-                    type="checkbox"
-                    @change="updateMealPlanDebug"
-                  />
-                  Enable Meal Plan Debug Logging
-                </label>
-                <span class="help-text"
-                  >Enable detailed console logging for meal plan component to
-                  debug rendering issues. Check browser console for logs.</span
-                >
-              </div>
 
               <!-- Add Web Service Form -->
               <div class="add-web-service-form">
@@ -1319,6 +1305,51 @@
             </div>
           </section>
 
+          <!-- Debug & Logging -->
+          <section
+            class="settings-section collapsible"
+            :class="{ expanded: expandedSections.debugLogging }"
+          >
+            <div class="section-header" @click="toggleSection('debugLogging')">
+              <h2>Debug & Logging</h2>
+              <span class="toggle-icon">{{
+                expandedSections.debugLogging ? "▼" : "▶"
+              }}</span>
+            </div>
+            <div v-show="expandedSections.debugLogging" class="section-content">
+              <div class="setting-item">
+                <label>
+                  <input
+                    v-model="localConfig.consoleLogEnabled"
+                    type="checkbox"
+                    @change="updateConsoleLogSettings"
+                  />
+                  Enable Console Logging
+                </label>
+                <span class="help-text"
+                  >Enable logging to browser console. When disabled, only errors
+                  will be shown.</span
+                >
+              </div>
+              <div v-if="localConfig.consoleLogEnabled" class="setting-item">
+                <label>Log Level</label>
+                <select
+                  v-model="localConfig.consoleLogLevel"
+                  @change="updateConsoleLogSettings"
+                >
+                  <option value="error">Error Only</option>
+                  <option value="warn">Warnings & Errors</option>
+                  <option value="info">Info, Warnings & Errors</option>
+                  <option value="debug">All Logs (Debug)</option>
+                </select>
+                <span class="help-text"
+                  >Controls which log messages are shown in the browser console.
+                  Lower levels include higher severity messages.</span
+                >
+              </div>
+            </div>
+          </section>
+
           <!-- System Information -->
           <section
             class="settings-section collapsible"
@@ -1480,6 +1511,7 @@ import axios from "axios";
 import PluginFieldRenderer from "../components/PluginFieldRenderer.vue";
 import PluginActions from "../components/PluginActions.vue";
 import PluginSections from "../components/PluginSections.vue";
+import { logError, logWarn, logInfo, logDebug } from "../utils/logger";
 
 const router = useRouter();
 const configStore = useConfigStore();
@@ -1535,8 +1567,9 @@ const localConfig = ref({
   clockPosition: "top-right",
   clockSize: "medium",
   mealPlanCardSize: "medium",
-  mealPlanDebug: false,
   orientationFlipped: false,
+  consoleLogEnabled: true,
+  consoleLogLevel: "info",
   version: null,
   frontendVersion: null,
 });
@@ -1549,7 +1582,11 @@ const getFrontendVersionFromMeta = () => {
       return metaTag.getAttribute("content");
     }
   } catch (error) {
-    console.warn("Could not read frontend version from meta tag:", error);
+    logWarn(
+      "[Settings]",
+      "Could not read frontend version from meta tag:",
+      error,
+    );
   }
   return null;
 };
@@ -1575,6 +1612,7 @@ const expandedSections = ref({
   plugins: false,
   displayPower: false,
   rebootCombo: false,
+  debugLogging: false,
   systemInfo: true,
   update: false,
 });
@@ -1711,13 +1749,14 @@ const updateMealPlanCardSize = async () => {
   }
 };
 
-const updateMealPlanDebug = async () => {
+const updateConsoleLogSettings = async () => {
   try {
     await configStore.updateConfig({
-      mealPlanDebug: localConfig.value.mealPlanDebug,
+      consoleLogEnabled: localConfig.value.consoleLogEnabled,
+      consoleLogLevel: localConfig.value.consoleLogLevel,
     });
   } catch (error) {
-    console.error("Failed to update meal plan debug setting:", error);
+    logError("[Settings]", "Failed to update console log settings:", error);
   }
 };
 
@@ -2448,12 +2487,19 @@ const loadConfig = async () => {
       } else {
         localConfig.value.mealPlanCardSize = "medium"; // Default
       }
-      if (response.data.mealPlanDebug !== undefined) {
-        localConfig.value.mealPlanDebug = response.data.mealPlanDebug;
-      } else if (response.data.meal_plan_debug !== undefined) {
-        localConfig.value.mealPlanDebug = response.data.meal_plan_debug;
+      if (response.data.consoleLogEnabled !== undefined) {
+        localConfig.value.consoleLogEnabled = response.data.consoleLogEnabled;
+      } else if (response.data.console_log_enabled !== undefined) {
+        localConfig.value.consoleLogEnabled = response.data.console_log_enabled;
       } else {
-        localConfig.value.mealPlanDebug = false; // Default
+        localConfig.value.consoleLogEnabled = true; // Default to enabled for backwards compatibility
+      }
+      if (response.data.consoleLogLevel !== undefined) {
+        localConfig.value.consoleLogLevel = response.data.consoleLogLevel;
+      } else if (response.data.console_log_level !== undefined) {
+        localConfig.value.consoleLogLevel = response.data.console_log_level;
+      } else {
+        localConfig.value.consoleLogLevel = "info"; // Default to 'info' level
       }
       localConfig.value.gitBranch =
         response.data.gitBranch ?? response.data.git_branch ?? "main";
@@ -2770,6 +2816,8 @@ const saveConfig = async () => {
       imageDisplayMode: localConfig.value.imageDisplayMode,
       timezone: localConfig.value.timezone,
       gitBranch: localConfig.value.gitBranch,
+      consoleLogEnabled: localConfig.value.consoleLogEnabled,
+      consoleLogLevel: localConfig.value.consoleLogLevel,
     });
 
     // Refresh the config store to ensure all components have the latest settings
@@ -2777,7 +2825,7 @@ const saveConfig = async () => {
 
     return response.data;
   } catch (error) {
-    console.error("Failed to save config:", error);
+    logError("[Settings]", "Failed to save config:", error);
     throw error;
   }
 };
@@ -2790,7 +2838,7 @@ const saveKeyboardMappings = async () => {
     };
     await keyboardStore.updateMappings(mappings);
   } catch (error) {
-    console.error("Failed to save keyboard mappings:", error);
+    logError("[Settings]", "Failed to save keyboard mappings:", error);
   }
 };
 
@@ -2965,7 +3013,7 @@ const triggerUpdate = async () => {
           setTimeout(checkStatus, 3000);
         }
       } catch (error) {
-        console.error("Failed to check update status:", error);
+        logError("[Settings]", "Failed to check update status:", error);
         // Continue checking, but show error
         updateMessage.value = `⚠️ Error checking status: ${error.message}. Retrying...`;
         updateMessageClass.value = "info";
@@ -2979,7 +3027,7 @@ const triggerUpdate = async () => {
     updateInProgress.value = false;
     updateMessage.value = `❌ Failed to start update: ${error.response?.data?.detail || error.message || "Unknown error"}`;
     updateMessageClass.value = "error";
-    console.error("Failed to trigger update:", error);
+    logError("[Settings]", "Failed to trigger update:", error);
   }
 };
 
@@ -3054,8 +3102,9 @@ const loadPlugins = async () => {
         );
         const rawConfig = configResponse.data.config || {};
         // Don't log sensitive data - configs from backend should already have sensitive fields removed
-        console.log(
-          `[Frontend] Loaded config for ${plugin.id}:`,
+        logDebug(
+          "[Settings]",
+          `Loaded config for ${plugin.id}:`,
           Object.keys(rawConfig),
         );
 
@@ -3066,8 +3115,9 @@ const loadPlugins = async () => {
             cleanedConfig[key] = "";
           } else if (typeof value === "object") {
             // If it's an object, try to extract the actual value
-            console.warn(
-              `[Frontend] Found object value for ${plugin.id}.${key}:`,
+            logWarn(
+              "[Settings]",
+              `Found object value for ${plugin.id}.${key}:`,
               value,
             );
             cleanedConfig[key] = value.value || value.default || "";
@@ -3075,8 +3125,9 @@ const loadPlugins = async () => {
             cleanedConfig[key] = String(value);
           }
         }
-        console.log(
-          `[Frontend] Cleaned config for ${plugin.id}:`,
+        logDebug(
+          "[Settings]",
+          `Cleaned config for ${plugin.id}:`,
           cleanedConfig,
         );
 
@@ -3085,12 +3136,16 @@ const loadPlugins = async () => {
         // This allows plugins to track form state separately from saved config
         pluginFormData.value[plugin.id] = { ...cleanedConfig };
       } catch (error) {
-        console.error(`Failed to load config for plugin ${plugin.id}:`, error);
+        logError(
+          "[Settings]",
+          `Failed to load config for plugin ${plugin.id}:`,
+          error,
+        );
         pluginConfigs.value[plugin.id] = {};
       }
     }
   } catch (error) {
-    console.error("Failed to load plugins:", error);
+    logError("[Settings]", "Failed to load plugins:", error);
   } finally {
     loadingPlugins.value = false;
   }
@@ -3328,12 +3383,13 @@ const savePluginConfig = async (pluginId) => {
     const updatedConfig = { ...currentConfig, ...formData };
 
     // Debug logging
-    console.log(
-      `[Frontend] Saving plugin config for ${pluginId}:`,
+    logDebug(
+      "[Settings]",
+      `Saving plugin config for ${pluginId}:`,
       updatedConfig,
     );
-    console.log(`[Frontend] Form data:`, formData);
-    console.log(`[Frontend] Current config:`, currentConfig);
+    logDebug("[Settings]", "Form data:", formData);
+    logDebug("[Settings]", "Current config:", currentConfig);
 
     // Ensure all values are strings, not objects
     const cleanedConfig = {};
@@ -3342,13 +3398,13 @@ const savePluginConfig = async (pluginId) => {
         cleanedConfig[key] = "";
       } else if (typeof value === "object") {
         // If it's an object, try to extract the actual value
-        console.warn(`[Frontend] Found object value for ${key}:`, value);
+        logWarn("[Settings]", `Found object value for ${key}:`, value);
         cleanedConfig[key] = value.value || value.default || "";
       } else {
         cleanedConfig[key] = String(value);
       }
     }
-    console.log(`[Frontend] Cleaned config:`, cleanedConfig);
+    logDebug("[Settings]", "Cleaned config:", cleanedConfig);
 
     await axios.put(`/api/plugins/${pluginId}`, cleanedConfig);
 
@@ -3445,13 +3501,17 @@ const testPluginConnection = async (pluginId) => {
 };
 
 const handleCustomAction = async (action) => {
-  console.log("[Settings] handleCustomAction called with:", action);
+  logDebug("[Settings]", "handleCustomAction called with:", action);
 
   const pluginId = action.pluginId;
   const endpoint = action.endpoint;
 
   if (!pluginId || !endpoint) {
-    console.error("Custom action missing pluginId or endpoint:", action);
+    logError(
+      "[Settings]",
+      "Custom action missing pluginId or endpoint:",
+      action,
+    );
     pluginTestStatus.value[pluginId || "unknown"] = {
       success: false,
       message: "Action configuration error: missing plugin ID or endpoint",
@@ -3461,12 +3521,12 @@ const handleCustomAction = async (action) => {
 
   // Extract action path from endpoint (e.g., "geocode" from "/api/plugins/{plugin_id}/geocode")
   const actionPath = endpoint.split("/").pop();
-  console.log("[Settings] Action path:", actionPath, "Plugin ID:", pluginId);
+  logDebug("[Settings]", "Action path:", actionPath, "Plugin ID:", pluginId);
 
   // Get form data for this plugin
   const formData = pluginFormData.value[pluginId] || {};
-  console.log("[Settings] Form data for plugin:", formData);
-  console.log("[Settings] All pluginFormData:", pluginFormData.value);
+  logDebug("[Settings]", "Form data for plugin:", formData);
+  logDebug("[Settings]", "All pluginFormData:", pluginFormData.value);
 
   try {
     if (actionPath === "geocode") {
@@ -3478,10 +3538,10 @@ const handleCustomAction = async (action) => {
       if (!location && pluginConfigs.value[pluginId]) {
         const config = pluginConfigs.value[pluginId];
         location = config.location || "";
-        console.log("[Settings] Got location from plugin config:", location);
+        logDebug("[Settings]", "Got location from plugin config:", location);
       }
 
-      console.log("[Settings] Location from form:", location);
+      logDebug("[Settings]", "Location from form:", location);
 
       if (!location || location.trim() === "") {
         pluginTestStatus.value[pluginId] = {
@@ -3494,8 +3554,9 @@ const handleCustomAction = async (action) => {
 
       // Call geocode endpoint (replace {plugin_id} placeholder)
       const actualEndpoint = endpoint.replace("{plugin_id}", pluginId);
-      console.log(
-        "[Settings] Calling geocode endpoint:",
+      logDebug(
+        "[Settings]",
+        "Calling geocode endpoint:",
         actualEndpoint,
         "with location:",
         location,

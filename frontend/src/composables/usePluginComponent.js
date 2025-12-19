@@ -11,6 +11,7 @@
  */
 
 import { shallowRef, ref, computed, watch, unref, markRaw } from "vue";
+import { logDebug, logWarn, logError } from "../utils/logger";
 
 // Cache for loaded components (use markRaw to prevent reactivity)
 const componentCache = new Map();
@@ -22,8 +23,9 @@ const pluginComponents = import.meta.glob("../components/plugins/**/*.vue", {
 
 // Debug: Log available components at module load (only in dev or if no components found)
 if (import.meta.env.DEV || Object.keys(pluginComponents).length === 0) {
-  console.log(
-    `[PluginComponent] Loaded ${Object.keys(pluginComponents).length} plugin components:`,
+  logDebug(
+    "[PluginComponent]",
+    `Loaded ${Object.keys(pluginComponents).length} plugin components:`,
     Object.keys(pluginComponents),
   );
 }
@@ -67,14 +69,15 @@ function findComponentInGlob(componentPath) {
 
   // Log available keys for debugging
   const availableKeys = Object.keys(pluginComponents);
-  console.warn(`[PluginComponent] Component not found: ${componentPath}`);
-  console.warn(`[PluginComponent] Tried paths:`, variations);
-  console.warn(
-    `[PluginComponent] Available glob keys (${availableKeys.length}):`,
+  logWarn("[PluginComponent]", `Component not found: ${componentPath}`);
+  logWarn("[PluginComponent]", "Tried paths:", variations);
+  logWarn(
+    "[PluginComponent]",
+    `Available glob keys (${availableKeys.length}):`,
     availableKeys.slice(0, 10),
   );
   if (availableKeys.length > 10) {
-    console.warn(`[PluginComponent] ... and ${availableKeys.length - 10} more`);
+    logWarn("[PluginComponent]", `... and ${availableKeys.length - 10} more`);
   }
 
   return null;
@@ -97,14 +100,16 @@ export async function loadPluginComponent(componentPath) {
     const moduleLoader = findComponentInGlob(componentPath);
 
     if (!moduleLoader) {
-      console.error(
-        `[PluginComponent] Component not found in glob: ${componentPath}`,
+      logError(
+        "[PluginComponent]",
+        `Component not found in glob: ${componentPath}`,
       );
       // In production, we should never reach here if the component was built
       // But provide a helpful error message
       if (import.meta.env.PROD) {
-        console.error(
-          `[PluginComponent] Component ${componentPath} was not included in the build. ` +
+        logError(
+          "[PluginComponent]",
+          `Component ${componentPath} was not included in the build. ` +
             `Make sure the component exists at frontend/src/components/plugins/${componentPath} ` +
             `and rebuild the frontend.`,
         );
@@ -122,8 +127,9 @@ export async function loadPluginComponent(componentPath) {
     componentCache.set(componentPath, rawComponent);
     return rawComponent;
   } catch (error) {
-    console.error(
-      `[PluginComponent] Failed to load component: ${componentPath}`,
+    logError(
+      "[PluginComponent]",
+      `Failed to load component: ${componentPath}`,
       error,
     );
     return null;
@@ -213,8 +219,9 @@ export function usePluginComponent(service) {
       }
     } catch (err) {
       error.value = err.message || String(err);
-      console.error(
-        `[PluginComponent] Error loading component for ${serviceRef.value?.id}:`,
+      logError(
+        "[PluginComponent]",
+        `Error loading component for ${serviceRef.value?.id}:`,
         err,
       );
     } finally {
