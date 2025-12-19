@@ -202,6 +202,15 @@ if [ "$HAS_CHANGES" = true ]; then
         exit 0  # Don't fail the service
     fi
 
+    # Get current git commit hash for frontend version (ensure git is available)
+    CURRENT_FRONTEND_COMMIT=$(cd "$REPO_DIR" && git rev-parse --short HEAD 2>/dev/null || echo "")
+    if [ -n "$CURRENT_FRONTEND_COMMIT" ]; then
+        echo "Building frontend with git commit: $CURRENT_FRONTEND_COMMIT" | tee -a "$LOG_FILE"
+        export GIT_COMMIT_HASH="$CURRENT_FRONTEND_COMMIT"
+    else
+        echo "Warning: Could not get git commit hash for frontend version" | tee -a "$LOG_FILE"
+    fi
+
     # Rebuild frontend (this will update the build timestamp for cache busting)
     echo "Rebuilding frontend..." | tee -a "$LOG_FILE"
     if ! npm run build 2>&1 | tee -a "$LOG_FILE"; then

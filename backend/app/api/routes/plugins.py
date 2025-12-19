@@ -122,10 +122,14 @@ async def get_plugins(plugin_type: str | None = None):
             "type": plugin_type.value if hasattr(plugin_type, "value") else str(plugin_type),
             "description": type_info.get("description", ""),
             "config_schema": type_info.get("common_config_schema", {}),
+            "instance_config_schema": type_info.get("instance_config_schema", {}),
             "enabled": enabled,
             "ui_actions": type_info.get("ui_actions", []),  # Plugin-specific actions (buttons)
             # Plugin-specific sections (upload, manage, etc.)
             "ui_sections": type_info.get("ui_sections", []),
+            # Whether plugin supports multiple instances
+            # (defaults to True for backward compatibility)
+            "supports_multiple_instances": type_info.get("supports_multiple_instances", True),
         }
 
         # Include error message if plugin is broken
@@ -323,13 +327,42 @@ async def get_plugin_instances(plugin_id: str):
         plugin = plugin_manager.get_plugin(db_plugin.id)
         running = plugin.is_running() if plugin else False
 
+        # Serialize config, converting Path objects and other non-serializable types to strings
+        def serialize_value(val):
+            """Recursively serialize values to JSON-serializable types."""
+            if val is None:
+                return None
+            elif isinstance(val, str | int | float | bool):
+                return val
+            elif isinstance(val, Path):
+                return str(val)
+            elif isinstance(val, dict):
+                return {k: serialize_value(v) for k, v in val.items()}
+            elif isinstance(val, list):
+                return [serialize_value(item) for item in val]
+            else:
+                # For any other type (including Path-like objects), convert to string
+                try:
+                    # Try to get string representation
+                    if hasattr(val, "__str__"):
+                        return str(val)
+                    elif hasattr(val, "path"):
+                        return str(val.path)
+                    else:
+                        return str(val)
+                except Exception:
+                    return "[Unable to serialize]"
+
+        config = db_plugin.config or {}
+        serialized_config = serialize_value(config)
+
         instances.append(
             {
                 "id": db_plugin.id,
                 "name": db_plugin.name,
                 "enabled": db_plugin.enabled,
                 "running": running,
-                "config": mask_sensitive_config(db_plugin.config or {}, mask_for_frontend=True),
+                "config": mask_sensitive_config(serialized_config, mask_for_frontend=True),
             }
         )
 
@@ -1076,6 +1109,108 @@ async def uninstall_plugin(plugin_id: str):
         raise HTTPException(status_code=404, detail=str(e))
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"Failed to uninstall plugin: {str(e)}")
+
+
+@router.get("/plugins/directories")
+async def browse_directories(path: str = "/"):
+    """
+    Browse directories on the server.
+
+    Args:
+        path: Directory path to browse (default: root)
+
+    Returns:
+        List of directories and files in the specified path
+    """
+    import os
+
+    # Security: Only allow browsing within safe directories
+    # Restrict to common safe paths and prevent directory traversal
+    safe_base_paths = [
+        os.path.expanduser("~"),  # User home directory
+        "/",  # Root (on Linux)
+        "C:\\",  # Root (on Windows)
+        ".",  # Current directory
+        "./data",  # Data directory
+    ]
+
+    # Normalize the path
+    try:
+        if os.path.isabs(path):
+            normalized_path = os.path.normpath(path)
+        else:
+            # Relative paths are relative to current working directory
+            normalized_path = os.path.normpath(os.path.join(os.getcwd(), path))
+
+        # Security check: Ensure we're not trying to access system directories
+        # Allow common safe paths
+        is_safe = False
+        for safe_base in safe_base_paths:
+            safe_base_norm = os.path.normpath(os.path.abspath(safe_base))
+            if normalized_path.startswith(safe_base_norm) or normalized_path == safe_base_norm:
+                is_safe = True
+                break
+
+        # Also allow paths that are subdirectories of safe paths
+        if not is_safe:
+            for safe_base in safe_base_paths:
+                safe_base_norm = os.path.normpath(os.path.abspath(safe_base))
+                try:
+                    # Check if normalized_path is within safe_base
+                    common_path = os.path.commonpath([normalized_path, safe_base_norm])
+                    if common_path == safe_base_norm:
+                        is_safe = True
+                        break
+                except ValueError:
+                    # Paths are on different drives (Windows)
+                    continue
+
+        if not is_safe:
+            raise HTTPException(
+                status_code=403,
+                detail=f"Access to path '{path}' is not allowed for security reasons",
+            )
+
+        # Check if path exists and is a directory
+        if not os.path.exists(normalized_path):
+            raise HTTPException(status_code=404, detail=f"Path '{path}' does not exist")
+
+        if not os.path.isdir(normalized_path):
+            raise HTTPException(status_code=400, detail=f"Path '{path}' is not a directory")
+
+        # List directory contents
+        items = []
+        try:
+            for item in sorted(os.listdir(normalized_path)):
+                item_path = os.path.join(normalized_path, item)
+                try:
+                    is_dir = os.path.isdir(item_path)
+                    items.append(
+                        {
+                            "name": item,
+                            "path": item_path,
+                            "is_directory": is_dir,
+                        }
+                    )
+                except (OSError, PermissionError):
+                    # Skip items we can't access
+                    continue
+        except PermissionError:
+            raise HTTPException(
+                status_code=403, detail=f"Permission denied accessing path '{path}'"
+            )
+
+        return {
+            "current_path": normalized_path,
+            "parent_path": os.path.dirname(normalized_path)
+            if normalized_path != os.path.dirname(normalized_path)
+            else None,
+            "items": items,
+        }
+    except HTTPException:
+        raise
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Error browsing directory: {str(e)}")
 
 
 @router.get("/plugins/installed/{plugin_id}")

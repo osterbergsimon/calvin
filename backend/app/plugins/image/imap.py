@@ -26,7 +26,8 @@ class ImapImagePlugin(ImagePlugin):
             "name": "Email (IMAP)",
             "description": "Download images from email attachments. Works with Gmail, Outlook, and any IMAP provider. Share photos from Android using Share → Email.",  # noqa: E501
             "version": "1.0.0",
-            "common_config_schema": {
+            "common_config_schema": {},
+            "instance_config_schema": {
                 "email_address": {
                     "type": "string",
                     "description": "Email address to check for images",

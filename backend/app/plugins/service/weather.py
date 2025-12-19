@@ -26,6 +26,7 @@ class WeatherServicePlugin(ServicePlugin):
                     "type": "password",
                     "description": "OpenWeatherMap API key",
                     "default": "",
+                    "global_only": True,  # This field is global, not instance-specific
                     "ui": {
                         "component": "password",
                         "placeholder": "Enter your OpenWeatherMap API key",
@@ -35,6 +36,23 @@ class WeatherServicePlugin(ServicePlugin):
                         },
                     },
                 },
+                "display_order": {
+                    "type": "integer",
+                    "description": "Display order for service instances",
+                    "default": 0,
+                    "ui": {
+                        "component": "number",
+                        "help_text": (
+                            "Order for display/switching (lower numbers appear first). "
+                            "This applies to all instances of this plugin type."
+                        ),
+                        "validation": {
+                            "min": 0,
+                        },
+                    },
+                },
+            },
+            "instance_config_schema": {
                 "location": {
                     "type": "string",
                     "description": "Location (city name, state code, country code)",
@@ -74,6 +92,15 @@ class WeatherServicePlugin(ServicePlugin):
                             "min": 1,
                             "max": 5,
                         },
+                    },
+                },
+                "fullscreen": {
+                    "type": "boolean",
+                    "description": "Prefer fullscreen mode",
+                    "default": False,
+                    "ui": {
+                        "component": "checkbox",
+                        "help_text": "Open this service in fullscreen by default",
                     },
                 },
             },

@@ -3,21 +3,51 @@ import vue from "@vitejs/plugin-vue";
 import { fileURLToPath, URL } from "node:url";
 import { execSync } from "child_process";
 import { join, dirname } from "path";
+import { existsSync } from "fs";
 
 // Get git version (commit short hash) for frontend version
 function getGitVersion() {
+  // First, try to use environment variable if set (from update script)
+  if (process.env.GIT_COMMIT_HASH) {
+    const envVersion = process.env.GIT_COMMIT_HASH.trim();
+    if (envVersion && envVersion.length >= 7) {
+      return envVersion;
+    }
+  }
+
   try {
     // Get the project root (parent of frontend directory)
     const frontendDir = dirname(fileURLToPath(import.meta.url));
     const projectRoot = join(frontendDir, "..");
+
+    // Check if .git directory exists
+    const gitDir = join(projectRoot, ".git");
+    if (!existsSync(gitDir)) {
+      return null;
+    }
+
+    // Try to get git version, with better error handling
     const version = execSync("git rev-parse --short HEAD", {
       cwd: projectRoot,
       encoding: "utf-8",
-      stdio: "pipe",
+      stdio: ["ignore", "pipe", "pipe"], // Ignore stdin, capture stdout/stderr
+      timeout: 5000, // 5 second timeout
     }).trim();
-    return version;
+
+    // Validate that we got a reasonable hash (7 characters)
+    if (version && version.length >= 7) {
+      return version;
+    }
+
+    console.warn(`[vite] Warning: Got unexpected git version: "${version}"`);
+    return null;
   } catch (error) {
-    // Git not available or error occurred
+    // Git not available or error occurred - log for debugging but don't fail build
+    if (process.env.NODE_ENV !== "production") {
+      console.warn(
+        `[vite] Warning: Could not get git version: ${error.message}`,
+      );
+    }
     return null;
   }
 }

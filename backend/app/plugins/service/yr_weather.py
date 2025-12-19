@@ -22,6 +22,23 @@ class YrWeatherServicePlugin(ServicePlugin):
             "description": "Display current weather conditions and forecast from Yr.no (Norwegian Meteorological Institute)",  # noqa: E501
             "version": "1.0.0",
             "common_config_schema": {
+                "display_order": {
+                    "type": "integer",
+                    "description": "Display order for service instances",
+                    "default": 0,
+                    "ui": {
+                        "component": "number",
+                        "help_text": (
+                            "Order for display/switching (lower numbers appear first). "
+                            "This applies to all instances of this plugin type."
+                        ),
+                        "validation": {
+                            "min": 0,
+                        },
+                    },
+                },
+            },
+            "instance_config_schema": {
                 "location": {
                     "type": "string",
                     "description": "Location name (city, address, etc.)",
@@ -87,6 +104,15 @@ class YrWeatherServicePlugin(ServicePlugin):
                             "min": 1,
                             "max": 9,
                         },
+                    },
+                },
+                "fullscreen": {
+                    "type": "boolean",
+                    "description": "Prefer fullscreen mode",
+                    "default": False,
+                    "ui": {
+                        "component": "checkbox",
+                        "help_text": "Open this service in fullscreen by default",
                     },
                 },
             },

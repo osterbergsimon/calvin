@@ -19,7 +19,47 @@ class IframeServicePlugin(ServicePlugin):
             "name": "Iframe Service",
             "description": "Web service displayed in iframe",
             "version": "1.0.0",
-            "common_config_schema": {},
+            "common_config_schema": {
+                "display_order": {
+                    "type": "integer",
+                    "description": "Display order for service instances",
+                    "default": 0,
+                    "ui": {
+                        "component": "number",
+                        "help_text": (
+                            "Order for display/switching (lower numbers appear first). "
+                            "This applies to all instances of this plugin type."
+                        ),
+                        "validation": {
+                            "min": 0,
+                        },
+                    },
+                },
+            },
+            "instance_config_schema": {
+                "url": {
+                    "type": "string",
+                    "description": "Website URL",
+                    "default": "",
+                    "ui": {
+                        "component": "input",
+                        "placeholder": "https://example.com",
+                        "validation": {
+                            "required": True,
+                            "type": "url",
+                        },
+                    },
+                },
+                "fullscreen": {
+                    "type": "boolean",
+                    "description": "Prefer fullscreen mode",
+                    "default": False,
+                    "ui": {
+                        "component": "checkbox",
+                        "help_text": "Open this service in fullscreen by default",
+                    },
+                },
+            },
             "display_schema": {
                 "type": "iframe",
                 "api_endpoint": None,  # Iframe services don't use API endpoints

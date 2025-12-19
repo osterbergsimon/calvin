@@ -726,6 +726,73 @@
             </div>
           </section>
 
+          <!-- Service Ordering -->
+          <section
+            class="settings-section collapsible"
+            :class="{ expanded: expandedSections.serviceOrdering }"
+          >
+            <div
+              class="section-header"
+              @click="toggleSection('serviceOrdering')"
+            >
+              <h2>Service Ordering</h2>
+              <span class="toggle-icon">{{
+                expandedSections.serviceOrdering ? "▼" : "▶"
+              }}</span>
+            </div>
+            <div
+              v-show="expandedSections.serviceOrdering"
+              class="section-content"
+            >
+              <div class="setting-item">
+                <p class="help-text">
+                  Configure the display order of service plugins. Lower numbers
+                  appear first in the service rotation. Drag to reorder or use
+                  the number inputs.
+                </p>
+              </div>
+              <div class="service-ordering-list">
+                <div
+                  v-for="(plugin, index) in sortedServicePlugins"
+                  :key="plugin.id"
+                  class="service-plugin-order-item"
+                >
+                  <div class="service-plugin-order-handle">
+                    <span class="order-number">{{ index + 1 }}</span>
+                    <span class="drag-handle">⋮⋮</span>
+                  </div>
+                  <div class="service-plugin-info">
+                    <strong>{{ plugin.name }}</strong>
+                    <span
+                      v-if="
+                        pluginInstances[plugin.id] &&
+                        pluginInstances[plugin.id].length > 0
+                      "
+                      class="instance-count-badge"
+                    >
+                      {{ pluginInstances[plugin.id].length }}
+                      {{
+                        pluginInstances[plugin.id].length === 1
+                          ? "instance"
+                          : "instances"
+                      }}
+                    </span>
+                  </div>
+                  <div class="service-plugin-order-control">
+                    <label>Order:</label>
+                    <input
+                      v-model.number="pluginDisplayOrders[plugin.id]"
+                      type="number"
+                      class="order-input"
+                      min="0"
+                      @change="updateServicePluginOrder(plugin.id)"
+                    />
+                  </div>
+                </div>
+              </div>
+            </div>
+          </section>
+
           <!-- Plugins Settings -->
           <section
             class="settings-section collapsible"
@@ -811,12 +878,20 @@
                             <button
                               v-if="
                                 Object.keys(plugin.config_schema || {}).length >
-                                0
+                                  0 ||
+                                (pluginInstances[plugin.id] &&
+                                  pluginInstances[plugin.id].length > 0) ||
+                                plugin.type === 'service'
                               "
                               class="btn-settings-icon"
                               :class="{ active: expandedPlugins[plugin.id] }"
                               @click="togglePluginSettings(plugin.id)"
-                              title="Show settings"
+                              :title="
+                                Object.keys(plugin.config_schema || {}).length >
+                                0
+                                  ? 'Show settings'
+                                  : 'Show instances'
+                              "
                             >
                               ⚙️
                             </button>
@@ -844,14 +919,15 @@
                       class="plugin-config"
                     >
                       <!-- Common Settings (for plugin type) -->
+                      <!-- Show fields from common_config_schema that are marked as global_only or all fields for non-service plugins -->
                       <div
                         v-if="
-                          Object.keys(plugin.config_schema || {}).length > 0
+                          Object.keys(getGlobalConfigSchema(plugin)).length > 0
                         "
                       >
                         <h4 class="config-section-title">Common Settings</h4>
                         <div
-                          v-for="(schema, key) in plugin.config_schema"
+                          v-for="(schema, key) in getGlobalConfigSchema(plugin)"
                           :key="key"
                           class="plugin-setting"
                         >
@@ -886,6 +962,25 @@
                         />
                       </div>
 
+                      <!-- For service plugins, show a note that settings are per-instance -->
+                      <!-- For service plugins without global settings, show a note that settings are per-instance -->
+                      <div
+                        v-if="
+                          plugin.type === 'service' &&
+                          Object.keys(getGlobalConfigSchema(plugin)).length ===
+                            0 &&
+                          Object.keys(plugin.config_schema || {}).length > 0
+                        "
+                        class="plugin-instance-note"
+                      >
+                        <p class="help-text">
+                          This plugin supports multiple instances. Configure
+                          settings for each instance using the "Add Instance"
+                          button below. Plugin-global settings are not available
+                          for this plugin type.
+                        </p>
+                      </div>
+
                       <!-- Plugin Sections (upload, manage images, etc.) -->
                       <PluginSections
                         v-if="
@@ -906,6 +1001,186 @@
                         @upload="handleFileSelectFromSection"
                         @delete-image="deleteImage"
                       />
+
+                      <!-- Plugin Instances (not shown for calendar plugins or single-instance plugins) -->
+                      <div
+                        v-if="
+                          plugin.enabled &&
+                          plugin.type !== 'calendar' &&
+                          plugin.supports_multiple_instances !== false
+                        "
+                        class="plugin-instances-section"
+                      >
+                        <div class="instances-header">
+                          <h4 class="config-section-title">
+                            Instances
+                            <span
+                              v-if="
+                                pluginInstances[plugin.id] &&
+                                pluginInstances[plugin.id].length > 0
+                              "
+                              class="instance-count"
+                            >
+                              ({{ pluginInstances[plugin.id].length }})
+                            </span>
+                          </h4>
+                          <button
+                            class="btn-add-instance"
+                            @click="openAddInstanceModal(plugin.id)"
+                            title="Add new instance"
+                          >
+                            + Add Instance
+                          </button>
+                        </div>
+
+                        <div
+                          v-if="
+                            !pluginInstances[plugin.id] ||
+                            pluginInstances[plugin.id].length === 0
+                          "
+                          class="empty-instances"
+                        >
+                          <p class="help-text">
+                            No instances configured. Click "Add Instance" to
+                            create one.
+                          </p>
+                        </div>
+                        <div v-else class="instances-list">
+                          <div
+                            v-for="instance in pluginInstances[plugin.id]"
+                            :key="instance.id"
+                            class="instance-item"
+                            :class="{ disabled: !instance.enabled }"
+                          >
+                            <div class="instance-info">
+                              <div class="instance-header">
+                                <h5>{{ instance.name }}</h5>
+                                <span
+                                  v-if="instance.running !== undefined"
+                                  class="running-indicator"
+                                  :class="{
+                                    running: instance.running,
+                                    stopped: !instance.running,
+                                  }"
+                                  :title="
+                                    instance.running
+                                      ? 'Instance is running'
+                                      : 'Instance is stopped'
+                                  "
+                                >
+                                  {{ instance.running ? "●" : "○" }}
+                                </span>
+                              </div>
+                              <div
+                                v-if="instance.config"
+                                class="instance-details"
+                              >
+                                <!-- Show key config values from instance config -->
+                                <!-- Display first non-empty, non-sensitive string value -->
+                                <template
+                                  v-for="(value, key) in instance.config"
+                                  :key="key"
+                                >
+                                  <span
+                                    v-if="
+                                      (typeof value === 'string' ||
+                                        (value && typeof value === 'object')) &&
+                                      ![
+                                        'api_token',
+                                        'api_key',
+                                        'password',
+                                        'token',
+                                      ].some((s) =>
+                                        key.toLowerCase().includes(s),
+                                      )
+                                    "
+                                    class="instance-detail"
+                                  >
+                                    {{
+                                      typeof value === "object" &&
+                                      value !== null
+                                        ? typeof value.toString === "function"
+                                          ? value.toString()
+                                          : value.path
+                                            ? String(value.path)
+                                            : String(value)
+                                        : value
+                                    }}
+                                  </span>
+                                  <span
+                                    v-else-if="
+                                      (typeof value === 'number' ||
+                                        typeof value === 'boolean') &&
+                                      ![
+                                        'api_token',
+                                        'api_key',
+                                        'password',
+                                        'token',
+                                      ].some((s) =>
+                                        key.toLowerCase().includes(s),
+                                      )
+                                    "
+                                    class="instance-detail"
+                                  >
+                                    {{ String(value) }}
+                                  </span>
+                                </template>
+                              </div>
+                            </div>
+                            <div class="instance-actions">
+                              <label class="toggle-switch">
+                                <input
+                                  type="checkbox"
+                                  :checked="instance.enabled"
+                                  @change="
+                                    togglePluginInstance(
+                                      instance.id,
+                                      $event.target.checked,
+                                    )
+                                  "
+                                />
+                                <span class="slider" />
+                              </label>
+                              <button
+                                v-if="
+                                  instance.enabled &&
+                                  instance.running !== undefined
+                                "
+                                class="btn-secondary btn-small"
+                                :class="{ 'btn-stop': instance.running }"
+                                :title="
+                                  instance.running
+                                    ? 'Stop instance'
+                                    : 'Start instance'
+                                "
+                                @click="
+                                  instance.running
+                                    ? stopPluginInstance(instance.id)
+                                    : startPluginInstance(instance.id)
+                                "
+                              >
+                                {{ instance.running ? "Stop" : "Start" }}
+                              </button>
+                              <button
+                                class="btn-edit btn-small"
+                                title="Edit instance"
+                                @click="
+                                  openEditInstanceModal(plugin.id, instance)
+                                "
+                              >
+                                Edit
+                              </button>
+                              <button
+                                class="btn-remove btn-small"
+                                title="Delete instance"
+                                @click="deletePluginInstance(instance.id)"
+                              >
+                                Delete
+                              </button>
+                            </div>
+                          </div>
+                        </div>
+                      </div>
                     </div>
                     <div
                       v-else-if="!plugin.enabled"
@@ -916,160 +1191,6 @@
                         dropdowns and existing instances will be hidden (but not
                         deleted).
                       </p>
-                    </div>
-                  </div>
-                </div>
-              </div>
-            </div>
-          </section>
-
-          <!-- Web Services Settings -->
-          <section
-            class="settings-section collapsible"
-            :class="{ expanded: expandedSections.webServices }"
-          >
-            <div class="section-header" @click="toggleSection('webServices')">
-              <h2>Web Services</h2>
-              <span class="toggle-icon">{{
-                expandedSections.webServices ? "▼" : "▶"
-              }}</span>
-            </div>
-            <div v-show="expandedSections.webServices" class="section-content">
-              <!-- Meal Plan Settings -->
-              <div class="setting-item">
-                <label>Meal Plan Card Size</label>
-                <select
-                  v-model="localConfig.mealPlanCardSize"
-                  @change="updateMealPlanCardSize"
-                >
-                  <option value="small">Small (fit 7+ cards)</option>
-                  <option value="medium">Medium (default)</option>
-                  <option value="large">Large</option>
-                </select>
-                <span class="help-text"
-                  >Size of meal plan cards. Smaller size allows more cards to
-                  fit on screen.</span
-                >
-              </div>
-
-              <!-- Add Web Service Form -->
-              <div class="add-web-service-form">
-                <h3>Add Web Service</h3>
-                <div class="form-group">
-                  <label>Service Name</label>
-                  <input
-                    v-model="newWebService.name"
-                    type="text"
-                    placeholder="Shopping List"
-                    class="form-input"
-                  />
-                </div>
-                <div class="form-group">
-                  <label>Service URL</label>
-                  <input
-                    v-model="newWebService.url"
-                    type="text"
-                    placeholder="https://example.com/shopping"
-                    class="form-input"
-                  />
-                  <span class="help-text">
-                    Note: Some websites block embedding in iframes due to
-                    security restrictions (CORS/X-Frame-Options). If a service
-                    cannot be embedded, you'll see an error message with an
-                    option to open it in a new window.
-                  </span>
-                </div>
-                <div class="form-group">
-                  <label>
-                    <input v-model="newWebService.fullscreen" type="checkbox" />
-                    Prefer Fullscreen Mode
-                  </label>
-                  <span class="help-text"
-                    >Open this service in fullscreen by default</span
-                  >
-                </div>
-                <button
-                  class="btn-add"
-                  :disabled="!canAddWebService"
-                  @click="addWebService"
-                >
-                  Add Web Service
-                </button>
-              </div>
-
-              <!-- Web Services List -->
-              <div class="web-services-list">
-                <h3>Configured Web Services</h3>
-                <div v-if="webServices.length === 0" class="empty-state">
-                  <p>No web services configured</p>
-                  <p class="help-text">
-                    Add a web service above to get started
-                  </p>
-                </div>
-                <div v-else class="services-list">
-                  <div
-                    v-for="service in webServices"
-                    :key="service.id"
-                    class="service-item"
-                  >
-                    <div class="service-info">
-                      <div class="service-header">
-                        <h4>{{ service.name }}</h4>
-                        <span class="service-url-display">{{
-                          service.url
-                        }}</span>
-                      </div>
-                      <div class="service-settings">
-                        <div class="service-setting">
-                          <label>Display Order:</label>
-                          <input
-                            type="number"
-                            :value="service.display_order"
-                            class="order-input"
-                            min="0"
-                            @change="
-                              updateServiceOrder(
-                                service.id,
-                                parseInt($event.target.value),
-                              )
-                            "
-                          />
-                        </div>
-                        <div class="service-setting">
-                          <label>
-                            <input
-                              type="checkbox"
-                              :checked="service.fullscreen"
-                              @change="
-                                updateServiceFullscreen(
-                                  service.id,
-                                  $event.target.checked,
-                                )
-                              "
-                            />
-                            Prefer Fullscreen
-                          </label>
-                        </div>
-                      </div>
-                    </div>
-                    <div class="service-actions">
-                      <label class="toggle-switch">
-                        <input
-                          type="checkbox"
-                          :checked="service.enabled"
-                          @change="
-                            toggleWebService(service.id, $event.target.checked)
-                          "
-                        />
-                        <span class="slider" />
-                      </label>
-                      <button
-                        class="btn-remove"
-                        title="Remove web service"
-                        @click="removeWebService(service.id)"
-                      >
-                        Remove
-                      </button>
                     </div>
                   </div>
                 </div>
@@ -1496,6 +1617,115 @@
       </section>
     </div>
   </div>
+
+  <!-- Instance Creation/Edit Modal -->
+  <div
+    v-if="showInstanceModal"
+    class="modal-overlay"
+    @click.self="closeInstanceModal"
+  >
+    <div class="modal-content instance-modal">
+      <div class="modal-header">
+        <h3>
+          {{
+            editingInstance
+              ? `Edit ${editingInstance.name}`
+              : `Add ${currentPluginType?.name || "Instance"}`
+          }}
+        </h3>
+        <button class="btn-close-modal" @click="closeInstanceModal">×</button>
+      </div>
+      <div class="modal-body">
+        <div v-if="instanceFormError" class="error-message">
+          {{ instanceFormError }}
+        </div>
+        <form @submit.prevent="saveInstance">
+          <!-- Instance Name -->
+          <div class="form-group">
+            <label>Instance Name</label>
+            <input
+              v-model="instanceForm.name"
+              type="text"
+              class="form-input"
+              placeholder="Enter instance name"
+              required
+            />
+          </div>
+
+          <!-- Instance-specific fields from instance_config_schema -->
+          <template
+            v-if="
+              currentPluginType?.instance_config_schema &&
+              Object.keys(currentPluginType.instance_config_schema).length > 0
+            "
+          >
+            <div
+              v-for="(schema, key) in currentPluginType.instance_config_schema"
+              :key="key"
+              class="form-group"
+            >
+              <PluginFieldRenderer
+                :plugin-id="currentPluginType.id"
+                :field-key="key"
+                :schema="schema"
+                :value="getInstanceFormValue(key, schema)"
+                @update="updateInstanceFormValue(key, $event)"
+              />
+            </div>
+
+            <!-- Show note about global settings if plugin has them -->
+            <div
+              v-if="
+                Object.keys(getGlobalConfigSchema(currentPluginType)).length > 0
+              "
+              class="form-group"
+            >
+              <p class="help-text">
+                <strong>Note:</strong> Some settings (like API keys) are
+                configured in the plugin's global settings above and are shared
+                across all instances.
+              </p>
+            </div>
+          </template>
+
+          <!-- Fallback for plugins without instance_config_schema -->
+          <template v-else>
+            <div class="form-group">
+              <p class="help-text">
+                This plugin type does not support instance-specific
+                configuration.
+              </p>
+            </div>
+          </template>
+
+          <!-- Enable/Disable -->
+          <div class="form-group">
+            <label>
+              <input v-model="instanceForm.enabled" type="checkbox" />
+              Enable this instance
+            </label>
+          </div>
+
+          <div class="modal-actions">
+            <button
+              type="button"
+              class="btn-secondary"
+              @click="closeInstanceModal"
+            >
+              Cancel
+            </button>
+            <button
+              type="submit"
+              class="btn-primary"
+              :disabled="savingInstance"
+            >
+              {{ savingInstance ? "Saving..." : "Save" }}
+            </button>
+          </div>
+        </form>
+      </div>
+    </div>
+  </div>
 </template>
 
 <script setup>
@@ -1504,7 +1734,6 @@ import { useRouter } from "vue-router";
 import { useConfigStore } from "../stores/config";
 import { useKeyboardStore } from "../stores/keyboard";
 import { useCalendarStore } from "../stores/calendar";
-import { useWebServicesStore } from "../stores/webServices";
 import { useModeStore } from "../stores/mode";
 import { useImagesStore } from "../stores/images";
 import axios from "axios";
@@ -1517,7 +1746,6 @@ const router = useRouter();
 const configStore = useConfigStore();
 const keyboardStore = useKeyboardStore();
 const calendarStore = useCalendarStore();
-const webServicesStore = useWebServicesStore();
 const modeStore = useModeStore();
 const imagesStore = useImagesStore();
 
@@ -1602,13 +1830,13 @@ const activeCategory = ref("layout");
 
 // Collapsible sections state
 const expandedSections = ref({
+  serviceOrdering: false,
   display: true,
   ui: true,
   photos: true,
   photoFrame: false,
   keyboard: false,
   calendar: false,
-  webServices: false,
   plugins: false,
   displayPower: false,
   rebootCombo: false,
@@ -1623,7 +1851,6 @@ const toggleSection = (section) => {
 
 const currentMappings = ref({});
 const calendarSources = ref([]);
-const webServices = ref([]);
 const imagesList = ref([]);
 const uploading = ref(false);
 const uploadError = ref("");
@@ -1633,6 +1860,19 @@ const uploadSuccess = ref("");
 const plugins = ref([]);
 const pluginInstances = ref({}); // Store instances by plugin type ID: { [pluginId]: [{ id, name, enabled, running, config }] }
 const pluginConfigs = ref({}); // Store configs by plugin type ID
+const pluginDisplayOrders = ref({}); // Store display orders for service plugins
+
+// Instance modal state
+const showInstanceModal = ref(false);
+const editingInstance = ref(null);
+const currentPluginType = ref(null);
+// Instance form - dynamically populated from instance_config_schema
+const instanceForm = ref({
+  name: "",
+  enabled: true,
+});
+const instanceFormError = ref("");
+const savingInstance = ref(false);
 const expandedPlugins = ref({}); // Track which plugin settings are expanded
 // const expandedManageImages = ref({}); // Track which plugins have manage images expanded (unused for now)
 const pluginFormData = ref({}); // Store form data before saving
@@ -1651,12 +1891,6 @@ const newCalendarSource = ref({
   ical_url: "",
 });
 
-const newWebService = ref({
-  name: "",
-  url: "",
-  fullscreen: false,
-});
-
 // Update from GitHub state
 const updateInProgress = ref(false);
 const updateMessage = ref("");
@@ -1666,13 +1900,6 @@ const canAddCalendar = computed(() => {
   return (
     newCalendarSource.value.name.trim() !== "" &&
     newCalendarSource.value.ical_url.trim() !== ""
-  );
-});
-
-const canAddWebService = computed(() => {
-  return (
-    newWebService.value.name.trim() !== "" &&
-    newWebService.value.url.trim() !== ""
   );
 });
 
@@ -2145,7 +2372,7 @@ const sortedPluginCategories = computed(() => {
 
   const grouped = {};
 
-  // Group plugins by type
+  // Group plugins by type (calendar plugins show here but instance management is in Calendar Settings)
   for (const plugin of plugins.value) {
     const type = plugin.type || "service";
     if (!grouped[type]) {
@@ -2185,6 +2412,23 @@ const sortedPluginCategories = computed(() => {
   }
 
   return categories;
+});
+
+// Service ordering
+const servicePlugins = computed(() => {
+  return plugins.value.filter((p) => p.type === "service");
+});
+
+const sortedServicePlugins = computed(() => {
+  return [...servicePlugins.value].sort((a, b) => {
+    const orderA = pluginDisplayOrders.value[a.id] ?? 0;
+    const orderB = pluginDisplayOrders.value[b.id] ?? 0;
+    if (orderA !== orderB) {
+      return orderA - orderB;
+    }
+    // If same order, sort by name
+    return a.name.localeCompare(b.name);
+  });
 });
 
 // Active plugin tab
@@ -2541,14 +2785,7 @@ const loadCalendarSources = async () => {
   }
 };
 
-const loadWebServices = async () => {
-  try {
-    await webServicesStore.fetchServices();
-    webServices.value = webServicesStore.services;
-  } catch (error) {
-    console.error("Failed to load web services:", error);
-  }
-};
+// loadWebServices removed - instances are now loaded through loadPlugins
 
 const loadImages = async () => {
   try {
@@ -2692,93 +2929,7 @@ const addCalendarSource = async () => {
   }
 };
 
-const addWebService = async () => {
-  if (!canAddWebService.value) {
-    alert("Please fill in service name and URL");
-    return;
-  }
-
-  try {
-    const service = {
-      name: newWebService.value.name.trim(),
-      url: newWebService.value.url.trim(),
-      enabled: true,
-      display_order: webServices.value.length,
-      fullscreen: newWebService.value.fullscreen,
-    };
-
-    await webServicesStore.addService(service);
-
-    // Reset form
-    newWebService.value = {
-      name: "",
-      url: "",
-      fullscreen: false,
-    };
-
-    // Reload services
-    await loadWebServices();
-  } catch (error) {
-    console.error("Failed to add web service:", error);
-    const errorMessage =
-      error.response?.data?.detail ||
-      error.message ||
-      "Failed to add web service";
-    alert(`Error: ${errorMessage}`);
-  }
-};
-
-const removeWebService = async (serviceId) => {
-  if (!confirm("Are you sure you want to remove this web service?")) {
-    return;
-  }
-
-  try {
-    await webServicesStore.removeService(serviceId);
-    await loadWebServices();
-  } catch (error) {
-    console.error("Failed to remove web service:", error);
-    alert(
-      `Error: ${error.response?.data?.detail || error.message || "Failed to remove web service"}`,
-    );
-  }
-};
-
-const toggleWebService = async (serviceId, enabled) => {
-  try {
-    await webServicesStore.updateService(serviceId, { enabled });
-    await loadWebServices();
-  } catch (error) {
-    console.error("Failed to toggle web service:", error);
-    alert(
-      `Error: ${error.response?.data?.detail || error.message || "Failed to toggle web service"}`,
-    );
-  }
-};
-
-const updateServiceOrder = async (serviceId, order) => {
-  try {
-    await webServicesStore.updateService(serviceId, { display_order: order });
-    await loadWebServices();
-  } catch (error) {
-    console.error("Failed to update service order:", error);
-    alert(
-      `Error: ${error.response?.data?.detail || error.message || "Failed to update service order"}`,
-    );
-  }
-};
-
-const updateServiceFullscreen = async (serviceId, fullscreen) => {
-  try {
-    await webServicesStore.updateService(serviceId, { fullscreen });
-    await loadWebServices();
-  } catch (error) {
-    console.error("Failed to update service fullscreen setting:", error);
-    alert(
-      `Error: ${error.response?.data?.detail || error.message || "Failed to update service setting"}`,
-    );
-  }
-};
+// Web service functions removed - now handled through instance management
 
 const saveConfig = async () => {
   try {
@@ -3067,6 +3218,38 @@ const loadPlugins = async () => {
       ) {
         plugin.config_schema = {};
       }
+      // Ensure instance_config_schema is always an object
+      if (
+        plugin.instance_config_schema &&
+        typeof plugin.instance_config_schema === "string"
+      ) {
+        try {
+          plugin.instance_config_schema = JSON.parse(
+            plugin.instance_config_schema,
+          );
+        } catch (e) {
+          console.error(
+            `Failed to parse instance_config_schema for plugin ${plugin.id}:`,
+            e,
+          );
+          plugin.instance_config_schema = {};
+        }
+      } else if (
+        !plugin.instance_config_schema ||
+        typeof plugin.instance_config_schema !== "object"
+      ) {
+        plugin.instance_config_schema = {};
+      }
+      // Debug log to verify instance_config_schema is loaded
+      if (
+        plugin.type === "service" &&
+        Object.keys(plugin.instance_config_schema).length > 0
+      ) {
+        logDebug(
+          "[Settings]",
+          `Plugin ${plugin.id} has instance_config_schema with ${Object.keys(plugin.instance_config_schema).length} fields`,
+        );
+      }
       // Ensure ui_actions and ui_sections are arrays
       if (!plugin.ui_actions || !Array.isArray(plugin.ui_actions)) {
         plugin.ui_actions = [];
@@ -3132,6 +3315,11 @@ const loadPlugins = async () => {
         );
 
         pluginConfigs.value[plugin.id] = cleanedConfig;
+        // Initialize display order for service plugins
+        if (plugin.type === "service") {
+          pluginDisplayOrders.value[plugin.id] =
+            cleanedConfig.display_order ?? 0;
+        }
         // Initialize form data with saved config for all plugins
         // This allows plugins to track form state separately from saved config
         pluginFormData.value[plugin.id] = { ...cleanedConfig };
@@ -3234,6 +3422,259 @@ const togglePluginSettings = (pluginId) => {
   expandedPlugins.value[pluginId] = !expandedPlugins.value[pluginId];
 };
 
+// Helper function to get global config schema (only fields marked as global_only)
+const getGlobalConfigSchema = (plugin) => {
+  if (!plugin || !plugin.config_schema) {
+    return {};
+  }
+
+  // For service plugins, only show fields marked as global_only
+  if (plugin.type === "service") {
+    const globalSchema = {};
+    for (const [key, schema] of Object.entries(plugin.config_schema)) {
+      if (schema.global_only === true) {
+        globalSchema[key] = schema;
+      }
+    }
+    return globalSchema;
+  }
+
+  // For non-service plugins, show all fields
+  return plugin.config_schema;
+};
+
+// Helper functions for instance form
+const getInstanceFormValue = (key, schema) => {
+  const value = instanceForm.value[key];
+  if (value !== undefined && value !== null) {
+    return value;
+  }
+  // Fallback to schema default
+  return schema?.default ?? "";
+};
+
+const updateInstanceFormValue = (key, value) => {
+  instanceForm.value[key] = value;
+};
+
+// Instance management functions
+const openAddInstanceModal = (pluginId) => {
+  const plugin = plugins.value.find((p) => p.id === pluginId);
+  if (!plugin) return;
+
+  logDebug(
+    "[Settings]",
+    `Opening add instance modal for ${pluginId}`,
+    "instance_config_schema:",
+    plugin.instance_config_schema,
+  );
+
+  currentPluginType.value = plugin;
+  editingInstance.value = null;
+
+  // Initialize form with defaults from instance_config_schema
+  const form = {
+    name: "",
+    enabled: true,
+  };
+
+  if (plugin.instance_config_schema) {
+    for (const [key, schema] of Object.entries(plugin.instance_config_schema)) {
+      form[key] = schema.default !== undefined ? schema.default : "";
+    }
+  } else {
+    logWarn(
+      "[Settings]",
+      `Plugin ${pluginId} does not have instance_config_schema`,
+    );
+  }
+
+  logDebug("[Settings]", "Initialized instance form:", form);
+  instanceForm.value = form;
+  instanceFormError.value = "";
+  showInstanceModal.value = true;
+};
+
+const openEditInstanceModal = (pluginId, instance) => {
+  const plugin = plugins.value.find((p) => p.id === pluginId);
+  if (!plugin) return;
+
+  currentPluginType.value = plugin;
+  editingInstance.value = instance;
+
+  // Initialize form from instance config, using schema defaults as fallback
+  const form = {
+    name: instance.name || "",
+    enabled: instance.enabled !== undefined ? instance.enabled : true,
+  };
+
+  if (plugin.instance_config_schema) {
+    for (const [key, schema] of Object.entries(plugin.instance_config_schema)) {
+      form[key] =
+        instance.config?.[key] !== undefined
+          ? instance.config[key]
+          : schema.default !== undefined
+            ? schema.default
+            : "";
+    }
+  }
+
+  instanceForm.value = form;
+  instanceFormError.value = "";
+  showInstanceModal.value = true;
+};
+
+const closeInstanceModal = () => {
+  showInstanceModal.value = false;
+  editingInstance.value = null;
+  currentPluginType.value = null;
+  instanceFormError.value = "";
+};
+
+const saveInstance = async () => {
+  savingInstance.value = true;
+  instanceFormError.value = "";
+
+  try {
+    const pluginId = currentPluginType.value.id;
+    const plugin = currentPluginType.value;
+
+    // Build config from instance_config_schema fields
+    // Exclude display_order - it's a global plugin setting, not instance-specific
+    const config = {};
+    if (plugin.instance_config_schema) {
+      for (const [key, schema] of Object.entries(
+        plugin.instance_config_schema,
+      )) {
+        // Skip display_order - it's handled at the plugin level
+        if (key === "display_order") {
+          continue;
+        }
+        const value = instanceForm.value[key];
+        if (value !== undefined && value !== null) {
+          // Handle different types
+          if (schema.type === "string" && typeof value === "string") {
+            config[key] = value.trim();
+          } else if (schema.type === "integer" || schema.type === "number") {
+            config[key] = Number(value) || schema.default || 0;
+          } else if (schema.type === "boolean") {
+            config[key] = Boolean(value);
+          } else {
+            config[key] = value;
+          }
+        } else if (schema.default !== undefined) {
+          config[key] = schema.default;
+        }
+      }
+    }
+
+    config.enabled = instanceForm.value.enabled;
+
+    if (editingInstance.value) {
+      // Update existing instance
+      // Try web services API first (works for iframe and other service plugins)
+      try {
+        await axios.put(`/api/web-services/${editingInstance.value.id}`, {
+          name: instanceForm.value.name.trim(),
+          ...config,
+        });
+      } catch (webServiceError) {
+        // If web service update fails, try plugin API
+        // This might be needed for plugins that don't use web services API
+        throw webServiceError;
+      }
+    } else {
+      // Create new instance
+      // Try web services API first (works for iframe)
+      try {
+        await axios.post("/api/web-services", {
+          name: instanceForm.value.name.trim(),
+          ...config,
+          enabled: config.enabled,
+        });
+      } catch (webServiceError) {
+        // If web services API fails, use plugin config update to trigger instance creation
+        // This will call handle_plugin_config_update hook
+        await axios.put(`/api/plugins/${pluginId}`, {
+          ...config,
+          enabled: config.enabled,
+        });
+      }
+    }
+
+    // Reload instances
+    await loadPlugins();
+    closeInstanceModal();
+  } catch (error) {
+    console.error("Failed to save instance:", error);
+    instanceFormError.value =
+      error.response?.data?.detail ||
+      error.message ||
+      "Failed to save instance";
+  } finally {
+    savingInstance.value = false;
+  }
+};
+
+const deletePluginInstance = async (instanceId) => {
+  if (!confirm("Are you sure you want to delete this instance?")) {
+    return;
+  }
+
+  try {
+    // Try web services API first (for iframe instances)
+    try {
+      await axios.delete(`/api/web-services/${instanceId}`);
+      // Reload instances
+      await loadPlugins();
+      return;
+    } catch (webServiceError) {
+      // If web services API fails with 404, it's not an iframe service
+      // Try to delete via plugin registry (which handles all plugin types)
+      if (webServiceError.response?.status === 404) {
+        // For non-iframe plugins, we need to use the plugin registry unregister
+        // which is called by web services API internally, but we can also call it directly
+        // Actually, web services API should handle all service plugins
+        // Let's check if there's a generic plugin instance delete endpoint
+        console.warn(
+          `Web services API returned 404 for ${instanceId}, instance may not exist or may have already been deleted`,
+        );
+        // Still reload to refresh the UI
+        await loadPlugins();
+        return;
+      }
+      // For other errors, throw them
+      throw webServiceError;
+    }
+  } catch (error) {
+    console.error("Failed to delete instance:", error);
+    alert(
+      `Failed to delete instance: ${error.response?.data?.detail || error.message || "Unknown error"}`,
+    );
+  }
+};
+
+const togglePluginInstance = async (instanceId, enabled) => {
+  try {
+    // Try web services API first (for iframe instances)
+    try {
+      await axios.put(`/api/web-services/${instanceId}`, { enabled });
+    } catch (webServiceError) {
+      // If not found in web services, we need plugin instance update endpoint
+      // For now, this will only work for iframe instances
+      throw webServiceError;
+    }
+
+    // Reload instances
+    await loadPlugins();
+  } catch (error) {
+    console.error("Failed to toggle instance:", error);
+    alert(
+      `Failed to toggle instance: ${error.response?.data?.detail || error.message || "Unknown error"}`,
+    );
+  }
+};
+
 const getConfigValue = (pluginId, key, schema) => {
   const config = pluginConfigs.value[pluginId];
   if (config && config[key] !== undefined && config[key] !== null) {
@@ -3291,85 +3732,6 @@ const updateFormValue = (pluginId, key, value) => {
     delete pluginSaveStatus.value[pluginId];
   }
 };
-
-// const browseDirectory = (pluginId, key) => {
-//   // Find the file input with matching data attributes
-//   const targetInput = document.querySelector(
-//     `input[type="file"][data-plugin-id="${pluginId}"][data-config-key="${key}"]`
-//   );
-//   if (targetInput) {
-//     targetInput.click();
-//   } else {
-//     console.error(`Could not find file input for ${pluginId}.${key}`);
-//   }
-// };
-
-// const handleDirectorySelect = (pluginId, key, event) => {
-//   const file = event.target.files?.[0];
-//   if (file) {
-//     // Extract directory path from file path
-//     // Note: Browsers don't allow access to full file paths for security reasons
-//     // We'll use webkitRelativePath if available (when using webkitdirectory attribute)
-//     // Otherwise, we'll prompt the user to enter the path manually
-//
-//     let directoryPath = '';
-//
-//     // Try to get the full path (works in Electron, not in regular browsers)
-//     if (file.path) {
-//       // Electron environment - extract directory from path string
-//       const pathString = file.path;
-//       const lastSlash = Math.max(pathString.lastIndexOf('/'), pathString.lastIndexOf('\\'));
-//       if (lastSlash !== -1) {
-//         directoryPath = pathString.substring(0, lastSlash);
-//       }
-//     } else if (file.webkitRelativePath) {
-//       // When using webkitdirectory, we get relative paths
-//       const parts = file.webkitRelativePath.split('/');
-//       parts.pop(); // Remove filename
-//       directoryPath = parts.join('/');
-//     } else {
-//       // Fallback: show a message that user needs to enter path manually
-//       alert('Browser security restrictions prevent automatic directory selection. Please enter the directory path manually, or use the file picker to select a file from the desired directory.');
-//       event.target.value = ''; // Reset input
-//       return;
-//     }
-//
-//     // Update the form value with the directory path
-//     if (directoryPath) {
-//       updateFormValue(pluginId, key, directoryPath);
-//     }
-//
-//     // Reset the input so the same file can be selected again if needed
-//     event.target.value = '';
-//   }
-// };
-
-// const updatePluginConfig = async (pluginId, config) => {
-//   try {
-//     // Merge with existing config
-//     const currentConfig = pluginConfigs.value[pluginId] || {};
-//     const updatedConfig = { ...currentConfig, ...config };
-//
-//     await axios.put(`/api/plugins/${pluginId}`, updatedConfig);
-//
-//     // Update local config
-//     pluginConfigs.value[pluginId] = updatedConfig;
-//
-//     // Reload relevant data based on plugin type
-//     const plugin = plugins.value.find((p) => p.id === pluginId);
-//     if (plugin) {
-//       if (plugin.type === "calendar") {
-//         await loadCalendarSources();
-//       } else if (plugin.type === "image") {
-//         // Reload images when image plugin config is updated
-//         await loadImages();
-//       }
-//     }
-//   } catch (error) {
-//     console.error("Failed to update plugin:", error);
-//     alert(`Error: ${error.response?.data?.detail || error.message || "Failed to update plugin"}`);
-//   }
-// };
 
 const savePluginConfig = async (pluginId) => {
   savingPlugin.value = pluginId;
@@ -3697,7 +4059,6 @@ onMounted(async () => {
   await loadKeyboardMappings();
   await loadCalendarPluginTypes();
   await loadCalendarSources();
-  await loadWebServices();
   await loadImages();
   await loadPlugins();
 });
@@ -4830,6 +5191,251 @@ input:checked + .slider:before {
   line-height: 1.4;
 }
 
+/* Plugin Instances Styles */
+.plugin-instances-section {
+  margin-top: 1.5rem;
+  padding-top: 1.5rem;
+  border-top: 1px solid var(--border-color);
+}
+
+.instances-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 1rem;
+}
+
+.instance-count {
+  font-weight: normal;
+  color: var(--text-secondary);
+  font-size: 0.9em;
+}
+
+.btn-add-instance {
+  padding: 0.5rem 1rem;
+  background: var(--accent-primary);
+  color: #fff;
+  border: none;
+  border-radius: 4px;
+  font-size: 0.9rem;
+  cursor: pointer;
+  transition: all 0.2s;
+}
+
+.btn-add-instance:hover {
+  background: var(--accent-secondary);
+  opacity: 0.9;
+}
+
+.empty-instances {
+  padding: 1.5rem;
+  text-align: center;
+  color: var(--text-tertiary);
+  background: var(--bg-tertiary);
+  border-radius: 4px;
+  border: 1px dashed var(--border-color);
+}
+
+.instances-list {
+  display: flex;
+  flex-direction: column;
+  gap: 0.75rem;
+}
+
+.instance-item {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+  padding: 1rem;
+  background: var(--bg-tertiary);
+  border-radius: 4px;
+  border: 1px solid var(--border-color);
+  gap: 1rem;
+  transition: all 0.2s;
+}
+
+.instance-item:hover {
+  border-color: var(--accent-primary);
+}
+
+.instance-item.disabled {
+  opacity: 0.6;
+}
+
+.instance-info {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+}
+
+.instance-header {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+}
+
+.instance-header h5 {
+  margin: 0;
+  font-size: 1rem;
+  color: var(--text-primary);
+}
+
+.running-indicator {
+  font-size: 0.9rem;
+  font-weight: bold;
+}
+
+.running-indicator.running {
+  color: var(--accent-success, #4caf50);
+}
+
+.running-indicator.stopped {
+  color: var(--text-tertiary);
+}
+
+.instance-details {
+  display: flex;
+  flex-direction: column;
+  gap: 0.25rem;
+}
+
+.instance-detail {
+  font-size: 0.85rem;
+  color: var(--text-secondary);
+  font-family: monospace;
+  word-break: break-all;
+}
+
+.instance-actions {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  flex-shrink: 0;
+}
+
+.btn-small {
+  padding: 0.4rem 0.8rem;
+  font-size: 0.85rem;
+}
+
+.btn-edit {
+  background: var(--accent-primary);
+  color: #fff;
+  border: none;
+  border-radius: 4px;
+  cursor: pointer;
+  transition: all 0.2s;
+}
+
+.btn-edit:hover {
+  background: var(--accent-secondary);
+  opacity: 0.9;
+}
+
+/* Instance Modal Styles */
+.modal-overlay {
+  position: fixed;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  background: rgba(0, 0, 0, 0.5);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 1000;
+}
+
+.instance-modal {
+  background: var(--bg-primary);
+  border-radius: 8px;
+  max-width: 600px;
+  width: 90%;
+  max-height: 90vh;
+  overflow-y: auto;
+  box-shadow: 0 4px 20px rgba(0, 0, 0, 0.3);
+}
+
+.modal-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 1.5rem;
+  border-bottom: 1px solid var(--border-color);
+}
+
+.modal-header h3 {
+  margin: 0;
+  font-size: 1.25rem;
+  color: var(--text-primary);
+}
+
+.btn-close-modal {
+  background: none;
+  border: none;
+  font-size: 1.5rem;
+  color: var(--text-secondary);
+  cursor: pointer;
+  padding: 0;
+  width: 32px;
+  height: 32px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 4px;
+  transition: all 0.2s;
+}
+
+.btn-close-modal:hover {
+  background: var(--bg-secondary);
+  color: var(--text-primary);
+}
+
+.modal-body {
+  padding: 1.5rem;
+}
+
+.error-message {
+  padding: 0.75rem 1rem;
+  background: var(--accent-error, #f44336);
+  color: #fff;
+  border-radius: 4px;
+  margin-bottom: 1rem;
+  font-size: 0.9rem;
+}
+
+.modal-actions {
+  display: flex;
+  justify-content: flex-end;
+  gap: 1rem;
+  margin-top: 1.5rem;
+  padding-top: 1.5rem;
+  border-top: 1px solid var(--border-color);
+}
+
+.btn-primary {
+  padding: 0.75rem 1.5rem;
+  background: var(--accent-primary);
+  color: #fff;
+  border: none;
+  border-radius: 4px;
+  font-size: 1rem;
+  font-weight: 600;
+  cursor: pointer;
+  transition: all 0.2s;
+}
+
+.btn-primary:hover:not(:disabled) {
+  background: var(--accent-secondary);
+  opacity: 0.9;
+}
+
+.btn-primary:disabled {
+  opacity: 0.6;
+  cursor: not-allowed;
+}
+
 .plugin-config {
   margin-top: 1rem;
 }
@@ -4866,6 +5472,21 @@ input:checked + .slider:before {
   color: var(--text-secondary);
 }
 
+.plugin-instance-note {
+  margin-top: 1rem;
+  margin-bottom: 1rem;
+  padding: 0.75rem;
+  background: var(--bg-tertiary);
+  border-radius: 4px;
+  border-left: 3px solid var(--accent-primary);
+}
+
+.plugin-instance-note .help-text {
+  margin: 0;
+  font-size: 0.875rem;
+  color: var(--text-secondary);
+}
+
 .btn-settings-icon {
   background: transparent;
   border: 1px solid var(--border-color);
@@ -4888,6 +5509,98 @@ input:checked + .slider:before {
   background: var(--accent-primary);
   border-color: var(--accent-primary);
   color: #fff;
+}
+
+/* Service Ordering Styles */
+.service-ordering-list {
+  display: flex;
+  flex-direction: column;
+  gap: 0.75rem;
+}
+
+.service-plugin-order-item {
+  display: flex;
+  align-items: center;
+  gap: 1rem;
+  padding: 1rem;
+  background: var(--bg-primary);
+  border: 1px solid var(--border-color);
+  border-radius: 6px;
+  transition: all 0.2s ease;
+}
+
+.service-plugin-order-item:hover {
+  border-color: var(--accent-primary);
+  box-shadow: 0 2px 4px var(--shadow);
+}
+
+.service-plugin-order-handle {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  color: var(--text-secondary);
+}
+
+.order-number {
+  font-weight: 600;
+  color: var(--accent-primary);
+  min-width: 1.5rem;
+  text-align: center;
+}
+
+.drag-handle {
+  cursor: grab;
+  font-size: 1.2rem;
+  line-height: 1;
+  color: var(--text-tertiary);
+  user-select: none;
+}
+
+.drag-handle:active {
+  cursor: grabbing;
+}
+
+.service-plugin-info {
+  flex: 1;
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+}
+
+.instance-count-badge {
+  padding: 0.25rem 0.5rem;
+  background: var(--bg-secondary);
+  border-radius: 12px;
+  font-size: 0.75rem;
+  color: var(--text-secondary);
+}
+
+.service-plugin-order-control {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+}
+
+.service-plugin-order-control label {
+  font-size: 0.875rem;
+  color: var(--text-secondary);
+}
+
+.order-input {
+  width: 4rem;
+  padding: 0.5rem;
+  border: 1px solid var(--border-color);
+  border-radius: 4px;
+  background: var(--bg-secondary);
+  color: var(--text-primary);
+  font-size: 0.875rem;
+  text-align: center;
+}
+
+.order-input:focus {
+  outline: none;
+  border-color: var(--accent-primary);
+  box-shadow: 0 0 0 2px rgba(var(--accent-primary-rgb), 0.2);
 }
 
 /* Responsive styles */

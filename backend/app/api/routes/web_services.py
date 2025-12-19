@@ -181,19 +181,12 @@ async def get_service_data(
             raise HTTPException(status_code=404, detail="Service plugin instance not found")
 
         # Ensure plugin is initialized and running
-        # For Mealie plugin, always re-initialize to ensure API token is current
-        if not plugin_instance.is_running() or db_plugin.type_id == "mealie":
+        if not plugin_instance.is_running():
             try:
-                # Close existing client if it exists (for mealie plugin)
-                if hasattr(plugin_instance, "cleanup"):
-                    await plugin_instance.cleanup()
                 await plugin_instance.initialize()
                 plugin_instance.start()
             except Exception as e:
                 print(f"[Service API] Error initializing plugin {service_id}: {e}")
-                import traceback
-
-                traceback.print_exc()
                 raise HTTPException(
                     status_code=500, detail=f"Failed to initialize service plugin: {str(e)}"
                 )

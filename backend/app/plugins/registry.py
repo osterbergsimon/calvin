@@ -379,7 +379,7 @@ class PluginRegistry:
             result = await session.execute(select(PluginDB).where(PluginDB.id == plugin_id))
             db_plugin = result.scalar_one_or_none()
             if db_plugin:
-                await session.delete(db_plugin)
+                session.delete(db_plugin)
                 await session.commit()
 
         return instance_manager.unregister(plugin_id)

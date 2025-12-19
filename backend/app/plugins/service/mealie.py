@@ -23,6 +23,23 @@ class MealieServicePlugin(ServicePlugin):
             "description": "Display weekly meal plan from Mealie recipe manager",
             "version": "1.0.0",
             "common_config_schema": {
+                "display_order": {
+                    "type": "integer",
+                    "description": "Display order for service instances",
+                    "default": 0,
+                    "ui": {
+                        "component": "number",
+                        "help_text": (
+                            "Order for display/switching (lower numbers appear first). "
+                            "This applies to all instances of this plugin type."
+                        ),
+                        "validation": {
+                            "min": 0,
+                        },
+                    },
+                },
+            },
+            "instance_config_schema": {
                 "mealie_url": {
                     "type": "string",
                     "description": "Mealie instance URL (e.g., http://mealie.local:9000)",
@@ -70,6 +87,32 @@ class MealieServicePlugin(ServicePlugin):
                             "min": 1,
                             "max": 30,
                         },
+                    },
+                },
+                "meal_plan_card_size": {
+                    "type": "string",
+                    "description": "Meal plan card size",
+                    "default": "medium",
+                    "ui": {
+                        "component": "select",
+                        "options": [
+                            {"value": "small", "label": "Small (fit 7+ cards)"},
+                            {"value": "medium", "label": "Medium (default)"},
+                            {"value": "large", "label": "Large"},
+                        ],
+                        "help_text": (
+                            "Size of meal plan cards. "
+                            "Smaller size allows more cards to fit on screen."
+                        ),
+                    },
+                },
+                "fullscreen": {
+                    "type": "boolean",
+                    "description": "Prefer fullscreen mode",
+                    "default": False,
+                    "ui": {
+                        "component": "checkbox",
+                        "help_text": "Open this service in fullscreen by default",
                     },
                 },
             },

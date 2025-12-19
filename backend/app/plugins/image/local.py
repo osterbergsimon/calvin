@@ -21,20 +21,13 @@ class LocalImagePlugin(ImagePlugin):
             "type_id": "local",
             "plugin_type": PluginType.IMAGE,
             "name": "Local Images",
-            "description": "Local filesystem image storage",
+            "description": (
+                "Upload and store images on the server. " "Images are stored in ./data/images"
+            ),
             "version": "1.0.0",
-            "common_config_schema": {
-                "image_dir": {
-                    "type": "string",
-                    "description": "Image directory path (thumbnails will be stored in image_dir/thumbnails)",  # noqa: E501
-                    "default": "",
-                    "ui": {
-                        "component": "directory",
-                        "browse_button": True,
-                        "placeholder": "Select image directory...",
-                    },
-                },
-            },
+            "common_config_schema": {},
+            "instance_config_schema": {},  # No configuration needed - uses hardcoded directory
+            "supports_multiple_instances": False,  # Single-instance plugin
             "ui_sections": [
                 {
                     "id": "upload",
@@ -331,28 +324,143 @@ def create_plugin_instance(
 
     enabled = config.get("enabled", False)  # Default to disabled
 
-    # Extract actual values from config (handle case where schema objects might be stored)
-    image_dir = config.get("image_dir", "")
-
-    # If image_dir is a dict (schema object), extract the default or actual value
-    if isinstance(image_dir, dict):
-        image_dir = image_dir.get("default", "") or image_dir.get("value", "")
-    # Ensure it's a string
-    image_dir = str(image_dir) if image_dir else ""
-
-    # Use default directory if image_dir is empty
-    if not image_dir:
-        image_dir = "./data/images"
+    # Use hardcoded directory - no configuration needed
+    # Images are stored in ./data/images (relative to current working directory)
+    # Resolve to absolute path for reliability
+    image_dir = Path("./data/images").resolve()
 
     # Thumbnail directory is always image_dir/thumbnails
     # We pass None and let the plugin set it automatically
     return LocalImagePlugin(
         plugin_id=plugin_id,
         name=name,
-        image_dir=Path(image_dir),
+        image_dir=image_dir,
         thumbnail_dir=None,  # Will be set to image_dir/thumbnails automatically
         enabled=enabled,
     )
+
+
+@hookimpl
+async def handle_plugin_config_update(
+    type_id: str,
+    config: dict[str, Any],
+    enabled: bool | None,
+    db_type: Any,
+    session: Any,
+) -> dict[str, Any] | None:
+    """Handle Local Images plugin configuration update and instance management."""
+    if type_id != "local":
+        return None
+
+    import logging
+
+    from sqlalchemy import select
+
+    from app.models.db_models import PluginDB
+    from app.plugins.manager import plugin_manager
+    from app.plugins.registry import plugin_registry
+
+    logger = logging.getLogger(__name__)
+
+    # Local Images plugin is single-instance - always use fixed instance ID
+    # Always create/update the single instance when plugin type is enabled
+    plugin_instance_id = "local-images"
+
+    # Check if Local Images instance exists
+    result = session.execute(select(PluginDB).where(PluginDB.type_id == "local"))
+    local_instance = result.scalar_one_or_none()
+
+    if not local_instance:
+        # Create new Local Images instance with hardcoded config
+        logger.info(f"[Local Images] Creating single instance: {plugin_instance_id}")
+        try:
+            instance_enabled = (
+                enabled if enabled is not None else (db_type.enabled if db_type else True)
+            )
+            # No config needed - uses hardcoded directory
+            plugin = await plugin_registry.register_plugin(
+                plugin_id=plugin_instance_id,
+                type_id="local",
+                name="Local Images",
+                config={},  # Empty config - uses hardcoded directory
+                enabled=instance_enabled,
+            )
+            return {
+                "instance_created": True,
+                "instance_id": plugin_instance_id,
+            }
+        except Exception as e:
+            logger.error(f"[Local Images] Failed to create instance: {e}", exc_info=True)
+            return {"instance_created": False, "error": str(e)}
+    else:
+        # Ensure we're using the correct instance ID (single-instance plugin)
+        if local_instance.id != plugin_instance_id:
+            # If there's an instance with a different ID, delete it and create the correct one
+            logger.warning(
+                f"[Local Images] Found instance with wrong ID ({local_instance.id}), "
+                f"recreating with correct ID ({plugin_instance_id})"
+            )
+            session.delete(local_instance)
+            await session.commit()
+            # Create the correct instance
+            instance_enabled = (
+                enabled if enabled is not None else (db_type.enabled if db_type else True)
+            )
+            plugin = await plugin_registry.register_plugin(
+                plugin_id=plugin_instance_id,
+                type_id="local",
+                name="Local Images",
+                config={},
+                enabled=instance_enabled,
+            )
+            return {
+                "instance_created": True,
+                "instance_id": plugin_instance_id,
+            }
+        # Update existing Local Images instance
+        logger.info(f"[Local Images] Updating existing instance: {local_instance.id}")
+        plugin = plugin_manager.get_plugin(local_instance.id)
+        if plugin:
+            # No config to update - uses hardcoded directory
+            instance_enabled = (
+                enabled
+                if enabled is not None
+                else (db_type.enabled if db_type else local_instance.enabled)
+            )
+
+            if instance_enabled:
+                plugin.enable()
+                if not plugin.is_running():
+                    try:
+                        await plugin.initialize()
+                        plugin.start()
+                    except Exception as e:
+                        logger.error(f"[Local Images] Error starting plugin: {e}", exc_info=True)
+            else:
+                plugin.disable()
+                if plugin.is_running():
+                    try:
+                        plugin.stop()
+                        await plugin.cleanup()
+                    except Exception as e:
+                        logger.warning(f"[Local Images] Error stopping plugin: {e}", exc_info=True)
+
+            # Update in database - keep config empty
+            local_instance.config = {}  # No config needed
+            local_instance.enabled = instance_enabled
+            if db_type:
+                db_type.enabled = instance_enabled
+            session.commit()
+
+            return {
+                "instance_updated": True,
+                "instance_id": local_instance.id,
+            }
+        else:
+            logger.warning(
+                f"[Local Images] Plugin instance {local_instance.id} not found in manager"
+            )
+            return {"instance_updated": False, "error": "Plugin instance not found"}
 
 
 # Auto-register this module with pluggy when imported
