@@ -53,9 +53,57 @@ async def update_web_service(service_id: str, updates: WebServiceUpdate):
 @router.delete("/web-services/{service_id}")
 async def remove_web_service(service_id: str):
     """Remove a web service."""
+    import logging
+
+    logger = logging.getLogger(__name__)
+    logger.info(f"Attempting to delete web service: {service_id}")
+
     removed = await web_service_service.remove_service(service_id)
     if not removed:
-        raise HTTPException(status_code=404, detail="Web service not found")
+        # Double-check if it exists in database with a direct query
+        from sqlalchemy import select
+
+        from app.database import AsyncSessionLocal
+        from app.models.db_models import PluginDB
+
+        async with AsyncSessionLocal() as session:
+            result = await session.execute(select(PluginDB).where(PluginDB.id == service_id))
+            db_plugin = result.scalar_one_or_none()
+
+            if db_plugin:
+                # Plugin exists but remove_service returned False - try direct deletion
+                logger.warning(
+                    f"Service {service_id} exists in database but remove_service returned False. "
+                    "Attempting direct deletion."
+                )
+                try:
+                    from app.plugins.registry import plugin_registry
+
+                    # Try unregister again
+                    removed = await plugin_registry.unregister_plugin(service_id)
+                    if not removed:
+                        # Last resort: delete directly from database
+                        logger.warning(
+                            f"Direct unregister also failed for {service_id}. "
+                            "Attempting direct database deletion."
+                        )
+                        session.delete(db_plugin)
+                        await session.commit()
+                        removed = True
+                        logger.info(f"Successfully deleted {service_id} directly from database")
+                except Exception as e:
+                    logger.error(
+                        f"Error during fallback deletion of {service_id}: {e}",
+                        exc_info=True,
+                    )
+                    raise HTTPException(
+                        status_code=500,
+                        detail=f"Failed to delete web service: {str(e)}",
+                    )
+
+        if not removed:
+            raise HTTPException(status_code=404, detail="Web service not found")
+
     return {"message": "Web service removed", "service_id": service_id}
 
 

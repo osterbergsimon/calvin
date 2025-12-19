@@ -249,10 +249,38 @@ class WebServiceService:
         Returns:
             True if removed, False if not found
         """
+        import logging
+
         from app.plugins.registry import plugin_registry
 
+        logger = logging.getLogger(__name__)
+
+        # First check if the service exists in the database
+        async with AsyncSessionLocal() as session:
+            from sqlalchemy import select
+
+            from app.models.db_models import PluginDB
+
+            result = await session.execute(select(PluginDB).where(PluginDB.id == service_id))
+            db_plugin = result.scalar_one_or_none()
+
+            if not db_plugin:
+                logger.warning(f"Service {service_id} not found in database during remove_service")
+                return False
+
+            logger.info(
+                f"Removing service {service_id} (name: {db_plugin.name}, type: {db_plugin.type_id})"
+            )
+
         # Unregister plugin using unified system
-        return await plugin_registry.unregister_plugin(service_id)
+        removed = await plugin_registry.unregister_plugin(service_id)
+
+        if not removed:
+            logger.error(
+                f"Failed to remove service {service_id} - unregister_plugin returned False"
+            )
+
+        return removed
 
     async def get_enabled_services(self) -> list[WebService]:
         """
