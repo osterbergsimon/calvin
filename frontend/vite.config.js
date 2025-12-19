@@ -23,11 +23,6 @@ export default defineConfig({
     environment: 'jsdom',
     setupFiles: ['./tests/setup.js'],
     include: ['tests/**/*.spec.js', 'tests/**/*.test.js'],
-    // Suppress unhandled rejection warnings for known serialization issues
-    // These are DataCloneError from trying to serialize axios/router error objects
-    onUnhandledRejection: 'warn',
-    // Don't fail on unhandled rejections - they're just serialization warnings
-    bail: 0,
     coverage: {
       provider: 'v8',
       reporter: ['text', 'json', 'html'],

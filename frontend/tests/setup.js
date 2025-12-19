@@ -11,15 +11,3 @@ expect.extend(matchers)
 afterEach(() => {
   cleanup()
 })
-
-// Handle unhandled promise rejections that can't be serialized
-// This is a known issue with Vitest and axios/router error objects containing functions
-if (typeof window !== 'undefined') {
-  window.addEventListener('unhandledrejection', (event) => {
-    // Suppress DataCloneError from serialization issues
-    if (event.reason && typeof event.reason === 'object' && 'code' in event.reason && event.reason.code === 25) {
-      event.preventDefault()
-      return
-    }
-  })
-}
