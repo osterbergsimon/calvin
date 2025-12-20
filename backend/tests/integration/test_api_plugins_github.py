@@ -124,6 +124,7 @@ class TestGitHubPluginEnumeration:
         async def mock_get_async_404(*args, **kwargs):
             mock_response = MagicMock()
             mock_response.status_code = 404
+            mock_response.raise_for_status = MagicMock()
             return mock_response
 
         async def mock_get_async_200(*args, **kwargs):

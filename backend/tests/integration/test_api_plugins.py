@@ -14,6 +14,17 @@ class TestPluginInstallationAPI:
 
     def test_get_installed_plugins_empty(self, test_client):
         """Test getting installed plugins when none are installed."""
+        # Clean up any existing plugins from previous tests
+        try:
+            installed_plugins = plugin_installer.get_installed_plugins()
+            for plugin in installed_plugins:
+                try:
+                    plugin_installer.uninstall_plugin(plugin["id"])
+                except Exception:
+                    pass
+        except Exception:
+            pass
+
         response = test_client.get("/api/plugins/installed")
         # The endpoint might return 200 with empty list or 404 if not found
         # Both are acceptable for empty state
@@ -154,6 +165,17 @@ def register_plugin_types() -> list[dict[str, Any]]:
 
     def test_uninstall_plugin(self, test_client, tmp_path):
         """Test uninstalling a plugin."""
+        # Clean up any existing plugins from previous tests
+        try:
+            installed_plugins = plugin_installer.get_installed_plugins()
+            for plugin in installed_plugins:
+                try:
+                    plugin_installer.uninstall_plugin(plugin["id"])
+                except Exception:
+                    pass
+        except Exception:
+            pass
+
         # Clean up first in case it exists
         try:
             plugin_installer.uninstall_plugin("test_uninstall_plugin")
