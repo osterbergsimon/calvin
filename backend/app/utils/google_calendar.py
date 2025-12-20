@@ -1,7 +1,7 @@
 """Google Calendar utility functions.
 
 DEPRECATED: These functions have been moved to the Google Calendar plugin.
-This module is kept for backward compatibility with the legacy calendar_service.
+This module is kept for backward compatibility only (e.g., migration scripts).
 New code should use the Google Calendar plugin instead.
 
 The functions are now available in:
