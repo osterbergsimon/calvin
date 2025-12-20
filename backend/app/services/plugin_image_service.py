@@ -1,11 +1,14 @@
 """Image service using plugin architecture."""
 
+import logging
 import random
 from typing import Any
 
 from app.plugins.base import PluginType
 from app.plugins.manager import plugin_manager
 from app.plugins.protocols import ImagePlugin
+
+logger = logging.getLogger(__name__)
 
 
 class PluginImageService:
@@ -66,9 +69,8 @@ class PluginImageService:
                 # Check if plugin type is enabled (default to True if not in map)
                 type_enabled = enabled_type_map.get(type_id, True)
                 if not type_enabled:
-                    print(
-                        f"[ImageService] Skipping plugin {plugin.plugin_id} - "
-                        f"plugin type {type_id} is disabled"
+                    logger.debug(
+                        f"Skipping plugin {plugin.plugin_id} - plugin type {type_id} is disabled"
                     )
                     continue
 
@@ -76,7 +78,7 @@ class PluginImageService:
                 plugin_images = await plugin.get_images()
                 images.extend(plugin_images)
             except Exception as e:
-                print(f"Error fetching images from image plugin {plugin.plugin_id}: {e}")
+                logger.error(f"Error fetching images from image plugin {plugin.plugin_id}: {e}")
 
         # Store original order
         self._all_images = images.copy()
@@ -226,7 +228,7 @@ class PluginImageService:
                 if img:
                     return img
             except Exception as e:
-                print(f"Error getting image {image_id} from plugin {plugin.plugin_id}: {e}")
+                logger.error(f"Error getting image {image_id} from plugin {plugin.plugin_id}: {e}")
 
         return None
 
@@ -256,7 +258,9 @@ class PluginImageService:
                     if data:
                         return data
             except Exception as e:
-                print(f"Error getting image data {image_id} from plugin {plugin.plugin_id}: {e}")
+                logger.error(
+                    f"Error getting image data {image_id} from plugin {plugin.plugin_id}: {e}"
+                )
 
         return None
 
@@ -284,7 +288,7 @@ class PluginImageService:
                     await self.get_images()
                     return result
             except Exception as e:
-                print(f"Error uploading image to plugin {plugin.plugin_id}: {e}")
+                logger.error(f"Error uploading image to plugin {plugin.plugin_id}: {e}")
 
         return None
 
@@ -319,7 +323,7 @@ class PluginImageService:
                             self._current_plugin_id = None
                         return True
             except Exception as e:
-                print(f"Error deleting image {image_id} from plugin {plugin.plugin_id}: {e}")
+                logger.error(f"Error deleting image {image_id} from plugin {plugin.plugin_id}: {e}")
 
         return False
 
@@ -342,7 +346,7 @@ class PluginImageService:
                 plugin_images = await plugin.scan_images()
                 images.extend(plugin_images)
             except Exception as e:
-                print(f"Error scanning images from plugin {plugin.plugin_id}: {e}")
+                logger.error(f"Error scanning images from plugin {plugin.plugin_id}: {e}")
 
         # Update cached list
         self._all_images = images

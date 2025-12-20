@@ -410,7 +410,10 @@ class PluginInstaller:
                 manifest["_installed_path"] = str(plugin_dir)
                 plugins.append(manifest)
             except (json.JSONDecodeError, Exception) as e:
-                print(f"Error reading plugin manifest for {plugin_dir.name}: {e}")
+                import logging
+
+                logger = logging.getLogger(__name__)
+                logger.warning(f"Error reading plugin manifest for {plugin_dir.name}: {e}")
                 continue
 
         return plugins

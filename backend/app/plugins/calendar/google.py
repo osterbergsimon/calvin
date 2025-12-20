@@ -1,14 +1,74 @@
 """Google Calendar plugin."""
 
+import re
 from datetime import datetime
 from typing import Any
+from urllib.parse import quote
 
 from app.models.calendar import CalendarEvent
 from app.plugins.base import PluginType
 from app.plugins.hooks import hookimpl
 from app.plugins.protocols import CalendarPlugin
-from app.utils.google_calendar import normalize_google_calendar_url
 from app.utils.ical_parser import parse_ical_from_url
+
+
+def _is_google_calendar_url(url: str) -> bool:
+    """Check if URL is a Google Calendar URL."""
+    return "calendar.google.com" in url
+
+
+def _convert_share_url_to_ical(share_url: str) -> str | None:
+    """
+    Convert Google Calendar share URL to iCal feed URL.
+
+    Args:
+        share_url: Google Calendar share URL
+            Example: https://calendar.google.com/calendar/u/0?cid=...
+
+    Returns:
+        iCal feed URL or None if conversion fails
+    """
+    # Extract calendar ID from share URL
+    cid_match = re.search(r"[?&]cid=([^&]+)", share_url)
+    if not cid_match:
+        return None
+
+    calendar_id = cid_match.group(1)
+
+    # URL encode the calendar ID properly
+    calendar_id_encoded = quote(calendar_id, safe="")
+
+    # Convert to iCal feed URL
+    ical_url = f"https://calendar.google.com/calendar/ical/{calendar_id_encoded}/basic.ics"
+
+    return ical_url
+
+
+def _normalize_google_calendar_url(url: str) -> str:
+    """
+    Normalize Google Calendar URL to iCal format.
+
+    If it's already an iCal URL (including private URLs with tokens), return as-is.
+    If it's a share URL, convert to iCal.
+
+    Args:
+        url: Google Calendar URL (share or iCal, including private URLs)
+
+    Returns:
+        iCal feed URL
+    """
+    # If already an iCal URL (ends with .ics or has /ical/ in path), return as-is
+    if url.endswith(".ics") or "/ical/" in url:
+        return url
+
+    # If it's a share URL, convert it
+    if _is_google_calendar_url(url):
+        ical_url = _convert_share_url_to_ical(url)
+        if ical_url:
+            return ical_url
+
+    # If we can't convert, return original (might be a different format or already correct)
+    return url
 
 
 class GoogleCalendarPlugin(CalendarPlugin):
@@ -44,7 +104,7 @@ class GoogleCalendarPlugin(CalendarPlugin):
     async def initialize(self) -> None:
         """Initialize the plugin."""
         # Normalize URL (convert share URL to iCal if needed)
-        self._normalized_url = normalize_google_calendar_url(self.ical_url)
+        self._normalized_url = _normalize_google_calendar_url(self.ical_url)
 
     async def cleanup(self) -> None:
         """Cleanup plugin resources."""

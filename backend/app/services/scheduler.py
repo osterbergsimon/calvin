@@ -1,11 +1,14 @@
 """Scheduler service for periodic calendar updates."""
 
+import logging
 from datetime import datetime, timedelta
 
 from apscheduler.schedulers.asyncio import AsyncIOScheduler
 from apscheduler.triggers.interval import IntervalTrigger
 
-from app.services.calendar_service import calendar_service
+from app.services import plugin_calendar_service
+
+logger = logging.getLogger(__name__)
 
 
 class CalendarScheduler:
@@ -36,8 +39,8 @@ class CalendarScheduler:
     async def refresh_calendars(self):
         """Refresh calendar events for all sources."""
         # Clear cache to force refresh
-        calendar_service._cache.clear()
-        print(f"Calendar cache cleared at {datetime.now()}")
+        await plugin_calendar_service.clear_cache()
+        logger.info(f"Calendar cache cleared at {datetime.now()}")
 
     def set_refresh_interval(self, minutes: int):
         """Set the refresh interval in minutes."""

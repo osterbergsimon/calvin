@@ -163,13 +163,9 @@ async def add_calendar_source(source: CalendarSource):
     - The URL includes authentication parameters (CacheKey and PassphraseKey) in the query string.
 
     Calendar events are cached for 5 minutes and automatically refreshed.
+
+    Note: Google Calendar URLs are automatically normalized by the plugin during initialization.
     """
-    # Normalize Google Calendar URLs if needed
-    if source.type == "google" and source.ical_url:
-        from app.utils.google_calendar import normalize_google_calendar_url
-
-        source.ical_url = normalize_google_calendar_url(source.ical_url)
-
     # Validate Proton Calendar URL format
     if source.type == "proton" and source.ical_url:
         proton_url_prefix = "https://calendar.proton.me/api/calendar/v1/url/"

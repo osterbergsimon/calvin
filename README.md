@@ -71,9 +71,9 @@ git checkout develop
 **Note:** On Windows, keyboard input uses a mock handler. Full keyboard support works on Linux/Raspberry Pi.
 
 **Detailed Instructions:**
-- **Development (develop branch)**: See [QUICKSTART_DEVELOP.md](QUICKSTART_DEVELOP.md)
-- **General Windows setup**: See [QUICKSTART_WINDOWS.md](QUICKSTART_WINDOWS.md)
-- **Remote Settings Configuration**: See [docs/REMOTE_SETTINGS.md](docs/REMOTE_SETTINGS.md) - Configure frontend to connect to remote dashboard backend
+- **Development (develop branch)**: See [docs/setup/QUICKSTART_DEVELOP.md](docs/setup/QUICKSTART_DEVELOP.md)
+- **General Windows setup**: See [docs/setup/QUICKSTART_WINDOWS.md](docs/setup/QUICKSTART_WINDOWS.md)
+- **Remote Settings Configuration**: See [docs/configuration/REMOTE_CONFIG.md](docs/configuration/REMOTE_CONFIG.md) - Configure frontend to connect to remote dashboard backend
 
 ### Raspberry Pi Setup
 
@@ -158,7 +158,7 @@ npm run dev
 **Note:** 
 - On Linux, full keyboard support is available via `evdev` (automatically included with `make install`)
 - The Makefile automatically detects Linux and includes the `linux` extra for evdev support
-- For detailed setup instructions, see [docs/SETUP_LINUX.md](docs/SETUP_LINUX.md)
+- For detailed setup instructions, see [docs/setup/SETUP_LINUX.md](docs/setup/SETUP_LINUX.md)
 
 **Important:** The `scripts/setup.sh` and `scripts/setup-dev.sh` scripts are for **Raspberry Pi deployment** (require root, set up systemd services). For Linux development, use the Makefile or manual commands above.
 
@@ -196,8 +196,8 @@ Calvin features an extensible plugin system that allows you to add custom functi
 - **Frontend Components**: Add custom Vue components
 
 **Documentation:**
-- [Plugin Development Guide](docs/PLUGIN_DEVELOPMENT.md)
-- [Plugin Installation Guide](docs/PLUGIN_INSTALLATION.md)
+- [Plugin Development Guide](docs/plugins/PLUGIN_DEVELOPMENT_GUIDE.md)
+- [Plugin Installation Guide](docs/plugins/PLUGIN_INSTALLATION.md)
 
 ## 🛠️ Development
 
@@ -227,17 +227,19 @@ The backend automatically handles platform differences:
 - Vite for build tooling
 - Pinia for state management
 
-**See [PROJECT_PLAN.md](PROJECT_PLAN.md) for detailed architecture and implementation plan.**
+**See [docs/PROJECT_PLAN.md](docs/PROJECT_PLAN.md) for detailed architecture and implementation plan.**
 
 ## 📚 Documentation
 
-- [Quick Start - Development](QUICKSTART_DEVELOP.md)
-- [Quick Start - Windows](QUICKSTART_WINDOWS.md)
-- [Linux Setup Guide](docs/SETUP_LINUX.md)
-- [Windows Setup Guide](docs/SETUP_WINDOWS.md)
-- [Add Google Calendar](docs/ADD_GOOGLE_CALENDAR.md)
-- [Plugin Development](docs/PLUGIN_DEVELOPMENT.md)
-- [Plugin Installation](docs/PLUGIN_INSTALLATION.md)
+- [Quick Start - Development](docs/setup/QUICKSTART_DEVELOP.md)
+- [Quick Start - Windows](docs/setup/QUICKSTART_WINDOWS.md)
+- [Linux Setup Guide](docs/setup/SETUP_LINUX.md)
+- [Windows Setup Guide](docs/setup/SETUP_WINDOWS.md)
+- [Add Google Calendar](docs/plugins/ADD_GOOGLE_CALENDAR.md)
+- [Plugin Development](docs/plugins/PLUGIN_DEVELOPMENT_GUIDE.md)
+- [Plugin Installation](docs/plugins/PLUGIN_INSTALLATION.md)
+- [Project Plan](docs/PROJECT_PLAN.md)
+- [Documentation Index](docs/README.md)
 - [Project Plan](PROJECT_PLAN.md)
 
 ## 📄 License

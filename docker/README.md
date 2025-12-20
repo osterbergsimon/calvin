@@ -6,16 +6,20 @@ This directory contains Docker configurations for different deployment scenarios
 
 ### Production Image
 ```bash
-# Build and run production image
-docker-compose up -d calvin-prod
+# From project root
+cd docker
+docker-compose -f docker-compose.prod.yml up -d calvin-prod
+
+# Or from project root
+docker-compose -f docker/docker-compose.prod.yml up -d calvin-prod
 
 # Access at http://localhost:8000
 ```
 
 ### Development Image (Auto-pull from GitHub)
 ```bash
-# Build and run dev image with auto-update
-docker-compose up -d calvin-dev
+# From project root
+docker-compose -f docker/docker-compose.prod.yml up -d calvin-dev
 
 # Auto-updates every 5 minutes (configurable via AUTO_UPDATE_INTERVAL)
 # Access at http://localhost:8000
@@ -23,8 +27,8 @@ docker-compose up -d calvin-dev
 
 ### Development with Hot-Reload (Local Code)
 ```bash
-# Run with local code, hot-reload enabled
-docker-compose -f docker-compose.dev.yml up
+# From project root
+docker-compose -f docker/docker-compose.dev.yml up
 
 # Backend: http://localhost:8000 (auto-reloads on code changes)
 # Frontend: http://localhost:5173 (Vite dev server with HMR)
@@ -32,7 +36,7 @@ docker-compose -f docker-compose.dev.yml up
 
 ## Image Types
 
-### 1. Production Image (`Dockerfile`)
+### 1. Production Image (`Dockerfile.prod`)
 - **Purpose**: Production deployment
 - **Features**: 
   - Multi-stage build (optimized size)
@@ -40,7 +44,7 @@ docker-compose -f docker-compose.dev.yml up
   - No auto-update
 - **Use case**: Final deployment, stable releases
 
-### 2. Development Image (`Dockerfile.dev`)
+### 2. Development Image (`Dockerfile.dev-prod`)
 - **Purpose**: Development/testing on Raspberry Pi
 - **Features**:
   - Auto-pulls latest code from GitHub
@@ -92,17 +96,17 @@ docker exec calvin-dev /usr/local/bin/update-calvin.sh
 
 For the best development experience, we recommend:
 
-1. **Local Development**: Use `docker-compose.dev.yml` for active coding
+1. **Local Development**: Use `docker/docker-compose.dev.yml` for active coding
    - Hot-reload enabled
    - Fast iteration
    - No network dependency
 
-2. **RPi Testing**: Use `docker-compose.yml` with `calvin-dev` service
+2. **RPi Testing**: Use `docker/docker-compose.prod.yml` with `calvin-dev` service
    - Auto-pulls from GitHub
    - Test latest code on actual hardware
    - No reflashing needed
 
-3. **Production**: Use `docker-compose.yml` with `calvin-prod` service
+3. **Production**: Use `docker/docker-compose.prod.yml` with `calvin-prod` service
    - Stable, optimized image
    - No auto-update
    - Production-ready
@@ -116,16 +120,16 @@ git clone https://github.com/osterbergsimon/calvin.git
 cd calvin
 
 # For development (auto-update)
-docker-compose up -d calvin-dev
+docker-compose -f docker/docker-compose.prod.yml up -d calvin-dev
 
 # For production
-docker-compose up -d calvin-prod
+docker-compose -f docker/docker-compose.prod.yml up -d calvin-prod
 ```
 
 ### Option 2: Native Installation (Current Approach)
 - Use systemd services
 - Manual updates via git pull
-- See `docs/SETUP_LINUX.md`
+- See `docs/setup/SETUP_LINUX.md`
 
 ## Advantages of Docker Approach
 
