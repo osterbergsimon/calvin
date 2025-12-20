@@ -71,8 +71,8 @@ git checkout develop
 **Note:** On Windows, keyboard input uses a mock handler. Full keyboard support works on Linux/Raspberry Pi.
 
 **Detailed Instructions:**
-- **Development (develop branch)**: See [QUICKSTART_DEVELOP.md](QUICKSTART_DEVELOP.md)
-- **General Windows setup**: See [QUICKSTART_WINDOWS.md](QUICKSTART_WINDOWS.md)
+- **Development (develop branch)**: See [docs/setup/QUICKSTART_DEVELOP.md](docs/setup/QUICKSTART_DEVELOP.md)
+- **General Windows setup**: See [docs/setup/QUICKSTART_WINDOWS.md](docs/setup/QUICKSTART_WINDOWS.md)
 - **Remote Settings Configuration**: See [docs/configuration/REMOTE_CONFIG.md](docs/configuration/REMOTE_CONFIG.md) - Configure frontend to connect to remote dashboard backend
 
 ### Raspberry Pi Setup
@@ -227,17 +227,18 @@ The backend automatically handles platform differences:
 - Vite for build tooling
 - Pinia for state management
 
-**See [PROJECT_PLAN.md](PROJECT_PLAN.md) for detailed architecture and implementation plan.**
+**See [docs/PROJECT_PLAN.md](docs/PROJECT_PLAN.md) for detailed architecture and implementation plan.**
 
 ## 📚 Documentation
 
-- [Quick Start - Development](QUICKSTART_DEVELOP.md)
-- [Quick Start - Windows](QUICKSTART_WINDOWS.md)
+- [Quick Start - Development](docs/setup/QUICKSTART_DEVELOP.md)
+- [Quick Start - Windows](docs/setup/QUICKSTART_WINDOWS.md)
 - [Linux Setup Guide](docs/setup/SETUP_LINUX.md)
 - [Windows Setup Guide](docs/setup/SETUP_WINDOWS.md)
 - [Add Google Calendar](docs/plugins/ADD_GOOGLE_CALENDAR.md)
 - [Plugin Development](docs/plugins/PLUGIN_DEVELOPMENT_GUIDE.md)
 - [Plugin Installation](docs/plugins/PLUGIN_INSTALLATION.md)
+- [Project Plan](docs/PROJECT_PLAN.md)
 - [Documentation Index](docs/README.md)
 - [Project Plan](PROJECT_PLAN.md)
 

@@ -4,7 +4,7 @@ These tests use a real GitHub repository to validate the full integration flow.
 They are marked as e2e and slow, so they can be skipped in CI/CD pipelines.
 
 To run these tests:
-1. Create a test repository on GitHub (see TEST_REPO_SETUP.md)
+1. Create a test repository on GitHub (see docs/testing/E2E_TEST_REPO_SETUP.md)
 2. Set TEST_GITHUB_REPO environment variable (optional, defaults to test repo)
 3. Run: pytest tests/e2e/test_github_plugin_e2e.py -m e2e
 
