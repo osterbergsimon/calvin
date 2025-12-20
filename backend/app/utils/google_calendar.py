@@ -1,4 +1,14 @@
-"""Google Calendar utility functions."""
+"""Google Calendar utility functions.
+
+DEPRECATED: These functions have been moved to the Google Calendar plugin.
+This module is kept for backward compatibility with the legacy calendar_service.
+New code should use the Google Calendar plugin instead.
+
+The functions are now available in:
+- app.plugins.calendar.google._normalize_google_calendar_url()
+- app.plugins.calendar.google._convert_share_url_to_ical()
+- app.plugins.calendar.google._is_google_calendar_url()
+"""
 
 import re
 from urllib.parse import quote
