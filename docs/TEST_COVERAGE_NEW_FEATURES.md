@@ -123,27 +123,6 @@ We use a **hybrid approach** for testing GitHub plugin installation:
 
 **Note**: These tests are marked `@pytest.mark.e2e` and `@pytest.mark.slow` and skip by default. See `backend/tests/e2e/TEST_REPO_SETUP.md` for setup instructions.
 
-**Purpose**: Integration tests for system management API endpoints
-
-**Test Classes**:
-- `TestSystemRestartEndpoints`: Tests restart endpoints
-  - Restart backend (`/api/system/restart-backend`)
-  - Restart frontend (`/api/system/restart-frontend`)
-  - Fallback to dbus if systemctl fails
-  - Error handling when all methods fail
-  - Reload UI endpoint
-
-- `TestSystemUpdateEndpoints`: Tests update endpoints
-  - Get update status
-  - Trigger update
-
-**Coverage**:
-- ✅ Backend restart API
-- ✅ Frontend restart API
-- ✅ Systemctl and dbus fallback
-- ✅ Error handling
-- ✅ Update status API
-
 ## Updated Test Files
 
 ### `backend/tests/conftest.py`

@@ -151,7 +151,7 @@
 </template>
 
 <script setup>
-import { ref, onMounted, onUnmounted, computed } from "vue";
+import { ref, onMounted, onUnmounted, computed, watch } from "vue";
 import axios from "axios";
 import LayoutManager from "../components/LayoutManager.vue";
 import CalendarView from "../components/CalendarView.vue";
@@ -180,7 +180,7 @@ const statusText = computed(() => {
   return status.value.charAt(0).toUpperCase() + status.value.slice(1);
 });
 
-// Polling interval for config updates (30 seconds)
+// Polling interval for config updates (configurable, default 30 seconds)
 let configPollInterval = null;
 
 const isLandscape = computed(() => configStore.orientation === "landscape");
@@ -297,14 +297,17 @@ const checkHealth = async () => {
 
 let healthInterval = null;
 
-onMounted(async () => {
-  // Check health immediately and then periodically
-  checkHealth();
-  healthInterval = setInterval(checkHealth, 30000); // Check every 30 seconds
+const startConfigPolling = () => {
+  // Clear existing interval if any
+  if (configPollInterval) {
+    clearInterval(configPollInterval);
+    configPollInterval = null;
+  }
 
-  // Fetch config on mount
-  await configStore.fetchConfig();
-  // Set up polling for config updates (every 30 seconds)
+  // Get polling interval from config (convert seconds to milliseconds)
+  const intervalMs = configStore.configPollInterval * 1000;
+
+  // Set up polling for config updates
   // This allows changes made from another device to appear on the Pi's display
   configPollInterval = setInterval(async () => {
     try {
@@ -312,7 +315,26 @@ onMounted(async () => {
     } catch (error) {
       console.error("Failed to fetch config updates:", error);
     }
-  }, 30000); // Poll every 30 seconds
+  }, intervalMs);
+};
+
+// Watch for changes to configPollInterval and restart polling
+watch(
+  () => configStore.configPollInterval,
+  () => {
+    startConfigPolling();
+  },
+);
+
+onMounted(async () => {
+  // Check health immediately and then periodically
+  checkHealth();
+  healthInterval = setInterval(checkHealth, 30000); // Check every 30 seconds
+
+  // Fetch config on mount
+  await configStore.fetchConfig();
+  // Start config polling with configured interval
+  startConfigPolling();
 });
 
 onUnmounted(() => {

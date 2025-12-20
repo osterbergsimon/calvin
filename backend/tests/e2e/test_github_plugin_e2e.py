@@ -23,7 +23,7 @@ from app.services.plugin_installer import plugin_installer
 # Default test repository (should be a public repo with test plugins)
 # This can be overridden with TEST_GITHUB_REPO environment variable
 DEFAULT_TEST_REPO = os.getenv(
-    "TEST_GITHUB_REPO", "https://github.com/calvin-dashboard/test-plugins"
+    "TEST_GITHUB_REPO", "https://github.com/osterbergsimon/calvin-plugins"
 )
 DEFAULT_TEST_BRANCH = os.getenv("TEST_GITHUB_BRANCH", "main")
 

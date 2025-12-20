@@ -267,6 +267,358 @@ async def stop_plugin_instance(instance_id: str):
         raise HTTPException(status_code=500, detail=f"Failed to stop plugin {instance_id}")
 
 
+# Specific routes must come before parameterized routes to avoid path conflicts
+@router.get("/plugins/types/calendar")
+async def get_calendar_plugin_types():
+    """
+    Get available calendar plugin types (only enabled ones).
+
+    Returns:
+        List of available calendar plugin types
+    """
+    # Get plugin types from pluggy hooks
+    plugin_types = plugin_loader.get_plugin_types()
+    calendar_types = [t for t in plugin_types if t.get("plugin_type") == PluginType.CALENDAR]
+
+    # Filter to only enabled plugin types from database
+    enabled_types = []
+    async with AsyncSessionLocal() as session:
+        for type_info in calendar_types:
+            type_id = type_info.get("type_id")
+            result = await session.execute(
+                select(PluginTypeDB).where(PluginTypeDB.type_id == type_id)
+            )
+            db_type = result.scalar_one_or_none()
+            enabled = db_type.enabled if db_type else True  # Default to enabled
+            if enabled:
+                enabled_types.append(type_info)
+
+    return {
+        "types": [
+            {
+                "id": t.get("type_id"),
+                "name": t.get("name", ""),
+                "description": t.get("description", ""),
+                "supports_ical_url": True,
+                "supports_api_key": False,
+            }
+            for t in enabled_types
+        ]
+    }
+
+
+@router.get("/plugins/installed")
+async def get_installed_plugins():
+    """
+    Get list of installed plugins.
+
+    Returns:
+        List of installed plugin manifests
+    """
+    try:
+        plugins = plugin_installer.get_installed_plugins()
+        # Remove internal path from response
+        for plugin in plugins:
+            plugin.pop("_installed_path", None)
+        return {"plugins": plugins}
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Failed to get installed plugins: {str(e)}")
+
+
+@router.post("/plugins/install")
+async def install_plugin(
+    file: UploadFile = File(...),
+    plugin_id: str | None = None,
+):
+    """
+    Install a plugin from a zip file or directory.
+
+    Args:
+        file: Plugin package zip file
+        plugin_id: Optional plugin ID override
+
+    Returns:
+        Plugin manifest
+    """
+    import shutil
+    import tempfile
+
+    if not file.filename:
+        raise HTTPException(status_code=400, detail="No file provided")
+
+    # Save uploaded file to temporary location
+    temp_path = None
+    try:
+        with tempfile.NamedTemporaryFile(delete=False, suffix=".zip") as temp_file:
+            # Write uploaded file to temp file
+            shutil.copyfileobj(file.file, temp_file)
+            temp_path = Path(temp_file.name)
+
+        # Install plugin
+        try:
+            manifest = plugin_installer.install_plugin(temp_path, plugin_id)
+
+            # Reload plugins to include the newly installed one
+            plugin_loader.load_installed_plugins()
+
+            return {
+                "success": True,
+                "message": f"Plugin {manifest['id']} installed successfully",
+                "manifest": manifest,
+                "requires_restart": True,
+            }
+        except ValueError as e:
+            raise HTTPException(status_code=400, detail=str(e))
+        except Exception as e:
+            raise HTTPException(status_code=500, detail=f"Failed to install plugin: {str(e)}")
+    finally:
+        # Clean up temp file
+        if temp_path and temp_path.exists():
+            try:
+                temp_path.unlink()
+            except (PermissionError, OSError):
+                # File might be locked on Windows, ignore
+                pass
+
+
+@router.get("/plugins/enumerate-from-github")
+async def enumerate_plugins_from_github(
+    repo_url: str,
+    branch: str | None = None,
+):
+    """
+    Enumerate available plugins from a GitHub repository.
+
+    Args:
+        repo_url: GitHub repository URL (e.g., https://github.com/user/repo)
+        branch: Optional branch name (defaults to main/master)
+
+    Returns:
+        Dictionary with manifest info and list of available plugins
+    """
+    import re
+    import shutil
+    import tempfile
+
+    import httpx
+
+    # Parse GitHub URL
+    github_pattern = r"github\.com[/:]([^/]+)/([^/]+?)(?:\.git)?/?$"
+    match = re.search(github_pattern, repo_url)
+    if not match:
+        raise HTTPException(
+            status_code=400,
+            detail="Invalid GitHub repository URL. Expected format: https://github.com/user/repo",
+        )
+
+    owner, repo = match.groups()
+    branch = branch or "main"
+
+    # Download zip from GitHub
+    zip_url = f"https://github.com/{owner}/{repo}/archive/refs/heads/{branch}.zip"
+    temp_path = None
+    temp_dir = None
+
+    try:
+        # Download the zip file
+        branch_switched = False
+        async with httpx.AsyncClient(timeout=60.0) as client:
+            response = await client.get(zip_url, follow_redirects=True)
+            if response.status_code == 404:
+                # Try master branch if main doesn't exist
+                # (only if user didn't explicitly specify branch)
+                # Note: branch defaults to "main" if not provided
+                if branch == "main":
+                    zip_url = f"https://github.com/{owner}/{repo}/archive/refs/heads/master.zip"
+                    response = await client.get(zip_url, follow_redirects=True)
+                    if response.status_code != 404:
+                        branch_switched = True
+                if response.status_code == 404:
+                    raise HTTPException(
+                        status_code=404,
+                        detail=(
+                            f"Repository or branch '{branch}' not found. "
+                            "Make sure the repository exists and is public."
+                        ),
+                    )
+            response.raise_for_status()
+
+            # Save to temporary file
+            with tempfile.NamedTemporaryFile(delete=False, suffix=".zip") as temp_file:
+                temp_file.write(response.content)
+                temp_path = Path(temp_file.name)
+
+        # Extract to temporary directory
+        temp_dir = tempfile.mkdtemp()
+        with zipfile.ZipFile(temp_path, "r") as zip_ref:
+            zip_ref.extractall(temp_dir)
+
+        # Find the root directory (GitHub zips contain repo-name-branch/)
+        extracted_path = Path(temp_dir)
+        subdirs = [d for d in extracted_path.iterdir() if d.is_dir()]
+        if len(subdirs) == 1:
+            repo_root = subdirs[0]
+        else:
+            repo_root = extracted_path
+
+        # Enumerate plugins
+        result = plugin_installer.enumerate_plugins_from_repo(repo_root)
+
+        actual_branch = "master" if branch_switched else branch
+        return {
+            "success": True,
+            "repo_url": repo_url,
+            "branch": actual_branch,
+            "branch_switched": branch_switched,
+            "has_manifest": result["has_manifest"],
+            "plugins": result["plugins"],
+        }
+    except HTTPException:
+        raise
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Failed to enumerate plugins: {str(e)}")
+    finally:
+        # Clean up temp files
+        if temp_path and temp_path.exists():
+            try:
+                temp_path.unlink()
+            except (PermissionError, OSError):
+                pass
+        if temp_dir and Path(temp_dir).exists():
+            try:
+                shutil.rmtree(temp_dir)
+            except (PermissionError, OSError):
+                pass
+
+
+@router.post("/plugins/install-from-github")
+async def install_plugin_from_github(request: dict[str, Any] = Body(...)):
+    """
+    Install a specific plugin from a GitHub repository.
+
+    Args:
+        request: Request body containing:
+            - repo_url: GitHub repository URL
+            - plugin_path: Relative path to plugin directory within repo
+            - branch: Optional branch name (defaults to main/master)
+            - plugin_id: Optional plugin ID override
+
+    Returns:
+        Plugin manifest
+    """
+    import re
+    import shutil
+    import tempfile
+
+    import httpx
+
+    repo_url = request.get("repo_url")
+    plugin_path = request.get("plugin_path")
+    if not repo_url:
+        raise HTTPException(status_code=400, detail="repo_url is required")
+    if not plugin_path:
+        raise HTTPException(status_code=400, detail="plugin_path is required")
+
+    branch = request.get("branch") or "main"
+    plugin_id = request.get("plugin_id")
+
+    # Parse GitHub URL
+    github_pattern = r"github\.com[/:]([^/]+)/([^/]+?)(?:\.git)?/?$"
+    match = re.search(github_pattern, repo_url)
+    if not match:
+        raise HTTPException(
+            status_code=400,
+            detail="Invalid GitHub repository URL. Expected format: https://github.com/user/repo",
+        )
+
+    owner, repo = match.groups()
+
+    # Download zip from GitHub
+    zip_url = f"https://github.com/{owner}/{repo}/archive/refs/heads/{branch}.zip"
+    temp_path = None
+    temp_dir = None
+
+    try:
+        # Download the zip file
+        branch_switched = False
+        async with httpx.AsyncClient(timeout=60.0) as client:
+            response = await client.get(zip_url, follow_redirects=True)
+            if response.status_code == 404:
+                # Try master branch if main doesn't exist (only if user didn't specify branch)
+                original_branch = request.get("branch")
+                if branch == "main" and not original_branch:
+                    zip_url = f"https://github.com/{owner}/{repo}/archive/refs/heads/master.zip"
+                    response = await client.get(zip_url, follow_redirects=True)
+                    if response.status_code != 404:
+                        branch_switched = True
+                if response.status_code == 404:
+                    raise HTTPException(
+                        status_code=404,
+                        detail=(
+                            f"Repository or branch '{branch}' not found. "
+                            "Make sure the repository exists and is public."
+                        ),
+                    )
+            response.raise_for_status()
+
+            # Save to temporary file
+            with tempfile.NamedTemporaryFile(delete=False, suffix=".zip") as temp_file:
+                temp_file.write(response.content)
+                temp_path = Path(temp_file.name)
+
+        # Extract to temporary directory
+        temp_dir = tempfile.mkdtemp()
+        with zipfile.ZipFile(temp_path, "r") as zip_ref:
+            zip_ref.extractall(temp_dir)
+
+        # Find the root directory (GitHub zips contain repo-name-branch/)
+        extracted_path = Path(temp_dir)
+        subdirs = [d for d in extracted_path.iterdir() if d.is_dir()]
+        if len(subdirs) == 1:
+            repo_root = subdirs[0]
+        else:
+            repo_root = extracted_path
+
+        # Install specific plugin
+        try:
+            manifest = plugin_installer.install_plugin_from_repo(repo_root, plugin_path, plugin_id)
+
+            # Reload plugins to include the newly installed one
+            plugin_loader.load_installed_plugins()
+
+            actual_branch = "master" if branch_switched else branch
+            return {
+                "success": True,
+                "message": f"Plugin {manifest['id']} installed successfully from {repo_url}",
+                "manifest": manifest,
+                "branch": actual_branch,
+                "branch_switched": branch_switched,
+                "requires_restart": True,
+            }
+        except ValueError as e:
+            raise HTTPException(status_code=400, detail=str(e))
+        except Exception as e:
+            raise HTTPException(status_code=500, detail=f"Failed to install plugin: {str(e)}")
+    except HTTPException:
+        raise
+    except Exception as e:
+        raise HTTPException(
+            status_code=500, detail=f"Failed to install plugin from GitHub: {str(e)}"
+        )
+    finally:
+        # Clean up temp files
+        if temp_path and temp_path.exists():
+            try:
+                temp_path.unlink()
+            except (PermissionError, OSError):
+                pass
+        if temp_dir and Path(temp_dir).exists():
+            try:
+                shutil.rmtree(temp_dir)
+            except (PermissionError, OSError):
+                pass
+
+
 @router.get("/plugins/{plugin_id}")
 async def get_plugin(plugin_id: str):
     """Get a specific plugin type by ID."""
@@ -966,357 +1318,6 @@ async def test_plugin(plugin_id: str):
         "success": False,
         "message": "This plugin type does not support connection testing",
     }
-
-
-@router.get("/plugins/types/calendar")
-async def get_calendar_plugin_types():
-    """
-    Get available calendar plugin types (only enabled ones).
-
-    Returns:
-        List of available calendar plugin types
-    """
-    # Get plugin types from pluggy hooks
-    plugin_types = plugin_loader.get_plugin_types()
-    calendar_types = [t for t in plugin_types if t.get("plugin_type") == PluginType.CALENDAR]
-
-    # Filter to only enabled plugin types from database
-    enabled_types = []
-    async with AsyncSessionLocal() as session:
-        for type_info in calendar_types:
-            type_id = type_info.get("type_id")
-            result = await session.execute(
-                select(PluginTypeDB).where(PluginTypeDB.type_id == type_id)
-            )
-            db_type = result.scalar_one_or_none()
-            enabled = db_type.enabled if db_type else True  # Default to enabled
-            if enabled:
-                enabled_types.append(type_info)
-
-    return {
-        "types": [
-            {
-                "id": t.get("type_id"),
-                "name": t.get("name", ""),
-                "description": t.get("description", ""),
-                "supports_ical_url": True,
-                "supports_api_key": False,
-            }
-            for t in enabled_types
-        ]
-    }
-
-
-@router.get("/plugins/installed")
-async def get_installed_plugins():
-    """
-    Get list of installed plugins.
-
-    Returns:
-        List of installed plugin manifests
-    """
-    try:
-        plugins = plugin_installer.get_installed_plugins()
-        # Remove internal path from response
-        for plugin in plugins:
-            plugin.pop("_installed_path", None)
-        return {"plugins": plugins}
-    except Exception as e:
-        raise HTTPException(status_code=500, detail=f"Failed to get installed plugins: {str(e)}")
-
-
-@router.post("/plugins/install")
-async def install_plugin(
-    file: UploadFile = File(...),
-    plugin_id: str | None = None,
-):
-    """
-    Install a plugin from a zip file or directory.
-
-    Args:
-        file: Plugin package zip file
-        plugin_id: Optional plugin ID override
-
-    Returns:
-        Plugin manifest
-    """
-    import shutil
-    import tempfile
-
-    if not file.filename:
-        raise HTTPException(status_code=400, detail="No file provided")
-
-    # Save uploaded file to temporary location
-    temp_path = None
-    try:
-        with tempfile.NamedTemporaryFile(delete=False, suffix=".zip") as temp_file:
-            # Write uploaded file to temp file
-            shutil.copyfileobj(file.file, temp_file)
-            temp_path = Path(temp_file.name)
-
-        # Install plugin
-        try:
-            manifest = plugin_installer.install_plugin(temp_path, plugin_id)
-
-            # Reload plugins to include the newly installed one
-            plugin_loader.load_installed_plugins()
-
-            return {
-                "success": True,
-                "message": f"Plugin {manifest['id']} installed successfully",
-                "manifest": manifest,
-                "requires_restart": True,
-            }
-        except ValueError as e:
-            raise HTTPException(status_code=400, detail=str(e))
-        except Exception as e:
-            raise HTTPException(status_code=500, detail=f"Failed to install plugin: {str(e)}")
-    finally:
-        # Clean up temp file
-        if temp_path and temp_path.exists():
-            try:
-                temp_path.unlink()
-            except (PermissionError, OSError):
-                # File might be locked on Windows, ignore
-                pass
-
-
-@router.get("/plugins/enumerate-from-github")
-async def enumerate_plugins_from_github(
-    repo_url: str,
-    branch: str | None = None,
-):
-    """
-    Enumerate available plugins from a GitHub repository.
-
-    Args:
-        repo_url: GitHub repository URL (e.g., https://github.com/user/repo)
-        branch: Optional branch name (defaults to main/master)
-
-    Returns:
-        Dictionary with manifest info and list of available plugins
-    """
-    import re
-    import shutil
-    import tempfile
-
-    import httpx
-
-    # Parse GitHub URL
-    github_pattern = r"github\.com[/:]([^/]+)/([^/]+?)(?:\.git)?/?$"
-    match = re.search(github_pattern, repo_url)
-    if not match:
-        raise HTTPException(
-            status_code=400,
-            detail="Invalid GitHub repository URL. Expected format: https://github.com/user/repo",
-        )
-
-    owner, repo = match.groups()
-    branch = branch or "main"
-
-    # Download zip from GitHub
-    zip_url = f"https://github.com/{owner}/{repo}/archive/refs/heads/{branch}.zip"
-    temp_path = None
-    temp_dir = None
-
-    try:
-        # Download the zip file
-        branch_switched = False
-        async with httpx.AsyncClient(timeout=60.0) as client:
-            response = await client.get(zip_url, follow_redirects=True)
-            if response.status_code == 404:
-                # Try master branch if main doesn't exist
-                # (only if user didn't explicitly specify branch)
-                # Note: branch defaults to "main" if not provided
-                if branch == "main":
-                    zip_url = f"https://github.com/{owner}/{repo}/archive/refs/heads/master.zip"
-                    response = await client.get(zip_url, follow_redirects=True)
-                    if response.status_code != 404:
-                        branch_switched = True
-                if response.status_code == 404:
-                    raise HTTPException(
-                        status_code=404,
-                        detail=(
-                            f"Repository or branch '{branch}' not found. "
-                            "Make sure the repository exists and is public."
-                        ),
-                    )
-            response.raise_for_status()
-
-            # Save to temporary file
-            with tempfile.NamedTemporaryFile(delete=False, suffix=".zip") as temp_file:
-                temp_file.write(response.content)
-                temp_path = Path(temp_file.name)
-
-        # Extract to temporary directory
-        temp_dir = tempfile.mkdtemp()
-        with zipfile.ZipFile(temp_path, "r") as zip_ref:
-            zip_ref.extractall(temp_dir)
-
-        # Find the root directory (GitHub zips contain repo-name-branch/)
-        extracted_path = Path(temp_dir)
-        subdirs = [d for d in extracted_path.iterdir() if d.is_dir()]
-        if len(subdirs) == 1:
-            repo_root = subdirs[0]
-        else:
-            repo_root = extracted_path
-
-        # Enumerate plugins
-        result = plugin_installer.enumerate_plugins_from_repo(repo_root)
-
-        actual_branch = "master" if branch_switched else branch
-        return {
-            "success": True,
-            "repo_url": repo_url,
-            "branch": actual_branch,
-            "branch_switched": branch_switched,
-            "has_manifest": result["has_manifest"],
-            "plugins": result["plugins"],
-        }
-    except HTTPException:
-        raise
-    except Exception as e:
-        raise HTTPException(status_code=500, detail=f"Failed to enumerate plugins: {str(e)}")
-    finally:
-        # Clean up temp files
-        if temp_path and temp_path.exists():
-            try:
-                temp_path.unlink()
-            except (PermissionError, OSError):
-                pass
-        if temp_dir and Path(temp_dir).exists():
-            try:
-                shutil.rmtree(temp_dir)
-            except (PermissionError, OSError):
-                pass
-
-
-@router.post("/plugins/install-from-github")
-async def install_plugin_from_github(request: dict[str, Any] = Body(...)):
-    """
-    Install a specific plugin from a GitHub repository.
-
-    Args:
-        request: Request body containing:
-            - repo_url: GitHub repository URL
-            - plugin_path: Relative path to plugin directory within repo
-            - branch: Optional branch name (defaults to main/master)
-            - plugin_id: Optional plugin ID override
-
-    Returns:
-        Plugin manifest
-    """
-    import re
-    import shutil
-    import tempfile
-
-    import httpx
-
-    repo_url = request.get("repo_url")
-    plugin_path = request.get("plugin_path")
-    if not repo_url:
-        raise HTTPException(status_code=400, detail="repo_url is required")
-    if not plugin_path:
-        raise HTTPException(status_code=400, detail="plugin_path is required")
-
-    branch = request.get("branch") or "main"
-    plugin_id = request.get("plugin_id")
-
-    # Parse GitHub URL
-    github_pattern = r"github\.com[/:]([^/]+)/([^/]+?)(?:\.git)?/?$"
-    match = re.search(github_pattern, repo_url)
-    if not match:
-        raise HTTPException(
-            status_code=400,
-            detail="Invalid GitHub repository URL. Expected format: https://github.com/user/repo",
-        )
-
-    owner, repo = match.groups()
-
-    # Download zip from GitHub
-    zip_url = f"https://github.com/{owner}/{repo}/archive/refs/heads/{branch}.zip"
-    temp_path = None
-    temp_dir = None
-
-    try:
-        # Download the zip file
-        branch_switched = False
-        async with httpx.AsyncClient(timeout=60.0) as client:
-            response = await client.get(zip_url, follow_redirects=True)
-            if response.status_code == 404:
-                # Try master branch if main doesn't exist (only if user didn't specify branch)
-                original_branch = request.get("branch")
-                if branch == "main" and not original_branch:
-                    zip_url = f"https://github.com/{owner}/{repo}/archive/refs/heads/master.zip"
-                    response = await client.get(zip_url, follow_redirects=True)
-                    if response.status_code != 404:
-                        branch_switched = True
-                if response.status_code == 404:
-                    raise HTTPException(
-                        status_code=404,
-                        detail=(
-                            f"Repository or branch '{branch}' not found. "
-                            "Make sure the repository exists and is public."
-                        ),
-                    )
-            response.raise_for_status()
-
-            # Save to temporary file
-            with tempfile.NamedTemporaryFile(delete=False, suffix=".zip") as temp_file:
-                temp_file.write(response.content)
-                temp_path = Path(temp_file.name)
-
-        # Extract to temporary directory
-        temp_dir = tempfile.mkdtemp()
-        with zipfile.ZipFile(temp_path, "r") as zip_ref:
-            zip_ref.extractall(temp_dir)
-
-        # Find the root directory (GitHub zips contain repo-name-branch/)
-        extracted_path = Path(temp_dir)
-        subdirs = [d for d in extracted_path.iterdir() if d.is_dir()]
-        if len(subdirs) == 1:
-            repo_root = subdirs[0]
-        else:
-            repo_root = extracted_path
-
-        # Install specific plugin
-        try:
-            manifest = plugin_installer.install_plugin_from_repo(repo_root, plugin_path, plugin_id)
-
-            # Reload plugins to include the newly installed one
-            plugin_loader.load_installed_plugins()
-
-            actual_branch = "master" if branch_switched else branch
-            return {
-                "success": True,
-                "message": f"Plugin {manifest['id']} installed successfully from {repo_url}",
-                "manifest": manifest,
-                "branch": actual_branch,
-                "branch_switched": branch_switched,
-                "requires_restart": True,
-            }
-        except ValueError as e:
-            raise HTTPException(status_code=400, detail=str(e))
-        except Exception as e:
-            raise HTTPException(status_code=500, detail=f"Failed to install plugin: {str(e)}")
-    except HTTPException:
-        raise
-    except Exception as e:
-        raise HTTPException(
-            status_code=500, detail=f"Failed to install plugin from GitHub: {str(e)}"
-        )
-    finally:
-        # Clean up temp files
-        if temp_path and temp_path.exists():
-            try:
-                temp_path.unlink()
-            except (PermissionError, OSError):
-                pass
-        if temp_dir and Path(temp_dir).exists():
-            try:
-                shutil.rmtree(temp_dir)
-            except (PermissionError, OSError):
-                pass
 
 
 @router.delete("/plugins/installed/{plugin_id}")

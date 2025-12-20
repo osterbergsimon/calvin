@@ -80,6 +80,7 @@ export function usePhotoFrameMode() {
         }
       }
     },
+    { immediate: false }, // Don't run on initial setup, we handle that in onMounted
   );
 
   watch(
@@ -89,10 +90,11 @@ export function usePhotoFrameMode() {
         resetInactivityTimer();
       }
     },
+    { immediate: false }, // Don't run on initial setup, we handle that in onMounted
   );
 
   onMounted(async () => {
-    // Load config first to get photo frame settings
+    // Load config first to get photo frame settings from server
     await configStore.fetchConfig();
 
     // Set up activity listeners
@@ -101,7 +103,8 @@ export function usePhotoFrameMode() {
       window.addEventListener(event, handleActivity, { passive: true });
     });
 
-    // Initialize timer if photo frame mode is enabled
+    // Initialize timer if photo frame mode is enabled (loaded from server)
+    // This ensures the setting from the server is properly applied
     if (configStore.photoFrameEnabled) {
       resetInactivityTimer();
     }

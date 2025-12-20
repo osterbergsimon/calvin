@@ -1691,6 +1691,42 @@
             </div>
           </section>
 
+          <!-- Dashboard Refresh Settings -->
+          <section
+            class="settings-section collapsible"
+            :class="{ expanded: expandedSections.dashboardRefresh }"
+          >
+            <div
+              class="section-header"
+              @click="toggleSection('dashboardRefresh')"
+            >
+              <h2>Dashboard Refresh</h2>
+              <span class="toggle-icon">{{
+                expandedSections.dashboardRefresh ? "▼" : "▶"
+              }}</span>
+            </div>
+            <div
+              v-show="expandedSections.dashboardRefresh"
+              class="section-content"
+            >
+              <div class="setting-item">
+                <label>Config Polling Interval (seconds)</label>
+                <input
+                  v-model.number="localConfig.configPollInterval"
+                  type="number"
+                  min="5"
+                  max="300"
+                  @change="updateConfigPollInterval"
+                />
+                <span class="help-text"
+                  >How often the dashboard checks for config changes from the
+                  server (5-300 seconds). Lower values provide faster updates
+                  but increase server load. Default: 30 seconds.</span
+                >
+              </div>
+            </div>
+          </section>
+
           <!-- System Information & Update Settings -->
           <section
             class="settings-section collapsible"
@@ -2017,6 +2053,7 @@ const localConfig = ref({
   orientationFlipped: false,
   consoleLogEnabled: true,
   consoleLogLevel: "info",
+  configPollInterval: 30,
   version: null,
   frontendVersion: null,
 });
@@ -2049,6 +2086,7 @@ const activeCategory = ref("layout");
 
 // Collapsible sections state
 const expandedSections = ref({
+  dashboardRefresh: false,
   serviceOrdering: false,
   display: true,
   ui: true,
@@ -2221,6 +2259,16 @@ const updateConsoleLogSettings = async () => {
   }
 };
 
+const updateConfigPollInterval = async () => {
+  try {
+    await configStore.updateConfig({
+      configPollInterval: localConfig.value.configPollInterval,
+    });
+  } catch (error) {
+    logError("[Settings]", "Failed to update config polling interval:", error);
+  }
+};
+
 const updateCalendarSplit = () => {
   configStore.setCalendarSplit(localConfig.value.calendarSplit);
   saveConfig();
@@ -2237,14 +2285,26 @@ const updateKeyboardType = () => {
   saveConfig();
 };
 
-const updatePhotoFrameEnabled = () => {
-  configStore.setPhotoFrameEnabled(localConfig.value.photoFrameEnabled);
-  saveConfig();
+const updatePhotoFrameEnabled = async () => {
+  try {
+    configStore.setPhotoFrameEnabled(localConfig.value.photoFrameEnabled);
+    await configStore.updateConfig({
+      photoFrameEnabled: localConfig.value.photoFrameEnabled,
+    });
+  } catch (error) {
+    logError("[Settings]", "Failed to update photo frame enabled:", error);
+  }
 };
 
-const updatePhotoFrameTimeout = () => {
-  configStore.setPhotoFrameTimeout(localConfig.value.photoFrameTimeout);
-  saveConfig();
+const updatePhotoFrameTimeout = async () => {
+  try {
+    configStore.setPhotoFrameTimeout(localConfig.value.photoFrameTimeout);
+    await configStore.updateConfig({
+      photoFrameTimeout: localConfig.value.photoFrameTimeout,
+    });
+  } catch (error) {
+    logError("[Settings]", "Failed to update photo frame timeout:", error);
+  }
 };
 
 const updateShowUI = () => {
@@ -2981,6 +3041,14 @@ const loadConfig = async () => {
       } else {
         localConfig.value.consoleLogLevel = "info"; // Default to 'info' level
       }
+      if (response.data.configPollInterval !== undefined) {
+        localConfig.value.configPollInterval = response.data.configPollInterval;
+      } else if (response.data.config_poll_interval !== undefined) {
+        localConfig.value.configPollInterval =
+          response.data.config_poll_interval;
+      } else {
+        localConfig.value.configPollInterval = 30; // Default to 30 seconds
+      }
       localConfig.value.gitBranch =
         response.data.gitBranch ?? response.data.git_branch ?? "main";
       localConfig.value.version = response.data.version ?? null;
@@ -3205,6 +3273,7 @@ const saveConfig = async () => {
       gitBranch: localConfig.value.gitBranch,
       consoleLogEnabled: localConfig.value.consoleLogEnabled,
       consoleLogLevel: localConfig.value.consoleLogLevel,
+      configPollInterval: localConfig.value.configPollInterval,
     });
 
     // Refresh the config store to ensure all components have the latest settings
@@ -3266,6 +3335,7 @@ const resetToDefaults = async () => {
       darkModeStart: 18,
       darkModeEnd: 6,
       gitBranch: "main",
+      configPollInterval: 30,
     };
     keyboardStore.setKeyboardType("7-button");
     // Reset mappings to defaults

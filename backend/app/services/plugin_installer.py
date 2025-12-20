@@ -105,6 +105,17 @@ class PluginInstaller:
                     f"Invalid plugin type: {manifest['type']}. Must be one of {valid_types}"
                 )
 
+            # Validate format version if specified
+            format_version = manifest.get("format_version", "1.0.0")
+            if format_version not in ["1.0.0"]:
+                raise ValueError(
+                    f"Unsupported plugin format version: {format_version}. "
+                    f"Supported versions: 1.0.0"
+                )
+
+            # Validate optional fields structure if present
+            self._validate_manifest_optional_fields(manifest)
+
             # Check for plugin.py in the same directory as plugin.json
             plugin_dir = "/".join(plugin_json_path.split("/")[:-1])
             plugin_py_path = f"{plugin_dir}/plugin.py" if plugin_dir else "plugin.py"
@@ -157,12 +168,65 @@ class PluginInstaller:
                 f"Invalid plugin type: {manifest['type']}. Must be one of {valid_types}"
             )
 
+        # Validate format version if specified
+        format_version = manifest.get("format_version", "1.0.0")
+        if format_version not in ["1.0.0"]:
+            raise ValueError(
+                f"Unsupported plugin format version: {format_version}. "
+                f"Supported versions: 1.0.0"
+            )
+
+        # Validate optional fields structure if present
+        self._validate_manifest_optional_fields(manifest)
+
         # Check for plugin.py
         plugin_py = plugin_dir / "plugin.py"
         if not plugin_py.exists():
             raise ValueError("plugin.py not found in plugin package")
 
         return manifest
+
+    def _validate_manifest_optional_fields(self, manifest: dict[str, Any]) -> None:
+        """
+        Validate optional manifest fields structure.
+
+        Args:
+            manifest: Plugin manifest dictionary
+
+        Raises:
+            ValueError: If optional fields have invalid structure
+        """
+        # Validate dependencies structure
+        if "dependencies" in manifest:
+            deps = manifest["dependencies"]
+            if not isinstance(deps, dict):
+                raise ValueError("dependencies must be an object")
+            if "packages" in deps and not isinstance(deps["packages"], dict):
+                raise ValueError("dependencies.packages must be an object")
+            if "system" in deps and not isinstance(deps["system"], dict):
+                raise ValueError("dependencies.system must be an object")
+
+        # Validate files structure
+        if "files" in manifest:
+            files = manifest["files"]
+            if not isinstance(files, dict):
+                raise ValueError("files must be an object")
+            if "include" in files and not isinstance(files["include"], list):
+                raise ValueError("files.include must be an array")
+            if "exclude" in files and not isinstance(files["exclude"], list):
+                raise ValueError("files.exclude must be an array")
+
+        # Validate requirements structure
+        if "requirements" in manifest:
+            reqs = manifest["requirements"]
+            if not isinstance(reqs, dict):
+                raise ValueError("requirements must be an object")
+            if "restart_required" in reqs and not isinstance(reqs["restart_required"], bool):
+                raise ValueError("requirements.restart_required must be a boolean")
+            if "config_required" in reqs and not isinstance(reqs["config_required"], bool):
+                raise ValueError("requirements.config_required must be a boolean")
+            if "permissions" in reqs and not isinstance(reqs["permissions"], list):
+                raise ValueError("requirements.permissions must be an array")
 
     def install_plugin(
         self, source_path: Path, plugin_id: str | None = None, check_version: bool = True

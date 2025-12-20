@@ -143,6 +143,7 @@ class ConfigUpdate(BaseModel):
         None  # Git repository URL for updates (default: 'https://github.com/osterbergsimon/calvin.git')
     )
     gitBranch: str | None = None  # Git branch to use for updates (default: 'main')
+    configPollInterval: int | None = None  # Config polling interval in seconds (default: 30)
 
     # Allow arbitrary fields for extensibility
     class Config:
@@ -398,6 +399,10 @@ async def get_config():
         config["consoleLogLevel"] = "info"  # Default to 'info' level
     elif "console_log_level" in config and "consoleLogLevel" not in config:
         config["consoleLogLevel"] = config["console_log_level"]
+    if "configPollInterval" not in config and "config_poll_interval" not in config:
+        config["configPollInterval"] = 30  # Default to 30 seconds
+    elif "config_poll_interval" in config and "configPollInterval" not in config:
+        config["configPollInterval"] = config["config_poll_interval"]
 
     # Add backend version (git commit short hash)
     config["version"] = get_git_version()
@@ -563,6 +568,8 @@ async def update_config(config_update: ConfigUpdate):
         update_dict["console_log_enabled"] = update_dict.pop("consoleLogEnabled")
     if "consoleLogLevel" in update_dict:
         update_dict["console_log_level"] = update_dict.pop("consoleLogLevel")
+    if "configPollInterval" in update_dict:
+        update_dict["config_poll_interval"] = update_dict.pop("configPollInterval")
 
     await config_service.update_config(update_dict)
 

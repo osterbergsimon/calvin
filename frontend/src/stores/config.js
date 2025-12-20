@@ -56,6 +56,7 @@ export const useConfigStore = defineStore("config", () => {
   const mealPlanCardSize = ref("medium"); // Meal plan card size: 'small' | 'medium' | 'large'
   const consoleLogEnabled = ref(true); // Enable console logging (default: true for backwards compatibility)
   const consoleLogLevel = ref("info"); // Console log level: 'error' | 'warn' | 'info' | 'debug' (default: 'info')
+  const configPollInterval = ref(30); // Config polling interval in seconds (default: 30)
   const loading = ref(false);
   const error = ref(null);
 
@@ -343,6 +344,13 @@ export const useConfigStore = defineStore("config", () => {
       } else {
         consoleLogLevel.value = "info"; // Default to 'info' level
       }
+      if (response.data.configPollInterval !== undefined) {
+        configPollInterval.value = response.data.configPollInterval;
+      } else if (response.data.config_poll_interval !== undefined) {
+        configPollInterval.value = response.data.config_poll_interval;
+      } else {
+        configPollInterval.value = 30; // Default to 30 seconds
+      }
       return response.data;
     } catch (err) {
       error.value = err.message;
@@ -556,6 +564,7 @@ export const useConfigStore = defineStore("config", () => {
     mealPlanCardSize,
     consoleLogEnabled,
     consoleLogLevel,
+    configPollInterval,
     loading,
     error,
     calendarWidth,

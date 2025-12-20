@@ -221,6 +221,163 @@ class TestGitHubPluginInstallation:
 
         return zip_path
 
+    @pytest.fixture
+    def mock_github_zip_test_plugin(self, tmp_path):
+        """Create a mock GitHub repository zip with the test plugin."""
+        zip_path = tmp_path / "repo.zip"
+
+        plugin_code = '''"""Test plugin for plugin installation testing."""
+
+from typing import Any
+
+from app.plugins.base import PluginType
+from app.plugins.hooks import hookimpl
+from app.plugins.protocols import ServicePlugin
+
+
+class TestServicePlugin(ServicePlugin):
+    """Test service plugin for installation testing."""
+
+    @classmethod
+    def get_plugin_metadata(cls) -> dict[str, Any]:
+        """Get plugin metadata for registration."""
+        return {
+            "type_id": "test_plugin",
+            "plugin_type": PluginType.SERVICE,
+            "name": "Test Plugin",
+            "description": "A basic test plugin for plugin installation testing",
+            "version": "1.0.0",
+            "common_config_schema": {
+                "message": {
+                    "type": "string",
+                    "description": "Test message to display",
+                    "default": "Hello from test plugin!",
+                    "ui": {
+                        "component": "input",
+                        "placeholder": "Enter a message",
+                        "validation": {
+                            "required": False,
+                        },
+                    },
+                },
+            },
+            "display_schema": {
+                "type": "api",
+                "api_endpoint": None,
+                "method": None,
+                "data_schema": None,
+                "render_template": "iframe",
+            },
+            "plugin_class": cls,
+        }
+
+    def __init__(
+        self,
+        plugin_id: str,
+        name: str,
+        message: str = "Hello from test plugin!",
+        enabled: bool = True,
+    ):
+        super().__init__(plugin_id, name, enabled)
+        self.message = message
+
+    async def initialize(self) -> None:
+        """Initialize the plugin."""
+        pass
+
+    async def cleanup(self) -> None:
+        """Cleanup plugin resources."""
+        pass
+
+    async def get_content(self) -> dict[str, Any]:
+        """Get service content for display."""
+        return {
+            "type": "iframe",
+            "url": "about:blank",
+            "config": {
+                "message": self.message,
+            },
+        }
+
+    async def validate_config(self, config: dict[str, Any]) -> bool:
+        """Validate plugin configuration."""
+        return True
+
+
+@hookimpl
+def register_plugin_types() -> list[dict[str, Any]]:
+    """Register TestServicePlugin type."""
+    return [TestServicePlugin.get_plugin_metadata()]
+
+
+@hookimpl
+def create_plugin_instance(
+    plugin_id: str,
+    type_id: str,
+    name: str,
+    config: dict[str, Any],
+) -> TestServicePlugin | None:
+    """Create a TestServicePlugin instance."""
+    if type_id != "test_plugin":
+        return None
+
+    enabled = config.get("enabled", False)
+    message = config.get("message", "Hello from test plugin!")
+
+    if isinstance(message, dict):
+        message = message.get("value") or message.get("default") or "Hello from test plugin!"
+    message = str(message) if message else "Hello from test plugin!"
+
+    return TestServicePlugin(
+        plugin_id=plugin_id,
+        name=name,
+        message=message,
+        enabled=enabled,
+    )
+'''
+
+        with zipfile.ZipFile(zip_path, "w") as zipf:
+            # Test plugin
+            zipf.writestr(
+                "repo-main/test-plugin/plugin.json",
+                json.dumps(
+                    {
+                        "id": "test_plugin",
+                        "name": "Test Plugin",
+                        "version": "1.0.0",
+                        "type": "service",
+                        "description": "A basic test plugin for plugin installation testing",
+                        "author": "Calvin Test Suite",
+                        "license": "MIT",
+                    }
+                ),
+            )
+            zipf.writestr("repo-main/test-plugin/plugin.py", plugin_code)
+
+            # plugins.json manifest
+            zipf.writestr(
+                "repo-main/plugins.json",
+                json.dumps(
+                    {
+                        "version": "1.0.0",
+                        "plugins": [
+                            {
+                                "id": "test_plugin",
+                                "name": "Test Plugin",
+                                "path": "test-plugin",
+                                "description": (
+                                    "A basic test plugin for plugin installation testing"
+                                ),
+                                "version": "1.0.0",
+                                "type": "service",
+                            }
+                        ],
+                    }
+                ),
+            )
+
+        return zip_path
+
     @patch("httpx.AsyncClient")
     def test_install_plugin_from_github_success(
         self, mock_client_class, test_client, mock_github_zip_single_plugin
@@ -379,6 +536,117 @@ class TestGitHubPluginInstallation:
         assert response.status_code in [400, 500]
         error_detail = response.json()["detail"].lower()
         assert "path traversal" in error_detail or "invalid" in error_detail
+
+    @patch("httpx.AsyncClient")
+    def test_install_test_plugin_from_github(
+        self, mock_client_class, test_client, mock_github_zip_test_plugin
+    ):
+        """Test successfully installing the test plugin from GitHub."""
+        # Clean up first
+        try:
+            plugin_installer.uninstall_plugin("test_plugin")
+        except Exception:
+            pass
+
+        with open(mock_github_zip_test_plugin, "rb") as f:
+            zip_content = f.read()
+
+        async def mock_get_async_200(*args, **kwargs):
+            mock_response = MagicMock()
+            mock_response.status_code = 200
+            mock_response.content = zip_content
+            mock_response.raise_for_status = MagicMock()
+            return mock_response
+
+        # Setup async context manager mock
+        mock_client = AsyncMock()
+        mock_client.__aenter__ = AsyncMock(return_value=mock_client)
+        mock_client.__aexit__ = AsyncMock(return_value=None)
+        mock_client.get = AsyncMock(side_effect=mock_get_async_200)
+        mock_client_class.return_value = mock_client
+
+        response = test_client.post(
+            "/api/plugins/install-from-github",
+            json={
+                "repo_url": "https://github.com/user/repo",
+                "plugin_path": "test-plugin",
+                "branch": "main",
+            },
+        )
+
+        if response.status_code == 404:
+            pytest.skip("GitHub installation route not available in test client")
+
+        assert response.status_code == 200
+        data = response.json()
+        assert data["success"] is True
+        assert data["manifest"]["id"] == "test_plugin"
+        assert data["manifest"]["name"] == "Test Plugin"
+        assert data["requires_restart"] is True
+
+        # Verify plugin is installed
+        plugin_path = plugin_installer.get_plugin_path("test_plugin")
+        assert plugin_path.exists()
+        assert (plugin_path / "plugin.json").exists()
+        assert (plugin_path / "plugin.py").exists()
+
+        # Verify plugin.json content
+        installed_manifest = json.loads((plugin_path / "plugin.json").read_text())
+        assert installed_manifest["id"] == "test_plugin"
+        assert installed_manifest["name"] == "Test Plugin"
+
+        # Cleanup
+        try:
+            plugin_installer.uninstall_plugin("test_plugin")
+        except Exception:
+            pass
+
+    @patch("httpx.AsyncClient")
+    def test_enumerate_test_plugin_from_github(
+        self, mock_client_class, test_client, mock_github_zip_test_plugin
+    ):
+        """Test enumerating the test plugin from GitHub."""
+        with open(mock_github_zip_test_plugin, "rb") as f:
+            zip_content = f.read()
+
+        async def mock_get_async(*args, **kwargs):
+            mock_response = MagicMock()
+            mock_response.status_code = 200
+            mock_response.content = zip_content
+            mock_response.raise_for_status = MagicMock()
+            return mock_response
+
+        # Setup async context manager mock
+        mock_client = AsyncMock()
+        mock_client.__aenter__ = AsyncMock(return_value=mock_client)
+        mock_client.__aexit__ = AsyncMock(return_value=None)
+        mock_client.get = AsyncMock(side_effect=mock_get_async)
+        mock_client_class.return_value = mock_client
+
+        response = test_client.get(
+            "/api/plugins/enumerate-from-github",
+            params={"repo_url": "https://github.com/user/repo", "branch": "main"},
+        )
+
+        if response.status_code == 404:
+            pytest.skip("GitHub enumeration route not available in test client")
+
+        assert response.status_code == 200
+        data = response.json()
+        assert data["success"] is True
+        assert "plugins" in data
+        assert len(data["plugins"]) >= 1
+
+        # Check that test plugin is listed
+        plugin_ids = [p["id"] for p in data["plugins"]]
+        assert "test_plugin" in plugin_ids
+
+        # Verify test plugin details
+        test_plugin = next(p for p in data["plugins"] if p["id"] == "test_plugin")
+        assert test_plugin["name"] == "Test Plugin"
+        assert test_plugin["path"] == "test-plugin"
+        assert test_plugin["version"] == "1.0.0"
+        assert test_plugin["type"] == "service"
 
 
 @pytest.mark.integration

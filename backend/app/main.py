@@ -10,8 +10,6 @@ from fastapi.responses import FileResponse
 from app.api.routes import calendar, config, health, images, keyboard, plugins, system, web_services
 from app.config import settings
 from app.database import init_db
-from app.services import image_service as image_service_module
-from app.services.image_service import ImageService
 from app.services.scheduler import calendar_scheduler
 
 # Plugins are auto-discovered via pluggy hooks when modules are imported
@@ -168,14 +166,6 @@ async def lifespan(app: FastAPI):
         await keyboard_mapping_service.set_mappings("standard", default_standard)
         print("Initialized default keyboard mappings")
 
-    # Initialize image service (legacy - will be replaced by plugin system)
-    thumbnail_dir = settings.image_cache_dir / "thumbnails"
-    image_service_module.image_service = ImageService(settings.image_dir, thumbnail_dir)
-    # Do initial scan
-    image_service_module.image_service.scan_images()
-    image_count = len(image_service_module.image_service.get_images())
-    print(f"Image service initialized: {image_count} images found (legacy)")
-
     # Initialize plugin image service
     from app.services.plugin_image_service import PluginImageService
 
@@ -204,6 +194,9 @@ async def lifespan(app: FastAPI):
     photo_frame_timeout = await config_service.get_value("photo_frame_timeout")
     if photo_frame_timeout is None:
         await config_service.set_value("photo_frame_timeout", 300)  # 5 minutes
+    config_poll_interval = await config_service.get_value("config_poll_interval")
+    if config_poll_interval is None:
+        await config_service.set_value("config_poll_interval", 30)  # 30 seconds default
     show_ui = await config_service.get_value("show_ui")
     if show_ui is None:
         await config_service.set_value("show_ui", True)

@@ -91,6 +91,158 @@ def mock_repo_with_manifest(tmp_path, mock_repo_structure):
     return mock_repo_structure
 
 
+@pytest.fixture
+def test_plugin_repo_structure(tmp_path):
+    """Create a mock repository structure with the test plugin."""
+    repo_root = tmp_path / "repo"
+    repo_root.mkdir()
+
+    # Test plugin matching the structure in calvin-plugins/test-plugin
+    test_plugin_dir = repo_root / "test-plugin"
+    test_plugin_dir.mkdir()
+
+    manifest = {
+        "id": "test_plugin",
+        "name": "Test Plugin",
+        "version": "1.0.0",
+        "type": "service",
+        "description": "A basic test plugin for plugin installation testing",
+        "author": "Calvin Test Suite",
+        "license": "MIT",
+    }
+    (test_plugin_dir / "plugin.json").write_text(json.dumps(manifest))
+
+    # Write a minimal but valid plugin.py
+    plugin_code = '''"""Test plugin for plugin installation testing."""
+
+from typing import Any
+
+from app.plugins.base import PluginType
+from app.plugins.hooks import hookimpl
+from app.plugins.protocols import ServicePlugin
+
+
+class TestServicePlugin(ServicePlugin):
+    """Test service plugin for installation testing."""
+
+    @classmethod
+    def get_plugin_metadata(cls) -> dict[str, Any]:
+        """Get plugin metadata for registration."""
+        return {
+            "type_id": "test_plugin",
+            "plugin_type": PluginType.SERVICE,
+            "name": "Test Plugin",
+            "description": "A basic test plugin for plugin installation testing",
+            "version": "1.0.0",
+            "common_config_schema": {
+                "message": {
+                    "type": "string",
+                    "description": "Test message to display",
+                    "default": "Hello from test plugin!",
+                    "ui": {
+                        "component": "input",
+                        "placeholder": "Enter a message",
+                        "validation": {
+                            "required": False,
+                        },
+                    },
+                },
+            },
+            "display_schema": {
+                "type": "api",
+                "api_endpoint": None,
+                "method": None,
+                "data_schema": None,
+                "render_template": "iframe",
+            },
+            "plugin_class": cls,
+        }
+
+    def __init__(
+        self,
+        plugin_id: str,
+        name: str,
+        message: str = "Hello from test plugin!",
+        enabled: bool = True,
+    ):
+        super().__init__(plugin_id, name, enabled)
+        self.message = message
+
+    async def initialize(self) -> None:
+        """Initialize the plugin."""
+        pass
+
+    async def cleanup(self) -> None:
+        """Cleanup plugin resources."""
+        pass
+
+    async def get_content(self) -> dict[str, Any]:
+        """Get service content for display."""
+        return {
+            "type": "iframe",
+            "url": "about:blank",
+            "config": {
+                "message": self.message,
+            },
+        }
+
+    async def validate_config(self, config: dict[str, Any]) -> bool:
+        """Validate plugin configuration."""
+        return True
+
+
+@hookimpl
+def register_plugin_types() -> list[dict[str, Any]]:
+    """Register TestServicePlugin type."""
+    return [TestServicePlugin.get_plugin_metadata()]
+
+
+@hookimpl
+def create_plugin_instance(
+    plugin_id: str,
+    type_id: str,
+    name: str,
+    config: dict[str, Any],
+) -> TestServicePlugin | None:
+    """Create a TestServicePlugin instance."""
+    if type_id != "test_plugin":
+        return None
+
+    enabled = config.get("enabled", False)
+    message = config.get("message", "Hello from test plugin!")
+
+    if isinstance(message, dict):
+        message = message.get("value") or message.get("default") or "Hello from test plugin!"
+    message = str(message) if message else "Hello from test plugin!"
+
+    return TestServicePlugin(
+        plugin_id=plugin_id,
+        name=name,
+        message=message,
+        enabled=enabled,
+    )
+'''
+    (test_plugin_dir / "plugin.py").write_text(plugin_code)
+
+    # Add plugins.json manifest
+    repo_manifest = {
+        "version": "1.0.0",
+        "plugins": [
+            {
+                "id": "test_plugin",
+                "name": "Test Plugin",
+                "path": "test-plugin",
+                "description": "A basic test plugin for plugin installation testing",
+                "version": "1.0.0",
+                "type": "service",
+            }
+        ],
+    }
+    (repo_root / "plugins.json").write_text(json.dumps(repo_manifest))
+
+    return repo_root
+
+
 @pytest.mark.unit
 class TestPluginEnumeration:
     """Test plugin enumeration from repositories."""
@@ -227,6 +379,50 @@ class TestPluginInstallFromRepo:
 
         with pytest.raises(ValueError, match="already installed"):
             plugin_installer.install_plugin_from_repo(mock_repo_structure, "plugin1")
+
+    def test_install_test_plugin_from_repo(self, plugin_installer, test_plugin_repo_structure):
+        """Test installing the test plugin from repository."""
+        manifest = plugin_installer.install_plugin_from_repo(
+            test_plugin_repo_structure, "test-plugin", plugin_id=None
+        )
+
+        assert manifest["id"] == "test_plugin"
+        assert manifest["name"] == "Test Plugin"
+        assert manifest["version"] == "1.0.0"
+        assert manifest["type"] == "service"
+
+        # Check plugin was installed
+        plugin_path = plugin_installer.get_plugin_path("test_plugin")
+        assert plugin_path.exists()
+        assert (plugin_path / "plugin.json").exists()
+        assert (plugin_path / "plugin.py").exists()
+
+        # Verify plugin.json content
+        installed_manifest = json.loads((plugin_path / "plugin.json").read_text())
+        assert installed_manifest["id"] == "test_plugin"
+        assert installed_manifest["name"] == "Test Plugin"
+
+        # Verify plugin.py content
+        plugin_code = (plugin_path / "plugin.py").read_text()
+        assert "TestServicePlugin" in plugin_code
+        assert "test_plugin" in plugin_code
+
+        # Cleanup
+        plugin_installer.uninstall_plugin("test_plugin")
+
+    def test_enumerate_test_plugin_from_repo(self, plugin_installer, test_plugin_repo_structure):
+        """Test enumerating the test plugin from repository."""
+        result = plugin_installer.enumerate_plugins_from_repo(test_plugin_repo_structure)
+
+        assert result["has_manifest"] is True
+        assert len(result["plugins"]) == 1
+
+        plugin = result["plugins"][0]
+        assert plugin["id"] == "test_plugin"
+        assert plugin["name"] == "Test Plugin"
+        assert plugin["path"] == "test-plugin"
+        assert plugin["version"] == "1.0.0"
+        assert plugin["type"] == "service"
 
 
 @pytest.mark.unit

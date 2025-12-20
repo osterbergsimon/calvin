@@ -5,15 +5,9 @@ from pathlib import Path
 from fastapi import APIRouter, File, HTTPException, UploadFile
 from fastapi.responses import FileResponse
 
-from app.services import image_service as image_service_module
 from app.services import plugin_image_service
 
 router = APIRouter()
-
-
-def get_image_service():
-    """Get the global image service instance (legacy)."""
-    return image_service_module.image_service
 
 
 @router.get("/images/list")

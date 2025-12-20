@@ -7,13 +7,15 @@
 </template>
 
 <script setup>
-import { ref, onMounted, onUnmounted } from "vue";
+import { ref, onMounted, onUnmounted, watch } from "vue";
 import { useKeyboardStore } from "../stores/keyboard";
 import { useKeyboardActions } from "../composables/useKeyboardActions";
 import { usePhotoFrameMode } from "../composables/usePhotoFrameMode";
+import { useConfigStore } from "../stores/config";
 import KeyboardFeedback from "./KeyboardFeedback.vue";
 
 const keyboardStore = useKeyboardStore();
+const configStore = useConfigStore();
 const { handleAction } = useKeyboardActions();
 const { resetInactivityTimer } = usePhotoFrameMode();
 const feedbackRef = ref(null);
@@ -183,15 +185,39 @@ const loadKeyboardConfig = async () => {
   }
 };
 
+let keyboardConfigInterval = null;
+
+const startKeyboardConfigPolling = () => {
+  // Clear existing interval if any
+  if (keyboardConfigInterval) {
+    clearInterval(keyboardConfigInterval);
+    keyboardConfigInterval = null;
+  }
+
+  // Get polling interval from config (convert seconds to milliseconds)
+  const intervalMs = configStore.configPollInterval * 1000;
+
+  // Poll for keyboard config updates
+  // This allows keyboard settings changed from another device to take effect
+  keyboardConfigInterval = setInterval(async () => {
+    await loadKeyboardConfig();
+  }, intervalMs);
+};
+
+// Watch for changes to configPollInterval and restart polling
+watch(
+  () => configStore.configPollInterval,
+  () => {
+    startKeyboardConfigPolling();
+  },
+);
+
 onMounted(async () => {
   // Load keyboard mappings and config
   await loadKeyboardConfig();
 
-  // Poll for keyboard config updates (every 30 seconds, same as dashboard config polling)
-  // This allows keyboard settings changed from another device to take effect
-  const keyboardConfigInterval = setInterval(async () => {
-    await loadKeyboardConfig();
-  }, 30000);
+  // Start keyboard config polling with configured interval
+  startKeyboardConfigPolling();
 
   // Add global keyboard listeners
   window.addEventListener("keydown", onKeyDown);
@@ -199,22 +225,21 @@ onMounted(async () => {
 
   // Start checking reboot combo periodically
   rebootComboCheckInterval = setInterval(checkRebootCombo, 100); // Check every 100ms
-
-  // Clean up interval on unmount
-  onUnmounted(() => {
-    clearInterval(keyboardConfigInterval);
-    if (rebootComboCheckInterval) {
-      clearInterval(rebootComboCheckInterval);
-    }
-  });
 });
 
 onUnmounted(() => {
   // Remove keyboard listeners
   window.removeEventListener("keydown", onKeyDown);
   window.removeEventListener("keyup", onKeyUp);
+
+  // Clean up intervals
+  if (keyboardConfigInterval) {
+    clearInterval(keyboardConfigInterval);
+    keyboardConfigInterval = null;
+  }
   if (rebootComboCheckInterval) {
     clearInterval(rebootComboCheckInterval);
+    rebootComboCheckInterval = null;
   }
 });
 </script>

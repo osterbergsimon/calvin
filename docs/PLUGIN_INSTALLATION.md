@@ -18,36 +18,86 @@ my-plugin/
 
 ## Plugin Manifest (plugin.json)
 
-The `plugin.json` file defines plugin metadata:
+The `plugin.json` file defines plugin metadata, dependencies, and installation requirements.
+
+**See [PLUGIN_PACKAGE_FORMAT.md](./PLUGIN_PACKAGE_FORMAT.md#plugin-manifest-schema-pluginjson) for the complete schema specification.**
+
+### Minimal Example
 
 ```json
 {
   "id": "my_plugin",
   "name": "My Plugin",
-  "description": "A custom plugin for Calvin",
+  "version": "1.0.0",
+  "type": "service"
+}
+```
+
+### Complete Example
+
+```json
+{
+  "id": "my_plugin",
+  "name": "My Plugin",
   "version": "1.0.0",
   "type": "service",
+  "description": "A custom plugin for Calvin",
   "author": "Your Name",
   "license": "MIT",
+  "homepage": "https://github.com/user/my-plugin",
+  "keywords": ["api", "service"],
   "dependencies": {
-    "python": ">=3.10"
+    "python": ">=3.10",
+    "packages": {
+      "requests": ">=2.28.0",
+      "pydantic": "^2.0.0"
+    },
+    "calvin": ">=1.0.0"
+  },
+  "files": {
+    "include": ["plugin.py", "config.yaml"],
+    "exclude": ["tests/**", "*.md"]
+  },
+  "requirements": {
+    "restart_required": true,
+    "permissions": ["network"],
+    "config_required": true
   }
 }
 ```
 
 ### Required Fields
 
-- **`id`**: Unique plugin identifier (lowercase, underscores)
+- **`id`**: Unique plugin identifier (lowercase, underscores, hyphens)
 - **`name`**: Human-readable plugin name
 - **`version`**: Plugin version (semantic versioning)
 - **`type`**: Plugin type (`calendar`, `image`, or `service`)
 
 ### Optional Fields
 
+#### Metadata
 - **`description`**: Plugin description
 - **`author`**: Plugin author name
-- **`license`**: License type
-- **`dependencies`**: Runtime dependencies
+- **`license`**: License type (e.g., `"MIT"`, `"Apache-2.0"`)
+- **`homepage`**: Plugin homepage URL
+- **`repository`**: Source code repository URL
+- **`bugs`**: Bug tracker URL
+- **`keywords`**: Array of tags for discovery
+
+#### Dependencies
+- **`dependencies.python`**: Required Python version (e.g., `">=3.10"`)
+- **`dependencies.packages`**: Python package dependencies (PyPI names with version constraints)
+- **`dependencies.system`**: System-level dependencies
+- **`dependencies.calvin`**: Minimum required Calvin version
+
+#### Files
+- **`files.include`**: Array of files/directories to include (glob patterns)
+- **`files.exclude`**: Array of files/directories to exclude (glob patterns)
+
+#### Requirements
+- **`requirements.restart_required`**: Whether restart is needed after installation (default: `true`)
+- **`requirements.permissions`**: Array of required permissions (e.g., `["network", "filesystem"]`)
+- **`requirements.config_required`**: Whether configuration is required before use (default: `false`)
 
 ## Plugin Implementation (plugin.py)
 
