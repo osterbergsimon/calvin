@@ -1,5 +1,6 @@
 """Main FastAPI application entry point."""
 
+import logging
 from contextlib import asynccontextmanager
 from pathlib import Path
 
@@ -13,6 +14,8 @@ from app.services.scheduler import calendar_scheduler
 
 # Plugins are auto-discovered via pluggy hooks when modules are imported
 
+logger = logging.getLogger(__name__)
+
 
 async def _initialize_database():
     """Initialize database and run migrations."""
@@ -20,10 +23,10 @@ async def _initialize_database():
     from app.utils.migrations import migrate_database
 
     await init_db()
-    print("Database initialized")
+    logger.info("Database initialized")
 
     await migrate_database()
-    print("Database migrations completed")
+    logger.info("Database migrations completed")
 
 
 async def _create_default_plugin_instance(
@@ -47,7 +50,7 @@ async def _create_default_plugin_instance(
     instance = result.scalar_one_or_none()
 
     if not instance:
-        print(f"Creating default {name} plugin instance...")
+        logger.info(f"Creating default {name} plugin instance...")
         try:
             await plugin_registry.register_plugin(
                 plugin_id=plugin_id,
@@ -56,9 +59,9 @@ async def _create_default_plugin_instance(
                 config=config,
                 enabled=True,
             )
-            print(f"Default {name} plugin instance created")
+            logger.info(f"Default {name} plugin instance created")
         except Exception as e:
-            print(f"Warning: Failed to create default {name} instance: {e}")
+            logger.warning(f"Failed to create default {name} instance: {e}")
 
 
 async def _initialize_plugins():
@@ -67,7 +70,7 @@ async def _initialize_plugins():
     from app.plugins.registry import plugin_registry
 
     await plugin_registry.load_plugins_from_db()
-    print("Loaded plugins from database")
+    logger.info("Loaded plugins from database")
 
     # Auto-create default instances for image plugins if enabled and no instance exists
     async with AsyncSessionLocal() as session:
@@ -135,7 +138,7 @@ async def _initialize_keyboard_mappings():
             "KEY_S": "mode_settings",
         }
         await keyboard_mapping_service.set_mappings("standard", default_standard)
-        print("Initialized default keyboard mappings")
+        logger.info("Initialized default keyboard mappings")
 
 
 async def _initialize_image_service():
@@ -145,7 +148,7 @@ async def _initialize_image_service():
     plugin_image_service = PluginImageService()
     await plugin_image_service.scan_images()
     plugin_image_count = len(await plugin_image_service.get_images())
-    print(f"Plugin image service initialized: {plugin_image_count} images found")
+    logger.info(f"Plugin image service initialized: {plugin_image_count} images found")
 
 
 async def _set_default_config_if_missing(config_service, key: str, default_value):
@@ -214,10 +217,10 @@ async def _start_schedulers():
     from app.services.display_power_service import display_power_service
 
     calendar_scheduler.start()
-    print("Calendar scheduler started - refreshing every 15 minutes")
+    logger.info("Calendar scheduler started - refreshing every 15 minutes")
 
     await display_power_service.start()
-    print("Display power scheduler started")
+    logger.info("Display power scheduler started")
 
 
 async def _sync_display_orientation():
@@ -230,16 +233,16 @@ async def _sync_display_orientation():
         if apply_rotation:
             result = await display_orientation_service.sync_with_config()
             if result.get("success"):
-                print(f"Display orientation synced: {result.get('message')}")
+                logger.info(f"Display orientation synced: {result.get('message')}")
             elif result.get("message") and "Not running on Raspberry Pi" not in result.get(
                 "message", ""
             ):
-                print(f"Display orientation sync: {result.get('message')}")
+                logger.info(f"Display orientation sync: {result.get('message')}")
         else:
-            print("Display rotation is disabled - skipping physical display rotation")
+            logger.info("Display rotation is disabled - skipping physical display rotation")
     except Exception as e:
         # Don't fail startup if orientation sync fails
-        print(f"Warning: Failed to sync display orientation on startup: {e}")
+        logger.warning(f"Failed to sync display orientation on startup: {e}")
 
 
 async def _shutdown_services():
@@ -248,13 +251,13 @@ async def _shutdown_services():
     from app.services.display_power_service import display_power_service
 
     await display_power_service.stop()
-    print("Display power scheduler stopped")
+    logger.info("Display power scheduler stopped")
 
     calendar_scheduler.stop()
-    print("Calendar scheduler stopped")
+    logger.info("Calendar scheduler stopped")
 
     await plugin_manager.cleanup_all()
-    print("Plugins cleaned up")
+    logger.info("Plugins cleaned up")
 
 
 @asynccontextmanager
@@ -339,9 +342,9 @@ if frontend_dist.exists():
 
             raise HTTPException(status_code=404, detail="Asset not found")
 
-        print(f"Mounted static assets from: {assets_dir} (with no-cache headers)")
+        logger.info(f"Mounted static assets from: {assets_dir} (with no-cache headers)")
     else:
-        print(f"WARNING: Assets directory not found: {assets_dir}")
+        logger.warning(f"Assets directory not found: {assets_dir}")
 
     # Serve index.html for root path
     @app.get("/")
