@@ -4,8 +4,8 @@ version: '3.8'
 services:
   calvin-backend-dev:
     build:
-      context: ./backend
-      dockerfile: ../docker/Dockerfile.backend-dev
+      context: ../backend
+      dockerfile: Dockerfile.backend-dev
     container_name: calvin-backend-dev
     ports:
       - "8000:8000"
@@ -23,8 +23,8 @@ services:
 
   calvin-frontend-dev:
     build:
-      context: ./frontend
-      dockerfile: ../docker/Dockerfile.frontend-dev
+      context: ../frontend
+      dockerfile: Dockerfile.frontend-dev
     container_name: calvin-frontend-dev
     ports:
       - "5173:5173"

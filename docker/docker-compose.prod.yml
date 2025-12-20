@@ -3,8 +3,8 @@ version: '3.8'
 services:
   calvin-prod:
     build:
-      context: .
-      dockerfile: Dockerfile
+      context: ..
+      dockerfile: docker/Dockerfile.prod
     container_name: calvin-prod
     ports:
       - "8000:8000"
@@ -20,8 +20,8 @@ services:
 
   calvin-dev:
     build:
-      context: .
-      dockerfile: Dockerfile.dev
+      context: ..
+      dockerfile: docker/Dockerfile.dev-prod
     container_name: calvin-dev
     ports:
       - "8000:8000"
