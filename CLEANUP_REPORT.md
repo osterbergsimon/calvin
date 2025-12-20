@@ -236,6 +236,11 @@ docs/
 1. ✅ Refactor `main.py` startup logic into smaller functions
 2. ✅ Simplify default config initialization
 3. ✅ Improve logging in startup code (replaced all print() with proper logging)
+4. ✅ Remove legacy calendar service (463 lines removed)
+5. ✅ Remove legacy calendar service unit tests
+6. ✅ Move Google Calendar utilities to plugin
+7. ✅ Remove unused legacy database models (CalendarSourceDB, WebServiceDB)
+8. ✅ Remove unused google_calendar.py utility file
 
 ### Phase 3: Documentation (Low Risk)
 1. ✅ Consolidate plugin documentation
