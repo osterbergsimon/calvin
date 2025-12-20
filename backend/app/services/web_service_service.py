@@ -1,10 +1,14 @@
 """Web service management service."""
 
+import logging
+
 from sqlalchemy import select
 
 from app.database import AsyncSessionLocal
 from app.models.db_models import PluginDB
 from app.models.web_service import WebService, WebServiceCreate, WebServiceUpdate
+
+logger = logging.getLogger(__name__)
 
 
 class WebServiceService:
@@ -26,9 +30,7 @@ class WebServiceService:
                 select(PluginDB).where(PluginDB.plugin_type == "service")
             )
             db_plugins = result.scalars().all()
-            print(
-                f"[WebServiceService] Found {len(db_plugins)} service plugin instances in database"
-            )
+            logger.debug(f"Found {len(db_plugins)} service plugin instances in database")
 
             services = []
             from app.plugins.loader import plugin_loader
@@ -38,9 +40,8 @@ class WebServiceService:
             plugin_types_by_id = {t.get("type_id"): t for t in plugin_types}
 
             for db_plugin in db_plugins:
-                print(
-                    f"[WebServiceService] Processing service: "
-                    f"id={db_plugin.id}, type_id={db_plugin.type_id}, "
+                logger.debug(
+                    f"Processing service: id={db_plugin.id}, type_id={db_plugin.type_id}, "
                     f"name={db_plugin.name}, enabled={db_plugin.enabled}"
                 )
                 config = db_plugin.config or {}
@@ -78,20 +79,17 @@ class WebServiceService:
                     type_id=type_id,
                     display_schema=display_schema,
                 )
-                print(
-                    f"[WebServiceService] Created service: "
-                    f"id={service.id}, name={service.name}, enabled={service.enabled}, "
-                    f"url={service.url[:50] if service.url else 'None'}..."
+                url_preview = service.url[:50] if service.url else "None"
+                logger.debug(
+                    f"Created service: id={service.id}, name={service.name}, "
+                    f"enabled={service.enabled}, url={url_preview}..."
                 )
                 services.append(service)
 
             # Sort by display_order (fallback if SQL ordering didn't work)
             services.sort(key=lambda s: (s.display_order, s.name))
             self._services = services
-            print(
-                f"[WebServiceService] Returning {len(services)} services: "
-                f"{[s.id for s in services]}"
-            )
+            logger.debug(f"Returning {len(services)} services: {[s.id for s in services]}")
             return services
 
     async def get_service(self, service_id: str) -> WebService | None:
