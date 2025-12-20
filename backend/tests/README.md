@@ -26,6 +26,13 @@ uv run pytest tests/unit/
 uv run pytest tests/integration/
 ```
 
+### E2E tests (requires network and test repository)
+```bash
+# Set test repository (optional, has default)
+export TEST_GITHUB_REPO="https://github.com/your-org/test-plugins"
+uv run pytest tests/e2e/ -m e2e -v
+```
+
 ### With coverage
 ```bash
 uv run pytest --cov=app --cov-report=html --cov-report=term

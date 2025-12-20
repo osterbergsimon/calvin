@@ -196,14 +196,50 @@ During installation:
 
 ## Installing Plugins
 
+**See [PLUGIN_PACKAGE_FORMAT.md](./PLUGIN_PACKAGE_FORMAT.md) for the complete package format specification.**
+
+### Via UI (Settings Page)
+
+1. **Upload Zip File**: Navigate to Settings → Plugins → Install New Plugin
+   - Click "Choose Zip File" and select a plugin zip file
+   - Zip files must contain exactly one plugin
+
+2. **Install from GitHub**:
+   - Enter GitHub repository URL
+   - Optionally specify a branch (defaults to main/master)
+   - Click "Browse Plugins" to see available plugins
+   - Select a plugin from the list and click "Install"
+
 ### Via API
 
-1. **Package your plugin** as a zip file containing the plugin directory structure
+#### Upload Zip File
+
+1. **Package your plugin** as a zip file containing exactly one plugin
 2. **Upload via API**:
 
 ```bash
 curl -X POST "http://localhost:8000/api/plugins/install" \
   -F "file=@my-plugin.zip"
+```
+
+#### Install from GitHub Repository
+
+1. **Enumerate available plugins**:
+
+```bash
+curl "http://localhost:8000/api/plugins/enumerate-from-github?repo_url=https://github.com/user/repo&branch=main"
+```
+
+2. **Install a specific plugin**:
+
+```bash
+curl -X POST "http://localhost:8000/api/plugins/install-from-github" \
+  -H "Content-Type: application/json" \
+  -d '{
+    "repo_url": "https://github.com/user/repo",
+    "plugin_path": "plugin-directory",
+    "branch": "main"
+  }'
 ```
 
 ### Installation Process

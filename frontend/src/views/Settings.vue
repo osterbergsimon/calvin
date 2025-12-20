@@ -2,7 +2,41 @@
   <div class="settings-page">
     <div class="settings-header">
       <h1>Settings & Configuration</h1>
-      <button class="btn-back" @click="goBack">← Back to Dashboard</button>
+      <div class="header-actions">
+        <div class="system-menu">
+          <button
+            class="btn-system-menu"
+            @click="showSystemMenu = !showSystemMenu"
+          >
+            ⚙️ System
+            <span class="menu-arrow">{{ showSystemMenu ? "▲" : "▼" }}</span>
+          </button>
+          <div v-if="showSystemMenu" class="system-menu-dropdown">
+            <button
+              class="menu-item"
+              @click="restartBackend"
+              title="Restart the backend server"
+            >
+              🔄 Restart Backend
+            </button>
+            <button
+              class="menu-item"
+              @click="restartFrontend"
+              title="Restart the frontend server"
+            >
+              🔄 Restart Frontend
+            </button>
+            <button
+              class="menu-item"
+              @click="reloadUI"
+              title="Reload the frontend page"
+            >
+              🔄 Reload Page
+            </button>
+          </div>
+        </div>
+        <button class="btn-back" @click="goBack">← Back to Dashboard</button>
+      </div>
     </div>
 
     <div class="settings-layout">
@@ -812,6 +846,183 @@
                   in their respective sections.
                 </p>
               </div>
+
+              <!-- Install New Plugin Section -->
+              <div class="setting-item plugin-install-compact">
+                <label>Install New Plugin</label>
+                <div class="plugin-install-tabs">
+                  <button
+                    class="install-tab"
+                    :class="{ active: installMethod === 'zip' }"
+                    @click="installMethod = 'zip'"
+                  >
+                    📦 Zip File
+                  </button>
+                  <button
+                    class="install-tab"
+                    :class="{ active: installMethod === 'github' }"
+                    @click="installMethod = 'github'"
+                  >
+                    🐙 GitHub
+                  </button>
+                </div>
+
+                <!-- Zip File Upload -->
+                <div
+                  v-show="installMethod === 'zip'"
+                  class="plugin-install-content"
+                >
+                  <input
+                    ref="pluginZipInput"
+                    type="file"
+                    accept=".zip"
+                    @change="handlePluginZipSelect"
+                    style="display: none"
+                  />
+                  <div class="install-compact-row">
+                    <button
+                      type="button"
+                      class="btn-upload"
+                      :disabled="installingPlugin"
+                      @click="$refs.pluginZipInput?.click()"
+                    >
+                      {{
+                        installingPlugin
+                          ? "Installing..."
+                          : "📦 Choose Zip File"
+                      }}
+                    </button>
+                    <span
+                      v-if="selectedPluginZip"
+                      class="selected-file-compact"
+                    >
+                      {{ selectedPluginZip.name }}
+                    </span>
+                  </div>
+                </div>
+
+                <!-- GitHub Repository -->
+                <div
+                  v-show="installMethod === 'github'"
+                  class="plugin-install-content"
+                >
+                  <p class="help-text-compact">
+                    Enter a GitHub repository URL and click "List Plugins" to
+                    see available plugins.
+                  </p>
+                  <div class="install-compact-row">
+                    <input
+                      v-model="githubRepoUrl"
+                      type="text"
+                      placeholder="https://github.com/user/repo"
+                      class="github-input-compact"
+                      :disabled="enumeratingPlugins || installingPlugin"
+                    />
+                    <input
+                      v-model="githubBranch"
+                      type="text"
+                      placeholder="main"
+                      class="github-branch-compact"
+                      :disabled="enumeratingPlugins || installingPlugin"
+                    />
+                    <button
+                      type="button"
+                      class="btn-browse"
+                      :disabled="
+                        !githubRepoUrl || enumeratingPlugins || installingPlugin
+                      "
+                      @click="enumeratePluginsFromGitHub"
+                    >
+                      {{
+                        enumeratingPlugins ? "Loading..." : "🔍 List Plugins"
+                      }}
+                    </button>
+                  </div>
+
+                  <!-- Branch Switch Notice -->
+                  <div
+                    v-if="pluginBranchSwitched && availablePlugins.length > 0"
+                    class="branch-switch-notice-compact"
+                  >
+                    ℹ️ Using branch: <strong>{{ pluginActualBranch }}</strong>
+                  </div>
+
+                  <!-- Available Plugins List -->
+                  <div
+                    v-if="availablePlugins.length > 0"
+                    class="available-plugins-compact"
+                  >
+                    <div
+                      v-for="plugin in availablePlugins"
+                      :key="plugin.id"
+                      class="plugin-item-inline"
+                    >
+                      <div class="plugin-info-inline">
+                        <strong>{{ plugin.name || plugin.id }}</strong>
+                        <span
+                          class="plugin-type-badge-small"
+                          :class="`type-${plugin.type}`"
+                        >
+                          {{ plugin.type }}
+                        </span>
+                        <span
+                          v-if="plugin.version"
+                          class="plugin-version-small"
+                        >
+                          v{{ plugin.version }}
+                        </span>
+                      </div>
+                      <button
+                        type="button"
+                        class="btn-install"
+                        :disabled="installingPlugin"
+                        @click="installPluginFromGitHub(plugin.path)"
+                      >
+                        {{ installingPlugin ? "Installing..." : "⬇️ Install" }}
+                      </button>
+                    </div>
+                  </div>
+                </div>
+
+                <!-- Installation Status Messages -->
+                <div v-if="pluginInstallError" class="error-message">
+                  {{ pluginInstallError }}
+                </div>
+                <div v-if="pluginInstallSuccess" class="success-message">
+                  {{ pluginInstallSuccess }}
+                  <!-- Branch Switch Notification -->
+                  <div v-if="pluginBranchSwitched" class="branch-switch-notice">
+                    ℹ️ Branch switched from 'main' to 'master' (main branch not
+                    found)
+                  </div>
+                </div>
+                <!-- Restart Required Notice -->
+                <div v-if="pluginRequiresRestart" class="restart-notice">
+                  <div class="restart-notice-content">
+                    <strong>⚠️ Server Restart Required</strong>
+                    <p>
+                      The plugin has been installed but won't appear in the UI
+                      until the backend server is restarted. This is because
+                      plugin types are registered in the database during server
+                      startup.
+                    </p>
+                    <div class="restart-actions">
+                      <button
+                        type="button"
+                        class="btn-primary"
+                        @click="restartBackend"
+                      >
+                        🔄 Restart Backend Now
+                      </button>
+                      <span class="restart-alternative">
+                        Or restart manually via SSH:
+                        <code>sudo systemctl restart calvin-backend</code>
+                      </span>
+                    </div>
+                  </div>
+                </div>
+              </div>
+
               <div v-if="loadingPlugins" class="loading-state">
                 <p>Loading plugins...</p>
               </div>
@@ -901,6 +1112,15 @@
                           </p>
                         </div>
                         <div class="plugin-header-actions">
+                          <!-- Uninstall button (only for installed plugins) -->
+                          <button
+                            v-if="plugin._installed"
+                            class="btn-remove btn-small"
+                            title="Uninstall this plugin"
+                            @click="uninstallPlugin(plugin.id)"
+                          >
+                            🗑️ Uninstall
+                          </button>
                           <label class="toggle-switch">
                             <input
                               type="checkbox"
@@ -1471,18 +1691,19 @@
             </div>
           </section>
 
-          <!-- System Information -->
+          <!-- System Information & Update Settings -->
           <section
             class="settings-section collapsible"
             :class="{ expanded: expandedSections.systemInfo }"
           >
             <div class="section-header" @click="toggleSection('systemInfo')">
-              <h2>System Information</h2>
+              <h2>System Information & Updates</h2>
               <span class="toggle-icon">{{
                 expandedSections.systemInfo ? "▼" : "▶"
               }}</span>
             </div>
             <div v-show="expandedSections.systemInfo" class="section-content">
+              <!-- System Information -->
               <div class="setting-item">
                 <label>Backend Version</label>
                 <div class="version-display">
@@ -1507,21 +1728,8 @@
                 </div>
                 <span class="help-text">Frontend git commit short hash</span>
               </div>
-            </div>
-          </section>
 
-          <!-- Update Settings -->
-          <section
-            class="settings-section collapsible"
-            :class="{ expanded: expandedSections.update }"
-          >
-            <div class="section-header" @click="toggleSection('update')">
-              <h2>Update Settings</h2>
-              <span class="toggle-icon">{{
-                expandedSections.update ? "▼" : "▶"
-              }}</span>
-            </div>
-            <div v-show="expandedSections.update" class="section-content">
+              <!-- Update Settings -->
               <div class="setting-item">
                 <label>Repository URL</label>
                 <input
@@ -1575,6 +1783,28 @@
                   {{ branchFetchError }}
                 </div>
               </div>
+              <div class="setting-item">
+                <label>Update from GitHub</label>
+                <button
+                  class="btn-update"
+                  :disabled="updateInProgress"
+                  @click="triggerUpdate"
+                >
+                  {{
+                    updateInProgress ? "Updating..." : "⬆️ Update from GitHub"
+                  }}
+                </button>
+                <span class="help-text"
+                  >Pull latest code, rebuild, and restart services</span
+                >
+                <div
+                  v-if="updateMessage"
+                  class="update-message"
+                  :class="updateMessageClass"
+                >
+                  {{ updateMessage }}
+                </div>
+              </div>
             </div>
           </section>
         </template>
@@ -1586,32 +1816,21 @@
       <section class="settings-section">
         <h2>Actions</h2>
         <div class="actions-list">
-          <button class="btn-save" @click="saveAllSettings">
-            Save All Settings
-          </button>
-          <button class="btn-reset" @click="resetToDefaults">
-            Reset to Defaults
-          </button>
-          <button
-            class="btn-update"
-            :disabled="updateInProgress"
-            @click="triggerUpdate"
-          >
-            {{ updateInProgress ? "Updating..." : "🔄 Update from GitHub" }}
-          </button>
-          <button
-            class="btn-reload"
-            @click="reloadUI"
-            title="Force reload the UI on the remote machine"
-          >
-            🔄 Reload UI
-          </button>
-          <div
-            v-if="updateMessage"
-            class="update-message"
-            :class="updateMessageClass"
-          >
-            {{ updateMessage }}
+          <!-- Settings Management -->
+          <div class="action-group">
+            <h3 class="action-group-title">Settings</h3>
+            <div class="action-buttons">
+              <button class="btn-save" @click="saveAllSettings">
+                💾 Save All Settings
+              </button>
+              <button class="btn-reset" @click="resetToDefaults">
+                ↺ Reset to Defaults
+              </button>
+            </div>
+            <p class="action-group-description">
+              Settings save automatically when changed. Use "Save All" to ensure
+              everything is saved.
+            </p>
           </div>
         </div>
       </section>
@@ -1861,6 +2080,21 @@ const plugins = ref([]);
 const pluginInstances = ref({}); // Store instances by plugin type ID: { [pluginId]: [{ id, name, enabled, running, config }] }
 const pluginConfigs = ref({}); // Store configs by plugin type ID
 const pluginDisplayOrders = ref({}); // Store display orders for service plugins
+
+// Plugin installation state
+const installingPlugin = ref(false);
+const enumeratingPlugins = ref(false);
+const selectedPluginZip = ref(null);
+const githubRepoUrl = ref("");
+const githubBranch = ref("");
+const availablePlugins = ref([]);
+const pluginInstallError = ref("");
+const pluginInstallSuccess = ref("");
+const pluginRequiresRestart = ref(false);
+const pluginBranchSwitched = ref(false);
+const pluginActualBranch = ref("");
+const showVersionConflictDialog = ref(false);
+const versionConflictInfo = ref(null);
 
 // Instance modal state
 const showInstanceModal = ref(false);
@@ -2146,6 +2380,8 @@ const updateGitRepoUrl = () => {
 const availableBranches = ref([]);
 const fetchingBranches = ref(false);
 const branchFetchError = ref(null);
+const showSystemMenu = ref(false);
+const installMethod = ref("zip");
 
 const fetchBranches = async () => {
   if (!localConfig.value.gitRepoUrl) {
@@ -2183,9 +2419,9 @@ const fetchBranches = async () => {
   }
 };
 
-// Auto-fetch branches when expanding the update section
+// Auto-fetch branches when expanding the system info section
 watch(
-  () => expandedSections.value.update,
+  () => expandedSections.value.systemInfo,
   (isExpanded) => {
     if (
       isExpanded &&
@@ -3182,25 +3418,116 @@ const triggerUpdate = async () => {
   }
 };
 
-const reloadUI = async () => {
+const uninstallPlugin = async (pluginId) => {
+  const plugin = plugins.value.find((p) => p.id === pluginId);
+  const pluginName = plugin?.name || pluginId;
+
+  if (
+    !confirm(
+      `Are you sure you want to uninstall "${pluginName}"?\n\nThis will:\n- Remove all plugin files\n- Delete all plugin instances\n- Remove frontend components\n\nThis action cannot be undone.`,
+    )
+  ) {
+    return;
+  }
+
   try {
-    await axios.post("/api/system/reload-ui");
-    // Reload the page after a short delay
+    await axios.delete(`/api/plugins/installed/${pluginId}`);
+    // Reload plugins to update the list
+    await loadPlugins();
+    alert(`Plugin "${pluginName}" uninstalled successfully.`);
+  } catch (error) {
+    const errorMsg =
+      error.response?.data?.detail ||
+      error.message ||
+      "Failed to uninstall plugin";
+    alert(`Failed to uninstall plugin: ${errorMsg}`);
+    console.error("Failed to uninstall plugin:", error);
+  }
+};
+
+const restartBackend = async () => {
+  if (
+    !confirm(
+      "Are you sure you want to restart the backend server?\n\nThe server will be unavailable for a few seconds while restarting.",
+    )
+  ) {
+    return;
+  }
+
+  try {
+    await axios.post("/api/system/restart-backend");
+    alert(
+      "Backend restart initiated. The server will restart shortly. This page will reload automatically.",
+    );
+    // Wait a bit then reload
     setTimeout(() => {
       window.location.reload();
-    }, 500);
+    }, 3000);
   } catch (error) {
-    console.error("Failed to reload UI:", error);
-    // Still reload even if API call fails
-    window.location.reload();
+    const errorMsg =
+      error.response?.data?.detail ||
+      error.message ||
+      "Failed to restart backend";
+    alert(
+      `Failed to restart backend: ${errorMsg}\n\nYou may need to restart manually via SSH.`,
+    );
+    console.error("Failed to restart backend:", error);
   }
+};
+
+const restartFrontend = async () => {
+  if (
+    !confirm(
+      "Are you sure you want to restart the frontend server?\n\nThe frontend will be unavailable for a few seconds while restarting.",
+    )
+  ) {
+    return;
+  }
+
+  try {
+    await axios.post("/api/system/restart-frontend");
+    alert(
+      "Frontend restart initiated. The server will restart shortly. This page will reload automatically.",
+    );
+    // Wait a bit then reload
+    setTimeout(() => {
+      window.location.reload();
+    }, 3000);
+  } catch (error) {
+    const errorMsg =
+      error.response?.data?.detail ||
+      error.message ||
+      "Failed to restart frontend";
+    alert(
+      `Failed to restart frontend: ${errorMsg}\n\nYou may need to restart manually via SSH.`,
+    );
+    console.error("Failed to restart frontend:", error);
+  }
+};
+
+const reloadUI = async () => {
+  // Just reload the page (client-side reload)
+  window.location.reload();
 };
 
 const loadPlugins = async () => {
   loadingPlugins.value = true;
   try {
-    const response = await axios.get("/api/plugins");
-    plugins.value = (response.data.plugins || []).map((plugin) => {
+    // Load both plugin types and installed plugins to mark which are installed
+    const [pluginsResponse, installedResponse] = await Promise.all([
+      axios.get("/api/plugins"),
+      axios
+        .get("/api/plugins/installed")
+        .catch(() => ({ data: { plugins: [] } })),
+    ]);
+
+    const installedPluginIds = new Set(
+      (installedResponse.data.plugins || []).map((p) => p.id),
+    );
+
+    plugins.value = (pluginsResponse.data.plugins || []).map((plugin) => {
+      // Mark if plugin is installed
+      plugin._installed = installedPluginIds.has(plugin.id);
       // Ensure config_schema is always an object
       if (plugin.config_schema && typeof plugin.config_schema === "string") {
         try {
@@ -3336,6 +3663,181 @@ const loadPlugins = async () => {
     logError("[Settings]", "Failed to load plugins:", error);
   } finally {
     loadingPlugins.value = false;
+  }
+};
+
+const handlePluginZipSelect = async (event) => {
+  const file = event.target.files?.[0];
+  if (!file) return;
+
+  selectedPluginZip.value = file;
+  await installPluginFromZip(file, event.target);
+};
+
+const installPluginFromZip = async (file, fileInput = null) => {
+  installingPlugin.value = true;
+  pluginInstallError.value = "";
+  pluginInstallSuccess.value = "";
+  pluginRequiresRestart.value = false;
+  pluginBranchSwitched.value = false;
+  pluginActualBranch.value = "";
+
+  try {
+    const formData = new FormData();
+    formData.append("file", file);
+
+    const response = await axios.post("/api/plugins/install", formData, {
+      headers: {
+        "Content-Type": "multipart/form-data",
+      },
+    });
+
+    pluginInstallSuccess.value =
+      response.data.message || "Plugin installed successfully!";
+    pluginRequiresRestart.value = response.data.requires_restart || false;
+    selectedPluginZip.value = null;
+    // Clear file input
+    if (fileInput) {
+      fileInput.value = "";
+    }
+
+    // Reload plugins to show the newly installed one (though it won't appear until restart)
+    await loadPlugins();
+
+    // Don't auto-clear success message if restart is required
+    if (!pluginRequiresRestart.value) {
+      setTimeout(() => {
+        pluginInstallSuccess.value = "";
+      }, 5000);
+    }
+  } catch (error) {
+    // Check for version conflict
+    const errorDetail = error.response?.data?.detail || error.message || "";
+    if (errorDetail.includes("older than") || errorDetail.includes("version")) {
+      // This is a version conflict - could show dialog here if needed
+      pluginInstallError.value = errorDetail;
+    } else {
+      pluginInstallError.value = errorDetail || "Failed to install plugin";
+    }
+    console.error("Failed to install plugin:", error);
+    // Clear error message after 10 seconds
+    setTimeout(() => {
+      pluginInstallError.value = "";
+    }, 10000);
+  } finally {
+    installingPlugin.value = false;
+  }
+};
+
+const enumeratePluginsFromGitHub = async () => {
+  if (!githubRepoUrl.value) return;
+
+  enumeratingPlugins.value = true;
+  pluginInstallError.value = "";
+  availablePlugins.value = [];
+  pluginBranchSwitched.value = false;
+  pluginActualBranch.value = "";
+
+  try {
+    const params = new URLSearchParams({
+      repo_url: githubRepoUrl.value,
+    });
+    if (githubBranch.value) {
+      params.append("branch", githubBranch.value);
+    }
+
+    const response = await axios.get(
+      `/api/plugins/enumerate-from-github?${params.toString()}`,
+    );
+
+    availablePlugins.value = response.data.plugins || [];
+    pluginBranchSwitched.value = response.data.branch_switched || false;
+    pluginActualBranch.value =
+      response.data.branch || githubBranch.value || "main";
+
+    if (availablePlugins.value.length === 0) {
+      pluginInstallError.value =
+        "No plugins found in this repository. Make sure it contains plugin directories with plugin.json and plugin.py files.";
+    }
+  } catch (error) {
+    pluginInstallError.value =
+      error.response?.data?.detail ||
+      error.message ||
+      "Failed to enumerate plugins from GitHub";
+    console.error("Failed to enumerate plugins:", error);
+    availablePlugins.value = [];
+  } finally {
+    enumeratingPlugins.value = false;
+  }
+};
+
+const installPluginFromGitHub = async (pluginPath = null) => {
+  if (!githubRepoUrl.value) return;
+
+  // If pluginPath is provided, it's a specific plugin. Otherwise, try direct install (legacy)
+  if (!pluginPath) {
+    pluginInstallError.value =
+      "Please browse plugins first and select a specific plugin to install.";
+    return;
+  }
+
+  installingPlugin.value = true;
+  pluginInstallError.value = "";
+  pluginInstallSuccess.value = "";
+  pluginRequiresRestart.value = false;
+  pluginBranchSwitched.value = false;
+  pluginActualBranch.value = "";
+
+  try {
+    const payload = {
+      repo_url: githubRepoUrl.value,
+      plugin_path: pluginPath,
+    };
+    if (githubBranch.value) {
+      payload.branch = githubBranch.value;
+    }
+
+    const response = await axios.post(
+      "/api/plugins/install-from-github",
+      payload,
+    );
+
+    pluginInstallSuccess.value =
+      response.data.message || "Plugin installed successfully!";
+    pluginRequiresRestart.value = response.data.requires_restart || false;
+    pluginBranchSwitched.value = response.data.branch_switched || false;
+    pluginActualBranch.value =
+      response.data.branch || githubBranch.value || "main";
+
+    // Clear available plugins list
+    availablePlugins.value = [];
+
+    // Reload plugins to show the newly installed one (though it won't appear until restart)
+    await loadPlugins();
+
+    // Don't auto-clear success message if restart is required
+    if (!pluginRequiresRestart.value) {
+      setTimeout(() => {
+        pluginInstallSuccess.value = "";
+      }, 5000);
+    }
+  } catch (error) {
+    // Check for version conflict
+    const errorDetail = error.response?.data?.detail || error.message || "";
+    if (errorDetail.includes("older than") || errorDetail.includes("version")) {
+      // This is a version conflict - could show dialog here if needed
+      pluginInstallError.value = errorDetail;
+    } else {
+      pluginInstallError.value =
+        errorDetail || "Failed to install plugin from GitHub";
+    }
+    console.error("Failed to install plugin from GitHub:", error);
+    // Clear error message after 10 seconds
+    setTimeout(() => {
+      pluginInstallError.value = "";
+    }, 10000);
+  } finally {
+    installingPlugin.value = false;
   }
 };
 
@@ -4061,6 +4563,14 @@ onMounted(async () => {
   await loadCalendarSources();
   await loadImages();
   await loadPlugins();
+
+  // Close system menu when clicking outside
+  document.addEventListener("click", (e) => {
+    const menu = document.querySelector(".system-menu");
+    if (menu && !menu.contains(e.target)) {
+      showSystemMenu.value = false;
+    }
+  });
 });
 </script>
 
@@ -4087,6 +4597,70 @@ onMounted(async () => {
   margin: 0;
   font-size: 2rem;
   color: var(--text-primary);
+}
+
+.header-actions {
+  display: flex;
+  align-items: center;
+  gap: 1rem;
+}
+
+.system-menu {
+  position: relative;
+}
+
+.btn-system-menu {
+  background: var(--bg-secondary);
+  color: var(--text-primary);
+  border: 1px solid var(--border-color);
+  border-radius: 4px;
+  padding: 0.5rem 1rem;
+  font-size: 0.9rem;
+  cursor: pointer;
+  transition: all 0.2s;
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+}
+
+.btn-system-menu:hover {
+  background: var(--bg-tertiary);
+}
+
+.menu-arrow {
+  font-size: 0.75rem;
+  margin-left: 0.25rem;
+}
+
+.system-menu-dropdown {
+  position: absolute;
+  top: 100%;
+  right: 0;
+  margin-top: 0.5rem;
+  background: var(--bg-primary);
+  border: 1px solid var(--border-color);
+  border-radius: 4px;
+  box-shadow: 0 4px 8px rgba(0, 0, 0, 0.15);
+  z-index: 1000;
+  min-width: 180px;
+  overflow: hidden;
+}
+
+.system-menu-dropdown .menu-item {
+  display: block;
+  width: 100%;
+  padding: 0.75rem 1rem;
+  background: transparent;
+  border: none;
+  text-align: left;
+  color: var(--text-primary);
+  font-size: 0.9rem;
+  cursor: pointer;
+  transition: background 0.2s;
+}
+
+.system-menu-dropdown .menu-item:hover {
+  background: var(--bg-secondary);
 }
 
 .btn-back {
@@ -4774,7 +5348,36 @@ input:checked + .slider:before {
 
 .actions-list {
   display: flex;
-  gap: 1rem;
+  flex-direction: column;
+  gap: 2rem;
+}
+
+.action-group {
+  padding: 1.5rem;
+  background: var(--bg-secondary);
+  border-radius: 8px;
+  border: 1px solid var(--border-color);
+}
+
+.action-group-title {
+  font-size: 1rem;
+  font-weight: 600;
+  margin: 0 0 1rem 0;
+  color: var(--text-primary);
+}
+
+.action-buttons {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.75rem;
+  margin-bottom: 0.75rem;
+}
+
+.action-group-description {
+  font-size: 0.875rem;
+  color: var(--text-secondary);
+  line-height: 1.6;
+  margin: 0;
 }
 
 .btn-save {
@@ -4840,12 +5443,49 @@ input:checked + .slider:before {
   font-weight: 500;
   cursor: pointer;
   transition: all 0.2s ease;
-  margin-left: 0.5rem;
 }
 
 .btn-reload:hover {
   background: var(--accent-info, #17a2b8);
   opacity: 0.9;
+}
+
+.btn-restart {
+  padding: 0.75rem 1.5rem;
+  background: #ff9800;
+  color: #fff;
+  border: none;
+  border-radius: 4px;
+  font-size: 1rem;
+  font-weight: 600;
+  cursor: pointer;
+  transition: all 0.2s;
+}
+
+.btn-restart:hover {
+  background: #f57c00;
+  opacity: 0.9;
+}
+
+.restart-actions {
+  margin-top: 1rem;
+  display: flex;
+  flex-direction: column;
+  gap: 0.75rem;
+}
+
+.restart-alternative {
+  font-size: 0.8125rem;
+  color: var(--text-secondary);
+  font-style: italic;
+}
+
+.restart-alternative code {
+  background: var(--bg-primary);
+  padding: 0.25rem 0.5rem;
+  border-radius: 3px;
+  font-family: monospace;
+  font-size: 0.875rem;
 }
 
 .update-message {
@@ -5470,6 +6110,424 @@ input:checked + .slider:before {
   margin: 0;
   font-size: 0.875rem;
   color: var(--text-secondary);
+}
+
+/* Compact Plugin Install UI */
+.plugin-install-compact {
+  margin-top: 1rem;
+}
+
+.plugin-install-tabs {
+  display: flex;
+  gap: 0.5rem;
+  margin-bottom: 1rem;
+  border-bottom: 1px solid var(--border-color);
+}
+
+.install-tab {
+  padding: 0.5rem 1rem;
+  background: transparent;
+  border: none;
+  border-bottom: 2px solid transparent;
+  color: var(--text-secondary);
+  font-size: 0.9rem;
+  cursor: pointer;
+  transition: all 0.2s;
+}
+
+.install-tab:hover {
+  color: var(--text-primary);
+}
+
+.install-tab.active {
+  color: var(--accent-primary);
+  border-bottom-color: var(--accent-primary);
+  font-weight: 600;
+}
+
+.plugin-install-content {
+  padding: 1rem;
+  background: var(--bg-tertiary);
+  border-radius: 4px;
+  border: 1px solid var(--border-color);
+}
+
+.install-compact-row {
+  display: flex;
+  gap: 0.5rem;
+  align-items: center;
+  flex-wrap: wrap;
+}
+
+.github-input-compact {
+  flex: 1;
+  min-width: 200px;
+  padding: 0.5rem;
+  border: 1px solid var(--border-color);
+  border-radius: 4px;
+  font-size: 0.9rem;
+  background: var(--bg-primary);
+  color: var(--text-primary);
+}
+
+.github-branch-compact {
+  width: 120px;
+  padding: 0.5rem;
+  border: 1px solid var(--border-color);
+  border-radius: 4px;
+  font-size: 0.9rem;
+  background: var(--bg-primary);
+  color: var(--text-primary);
+}
+
+.selected-file-compact {
+  font-size: 0.875rem;
+  color: var(--text-secondary);
+  font-style: italic;
+}
+
+.branch-switch-notice-compact {
+  margin-top: 0.5rem;
+  padding: 0.5rem;
+  background: rgba(23, 162, 184, 0.1);
+  border: 1px solid rgba(23, 162, 184, 0.3);
+  border-radius: 4px;
+  font-size: 0.8125rem;
+  color: #0c5460;
+}
+
+.available-plugins-compact {
+  margin-top: 1rem;
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+}
+
+.plugin-item-inline {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 0.75rem;
+  background: var(--bg-primary);
+  border: 1px solid var(--border-color);
+  border-radius: 4px;
+  gap: 1rem;
+}
+
+.plugin-info-inline {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  flex: 1;
+  min-width: 0;
+}
+
+.plugin-info-inline strong {
+  font-size: 0.9rem;
+  color: var(--text-primary);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.plugin-type-badge-small {
+  padding: 0.2rem 0.5rem;
+  border-radius: 3px;
+  font-size: 0.75rem;
+  font-weight: 600;
+  text-transform: uppercase;
+}
+
+.plugin-version-small {
+  font-size: 0.75rem;
+  color: var(--text-secondary);
+}
+
+/* Legacy styles (kept for backward compatibility) */
+.plugin-install-section {
+  margin-top: 1rem;
+  padding: 1rem;
+  background: var(--bg-secondary);
+  border-radius: 4px;
+  border: 1px solid var(--border-color);
+}
+
+.plugin-install-method {
+  margin-bottom: 1.5rem;
+}
+
+.plugin-install-method:last-child {
+  margin-bottom: 0;
+}
+
+.plugin-install-method h4 {
+  font-size: 0.875rem;
+  font-weight: 600;
+  margin-bottom: 0.75rem;
+  color: var(--text-primary);
+}
+
+.file-upload-area {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+}
+
+.selected-file {
+  font-size: 0.875rem;
+  color: var(--text-secondary);
+  font-style: italic;
+}
+
+.github-install-form {
+  display: flex;
+  flex-direction: column;
+  gap: 1rem;
+}
+
+.github-install-form .form-group {
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+}
+
+.github-install-form .form-group label {
+  font-size: 0.875rem;
+  font-weight: 500;
+  color: var(--text-primary);
+}
+
+.github-install-form .form-group input {
+  padding: 0.5rem;
+  border: 1px solid var(--border-color);
+  border-radius: 4px;
+  font-size: 0.875rem;
+  background: var(--bg-primary);
+  color: var(--text-primary);
+}
+
+.github-install-form .form-group input:disabled {
+  opacity: 0.6;
+  cursor: not-allowed;
+}
+
+.github-actions {
+  display: flex;
+  gap: 0.75rem;
+  margin-top: 0.5rem;
+}
+
+.available-plugins {
+  margin-top: 1.5rem;
+  padding: 1rem;
+  background: var(--bg-tertiary);
+  border-radius: 4px;
+  border: 1px solid var(--border-color);
+}
+
+.available-plugins h5 {
+  font-size: 0.875rem;
+  font-weight: 600;
+  margin-bottom: 0.75rem;
+  color: var(--text-primary);
+}
+
+.plugins-list-compact {
+  display: flex;
+  flex-direction: column;
+  gap: 0.75rem;
+}
+
+.plugin-item-compact {
+  padding: 0.75rem;
+  background: var(--bg-primary);
+  border: 1px solid var(--border-color);
+  border-radius: 4px;
+}
+
+.plugin-info-compact {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  margin-bottom: 0.5rem;
+}
+
+.plugin-info-compact strong {
+  font-size: 0.875rem;
+  color: var(--text-primary);
+}
+
+.plugin-version {
+  font-size: 0.75rem;
+  color: var(--text-secondary);
+  font-style: italic;
+}
+
+.plugin-description-compact {
+  font-size: 0.8125rem;
+  color: var(--text-secondary);
+  margin: 0.5rem 0;
+  line-height: 1.4;
+}
+
+.plugin-item-compact .btn-small {
+  padding: 0.5rem 1rem;
+  font-size: 0.875rem;
+}
+
+.restart-notice {
+  margin-top: 1rem;
+  padding: 1rem;
+  background: rgba(255, 193, 7, 0.1);
+  border: 1px solid rgba(255, 193, 7, 0.3);
+  border-radius: 4px;
+  border-left: 4px solid #ffc107;
+}
+
+.restart-notice-content {
+  color: #856404;
+}
+
+.restart-notice-content strong {
+  display: block;
+  margin-bottom: 0.5rem;
+  font-size: 0.875rem;
+  color: #856404;
+}
+
+.restart-notice-content p {
+  margin: 0.5rem 0;
+  font-size: 0.875rem;
+  line-height: 1.5;
+}
+
+.restart-instructions {
+  font-weight: 500;
+  margin-top: 0.75rem !important;
+}
+
+.branch-switch-notice {
+  margin-top: 0.75rem;
+  padding: 0.5rem;
+  background: rgba(23, 162, 184, 0.1);
+  border: 1px solid rgba(23, 162, 184, 0.3);
+  border-radius: 4px;
+  font-size: 0.8125rem;
+  color: #0c5460;
+}
+
+/* Plugin Install Buttons - More Colorful */
+.btn-browse {
+  padding: 0.5rem 1rem;
+  background: var(--accent-primary);
+  color: #fff;
+  border: none;
+  border-radius: 4px;
+  font-size: 0.9rem;
+  font-weight: 600;
+  cursor: pointer;
+  transition: all 0.2s;
+  white-space: nowrap;
+}
+
+.btn-browse:hover:not(:disabled) {
+  background: var(--accent-secondary);
+  opacity: 0.9;
+  transform: translateY(-1px);
+  box-shadow: 0 2px 4px rgba(0, 0, 0, 0.2);
+}
+
+.btn-browse:disabled {
+  opacity: 0.6;
+  cursor: not-allowed;
+  transform: none;
+}
+
+.btn-install {
+  padding: 0.5rem 1rem;
+  background: #4caf50;
+  color: #fff;
+  border: none;
+  border-radius: 4px;
+  font-size: 0.85rem;
+  font-weight: 600;
+  cursor: pointer;
+  transition: all 0.2s;
+  white-space: nowrap;
+}
+
+.btn-install:hover:not(:disabled) {
+  background: #45a049;
+  transform: translateY(-1px);
+  box-shadow: 0 2px 4px rgba(0, 0, 0, 0.2);
+}
+
+.btn-install:disabled {
+  opacity: 0.6;
+  cursor: not-allowed;
+  transform: none;
+}
+
+.btn-upload {
+  padding: 0.5rem 1rem;
+  background: #2196f3;
+  color: #fff;
+  border: none;
+  border-radius: 4px;
+  font-size: 0.9rem;
+  font-weight: 600;
+  cursor: pointer;
+  transition: all 0.2s;
+  white-space: nowrap;
+}
+
+.btn-upload:hover:not(:disabled) {
+  background: #1976d2;
+  transform: translateY(-1px);
+  box-shadow: 0 2px 4px rgba(0, 0, 0, 0.2);
+}
+
+.btn-upload:disabled {
+  opacity: 0.6;
+  cursor: not-allowed;
+  transform: none;
+}
+
+.help-text-compact {
+  font-size: 0.875rem;
+  color: var(--text-secondary);
+  margin: 0 0 0.75rem 0;
+  line-height: 1.4;
+}
+
+.branch-switch-notice-info {
+  margin-top: 1rem;
+  padding: 0.75rem;
+  background: rgba(23, 162, 184, 0.1);
+  border: 1px solid rgba(23, 162, 184, 0.3);
+  border-radius: 4px;
+  font-size: 0.875rem;
+  color: #0c5460;
+}
+
+.error-message {
+  margin-top: 1rem;
+  padding: 0.75rem;
+  background: rgba(220, 53, 69, 0.1);
+  border: 1px solid rgba(220, 53, 69, 0.3);
+  border-radius: 4px;
+  color: #dc3545;
+  font-size: 0.875rem;
+}
+
+.success-message {
+  margin-top: 1rem;
+  padding: 0.75rem;
+  background: rgba(40, 167, 69, 0.1);
+  border: 1px solid rgba(40, 167, 69, 0.3);
+  border-radius: 4px;
+  color: #28a745;
+  font-size: 0.875rem;
 }
 
 .plugin-instance-note {

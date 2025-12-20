@@ -355,6 +355,178 @@ async def reload_ui():
     }
 
 
+@router.post("/restart-frontend")
+async def restart_frontend():
+    """
+    Restart the frontend service.
+    Uses systemctl to restart the calvin-frontend service.
+    """
+    try:
+        # Try to restart the frontend service
+        restart_attempted = False
+
+        # Method 1: systemctl restart (might work without sudo)
+        try:
+            result = subprocess.run(
+                ["systemctl", "restart", "calvin-frontend"],
+                capture_output=True,
+                timeout=5,
+            )
+            if result.returncode == 0:
+                print("Frontend restart initiated via systemctl restart")
+                restart_attempted = True
+            else:
+                error_msg = result.stderr.decode()
+                print(f"systemctl restart failed: {error_msg}")
+        except FileNotFoundError:
+            print("systemctl not found")
+        except subprocess.TimeoutExpired:
+            print("systemctl restart timed out (but may have initiated)")
+            restart_attempted = True
+        except Exception as e:
+            print(f"systemctl restart error: {e}")
+
+        # Method 2: Use dbus to call systemd-logind (alternative to systemctl)
+        if not restart_attempted:
+            try:
+                result = subprocess.run(
+                    [
+                        "dbus-send",
+                        "--system",
+                        "--print-reply",
+                        "--dest=org.freedesktop.systemd1",
+                        "/org/freedesktop/systemd1",
+                        "org.freedesktop.systemd1.Manager.RestartUnit",
+                        "string:calvin-frontend.service",
+                        "string:replace",
+                    ],
+                    capture_output=True,
+                    timeout=5,
+                )
+                if result.returncode == 0:
+                    print("Frontend restart initiated via dbus")
+                    restart_attempted = True
+                else:
+                    error_msg = result.stderr.decode()
+                    print(f"dbus restart failed: {error_msg}")
+            except FileNotFoundError:
+                print("dbus-send not found")
+            except subprocess.TimeoutExpired:
+                print("dbus restart timed out (but may have initiated)")
+                restart_attempted = True
+            except Exception as e:
+                print(f"dbus restart error: {e}")
+
+        if restart_attempted:
+            return {
+                "status": "success",
+                "message": "Frontend service restart initiated. The service will restart shortly.",
+            }
+        else:
+            # If all methods failed, return error with details
+            error_detail = (
+                "Failed to restart frontend service: All restart methods failed.\n"
+                "Note: Polkit rules must be configured to allow calvin user to restart services.\n"
+                "Check /etc/polkit-1/rules.d/50-calvin-restart.rules exists.\n"
+                "Alternatively, you can restart manually via SSH: "
+                "sudo systemctl restart calvin-frontend"
+            )
+            print(error_detail)
+            raise HTTPException(status_code=500, detail=error_detail)
+    except HTTPException:
+        raise
+    except Exception as e:
+        print(f"Frontend restart error: {e}")
+        raise HTTPException(status_code=500, detail=f"Failed to restart frontend service: {str(e)}")
+
+
+@router.post("/restart-backend")
+async def restart_backend():
+    """
+    Restart the backend service.
+    Uses systemctl to restart the calvin-backend service.
+    """
+    try:
+        # Try to restart the backend service
+        # Note: The backend service runs with NoNewPrivileges=true, so sudo might not work
+        # Try systemctl restart first (might work if user has permissions)
+        restart_attempted = False
+
+        # Method 1: systemctl restart (might work without sudo)
+        try:
+            result = subprocess.run(
+                ["systemctl", "restart", "calvin-backend"],
+                capture_output=True,
+                timeout=5,
+            )
+            if result.returncode == 0:
+                print("Backend restart initiated via systemctl restart")
+                restart_attempted = True
+            else:
+                error_msg = result.stderr.decode()
+                print(f"systemctl restart failed: {error_msg}")
+        except FileNotFoundError:
+            print("systemctl not found")
+        except subprocess.TimeoutExpired:
+            print("systemctl restart timed out (but may have initiated)")
+            restart_attempted = True
+        except Exception as e:
+            print(f"systemctl restart error: {e}")
+
+        # Method 2: Use dbus to call systemd-logind (alternative to systemctl)
+        if not restart_attempted:
+            try:
+                result = subprocess.run(
+                    [
+                        "dbus-send",
+                        "--system",
+                        "--print-reply",
+                        "--dest=org.freedesktop.systemd1",
+                        "/org/freedesktop/systemd1",
+                        "org.freedesktop.systemd1.Manager.RestartUnit",
+                        "string:calvin-backend.service",
+                        "string:replace",
+                    ],
+                    capture_output=True,
+                    timeout=5,
+                )
+                if result.returncode == 0:
+                    print("Backend restart initiated via dbus")
+                    restart_attempted = True
+                else:
+                    error_msg = result.stderr.decode()
+                    print(f"dbus restart failed: {error_msg}")
+            except FileNotFoundError:
+                print("dbus-send not found")
+            except subprocess.TimeoutExpired:
+                print("dbus restart timed out (but may have initiated)")
+                restart_attempted = True
+            except Exception as e:
+                print(f"dbus restart error: {e}")
+
+        if restart_attempted:
+            return {
+                "status": "success",
+                "message": "Backend service restart initiated. The service will restart shortly.",
+            }
+        else:
+            # If all methods failed, return error with details
+            error_detail = (
+                "Failed to restart backend service: All restart methods failed.\n"
+                "Note: Polkit rules must be configured to allow calvin user to restart services.\n"
+                "Check /etc/polkit-1/rules.d/50-calvin-restart.rules exists.\n"
+                "Alternatively, you can restart manually via SSH: "
+                "sudo systemctl restart calvin-backend"
+            )
+            print(error_detail)
+            raise HTTPException(status_code=500, detail=error_detail)
+    except HTTPException:
+        raise
+    except Exception as e:
+        print(f"Backend restart error: {e}")
+        raise HTTPException(status_code=500, detail=f"Failed to restart backend service: {str(e)}")
+
+
 @router.post("/reboot")
 async def reboot_system():
     """Reboot the Raspberry Pi."""

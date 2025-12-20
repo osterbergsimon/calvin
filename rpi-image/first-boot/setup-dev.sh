@@ -361,6 +361,23 @@ POLKIT_EOF
     chmod 644 /etc/polkit-1/rules.d/50-calvin-reboot.rules
     echo "[$(date)] Polkit configured to allow calvin user to reboot" | tee -a "$LOG_FILE"
 
+    # Configure polkit to allow calvin user to restart services
+    echo "[$(date)] Configuring polkit for service restarts..." | tee -a "$LOG_FILE"
+    cat > /etc/polkit-1/rules.d/50-calvin-restart.rules << 'POLKIT_EOF'
+polkit.addRule(function(action, subject) {
+    if (action.id == "org.freedesktop.systemd1.manage-units" &&
+        subject.user == "calvin") {
+        // Allow managing calvin-backend and calvin-frontend services
+        var unit = action.lookup("unit");
+        if (unit == "calvin-backend.service" || unit == "calvin-frontend.service") {
+            return polkit.Result.YES;
+        }
+    }
+});
+POLKIT_EOF
+    chmod 644 /etc/polkit-1/rules.d/50-calvin-restart.rules
+    echo "[$(date)] Polkit configured to allow calvin user to restart services" | tee -a "$LOG_FILE"
+
 # Configure update script with environment variables
 cat > /etc/default/calvin-update << EOF
 GIT_REPO=$GIT_REPO

@@ -92,7 +92,16 @@ def test_client(temp_db_path: Path) -> Generator[TestClient, None, None]:
     from fastapi import FastAPI
     from fastapi.middleware.cors import CORSMiddleware
 
-    from app.api.routes import calendar, config, health, images, keyboard, plugins, web_services
+    from app.api.routes import (
+        calendar,
+        config,
+        health,
+        images,
+        keyboard,
+        plugins,
+        system,
+        web_services,
+    )
 
     test_app = FastAPI(title="Calvin Test API")
     test_app.add_middleware(
@@ -109,6 +118,7 @@ def test_client(temp_db_path: Path) -> Generator[TestClient, None, None]:
     test_app.include_router(images.router, prefix="/api", tags=["images"])
     test_app.include_router(web_services.router, prefix="/api", tags=["web-services"])
     test_app.include_router(plugins.router, prefix="/api", tags=["plugins"])
+    test_app.include_router(system.router, prefix="/api", tags=["system"])
 
     @test_app.get("/")
     async def root():
@@ -135,3 +145,19 @@ def mock_env_vars(monkeypatch, temp_db_path: Path, temp_image_dir: Path):
     monkeypatch.setenv("DATABASE_URL", f"sqlite:///{temp_db_path}")
     monkeypatch.setenv("IMAGE_DIR", str(temp_image_dir))
     monkeypatch.setenv("LOG_LEVEL", "INFO")
+
+
+@pytest.fixture
+def temp_plugins_dir(tmp_path):
+    """Create a temporary plugins directory."""
+    plugins_dir = tmp_path / "plugins"
+    plugins_dir.mkdir()
+    return plugins_dir
+
+
+@pytest.fixture
+def temp_frontend_dir(tmp_path):
+    """Create a temporary frontend directory."""
+    frontend_dir = tmp_path / "frontend" / "src" / "components" / "plugins"
+    frontend_dir.mkdir(parents=True)
+    return frontend_dir
