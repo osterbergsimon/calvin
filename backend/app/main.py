@@ -9,136 +9,109 @@ from fastapi.responses import FileResponse
 
 from app.api.routes import calendar, config, health, images, keyboard, plugins, system, web_services
 from app.config import settings
-from app.database import init_db
 from app.services.scheduler import calendar_scheduler
 
 # Plugins are auto-discovered via pluggy hooks when modules are imported
 
 
-@asynccontextmanager
-async def lifespan(app: FastAPI):
-    """Lifespan context manager for startup/shutdown."""
-    # Startup
-    # Initialize database
+async def _initialize_database():
+    """Initialize database and run migrations."""
+    from app.database import init_db
+    from app.utils.migrations import migrate_database
+
     await init_db()
     print("Database initialized")
-
-    # Run migrations
-    from app.utils.migrations import migrate_database
 
     await migrate_database()
     print("Database migrations completed")
 
-    # Load plugins from database using unified system
+
+async def _create_default_plugin_instance(
+    plugin_registry, session, type_id: str, plugin_id: str, name: str, config: dict
+):
+    """Create a default plugin instance if the plugin type is enabled and no instance exists."""
+    from sqlalchemy import select
+
+    from app.models.db_models import PluginDB, PluginTypeDB
+
+    # Check if plugin type exists and is enabled (default to enabled if not in DB)
+    result = await session.execute(select(PluginTypeDB).where(PluginTypeDB.type_id == type_id))
+    plugin_type = result.scalar_one_or_none()
+    is_enabled = plugin_type.enabled if plugin_type else True
+
+    if not is_enabled:
+        return
+
+    # Check if an instance already exists
+    result = await session.execute(select(PluginDB).where(PluginDB.type_id == type_id))
+    instance = result.scalar_one_or_none()
+
+    if not instance:
+        print(f"Creating default {name} plugin instance...")
+        try:
+            await plugin_registry.register_plugin(
+                plugin_id=plugin_id,
+                type_id=type_id,
+                name=name,
+                config=config,
+                enabled=True,
+            )
+            print(f"Default {name} plugin instance created")
+        except Exception as e:
+            print(f"Warning: Failed to create default {name} instance: {e}")
+
+
+async def _initialize_plugins():
+    """Load plugins from database and create default instances."""
+    from app.database import AsyncSessionLocal
     from app.plugins.registry import plugin_registry
 
     await plugin_registry.load_plugins_from_db()
     print("Loaded plugins from database")
 
     # Auto-create default instances for image plugins if enabled and no instance exists
-    from sqlalchemy import select
-
-    from app.database import AsyncSessionLocal
-    from app.models.db_models import PluginDB, PluginTypeDB
-    from app.plugins.manager import plugin_manager
-
     async with AsyncSessionLocal() as session:
-        # Check for Unsplash plugin type (default to enabled if not in DB)
-        result = await session.execute(
-            select(PluginTypeDB).where(PluginTypeDB.type_id == "unsplash")
+        # Unsplash plugin
+        await _create_default_plugin_instance(
+            plugin_registry,
+            session,
+            type_id="unsplash",
+            plugin_id="unsplash-images",
+            name="Unsplash Images",
+            config={"api_key": "", "category": "popular", "count": 30},
         )
-        unsplash_type = result.scalar_one_or_none()
-        unsplash_enabled = unsplash_type.enabled if unsplash_type else True  # Default to enabled
 
-        if unsplash_enabled:
-            # Check if an Unsplash instance exists
-            result = await session.execute(select(PluginDB).where(PluginDB.type_id == "unsplash"))
-            unsplash_instance = result.scalar_one_or_none()
+        # Picsum plugin
+        await _create_default_plugin_instance(
+            plugin_registry,
+            session,
+            type_id="picsum",
+            plugin_id="picsum-images",
+            name="Picsum Photos",
+            config={"count": 30},
+        )
 
-            if not unsplash_instance:
-                # Create default Unsplash instance
-                print("Creating default Unsplash plugin instance...")
-                try:
-                    await plugin_registry.register_plugin(
-                        plugin_id="unsplash-images",
-                        type_id="unsplash",
-                        name="Unsplash Images",
-                        config={
-                            "api_key": "",
-                            "category": "popular",
-                            "count": 30,
-                        },
-                        enabled=True,
-                    )
-                    print("Default Unsplash plugin instance created")
-                except Exception as e:
-                    print(f"Warning: Failed to create default Unsplash instance: {e}")
+        # Local images plugin
+        await _create_default_plugin_instance(
+            plugin_registry,
+            session,
+            type_id="local",
+            plugin_id="local-images",
+            name="Local Images",
+            config={
+                "image_dir": "./data/images",
+                "thumbnail_dir": "./data/images/thumbnails",
+            },
+        )
 
-        # Check for Picsum plugin type (default to enabled if not in DB)
-        result = await session.execute(select(PluginTypeDB).where(PluginTypeDB.type_id == "picsum"))
-        picsum_type = result.scalar_one_or_none()
-        picsum_enabled = picsum_type.enabled if picsum_type else True  # Default to enabled
 
-        if picsum_enabled:
-            # Check if a Picsum instance exists
-            result = await session.execute(select(PluginDB).where(PluginDB.type_id == "picsum"))
-            picsum_instance = result.scalar_one_or_none()
-
-            if not picsum_instance:
-                # Create default Picsum instance
-                print("Creating default Picsum plugin instance...")
-                try:
-                    await plugin_registry.register_plugin(
-                        plugin_id="picsum-images",
-                        type_id="picsum",
-                        name="Picsum Photos",
-                        config={
-                            "count": 30,
-                        },
-                        enabled=True,
-                    )
-                    print("Default Picsum plugin instance created")
-                except Exception as e:
-                    print(f"Warning: Failed to create default Picsum instance: {e}")
-
-        # Check for local images plugin type (default to enabled if not in DB)
-        result = await session.execute(select(PluginTypeDB).where(PluginTypeDB.type_id == "local"))
-        local_type = result.scalar_one_or_none()
-        local_enabled = local_type.enabled if local_type else True  # Default to enabled
-
-        if local_enabled:
-            # Check if a local images instance exists
-            result = await session.execute(select(PluginDB).where(PluginDB.type_id == "local"))
-            local_instance = result.scalar_one_or_none()
-
-            if not local_instance:
-                # Create default local images instance
-                print("Creating default local images plugin instance...")
-                try:
-                    await plugin_registry.register_plugin(
-                        plugin_id="local-images",
-                        type_id="local",
-                        name="Local Images",
-                        config={
-                            "image_dir": "./data/images",
-                            "thumbnail_dir": "./data/images/thumbnails",
-                        },
-                        enabled=True,
-                    )
-                    print("Default local images plugin instance created")
-                except Exception as e:
-                    print(f"Warning: Failed to create default local images instance: {e}")
-
-    # Initialize default keyboard mappings if none exist
-    from app.services.config_service import config_service
+async def _initialize_keyboard_mappings():
+    """Initialize default keyboard mappings if none exist."""
     from app.services.keyboard_mapping_service import keyboard_mapping_service
 
-    # Check if keyboard mappings exist, if not, create defaults
     mappings = await keyboard_mapping_service.get_all_mappings()
     if not mappings:
         # Set default 7-button keyboard mappings
-        # Generic buttons (context-aware): KEY_1, KEY_2, KEY_3
-        # Mode buttons: KEY_4, KEY_5, KEY_6, KEY_7
         default_7button = {
             "KEY_1": "generic_next",
             "KEY_2": "generic_prev",
@@ -151,154 +124,108 @@ async def lifespan(app: FastAPI):
         await keyboard_mapping_service.set_mappings("7-button", default_7button)
 
         # Set default standard keyboard mappings
-        # Layout: 3 generic buttons (next, prev, expand/close) +
-        # 4 mode buttons (calendar, photos, services, spare)
         default_standard = {
-            "KEY_RIGHT": "generic_next",  # Generic Next (context-aware)
-            "KEY_LEFT": "generic_prev",  # Generic Previous (context-aware)
-            "KEY_UP": "generic_expand_close",  # Generic Expand/Close (context-aware)
-            "KEY_DOWN": "mode_calendar",  # Mode: Calendar
-            "KEY_SPACE": "mode_photos",  # Mode: Photos
-            "KEY_1": "mode_web_services",  # Mode: Web Services
-            "KEY_2": "mode_spare",  # Mode: Spare
-            "KEY_S": "mode_settings",  # Settings (separate)
+            "KEY_RIGHT": "generic_next",
+            "KEY_LEFT": "generic_prev",
+            "KEY_UP": "generic_expand_close",
+            "KEY_DOWN": "mode_calendar",
+            "KEY_SPACE": "mode_photos",
+            "KEY_1": "mode_web_services",
+            "KEY_2": "mode_spare",
+            "KEY_S": "mode_settings",
         }
         await keyboard_mapping_service.set_mappings("standard", default_standard)
         print("Initialized default keyboard mappings")
 
-    # Initialize plugin image service
+
+async def _initialize_image_service():
+    """Initialize plugin image service and perform initial scan."""
     from app.services.plugin_image_service import PluginImageService
 
     plugin_image_service = PluginImageService()
-    # Do initial scan
     await plugin_image_service.scan_images()
     plugin_image_count = len(await plugin_image_service.get_images())
     print(f"Plugin image service initialized: {plugin_image_count} images found")
 
-    # Initialize default config if not present
-    orientation = await config_service.get_value("orientation")
-    if orientation is None:
-        await config_service.set_value("orientation", "landscape")
-    apply_display_rotation = await config_service.get_value("apply_display_rotation")
-    if apply_display_rotation is None:
-        await config_service.set_value("apply_display_rotation", True)  # Default to enabled
-    calendar_split = await config_service.get_value("calendar_split")
-    if calendar_split is None:
-        await config_service.set_value("calendar_split", 70.0)
-    keyboard_type = await config_service.get_value("keyboard_type")
-    if keyboard_type is None:
-        await config_service.set_value("keyboard_type", "7-button")
-    photo_frame_enabled = await config_service.get_value("photo_frame_enabled")
-    if photo_frame_enabled is None:
-        await config_service.set_value("photo_frame_enabled", False)
-    photo_frame_timeout = await config_service.get_value("photo_frame_timeout")
-    if photo_frame_timeout is None:
-        await config_service.set_value("photo_frame_timeout", 300)  # 5 minutes
-    config_poll_interval = await config_service.get_value("config_poll_interval")
-    if config_poll_interval is None:
-        await config_service.set_value("config_poll_interval", 30)  # 30 seconds default
-    show_ui = await config_service.get_value("show_ui")
-    if show_ui is None:
-        await config_service.set_value("show_ui", True)
-    photo_rotation_interval = await config_service.get_value("photo_rotation_interval")
-    if photo_rotation_interval is None:
-        await config_service.set_value("photo_rotation_interval", 30)  # 30 seconds
-    calendar_view_mode = await config_service.get_value("calendar_view_mode")
-    if calendar_view_mode is None:
-        await config_service.set_value(
-            "calendar_view_mode", "month"
-        )  # 'month' | 'week' | 'day' | 'rolling'
-    time_format = await config_service.get_value("time_format")
-    if time_format is None:
-        await config_service.set_value("time_format", "24h")  # '12h' or '24h' (default: '24h')
-    mode_indicator_timeout = await config_service.get_value("mode_indicator_timeout")
-    if mode_indicator_timeout is None:
-        await config_service.set_value("mode_indicator_timeout", 5)  # 5 seconds default
-    keyboard_feedback_enabled = await config_service.get_value("keyboard_feedback_enabled")
-    if keyboard_feedback_enabled is None:
-        await config_service.set_value("keyboard_feedback_enabled", True)  # Enabled by default
-    keyboard_feedback_mode = await config_service.get_value("keyboard_feedback_mode")
-    if keyboard_feedback_mode is None:
-        await config_service.set_value("keyboard_feedback_mode", "normal")  # Normal mode by default
-    week_start_day = await config_service.get_value("week_start_day")
-    if week_start_day is None:
-        await config_service.set_value("week_start_day", 0)  # Sunday default
-    show_week_numbers = await config_service.get_value("show_week_numbers")
-    if show_week_numbers is None:
-        await config_service.set_value("show_week_numbers", False)  # Hide by default
-    side_view_position = await config_service.get_value("side_view_position")
-    if side_view_position is None:
-        await config_service.set_value("side_view_position", "right")  # Right/bottom default
-    theme_mode = await config_service.get_value("theme_mode")
-    if theme_mode is None:
-        await config_service.set_value("theme_mode", "auto")  # Auto theme by default
-    dark_mode_start = await config_service.get_value("dark_mode_start")
-    if dark_mode_start is None:
-        await config_service.set_value("dark_mode_start", 18)  # 6 PM default
-    dark_mode_end = await config_service.get_value("dark_mode_end")
-    if dark_mode_end is None:
-        await config_service.set_value("dark_mode_end", 6)  # 6 AM default
-    display_schedule_enabled = await config_service.get_value("display_schedule_enabled")
-    if display_schedule_enabled is None:
-        await config_service.set_value("display_schedule_enabled", False)  # Disabled by default
-    display_off_time = await config_service.get_value("display_off_time")
-    if display_off_time is None:
-        await config_service.set_value("display_off_time", "22:00")  # 10 PM default
-    display_on_time = await config_service.get_value("display_on_time")
-    if display_on_time is None:
-        await config_service.set_value("display_on_time", "06:00")  # 6 AM default
-    # Initialize display schedule if not exists (per-day schedule)
+
+async def _set_default_config_if_missing(config_service, key: str, default_value):
+    """Set config value if it doesn't exist."""
+    current = await config_service.get_value(key)
+    if current is None:
+        await config_service.set_value(key, default_value)
+
+
+async def _initialize_default_config():
+    """Initialize default configuration values if not present."""
+    import json
+
+    from app.services.config_service import config_service
+
+    # Define all default config values
+    default_configs = {
+        "orientation": "landscape",
+        "apply_display_rotation": True,
+        "calendar_split": 70.0,
+        "keyboard_type": "7-button",
+        "photo_frame_enabled": False,
+        "photo_frame_timeout": 300,  # 5 minutes
+        "config_poll_interval": 30,  # 30 seconds
+        "show_ui": True,
+        "photo_rotation_interval": 30,  # 30 seconds
+        "calendar_view_mode": "month",  # 'month' | 'week' | 'day' | 'rolling'
+        "time_format": "24h",  # '12h' or '24h'
+        "mode_indicator_timeout": 5,  # 5 seconds
+        "keyboard_feedback_enabled": True,
+        "keyboard_feedback_mode": "normal",
+        "week_start_day": 0,  # Sunday
+        "show_week_numbers": False,
+        "side_view_position": "right",
+        "theme_mode": "auto",
+        "dark_mode_start": 18,  # 6 PM
+        "dark_mode_end": 6,  # 6 AM
+        "display_schedule_enabled": False,
+        "display_off_time": "22:00",  # 10 PM
+        "display_on_time": "06:00",  # 6 AM
+        "reboot_combo_key1": "KEY_1",
+        "reboot_combo_key2": "KEY_7",
+        "reboot_combo_duration": 10000,  # 10 seconds
+        "display_timeout_enabled": False,
+        "display_timeout": 0,  # 0 = never
+        "image_display_mode": "smart",
+        "randomize_images": "false",
+    }
+
+    # Set all defaults
+    for key, value in default_configs.items():
+        await _set_default_config_if_missing(config_service, key, value)
+
+    # Handle display schedule separately (it's a JSON string)
     display_schedule = await config_service.get_value("display_schedule")
     if display_schedule is None:
-        # Default: all days enabled, 06:00-22:00
-        import json
-
         default_schedule = [
             {"day": i, "enabled": True, "onTime": "06:00", "offTime": "22:00"}
             for i in range(7)  # 0=Monday, 6=Sunday
         ]
         await config_service.set_value("display_schedule", json.dumps(default_schedule))
-    reboot_combo_key1 = await config_service.get_value("reboot_combo_key1")
-    if reboot_combo_key1 is None:
-        await config_service.set_value("reboot_combo_key1", "KEY_1")  # Default first key
-    reboot_combo_key2 = await config_service.get_value("reboot_combo_key2")
-    if reboot_combo_key2 is None:
-        await config_service.set_value("reboot_combo_key2", "KEY_7")  # Default second key
-    reboot_combo_duration = await config_service.get_value("reboot_combo_duration")
-    if reboot_combo_duration is None:
-        await config_service.set_value("reboot_combo_duration", 10000)  # 10 seconds default
-    # Initialize display timeout settings (default: disabled - keep display on)
-    display_timeout_enabled = await config_service.get_value("display_timeout_enabled")
-    if display_timeout_enabled is None:
-        await config_service.set_value(
-            "display_timeout_enabled", False
-        )  # Disabled by default - keep display on
-    display_timeout = await config_service.get_value("display_timeout")
-    if display_timeout is None:
-        await config_service.set_value(
-            "display_timeout", 0
-        )  # 0 = never (disabled by default - keep display on)
-    image_display_mode = await config_service.get_value("image_display_mode")
-    if image_display_mode is None:
-        await config_service.set_value("image_display_mode", "smart")  # Smart mode by default
-    randomize_images = await config_service.get_value("randomize_images")
-    if randomize_images is None:
-        await config_service.set_value("randomize_images", "false")  # Don't randomize by default
 
-    # Start schedulers
+
+async def _start_schedulers():
+    """Start background schedulers."""
+    from app.services.display_power_service import display_power_service
+
     calendar_scheduler.start()
     print("Calendar scheduler started - refreshing every 15 minutes")
-
-    # Start display power scheduler
-    from app.services.display_power_service import display_power_service
 
     await display_power_service.start()
     print("Display power scheduler started")
 
-    # Sync display orientation with config (on Raspberry Pi, if enabled)
-    try:
-        from app.services.display_orientation_service import display_orientation_service
 
+async def _sync_display_orientation():
+    """Sync display orientation with config (on Raspberry Pi, if enabled)."""
+    from app.services.config_service import config_service
+    from app.services.display_orientation_service import display_orientation_service
+
+    try:
         apply_rotation = await config_service.get_value("apply_display_rotation", True)
         if apply_rotation:
             result = await display_orientation_service.sync_with_config()
@@ -314,16 +241,38 @@ async def lifespan(app: FastAPI):
         # Don't fail startup if orientation sync fails
         print(f"Warning: Failed to sync display orientation on startup: {e}")
 
-    yield
-    # Shutdown
+
+async def _shutdown_services():
+    """Shutdown all services and schedulers."""
+    from app.plugins.manager import plugin_manager
+    from app.services.display_power_service import display_power_service
+
     await display_power_service.stop()
     print("Display power scheduler stopped")
+
     calendar_scheduler.stop()
     print("Calendar scheduler stopped")
 
-    # Cleanup plugins
     await plugin_manager.cleanup_all()
     print("Plugins cleaned up")
+
+
+@asynccontextmanager
+async def lifespan(app: FastAPI):
+    """Lifespan context manager for startup/shutdown."""
+    # Startup
+    await _initialize_database()
+    await _initialize_plugins()
+    await _initialize_keyboard_mappings()
+    await _initialize_image_service()
+    await _initialize_default_config()
+    await _start_schedulers()
+    await _sync_display_orientation()
+
+    yield
+
+    # Shutdown
+    await _shutdown_services()
 
 
 app = FastAPI(
