@@ -125,7 +125,7 @@ docker-compose up -d calvin-prod
 ### Option 2: Native Installation (Current Approach)
 - Use systemd services
 - Manual updates via git pull
-- See `docs/SETUP_LINUX.md`
+- See `docs/setup/SETUP_LINUX.md`
 
 ## Advantages of Docker Approach
 

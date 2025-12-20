@@ -1,90 +1,93 @@
 # Calvin Documentation
 
-Welcome to the Calvin documentation! This directory contains guides, references, and technical documentation for the Calvin dashboard system.
+Welcome to the Calvin documentation! This directory contains guides, references, and information for setting up, configuring, and extending Calvin.
 
-## 📚 Documentation Index
+## 📚 Documentation Structure
 
-### Getting Started
-- **[Setup - Linux](./SETUP_LINUX.md)** - Installation and setup instructions for Linux
-- **[Setup - Windows](./SETUP_WINDOWS.md)** - Installation and setup instructions for Windows
-- **[Add Google Calendar](./ADD_GOOGLE_CALENDAR.md)** - Quick guide to adding Google Calendar
+### 🚀 [Setup Guides](./setup/)
+Get started with Calvin on your platform.
 
-### Plugin Development
-- **[Plugin Development Guide](./PLUGIN_DEVELOPMENT.md)** - Complete guide to developing plugins
-- **[Plugin Package Format](./PLUGIN_PACKAGE_FORMAT.md)** - Detailed specification for plugin packages
-- **[Plugin Installation](./PLUGIN_INSTALLATION.md)** - How to install and manage plugins
-- **[Plugin Repository Setup](./PLUGIN_REPOSITORY_SETUP.md)** - Setting up a plugin repository
-- **[Plugin Frontend Components](./PLUGIN_FRONTEND_COMPONENTS.md)** - Creating Vue.js components for plugins
-- **[Plugin Persistence and Restart](./PLUGIN_PERSISTENCE_AND_RESTART.md)** - How plugins are persisted and restart behavior
+- **[Windows Setup](./setup/SETUP_WINDOWS.md)** - Install and run Calvin on Windows
+- **[Linux Setup](./setup/SETUP_LINUX.md)** - Install and run Calvin on Linux (including Raspberry Pi)
+- **[Polkit Service Restart](./setup/POLKIT_SERVICE_RESTART.md)** - Configure service restart permissions on Linux
 
-### Configuration & Settings
-- **[Remote Settings](./REMOTE_SETTINGS.md)** - Configuring remote dashboard access
-- **[Settings Save Behavior](./SETTINGS_SAVE_BEHAVIOR.md)** - How settings are saved and when
-- **[Polkit Service Restart](./POLKIT_SERVICE_RESTART.md)** - System service restart configuration
+### 🔌 [Plugin Documentation](./plugins/)
+Everything you need to know about plugins.
 
-### Testing
-- **[Test Coverage for New Features](./TEST_COVERAGE_NEW_FEATURES.md)** - Testing strategy and coverage
+- **[Plugin Development Guide](./plugins/PLUGIN_DEVELOPMENT_GUIDE.md)** - Complete guide to creating plugins
+- **[Plugin Installation](./plugins/PLUGIN_INSTALLATION.md)** - How to install plugins from repositories
+- **[Plugin Package Format](./plugins/PLUGIN_PACKAGE_FORMAT.md)** - Plugin package structure and requirements
+- **[Plugin Repository Setup](./plugins/PLUGIN_REPOSITORY_SETUP.md)** - Setting up your own plugin repository
+- **[Plugin Frontend Components](./plugins/PLUGIN_FRONTEND_COMPONENTS.md)** - Frontend integration guide
+- **[Plugin Persistence and Restart](./plugins/PLUGIN_PERSISTENCE_AND_RESTART.md)** - Plugin lifecycle management
+- **[Adding Google Calendar](./plugins/ADD_GOOGLE_CALENDAR.md)** - Quick guide for Google Calendar integration
 
-### Planning & Design Documents
-- **[Settings UI Improvements](./SETTINGS_UI_IMPROVEMENTS.md)** - Proposed improvements to settings UI (planning document)
+### ⚙️ [Configuration](./configuration/)
+Configuration and settings documentation.
 
-### Archived Documents
-Planning and design documents are in the [archive](./archive/) directory:
-- `SETTINGS_UI_IMPROVEMENTS.md` - Proposed improvements to settings UI (planning document)
+- **[Remote Configuration](./configuration/REMOTE_CONFIG.md)** - Configure frontend to connect to remote backend
+- **[Settings Save Behavior](./configuration/SETTINGS_SAVE_BEHAVIOR.md)** - How settings are saved and persisted
+
+### 🧪 [Testing](./testing/)
+Testing documentation and coverage information.
+
+- **[Test Coverage for New Features](./testing/TEST_COVERAGE_NEW_FEATURES.md)** - Testing strategy and coverage for plugin installation and system management
+
+### 📦 [Archive](./archive/)
+Historical and completed documentation.
+
+- Plugin installation flow analysis
+- Plugin installation improvements (completed)
+- Plugin uninstall and restart (completed)
+- Settings UI improvements (completed)
+
+## 🎯 Quick Start
+
+1. **New to Calvin?** Start with the [Setup Guides](./setup/) for your platform
+2. **Want to add a calendar?** See [Adding Google Calendar](./plugins/ADD_GOOGLE_CALENDAR.md)
+3. **Want to create a plugin?** Read the [Plugin Development Guide](./plugins/PLUGIN_DEVELOPMENT_GUIDE.md)
+4. **Setting up a remote dashboard?** Check [Remote Configuration](./configuration/REMOTE_CONFIG.md)
+
+## 📖 Documentation Guidelines
+
+### Contributing Documentation
+
+When adding new documentation:
+
+1. **Place files in the appropriate category directory**
+   - Setup guides → `setup/`
+   - Plugin docs → `plugins/`
+   - Configuration → `configuration/`
+   - Testing → `testing/`
+   - Historical/completed → `archive/`
+
+2. **Use descriptive filenames**
+   - Use UPPERCASE_WITH_UNDERSCORES.md format
+   - Be specific and clear about the topic
+
+3. **Update this README**
+   - Add new documents to the appropriate section
+   - Include a brief description
+
+4. **Keep it current**
+   - Archive outdated docs to `archive/`
+   - Update docs when features change
+   - Remove duplicate or redundant content
+
+## 🔗 External Resources
+
+- **Plugin Repository**: See [PLUGIN_REPOSITORY_SETUP.md](./plugins/PLUGIN_REPOSITORY_SETUP.md)
+- **Plugin Development**: See [PLUGIN_DEVELOPMENT_GUIDE.md](./plugins/PLUGIN_DEVELOPMENT_GUIDE.md)
+
+## 📝 Notes
+
+- All documentation is written in Markdown (`.md`)
+- Code examples should be tested and working
+- Keep documentation up-to-date with code changes
+- Use clear, concise language
+- Include examples where helpful
 
 ---
 
-## Quick Links
-
-### For Users
-- [Linux Setup](./SETUP_LINUX.md) | [Windows Setup](./SETUP_WINDOWS.md)
-- [Add Google Calendar](./ADD_GOOGLE_CALENDAR.md)
-- [Remote Settings](./REMOTE_SETTINGS.md)
-
-### For Developers
-- [Plugin Development Guide](./PLUGIN_DEVELOPMENT.md)
-- [Plugin Package Format](./PLUGIN_PACKAGE_FORMAT.md)
-- [Plugin Installation](./PLUGIN_INSTALLATION.md)
-- [Frontend Components](./PLUGIN_FRONTEND_COMPONENTS.md)
-
-### For Contributors
-- [Test Coverage](./TEST_COVERAGE_NEW_FEATURES.md)
-- [Repository Setup](./PLUGIN_REPOSITORY_SETUP.md)
-
----
-
-## Document Status
-
-### ✅ Current & Maintained
-- Setup guides (Linux, Windows)
-- Plugin development documentation
-- Configuration guides
-- Test coverage documentation
-
-### 📝 Planning Documents
-- Settings UI Improvements (proposed changes)
-
-### 📦 Archived
-- Completed analysis documents
-- Historical implementation notes
-
----
-
-## Contributing to Documentation
-
-When adding or updating documentation:
-1. Follow the existing structure and naming conventions
-2. Use clear headings and markdown formatting
-3. Include code examples where helpful
-4. Update this README if adding new major sections
-5. Move completed planning documents to `archive/` when done
-
----
-
-## Questions?
-
-If you have questions about the documentation or need help:
-- Check the relevant guide above
-- Review the plugin development documentation
-- Check archived documents for historical context
+**Last Updated**: 2024 (organized during cleanup)
 
