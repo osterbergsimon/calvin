@@ -101,12 +101,12 @@
                 <input
                   v-model.number="localConfig.calendarSplit"
                   type="number"
-                  min="66"
-                  max="75"
+                  min="10"
+                  max="90"
                   @change="updateCalendarSplit"
                 />
                 <span class="help-text"
-                  >Calendar width percentage (66-75%)</span
+                  >Calendar width percentage (10-90%)</span
                 >
               </div>
               <div class="setting-item">
@@ -618,6 +618,65 @@
                 </label>
                 <span class="help-text"
                   >Display ISO 8601 week numbers in the calendar</span
+                >
+              </div>
+              <div class="setting-item">
+                <label>Weekend Days</label>
+                <div class="weekend-days-selector">
+                  <label
+                    v-for="dayOption in [
+                      { value: 0, label: 'Sun' },
+                      { value: 1, label: 'Mon' },
+                      { value: 2, label: 'Tue' },
+                      { value: 3, label: 'Wed' },
+                      { value: 4, label: 'Thu' },
+                      { value: 5, label: 'Fri' },
+                      { value: 6, label: 'Sat' },
+                    ]"
+                    :key="dayOption.value"
+                    class="weekend-day-checkbox"
+                  >
+                    <input
+                      type="checkbox"
+                      :value="dayOption.value"
+                      :checked="
+                        localConfig.weekendDays?.includes(dayOption.value) ||
+                        false
+                      "
+                      @change="updateWeekendDays(dayOption.value, $event)"
+                    />
+                    {{ dayOption.label }}
+                  </label>
+                </div>
+                <span class="help-text"
+                  >Select which days should be styled as weekends</span
+                >
+              </div>
+              <div class="setting-item">
+                <label>
+                  <input
+                    v-model="localConfig.showRedDays"
+                    type="checkbox"
+                    @change="updateShowRedDays"
+                  />
+                  Show Red Days (Holidays)
+                </label>
+                <span class="help-text"
+                  >Highlight holidays in red (requires backend support)</span
+                >
+              </div>
+              <div class="setting-item">
+                <label>Max Visible Events</label>
+                <input
+                  v-model.number="localConfig.maxVisibleEvents"
+                  type="number"
+                  min="1"
+                  max="20"
+                  @change="updateMaxVisibleEvents"
+                />
+                <span class="help-text"
+                  >Maximum events shown per day before "+X more" indicator
+                  (1-20)</span
                 >
               </div>
               <div class="setting-item">
@@ -2371,6 +2430,33 @@ const updateShowWeekNumbers = () => {
   saveConfig();
 };
 
+const updateWeekendDays = (dayValue, event) => {
+  if (!localConfig.value.weekendDays) {
+    localConfig.value.weekendDays = [];
+  }
+  if (event.target.checked) {
+    if (!localConfig.value.weekendDays.includes(dayValue)) {
+      localConfig.value.weekendDays.push(dayValue);
+    }
+  } else {
+    localConfig.value.weekendDays = localConfig.value.weekendDays.filter(
+      (d) => d !== dayValue,
+    );
+  }
+  configStore.setWeekendDays(localConfig.value.weekendDays);
+  saveConfig();
+};
+
+const updateShowRedDays = () => {
+  configStore.setShowRedDays(localConfig.value.showRedDays);
+  saveConfig();
+};
+
+const updateMaxVisibleEvents = () => {
+  configStore.setMaxVisibleEvents(localConfig.value.maxVisibleEvents);
+  saveConfig();
+};
+
 const updateThemeMode = () => {
   configStore.setThemeMode(localConfig.value.themeMode);
   // Theme composable in App.vue will watch config store and update automatically
@@ -2875,6 +2961,12 @@ const loadConfig = async () => {
         response.data.showWeekNumbers ??
         response.data.show_week_numbers ??
         false;
+      localConfig.value.weekendDays = response.data.weekendDays ??
+        response.data.weekend_days ?? [0, 6];
+      localConfig.value.showRedDays =
+        response.data.showRedDays ?? response.data.show_red_days ?? false;
+      localConfig.value.maxVisibleEvents =
+        response.data.maxVisibleEvents ?? response.data.max_visible_events ?? 4;
       localConfig.value.sideViewPosition =
         response.data.sideViewPosition ??
         response.data.side_view_position ??
@@ -3255,6 +3347,9 @@ const saveConfig = async () => {
       timeFormat: localConfig.value.timeFormat,
       weekStartDay: localConfig.value.weekStartDay,
       showWeekNumbers: localConfig.value.showWeekNumbers,
+      weekendDays: localConfig.value.weekendDays,
+      showRedDays: localConfig.value.showRedDays,
+      maxVisibleEvents: localConfig.value.maxVisibleEvents,
       sideViewPosition: localConfig.value.sideViewPosition,
       themeMode: localConfig.value.themeMode,
       darkModeStart: localConfig.value.darkModeStart,

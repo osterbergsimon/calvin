@@ -110,7 +110,7 @@
             sideViewPositionClass,
           ]"
         >
-          <!-- Calendar Section (66-75%) -->
+          <!-- Calendar Section (configurable percentage) -->
           <div
             class="calendar-section"
             :style="{ width: calendarWidth, height: calendarHeight }"
@@ -118,7 +118,7 @@
             <CalendarView />
           </div>
 
-          <!-- Right/Bottom Section (25-33%) - Shows current mode content -->
+          <!-- Right/Bottom Section (secondary view) - Shows current mode content -->
           <div
             class="secondary-section"
             :style="{ width: secondaryWidth, height: secondaryHeight }"

@@ -1,18 +1,8 @@
 <template>
-  <div
-    v-if="event"
-    class="event-detail-panel"
-    @keydown="handleKeydown"
-  >
+  <div v-if="event" class="event-detail-panel" @keydown="handleKeydown">
     <div class="event-detail-header">
       <h3>{{ event.title }}</h3>
-      <button
-        class="btn-close"
-        aria-label="Close"
-        @click="close"
-      >
-        ×
-      </button>
+      <button class="btn-close" aria-label="Close" @click="close">×</button>
     </div>
     <div class="event-detail-content">
       <!-- Show all events for the day if expanding "today" via keyboard -->
@@ -21,10 +11,8 @@
         class="all-day-events-details"
       >
         <div class="day-events-header">
-          <span
-            class="label"
-          >
-            All Events for {{ formatDate(event.start) }} ({{
+          <span class="label">
+            All Events for {{ formatDate(selectedDate || event.start) }} ({{
               dayEvents.length
             }})
           </span>
@@ -40,28 +28,18 @@
               <h4>{{ dayEvent.title }}</h4>
             </div>
             <div class="day-event-detail-content">
-              <div
-                v-if="isEventMultiDay(dayEvent)"
-                class="event-detail-row"
-              >
+              <div v-if="isEventMultiDay(dayEvent)" class="event-detail-row">
                 <span class="label">Start:</span>
-                <span
-                  class="value"
-                >
+                <span class="value">
                   {{ formatDate(dayEvent.start)
                   }}<span v-if="!dayEvent.all_day">
                     {{ formatTime(dayEvent.start) }}</span
                   ></span
                 >
               </div>
-              <div
-                v-if="isEventMultiDay(dayEvent)"
-                class="event-detail-row"
-              >
+              <div v-if="isEventMultiDay(dayEvent)" class="event-detail-row">
                 <span class="label">End:</span>
-                <span
-                  class="value"
-                >
+                <span class="value">
                   {{ formatDate(dayEvent.end)
                   }}<span v-if="!dayEvent.all_day">
                     {{ formatTime(dayEvent.end) }}</span
@@ -134,6 +112,12 @@
         class="current-event-details"
       >
         <div v-if="isMultiDay" class="event-detail-row">
+          <span class="label">Selected Date:</span>
+          <span class="value">{{
+            formatDate(selectedDate || event.start)
+          }}</span>
+        </div>
+        <div v-if="isMultiDay" class="event-detail-row">
           <span class="label">Start:</span>
           <span class="value"
             >{{ formatDate(event.start)
@@ -153,7 +137,9 @@
         </div>
         <div v-if="!isMultiDay" class="event-detail-row">
           <span class="label">Date:</span>
-          <span class="value">{{ formatDate(event.start) }}</span>
+          <span class="value">{{
+            formatDate(selectedDate || event.start)
+          }}</span>
         </div>
         <div v-if="!isMultiDay && !event.all_day" class="event-detail-row">
           <span class="label">Time:</span>
@@ -173,7 +159,7 @@
         </div>
         <div class="event-detail-row">
           <span class="label">Source:</span>
-          <span class="value">{{ event.source }}</span>
+          <span class="value">{{ getSourceName(event.source) }}</span>
         </div>
       </div>
     </div>
@@ -198,6 +184,7 @@ const calendarStore = useCalendarStore();
 
 const dayEvents = computed(() => calendarStore.dayEvents);
 const showAllDayEvents = computed(() => calendarStore.showAllDayEvents);
+const selectedDate = computed(() => calendarStore.selectedDate);
 
 // Handle keyboard navigation - only handle Escape here
 // Arrow keys are handled by the global keyboard mapping system via generic_next/generic_prev
@@ -261,6 +248,13 @@ const isMultiDay = computed(() => {
     start.getDate() !== end.getDate()
   );
 });
+
+// Get calendar source name instead of plugin ID
+const getSourceName = (sourceId) => {
+  if (!sourceId) return "Unknown";
+  const source = calendarStore.sources.find((s) => s.id === sourceId);
+  return source?.name || sourceId;
+};
 </script>
 
 <style scoped>

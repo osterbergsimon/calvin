@@ -89,6 +89,8 @@
                 'other-month': day.otherMonth,
                 today: day.isToday,
                 'week-start': isWeekStart(dayIndex),
+                weekend: isWeekend(day.date),
+                'red-day': showRedDays && isRedDay(day.date),
               },
             ]"
           >
@@ -104,9 +106,9 @@
               </div>
             </div>
             <div class="day-events">
-              <!-- All events for this day -->
+              <!-- Visible events for this day (limited) -->
               <CalendarEventItem
-                v-for="(event, eventIndex) in day.events"
+                v-for="(event, eventIndex) in getVisibleEvents(day.events)"
                 :key="`${event.id}-${day.date.toISOString()}-${eventIndex}`"
                 :ref="(el) => setEventRef(el, dayIndex, eventIndex)"
                 :event="event"
@@ -114,10 +116,18 @@
                 :event-index="eventIndex"
                 :day-date="day.date"
                 :is-focused="isFocused(dayIndex, eventIndex)"
-                :is-selected="isSelected(event)"
+                :is-selected="isEventSelected(event, day.date)"
                 @click="selectEvent"
                 @focus="setFocusedEvent"
               />
+              <!-- Overflow indicator -->
+              <div
+                v-if="getOverflowCount(day.events) > 0"
+                class="event-overflow-indicator"
+                :title="`${getOverflowCount(day.events)} more event${getOverflowCount(day.events) > 1 ? 's' : ''}`"
+              >
+                +{{ getOverflowCount(day.events) }} more
+              </div>
             </div>
           </div>
         </div>
@@ -159,6 +169,8 @@ const showHeader = computed(() => configStore.shouldShowUI);
 const viewMode = computed(() => configStore.calendarViewMode);
 const showWeekNumbers = computed(() => configStore.showWeekNumbers);
 const weekStartDay = computed(() => configStore.weekStartDay || 0);
+const weekendDays = computed(() => configStore.weekendDays || [0, 6]);
+const showRedDays = computed(() => configStore.showRedDays || false);
 
 const viewModeLabel = computed(() => {
   const labels = {
@@ -390,7 +402,42 @@ const getEventsForDate = (date) => {
         _isMultiDay: isMultiDay,
         _isMiddle: isMultiDay && !isStart && !isEnd,
       };
+    })
+    .sort((a, b) => {
+      // First, sort multi-day events before single-day events
+      // Multi-day events get priority (return -1 means a comes before b)
+      if (a._isMultiDay && !b._isMultiDay) return -1;
+      if (!a._isMultiDay && b._isMultiDay) return 1;
+
+      // If both are the same type, sort by start date/time (earlier first)
+      const aStart = new Date(a.start).getTime();
+      const bStart = new Date(b.start).getTime();
+      return aStart - bStart;
     });
+};
+
+// Get visible events (limited) for a day
+// Note: Overflow limiting only applies to month/rolling views, not week/day views
+const getVisibleEvents = (events) => {
+  if (!events || events.length === 0) return [];
+  // Don't limit events in week or day view where we have more space
+  if (viewMode.value === "week" || viewMode.value === "day") {
+    return events;
+  }
+  const maxVisible = configStore.maxVisibleEvents || 4;
+  return events.slice(0, maxVisible);
+};
+
+// Get count of overflow events
+// Note: Overflow indicator only shows in month/rolling views
+const getOverflowCount = (events) => {
+  if (!events || events.length === 0) return 0;
+  // Don't show overflow indicator in week or day view
+  if (viewMode.value === "week" || viewMode.value === "day") {
+    return 0;
+  }
+  const maxVisible = configStore.maxVisibleEvents || 4;
+  return Math.max(0, events.length - maxVisible);
 };
 
 // Event helper functions moved to useEventHelpers composable
@@ -575,6 +622,20 @@ const getWeekNumberForDay = (dayIndex) => {
   return weekNum;
 };
 
+// Helper function to check if a date is a weekend day
+const isWeekend = (date) => {
+  const dayOfWeek = date.getDay();
+  return weekendDays.value.includes(dayOfWeek);
+};
+
+// Helper function to check if a date is a red day (holiday)
+// For now, this is a placeholder - actual holiday detection would need backend support
+const isRedDay = (date) => {
+  // TODO: Implement actual holiday detection when backend supports it
+  // This could check against a holidays list or use a holiday API
+  return false;
+};
+
 // Get all events in a flat list for keyboard navigation
 const allEvents = computed(() => {
   const flatEvents = [];
@@ -603,8 +664,37 @@ const isFocused = (dayIndex, eventIndex) => {
   );
 };
 
-const isSelected = (event) => {
-  return selectedEvent.value && selectedEvent.value.id === event.id;
+// Simple function that checks if an event is selected for a specific day
+// This function is called in the template, so Vue will track reactive dependencies
+const isEventSelected = (event, dayDate) => {
+  // Access reactive values - Vue tracks these as dependencies when called in template
+  const currentSelectedEvent = selectedEvent.value;
+  const currentSelectedDate = calendarStore.selectedDate;
+
+  // Early returns for clarity
+  if (!currentSelectedEvent || !event || !currentSelectedDate) {
+    return false;
+  }
+
+  // Compare IDs - must be exact match (convert to string for safety)
+  const selectedId = currentSelectedEvent.id;
+  const eventId = event.id;
+
+  // Null/undefined check
+  if (selectedId == null || eventId == null) {
+    return false;
+  }
+
+  // String comparison for robustness
+  if (String(selectedId) !== String(eventId)) {
+    return false;
+  }
+
+  // Only highlight on the selected day (critical for multi-day events)
+  // This ensures a multi-day event is only highlighted on the day that was clicked
+  const selectedDateComponents = getDateComponents(currentSelectedDate, false);
+  const dayDateComponents = getDateComponents(dayDate, false);
+  return compareDateComponents(selectedDateComponents, dayDateComponents) === 0;
 };
 
 const setFocusedEvent = (dayIndex, eventIndex) => {
@@ -1204,6 +1294,21 @@ onActivated(() => {
   opacity: 1 !important;
 }
 
+/* Weekend styling - very subtle background tint */
+.calendar-day.weekend:not(.other-month) {
+  background: rgba(0, 0, 0, 0.02) !important;
+}
+
+/* Red day (holiday) styling */
+.calendar-day.red-day:not(.other-month) {
+  background: rgba(220, 53, 69, 0.1) !important;
+}
+
+.calendar-day.red-day:not(.other-month) .day-number {
+  color: #dc3545;
+  font-weight: 700;
+}
+
 /* Ensure day-events container doesn't affect day background */
 .calendar-day .day-events {
   background: transparent !important;
@@ -1263,6 +1368,20 @@ onActivated(() => {
   box-sizing: border-box;
   /* Allow events to expand vertically when space is available */
   align-content: flex-start;
+}
+
+.event-overflow-indicator {
+  font-size: 0.7rem;
+  padding: 0.15rem 0.35rem;
+  background: var(--bg-secondary);
+  color: var(--text-secondary);
+  border-radius: 3px;
+  text-align: center;
+  cursor: default;
+  margin-top: 0.1rem;
+  opacity: 0.8;
+  font-weight: 500;
+  flex-shrink: 0;
 }
 
 .event-detail-backdrop {

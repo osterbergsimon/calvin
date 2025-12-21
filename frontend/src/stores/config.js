@@ -7,7 +7,7 @@ export const useConfigStore = defineStore("config", () => {
   const orientation = ref("landscape"); // 'landscape' | 'portrait'
   const orientationFlipped = ref(false); // Whether orientation is flipped (180° rotation)
   const applyDisplayRotation = ref(true); // Whether to physically rotate display on RPi (default: true)
-  const calendarSplit = ref(70); // Percentage for calendar (66-75%, default 70%)
+  const calendarSplit = ref(70); // Percentage for calendar (10-90%, default 70%)
   const sideViewPosition = ref("right"); // 'left' | 'right' for landscape, 'top' | 'bottom' for portrait
   const lastSideViewMode = ref("photos"); // Track last side view mode ('photos' | 'web_services')
   const showWebServices = ref(false); // Toggle for web services view
@@ -23,6 +23,9 @@ export const useConfigStore = defineStore("config", () => {
   const timeFormat = ref("24h"); // Time format: '12h' or '24h' (default: '24h')
   const weekStartDay = ref(0); // Week starting day (0=Sunday, 1=Monday, ..., 6=Saturday, default 0)
   const showWeekNumbers = ref(false); // Show week numbers in calendar (default false)
+  const weekendDays = ref([0, 6]); // Weekend days (0=Sunday, 6=Saturday, default [0, 6])
+  const showRedDays = ref(false); // Show red days (holidays) if enabled (default false)
+  const maxVisibleEvents = ref(4); // Maximum visible events per day before showing overflow (default 4)
   const themeMode = ref("auto"); // Theme mode: 'light' | 'dark' | 'auto' | 'time'
   const darkModeStart = ref(18); // Dark mode start hour (0-23, default 18 = 6 PM)
   const darkModeEnd = ref(6); // Dark mode end hour (0-23, default 6 = 6 AM)
@@ -77,8 +80,8 @@ export const useConfigStore = defineStore("config", () => {
   };
 
   const setCalendarSplit = (percentage) => {
-    // Clamp between 66 and 75
-    calendarSplit.value = Math.max(66, Math.min(75, percentage));
+    // Clamp between 10 and 90 to prevent UI issues while allowing flexibility
+    calendarSplit.value = Math.max(10, Math.min(90, percentage));
   };
 
   const toggleWebServices = () => {
@@ -186,6 +189,24 @@ export const useConfigStore = defineStore("config", () => {
       }
       if (response.data.show_week_numbers !== undefined) {
         showWeekNumbers.value = response.data.show_week_numbers;
+      }
+      if (response.data.weekendDays !== undefined) {
+        weekendDays.value = response.data.weekendDays;
+      }
+      if (response.data.weekend_days !== undefined) {
+        weekendDays.value = response.data.weekend_days;
+      }
+      if (response.data.showRedDays !== undefined) {
+        showRedDays.value = response.data.showRedDays;
+      }
+      if (response.data.show_red_days !== undefined) {
+        showRedDays.value = response.data.show_red_days;
+      }
+      if (response.data.maxVisibleEvents !== undefined) {
+        maxVisibleEvents.value = response.data.maxVisibleEvents;
+      }
+      if (response.data.max_visible_events !== undefined) {
+        maxVisibleEvents.value = response.data.max_visible_events;
       }
       if (response.data.sideViewPosition !== undefined) {
         sideViewPosition.value = response.data.sideViewPosition;
@@ -492,6 +513,22 @@ export const useConfigStore = defineStore("config", () => {
     showWeekNumbers.value = show;
   };
 
+  const setWeekendDays = (days) => {
+    // Ensure days is an array of valid day numbers (0-6)
+    if (Array.isArray(days)) {
+      weekendDays.value = days.filter((d) => d >= 0 && d <= 6);
+    }
+  };
+
+  const setShowRedDays = (show) => {
+    showRedDays.value = show;
+  };
+
+  const setMaxVisibleEvents = (count) => {
+    // Clamp between 1 and 20 to prevent UI issues
+    maxVisibleEvents.value = Math.max(1, Math.min(20, count));
+  };
+
   const setSideViewPosition = (position) => {
     sideViewPosition.value = position;
   };
@@ -540,6 +577,9 @@ export const useConfigStore = defineStore("config", () => {
     timeFormat,
     weekStartDay,
     showWeekNumbers,
+    weekendDays,
+    showRedDays,
+    maxVisibleEvents,
     sideViewPosition,
     themeMode,
     darkModeStart,
@@ -589,6 +629,9 @@ export const useConfigStore = defineStore("config", () => {
     setTimeFormat,
     setWeekStartDay,
     setShowWeekNumbers,
+    setWeekendDays,
+    setShowRedDays,
+    setMaxVisibleEvents,
     setSideViewPosition,
     toggleSideViewPosition,
     setThemeMode,
