@@ -1,15 +1,18 @@
 import { ref, watch, onMounted, onUnmounted } from "vue";
 import { useConfigStore } from "../stores/config";
+import { useThemesStore } from "../stores/themes";
 
 /**
- * Composable for managing theme (dark mode).
- * Supports manual toggle, time-based, and system theme detection.
+ * Composable for managing theme (dark mode and custom themes).
+ * Supports manual toggle, time-based, system theme detection, and custom theme selection.
  */
 export function useTheme() {
   const configStore = useConfigStore();
+  const themesStore = useThemesStore();
 
   // Theme modes: 'light', 'dark', 'auto' (system), 'time' (time-based)
   const themeMode = ref("auto"); // 'light' | 'dark' | 'auto' | 'time'
+  const selectedThemeId = ref(null); // Selected custom theme ID (null = use themeMode)
   const isDark = ref(false);
   const darkModeStart = ref(18); // 6 PM (18:00) - when to switch to dark mode
   const darkModeEnd = ref(6); // 6 AM (06:00) - when to switch to light mode
@@ -30,7 +33,7 @@ export function useTheme() {
   };
 
   // Update theme based on current mode
-  const updateTheme = () => {
+  const updateTheme = async () => {
     if (typeof window === "undefined") return;
 
     let shouldBeDark = false;
@@ -48,11 +51,38 @@ export function useTheme() {
     }
 
     isDark.value = shouldBeDark;
-    applyTheme(shouldBeDark);
+    await applyTheme(shouldBeDark);
+  };
+
+  // Apply custom theme variables
+  const applyCustomTheme = async (themeId) => {
+    if (!themeId || typeof window === "undefined") return;
+
+    try {
+      const theme = await themesStore.getTheme(themeId);
+      if (!theme || !theme.variables) return;
+
+      const root = document.documentElement;
+      const variables = theme.variables;
+
+      // Apply light mode variables
+      for (const [key, value] of Object.entries(variables)) {
+        root.style.setProperty(`--${key}`, value);
+      }
+
+      // Apply dark mode variables if available
+      if (theme.dark_mode && isDark.value) {
+        for (const [key, value] of Object.entries(theme.dark_mode)) {
+          root.style.setProperty(`--${key}`, value);
+        }
+      }
+    } catch (err) {
+      console.error(`Failed to apply custom theme ${themeId}:`, err);
+    }
   };
 
   // Apply theme to document
-  const applyTheme = (dark) => {
+  const applyTheme = async (dark) => {
     const html = document.documentElement;
     if (dark) {
       html.classList.add("dark");
@@ -61,12 +91,23 @@ export function useTheme() {
       html.classList.add("light");
       html.classList.remove("dark");
     }
+
+    // Apply custom theme if one is selected, otherwise use default theme variables
+    if (selectedThemeId.value) {
+      await applyCustomTheme(selectedThemeId.value);
+    } else {
+      // Reset to default theme variables (from theme.css)
+      // This is handled by the CSS file, but we can explicitly reset if needed
+      const root = document.documentElement;
+      // Remove any custom theme variables that might have been set
+      // The default theme.css will take over
+    }
   };
 
   // Set theme mode
-  const setThemeMode = (mode) => {
+  const setThemeMode = async (mode) => {
     themeMode.value = mode;
-    updateTheme();
+    await updateTheme();
   };
 
   // Set dark mode time range
@@ -116,6 +157,14 @@ export function useTheme() {
     }
   };
 
+  // Set selected theme
+  const setSelectedTheme = async (themeId) => {
+    selectedThemeId.value = themeId;
+    themesStore.setSelectedTheme(themeId);
+    await updateTheme();
+    await saveTheme();
+  };
+
   // Load theme from config
   const loadTheme = async () => {
     await configStore.fetchConfig();
@@ -124,6 +173,10 @@ export function useTheme() {
     if (configStore.themeMode) {
       themeMode.value = configStore.themeMode;
     }
+    if (configStore.selectedTheme !== undefined) {
+      selectedThemeId.value = configStore.selectedTheme;
+      themesStore.setSelectedTheme(configStore.selectedTheme);
+    }
     if (configStore.darkModeStart !== undefined) {
       darkModeStart.value = configStore.darkModeStart;
     }
@@ -131,7 +184,7 @@ export function useTheme() {
       darkModeEnd.value = configStore.darkModeEnd;
     }
 
-    updateTheme();
+    await updateTheme();
     startTimeCheck();
   };
 
@@ -139,52 +192,69 @@ export function useTheme() {
   const saveTheme = async () => {
     await configStore.updateConfig({
       themeMode: themeMode.value,
+      selectedTheme: selectedThemeId.value,
       darkModeStart: darkModeStart.value,
       darkModeEnd: darkModeEnd.value,
     });
   };
 
   // Watch theme mode changes
-  watch(themeMode, (newMode) => {
-    updateTheme();
+  watch(themeMode, async (newMode) => {
+    await updateTheme();
     if (newMode === "time") {
       startTimeCheck();
     } else {
       stopTimeCheck();
     }
-    saveTheme();
+    await saveTheme();
+  });
+
+  // Watch selected theme changes
+  watch(selectedThemeId, async (newThemeId) => {
+    if (newThemeId) {
+      await applyCustomTheme(newThemeId);
+    }
+    await saveTheme();
   });
 
   // Watch dark mode time changes
-  watch([darkModeStart, darkModeEnd], () => {
+  watch([darkModeStart, darkModeEnd], async () => {
     if (themeMode.value === "time") {
-      updateTheme();
+      await updateTheme();
     }
-    saveTheme();
+    await saveTheme();
   });
 
   // Watch config store for theme changes (so changes from Settings page apply immediately)
-  watch(() => configStore.themeMode, (newMode) => {
+  watch(() => configStore.themeMode, async (newMode) => {
     if (newMode !== undefined && newMode !== themeMode.value) {
       themeMode.value = newMode;
-      updateTheme();
+      await updateTheme();
     }
   });
 
-  watch(() => configStore.darkModeStart, (newStart) => {
+  watch(() => configStore.selectedTheme, async (newTheme) => {
+    if (newTheme !== undefined && newTheme !== selectedThemeId.value) {
+      selectedThemeId.value = newTheme;
+      themesStore.setSelectedTheme(newTheme);
+      await applyCustomTheme(newTheme);
+    }
+  });
+
+  watch(() => configStore.darkModeStart, async (newStart) => {
     if (newStart !== undefined && newStart !== darkModeStart.value) {
       darkModeStart.value = newStart;
       if (themeMode.value === "time") {
-        updateTheme();
+        await updateTheme();
       }
     }
   });
 
-  watch(() => configStore.darkModeEnd, (newEnd) => {
+  watch(() => configStore.darkModeEnd, async (newEnd) => {
     if (newEnd !== undefined && newEnd !== darkModeEnd.value) {
       darkModeEnd.value = newEnd;
       if (themeMode.value === "time") {
-        updateTheme();
+        await updateTheme();
       }
     }
   });
@@ -195,8 +265,8 @@ export function useTheme() {
     updateTheme();
   }
 
-  onMounted(() => {
-    loadTheme();
+  onMounted(async () => {
+    await loadTheme();
     watchSystemTheme();
   });
 
@@ -209,10 +279,12 @@ export function useTheme() {
 
   return {
     themeMode,
+    selectedThemeId,
     isDark,
     darkModeStart,
     darkModeEnd,
     setThemeMode,
+    setSelectedTheme,
     setDarkModeTime,
     updateTheme,
     loadTheme,

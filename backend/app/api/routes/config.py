@@ -115,6 +115,7 @@ class ConfigUpdate(BaseModel):
         None  # Side view position: 'left' | 'right' for landscape, 'top' | 'bottom' for portrait
     )
     themeMode: str | None = None  # Theme mode: 'light' | 'dark' | 'auto' | 'time'
+    selectedTheme: str | None = None  # Selected custom theme ID (null = use themeMode)
     darkModeStart: int | None = None  # Dark mode start hour (0-23)
     darkModeEnd: int | None = None  # Dark mode end hour (0-23)
     displayScheduleEnabled: bool | None = None  # Enable display power schedule
@@ -234,6 +235,14 @@ async def get_config():
         pass
     else:
         config["themeMode"] = "auto"  # Auto theme by default
+    # Handle selectedTheme - prioritize saved value from database
+    if "selected_theme" in config:
+        config["selectedTheme"] = config["selected_theme"]
+    elif "selectedTheme" in config:
+        # Already in camelCase, keep it
+        pass
+    else:
+        config["selectedTheme"] = None  # No custom theme selected by default
     # Handle darkModeStart - prioritize saved value from database
     if "dark_mode_start" in config:
         config["darkModeStart"] = config["dark_mode_start"]
@@ -457,6 +466,8 @@ async def update_config(config_update: ConfigUpdate):
         update_dict["side_view_position"] = update_dict.pop("sideViewPosition")
     if "themeMode" in update_dict:
         update_dict["theme_mode"] = update_dict.pop("themeMode")
+    if "selectedTheme" in update_dict:
+        update_dict["selected_theme"] = update_dict.pop("selectedTheme")
     if "darkModeStart" in update_dict:
         update_dict["dark_mode_start"] = update_dict.pop("darkModeStart")
     if "darkModeEnd" in update_dict:

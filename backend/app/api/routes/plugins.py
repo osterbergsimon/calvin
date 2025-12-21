@@ -4,7 +4,7 @@ import zipfile
 from pathlib import Path
 from typing import Any
 
-from fastapi import APIRouter, Body, File, HTTPException, UploadFile
+from fastapi import APIRouter, Body, File, HTTPException, UploadFile, Query
 from sqlalchemy import select
 
 from app.database import AsyncSessionLocal
@@ -12,8 +12,118 @@ from app.models.db_models import PluginDB, PluginTypeDB
 from app.plugins.base import PluginType
 from app.plugins.loader import plugin_loader
 from app.services.plugin_installer import plugin_installer
+from app.services.theme_installer import theme_installer
 
 router = APIRouter()
+
+
+# Theme helper functions (moved from themes.py)
+def _load_builtin_themes() -> dict[str, Any]:
+    """Load built-in themes from JSON file."""
+    import json
+    from pathlib import Path
+    
+    # Path: backend/app/api/routes/plugins.py -> backend/data/themes/builtin.json
+    backend_dir = Path(__file__).parent.parent.parent.parent
+    themes_file = backend_dir / "data" / "themes" / "builtin.json"
+    
+    if not themes_file.exists():
+        import logging
+        logger = logging.getLogger(__name__)
+        logger.warning(f"Built-in themes file not found at {themes_file}, using empty themes")
+        return {}
+    
+    try:
+        with open(themes_file, encoding="utf-8") as f:
+            themes = json.load(f)
+            # Ensure is_builtin is True for all loaded themes
+            for theme_id, theme_data in themes.items():
+                theme_data["is_builtin"] = True
+            return themes
+    except (json.JSONDecodeError, Exception) as e:
+        import logging
+        logger = logging.getLogger(__name__)
+        logger.error(f"Failed to load built-in themes from {themes_file}: {e}")
+        return {}
+
+
+# Built-in themes (loaded from JSON file)
+BUILTIN_THEMES = _load_builtin_themes()
+
+
+async def _register_theme_in_db(manifest: dict[str, Any]) -> None:
+    """
+    Register a theme in PluginTypeDB (like other plugins).
+
+    Args:
+        manifest: Theme manifest dictionary
+    """
+    theme_id = manifest.get("id")
+    if not theme_id:
+        return
+
+    async with AsyncSessionLocal() as session:
+        result = await session.execute(
+            select(PluginTypeDB).where(PluginTypeDB.type_id == theme_id)
+        )
+        db_type = result.scalar_one_or_none()
+
+        if not db_type:
+            # Create new theme entry in database
+            db_type = PluginTypeDB(
+                type_id=theme_id,
+                plugin_type=PluginType.THEME.value,
+                name=manifest.get("name", theme_id),
+                description=manifest.get("description"),
+                version=manifest.get("version", "1.0.0"),
+                common_config_schema={},  # Themes don't have config schemas
+                enabled=True,  # Themes are enabled by default
+                error_message=None,
+            )
+            session.add(db_type)
+        else:
+            # Update existing theme entry
+            db_type.name = manifest.get("name", theme_id)
+            db_type.description = manifest.get("description")
+            db_type.version = manifest.get("version", "1.0.0")
+            db_type.plugin_type = PluginType.THEME.value
+            db_type.error_message = None
+
+        await session.commit()
+
+
+async def _unregister_theme_from_db(theme_id: str) -> None:
+    """
+    Remove a theme from PluginTypeDB.
+
+    Args:
+        theme_id: Theme identifier
+    """
+    async with AsyncSessionLocal() as session:
+        result = await session.execute(
+            select(PluginTypeDB).where(PluginTypeDB.type_id == theme_id)
+        )
+        db_type = result.scalar_one_or_none()
+
+        if db_type and db_type.plugin_type == PluginType.THEME.value:
+            await session.delete(db_type)
+            await session.commit()
+
+
+async def sync_themes_to_db() -> None:
+    """
+    Sync all themes (built-in + installed) to PluginTypeDB.
+    Should be called on startup to ensure themes are registered.
+    """
+    # Register built-in themes
+    for theme_id, theme_data in BUILTIN_THEMES.items():
+        await _register_theme_in_db(theme_data)
+
+    # Register installed themes
+    installed_themes = theme_installer.get_installed_themes()
+    for theme in installed_themes:
+        await _register_theme_in_db(theme)
+
 
 # Sensitive fields that should be masked in logs and never sent to frontend
 SENSITIVE_FIELDS = {
@@ -70,25 +180,36 @@ def mask_sensitive_config(
 
 
 @router.get("/plugins")
-async def get_plugins(plugin_type: str | None = None):
+async def get_plugins(plugin_type: str | None = Query(None, description="Optional plugin type filter")):
     """
     Get all plugin types, optionally filtered by type.
 
     Args:
-        plugin_type: Optional plugin type filter ('calendar', 'image', 'service')
+        plugin_type: Optional plugin type filter ('calendar', 'image', 'service', 'theme')
 
     Returns:
         List of plugin types with their common configuration
     """
+    # Normalize plugin_type: treat empty string as None
+    if plugin_type == "":
+        plugin_type = None
+    
     # Parse plugin type if provided
     pt = None
+    include_themes = False
+    only_themes = False
     if plugin_type:
+        plugin_type_lower = plugin_type.lower()
         try:
-            pt = PluginType(plugin_type.lower())
+            pt = PluginType(plugin_type_lower)
+            if pt == PluginType.THEME:
+                only_themes = True
+                include_themes = True
         except ValueError:
+            valid_types = "calendar, image, service, theme"
             raise HTTPException(
                 status_code=400,
-                detail=f"Invalid plugin type: {plugin_type}. Valid types: calendar, image, service",
+                detail=f"Invalid plugin type: {plugin_type}. Valid types: {valid_types}",
             )
 
     # Get plugin types from pluggy hooks
@@ -108,37 +229,90 @@ async def get_plugins(plugin_type: str | None = None):
 
     # Convert to response format
     result = []
-    for type_info in plugin_types:
-        type_id = type_info.get("type_id")
-        plugin_type = type_info.get("plugin_type")
+    # Only add regular plugins if not filtering for themes only
+    if not only_themes:
+        for type_info in plugin_types:
+            type_id = type_info.get("type_id")
+            plugin_type_enum = type_info.get("plugin_type")
 
-        # Get plugin type info from database (including error messages)
-        db_type = db_types.get(type_id)
-        enabled = db_type.enabled if db_type else True  # Default to enabled
-        error_message = db_type.error_message if db_type else None
+            # Get plugin type info from database (including error messages)
+            db_type = db_types.get(type_id)
+            enabled = db_type.enabled if db_type else True  # Default to enabled
+            error_message = db_type.error_message if db_type else None
 
-        plugin_info: dict[str, Any] = {
-            "id": type_id,
-            "name": type_info.get("name", ""),
-            "type": plugin_type.value if hasattr(plugin_type, "value") else str(plugin_type),
-            "description": type_info.get("description", ""),
-            "config_schema": type_info.get("common_config_schema", {}),
-            "instance_config_schema": type_info.get("instance_config_schema", {}),
-            "enabled": enabled,
-            "ui_actions": type_info.get("ui_actions", []),  # Plugin-specific actions (buttons)
-            # Plugin-specific sections (upload, manage, etc.)
-            "ui_sections": type_info.get("ui_sections", []),
-            # Whether plugin supports multiple instances
-            # (defaults to True for backward compatibility)
-            "supports_multiple_instances": type_info.get("supports_multiple_instances", True),
-        }
+            plugin_info: dict[str, Any] = {
+                "id": type_id,
+                "name": type_info.get("name", ""),
+                "type": plugin_type_enum.value if hasattr(plugin_type_enum, "value") else str(plugin_type_enum),
+                "description": type_info.get("description", ""),
+                "config_schema": type_info.get("common_config_schema", {}),
+                "instance_config_schema": type_info.get("instance_config_schema", {}),
+                "enabled": enabled,
+                "ui_actions": type_info.get("ui_actions", []),  # Plugin-specific actions (buttons)
+                # Plugin-specific sections (upload, manage, etc.)
+                "ui_sections": type_info.get("ui_sections", []),
+                # Whether plugin supports multiple instances
+                # (defaults to True for backward compatibility)
+                "supports_multiple_instances": type_info.get("supports_multiple_instances", True),
+            }
 
-        # Include error message if plugin is broken
-        if error_message:
-            plugin_info["error_message"] = error_message
+            # Include error message if plugin is broken
+            if error_message:
+                plugin_info["error_message"] = error_message
 
-        result.append(plugin_info)
+            result.append(plugin_info)
 
+    # Add themes from database - they're just another plugin type, stored in PluginTypeDB
+    # Include themes when:
+    # 1. Explicitly requested (plugin_type == "theme")
+    # 2. No filter specified (plugin_type is None) - show all types including themes
+    if include_themes or plugin_type is None:
+        try:
+            import logging
+            logger = logging.getLogger(__name__)
+            
+            # Get themes from database (same as other plugins)
+            theme_db_types = {tid: db_type for tid, db_type in db_types.items() if db_type.plugin_type == PluginType.THEME.value}
+            
+            for theme_id, db_type in theme_db_types.items():
+                # Get theme manifest for additional metadata (is_builtin, variables, etc.)
+                # This is still needed for theme-specific features,
+                # but DB is source of truth for listing
+                theme_manifest = None
+                try:
+                    if db_type.type_id in BUILTIN_THEMES:
+                        # Built-in theme - get from BUILTIN_THEMES
+                        theme_manifest = BUILTIN_THEMES.get(db_type.type_id)
+                    else:
+                        # Installed theme - get from disk (for now, could cache in DB later)
+                        theme_manifest = theme_installer.get_theme_manifest(db_type.type_id)
+                except Exception as e:
+                    logger.warning(f"[get_plugins] Error loading theme manifest for {theme_id}: {e}")
+                    # Use DB data if manifest unavailable
+                
+                # Determine if built-in
+                is_builtin = theme_manifest.get("is_builtin", False) if theme_manifest else False
+                
+                theme_entry = {
+                    "id": db_type.type_id,
+                    "name": db_type.name,
+                    "type": PluginType.THEME.value,
+                    "description": db_type.description or "",
+                    "config_schema": {},
+                    "instance_config_schema": {},
+                    "enabled": db_type.enabled,
+                    "ui_actions": [],
+                    "ui_sections": [],
+                    "supports_multiple_instances": False,
+                    "is_builtin": is_builtin,
+                    "version": db_type.version or "1.0.0",
+                }
+                result.append(theme_entry)
+        except Exception as e:
+            import logging
+            logger = logging.getLogger(__name__)
+            logger.error(f"[get_plugins] Error including themes: {e}", exc_info=True)
+    
     return {"plugins": result, "total": len(result)}
 
 
@@ -268,59 +442,29 @@ async def stop_plugin_instance(instance_id: str):
 
 
 # Specific routes must come before parameterized routes to avoid path conflicts
-@router.get("/plugins/types/calendar")
-async def get_calendar_plugin_types():
-    """
-    Get available calendar plugin types (only enabled ones).
-
-    Returns:
-        List of available calendar plugin types
-    """
-    # Get plugin types from pluggy hooks
-    plugin_types = plugin_loader.get_plugin_types()
-    calendar_types = [t for t in plugin_types if t.get("plugin_type") == PluginType.CALENDAR]
-
-    # Filter to only enabled plugin types from database
-    enabled_types = []
-    async with AsyncSessionLocal() as session:
-        for type_info in calendar_types:
-            type_id = type_info.get("type_id")
-            result = await session.execute(
-                select(PluginTypeDB).where(PluginTypeDB.type_id == type_id)
-            )
-            db_type = result.scalar_one_or_none()
-            enabled = db_type.enabled if db_type else True  # Default to enabled
-            if enabled:
-                enabled_types.append(type_info)
-
-    return {
-        "types": [
-            {
-                "id": t.get("type_id"),
-                "name": t.get("name", ""),
-                "description": t.get("description", ""),
-                "supports_ical_url": True,
-                "supports_api_key": False,
-            }
-            for t in enabled_types
-        ]
-    }
-
-
 @router.get("/plugins/installed")
 async def get_installed_plugins():
     """
-    Get list of installed plugins.
+    Get list of installed plugins and themes.
 
     Returns:
-        List of installed plugin manifests
+        List of installed plugin and theme manifests
     """
     try:
         plugins = plugin_installer.get_installed_plugins()
         # Remove internal path from response
         for plugin in plugins:
             plugin.pop("_installed_path", None)
-        return {"plugins": plugins}
+        
+        # Also include installed themes
+        themes = theme_installer.get_installed_themes()
+        # Remove internal path from response
+        for theme in themes:
+            theme.pop("_installed_path", None)
+            # Add type field to distinguish from plugins
+            theme["type"] = PluginType.THEME.value
+        
+        return {"plugins": plugins + themes}
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"Failed to get installed plugins: {str(e)}")
 
@@ -461,8 +605,23 @@ async def enumerate_plugins_from_github(
         else:
             repo_root = extracted_path
 
-        # Enumerate plugins
-        result = plugin_installer.enumerate_plugins_from_repo(repo_root)
+        # Enumerate plugins and themes
+        plugins_result = {"has_manifest": False, "plugins": []}
+        try:
+            plugins_result = plugin_installer.enumerate_plugins_from_repo(repo_root)
+        except Exception as e:
+            import logging
+            logger = logging.getLogger(__name__)
+            logger.warning(f"Failed to enumerate plugins from repo: {e}")
+        
+        # Enumerate themes (don't fail if this errors - just return empty themes)
+        themes_result = {"has_manifest": False, "themes": []}
+        try:
+            themes_result = theme_installer.enumerate_themes_from_repo(repo_root)
+        except Exception as e:
+            import logging
+            logger = logging.getLogger(__name__)
+            logger.warning(f"Failed to enumerate themes from repo: {e}")
 
         actual_branch = "master" if branch_switched else branch
         return {
@@ -470,12 +629,16 @@ async def enumerate_plugins_from_github(
             "repo_url": repo_url,
             "branch": actual_branch,
             "branch_switched": branch_switched,
-            "has_manifest": result["has_manifest"],
-            "plugins": result["plugins"],
+            "has_manifest": plugins_result.get("has_manifest", False) or themes_result.get("has_manifest", False),
+            "plugins": plugins_result.get("plugins", []),
+            "themes": themes_result.get("themes", []),
         }
     except HTTPException:
         raise
     except Exception as e:
+        import logging
+        logger = logging.getLogger(__name__)
+        logger.error(f"Failed to enumerate plugins from GitHub: {e}", exc_info=True)
         raise HTTPException(status_code=500, detail=f"Failed to enumerate plugins: {str(e)}")
     finally:
         # Clean up temp files
@@ -579,26 +742,50 @@ async def install_plugin_from_github(request: dict[str, Any] = Body(...)):
         else:
             repo_root = extracted_path
 
-        # Install specific plugin
+        # Detect if it's a theme or plugin by checking for theme.json or plugin.json
+        theme_path = repo_root / plugin_path / "theme.json"
+        plugin_path_check = repo_root / plugin_path / "plugin.json"
+        
         try:
-            manifest = plugin_installer.install_plugin_from_repo(repo_root, plugin_path, plugin_id)
+            if theme_path.exists():
+                # Install theme
+                manifest = theme_installer.install_theme_from_repo(repo_root, plugin_path, plugin_id)
+                # Register theme in database
+                await _register_theme_in_db(manifest)
+                actual_branch = "master" if branch_switched else branch
+                return {
+                    "success": True,
+                    "message": f"Theme {manifest['id']} installed successfully from {repo_url}",
+                    "manifest": manifest,
+                    "branch": actual_branch,
+                    "branch_switched": branch_switched,
+                    "requires_restart": False,  # Themes don't require restart
+                }
+            elif plugin_path_check.exists():
+                # Install plugin
+                manifest = plugin_installer.install_plugin_from_repo(repo_root, plugin_path, plugin_id)
 
-            # Reload plugins to include the newly installed one
-            plugin_loader.load_installed_plugins()
+                # Reload plugins to include the newly installed one
+                plugin_loader.load_installed_plugins()
 
-            actual_branch = "master" if branch_switched else branch
-            return {
-                "success": True,
-                "message": f"Plugin {manifest['id']} installed successfully from {repo_url}",
-                "manifest": manifest,
-                "branch": actual_branch,
-                "branch_switched": branch_switched,
-                "requires_restart": True,
-            }
+                actual_branch = "master" if branch_switched else branch
+                return {
+                    "success": True,
+                    "message": f"Plugin {manifest['id']} installed successfully from {repo_url}",
+                    "manifest": manifest,
+                    "branch": actual_branch,
+                    "branch_switched": branch_switched,
+                    "requires_restart": True,
+                }
+            else:
+                raise HTTPException(
+                    status_code=400,
+                    detail=f"Neither plugin.json nor theme.json found in {plugin_path}",
+                )
         except ValueError as e:
             raise HTTPException(status_code=400, detail=str(e))
         except Exception as e:
-            raise HTTPException(status_code=500, detail=f"Failed to install plugin: {str(e)}")
+            raise HTTPException(status_code=500, detail=f"Failed to install: {str(e)}")
     except HTTPException:
         raise
     except Exception as e:
@@ -621,8 +808,41 @@ async def install_plugin_from_github(request: dict[str, Any] = Body(...)):
 
 @router.get("/plugins/{plugin_id}")
 async def get_plugin(plugin_id: str):
-    """Get a specific plugin type by ID."""
-    # Get plugin types from pluggy hooks
+    """Get a specific plugin type or theme by ID."""
+    # Check if it's a theme first (check built-in, then database, then installed)
+    theme_manifest = None
+    
+    # Check built-in themes first
+    if plugin_id in BUILTIN_THEMES:
+        theme_manifest = BUILTIN_THEMES.get(plugin_id)
+    else:
+        # Check database
+        async with AsyncSessionLocal() as session:
+            result = await session.execute(
+                select(PluginTypeDB).where(PluginTypeDB.type_id == plugin_id)
+            )
+            db_type = result.scalar_one_or_none()
+            
+            if db_type and db_type.plugin_type == PluginType.THEME.value:
+                # It's a theme in database - try to get manifest
+                try:
+                    theme_manifest = theme_installer.get_theme_manifest(plugin_id)
+                except Exception:
+                    pass
+    
+    # If still not found, try installed themes (might not be in DB yet)
+    if not theme_manifest:
+        try:
+            theme_manifest = theme_installer.get_theme_manifest(plugin_id)
+        except Exception:
+            pass
+    
+    if theme_manifest:
+        # Remove internal path if present
+        theme_manifest.pop("_installed_path", None)
+        return theme_manifest
+    
+    # Not a theme - get plugin type from pluggy hooks
     plugin_types = plugin_loader.get_plugin_types()
     type_info = next((t for t in plugin_types if t.get("type_id") == plugin_id), None)
 
@@ -635,8 +855,9 @@ async def get_plugin(plugin_id: str):
             select(PluginTypeDB).where(PluginTypeDB.type_id == plugin_id)
         )
         db_type = result.scalar_one_or_none()
-        enabled = db_type.enabled if db_type else True
-        error_message = db_type.error_message if db_type else None
+    
+    enabled = db_type.enabled if db_type else True
+    error_message = db_type.error_message if db_type else None
 
     plugin_info: dict[str, Any] = {
         "id": type_info.get("type_id"),
@@ -728,13 +949,31 @@ async def update_plugin(plugin_id: str, config: dict[str, Any]):
     Update plugin type common configuration and enabled status.
 
     Args:
-        plugin_id: Plugin type ID (e.g., 'google', 'ical', 'local')
+        plugin_id: Plugin type ID (e.g., 'google', 'ical', 'local', 'light', 'midnight')
         config: Configuration dictionary with common settings and/or enabled status
     """
     print(f"[Plugin Update] Received update for plugin {plugin_id}")
     print(f"[Plugin Update] Config keys: {list(config.keys())}")
 
-    # Get plugin types from pluggy hooks
+    # Check if it's a theme first
+    async with AsyncSessionLocal() as session:
+        result = await session.execute(
+            select(PluginTypeDB).where(PluginTypeDB.type_id == plugin_id)
+        )
+        db_type = result.scalar_one_or_none()
+        
+        if db_type and db_type.plugin_type == PluginType.THEME.value:
+            # It's a theme - handle enabled status only (themes don't have config)
+            if "enabled" in config:
+                enabled = config["enabled"]
+                db_type.enabled = enabled
+                await session.commit()
+                return {"success": True, "enabled": enabled}
+            else:
+                # No enabled status to update
+                return {"success": True}
+    
+    # Not a theme - get plugin type from pluggy hooks
     plugin_types = plugin_loader.get_plugin_types()
     type_info = next((t for t in plugin_types if t.get("type_id") == plugin_id), None)
 
@@ -1328,29 +1567,48 @@ async def test_plugin(plugin_id: str, test_config: dict[str, Any] | None = Body(
 @router.delete("/plugins/installed/{plugin_id}")
 async def uninstall_plugin(plugin_id: str):
     """
-    Uninstall a plugin.
+    Uninstall a plugin or theme.
 
     Args:
-        plugin_id: Plugin identifier
+        plugin_id: Plugin/theme identifier
 
     Returns:
         Success message
     """
     try:
-        plugin_installer.uninstall_plugin(plugin_id)
+        # Check if it's a theme by checking database
+        async with AsyncSessionLocal() as session:
+            result = await session.execute(
+                select(PluginTypeDB).where(PluginTypeDB.type_id == plugin_id)
+            )
+            db_type = result.scalar_one_or_none()
+            
+            if db_type and db_type.plugin_type == PluginType.THEME.value:
+                # Uninstall theme
+                theme_installer.uninstall_theme(plugin_id)
+                # Remove theme from database
+                await _unregister_theme_from_db(plugin_id)
+                return {
+                    "success": True,
+                    "message": f"Theme {plugin_id} uninstalled successfully",
+                }
+            else:
+                # Uninstall regular plugin
+                plugin_installer.uninstall_plugin(plugin_id)
 
-        # Reload plugins to remove the uninstalled one
-        # Note: We can't easily unload a module from Python, but it won't be loaded on next restart
-        plugin_loader._loaded_modules = {
-            m
-            for m in plugin_loader._loaded_modules
-            if not m.startswith(f"installed_plugin_{plugin_id}")
-        }
+                # Reload plugins to remove the uninstalled one
+                # Note: We can't easily unload a module from Python,
+                # but it won't be loaded on next restart
+                plugin_loader._loaded_modules = {
+                    m
+                    for m in plugin_loader._loaded_modules
+                    if not m.startswith(f"installed_plugin_{plugin_id}")
+                }
 
-        return {
-            "success": True,
-            "message": f"Plugin {plugin_id} uninstalled successfully",
-        }
+                return {
+                    "success": True,
+                    "message": f"Plugin {plugin_id} uninstalled successfully",
+                }
     except ValueError as e:
         raise HTTPException(status_code=404, detail=str(e))
     except Exception as e:

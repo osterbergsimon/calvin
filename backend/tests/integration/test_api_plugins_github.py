@@ -120,26 +120,45 @@ class TestGitHubPluginEnumeration:
         with open(mock_github_zip, "rb") as f:
             zip_content = f.read()
 
-        # Create async mock responses
+        # Create mock response objects
+        mock_response_404 = MagicMock()
+        mock_response_404.status_code = 404
+        # Don't raise on 404 - let the code handle it
+        def no_raise_404():
+            pass
+        mock_response_404.raise_for_status = no_raise_404
+        
+        mock_response_200 = MagicMock()
+        mock_response_200.status_code = 200
+        mock_response_200.content = zip_content
+        # Don't raise on 200
+        def no_raise_200():
+            pass
+        mock_response_200.raise_for_status = no_raise_200
+
+        # Create async functions that return the mock responses
         async def mock_get_async_404(*args, **kwargs):
-            mock_response = MagicMock()
-            mock_response.status_code = 404
-            mock_response.raise_for_status = MagicMock()
-            return mock_response
+            return mock_response_404
 
         async def mock_get_async_200(*args, **kwargs):
-            mock_response = MagicMock()
-            mock_response.status_code = 200
-            mock_response.content = zip_content
-            mock_response.raise_for_status = MagicMock()
-            return mock_response
+            return mock_response_200
 
         # Setup async context manager mock
         mock_client = AsyncMock()
         mock_client.__aenter__ = AsyncMock(return_value=mock_client)
         mock_client.__aexit__ = AsyncMock(return_value=None)
         # First call returns 404, second returns 200
-        mock_client.get = AsyncMock(side_effect=[mock_get_async_404, mock_get_async_200])
+        # Use side_effect with the async functions - AsyncMock will properly await them
+        # Create a call counter to track which response to return
+        call_count = [0]  # Use list to allow modification in nested function
+        async def mock_get_with_side_effect(*args, **kwargs):
+            call_count[0] += 1
+            if call_count[0] == 1:
+                return await mock_get_async_404(*args, **kwargs)
+            else:
+                return await mock_get_async_200(*args, **kwargs)
+        
+        mock_client.get = mock_get_with_side_effect
         mock_client_class.return_value = mock_client
 
         response = test_client.get(

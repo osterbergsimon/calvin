@@ -27,6 +27,7 @@ export const useConfigStore = defineStore("config", () => {
   const showRedDays = ref(false); // Show red days (holidays) if enabled (default false)
   const maxVisibleEvents = ref(4); // Maximum visible events per day before showing overflow (default 4)
   const themeMode = ref("auto"); // Theme mode: 'light' | 'dark' | 'auto' | 'time'
+  const selectedTheme = ref(null); // Selected custom theme ID (null = use themeMode)
   const darkModeStart = ref(18); // Dark mode start hour (0-23, default 18 = 6 PM)
   const darkModeEnd = ref(6); // Dark mode end hour (0-23, default 6 = 6 AM)
   const displayScheduleEnabled = ref(false); // Enable display power schedule
@@ -219,6 +220,12 @@ export const useConfigStore = defineStore("config", () => {
       }
       if (response.data.theme_mode !== undefined) {
         themeMode.value = response.data.theme_mode;
+      }
+      if (response.data.selectedTheme !== undefined) {
+        selectedTheme.value = response.data.selectedTheme;
+      }
+      if (response.data.selected_theme !== undefined) {
+        selectedTheme.value = response.data.selected_theme;
       }
       if (response.data.darkModeStart !== undefined) {
         darkModeStart.value = response.data.darkModeStart;
@@ -582,6 +589,7 @@ export const useConfigStore = defineStore("config", () => {
     maxVisibleEvents,
     sideViewPosition,
     themeMode,
+    selectedTheme,
     darkModeStart,
     darkModeEnd,
     displayScheduleEnabled,

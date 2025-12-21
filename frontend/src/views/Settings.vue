@@ -151,6 +151,78 @@
                 </span>
               </div>
               <div class="setting-item">
+                <div
+                  class="collapsible-setting"
+                  :class="{ expanded: expandedSections.themeSelection }"
+                >
+                  <div
+                    class="setting-header"
+                    @click="toggleSection('themeSelection')"
+                    style="cursor: pointer; display: flex; justify-content: space-between; align-items: center;"
+                  >
+                    <label>Theme</label>
+                    <span class="toggle-icon">{{
+                      expandedSections.themeSelection ? "▼" : "▶"
+                    }}</span>
+                  </div>
+                  <div
+                    v-show="expandedSections.themeSelection"
+                    class="setting-content"
+                    style="margin-top: 0.5rem;"
+                  >
+                    <div v-if="loadingThemes" class="loading-state">
+                      <p>Loading themes...</p>
+                    </div>
+                    <div v-else class="theme-selection-grid">
+                      <div
+                        v-for="theme in themesList"
+                        :key="theme.id"
+                        class="theme-selection-item"
+                        :class="{
+                          active: localConfig.selectedTheme === theme.id,
+                          builtin: theme.is_builtin,
+                        }"
+                        @click="selectTheme(theme.id)"
+                      >
+                        <div class="theme-selection-preview">
+                          <div
+                            v-if="theme.preview_image"
+                            class="theme-preview-image"
+                            :style="{
+                              backgroundImage: theme.preview ? `url(/api/plugins/${theme.id}/preview)` : undefined,
+                            }"
+                          ></div>
+                          <div
+                            v-else
+                            class="theme-preview-placeholder"
+                            :style="getThemePreviewStyle(theme)"
+                          >
+                            {{ theme.name.charAt(0) }}
+                          </div>
+                          <span
+                            v-if="localConfig.selectedTheme === theme.id"
+                            class="theme-selected-badge"
+                          >
+                            ✓
+                          </span>
+                        </div>
+                        <div class="theme-selection-info">
+                          <strong>{{ theme.name }}</strong>
+                          <span
+                            v-if="theme.is_builtin"
+                            class="theme-badge-small"
+                            >Built-in</span
+                          >
+                        </div>
+                      </div>
+                    </div>
+                    <span class="help-text" style="display: block; margin-top: 0.5rem;"
+                      >Select a theme to customize the appearance</span
+                    >
+                  </div>
+                </div>
+              </div>
+              <div class="setting-item">
                 <label>Theme Mode</label>
                 <select
                   v-model="localConfig.themeMode"
@@ -162,7 +234,10 @@
                   <option value="auto">Auto (System)</option>
                   <option value="time">Time-based</option>
                 </select>
-                <span class="help-text">Theme selection mode</span>
+                <span class="help-text"
+                  >Controls when dark mode is applied (if theme supports
+                  it)</span
+                >
               </div>
               <div v-if="localConfig.themeMode === 'time'" class="setting-item">
                 <label>Dark Mode Time Range</label>
@@ -967,7 +1042,7 @@
                 >
                   <p class="help-text-compact">
                     Enter a GitHub repository URL and click "List Plugins" to
-                    see available plugins.
+                    see available plugins and themes.
                   </p>
                   <div class="install-compact-row">
                     <input
@@ -1104,6 +1179,41 @@
 
                 <!-- Plugin Cards for Active Tab -->
                 <div class="plugins-list">
+                  <!-- Info message for Themes tab (only show if no installed themes) -->
+                  <div
+                    v-if="activePluginTab === 'theme' && !hasInstalledThemes"
+                    class="setting-item"
+                    style="margin-bottom: 1rem"
+                  >
+                    <div class="help-text" style="background: var(--bg-secondary); padding: 1rem; border-radius: 6px;">
+                      <p style="margin: 0 0 0.5rem 0;">
+                        <strong>💡 Installing Themes:</strong> Themes are installed the same way as plugins!
+                      </p>
+                      <ol style="margin: 0.5rem 0 0 1.5rem; text-align: left;">
+                        <li>Use the installation section above (Zip File or GitHub tab)</li>
+                        <li>Enter a GitHub repository URL and click "List Plugins"</li>
+                        <li>Themes will appear in the list alongside plugins</li>
+                        <li>Click "Install" next to any theme you want</li>
+                      </ol>
+                      <p style="margin: 0.5rem 0 0 0;">
+                        Built-in themes (Light, Dark, Ocean, Forest, Sunset) are always available and can be selected in <strong>UI Settings → Select Theme</strong>.
+                      </p>
+                    </div>
+                  </div>
+
+                  <!-- Empty state for Themes tab (only if truly empty) -->
+                  <div
+                    v-if="
+                      activePluginTab === 'theme' &&
+                      (!activePluginCategory?.plugins ||
+                        activePluginCategory.plugins.length === 0)
+                    "
+                    class="empty-state"
+                  >
+                    <p>No themes found. Install themes using the instructions above.</p>
+                  </div>
+
+                  <!-- Plugin/Theme Cards -->
                   <div
                     v-for="plugin in activePluginCategory?.plugins || []"
                     :key="plugin.id"
@@ -1174,12 +1284,12 @@
                           >
                             ⚙️
                           </button>
-                          <!-- Uninstall button (only for installed plugins) -->
+                          <!-- Uninstall button (only for installed plugins/themes) -->
                           <button
                             v-if="plugin._installed"
                             class="btn-remove btn-icon-only"
-                            title="Uninstall this plugin"
-                            @click="uninstallPlugin(plugin.id)"
+                            :title="plugin.type === 'theme' ? 'Uninstall this theme' : 'Uninstall this plugin'"
+                            @click="uninstallPlugin(plugin.id, plugin.type)"
                           >
                             🗑️
                           </button>
@@ -1284,11 +1394,12 @@
                         @delete-image="deleteImage"
                       />
 
-                      <!-- Plugin Instances (not shown for calendar plugins or single-instance plugins) -->
+                      <!-- Plugin Instances (not shown for calendar plugins, themes, or single-instance plugins) -->
                       <div
                         v-if="
                           plugin.enabled &&
                           plugin.type !== 'calendar' &&
+                          plugin.type !== 'theme' &&
                           plugin.supports_multiple_instances !== false
                         "
                         class="plugin-instances-section"
@@ -1420,6 +1531,7 @@
                         </div>
                       </div>
                     </div>
+                    <!-- End plugin-config -->
                     <div
                       v-else-if="!plugin.enabled"
                       class="plugin-disabled-message"
@@ -1431,8 +1543,11 @@
                       </p>
                     </div>
                   </div>
+                  <!-- End plugin-item -->
                 </div>
+                <!-- End plugins-list -->
               </div>
+              <!-- End plugins-container -->
             </div>
           </section>
         </template>
@@ -2042,6 +2157,8 @@ import { useKeyboardStore } from "../stores/keyboard";
 import { useCalendarStore } from "../stores/calendar";
 import { useModeStore } from "../stores/mode";
 import { useImagesStore } from "../stores/images";
+import { useThemesStore } from "../stores/themes";
+import { useTheme } from "../composables/useTheme";
 import axios from "axios";
 import PluginFieldRenderer from "../components/PluginFieldRenderer.vue";
 import PluginActions from "../components/PluginActions.vue";
@@ -2054,6 +2171,8 @@ const keyboardStore = useKeyboardStore();
 const calendarStore = useCalendarStore();
 const modeStore = useModeStore();
 const imagesStore = useImagesStore();
+const themesStore = useThemesStore();
+const theme = useTheme();
 
 const localConfig = ref({
   orientation: "landscape",
@@ -2070,6 +2189,7 @@ const localConfig = ref({
   calendarViewMode: "month",
   timeFormat: "24h",
   themeMode: "auto",
+  selectedTheme: null,
   darkModeStart: 18,
   darkModeEnd: 6,
   displayScheduleEnabled: false,
@@ -2151,6 +2271,7 @@ const expandedSections = ref({
   debugLogging: false,
   systemInfo: true,
   update: false,
+  themeSelection: false, // Collapsed by default to save space
 });
 
 const toggleSection = (section) => {
@@ -2184,6 +2305,21 @@ const pluginBranchSwitched = ref(false);
 const pluginActualBranch = ref("");
 const showVersionConflictDialog = ref(false);
 const versionConflictInfo = ref(null);
+
+// Theme management
+const themesList = ref([]);
+const loadingThemes = ref(false);
+const themeInstallMethod = ref("zip");
+const installingTheme = ref(false);
+const enumeratingThemes = ref(false);
+const selectedThemeZip = ref(null);
+const themeGithubRepoUrl = ref("");
+const themeGithubBranch = ref("");
+const availableThemes = ref([]);
+const themeInstallError = ref("");
+const themeInstallSuccess = ref("");
+const themeBranchSwitched = ref(false);
+const themeActualBranch = ref("");
 
 // Instance modal state
 const showInstanceModal = ref(false);
@@ -2760,11 +2896,12 @@ const getAggregatedRunningTooltip = (instances) => {
 
 // Sort and group plugins by type
 const sortedPluginCategories = computed(() => {
-  const typeOrder = ["calendar", "image", "service"];
+  const typeOrder = ["calendar", "image", "service", "theme"];
   const typeLabels = {
     calendar: "Calendar",
     image: "Image",
     service: "Service",
+    theme: "Themes",
   };
 
   const grouped = {};
@@ -2777,16 +2914,24 @@ const sortedPluginCategories = computed(() => {
     }
     grouped[type].push(plugin);
   }
+  
 
   // Sort each group by name
   for (const type in grouped) {
     grouped[type].sort((a, b) => a.name.localeCompare(b.name));
   }
 
-  // Create categories in order
+  // Create categories in order - always include Themes tab even if empty
   const categories = [];
   for (const type of typeOrder) {
-    if (grouped[type] && grouped[type].length > 0) {
+    if (type === "theme") {
+      // Always include Themes category, even if empty
+      categories.push({
+        type,
+        label: typeLabels[type],
+        plugins: grouped[type] || [],
+      });
+    } else if (grouped[type] && grouped[type].length > 0) {
       categories.push({
         type,
         label:
@@ -2840,6 +2985,13 @@ const activePluginCategory = computed(() => {
     sortedPluginCategories.value.find(
       (cat) => cat.type === activePluginTab.value,
     ) || sortedPluginCategories.value[0]
+  );
+});
+
+// Check if there are any installed (non-built-in) themes
+const hasInstalledThemes = computed(() => {
+  return plugins.value.some(
+    (plugin) => plugin.type === "theme" && plugin._installed
   );
 });
 
@@ -3598,30 +3750,33 @@ const triggerUpdate = async () => {
   }
 };
 
-const uninstallPlugin = async (pluginId) => {
+const uninstallPlugin = async (pluginId, itemType = null) => {
   const plugin = plugins.value.find((p) => p.id === pluginId);
   const pluginName = plugin?.name || pluginId;
+  const isTheme = itemType === "theme" || plugin?.type === "theme";
+  const itemName = isTheme ? "theme" : "plugin";
 
-  if (
-    !confirm(
-      `Are you sure you want to uninstall "${pluginName}"?\n\nThis will:\n- Remove all plugin files\n- Delete all plugin instances\n- Remove frontend components\n\nThis action cannot be undone.`,
-    )
-  ) {
+  const confirmMessage = isTheme
+    ? `Are you sure you want to uninstall theme "${pluginName}"?\n\nThis will:\n- Remove all theme files\n- Remove frontend theme assets\n\nThis action cannot be undone.`
+    : `Are you sure you want to uninstall "${pluginName}"?\n\nThis will:\n- Remove all plugin files\n- Delete all plugin instances\n- Remove frontend components\n\nThis action cannot be undone.`;
+
+  if (!confirm(confirmMessage)) {
     return;
   }
 
   try {
-    await axios.delete(`/api/plugins/installed/${pluginId}`);
+    const params = itemType ? new URLSearchParams({ item_type: itemType }) : "";
+    await axios.delete(`/api/plugins/installed/${pluginId}${params ? `?${params}` : ""}`);
     // Reload plugins to update the list
     await loadPlugins();
-    alert(`Plugin "${pluginName}" uninstalled successfully.`);
+    alert(`${itemName.charAt(0).toUpperCase() + itemName.slice(1)} "${pluginName}" uninstalled successfully.`);
   } catch (error) {
     const errorMsg =
       error.response?.data?.detail ||
       error.message ||
-      "Failed to uninstall plugin";
-    alert(`Failed to uninstall plugin: ${errorMsg}`);
-    console.error("Failed to uninstall plugin:", error);
+      `Failed to uninstall ${itemName}`;
+    alert(`Failed to uninstall ${itemName}: ${errorMsg}`);
+    console.error(`Failed to uninstall ${itemName}:`, error);
   }
 };
 
@@ -3702,12 +3857,21 @@ const loadPlugins = async () => {
     ]);
 
     const installedPluginIds = new Set(
-      (installedResponse.data.plugins || []).map((p) => p.id),
+      (installedResponse.data.plugins || []).map((p) => p.id || p.get?.("id")),
     );
+    
 
     plugins.value = (pluginsResponse.data.plugins || []).map((plugin) => {
-      // Mark if plugin is installed
-      plugin._installed = installedPluginIds.has(plugin.id);
+      // Mark if plugin/theme is installed
+      // Built-in themes are not marked as installed, but installed themes should be
+      if (plugin.type === "theme") {
+        // For themes: only mark as installed if it's not built-in and is in the installed list
+        plugin._installed = !plugin.is_builtin && installedPluginIds.has(plugin.id);
+      } else {
+        // For regular plugins: mark as installed if in the installed list
+        plugin._installed = installedPluginIds.has(plugin.id);
+      }
+      
       // Ensure config_schema is always an object
       if (plugin.config_schema && typeof plugin.config_schema === "string") {
         try {
@@ -3767,8 +3931,13 @@ const loadPlugins = async () => {
       return plugin;
     });
 
-    // Load instances for each plugin type
+    // Load instances for each plugin type (skip themes - they don't have instances)
     for (const plugin of plugins.value) {
+      if (plugin.type === "theme") {
+        // Themes don't have instances
+        pluginInstances.value[plugin.id] = [];
+        continue;
+      }
       try {
         const instancesResponse = await axios.get(
           `/api/plugins/${plugin.id}/instances`,
@@ -3784,8 +3953,13 @@ const loadPlugins = async () => {
       }
     }
 
-    // Load configs for each plugin type
+    // Load configs for each plugin type (skip themes - they don't have configs)
     for (const plugin of plugins.value) {
+      if (plugin.type === "theme") {
+        // Themes don't have configs
+        pluginConfigs.value[plugin.id] = {};
+        continue;
+      }
       try {
         const configResponse = await axios.get(
           `/api/plugins/${plugin.id}/config`,
@@ -3930,14 +4104,20 @@ const enumeratePluginsFromGitHub = async () => {
       `/api/plugins/enumerate-from-github?${params.toString()}`,
     );
 
-    availablePlugins.value = response.data.plugins || [];
+    // Combine plugins and themes into a single list
+    const plugins = response.data.plugins || [];
+    const themes = response.data.themes || [];
+    availablePlugins.value = [
+      ...plugins.map((p) => ({ ...p, type: p.type || "service" })),
+      ...themes.map((t) => ({ ...t, type: "theme" })),
+    ];
     pluginBranchSwitched.value = response.data.branch_switched || false;
     pluginActualBranch.value =
       response.data.branch || githubBranch.value || "main";
 
     if (availablePlugins.value.length === 0) {
       pluginInstallError.value =
-        "No plugins found in this repository. Make sure it contains plugin directories with plugin.json and plugin.py files.";
+        "No plugins or themes found in this repository. Make sure it contains plugin directories with plugin.json and plugin.py files, or theme directories with theme.json files.";
     }
   } catch (error) {
     pluginInstallError.value =
@@ -4021,10 +4201,194 @@ const installPluginFromGitHub = async (pluginPath = null) => {
   }
 };
 
+// Theme management functions
+const loadThemes = async () => {
+  loadingThemes.value = true;
+  try {
+    // Get themes from plugins API (includes built-in and installed themes)
+    // Filter to only themes (type === "theme")
+    const response = await axios.get("/api/plugins?plugin_type=theme");
+    const allItems = response.data.plugins || [];
+    const themePlugins = allItems.filter((p) => p.type === "theme");
+    
+    // Also get theme details from themes API for variables/preview
+    const themesWithDetails = [];
+    for (const themePlugin of themePlugins) {
+      try {
+        const themeResponse = await axios.get(`/api/plugins/${themePlugin.id}`);
+        themesWithDetails.push({
+          ...themePlugin,
+          ...themeResponse.data,
+        });
+      } catch (error) {
+        // If theme details not found, use plugin data
+        themesWithDetails.push(themePlugin);
+      }
+    }
+    
+    themesList.value = themesWithDetails;
+  } catch (error) {
+    console.error("Failed to load themes:", error);
+    themesList.value = [];
+  } finally {
+    loadingThemes.value = false;
+  }
+};
+
+// Get theme preview style based on theme variables
+const getThemePreviewStyle = (theme) => {
+  if (!theme.variables) return {};
+  
+  const vars = theme.variables;
+  // Create a gradient preview using theme colors
+  const bgPrimary = vars["bg-primary"] || "#ffffff";
+  const bgSecondary = vars["bg-secondary"] || "#f5f5f5";
+  const accentPrimary = vars["accent-primary"] || "#2196f3";
+  
+  return {
+    background: `linear-gradient(135deg, ${bgPrimary} 0%, ${bgSecondary} 50%, ${accentPrimary} 100%)`,
+    color: vars["text-primary"] || "#333333",
+  };
+};
+
+const selectTheme = async (themeId) => {
+  try {
+    localConfig.value.selectedTheme = themeId;
+    await theme.setSelectedTheme(themeId);
+    await configStore.updateConfig({ selectedTheme: themeId });
+  } catch (error) {
+    console.error("Failed to select theme:", error);
+  }
+};
+
+const handleThemeZipSelect = async (event) => {
+  const file = event.target.files?.[0];
+  if (!file) return;
+
+  selectedThemeZip.value = file;
+  await installThemeFromZip();
+};
+
+const installThemeFromZip = async () => {
+  if (!selectedThemeZip.value) return;
+
+  installingTheme.value = true;
+  themeInstallError.value = "";
+  themeInstallSuccess.value = "";
+
+  try {
+    await themesStore.installTheme(selectedThemeZip.value);
+    themeInstallSuccess.value = `Theme installed successfully!`;
+    selectedThemeZip.value = null;
+    await loadThemes();
+    setTimeout(() => {
+      themeInstallSuccess.value = "";
+    }, 5000);
+  } catch (error) {
+    themeInstallError.value =
+      error.response?.data?.detail || error.message || "Failed to install theme";
+    setTimeout(() => {
+      themeInstallError.value = "";
+    }, 10000);
+  } finally {
+    installingTheme.value = false;
+  }
+};
+
+const enumerateThemesFromGitHub = async () => {
+  if (!themeGithubRepoUrl.value) return;
+
+  enumeratingThemes.value = true;
+  availableThemes.value = [];
+  themeBranchSwitched.value = false;
+  themeActualBranch.value = "";
+
+  try {
+    const result = await themesStore.enumerateThemesFromGitHub(
+      themeGithubRepoUrl.value,
+      themeGithubBranch.value || "main",
+    );
+    availableThemes.value = result.themes || [];
+    themeBranchSwitched.value = result.branch_switched || false;
+    themeActualBranch.value = result.branch || themeGithubBranch.value || "main";
+  } catch (error) {
+    console.error("Failed to enumerate themes from GitHub:", error);
+    themeInstallError.value =
+      error.response?.data?.detail ||
+      error.message ||
+      "Failed to enumerate themes from GitHub";
+    setTimeout(() => {
+      themeInstallError.value = "";
+    }, 10000);
+  } finally {
+    enumeratingThemes.value = false;
+  }
+};
+
+const installThemeFromGitHub = async (themePath) => {
+  if (!themeGithubRepoUrl.value || !themePath) return;
+
+  installingTheme.value = true;
+  themeInstallError.value = "";
+  themeInstallSuccess.value = "";
+
+  try {
+    await themesStore.installThemeFromGitHub(
+      themeGithubRepoUrl.value,
+      themePath,
+      themeGithubBranch.value || "main",
+    );
+    themeInstallSuccess.value = `Theme installed successfully!`;
+    await loadThemes();
+    setTimeout(() => {
+      themeInstallSuccess.value = "";
+    }, 5000);
+  } catch (error) {
+    themeInstallError.value =
+      error.response?.data?.detail || error.message || "Failed to install theme";
+    setTimeout(() => {
+      themeInstallError.value = "";
+    }, 10000);
+  } finally {
+    installingTheme.value = false;
+  }
+};
+
+const uninstallTheme = async (themeId) => {
+  if (!confirm(`Are you sure you want to uninstall theme "${themeId}"?`)) {
+    return;
+  }
+
+  try {
+    await themesStore.uninstallTheme(themeId);
+    // If the uninstalled theme was selected, clear selection
+    if (localConfig.value.selectedTheme === themeId) {
+      localConfig.value.selectedTheme = null;
+      await theme.setSelectedTheme(null);
+      await configStore.updateConfig({ selectedTheme: null });
+    }
+    await loadThemes();
+  } catch (error) {
+    console.error("Failed to uninstall theme:", error);
+    themeInstallError.value =
+      error.response?.data?.detail || error.message || "Failed to uninstall theme";
+    setTimeout(() => {
+      themeInstallError.value = "";
+    }, 10000);
+  }
+};
+
 const loadCalendarPluginTypes = async () => {
   try {
-    const response = await axios.get("/api/plugins/types/calendar");
-    calendarPluginTypes.value = response.data.types || [];
+    const response = await axios.get("/api/plugins?plugin_type=calendar");
+    // Filter to only enabled calendar plugins and map to expected format
+    calendarPluginTypes.value = (response.data.plugins || [])
+      .filter((p) => p.enabled !== false)
+      .map((p) => ({
+        id: p.id,
+        name: p.name,
+        description: p.description,
+      }));
     // Set default type if none selected
     if (calendarPluginTypes.value.length > 0 && !newCalendarSource.value.type) {
       newCalendarSource.value.type = calendarPluginTypes.value[0].id;
@@ -4940,6 +5304,7 @@ const getCalendarTypeHelpText = (type) => {
 };
 
 onMounted(async () => {
+  await loadThemes();
   await loadConfig();
   await loadKeyboardMappings();
   await loadCalendarPluginTypes();
@@ -7210,5 +7575,153 @@ input:checked + .slider:before {
   .settings-actions {
     padding: 0 1rem;
   }
+}
+
+/* Theme Selection Styles */
+.theme-selection-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(120px, 1fr));
+  gap: 1rem;
+  margin-top: 0.5rem;
+}
+
+.theme-selection-item {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  padding: 1rem;
+  background: var(--bg-secondary);
+  border: 2px solid var(--border-color);
+  border-radius: 8px;
+  cursor: pointer;
+  transition: all 0.2s ease;
+}
+
+.theme-selection-item:hover {
+  border-color: var(--accent-primary);
+  box-shadow: 0 2px 8px var(--shadow);
+  transform: translateY(-2px);
+}
+
+.theme-selection-item.active {
+  border-color: var(--accent-primary);
+  background: var(--bg-tertiary);
+  box-shadow: 0 4px 12px var(--shadow-hover);
+}
+
+.theme-selection-preview {
+  position: relative;
+  width: 100%;
+  aspect-ratio: 16 / 9;
+  border-radius: 6px;
+  overflow: hidden;
+  margin-bottom: 0.5rem;
+  background: var(--bg-primary);
+  border: 1px solid var(--border-color);
+}
+
+.theme-preview-image {
+  width: 100%;
+  height: 100%;
+  background-size: cover;
+  background-position: center;
+}
+
+.theme-preview-placeholder {
+  width: 100%;
+  height: 100%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 2rem;
+  font-weight: bold;
+  color: var(--text-secondary);
+  background: linear-gradient(
+    135deg,
+    var(--accent-primary),
+    var(--accent-secondary)
+  );
+}
+
+.theme-selected-badge {
+  position: absolute;
+  top: 0.25rem;
+  right: 0.25rem;
+  width: 1.5rem;
+  height: 1.5rem;
+  background: var(--accent-primary);
+  color: white;
+  border-radius: 50%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 0.875rem;
+  font-weight: bold;
+  box-shadow: 0 2px 4px var(--shadow);
+}
+
+.theme-selection-info {
+  text-align: center;
+  width: 100%;
+}
+
+.theme-selection-info strong {
+  display: block;
+  font-size: 0.875rem;
+  color: var(--text-primary);
+  margin-bottom: 0.25rem;
+}
+
+.theme-badge-small {
+  display: inline-block;
+  padding: 0.125rem 0.375rem;
+  background: var(--bg-tertiary);
+  color: var(--text-secondary);
+  border-radius: 4px;
+  font-size: 0.7rem;
+  margin-left: 0.25rem;
+}
+
+/* Themes Management (in Plugins tab) */
+.themes-management {
+  padding: 1rem 0;
+}
+
+.themes-list-compact {
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+  margin-top: 0.5rem;
+}
+
+.theme-item-compact {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 0.75rem;
+  background: var(--bg-secondary);
+  border: 1px solid var(--border-color);
+  border-radius: 6px;
+}
+
+.theme-item-compact.builtin {
+  background: var(--bg-tertiary);
+}
+
+.theme-item-info {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  flex: 1;
+}
+
+.theme-item-info strong {
+  color: var(--text-primary);
+}
+
+.theme-item-actions {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
 }
 </style>
