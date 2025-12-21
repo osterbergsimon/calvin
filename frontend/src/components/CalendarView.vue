@@ -69,7 +69,13 @@
       >
         <!-- Day headers -->
         <div class="calendar-weekdays">
-          <div v-for="day in weekDays" :key="day" class="weekday">
+          <div
+            v-for="day in viewMode === 'day'
+              ? [getCurrentWeekdayName()]
+              : weekDays"
+            :key="day"
+            class="weekday"
+          >
             {{ day }}
           </div>
         </div>
@@ -471,6 +477,12 @@ const getWeekStart = (date) => {
   return d;
 };
 
+// Helper function to get current weekday name for day view
+const getCurrentWeekdayName = () => {
+  const dayOfWeek = currentDate.value.getDay();
+  return weekDayNames[dayOfWeek];
+};
+
 const calendarDays = computed(() => {
   const todayDate = new Date(today.value);
   todayDate.setHours(0, 0, 0, 0);
@@ -803,32 +815,27 @@ const handleKeydown = (event) => {
       }
       event.preventDefault();
       break;
-    case "ArrowUp":
-      previousMonth();
-      event.preventDefault();
-      break;
-    case "ArrowDown":
-      nextMonth();
-      event.preventDefault();
-      break;
-    case "PageUp":
-      previousMonth();
-      event.preventDefault();
-      break;
-    case "PageDown":
-      nextMonth();
-      event.preventDefault();
-      break;
+    // ArrowUp/ArrowDown/PageUp/PageDown are handled by the generic keyboard binding system
+    // via calendar_next/calendar_prev actions which are context-aware (day/week/month based on view mode)
   }
 };
 
-const previousMonth = () => {
+// Context-aware navigation: moves by appropriate unit based on view mode
+// - Day view: moves by 1 day
+// - Week view: moves by 1 week (7 days)
+// - Month/Rolling view: moves by 1 month
+const navigatePrevious = () => {
   const newDate = new Date(currentDate.value);
-  if (viewMode.value === "week") {
-    newDate.setDate(newDate.getDate() - 7);
-  } else if (viewMode.value === "day") {
+  if (viewMode.value === "day") {
+    // Day view: move to previous day
     newDate.setDate(newDate.getDate() - 1);
+  } else if (viewMode.value === "week") {
+    // Week view: move to the start of the previous week
+    const weekStart = getWeekStart(currentDate.value);
+    weekStart.setDate(weekStart.getDate() - 7);
+    newDate.setTime(weekStart.getTime());
   } else {
+    // Month/Rolling view: move to previous month
     newDate.setMonth(newDate.getMonth() - 1);
   }
   calendarStore.setCurrentDate(newDate);
@@ -838,13 +845,18 @@ const previousMonth = () => {
   focusedEventIndex.value = null;
 };
 
-const nextMonth = () => {
+const navigateNext = () => {
   const newDate = new Date(currentDate.value);
-  if (viewMode.value === "week") {
-    newDate.setDate(newDate.getDate() + 7);
-  } else if (viewMode.value === "day") {
+  if (viewMode.value === "day") {
+    // Day view: move to next day
     newDate.setDate(newDate.getDate() + 1);
+  } else if (viewMode.value === "week") {
+    // Week view: move to the start of the next week
+    const weekStart = getWeekStart(currentDate.value);
+    weekStart.setDate(weekStart.getDate() + 7);
+    newDate.setTime(weekStart.getTime());
   } else {
+    // Month/Rolling view: move to next month
     newDate.setMonth(newDate.getMonth() + 1);
   }
   calendarStore.setCurrentDate(newDate);
@@ -854,20 +866,49 @@ const nextMonth = () => {
   focusedEventIndex.value = null;
 };
 
+// Legacy function names for backward compatibility (used by header buttons)
+const previousMonth = navigatePrevious;
+const nextMonth = navigateNext;
+
 const loadEvents = async () => {
+  let startDate, endDate;
   const year = currentDate.value.getFullYear();
   const month = currentDate.value.getMonth();
 
-  // Expand date range to include events that span across month boundaries
-  // Load 7 days before the month start and 7 days after the month end
-  // This ensures multi-day events that start in the previous month or end in the next month are included
-  const startDate = new Date(year, month, 1);
-  startDate.setDate(startDate.getDate() - 7); // 7 days before month start
-  startDate.setHours(0, 0, 0, 0);
+  if (viewMode.value === "week") {
+    // Week view: load the week plus buffer days for multi-day events
+    const weekStart = getWeekStart(currentDate.value);
+    startDate = new Date(weekStart);
+    startDate.setDate(startDate.getDate() - 7); // 7 days before week start
+    startDate.setHours(0, 0, 0, 0);
 
-  const endDate = new Date(year, month + 1, 0);
-  endDate.setDate(endDate.getDate() + 7); // 7 days after month end
-  endDate.setHours(23, 59, 59, 999);
+    endDate = new Date(weekStart);
+    endDate.setDate(endDate.getDate() + 14); // 7 days after week end
+    endDate.setHours(23, 59, 59, 999);
+  } else if (viewMode.value === "day") {
+    // Day view: load the day plus buffer days for multi-day events
+    const day = new Date(currentDate.value);
+    day.setHours(0, 0, 0, 0);
+    startDate = new Date(day);
+    startDate.setDate(startDate.getDate() - 7); // 7 days before
+    startDate.setHours(0, 0, 0, 0);
+
+    endDate = new Date(day);
+    endDate.setDate(endDate.getDate() + 7); // 7 days after
+    endDate.setHours(23, 59, 59, 999);
+  } else {
+    // Month/rolling view: use month-based range
+    // Expand date range to include events that span across month boundaries
+    // Load 7 days before the month start and 7 days after the month end
+    // This ensures multi-day events that start in the previous month or end in the next month are included
+    startDate = new Date(year, month, 1);
+    startDate.setDate(startDate.getDate() - 7); // 7 days before month start
+    startDate.setHours(0, 0, 0, 0);
+
+    endDate = new Date(year, month + 1, 0);
+    endDate.setDate(endDate.getDate() + 7); // 7 days after month end
+    endDate.setHours(23, 59, 59, 999);
+  }
 
   try {
     // Force refresh when viewing current month to ensure newly added events are visible
@@ -1227,8 +1268,12 @@ onActivated(() => {
 }
 
 /* Day view: single column, very tall */
+.calendar-grid.day-view .calendar-weekdays {
+  grid-template-columns: minmax(0, 1fr) !important;
+}
+
 .calendar-grid.day-view .calendar-days {
-  grid-template-columns: minmax(0, 1fr);
+  grid-template-columns: minmax(0, 1fr) !important;
 }
 
 .calendar-grid.day-view .calendar-day {

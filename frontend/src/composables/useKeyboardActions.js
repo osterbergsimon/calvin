@@ -1,3 +1,4 @@
+import { nextTick } from "vue";
 import { useModeStore } from "../stores/mode";
 import { useCalendarStore } from "../stores/calendar";
 import { useImagesStore } from "../stores/images";
@@ -317,6 +318,25 @@ export function useKeyboardActions() {
     }
   };
 
+  // Helper function to adjust day of week based on week start day
+  const adjustDayOfWeek = (dayOfWeek) => {
+    // dayOfWeek: 0=Sunday, 1=Monday, ..., 6=Saturday
+    // weekStartDay: 0=Sunday, 1=Monday, ..., 6=Saturday
+    // Return adjusted day where 0 = week start day
+    const weekStartDay = configStore.weekStartDay || 0;
+    return (dayOfWeek - weekStartDay + 7) % 7;
+  };
+
+  // Helper function to get date at start of week for a given date
+  const getWeekStart = (date) => {
+    const d = new Date(date);
+    const dayOfWeek = d.getDay();
+    const adjustedDay = adjustDayOfWeek(dayOfWeek);
+    d.setDate(d.getDate() - adjustedDay);
+    d.setHours(0, 0, 0, 0);
+    return d;
+  };
+
   const handleAction = (action) => {
     logDebug(
       "[Keyboard]",
@@ -366,26 +386,127 @@ export function useKeyboardActions() {
         }
         break;
 
-      // Calendar actions
-      case "calendar_next_month":
+      // Calendar actions - context-aware based on view mode
+      // Day view: moves by 1 day, Week view: moves by 1 week, Month view: moves by 1 month
+      // Note: Navigation preserves the selected event and keeps the modal open
+      case "calendar_next":
+      case "calendar_next_month": // Legacy name for backward compatibility
         if (modeStore.currentMode === modeStore.MODES.CALENDAR) {
-          const newDate = new Date(calendarStore.currentDate);
-          newDate.setMonth(newDate.getMonth() + 1);
-          calendarStore.setCurrentDate(newDate);
+          // Preserve selected event before navigation (modal stays open)
+          const preservedEvent = calendarStore.selectedEvent;
+          const preservedDate = calendarStore.selectedDate;
+
+          const viewMode = configStore.calendarViewMode;
+          let newDate;
+
+          if (viewMode === "day") {
+            // Day view: move to next day
+            newDate = new Date(calendarStore.currentDate);
+            newDate.setDate(newDate.getDate() + 1);
+          } else if (viewMode === "week") {
+            // Week view: move to the start of the next week
+            const weekStart = getWeekStart(calendarStore.currentDate);
+            weekStart.setDate(weekStart.getDate() + 7);
+            newDate = new Date(weekStart);
+          } else {
+            // Month/Rolling view: move to next month
+            newDate = new Date(calendarStore.currentDate);
+            newDate.setMonth(newDate.getMonth() + 1);
+          }
+
+          // Update current date (triggers calendar rerender)
+          // Create a new Date object to ensure Vue detects the change
+          calendarStore.setCurrentDate(new Date(newDate));
+
+          // Restore selected event if it was open (keeps modal open)
+          // Use nextTick to ensure calendar rerenders first
+          if (preservedEvent && preservedDate) {
+            nextTick(() => {
+              // Re-select the event to ensure it's properly displayed
+              // This will update dayEvents if the event is in the new date range,
+              // or keep the event visible even if outside the range
+              calendarStore.selectEvent(preservedEvent, preservedDate);
+            });
+          }
         }
         break;
-      case "calendar_prev_month":
+      case "calendar_prev":
+      case "calendar_prev_month": // Legacy name for backward compatibility
         if (modeStore.currentMode === modeStore.MODES.CALENDAR) {
-          const newDate = new Date(calendarStore.currentDate);
-          newDate.setMonth(newDate.getMonth() - 1);
-          calendarStore.setCurrentDate(newDate);
+          // Preserve selected event before navigation (modal stays open)
+          const preservedEvent = calendarStore.selectedEvent;
+          const preservedDate = calendarStore.selectedDate;
+
+          const viewMode = configStore.calendarViewMode;
+          let newDate;
+
+          if (viewMode === "day") {
+            // Day view: move to previous day
+            newDate = new Date(calendarStore.currentDate);
+            newDate.setDate(newDate.getDate() - 1);
+          } else if (viewMode === "week") {
+            // Week view: move to the start of the previous week
+            const weekStart = getWeekStart(calendarStore.currentDate);
+            weekStart.setDate(weekStart.getDate() - 7);
+            newDate = new Date(weekStart);
+          } else {
+            // Month/Rolling view: move to previous month
+            newDate = new Date(calendarStore.currentDate);
+            newDate.setMonth(newDate.getMonth() - 1);
+          }
+
+          // Update current date (triggers calendar rerender)
+          // Create a new Date object to ensure Vue detects the change
+          calendarStore.setCurrentDate(new Date(newDate));
+
+          // Restore selected event if it was open (keeps modal open)
+          // Use nextTick to ensure calendar rerenders first
+          if (preservedEvent && preservedDate) {
+            nextTick(() => {
+              // Re-select the event to ensure it's properly displayed
+              // This will update dayEvents if the event is in the new date range,
+              // or keep the event visible even if outside the range
+              calendarStore.selectEvent(preservedEvent, preservedDate);
+            });
+          }
         }
         break;
-      case "calendar_expand_today":
-        // Expand all events for today - show all details for all events
+      case "calendar_expand":
+      case "calendar_expand_today": // Legacy name for backward compatibility
+        // Context-aware expand: expands events for current day/week based on view mode
         if (modeStore.currentMode === modeStore.MODES.CALENDAR) {
-          const today = new Date();
-          today.setHours(0, 0, 0, 0);
+          const viewMode = configStore.calendarViewMode;
+          let targetDate = new Date();
+
+          if (viewMode === "day") {
+            // Day view: expand events for the currently viewed day
+            targetDate = new Date(calendarStore.currentDate);
+            targetDate.setHours(0, 0, 0, 0);
+          } else if (viewMode === "week") {
+            // Week view: expand events for today if it's in the current week,
+            // otherwise use the same day of week as today within the viewed week
+            const today = new Date();
+            today.setHours(0, 0, 0, 0);
+            const weekStart = getWeekStart(calendarStore.currentDate);
+            const weekEnd = new Date(weekStart);
+            weekEnd.setDate(weekEnd.getDate() + 6);
+
+            if (today >= weekStart && today <= weekEnd) {
+              // Today is in the viewed week, use today
+              targetDate = today;
+            } else {
+              // Today is not in the viewed week, use the same day of week as today
+              // For example, if today is Wednesday, expand Wednesday of the viewed week
+              // Use adjustDayOfWeek to account for week start day setting
+              const todayAdjusted = adjustDayOfWeek(today.getDay());
+              targetDate = new Date(weekStart);
+              targetDate.setDate(weekStart.getDate() + todayAdjusted);
+            }
+          } else {
+            // Month/Rolling view: expand events for today
+            targetDate = new Date();
+            targetDate.setHours(0, 0, 0, 0);
+          }
 
           // Helper to get calendar date components
           const getDateComponents = (date) => {
@@ -404,10 +525,10 @@ export function useKeyboardActions() {
             return date1.day - date2.day;
           };
 
-          const todayComponents = getDateComponents(today);
+          const targetComponents = getDateComponents(targetDate);
 
-          // Get all events for today (including multi-day events that span today)
-          const todayEvents = calendarStore.events.filter((event) => {
+          // Get all events for the target date (including multi-day events that span it)
+          const targetEvents = calendarStore.events.filter((event) => {
             const eventStart = new Date(event.start);
             const eventEnd = new Date(event.end);
 
@@ -424,46 +545,46 @@ export function useKeyboardActions() {
 
               const startCompare = compareDateComponents(
                 eStartComponents,
-                todayComponents,
+                targetComponents,
               );
 
               const endCompare = compareDateComponents(
-                todayComponents,
+                targetComponents,
                 eEndComponents,
               );
               return startCompare <= 0 && endCompare <= 0;
             } else {
-              // Timed events: check if event overlaps with today
+              // Timed events: check if event overlaps with target date
               const eStartComponents = getDateComponents(eventStart);
               const eEndComponents = getDateComponents(eventEnd);
 
               const startCompare = compareDateComponents(
                 eStartComponents,
-                todayComponents,
+                targetComponents,
               );
               const endCompare = compareDateComponents(
-                todayComponents,
+                targetComponents,
                 eEndComponents,
               );
               return startCompare <= 0 && endCompare <= 0;
             }
           });
 
-          if (todayEvents.length > 0) {
+          if (targetEvents.length > 0) {
             // Set flag to show all events' details
             calendarStore.setShowAllDayEvents(true);
             // Expand the first event (the panel will show all events' details)
-            // Pass today's date so it knows which day was selected
-            calendarStore.selectEvent(todayEvents[0], today);
+            // Pass target date so it knows which day was selected
+            calendarStore.selectEvent(targetEvents[0], targetDate);
           } else {
-            // No events today - create a placeholder event to open the details view
-            // This allows users to navigate to other days even when there are no events today
+            // No events for target date - create a placeholder event to open the details view
+            // This allows users to navigate to other days even when there are no events
             const placeholderEvent = {
-              id: `placeholder-${today.getTime()}`,
+              id: `placeholder-${targetDate.getTime()}`,
               title: "No events",
-              start: today.toISOString(),
+              start: targetDate.toISOString(),
               end: new Date(
-                today.getTime() + 24 * 60 * 60 * 1000 - 1,
+                targetDate.getTime() + 24 * 60 * 60 * 1000 - 1,
               ).toISOString(), // End of day
               all_day: true,
               location: null,
@@ -472,8 +593,8 @@ export function useKeyboardActions() {
             };
             // Set flag to show all events (even though there are none)
             calendarStore.setShowAllDayEvents(true);
-            // Select the placeholder event with today's date
-            calendarStore.selectEvent(placeholderEvent, today);
+            // Select the placeholder event with target date
+            calendarStore.selectEvent(placeholderEvent, targetDate);
           }
         }
         break;
@@ -670,11 +791,11 @@ export function useKeyboardActions() {
 
     if (activeMode === modeStore.MODES.CALENDAR) {
       // If event detail panel is open, navigate to next event (within day or next day)
-      // Otherwise navigate to next month
+      // Otherwise navigate to next (context-aware: day/week/month based on view mode)
       if (calendarStore.selectedEvent) {
         return "calendar_next_event";
       }
-      return "calendar_next_month";
+      return "calendar_next";
     } else if (activeMode === modeStore.MODES.PHOTOS) {
       return "images_next";
     } else if (activeMode === modeStore.MODES.WEB_SERVICES) {
@@ -693,11 +814,11 @@ export function useKeyboardActions() {
 
     if (activeMode === modeStore.MODES.CALENDAR) {
       // If event detail panel is open, navigate to previous event (within day or previous day)
-      // Otherwise navigate to previous month
+      // Otherwise navigate to previous (context-aware: day/week/month based on view mode)
       if (calendarStore.selectedEvent) {
         return "calendar_prev_event";
       }
-      return "calendar_prev_month";
+      return "calendar_prev";
     } else if (activeMode === modeStore.MODES.PHOTOS) {
       return "images_prev";
     } else if (activeMode === modeStore.MODES.WEB_SERVICES) {
@@ -720,11 +841,11 @@ export function useKeyboardActions() {
 
     const currentMode = modeStore.currentMode;
     if (currentMode === modeStore.MODES.CALENDAR) {
-      // Check if event is expanded - if so, close it; otherwise expand today
+      // Check if event is expanded - if so, close it; otherwise expand (context-aware)
       if (calendarStore.selectedEvent) {
         return "calendar_collapse";
       } else {
-        return "calendar_expand_today";
+        return "calendar_expand";
       }
     } else if (currentMode === modeStore.MODES.PHOTOS) {
       // Enter fullscreen photos

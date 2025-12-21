@@ -158,7 +158,12 @@
                   <div
                     class="setting-header"
                     @click="toggleSection('themeSelection')"
-                    style="cursor: pointer; display: flex; justify-content: space-between; align-items: center;"
+                    style="
+                      cursor: pointer;
+                      display: flex;
+                      justify-content: space-between;
+                      align-items: center;
+                    "
                   >
                     <label>Theme</label>
                     <span class="toggle-icon">{{
@@ -168,7 +173,7 @@
                   <div
                     v-show="expandedSections.themeSelection"
                     class="setting-content"
-                    style="margin-top: 0.5rem;"
+                    style="margin-top: 0.5rem"
                   >
                     <div v-if="loadingThemes" class="loading-state">
                       <p>Loading themes...</p>
@@ -189,7 +194,9 @@
                             v-if="theme.preview_image"
                             class="theme-preview-image"
                             :style="{
-                              backgroundImage: theme.preview ? `url(/api/plugins/${theme.id}/preview)` : undefined,
+                              backgroundImage: theme.preview
+                                ? `url(/api/plugins/${theme.id}/preview)`
+                                : undefined,
                             }"
                           ></div>
                           <div
@@ -216,7 +223,9 @@
                         </div>
                       </div>
                     </div>
-                    <span class="help-text" style="display: block; margin-top: 0.5rem;"
+                    <span
+                      class="help-text"
+                      style="display: block; margin-top: 0.5rem"
                       >Select a theme to customize the appearance</span
                     >
                   </div>
@@ -1185,18 +1194,35 @@
                     class="setting-item"
                     style="margin-bottom: 1rem"
                   >
-                    <div class="help-text" style="background: var(--bg-secondary); padding: 1rem; border-radius: 6px;">
-                      <p style="margin: 0 0 0.5rem 0;">
-                        <strong>💡 Installing Themes:</strong> Themes are installed the same way as plugins!
+                    <div
+                      class="help-text"
+                      style="
+                        background: var(--bg-secondary);
+                        padding: 1rem;
+                        border-radius: 6px;
+                      "
+                    >
+                      <p style="margin: 0 0 0.5rem 0">
+                        <strong>💡 Installing Themes:</strong> Themes are
+                        installed the same way as plugins!
                       </p>
-                      <ol style="margin: 0.5rem 0 0 1.5rem; text-align: left;">
-                        <li>Use the installation section above (Zip File or GitHub tab)</li>
-                        <li>Enter a GitHub repository URL and click "List Plugins"</li>
-                        <li>Themes will appear in the list alongside plugins</li>
+                      <ol style="margin: 0.5rem 0 0 1.5rem; text-align: left">
+                        <li>
+                          Use the installation section above (Zip File or GitHub
+                          tab)
+                        </li>
+                        <li>
+                          Enter a GitHub repository URL and click "List Plugins"
+                        </li>
+                        <li>
+                          Themes will appear in the list alongside plugins
+                        </li>
                         <li>Click "Install" next to any theme you want</li>
                       </ol>
-                      <p style="margin: 0.5rem 0 0 0;">
-                        Built-in themes (Light, Dark, Ocean, Forest, Sunset) are always available and can be selected in <strong>UI Settings → Select Theme</strong>.
+                      <p style="margin: 0.5rem 0 0 0">
+                        Built-in themes (Light, Dark, Ocean, Forest, Sunset) are
+                        always available and can be selected in
+                        <strong>UI Settings → Select Theme</strong>.
                       </p>
                     </div>
                   </div>
@@ -1210,7 +1236,10 @@
                     "
                     class="empty-state"
                   >
-                    <p>No themes found. Install themes using the instructions above.</p>
+                    <p>
+                      No themes found. Install themes using the instructions
+                      above.
+                    </p>
                   </div>
 
                   <!-- Plugin/Theme Cards -->
@@ -1288,7 +1317,11 @@
                           <button
                             v-if="plugin._installed"
                             class="btn-remove btn-icon-only"
-                            :title="plugin.type === 'theme' ? 'Uninstall this theme' : 'Uninstall this plugin'"
+                            :title="
+                              plugin.type === 'theme'
+                                ? 'Uninstall this theme'
+                                : 'Uninstall this plugin'
+                            "
                             @click="uninstallPlugin(plugin.id, plugin.type)"
                           >
                             🗑️
@@ -2382,9 +2415,12 @@ const availableActions = [
   // Legacy/Advanced actions (for direct mapping if needed)
   { value: "mode_settings", label: "Open Settings" },
   { value: "mode_cycle", label: "Cycle Between Modes" },
-  { value: "calendar_next_month", label: "Calendar: Next Month (direct)" },
-  { value: "calendar_prev_month", label: "Calendar: Previous Month (direct)" },
-  { value: "calendar_expand_today", label: "Calendar: Expand Today (direct)" },
+  { value: "calendar_next", label: "Calendar: Next (context-aware)" },
+  { value: "calendar_prev", label: "Calendar: Previous (context-aware)" },
+  { value: "calendar_next_month", label: "Calendar: Next Month (legacy)" },
+  { value: "calendar_prev_month", label: "Calendar: Previous Month (legacy)" },
+  { value: "calendar_expand", label: "Calendar: Expand (context-aware)" },
+  { value: "calendar_expand_today", label: "Calendar: Expand Today (legacy)" },
   { value: "calendar_collapse", label: "Calendar: Collapse (direct)" },
 
   // Image-specific actions
@@ -2914,7 +2950,6 @@ const sortedPluginCategories = computed(() => {
     }
     grouped[type].push(plugin);
   }
-  
 
   // Sort each group by name
   for (const type in grouped) {
@@ -2991,7 +3026,7 @@ const activePluginCategory = computed(() => {
 // Check if there are any installed (non-built-in) themes
 const hasInstalledThemes = computed(() => {
   return plugins.value.some(
-    (plugin) => plugin.type === "theme" && plugin._installed
+    (plugin) => plugin.type === "theme" && plugin._installed,
   );
 });
 
@@ -3766,10 +3801,14 @@ const uninstallPlugin = async (pluginId, itemType = null) => {
 
   try {
     const params = itemType ? new URLSearchParams({ item_type: itemType }) : "";
-    await axios.delete(`/api/plugins/installed/${pluginId}${params ? `?${params}` : ""}`);
+    await axios.delete(
+      `/api/plugins/installed/${pluginId}${params ? `?${params}` : ""}`,
+    );
     // Reload plugins to update the list
     await loadPlugins();
-    alert(`${itemName.charAt(0).toUpperCase() + itemName.slice(1)} "${pluginName}" uninstalled successfully.`);
+    alert(
+      `${itemName.charAt(0).toUpperCase() + itemName.slice(1)} "${pluginName}" uninstalled successfully.`,
+    );
   } catch (error) {
     const errorMsg =
       error.response?.data?.detail ||
@@ -3859,19 +3898,19 @@ const loadPlugins = async () => {
     const installedPluginIds = new Set(
       (installedResponse.data.plugins || []).map((p) => p.id || p.get?.("id")),
     );
-    
 
     plugins.value = (pluginsResponse.data.plugins || []).map((plugin) => {
       // Mark if plugin/theme is installed
       // Built-in themes are not marked as installed, but installed themes should be
       if (plugin.type === "theme") {
         // For themes: only mark as installed if it's not built-in and is in the installed list
-        plugin._installed = !plugin.is_builtin && installedPluginIds.has(plugin.id);
+        plugin._installed =
+          !plugin.is_builtin && installedPluginIds.has(plugin.id);
       } else {
         // For regular plugins: mark as installed if in the installed list
         plugin._installed = installedPluginIds.has(plugin.id);
       }
-      
+
       // Ensure config_schema is always an object
       if (plugin.config_schema && typeof plugin.config_schema === "string") {
         try {
@@ -4210,7 +4249,7 @@ const loadThemes = async () => {
     const response = await axios.get("/api/plugins?plugin_type=theme");
     const allItems = response.data.plugins || [];
     const themePlugins = allItems.filter((p) => p.type === "theme");
-    
+
     // Also get theme details from themes API for variables/preview
     const themesWithDetails = [];
     for (const themePlugin of themePlugins) {
@@ -4225,7 +4264,7 @@ const loadThemes = async () => {
         themesWithDetails.push(themePlugin);
       }
     }
-    
+
     themesList.value = themesWithDetails;
   } catch (error) {
     console.error("Failed to load themes:", error);
@@ -4238,13 +4277,13 @@ const loadThemes = async () => {
 // Get theme preview style based on theme variables
 const getThemePreviewStyle = (theme) => {
   if (!theme.variables) return {};
-  
+
   const vars = theme.variables;
   // Create a gradient preview using theme colors
   const bgPrimary = vars["bg-primary"] || "#ffffff";
   const bgSecondary = vars["bg-secondary"] || "#f5f5f5";
   const accentPrimary = vars["accent-primary"] || "#2196f3";
-  
+
   return {
     background: `linear-gradient(135deg, ${bgPrimary} 0%, ${bgSecondary} 50%, ${accentPrimary} 100%)`,
     color: vars["text-primary"] || "#333333",
@@ -4286,7 +4325,9 @@ const installThemeFromZip = async () => {
     }, 5000);
   } catch (error) {
     themeInstallError.value =
-      error.response?.data?.detail || error.message || "Failed to install theme";
+      error.response?.data?.detail ||
+      error.message ||
+      "Failed to install theme";
     setTimeout(() => {
       themeInstallError.value = "";
     }, 10000);
@@ -4310,7 +4351,8 @@ const enumerateThemesFromGitHub = async () => {
     );
     availableThemes.value = result.themes || [];
     themeBranchSwitched.value = result.branch_switched || false;
-    themeActualBranch.value = result.branch || themeGithubBranch.value || "main";
+    themeActualBranch.value =
+      result.branch || themeGithubBranch.value || "main";
   } catch (error) {
     console.error("Failed to enumerate themes from GitHub:", error);
     themeInstallError.value =
@@ -4345,7 +4387,9 @@ const installThemeFromGitHub = async (themePath) => {
     }, 5000);
   } catch (error) {
     themeInstallError.value =
-      error.response?.data?.detail || error.message || "Failed to install theme";
+      error.response?.data?.detail ||
+      error.message ||
+      "Failed to install theme";
     setTimeout(() => {
       themeInstallError.value = "";
     }, 10000);
@@ -4371,7 +4415,9 @@ const uninstallTheme = async (themeId) => {
   } catch (error) {
     console.error("Failed to uninstall theme:", error);
     themeInstallError.value =
-      error.response?.data?.detail || error.message || "Failed to uninstall theme";
+      error.response?.data?.detail ||
+      error.message ||
+      "Failed to uninstall theme";
     setTimeout(() => {
       themeInstallError.value = "";
     }, 10000);

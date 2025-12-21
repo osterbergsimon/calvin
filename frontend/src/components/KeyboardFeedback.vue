@@ -62,11 +62,14 @@ const actionLabels = {
   generic_expand_close: "Expand/Close",
 
   // Calendar actions
-  calendar_next_month: "Next Month",
-  calendar_prev_month: "Previous Month",
+  calendar_next: "Next",
+  calendar_prev: "Previous",
+  calendar_next_month: "Next Month", // Legacy
+  calendar_prev_month: "Previous Month", // Legacy
   calendar_next_day: "Next Day",
   calendar_prev_day: "Previous Day",
-  calendar_expand_today: "Expand Today",
+  calendar_expand: "Expand",
+  calendar_expand_today: "Expand Today", // Legacy
   calendar_collapse: "Collapse",
   calendar_next_event: "Next Event",
   calendar_prev_event: "Previous Event",
