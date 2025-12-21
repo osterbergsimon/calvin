@@ -1,12 +1,17 @@
 """Theme installation service for managing installed themes (file operations only)."""
 
 import json
+import logging
 import shutil
 import zipfile
 from pathlib import Path
 from typing import Any
 
-from app.config import settings
+logger = logging.getLogger(__name__)
+
+# Constants
+REQUIRED_THEME_FIELDS = ["id", "name", "version", "variables"]
+SUPPORTED_FORMAT_VERSIONS = ["1.0.0"]
 
 
 class ThemeInstaller:
@@ -18,7 +23,6 @@ class ThemeInstaller:
         backend_dir = Path(__file__).parent.parent.parent
         self.themes_dir = backend_dir / "data" / "themes"
         self.themes_dir.mkdir(parents=True, exist_ok=True)
-
 
     def get_theme_path(self, theme_id: str) -> Path:
         """
@@ -32,6 +36,62 @@ class ThemeInstaller:
         """
         return self.themes_dir / theme_id
 
+    def _is_safe_path(self, path: str, base_path: Path) -> bool:
+        """
+        Check if a path is safe (no path traversal).
+
+        Args:
+            path: Relative path to check
+            base_path: Base directory to resolve against
+
+        Returns:
+            True if path is safe, False otherwise
+        """
+        # Check for obvious path traversal attempts
+        if ".." in path or path.startswith("/"):
+            return False
+
+        # Resolve the path and check it's within base_path
+        try:
+            resolved = (base_path / path).resolve()
+            base_resolved = base_path.resolve()
+            # Check that resolved path is within base path
+            # Use try/except for is_relative_to in case of different drives on Windows
+            try:
+                return resolved.is_relative_to(base_resolved)
+            except ValueError:
+                # Different drives or other path issues
+                return False
+        except (ValueError, OSError):
+            # Path resolution failed, not safe
+            return False
+
+    def _validate_manifest(self, manifest: dict[str, Any]) -> None:
+        """
+        Validate a theme manifest structure.
+
+        Args:
+            manifest: Theme manifest dictionary
+
+        Raises:
+            ValueError: If manifest is invalid
+        """
+        # Validate required fields
+        for field in REQUIRED_THEME_FIELDS:
+            if field not in manifest:
+                raise ValueError(f"Missing required field in theme.json: {field}")
+
+        # Validate format version if specified
+        format_version = manifest.get("format_version", "1.0.0")
+        if format_version not in SUPPORTED_FORMAT_VERSIONS:
+            raise ValueError(
+                f"Unsupported theme format version: {format_version}. "
+                f"Supported versions: {', '.join(SUPPORTED_FORMAT_VERSIONS)}"
+            )
+
+        # Validate variables structure
+        if not isinstance(manifest["variables"], dict):
+            raise ValueError("variables must be an object")
 
     def validate_theme_package(self, theme_path: Path) -> dict[str, Any]:
         """
@@ -75,19 +135,8 @@ class ThemeInstaller:
             except json.JSONDecodeError as e:
                 raise ValueError(f"Invalid JSON in theme.json: {e}")
 
-            # Validate required fields
-            required_fields = ["id", "name", "version", "variables"]
-            for field in required_fields:
-                if field not in manifest:
-                    raise ValueError(f"Missing required field in theme.json: {field}")
-
-            # Validate format version if specified
-            format_version = manifest.get("format_version", "1.0.0")
-            if format_version not in ["1.0.0"]:
-                raise ValueError(
-                    f"Unsupported theme format version: {format_version}. "
-                    f"Supported versions: 1.0.0"
-                )
+            # Validate manifest structure
+            self._validate_manifest(manifest)
 
             return manifest
 
@@ -116,28 +165,17 @@ class ThemeInstaller:
         except json.JSONDecodeError as e:
             raise ValueError(f"Invalid JSON in theme.json: {e}")
 
-        # Required fields
-        required_fields = ["id", "name", "version", "variables"]
-        for field in required_fields:
-            if field not in manifest:
-                raise ValueError(f"Missing required field in theme.json: {field}")
-
-        # Validate format version if specified
-        format_version = manifest.get("format_version", "1.0.0")
-        if format_version not in ["1.0.0"]:
-            raise ValueError(
-                f"Unsupported theme format version: {format_version}. "
-                f"Supported versions: 1.0.0"
-            )
-
-        # Validate variables structure
-        if not isinstance(manifest["variables"], dict):
-            raise ValueError("variables must be an object")
+        # Validate manifest structure
+        self._validate_manifest(manifest)
 
         return manifest
 
     def install_theme(
-        self, source_path: Path, theme_id: str | None = None, check_version: bool = True
+        self,
+        source_path: Path,
+        theme_id: str | None = None,
+        check_version: bool = True,
+        force: bool = False,
     ) -> dict[str, Any]:
         """
         Install a theme from a directory or zip file.
@@ -146,6 +184,7 @@ class ThemeInstaller:
             source_path: Path to theme directory or zip file
             theme_id: Optional theme ID (if not provided, uses manifest ID)
             check_version: If True, checks for existing version and raises if older
+            force: If True, uninstalls existing theme before installing
 
         Returns:
             Theme manifest dictionary
@@ -162,33 +201,47 @@ class ThemeInstaller:
         # Check if theme already installed
         theme_path = self.get_theme_path(install_id)
         if theme_path.exists():
-            # Check version if requested
-            if check_version:
-                existing_manifest = self.get_theme_manifest(install_id)
-                if existing_manifest:
-                    existing_version = existing_manifest.get("version", "0.0.0")
-                    new_version = manifest.get("version", "0.0.0")
-                    # Simple version comparison (assumes semantic versioning)
-                    try:
-                        from packaging import version
+            if force:
+                # Uninstall existing theme
+                logger.info(f"Force installing theme {install_id}, removing existing installation")
+                shutil.rmtree(theme_path)
+            else:
+                # Check version if requested
+                if check_version:
+                    existing_manifest = self.get_theme_manifest(install_id)
+                    if existing_manifest:
+                        existing_version = existing_manifest.get("version", "0.0.0")
+                        new_version = manifest.get("version", "0.0.0")
+                        # Simple version comparison (assumes semantic versioning)
+                        try:
+                            from packaging import version
 
-                        if version.parse(new_version) < version.parse(existing_version):
-                            raise ValueError(
-                                f"Theme {install_id} version {new_version} is older than "
-                                f"installed version {existing_version}. "
-                                "Uninstall the existing theme first."
+                            if version.parse(new_version) < version.parse(existing_version):
+                                raise ValueError(
+                                    f"Theme {install_id} version {new_version} is older than "
+                                    f"installed version {existing_version}. "
+                                    "Uninstall the existing theme first or use "
+                                    "force=True to override."
+                                )
+                        except ImportError:
+                            # packaging not available, skip version check
+                            logger.warning(
+                                "packaging library not available, skipping version comparison"
                             )
-                    except ImportError:
-                        # packaging not available, skip version check
-                        pass
-                    except Exception:
-                        # If version parsing fails, allow install but warn
-                        pass
+                        except ValueError:
+                            # Re-raise version comparison errors
+                            raise
+                        except Exception as e:
+                            # If version parsing fails, log warning but allow install
+                            logger.warning(
+                                f"Failed to parse version for theme {install_id}: {e}. "
+                                "Proceeding with installation."
+                            )
 
-            raise ValueError(
-                f"Theme {install_id} is already installed. "
-                "Uninstall the existing theme first or use force=True to override."
-            )
+                raise ValueError(
+                    f"Theme {install_id} is already installed. "
+                    "Uninstall the existing theme first or use force=True to override."
+                )
 
         # Create theme directory
         theme_path.mkdir(parents=True, exist_ok=True)
@@ -247,13 +300,6 @@ class ThemeInstaller:
                 else:
                     raise ValueError(f"Invalid source path: {source_path}")
 
-
-            # Copy preview image if it exists
-            preview_source = theme_path / "preview.png"
-            if preview_source.exists():
-                # Preview will be served from theme_path
-                pass
-
             # Save manifest
             manifest_path = theme_path / "theme.json"
             with open(manifest_path, "w", encoding="utf-8") as f:
@@ -266,7 +312,6 @@ class ThemeInstaller:
             if theme_path.exists():
                 shutil.rmtree(theme_path)
             raise ValueError(f"Failed to install theme: {e}") from e
-
 
     def uninstall_theme(self, theme_id: str) -> None:
         """
@@ -309,10 +354,10 @@ class ThemeInstaller:
                     manifest = json.load(f)
                 manifest["_installed_path"] = str(theme_dir)
                 themes.append(manifest)
-            except (json.JSONDecodeError, Exception) as e:
-                import logging
-
-                logger = logging.getLogger(__name__)
+            except json.JSONDecodeError as e:
+                logger.warning(f"Invalid JSON in theme manifest for {theme_dir.name}: {e}")
+                continue
+            except Exception as e:
                 logger.warning(f"Error reading theme manifest for {theme_dir.name}: {e}")
                 continue
 
@@ -377,7 +422,7 @@ class ThemeInstaller:
 
                         theme_path_rel = theme_info["path"]
                         # Security: prevent path traversal
-                        if ".." in theme_path_rel or theme_path_rel.startswith("/"):
+                        if not self._is_safe_path(theme_path_rel, repo_path):
                             continue
 
                         theme_dir = repo_path / theme_path_rel
@@ -460,7 +505,7 @@ class ThemeInstaller:
             ValueError: If theme path is invalid or theme is invalid
         """
         # Security: prevent path traversal
-        if ".." in theme_path or theme_path.startswith("/"):
+        if not self._is_safe_path(theme_path, repo_path):
             raise ValueError("Invalid theme path: path traversal not allowed")
 
         theme_dir = repo_path / theme_path
@@ -479,7 +524,5 @@ class ThemeInstaller:
         return self.install_theme(theme_dir, install_id)
 
 
-
 # Global theme installer instance
 theme_installer = ThemeInstaller()
-
