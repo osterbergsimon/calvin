@@ -4,13 +4,60 @@ import logging
 from contextlib import asynccontextmanager
 from pathlib import Path
 
-from fastapi import FastAPI
-from fastapi.middleware.cors import CORSMiddleware
-from fastapi.responses import FileResponse
-
-from app.api.routes import calendar, config, health, images, keyboard, plugins, system, web_services
+# Configure logging FIRST, before any other imports that might trigger database initialization
+# Import settings first to get log level
 from app.config import settings
-from app.services.scheduler import calendar_scheduler
+
+# Configure logging: reduce SQLAlchemy verbosity while keeping app logs visible
+# Use force=True (Python 3.8+) to reconfigure even if logging was already set up (e.g., by uvicorn)
+try:
+    logging.basicConfig(
+        level=getattr(logging, settings.log_level.upper(), logging.INFO),
+        format="%(asctime)s - %(name)s - %(levelname)s - %(message)s",
+        datefmt="%Y-%m-%d %H:%M:%S",
+        force=True,  # Reconfigure even if logging was already configured
+    )
+except TypeError:
+    # Python < 3.8 doesn't have force parameter
+    # Check if root logger has handlers, if not, configure it
+    root_logger = logging.getLogger()
+    if not root_logger.handlers:
+        logging.basicConfig(
+            level=getattr(logging, settings.log_level.upper(), logging.INFO),
+            format="%(asctime)s - %(name)s - %(levelname)s - %(message)s",
+            datefmt="%Y-%m-%d %H:%M:%S",
+        )
+
+# Set SQLAlchemy engine logger to WARNING to reduce query logging noise
+# This must be done BEFORE database.py is imported (which creates the engine)
+# Set explicitly and unconditionally to ensure it takes effect
+sqlalchemy_engine_logger = logging.getLogger("sqlalchemy.engine")
+sqlalchemy_engine_logger.setLevel(logging.WARNING)
+sqlalchemy_engine_logger.propagate = True
+
+sqlalchemy_pool_logger = logging.getLogger("sqlalchemy.pool")
+sqlalchemy_pool_logger.setLevel(logging.WARNING)
+sqlalchemy_pool_logger.propagate = True
+
+sqlalchemy_dialects_logger = logging.getLogger("sqlalchemy.dialects")
+sqlalchemy_dialects_logger.setLevel(logging.WARNING)
+sqlalchemy_dialects_logger.propagate = True
+
+from fastapi import FastAPI  # noqa: E402
+from fastapi.middleware.cors import CORSMiddleware  # noqa: E402
+from fastapi.responses import FileResponse  # noqa: E402
+
+from app.api.routes import (  # noqa: E402
+    calendar,
+    config,
+    health,
+    images,
+    keyboard,
+    plugins,
+    system,
+    web_services,
+)
+from app.services.scheduler import calendar_scheduler  # noqa: E402
 
 # Plugins are auto-discovered via pluggy hooks when modules are imported
 
@@ -19,14 +66,18 @@ logger = logging.getLogger(__name__)
 
 async def _initialize_database():
     """Initialize database and run migrations."""
-    from app.database import init_db
-    from app.utils.migrations import migrate_database
+    from pathlib import Path
 
-    await init_db()
-    logger.info("Database initialized")
+    from app.database import engine
+    from app.utils.db_init import initialize_database
 
-    await migrate_database()
-    logger.info("Database migrations completed")
+    # Extract database path from settings
+    db_path_str = settings.database_url.replace("sqlite:///", "")
+    db_path = Path(db_path_str) if db_path_str.startswith("/") else Path(db_path_str).resolve()
+
+    # Use the unified initialization function
+    await initialize_database(db_path, engine=engine, run_migrations=True)
+    logger.info("Database initialized and migrations completed")
 
 
 async def _create_default_plugin_instance(
@@ -225,6 +276,18 @@ async def _sync_display_orientation():
         logger.warning(f"Failed to sync display orientation on startup: {e}")
 
 
+async def _sync_themes_to_db():
+    """Sync all themes (built-in + installed) to PluginTypeDB on startup."""
+    from app.api.routes.plugins import sync_themes_to_db
+
+    try:
+        await sync_themes_to_db()
+        logger.info("Themes synced to database")
+    except Exception as e:
+        # Don't fail startup if theme sync fails
+        logger.warning(f"Failed to sync themes to database on startup: {e}")
+
+
 async def _shutdown_services():
     """Shutdown all services and schedulers."""
     from app.plugins.manager import plugin_manager
@@ -251,6 +314,7 @@ async def lifespan(app: FastAPI):
     await _initialize_default_config()
     await _start_schedulers()
     await _sync_display_orientation()
+    await _sync_themes_to_db()
 
     yield
 

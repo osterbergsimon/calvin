@@ -469,43 +469,42 @@ class PluginInstaller:
                 result["manifest"] = manifest_data
 
                 # Validate and enumerate plugins from manifest
-                if "plugins" not in manifest_data:
-                    raise ValueError("plugins.json missing 'plugins' array")
-
+                # Support both old format (just "plugins") and new format ("plugins" and "themes")
                 plugins_list = []
-                for plugin_info in manifest_data["plugins"]:
-                    # Validate required fields
-                    if "id" not in plugin_info or "path" not in plugin_info:
-                        continue
+                if "plugins" in manifest_data:
+                    for plugin_info in manifest_data["plugins"]:
+                        # Validate required fields
+                        if "id" not in plugin_info or "path" not in plugin_info:
+                            continue
 
-                    plugin_path_rel = plugin_info["path"]
-                    # Security: prevent path traversal
-                    if ".." in plugin_path_rel or plugin_path_rel.startswith("/"):
-                        continue
+                        plugin_path_rel = plugin_info["path"]
+                        # Security: prevent path traversal
+                        if ".." in plugin_path_rel or plugin_path_rel.startswith("/"):
+                            continue
 
-                    plugin_dir = repo_path / plugin_path_rel
-                    if not plugin_dir.exists() or not plugin_dir.is_dir():
-                        continue
+                        plugin_dir = repo_path / plugin_path_rel
+                        if not plugin_dir.exists() or not plugin_dir.is_dir():
+                            continue
 
-                    # Validate plugin directory
-                    try:
-                        manifest = self._validate_plugin_directory(plugin_dir)
-                        # Add metadata from manifest file
-                        plugin_entry = {
-                            "id": manifest["id"],
-                            "name": plugin_info.get("name", manifest.get("name", "")),
-                            "path": plugin_path_rel,
-                            "description": plugin_info.get(
-                                "description", manifest.get("description", "")
-                            ),
-                            "version": plugin_info.get("version", manifest.get("version", "")),
-                            "type": plugin_info.get("type", manifest.get("type", "")),
-                            "manifest": manifest,
-                        }
-                        plugins_list.append(plugin_entry)
-                    except ValueError:
-                        # Invalid plugin, skip it
-                        continue
+                        # Validate plugin directory
+                        try:
+                            manifest = self._validate_plugin_directory(plugin_dir)
+                            # Add metadata from manifest file
+                            plugin_entry = {
+                                "id": manifest["id"],
+                                "name": plugin_info.get("name", manifest.get("name", "")),
+                                "path": plugin_path_rel,
+                                "description": plugin_info.get(
+                                    "description", manifest.get("description", "")
+                                ),
+                                "version": plugin_info.get("version", manifest.get("version", "")),
+                                "type": plugin_info.get("type", manifest.get("type", "")),
+                                "manifest": manifest,
+                            }
+                            plugins_list.append(plugin_entry)
+                        except ValueError:
+                            # Invalid plugin, skip it
+                            continue
 
                 result["plugins"] = plugins_list
                 return result
