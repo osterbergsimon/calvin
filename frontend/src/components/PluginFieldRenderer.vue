@@ -73,6 +73,31 @@
       @input="$emit('update', $event.target.value)"
     />
 
+    <!-- Checkbox -->
+    <label
+      v-else-if="
+        (ui && ui.component === 'checkbox') ||
+        (schema && typeof schema === 'object' && schema.type === 'boolean')
+      "
+      class="checkbox-label"
+    >
+      <input
+        type="checkbox"
+        :checked="
+          value === true || value === 'true' || value === 1 || value === '1'
+        "
+        class="checkbox-input"
+        @change="$emit('update', $event.target.checked)"
+      />
+      <span class="checkbox-text">
+        {{
+          ui && ui.help_text
+            ? ui.help_text
+            : (schema && schema.description) || fieldKey
+        }}
+      </span>
+    </label>
+
     <!-- Fallback: Default input based on schema type -->
     <input
       v-else-if="
@@ -130,7 +155,7 @@ const props = defineProps({
     default: () => ({}),
   },
   value: {
-    type: String,
+    type: [String, Boolean, Number],
     default: "",
   },
 });
@@ -222,5 +247,24 @@ const ui = computed(() => {
 .help-text a {
   color: var(--accent-color);
   text-decoration: underline;
+}
+
+.checkbox-label {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  cursor: pointer;
+  user-select: none;
+}
+
+.checkbox-input {
+  width: auto;
+  margin: 0;
+  cursor: pointer;
+}
+
+.checkbox-text {
+  color: var(--text-primary);
+  font-size: 0.9rem;
 }
 </style>

@@ -1258,7 +1258,7 @@ async def geocode_location(plugin_id: str, request: dict[str, Any] = Body(...)):
 
 
 @router.post("/plugins/{plugin_id}/test")
-async def test_plugin(plugin_id: str):
+async def test_plugin(plugin_id: str, test_config: dict[str, Any] | None = Body(default=None)):
     """
     Test plugin connection/configuration.
 
@@ -1266,6 +1266,7 @@ async def test_plugin(plugin_id: str):
 
     Args:
         plugin_id: Plugin type ID (e.g., 'imap', 'mealie')
+        test_config: Optional config to use for testing (if not provided, uses saved config)
 
     Returns:
         Test result with success status and message
@@ -1277,21 +1278,25 @@ async def test_plugin(plugin_id: str):
     if not type_info:
         raise HTTPException(status_code=404, detail="Plugin type not found")
 
-    # Get plugin config
-    from app.services.config_service import config_service
-
-    config_key = f"plugin_{plugin_id}_config"
-    config_json = await config_service.get_value(config_key)
-
-    if config_json:
-        import json
-
-        try:
-            config = json.loads(config_json)
-        except json.JSONDecodeError:
-            config = {}
+    # Use provided test_config if available, otherwise get saved config
+    if test_config:
+        config = test_config
     else:
-        config = {}
+        # Get plugin config
+        from app.services.config_service import config_service
+
+        config_key = f"plugin_{plugin_id}_config"
+        config_json = await config_service.get_value(config_key)
+
+        if config_json:
+            import json
+
+            try:
+                config = json.loads(config_json)
+            except json.JSONDecodeError:
+                config = {}
+        else:
+            config = {}
 
     # Call plugin-specific test handlers via hooks
     import asyncio

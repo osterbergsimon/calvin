@@ -1114,13 +1114,6 @@
                       <div class="plugin-header-top">
                         <div class="plugin-info">
                           <div class="plugin-title-row">
-                            <strong>{{ plugin.name }}</strong>
-                            <span
-                              class="plugin-type-badge"
-                              :class="`type-${plugin.type}`"
-                            >
-                              {{ plugin.type }}
-                            </span>
                             <!-- Aggregated running indicator -->
                             <span
                               v-if="
@@ -1134,7 +1127,7 @@
                                 )
                               "
                               :title="
-                                getAggregatedRunningTitle(
+                                getAggregatedRunningTooltip(
                                   pluginInstances[plugin.id],
                                 )
                               "
@@ -1145,40 +1138,50 @@
                                 )
                               }}
                             </span>
-                            <button
-                              v-if="
-                                Object.keys(plugin.config_schema || {}).length >
-                                  0 ||
-                                (pluginInstances[plugin.id] &&
-                                  pluginInstances[plugin.id].length > 0) ||
-                                plugin.type === 'service'
-                              "
-                              class="btn-settings-icon"
-                              :class="{ active: expandedPlugins[plugin.id] }"
-                              @click="togglePluginSettings(plugin.id)"
-                              :title="
-                                Object.keys(plugin.config_schema || {}).length >
-                                0
-                                  ? 'Show settings'
-                                  : 'Show instances'
-                              "
+                            <strong>{{ plugin.name }}</strong>
+                            <span
+                              class="plugin-type-badge"
+                              :class="`type-${plugin.type}`"
                             >
-                              ⚙️
-                            </button>
+                              {{ plugin.type }}
+                            </span>
                           </div>
                           <p class="plugin-description">
                             {{ plugin.description }}
                           </p>
                         </div>
                         <div class="plugin-header-actions">
+                          <!-- Settings button -->
+                          <button
+                            v-if="
+                              Object.keys(plugin.config_schema || {}).length >
+                                0 ||
+                              (pluginInstances[plugin.id] &&
+                                pluginInstances[plugin.id].length > 0) ||
+                              plugin.type === 'service'
+                            "
+                            class="btn-icon-only btn-settings-icon"
+                            :class="{ active: expandedPlugins[plugin.id] }"
+                            @click="togglePluginSettings(plugin.id)"
+                            :title="
+                              expandedPlugins[plugin.id]
+                                ? 'Hide settings'
+                                : Object.keys(plugin.config_schema || {})
+                                      .length > 0
+                                  ? 'Show settings'
+                                  : 'Show instances'
+                            "
+                          >
+                            ⚙️
+                          </button>
                           <!-- Uninstall button (only for installed plugins) -->
                           <button
                             v-if="plugin._installed"
-                            class="btn-remove btn-small"
+                            class="btn-remove btn-icon-only"
                             title="Uninstall this plugin"
                             @click="uninstallPlugin(plugin.id)"
                           >
-                            🗑️ Uninstall
+                            🗑️
                           </button>
                           <label class="toggle-switch">
                             <input
@@ -1333,7 +1336,6 @@
                           >
                             <div class="instance-info">
                               <div class="instance-header">
-                                <h5>{{ instance.name }}</h5>
                                 <span
                                   v-if="instance.running !== undefined"
                                   class="running-indicator"
@@ -1343,71 +1345,48 @@
                                   }"
                                   :title="
                                     instance.running
-                                      ? 'Instance is running'
-                                      : 'Instance is stopped'
+                                      ? '● Green: Instance is running'
+                                      : '○ Red: Instance is stopped'
                                   "
                                 >
                                   {{ instance.running ? "●" : "○" }}
                                 </span>
+                                <h5>{{ instance.name }}</h5>
                               </div>
                               <div
                                 v-if="instance.config"
                                 class="instance-details"
                               >
-                                <!-- Show key config values from instance config -->
-                                <!-- Display first non-empty, non-sensitive string value -->
-                                <template
-                                  v-for="(value, key) in instance.config"
-                                  :key="key"
+                                <!-- Show only the most important config value -->
+                                <div
+                                  v-if="
+                                    getInstanceSummary(
+                                      plugin.id,
+                                      instance.config,
+                                    )
+                                  "
+                                  class="instance-detail-item"
                                 >
-                                  <span
-                                    v-if="
-                                      (typeof value === 'string' ||
-                                        (value && typeof value === 'object')) &&
-                                      ![
-                                        'api_token',
-                                        'api_key',
-                                        'password',
-                                        'token',
-                                      ].some((s) =>
-                                        key.toLowerCase().includes(s),
-                                      )
-                                    "
-                                    class="instance-detail"
-                                  >
+                                  <span class="instance-detail-value">
                                     {{
-                                      typeof value === "object" &&
-                                      value !== null
-                                        ? typeof value.toString === "function"
-                                          ? value.toString()
-                                          : value.path
-                                            ? String(value.path)
-                                            : String(value)
-                                        : value
+                                      getInstanceSummary(
+                                        plugin.id,
+                                        instance.config,
+                                      )
                                     }}
                                   </span>
-                                  <span
-                                    v-else-if="
-                                      (typeof value === 'number' ||
-                                        typeof value === 'boolean') &&
-                                      ![
-                                        'api_token',
-                                        'api_key',
-                                        'password',
-                                        'token',
-                                      ].some((s) =>
-                                        key.toLowerCase().includes(s),
-                                      )
-                                    "
-                                    class="instance-detail"
-                                  >
-                                    {{ String(value) }}
-                                  </span>
-                                </template>
+                                </div>
                               </div>
                             </div>
                             <div class="instance-actions">
-                              <label class="toggle-switch">
+                              <label
+                                class="toggle-switch-small"
+                                :title="
+                                  instance.enabled
+                                    ? 'Disable and stop instance'
+                                    : 'Enable and start instance'
+                                "
+                              >
                                 <input
                                   type="checkbox"
                                   :checked="instance.enabled"
@@ -1418,43 +1397,23 @@
                                     )
                                   "
                                 />
-                                <span class="slider" />
+                                <span class="slider-small" />
                               </label>
                               <button
-                                v-if="
-                                  instance.enabled &&
-                                  instance.running !== undefined
-                                "
-                                class="btn-secondary btn-small"
-                                :class="{ 'btn-stop': instance.running }"
-                                :title="
-                                  instance.running
-                                    ? 'Stop instance'
-                                    : 'Start instance'
-                                "
-                                @click="
-                                  instance.running
-                                    ? stopPluginInstance(instance.id)
-                                    : startPluginInstance(instance.id)
-                                "
-                              >
-                                {{ instance.running ? "Stop" : "Start" }}
-                              </button>
-                              <button
-                                class="btn-edit btn-small"
+                                class="btn-icon-only btn-action"
                                 title="Edit instance"
                                 @click="
                                   openEditInstanceModal(plugin.id, instance)
                                 "
                               >
-                                Edit
+                                ✏️
                               </button>
                               <button
-                                class="btn-remove btn-small"
+                                class="btn-icon-only btn-action btn-action-danger"
                                 title="Delete instance"
                                 @click="deletePluginInstance(instance.id)"
                               >
-                                Delete
+                                🗑️
                               </button>
                             </div>
                           </div>
@@ -2020,6 +1979,39 @@
             </label>
           </div>
 
+          <!-- Test Connection Button (if plugin supports it) -->
+          <div
+            v-if="
+              currentPluginType?.ui_actions &&
+              currentPluginType.ui_actions.some(
+                (action) => action.type === 'test',
+              )
+            "
+            class="form-group"
+          >
+            <button
+              type="button"
+              class="btn-secondary"
+              :disabled="testingInstance"
+              @click="testInstanceConnection"
+            >
+              {{ testingInstance ? "Testing..." : "Test Connection" }}
+            </button>
+            <div
+              v-if="instanceTestStatus"
+              :class="
+                instanceTestStatus.success ? 'success-message' : 'error-message'
+              "
+              style="
+                margin-top: 0.5rem;
+                padding: 0.5rem 1rem;
+                border-radius: 4px;
+              "
+            >
+              {{ instanceTestStatus.message }}
+            </div>
+          </div>
+
           <div class="modal-actions">
             <button
               type="button"
@@ -2204,6 +2196,8 @@ const instanceForm = ref({
 });
 const instanceFormError = ref("");
 const savingInstance = ref(false);
+const testingInstance = ref(false);
+const instanceTestStatus = ref(null);
 const expandedPlugins = ref({}); // Track which plugin settings are expanded
 // const expandedManageImages = ref({}); // Track which plugins have manage images expanded (unused for now)
 const pluginFormData = ref({}); // Store form data before saving
@@ -2741,6 +2735,27 @@ const getAggregatedRunningTitle = (instances) => {
   } else {
     return `${running} running, ${stopped} stopped`;
   }
+};
+
+const getAggregatedRunningTooltip = (instances) => {
+  const running = getRunningCount(instances);
+  const total = instances.length;
+  const stopped = total - running;
+  let statusText = "";
+  let colorText = "";
+
+  if (running === total) {
+    statusText = `All ${total} instance${total !== 1 ? "s" : ""} running`;
+    colorText = "● Green: All instances are running";
+  } else if (running === 0) {
+    statusText = `All ${total} instance${total !== 1 ? "s" : ""} stopped`;
+    colorText = "○ Red: All instances are stopped";
+  } else {
+    statusText = `${running} running, ${stopped} stopped`;
+    colorText = "◐ Orange: Some instances are running";
+  }
+
+  return `${colorText}\n${statusText}`;
 };
 
 // Sort and group plugins by type
@@ -4124,6 +4139,101 @@ const updateInstanceFormValue = (key, value) => {
   instanceForm.value[key] = value;
 };
 
+const getInstanceFieldLabel = (pluginId, fieldKey) => {
+  const plugin = plugins.value.find((p) => p.id === pluginId);
+  if (!plugin || !plugin.instance_config_schema) {
+    // Fallback: format the key nicely
+    return fieldKey.replace(/_/g, " ").replace(/\b\w/g, (l) => l.toUpperCase());
+  }
+  const schema = plugin.instance_config_schema[fieldKey];
+  if (schema && schema.description) {
+    return schema.description;
+  }
+  // Fallback: format the key nicely
+  return fieldKey.replace(/_/g, " ").replace(/\b\w/g, (l) => l.toUpperCase());
+};
+
+const formatInstanceValue = (value, key) => {
+  if (typeof value === "boolean") {
+    return value ? "Yes" : "No";
+  }
+  if (typeof value === "number") {
+    return String(value);
+  }
+  if (typeof value === "object" && value !== null) {
+    if (typeof value.toString === "function") {
+      return value.toString();
+    }
+    if (value.path) {
+      return String(value.path);
+    }
+    return JSON.stringify(value);
+  }
+  // Truncate long strings
+  const str = String(value);
+  if (str.length > 50) {
+    return str.substring(0, 47) + "...";
+  }
+  return str;
+};
+
+const getInstanceSummary = (pluginId, config) => {
+  if (!config || Object.keys(config).length === 0) {
+    return null;
+  }
+
+  const plugin = plugins.value.find((p) => p.id === pluginId);
+  const schema = plugin?.instance_config_schema || {};
+
+  // Priority order: configured URLs (not internal API endpoints), name, title
+  // Exclude internal API URLs that start with /api/
+  const priorityKeys = [
+    "mealie_url",
+    "url",
+    "api_url",
+    "endpoint",
+    "base_url",
+    "server_url",
+    "host",
+    "name",
+    "title",
+  ];
+
+  // Try to find a priority key first (excluding internal API URLs)
+  for (const key of priorityKeys) {
+    const value = config[key];
+    if (
+      value !== null &&
+      value !== undefined &&
+      value !== "" &&
+      typeof value === "string" &&
+      !value.startsWith("/api/") && // Exclude internal API endpoints
+      !value.includes("/api/web-services/") // Exclude internal service endpoints
+    ) {
+      return formatInstanceValue(value, key);
+    }
+  }
+
+  // Otherwise, find the first non-sensitive string value (excluding internal URLs)
+  for (const [key, value] of Object.entries(config)) {
+    if (
+      value !== null &&
+      value !== undefined &&
+      value !== "" &&
+      typeof value === "string" &&
+      !value.startsWith("/api/") && // Exclude internal API endpoints
+      !value.includes("/api/web-services/") && // Exclude internal service endpoints
+      !["api_token", "api_key", "password", "token", "enabled"].some((s) =>
+        key.toLowerCase().includes(s),
+      )
+    ) {
+      return formatInstanceValue(value, key);
+    }
+  }
+
+  return null;
+};
+
 // Instance management functions
 const openAddInstanceModal = (pluginId) => {
   const plugin = plugins.value.find((p) => p.id === pluginId);
@@ -4147,7 +4257,13 @@ const openAddInstanceModal = (pluginId) => {
 
   if (plugin.instance_config_schema) {
     for (const [key, schema] of Object.entries(plugin.instance_config_schema)) {
-      form[key] = schema.default !== undefined ? schema.default : "";
+      if (schema.default !== undefined) {
+        form[key] = schema.default;
+      } else if (schema.type === "boolean") {
+        form[key] = false;
+      } else {
+        form[key] = "";
+      }
     }
   } else {
     logWarn(
@@ -4182,7 +4298,9 @@ const openEditInstanceModal = (pluginId, instance) => {
           ? instance.config[key]
           : schema.default !== undefined
             ? schema.default
-            : "";
+            : schema.type === "boolean"
+              ? false
+              : "";
     }
   }
 
@@ -4196,6 +4314,89 @@ const closeInstanceModal = () => {
   editingInstance.value = null;
   currentPluginType.value = null;
   instanceFormError.value = "";
+  testingInstance.value = false;
+  instanceTestStatus.value = null;
+};
+
+const testInstanceConnection = async () => {
+  testingInstance.value = true;
+  instanceTestStatus.value = null;
+  instanceFormError.value = "";
+
+  try {
+    const pluginId = currentPluginType.value.id;
+    const plugin = currentPluginType.value;
+
+    // Build test config from instance form data
+    const testConfig = {};
+    if (plugin.instance_config_schema) {
+      for (const [key, schema] of Object.entries(
+        plugin.instance_config_schema,
+      )) {
+        // Skip display_order - it's a global plugin setting
+        if (key === "display_order") {
+          continue;
+        }
+        const value = instanceForm.value[key];
+        if (value !== undefined && value !== null) {
+          // Handle different types
+          if (schema.type === "string" && typeof value === "string") {
+            testConfig[key] = value.trim();
+          } else if (schema.type === "integer" || schema.type === "number") {
+            testConfig[key] = Number(value) || schema.default || 0;
+          } else if (schema.type === "boolean") {
+            testConfig[key] = Boolean(value);
+          } else {
+            testConfig[key] = value;
+          }
+        } else if (schema.default !== undefined) {
+          testConfig[key] = schema.default;
+        }
+      }
+    }
+
+    // Also include common_config_schema values if needed
+    if (plugin.config_schema) {
+      for (const [key, schema] of Object.entries(plugin.config_schema)) {
+        // Get from saved plugin config if available
+        const savedValue = pluginConfigs.value[pluginId]?.[key];
+        if (savedValue !== undefined && savedValue !== null) {
+          testConfig[key] = savedValue;
+        } else if (schema.default !== undefined) {
+          testConfig[key] = schema.default;
+        }
+      }
+    }
+
+    // Test connection with instance config
+    const response = await axios.post(
+      `/api/plugins/${pluginId}/test`,
+      testConfig,
+    );
+
+    instanceTestStatus.value = {
+      success: response.data.success,
+      message: response.data.message,
+    };
+
+    // Clear test status after 5 seconds
+    setTimeout(() => {
+      if (instanceTestStatus.value) {
+        instanceTestStatus.value = null;
+      }
+    }, 5000);
+  } catch (error) {
+    console.error("Failed to test instance connection:", error);
+    instanceTestStatus.value = {
+      success: false,
+      message:
+        error.response?.data?.detail ||
+        error.message ||
+        "Failed to test connection",
+    };
+  } finally {
+    testingInstance.value = false;
+  }
 };
 
 const saveInstance = async () => {
@@ -4330,6 +4531,23 @@ const togglePluginInstance = async (instanceId, enabled) => {
       // If not found in web services, we need plugin instance update endpoint
       // For now, this will only work for iframe instances
       throw webServiceError;
+    }
+
+    // If enabling, start the instance; if disabling, stop it
+    if (enabled) {
+      try {
+        await startPluginInstance(instanceId);
+      } catch (startError) {
+        // If start fails, that's okay - instance is enabled but not running
+        console.warn("Failed to start instance after enabling:", startError);
+      }
+    } else {
+      try {
+        await stopPluginInstance(instanceId);
+      } catch (stopError) {
+        // If stop fails, that's okay - instance is disabled
+        console.warn("Failed to stop instance after disabling:", stopError);
+      }
     }
 
     // Reload instances
@@ -5490,15 +5708,14 @@ input:checked + .slider:before {
   color: #fff; /* Keep white for contrast on error background */
   border: none;
   border-radius: 4px;
-  padding: 0.5rem 1rem;
-  font-size: 0.9rem;
   cursor: pointer;
-  transition: background 0.2s;
+  transition: all 0.2s ease;
 }
 
 .btn-remove:hover {
   background: var(--accent-error);
   opacity: 0.9;
+  transform: translateY(-1px);
 }
 
 .btn-stop {
@@ -5901,7 +6118,7 @@ input:checked + .slider:before {
 
 .plugin-header-top {
   display: flex;
-  align-items: flex-start;
+  align-items: center;
   justify-content: space-between;
   gap: 1.5rem;
   width: 100%;
@@ -5912,7 +6129,6 @@ input:checked + .slider:before {
   align-items: center;
   gap: 0.75rem;
   flex-shrink: 0;
-  margin-top: 0.25rem;
 }
 
 .plugin-info {
@@ -5928,6 +6144,11 @@ input:checked + .slider:before {
   min-width: 0; /* Allow flex items to shrink */
 }
 
+.plugin-title-row .running-indicator-aggregate {
+  flex-shrink: 0;
+  margin: 0;
+}
+
 .plugin-title-row strong {
   flex-shrink: 1;
   min-width: 0;
@@ -5936,14 +6157,8 @@ input:checked + .slider:before {
   white-space: nowrap;
 }
 
-.plugin-title-row .btn-settings-icon {
-  flex-shrink: 0;
-  margin-left: auto;
-}
-
 .running-indicator-aggregate {
   font-size: 1rem;
-  margin-left: 0.5rem;
   font-weight: bold;
 }
 
@@ -5957,11 +6172,6 @@ input:checked + .slider:before {
 
 .running-indicator-aggregate.partial {
   color: #ff9800; /* Orange for partially running */
-}
-
-.plugin-title-row .running-indicator {
-  font-size: 0.9rem;
-  margin-left: 0.25rem;
 }
 
 .plugin-type-badge {
@@ -6050,13 +6260,15 @@ input:checked + .slider:before {
 .instance-item {
   display: flex;
   justify-content: space-between;
-  align-items: flex-start;
-  padding: 1rem;
+  align-items: center;
+  padding: 0.75rem 1rem;
   background: var(--bg-tertiary);
   border-radius: 4px;
   border: 1px solid var(--border-color);
   gap: 1rem;
   transition: all 0.2s;
+  min-width: 0;
+  overflow: hidden;
 }
 
 .instance-item:hover {
@@ -6071,19 +6283,33 @@ input:checked + .slider:before {
   flex: 1;
   display: flex;
   flex-direction: column;
-  gap: 0.5rem;
+  gap: 0.25rem;
+  min-width: 0;
+  overflow: hidden;
 }
 
 .instance-header {
   display: flex;
   align-items: center;
   gap: 0.5rem;
+  min-width: 0;
+  flex: 1;
 }
 
 .instance-header h5 {
   margin: 0;
   font-size: 1rem;
   color: var(--text-primary);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  flex: 1;
+  min-width: 0;
+}
+
+.instance-header .running-indicator {
+  flex-shrink: 0;
+  margin: 0;
 }
 
 .running-indicator {
@@ -6100,16 +6326,54 @@ input:checked + .slider:before {
 }
 
 .instance-details {
-  display: flex;
-  flex-direction: column;
-  gap: 0.25rem;
+  margin-top: 0.25rem;
+  min-width: 0;
+  overflow: hidden;
 }
 
-.instance-detail {
-  font-size: 0.85rem;
+.instance-detail-item {
+  display: flex;
+  align-items: center;
+  font-size: 0.875rem;
+  min-width: 0;
+}
+
+.instance-detail-label {
+  font-weight: 500;
   color: var(--text-secondary);
-  font-family: monospace;
-  word-break: break-all;
+  flex-shrink: 0;
+  min-width: fit-content;
+}
+
+.instance-detail-value {
+  color: var(--text-primary);
+  font-size: 0.875rem;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  min-width: 0;
+  max-width: 100%;
+}
+
+.btn-icon-only {
+  padding: 0.4rem;
+  width: 2rem;
+  height: 2rem;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 1rem;
+  line-height: 1;
+  border: 1px solid var(--border-color);
+  border-radius: 4px;
+  background: transparent;
+  transition: all 0.2s ease;
+  flex-shrink: 0;
+}
+
+.btn-icon-only:hover {
+  background: var(--bg-secondary);
+  border-color: var(--accent-primary);
 }
 
 .instance-actions {
@@ -6117,6 +6381,84 @@ input:checked + .slider:before {
   align-items: center;
   gap: 0.5rem;
   flex-shrink: 0;
+  flex-wrap: nowrap;
+}
+
+.btn-action {
+  background: transparent;
+  border: 1px solid var(--border-color);
+  color: var(--text-secondary);
+  font-size: 0.875rem;
+  width: 1.75rem;
+  height: 1.75rem;
+  padding: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 4px;
+  cursor: pointer;
+  transition: all 0.2s ease;
+}
+
+.btn-action:hover {
+  background: var(--bg-secondary);
+  border-color: var(--accent-primary);
+  color: var(--accent-primary);
+}
+
+.btn-action-danger {
+  color: var(--accent-error);
+}
+
+.btn-action-danger:hover {
+  border-color: var(--accent-error);
+  background: rgba(220, 53, 69, 0.1);
+}
+
+.toggle-switch-small {
+  position: relative;
+  display: inline-block;
+  width: 36px;
+  height: 20px;
+  margin: 0;
+}
+
+.toggle-switch-small input {
+  opacity: 0;
+  width: 0;
+  height: 0;
+}
+
+.slider-small {
+  position: absolute;
+  cursor: pointer;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  background-color: var(--text-tertiary);
+  transition: 0.4s;
+  border-radius: 20px;
+}
+
+.slider-small:before {
+  position: absolute;
+  content: "";
+  height: 14px;
+  width: 14px;
+  left: 3px;
+  bottom: 3px;
+  background-color: white;
+  transition: 0.4s;
+  border-radius: 50%;
+}
+
+.toggle-switch-small input:checked + .slider-small {
+  background-color: var(--accent-primary);
+}
+
+.toggle-switch-small input:checked + .slider-small:before {
+  transform: translateX(16px);
 }
 
 .btn-small {
@@ -6711,27 +7053,17 @@ input:checked + .slider:before {
 }
 
 .btn-settings-icon {
-  background: transparent;
-  border: 1px solid var(--border-color);
-  border-radius: 4px;
-  padding: 0.25rem 0.5rem;
-  font-size: 1rem;
-  cursor: pointer;
-  transition: all 0.2s ease;
   color: var(--text-secondary);
-  flex-shrink: 0;
 }
 
 .btn-settings-icon:hover {
-  background: var(--bg-secondary);
-  border-color: var(--accent-primary);
   color: var(--accent-primary);
 }
 
 .btn-settings-icon.active {
   background: var(--accent-primary);
-  border-color: var(--accent-primary);
   color: #fff;
+  border-color: var(--accent-primary);
 }
 
 /* Service Ordering Styles */
