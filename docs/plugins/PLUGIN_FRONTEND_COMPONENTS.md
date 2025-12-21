@@ -35,9 +35,9 @@ This works for:
 
 ### Example: Mealie Plugin
 
-The Mealie plugin demonstrates this:
+The Mealie plugin (available in the calvin-plugins repository) demonstrates this:
 
-**Backend** (`backend/app/plugins/service/mealie.py`):
+**Backend** (in the plugin's `plugin.py`):
 ```python
 "display_schema": {
     "type": "api",
@@ -47,7 +47,7 @@ The Mealie plugin demonstrates this:
 }
 ```
 
-**Frontend Component** (`frontend/src/components/plugins/mealie/MealPlanViewer.vue`):
+**Frontend Component** (in the plugin's `frontend/MealPlanViewer.vue`):
 - This component is loaded dynamically by the `ServiceViewer` component
 - Uses the `usePluginComponent` composable to load plugin-provided components
 

@@ -74,26 +74,6 @@ async def _initialize_plugins():
 
     # Auto-create default instances for image plugins if enabled and no instance exists
     async with AsyncSessionLocal() as session:
-        # Unsplash plugin
-        await _create_default_plugin_instance(
-            plugin_registry,
-            session,
-            type_id="unsplash",
-            plugin_id="unsplash-images",
-            name="Unsplash Images",
-            config={"api_key": "", "category": "popular", "count": 30},
-        )
-
-        # Picsum plugin
-        await _create_default_plugin_instance(
-            plugin_registry,
-            session,
-            type_id="picsum",
-            plugin_id="picsum-images",
-            name="Picsum Photos",
-            config={"count": 30},
-        )
-
         # Local images plugin
         await _create_default_plugin_instance(
             plugin_registry,

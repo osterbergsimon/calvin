@@ -514,7 +514,7 @@ def create_plugin_instance(
 
 ### Example 3: API-Driven Service Plugin
 
-See `backend/app/plugins/service/mealie.py` for a complete example of:
+See the Mealie plugin in the calvin-plugins repository for a complete example of:
 - API authentication
 - Backend proxy endpoints
 - Custom frontend rendering
