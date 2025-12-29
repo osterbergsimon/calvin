@@ -2,6 +2,7 @@
 
 from datetime import UTC, datetime, timedelta
 
+import httpx
 from fastapi import APIRouter, HTTPException, Query
 
 from app.models.calendar import (
@@ -9,6 +10,7 @@ from app.models.calendar import (
     CalendarSource,
     CalendarSourcesResponse,
 )
+from app.plugins.calendar.google import _normalize_google_calendar_url
 from app.services import plugin_calendar_service
 
 router = APIRouter()
@@ -21,6 +23,95 @@ def normalize_datetime(dt: datetime | None) -> datetime | None:
     if dt.tzinfo is None:
         return dt.replace(tzinfo=UTC)
     return dt
+
+
+async def validate_calendar_url(ical_url: str, calendar_type: str) -> None:
+    """
+    Validate that a calendar URL exists and is accessible.
+
+    Args:
+        ical_url: The calendar iCal URL to validate
+        calendar_type: Type of calendar ('google', 'proton', or 'ical')
+
+    Raises:
+        HTTPException: If the calendar URL is invalid, inaccessible, or doesn't exist
+    """
+    if not ical_url or not ical_url.strip():
+        raise HTTPException(
+            status_code=400,
+            detail="Calendar URL is required",
+        )
+
+    # Normalize Google Calendar URLs first
+    url_to_check = ical_url
+    if calendar_type == "google":
+        try:
+            url_to_check = _normalize_google_calendar_url(ical_url)
+        except Exception as e:
+            raise HTTPException(
+                status_code=400,
+                detail=f"Invalid Google Calendar URL format: {str(e)}",
+            ) from e
+
+    # Try to fetch the calendar URL to verify it exists and is accessible
+    try:
+        async with httpx.AsyncClient(timeout=10.0, follow_redirects=True) as client:
+            # Use HEAD request first (lighter weight, doesn't download content)
+            try:
+                response = await client.head(url_to_check)
+                # If HEAD is not supported (405 Method Not Allowed), try GET instead
+                if response.status_code == 405:
+                    response = await client.get(url_to_check, headers={"Range": "bytes=0-8192"})
+            except httpx.HTTPError:
+                # If HEAD fails for other reasons, try GET with limited range
+                response = await client.get(url_to_check, headers={"Range": "bytes=0-8192"})
+
+            # Check if the request was successful
+            # Accept 200 (OK), 206 (Partial Content), or 301/302
+            # (redirects handled by follow_redirects=True)
+            if response.status_code >= 400:
+                raise HTTPException(
+                    status_code=400,
+                    detail=(
+                        f"Calendar URL is not accessible (HTTP {response.status_code}). "
+                        f"Please verify the URL is correct and the calendar is publicly accessible."
+                    ),
+                )
+
+    except httpx.TimeoutException as e:
+        raise HTTPException(
+            status_code=400,
+            detail=(
+                "Timeout while trying to access calendar URL. "
+                "Please check your internet connection and verify the URL is correct."
+            ),
+        ) from e
+    except httpx.ConnectError as e:
+        raise HTTPException(
+            status_code=400,
+            detail=(
+                "Unable to connect to calendar URL. "
+                "Please verify the URL is correct and the server is reachable."
+            ),
+        ) from e
+    except httpx.HTTPStatusError as e:
+        # This is raised by httpx when status_code >= 400 and raise_for_status() is called
+        # But we're checking status_code manually, so this should be rare
+        raise HTTPException(
+            status_code=400,
+            detail=(
+                f"Calendar URL returned HTTP {e.response.status_code}. "
+                f"Please verify the URL is correct and the calendar is publicly accessible."
+            ),
+        ) from e
+    except HTTPException:
+        # Re-raise HTTPException that we've already raised
+        raise
+    except Exception as e:
+        raise HTTPException(
+            status_code=400,
+            detail=f"Error validating calendar URL: {str(e)}. Please verify the URL is correct.",
+        ) from e
 
 
 @router.get("/calendar/events", response_model=CalendarEventsResponse)
@@ -184,6 +275,11 @@ async def add_calendar_source(source: CalendarSource):
                 detail="Invalid Proton Calendar URL. Must include '/calendar.ics' endpoint.",
             )
 
+    # Validate that the calendar URL exists and is accessible
+    # Check if ical_url is provided (even if empty, we want to validate it)
+    if source.ical_url is not None:
+        await validate_calendar_url(source.ical_url, source.type)
+
     # Determine plugin type_id
     type_id = (
         "google" if source.type == "google" else ("proton" if source.type == "proton" else "ical")
@@ -218,6 +314,29 @@ async def update_calendar_source(source_id: str, source: CalendarSource):
     from app.plugins.loader import plugin_loader
     from app.plugins.manager import plugin_manager
     from app.plugins.protocols import CalendarPlugin
+
+    # Validate Proton Calendar URL format if URL is provided
+    if source.type == "proton" and source.ical_url:
+        proton_url_prefix = "https://calendar.proton.me/api/calendar/v1/url/"
+        if not source.ical_url.startswith(proton_url_prefix):
+            raise HTTPException(
+                status_code=400,
+                detail=(
+                    "Invalid Proton Calendar URL. Expected format: "
+                    "https://calendar.proton.me/api/calendar/v1/url/"
+                    "{calendar_id}/calendar.ics?CacheKey=...&PassphraseKey=..."
+                ),
+            )
+        if "/calendar.ics" not in source.ical_url:
+            raise HTTPException(
+                status_code=400,
+                detail="Invalid Proton Calendar URL. Must include '/calendar.ics' endpoint.",
+            )
+
+    # Validate that the calendar URL exists and is accessible if URL is provided
+    # Check if ical_url is provided (even if empty, we want to validate it)
+    if source.ical_url is not None:
+        await validate_calendar_url(source.ical_url, source.type)
 
     # Update in database first
     async with AsyncSessionLocal() as session:
