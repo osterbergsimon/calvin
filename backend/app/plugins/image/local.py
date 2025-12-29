@@ -117,8 +117,16 @@ class LocalImagePlugin(ImagePlugin):
         Returns:
             List of image metadata dictionaries
         """
+        print(f"[Local Images] get_images() called for plugin {self.plugin_id}")
+        print(f"[Local Images] image_dir: {self.image_dir}")
+        cache_size = len(self._images) if self._images else 0
+        print(f"[Local Images] _images cache before scan: {cache_size} images")
         await self.scan_images()
-        return self._images.copy()
+        cache_size_after = len(self._images) if self._images else 0
+        print(f"[Local Images] _images cache after scan: {cache_size_after} images")
+        result = self._images.copy()
+        print(f"[Local Images] Returning {len(result)} images")
+        return result
 
     async def get_image(self, image_id: str) -> dict[str, Any] | None:
         """
@@ -164,14 +172,27 @@ class LocalImagePlugin(ImagePlugin):
         Returns:
             List of image metadata dictionaries
         """
+        import logging
+
+        logger = logging.getLogger(__name__)
+
+        logger.debug(f"[Local Images] scan_images() called for plugin {self.plugin_id}")
+        logger.debug(f"[Local Images] image_dir: {self.image_dir}")
+        logger.debug(f"[Local Images] image_dir exists: {self.image_dir.exists()}")
+
         images = []
         if not self.image_dir.exists():
+            logger.warning(f"[Local Images] image_dir does not exist: {self.image_dir}")
             self._images = []
             return []
+
+        all_files = list(self.image_dir.iterdir())
+        logger.debug(f"[Local Images] Found {len(all_files)} files/dirs in image_dir")
 
         for file_path in sorted(self.image_dir.iterdir()):
             if file_path.is_file() and file_path.suffix.lower() in self.supported_formats:
                 try:
+                    logger.debug(f"[Local Images] Processing image file: {file_path.name}")
                     # Get image metadata
                     with Image.open(file_path) as img:
                         width, height = img.size
@@ -197,10 +218,21 @@ class LocalImagePlugin(ImagePlugin):
                                 "source": self.plugin_id,  # Mark which plugin provided this
                             }
                         )
+                        logger.debug(
+                            f"[Local Images] Added image: {file_path.name} (id: {image_id})"
+                        )
                 except Exception as e:
-                    print(f"Error reading image {file_path}: {e}")
+                    logger.warning(f"[Local Images] Error reading image {file_path}: {e}")
                     continue
+            else:
+                is_file = file_path.is_file()
+                suffix = file_path.suffix.lower()
+                logger.debug(
+                    f"[Local Images] Skipping {file_path.name} "
+                    f"(is_file: {is_file}, suffix: {suffix})"
+                )
 
+        logger.debug(f"[Local Images] scan_images() found {len(images)} images total")
         self._images = images
         return images
 
@@ -216,6 +248,8 @@ class LocalImagePlugin(ImagePlugin):
             Image metadata dictionary or None if upload failed
         """
         try:
+            # Ensure image directory exists
+            self.image_dir.mkdir(parents=True, exist_ok=True)
             # Save file to image directory
             file_path = self.image_dir / filename
             with open(file_path, "wb") as f:
@@ -270,6 +304,9 @@ class LocalImagePlugin(ImagePlugin):
     def _generate_thumbnail(self, image_path: Path, thumbnail_path: Path) -> None:
         """Generate a thumbnail for an image."""
         try:
+            # Ensure thumbnail directory exists
+            self.thumbnail_dir.mkdir(parents=True, exist_ok=True)
+
             with Image.open(image_path) as img:
                 # Handle EXIF orientation
                 img = ImageOps.exif_transpose(img)
@@ -324,10 +361,16 @@ def create_plugin_instance(
 
     enabled = config.get("enabled", False)  # Default to disabled
 
-    # Use hardcoded directory - no configuration needed
+    # Use IMAGE_DIR environment variable if set, otherwise use hardcoded directory
     # Images are stored in ./data/images (relative to current working directory)
     # Resolve to absolute path for reliability
-    image_dir = Path("./data/images").resolve()
+    import os
+
+    image_dir_str = os.getenv("IMAGE_DIR")
+    if image_dir_str:
+        image_dir = Path(image_dir_str).resolve()
+    else:
+        image_dir = Path("./data/images").resolve()
 
     # Thumbnail directory is always image_dir/thumbnails
     # We pass None and let the plugin set it automatically
@@ -367,8 +410,16 @@ async def handle_plugin_config_update(
     plugin_instance_id = "local-images"
 
     # Check if Local Images instance exists
-    result = session.execute(select(PluginDB).where(PluginDB.type_id == "local"))
-    local_instance = result.scalar_one_or_none()
+    # Note: session is async, but we're in an async function, so we can await
+    # However, the hook signature might pass a sync session, so we need to handle both
+    try:
+        # Try async first
+        result = await session.execute(select(PluginDB).where(PluginDB.type_id == "local"))
+        local_instance = result.scalar_one_or_none()
+    except TypeError:
+        # Fallback to sync if session is not async
+        result = session.execute(select(PluginDB).where(PluginDB.type_id == "local"))
+        local_instance = result.scalar_one_or_none()
 
     if not local_instance:
         # Create new Local Images instance with hardcoded config
@@ -377,6 +428,23 @@ async def handle_plugin_config_update(
             instance_enabled = (
                 enabled if enabled is not None else (db_type.enabled if db_type else True)
             )
+            # Check if plugin is already registered in plugin_manager
+            existing_plugin = plugin_manager.get_plugin(plugin_instance_id)
+            if existing_plugin:
+                # Plugin already exists, just ensure it's enabled
+                logger.info(
+                    f"[Local Images] Plugin {plugin_instance_id} already registered, "
+                    f"ensuring it's enabled"
+                )
+                if instance_enabled and not existing_plugin.enabled:
+                    existing_plugin.enable()
+                elif not instance_enabled and existing_plugin.enabled:
+                    existing_plugin.disable()
+                return {
+                    "instance_created": False,
+                    "instance_id": plugin_instance_id,
+                    "already_exists": True,
+                }
             # No config needed - uses hardcoded directory
             plugin = await plugin_registry.register_plugin(
                 plugin_id=plugin_instance_id,
@@ -389,6 +457,28 @@ async def handle_plugin_config_update(
                 "instance_created": True,
                 "instance_id": plugin_instance_id,
             }
+        except ValueError as e:
+            # Plugin already registered - this is okay, just ensure it's enabled
+            if "already registered" in str(e):
+                logger.info(
+                    f"[Local Images] Plugin {plugin_instance_id} already registered, "
+                    f"ensuring it's enabled"
+                )
+                existing_plugin = plugin_manager.get_plugin(plugin_instance_id)
+                if existing_plugin:
+                    instance_enabled = (
+                        enabled if enabled is not None else (db_type.enabled if db_type else True)
+                    )
+                    if instance_enabled and not existing_plugin.enabled:
+                        existing_plugin.enable()
+                    elif not instance_enabled and existing_plugin.enabled:
+                        existing_plugin.disable()
+                return {
+                    "instance_created": False,
+                    "instance_id": plugin_instance_id,
+                    "already_exists": True,
+                }
+            raise
         except Exception as e:
             logger.error(f"[Local Images] Failed to create instance: {e}", exc_info=True)
             return {"instance_created": False, "error": str(e)}
@@ -401,33 +491,75 @@ async def handle_plugin_config_update(
                 f"recreating with correct ID ({plugin_instance_id})"
             )
             session.delete(local_instance)
-            await session.commit()
+            try:
+                await session.commit()
+            except TypeError:
+                session.commit()
             # Create the correct instance
             instance_enabled = (
                 enabled if enabled is not None else (db_type.enabled if db_type else True)
             )
-            plugin = await plugin_registry.register_plugin(
-                plugin_id=plugin_instance_id,
-                type_id="local",
-                name="Local Images",
-                config={},
-                enabled=instance_enabled,
-            )
-            return {
-                "instance_created": True,
-                "instance_id": plugin_instance_id,
-            }
+            try:
+                plugin = await plugin_registry.register_plugin(
+                    plugin_id=plugin_instance_id,
+                    type_id="local",
+                    name="Local Images",
+                    config={},
+                    enabled=instance_enabled,
+                )
+                return {
+                    "instance_created": True,
+                    "instance_id": plugin_instance_id,
+                }
+            except ValueError as e:
+                # Plugin already registered - this is okay
+                if "already registered" in str(e):
+                    existing_plugin = plugin_manager.get_plugin(plugin_instance_id)
+                    if existing_plugin:
+                        if instance_enabled and not existing_plugin.enabled:
+                            existing_plugin.enable()
+                        elif not instance_enabled and existing_plugin.enabled:
+                            existing_plugin.disable()
+                    return {
+                        "instance_created": False,
+                        "instance_id": plugin_instance_id,
+                        "already_exists": True,
+                    }
+                raise
         # Update existing Local Images instance
         logger.info(f"[Local Images] Updating existing instance: {local_instance.id}")
+        instance_enabled = (
+            enabled if enabled is not None else (db_type.enabled if db_type else True)
+        )
+
+        # Update database
+        if local_instance.enabled != instance_enabled:
+            local_instance.enabled = instance_enabled
+            try:
+                await session.commit()
+            except TypeError:
+                session.commit()
+
+        # Update plugin in memory
         plugin = plugin_manager.get_plugin(local_instance.id)
         if plugin:
-            # No config to update - uses hardcoded directory
-            instance_enabled = (
-                enabled
-                if enabled is not None
-                else (db_type.enabled if db_type else local_instance.enabled)
-            )
+            # Check if IMAGE_DIR environment variable has changed
+            import os
 
+            current_image_dir = os.getenv("IMAGE_DIR")
+            if current_image_dir:
+                new_image_dir = Path(current_image_dir).resolve()
+                if plugin.image_dir.resolve() != new_image_dir:
+                    logger.info(
+                        f"[Local Images] IMAGE_DIR changed from {plugin.image_dir} "
+                        f"to {new_image_dir}, updating plugin"
+                    )
+                    plugin.image_dir = new_image_dir
+                    plugin.image_dir.mkdir(parents=True, exist_ok=True)
+                    plugin.thumbnail_dir = plugin.image_dir / "thumbnails"
+                    plugin.thumbnail_dir.mkdir(parents=True, exist_ok=True)
+
+            # No config to update - uses hardcoded directory
             if instance_enabled:
                 plugin.enable()
                 if not plugin.is_running():
@@ -436,6 +568,29 @@ async def handle_plugin_config_update(
                         plugin.start()
                     except Exception as e:
                         logger.error(f"[Local Images] Error starting plugin: {e}", exc_info=True)
+                else:
+                    # Plugin is already running, but re-scan for new images
+                    # Also ensure image_dir is correct (in case IMAGE_DIR changed)
+                    import os
+
+                    current_image_dir = os.getenv("IMAGE_DIR")
+                    if current_image_dir:
+                        new_image_dir = Path(current_image_dir).resolve()
+                        if plugin.image_dir.resolve() != new_image_dir:
+                            logger.info(
+                                f"[Local Images] Updating image_dir from {plugin.image_dir} "
+                                f"to {new_image_dir}"
+                            )
+                            plugin.image_dir = new_image_dir
+                            plugin.image_dir.mkdir(parents=True, exist_ok=True)
+                            plugin.thumbnail_dir = plugin.image_dir / "thumbnails"
+                            plugin.thumbnail_dir.mkdir(parents=True, exist_ok=True)
+                    try:
+                        await plugin.scan_images()
+                    except Exception as e:
+                        logger.warning(
+                            f"[Local Images] Error re-scanning images: {e}", exc_info=True
+                        )
             else:
                 plugin.disable()
                 if plugin.is_running():
