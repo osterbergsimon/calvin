@@ -193,19 +193,13 @@ class TestImageAPI:
 
             print(f"[TEST DEBUG] Plugin image_dir AFTER update: {plugin.image_dir}")
             print(f"[TEST DEBUG] Plugin image_dir exists: {plugin.image_dir.exists()}")
-            files_list = (
-                list(plugin.image_dir.glob("*"))
-                if plugin.image_dir.exists()
-                else "N/A"
-            )
+            files_list = list(plugin.image_dir.glob("*")) if plugin.image_dir.exists() else "N/A"
             print(f"[TEST DEBUG] Files in plugin image_dir: {files_list}")
 
             # Verify images exist in the directory
             image_files_in_dir = list(temp_image_dir.glob("test_image_*"))
             print(f"[TEST DEBUG] Image files in temp_image_dir: {len(image_files_in_dir)}")
-            assert (
-                len(image_files_in_dir) >= 3
-            ), (
+            assert len(image_files_in_dir) >= 3, (
                 f"Expected at least 3 test images, found {len(image_files_in_dir)} "
                 f"in {temp_image_dir}"
             )
@@ -218,9 +212,7 @@ class TestImageAPI:
                 filename = img.get("filename")
                 img_id = img.get("id")
                 img_path = img.get("path")
-                print(
-                    f"[TEST DEBUG]   - {filename} (id: {img_id}, path: {img_path})"
-                )
+                print(f"[TEST DEBUG]   - {filename} (id: {img_id}, path: {img_path})")
 
             assert len(scanned_images) >= 3, (
                 f"Plugin scanned {len(scanned_images)} images, expected at least 3. "
