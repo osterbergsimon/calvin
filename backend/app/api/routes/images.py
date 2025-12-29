@@ -18,14 +18,20 @@ async def list_images():
     Returns:
         List of image metadata
     """
+    print("[API] /images/list called")
+
     # Get randomize setting from config
     from app.services.config_service import config_service
 
     randomize_value = await config_service.get_value("randomize_images")
     randomize = randomize_value == "true" if randomize_value else False
+    print(f"[API] randomize_images config: {randomize_value}, randomize: {randomize}")
 
     # Use plugin service to aggregate images from all plugins
+    print("[API] Calling plugin_image_service.get_images()...")
     images = await plugin_image_service.get_images(randomize=randomize)
+    print(f"[API] plugin_image_service.get_images() returned {len(images)} images")
+
     return {"images": images, "total": len(images)}
 
 

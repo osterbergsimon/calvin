@@ -75,18 +75,39 @@ class PluginImageService:
 
         # Get all enabled image plugins
         plugins = plugin_manager.get_plugins(PluginType.IMAGE, enabled_only=True)
+        print(f"[PluginImageService] Found {len(plugins)} enabled image plugins")
+        for p in plugins:
+            running = p.is_running()
+            print(
+                f"[PluginImageService]   - {p.plugin_id} "
+                f"(enabled: {p.enabled}, running: {running})"
+            )
+            if hasattr(p, "image_dir"):
+                print(f"[PluginImageService]     image_dir: {p.image_dir}")
 
         # Group plugins by type_id and sort by plugin type display_order
         plugins_by_type: dict[str, list[BasePlugin]] = {}
+        print(f"[PluginImageService] plugin_type_map: {plugin_type_map}")
         for plugin in plugins:
+            print(f"[PluginImageService] Processing plugin {plugin.plugin_id}")
             if not isinstance(plugin, ImagePlugin):
+                print(
+                    f"[PluginImageService] Plugin {plugin.plugin_id} "
+                    f"is not an ImagePlugin, skipping"
+                )
                 continue
 
             type_id = plugin_type_map.get(plugin.plugin_id)
+            print(f"[PluginImageService] Plugin {plugin.plugin_id} has type_id: {type_id}")
             if type_id:
                 # Check if plugin type is enabled
                 type_enabled = enabled_type_map.get(type_id, True)
+                print(f"[PluginImageService] Plugin type {type_id} enabled: {type_enabled}")
                 if not type_enabled:
+                    print(
+                        f"[PluginImageService] Skipping plugin {plugin.plugin_id} - "
+                        f"plugin type {type_id} is disabled"
+                    )
                     logger.debug(
                         f"Skipping plugin {plugin.plugin_id} - plugin type {type_id} is disabled"
                     )
@@ -95,6 +116,15 @@ class PluginImageService:
                 if type_id not in plugins_by_type:
                     plugins_by_type[type_id] = []
                 plugins_by_type[type_id].append(plugin)
+                print(
+                    f"[PluginImageService] Added plugin {plugin.plugin_id} "
+                    f"to plugins_by_type[{type_id}]"
+                )
+            else:
+                print(
+                    f"[PluginImageService] WARNING: Plugin {plugin.plugin_id} "
+                    f"has no type_id in plugin_type_map!"
+                )
 
         # Sort plugin types by display_order
         sorted_type_ids = sorted(
@@ -111,11 +141,43 @@ class PluginImageService:
 
             for plugin in type_plugins:
                 try:
+                    print(f"[PluginImageService] Getting images from plugin {plugin.plugin_id}")
+                    if hasattr(plugin, "image_dir"):
+                        print(
+                            f"[PluginImageService] Plugin {plugin.plugin_id} "
+                            f"image_dir: {plugin.image_dir}"
+                        )
+                    print("[PluginImageService] Calling plugin.get_images()...")
                     plugin_images = await plugin.get_images()
+                    img_count = len(plugin_images) if plugin_images else 0
+                    print(
+                        f"[PluginImageService] Plugin {plugin.plugin_id} "
+                        f"returned {img_count} images"
+                    )
                     if plugin_images:
+                        img_count = len(plugin_images)
+                        print(
+                            f"[PluginImageService] Adding {img_count} images "
+                            f"from plugin {plugin.plugin_id}"
+                        )
                         images_by_plugin.append((plugin.plugin_id, plugin_images))
+                    else:
+                        print(
+                            f"[PluginImageService] Plugin {plugin.plugin_id} "
+                            f"returned no images - skipping"
+                        )
                 except Exception as e:
-                    logger.error(f"Error fetching images from image plugin {plugin.plugin_id}: {e}")
+                    print(
+                        f"[PluginImageService] ERROR fetching images from plugin "
+                        f"{plugin.plugin_id}: {e}"
+                    )
+                    import traceback
+
+                    traceback.print_exc()
+                    logger.error(
+                        f"Error fetching images from image plugin {plugin.plugin_id}: {e}",
+                        exc_info=True,
+                    )
 
         # Combine images, respecting plugin order
         images = []
@@ -130,16 +192,19 @@ class PluginImageService:
 
         # Store original order
         self._all_images = images.copy()
+        print(f"[PluginImageService] Total images collected: {len(images)}")
 
         # Apply global randomization if requested (overrides per-plugin randomization)
         if randomize and images:
             randomized = images.copy()
             random.shuffle(randomized)
             self._randomized_order = randomized
+            print(f"[PluginImageService] Returning {len(randomized)} randomized images")
             return randomized
 
         # Store original order as randomized order when not randomizing
         self._randomized_order = images.copy()
+        print(f"[PluginImageService] Returning {len(images)} images (not randomized)")
         return images
 
     async def get_current_image(self, randomize: bool = False) -> dict[str, Any] | None:
