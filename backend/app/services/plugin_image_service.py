@@ -4,7 +4,7 @@ import logging
 import random
 from typing import Any
 
-from app.plugins.base import PluginType
+from app.plugins.base import BasePlugin, PluginType
 from app.plugins.manager import plugin_manager
 from app.plugins.protocols import ImagePlugin
 
@@ -21,52 +21,70 @@ class PluginImageService:
         self._all_images: list[dict[str, Any]] = []
         self._randomized_order: list[dict[str, Any]] = []
 
-    async def get_images(self, randomize: bool = False) -> list[dict[str, Any]]:
+    async def get_images(
+        self, randomize: bool = False, randomize_per_plugin: bool = False
+    ) -> list[dict[str, Any]]:
         """
-        Get list of all images from all enabled image plugins.
+        Get list of all images from all enabled image plugins, ordered by display_order.
 
         Args:
-            randomize: Whether to randomize the order of images
+            randomize: Whether to randomize the order of images (global randomization)
+            randomize_per_plugin: Whether to randomize images within each plugin
+                (per-plugin randomization, respects plugin order)
 
         Returns:
             List of image metadata dictionaries
         """
-        images = []
-
-        # Get all enabled image plugins
-        plugins = plugin_manager.get_plugins(PluginType.IMAGE, enabled_only=True)
-
-        # Also check if plugin types are enabled
         from sqlalchemy import select
 
         from app.database import AsyncSessionLocal
         from app.models.db_models import PluginDB, PluginTypeDB
 
-        # Get enabled plugin types
+        # Get enabled plugin types with their display_order from common_config_schema
         async with AsyncSessionLocal() as session:
-            # Get all image plugin types and their enabled status
+            # Get all image plugin types and their enabled status + display_order
             result = await session.execute(
                 select(PluginTypeDB).where(PluginTypeDB.plugin_type == "image")
             )
             plugin_types = result.scalars().all()
-            # Create a map of type_id -> enabled status (default to True if not in DB)
+            # Create maps: type_id -> enabled status, type_id -> display_order
             enabled_type_map = {pt.type_id: pt.enabled for pt in plugin_types}
+            plugin_type_order_map = {}
+            for pt in plugin_types:
+                common_config = pt.common_config_schema or {}
+                # display_order is stored in common_config_schema (like service plugins)
+                display_order = common_config.get("display_order", 0)
+                try:
+                    display_order = int(display_order) if display_order else 0
+                except (ValueError, TypeError):
+                    display_order = 0
+                plugin_type_order_map[pt.type_id] = display_order
 
-            # Get type_id for each plugin instance
-            result = await session.execute(select(PluginDB).where(PluginDB.plugin_type == "image"))
+            # Get all image plugin instances with their display_order
+            result = await session.execute(
+                select(PluginDB)
+                .where(PluginDB.plugin_type == "image")
+                .order_by(PluginDB.display_order, PluginDB.name)
+            )
             db_plugins = result.scalars().all()
-            # Create a map of plugin_id -> type_id
+            # Create maps: plugin_id -> type_id, plugin_id -> display_order
             plugin_type_map = {db_plugin.id: db_plugin.type_id for db_plugin in db_plugins}
+            plugin_order_map = {
+                db_plugin.id: (db_plugin.display_order or 0) for db_plugin in db_plugins
+            }
 
-        # Fetch images from all plugins, but only if plugin type is enabled
+        # Get all enabled image plugins
+        plugins = plugin_manager.get_plugins(PluginType.IMAGE, enabled_only=True)
+
+        # Group plugins by type_id and sort by plugin type display_order
+        plugins_by_type: dict[str, list[BasePlugin]] = {}
         for plugin in plugins:
             if not isinstance(plugin, ImagePlugin):
                 continue
 
-            # Check if this plugin's type is enabled
             type_id = plugin_type_map.get(plugin.plugin_id)
             if type_id:
-                # Check if plugin type is enabled (default to True if not in map)
+                # Check if plugin type is enabled
                 type_enabled = enabled_type_map.get(type_id, True)
                 if not type_enabled:
                     logger.debug(
@@ -74,16 +92,46 @@ class PluginImageService:
                     )
                     continue
 
-            try:
-                plugin_images = await plugin.get_images()
+                if type_id not in plugins_by_type:
+                    plugins_by_type[type_id] = []
+                plugins_by_type[type_id].append(plugin)
+
+        # Sort plugin types by display_order
+        sorted_type_ids = sorted(
+            plugins_by_type.keys(),
+            key=lambda tid: (plugin_type_order_map.get(tid, 0), tid),
+        )
+
+        # Fetch images from plugins in order, grouping by plugin
+        images_by_plugin: list[tuple[str, list[dict[str, Any]]]] = []
+        for type_id in sorted_type_ids:
+            type_plugins = plugins_by_type[type_id]
+            # Sort instances within this plugin type by display_order
+            type_plugins.sort(key=lambda p: (plugin_order_map.get(p.plugin_id, 0), p.plugin_id))
+
+            for plugin in type_plugins:
+                try:
+                    plugin_images = await plugin.get_images()
+                    if plugin_images:
+                        images_by_plugin.append((plugin.plugin_id, plugin_images))
+                except Exception as e:
+                    logger.error(f"Error fetching images from image plugin {plugin.plugin_id}: {e}")
+
+        # Combine images, respecting plugin order
+        images = []
+        for plugin_id, plugin_images in images_by_plugin:
+            # Apply per-plugin randomization if requested
+            if randomize_per_plugin and plugin_images:
+                randomized_plugin_images = plugin_images.copy()
+                random.shuffle(randomized_plugin_images)
+                images.extend(randomized_plugin_images)
+            else:
                 images.extend(plugin_images)
-            except Exception as e:
-                logger.error(f"Error fetching images from image plugin {plugin.plugin_id}: {e}")
 
         # Store original order
         self._all_images = images.copy()
 
-        # Randomize if requested
+        # Apply global randomization if requested (overrides per-plugin randomization)
         if randomize and images:
             randomized = images.copy()
             random.shuffle(randomized)

@@ -923,49 +923,281 @@
             >
               <div class="setting-item">
                 <p class="help-text">
-                  Configure the display order of service plugins. Lower numbers
-                  appear first in the service rotation. Drag to reorder or use
-                  the number inputs.
+                  Configure the display order of service plugins and their
+                  instances. Drag plugins to reorder them, and drag instances
+                  within each plugin to reorder instances. Each level can only
+                  be reordered within its own scope.
                 </p>
               </div>
-              <div class="service-ordering-list">
-                <div
-                  v-for="(plugin, index) in sortedServicePlugins"
-                  :key="plugin.id"
-                  class="service-plugin-order-item"
+              <div class="service-ordering-tree">
+                <draggable
+                  v-model="draggableServicePlugins"
+                  :animation="200"
+                  handle=".plugin-drag-handle"
+                  group="plugins"
+                  @start="onServicePluginDragStart"
+                  @end="onServicePluginDragEnd"
+                  item-key="id"
                 >
-                  <div class="service-plugin-order-handle">
-                    <span class="order-number">{{ index + 1 }}</span>
-                    <span class="drag-handle">⋮⋮</span>
-                  </div>
-                  <div class="service-plugin-info">
-                    <strong>{{ plugin.name }}</strong>
-                    <span
-                      v-if="
-                        pluginInstances[plugin.id] &&
-                        pluginInstances[plugin.id].length > 0
-                      "
-                      class="instance-count-badge"
-                    >
-                      {{ pluginInstances[plugin.id].length }}
-                      {{
-                        pluginInstances[plugin.id].length === 1
-                          ? "instance"
-                          : "instances"
-                      }}
-                    </span>
-                  </div>
-                  <div class="service-plugin-order-control">
-                    <label>Order:</label>
-                    <input
-                      v-model.number="pluginDisplayOrders[plugin.id]"
-                      type="number"
-                      class="order-input"
-                      min="0"
-                      @change="updateServicePluginOrder(plugin.id)"
-                    />
-                  </div>
-                </div>
+                  <template #item="{ element: plugin, index }">
+                    <div class="service-plugin-tree-item">
+                      <div class="service-plugin-tree-header">
+                        <div class="service-plugin-order-handle">
+                          <span class="order-number">{{ index + 1 }}</span>
+                          <span
+                            class="plugin-drag-handle"
+                            title="Drag to reorder plugins"
+                            >⋮⋮</span
+                          >
+                        </div>
+                        <div class="service-plugin-info">
+                          <strong>{{ plugin.name }}</strong>
+                          <span
+                            v-if="
+                              draggableInstances[plugin.id] &&
+                              draggableInstances[plugin.id].length > 0
+                            "
+                            class="instance-count-badge"
+                          >
+                            {{ draggableInstances[plugin.id].length }}
+                            {{
+                              draggableInstances[plugin.id].length === 1
+                                ? "instance"
+                                : "instances"
+                            }}
+                          </span>
+                        </div>
+                        <div class="service-plugin-order-control">
+                          <label>Order:</label>
+                          <input
+                            v-model.number="pluginDisplayOrders[plugin.id]"
+                            type="number"
+                            class="order-input"
+                            min="0"
+                            @change="updateServicePluginOrder(plugin.id)"
+                          />
+                        </div>
+                      </div>
+                      <!-- Nested instances list -->
+                      <div
+                        v-if="
+                          draggableInstances[plugin.id] &&
+                          draggableInstances[plugin.id].length > 0
+                        "
+                        class="plugin-instances-tree"
+                      >
+                        <draggable
+                          v-model="draggableInstances[plugin.id]"
+                          :animation="200"
+                          handle=".instance-drag-handle"
+                          group="instances"
+                          :data-plugin-id="plugin.id"
+                          @start="onInstanceDragStart(plugin.id)"
+                          @end="onInstanceDragEnd(plugin.id)"
+                          item-key="id"
+                        >
+                          <template #item="{ element: instance, index }">
+                            <div class="instance-tree-item">
+                              <div class="instance-tree-header">
+                                <span
+                                  class="instance-drag-handle"
+                                  title="Drag to reorder instances"
+                                  >⋮⋮</span
+                                >
+                                <span
+                                  v-if="instance.running !== undefined"
+                                  class="running-indicator"
+                                  :class="{
+                                    running: instance.running,
+                                    stopped: !instance.running,
+                                  }"
+                                  :title="
+                                    instance.running
+                                      ? '● Green: Instance is running'
+                                      : '○ Red: Instance is stopped'
+                                  "
+                                >
+                                  {{ instance.running ? "●" : "○" }}
+                                </span>
+                                <span class="instance-name">{{
+                                  instance.name
+                                }}</span>
+                                <span
+                                  v-if="
+                                    instance.config &&
+                                    getInstanceSummary(
+                                      plugin.id,
+                                      instance.config,
+                                    )
+                                  "
+                                  class="instance-summary"
+                                >
+                                  {{
+                                    getInstanceSummary(
+                                      plugin.id,
+                                      instance.config,
+                                    )
+                                  }}
+                                </span>
+                              </div>
+                            </div>
+                          </template>
+                        </draggable>
+                      </div>
+                      <div v-else class="no-instances-message">
+                        <span class="help-text">No instances configured</span>
+                      </div>
+                    </div>
+                  </template>
+                </draggable>
+              </div>
+            </div>
+          </section>
+
+          <!-- Image Ordering -->
+          <section
+            class="settings-section collapsible"
+            :class="{ expanded: expandedSections.imageOrdering }"
+          >
+            <div class="section-header" @click="toggleSection('imageOrdering')">
+              <h2>Image Ordering</h2>
+              <span class="toggle-icon">{{
+                expandedSections.imageOrdering ? "▼" : "▶"
+              }}</span>
+            </div>
+            <div
+              v-show="expandedSections.imageOrdering"
+              class="section-content"
+            >
+              <div class="setting-item">
+                <p class="help-text">
+                  Configure the display order of image plugins and their
+                  instances. Drag plugins to reorder them, and drag instances
+                  within each plugin to reorder instances. Each level can only
+                  be reordered within its own scope.
+                </p>
+              </div>
+              <div class="service-ordering-tree">
+                <draggable
+                  v-model="draggableImagePlugins"
+                  :animation="200"
+                  handle=".plugin-drag-handle"
+                  group="image-plugins"
+                  @start="onImagePluginDragStart"
+                  @end="onImagePluginDragEnd"
+                  item-key="id"
+                >
+                  <template #item="{ element: plugin, index }">
+                    <div class="service-plugin-tree-item">
+                      <div class="service-plugin-tree-header">
+                        <div class="service-plugin-order-handle">
+                          <span class="order-number">{{ index + 1 }}</span>
+                          <span
+                            class="plugin-drag-handle"
+                            title="Drag to reorder plugins"
+                            >⋮⋮</span
+                          >
+                        </div>
+                        <div class="service-plugin-info">
+                          <strong>{{ plugin.name }}</strong>
+                          <span
+                            v-if="
+                              draggableImageInstances[plugin.id] &&
+                              draggableImageInstances[plugin.id].length > 0
+                            "
+                            class="instance-count-badge"
+                          >
+                            {{ draggableImageInstances[plugin.id].length }}
+                            {{
+                              draggableImageInstances[plugin.id].length === 1
+                                ? "instance"
+                                : "instances"
+                            }}
+                          </span>
+                        </div>
+                        <div class="service-plugin-order-control">
+                          <label>Order:</label>
+                          <input
+                            v-model.number="imagePluginDisplayOrders[plugin.id]"
+                            type="number"
+                            class="order-input"
+                            min="0"
+                            @change="updateImagePluginOrder(plugin.id)"
+                          />
+                        </div>
+                      </div>
+                      <!-- Nested instances list -->
+                      <div
+                        v-if="
+                          draggableImageInstances[plugin.id] &&
+                          draggableImageInstances[plugin.id].length > 0
+                        "
+                        class="plugin-instances-tree"
+                      >
+                        <draggable
+                          v-model="draggableImageInstances[plugin.id]"
+                          :animation="200"
+                          handle=".instance-drag-handle"
+                          group="image-instances"
+                          :data-plugin-id="plugin.id"
+                          @start="onImageInstanceDragStart(plugin.id)"
+                          @end="onImageInstanceDragEnd(plugin.id)"
+                          item-key="id"
+                        >
+                          <template #item="{ element: instance, index }">
+                            <div class="instance-tree-item">
+                              <div class="instance-tree-header">
+                                <span
+                                  class="instance-drag-handle"
+                                  title="Drag to reorder instances"
+                                  >⋮⋮</span
+                                >
+                                <span
+                                  v-if="instance.running !== undefined"
+                                  class="running-indicator"
+                                  :class="{
+                                    running: instance.running,
+                                    stopped: !instance.running,
+                                  }"
+                                  :title="
+                                    instance.running
+                                      ? '● Green: Instance is running'
+                                      : '○ Red: Instance is stopped'
+                                  "
+                                >
+                                  {{ instance.running ? "●" : "○" }}
+                                </span>
+                                <span class="instance-name">{{
+                                  instance.name
+                                }}</span>
+                                <span
+                                  v-if="
+                                    instance.config &&
+                                    getInstanceSummary(
+                                      plugin.id,
+                                      instance.config,
+                                    )
+                                  "
+                                  class="instance-summary"
+                                >
+                                  {{
+                                    getInstanceSummary(
+                                      plugin.id,
+                                      instance.config,
+                                    )
+                                  }}
+                                </span>
+                              </div>
+                            </div>
+                          </template>
+                        </draggable>
+                      </div>
+                      <div v-else class="no-instances-message">
+                        <span class="help-text">No instances configured</span>
+                      </div>
+                    </div>
+                  </template>
+                </draggable>
               </div>
             </div>
           </section>
@@ -1472,95 +1704,109 @@
                           </p>
                         </div>
                         <div v-else class="instances-list">
-                          <div
-                            v-for="instance in pluginInstances[plugin.id]"
-                            :key="instance.id"
-                            class="instance-item"
-                            :class="{ disabled: !instance.enabled }"
+                          <draggable
+                            v-model="draggableInstances[plugin.id]"
+                            :animation="200"
+                            handle=".instance-drag-handle"
+                            @start="onInstanceDragStart(plugin.id)"
+                            @end="onInstanceDragEnd(plugin.id)"
+                            item-key="id"
                           >
-                            <div class="instance-info">
-                              <div class="instance-header">
-                                <span
-                                  v-if="instance.running !== undefined"
-                                  class="running-indicator"
-                                  :class="{
-                                    running: instance.running,
-                                    stopped: !instance.running,
-                                  }"
-                                  :title="
-                                    instance.running
-                                      ? '● Green: Instance is running'
-                                      : '○ Red: Instance is stopped'
-                                  "
-                                >
-                                  {{ instance.running ? "●" : "○" }}
-                                </span>
-                                <h5>{{ instance.name }}</h5>
-                              </div>
+                            <template #item="{ element: instance, index }">
                               <div
-                                v-if="instance.config"
-                                class="instance-details"
+                                class="instance-item"
+                                :class="{ disabled: !instance.enabled }"
                               >
-                                <!-- Show only the most important config value -->
-                                <div
-                                  v-if="
-                                    getInstanceSummary(
-                                      plugin.id,
-                                      instance.config,
-                                    )
-                                  "
-                                  class="instance-detail-item"
-                                >
-                                  <span class="instance-detail-value">
-                                    {{
-                                      getInstanceSummary(
-                                        plugin.id,
-                                        instance.config,
-                                      )
-                                    }}
-                                  </span>
+                                <div class="instance-info">
+                                  <div class="instance-header">
+                                    <span
+                                      class="instance-drag-handle"
+                                      title="Drag to reorder"
+                                      >⋮⋮</span
+                                    >
+                                    <span
+                                      v-if="instance.running !== undefined"
+                                      class="running-indicator"
+                                      :class="{
+                                        running: instance.running,
+                                        stopped: !instance.running,
+                                      }"
+                                      :title="
+                                        instance.running
+                                          ? '● Green: Instance is running'
+                                          : '○ Red: Instance is stopped'
+                                      "
+                                    >
+                                      {{ instance.running ? "●" : "○" }}
+                                    </span>
+                                    <h5>{{ instance.name }}</h5>
+                                  </div>
+                                  <div
+                                    v-if="instance.config"
+                                    class="instance-details"
+                                  >
+                                    <!-- Show only the most important config value -->
+                                    <div
+                                      v-if="
+                                        getInstanceSummary(
+                                          plugin.id,
+                                          instance.config,
+                                        )
+                                      "
+                                      class="instance-detail-item"
+                                    >
+                                      <span class="instance-detail-value">
+                                        {{
+                                          getInstanceSummary(
+                                            plugin.id,
+                                            instance.config,
+                                          )
+                                        }}
+                                      </span>
+                                    </div>
+                                  </div>
+                                </div>
+                                <div class="instance-actions">
+                                  <label
+                                    class="toggle-switch-small"
+                                    :title="
+                                      instance.enabled
+                                        ? 'Disable and stop instance'
+                                        : 'Enable and start instance'
+                                    "
+                                  >
+                                    <input
+                                      type="checkbox"
+                                      :checked="instance.enabled"
+                                      @change="
+                                        togglePluginInstance(
+                                          instance.id,
+                                          $event.target.checked,
+                                        )
+                                      "
+                                    />
+                                    <span class="slider-small" />
+                                  </label>
+                                  <button
+                                    class="btn-icon-only btn-action"
+                                    title="Edit instance"
+                                    @click="
+                                      openEditInstanceModal(plugin.id, instance)
+                                    "
+                                  >
+                                    ✏️
+                                  </button>
+                                  <button
+                                    class="btn-icon-only btn-action btn-action-danger"
+                                    title="Delete instance"
+                                    @click="deletePluginInstance(instance.id)"
+                                  >
+                                    🗑️
+                                  </button>
                                 </div>
                               </div>
-                            </div>
-                            <div class="instance-actions">
-                              <label
-                                class="toggle-switch-small"
-                                :title="
-                                  instance.enabled
-                                    ? 'Disable and stop instance'
-                                    : 'Enable and start instance'
-                                "
-                              >
-                                <input
-                                  type="checkbox"
-                                  :checked="instance.enabled"
-                                  @change="
-                                    togglePluginInstance(
-                                      instance.id,
-                                      $event.target.checked,
-                                    )
-                                  "
-                                />
-                                <span class="slider-small" />
-                              </label>
-                              <button
-                                class="btn-icon-only btn-action"
-                                title="Edit instance"
-                                @click="
-                                  openEditInstanceModal(plugin.id, instance)
-                                "
-                              >
-                                ✏️
-                              </button>
-                              <button
-                                class="btn-icon-only btn-action btn-action-danger"
-                                title="Delete instance"
-                                @click="deletePluginInstance(instance.id)"
-                              >
-                                🗑️
-                              </button>
-                            </div>
-                          </div>
+                            </template>
+                          </draggable>
                         </div>
                       </div>
                     </div>
@@ -2197,6 +2443,7 @@ import PluginFieldRenderer from "../components/PluginFieldRenderer.vue";
 import PluginActions from "../components/PluginActions.vue";
 import PluginSections from "../components/PluginSections.vue";
 import { logError, logWarn, logInfo, logDebug } from "../utils/logger";
+import draggable from "vuedraggable";
 
 const router = useRouter();
 const configStore = useConfigStore();
@@ -2292,6 +2539,7 @@ const activeCategory = ref("layout");
 const expandedSections = ref({
   dashboardRefresh: false,
   serviceOrdering: false,
+  imageOrdering: false,
   display: true,
   ui: true,
   photos: true,
@@ -2323,6 +2571,36 @@ const plugins = ref([]);
 const pluginInstances = ref({}); // Store instances by plugin type ID: { [pluginId]: [{ id, name, enabled, running, config }] }
 const pluginConfigs = ref({}); // Store configs by plugin type ID
 const pluginDisplayOrders = ref({}); // Store display orders for service plugins
+const imagePluginDisplayOrders = ref({}); // Store display orders for image plugins
+
+// Draggable instances for each plugin type
+const draggableInstances = ref({});
+const isDraggingInstance = ref({}); // Track which plugin is being dragged
+
+// Image plugin ordering
+const imagePlugins = computed(() => {
+  return plugins.value.filter((p) => p.type === "image" && p.enabled);
+});
+
+const sortedImagePlugins = computed(() => {
+  return [...imagePlugins.value].sort((a, b) => {
+    const orderA = imagePluginDisplayOrders.value[a.id] ?? 0;
+    const orderB = imagePluginDisplayOrders.value[b.id] ?? 0;
+    if (orderA !== orderB) {
+      return orderA - orderB;
+    }
+    // If same order, sort by name
+    return a.name.localeCompare(b.name);
+  });
+});
+
+// Draggable list for image plugins
+const draggableImagePlugins = ref([]);
+const isDraggingImagePlugin = ref(false);
+
+// Draggable instances for image plugins
+const draggableImageInstances = ref({});
+const isDraggingImageInstance = ref({}); // Track which image plugin is being dragged
 
 // Plugin installation state
 const installingPlugin = ref(false);
@@ -2993,7 +3271,7 @@ const sortedPluginCategories = computed(() => {
 
 // Service ordering
 const servicePlugins = computed(() => {
-  return plugins.value.filter((p) => p.type === "service");
+  return plugins.value.filter((p) => p.type === "service" && p.enabled);
 });
 
 const sortedServicePlugins = computed(() => {
@@ -3007,6 +3285,302 @@ const sortedServicePlugins = computed(() => {
     return a.name.localeCompare(b.name);
   });
 });
+
+// Draggable list for service plugins
+const draggableServicePlugins = ref([]);
+const isDragging = ref(false);
+
+// Sync draggable list with sorted list (only when plugins are added/removed, not during drag)
+watch(
+  sortedServicePlugins,
+  (newList) => {
+    if (isDragging.value) {
+      // Don't sync during drag operations
+      return;
+    }
+    // Check if plugins were added/removed (not just reordered)
+    const currentIds = new Set(draggableServicePlugins.value.map((p) => p.id));
+    const newIds = new Set(newList.map((p) => p.id));
+    const idsChanged =
+      currentIds.size !== newIds.size ||
+      [...currentIds].some((id) => !newIds.has(id));
+    if (idsChanged) {
+      draggableServicePlugins.value = [...newList];
+    }
+  },
+  { immediate: true },
+);
+
+// Handle drag start
+const onServicePluginDragStart = () => {
+  isDragging.value = true;
+};
+
+// Handle drag end - update display orders based on new position
+const onServicePluginDragEnd = async () => {
+  isDragging.value = false;
+  // Update display orders based on new positions
+  draggableServicePlugins.value.forEach((plugin, index) => {
+    pluginDisplayOrders.value[plugin.id] = index;
+  });
+
+  // Save all updated orders
+  for (const plugin of draggableServicePlugins.value) {
+    await updateServicePluginOrder(plugin.id);
+  }
+};
+
+// Update service plugin order
+const updateServicePluginOrder = async (pluginId) => {
+  const order = pluginDisplayOrders.value[pluginId] ?? 0;
+  const currentConfig = pluginConfigs.value[pluginId] || {};
+  const updatedConfig = { ...currentConfig, display_order: order };
+
+  try {
+    // Ensure all values are strings, not objects
+    const cleanedConfig = {};
+    for (const [key, value] of Object.entries(updatedConfig)) {
+      if (key === "display_order") {
+        cleanedConfig[key] = String(value);
+      } else if (value === null || value === undefined) {
+        cleanedConfig[key] = "";
+      } else if (typeof value === "object") {
+        cleanedConfig[key] = value.value || value.default || "";
+      } else {
+        cleanedConfig[key] = String(value);
+      }
+    }
+
+    await axios.put(`/api/plugins/${pluginId}`, cleanedConfig);
+
+    // Update local config
+    pluginConfigs.value[pluginId] = cleanedConfig;
+  } catch (error) {
+    console.error(`Failed to update order for plugin ${pluginId}:`, error);
+    logError(
+      "[Settings]",
+      `Failed to update order for plugin ${pluginId}:`,
+      error,
+    );
+  }
+};
+
+// Instance drag handlers
+const onInstanceDragStart = (pluginId) => {
+  isDraggingInstance.value[pluginId] = true;
+};
+
+const onInstanceDragEnd = async (pluginId) => {
+  isDraggingInstance.value[pluginId] = false;
+
+  // Update display orders based on new positions
+  const instanceOrders = {};
+  draggableInstances.value[pluginId].forEach((instance, index) => {
+    instanceOrders[instance.id] = index;
+  });
+
+  // Update instance orders via API
+  try {
+    await axios.put(`/api/plugins/${pluginId}/instances/order`, instanceOrders);
+
+    // Update pluginInstances to reflect new order
+    pluginInstances.value[pluginId] = [...draggableInstances.value[pluginId]];
+
+    logDebug(
+      "[Settings]",
+      `Updated instance order for ${pluginId}:`,
+      instanceOrders,
+    );
+  } catch (error) {
+    console.error(`Failed to update instance order for ${pluginId}:`, error);
+    logError(
+      "[Settings]",
+      `Failed to update instance order for ${pluginId}:`,
+      error,
+    );
+
+    // Revert draggable instances to match pluginInstances on error
+    draggableInstances.value[pluginId] = [...pluginInstances.value[pluginId]];
+  }
+};
+
+// Watch pluginInstances to sync draggableInstances (only when not dragging)
+watch(
+  pluginInstances,
+  (newInstances) => {
+    for (const pluginId in newInstances) {
+      if (isDraggingInstance.value[pluginId]) {
+        // Don't sync during drag operations
+        continue;
+      }
+      // Check if instances were added/removed (not just reordered)
+      const currentIds = new Set(
+        (draggableInstances.value[pluginId] || []).map((i) => i.id),
+      );
+      const newIds = new Set(newInstances[pluginId].map((i) => i.id));
+      const idsChanged =
+        currentIds.size !== newIds.size ||
+        [...currentIds].some((id) => !newIds.has(id));
+      if (idsChanged) {
+        draggableInstances.value[pluginId] = [...newInstances[pluginId]];
+      }
+    }
+  },
+  { deep: true },
+);
+
+// Sync draggable image plugins list with sorted list
+watch(
+  sortedImagePlugins,
+  (newList) => {
+    if (isDraggingImagePlugin.value) {
+      // Don't sync during drag operations
+      return;
+    }
+    // Check if plugins were added/removed (not just reordered)
+    const currentIds = new Set(draggableImagePlugins.value.map((p) => p.id));
+    const newIds = new Set(newList.map((p) => p.id));
+    const idsChanged =
+      currentIds.size !== newIds.size ||
+      [...currentIds].some((id) => !newIds.has(id));
+    if (idsChanged) {
+      draggableImagePlugins.value = [...newList];
+    }
+  },
+  { immediate: true },
+);
+
+// Handle image plugin drag start
+const onImagePluginDragStart = () => {
+  isDraggingImagePlugin.value = true;
+};
+
+// Handle image plugin drag end - update display orders based on new position
+const onImagePluginDragEnd = async () => {
+  isDraggingImagePlugin.value = false;
+  // Update display orders based on new positions
+  draggableImagePlugins.value.forEach((plugin, index) => {
+    imagePluginDisplayOrders.value[plugin.id] = index;
+  });
+
+  // Save all updated orders
+  for (const plugin of draggableImagePlugins.value) {
+    await updateImagePluginOrder(plugin.id);
+  }
+};
+
+// Update image plugin order
+const updateImagePluginOrder = async (pluginId) => {
+  const order = imagePluginDisplayOrders.value[pluginId] ?? 0;
+  const currentConfig = pluginConfigs.value[pluginId] || {};
+  const updatedConfig = { ...currentConfig, display_order: order };
+
+  try {
+    // Ensure all values are strings, not objects
+    const cleanedConfig = {};
+    for (const [key, value] of Object.entries(updatedConfig)) {
+      if (key === "display_order") {
+        cleanedConfig[key] = String(value);
+      } else if (value === null || value === undefined) {
+        cleanedConfig[key] = "";
+      } else if (typeof value === "object") {
+        cleanedConfig[key] = value.value || value.default || "";
+      } else {
+        cleanedConfig[key] = String(value);
+      }
+    }
+
+    await axios.put(`/api/plugins/${pluginId}`, cleanedConfig);
+
+    // Update local config
+    pluginConfigs.value[pluginId] = cleanedConfig;
+  } catch (error) {
+    console.error(
+      `Failed to update order for image plugin ${pluginId}:`,
+      error,
+    );
+    logError(
+      "[Settings]",
+      `Failed to update order for image plugin ${pluginId}:`,
+      error,
+    );
+  }
+};
+
+// Image instance drag handlers
+const onImageInstanceDragStart = (pluginId) => {
+  isDraggingImageInstance.value[pluginId] = true;
+};
+
+const onImageInstanceDragEnd = async (pluginId) => {
+  isDraggingImageInstance.value[pluginId] = false;
+
+  // Update display orders based on new positions
+  const instanceOrders = {};
+  draggableImageInstances.value[pluginId].forEach((instance, index) => {
+    instanceOrders[instance.id] = index;
+  });
+
+  // Update instance orders via API
+  try {
+    await axios.put(`/api/plugins/${pluginId}/instances/order`, instanceOrders);
+
+    // Update pluginInstances to reflect new order
+    pluginInstances.value[pluginId] = [
+      ...draggableImageInstances.value[pluginId],
+    ];
+
+    logDebug(
+      "[Settings]",
+      `Updated image instance order for ${pluginId}:`,
+      instanceOrders,
+    );
+  } catch (error) {
+    console.error(
+      `Failed to update image instance order for ${pluginId}:`,
+      error,
+    );
+    logError(
+      "[Settings]",
+      `Failed to update image instance order for ${pluginId}:`,
+      error,
+    );
+
+    // Revert draggable instances to match pluginInstances on error
+    draggableImageInstances.value[pluginId] = [
+      ...pluginInstances.value[pluginId],
+    ];
+  }
+};
+
+// Watch pluginInstances to sync draggableImageInstances for image plugins (only when not dragging)
+watch(
+  pluginInstances,
+  (newInstances) => {
+    for (const pluginId in newInstances) {
+      const plugin = plugins.value.find((p) => p.id === pluginId);
+      if (!plugin || plugin.type !== "image") {
+        continue;
+      }
+      if (isDraggingImageInstance.value[pluginId]) {
+        // Don't sync during drag operations
+        continue;
+      }
+      // Check if instances were added/removed (not just reordered)
+      const currentIds = new Set(
+        (draggableImageInstances.value[pluginId] || []).map((i) => i.id),
+      );
+      const newIds = new Set(newInstances[pluginId].map((i) => i.id));
+      const idsChanged =
+        currentIds.size !== newIds.size ||
+        [...currentIds].some((id) => !newIds.has(id));
+      if (idsChanged) {
+        draggableImageInstances.value[pluginId] = [...newInstances[pluginId]];
+      }
+    }
+  },
+  { deep: true },
+);
 
 // Active plugin tab
 const activePluginTab = ref(null);
@@ -3975,6 +4549,7 @@ const loadPlugins = async () => {
       if (plugin.type === "theme") {
         // Themes don't have instances
         pluginInstances.value[plugin.id] = [];
+        draggableInstances.value[plugin.id] = [];
         continue;
       }
       try {
@@ -3983,12 +4558,26 @@ const loadPlugins = async () => {
         );
         pluginInstances.value[plugin.id] =
           instancesResponse.data.instances || [];
+        // Initialize draggable instances
+        draggableInstances.value[plugin.id] = [
+          ...(instancesResponse.data.instances || []),
+        ];
+        // Initialize draggable image instances for image plugins
+        if (plugin.type === "image") {
+          draggableImageInstances.value[plugin.id] = [
+            ...(instancesResponse.data.instances || []),
+          ];
+        }
       } catch (error) {
         console.error(
           `Failed to load instances for plugin ${plugin.id}:`,
           error,
         );
         pluginInstances.value[plugin.id] = [];
+        draggableInstances.value[plugin.id] = [];
+        if (plugin.type === "image") {
+          draggableImageInstances.value[plugin.id] = [];
+        }
       }
     }
 
@@ -4038,6 +4627,11 @@ const loadPlugins = async () => {
         // Initialize display order for service plugins
         if (plugin.type === "service") {
           pluginDisplayOrders.value[plugin.id] =
+            cleanedConfig.display_order ?? 0;
+        }
+        // Initialize display order for image plugins
+        if (plugin.type === "image") {
+          imagePluginDisplayOrders.value[plugin.id] =
             cleanedConfig.display_order ?? 0;
         }
         // Initialize form data with saved config for all plugins
@@ -4490,6 +5084,12 @@ const togglePlugin = async (pluginId, enabled) => {
         `/api/plugins/${pluginId}/instances`,
       );
       pluginInstances.value[pluginId] = instancesResponse.data.instances || [];
+      // Update draggable instances if not currently dragging
+      if (!isDraggingInstance.value[pluginId]) {
+        draggableInstances.value[pluginId] = [
+          ...(instancesResponse.data.instances || []),
+        ];
+      }
     } catch (error) {
       console.error(
         `Failed to reload instances for plugin ${pluginId}:`,
@@ -6723,6 +7323,20 @@ input:checked + .slider:before {
   margin: 0;
 }
 
+.instance-drag-handle {
+  cursor: grab;
+  font-size: 1.2rem;
+  line-height: 1;
+  color: var(--text-tertiary);
+  user-select: none;
+  flex-shrink: 0;
+  margin-right: 0.25rem;
+}
+
+.instance-drag-handle:active {
+  cursor: grabbing;
+}
+
 .running-indicator {
   font-size: 0.9rem;
   font-weight: bold;
@@ -7477,27 +8091,31 @@ input:checked + .slider:before {
   border-color: var(--accent-primary);
 }
 
-/* Service Ordering Styles */
-.service-ordering-list {
+/* Service Ordering Styles - Tree Layout */
+.service-ordering-tree {
   display: flex;
   flex-direction: column;
   gap: 0.75rem;
 }
 
-.service-plugin-order-item {
-  display: flex;
-  align-items: center;
-  gap: 1rem;
-  padding: 1rem;
+.service-plugin-tree-item {
   background: var(--bg-primary);
   border: 1px solid var(--border-color);
   border-radius: 6px;
   transition: all 0.2s ease;
+  overflow: hidden;
 }
 
-.service-plugin-order-item:hover {
+.service-plugin-tree-item:hover {
   border-color: var(--accent-primary);
   box-shadow: 0 2px 4px var(--shadow);
+}
+
+.service-plugin-tree-header {
+  display: flex;
+  align-items: center;
+  gap: 1rem;
+  padding: 1rem;
 }
 
 .service-plugin-order-handle {
@@ -7567,6 +8185,94 @@ input:checked + .slider:before {
   outline: none;
   border-color: var(--accent-primary);
   box-shadow: 0 0 0 2px rgba(var(--accent-primary-rgb), 0.2);
+}
+
+/* Plugin drag handle */
+.plugin-drag-handle {
+  cursor: grab;
+  font-size: 1.2rem;
+  line-height: 1;
+  color: var(--text-tertiary);
+  user-select: none;
+}
+
+.plugin-drag-handle:active {
+  cursor: grabbing;
+}
+
+/* Plugin Instances Tree */
+.plugin-instances-tree {
+  margin-left: 2rem;
+  margin-right: 1rem;
+  margin-bottom: 0.75rem;
+  padding-left: 1rem;
+  border-left: 2px solid var(--border-color);
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+}
+
+.instance-tree-item {
+  padding: 0.5rem 0.75rem;
+  background: var(--bg-tertiary);
+  border: 1px solid var(--border-color);
+  border-radius: 4px;
+  transition: all 0.2s ease;
+}
+
+.instance-tree-item:hover {
+  border-color: var(--accent-primary);
+  background: var(--bg-secondary);
+}
+
+.instance-tree-header {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  font-size: 0.9rem;
+}
+
+.instance-tree-header .instance-drag-handle {
+  cursor: grab;
+  font-size: 1rem;
+  line-height: 1;
+  color: var(--text-tertiary);
+  user-select: none;
+  flex-shrink: 0;
+}
+
+.instance-tree-header .instance-drag-handle:active {
+  cursor: grabbing;
+}
+
+.instance-tree-header .instance-name {
+  font-weight: 500;
+  color: var(--text-primary);
+  flex: 0 0 auto;
+}
+
+.instance-tree-header .instance-summary {
+  color: var(--text-secondary);
+  font-size: 0.85rem;
+  flex: 1;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.no-instances-message {
+  margin-left: 2rem;
+  margin-right: 1rem;
+  margin-bottom: 0.75rem;
+  padding-left: 1rem;
+  padding-top: 0.5rem;
+  padding-bottom: 0.5rem;
+}
+
+.no-instances-message .help-text {
+  font-size: 0.85rem;
+  color: var(--text-tertiary);
+  font-style: italic;
 }
 
 /* Responsive styles */

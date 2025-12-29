@@ -83,5 +83,8 @@ class PluginDB(Base):
     version = Column(String, nullable=True)  # Plugin version (optional)
     enabled = Column(Boolean, default=True, nullable=False)  # Whether plugin instance is enabled
     config = Column(JSONEncodedDict, nullable=True)  # Instance-specific config (JSON)
+    display_order = Column(
+        Integer, default=0, nullable=False
+    )  # Display order for instances of the same plugin type
     created_at = Column(DateTime, default=datetime.utcnow, nullable=False)
     updated_at = Column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow, nullable=False)

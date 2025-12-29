@@ -49,6 +49,7 @@ def _migrate_database_sync():
                     version TEXT,
                     enabled BOOLEAN DEFAULT 1 NOT NULL,
                     config TEXT,
+                    display_order INTEGER DEFAULT 0 NOT NULL,
                     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
                     updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
                 )
@@ -57,6 +58,19 @@ def _migrate_database_sync():
             cursor.execute("CREATE INDEX idx_plugins_plugin_type ON plugins(plugin_type)")
             conn.commit()
             print("Created 'plugins' table")
+        else:
+            # Check if display_order column exists
+            cursor.execute("PRAGMA table_info(plugins)")
+            columns = [row[1] for row in cursor.fetchall()]
+
+            # Add display_order column if it doesn't exist
+            if "display_order" not in columns:
+                print("Adding 'display_order' column to plugins table...")
+                cursor.execute(
+                    "ALTER TABLE plugins ADD COLUMN display_order INTEGER DEFAULT 0 NOT NULL"
+                )
+                conn.commit()
+                print("Added 'display_order' column")
 
         # Check if plugin_types table exists
         cursor.execute("""
