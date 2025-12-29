@@ -13,7 +13,6 @@ def plugin_registry_instance():
     return PluginRegistry()
 
 
-@pytest.mark.asyncio
 @pytest.mark.unit
 class TestPluginRegistry:
     """Test PluginRegistry class."""
@@ -22,6 +21,7 @@ class TestPluginRegistry:
         """Test PluginRegistry initialization."""
         assert plugin_registry_instance._initialized is False
 
+    @pytest.mark.asyncio
     @patch("app.plugins.registry.plugin_loader")
     @patch("app.plugins.registry.instance_manager")
     async def test_load_plugins_from_db(
@@ -63,6 +63,7 @@ class TestPluginRegistry:
             assert mock_instance_manager.initialize_all.called
         assert plugin_registry_instance._initialized is True
 
+    @pytest.mark.asyncio
     @patch("app.plugins.registry.plugin_loader")
     @patch("app.plugins.registry.instance_manager")
     async def test_load_plugins_from_db_existing_instance(
@@ -119,6 +120,7 @@ class TestPluginRegistry:
         # an existing one is reused.
         assert plugin_registry_instance._initialized is True
 
+    @pytest.mark.asyncio
     @patch("app.plugins.registry.plugin_loader")
     @patch("app.plugins.registry.instance_manager")
     async def test_register_plugin(
@@ -186,6 +188,7 @@ class TestPluginRegistry:
             assert db_plugin.name == "Test Plugin Instance"
             assert db_plugin.enabled is True
 
+    @pytest.mark.asyncio
     @patch("app.plugins.registry.plugin_loader")
     async def test_register_plugin_failed_creation(
         self,
@@ -203,6 +206,7 @@ class TestPluginRegistry:
                 config={},
             )
 
+    @pytest.mark.asyncio
     @patch("app.plugins.registry.instance_manager")
     async def test_unregister_plugin(
         self,
@@ -249,6 +253,7 @@ class TestPluginRegistry:
             db_plugin = result.scalar_one_or_none()
             assert db_plugin is None
 
+    @pytest.mark.asyncio
     @patch("app.plugins.registry.instance_manager")
     async def test_unregister_plugin_not_found(
         self,
@@ -263,6 +268,7 @@ class TestPluginRegistry:
 
         assert result is False
 
+    @pytest.mark.asyncio
     @patch("app.plugins.registry.plugin_loader")
     async def test_load_plugin_types_new(
         self,
@@ -301,6 +307,7 @@ class TestPluginRegistry:
             assert db_type.name == "New Plugin"
             assert db_type.enabled is False  # Default to disabled
 
+    @pytest.mark.asyncio
     @patch("app.plugins.registry.plugin_loader")
     async def test_load_plugin_types_update_existing(
         self,

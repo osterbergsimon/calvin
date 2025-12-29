@@ -6,7 +6,7 @@ from pathlib import Path
 from typing import Any
 
 from fastapi import APIRouter, HTTPException
-from pydantic import BaseModel
+from pydantic import BaseModel, ConfigDict
 
 from app.services.config_service import config_service
 from app.services.display_orientation_service import display_orientation_service
@@ -147,8 +147,7 @@ class ConfigUpdate(BaseModel):
     configPollInterval: int | None = None  # Config polling interval in seconds (default: 30)
 
     # Allow arbitrary fields for extensibility
-    class Config:
-        extra = "allow"
+    model_config = ConfigDict(extra="allow")
 
 
 @router.get("/config")

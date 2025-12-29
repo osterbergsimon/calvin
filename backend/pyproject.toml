@@ -92,6 +92,10 @@ addopts = [
     "--strict-markers",
     "--tb=short",
 ]
+filterwarnings = [
+    "ignore::DeprecationWarning:sqlalchemy.*",
+    "ignore:datetime.datetime.utcnow.*:DeprecationWarning",
+]
 markers = [
     "unit: Unit tests",
     "integration: Integration tests",
