@@ -506,16 +506,33 @@ This document outlines potential improvements, dead code, complexity issues, mod
 ### Additional Modules Found
 
 #### `plugins/registry.py` (518 lines)
+**Status**: ✅ **ACTIVE AND CRITICAL** - NOT dead code
+**Usage**: Used in 7+ locations:
+- `main.py` - Application startup (load_plugins_from_db)
+- `api/routes/calendar.py` - Calendar source management
+- `api/routes/web_services.py` - Web service management
+- `services/web_service_service.py` - Web service CRUD
+- `plugins/image/local.py` - Instance management hook
+- `plugins/image/imap.py` - Instance management hook
+- `plugins/service/yr_weather.py` - Instance management hook
+
+**Architecture Role**: 
+- Bridges pluggy hooks (discovery) ↔ database (persistence) ↔ plugin manager (runtime)
+- Coordinates plugin lifecycle (creation, registration, deletion)
+- Syncs plugin types between pluggy and database
+
 **Issues:**
-- **Unneeded Complexity**: Very long file with complex plugin loading logic
+- **Unneeded Complexity**: Very long file (518 lines) with complex plugin loading logic
 - **Modularity**: Should be split into:
-  - `plugins/registry/loader.py` - Plugin loading from DB
-  - `plugins/registry/manager.py` - Plugin registration/unregistration
-  - `plugins/registry/errors.py` - Error handling
+  - `plugins/registry/loader.py` - Plugin loading from DB (_load_plugin_types, _load_plugin_instances)
+  - `plugins/registry/manager.py` - Plugin registration/unregistration (register_plugin, unregister_plugin)
+  - `plugins/registry/types.py` - Plugin type management
 - **Easy Improvements**: 
   - Extract error handling to separate functions
-  - Simplify plugin instance creation logic
+  - Simplify plugin instance creation logic (lines 216-291 are very complex)
+  - Extract config cleaning logic (lines 221-232) to utility function
   - Better separation of concerns
+  - The unregister_plugin method (lines 363-513) has complex fallback logic that could be simplified
 
 #### `plugins/types.py` (153 lines)
 **Issues:**
