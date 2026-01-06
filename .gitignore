@@ -84,6 +84,8 @@ htmlcov/
 # Data
 data/images/
 backend/data/
+# Exception: builtin.json should be tracked
+!backend/data/themes/builtin.json
 data/db/
 
 # Build
