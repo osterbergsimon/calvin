@@ -6,15 +6,15 @@
         help="GitHub repository URL for updates"
       >
         <input
-          v-model="gitRepoUrl"
+          :model-value="gitRepoUrl"
           type="text"
           placeholder="https://github.com/user/repo.git"
-          @change="handleGitRepoChange"
+          @input="handleGitRepoInput"
         />
       </SettingItem>
 
       <SettingItem label="Git Branch" help="Branch to update from">
-        <select v-model="gitBranch" @change="handleGitBranchChange">
+        <select :model-value="gitBranch" @change="handleGitBranchChange">
           <option
             v-for="branch in availableBranches"
             :key="branch"
@@ -92,8 +92,8 @@ const {
 
 const availableBranches = ref([props.gitBranch || "main"]);
 
-const handleGitRepoChange = () => {
-  emit("update:gitRepoUrl", props.gitRepoUrl);
+const handleGitRepoInput = (event) => {
+  emit("update:gitRepoUrl", event.target.value);
 };
 
 const handleGitBranchChange = () => {

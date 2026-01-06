@@ -11,4 +11,4 @@ export { useEventHelpers } from "./useEventHelpers";
 export { usePhotoFrameMode } from "./usePhotoFrameMode";
 export { usePluginComponent } from "./usePluginComponent";
 export { useWeatherData } from "./useWeatherData";
-export { default as serviceComponentRegistry } from "./serviceComponentRegistry";
+export { serviceComponentRegistry } from "./serviceComponentRegistry";

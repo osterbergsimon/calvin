@@ -7,10 +7,28 @@
     />
 
     <SettingsTab>
-      <PowerTab v-if="activeTab === 'power'" />
-      <HardwareTab v-if="activeTab === 'hardware'" />
-      <UpdatesTab v-if="activeTab === 'updates'" />
-      <DebugTab v-if="activeTab === 'debug'" />
+      <PowerTab
+        v-if="activeTab === 'power'"
+        :config="config"
+        @update:config="$emit('update:config', $event)"
+      />
+      <HardwareTab
+        v-if="activeTab === 'hardware'"
+        :version="version"
+        :frontend-version="frontendVersion"
+      />
+      <UpdatesTab
+        v-if="activeTab === 'updates'"
+        :git-repo-url="gitRepoUrl"
+        :git-branch="gitBranch"
+        @update:gitRepoUrl="$emit('update:gitRepoUrl', $event)"
+        @update:gitBranch="$emit('update:gitBranch', $event)"
+      />
+      <DebugTab
+        v-if="activeTab === 'debug'"
+        :config="config"
+        @update:config="$emit('update:config', $event)"
+      />
     </SettingsTab>
   </div>
 </template>
@@ -23,6 +41,31 @@ import PowerTab from "../tabs/system/PowerTab.vue";
 import HardwareTab from "../tabs/system/HardwareTab.vue";
 import UpdatesTab from "../tabs/system/UpdatesTab.vue";
 import DebugTab from "../tabs/system/DebugTab.vue";
+
+const props = defineProps({
+  config: {
+    type: Object,
+    required: true,
+  },
+  version: {
+    type: String,
+    default: null,
+  },
+  frontendVersion: {
+    type: String,
+    default: null,
+  },
+  gitRepoUrl: {
+    type: String,
+    default: "",
+  },
+  gitBranch: {
+    type: String,
+    default: "main",
+  },
+});
+
+defineEmits(["update:config", "update:gitRepoUrl", "update:gitBranch"]);
 
 const tabs = [
   { id: "power", label: "Power", icon: "⚡" },
