@@ -57,6 +57,7 @@ GIT_BRANCH="${GIT_BRANCH:-main}"
 LOG_FILE="${REPO_DIR}/backend/logs/calvin-update.log"
 mkdir -p "$(dirname "$LOG_FILE")"
 
+
 # Helper function to get UV PATH
 get_uv_path() {
     echo "/home/calvin/.local/bin:/home/calvin/.cargo/bin:$PATH"
@@ -222,6 +223,9 @@ if [ -f "$REPO_DIR/scripts/update-calvin.sh" ] && [ -f "/usr/local/bin/update-ca
     chown calvin:calvin /usr/local/bin/update-calvin.sh 2>/dev/null || true
 fi
 
+# Track if updates completed successfully
+UPDATES_SUCCESSFUL=false
+
 # Only update dependencies and rebuild if there are changes or --force is set
 if [ "$HAS_CHANGES" = true ] || [ "$FORCE_UPDATE" = true ]; then
     if [ "$FORCE_UPDATE" = true ] && [ "$HAS_CHANGES" = false ]; then
@@ -290,31 +294,55 @@ if [ "$HAS_CHANGES" = true ] || [ "$FORCE_UPDATE" = true ]; then
 
     # Always rebuild frontend when there are any changes to ensure cache busting
     # This ensures users get the latest version even if only backend changed
-    echo "Rebuilding frontend to force cache update..." | tee -a "$LOG_FILE"
-    cd "$REPO_DIR/frontend"
-    if ! npm ci; then
-        echo "Warning: Failed to update frontend dependencies" | tee -a "$LOG_FILE"
+    echo "[$(date)] Starting frontend rebuild..." | tee -a "$LOG_FILE"
+    cd "$REPO_DIR/frontend" || {
+        echo "[$(date)] ERROR: Cannot cd to frontend directory" | tee -a "$LOG_FILE"
+        exit 0  # Don't fail the service
+    }
+    
+    echo "[$(date)] Installing frontend dependencies (npm ci)..." | tee -a "$LOG_FILE"
+    if ! npm ci 2>&1 | tee -a "$LOG_FILE"; then
+        echo "[$(date)] Warning: Failed to update frontend dependencies" | tee -a "$LOG_FILE"
         exit 0  # Don't fail the service
     fi
+    echo "[$(date)] Frontend dependencies installed successfully" | tee -a "$LOG_FILE"
 
     # Get current git commit hash for frontend version (ensure git is available)
     CURRENT_FRONTEND_COMMIT=$(cd "$REPO_DIR" && git rev-parse --short HEAD 2>/dev/null || echo "")
     if [ -n "$CURRENT_FRONTEND_COMMIT" ]; then
-        echo "Building frontend with git commit: $CURRENT_FRONTEND_COMMIT" | tee -a "$LOG_FILE"
+        echo "[$(date)] Building frontend with git commit: $CURRENT_FRONTEND_COMMIT" | tee -a "$LOG_FILE"
         export GIT_COMMIT_HASH="$CURRENT_FRONTEND_COMMIT"
     else
-        echo "Warning: Could not get git commit hash for frontend version" | tee -a "$LOG_FILE"
+        echo "[$(date)] Warning: Could not get git commit hash for frontend version" | tee -a "$LOG_FILE"
     fi
 
     # Rebuild frontend (this will update the build timestamp for cache busting)
-    echo "Rebuilding frontend..." | tee -a "$LOG_FILE"
-    if ! npm run build 2>&1 | tee -a "$LOG_FILE"; then
-        echo "Warning: Failed to build frontend" | tee -a "$LOG_FILE"
-        exit 0  # Don't fail the service
+    echo "[$(date)] Building frontend (npm run build) - this may take a few minutes..." | tee -a "$LOG_FILE"
+    BUILD_START=$(date +%s)
+    # Run build and capture exit code separately from tee
+    npm run build > /tmp/calvin-build.log 2>&1
+    BUILD_EXIT_CODE=$?
+    # Append build output to log
+    cat /tmp/calvin-build.log | tee -a "$LOG_FILE"
+    rm -f /tmp/calvin-build.log
+    
+    BUILD_END=$(date +%s)
+    BUILD_DURATION=$((BUILD_END - BUILD_START))
+    
+    if [ "$BUILD_EXIT_CODE" -ne 0 ]; then
+        echo "[$(date)] ERROR: Frontend build failed after ${BUILD_DURATION} seconds (exit code: $BUILD_EXIT_CODE)" | tee -a "$LOG_FILE"
+        echo "[$(date)] Skipping service restart due to build failure" | tee -a "$LOG_FILE"
+        UPDATES_SUCCESSFUL=false
+    else
+        echo "[$(date)] Frontend build completed successfully in ${BUILD_DURATION} seconds" | tee -a "$LOG_FILE"
+        # Small delay to ensure all build files are fully written to disk
+        sleep 2
+        UPDATES_SUCCESSFUL=true
     fi
-    echo "Frontend build completed successfully" | tee -a "$LOG_FILE"
 else
-    echo "No changes detected. Skipping dependency updates and rebuilds." | tee -a "$LOG_FILE"
+    echo "[$(date)] No changes detected. Skipping dependency updates and rebuilds." | tee -a "$LOG_FILE"
+    # If no changes and not forced, don't restart services (they're already running the current code)
+    UPDATES_SUCCESSFUL=false
 fi
 
 # Helper function to restart a systemd service
@@ -332,9 +360,10 @@ restart_service() {
     fi
 }
 
-# Restart services via systemd (non-blocking)
-if systemctl is-active --quiet calvin-backend.service 2>/dev/null || sudo systemctl is-active --quiet calvin-backend.service 2>/dev/null; then
-    echo "Restarting services via systemd..." | tee -a "$LOG_FILE"
+# Restart services via systemd (only after all updates are complete)
+# Only restart if we successfully completed all updates
+if [ "$UPDATES_SUCCESSFUL" = true ] && (systemctl is-active --quiet calvin-backend.service 2>/dev/null || sudo systemctl is-active --quiet calvin-backend.service 2>/dev/null); then
+    echo "[$(date)] All updates complete. Restarting services..." | tee -a "$LOG_FILE"
     restart_service calvin-backend
     
     # Clear Chromium cache before restarting to ensure fresh files are loaded

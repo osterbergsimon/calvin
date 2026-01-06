@@ -245,9 +245,21 @@ async def get_plugins(
         plugin_types = [t for t in plugin_types if t.get("plugin_type") == pt]
 
     # Load enabled status and error messages from database
-    async with AsyncSessionLocal() as session:
-        result = await session.execute(select(PluginTypeDB))
-        db_types = {db_type.type_id: db_type for db_type in result.scalars().all()}
+    try:
+        async with AsyncSessionLocal() as session:
+            result = await session.execute(select(PluginTypeDB))
+            db_types = {db_type.type_id: db_type for db_type in result.scalars().all()}
+    except Exception as e:
+        import logging
+
+        logger = logging.getLogger(__name__)
+        logger.error(
+            f"[get_plugins] Failed to load plugin types from database: {e}. "
+            "This may indicate missing tables. Check database initialization.",
+            exc_info=True,
+        )
+        # Continue with empty dict - app won't crash but plugins won't load
+        db_types = {}
 
     # Convert to response format
     result = []
