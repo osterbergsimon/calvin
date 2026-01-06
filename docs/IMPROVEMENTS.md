@@ -829,7 +829,7 @@ This document outlines potential improvements, dead code, complexity issues, mod
 
 1. **Weeks 3-4**:
    - Split `api/routes/plugins.py` into 5 modules (4-6 hours)
-   - Split `plugins/registry.py` into 3 modules (3-4 hours)
+   - Split `plugins/registry.py` into 3 modules (3-4 hours)   NOTE:IS theis file even used? we have pluggy hooks. Investigate.
    - Extract validation logic from installers (4-6 hours)
 
 2. **Weeks 5-6**:
