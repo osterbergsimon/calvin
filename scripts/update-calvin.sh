@@ -225,6 +225,8 @@ fi
 
 # Track if updates completed successfully
 UPDATES_SUCCESSFUL=false
+# Track if frontend was running before we stopped it
+FRONTEND_WAS_RUNNING=false
 
 # Only update dependencies and rebuild if there are changes or --force is set
 if [ "$HAS_CHANGES" = true ] || [ "$FORCE_UPDATE" = true ]; then
@@ -321,14 +323,34 @@ if [ "$HAS_CHANGES" = true ] || [ "$FORCE_UPDATE" = true ]; then
     # Always rebuild frontend when there are any changes to ensure cache busting
     # This ensures users get the latest version even if only backend changed
     echo "[$(date)] Starting frontend rebuild..." | tee -a "$LOG_FILE"
+    
+    # Stop frontend service during build to prevent restarts from interfering
+    FRONTEND_WAS_RUNNING=false
+    if systemctl is-active --quiet calvin-frontend.service 2>/dev/null || sudo systemctl is-active --quiet calvin-frontend.service 2>/dev/null; then
+        FRONTEND_WAS_RUNNING=true
+        echo "[$(date)] Stopping frontend service during build to prevent interference..." | tee -a "$LOG_FILE"
+        sudo systemctl stop calvin-frontend.service 2>/dev/null || systemctl --user stop calvin-frontend.service 2>/dev/null || true
+        sleep 1  # Give it a moment to fully stop
+    fi
+    
     cd "$REPO_DIR/frontend" || {
         echo "[$(date)] ERROR: Cannot cd to frontend directory" | tee -a "$LOG_FILE"
+        # Restart frontend if we stopped it
+        if [ "$FRONTEND_WAS_RUNNING" = true ]; then
+            echo "[$(date)] Restarting frontend service after error..." | tee -a "$LOG_FILE"
+            sudo systemctl start calvin-frontend.service 2>/dev/null || systemctl --user start calvin-frontend.service 2>/dev/null || true
+        fi
         exit 0  # Don't fail the service
     }
     
     echo "[$(date)] Installing frontend dependencies (npm ci)..." | tee -a "$LOG_FILE"
     if ! npm ci 2>&1 | tee -a "$LOG_FILE"; then
         echo "[$(date)] Warning: Failed to update frontend dependencies" | tee -a "$LOG_FILE"
+        # Restart frontend if we stopped it
+        if [ "$FRONTEND_WAS_RUNNING" = true ]; then
+            echo "[$(date)] Restarting frontend service after dependency install failure..." | tee -a "$LOG_FILE"
+            sudo systemctl start calvin-frontend.service 2>/dev/null || systemctl --user start calvin-frontend.service 2>/dev/null || true
+        fi
         exit 0  # Don't fail the service
     fi
     echo "[$(date)] Frontend dependencies installed successfully" | tee -a "$LOG_FILE"
@@ -343,11 +365,16 @@ if [ "$HAS_CHANGES" = true ] || [ "$FORCE_UPDATE" = true ]; then
     fi
 
     # Rebuild frontend (this will update the build timestamp for cache busting)
+    # Add timeout to prevent hanging (30 minutes should be more than enough)
     echo "[$(date)] Building frontend (npm run build) - this may take a few minutes..." | tee -a "$LOG_FILE"
+    echo "[$(date)] Build timeout set to 30 minutes to prevent hanging" | tee -a "$LOG_FILE"
     BUILD_START=$(date +%s)
-    # Run build and capture exit code separately from tee
-    npm run build > /tmp/calvin-build.log 2>&1
+    BUILD_TIMEOUT=1800  # 30 minutes in seconds
+    
+    # Run build with timeout and capture exit code separately from tee
+    timeout "$BUILD_TIMEOUT" npm run build > /tmp/calvin-build.log 2>&1
     BUILD_EXIT_CODE=$?
+    
     # Append build output to log
     cat /tmp/calvin-build.log | tee -a "$LOG_FILE"
     rm -f /tmp/calvin-build.log
@@ -356,14 +383,24 @@ if [ "$HAS_CHANGES" = true ] || [ "$FORCE_UPDATE" = true ]; then
     BUILD_DURATION=$((BUILD_END - BUILD_START))
     
     if [ "$BUILD_EXIT_CODE" -ne 0 ]; then
-        echo "[$(date)] ERROR: Frontend build failed after ${BUILD_DURATION} seconds (exit code: $BUILD_EXIT_CODE)" | tee -a "$LOG_FILE"
+        if [ "$BUILD_EXIT_CODE" -eq 124 ]; then
+            echo "[$(date)] ERROR: Frontend build timed out after ${BUILD_DURATION} seconds (timeout: ${BUILD_TIMEOUT}s)" | tee -a "$LOG_FILE"
+        else
+            echo "[$(date)] ERROR: Frontend build failed after ${BUILD_DURATION} seconds (exit code: $BUILD_EXIT_CODE)" | tee -a "$LOG_FILE"
+        fi
         echo "[$(date)] Skipping service restart due to build failure" | tee -a "$LOG_FILE"
+        # Restart frontend if we stopped it (even on failure, so user has a working frontend)
+        if [ "$FRONTEND_WAS_RUNNING" = true ]; then
+            echo "[$(date)] Restarting frontend service with old build..." | tee -a "$LOG_FILE"
+            sudo systemctl start calvin-frontend.service 2>/dev/null || systemctl --user start calvin-frontend.service 2>/dev/null || true
+        fi
         UPDATES_SUCCESSFUL=false
     else
         echo "[$(date)] Frontend build completed successfully in ${BUILD_DURATION} seconds" | tee -a "$LOG_FILE"
         # Small delay to ensure all build files are fully written to disk
         sleep 2
         UPDATES_SUCCESSFUL=true
+        # Note: Frontend will be restarted later in the script after cache clearing
     fi
 else
     echo "[$(date)] No changes detected. Skipping dependency updates and rebuilds." | tee -a "$LOG_FILE"
@@ -388,28 +425,41 @@ restart_service() {
 
 # Restart services via systemd (only after all updates are complete)
 # Only restart if we successfully completed all updates
-if [ "$UPDATES_SUCCESSFUL" = true ] && (systemctl is-active --quiet calvin-backend.service 2>/dev/null || sudo systemctl is-active --quiet calvin-backend.service 2>/dev/null); then
-    echo "[$(date)] All updates complete. Restarting services..." | tee -a "$LOG_FILE"
-    restart_service calvin-backend
+if [ "$UPDATES_SUCCESSFUL" = true ]; then
+    # Restart backend service
+    if systemctl is-active --quiet calvin-backend.service 2>/dev/null || sudo systemctl is-active --quiet calvin-backend.service 2>/dev/null; then
+        echo "[$(date)] All updates complete. Restarting backend service..." | tee -a "$LOG_FILE"
+        restart_service calvin-backend
+    fi
     
+    # Restart frontend service (only if it was running before, or if we stopped it during build)
     # Clear Chromium cache before restarting to ensure fresh files are loaded
-    echo "Clearing Chromium cache..." | tee -a "$LOG_FILE"
+    echo "[$(date)] Clearing Chromium cache before restarting frontend..." | tee -a "$LOG_FILE"
     CHROMIUM_CACHE_DIR="/home/calvin/.cache/chromium"
     if [ -d "$CHROMIUM_CACHE_DIR" ]; then
         if sudo rm -rf "$CHROMIUM_CACHE_DIR/Default/Cache"/* "$CHROMIUM_CACHE_DIR/Default/Code Cache"/* 2>/dev/null || \
            rm -rf "$CHROMIUM_CACHE_DIR/Default/Cache"/* "$CHROMIUM_CACHE_DIR/Default/Code Cache"/* 2>/dev/null; then
-            echo "Chromium cache cleared successfully" | tee -a "$LOG_FILE"
+            echo "[$(date)] Chromium cache cleared successfully" | tee -a "$LOG_FILE"
         else
-            echo "Warning: Failed to clear Chromium cache" | tee -a "$LOG_FILE"
+            echo "[$(date)] Warning: Failed to clear Chromium cache" | tee -a "$LOG_FILE"
         fi
     fi
     
-    restart_service calvin-frontend || {
-        echo "Please restart manually: sudo systemctl restart calvin-frontend" | tee -a "$LOG_FILE"
-        echo "Or clear Chromium cache manually: rm -rf ~/.cache/chromium" | tee -a "$LOG_FILE"
-    }
+    # Only restart frontend if we stopped it during build (it will be started fresh)
+    # or if it was already running
+    if [ "${FRONTEND_WAS_RUNNING:-false}" = true ]; then
+        echo "[$(date)] Restarting frontend service with new build..." | tee -a "$LOG_FILE"
+        restart_service calvin-frontend || {
+            echo "[$(date)] Please restart manually: sudo systemctl restart calvin-frontend" | tee -a "$LOG_FILE"
+            echo "[$(date)] Or clear Chromium cache manually: rm -rf ~/.cache/chromium" | tee -a "$LOG_FILE"
+        }
+    elif systemctl is-active --quiet calvin-frontend.service 2>/dev/null || sudo systemctl is-active --quiet calvin-frontend.service 2>/dev/null; then
+        # Frontend was running but we didn't stop it (shouldn't happen, but be safe)
+        echo "[$(date)] Restarting frontend service..." | tee -a "$LOG_FILE"
+        restart_service calvin-frontend
+    fi
 else
-    echo "Services not running. Please start them manually." | tee -a "$LOG_FILE"
+    echo "[$(date)] Updates did not complete successfully. Services not restarted." | tee -a "$LOG_FILE"
 fi
 
 echo "[$(date)] Update complete!" | tee -a "$LOG_FILE"
