@@ -1,8 +1,11 @@
 """Configuration management."""
 
+import logging
 from pathlib import Path
 
 from pydantic_settings import BaseSettings, SettingsConfigDict
+
+logger = logging.getLogger(__name__)
 
 
 class Settings(BaseSettings):
@@ -42,6 +45,11 @@ class Settings(BaseSettings):
         False  # Allow all origins (development only, not recommended for production)
     )
 
+    # System paths (for Raspberry Pi deployment)
+    update_script_path: Path = Path("/usr/local/bin/update-calvin.sh")
+    repo_dir: Path = Path("/home/calvin/calvin")
+    system_path: str = "/home/calvin/.local/bin:/usr/local/bin:/usr/bin:/bin"
+
     model_config = SettingsConfigDict(
         env_file=".env",
         env_file_encoding="utf-8",
@@ -75,8 +83,8 @@ class Settings(BaseSettings):
             ]
             for wrong_path in wrong_paths:
                 if wrong_path.exists():
-                    print(f"Found database at incorrect location: {wrong_path}")
-                    print(f"Migrating to correct location: {db_path}")
+                    logger.info(f"Found database at incorrect location: {wrong_path}")
+                    logger.info(f"Migrating to correct location: {db_path}")
                     try:
                         # Ensure target directory exists
                         db_path.parent.mkdir(parents=True, exist_ok=True)
@@ -84,12 +92,12 @@ class Settings(BaseSettings):
                         import shutil
 
                         shutil.copy2(wrong_path, db_path)
-                        print(f"Database migrated successfully to {db_path}")
+                        logger.info(f"Database migrated successfully to {db_path}")
                         # Optionally remove old file (commented out for safety)
                         # wrong_path.unlink()
-                        # print(f"Removed old database file: {wrong_path}")
+                        # logger.info(f"Removed old database file: {wrong_path}")
                     except Exception as e:
-                        print(f"Warning: Failed to migrate database: {e}")
+                        logger.warning(f"Failed to migrate database: {e}", exc_info=True)
                     break
 
 

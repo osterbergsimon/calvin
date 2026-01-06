@@ -1,5 +1,6 @@
 """System management endpoints."""
 
+import logging
 import os
 import re
 import subprocess
@@ -7,7 +8,10 @@ from pathlib import Path
 
 from fastapi import APIRouter, HTTPException
 
+from app.config import settings
 from app.services.display_power_service import display_power_service
+
+logger = logging.getLogger(__name__)
 
 router = APIRouter()
 
@@ -20,7 +24,7 @@ async def trigger_update():
     """
     from app.services.config_service import config_service
 
-    update_script = Path("/usr/local/bin/update-calvin.sh")
+    update_script = settings.update_script_path
 
     if not update_script.exists():
         raise HTTPException(
@@ -33,7 +37,7 @@ async def trigger_update():
         git_branch = await config_service.get_value("git_branch", "main")
 
         # Ensure log directory exists
-        log_dir = Path("/home/calvin/calvin/backend/logs")
+        log_dir = settings.repo_dir / "backend" / "logs"
         log_dir.mkdir(parents=True, exist_ok=True)
         log_file = log_dir / "calvin-update.log"
 
@@ -45,10 +49,10 @@ async def trigger_update():
                 stdout=log_f,
                 stderr=subprocess.STDOUT,  # Merge stderr into stdout
                 text=True,
-                cwd="/home/calvin/calvin",  # Set working directory
+                cwd=str(settings.repo_dir),  # Set working directory
                 env={
                     **os.environ,
-                    "PATH": "/home/calvin/.local/bin:/usr/local/bin:/usr/bin:/bin",
+                    "PATH": settings.system_path,
                     "GIT_BRANCH": git_branch,  # Pass git branch to update script
                 },
             )
@@ -96,8 +100,8 @@ async def get_update_status():
     """
     # Try multiple possible log file locations
     log_locations = [
-        Path("/home/calvin/calvin/backend/logs/calvin-update.log"),
-        Path("/home/calvin/calvin-update.log"),
+        settings.repo_dir / "backend" / "logs" / "calvin-update.log",
+        settings.repo_dir.parent / "calvin-update.log",
         Path("/tmp/calvin-update.log"),
         Path("/var/log/calvin-update.log"),
     ]
@@ -163,7 +167,7 @@ async def get_update_status():
                 new_commit_short = match.group(1)
                 # Try to get full commit hash
                 try:
-                    repo_path = Path("/home/calvin/calvin")
+                    repo_path = settings.repo_dir
                     if (repo_path / ".git").exists():
                         result = subprocess.run(
                             ["git", "rev-parse", new_commit_short],
@@ -373,18 +377,18 @@ async def restart_frontend():
                 timeout=5,
             )
             if result.returncode == 0:
-                print("Frontend restart initiated via systemctl restart")
+                logger.info("Frontend restart initiated via systemctl restart")
                 restart_attempted = True
             else:
                 error_msg = result.stderr.decode()
-                print(f"systemctl restart failed: {error_msg}")
+                logger.warning(f"systemctl restart failed: {error_msg}")
         except FileNotFoundError:
-            print("systemctl not found")
+            logger.warning("systemctl not found")
         except subprocess.TimeoutExpired:
-            print("systemctl restart timed out (but may have initiated)")
+            logger.info("systemctl restart timed out (but may have initiated)")
             restart_attempted = True
         except Exception as e:
-            print(f"systemctl restart error: {e}")
+            logger.error(f"systemctl restart error: {e}", exc_info=True)
 
         # Method 2: Use dbus to call systemd-logind (alternative to systemctl)
         if not restart_attempted:
@@ -404,18 +408,18 @@ async def restart_frontend():
                     timeout=5,
                 )
                 if result.returncode == 0:
-                    print("Frontend restart initiated via dbus")
+                    logger.info("Frontend restart initiated via dbus")
                     restart_attempted = True
                 else:
                     error_msg = result.stderr.decode()
-                    print(f"dbus restart failed: {error_msg}")
+                    logger.warning(f"dbus restart failed: {error_msg}")
             except FileNotFoundError:
-                print("dbus-send not found")
+                logger.warning("dbus-send not found")
             except subprocess.TimeoutExpired:
-                print("dbus restart timed out (but may have initiated)")
+                logger.info("dbus restart timed out (but may have initiated)")
                 restart_attempted = True
             except Exception as e:
-                print(f"dbus restart error: {e}")
+                logger.error(f"dbus restart error: {e}", exc_info=True)
 
         if restart_attempted:
             return {
@@ -431,12 +435,12 @@ async def restart_frontend():
                 "Alternatively, you can restart manually via SSH: "
                 "sudo systemctl restart calvin-frontend"
             )
-            print(error_detail)
+            logger.error(error_detail)
             raise HTTPException(status_code=500, detail=error_detail)
     except HTTPException:
         raise
     except Exception as e:
-        print(f"Frontend restart error: {e}")
+        logger.error(f"Frontend restart error: {e}", exc_info=True)
         raise HTTPException(status_code=500, detail=f"Failed to restart frontend service: {str(e)}")
 
 
@@ -460,18 +464,18 @@ async def restart_backend():
                 timeout=5,
             )
             if result.returncode == 0:
-                print("Backend restart initiated via systemctl restart")
+                logger.info("Backend restart initiated via systemctl restart")
                 restart_attempted = True
             else:
                 error_msg = result.stderr.decode()
-                print(f"systemctl restart failed: {error_msg}")
+                logger.warning(f"systemctl restart failed: {error_msg}")
         except FileNotFoundError:
-            print("systemctl not found")
+            logger.warning("systemctl not found")
         except subprocess.TimeoutExpired:
-            print("systemctl restart timed out (but may have initiated)")
+            logger.info("systemctl restart timed out (but may have initiated)")
             restart_attempted = True
         except Exception as e:
-            print(f"systemctl restart error: {e}")
+            logger.error(f"systemctl restart error: {e}", exc_info=True)
 
         # Method 2: Use dbus to call systemd-logind (alternative to systemctl)
         if not restart_attempted:
@@ -491,18 +495,18 @@ async def restart_backend():
                     timeout=5,
                 )
                 if result.returncode == 0:
-                    print("Backend restart initiated via dbus")
+                    logger.info("Backend restart initiated via dbus")
                     restart_attempted = True
                 else:
                     error_msg = result.stderr.decode()
-                    print(f"dbus restart failed: {error_msg}")
+                    logger.warning(f"dbus restart failed: {error_msg}")
             except FileNotFoundError:
-                print("dbus-send not found")
+                logger.warning("dbus-send not found")
             except subprocess.TimeoutExpired:
-                print("dbus restart timed out (but may have initiated)")
+                logger.info("dbus restart timed out (but may have initiated)")
                 restart_attempted = True
             except Exception as e:
-                print(f"dbus restart error: {e}")
+                logger.error(f"dbus restart error: {e}", exc_info=True)
 
         if restart_attempted:
             return {
@@ -518,12 +522,12 @@ async def restart_backend():
                 "Alternatively, you can restart manually via SSH: "
                 "sudo systemctl restart calvin-backend"
             )
-            print(error_detail)
+            logger.error(error_detail)
             raise HTTPException(status_code=500, detail=error_detail)
     except HTTPException:
         raise
     except Exception as e:
-        print(f"Backend restart error: {e}")
+        logger.error(f"Backend restart error: {e}", exc_info=True)
         raise HTTPException(status_code=500, detail=f"Failed to restart backend service: {str(e)}")
 
 
@@ -544,17 +548,17 @@ async def reboot_system():
                 timeout=5,
             )
             if result.returncode == 0:
-                print("Reboot initiated via systemctl reboot")
+                logger.info("Reboot initiated via systemctl reboot")
                 reboot_attempted = True
             else:
-                print(f"systemctl reboot failed: {result.stderr.decode()}")
+                logger.warning(f"systemctl reboot failed: {result.stderr.decode()}")
         except FileNotFoundError:
-            print("systemctl not found")
+            logger.warning("systemctl not found")
         except subprocess.TimeoutExpired:
-            print("systemctl reboot timed out (but may have initiated)")
+            logger.info("systemctl reboot timed out (but may have initiated)")
             reboot_attempted = True
         except Exception as e:
-            print(f"systemctl reboot error: {e}")
+            logger.error(f"systemctl reboot error: {e}", exc_info=True)
 
         # Method 2: Use dbus to call systemd-logind (alternative to systemctl)
         # This might work if polkit rules are configured
@@ -574,18 +578,18 @@ async def reboot_system():
                     timeout=5,
                 )
                 if result.returncode == 0:
-                    print("Reboot initiated via dbus")
+                    logger.info("Reboot initiated via dbus")
                     reboot_attempted = True
                 else:
                     error_msg = result.stderr.decode()
-                    print(f"dbus reboot failed: {error_msg}")
+                    logger.warning(f"dbus reboot failed: {error_msg}")
             except FileNotFoundError:
-                print("dbus-send not found")
+                logger.warning("dbus-send not found")
             except subprocess.TimeoutExpired:
-                print("dbus reboot timed out (but may have initiated)")
+                logger.info("dbus reboot timed out (but may have initiated)")
                 reboot_attempted = True
             except Exception as e:
-                print(f"dbus reboot error: {e}")
+                logger.error(f"dbus reboot error: {e}", exc_info=True)
 
         if reboot_attempted:
             return {"status": "success", "message": "System reboot initiated"}
@@ -597,10 +601,10 @@ async def reboot_system():
                 "Check /etc/polkit-1/rules.d/50-calvin-reboot.rules exists.\n"
                 "Check logs for details."
             )
-            print(error_detail)
+            logger.error(error_detail)
             raise HTTPException(status_code=500, detail=error_detail)
     except HTTPException:
         raise
     except Exception as e:
-        print(f"Reboot error: {e}")
+        logger.error(f"Reboot error: {e}", exc_info=True)
         raise HTTPException(status_code=500, detail=f"Failed to reboot system: {str(e)}")
