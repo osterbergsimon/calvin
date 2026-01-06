@@ -88,23 +88,44 @@ async def initialize_database(
         db_url = f"sqlite:///{database_path.resolve()}"
 
         # Get absolute path to alembic.ini
+        # Try multiple strategies to find alembic.ini
+        alembic_ini_path = None
+
+        # Strategy 1: Relative to database path (production structure)
         # database_path structure: backend/data/db/calvin.db (when resolved)
         # alembic.ini is at: backend/alembic.ini
         # So we go up 2 levels from database_path to get to backend
         backend_dir = database_path.resolve().parent.parent.parent
-        alembic_ini_path = backend_dir / "alembic.ini"
+        potential_path = backend_dir / "alembic.ini"
+        if potential_path.exists():
+            alembic_ini_path = potential_path
 
-        if not alembic_ini_path.exists():
-            # Try alternative: search from current working directory
+        # Strategy 2: Current working directory (for tests)
+        if alembic_ini_path is None or not alembic_ini_path.exists():
             import os
 
             cwd = Path(os.getcwd())
-            if (cwd / "alembic.ini").exists():
-                alembic_ini_path = cwd / "alembic.ini"
-            else:
-                logger.warning(
-                    f"Alembic config not found at {alembic_ini_path}, migrations may fail"
-                )
+            potential_path = cwd / "alembic.ini"
+            if potential_path.exists():
+                alembic_ini_path = potential_path
+
+        # Strategy 3: Search upward from database path
+        if alembic_ini_path is None or not alembic_ini_path.exists():
+            current = database_path.resolve().parent
+            while current != current.parent:  # Stop at filesystem root
+                potential_path = current / "alembic.ini"
+                if potential_path.exists():
+                    alembic_ini_path = potential_path
+                    break
+                current = current.parent
+
+        if alembic_ini_path is None or not alembic_ini_path.exists():
+            logger.warning(
+                f"Alembic config not found, migrations may fail. "
+                f"Tried: {backend_dir / 'alembic.ini'}, {Path.cwd() / 'alembic.ini'}"
+            )
+            # Don't fail, just skip migrations
+            return engine
 
         # Configure Alembic
         alembic_cfg = Config(str(alembic_ini_path))
