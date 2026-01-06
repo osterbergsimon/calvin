@@ -277,6 +277,19 @@ if [ "$HAS_CHANGES" = true ] || [ "$FORCE_UPDATE" = true ]; then
         
         if [ "$UV_SYNC_SUCCESS" = true ]; then
             echo "UV dependency update completed successfully" | tee -a "$LOG_FILE"
+            
+            # Run database migrations with Alembic
+            echo "[$(date)] Running database migrations..." | tee -a "$LOG_FILE"
+            if [ -f "alembic.ini" ] && [ -d "alembic" ]; then
+                if uv run alembic upgrade head 2>&1 | tee -a "$LOG_FILE"; then
+                    echo "[$(date)] Database migrations completed successfully" | tee -a "$LOG_FILE"
+                else
+                    echo "[$(date)] Warning: Database migrations failed, but continuing..." | tee -a "$LOG_FILE"
+                    # Don't fail the update, but log the error
+                fi
+            else
+                echo "[$(date)] Warning: Alembic not configured, skipping migrations" | tee -a "$LOG_FILE"
+            fi
         fi
     else
         # Fallback to pip/venv only if UV is not available
@@ -290,6 +303,19 @@ if [ "$HAS_CHANGES" = true ] || [ "$FORCE_UPDATE" = true ]; then
         source .venv/bin/activate
         pip install --upgrade pip
         pip install .[linux] 2>&1 | tee -a "$LOG_FILE"
+        
+        # Run database migrations with Alembic (pip/venv path)
+        echo "[$(date)] Running database migrations..." | tee -a "$LOG_FILE"
+        if [ -f "alembic.ini" ] && [ -d "alembic" ]; then
+            if alembic upgrade head 2>&1 | tee -a "$LOG_FILE"; then
+                echo "[$(date)] Database migrations completed successfully" | tee -a "$LOG_FILE"
+            else
+                echo "[$(date)] Warning: Database migrations failed, but continuing..." | tee -a "$LOG_FILE"
+                # Don't fail the update, but log the error
+            fi
+        else
+            echo "[$(date)] Warning: Alembic not configured, skipping migrations" | tee -a "$LOG_FILE"
+        fi
     fi
 
     # Always rebuild frontend when there are any changes to ensure cache busting
