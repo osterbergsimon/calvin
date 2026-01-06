@@ -93,3 +93,4 @@ Both plugins respect the image ordering system:
 3. **For multiple IMAP accounts**: Each instance can use its own directory or share one
 4. **Ordering**: Set display_order to control which plugin's images appear first
 
+

@@ -11,7 +11,6 @@ from pathlib import Path
 from sqlalchemy.ext.asyncio import AsyncEngine, create_async_engine
 
 from app.database import Base
-from app.utils.migrations import _migrate_database_sync
 
 logger = logging.getLogger(__name__)
 
@@ -81,21 +80,40 @@ async def initialize_database(
 
     # Run migrations if requested
     if run_migrations:
-        # Migrations use sync SQLite, so we need to run them in an executor
-        # But first, we need to patch settings.database_url temporarily
-        from app.config import settings
+        # Use Alembic for migrations
+        from alembic import command
+        from alembic.config import Config
 
-        original_db_url = settings.database_url
-        settings.database_url = f"sqlite:///{database_path.resolve()}"
+        # Get database URL for Alembic (convert async to sync)
+        db_url = f"sqlite:///{database_path.resolve()}"
 
-        try:
-            # Run migrations synchronously in executor
-            loop = asyncio.get_event_loop()
-            await loop.run_in_executor(None, _migrate_database_sync)
-            logger.debug(f"Ran migrations for {database_path}")
-        finally:
-            # Restore original database URL
-            settings.database_url = original_db_url
+        # Get absolute path to alembic.ini
+        # database_path structure: backend/data/db/calvin.db (when resolved)
+        # alembic.ini is at: backend/alembic.ini
+        # So we go up 2 levels from database_path to get to backend
+        backend_dir = database_path.resolve().parent.parent.parent
+        alembic_ini_path = backend_dir / "alembic.ini"
+
+        if not alembic_ini_path.exists():
+            # Try alternative: search from current working directory
+            import os
+
+            cwd = Path(os.getcwd())
+            if (cwd / "alembic.ini").exists():
+                alembic_ini_path = cwd / "alembic.ini"
+            else:
+                logger.warning(
+                    f"Alembic config not found at {alembic_ini_path}, migrations may fail"
+                )
+
+        # Configure Alembic
+        alembic_cfg = Config(str(alembic_ini_path))
+        alembic_cfg.set_main_option("sqlalchemy.url", db_url)
+
+        # Run migrations in executor (Alembic is sync)
+        loop = asyncio.get_event_loop()
+        await loop.run_in_executor(None, command.upgrade, alembic_cfg, "head")
+        logger.debug(f"Ran Alembic migrations for {database_path}")
 
     return engine
 

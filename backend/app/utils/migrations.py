@@ -1,4 +1,15 @@
-"""Database migration utilities."""
+"""Database migration utilities.
+
+⚠️ DEPRECATED: This module is deprecated and should not be used.
+
+This file is kept for reference only. The project now uses Alembic for database
+migrations. All migration logic has been moved to:
+- Alembic migrations: backend/alembic/versions/
+- Theme registration: backend/alembic/versions/747053ae503f_ensure_built_in_themes_are_registered.py
+- Database initialization: backend/app/utils/db_init.py (now uses Alembic)
+
+DO NOT import or use functions from this module in new code.
+"""
 
 import asyncio
 import sqlite3
@@ -8,14 +19,39 @@ from app.config import settings
 
 
 async def migrate_database():
-    """Run database migrations."""
+    """
+    Run database migrations.
+
+    ⚠️ DEPRECATED: This function is deprecated. Use Alembic instead.
+    See backend/app/utils/db_init.py for the new migration system.
+    """
+    import warnings
+
+    warnings.warn(
+        "migrate_database() is deprecated. Use Alembic migrations instead. "
+        "See backend/app/utils/db_init.py",
+        DeprecationWarning,
+        stacklevel=2,
+    )
     # Run in executor to avoid blocking
     loop = asyncio.get_event_loop()
     await loop.run_in_executor(None, _migrate_database_sync)
 
 
 def _migrate_database_sync():
-    """Synchronous database migration."""
+    """
+    Synchronous database migration.
+
+    ⚠️ DEPRECATED: This function is deprecated. Use Alembic instead.
+    This function is no longer called by the application.
+    """
+    import warnings
+
+    warnings.warn(
+        "_migrate_database_sync() is deprecated. Use Alembic migrations instead.",
+        DeprecationWarning,
+        stacklevel=2,
+    )
     # Extract database path and handle both absolute and relative paths
     db_path_str = settings.database_url.replace("sqlite:///", "")
     # If path starts with /, it's absolute; otherwise resolve relative to current working directory
@@ -111,6 +147,9 @@ def _migrate_database_sync():
         # Migrate existing data to new tables
         _migrate_existing_data(cursor, conn)
 
+        # Ensure built-in themes are registered
+        _ensure_builtin_themes(cursor, conn)
+
         print("Database migration completed")
     except Exception as e:
         print(f"Error during migration: {e}")
@@ -121,7 +160,11 @@ def _migrate_database_sync():
 
 
 def _migrate_existing_data(cursor, conn):
-    """Migrate existing data from old tables to new unified tables."""
+    """
+    Migrate existing data from old tables to new unified tables.
+
+    ⚠️ DEPRECATED: This function is deprecated. Use Alembic migrations instead.
+    """
     import json
     from datetime import datetime
 
@@ -271,3 +314,98 @@ def _migrate_existing_data(cursor, conn):
                     print("Migrated local image plugin config to plugins table")
             except json.JSONDecodeError:
                 print("Warning: Failed to parse local image plugin config")
+
+
+def _ensure_builtin_themes(cursor, conn):
+    """
+    Ensure all built-in themes are registered in plugin_types table.
+
+    ⚠️ DEPRECATED: This function is deprecated.
+    Theme registration is now handled by:
+    1. Alembic migration: backend/alembic/versions/
+       747053ae503f_ensure_built_in_themes_are_registered.py
+    2. Startup sync: backend/app/api/routes/plugins.py::sync_themes_to_db()
+
+    The startup sync runs on every app restart and automatically registers
+    any new themes added to builtin.json.
+    """
+    import json
+    from datetime import datetime
+    from pathlib import Path
+
+    # Load built-in themes from JSON file
+    # Path: backend/app/utils/migrations.py -> backend/data/themes/builtin.json
+    backend_dir = Path(__file__).parent.parent.parent.parent
+    themes_file = backend_dir / "data" / "themes" / "builtin.json"
+
+    if not themes_file.exists():
+        print("Warning: Built-in themes file not found, skipping theme registration")
+        return
+
+    try:
+        with open(themes_file, encoding="utf-8") as f:
+            themes = json.load(f)
+    except (json.JSONDecodeError, Exception) as e:
+        print(f"Warning: Failed to load built-in themes: {e}")
+        return
+
+    # Check if plugin_types table exists (should exist by this point)
+    cursor.execute("""
+        SELECT name FROM sqlite_master
+        WHERE type='table' AND name='plugin_types'
+    """)
+    if not cursor.fetchone():
+        print("Warning: plugin_types table does not exist, skipping theme registration")
+        return
+
+    # Register each built-in theme
+    registered_count = 0
+    for theme_id, theme_data in themes.items():
+        # Check if theme already exists
+        cursor.execute("SELECT type_id FROM plugin_types WHERE type_id = ?", (theme_id,))
+        existing = cursor.fetchone()
+
+        theme_name = theme_data.get("name", theme_id)
+        theme_description = theme_data.get("description", "")
+        theme_version = theme_data.get("version", "1.0.0")
+
+        if existing:
+            # Update existing theme to ensure it's correct
+            cursor.execute(
+                """
+                UPDATE plugin_types
+                SET plugin_type = ?, name = ?, description = ?, version = ?,
+                    enabled = ?, error_message = NULL
+                WHERE type_id = ?
+                """,
+                ("theme", theme_name, theme_description, theme_version, True, theme_id),
+            )
+        else:
+            # Insert new theme
+            cursor.execute(
+                """
+                INSERT INTO plugin_types (
+                    type_id, plugin_type, name, description, version,
+                    common_config_schema, enabled, error_message,
+                    created_at, updated_at
+                )
+                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                """,
+                (
+                    theme_id,
+                    "theme",
+                    theme_name,
+                    theme_description,
+                    theme_version,
+                    "{}",  # Themes don't have config schemas
+                    True,  # Themes are enabled by default
+                    None,  # No error message
+                    datetime.utcnow().isoformat(),
+                    datetime.utcnow().isoformat(),
+                ),
+            )
+        registered_count += 1
+
+    conn.commit()
+    if registered_count > 0:
+        print(f"Registered {registered_count} built-in themes in database")

@@ -113,14 +113,36 @@ async def sync_themes_to_db() -> None:
     Sync all themes (built-in + installed) to PluginTypeDB.
     Should be called on startup to ensure themes are registered.
     """
+    import logging
+
+    logger = logging.getLogger(__name__)
+
     # Register built-in themes
+    logger.info(f"Syncing {len(BUILTIN_THEMES)} built-in themes to database")
     for theme_id, theme_data in BUILTIN_THEMES.items():
-        await _register_theme_in_db(theme_data)
+        try:
+            await _register_theme_in_db(theme_data)
+            logger.debug(f"Registered built-in theme: {theme_id}")
+        except Exception as e:
+            logger.error(f"Failed to register built-in theme {theme_id}: {e}", exc_info=True)
+            # Continue with other themes even if one fails
 
     # Register installed themes
-    installed_themes = theme_installer.get_installed_themes()
-    for theme in installed_themes:
-        await _register_theme_in_db(theme)
+    try:
+        installed_themes = theme_installer.get_installed_themes()
+        logger.info(f"Syncing {len(installed_themes)} installed themes to database")
+        for theme in installed_themes:
+            try:
+                await _register_theme_in_db(theme)
+                logger.debug(f"Registered installed theme: {theme.get('id', 'unknown')}")
+            except Exception as e:
+                logger.error(
+                    f"Failed to register installed theme {theme.get('id', 'unknown')}: {e}",
+                    exc_info=True,
+                )
+                # Continue with other themes even if one fails
+    except Exception as e:
+        logger.error(f"Failed to get installed themes: {e}", exc_info=True)
 
 
 # Sensitive fields that should be masked in logs and never sent to frontend
