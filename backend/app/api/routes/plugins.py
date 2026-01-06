@@ -24,15 +24,29 @@ def _load_builtin_themes() -> dict[str, Any]:
     from pathlib import Path
 
     # Path: backend/app/api/routes/plugins.py -> backend/data/themes/builtin.json
+    # __file__ is at backend/app/api/routes/plugins.py
+    # .parent = backend/app/api/routes/
+    # .parent.parent = backend/app/api/
+    # .parent.parent.parent = backend/app/
+    # .parent.parent.parent.parent = backend/
     backend_dir = Path(__file__).parent.parent.parent.parent
     themes_file = backend_dir / "data" / "themes" / "builtin.json"
 
+    # Try alternative path if first doesn't work (for when running from different locations)
     if not themes_file.exists():
-        import logging
+        # Try relative to current working directory
+        cwd_themes = Path.cwd() / "data" / "themes" / "builtin.json"
+        if cwd_themes.exists():
+            themes_file = cwd_themes
+        else:
+            import logging
 
-        logger = logging.getLogger(__name__)
-        logger.warning(f"Built-in themes file not found at {themes_file}, using empty themes")
-        return {}
+            logger = logging.getLogger(__name__)
+            logger.warning(
+                f"Built-in themes file not found at {themes_file} or {cwd_themes}, "
+                "using empty themes"
+            )
+            return {}
 
     try:
         with open(themes_file, encoding="utf-8") as f:
