@@ -1,0 +1,144 @@
+"""Theme helper functions for plugin management."""
+
+import json
+import logging
+from pathlib import Path
+from typing import Any
+
+from sqlalchemy import select
+
+from app.database import AsyncSessionLocal
+from app.models.db_models import PluginTypeDB
+from app.plugins.base import PluginType
+from app.services.theme_installer import theme_installer
+
+logger = logging.getLogger(__name__)
+
+
+def _load_builtin_themes() -> dict[str, Any]:
+    """Load built-in themes from JSON file."""
+    # Path: backend/app/api/routes/plugins/themes.py -> backend/data/themes/builtin.json
+    # __file__ is at backend/app/api/routes/plugins/themes.py
+    # .parent = backend/app/api/routes/plugins/
+    # .parent.parent = backend/app/api/routes/
+    # .parent.parent.parent = backend/app/api/
+    # .parent.parent.parent.parent = backend/app/
+    # .parent.parent.parent.parent.parent = backend/
+    backend_dir = Path(__file__).parent.parent.parent.parent.parent
+    themes_file = backend_dir / "data" / "themes" / "builtin.json"
+
+    # Try alternative path if first doesn't work (for when running from different locations)
+    if not themes_file.exists():
+        # Try relative to current working directory
+        cwd_themes = Path.cwd() / "data" / "themes" / "builtin.json"
+        if cwd_themes.exists():
+            themes_file = cwd_themes
+        else:
+            logger.warning(
+                f"Built-in themes file not found at {themes_file} or {cwd_themes}, "
+                "using empty themes"
+            )
+            return {}
+
+    try:
+        with open(themes_file, encoding="utf-8") as f:
+            themes = json.load(f)
+            # Ensure is_builtin is True for all loaded themes
+            for theme_id, theme_data in themes.items():
+                theme_data["is_builtin"] = True
+            return themes
+    except (json.JSONDecodeError, Exception) as e:
+        logger.error(f"Failed to load built-in themes from {themes_file}: {e}")
+        return {}
+
+
+# Built-in themes (loaded from JSON file)
+BUILTIN_THEMES = _load_builtin_themes()
+
+
+async def _register_theme_in_db(manifest: dict[str, Any]) -> None:
+    """
+    Register a theme in PluginTypeDB (like other plugins).
+
+    Args:
+        manifest: Theme manifest dictionary
+    """
+    theme_id = manifest.get("id")
+    if not theme_id:
+        return
+
+    async with AsyncSessionLocal() as session:
+        result = await session.execute(select(PluginTypeDB).where(PluginTypeDB.type_id == theme_id))
+        db_type = result.scalar_one_or_none()
+
+        if not db_type:
+            # Create new theme entry in database
+            db_type = PluginTypeDB(
+                type_id=theme_id,
+                plugin_type=PluginType.THEME.value,
+                name=manifest.get("name", theme_id),
+                description=manifest.get("description"),
+                version=manifest.get("version", "1.0.0"),
+                common_config_schema={},  # Themes don't have config schemas
+                enabled=True,  # Themes are enabled by default
+                error_message=None,
+            )
+            session.add(db_type)
+        else:
+            # Update existing theme entry
+            db_type.name = manifest.get("name", theme_id)
+            db_type.description = manifest.get("description")
+            db_type.version = manifest.get("version", "1.0.0")
+            db_type.plugin_type = PluginType.THEME.value
+            db_type.error_message = None
+
+        await session.commit()
+
+
+async def _unregister_theme_from_db(theme_id: str) -> None:
+    """
+    Remove a theme from PluginTypeDB.
+
+    Args:
+        theme_id: Theme identifier
+    """
+    async with AsyncSessionLocal() as session:
+        result = await session.execute(select(PluginTypeDB).where(PluginTypeDB.type_id == theme_id))
+        db_type = result.scalar_one_or_none()
+
+        if db_type and db_type.plugin_type == PluginType.THEME.value:
+            await session.delete(db_type)
+            await session.commit()
+
+
+async def sync_themes_to_db() -> None:
+    """
+    Sync all themes (built-in + installed) to PluginTypeDB.
+    Should be called on startup to ensure themes are registered.
+    """
+    # Register built-in themes
+    logger.info(f"Syncing {len(BUILTIN_THEMES)} built-in themes to database")
+    for theme_id, theme_data in BUILTIN_THEMES.items():
+        try:
+            await _register_theme_in_db(theme_data)
+            logger.debug(f"Registered built-in theme: {theme_id}")
+        except Exception as e:
+            logger.error(f"Failed to register built-in theme {theme_id}: {e}", exc_info=True)
+            # Continue with other themes even if one fails
+
+    # Register installed themes
+    try:
+        installed_themes = theme_installer.get_installed_themes()
+        logger.info(f"Syncing {len(installed_themes)} installed themes to database")
+        for theme in installed_themes:
+            try:
+                await _register_theme_in_db(theme)
+                logger.debug(f"Registered installed theme: {theme.get('id', 'unknown')}")
+            except Exception as e:
+                logger.error(
+                    f"Failed to register installed theme {theme.get('id', 'unknown')}: {e}",
+                    exc_info=True,
+                )
+                # Continue with other themes even if one fails
+    except Exception as e:
+        logger.error(f"Failed to get installed themes: {e}", exc_info=True)
