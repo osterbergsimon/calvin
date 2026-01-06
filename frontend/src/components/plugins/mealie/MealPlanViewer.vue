@@ -22,7 +22,7 @@
     >
       <div class="meal-plan-header">
         <h3>Meal Plan</h3>
-        <span class="meal-plan-dates" v-if="dateRange">
+        <span v-if="dateRange" class="meal-plan-dates">
           {{ dateRange }}
         </span>
       </div>
@@ -37,15 +37,15 @@
           class="meal-plan-item"
         >
           <div
+            v-if="item.date"
             class="meal-plan-date"
             :class="{ today: isToday(item.date) }"
-            v-if="item.date"
           >
             {{ formatDate(item.date) }}
           </div>
           <div
-            class="meal-plan-meals"
             v-if="item.meals && item.meals.length > 0"
+            class="meal-plan-meals"
           >
             <div
               v-for="meal in item.meals"
@@ -942,4 +942,3 @@ const gridStyle = computed(() => {
   }
 }
 </style>
-

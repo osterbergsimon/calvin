@@ -19,7 +19,9 @@
           This service cannot be embedded in an iframe due to security
           restrictions (CORS/X-Frame-Options).
         </p>
-        <p class="service-url">{{ url }}</p>
+        <p class="service-url">
+          {{ url }}
+        </p>
         <div class="error-actions">
           <a
             :href="url"
@@ -106,7 +108,7 @@ watch(
       }
     }, 5000);
   },
-  { immediate: true }
+  { immediate: true },
 );
 
 onUnmounted(() => {
@@ -212,4 +214,3 @@ onUnmounted(() => {
   background: var(--bg-tertiary);
 }
 </style>
-

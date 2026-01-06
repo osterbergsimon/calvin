@@ -1,32 +1,26 @@
 <template>
-  <div class="service-viewer" :key="service.id">
+  <div :key="service.id" class="service-viewer">
     <!-- Loading plugin component -->
     <div v-if="pluginComponentLoading" class="loading-state">
       <div class="spinner" />
       <p>Loading component...</p>
     </div>
-    
+
     <!-- Plugin-provided component (highest priority) -->
     <component
-      v-else-if="pluginComponent"
       :is="pluginComponent"
+      v-else-if="pluginComponent"
       :service-id="service.id"
       :api-endpoint="apiEndpoint"
     />
-    
+
     <!-- Generic viewers (fallback) -->
-    <IframeViewer
-      v-else-if="displayType === 'iframe'"
-      :url="service.url"
-    />
+    <IframeViewer v-else-if="displayType === 'iframe'" :url="service.url" />
     <WeatherViewer
       v-else-if="displayType === 'api' && renderTemplate === 'weather'"
       :service-id="service.id"
     />
-    <GenericApiViewer
-      v-else-if="displayType === 'api'"
-      :service="service"
-    />
+    <GenericApiViewer v-else-if="displayType === 'api'" :service="service" />
     <div v-else class="unknown-service">
       <p>Unknown service type: {{ displayType }}</p>
       <p v-if="pluginComponentError" class="error-text">
@@ -64,7 +58,10 @@ const renderTemplate = computed(() => {
 
 const apiEndpoint = computed(() => {
   if (props.service.display_schema?.api_endpoint) {
-    return props.service.display_schema.api_endpoint.replace("{service_id}", props.service.id);
+    return props.service.display_schema.api_endpoint.replace(
+      "{service_id}",
+      props.service.id,
+    );
   }
   return props.service.url;
 });
@@ -92,4 +89,3 @@ const {
   color: var(--text-secondary);
 }
 </style>
-

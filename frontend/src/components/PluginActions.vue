@@ -1,35 +1,45 @@
 <template>
-  <div v-if="actions && actions.length > 0" class="plugin-actions" style="margin-top: 1rem; display: flex; gap: 1rem; align-items: center; flex-wrap: wrap;">
+  <div
+    v-if="actions && actions.length > 0"
+    class="plugin-actions"
+    style="
+      margin-top: 1rem;
+      display: flex;
+      gap: 1rem;
+      align-items: center;
+      flex-wrap: wrap;
+    "
+  >
     <button
       v-for="action in actions"
       :key="action.id"
       :class="action.style === 'primary' ? 'btn-primary' : 'btn-secondary'"
       :disabled="isActionDisabled(action)"
-      @click="handleAction(action)"
       :title="action.type === 'custom' ? `Custom action: ${action.id}` : ''"
+      @click="handleAction(action)"
     >
       {{ getActionLabel(action) }}
     </button>
-    
+
     <!-- Status messages -->
     <span
       v-if="saveStatus"
       :class="saveStatus.success ? 'success-message' : 'error-message'"
-      style="margin-left: 0.5rem; padding: 0.5rem 1rem; border-radius: 4px;"
+      style="margin-left: 0.5rem; padding: 0.5rem 1rem; border-radius: 4px"
     >
       {{ saveStatus.message }}
     </span>
     <span
       v-if="testStatus"
       :class="testStatus.success ? 'success-message' : 'error-message'"
-      style="margin-left: 0.5rem; padding: 0.5rem 1rem; border-radius: 4px;"
+      style="margin-left: 0.5rem; padding: 0.5rem 1rem; border-radius: 4px"
     >
       {{ testStatus.message }}
     </span>
     <span
       v-if="fetchStatus"
       :class="fetchStatus.success ? 'success-message' : 'error-message'"
-      style="margin-left: 0.5rem; padding: 0.5rem 1rem; border-radius: 4px;"
+      style="margin-left: 0.5rem; padding: 0.5rem 1rem; border-radius: 4px"
     >
       {{ fetchStatus.message }}
     </span>
@@ -79,7 +89,7 @@ const props = defineProps({
   },
 });
 
-const emit = defineEmits(['save', 'test', 'fetch', 'custom-action']);
+const emit = defineEmits(["save", "test", "fetch", "custom-action"]);
 
 // Helper to get plugin ID - always use prop since endpoint may have placeholder
 const getPluginIdFromAction = () => {
@@ -91,43 +101,49 @@ const getPluginIdFromAction = () => {
 
 const isActionDisabled = (action) => {
   if (props.saving) return true;
-  if (action.type === 'test' && props.testing) return true;
-  if (action.type === 'fetch' && props.fetching) return true;
-  if (action.type === 'custom' && action.loading) return true;
+  if (action.type === "test" && props.testing) return true;
+  if (action.type === "fetch" && props.fetching) return true;
+  if (action.type === "custom" && action.loading) return true;
   return false;
 };
 
 const getActionLabel = (action) => {
-  if (action.type === 'save' && props.saving) return 'Saving...';
-  if (action.type === 'test' && props.testing) return 'Testing...';
-  if (action.type === 'fetch' && props.fetching) return 'Fetching...';
-  if (action.type === 'custom' && action.loading) return 'Loading...';
+  if (action.type === "save" && props.saving) return "Saving...";
+  if (action.type === "test" && props.testing) return "Testing...";
+  if (action.type === "fetch" && props.fetching) return "Fetching...";
+  if (action.type === "custom" && action.loading) return "Loading...";
   return action.label || action.id;
 };
 
 const handleAction = (_action) => {
   console.log("[PluginActions] handleAction called with:", _action);
   switch (_action.type) {
-    case 'save':
-      emit('save');
+    case "save":
+      emit("save");
       break;
-    case 'test':
-      emit('test');
+    case "test":
+      emit("test");
       break;
-    case 'fetch':
-      emit('fetch');
+    case "fetch":
+      emit("fetch");
       break;
-    case 'custom': {
+    case "custom": {
       const actionWithPluginId = {
         ..._action,
         pluginId: getPluginIdFromAction(),
       };
-      console.log("[PluginActions] Emitting custom-action with:", actionWithPluginId);
-      emit('custom-action', actionWithPluginId);
+      console.log(
+        "[PluginActions] Emitting custom-action with:",
+        actionWithPluginId,
+      );
+      emit("custom-action", actionWithPluginId);
       break;
     }
     default:
-      console.warn(`[PluginActions] Unknown action type: ${_action.type}`, _action);
+      console.warn(
+        `[PluginActions] Unknown action type: ${_action.type}`,
+        _action,
+      );
   }
 };
 </script>
@@ -200,4 +216,3 @@ const handleAction = (_action) => {
   font-size: 0.875rem;
 }
 </style>
-

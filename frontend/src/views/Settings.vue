@@ -14,22 +14,22 @@
           <div v-if="showSystemMenu" class="system-menu-dropdown">
             <button
               class="menu-item"
-              @click="restartBackend"
               title="Restart the backend server"
+              @click="restartBackend"
             >
               🔄 Restart Backend
             </button>
             <button
               class="menu-item"
-              @click="restartFrontend"
               title="Restart the frontend server"
+              @click="restartFrontend"
             >
               🔄 Restart Frontend
             </button>
             <button
               class="menu-item"
-              @click="reloadUI"
               title="Reload the frontend page"
+              @click="reloadUI"
             >
               🔄 Reload Page
             </button>
@@ -157,13 +157,13 @@
                 >
                   <div
                     class="setting-header"
-                    @click="toggleSection('themeSelection')"
                     style="
                       cursor: pointer;
                       display: flex;
                       justify-content: space-between;
                       align-items: center;
                     "
+                    @click="toggleSection('themeSelection')"
                   >
                     <label>Theme</label>
                     <span class="toggle-icon">{{
@@ -198,7 +198,7 @@
                                 ? `url(/api/plugins/${theme.id}/preview)`
                                 : undefined,
                             }"
-                          ></div>
+                          />
                           <div
                             v-else
                             class="theme-preview-placeholder"
@@ -565,8 +565,8 @@
               <div class="setting-item">
                 <label>
                   <input
-                    type="checkbox"
                     v-model="localConfig.keyboardFeedbackEnabled"
+                    type="checkbox"
                     @change="saveConfig"
                   />
                   Enable Keyboard Feedback
@@ -578,8 +578,8 @@
               </div>
 
               <div
-                class="setting-item"
                 v-if="localConfig.keyboardFeedbackEnabled"
+                class="setting-item"
               >
                 <label>Feedback Mode</label>
                 <select
@@ -880,12 +880,12 @@
                         class="btn-secondary"
                         :class="{ 'btn-stop': source.running }"
                         :title="source.running ? 'Stop plugin' : 'Start plugin'"
+                        :disabled="!source.enabled"
                         @click="
                           source.running
                             ? stopPluginInstance(source.id)
                             : startPluginInstance(source.id)
                         "
-                        :disabled="!source.enabled"
                       >
                         {{ source.running ? "Stop" : "Start" }}
                       </button>
@@ -935,9 +935,9 @@
                   :animation="200"
                   handle=".plugin-drag-handle"
                   group="plugins"
+                  item-key="id"
                   @start="onServicePluginDragStart"
                   @end="onServicePluginDragEnd"
-                  item-key="id"
                 >
                   <template #item="{ element: plugin, index }">
                     <div class="service-plugin-tree-item">
@@ -992,9 +992,9 @@
                           handle=".instance-drag-handle"
                           group="instances"
                           :data-plugin-id="plugin.id"
+                          item-key="id"
                           @start="onInstanceDragStart(plugin.id)"
                           @end="onInstanceDragEnd(plugin.id)"
-                          item-key="id"
                         >
                           <template #item="{ element: instance, index }">
                             <div class="instance-tree-item">
@@ -1083,9 +1083,9 @@
                   :animation="200"
                   handle=".plugin-drag-handle"
                   group="image-plugins"
+                  item-key="id"
                   @start="onImagePluginDragStart"
                   @end="onImagePluginDragEnd"
-                  item-key="id"
                 >
                   <template #item="{ element: plugin, index }">
                     <div class="service-plugin-tree-item">
@@ -1140,9 +1140,9 @@
                           handle=".instance-drag-handle"
                           group="image-instances"
                           :data-plugin-id="plugin.id"
+                          item-key="id"
                           @start="onImageInstanceDragStart(plugin.id)"
                           @end="onImageInstanceDragEnd(plugin.id)"
-                          item-key="id"
                         >
                           <template #item="{ element: instance, index }">
                             <div class="instance-tree-item">
@@ -1251,8 +1251,8 @@
                     ref="pluginZipInput"
                     type="file"
                     accept=".zip"
-                    @change="handlePluginZipSelect"
                     style="display: none"
+                    @change="handlePluginZipSelect"
                   />
                   <div class="install-compact-row">
                     <button
@@ -1533,7 +1533,6 @@
                             "
                             class="btn-icon-only btn-settings-icon"
                             :class="{ active: expandedPlugins[plugin.id] }"
-                            @click="togglePluginSettings(plugin.id)"
                             :title="
                               expandedPlugins[plugin.id]
                                 ? 'Hide settings'
@@ -1542,6 +1541,7 @@
                                   ? 'Show settings'
                                   : 'Show instances'
                             "
+                            @click="togglePluginSettings(plugin.id)"
                           >
                             ⚙️
                           </button>
@@ -1684,8 +1684,8 @@
                           </h4>
                           <button
                             class="btn-add-instance"
-                            @click="openAddInstanceModal(plugin.id)"
                             title="Add new instance"
+                            @click="openAddInstanceModal(plugin.id)"
                           >
                             + Add Instance
                           </button>
@@ -1708,9 +1708,9 @@
                             v-model="draggableInstances[plugin.id]"
                             :animation="200"
                             handle=".instance-drag-handle"
+                            item-key="id"
                             @start="onInstanceDragStart(plugin.id)"
                             @end="onInstanceDragEnd(plugin.id)"
-                            item-key="id"
                           >
                             <template #item="{ element: instance, index }">
                               <div
@@ -2212,8 +2212,8 @@
                     v-model="localConfig.gitBranch"
                     type="text"
                     placeholder="main"
-                    @change="updateGitBranch"
                     :disabled="fetchingBranches"
+                    @change="updateGitBranch"
                   />
                   <button
                     class="btn-fetch-branches"

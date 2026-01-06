@@ -95,4 +95,3 @@ const query = useWeatherData(props.serviceId, true);
   background: var(--bg-tertiary);
 }
 </style>
-

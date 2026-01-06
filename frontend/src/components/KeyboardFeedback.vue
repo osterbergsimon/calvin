@@ -6,8 +6,12 @@
       :class="[feedbackClass, sizeClass, positionClass]"
     >
       <div class="keyboard-feedback-content">
-        <div class="keyboard-feedback-key">{{ keyLabel }}</div>
-        <div class="keyboard-feedback-action">{{ actionLabel }}</div>
+        <div class="keyboard-feedback-key">
+          {{ keyLabel }}
+        </div>
+        <div class="keyboard-feedback-action">
+          {{ actionLabel }}
+        </div>
       </div>
     </div>
   </Transition>

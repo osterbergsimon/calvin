@@ -3,9 +3,15 @@
     <div v-for="section in sections" :key="section.id" class="plugin-section">
       <!-- Upload Section -->
       <div v-if="section.type === 'upload'" class="upload-section">
-        <h4 class="config-section-title">{{ section.title || 'Upload' }}</h4>
+        <h4 class="config-section-title">
+          {{ section.title || "Upload" }}
+        </h4>
         <input
-          :ref="el => { if (el) fileInputs[section.id] = el }"
+          :ref="
+            (el) => {
+              if (el) fileInputs[section.id] = el;
+            }
+          "
           type="file"
           :accept="section.accept || 'image/*'"
           :multiple="section.multiple || false"
@@ -14,8 +20,8 @@
         />
         <button
           class="btn-upload"
-          @click="triggerFileInput(section.id)"
           :disabled="uploading"
+          @click="triggerFileInput(section.id)"
         >
           {{ uploading ? "Uploading..." : "Choose Files" }}
         </button>
@@ -29,35 +35,43 @@
           {{ uploadSuccess }}
         </div>
       </div>
-      
+
       <!-- Manage Images Section -->
-      <div v-else-if="section.type === 'manage_images'" class="manage-images-section" style="margin-top: 1.5rem;">
+      <div
+        v-else-if="section.type === 'manage_images'"
+        class="manage-images-section"
+        style="margin-top: 1.5rem"
+      >
         <div
           v-if="section.collapsible"
           class="config-section-title collapsible-header"
-          style="cursor: pointer; display: flex; justify-content: space-between; align-items: center; padding: 0.5rem 0;"
+          style="
+            cursor: pointer;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            padding: 0.5rem 0;
+          "
           @click="toggleSection(section.id)"
         >
-          <h4 style="margin: 0;">
-            {{ section.title || 'Manage Images' }}
+          <h4 style="margin: 0">
+            {{ section.title || "Manage Images" }}
             <span v-if="imageCount !== undefined"> ({{ imageCount }})</span>
           </h4>
-          <span style="font-size: 0.9rem; color: var(--text-secondary);">
+          <span style="font-size: 0.9rem; color: var(--text-secondary)">
             {{ expandedSections[section.id] ? "▼" : "▶" }}
           </span>
         </div>
-        <h4 v-else class="config-section-title">{{ section.title || 'Manage Images' }}</h4>
-        
+        <h4 v-else class="config-section-title">
+          {{ section.title || "Manage Images" }}
+        </h4>
+
         <div
           v-show="!section.collapsible || expandedSections[section.id]"
           class="images-list"
-          style="margin-top: 1rem; max-height: 400px; overflow-y: auto;"
+          style="margin-top: 1rem; max-height: 400px; overflow-y: auto"
         >
-          <div
-            v-for="image in images"
-            :key="image.id"
-            class="image-item"
-          >
+          <div v-for="image in images" :key="image.id" class="image-item">
             <div class="image-thumbnail">
               <img
                 :src="`/api/images/${image.id}/thumbnail`"
@@ -69,7 +83,8 @@
             <div class="image-info">
               <strong>{{ image.filename }}</strong>
               <span class="image-details">
-                {{ image.width }}×{{ image.height }} • {{ formatFileSize(image.size) }}
+                {{ image.width }}×{{ image.height }} •
+                {{ formatFileSize(image.size) }}
               </span>
             </div>
             <button
@@ -90,7 +105,7 @@
 </template>
 
 <script setup>
-import { ref, computed } from 'vue';
+import { ref, computed } from "vue";
 
 const props = defineProps({
   pluginId: {
@@ -111,15 +126,15 @@ const props = defineProps({
   },
   uploadError: {
     type: String,
-    default: '',
+    default: "",
   },
   uploadSuccess: {
     type: String,
-    default: '',
+    default: "",
   },
 });
 
-const emit = defineEmits(['upload', 'delete-image']);
+const emit = defineEmits(["upload", "delete-image"]);
 
 const expandedSections = ref({});
 const fileInputs = ref({});
@@ -143,24 +158,24 @@ const handleFileSelect = (event) => {
   const files = event.target.files;
   if (files && files.length > 0) {
     // Find the section that matches this file input
-    const section = props.sections.find(s => s.type === 'upload');
+    const section = props.sections.find((s) => s.type === "upload");
     if (section) {
-      emit('upload', files, section);
+      emit("upload", files, section);
     }
   }
-  event.target.value = '';
+  event.target.value = "";
 };
 
 const handleThumbnailError = (event) => {
-  event.target.src = '/placeholder-thumbnail.png';
+  event.target.src = "/placeholder-thumbnail.png";
 };
 
 const formatFileSize = (bytes) => {
-  if (!bytes) return '0 B';
+  if (!bytes) return "0 B";
   const k = 1024;
-  const sizes = ['B', 'KB', 'MB', 'GB'];
+  const sizes = ["B", "KB", "MB", "GB"];
   const i = Math.floor(Math.log(bytes) / Math.log(k));
-  return Math.round(bytes / Math.pow(k, i) * 100) / 100 + ' ' + sizes[i];
+  return Math.round((bytes / Math.pow(k, i)) * 100) / 100 + " " + sizes[i];
 };
 </script>
 
@@ -301,4 +316,3 @@ const formatFileSize = (bytes) => {
   color: var(--text-primary);
 }
 </style>
-

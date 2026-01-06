@@ -1,14 +1,27 @@
 <template>
-  <div v-if="!configStore.shouldShowUI" class="minimal-ui-overlay" :class="buttonPositionClass">
+  <div
+    v-if="!configStore.shouldShowUI"
+    class="minimal-ui-overlay"
+    :class="buttonPositionClass"
+  >
     <button
       class="ui-toggle-btn"
       title="Show UI"
       aria-label="Show UI"
       @click="configStore.showUITemporarily(60)"
     >
-      <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-        <circle cx="12" cy="12" r="3"></circle>
-        <path d="M12 1v6m0 6v6M23 12h-6m-6 0H1M20.66 3.34l-4.24 4.24m0 4.24l4.24 4.24M3.34 20.66l4.24-4.24m0-4.24L3.34 7.94"></path>
+      <svg
+        width="16"
+        height="16"
+        viewBox="0 0 24 24"
+        fill="none"
+        stroke="currentColor"
+        stroke-width="2"
+      >
+        <circle cx="12" cy="12" r="3" />
+        <path
+          d="M12 1v6m0 6v6M23 12h-6m-6 0H1M20.66 3.34l-4.24 4.24m0 4.24l4.24 4.24M3.34 20.66l4.24-4.24m0-4.24L3.34 7.94"
+        />
       </svg>
     </button>
   </div>
@@ -23,7 +36,7 @@ const configStore = useConfigStore();
 // Position button opposite to clock position to avoid conflicts
 const buttonPositionClass = computed(() => {
   const clockPos = configStore.clockPosition || "top-right";
-  
+
   // If clock is in top-right, put button in bottom-left (and vice versa)
   // If clock is in top-left, put button in bottom-right (and vice versa)
   switch (clockPos) {

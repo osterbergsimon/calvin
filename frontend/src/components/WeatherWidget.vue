@@ -2,31 +2,42 @@
   <div class="weather-widget">
     <div v-if="data && !data.error" class="weather-content">
       <div class="weather-header">
-        <h3>{{ data.location || 'Weather' }}</h3>
-        <button class="btn-refresh" @click="$emit('refresh')" title="Refresh weather">
+        <h3>{{ data.location || "Weather" }}</h3>
+        <button
+          class="btn-refresh"
+          title="Refresh weather"
+          @click="$emit('refresh')"
+        >
           ↻
         </button>
       </div>
-      
+
       <!-- Current Weather -->
       <div v-if="data.current" class="weather-current">
         <div class="weather-main">
           <div class="weather-icon">
-            <img 
-              :src="`https://openweathermap.org/img/wn/${data.current.icon}@2x.png`" 
+            <img
+              :src="`https://openweathermap.org/img/wn/${data.current.icon}@2x.png`"
               :alt="data.current.description"
             />
           </div>
           <div class="weather-temp">
-            <span class="temp-value">{{ Math.round(data.current.temperature) }}</span>
+            <span class="temp-value">{{
+              Math.round(data.current.temperature)
+            }}</span>
             <span class="temp-unit">{{ getTempUnit() }}</span>
           </div>
-          <div class="weather-desc">{{ capitalize(data.current.description) }}</div>
+          <div class="weather-desc">
+            {{ capitalize(data.current.description) }}
+          </div>
         </div>
         <div class="weather-details">
           <div class="weather-detail-item">
             <span class="detail-label">Feels like</span>
-            <span class="detail-value">{{ Math.round(data.current.feels_like) }}{{ getTempUnit() }}</span>
+            <span class="detail-value"
+              >{{ Math.round(data.current.feels_like)
+              }}{{ getTempUnit() }}</span
+            >
           </div>
           <div class="weather-detail-item">
             <span class="detail-label">Humidity</span>
@@ -34,7 +45,10 @@
           </div>
           <div class="weather-detail-item">
             <span class="detail-label">Wind</span>
-            <span class="detail-value">{{ formatWindSpeed(data.current.wind_speed) }} {{ getWindUnit() }}</span>
+            <span class="detail-value"
+              >{{ formatWindSpeed(data.current.wind_speed) }}
+              {{ getWindUnit() }}</span
+            >
           </div>
           <div class="weather-detail-item">
             <span class="detail-label">Pressure</span>
@@ -44,26 +58,37 @@
       </div>
 
       <!-- Forecast -->
-      <div v-if="data.forecast && data.forecast.length > 0" class="weather-forecast">
+      <div
+        v-if="data.forecast && data.forecast.length > 0"
+        class="weather-forecast"
+      >
         <h4>Forecast</h4>
         <div class="forecast-items">
-          <div 
-            v-for="day in data.forecast" 
+          <div
+            v-for="day in data.forecast"
             :key="day.date"
             class="forecast-item"
           >
-            <div class="forecast-date">{{ formatForecastDate(day.date) }}</div>
+            <div class="forecast-date">
+              {{ formatForecastDate(day.date) }}
+            </div>
             <div class="forecast-icon">
-              <img 
-                :src="`https://openweathermap.org/img/wn/${day.icon}@2x.png`" 
+              <img
+                :src="`https://openweathermap.org/img/wn/${day.icon}@2x.png`"
                 :alt="day.description"
               />
             </div>
             <div class="forecast-temps">
-              <span class="temp-high">{{ Math.round(day.temp_max) }}{{ getTempUnit() }}</span>
-              <span class="temp-low">{{ Math.round(day.temp_min) }}{{ getTempUnit() }}</span>
+              <span class="temp-high"
+                >{{ Math.round(day.temp_max) }}{{ getTempUnit() }}</span
+              >
+              <span class="temp-low"
+                >{{ Math.round(day.temp_min) }}{{ getTempUnit() }}</span
+              >
             </div>
-            <div class="forecast-desc">{{ capitalize(day.description) }}</div>
+            <div class="forecast-desc">
+              {{ capitalize(day.description) }}
+            </div>
           </div>
         </div>
       </div>
@@ -71,14 +96,15 @@
       <!-- Error Display -->
       <div v-if="data.error" class="weather-error">
         <p>⚠️ {{ data.error }}</p>
-        <p v-if="data.message" class="error-detail">{{ data.message }}</p>
+        <p v-if="data.message" class="error-detail">
+          {{ data.message }}
+        </p>
       </div>
     </div>
   </div>
 </template>
 
 <script setup>
-
 const props = defineProps({
   data: {
     type: Object,
@@ -86,7 +112,7 @@ const props = defineProps({
   },
 });
 
-defineEmits(['refresh']);
+defineEmits(["refresh"]);
 
 // Weather helper functions
 const getTempUnit = () => {
@@ -116,13 +142,17 @@ const formatForecastDate = (dateString) => {
   today.setHours(0, 0, 0, 0);
   const forecastDate = new Date(date);
   forecastDate.setHours(0, 0, 0, 0);
-  
+
   const diffDays = Math.round((forecastDate - today) / (1000 * 60 * 60 * 24));
-  
+
   if (diffDays === 0) return "Today";
   if (diffDays === 1) return "Tomorrow";
-  
-  return date.toLocaleDateString("en-US", { weekday: "short", month: "short", day: "numeric" });
+
+  return date.toLocaleDateString("en-US", {
+    weekday: "short",
+    month: "short",
+    day: "numeric",
+  });
 };
 
 const capitalize = (str) => {
@@ -330,4 +360,3 @@ const capitalize = (str) => {
   color: var(--text-secondary);
 }
 </style>
-

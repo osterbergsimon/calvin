@@ -66,7 +66,7 @@ const displayMode = computed(() => {
 const imageStyle = computed(() => {
   const mode = displayMode.value;
   const image = imagesStore.currentImage;
-  
+
   if (!image || mode !== "smart") {
     return {};
   }
@@ -75,10 +75,10 @@ const imageStyle = computed(() => {
   // - Image aspect ratio (width/height)
   // - Container aspect ratio (from orientation and layout)
   // - Screen orientation
-  
+
   const imageAspect = image.width / image.height;
   const isLandscape = configStore.orientation === "landscape";
-  
+
   // Estimate container aspect ratio based on layout
   // In landscape: side view is typically narrower (30% width)
   // In portrait: side view is typically shorter (30% height)
@@ -92,13 +92,13 @@ const imageStyle = computed(() => {
     // Assuming 9:16 screen, side view would be ~9:5.3 = ~1.7:1
     containerAspect = 1.7;
   }
-  
+
   // Smart mode logic:
   // - If image is wider than container (imageAspect > containerAspect): use fill/crop
   // - If image is taller than container (imageAspect < containerAspect): use fit
   // - If similar aspect ratios: use fill
   const aspectDiff = Math.abs(imageAspect - containerAspect) / containerAspect;
-  
+
   if (aspectDiff < 0.1) {
     // Very similar aspect ratios: use fill
     return { objectFit: "cover", objectPosition: "center" };
