@@ -26,8 +26,12 @@ def upgrade() -> None:
     from pathlib import Path
 
     # Load built-in themes from JSON file
-    # Path: backend/alembic/versions -> backend/data/themes/builtin.json
-    backend_dir = Path(__file__).parent.parent.parent.parent
+    # Path: backend/alembic/versions/ -> backend/data/themes/builtin.json
+    # __file__ is at backend/alembic/versions/747053ae503f_*.py
+    # .parent = backend/alembic/versions/
+    # .parent.parent = backend/alembic/
+    # .parent.parent.parent = backend/
+    backend_dir = Path(__file__).parent.parent.parent
     themes_file = backend_dir / "data" / "themes" / "builtin.json"
 
     if not themes_file.exists():
