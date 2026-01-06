@@ -1,6 +1,6 @@
 # Settings.vue Refactoring Progress
 
-## Status: ~50% Complete
+## Status: ~65% Complete
 
 ### ✅ Completed
 
@@ -10,9 +10,13 @@
 - ✅ `TabNavigation.vue` - Reusable tab navigation
 - ✅ `SettingsTab.vue` - Base component for tab content
 
-#### Phase 2: Specialized Components (Partial)
+#### Phase 2: Specialized Components ✅
 - ✅ `ThemeSelector.vue` - Theme selection grid with previews
 - ✅ `PluginInstaller.vue` - Plugin installation (zip/GitHub)
+- ✅ `PluginManager.vue` - Plugin management with tabs
+- ✅ `PluginCard.vue` - Individual plugin card component
+- ✅ `PluginInstances.vue` - Plugin instances list component
+- ✅ `OrderingManager.vue` - Unified ordering for services/images
 
 #### Phase 5: Composables
 - ✅ `usePlugins.js` - Plugin management logic
@@ -27,9 +31,6 @@
 
 ### 🔄 In Progress
 
-#### Phase 2: Specialized Components
-- ⏳ `PluginManager.vue` - Plugin cards, instances, configuration
-- ⏳ `OrderingManager.vue` - Service/image ordering with drag-and-drop
 
 ### 📋 Remaining
 
