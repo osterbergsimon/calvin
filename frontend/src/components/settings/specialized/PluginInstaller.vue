@@ -49,18 +49,20 @@
       </p>
       <div class="install-compact-row">
         <input
-          v-model="repoUrl"
+          :model-value="repoUrl"
           type="text"
           placeholder="https://github.com/user/repo"
           class="github-input-compact"
           :disabled="enumerating || installing"
+          @input="handleRepoUrlInput"
         />
         <input
-          v-model="branch"
+          :model-value="branch"
           type="text"
           placeholder="main"
           class="github-branch-compact"
           :disabled="enumerating || installing"
+          @input="handleBranchInput"
         />
         <button
           type="button"
