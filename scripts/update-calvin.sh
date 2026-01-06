@@ -1,9 +1,31 @@
 #!/bin/bash
 # Auto-update script for Calvin Dashboard
 # Pulls latest code from GitHub and restarts services
+# Usage: update-calvin.sh [--force]
+#   --force: Force dependency updates and rebuilds even if no git changes detected
 
 # Don't use set -e - we want to continue even if some steps fail
 set +e
+
+# Parse command line arguments
+FORCE_UPDATE=false
+for arg in "$@"; do
+    case "$arg" in
+        --force|-f)
+            FORCE_UPDATE=true
+            ;;
+        --help|-h)
+            echo "Usage: $0 [--force]"
+            echo "  --force, -f: Force dependency updates and rebuilds even if no git changes detected"
+            exit 0
+            ;;
+        *)
+            echo "Unknown option: $arg" >&2
+            echo "Use --help for usage information" >&2
+            exit 1
+            ;;
+    esac
+done
 
 # Save environment variables before sourcing config file
 # This ensures environment variables (passed from API) take precedence over file values
@@ -163,8 +185,13 @@ else
     fi
     
     if [ "$CURRENT_COMMIT" = "$NEW_COMMIT" ]; then
-        echo "No changes detected. Already up to date at commit $CURRENT_COMMIT_SHORT" | tee -a "$LOG_FILE"
-        HAS_CHANGES=false
+        if [ "$FORCE_UPDATE" = true ]; then
+            echo "No git changes detected, but --force flag is set. Will update dependencies anyway." | tee -a "$LOG_FILE"
+            HAS_CHANGES=true
+        else
+            echo "No changes detected. Already up to date at commit $CURRENT_COMMIT_SHORT" | tee -a "$LOG_FILE"
+            HAS_CHANGES=false
+        fi
     else
         echo "Changes detected. Updating from $CURRENT_COMMIT_SHORT to $NEW_COMMIT_SHORT..." | tee -a "$LOG_FILE"
         if [ -n "$CURRENT_COMMIT" ] && [ -n "$NEW_COMMIT" ]; then
@@ -195,8 +222,11 @@ if [ -f "$REPO_DIR/scripts/update-calvin.sh" ] && [ -f "/usr/local/bin/update-ca
     chown calvin:calvin /usr/local/bin/update-calvin.sh 2>/dev/null || true
 fi
 
-# Only update dependencies and rebuild if there are changes
-if [ "$HAS_CHANGES" = true ]; then
+# Only update dependencies and rebuild if there are changes or --force is set
+if [ "$HAS_CHANGES" = true ] || [ "$FORCE_UPDATE" = true ]; then
+    if [ "$FORCE_UPDATE" = true ] && [ "$HAS_CHANGES" = false ]; then
+        echo "Force update requested. Updating dependencies and rebuilding..." | tee -a "$LOG_FILE"
+    fi
     # Update backend dependencies
     echo "Updating backend dependencies..." | tee -a "$LOG_FILE"
     cd "$REPO_DIR/backend" || {
