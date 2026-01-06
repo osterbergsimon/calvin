@@ -35,8 +35,50 @@ GIT_BRANCH="${GIT_BRANCH:-main}"
 LOG_FILE="${REPO_DIR}/backend/logs/calvin-update.log"
 mkdir -p "$(dirname "$LOG_FILE")"
 
+# Helper function to get UV PATH
+get_uv_path() {
+    echo "/home/calvin/.local/bin:/home/calvin/.cargo/bin:$PATH"
+}
+
+# Helper function to ensure UV is installed
+ensure_uv() {
+    local uv_path
+    uv_path=$(get_uv_path)
+    export PATH="$uv_path"
+    
+    if command -v uv &> /dev/null; then
+        return 0
+    fi
+    
+    echo "UV not found, attempting to install..." | tee -a "$LOG_FILE"
+    
+    if [ "$(id -u)" = "0" ] || [ "$(id -un)" = "root" ]; then
+        sudo -u calvin bash << 'UV_INSTALL_EOF'
+            export PATH="$HOME/.local/bin:$HOME/.cargo/bin:$PATH"
+            if ! command -v uv &> /dev/null; then
+                curl -LsSf https://astral.sh/uv/install.sh | sh || exit 1
+                echo 'export PATH="$HOME/.local/bin:$HOME/.cargo/bin:$PATH"' >> ~/.bashrc
+                echo 'export PATH="$HOME/.local/bin:$HOME/.cargo/bin:$PATH"' >> ~/.profile
+                export PATH="$HOME/.local/bin:$HOME/.cargo/bin:$PATH"
+            fi
+UV_INSTALL_EOF
+        [ $? -eq 0 ] || return 1
+    else
+        export PATH="$HOME/.local/bin:$HOME/.cargo/bin:$PATH"
+        if ! command -v uv &> /dev/null; then
+            curl -LsSf https://astral.sh/uv/install.sh | sh || return 1
+            echo 'export PATH="$HOME/.local/bin:$HOME/.cargo/bin:$PATH"' >> ~/.bashrc
+            echo 'export PATH="$HOME/.local/bin:$HOME/.cargo/bin:$PATH"' >> ~/.profile
+            export PATH="$HOME/.local/bin:$HOME/.cargo/bin:$PATH"
+        fi
+    fi
+    
+    export PATH="$uv_path"
+    command -v uv &> /dev/null
+}
+
 # Ensure PATH includes UV
-export PATH="/home/calvin/.local/bin:$PATH"
+export PATH=$(get_uv_path)
 
 # Ensure we can write to the log file
 touch "$LOG_FILE" 2>/dev/null || {
@@ -93,25 +135,14 @@ else
     # Ensure we're on the correct branch
     if [ "$CURRENT_BRANCH" != "$GIT_BRANCH" ]; then
         echo "Switching to branch $GIT_BRANCH (currently on $CURRENT_BRANCH)..." | tee -a "$LOG_FILE"
-        # Check if the branch exists locally
+        # Try to checkout existing local branch, or create from origin
         if git show-ref --verify --quiet refs/heads/"$GIT_BRANCH"; then
-            # Branch exists locally, just checkout
-            if ! git checkout "$GIT_BRANCH"; then
-                echo "Warning: Failed to checkout local branch $GIT_BRANCH" | tee -a "$LOG_FILE"
-                exit 0
-            fi
+            git checkout "$GIT_BRANCH" || { echo "Warning: Failed to checkout $GIT_BRANCH" | tee -a "$LOG_FILE"; exit 0; }
+        elif git show-ref --verify --quiet refs/remotes/origin/"$GIT_BRANCH"; then
+            git checkout -b "$GIT_BRANCH" "origin/$GIT_BRANCH" || { echo "Warning: Failed to create branch $GIT_BRANCH from origin" | tee -a "$LOG_FILE"; exit 0; }
         else
-            # Branch doesn't exist locally, create it from origin
-            if git show-ref --verify --quiet refs/remotes/origin/"$GIT_BRANCH"; then
-                # Remote branch exists, create local tracking branch
-                if ! git checkout -b "$GIT_BRANCH" "origin/$GIT_BRANCH"; then
-                    echo "Warning: Failed to create and checkout branch $GIT_BRANCH from origin" | tee -a "$LOG_FILE"
-                    exit 0
-                fi
-            else
-                echo "Warning: Branch $GIT_BRANCH does not exist on origin" | tee -a "$LOG_FILE"
-                exit 0
-            fi
+            echo "Warning: Branch $GIT_BRANCH does not exist on origin" | tee -a "$LOG_FILE"
+            exit 0
         fi
         echo "Successfully switched to branch $GIT_BRANCH" | tee -a "$LOG_FILE"
     fi
@@ -173,24 +204,58 @@ if [ "$HAS_CHANGES" = true ]; then
         exit 1
     }
 
-    # Use venv if it exists (pip installation), otherwise use UV
-    if [ -f .venv/bin/activate ]; then
+    # Detect if we have an existing .venv (could be from pip or UV)
+    HAS_EXISTING_VENV=false
+    if [ -d ".venv" ]; then
+        HAS_EXISTING_VENV=true
+        echo "Detected existing virtual environment (.venv directory)" | tee -a "$LOG_FILE"
+    fi
+
+    # Try to use UV (preferred method) - it will work with existing .venv or create new one
+    if ensure_uv; then
+        echo "Using UV for dependency management..." | tee -a "$LOG_FILE"
+        
+        # If we had an existing venv, note that we're migrating/updating to UV
+        if [ "$HAS_EXISTING_VENV" = true ]; then
+            echo "Updating/migrating to UV-managed environment..." | tee -a "$LOG_FILE"
+        fi
+        
+        # Use frozen lock file if available, fallback to non-frozen if it fails
+        UV_SYNC_SUCCESS=false
+        if [ -f uv.lock ]; then
+            if uv sync --frozen --extra linux 2>&1 | tee -a "$LOG_FILE"; then
+                UV_SYNC_SUCCESS=true
+            else
+                echo "Warning: Frozen sync failed, trying without frozen..." | tee -a "$LOG_FILE"
+                if uv sync --extra linux 2>&1 | tee -a "$LOG_FILE"; then
+                    UV_SYNC_SUCCESS=true
+                else
+                    echo "Warning: Failed to update backend dependencies with UV" | tee -a "$LOG_FILE"
+                fi
+            fi
+        else
+            if uv sync --extra linux 2>&1 | tee -a "$LOG_FILE"; then
+                UV_SYNC_SUCCESS=true
+            else
+                echo "Warning: Failed to update backend dependencies with UV" | tee -a "$LOG_FILE"
+            fi
+        fi
+        
+        if [ "$UV_SYNC_SUCCESS" = true ]; then
+            echo "UV dependency update completed successfully" | tee -a "$LOG_FILE"
+        fi
+    else
+        # Fallback to pip/venv only if UV is not available
+        echo "Warning: UV not available, using pip/venv as fallback..." | tee -a "$LOG_FILE"
+        if [ "$HAS_EXISTING_VENV" = false ]; then
+            echo "Creating new virtual environment..." | tee -a "$LOG_FILE"
+            python3 -m venv .venv
+        else
+            echo "Using existing virtual environment..." | tee -a "$LOG_FILE"
+        fi
         source .venv/bin/activate
         pip install --upgrade pip
-        # Install from pyproject.toml with linux and dev extras
-        pip install .[linux,dev] 2>&1 | tee -a "$LOG_FILE"
-    else
-        export PATH="/home/calvin/.local/bin:/home/calvin/.cargo/bin:$PATH"
-        if ! uv sync --extra dev --extra linux 2>&1 | tee -a "$LOG_FILE"; then
-            echo "Warning: Failed to update backend dependencies with UV" | tee -a "$LOG_FILE"
-            # Try with pip as fallback
-            echo "Trying pip as fallback..." | tee -a "$LOG_FILE"
-            python3 -m venv .venv
-            source .venv/bin/activate
-            pip install --upgrade pip
-            # Install from pyproject.toml with linux and dev extras
-            pip install .[linux,dev] 2>&1 | tee -a "$LOG_FILE"
-        fi
+        pip install .[linux] 2>&1 | tee -a "$LOG_FILE"
     fi
 
     # Always rebuild frontend when there are any changes to ensure cache busting
@@ -222,46 +287,42 @@ else
     echo "No changes detected. Skipping dependency updates and rebuilds." | tee -a "$LOG_FILE"
 fi
 
+# Helper function to restart a systemd service
+restart_service() {
+    local service="$1"
+    if sudo systemctl restart "$service" 2>/dev/null; then
+        echo "$service restarted successfully" | tee -a "$LOG_FILE"
+        return 0
+    elif systemctl --user restart "$service" 2>/dev/null; then
+        echo "$service restarted successfully (user service)" | tee -a "$LOG_FILE"
+        return 0
+    else
+        echo "Warning: Failed to restart $service" | tee -a "$LOG_FILE"
+        return 1
+    fi
+}
+
 # Restart services via systemd (non-blocking)
-# Use sudo if available, otherwise try without (might fail if not running as root)
 if systemctl is-active --quiet calvin-backend.service 2>/dev/null || sudo systemctl is-active --quiet calvin-backend.service 2>/dev/null; then
     echo "Restarting services via systemd..." | tee -a "$LOG_FILE"
-    if sudo systemctl restart calvin-backend 2>/dev/null; then
-        echo "Backend service restarted successfully" | tee -a "$LOG_FILE"
-    elif systemctl --user restart calvin-backend 2>/dev/null; then
-        echo "Backend service restarted successfully (user service)" | tee -a "$LOG_FILE"
-    else
-        echo "Warning: Failed to restart backend (may need sudo permissions)" | tee -a "$LOG_FILE"
-        echo "Please restart manually: sudo systemctl restart calvin-backend" | tee -a "$LOG_FILE"
-    fi
+    restart_service calvin-backend
+    
     # Clear Chromium cache before restarting to ensure fresh files are loaded
-    # This is critical - Chromium in kiosk mode may cache files even with no-cache headers
     echo "Clearing Chromium cache..." | tee -a "$LOG_FILE"
     CHROMIUM_CACHE_DIR="/home/calvin/.cache/chromium"
     if [ -d "$CHROMIUM_CACHE_DIR" ]; then
-        # Clear cache directories (using sudo if needed, or as current user)
-        if sudo rm -rf "$CHROMIUM_CACHE_DIR/Default/Cache"/* "$CHROMIUM_CACHE_DIR/Default/Code Cache"/* 2>/dev/null; then
-            echo "Chromium cache cleared successfully (with sudo)" | tee -a "$LOG_FILE"
-        elif rm -rf "$CHROMIUM_CACHE_DIR/Default/Cache"/* "$CHROMIUM_CACHE_DIR/Default/Code Cache"/* 2>/dev/null; then
+        if sudo rm -rf "$CHROMIUM_CACHE_DIR/Default/Cache"/* "$CHROMIUM_CACHE_DIR/Default/Code Cache"/* 2>/dev/null || \
+           rm -rf "$CHROMIUM_CACHE_DIR/Default/Cache"/* "$CHROMIUM_CACHE_DIR/Default/Code Cache"/* 2>/dev/null; then
             echo "Chromium cache cleared successfully" | tee -a "$LOG_FILE"
         else
-            echo "Warning: Failed to clear Chromium cache (may need sudo permissions)" | tee -a "$LOG_FILE"
+            echo "Warning: Failed to clear Chromium cache" | tee -a "$LOG_FILE"
         fi
-    else
-        echo "Chromium cache directory not found, skipping cache clear" | tee -a "$LOG_FILE"
     fi
     
-    # Restart frontend (Chromium) to force reload
-    echo "Restarting frontend service (Chromium) to reload..." | tee -a "$LOG_FILE"
-    if sudo systemctl restart calvin-frontend 2>/dev/null; then
-        echo "Frontend service restarted successfully" | tee -a "$LOG_FILE"
-    elif systemctl --user restart calvin-frontend 2>/dev/null; then
-        echo "Frontend service restarted successfully (user service)" | tee -a "$LOG_FILE"
-    else
-        echo "Warning: Failed to restart frontend (may need sudo permissions)" | tee -a "$LOG_FILE"
+    restart_service calvin-frontend || {
         echo "Please restart manually: sudo systemctl restart calvin-frontend" | tee -a "$LOG_FILE"
         echo "Or clear Chromium cache manually: rm -rf ~/.cache/chromium" | tee -a "$LOG_FILE"
-    fi
+    }
 else
     echo "Services not running. Please start them manually." | tee -a "$LOG_FILE"
 fi

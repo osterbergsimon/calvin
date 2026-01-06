@@ -8,7 +8,7 @@ Type=simple
 User=calvin
 Group=calvin
 WorkingDirectory=/home/calvin/calvin/backend
-Environment="PATH=/home/calvin/.local/bin:/usr/local/bin:/usr/bin:/bin"
+Environment="PATH=/home/calvin/.local/bin:/home/calvin/.cargo/bin:/usr/local/bin:/usr/bin:/bin"
 Environment="DATABASE_URL=sqlite:///home/calvin/calvin/backend/data/db/calvin.db"
 Environment="IMAGE_DIR=/home/calvin/calvin/backend/data/images"
 # Use venv if it exists (pip installation), otherwise use UV

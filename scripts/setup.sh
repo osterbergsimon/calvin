@@ -70,15 +70,34 @@ apt-get install -y -qq \
     x11-xserver-utils \
     || warn "Some packages may already be installed"
 
-# Install UV (Python package manager) as calvin user
-log "Installing UV..."
-if ! sudo -u calvin bash -c 'command -v uv &> /dev/null'; then
-    sudo -u calvin bash << 'UV_INSTALL_EOF'
-        curl -LsSf https://astral.sh/uv/install.sh | sh
+# Helper function to ensure UV is installed and available
+ensure_uv_installed() {
+    local user="${1:-calvin}"
+    log "Checking UV installation..."
+    
+    if sudo -u "$user" bash -c 'export PATH="$HOME/.local/bin:$HOME/.cargo/bin:$PATH" && command -v uv &> /dev/null'; then
+        log "UV already installed"
+        return 0
+    fi
+    
+    log "Installing UV..."
+    sudo -u "$user" bash << 'UV_INSTALL_EOF'
+        export PATH="$HOME/.local/bin:$HOME/.cargo/bin:$PATH"
+        curl -LsSf https://astral.sh/uv/install.sh | sh || exit 1
         echo 'export PATH="$HOME/.local/bin:$HOME/.cargo/bin:$PATH"' >> ~/.bashrc
         echo 'export PATH="$HOME/.local/bin:$HOME/.cargo/bin:$PATH"' >> ~/.profile
+        export PATH="$HOME/.local/bin:$HOME/.cargo/bin:$PATH"
+        command -v uv &> /dev/null || { echo "ERROR: UV installation failed" >&2; exit 1; }
+        uv --version
 UV_INSTALL_EOF
-fi
+    
+    if [ $? -ne 0 ] || ! sudo -u "$user" bash -c 'export PATH="$HOME/.local/bin:$HOME/.cargo/bin:$PATH" && uv --version &> /dev/null'; then
+        error "Failed to install or verify UV"
+    fi
+    log "UV installed successfully"
+}
+
+ensure_uv_installed calvin
 
 # Install Node.js 20+
 log "Installing Node.js..."
@@ -109,12 +128,8 @@ chown -R calvin:calvin "$CALVIN_DIR"
 sudo -u calvin bash << 'BACKEND_INSTALL_EOF'
     export PATH="$HOME/.local/bin:$HOME/.cargo/bin:$PATH"
     cd /home/calvin/calvin/backend
-    # Use pip for production (more stable on Pi 3B+)
-    python3 -m venv .venv
-    source .venv/bin/activate
-    pip install --upgrade pip
-    # Install production dependencies + linux extras (evdev)
-    pip install .[linux]
+    # Use UV for production (with frozen lock file if available)
+    [ -f uv.lock ] && uv sync --frozen --extra linux || uv sync --extra linux
 BACKEND_INSTALL_EOF
 
 # Install frontend dependencies (production)
