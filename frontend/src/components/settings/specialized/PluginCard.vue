@@ -19,7 +19,9 @@
               {{ plugin.type }}
             </span>
           </div>
-          <p class="plugin-description">{{ plugin.description }}</p>
+          <p class="plugin-description">
+            {{ plugin.description }}
+          </p>
         </div>
         <div class="plugin-header-actions">
           <!-- Settings button -->

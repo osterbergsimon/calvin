@@ -104,7 +104,6 @@
 </template>
 
 <script setup>
-import { computed } from "vue";
 import draggable from "vuedraggable";
 
 const props = defineProps({

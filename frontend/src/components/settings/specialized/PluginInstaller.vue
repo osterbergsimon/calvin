@@ -112,7 +112,9 @@
     </div>
 
     <!-- Installation Status Messages -->
-    <div v-if="error" class="error-message">{{ error }}</div>
+    <div v-if="error" class="error-message">
+      {{ error }}
+    </div>
     <div v-if="success" class="success-message">
       {{ success }}
       <!-- Branch Switch Notification -->
@@ -230,19 +232,13 @@ const handleRestart = () => {
   emit("restart");
 };
 
-watch(
-  () => props.repoUrl,
-  (newVal) => {
-    emit("update:repoUrl", newVal);
-  },
-);
+const handleRepoUrlInput = (event) => {
+  emit("update:repoUrl", event.target.value);
+};
 
-watch(
-  () => props.branch,
-  (newVal) => {
-    emit("update:branch", newVal);
-  },
-);
+const handleBranchInput = (event) => {
+  emit("update:branch", event.target.value);
+};
 </script>
 
 <style scoped>
