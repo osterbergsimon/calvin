@@ -7,6 +7,14 @@ from pathlib import Path
 from typing import Any
 
 from app.config import settings
+from app.services.validation import (
+    validate_directory_structure,
+    validate_manifest_format_version,
+    validate_manifest_required_fields,
+    validate_plugin_optional_fields,
+    validate_plugin_type,
+    validate_zip_structure,
+)
 
 
 class PluginInstaller:
@@ -69,66 +77,23 @@ class PluginInstaller:
         if not plugin_path.suffix == ".zip":
             return self._validate_plugin_directory(plugin_path)
 
-        # For zip files, validate structure without extracting
-        # (extraction happens during install)
-        with zipfile.ZipFile(plugin_path, "r") as zip_ref:
-            # Find all plugin.json files in the zip
-            plugin_jsons = [name for name in zip_ref.namelist() if name.endswith("plugin.json")]
+        # For zip files, use shared validation
+        manifest = validate_zip_structure(
+            zip_path=plugin_path,
+            manifest_filename="plugin.json",
+            required_file="plugin.py",
+        )
 
-            if not plugin_jsons:
-                raise ValueError("plugin.json not found in plugin package")
+        # Validate plugin-specific fields
+        required_fields = ["id", "name", "version", "type"]
+        validate_manifest_required_fields(manifest, required_fields, "plugin.json")
+        validate_plugin_type(manifest["type"])
+        validate_manifest_format_version(
+            manifest, ["1.0.0"], default_version="1.0.0", manifest_type="plugin.json"
+        )
+        validate_plugin_optional_fields(manifest)
 
-            if len(plugin_jsons) > 1:
-                raise ValueError(
-                    f"Zip file contains {len(plugin_jsons)} plugins. "
-                    "Zip files must contain exactly one plugin."
-                )
-
-            # Read and validate the manifest from zip
-            plugin_json_path = plugin_jsons[0]
-            try:
-                with zip_ref.open(plugin_json_path) as f:
-                    manifest = json.load(f)
-            except json.JSONDecodeError as e:
-                raise ValueError(f"Invalid JSON in plugin.json: {e}")
-
-            # Validate required fields
-            required_fields = ["id", "name", "version", "type"]
-            for field in required_fields:
-                if field not in manifest:
-                    raise ValueError(f"Missing required field in plugin.json: {field}")
-
-            # Validate plugin type
-            valid_types = ["calendar", "image", "service"]
-            if manifest["type"] not in valid_types:
-                raise ValueError(
-                    f"Invalid plugin type: {manifest['type']}. Must be one of {valid_types}"
-                )
-
-            # Validate format version if specified
-            format_version = manifest.get("format_version", "1.0.0")
-            if format_version not in ["1.0.0"]:
-                raise ValueError(
-                    f"Unsupported plugin format version: {format_version}. "
-                    f"Supported versions: 1.0.0"
-                )
-
-            # Validate optional fields structure if present
-            self._validate_manifest_optional_fields(manifest)
-
-            # Check for plugin.py in the same directory as plugin.json
-            plugin_dir = "/".join(plugin_json_path.split("/")[:-1])
-            plugin_py_path = f"{plugin_dir}/plugin.py" if plugin_dir else "plugin.py"
-            if plugin_py_path not in zip_ref.namelist():
-                # Try alternative path separators
-                plugin_dir_alt = "\\".join(plugin_json_path.split("\\")[:-1])
-                plugin_py_path_alt = (
-                    f"{plugin_dir_alt}\\plugin.py" if plugin_dir_alt else "plugin.py"
-                )
-                if plugin_py_path_alt not in zip_ref.namelist():
-                    raise ValueError("plugin.py not found in plugin package")
-
-            return manifest
+        return manifest
 
     def _validate_plugin_directory(self, plugin_dir: Path) -> dict[str, Any]:
         """
@@ -143,90 +108,23 @@ class PluginInstaller:
         Raises:
             ValueError: If plugin directory is invalid
         """
-        # Check for plugin.json
-        manifest_path = plugin_dir / "plugin.json"
-        if not manifest_path.exists():
-            raise ValueError(f"plugin.json not found in {plugin_dir}")
+        # Use shared validation for directory structure
+        manifest = validate_directory_structure(
+            directory=plugin_dir,
+            manifest_filename="plugin.json",
+            required_file="plugin.py",
+        )
 
-        # Load and validate manifest
-        try:
-            with open(manifest_path, encoding="utf-8") as f:
-                manifest = json.load(f)
-        except json.JSONDecodeError as e:
-            raise ValueError(f"Invalid JSON in plugin.json: {e}")
-
-        # Required fields
+        # Validate plugin-specific fields
         required_fields = ["id", "name", "version", "type"]
-        for field in required_fields:
-            if field not in manifest:
-                raise ValueError(f"Missing required field in plugin.json: {field}")
-
-        # Validate plugin type
-        valid_types = ["calendar", "image", "service"]
-        if manifest["type"] not in valid_types:
-            raise ValueError(
-                f"Invalid plugin type: {manifest['type']}. Must be one of {valid_types}"
-            )
-
-        # Validate format version if specified
-        format_version = manifest.get("format_version", "1.0.0")
-        if format_version not in ["1.0.0"]:
-            raise ValueError(
-                f"Unsupported plugin format version: {format_version}. "
-                f"Supported versions: 1.0.0"
-            )
-
-        # Validate optional fields structure if present
-        self._validate_manifest_optional_fields(manifest)
-
-        # Check for plugin.py
-        plugin_py = plugin_dir / "plugin.py"
-        if not plugin_py.exists():
-            raise ValueError("plugin.py not found in plugin package")
+        validate_manifest_required_fields(manifest, required_fields, "plugin.json")
+        validate_plugin_type(manifest["type"])
+        validate_manifest_format_version(
+            manifest, ["1.0.0"], default_version="1.0.0", manifest_type="plugin.json"
+        )
+        validate_plugin_optional_fields(manifest)
 
         return manifest
-
-    def _validate_manifest_optional_fields(self, manifest: dict[str, Any]) -> None:
-        """
-        Validate optional manifest fields structure.
-
-        Args:
-            manifest: Plugin manifest dictionary
-
-        Raises:
-            ValueError: If optional fields have invalid structure
-        """
-        # Validate dependencies structure
-        if "dependencies" in manifest:
-            deps = manifest["dependencies"]
-            if not isinstance(deps, dict):
-                raise ValueError("dependencies must be an object")
-            if "packages" in deps and not isinstance(deps["packages"], dict):
-                raise ValueError("dependencies.packages must be an object")
-            if "system" in deps and not isinstance(deps["system"], dict):
-                raise ValueError("dependencies.system must be an object")
-
-        # Validate files structure
-        if "files" in manifest:
-            files = manifest["files"]
-            if not isinstance(files, dict):
-                raise ValueError("files must be an object")
-            if "include" in files and not isinstance(files["include"], list):
-                raise ValueError("files.include must be an array")
-            if "exclude" in files and not isinstance(files["exclude"], list):
-                raise ValueError("files.exclude must be an array")
-
-        # Validate requirements structure
-        if "requirements" in manifest:
-            reqs = manifest["requirements"]
-            if not isinstance(reqs, dict):
-                raise ValueError("requirements must be an object")
-            if "restart_required" in reqs and not isinstance(reqs["restart_required"], bool):
-                raise ValueError("requirements.restart_required must be a boolean")
-            if "config_required" in reqs and not isinstance(reqs["config_required"], bool):
-                raise ValueError("requirements.config_required must be a boolean")
-            if "permissions" in reqs and not isinstance(reqs["permissions"], list):
-                raise ValueError("requirements.permissions must be an array")
 
     def install_plugin(
         self, source_path: Path, plugin_id: str | None = None, check_version: bool = True
