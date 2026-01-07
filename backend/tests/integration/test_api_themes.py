@@ -138,7 +138,11 @@ class TestThemeAPI:
             response = test_client.get("/api/plugins/installed")
             if response.status_code == 200:
                 plugins_data = response.json()
-                plugins = plugins_data.get("plugins", plugins_data) if isinstance(plugins_data, dict) else plugins_data
+                plugins = (
+                    plugins_data.get("plugins", plugins_data)
+                    if isinstance(plugins_data, dict)
+                    else plugins_data
+                )
                 theme_ids = [p["id"] for p in plugins if p.get("type") == "theme"]
                 assert "test_install_theme" in theme_ids
 
@@ -192,7 +196,11 @@ class TestThemeAPI:
                 response = test_client.get("/api/plugins/installed")
                 if response.status_code == 200:
                     plugins_data = response.json()
-                    plugins = plugins_data.get("plugins", plugins_data) if isinstance(plugins_data, dict) else plugins_data
+                    plugins = (
+                        plugins_data.get("plugins", plugins_data)
+                        if isinstance(plugins_data, dict)
+                        else plugins_data
+                    )
                     theme_ids = [p["id"] for p in plugins if p.get("type") == "theme"]
                     assert "test_uninstall_theme" not in theme_ids
 
@@ -208,12 +216,12 @@ class TestThemeAPI:
         assert response.status_code == 200
         data = response.json()
         assert "plugins" in data
-        
+
         # Should include both plugins and themes
         items = data["plugins"]
         plugin_types = {item.get("type") for item in items}
         assert "theme" in plugin_types
-        
+
         # Should include built-in themes
         theme_ids = [item["id"] for item in items if item.get("type") == "theme"]
         assert "light" in theme_ids
@@ -225,13 +233,12 @@ class TestThemeAPI:
         assert response.status_code == 200
         data = response.json()
         assert "plugins" in data
-        
+
         # All items should be themes
         items = data["plugins"]
         assert all(item.get("type") == "theme" for item in items)
-        
+
         # Should include built-in themes
         theme_ids = [item["id"] for item in items]
         assert "light" in theme_ids
         assert "dark" in theme_ids
-
