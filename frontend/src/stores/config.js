@@ -414,6 +414,36 @@ export const useConfigStore = defineStore("config", () => {
       if (config.showUI !== undefined) {
         showUI.value = config.showUI;
       }
+      if (config.clockPosition !== undefined) {
+        clockPosition.value = config.clockPosition;
+      } else if (config.clock_position !== undefined) {
+        clockPosition.value = config.clock_position;
+      }
+      if (config.clockEnabled !== undefined) {
+        clockEnabled.value = config.clockEnabled;
+      } else if (config.clock_enabled !== undefined) {
+        clockEnabled.value = config.clock_enabled;
+      }
+      if (config.clockDisplayMode !== undefined) {
+        clockDisplayMode.value = config.clockDisplayMode;
+      } else if (config.clock_display_mode !== undefined) {
+        clockDisplayMode.value = config.clock_display_mode;
+      }
+      if (config.clockShowDate !== undefined) {
+        clockShowDate.value = config.clockShowDate;
+      } else if (config.clock_show_date !== undefined) {
+        clockShowDate.value = config.clock_show_date;
+      }
+      if (config.clockShowSeconds !== undefined) {
+        clockShowSeconds.value = config.clockShowSeconds;
+      } else if (config.clock_show_seconds !== undefined) {
+        clockShowSeconds.value = config.clock_show_seconds;
+      }
+      if (config.clockSize !== undefined) {
+        clockSize.value = config.clockSize;
+      } else if (config.clock_size !== undefined) {
+        clockSize.value = config.clock_size;
+      }
       return response.data;
     } catch (err) {
       error.value = err.message;

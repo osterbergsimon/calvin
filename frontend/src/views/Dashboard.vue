@@ -61,7 +61,7 @@
 
       <!-- Minimal UI overlay (shown when UI is hidden) -->
       <MinimalUIOverlay v-if="!configStore.shouldShowUI" />
-      <ModeIndicator />
+      <!-- ModeIndicator removed - functionality merged into NotificationSystem -->
 
       <!-- Connection indicator (shown when offline) -->
       <ConnectionIndicator
@@ -158,16 +158,16 @@ import CalendarView from "../components/CalendarView.vue";
 import PhotoSlideshow from "../components/PhotoSlideshow.vue";
 import WebServiceViewer from "../components/WebServiceViewer.vue";
 import MinimalUIOverlay from "../components/MinimalUIOverlay.vue";
-import ModeIndicator from "../components/ModeIndicator.vue";
 import Clock from "../components/Clock.vue";
 import ConnectionIndicator from "../components/ConnectionIndicator.vue";
 import { useConfigStore } from "../stores/config";
 import { useModeStore } from "../stores/mode";
-import { useRouter } from "vue-router";
+import { useRouter, useRoute } from "vue-router";
 
 const configStore = useConfigStore();
 const modeStore = useModeStore();
 const router = useRouter();
+const route = useRoute();
 
 const status = ref("checking...");
 const statusClass = computed(() => {
@@ -323,6 +323,19 @@ watch(
   () => configStore.configPollInterval,
   () => {
     startConfigPolling();
+  },
+);
+
+// Watch for route changes to reload config when returning from settings
+watch(
+  () => route.path,
+  async (newPath) => {
+    if (newPath === "/") {
+      // Reload config when returning to dashboard
+      await configStore.fetchConfig();
+      // Restore previous mode if returning from settings
+      modeStore.returnFromSettings();
+    }
   },
 );
 
