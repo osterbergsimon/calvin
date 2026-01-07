@@ -3,7 +3,7 @@
     <!-- This component handles keyboard events globally -->
     <span />
   </div>
-  <KeyboardFeedback ref="feedbackRef" />
+  <NotificationSystem ref="notificationRef" />
 </template>
 
 <script setup>
@@ -12,13 +12,13 @@ import { useKeyboardStore } from "../stores/keyboard";
 import { useKeyboardActions } from "../composables/useKeyboardActions";
 import { usePhotoFrameMode } from "../composables/usePhotoFrameMode";
 import { useConfigStore } from "../stores/config";
-import KeyboardFeedback from "./KeyboardFeedback.vue";
+import NotificationSystem from "./NotificationSystem.vue";
 
 const keyboardStore = useKeyboardStore();
 const configStore = useConfigStore();
 const { handleAction } = useKeyboardActions();
 const { resetInactivityTimer } = usePhotoFrameMode();
-const feedbackRef = ref(null);
+const notificationRef = ref(null);
 
 // Reboot combo tracking
 const pressedKeys = new Set();
@@ -130,8 +130,8 @@ const onKeyDown = async (event) => {
     // Reset inactivity timer on any keyboard action
     resetInactivityTimer();
     // Show visual feedback
-    if (feedbackRef.value) {
-      feedbackRef.value.show(keyCode, action);
+    if (notificationRef.value) {
+      notificationRef.value.showKeyboardFeedback(keyCode, action);
     }
     handleAction(action);
   } else {
