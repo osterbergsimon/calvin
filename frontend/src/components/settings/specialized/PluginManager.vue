@@ -55,9 +55,9 @@
           :instances="instances[plugin.id] || []"
           :expanded="expandedPlugins[plugin.id] || false"
           :form-data="formData[plugin.id] || {}"
-          :saving="saving === plugin.id"
-          :testing="testing[plugin.id] || false"
-          :fetching="fetching[plugin.id] || false"
+          :saving="saving === plugin.id ? plugin.id : null"
+          :testing="testing[plugin.id] || {}"
+          :fetching="fetching[plugin.id] || {}"
           :save-status="saveStatus[plugin.id]"
           :test-status="testStatus[plugin.id]"
           :fetch-status="fetchStatus[plugin.id]"
@@ -122,11 +122,11 @@ const props = defineProps({
     default: null,
   },
   testing: {
-    type: Object,
+    type: [Object, Boolean],
     default: () => ({}),
   },
   fetching: {
-    type: Object,
+    type: [Object, Boolean],
     default: () => ({}),
   },
   saveStatus: {

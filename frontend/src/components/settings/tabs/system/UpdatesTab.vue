@@ -6,7 +6,7 @@
         help="GitHub repository URL for updates"
       >
         <input
-          :model-value="gitRepoUrl"
+          :value="gitRepoUrl"
           type="text"
           placeholder="https://github.com/user/repo.git"
           @input="handleGitRepoInput"
@@ -14,7 +14,7 @@
       </SettingItem>
 
       <SettingItem label="Git Branch" help="Branch to update from">
-        <select :model-value="gitBranch" @change="handleGitBranchChange">
+        <select :value="gitBranch" @change="handleGitBranchChange">
           <option
             v-for="branch in availableBranches"
             :key="branch"

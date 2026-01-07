@@ -14,7 +14,7 @@
         label="Theme Mode"
         help="Controls when dark mode is applied (if theme supports it)"
       >
-        <select :model-value="config.themeMode" @change="handleThemeModeChange">
+        <select :value="config.themeMode" @change="handleThemeModeChange">
           <option value="light">Light</option>
           <option value="dark">Dark</option>
           <option value="auto">Auto (System)</option>
@@ -31,7 +31,7 @@
             <div class="time-input-group">
               <label>Start (hour):</label>
               <input
-                :model-value="config.darkModeStart"
+                :value="config.darkModeStart"
                 type="number"
                 min="0"
                 max="23"
@@ -42,7 +42,7 @@
             <div class="time-input-group">
               <label>End (hour):</label>
               <input
-                :model-value="config.darkModeEnd"
+                :value="config.darkModeEnd"
                 type="number"
                 min="0"
                 max="23"
@@ -69,34 +69,6 @@
           Show Headers and UI Controls
         </label>
       </SettingItem>
-
-      <SettingItem
-        label="Show Mode Indicator Icon"
-        help="Show mode indicator icon when UI is hidden (top-left corner)"
-      >
-        <label>
-          <input
-            :checked="config.showModeIndicator"
-            type="checkbox"
-            @change="handleShowModeIndicatorChange"
-          />
-          Show Mode Indicator Icon
-        </label>
-      </SettingItem>
-
-      <SettingItem
-        v-if="config.showModeIndicator"
-        label="Mode Indicator Auto-Hide Timeout (seconds)"
-        help="Time before indicator auto-hides after mode change (0 = never hide)"
-      >
-        <input
-          :model-value="config.modeIndicatorTimeout"
-          type="number"
-          min="0"
-          max="60"
-          @change="handleModeIndicatorTimeoutChange"
-        />
-      </SettingItem>
     </CollapsibleSection>
 
     <CollapsibleSection title="Clock Settings" icon="🕐">
@@ -117,7 +89,7 @@
           help="When to display the clock on the dashboard"
         >
           <select
-            :model-value="config.clockDisplayMode"
+            :value="config.clockDisplayMode"
             @change="handleClockSettingsChange"
           >
             <option value="always">When UI is Off (Kiosk Mode)</option>
@@ -132,7 +104,8 @@
           help="Position of the clock when UI is off"
         >
           <select
-            :model-value="config.clockPosition"
+            name="clockPosition"
+            :value="config.clockPosition"
             @change="handleClockSettingsChange"
           >
             <option value="top-left">Top Left</option>
@@ -143,10 +116,7 @@
         </SettingItem>
 
         <SettingItem label="Clock Size" help="Size of the clock display">
-          <select
-            :model-value="config.clockSize"
-            @change="handleClockSettingsChange"
-          >
+          <select :value="config.clockSize" @change="handleClockSettingsChange">
             <option value="small">Small</option>
             <option value="medium">Medium</option>
             <option value="large">Large</option>
@@ -191,6 +161,7 @@ import CollapsibleSection from "../../shared/CollapsibleSection.vue";
 import SettingItem from "../../shared/SettingItem.vue";
 import ThemeSelector from "../../specialized/ThemeSelector.vue";
 import { useThemesStore } from "@/stores/themes";
+import { useTheme } from "@/composables/useTheme";
 import * as pluginsApi from "@/services/pluginsApi";
 
 const props = defineProps({
@@ -203,16 +174,38 @@ const props = defineProps({
 const emit = defineEmits(["update:config"]);
 
 const themesStore = useThemesStore();
+const theme = useTheme();
 const themes = ref([]);
 const loadingThemes = ref(false);
 
 const loadThemes = async () => {
   loadingThemes.value = true;
   try {
-    const response = await pluginsApi.getInstalledPlugins("theme");
-    themes.value = response.plugins || [];
+    // Get themes directly from API (same as old Settings.vue)
+    // This includes both built-in and installed themes
+    const response = await pluginsApi.getPlugins({ plugin_type: "theme" });
+    const allItems = response.plugins || [];
+    const themePlugins = allItems.filter((p) => p.type === "theme");
+
+    // Also get theme details from individual plugin endpoint for variables/preview
+    const themesWithDetails = [];
+    for (const themePlugin of themePlugins) {
+      try {
+        const themeDetail = await pluginsApi.getPlugin(themePlugin.id);
+        themesWithDetails.push({
+          ...themePlugin,
+          ...themeDetail,
+        });
+      } catch (error) {
+        // If theme details not found, use plugin data
+        themesWithDetails.push(themePlugin);
+      }
+    }
+
+    themes.value = themesWithDetails;
   } catch (error) {
     console.error("Failed to load themes:", error);
+    themes.value = [];
   } finally {
     loadingThemes.value = false;
   }
@@ -220,8 +213,15 @@ const loadThemes = async () => {
 
 loadThemes();
 
-const handleThemeSelect = (themeId) => {
-  emit("update:config", { selectedTheme: themeId });
+const handleThemeSelect = async (themeId) => {
+  try {
+    // Update config (saves to backend)
+    emit("update:config", { selectedTheme: themeId });
+    // Apply theme immediately (same as old Settings.vue)
+    await theme.setSelectedTheme(themeId);
+  } catch (error) {
+    console.error("Failed to select theme:", error);
+  }
 };
 
 const handleThemeModeChange = (event) => {
@@ -242,17 +242,6 @@ const handleDarkModeTimeChange = (event) => {
 
 const handleShowUIChange = (event) => {
   emit("update:config", { showUI: event.target.checked });
-};
-
-const handleShowModeIndicatorChange = (event) => {
-  emit("update:config", { showModeIndicator: event.target.checked });
-};
-
-const handleModeIndicatorTimeoutChange = (event) => {
-  const value = parseInt(event.target.value, 10);
-  if (!isNaN(value)) {
-    emit("update:config", { modeIndicatorTimeout: value });
-  }
 };
 
 const handleClockSettingsChange = (event) => {

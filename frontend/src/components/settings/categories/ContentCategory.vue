@@ -15,12 +15,15 @@
 </template>
 
 <script setup>
-import { ref } from "vue";
+import { ref, onMounted } from "vue";
+import { usePlugins } from "@/composables";
 import TabNavigation from "../shared/TabNavigation.vue";
 import SettingsTab from "../shared/SettingsTab.vue";
 import ImagesTab from "../tabs/content/ImagesTab.vue";
 import ServicesTab from "../tabs/content/ServicesTab.vue";
 import CalendarSourcesTab from "../tabs/content/CalendarSourcesTab.vue";
+
+const { loadPlugins } = usePlugins();
 
 const tabs = [
   { id: "images", label: "Images", icon: "🖼️" },
@@ -33,6 +36,11 @@ const activeTab = ref("images");
 const handleTabChange = (tabId) => {
   activeTab.value = tabId;
 };
+
+// Load plugins when component mounts
+onMounted(async () => {
+  await loadPlugins();
+});
 </script>
 
 <style scoped>

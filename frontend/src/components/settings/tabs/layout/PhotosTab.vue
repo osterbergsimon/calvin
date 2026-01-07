@@ -6,7 +6,7 @@
         help="How often to switch photos (5-3600 seconds)"
       >
         <input
-          :model-value="config.photoRotationInterval"
+          :value="config.photoRotationInterval"
           type="number"
           min="5"
           max="3600"
@@ -18,7 +18,7 @@
     <CollapsibleSection title="Image Display" icon="🖼️">
       <SettingItem label="Image Display Mode" help="How images are displayed">
         <select
-          :model-value="config.imageDisplayMode"
+          :value="config.imageDisplayMode"
           @change="handleImageDisplayModeChange"
         >
           <option value="smart">Smart (Auto-detect best fit)</option>

@@ -8,13 +8,12 @@
       :get-instance-summary="getInstanceSummary"
       @plugin-order-change="handleServicePluginOrderChange"
       @instance-order-change="handleServiceInstanceOrderChange"
-      @order-input-change="handleServiceOrderInputChange"
     />
   </div>
 </template>
 
 <script setup>
-import { computed } from "vue";
+import { computed, onMounted } from "vue";
 import { usePlugins } from "@/composables";
 import OrderingManager from "../../specialized/OrderingManager.vue";
 
@@ -22,18 +21,41 @@ const {
   plugins,
   pluginInstances,
   pluginDisplayOrders,
+  loadingPlugins,
+  loadPlugins,
   updatePluginOrder,
   updateInstanceOrder,
 } = usePlugins();
 
+// Ensure plugins are loaded
+onMounted(async () => {
+  if (plugins.value.length === 0 && !loadingPlugins.value) {
+    await loadPlugins();
+  }
+});
+
 const servicePlugins = computed(() => {
-  return plugins.value.filter((p) => p.type === "service" && p.enabled);
+  const filtered = plugins.value.filter(
+    (p) => p.type === "service" && p.enabled,
+  );
+  // Sort by display order
+  return filtered.sort((a, b) => {
+    const orderA = pluginDisplayOrders.value[a.id] ?? 0;
+    const orderB = pluginDisplayOrders.value[b.id] ?? 0;
+    return orderA - orderB;
+  });
 });
 
 const servicePluginInstances = computed(() => {
   const instances = {};
   servicePlugins.value.forEach((plugin) => {
-    instances[plugin.id] = pluginInstances.value[plugin.id] || [];
+    const pluginInsts = pluginInstances.value[plugin.id] || [];
+    // Sort instances by display_order
+    instances[plugin.id] = pluginInsts.sort((a, b) => {
+      const orderA = a.display_order ?? 0;
+      const orderB = b.display_order ?? 0;
+      return orderA - orderB;
+    });
   });
   return instances;
 });
@@ -54,10 +76,6 @@ const handleServicePluginOrderChange = async (newOrder) => {
 
 const handleServiceInstanceOrderChange = async (pluginId, newOrder) => {
   await updateInstanceOrder(pluginId, newOrder);
-};
-
-const handleServiceOrderInputChange = async (pluginId, value) => {
-  await updatePluginOrder(pluginId, value);
 };
 </script>
 

@@ -3,7 +3,7 @@
     <CollapsibleSection title="Screen Orientation" icon="🖥️">
       <SettingItem label="Orientation" help="Screen orientation">
         <select
-          :model-value="config.orientation"
+          :value="configValue.orientation"
           @change="handleOrientationChange"
         >
           <option value="landscape">Landscape</option>
@@ -17,7 +17,7 @@
       >
         <label>
           <input
-            :checked="config.orientationFlipped"
+            :checked="configValue.orientationFlipped"
             type="checkbox"
             @change="handleOrientationFlippedChange"
           />
@@ -32,7 +32,7 @@
         help="Calendar width percentage (10-90%)"
       >
         <input
-          :model-value="config.calendarSplit"
+          :value="configValue.calendarSplit"
           type="number"
           min="10"
           max="90"
@@ -43,25 +43,25 @@
       <SettingItem
         label="Side View Position"
         :help="
-          config.orientation === 'landscape'
+          configValue.orientation === 'landscape'
             ? 'Position of side view (left or right of calendar)'
             : 'Position of side view (top or bottom of calendar)'
         "
       >
         <select
-          :model-value="config.sideViewPosition"
+          :value="configValue.sideViewPosition"
           @change="handleSideViewPositionChange"
         >
-          <option v-if="config.orientation === 'landscape'" value="left">
+          <option v-if="configValue.orientation === 'landscape'" value="left">
             Left
           </option>
-          <option v-if="config.orientation === 'landscape'" value="right">
+          <option v-if="configValue.orientation === 'landscape'" value="right">
             Right
           </option>
-          <option v-if="config.orientation === 'portrait'" value="top">
+          <option v-if="configValue.orientation === 'portrait'" value="top">
             Top
           </option>
-          <option v-if="config.orientation === 'portrait'" value="bottom">
+          <option v-if="configValue.orientation === 'portrait'" value="bottom">
             Bottom
           </option>
         </select>
@@ -71,6 +71,7 @@
 </template>
 
 <script setup>
+import { computed } from "vue";
 import CollapsibleSection from "../../shared/CollapsibleSection.vue";
 import SettingItem from "../../shared/SettingItem.vue";
 
@@ -78,10 +79,22 @@ const props = defineProps({
   config: {
     type: Object,
     required: true,
+    default: () => ({}),
   },
 });
 
 const emit = defineEmits(["update:config"]);
+
+// Ensure config values are reactive and have defaults
+const configValue = computed(() => {
+  const config = props.config || {};
+  return {
+    orientation: config.orientation ?? "landscape",
+    orientationFlipped: config.orientationFlipped ?? false,
+    calendarSplit: config.calendarSplit ?? 70,
+    sideViewPosition: config.sideViewPosition ?? "right",
+  };
+});
 
 const handleOrientationChange = (event) => {
   emit("update:config", { orientation: event.target.value });

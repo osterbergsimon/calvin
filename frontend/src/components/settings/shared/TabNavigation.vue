@@ -52,8 +52,8 @@ const selectTab = (tabId) => {
   gap: 0.5rem;
   border-bottom: 2px solid var(--border-color);
   margin-bottom: 1.5rem;
-  overflow-x: auto;
-  scrollbar-width: thin;
+  overflow-x: hidden;
+  overflow-y: hidden;
 }
 
 .tab-button {

@@ -8,13 +8,12 @@
       :get-instance-summary="getInstanceSummary"
       @plugin-order-change="handleImagePluginOrderChange"
       @instance-order-change="handleImageInstanceOrderChange"
-      @order-input-change="handleImageOrderInputChange"
     />
   </div>
 </template>
 
 <script setup>
-import { computed } from "vue";
+import { computed, onMounted } from "vue";
 import { usePlugins } from "@/composables";
 import OrderingManager from "../../specialized/OrderingManager.vue";
 
@@ -22,18 +21,39 @@ const {
   plugins,
   pluginInstances,
   imagePluginDisplayOrders,
+  loadingPlugins,
+  loadPlugins,
   updateImagePluginOrder,
   updateImageInstanceOrder,
 } = usePlugins();
 
+// Ensure plugins are loaded
+onMounted(async () => {
+  if (plugins.value.length === 0 && !loadingPlugins.value) {
+    await loadPlugins();
+  }
+});
+
 const imagePlugins = computed(() => {
-  return plugins.value.filter((p) => p.type === "image" && p.enabled);
+  const filtered = plugins.value.filter((p) => p.type === "image" && p.enabled);
+  // Sort by display order
+  return filtered.sort((a, b) => {
+    const orderA = imagePluginDisplayOrders.value[a.id] ?? 0;
+    const orderB = imagePluginDisplayOrders.value[b.id] ?? 0;
+    return orderA - orderB;
+  });
 });
 
 const imagePluginInstances = computed(() => {
   const instances = {};
   imagePlugins.value.forEach((plugin) => {
-    instances[plugin.id] = pluginInstances.value[plugin.id] || [];
+    const pluginInsts = pluginInstances.value[plugin.id] || [];
+    // Sort instances by display_order
+    instances[plugin.id] = pluginInsts.sort((a, b) => {
+      const orderA = a.display_order ?? 0;
+      const orderB = b.display_order ?? 0;
+      return orderA - orderB;
+    });
   });
   return instances;
 });
@@ -52,10 +72,6 @@ const handleImagePluginOrderChange = async (newOrder) => {
 
 const handleImageInstanceOrderChange = async (pluginId, newOrder) => {
   await updateImageInstanceOrder(pluginId, newOrder);
-};
-
-const handleImageOrderInputChange = async (pluginId, value) => {
-  await updateImagePluginOrder(pluginId, value);
 };
 </script>
 

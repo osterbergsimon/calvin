@@ -9,7 +9,14 @@
       </p>
     </div>
 
-    <div class="ordering-tree">
+    <div v-if="plugins.length === 0" class="no-plugins-message">
+      <p class="help-text">
+        No {{ type }} plugins are currently enabled. Enable plugins in the
+        Plugins section to configure their display order here.
+      </p>
+    </div>
+
+    <div v-else class="ordering-tree">
       <draggable
         :model-value="plugins"
         :animation="200"
@@ -45,16 +52,6 @@
                       : "instances"
                   }}
                 </span>
-              </div>
-              <div class="plugin-order-control">
-                <label>Order:</label>
-                <input
-                  :model-value="displayOrders[plugin.id] ?? index"
-                  type="number"
-                  class="order-input"
-                  min="0"
-                  @change="handleOrderInputChange(plugin.id, $event)"
-                />
               </div>
             </div>
 
@@ -157,7 +154,6 @@ const props = defineProps({
 const emit = defineEmits([
   "plugin-order-change",
   "instance-order-change",
-  "order-input-change",
   "plugin-drag-start",
   "plugin-drag-end",
   "instance-drag-start",
@@ -170,13 +166,6 @@ const handlePluginOrderChange = (newOrder) => {
 
 const handleInstanceOrderChange = (pluginId, newOrder) => {
   emit("instance-order-change", pluginId, newOrder);
-};
-
-const handleOrderInputChange = (pluginId, event) => {
-  const value = parseInt(event.target.value, 10);
-  if (!isNaN(value)) {
-    emit("order-input-change", pluginId, value);
-  }
 };
 
 const handlePluginDragStart = () => {
@@ -268,34 +257,6 @@ const handleInstanceDragEnd = (pluginId) => {
   color: var(--text-secondary);
 }
 
-.plugin-order-control {
-  display: flex;
-  align-items: center;
-  gap: 0.5rem;
-}
-
-.plugin-order-control label {
-  font-size: 0.875rem;
-  color: var(--text-secondary);
-}
-
-.order-input {
-  width: 4rem;
-  padding: 0.5rem;
-  border: 1px solid var(--border-color);
-  border-radius: 4px;
-  background: var(--bg-secondary);
-  color: var(--text-primary);
-  font-size: 0.875rem;
-  text-align: center;
-}
-
-.order-input:focus {
-  outline: none;
-  border-color: var(--accent-primary);
-  box-shadow: 0 0 0 2px rgba(var(--accent-primary-rgb), 0.2);
-}
-
 .plugin-instances-tree {
   margin-left: 2rem;
   margin-right: 1rem;
@@ -382,5 +343,13 @@ const handleInstanceDragEnd = (pluginId) => {
   color: var(--text-secondary);
   margin: 0;
   line-height: 1.4;
+}
+
+.no-plugins-message {
+  padding: 2rem;
+  text-align: center;
+  background: var(--bg-secondary);
+  border: 1px solid var(--border-color);
+  border-radius: 6px;
 }
 </style>

@@ -22,11 +22,6 @@
         :config="config"
         @update:config="$emit('update:config', $event)"
       />
-      <CalendarTab
-        v-if="activeTab === 'calendar'"
-        :config="config"
-        @update:config="$emit('update:config', $event)"
-      />
       <KeyboardTab
         v-if="activeTab === 'keyboard'"
         :config="config"
@@ -43,13 +38,13 @@ import SettingsTab from "../shared/SettingsTab.vue";
 import DisplayTab from "../tabs/layout/DisplayTab.vue";
 import UITab from "../tabs/layout/UITab.vue";
 import PhotosTab from "../tabs/layout/PhotosTab.vue";
-import CalendarTab from "../tabs/layout/CalendarTab.vue";
 import KeyboardTab from "../tabs/layout/KeyboardTab.vue";
 
 const props = defineProps({
   config: {
     type: Object,
     required: true,
+    default: () => ({}),
   },
 });
 
@@ -59,7 +54,6 @@ const tabs = [
   { id: "display", label: "Display", icon: "🖥️" },
   { id: "ui", label: "UI", icon: "🎨" },
   { id: "photos", label: "Photos", icon: "📷" },
-  { id: "calendar", label: "Calendar", icon: "📅" },
   { id: "keyboard", label: "Keyboard", icon: "⌨️" },
 ];
 

@@ -85,9 +85,17 @@
           v-if="plugin.ui_actions && plugin.ui_actions.length > 0"
           :plugin-id="plugin.id"
           :actions="plugin.ui_actions"
-          :saving="saving === plugin.id"
-          :testing="testing[plugin.id] || false"
-          :fetching="fetching[plugin.id] || false"
+          :saving="saving === plugin.id ? plugin.id : null"
+          :testing="
+            typeof testing === 'object' && testing
+              ? testing[plugin.id] || {}
+              : {}
+          "
+          :fetching="
+            typeof fetching === 'object' && fetching
+              ? fetching[plugin.id] || {}
+              : {}
+          "
           :save-status="saveStatus"
           :test-status="testStatus"
           :fetch-status="fetchStatus"
@@ -178,15 +186,15 @@ const props = defineProps({
     default: () => ({}),
   },
   saving: {
-    type: [String, null],
+    type: [String, null, Boolean],
     default: null,
   },
   testing: {
-    type: Object,
+    type: [Object, Boolean],
     default: () => ({}),
   },
   fetching: {
-    type: Object,
+    type: [Object, Boolean],
     default: () => ({}),
   },
   saveStatus: {
