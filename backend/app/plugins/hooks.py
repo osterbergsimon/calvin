@@ -142,7 +142,7 @@ class PluginHookSpec:
         Fetch service data from a service plugin instance.
 
         This hook allows service plugins to implement their own data fetching logic
-        for the generic /web-services/{service_id}/data endpoint.
+        for the generic /api/plugins/{plugin_id}/data endpoint.
 
         Args:
             instance_id: Plugin instance ID

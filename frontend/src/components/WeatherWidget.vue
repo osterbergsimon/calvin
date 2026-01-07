@@ -2,7 +2,7 @@
   <div class="weather-widget">
     <div v-if="data && !data.error" class="weather-content">
       <div class="weather-header">
-        <h3>{{ data.location || "Weather" }}</h3>
+        <h3>{{ serviceName || data.location || "Weather" }}</h3>
         <button
           class="btn-refresh"
           title="Refresh weather"
@@ -108,6 +108,10 @@
 const props = defineProps({
   data: {
     type: Object,
+    default: null,
+  },
+  serviceName: {
+    type: String,
     default: null,
   },
 });

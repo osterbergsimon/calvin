@@ -139,7 +139,7 @@ class YrWeatherServicePlugin(ServicePlugin):
             ],
             "display_schema": {
                 "type": "api",
-                "api_endpoint": "/api/web-services/{service_id}/weather",
+                "api_endpoint": "/api/plugins/{service_id}/data",
                 "method": "GET",
                 "data_schema": {
                     "current": {
@@ -246,7 +246,7 @@ class YrWeatherServicePlugin(ServicePlugin):
         Returns:
             Dictionary with content information
         """
-        weather_api_url = f"/api/web-services/{self.plugin_id}/weather"
+        weather_api_url = f"/api/plugins/{self.plugin_id}/data"
 
         return {
             "type": "weather",
@@ -268,7 +268,7 @@ class YrWeatherServicePlugin(ServicePlugin):
         Returns:
             Configuration dictionary
         """
-        weather_api_url = f"/api/web-services/{self.plugin_id}/weather"
+        weather_api_url = f"/api/plugins/{self.plugin_id}/data"
         return {
             "url": weather_api_url,
             "latitude": self.latitude,
@@ -867,10 +867,11 @@ async def handle_plugin_config_update(
         logger.info("[YrWeather] Skipping instance creation - invalid coordinates")
         return {"instance_created": False, "instance_updated": False}
 
-    # Check if YrWeather instance exists
-    result = session.execute(select(PluginDB).where(PluginDB.type_id == "yr_weather"))
-    yr_weather_instance = result.scalar_one_or_none()
+    # Check if we're updating a specific instance or creating a new one
+    instance_id_to_update = config.get("_instance_id")
+    instance_name = config.get("_instance_name", "Yr.no Weather")
 
+    # Remove special fields from config
     instance_config = {
         "latitude": latitude,
         "longitude": longitude,
@@ -881,6 +882,19 @@ async def handle_plugin_config_update(
         "fullscreen": False,
     }
 
+    if instance_id_to_update:
+        # Update specific instance
+        result = await session.execute(select(PluginDB).where(PluginDB.id == instance_id_to_update))
+        yr_weather_instance = result.scalar_one_or_none()
+
+        if not yr_weather_instance:
+            logger.warning(f"[YrWeather] Instance {instance_id_to_update} not found for update")
+            return {"instance_created": False, "instance_updated": False}
+    else:
+        # Check if YrWeather instance exists (for backward compatibility - only one instance)
+        result = await session.execute(select(PluginDB).where(PluginDB.type_id == "yr_weather"))
+        yr_weather_instance = result.scalar_one_or_none()
+
     if not yr_weather_instance:
         # Create new YrWeather instance
         plugin_instance_id = f"yr_weather-{abs(hash(f'{latitude},{longitude}')) % 10000}"
@@ -889,12 +903,17 @@ async def handle_plugin_config_update(
             instance_enabled = (
                 enabled if enabled is not None else (db_type.enabled if db_type else False)
             )
+            # Use _instance_enabled if provided, otherwise use enabled
+            instance_enabled = config.get("_instance_enabled", instance_enabled)
+            if isinstance(instance_enabled, str):
+                instance_enabled = instance_enabled.lower() in ("true", "1", "yes")
+
             plugin = await plugin_registry.register_plugin(
                 plugin_id=plugin_instance_id,
                 type_id="yr_weather",
-                name="Yr.no Weather",
+                name=instance_name,
                 config=instance_config,
-                enabled=instance_enabled,
+                enabled=bool(instance_enabled),
             )
             return {
                 "instance_created": True,
@@ -906,16 +925,37 @@ async def handle_plugin_config_update(
     else:
         # Update existing YrWeather instance
         logger.info(f"[YrWeather] Updating existing instance: {yr_weather_instance.id}")
+
+        # Update instance name if provided
+        if instance_name and instance_name != yr_weather_instance.name:
+            yr_weather_instance.name = instance_name
+
+        # Update enabled status if provided
+        instance_enabled = config.get("_instance_enabled")
+        if instance_enabled is not None:
+            if isinstance(instance_enabled, str):
+                instance_enabled = instance_enabled.lower() in ("true", "1", "yes")
+            yr_weather_instance.enabled = bool(instance_enabled)
+        elif enabled is not None:
+            yr_weather_instance.enabled = enabled
+
+        # Update config
+        yr_weather_instance.config = instance_config
+        await session.commit()
+
         plugin = plugin_manager.get_plugin(yr_weather_instance.id)
         if plugin:
             await plugin.configure(instance_config)
-            instance_enabled = (
-                enabled
-                if enabled is not None
-                else (db_type.enabled if db_type else yr_weather_instance.enabled)
+            # Update plugin name
+            plugin.name = instance_name
+            # Update enabled status
+            final_enabled = (
+                instance_enabled
+                if instance_enabled is not None
+                else (enabled if enabled is not None else yr_weather_instance.enabled)
             )
 
-            if instance_enabled:
+            if final_enabled:
                 plugin.enable()
                 if not plugin.is_running():
                     try:
@@ -932,19 +972,15 @@ async def handle_plugin_config_update(
                     except Exception as e:
                         logger.warning(f"[YrWeather] Error stopping plugin: {e}", exc_info=True)
 
-            # Update in database
-            yr_weather_instance.config = instance_config
-            yr_weather_instance.enabled = instance_enabled
-            if db_type:
-                db_type.enabled = instance_enabled
-            session.commit()
-
             return {
                 "instance_updated": True,
                 "instance_id": yr_weather_instance.id,
+                "running": plugin.is_running(),
             }
         else:
-            logger.warning(
-                f"[YrWeather] Plugin instance {yr_weather_instance.id} not found in manager"
-            )
-            return {"instance_updated": False, "error": "Plugin instance not found"}
+            # Plugin not in manager, but database was updated
+            return {
+                "instance_updated": True,
+                "instance_id": yr_weather_instance.id,
+                "running": False,
+            }

@@ -251,7 +251,7 @@ class ServicePlugin(BasePlugin):
         """
         Fetch service data for display (optional - not all services support data fetching).
 
-        This method is called by the core when fetching data via /web-services/{service_id}/data.
+        This method is called by the core when fetching data via /api/plugins/{plugin_id}/data.
         Plugins can implement this to provide their own data fetching logic.
         Alternatively, plugins can use the fetch_service_data hook for more complex scenarios.
 

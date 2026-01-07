@@ -55,7 +55,6 @@ from app.api.routes import (  # noqa: E402
     keyboard,
     plugins,
     system,
-    web_services,
 )
 from app.services.scheduler import calendar_scheduler  # noqa: E402
 
@@ -352,7 +351,6 @@ app.include_router(config.router, prefix="/api", tags=["config"])
 app.include_router(calendar.router, prefix="/api", tags=["calendar"])
 app.include_router(keyboard.router, prefix="/api", tags=["keyboard"])
 app.include_router(images.router, prefix="/api", tags=["images"])
-app.include_router(web_services.router, prefix="/api", tags=["web-services"])
 app.include_router(plugins.router, prefix="/api", tags=["plugins"])
 app.include_router(system.router, prefix="/api/system", tags=["system"])
 

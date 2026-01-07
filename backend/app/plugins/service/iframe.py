@@ -66,6 +66,7 @@ class IframeServicePlugin(ServicePlugin):
                 "method": None,
                 "data_schema": None,
                 "render_template": "iframe",
+                "component": "iframe/IframeViewer.vue",  # Plugin-provided frontend component
             },
             "plugin_class": cls,
         }

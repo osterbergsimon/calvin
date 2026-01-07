@@ -120,7 +120,7 @@ class WeatherServicePlugin(ServicePlugin):
             ],
             "display_schema": {
                 "type": "api",
-                "api_endpoint": "/api/web-services/{service_id}/weather",
+                "api_endpoint": "/api/plugins/{service_id}/data",
                 "method": "GET",
                 "data_schema": {
                     "current": {
@@ -222,7 +222,7 @@ class WeatherServicePlugin(ServicePlugin):
             Dictionary with content information
         """
         # Return a special URL that points to our backend endpoint
-        weather_api_url = f"/api/web-services/{self.plugin_id}/weather"
+        weather_api_url = f"/api/plugins/{self.plugin_id}/data"
 
         return {
             "type": "weather",
@@ -244,7 +244,7 @@ class WeatherServicePlugin(ServicePlugin):
         Returns:
             Configuration dictionary
         """
-        weather_api_url = f"/api/web-services/{self.plugin_id}/weather"
+        weather_api_url = f"/api/plugins/{self.plugin_id}/data"
         return {
             "url": weather_api_url,
             "api_key": self.api_key,

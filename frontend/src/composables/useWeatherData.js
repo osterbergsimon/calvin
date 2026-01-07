@@ -29,9 +29,7 @@ export function useWeatherData(serviceId, enabled = true) {
       }
 
       try {
-        const response = await axios.get(
-          `/api/web-services/${serviceId}/weather`,
-        );
+        const response = await axios.get(`/api/plugins/${serviceId}/data`);
         const data = response.data;
 
         // Cache the response

@@ -181,77 +181,6 @@ async def get_plugins(
     return {"plugins": result, "total": len(result)}
 
 
-@router.get("/plugins/{plugin_id}")
-async def get_plugin(plugin_id: str):
-    """Get a specific plugin type or theme by ID."""
-    # Check if it's a theme first (check built-in, then database, then installed)
-    theme_manifest = None
-
-    # Check built-in themes first
-    if plugin_id in BUILTIN_THEMES:
-        theme_manifest = BUILTIN_THEMES.get(plugin_id)
-    else:
-        # Check database
-        async with AsyncSessionLocal() as session:
-            result = await session.execute(
-                select(PluginTypeDB).where(PluginTypeDB.type_id == plugin_id)
-            )
-            db_type = result.scalar_one_or_none()
-
-            if db_type and db_type.plugin_type == PluginType.THEME.value:
-                # It's a theme in database - try to get manifest
-                try:
-                    theme_manifest = theme_installer.get_theme_manifest(plugin_id)
-                except Exception:
-                    pass
-
-    # If still not found, try installed themes (might not be in DB yet)
-    if not theme_manifest:
-        try:
-            theme_manifest = theme_installer.get_theme_manifest(plugin_id)
-        except Exception:
-            pass
-
-    if theme_manifest:
-        # Remove internal path if present
-        theme_manifest.pop("_installed_path", None)
-        return theme_manifest
-
-    # Not a theme - get plugin type from pluggy hooks
-    plugin_types = plugin_loader.get_plugin_types()
-    type_info = next((t for t in plugin_types if t.get("type_id") == plugin_id), None)
-
-    if not type_info:
-        raise HTTPException(status_code=404, detail="Plugin type not found")
-
-    # Get enabled status and error message from database
-    async with AsyncSessionLocal() as session:
-        result = await session.execute(
-            select(PluginTypeDB).where(PluginTypeDB.type_id == plugin_id)
-        )
-        db_type = result.scalar_one_or_none()
-
-    enabled = db_type.enabled if db_type else True
-    error_message = db_type.error_message if db_type else None
-
-    plugin_info: dict[str, Any] = {
-        "id": type_info.get("type_id"),
-        "name": type_info.get("name", ""),
-        "type": type_info.get("plugin_type").value
-        if hasattr(type_info.get("plugin_type"), "value")
-        else str(type_info.get("plugin_type")),
-        "description": type_info.get("description", ""),
-        "config_schema": type_info.get("common_config_schema", {}),
-        "enabled": enabled,
-    }
-
-    # Include error message if plugin is broken
-    if error_message:
-        plugin_info["error_message"] = error_message
-
-    return plugin_info
-
-
 # Specific routes must come before parameterized routes to avoid path conflicts
 @router.get("/plugins/installed")
 async def get_installed_plugins():
@@ -399,6 +328,80 @@ async def uninstall_plugin(plugin_id: str):
         raise HTTPException(status_code=404, detail=str(e))
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"Failed to uninstall plugin: {str(e)}")
+
+
+@router.get("/plugins/{plugin_id}")
+async def get_plugin(plugin_id: str):
+    """Get a specific plugin type or theme by ID."""
+    # Check if it's a theme first (check built-in, then database, then installed)
+    theme_manifest = None
+
+    # Check built-in themes first
+    if plugin_id in BUILTIN_THEMES:
+        theme_manifest = BUILTIN_THEMES.get(plugin_id)
+    else:
+        # Check database
+        async with AsyncSessionLocal() as session:
+            result = await session.execute(
+                select(PluginTypeDB).where(PluginTypeDB.type_id == plugin_id)
+            )
+            db_type = result.scalar_one_or_none()
+
+            if db_type and db_type.plugin_type == PluginType.THEME.value:
+                # It's a theme in database - try to get manifest
+                try:
+                    theme_manifest = theme_installer.get_theme_manifest(plugin_id)
+                except Exception:
+                    pass
+
+    # If still not found, try installed themes (might not be in DB yet)
+    if not theme_manifest:
+        try:
+            theme_manifest = theme_installer.get_theme_manifest(plugin_id)
+        except Exception:
+            pass
+
+    if theme_manifest:
+        # Remove internal path if present
+        theme_manifest.pop("_installed_path", None)
+        return theme_manifest
+
+    # Not a theme - get plugin type from pluggy hooks
+    plugin_types = plugin_loader.get_plugin_types()
+    type_info = next((t for t in plugin_types if t.get("type_id") == plugin_id), None)
+
+    if not type_info:
+        raise HTTPException(status_code=404, detail="Plugin type not found")
+
+    # Get enabled status and error message from database
+    async with AsyncSessionLocal() as session:
+        result = await session.execute(
+            select(PluginTypeDB).where(PluginTypeDB.type_id == plugin_id)
+        )
+        db_type = result.scalar_one_or_none()
+
+    enabled = db_type.enabled if db_type else True
+    error_message = db_type.error_message if db_type else None
+
+    plugin_info: dict[str, Any] = {
+        "id": type_info.get("type_id"),
+        "name": type_info.get("name", ""),
+        "type": type_info.get("plugin_type").value
+        if hasattr(type_info.get("plugin_type"), "value")
+        else str(type_info.get("plugin_type")),
+        "description": type_info.get("description", ""),
+        "config_schema": type_info.get("common_config_schema", {}),
+        "display_schema": type_info.get(
+            "display_schema"
+        ),  # Include display_schema for frontend components
+        "enabled": enabled,
+    }
+
+    # Include error message if plugin is broken
+    if error_message:
+        plugin_info["error_message"] = error_message
+
+    return plugin_info
 
 
 @router.put("/plugins/{plugin_id}")
@@ -658,6 +661,77 @@ async def fetch_plugin(plugin_id: str):
         "images_downloaded": False,
         "image_count": 0,
     }
+
+
+@router.get("/plugins/{plugin_id}/data")
+async def get_plugin_data(
+    plugin_id: str,
+    start_date: str | None = Query(None, description="Start date (YYYY-MM-DD)"),
+    end_date: str | None = Query(None, description="End date (YYYY-MM-DD)"),
+):
+    """
+    Get data from a service plugin instance.
+
+    This is a generic endpoint that works for all service plugins that implement
+    the fetch_service_data() method (e.g., weather plugins).
+
+    Args:
+        plugin_id: Plugin instance ID
+        start_date: Optional start date (plugin-specific)
+        end_date: Optional end date (plugin-specific)
+
+    Returns:
+        Plugin data (format depends on plugin type)
+    """
+    from sqlalchemy import select
+
+    from app.database import AsyncSessionLocal
+    from app.models.db_models import PluginDB
+    from app.plugins.manager import plugin_manager
+    from app.plugins.protocols import ServicePlugin
+
+    # Get the plugin instance
+    async with AsyncSessionLocal() as session:
+        result = await session.execute(select(PluginDB).where(PluginDB.id == plugin_id))
+        db_plugin = result.scalar_one_or_none()
+
+        if not db_plugin:
+            raise HTTPException(status_code=404, detail="Plugin instance not found")
+
+        # Get plugin instance from manager
+        plugin_instance = plugin_manager.get_plugin(plugin_id)
+        if not plugin_instance or not isinstance(plugin_instance, ServicePlugin):
+            raise HTTPException(
+                status_code=404, detail="Service plugin instance not found or not a service plugin"
+            )
+
+        # Ensure plugin is initialized and running
+        if not plugin_instance.is_running():
+            try:
+                await plugin_instance.initialize()
+                plugin_instance.start()
+            except Exception as e:
+                logger.error(f"Error initializing plugin {plugin_id}: {e}", exc_info=True)
+                raise HTTPException(
+                    status_code=500, detail=f"Failed to initialize plugin: {str(e)}"
+                )
+
+        # Call the plugin's fetch_service_data method (protocol-defined)
+        try:
+            data = await plugin_instance.fetch_service_data(
+                start_date=start_date, end_date=end_date
+            )
+            if data is not None:
+                return data
+        except Exception as e:
+            logger.error(f"Error calling fetch_service_data for {plugin_id}: {e}", exc_info=True)
+            raise HTTPException(status_code=500, detail=f"Failed to fetch plugin data: {str(e)}")
+
+        # If plugin returned None, it doesn't support data fetching
+        raise HTTPException(
+            status_code=501,
+            detail="This plugin does not support data fetching via this endpoint",
+        )
 
 
 @router.post("/plugins/{plugin_id}/geocode")
