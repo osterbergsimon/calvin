@@ -51,12 +51,28 @@ export const useConfigStore = defineStore("config", () => {
   const keyboardFeedbackMode = ref("normal"); // Keyboard feedback mode: 'normal' | 'small' (default: 'normal')
   const imageDisplayMode = ref("smart"); // Image display mode: 'fit', 'fill', 'crop', 'center', 'smart' (default: 'smart')
   const timezone = ref(null); // Timezone (e.g., "America/New_York", "Europe/London", "UTC") - null = system timezone
+  // Legacy clock settings (kept for backwards compatibility)
   const clockEnabled = ref(true); // Clock enabled/disabled
   const clockDisplayMode = ref("header"); // Clock display mode: 'always' | 'header' | 'off'
   const clockShowDate = ref(false); // Show date in clock
   const clockShowSeconds = ref(false); // Show seconds in clock
   const clockPosition = ref("top-right"); // Clock position: 'top-left' | 'top-right' | 'bottom-left' | 'bottom-right'
   const clockSize = ref("medium"); // Clock size: 'small' | 'medium' | 'large'
+
+  // New clock settings
+  const clockWidgetEnabled = ref(false); // Widget clock enabled/disabled
+  const clockWidgetShowInKiosk = ref(false); // Show widget in kiosk mode
+  const clockWidgetPosition = ref("top-right"); // Widget position: 'top-left' | 'top-right' | 'top-center' | 'bottom-left' | 'bottom-right' | 'bottom-center'
+  const clockBarEnabled = ref(false); // Bar clock enabled/disabled
+  const clockBarMode = ref("horizontal"); // Bar mode: 'horizontal' | 'vertical'
+  const clockBarShowInNonKiosk = ref(false); // Show bar in non-kiosk mode (UI visible)
+  const clockBarShowInKiosk = ref(false); // Show bar in kiosk mode (UI hidden)
+  const clockBarPosition = ref("top"); // Bar position (depends on mode): horizontal: 'top' | 'bottom' | 'between', vertical: 'left' | 'right' | 'between'
+  const clockBarSize = ref("medium"); // Bar clock size: 'small' | 'medium' | 'large' (deprecated, use clockBarFontSize)
+  const clockBarFontSize = ref(16); // Bar clock font size in pixels
+  const clockBarDateFontSize = ref(14); // Bar clock date font size in pixels
+  const clockBarLayout = ref("single-line"); // Bar layout: 'single-line' | 'two-lines'
+  const clockBarPadding = ref(8); // Bar padding in pixels (all sides)
   const mealPlanCardSize = ref("medium"); // Meal plan card size: 'small' | 'medium' | 'large'
   const consoleLogEnabled = ref(true); // Enable console logging (default: true for backwards compatibility)
   const consoleLogLevel = ref("info"); // Console log level: 'error' | 'warn' | 'info' | 'debug' (default: 'info')
@@ -351,6 +367,89 @@ export const useConfigStore = defineStore("config", () => {
       } else {
         clockSize.value = "medium"; // Default
       }
+      // New clock settings
+      if (response.data.clockWidgetEnabled !== undefined) {
+        clockWidgetEnabled.value = response.data.clockWidgetEnabled;
+      } else if (response.data.clock_widget_enabled !== undefined) {
+        clockWidgetEnabled.value = response.data.clock_widget_enabled;
+      }
+      if (response.data.clockWidgetShowInKiosk !== undefined) {
+        clockWidgetShowInKiosk.value = response.data.clockWidgetShowInKiosk;
+      } else if (response.data.clock_widget_show_in_kiosk !== undefined) {
+        clockWidgetShowInKiosk.value = response.data.clock_widget_show_in_kiosk;
+      }
+      if (response.data.clockWidgetPosition !== undefined) {
+        clockWidgetPosition.value = response.data.clockWidgetPosition;
+      } else if (response.data.clock_widget_position !== undefined) {
+        clockWidgetPosition.value = response.data.clock_widget_position;
+      } else {
+        clockWidgetPosition.value = "top-right"; // Default
+      }
+      if (response.data.clockBarEnabled !== undefined) {
+        clockBarEnabled.value = response.data.clockBarEnabled;
+      } else if (response.data.clock_bar_enabled !== undefined) {
+        clockBarEnabled.value = response.data.clock_bar_enabled;
+      }
+      if (response.data.clockBarMode !== undefined) {
+        clockBarMode.value = response.data.clockBarMode;
+      } else if (response.data.clock_bar_mode !== undefined) {
+        clockBarMode.value = response.data.clock_bar_mode;
+      } else {
+        clockBarMode.value = "horizontal"; // Default
+      }
+      if (response.data.clockBarShowInNonKiosk !== undefined) {
+        clockBarShowInNonKiosk.value = response.data.clockBarShowInNonKiosk;
+      } else if (response.data.clock_bar_show_in_non_kiosk !== undefined) {
+        clockBarShowInNonKiosk.value =
+          response.data.clock_bar_show_in_non_kiosk;
+      }
+      if (response.data.clockBarShowInKiosk !== undefined) {
+        clockBarShowInKiosk.value = response.data.clockBarShowInKiosk;
+      } else if (response.data.clock_bar_show_in_kiosk !== undefined) {
+        clockBarShowInKiosk.value = response.data.clock_bar_show_in_kiosk;
+      }
+      if (response.data.clockBarPosition !== undefined) {
+        clockBarPosition.value = response.data.clockBarPosition;
+      } else if (response.data.clock_bar_position !== undefined) {
+        clockBarPosition.value = response.data.clock_bar_position;
+      } else {
+        clockBarPosition.value = "top"; // Default
+      }
+      if (response.data.clockBarSize !== undefined) {
+        clockBarSize.value = response.data.clockBarSize;
+      } else if (response.data.clock_bar_size !== undefined) {
+        clockBarSize.value = response.data.clock_bar_size;
+      } else {
+        clockBarSize.value = "medium"; // Default
+      }
+      if (response.data.clockBarFontSize !== undefined) {
+        clockBarFontSize.value = response.data.clockBarFontSize;
+      } else if (response.data.clock_bar_font_size !== undefined) {
+        clockBarFontSize.value = response.data.clock_bar_font_size;
+      } else {
+        clockBarFontSize.value = 16; // Default
+      }
+      if (response.data.clockBarDateFontSize !== undefined) {
+        clockBarDateFontSize.value = response.data.clockBarDateFontSize;
+      } else if (response.data.clock_bar_date_font_size !== undefined) {
+        clockBarDateFontSize.value = response.data.clock_bar_date_font_size;
+      } else {
+        clockBarDateFontSize.value = 14; // Default
+      }
+      if (response.data.clockBarLayout !== undefined) {
+        clockBarLayout.value = response.data.clockBarLayout;
+      } else if (response.data.clock_bar_layout !== undefined) {
+        clockBarLayout.value = response.data.clock_bar_layout;
+      } else {
+        clockBarLayout.value = "single-line"; // Default
+      }
+      if (response.data.clockBarPadding !== undefined) {
+        clockBarPadding.value = response.data.clockBarPadding;
+      } else if (response.data.clock_bar_padding !== undefined) {
+        clockBarPadding.value = response.data.clock_bar_padding;
+      } else {
+        clockBarPadding.value = 8; // Default
+      }
       if (response.data.mealPlanCardSize !== undefined) {
         mealPlanCardSize.value = response.data.mealPlanCardSize;
       } else if (response.data.meal_plan_card_size !== undefined) {
@@ -443,6 +542,72 @@ export const useConfigStore = defineStore("config", () => {
         clockSize.value = config.clockSize;
       } else if (config.clock_size !== undefined) {
         clockSize.value = config.clock_size;
+      }
+      // New clock settings
+      if (config.clockWidgetEnabled !== undefined) {
+        clockWidgetEnabled.value = config.clockWidgetEnabled;
+      } else if (config.clock_widget_enabled !== undefined) {
+        clockWidgetEnabled.value = config.clock_widget_enabled;
+      }
+      if (config.clockWidgetShowInKiosk !== undefined) {
+        clockWidgetShowInKiosk.value = config.clockWidgetShowInKiosk;
+      } else if (config.clock_widget_show_in_kiosk !== undefined) {
+        clockWidgetShowInKiosk.value = config.clock_widget_show_in_kiosk;
+      }
+      if (config.clockWidgetPosition !== undefined) {
+        clockWidgetPosition.value = config.clockWidgetPosition;
+      } else if (config.clock_widget_position !== undefined) {
+        clockWidgetPosition.value = config.clock_widget_position;
+      }
+      if (config.clockBarEnabled !== undefined) {
+        clockBarEnabled.value = config.clockBarEnabled;
+      } else if (config.clock_bar_enabled !== undefined) {
+        clockBarEnabled.value = config.clock_bar_enabled;
+      }
+      if (config.clockBarMode !== undefined) {
+        clockBarMode.value = config.clockBarMode;
+      } else if (config.clock_bar_mode !== undefined) {
+        clockBarMode.value = config.clock_bar_mode;
+      }
+      if (config.clockBarShowInNonKiosk !== undefined) {
+        clockBarShowInNonKiosk.value = config.clockBarShowInNonKiosk;
+      } else if (config.clock_bar_show_in_non_kiosk !== undefined) {
+        clockBarShowInNonKiosk.value = config.clock_bar_show_in_non_kiosk;
+      }
+      if (config.clockBarShowInKiosk !== undefined) {
+        clockBarShowInKiosk.value = config.clockBarShowInKiosk;
+      } else if (config.clock_bar_show_in_kiosk !== undefined) {
+        clockBarShowInKiosk.value = config.clock_bar_show_in_kiosk;
+      }
+      if (config.clockBarPosition !== undefined) {
+        clockBarPosition.value = config.clockBarPosition;
+      } else if (config.clock_bar_position !== undefined) {
+        clockBarPosition.value = config.clock_bar_position;
+      }
+      if (config.clockBarSize !== undefined) {
+        clockBarSize.value = config.clockBarSize;
+      } else if (config.clock_bar_size !== undefined) {
+        clockBarSize.value = config.clock_bar_size;
+      }
+      if (config.clockBarFontSize !== undefined) {
+        clockBarFontSize.value = config.clockBarFontSize;
+      } else if (config.clock_bar_font_size !== undefined) {
+        clockBarFontSize.value = config.clock_bar_font_size;
+      }
+      if (config.clockBarDateFontSize !== undefined) {
+        clockBarDateFontSize.value = config.clockBarDateFontSize;
+      } else if (config.clock_bar_date_font_size !== undefined) {
+        clockBarDateFontSize.value = config.clock_bar_date_font_size;
+      }
+      if (config.clockBarLayout !== undefined) {
+        clockBarLayout.value = config.clockBarLayout;
+      } else if (config.clock_bar_layout !== undefined) {
+        clockBarLayout.value = config.clock_bar_layout;
+      }
+      if (config.clockBarPadding !== undefined) {
+        clockBarPadding.value = config.clockBarPadding;
+      } else if (config.clock_bar_padding !== undefined) {
+        clockBarPadding.value = config.clock_bar_padding;
       }
       return response.data;
     } catch (err) {
@@ -639,6 +804,19 @@ export const useConfigStore = defineStore("config", () => {
     clockShowSeconds,
     clockPosition,
     clockSize,
+    clockWidgetEnabled,
+    clockWidgetShowInKiosk,
+    clockWidgetPosition,
+    clockBarEnabled,
+    clockBarMode,
+    clockBarShowInNonKiosk,
+    clockBarShowInKiosk,
+    clockBarPosition,
+    clockBarSize,
+    clockBarFontSize,
+    clockBarDateFontSize,
+    clockBarLayout,
+    clockBarPadding,
     mealPlanCardSize,
     consoleLogEnabled,
     consoleLogLevel,
