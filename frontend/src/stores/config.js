@@ -512,6 +512,14 @@ export const useConfigStore = defineStore("config", () => {
       }
       if (config.showUI !== undefined) {
         showUI.value = config.showUI;
+      } else if (config.show_ui !== undefined) {
+        showUI.value = config.show_ui;
+      }
+      // Also check response data in case backend returns it
+      if (response.data?.showUI !== undefined) {
+        showUI.value = response.data.showUI;
+      } else if (response.data?.show_ui !== undefined) {
+        showUI.value = response.data.show_ui;
       }
       if (config.clockPosition !== undefined) {
         clockPosition.value = config.clockPosition;
@@ -632,8 +640,20 @@ export const useConfigStore = defineStore("config", () => {
   };
 
   const toggleUI = async () => {
-    const newValue = !showUI.value;
+    // Toggle based on the actual visible state (shouldShowUI), not just showUI
+    const currentlyVisible = shouldShowUI.value;
+    const newValue = !currentlyVisible;
+
+    // Clear any temporary UI override when toggling permanently
+    if (temporaryUITimer.value) {
+      clearTimeout(temporaryUITimer.value);
+      temporaryUITimer.value = null;
+    }
+    showUITemporary.value = false;
+
+    // Update the persistent showUI value
     showUI.value = newValue;
+
     // Persist the change to backend
     try {
       await updateConfig({ showUI: newValue });
