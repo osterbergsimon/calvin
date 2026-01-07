@@ -340,7 +340,6 @@ import SettingItem from "../../shared/SettingItem.vue";
 import ThemeSelector from "../../specialized/ThemeSelector.vue";
 import FontSizePicker from "../../shared/FontSizePicker.vue";
 import ClockBarFontSizePicker from "../../shared/ClockBarFontSizePicker.vue";
-import { useThemesStore } from "@/stores/themes";
 import { useTheme } from "@/composables/useTheme";
 import * as pluginsApi from "@/services/pluginsApi";
 
@@ -353,7 +352,6 @@ const props = defineProps({
 
 const emit = defineEmits(["update:config"]);
 
-const themesStore = useThemesStore();
 const theme = useTheme();
 const themes = ref([]);
 const loadingThemes = ref(false);
@@ -361,7 +359,7 @@ const loadingThemes = ref(false);
 const loadThemes = async () => {
   loadingThemes.value = true;
   try {
-    // Get themes directly from API (same as old Settings.vue)
+    // Get themes directly from API
     // This includes both built-in and installed themes
     const response = await pluginsApi.getPlugins({ plugin_type: "theme" });
     const allItems = response.plugins || [];
@@ -397,7 +395,7 @@ const handleThemeSelect = async (themeId) => {
   try {
     // Update config (saves to backend)
     emit("update:config", { selectedTheme: themeId });
-    // Apply theme immediately (same as old Settings.vue)
+    // Apply theme immediately
     await theme.setSelectedTheme(themeId);
   } catch (error) {
     console.error("Failed to select theme:", error);

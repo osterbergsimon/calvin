@@ -283,7 +283,7 @@ const handleFetchNow = async (pluginId) => {
 
 const handleCustomAction = async (pluginId, action) => {
   // Handle custom plugin actions
-  console.log("Custom action:", pluginId, action);
+  // TODO: Implement custom plugin actions if needed
 };
 
 // Instance modal state

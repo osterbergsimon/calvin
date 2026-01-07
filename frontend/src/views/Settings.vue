@@ -129,8 +129,6 @@ const getFrontendVersionFromMeta = () => {
   return null;
 };
 
-// Version comes from config
-
 // Handle config updates
 const handleConfigUpdate = async (updates) => {
   await updateConfig(updates);
