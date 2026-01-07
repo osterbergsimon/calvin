@@ -21,21 +21,27 @@ logger = logging.getLogger(__name__)
 router = APIRouter()
 
 
-@router.get("/plugins/enumerate-from-github")
+@router.post("/plugins/github/enumerate")
 async def enumerate_plugins_from_github(
-    repo_url: str,
-    branch: str | None = None,
+    request: dict[str, Any] = Body(...),
 ):
     """
     Enumerate available plugins from a GitHub repository.
 
     Args:
-        repo_url: GitHub repository URL (e.g., https://github.com/user/repo)
-        branch: Optional branch name (defaults to main/master)
+        request: Request body containing:
+            - repo_url: GitHub repository URL (e.g., https://github.com/user/repo)
+            - branch: Optional branch name (defaults to main/master)
 
     Returns:
         Dictionary with manifest info and list of available plugins
     """
+    repo_url = request.get("repo_url")
+    branch = request.get("branch")
+
+    if not repo_url:
+        raise HTTPException(status_code=400, detail="repo_url is required")
+
     # Parse GitHub URL
     github_pattern = r"github\.com[/:]([^/]+)/([^/]+?)(?:\.git)?/?$"
     match = re.search(github_pattern, repo_url)
@@ -139,7 +145,7 @@ async def enumerate_plugins_from_github(
                 pass
 
 
-@router.post("/plugins/install-from-github")
+@router.post("/plugins/github/install")
 async def install_plugin_from_github(request: dict[str, Any] = Body(...)):
     """
     Install a specific plugin from a GitHub repository.
