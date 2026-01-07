@@ -134,8 +134,8 @@ export async function uninstallPlugin(pluginId, pluginType = null) {
 /**
  * Test plugin connection.
  */
-export async function testPlugin(pluginId) {
-  const response = await api.post(`/plugins/${pluginId}/test`);
+export async function testPlugin(pluginId, config = {}) {
+  const response = await api.post(`/plugins/${pluginId}/test`, config);
   return response.data;
 }
 
@@ -144,5 +144,82 @@ export async function testPlugin(pluginId) {
  */
 export async function fetchPlugin(pluginId) {
   const response = await api.post(`/plugins/${pluginId}/fetch`);
+  return response.data;
+}
+
+/**
+ * Geocode a location name to coordinates.
+ */
+export async function geocodeLocation(pluginId, location) {
+  const response = await api.post(`/plugins/${pluginId}/geocode`, { location });
+  return response.data;
+}
+
+/**
+ * Update plugin (general update).
+ */
+export async function updatePlugin(pluginId, data) {
+  const response = await api.put(`/plugins/${pluginId}`, data);
+  return response.data;
+}
+
+/**
+ * Create a new plugin instance.
+ * All plugins (including iframe) are created by updating the plugin config,
+ * which triggers the plugin's handle_plugin_config_update hook.
+ */
+export async function createPluginInstance(pluginId, instanceData) {
+  // Use plugin config update to trigger instance creation
+  // This will call handle_plugin_config_update hook which creates the instance
+  // Include instance name and config in the update
+  const configUpdate = {
+    ...instanceData.config,
+    _instance_name: instanceData.name, // Pass instance name as a special field
+    _instance_enabled:
+      instanceData.enabled !== undefined ? instanceData.enabled : true,
+  };
+  const response = await api.put(`/plugins/${pluginId}`, configUpdate);
+  return response.data;
+}
+
+/**
+ * Update a plugin instance.
+ * All plugins are updated by updating the plugin config,
+ * which triggers the plugin's handle_plugin_config_update hook.
+ */
+export async function updatePluginInstance(instanceId, instanceData) {
+  // We need the plugin type_id, not the instance_id
+  // For now, we'll need to get it from the instance or pass it separately
+  // This is a limitation - we should improve the API to accept instance_id directly
+  // For now, use plugin config update with instance ID passed in config
+  const configUpdate = {
+    ...instanceData.config,
+    _instance_id: instanceId, // Pass instance ID so hook knows which to update
+    _instance_name: instanceData.name,
+    _instance_enabled: instanceData.enabled,
+  };
+
+  // Try to get plugin type_id from instanceData if provided, otherwise use instanceId
+  // This is a workaround - ideally we'd have a GET /plugins/instances/{id} endpoint
+  const pluginTypeId = instanceData.plugin_id || instanceId;
+  const response = await api.put(`/plugins/${pluginTypeId}`, configUpdate);
+  return response.data;
+}
+
+/**
+ * Delete a plugin instance.
+ */
+export async function deletePluginInstance(instanceId) {
+  const response = await api.delete(`/plugins/instances/${instanceId}`);
+  return response.data;
+}
+
+/**
+ * Update plugin instances order (takes array of instance IDs in order).
+ */
+export async function updatePluginInstancesOrder(pluginId, instanceIds) {
+  const response = await api.put(`/plugins/${pluginId}/instances/order`, {
+    instance_ids: instanceIds,
+  });
   return response.data;
 }

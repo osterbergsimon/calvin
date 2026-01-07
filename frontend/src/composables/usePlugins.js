@@ -1,59 +1,76 @@
 /**
  * Composable for plugin management.
+ * Uses singleton pattern to ensure state is shared across all components.
  */
 
 import { ref, computed } from "vue";
 import * as pluginsApi from "../services/pluginsApi";
 
+// Shared state (singleton pattern)
+const plugins = ref([]);
+const pluginInstances = ref({});
+const pluginConfigs = ref({});
+const pluginDisplayOrders = ref({});
+const imagePluginDisplayOrders = ref({});
+const loadingPlugins = ref(false);
+const installingPlugin = ref(false);
+const enumeratingPlugins = ref(false);
+const selectedPluginZip = ref(null);
+const githubRepoUrl = ref("");
+const githubBranch = ref("main");
+const availablePlugins = ref([]);
+const pluginInstallError = ref("");
+const pluginInstallSuccess = ref("");
+const pluginRequiresRestart = ref(false);
+const pluginBranchSwitched = ref(false);
+const pluginActualBranch = ref("");
+const expandedPlugins = ref({});
+const pluginFormData = ref({});
+const savingPlugin = ref(null);
+const testingPlugin = ref({});
+const fetchingPlugin = ref({});
+const pluginSaveStatus = ref({});
+const pluginTestStatus = ref({});
+const pluginFetchStatus = ref({});
+
+// Computed properties (using shared refs)
+const imagePlugins = computed(() => {
+  return plugins.value.filter((p) => p.type === "image" && p.enabled);
+});
+
+const sortedPluginCategories = computed(() => {
+  const categories = [
+    { type: "calendar", label: "Calendar", plugins: [] },
+    { type: "image", label: "Image", plugins: [] },
+    { type: "service", label: "Service", plugins: [] },
+    { type: "theme", label: "Theme", plugins: [] },
+  ];
+
+  plugins.value.forEach((plugin) => {
+    const category = categories.find((c) => c.type === plugin.type);
+    if (category) {
+      category.plugins.push(plugin);
+    }
+  });
+
+  return categories.filter((c) => c.plugins.length > 0);
+});
+
 export function usePlugins() {
-  const plugins = ref([]);
-  const pluginInstances = ref({});
-  const pluginConfigs = ref({});
-  const pluginDisplayOrders = ref({});
-  const imagePluginDisplayOrders = ref({});
-  const loadingPlugins = ref(false);
-  const installingPlugin = ref(false);
-  const enumeratingPlugins = ref(false);
-  const selectedPluginZip = ref(null);
-  const githubRepoUrl = ref("");
-  const githubBranch = ref("main");
-  const availablePlugins = ref([]);
-  const pluginInstallError = ref("");
-  const pluginInstallSuccess = ref("");
-  const pluginRequiresRestart = ref(false);
-  const pluginBranchSwitched = ref(false);
-  const pluginActualBranch = ref("");
-
-  // Computed
-  const imagePlugins = computed(() => {
-    return plugins.value.filter((p) => p.type === "image" && p.enabled);
-  });
-
-  const sortedPluginCategories = computed(() => {
-    const categories = [
-      { type: "calendar", label: "Calendar", plugins: [] },
-      { type: "image", label: "Image", plugins: [] },
-      { type: "service", label: "Service", plugins: [] },
-      { type: "theme", label: "Theme", plugins: [] },
-    ];
-
-    plugins.value.forEach((plugin) => {
-      const category = categories.find((c) => c.type === plugin.type);
-      if (category) {
-        category.plugins.push(plugin);
-      }
-    });
-
-    return categories.filter((c) => c.plugins.length > 0);
-  });
-
   // Load plugins
   const loadPlugins = async () => {
     loadingPlugins.value = true;
     try {
       const [pluginsResponse, installedResponse] = await Promise.all([
         pluginsApi.getPlugins(),
-        pluginsApi.getInstalledPlugins(),
+        pluginsApi.getInstalledPlugins().catch((error) => {
+          // Silently handle 404 for installed plugins endpoint
+          if (error.response?.status === 404) {
+            return { plugins: [] };
+          }
+          console.warn("Failed to load installed plugins:", error);
+          return { plugins: [] };
+        }),
       ]);
 
       const allPlugins = pluginsResponse.plugins || [];
@@ -70,13 +87,36 @@ export function usePlugins() {
       // Load instances and configs for each plugin
       for (const plugin of plugins.value) {
         try {
+          // Skip config loading for themes (they don't have configs)
+          if (plugin.type === "theme") {
+            pluginInstances.value[plugin.id] = [];
+            pluginConfigs.value[plugin.id] = {};
+            continue;
+          }
+
           const [instancesResponse, configResponse] = await Promise.all([
-            pluginsApi.getPluginInstances(plugin.id),
-            pluginsApi.getPluginConfig(plugin.id),
+            pluginsApi
+              .getPluginInstances(plugin.id)
+              .catch(() => ({ instances: [] })),
+            pluginsApi.getPluginConfig(plugin.id).catch(() => ({ config: {} })),
           ]);
 
           pluginInstances.value[plugin.id] = instancesResponse.instances || [];
           pluginConfigs.value[plugin.id] = configResponse.config || {};
+
+          // Load display orders from config
+          const config = configResponse.config || {};
+          if (plugin.type === "service") {
+            pluginDisplayOrders.value[plugin.id] = parseInt(
+              config.display_order || "0",
+              10,
+            );
+          } else if (plugin.type === "image") {
+            imagePluginDisplayOrders.value[plugin.id] = parseInt(
+              config.display_order || "0",
+              10,
+            );
+          }
         } catch (error) {
           console.error(`Failed to load data for plugin ${plugin.id}:`, error);
           pluginInstances.value[plugin.id] = [];
@@ -218,9 +258,152 @@ export function usePlugins() {
   const togglePlugin = async (pluginId, enabled) => {
     try {
       await pluginsApi.updatePluginConfig(pluginId, { enabled });
-      await loadPlugins();
+
+      // Update local state immediately (optimistic update)
+      const plugin = plugins.value.find((p) => p.id === pluginId);
+      if (plugin) {
+        plugin.enabled = enabled;
+      }
+
+      // If enabling and there are instances, start them all
+      if (
+        enabled &&
+        pluginInstances.value[pluginId] &&
+        pluginInstances.value[pluginId].length > 0
+      ) {
+        const instances = pluginInstances.value[pluginId];
+        const promises = instances.map((instance) =>
+          pluginsApi.startPluginInstance(instance.id),
+        );
+        await Promise.all(promises);
+      }
+      // If disabling and there are instances, stop them all
+      else if (
+        !enabled &&
+        pluginInstances.value[pluginId] &&
+        pluginInstances.value[pluginId].length > 0
+      ) {
+        const instances = pluginInstances.value[pluginId];
+        const promises = instances.map((instance) =>
+          pluginsApi.stopPluginInstance(instance.id),
+        );
+        await Promise.all(promises);
+      }
+
+      // Only reload instances for this specific plugin to update running status
+      // This avoids reloading the entire plugins list
+      try {
+        const instancesResponse = await pluginsApi.getPluginInstances(pluginId);
+        pluginInstances.value[pluginId] = instancesResponse.instances || [];
+      } catch (error) {
+        console.error(
+          `Failed to reload instances for plugin ${pluginId}:`,
+          error,
+        );
+      }
     } catch (error) {
       console.error("Failed to toggle plugin:", error);
+      // Revert optimistic update on error
+      const plugin = plugins.value.find((p) => p.id === pluginId);
+      if (plugin) {
+        plugin.enabled = !enabled;
+      }
+      throw error;
+    }
+  };
+
+  // Update service plugin display order
+  const updatePluginOrder = async (pluginId, order) => {
+    try {
+      const currentConfig = pluginConfigs.value[pluginId] || {};
+      const updatedConfig = { ...currentConfig, display_order: order };
+
+      // Clean config values (ensure strings, not objects)
+      const cleanedConfig = {};
+      for (const [key, value] of Object.entries(updatedConfig)) {
+        if (key === "display_order") {
+          cleanedConfig[key] = String(value);
+        } else if (value === null || value === undefined) {
+          cleanedConfig[key] = "";
+        } else if (typeof value === "object") {
+          cleanedConfig[key] = value.value || value.default || "";
+        } else {
+          cleanedConfig[key] = String(value);
+        }
+      }
+
+      await pluginsApi.updatePlugin(pluginId, cleanedConfig);
+      pluginConfigs.value[pluginId] = cleanedConfig;
+      pluginDisplayOrders.value[pluginId] = order;
+    } catch (error) {
+      console.error(`Failed to update order for plugin ${pluginId}:`, error);
+      throw error;
+    }
+  };
+
+  // Update image plugin display order
+  const updateImagePluginOrder = async (pluginId, order) => {
+    try {
+      const currentConfig = pluginConfigs.value[pluginId] || {};
+      const updatedConfig = { ...currentConfig, display_order: order };
+
+      // Clean config values (ensure strings, not objects)
+      const cleanedConfig = {};
+      for (const [key, value] of Object.entries(updatedConfig)) {
+        if (key === "display_order") {
+          cleanedConfig[key] = String(value);
+        } else if (value === null || value === undefined) {
+          cleanedConfig[key] = "";
+        } else if (typeof value === "object") {
+          cleanedConfig[key] = value.value || value.default || "";
+        } else {
+          cleanedConfig[key] = String(value);
+        }
+      }
+
+      await pluginsApi.updatePlugin(pluginId, cleanedConfig);
+      pluginConfigs.value[pluginId] = cleanedConfig;
+      imagePluginDisplayOrders.value[pluginId] = order;
+    } catch (error) {
+      console.error(
+        `Failed to update order for image plugin ${pluginId}:`,
+        error,
+      );
+      throw error;
+    }
+  };
+
+  // Update instance order for a plugin
+  const updateInstanceOrder = async (pluginId, newOrder) => {
+    try {
+      // newOrder is an array of instance objects from draggable
+      // Extract instance IDs in the new order
+      const instanceIds = newOrder.map((instance) => instance.id);
+      await pluginsApi.updatePluginInstancesOrder(pluginId, instanceIds);
+      // Reload instances to get updated order
+      const instancesResponse = await pluginsApi.getPluginInstances(pluginId);
+      pluginInstances.value[pluginId] = instancesResponse.instances || [];
+    } catch (error) {
+      console.error(`Failed to update instance order for ${pluginId}:`, error);
+      throw error;
+    }
+  };
+
+  // Update image instance order for a plugin
+  const updateImageInstanceOrder = async (pluginId, newOrder) => {
+    try {
+      // newOrder is an array of instance objects from draggable
+      // Extract instance IDs in the new order
+      const instanceIds = newOrder.map((instance) => instance.id);
+      await pluginsApi.updatePluginInstancesOrder(pluginId, instanceIds);
+      // Reload instances to get updated order
+      const instancesResponse = await pluginsApi.getPluginInstances(pluginId);
+      pluginInstances.value[pluginId] = instancesResponse.instances || [];
+    } catch (error) {
+      console.error(
+        `Failed to update image instance order for ${pluginId}:`,
+        error,
+      );
       throw error;
     }
   };
@@ -244,6 +427,14 @@ export function usePlugins() {
     pluginRequiresRestart,
     pluginBranchSwitched,
     pluginActualBranch,
+    expandedPlugins,
+    pluginFormData,
+    savingPlugin,
+    testingPlugin,
+    fetchingPlugin,
+    pluginSaveStatus,
+    pluginTestStatus,
+    pluginFetchStatus,
     // Computed
     imagePlugins,
     sortedPluginCategories,
@@ -254,5 +445,9 @@ export function usePlugins() {
     installPluginFromGitHub,
     uninstallPlugin,
     togglePlugin,
+    updatePluginOrder,
+    updateImagePluginOrder,
+    updateInstanceOrder,
+    updateImageInstanceOrder,
   };
 }

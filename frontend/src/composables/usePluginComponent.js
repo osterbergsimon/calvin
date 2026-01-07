@@ -120,6 +120,22 @@ export async function loadPluginComponent(componentPath) {
     // Load the component using the glob loader
     const componentModule = await moduleLoader();
     const component = componentModule.default || componentModule;
+
+    // Validate that we got a Vue component, not a string or other type
+    if (
+      typeof component === "string" ||
+      !component ||
+      typeof component !== "object"
+    ) {
+      logError(
+        "[PluginComponent]",
+        `Component ${componentPath} did not export a valid Vue component. Got:`,
+        typeof component,
+        component,
+      );
+      return null;
+    }
+
     // Mark component as raw to prevent Vue from making it reactive
     const rawComponent = markRaw(component);
 
@@ -154,9 +170,9 @@ export function getPluginComponentPath(service) {
   const typeId = service.type_id || service.id?.split("-")[0];
   const renderTemplate = service.display_schema.render_template;
 
-  // If render_template is a known generic template, return null (use generic viewer)
-  const genericTemplates = ["weather", "iframe"];
-  if (genericTemplates.includes(renderTemplate)) {
+  // If render_template is "weather", return null (use generic WeatherViewer)
+  // Note: "iframe" now has its own plugin component, so don't exclude it
+  if (renderTemplate === "weather") {
     return null;
   }
 

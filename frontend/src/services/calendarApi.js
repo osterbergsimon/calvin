@@ -21,6 +21,14 @@ export async function addCalendarSource(source) {
 }
 
 /**
+ * Update calendar source.
+ */
+export async function updateCalendarSource(sourceId, updates) {
+  const response = await api.put(`/calendar/sources/${sourceId}`, updates);
+  return response.data;
+}
+
+/**
  * Delete calendar source.
  */
 export async function deleteCalendarSource(sourceId) {
