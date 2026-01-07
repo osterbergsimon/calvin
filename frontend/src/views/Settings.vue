@@ -59,7 +59,7 @@
       <!-- Main Content -->
       <div class="settings-content">
         <LayoutCategory
-          v-if="activeCategory === 'layout'"
+          v-if="activeCategory === 'layout' && localConfig"
           :config="localConfig"
           @update:config="handleConfigUpdate"
         />
@@ -86,13 +86,14 @@ import { ref, onMounted } from "vue";
 import { useRouter } from "vue-router";
 import { useConfigForm } from "@/composables";
 import { useSystem } from "@/composables";
-import * as systemApi from "@/services/systemApi";
+import { useModeStore } from "@/stores/mode";
 import LayoutCategory from "@/components/settings/categories/LayoutCategory.vue";
 import ContentCategory from "@/components/settings/categories/ContentCategory.vue";
 import PluginsCategory from "@/components/settings/categories/PluginsCategory.vue";
 import SystemCategory from "@/components/settings/categories/SystemCategory.vue";
 
 const router = useRouter();
+const modeStore = useModeStore();
 
 // Category navigation
 const categories = [
@@ -128,15 +129,7 @@ const getFrontendVersionFromMeta = () => {
   return null;
 };
 
-// Load backend version
-const loadVersion = async () => {
-  try {
-    const response = await systemApi.getVersion();
-    version.value = response.version;
-  } catch (error) {
-    console.error("Failed to load version:", error);
-  }
-};
+// Version comes from config
 
 // Handle config updates
 const handleConfigUpdate = async (updates) => {
@@ -155,6 +148,8 @@ const handleGitBranchUpdate = async (branch) => {
 
 // Navigation
 const goBack = () => {
+  // Restore previous mode when returning from settings
+  modeStore.returnFromSettings();
   router.push("/");
 };
 
@@ -167,7 +162,8 @@ const reloadUI = () => {
 onMounted(async () => {
   await loadConfig();
   frontendVersion.value = getFrontendVersionFromMeta();
-  await loadVersion();
+  // Version comes from config
+  version.value = localConfig.value.version;
 });
 </script>
 
