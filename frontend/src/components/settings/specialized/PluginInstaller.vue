@@ -84,11 +84,43 @@
 
       <!-- Available Plugins List -->
       <div v-if="availablePlugins.length > 0" class="available-plugins-compact">
+        <div class="plugin-list-header">
+          <label class="select-all-checkbox">
+            <input
+              type="checkbox"
+              :checked="allSelected"
+              :indeterminate="someSelected"
+              @change="handleSelectAll"
+            />
+            <span>Select All</span>
+          </label>
+          <button
+            type="button"
+            class="btn-install-selected"
+            :disabled="installing || selectedPlugins.length === 0"
+            @click="handleInstallSelected"
+          >
+            {{
+              installing
+                ? `Installing ${selectedPlugins.length}...`
+                : `⬇️ Install Selected (${selectedPlugins.length})`
+            }}
+          </button>
+        </div>
         <div
           v-for="plugin in availablePlugins"
           :key="plugin.id"
           class="plugin-item-inline"
+          :class="{ 'plugin-installed': plugin._installed }"
         >
+          <div class="plugin-checkbox-wrapper">
+            <input
+              type="checkbox"
+              :checked="isSelected(plugin.id)"
+              :disabled="installing"
+              @change="handleToggleSelect(plugin.id)"
+            />
+          </div>
           <div class="plugin-info-inline">
             <strong>{{ plugin.name || plugin.id }}</strong>
             <span
@@ -100,14 +132,41 @@
             <span v-if="plugin.version" class="plugin-version-small">
               v{{ plugin.version }}
             </span>
+            <span
+              v-if="plugin._installed"
+              class="plugin-installed-badge"
+              :class="{
+                'plugin-update-available':
+                  plugin._installedVersion &&
+                  plugin.version &&
+                  plugin._installedVersion !== plugin.version,
+              }"
+            >
+              {{
+                plugin._installedVersion &&
+                plugin.version &&
+                plugin._installedVersion !== plugin.version
+                  ? `Installed: v${plugin._installedVersion} → Update to v${plugin.version}`
+                  : `Installed: v${plugin._installedVersion || "?"}`
+              }}
+            </span>
           </div>
           <button
             type="button"
             class="btn-install"
+            :class="{
+              'btn-update': plugin._installed,
+            }"
             :disabled="installing"
             @click="handleInstall(plugin.path)"
           >
-            {{ installing ? "Installing..." : "⬇️ Install" }}
+            {{
+              installing
+                ? "Installing..."
+                : plugin._installed
+                  ? "🔄 Update"
+                  : "⬇️ Install"
+            }}
           </button>
         </div>
       </div>
@@ -148,7 +207,7 @@
 </template>
 
 <script setup>
-import { ref, watch } from "vue";
+import { ref, computed, watch } from "vue";
 
 const props = defineProps({
   installing: {
@@ -201,12 +260,68 @@ const emit = defineEmits([
   "zip-select",
   "list-plugins",
   "install",
+  "install-selected",
   "restart",
   "update:repoUrl",
   "update:branch",
 ]);
 
 const installMethod = ref("zip");
+const selectedPluginIds = ref(new Set());
+
+// Computed properties
+const selectedPlugins = computed(() => {
+  return props.availablePlugins.filter((p) =>
+    selectedPluginIds.value.has(p.id),
+  );
+});
+
+const allSelected = computed(() => {
+  return (
+    props.availablePlugins.length > 0 &&
+    props.availablePlugins.every((p) => selectedPluginIds.value.has(p.id))
+  );
+});
+
+const someSelected = computed(() => {
+  const selectedCount = selectedPluginIds.value.size;
+  return selectedCount > 0 && selectedCount < props.availablePlugins.length;
+});
+
+// Methods
+const isSelected = (pluginId) => {
+  return selectedPluginIds.value.has(pluginId);
+};
+
+const handleToggleSelect = (pluginId) => {
+  if (selectedPluginIds.value.has(pluginId)) {
+    selectedPluginIds.value.delete(pluginId);
+  } else {
+    selectedPluginIds.value.add(pluginId);
+  }
+};
+
+const handleSelectAll = (event) => {
+  if (event.target.checked) {
+    props.availablePlugins.forEach((p) => selectedPluginIds.value.add(p.id));
+  } else {
+    selectedPluginIds.value.clear();
+  }
+};
+
+const handleInstallSelected = () => {
+  const pluginsToInstall = selectedPlugins.value.map((p) => ({
+    path: p.path,
+    id: p.id,
+  }));
+  emit("install-selected", {
+    plugins: pluginsToInstall,
+    repoUrl: props.repoUrl,
+    branch: props.branch,
+  });
+  // Clear selection after install
+  selectedPluginIds.value.clear();
+};
 
 const handleZipSelect = (event) => {
   const file = event.target.files?.[0];
@@ -241,6 +356,14 @@ const handleRepoUrlInput = (event) => {
 const handleBranchInput = (event) => {
   emit("update:branch", event.target.value);
 };
+
+// Watch for availablePlugins changes to clear selection when list changes
+watch(
+  () => props.availablePlugins.length,
+  () => {
+    selectedPluginIds.value.clear();
+  },
+);
 </script>
 
 <style scoped>
@@ -390,6 +513,58 @@ const handleBranchInput = (event) => {
   gap: 0.5rem;
 }
 
+.plugin-list-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 0.75rem;
+  background: var(--bg-tertiary);
+  border: 1px solid var(--border-color);
+  border-radius: 6px;
+  margin-bottom: 0.5rem;
+}
+
+.select-all-checkbox {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  cursor: pointer;
+  font-size: 0.9rem;
+  font-weight: 500;
+  color: var(--text-primary);
+}
+
+.select-all-checkbox input[type="checkbox"] {
+  width: 18px;
+  height: 18px;
+  cursor: pointer;
+}
+
+.btn-install-selected {
+  padding: 0.5rem 1rem;
+  background: var(--accent-primary);
+  color: white;
+  border: none;
+  border-radius: 4px;
+  font-size: 0.875rem;
+  font-weight: 600;
+  cursor: pointer;
+  transition: all 0.2s;
+  white-space: nowrap;
+}
+
+.btn-install-selected:hover:not(:disabled) {
+  background: var(--accent-secondary);
+  transform: translateY(-1px);
+  box-shadow: 0 2px 4px var(--shadow);
+}
+
+.btn-install-selected:disabled {
+  opacity: 0.6;
+  cursor: not-allowed;
+  transform: none;
+}
+
 .plugin-item-inline {
   display: flex;
   justify-content: space-between;
@@ -398,6 +573,23 @@ const handleBranchInput = (event) => {
   background: var(--bg-secondary);
   border: 1px solid var(--border-color);
   border-radius: 6px;
+  gap: 0.75rem;
+}
+
+.plugin-item-inline.plugin-installed {
+  background: rgba(40, 167, 69, 0.05);
+  border-color: rgba(40, 167, 69, 0.3);
+}
+
+.plugin-checkbox-wrapper {
+  display: flex;
+  align-items: center;
+}
+
+.plugin-checkbox-wrapper input[type="checkbox"] {
+  width: 18px;
+  height: 18px;
+  cursor: pointer;
 }
 
 .plugin-info-inline {
@@ -437,6 +629,31 @@ const handleBranchInput = (event) => {
 .plugin-version-small {
   color: var(--text-secondary);
   font-size: 0.75rem;
+}
+
+.plugin-installed-badge {
+  padding: 0.125rem 0.5rem;
+  border-radius: 12px;
+  font-size: 0.7rem;
+  font-weight: 500;
+  background: rgba(40, 167, 69, 0.1);
+  color: #28a745;
+  border: 1px solid rgba(40, 167, 69, 0.3);
+}
+
+.plugin-installed-badge.plugin-update-available {
+  background: rgba(255, 193, 7, 0.1);
+  color: #856404;
+  border-color: rgba(255, 193, 7, 0.3);
+}
+
+.btn-update {
+  background: #ffc107 !important;
+  color: #000 !important;
+}
+
+.btn-update:hover:not(:disabled) {
+  background: #ffb300 !important;
 }
 
 .btn-install {

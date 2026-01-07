@@ -1,6 +1,6 @@
 <template>
   <div class="updates-tab">
-    <CollapsibleSection title="Update Settings" icon="🔄">
+    <CollapsibleSection title="Update Settings" icon="🔄" :expanded="true">
       <SettingItem
         label="Git Repository URL"
         help="GitHub repository URL for updates"

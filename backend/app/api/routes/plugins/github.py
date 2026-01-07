@@ -36,10 +36,18 @@ async def enumerate_plugins_from_github(
     Returns:
         Dictionary with manifest info and list of available plugins
     """
+    try:
+        if not isinstance(request, dict):
+            raise HTTPException(status_code=400, detail="Request body must be a JSON object")
+    except Exception as e:
+        if isinstance(e, HTTPException):
+            raise
+        raise HTTPException(status_code=400, detail=f"Invalid request body: {str(e)}")
+
     repo_url = request.get("repo_url")
     branch = request.get("branch")
 
-    if not repo_url:
+    if not repo_url or not repo_url.strip():
         raise HTTPException(status_code=400, detail="repo_url is required")
 
     # Parse GitHub URL
@@ -130,7 +138,8 @@ async def enumerate_plugins_from_github(
         raise
     except Exception as e:
         logger.error(f"Failed to enumerate plugins from GitHub: {e}", exc_info=True)
-        raise HTTPException(status_code=500, detail=f"Failed to enumerate plugins: {str(e)}")
+        error_detail = str(e) if str(e) else "Unknown error occurred"
+        raise HTTPException(status_code=500, detail=f"Failed to enumerate plugins: {error_detail}")
     finally:
         # Clean up temp files
         if temp_path and temp_path.exists():

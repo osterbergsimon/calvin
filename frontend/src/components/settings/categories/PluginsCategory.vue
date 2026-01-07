@@ -18,6 +18,7 @@
         @zip-select="handleZipSelect"
         @list-plugins="handleListPlugins"
         @install="handleInstall"
+        @install-selected="handleInstallSelected"
         @restart="handleRestart"
       />
     </CollapsibleSection>
@@ -69,6 +70,16 @@
       @close="handleCloseInstanceModal"
       @save="handleInstanceModalSave"
     />
+
+    <!-- Uninstall Confirm Modal -->
+    <ConfirmModal
+      :show="showUninstallModal"
+      title="Uninstall Plugin"
+      :message="uninstallMessage"
+      confirm-text="Uninstall"
+      @confirm="confirmUninstall"
+      @cancel="cancelUninstall"
+    />
   </div>
 </template>
 
@@ -82,6 +93,7 @@ import CollapsibleSection from "../shared/CollapsibleSection.vue";
 import PluginInstaller from "../specialized/PluginInstaller.vue";
 import PluginManager from "../specialized/PluginManager.vue";
 import InstanceModal from "../specialized/InstanceModal.vue";
+import ConfirmModal from "../shared/ConfirmModal.vue";
 
 // Use composables
 const {
@@ -103,6 +115,7 @@ const {
   installPluginFromZip,
   enumeratePluginsFromGitHub,
   installPluginFromGitHub,
+  installPluginsFromGitHub,
   uninstallPlugin,
   togglePlugin,
 } = usePlugins();
@@ -142,7 +155,11 @@ const handleListPlugins = async ({ repoUrl, branch }) => {
 };
 
 const handleInstall = async ({ path, repoUrl, branch }) => {
-  await installPluginFromGitHub(path, repoUrl, branch);
+  await installPluginFromGitHub(repoUrl, path, branch);
+};
+
+const handleInstallSelected = async ({ plugins, repoUrl, branch }) => {
+  await installPluginsFromGitHub(plugins, repoUrl, branch);
 };
 
 const handleRestart = async () => {
@@ -161,9 +178,30 @@ const handleToggleEnabled = async (pluginId, enabled) => {
   await togglePlugin(pluginId, enabled);
 };
 
-const handleUninstall = async (pluginId, pluginType) => {
-  await uninstallPlugin(pluginId, pluginType);
-  await loadPlugins();
+const handleUninstall = (pluginId, pluginType) => {
+  const plugin = plugins.value.find((p) => p.id === pluginId);
+  const pluginName = plugin?.name || pluginId;
+  uninstallMessage.value = `Are you sure you want to uninstall "${pluginName}"? This action cannot be undone.`;
+  pendingUninstall.value = { pluginId, pluginType };
+  showUninstallModal.value = true;
+};
+
+const confirmUninstall = async () => {
+  const { pluginId, pluginType } = pendingUninstall.value;
+  showUninstallModal.value = false;
+  try {
+    await uninstallPlugin(pluginId, pluginType);
+    await loadPlugins();
+  } catch (error) {
+    console.error("Failed to uninstall plugin:", error);
+  } finally {
+    pendingUninstall.value = { pluginId: null, pluginType: null };
+  }
+};
+
+const cancelUninstall = () => {
+  showUninstallModal.value = false;
+  pendingUninstall.value = { pluginId: null, pluginType: null };
 };
 
 const handleUpdateFormValue = (pluginId, key, value) => {
@@ -252,6 +290,11 @@ const handleCustomAction = async (pluginId, action) => {
 const showInstanceModal = ref(false);
 const currentPlugin = ref(null);
 const editingInstance = ref(null);
+
+// Uninstall confirm modal state
+const showUninstallModal = ref(false);
+const pendingUninstall = ref({ pluginId: null, pluginType: null });
+const uninstallMessage = ref("");
 
 const handleAddInstance = (pluginId) => {
   const plugin = plugins.value.find((p) => p.id === pluginId);

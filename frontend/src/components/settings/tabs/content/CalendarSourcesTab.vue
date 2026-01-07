@@ -113,20 +113,6 @@
                 <span class="slider" />
               </label>
               <button
-                v-if="source.enabled && source.running !== undefined"
-                class="btn-secondary"
-                :class="{ 'btn-stop': source.running }"
-                :title="source.running ? 'Stop plugin' : 'Start plugin'"
-                :disabled="!source.enabled"
-                @click="
-                  source.running
-                    ? handleStopPluginInstance(source.id)
-                    : handleStartPluginInstance(source.id)
-                "
-              >
-                {{ source.running ? "Stop" : "Start" }}
-              </button>
-              <button
                 class="btn-remove"
                 title="Remove calendar"
                 @click="handleRemoveSource(source.id)"
@@ -384,26 +370,6 @@ const handleToggleSource = async (sourceId, enabled) => {
   }
 };
 
-const handleStartPluginInstance = async (instanceId) => {
-  try {
-    await pluginsApi.startPluginInstance(instanceId);
-    await loadCalendarSources();
-  } catch (error) {
-    console.error("Failed to start plugin instance:", error);
-    alert("Failed to start plugin instance");
-  }
-};
-
-const handleStopPluginInstance = async (instanceId) => {
-  try {
-    await pluginsApi.stopPluginInstance(instanceId);
-    await loadCalendarSources();
-  } catch (error) {
-    console.error("Failed to stop plugin instance:", error);
-    alert("Failed to stop plugin instance");
-  }
-};
-
 const handleRemoveSource = async (sourceId) => {
   if (!confirm("Are you sure you want to remove this calendar source?")) {
     return;
@@ -617,38 +583,6 @@ onMounted(async () => {
 
 .toggle-switch input:checked + .slider:before {
   transform: translateX(26px);
-}
-
-.btn-secondary {
-  padding: 0.5rem 1rem;
-  background: var(--bg-tertiary);
-  color: var(--text-primary);
-  border: 1px solid var(--border-color);
-  border-radius: 4px;
-  font-size: 0.9rem;
-  cursor: pointer;
-  transition: all 0.2s;
-}
-
-.btn-secondary:hover:not(:disabled) {
-  background: var(--bg-primary);
-  border-color: var(--accent-primary);
-}
-
-.btn-secondary:disabled {
-  opacity: 0.6;
-  cursor: not-allowed;
-}
-
-.btn-stop {
-  background: #f44336;
-  color: white;
-  border-color: #f44336;
-}
-
-.btn-stop:hover:not(:disabled) {
-  background: #d32f2f;
-  border-color: #d32f2f;
 }
 
 .btn-remove {

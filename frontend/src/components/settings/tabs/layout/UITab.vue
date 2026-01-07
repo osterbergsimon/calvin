@@ -1,15 +1,13 @@
 <template>
   <div class="ui-tab">
-    <CollapsibleSection title="Theme Selection" icon="🎨">
+    <CollapsibleSection title="Theme" icon="🎨">
       <ThemeSelector
         :themes="themes"
         :selected-theme-id="config.selectedTheme"
         :loading="loadingThemes"
         @select="handleThemeSelect"
       />
-    </CollapsibleSection>
 
-    <CollapsibleSection title="Theme Mode" icon="🌓">
       <SettingItem
         label="Theme Mode"
         help="Controls when dark mode is applied (if theme supports it)"
@@ -55,7 +53,7 @@
       </div>
     </CollapsibleSection>
 
-    <CollapsibleSection title="UI Visibility" icon="👁️">
+    <CollapsibleSection title="UI Visibility & Clock" icon="👁️">
       <SettingItem
         label="Show Headers and UI Controls"
         help="Hide headers to maximize content space (kiosk mode)"
@@ -69,12 +67,11 @@
           Show Headers and UI Controls
         </label>
       </SettingItem>
-    </CollapsibleSection>
 
-    <CollapsibleSection title="Clock Settings" icon="🕐">
       <SettingItem label="Enable Clock" help="Show clock on dashboard">
         <label>
           <input
+            name="clockEnabled"
             :checked="config.clockEnabled"
             type="checkbox"
             @change="handleClockSettingsChange"
@@ -89,6 +86,7 @@
           help="When to display the clock on the dashboard"
         >
           <select
+            name="clockDisplayMode"
             :value="config.clockDisplayMode"
             @change="handleClockSettingsChange"
           >
@@ -116,7 +114,11 @@
         </SettingItem>
 
         <SettingItem label="Clock Size" help="Size of the clock display">
-          <select :value="config.clockSize" @change="handleClockSettingsChange">
+          <select
+            name="clockSize"
+            :value="config.clockSize"
+            @change="handleClockSettingsChange"
+          >
             <option value="small">Small</option>
             <option value="medium">Medium</option>
             <option value="large">Large</option>
@@ -129,6 +131,7 @@
         >
           <label>
             <input
+              name="clockShowDate"
               :checked="config.clockShowDate"
               type="checkbox"
               @change="handleClockSettingsChange"
@@ -143,6 +146,7 @@
         >
           <label>
             <input
+              name="clockShowSeconds"
               :checked="config.clockShowSeconds"
               type="checkbox"
               @change="handleClockSettingsChange"
@@ -151,6 +155,53 @@
           </label>
         </SettingItem>
       </template>
+    </CollapsibleSection>
+
+    <CollapsibleSection title="Notifications" icon="🔔" :expanded="true">
+      <SettingItem
+        label="Enable Notifications"
+        help="Show visual notifications for keyboard actions and mode changes. This unified notification system replaces the old separate mode indicator and keyboard feedback."
+      >
+        <label>
+          <input
+            type="checkbox"
+            :checked="config.keyboardFeedbackEnabled"
+            @change="handleKeyboardFeedbackEnabledChange"
+          />
+          Enable Notifications
+        </label>
+      </SettingItem>
+
+      <SettingItem
+        v-if="config.keyboardFeedbackEnabled"
+        label="Notification Style"
+        help="Choose the size and position of notifications."
+      >
+        <select
+          name="keyboardFeedbackMode"
+          :value="config.keyboardFeedbackMode"
+          @change="handleKeyboardFeedbackModeChange"
+          class="form-select"
+        >
+          <option value="normal">Normal (Center, Large)</option>
+          <option value="small">Small (Bottom-Right, Compact)</option>
+        </select>
+      </SettingItem>
+
+      <SettingItem
+        v-if="config.keyboardFeedbackEnabled"
+        label="Mode Change Notification Timeout (seconds)"
+        help="Time before mode change notifications auto-hide (0 = never hide, only applies to mode changes, not keyboard actions)"
+      >
+        <input
+          name="modeIndicatorTimeout"
+          :value="config.modeIndicatorTimeout"
+          type="number"
+          min="0"
+          max="60"
+          @change="handleModeIndicatorTimeoutChange"
+        />
+      </SettingItem>
     </CollapsibleSection>
   </div>
 </template>
@@ -245,29 +296,34 @@ const handleShowUIChange = (event) => {
 };
 
 const handleClockSettingsChange = (event) => {
+  const field = event.target.name || event.target.id;
+  if (!field) {
+    console.warn("Clock setting change event missing field name/id");
+    return;
+  }
+
   const updates = {};
   if (event.target.type === "checkbox") {
-    updates[event.target.name || event.target.id] = event.target.checked;
+    updates[field] = event.target.checked;
   } else {
-    updates[event.target.name || event.target.id] = event.target.value;
-  }
-  // For clock settings, we need to update all at once
-  if (event.target.type === "checkbox") {
-    const field = event.target.previousElementSibling?.textContent
-      .toLowerCase()
-      .replace(/\s+/g, "");
-    if (field.includes("clockenabled")) {
-      updates.clockEnabled = event.target.checked;
-    } else if (field.includes("showdate")) {
-      updates.clockShowDate = event.target.checked;
-    } else if (field.includes("showseconds")) {
-      updates.clockShowSeconds = event.target.checked;
-    }
-  } else {
-    const field = event.target.name || event.target.id;
     updates[field] = event.target.value;
   }
   emit("update:config", updates);
+};
+
+const handleKeyboardFeedbackEnabledChange = (event) => {
+  emit("update:config", { keyboardFeedbackEnabled: event.target.checked });
+};
+
+const handleKeyboardFeedbackModeChange = (event) => {
+  emit("update:config", { keyboardFeedbackMode: event.target.value });
+};
+
+const handleModeIndicatorTimeoutChange = (event) => {
+  const value = parseInt(event.target.value, 10);
+  if (!isNaN(value)) {
+    emit("update:config", { modeIndicatorTimeout: value });
+  }
 };
 </script>
 
@@ -299,5 +355,28 @@ const handleClockSettingsChange = (event) => {
   background: var(--bg-primary);
   color: var(--text-primary);
   width: 5rem;
+}
+
+.form-select {
+  width: 100%;
+  max-width: 400px;
+  padding: 0.5rem 0.75rem;
+  border: 1px solid var(--border-color);
+  border-radius: 4px;
+  font-size: 0.95rem;
+  background: var(--bg-secondary);
+  color: var(--text-primary);
+  cursor: pointer;
+  transition: all 0.2s ease;
+}
+
+.form-select:hover {
+  border-color: var(--accent-primary);
+}
+
+.form-select:focus {
+  outline: none;
+  border-color: var(--accent-primary);
+  box-shadow: 0 0 0 2px rgba(33, 150, 243, 0.2);
 }
 </style>

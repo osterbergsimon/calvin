@@ -1,6 +1,6 @@
 <template>
   <div class="photos-tab">
-    <CollapsibleSection title="Photo Rotation" icon="🔄">
+    <CollapsibleSection title="Photos Settings" icon="📷" :expanded="true">
       <SettingItem
         label="Photo Rotation Interval (seconds)"
         help="How often to switch photos (5-3600 seconds)"
@@ -13,9 +13,7 @@
           @change="handlePhotoRotationIntervalChange"
         />
       </SettingItem>
-    </CollapsibleSection>
 
-    <CollapsibleSection title="Image Display" icon="🖼️">
       <SettingItem label="Image Display Mode" help="How images are displayed">
         <select
           :value="config.imageDisplayMode"
@@ -26,9 +24,7 @@
           <option value="fill">Fill (Fill container, may crop)</option>
         </select>
       </SettingItem>
-    </CollapsibleSection>
 
-    <CollapsibleSection title="Photo Frame Mode" icon="🖼️">
       <SettingItem
         label="Enable Photo Frame Mode"
         help="Display only photos, hiding calendar and other content"

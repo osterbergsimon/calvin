@@ -165,6 +165,14 @@ export function usePlugins() {
 
   // Enumerate plugins from GitHub
   const enumeratePluginsFromGitHub = async (repoUrl, branch = "main") => {
+    if (!repoUrl || !repoUrl.trim()) {
+      pluginInstallError.value = "Repository URL is required";
+      setTimeout(() => {
+        pluginInstallError.value = "";
+      }, 10000);
+      return;
+    }
+
     enumeratingPlugins.value = true;
     availablePlugins.value = [];
     pluginBranchSwitched.value = false;
@@ -175,7 +183,43 @@ export function usePlugins() {
         repoUrl,
         branch,
       );
-      availablePlugins.value = response.plugins || [];
+      const enumeratedPlugins = response.plugins || [];
+
+      // Get installed plugins to compare versions
+      let installedPluginsMap = {};
+      try {
+        const installedResponse = await pluginsApi.getInstalledPlugins();
+        const installed = installedResponse.plugins || [];
+        installedPluginsMap = Object.fromEntries(
+          installed.map((p) => [p.id, p]),
+        );
+      } catch (error) {
+        // Silently handle 404 for installed plugins endpoint
+        if (error.response?.status !== 404) {
+          console.warn(
+            "Failed to load installed plugins for comparison:",
+            error,
+          );
+        }
+      }
+
+      // Mark installed plugins and add version info
+      availablePlugins.value = enumeratedPlugins.map((plugin) => {
+        const installed = installedPluginsMap[plugin.id];
+        if (installed) {
+          return {
+            ...plugin,
+            _installed: true,
+            _installedVersion: installed.version || null,
+          };
+        }
+        return {
+          ...plugin,
+          _installed: false,
+          _installedVersion: null,
+        };
+      });
+
       pluginBranchSwitched.value = response.branch_switched || false;
       pluginActualBranch.value = response.branch || branch;
     } catch (error) {
@@ -235,6 +279,102 @@ export function usePlugins() {
         pluginInstallError.value =
           errorDetail || "Failed to install plugin from GitHub";
       }
+      setTimeout(() => {
+        pluginInstallError.value = "";
+      }, 10000);
+    } finally {
+      installingPlugin.value = false;
+    }
+  };
+
+  // Install multiple plugins from GitHub
+  const installPluginsFromGitHub = async (
+    plugins,
+    repoUrl,
+    branch = "main",
+  ) => {
+    installingPlugin.value = true;
+    pluginInstallError.value = "";
+    pluginInstallSuccess.value = "";
+    pluginRequiresRestart.value = false;
+    pluginBranchSwitched.value = false;
+    pluginActualBranch.value = "";
+
+    const results = {
+      success: [],
+      failed: [],
+      requiresRestart: false,
+    };
+
+    try {
+      for (const plugin of plugins) {
+        try {
+          const response = await pluginsApi.installPluginFromGitHub(
+            repoUrl,
+            plugin.path,
+            branch,
+          );
+          results.success.push({
+            id: plugin.id,
+            name: plugin.name || plugin.id,
+            response,
+          });
+          if (response.requires_restart) {
+            results.requiresRestart = true;
+          }
+          if (response.branch_switched) {
+            pluginBranchSwitched.value = true;
+            pluginActualBranch.value = response.branch || branch;
+          }
+        } catch (error) {
+          results.failed.push({
+            id: plugin.id,
+            name: plugin.name || plugin.id,
+            error:
+              error.response?.data?.detail || error.message || "Unknown error",
+          });
+        }
+      }
+
+      // Build combined message
+      if (results.success.length > 0 && results.failed.length === 0) {
+        // All succeeded
+        const successNames = results.success.map((s) => s.name).join(", ");
+        pluginInstallSuccess.value = `Successfully installed ${results.success.length} plugin(s): ${successNames}`;
+        pluginRequiresRestart.value = results.requiresRestart;
+      } else if (results.success.length > 0 && results.failed.length > 0) {
+        // Partial success
+        const successNames = results.success.map((s) => s.name).join(", ");
+        const failedNames = results.failed.map((f) => f.name).join(", ");
+        pluginInstallSuccess.value = `Successfully installed ${results.success.length} plugin(s): ${successNames}`;
+        pluginInstallError.value = `Failed to install ${results.failed.length} plugin(s): ${failedNames}`;
+        pluginRequiresRestart.value = results.requiresRestart;
+      } else if (results.failed.length > 0) {
+        // All failed
+        const failedNames = results.failed.map((f) => f.name).join(", ");
+        const failedDetails = results.failed
+          .map((f) => `${f.name}: ${f.error}`)
+          .join("; ");
+        pluginInstallError.value = `Failed to install ${results.failed.length} plugin(s): ${failedNames}. Details: ${failedDetails}`;
+      }
+
+      // Refresh installed plugins list
+      // Only refresh if we had any successes
+      if (results.success.length > 0) {
+        await loadPlugins();
+      }
+
+      if (!pluginRequiresRestart.value) {
+        setTimeout(() => {
+          pluginInstallSuccess.value = "";
+          pluginInstallError.value = "";
+        }, 10000);
+      }
+    } catch (error) {
+      pluginInstallError.value =
+        error.response?.data?.detail ||
+        error.message ||
+        "Failed to install plugins from GitHub";
       setTimeout(() => {
         pluginInstallError.value = "";
       }, 10000);
@@ -443,6 +583,7 @@ export function usePlugins() {
     installPluginFromZip,
     enumeratePluginsFromGitHub,
     installPluginFromGitHub,
+    installPluginsFromGitHub,
     uninstallPlugin,
     togglePlugin,
     updatePluginOrder,
