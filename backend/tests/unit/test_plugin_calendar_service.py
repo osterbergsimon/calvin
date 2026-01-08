@@ -1,6 +1,7 @@
 """Unit tests for plugin calendar service."""
 
 from datetime import datetime, timedelta
+from typing import Any
 from unittest.mock import AsyncMock, MagicMock, patch
 
 import pytest
@@ -11,26 +12,38 @@ from app.plugins.protocols import CalendarPlugin
 from app.services.plugin_calendar_service import PluginCalendarService
 
 
-class TestCalendarPlugin(CalendarPlugin):
+class MockCalendarPlugin(CalendarPlugin):
     """Test implementation of CalendarPlugin for testing."""
 
     def __init__(self, plugin_id: str, name: str, events: list[CalendarEvent] | None = None):
         """Initialize test calendar plugin."""
-        self._plugin_id = plugin_id
-        self._name = name
+        super().__init__(plugin_id, name, enabled=True)
         self._events = events or []
         self._running = True
         self._config = {}
 
     @property
-    def plugin_id(self) -> str:
-        """Return plugin ID."""
-        return self._plugin_id
+    def plugin_type(self) -> PluginType:
+        """Return plugin type."""
+        return PluginType.CALENDAR
 
-    @property
-    def name(self) -> str:
-        """Return plugin name."""
-        return self._name
+    @classmethod
+    def get_plugin_metadata(cls) -> dict[str, Any]:
+        """Return plugin metadata."""
+        return {
+            "type_id": "test-calendar",
+            "name": "Test Calendar Plugin",
+            "description": "Test calendar plugin for unit tests",
+            "version": "1.0.0",
+        }
+
+    async def initialize(self) -> None:
+        """Initialize plugin."""
+        self.start()
+
+    async def cleanup(self) -> None:
+        """Cleanup plugin."""
+        self.stop()
 
     def is_running(self) -> bool:
         """Return running status."""
@@ -58,7 +71,7 @@ def calendar_service():
 @pytest.fixture
 def mock_calendar_plugin(sample_events):
     """Create a mock calendar plugin."""
-    plugin = TestCalendarPlugin("test-calendar-1", "Test Calendar", sample_events)
+    plugin = MockCalendarPlugin("test-calendar-1", "Test Calendar", sample_events)
     plugin._config = {
         "ical_url": "https://example.com/calendar.ics",
         "color": "#FF0000",
@@ -129,8 +142,8 @@ class TestPluginCalendarService:
         self, calendar_service, mock_calendar_plugin, sample_events
     ):
         """Test getting events from multiple plugins."""
-        plugin1 = TestCalendarPlugin("calendar-1", "Test Calendar 1", sample_events)
-        plugin2 = TestCalendarPlugin(
+        plugin1 = MockCalendarPlugin("calendar-1", "Test Calendar 1", sample_events)
+        plugin2 = MockCalendarPlugin(
             "calendar-2",
             "Test Calendar 2",
             [
@@ -161,8 +174,8 @@ class TestPluginCalendarService:
     @pytest.mark.asyncio
     async def test_get_events_filters_by_source_ids(self, calendar_service, sample_events):
         """Test filtering events by source IDs."""
-        plugin1 = TestCalendarPlugin("calendar-1", "Test Calendar 1", sample_events)
-        plugin2 = TestCalendarPlugin("calendar-2", "Test Calendar 2", [])
+        plugin1 = MockCalendarPlugin("calendar-1", "Test Calendar 1", sample_events)
+        plugin2 = MockCalendarPlugin("calendar-2", "Test Calendar 2", [])
 
         with patch("app.services.plugin_calendar_service.plugin_manager") as mock_manager:
             mock_manager.get_plugins.return_value = [plugin1, plugin2]
@@ -348,7 +361,7 @@ class TestPluginCalendarService:
 
             with patch("app.services.plugin_calendar_service.plugin_manager") as mock_manager:
                 # Create a proper CalendarPlugin instance
-                test_plugin = TestCalendarPlugin("test-calendar-1", "Test Calendar")
+                test_plugin = MockCalendarPlugin("test-calendar-1", "Test Calendar")
                 test_plugin._config = {
                     "ical_url": "https://example.com/calendar.ics",
                     "color": "#FF0000",

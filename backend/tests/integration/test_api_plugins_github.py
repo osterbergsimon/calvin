@@ -432,7 +432,7 @@ def create_plugin_instance(
         mock_client_class.return_value = mock_client
 
         response = test_client.post(
-            "/api/plugins/install-from-github",
+            "/api/plugins/github/install",
             json={
                 "repo_url": "https://github.com/user/repo",
                 "plugin_path": "plugin1",
@@ -497,7 +497,7 @@ def create_plugin_instance(
         mock_client_class.return_value = mock_client
 
         response = test_client.post(
-            "/api/plugins/install-from-github",
+            "/api/plugins/github/install",
             json={
                 "repo_url": "https://github.com/user/repo",
                 "plugin_path": "plugin1",
@@ -535,7 +535,7 @@ def create_plugin_instance(
     def test_install_plugin_from_github_missing_params(self, test_client):
         """Test installation with missing required parameters."""
         response = test_client.post(
-            "/api/plugins/install-from-github",
+            "/api/plugins/github/install",
             json={"repo_url": "https://github.com/user/repo"},
         )
 
@@ -548,7 +548,7 @@ def create_plugin_instance(
     def test_install_plugin_from_github_invalid_path(self, test_client):
         """Test installation with invalid plugin path."""
         response = test_client.post(
-            "/api/plugins/install-from-github",
+            "/api/plugins/github/install",
             json={
                 "repo_url": "https://github.com/user/repo",
                 "plugin_path": "../etc/passwd",  # Path traversal attempt
@@ -591,7 +591,7 @@ def create_plugin_instance(
         mock_client_class.return_value = mock_client
 
         response = test_client.post(
-            "/api/plugins/install-from-github",
+            "/api/plugins/github/install",
             json={
                 "repo_url": "https://github.com/user/repo",
                 "plugin_path": "test-plugin",
