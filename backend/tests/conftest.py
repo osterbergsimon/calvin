@@ -1,6 +1,8 @@
 """Pytest configuration and shared fixtures."""
 
 import asyncio
+import logging
+import shutil
 import tempfile
 from collections.abc import AsyncGenerator, Generator
 from pathlib import Path
@@ -12,15 +14,17 @@ from sqlalchemy.ext.asyncio import AsyncEngine, AsyncSession, create_async_engin
 from sqlalchemy.orm import sessionmaker
 
 from app.database import Base
-
-# Import all models to ensure they're registered in Base.metadata
-# This must be done at module level, before any fixtures run
 from app.models.db_models import (  # noqa: F401
     ConfigDB,
     KeyboardMappingDB,
     PluginDB,
     PluginTypeDB,
 )
+
+logger = logging.getLogger(__name__)
+
+# Import all models to ensure they're registered in Base.metadata
+# This must be done at module level, before any fixtures run
 
 
 @pytest.fixture(scope="session")
@@ -31,12 +35,166 @@ def event_loop():
     loop.close()
 
 
+@pytest.fixture(scope="session")
+def base_test_db(tmp_path_factory) -> Path:
+    """
+    Create a base test database with all migrations applied and test data.
+
+    This database is created once per test session and copied for each test,
+    avoiding the need to run migrations for every test. This is faster and
+    avoids test isolation issues with Alembic/SQLite.
+    """
+    from datetime import datetime
+
+    from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker, create_async_engine
+
+    from app.utils.db_init import initialize_database
+
+    # Create a temporary directory for the base database
+    base_dir = tmp_path_factory.mktemp("base_db")
+    base_db_path = base_dir / "base_test.db"
+
+    # Create the base database with migrations
+    logger = logging.getLogger(__name__)
+    logger.info(f"Creating base test database: {base_db_path}")
+
+    # Create engine for base database
+    base_db_url = f"sqlite+aiosqlite:///{base_db_path}"
+    base_engine = create_async_engine(base_db_url, echo=False, future=True)
+
+    # Initialize database with migrations
+    loop = asyncio.new_event_loop()
+    asyncio.set_event_loop(loop)
+    try:
+        loop.run_until_complete(
+            initialize_database(base_db_path, engine=base_engine, run_migrations=True)
+        )
+
+        # Add test data to the base database
+        base_session_factory = async_sessionmaker(
+            base_engine, class_=AsyncSession, expire_on_commit=False
+        )
+
+        async def add_test_data():
+            async with base_session_factory() as session:
+                # Add plugin types
+                plugin_types = [
+                    PluginTypeDB(
+                        type_id="local",
+                        plugin_type="image",
+                        name="Local Images",
+                        description="Load images from local directory",
+                        version="1.0.0",
+                        enabled=True,
+                        created_at=datetime.utcnow(),
+                        updated_at=datetime.utcnow(),
+                    ),
+                    PluginTypeDB(
+                        type_id="ical",
+                        plugin_type="calendar",
+                        name="iCal",
+                        description="Load calendar from iCal URL",
+                        version="1.0.0",
+                        enabled=True,
+                        created_at=datetime.utcnow(),
+                        updated_at=datetime.utcnow(),
+                    ),
+                    PluginTypeDB(
+                        type_id="google",
+                        plugin_type="calendar",
+                        name="Google Calendar",
+                        description="Load calendar from Google Calendar API",
+                        version="1.0.0",
+                        enabled=True,
+                        created_at=datetime.utcnow(),
+                        updated_at=datetime.utcnow(),
+                    ),
+                    PluginTypeDB(
+                        type_id="weather",
+                        plugin_type="service",
+                        name="Weather",
+                        description="Weather service plugin",
+                        version="1.0.0",
+                        enabled=True,
+                        created_at=datetime.utcnow(),
+                        updated_at=datetime.utcnow(),
+                    ),
+                    PluginTypeDB(
+                        type_id="iframe",
+                        plugin_type="service",
+                        name="iFrame",
+                        description="iFrame service plugin",
+                        version="1.0.0",
+                        enabled=True,
+                        created_at=datetime.utcnow(),
+                        updated_at=datetime.utcnow(),
+                    ),
+                ]
+
+                for plugin_type in plugin_types:
+                    session.add(plugin_type)
+
+                # Add some default plugins
+                plugins = [
+                    PluginDB(
+                        id="local-images",
+                        type_id="local",
+                        plugin_type="image",
+                        name="Local Images",
+                        enabled=True,
+                        display_order=0,
+                        created_at=datetime.utcnow(),
+                        updated_at=datetime.utcnow(),
+                    ),
+                ]
+
+                for plugin in plugins:
+                    session.add(plugin)
+
+                # Add some default config entries
+                config_entries = [
+                    ConfigDB(key="show_ui", value="true", value_type="bool"),
+                    ConfigDB(key="theme", value="default", value_type="string"),
+                ]
+
+                for config_entry in config_entries:
+                    session.add(config_entry)
+
+                await session.commit()
+                logger.info("Added test data to base database")
+
+        loop.run_until_complete(add_test_data())
+
+        # Close the engine (sync dispose)
+        loop.run_until_complete(base_engine.dispose())
+
+    finally:
+        loop.close()
+
+    logger.info(f"Base test database created: {base_db_path}")
+    yield base_db_path
+
+    # Cleanup
+    if base_db_path.exists():
+        base_db_path.unlink()
+
+
 @pytest.fixture
-def temp_db_path() -> Generator[Path, None, None]:
-    """Create a temporary database file for testing."""
+def temp_db_path(base_test_db: Path) -> Generator[Path, None, None]:
+    """
+    Create a temporary database file for testing by copying the base test database.
+
+    This avoids running migrations for each test and ensures test isolation.
+    """
     with tempfile.NamedTemporaryFile(suffix=".db", delete=False) as tmp:
         db_path = Path(tmp.name)
+
+    # Copy the base database to the temporary location
+    shutil.copy2(base_test_db, db_path)
+    logger.debug(f"Copied base database to: {db_path}")
+
     yield db_path
+
     # Cleanup
     if db_path.exists():
         db_path.unlink()
@@ -165,43 +323,39 @@ def test_client(temp_db_path: Path, temp_image_dir: Path) -> Generator[TestClien
         if module_name in sys.modules:
             importlib.reload(sys.modules[module_name])
 
-    # Initialize test database using the unified utility
+    # Database is already initialized (copied from base_test_db)
+    # No need to run migrations - the base database already has all tables and test data
+    import logging
+
+    logger = logging.getLogger(__name__)
+    logger.info(f"Using test database (copied from base): {test_db_path_abs}")
+
+    # Verify database file exists and has tables (quick sanity check)
+    import sqlite3
+
+    try:
+        conn = sqlite3.connect(str(test_db_path_abs))
+        cursor = conn.cursor()
+        cursor.execute("SELECT name FROM sqlite_master WHERE type='table'")
+        tables = {row[0] for row in cursor.fetchall()}
+        conn.close()
+        logger.debug(f"Database {test_db_path_abs} has tables: {sorted(tables)}")
+        required = {"plugins", "plugin_types", "config", "keyboard_mappings"}
+        if not (required <= tables):
+            missing = required - tables
+            raise RuntimeError(
+                f"Database {test_db_path_abs} missing tables: {missing}. "
+                f"Existing tables: {sorted(tables)}. "
+                f"This should not happen if base_test_db was created correctly."
+            )
+    except Exception as e:
+        logger.error(f"Failed to verify database: {e}")
+        raise
+
+    # Load plugins and sync plugin types/themes (but don't run migrations)
     loop = asyncio.new_event_loop()
     asyncio.set_event_loop(loop)
     try:
-        # Use the same initialization function as production
-        # This will create tables and verify they exist
-        # Log the database path for debugging
-        import logging
-
-        logger = logging.getLogger(__name__)
-        logger.info(f"Initializing test database: {test_db_path_abs}")
-
-        loop.run_until_complete(
-            initialize_database(test_db_path_abs, engine=test_engine, run_migrations=True)
-        )
-
-        # Verify database file exists and has tables
-        import sqlite3
-
-        try:
-            conn = sqlite3.connect(str(test_db_path_abs))
-            cursor = conn.cursor()
-            cursor.execute("SELECT name FROM sqlite_master WHERE type='table'")
-            tables = {row[0] for row in cursor.fetchall()}
-            conn.close()
-            logger.debug(f"Database {test_db_path_abs} has tables: {sorted(tables)}")
-            required = {"plugins", "plugin_types", "config", "keyboard_mappings"}
-            if not (required <= tables):
-                missing = required - tables
-                raise RuntimeError(
-                    f"Database {test_db_path_abs} missing tables after initialization: {missing}. "
-                    f"Existing tables: {sorted(tables)}"
-                )
-        except Exception as e:
-            logger.error(f"Failed to verify database after initialization: {e}")
-            raise
-
         # Load plugins so they're available for tests
         from app.plugins.loader import plugin_loader
 
