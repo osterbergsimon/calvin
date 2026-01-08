@@ -106,25 +106,30 @@ async def initialize_database(
             return engine
 
         # Configure Alembic
-        # IMPORTANT: env.py reads settings.database_url at import time (line 33)
-        # We need to patch settings BEFORE creating Config, so env.py uses correct URL
-        import importlib
+        # IMPORTANT: Known issue - alembic/env.py reads settings.database_url at import time
+        # (line 33). This causes problems in tests. Solution: Set URL in config first,
+        # then patch settings, and ensure env.py uses config.get_main_option() which
+        # takes precedence.
         import sys
 
         import app.config
 
+        # Create Alembic config FIRST and set the URL explicitly
+        # This ensures config.get_main_option() returns the correct URL
+        alembic_cfg = Config(str(alembic_ini_path))
+        alembic_cfg.set_main_option("sqlalchemy.url", db_url)
+
+        # Patch settings.database_url as backup (env.py reads it at import time)
+        # But config.get_main_option() takes precedence in run_migrations_online()
         original_settings_url = app.config.settings.database_url
-        # Patch settings to use the test database URL (async format for settings)
         app.config.settings.database_url = db_url.replace("sqlite:///", "sqlite+aiosqlite:///")
 
-        # Reload alembic.env module so it reads the patched settings
+        # Delete and reload alembic.env module to force it to re-read settings
+        # This is critical because env.py reads settings at module import time
         if "alembic.env" in sys.modules:
-            importlib.reload(sys.modules["alembic.env"])
-
-        # Now create Alembic config - env.py will use patched settings
-        alembic_cfg = Config(str(alembic_ini_path))
-        # Also explicitly set it in config to override anything from env.py
-        alembic_cfg.set_main_option("sqlalchemy.url", db_url)
+            del sys.modules["alembic.env"]
+            # Module will be re-imported when command.upgrade is called
+            # This ensures it reads the patched settings.database_url
 
         # Run migrations in executor (Alembic is sync)
         try:
@@ -134,8 +139,16 @@ async def initialize_database(
                 f"Running Alembic migrations. Database path: {database_path}. "
                 f"Config URL: {alembic_cfg.get_main_option('sqlalchemy.url')}"
             )
+            # Verify the config URL is correct before running migrations
+            actual_url = alembic_cfg.get_main_option("sqlalchemy.url")
+            if actual_url != db_url:
+                logger.warning(
+                    f"Config URL mismatch! Expected: {db_url}, Got: {actual_url}. "
+                    f"Database path: {database_path}"
+                )
+
             await loop.run_in_executor(None, command.upgrade, alembic_cfg, "head")
-            logger.debug(f"Ran Alembic migrations for {database_path}")
+            logger.debug(f"Ran Alembic migrations for {database_path}. URL used: {actual_url}")
         finally:
             # Restore original settings URL
             app.config.settings.database_url = original_settings_url
