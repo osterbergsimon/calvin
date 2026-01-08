@@ -93,9 +93,9 @@ class TestGitHubPluginEnumeration:
         mock_client.get = AsyncMock(side_effect=mock_get_async)
         mock_client_class.return_value = mock_client
 
-        response = test_client.get(
-            "/api/plugins/enumerate-from-github",
-            params={"repo_url": "https://github.com/user/repo", "branch": "main"},
+        response = test_client.post(
+            "/api/plugins/github/enumerate",
+            json={"repo_url": "https://github.com/user/repo", "branch": "main"},
         )
 
         # Route might not be available in test client - check if it exists
@@ -166,9 +166,9 @@ class TestGitHubPluginEnumeration:
         mock_client.get = mock_get_with_side_effect
         mock_client_class.return_value = mock_client
 
-        response = test_client.get(
-            "/api/plugins/enumerate-from-github",
-            params={"repo_url": "https://github.com/user/repo"},  # No branch specified
+        response = test_client.post(
+            "/api/plugins/github/enumerate",
+            json={"repo_url": "https://github.com/user/repo"},  # No branch specified
         )
 
         if response.status_code == 404:
@@ -196,9 +196,9 @@ class TestGitHubPluginEnumeration:
         mock_client.get = AsyncMock(side_effect=mock_get_async_404)
         mock_client_class.return_value = mock_client
 
-        response = test_client.get(
-            "/api/plugins/enumerate-from-github",
-            params={"repo_url": "https://github.com/user/nonexistent"},
+        response = test_client.post(
+            "/api/plugins/github/enumerate",
+            json={"repo_url": "https://github.com/user/nonexistent"},
         )
 
         if response.status_code == 404 and "route" in response.text.lower():
@@ -209,9 +209,9 @@ class TestGitHubPluginEnumeration:
 
     def test_enumerate_plugins_from_github_invalid_url(self, test_client):
         """Test enumerating with invalid GitHub URL."""
-        response = test_client.get(
-            "/api/plugins/enumerate-from-github",
-            params={"repo_url": "not-a-github-url"},
+        response = test_client.post(
+            "/api/plugins/github/enumerate",
+            json={"repo_url": "not-a-github-url"},
         )
 
         if response.status_code == 404:
@@ -648,9 +648,9 @@ def create_plugin_instance(
         mock_client.get = AsyncMock(side_effect=mock_get_async)
         mock_client_class.return_value = mock_client
 
-        response = test_client.get(
-            "/api/plugins/enumerate-from-github",
-            params={"repo_url": "https://github.com/user/repo", "branch": "main"},
+        response = test_client.post(
+            "/api/plugins/github/enumerate",
+            json={"repo_url": "https://github.com/user/repo", "branch": "main"},
         )
 
         if response.status_code == 404:

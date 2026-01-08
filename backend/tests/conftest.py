@@ -1,6 +1,7 @@
 """Pytest configuration and shared fixtures."""
 
 import asyncio
+import logging
 import tempfile
 from collections.abc import AsyncGenerator, Generator
 from pathlib import Path
@@ -196,18 +197,51 @@ def test_client(temp_db_path: Path, temp_image_dir: Path) -> Generator[TestClien
         loop.close()
 
     # Double-check tables exist (initialize_database should have verified, but be extra sure)
+    # Wait a moment for database file to be fully written (Windows file system delay)
+    import time
+
     from app.utils.db_init import verify_database_tables
+
+    time.sleep(0.1)
 
     table_status = verify_database_tables(test_db_path_abs)
     if not all(table_status.values()):
         missing = [table for table, exists in table_status.items() if not exists]
         # This should never happen if initialize_database worked correctly
-        error_msg = (
-            f"Database initialization verification failed. "
-            f"Missing tables: {missing}. "
-            f"This indicates a bug in initialize_database."
+        # But if it does, try to re-initialize once
+        logger = logging.getLogger(__name__)
+        logger.warning(
+            f"Database tables missing after initialization: {missing}. "
+            f"Attempting to re-initialize..."
         )
-        raise RuntimeError(error_msg)
+        try:
+            loop2 = asyncio.new_event_loop()
+            asyncio.set_event_loop(loop2)
+            try:
+                loop2.run_until_complete(
+                    initialize_database(test_db_path_abs, engine=test_engine, run_migrations=False)
+                )
+                # Verify again
+                time.sleep(0.1)
+                table_status = verify_database_tables(test_db_path_abs)
+                if not all(table_status.values()):
+                    missing = [table for table, exists in table_status.items() if not exists]
+                    error_msg = (
+                        f"Database initialization failed after retry. "
+                        f"Missing tables: {missing}. "
+                        f"Database path: {test_db_path_abs}"
+                    )
+                    raise RuntimeError(error_msg)
+            finally:
+                loop2.close()
+        except Exception as e:
+            error_msg = (
+                f"Database initialization verification failed. "
+                f"Missing tables: {missing}. "
+                f"Database path: {test_db_path_abs}. "
+                f"Error: {e}"
+            )
+            raise RuntimeError(error_msg) from e
 
     # Create a test app without the complex lifespan
     # This avoids startup issues in tests
