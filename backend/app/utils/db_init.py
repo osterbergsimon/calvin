@@ -106,21 +106,63 @@ async def initialize_database(
             return engine
 
         # Configure Alembic
+        # IMPORTANT: Set the database URL in config BEFORE creating Config object
+        # This ensures alembic/env.py uses the correct database URL
         alembic_cfg = Config(str(alembic_ini_path))
         alembic_cfg.set_main_option("sqlalchemy.url", db_url)
 
+        # Also patch settings.database_url temporarily to ensure env.py uses correct URL
+        # This is needed because env.py reads settings.database_url at import time
+        import app.config
+
+        original_settings_url = app.config.settings.database_url
+        app.config.settings.database_url = db_url.replace("sqlite:///", "sqlite+aiosqlite:///")
+
         # Run migrations in executor (Alembic is sync)
-        loop = asyncio.get_event_loop()
-        await loop.run_in_executor(None, command.upgrade, alembic_cfg, "head")
-        logger.debug(f"Ran Alembic migrations for {database_path}")
+        try:
+            loop = asyncio.get_event_loop()
+            # Log the database path being used for debugging
+            logger.debug(
+                f"Running Alembic migrations. Database path: {database_path}. "
+                f"Config URL: {alembic_cfg.get_main_option('sqlalchemy.url')}"
+            )
+            await loop.run_in_executor(None, command.upgrade, alembic_cfg, "head")
+            logger.debug(f"Ran Alembic migrations for {database_path}")
+        finally:
+            # Restore original settings URL
+            app.config.settings.database_url = original_settings_url
 
         # Verify tables were actually created by migrations
+        # Add a small delay to ensure file system has flushed writes (Windows)
+        import time
+
+        time.sleep(0.1)
+
         table_status = verify_database_tables(database_path)
         if not all(table_status.values()):
             missing = [table for table, exists in table_status.items() if not exists]
-            logger.error(f"Database initialization failed! Missing tables: {missing}")
+            # Try to check what tables actually exist for debugging
+            import sqlite3
+
+            existing_tables = []
+            try:
+                conn = sqlite3.connect(str(database_path))
+                cursor = conn.cursor()
+                cursor.execute("SELECT name FROM sqlite_master WHERE type='table'")
+                existing_tables = [row[0] for row in cursor.fetchall()]
+                conn.close()
+            except Exception as e:
+                logger.warning(f"Could not check existing tables: {e}")
+
+            logger.error(
+                f"Database initialization failed! Missing tables: {missing}. "
+                f"Database path: {database_path}. "
+                f"URL used: {db_url}. "
+                f"Existing tables: {existing_tables}"
+            )
             raise RuntimeError(
-                f"Failed to create database tables via migrations. Missing: {missing}"
+                f"Failed to create database tables via migrations. Missing: {missing}. "
+                f"Database: {database_path}. Existing tables: {existing_tables}"
             )
     else:
         # If migrations are disabled, fall back to create_all() for backward compatibility
@@ -162,6 +204,10 @@ def verify_database_tables(database_path: Path) -> dict[str, bool]:
         existing_tables = {row[0] for row in cursor.fetchall()}
 
         required_tables = {"plugins", "plugin_types", "config", "keyboard_mappings"}
-        return {table: table in existing_tables for table in required_tables}
+        # Also check if alembic_version table exists (indicates migrations ran)
+        has_alembic_version = "alembic_version" in existing_tables
+        result = {table: table in existing_tables for table in required_tables}
+        result["alembic_version"] = has_alembic_version
+        return result
     finally:
         conn.close()
