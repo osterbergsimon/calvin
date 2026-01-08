@@ -282,6 +282,41 @@ def test_client(temp_db_path: Path, temp_image_dir: Path) -> Generator[TestClien
         """Root endpoint."""
         return {"message": "Calvin Dashboard API", "version": "0.1.0"}
 
+    # Verify database is ready before yielding client
+    # This ensures tables exist before any test runs
+    import sqlite3
+
+    max_retries = 5
+    for attempt in range(max_retries):
+        try:
+            conn = sqlite3.connect(str(test_db_path_abs))
+            cursor = conn.cursor()
+            cursor.execute(
+                "SELECT name FROM sqlite_master WHERE type='table' "
+                "AND name IN ('plugins', 'plugin_types', 'config', 'keyboard_mappings')"
+            )
+            tables = {row[0] for row in cursor.fetchall()}
+            conn.close()
+
+            required_tables = {"plugins", "plugin_types", "config", "keyboard_mappings"}
+            if tables >= required_tables:
+                break
+            elif attempt < max_retries - 1:
+                time.sleep(0.2 * (attempt + 1))  # Exponential backoff
+            else:
+                missing = required_tables - tables
+                raise RuntimeError(
+                    f"Database tables not ready after {max_retries} attempts. "
+                    f"Missing: {missing}. Database: {test_db_path_abs}"
+                )
+        except Exception as e:
+            if attempt < max_retries - 1:
+                time.sleep(0.2 * (attempt + 1))
+            else:
+                raise RuntimeError(
+                    f"Failed to verify database tables: {e}. Database: {test_db_path_abs}"
+                ) from e
+
     with TestClient(test_app) as client:
         yield client
 
