@@ -160,6 +160,9 @@ def base_test_db(tmp_path_factory) -> Path:
                 for config_entry in config_entries:
                     session.add(config_entry)
 
+                # Themes are already added by migrations (747053ae503f and 2e2f87ec8be2)
+                # So we don't need to add them here
+
                 await session.commit()
                 logger.info("Added test data to base database")
 
@@ -299,19 +302,23 @@ def test_client(temp_db_path: Path, temp_image_dir: Path) -> Generator[TestClien
     import importlib
     import sys
 
-    # Reload plugin_registry FIRST so it uses the patched AsyncSessionLocal
-    # This is critical because plugin_registry imports AsyncSessionLocal at module level
-    # and we need it to use the test database before we load plugin types
+    # Reload plugin_registry modules FIRST so they use the patched AsyncSessionLocal
+    # This is critical because these modules import AsyncSessionLocal at module level
+    # and we need them to use the test database before we load plugin types/instances
     registry_modules = [
         "app.plugins.registry",
+        "app.plugins.registry.loader",  # Must reload loader to use patched AsyncSessionLocal
+        "app.plugins.registry.manager",  # Must reload manager to use patched AsyncSessionLocal
     ]
     for module_name in registry_modules:
         if module_name in sys.modules:
             importlib.reload(sys.modules[module_name])
 
     # Reload routes modules that might have cached the old AsyncSessionLocal
+    # IMPORTANT: Must reload themes module since it uses AsyncSessionLocal directly
     routes_modules = [
         "app.api.routes.plugins",
+        "app.api.routes.plugins.themes",  # Must reload themes to use patched AsyncSessionLocal
         "app.api.routes.config",
         "app.api.routes.calendar",
         "app.api.routes.images",
@@ -363,16 +370,37 @@ def test_client(temp_db_path: Path, temp_image_dir: Path) -> Generator[TestClien
 
         # Load plugin types into database (same as production startup)
         # This registers plugin types in PluginTypeDB so they can be used
-        # plugin_registry was already reloaded above to use the test database
-        from app.plugins.registry.loader import load_plugin_types
+        # IMPORTANT: Import AFTER reloading modules to ensure it uses patched AsyncSessionLocal
+        # Verify database connection is working before loading
+        import sqlite3
+
+        from app.plugins.registry.loader import load_plugin_instances, load_plugin_types
+
+        try:
+            conn = sqlite3.connect(str(test_db_path_abs))
+            cursor = conn.cursor()
+            cursor.execute("SELECT name FROM sqlite_master WHERE type='table'")
+            tables = {row[0] for row in cursor.fetchall()}
+            conn.close()
+            if "plugin_types" not in tables:
+                raise RuntimeError(
+                    f"plugin_types table missing before load_plugin_types(). "
+                    f"Tables: {sorted(tables)}"
+                )
+        except Exception as e:
+            logger.error(f"Database verification failed before load_plugin_types(): {e}")
+            raise
 
         loop.run_until_complete(load_plugin_types())
 
-        # Sync themes to database (same as production startup)
-        # This registers built-in themes in PluginTypeDB so they appear in API responses
-        from app.api.routes.plugins import sync_themes_to_db
+        # Load plugin instances from database and register them in plugin manager
+        # This is critical - without this, plugin instances exist in DB but aren't
+        # registered in the plugin manager, causing "plugin not found" errors
+        loop.run_until_complete(load_plugin_instances())
 
-        loop.run_until_complete(sync_themes_to_db())
+        # Themes are already in the base database, so we don't need to sync them
+        # This avoids the "no such table" errors from sync_themes_to_db() using
+        # the wrong AsyncSessionLocal reference
     finally:
         loop.close()
 
