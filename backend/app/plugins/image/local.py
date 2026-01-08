@@ -605,7 +605,7 @@ async def handle_plugin_config_update(
             local_instance.enabled = instance_enabled
             if db_type:
                 db_type.enabled = instance_enabled
-            session.commit()
+            await session.commit()
 
             return {
                 "instance_updated": True,

@@ -109,9 +109,13 @@ async def test_initialize_database_without_migrations():
         # Initialize database without migrations
         engine = await initialize_database(db_path, run_migrations=False)
 
-        # Verify tables exist
+        # Verify tables exist (alembic_version won't exist without migrations)
         table_status = verify_database_tables(db_path)
-        assert all(table_status.values())
+        # Check only the application tables, not alembic_version
+        app_tables = {k: v for k, v in table_status.items() if k != "alembic_version"}
+        assert all(
+            app_tables.values()
+        ), f"Missing tables: {[k for k, v in app_tables.items() if not v]}"
     finally:
         if engine:
             await engine.dispose()
@@ -147,12 +151,16 @@ def test_verify_database_tables_empty():
         # Verify returns dict with False values for empty database (tables don't exist)
         result = verify_database_tables(db_path)
         # Empty database should return dict with all False values
-        assert result == {
+        # (alembic_version may or may not be present)
+        expected = {
             "plugins": False,
             "plugin_types": False,
             "config": False,
             "keyboard_mappings": False,
         }
+        # Check only the expected keys, ignore alembic_version if present
+        for key, value in expected.items():
+            assert result.get(key) == value, f"Expected {key}={value}, got {result.get(key)}"
     finally:
         if db_path.exists():
             db_path.unlink()
