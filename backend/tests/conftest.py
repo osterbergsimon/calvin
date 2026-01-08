@@ -1,7 +1,6 @@
 """Pytest configuration and shared fixtures."""
 
 import asyncio
-import logging
 import tempfile
 from collections.abc import AsyncGenerator, Generator
 from pathlib import Path
@@ -172,9 +171,36 @@ def test_client(temp_db_path: Path, temp_image_dir: Path) -> Generator[TestClien
     try:
         # Use the same initialization function as production
         # This will create tables and verify they exist
+        # Log the database path for debugging
+        import logging
+
+        logger = logging.getLogger(__name__)
+        logger.info(f"Initializing test database: {test_db_path_abs}")
+
         loop.run_until_complete(
             initialize_database(test_db_path_abs, engine=test_engine, run_migrations=True)
         )
+
+        # Verify database file exists and has tables
+        import sqlite3
+
+        try:
+            conn = sqlite3.connect(str(test_db_path_abs))
+            cursor = conn.cursor()
+            cursor.execute("SELECT name FROM sqlite_master WHERE type='table'")
+            tables = {row[0] for row in cursor.fetchall()}
+            conn.close()
+            logger.debug(f"Database {test_db_path_abs} has tables: {sorted(tables)}")
+            required = {"plugins", "plugin_types", "config", "keyboard_mappings"}
+            if not (required <= tables):
+                missing = required - tables
+                raise RuntimeError(
+                    f"Database {test_db_path_abs} missing tables after initialization: {missing}. "
+                    f"Existing tables: {sorted(tables)}"
+                )
+        except Exception as e:
+            logger.error(f"Failed to verify database after initialization: {e}")
+            raise
 
         # Load plugins so they're available for tests
         from app.plugins.loader import plugin_loader

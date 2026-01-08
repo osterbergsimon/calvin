@@ -106,17 +106,25 @@ async def initialize_database(
             return engine
 
         # Configure Alembic
-        # IMPORTANT: Set the database URL in config BEFORE creating Config object
-        # This ensures alembic/env.py uses the correct database URL
-        alembic_cfg = Config(str(alembic_ini_path))
-        alembic_cfg.set_main_option("sqlalchemy.url", db_url)
+        # IMPORTANT: env.py reads settings.database_url at import time (line 33)
+        # We need to patch settings BEFORE creating Config, so env.py uses correct URL
+        import importlib
+        import sys
 
-        # Also patch settings.database_url temporarily to ensure env.py uses correct URL
-        # This is needed because env.py reads settings.database_url at import time
         import app.config
 
         original_settings_url = app.config.settings.database_url
+        # Patch settings to use the test database URL (async format for settings)
         app.config.settings.database_url = db_url.replace("sqlite:///", "sqlite+aiosqlite:///")
+
+        # Reload alembic.env module so it reads the patched settings
+        if "alembic.env" in sys.modules:
+            importlib.reload(sys.modules["alembic.env"])
+
+        # Now create Alembic config - env.py will use patched settings
+        alembic_cfg = Config(str(alembic_ini_path))
+        # Also explicitly set it in config to override anything from env.py
+        alembic_cfg.set_main_option("sqlalchemy.url", db_url)
 
         # Run migrations in executor (Alembic is sync)
         try:
