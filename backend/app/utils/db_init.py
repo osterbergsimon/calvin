@@ -21,17 +21,18 @@ async def initialize_database(
     run_migrations: bool = True,
 ) -> AsyncEngine:
     """
-    Initialize a database: create all tables and run migrations.
+    Initialize a database: run migrations to create all tables.
 
     This function:
     1. Ensures the database file exists
-    2. Creates all tables using SQLAlchemy's Base.metadata
-    3. Runs migrations to handle any data migration
+    2. Runs Alembic migrations to create all tables and handle data migrations
+    3. If migrations are disabled, falls back to Base.metadata.create_all()
 
     Args:
         database_path: Path to the SQLite database file
         engine: Optional existing async engine. If None, creates a new one.
-        run_migrations: Whether to run migrations after creating tables
+        run_migrations: Whether to run migrations (default: True).
+                       If False, uses Base.metadata.create_all() instead.
 
     Returns:
         The async engine (either the provided one or a newly created one)
@@ -45,7 +46,7 @@ async def initialize_database(
         engine = create_async_engine(db_url, echo=False, future=True)
 
     # Import all models to ensure they're registered in Base.metadata
-    # This must be done before create_all()
+    # This is needed for Alembic to know about the models
     from app.models.db_models import (  # noqa: F401
         ConfigDB,
         KeyboardMappingDB,
@@ -53,32 +54,9 @@ async def initialize_database(
         PluginTypeDB,
     )
 
-    # Create all tables using SQLAlchemy
-    # According to SQLAlchemy docs, when using run_sync with create_all,
-    # we need to pass a callable that receives the sync connection
-    async def create_tables():
-        # Use begin() which auto-commits on success when context exits
-        async with engine.begin() as conn:
-            # run_sync provides the sync connection as the first argument to the callable
-            # We need to explicitly pass it to create_all using bind parameter
-            def create_all_tables(sync_conn):
-                # create_all needs the bind parameter to know which connection to use
-                Base.metadata.create_all(bind=sync_conn)
-
-            await conn.run_sync(create_all_tables)
-
-    await create_tables()
-
-    # Verify tables were actually created (helps catch issues early)
-    table_status = verify_database_tables(database_path)
-    if not all(table_status.values()):
-        missing = [table for table, exists in table_status.items() if not exists]
-        logger.error(f"Database initialization failed! Missing tables: {missing}")
-        raise RuntimeError(f"Failed to create database tables. Missing: {missing}")
-
-    logger.debug(f"Created all tables in {database_path}")
-
-    # Run migrations if requested
+    # Run migrations if requested - migrations will create all tables
+    # We rely on Alembic migrations instead of Base.metadata.create_all()
+    # to ensure consistency and proper schema management
     if run_migrations:
         # Use Alembic for migrations
         from alembic import command
@@ -135,6 +113,28 @@ async def initialize_database(
         loop = asyncio.get_event_loop()
         await loop.run_in_executor(None, command.upgrade, alembic_cfg, "head")
         logger.debug(f"Ran Alembic migrations for {database_path}")
+
+        # Verify tables were actually created by migrations
+        table_status = verify_database_tables(database_path)
+        if not all(table_status.values()):
+            missing = [table for table, exists in table_status.items() if not exists]
+            logger.error(f"Database initialization failed! Missing tables: {missing}")
+            raise RuntimeError(
+                f"Failed to create database tables via migrations. Missing: {missing}"
+            )
+    else:
+        # If migrations are disabled, fall back to create_all() for backward compatibility
+        # This should only be used in special cases
+        async def create_tables():
+            async with engine.begin() as conn:
+
+                def create_all_tables(sync_conn):
+                    Base.metadata.create_all(bind=sync_conn)
+
+                await conn.run_sync(create_all_tables)
+
+        await create_tables()
+        logger.debug(f"Created all tables using Base.metadata.create_all() in {database_path}")
 
     return engine
 
