@@ -183,9 +183,9 @@ def test_client(temp_db_path: Path, temp_image_dir: Path) -> Generator[TestClien
         # Load plugin types into database (same as production startup)
         # This registers plugin types in PluginTypeDB so they can be used
         # plugin_registry was already reloaded above to use the test database
-        from app.plugins.registry import plugin_registry
+        from app.plugins.registry.loader import load_plugin_types
 
-        loop.run_until_complete(plugin_registry._load_plugin_types())
+        loop.run_until_complete(load_plugin_types())
 
         # Sync themes to database (same as production startup)
         # This registers built-in themes in PluginTypeDB so they appear in API responses
@@ -225,7 +225,6 @@ def test_client(temp_db_path: Path, temp_image_dir: Path) -> Generator[TestClien
         keyboard,
         plugins,
         system,
-        web_services,
     )
 
     test_app = FastAPI(title="Calvin Test API")
@@ -241,7 +240,6 @@ def test_client(temp_db_path: Path, temp_image_dir: Path) -> Generator[TestClien
     test_app.include_router(calendar.router, prefix="/api", tags=["calendar"])
     test_app.include_router(keyboard.router, prefix="/api", tags=["keyboard"])
     test_app.include_router(images.router, prefix="/api", tags=["images"])
-    test_app.include_router(web_services.router, prefix="/api", tags=["web-services"])
     test_app.include_router(plugins.router, prefix="/api", tags=["plugins"])
     test_app.include_router(system.router, prefix="/api", tags=["system"])
 
