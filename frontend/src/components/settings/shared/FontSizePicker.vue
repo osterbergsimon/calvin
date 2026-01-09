@@ -42,6 +42,9 @@
 
 <script setup>
 import { computed, ref, watch } from "vue";
+import { useConfigStore } from "@/stores/config";
+
+const configStore = useConfigStore();
 
 const props = defineProps({
   modelValue: {
