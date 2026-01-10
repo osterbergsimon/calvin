@@ -144,8 +144,10 @@ class GoogleCalendarPlugin(CalendarPlugin):
                 f"({start_date.date()} to {end_date.date()})"
             )
             ical_events = await parse_ical_from_url(self._normalized_url)
-            logger.info(
-                f"[GOOGLE PLUGIN] Fetched {len(ical_events)} raw events from {self.plugin_id}"
+            logger.debug(
+                "[GOOGLE PLUGIN] Fetched {} raw events from {}",
+                len(ical_events),
+                self.plugin_id,
             )
 
             # Filter events by date range
@@ -158,9 +160,11 @@ class GoogleCalendarPlugin(CalendarPlugin):
                     updated_event = event.model_copy(update={"source": self.plugin_id})
                     filtered_events.append(updated_event)
 
-            logger.info(
-                f"[GOOGLE PLUGIN] Filtered to {len(filtered_events)} events for date range "
-                f"({start_date.date()} to {end_date.date()})"
+            logger.debug(
+                "[GOOGLE PLUGIN] Filtered to {} events for date range ({} to {})",
+                len(filtered_events),
+                start_date.date(),
+                end_date.date(),
             )
             return filtered_events
         except httpx.HTTPStatusError as e:

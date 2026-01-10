@@ -1,6 +1,6 @@
 """Unit tests for plugin calendar service."""
 
-from datetime import datetime, timedelta
+from datetime import UTC, datetime, timedelta
 from typing import Any
 from unittest.mock import AsyncMock, MagicMock, patch
 
@@ -324,18 +324,19 @@ class TestPluginCalendarService:
 
             assert len(events) == 2
 
-    def test_clear_cache(self, calendar_service, sample_events):
+    @pytest.mark.asyncio
+    async def test_clear_cache(self, calendar_service, sample_events):
         """Test clearing the cache."""
         # Add something to cache
         cache_key = "test:key"
         calendar_service._cache[cache_key] = {
             "events": sample_events,
-            "timestamp": datetime.now(),
+            "timestamp": datetime.now(UTC),
         }
 
         assert len(calendar_service._cache) == 1
 
-        calendar_service.clear_cache()
+        await calendar_service.clear_cache()
 
         assert len(calendar_service._cache) == 0
 

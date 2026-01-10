@@ -23,7 +23,7 @@ async def parse_ical_from_url(url: str) -> list[CalendarEvent]:
     """
     events: list[CalendarEvent] = []
 
-    logger.info("Fetching iCal from URL: {}...", url[:100])
+    logger.debug("Fetching iCal from URL: {}...", url[:100])
 
     try:
         async with httpx.AsyncClient(timeout=10.0, follow_redirects=True) as client:
@@ -55,7 +55,7 @@ async def parse_ical_from_url(url: str) -> list[CalendarEvent]:
                     if event:
                         events.append(event)
 
-            logger.info("Parsed {} events from iCal URL: {}...", len(events), url[:100])
+            logger.debug("Parsed {} events from iCal URL: {}...", len(events), url[:100])
             if events:
                 logger.debug(
                     "Event date range: earliest={}, latest={}",

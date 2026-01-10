@@ -132,11 +132,17 @@ async def get_calendar_events(
     start_date_normalized = normalize_datetime(start_date)
     end_date_normalized = normalize_datetime(end_date)
 
-    logger.info(
-        f"[CALENDAR API] get_calendar_events called: "
-        f"start_date={start_date} -> {start_date_normalized}, "
-        f"end_date={end_date} -> {end_date_normalized}, "
-        f"source_ids={source_ids}, refresh={refresh}"
+    logger.debug(
+        "[CALENDAR API] get_calendar_events called: "
+        "start_date={} -> {}, "
+        "end_date={} -> {}, "
+        "source_ids={}, refresh={}",
+        start_date,
+        start_date_normalized,
+        end_date,
+        end_date_normalized,
+        source_ids,
+        refresh,
     )
 
     start_date = start_date_normalized
@@ -168,17 +174,19 @@ async def get_calendar_events(
     if source_ids:
         source_id_list = [s.strip() for s in source_ids.split(",")]
 
-    # Clear cache if refresh is requested (only for the requested month, not entire cache)
+    # Clear cache if refresh is requested (clear entries that overlap with requested range)
     if refresh:
-        # Extract month and year from start_date to clear only that month's cache
-        # This prevents clearing the entire cache when just navigating months
-        month = start_date.month
-        year = start_date.year
-        await plugin_calendar_service.clear_cache(month=month, year=year)
-        logger.debug(f"Cleared cache for {year}-{month:02d} due to refresh request")
+        await plugin_calendar_service.clear_cache(start_date=start_date, end_date=end_date)
+        logger.info(
+            "🔄 Cache cleared and refreshing events for range {} to {}",
+            start_date.date(),
+            end_date.date(),
+        )
 
     # Get events from plugin service (aggregates from all calendar plugins)
-    events = await plugin_calendar_service.get_events(start_date, end_date, source_id_list)
+    events = await plugin_calendar_service.get_events(
+        start_date, end_date, source_id_list, refresh=refresh
+    )
 
     return CalendarEventsResponse(
         events=events,
