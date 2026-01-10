@@ -145,6 +145,9 @@ class ConfigUpdate(BaseModel):
     )
     gitBranch: str | None = None  # Git branch to use for updates (default: 'main')
     configPollInterval: int | None = None  # Config polling interval in seconds (default: 30)
+    calendarRefreshInterval: int | None = (
+        None  # Calendar cache refresh interval in minutes (default: 15)
+    )
 
     # Allow arbitrary fields for extensibility
     model_config = ConfigDict(extra="allow")
@@ -411,6 +414,10 @@ async def get_config():
         config["configPollInterval"] = 30  # Default to 30 seconds
     elif "config_poll_interval" in config and "configPollInterval" not in config:
         config["configPollInterval"] = config["config_poll_interval"]
+    if "calendarRefreshInterval" not in config and "calendar_refresh_interval" not in config:
+        config["calendarRefreshInterval"] = 15  # Default to 15 minutes
+    elif "calendar_refresh_interval" in config and "calendarRefreshInterval" not in config:
+        config["calendarRefreshInterval"] = config["calendar_refresh_interval"]
 
     # Add backend version (git commit short hash)
     config["version"] = get_git_version()
@@ -580,6 +587,13 @@ async def update_config(config_update: ConfigUpdate):
         update_dict["console_log_level"] = update_dict.pop("consoleLogLevel")
     if "configPollInterval" in update_dict:
         update_dict["config_poll_interval"] = update_dict.pop("configPollInterval")
+    if "calendarRefreshInterval" in update_dict:
+        calendar_refresh_interval = update_dict.pop("calendarRefreshInterval")
+        update_dict["calendar_refresh_interval"] = calendar_refresh_interval
+        # Update scheduler with new interval
+        from app.services.scheduler import calendar_scheduler
+
+        await calendar_scheduler.set_refresh_interval(calendar_refresh_interval)
 
     await config_service.update_config(update_dict)
 

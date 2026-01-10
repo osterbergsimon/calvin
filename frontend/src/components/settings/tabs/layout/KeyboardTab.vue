@@ -128,6 +128,7 @@ const availableActions = [
     value: "generic_expand_close",
     label: "Generic: Expand/Close (context-aware)",
   },
+  { value: "generic_refresh", label: "Generic: Refresh (context-aware)" },
 
   // Legacy/Advanced actions (for direct mapping if needed)
   { value: "mode_settings", label: "Open Settings" },
@@ -139,6 +140,7 @@ const availableActions = [
   { value: "calendar_expand", label: "Calendar: Expand (context-aware)" },
   { value: "calendar_expand_today", label: "Calendar: Expand Today (legacy)" },
   { value: "calendar_collapse", label: "Calendar: Collapse (direct)" },
+  { value: "calendar_refresh", label: "Calendar: Refresh" },
 
   // Image-specific actions
   { value: "images_next", label: "Images: Next" },
@@ -152,6 +154,7 @@ const availableActions = [
   { value: "web_service_next", label: "Web Service: Next" },
   { value: "web_service_prev", label: "Web Service: Previous" },
   { value: "web_service_close", label: "Web Service: Close/Exit" },
+  { value: "service_refresh", label: "Service: Refresh" },
 
   { value: "none", label: "No Action" },
 ];

@@ -10,12 +10,12 @@ try:
 except ImportError:
     pytz = None  # pytz not available, will use system timezone
 
-import logging
+from loguru import logger
 
 from app.services.config_service import config_service
 from app.utils.platform import has_x11, is_raspberry_pi
 
-logger = logging.getLogger(__name__)
+# Loguru automatically includes module/function info in logs
 
 
 class DisplayPowerService:
@@ -53,8 +53,8 @@ class DisplayPowerService:
                 await asyncio.sleep(60)
             except asyncio.CancelledError:
                 break
-            except Exception as e:
-                print(f"Error in display power scheduler: {e}")
+            except Exception:
+                logger.exception("Error in display power scheduler")
                 await asyncio.sleep(60)
 
     async def _check_and_update_display(self):

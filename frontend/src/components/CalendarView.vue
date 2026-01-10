@@ -899,23 +899,24 @@ const loadEvents = async () => {
   } else {
     // Month/rolling view: use month-based range
     // Expand date range to include events that span across month boundaries
-    // Load 7 days before the month start and 7 days after the month end
-    // This ensures multi-day events that start in the previous month or end in the next month are included
-    startDate = new Date(year, month, 1);
-    startDate.setDate(startDate.getDate() - 7); // 7 days before month start
+    // Load previous month, current month, and next month for better caching
+    // This ensures we have data cached for adjacent months
+    const prevMonth = month === 0 ? 11 : month - 1;
+    const prevYear = month === 0 ? year - 1 : year;
+    startDate = new Date(prevYear, prevMonth, 1);
     startDate.setHours(0, 0, 0, 0);
 
-    endDate = new Date(year, month + 1, 0);
-    endDate.setDate(endDate.getDate() + 7); // 7 days after month end
+    const nextMonth = month === 11 ? 0 : month + 1;
+    const nextYear = month === 11 ? year + 1 : year;
+    endDate = new Date(nextYear, nextMonth + 1, 0); // Last day of next month
     endDate.setHours(23, 59, 59, 999);
   }
 
   try {
-    // Force refresh when viewing current month to ensure newly added events are visible
-    const now = new Date();
-    const isCurrentMonth =
-      year === now.getFullYear() && month === now.getMonth();
-    const refresh = isCurrentMonth;
+    // Don't force refresh on navigation - let the cache handle it
+    // Only refresh when explicitly requested (e.g., manual refresh button)
+    // The cache TTL (5 minutes) and periodic refresh (15 minutes) will keep data fresh
+    const refresh = false;
 
     await calendarStore.fetchEvents(startDate, endDate, refresh);
     console.log(

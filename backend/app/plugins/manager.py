@@ -1,6 +1,10 @@
 """Plugin manager for registering and managing plugins."""
 
+from loguru import logger
+
 from app.plugins.base import BasePlugin, PluginType
+
+# Loguru automatically includes module/function info in logs
 
 
 class PluginManager:
@@ -89,8 +93,8 @@ class PluginManager:
                     await plugin.initialize()
                     # Mark as running after successful initialization
                     plugin.start()
-                except Exception as e:
-                    print(f"Error initializing plugin {plugin.plugin_id}: {e}")
+                except Exception:
+                    logger.exception("Error initializing plugin {}", plugin.plugin_id)
                     # Plugin failed to initialize, so it's not running
                     plugin.stop()
 
@@ -101,8 +105,8 @@ class PluginManager:
                 # Stop plugin before cleanup
                 plugin.stop()
                 await plugin.cleanup()
-            except Exception as e:
-                print(f"Error cleaning up plugin {plugin.plugin_id}: {e}")
+            except Exception:
+                logger.exception("Error cleaning up plugin {}", plugin.plugin_id)
 
     async def start_plugin(self, plugin_id: str) -> bool:
         """
@@ -123,8 +127,8 @@ class PluginManager:
                 await plugin.initialize()
                 plugin.start()
             return True
-        except Exception as e:
-            print(f"Error starting plugin {plugin_id}: {e}")
+        except Exception:
+            logger.exception("Error starting plugin {}", plugin_id)
             plugin.stop()
             return False
 
@@ -147,8 +151,8 @@ class PluginManager:
                 plugin.stop()
                 await plugin.cleanup()
             return True
-        except Exception as e:
-            print(f"Error stopping plugin {plugin_id}: {e}")
+        except Exception:
+            logger.exception("Error stopping plugin {}", plugin_id)
             return False
 
     def get_plugin_count(self, plugin_type: PluginType | None = None) -> int:

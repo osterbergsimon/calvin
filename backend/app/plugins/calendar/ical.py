@@ -3,11 +3,16 @@
 from datetime import datetime
 from typing import Any
 
+import httpx
+from loguru import logger
+
 from app.models.calendar import CalendarEvent
 from app.plugins.base import PluginType
 from app.plugins.hooks import hookimpl
 from app.plugins.protocols import CalendarPlugin
 from app.utils.ical_parser import parse_ical_from_url
+
+# Loguru automatically includes module/function info in logs
 
 
 class ICalCalendarPlugin(CalendarPlugin):
@@ -67,7 +72,14 @@ class ICalCalendarPlugin(CalendarPlugin):
         """
         try:
             # Fetch events from iCal URL
+            logger.debug(
+                f"[ICAL PLUGIN] Fetching events for {self.plugin_id} "
+                f"({start_date.date()} to {end_date.date()})"
+            )
             ical_events = await parse_ical_from_url(self.ical_url)
+            logger.info(
+                f"[ICAL PLUGIN] Fetched {len(ical_events)} raw events from {self.plugin_id}"
+            )
 
             # Filter events by date range
             filtered_events = []
@@ -79,10 +91,26 @@ class ICalCalendarPlugin(CalendarPlugin):
                     updated_event = event.model_copy(update={"source": self.plugin_id})
                     filtered_events.append(updated_event)
 
+            logger.info(
+                f"[ICAL PLUGIN] Filtered to {len(filtered_events)} events for date range "
+                f"({start_date.date()} to {end_date.date()})"
+            )
             return filtered_events
+        except httpx.HTTPStatusError as e:
+            # Re-raise HTTP errors so they can be handled by the service layer
+            logger.error(
+                "HTTP {} error fetching from {}: {}",
+                e.response.status_code,
+                self.plugin_id,
+                e,
+            )
+            raise
         except Exception as e:
-            print(f"Error fetching events from iCal plugin {self.plugin_id}: {e}")
-            return []
+            logger.error(
+                f"[ICAL PLUGIN] Error fetching events from {self.plugin_id}: {e}",
+                exc_info=True,
+            )
+            raise
 
     async def validate_config(self, config: dict) -> bool:
         """

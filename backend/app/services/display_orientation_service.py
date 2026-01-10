@@ -3,8 +3,12 @@
 import subprocess
 from pathlib import Path
 
+from loguru import logger
+
 from app.services.config_service import config_service
 from app.utils.platform import has_x11, is_raspberry_pi
+
+# Loguru automatically includes module/function info in logs
 
 
 class DisplayOrientationService:
@@ -97,7 +101,7 @@ class DisplayOrientationService:
                                 "method": "xrandr",
                             }
         except (subprocess.TimeoutExpired, FileNotFoundError) as e:
-            print(f"Failed to get xrandr orientation: {e}")
+            logger.warning("Failed to get xrandr orientation: {}", e)
 
         return {"orientation": "unknown", "flipped": False, "method": "xrandr"}
 
@@ -147,7 +151,7 @@ class DisplayOrientationService:
                     except ValueError:
                         pass
         except Exception as e:
-            print(f"Failed to read config.txt: {e}")
+            logger.warning("Failed to read config.txt: {}", e)
 
         return {"orientation": "unknown", "flipped": False, "method": "config.txt"}
 

@@ -1,47 +1,108 @@
 """Main FastAPI application entry point."""
 
 import logging
+import sys
 from contextlib import asynccontextmanager
 from pathlib import Path
+
+# Configure loguru for better, simpler logging
+from loguru import logger
 
 # Configure logging FIRST, before any other imports that might trigger database initialization
 # Import settings first to get log level
 from app.config import settings
 
-# Configure logging: reduce SQLAlchemy verbosity while keeping app logs visible
-# Use force=True (Python 3.8+) to reconfigure even if logging was already set up (e.g., by uvicorn)
-try:
-    logging.basicConfig(
-        level=getattr(logging, settings.log_level.upper(), logging.INFO),
-        format="%(asctime)s - %(name)s - %(levelname)s - %(message)s",
-        datefmt="%Y-%m-%d %H:%M:%S",
-        force=True,  # Reconfigure even if logging was already configured
-    )
-except TypeError:
-    # Python < 3.8 doesn't have force parameter
-    # Check if root logger has handlers, if not, configure it
-    root_logger = logging.getLogger()
-    if not root_logger.handlers:
-        logging.basicConfig(
-            level=getattr(logging, settings.log_level.upper(), logging.INFO),
-            format="%(asctime)s - %(name)s - %(levelname)s - %(message)s",
-            datefmt="%Y-%m-%d %H:%M:%S",
+# Remove loguru's default handler and configure our own
+logger.remove()
+
+# Map settings log level to loguru levels
+log_level_map = {
+    "DEBUG": "DEBUG",
+    "INFO": "INFO",
+    "WARNING": "WARNING",
+    "ERROR": "ERROR",
+    "CRITICAL": "CRITICAL",
+}
+log_level = log_level_map.get(settings.log_level.upper(), "INFO")
+
+# Add handler with our desired format
+logger.add(
+    sys.stderr,
+    format=(
+        "<green>{time:YYYY-MM-DD HH:mm:ss}</green> | "
+        "<level>{level: <8}</level> | "
+        "<cyan>{name}</cyan>:<cyan>{function}</cyan>:<cyan>{line}</cyan> - "
+        "<level>{message}</level>"
+    ),
+    level=log_level,
+    colorize=True,  # Enable colors for better readability
+)
+
+
+# Intercept standard logging and redirect to loguru
+#
+# WHY WE NEED THIS:
+# Many third-party libraries (SQLAlchemy, FastAPI, uvicorn, httpx, etc.) use Python's
+# standard logging module, not loguru. Without InterceptHandler, those library logs would
+# go through standard logging with its own format/handlers, creating inconsistent output.
+#
+# InterceptHandler catches ALL standard logging calls and redirects them to loguru, so:
+# - All logs use the same format and handlers (unified output)
+# - All logs respect our log level configuration
+# - We get consistent log formatting across the entire application
+#
+# This is especially important for SQLAlchemy query logs, FastAPI request logs, etc.
+class InterceptHandler(logging.Handler):
+    """Intercept standard logging messages and route them to loguru."""
+
+    def emit(self, record):
+        # Map standard logging numeric levels to loguru level names
+        level_map = {
+            logging.DEBUG: "DEBUG",
+            logging.INFO: "INFO",
+            logging.WARNING: "WARNING",
+            logging.ERROR: "ERROR",
+            logging.CRITICAL: "CRITICAL",
+        }
+        # Get loguru level name from the numeric level
+        level_name = level_map.get(record.levelno, "INFO")
+
+        # Find the caller frame that's not in logging module
+        try:
+            frame = sys._getframe(6)  # Skip logging internals
+            depth = 6
+            while frame and frame.f_code.co_filename == logging.__file__:
+                frame = frame.f_back
+                depth += 1
+        except (ValueError, AttributeError):
+            depth = 0
+
+        # Use loguru's opt to log with proper exception info and depth
+        # Import logger here to avoid circular import issues
+        from loguru import logger as loguru_logger
+
+        loguru_logger.opt(depth=depth, exception=record.exc_info).log(
+            level_name, record.getMessage()
         )
 
-# Set SQLAlchemy engine logger to WARNING to reduce query logging noise
+
+# Set up standard logging interception for compatibility
+logging.basicConfig(handlers=[InterceptHandler()], level=0, force=True)
+
+# Reduce SQLAlchemy verbosity by setting its loggers to WARNING
 # This must be done BEFORE database.py is imported (which creates the engine)
-# Set explicitly and unconditionally to ensure it takes effect
-sqlalchemy_engine_logger = logging.getLogger("sqlalchemy.engine")
-sqlalchemy_engine_logger.setLevel(logging.WARNING)
-sqlalchemy_engine_logger.propagate = True
+sqlalchemy_loggers = [
+    "sqlalchemy.engine",
+    "sqlalchemy.pool",
+    "sqlalchemy.dialects",
+]
+for sql_logger_name in sqlalchemy_loggers:
+    sql_logger = logging.getLogger(sql_logger_name)
+    sql_logger.setLevel(logging.WARNING)
+    sql_logger.handlers = [InterceptHandler()]
+    sql_logger.propagate = False
 
-sqlalchemy_pool_logger = logging.getLogger("sqlalchemy.pool")
-sqlalchemy_pool_logger.setLevel(logging.WARNING)
-sqlalchemy_pool_logger.propagate = True
-
-sqlalchemy_dialects_logger = logging.getLogger("sqlalchemy.dialects")
-sqlalchemy_dialects_logger.setLevel(logging.WARNING)
-sqlalchemy_dialects_logger.propagate = True
+logger.info(f"Loguru logging configured with level: {log_level}")
 
 from fastapi import FastAPI  # noqa: E402
 from fastapi.middleware.cors import CORSMiddleware  # noqa: E402
@@ -60,7 +121,7 @@ from app.services.scheduler import calendar_scheduler  # noqa: E402
 
 # Plugins are auto-discovered via pluggy hooks when modules are imported
 
-logger = logging.getLogger(__name__)
+# Use loguru logger (already imported at top of file)
 
 
 async def _initialize_database():
@@ -246,8 +307,8 @@ async def _start_schedulers():
     """Start background schedulers."""
     from app.services.display_power_service import display_power_service
 
-    calendar_scheduler.start()
-    logger.info("Calendar scheduler started - refreshing every 15 minutes")
+    await calendar_scheduler.start()
+    # Log message is now handled in scheduler.start()
 
     await display_power_service.start()
     logger.info("Display power scheduler started")

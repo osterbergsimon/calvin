@@ -7,11 +7,14 @@ from email.header import decode_header
 from pathlib import Path
 from typing import Any
 
+from loguru import logger
 from PIL import Image
 
 from app.plugins.base import PluginType
 from app.plugins.hooks import hookimpl
 from app.plugins.protocols import ImagePlugin
+
+# Loguru automatically includes module/function info in logs
 
 
 class ImapImagePlugin(ImagePlugin):
@@ -193,8 +196,8 @@ class ImapImagePlugin(ImagePlugin):
                 await asyncio.sleep(self.check_interval)
             except asyncio.CancelledError:
                 break
-            except Exception as e:
-                print(f"Error in IMAP email check loop: {e}")
+            except Exception:
+                logger.exception("Error in IMAP email check loop")
                 await asyncio.sleep(self.check_interval)
 
     async def _check_emails(self) -> None:
@@ -205,8 +208,8 @@ class ImapImagePlugin(ImagePlugin):
             # Rescan images if any were downloaded
             if images_downloaded:
                 await self.scan_images()
-        except Exception as e:
-            print(f"Error checking emails: {e}")
+        except Exception:
+            logger.exception("Error checking emails")
 
     async def fetch_now(self) -> dict[str, Any]:
         """
@@ -220,10 +223,10 @@ class ImapImagePlugin(ImagePlugin):
             images_downloaded = await asyncio.to_thread(self._check_emails_sync)
 
             # Always rescan images to get accurate count
-            print("[IMAP] Rescanning images after fetch...")
+            logger.debug("Rescanning images after fetch...")
             await self.scan_images()
             image_count = len(self._images)
-            print(f"[IMAP] Scan complete. Found {image_count} images in {self.image_dir}")
+            logger.debug("Scan complete. Found {} images in {}", image_count, self.image_dir)
 
             if images_downloaded:
                 return {
@@ -318,16 +321,16 @@ class ImapImagePlugin(ImagePlugin):
                             mail.store(email_id, "+FLAGS", "\\Seen")
                         images_downloaded = True
 
-                except Exception as e:
-                    print(f"Error processing email {email_id}: {e}")
+                except Exception:
+                    logger.exception("Error processing email {}", email_id)
                     continue
 
             mail.close()
             mail.logout()
             return images_downloaded
 
-        except Exception as e:
-            print(f"Error connecting to IMAP server: {e}")
+        except Exception:
+            logger.exception("Error connecting to IMAP server")
             return False
 
     def _extract_images(self, email_message: email.message.Message) -> bool:
@@ -378,10 +381,10 @@ class ImapImagePlugin(ImagePlugin):
                     self._generate_thumbnail(image_path)
 
                     images_downloaded = True
-                    print(f"Downloaded image from email: {image_path}")
+                    logger.info("Downloaded image from email: {}", image_path)
 
-                except Exception as e:
-                    print(f"Error downloading image {decoded_filename}: {e}")
+                except Exception:
+                    logger.exception("Error downloading image {}", decoded_filename)
                     continue
 
         return images_downloaded
@@ -420,8 +423,8 @@ class ImapImagePlugin(ImagePlugin):
                     rgb_img.paste(img, mask=img.split()[3] if img.mode == "RGBA" else None)
                     img = rgb_img
                 img.save(thumbnail_path, "JPEG", quality=85)
-        except Exception as e:
-            print(f"Error generating thumbnail for {image_path}: {e}")
+        except Exception:
+            logger.exception("Error generating thumbnail for {}", image_path)
 
     async def get_images(self) -> list[dict[str, Any]]:
         """
@@ -466,8 +469,8 @@ class ImapImagePlugin(ImagePlugin):
         try:
             with open(img["path"], "rb") as f:
                 return f.read()
-        except Exception as e:
-            print(f"Error reading image file {img['path']}: {e}")
+        except Exception:
+            logger.exception("Error reading image file {}", img["path"])
             return None
 
     async def scan_images(self) -> list[dict[str, Any]]:
@@ -479,17 +482,17 @@ class ImapImagePlugin(ImagePlugin):
         """
         images = []
 
-        print(f"[IMAP] Scanning images in directory: {self.image_dir}")
-        print(f"[IMAP] Directory exists: {self.image_dir.exists()}")
+        logger.debug("Scanning images in directory: {}", self.image_dir)
+        logger.debug("Directory exists: {}", self.image_dir.exists())
 
         for image_path in self.image_dir.glob("*"):
             if not image_path.is_file():
-                print(f"[IMAP] Skipping non-file: {image_path}")
+                logger.debug("Skipping non-file: {}", image_path)
                 continue
 
             file_ext = image_path.suffix.lower()
             if file_ext not in self.supported_formats:
-                print(f"[IMAP] Skipping unsupported format: {image_path} (ext: {file_ext})")
+                logger.debug("Skipping unsupported format: {} (ext: {})", image_path, file_ext)
                 continue
 
             try:
@@ -516,16 +519,13 @@ class ImapImagePlugin(ImagePlugin):
                     "title": image_path.stem,
                 }
                 images.append(image_metadata)
-                print(f"[IMAP] Found image: {image_path.name} (id: {image_id})")
+                logger.debug("Found image: {} (id: {})", image_path.name, image_id)
 
-            except Exception as e:
-                print(f"[IMAP] Error scanning image {image_path}: {e}")
-                import traceback
-
-                traceback.print_exc()
+            except Exception:
+                logger.exception("Error scanning image {}", image_path)
                 continue
 
-        print(f"[IMAP] Scan complete. Found {len(images)} images")
+        logger.debug("Scan complete. Found {} images", len(images))
         self._images = images
         return images
 

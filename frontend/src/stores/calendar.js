@@ -366,6 +366,38 @@ export const useCalendarStore = defineStore("calendar", () => {
     showAllDayEvents.value = false;
   };
 
+  const refreshEvents = async () => {
+    /** Manually refresh calendar cache and reload events. */
+    try {
+      // Call the backend refresh endpoint to clear cache and reload
+      await axios.post("/api/calendar/refresh");
+
+      // Reload events for the current view
+      // Calculate the date range based on current date (same logic as CalendarView.loadEvents)
+      const currentYear = currentDate.value.getFullYear();
+      const currentMonth = currentDate.value.getMonth();
+
+      // Calculate start and end dates for the current month plus buffer for multi-day events
+      // This matches the logic in CalendarView.vue for month view
+      const startDate = new Date(currentYear, currentMonth, 1);
+      startDate.setDate(startDate.getDate() - 7); // 7 days before month start
+      startDate.setHours(0, 0, 0, 0);
+
+      const endDate = new Date(currentYear, currentMonth + 1, 0);
+      endDate.setDate(endDate.getDate() + 7); // 7 days after month end
+      endDate.setHours(23, 59, 59, 999);
+
+      // Reload events with refresh flag
+      await fetchEvents(startDate, endDate, true);
+
+      console.log("[Calendar] Events refreshed successfully");
+    } catch (err) {
+      error.value = err.message;
+      console.error("[Calendar] Failed to refresh events:", err);
+      throw err;
+    }
+  };
+
   return {
     events,
     sources,
@@ -386,5 +418,6 @@ export const useCalendarStore = defineStore("calendar", () => {
     setDayEvents,
     setShowAllDayEvents,
     clearSelectedEvent,
+    refreshEvents,
   };
 });

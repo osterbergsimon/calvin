@@ -3,10 +3,13 @@
 from typing import Any
 
 import httpx
+from loguru import logger
 
 from app.plugins.base import PluginType
 from app.plugins.hooks import hookimpl
 from app.plugins.protocols import ServicePlugin
+
+# Loguru automatically includes module/function info in logs
 
 
 class WeatherServicePlugin(ServicePlugin):
@@ -364,21 +367,18 @@ class WeatherServicePlugin(ServicePlugin):
             }
 
         except httpx.HTTPStatusError as e:
-            print(f"[Weather] HTTP error fetching weather: {e.response.status_code} - {e}")
+            logger.error("HTTP error fetching weather: {} - {}", e.response.status_code, e)
             return {
                 "error": f"HTTP error: {e.response.status_code}",
                 "message": e.response.text if hasattr(e.response, "text") else str(e),
             }
         except httpx.HTTPError as e:
-            print(f"[Weather] Error fetching weather: {e}")
+            logger.exception("Error fetching weather")
             return {
                 "error": str(e),
             }
         except Exception as e:
-            print(f"[Weather] Unexpected error fetching weather: {e}")
-            import traceback
-
-            traceback.print_exc()
+            logger.exception("Unexpected error fetching weather")
             return {
                 "error": str(e),
             }

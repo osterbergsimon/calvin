@@ -254,6 +254,22 @@ export const useWebServicesStore = defineStore("webServices", () => {
     }
   };
 
+  const refreshCurrentService = async () => {
+    /** Refresh the current service's data by refetching services. */
+    try {
+      // Clear cache and refetch services
+      const cacheKey = "web_services";
+      // Clear from cache utility if it has a clear method
+      // For now, just refetch which will overwrite cache
+      await fetchServices();
+      console.log("[WebServices] Current service refreshed");
+    } catch (err) {
+      error.value = err.message;
+      console.error("[WebServices] Failed to refresh current service:", err);
+      throw err;
+    }
+  };
+
   return {
     services,
     currentServiceIndex,
@@ -267,5 +283,6 @@ export const useWebServicesStore = defineStore("webServices", () => {
     nextService,
     previousService,
     setServiceIndex,
+    refreshCurrentService,
   };
 });

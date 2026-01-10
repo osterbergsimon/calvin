@@ -773,6 +773,31 @@ export function useKeyboardActions() {
         }
         break;
 
+      // Context-aware refresh action
+      case "generic_refresh":
+        action = getGenericRefreshAction();
+        logDebug("[Keyboard]", "generic_refresh resolved to:", action);
+      // Fall through to handle the resolved action
+      // eslint-disable-next-line no-fallthrough
+      case "calendar_refresh":
+        if (modeStore.currentMode === modeStore.MODES.CALENDAR) {
+          // Refresh calendar events
+          calendarStore.refreshEvents().catch((err) => {
+            logError("[Keyboard]", "Failed to refresh calendar:", err);
+          });
+          logInfo("[Keyboard]", "Refreshing calendar events");
+        }
+        break;
+      case "service_refresh":
+        // Refresh service plugin data (for web services)
+        if (modeStore.currentMode === modeStore.MODES.WEB_SERVICES) {
+          webServicesStore.refreshCurrentService().catch((err) => {
+            logError("[Keyboard]", "Failed to refresh service:", err);
+          });
+          logInfo("[Keyboard]", "Refreshing web service data");
+        }
+        break;
+
       case "none":
         // No action
         break;
@@ -855,6 +880,22 @@ export function useKeyboardActions() {
       return "web_service_enter_fullscreen";
     } else {
       return "none"; // No action for other modes
+    }
+  };
+
+  // Get the appropriate action for generic_refresh based on current mode
+  const getGenericRefreshAction = () => {
+    // If in fullscreen, use fullscreen mode; otherwise use current mode
+    const activeMode = modeStore.isFullscreen
+      ? modeStore.fullscreenMode
+      : modeStore.currentMode;
+
+    if (activeMode === modeStore.MODES.CALENDAR) {
+      return "calendar_refresh";
+    } else if (activeMode === modeStore.MODES.WEB_SERVICES) {
+      return "service_refresh";
+    } else {
+      return "none"; // No refresh action for other modes
     }
   };
 

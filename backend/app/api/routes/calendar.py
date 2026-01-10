@@ -4,6 +4,7 @@ from datetime import UTC, datetime, timedelta
 
 import httpx
 from fastapi import APIRouter, HTTPException, Query
+from loguru import logger
 
 from app.models.calendar import (
     CalendarEventsResponse,
@@ -13,6 +14,7 @@ from app.models.calendar import (
 from app.plugins.calendar.google import _normalize_google_calendar_url
 from app.services import plugin_calendar_service
 
+# Loguru automatically includes module/function info in logs
 router = APIRouter()
 
 
@@ -127,8 +129,18 @@ async def get_calendar_events(
     If start_date and end_date are not provided, defaults to current month.
     """
     # Normalize datetimes to timezone-aware (UTC if naive)
-    start_date = normalize_datetime(start_date)
-    end_date = normalize_datetime(end_date)
+    start_date_normalized = normalize_datetime(start_date)
+    end_date_normalized = normalize_datetime(end_date)
+
+    logger.info(
+        f"[CALENDAR API] get_calendar_events called: "
+        f"start_date={start_date} -> {start_date_normalized}, "
+        f"end_date={end_date} -> {end_date_normalized}, "
+        f"source_ids={source_ids}, refresh={refresh}"
+    )
+
+    start_date = start_date_normalized
+    end_date = end_date_normalized
 
     # Default to current month if not provided
     if not start_date:
@@ -156,9 +168,14 @@ async def get_calendar_events(
     if source_ids:
         source_id_list = [s.strip() for s in source_ids.split(",")]
 
-    # Clear cache if refresh is requested
+    # Clear cache if refresh is requested (only for the requested month, not entire cache)
     if refresh:
-        plugin_calendar_service.clear_cache()
+        # Extract month and year from start_date to clear only that month's cache
+        # This prevents clearing the entire cache when just navigating months
+        month = start_date.month
+        year = start_date.year
+        await plugin_calendar_service.clear_cache(month=month, year=year)
+        logger.debug(f"Cleared cache for {year}-{month:02d} due to refresh request")
 
     # Get events from plugin service (aggregates from all calendar plugins)
     events = await plugin_calendar_service.get_events(start_date, end_date, source_id_list)
@@ -400,11 +417,11 @@ async def update_calendar_source(source_id: str, source: CalendarSource):
                     await existing_plugin.cleanup()
                 # Then unregister it
                 plugin_manager.unregister(source_id)
-            except Exception as e:
+            except Exception:
                 import logging
 
                 logger = logging.getLogger(__name__)
-                logger.warning(f"Error cleaning up disabled plugin {source_id}: {e}", exc_info=True)
+                logger.exception("Error cleaning up disabled plugin {}", source_id)
 
     return source
 
@@ -420,3 +437,48 @@ async def remove_calendar_source(source_id: str):
         raise HTTPException(status_code=404, detail="Calendar source not found")
 
     return {"message": "Calendar source removed", "source_id": source_id}
+
+
+@router.post("/calendar/refresh")
+async def refresh_calendar_cache(
+    month: int | None = Query(None, description="Optional month (1-12) to refresh specific month"),
+    year: int | None = Query(None, description="Optional year to refresh specific month"),
+):
+    """
+    Manually refresh calendar cache.
+
+    If month and year are provided, only refreshes that specific month.
+    Otherwise, refreshes all cached months (current, previous, next).
+    """
+    if month is not None and year is not None:
+        if month < 1 or month > 12:
+            raise HTTPException(status_code=400, detail="Month must be between 1 and 12")
+
+        # Clear cache for specific month
+        await plugin_calendar_service.clear_cache(month=month, year=year)
+
+        # Preload that specific month
+        from datetime import UTC
+
+        start_date = datetime(year, month, 1, tzinfo=UTC)
+        if month == 12:
+            end_date = datetime(year + 1, 1, 1, tzinfo=UTC) - timedelta(days=1)
+        else:
+            end_date = datetime(year, month + 1, 1, tzinfo=UTC) - timedelta(days=1)
+        end_date = end_date.replace(hour=23, minute=59, second=59, microsecond=999999)
+
+        # Add buffer days for multi-day events
+        start_date = start_date - timedelta(days=7)
+        end_date = end_date + timedelta(days=7)
+
+        await plugin_calendar_service.get_events(start_date, end_date)
+
+        return {
+            "message": f"Calendar cache refreshed for {year}-{month:02d}",
+            "month": month,
+            "year": year,
+        }
+    else:
+        # Refresh all cached months (current, previous, next)
+        await plugin_calendar_service.preload_months(months_to_preload=1)
+        return {"message": "Calendar cache refreshed for all cached months"}

@@ -7,8 +7,12 @@ import sys
 from pathlib import Path
 from typing import Any
 
+from loguru import logger
+
 from app.plugins.hooks import plugin_manager
 from app.services.plugin_installer import plugin_installer
+
+# Loguru automatically includes module/function info in logs
 
 
 class PluginLoader:
@@ -48,13 +52,15 @@ class PluginLoader:
                                     try:
                                         plugin_manager.register(module)
                                         self._loaded_modules.add(full_module_name)
-                                        print(f"Registered plugin module: {full_module_name}")
+                                        logger.info(
+                                            "Registered plugin module: {}", full_module_name
+                                        )
                                     except ValueError:
                                         # Already registered
                                         # (e.g., if module is imported multiple times)
                                         pass
-                            except Exception as e:
-                                print(f"Error loading plugin module {full_module_name}: {e}")
+                            except Exception:
+                                logger.exception("Error loading plugin module {}", full_module_name)
 
                 # Also load subpackages
                 for _, module_name, is_pkg in pkgutil.iter_modules([str(package_path)]):
@@ -62,8 +68,8 @@ class PluginLoader:
                         full_module_name = f"{package_name}.{module_name}"
                         self.load_plugins_from_package(full_module_name)
 
-        except Exception as e:
-            print(f"Error loading plugins from package {package_name}: {e}")
+        except Exception:
+            logger.exception("Error loading plugins from package {}", package_name)
 
     def load_installed_plugins(self) -> None:
         """
@@ -80,7 +86,7 @@ class PluginLoader:
             plugin_py = plugin_path / "plugin.py"
 
             if not plugin_py.exists():
-                print(f"Warning: plugin.py not found for installed plugin {plugin_id}")
+                logger.warning("plugin.py not found for installed plugin {}", plugin_id)
                 continue
 
             try:
@@ -108,16 +114,13 @@ class PluginLoader:
                         try:
                             plugin_manager.register(module)
                             self._loaded_modules.add(module_name)
-                            print(f"Registered installed plugin: {plugin_id}")
+                            logger.info("Registered installed plugin: {}", plugin_id)
                         except ValueError:
                             # Already registered
                             pass
 
-            except Exception as e:
-                print(f"Error loading installed plugin {plugin_id}: {e}")
-                import traceback
-
-                traceback.print_exc()
+            except Exception:
+                logger.exception("Error loading installed plugin {}", plugin_id)
 
     def load_all_plugins(self) -> None:
         """Load all plugins from the plugins package and installed plugins."""

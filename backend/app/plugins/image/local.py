@@ -4,11 +4,14 @@ import hashlib
 from pathlib import Path
 from typing import Any
 
+from loguru import logger
 from PIL import Image, ImageOps
 
 from app.plugins.base import PluginType
 from app.plugins.hooks import hookimpl
 from app.plugins.protocols import ImagePlugin
+
+# Loguru automatically includes module/function info in logs
 
 
 class LocalImagePlugin(ImagePlugin):
@@ -117,15 +120,15 @@ class LocalImagePlugin(ImagePlugin):
         Returns:
             List of image metadata dictionaries
         """
-        print(f"[Local Images] get_images() called for plugin {self.plugin_id}")
-        print(f"[Local Images] image_dir: {self.image_dir}")
+        logger.debug("get_images() called for plugin {}", self.plugin_id)
+        logger.debug("image_dir: {}", self.image_dir)
         cache_size = len(self._images) if self._images else 0
-        print(f"[Local Images] _images cache before scan: {cache_size} images")
+        logger.debug("_images cache before scan: {} images", cache_size)
         await self.scan_images()
         cache_size_after = len(self._images) if self._images else 0
-        print(f"[Local Images] _images cache after scan: {cache_size_after} images")
+        logger.debug("_images cache after scan: {} images", cache_size_after)
         result = self._images.copy()
-        print(f"[Local Images] Returning {len(result)} images")
+        logger.debug("Returning {} images", len(result))
         return result
 
     async def get_image(self, image_id: str) -> dict[str, Any] | None:
@@ -161,8 +164,8 @@ class LocalImagePlugin(ImagePlugin):
         try:
             with open(img["path"], "rb") as f:
                 return f.read()
-        except Exception as e:
-            print(f"Error reading image file {img['path']}: {e}")
+        except Exception:
+            logger.exception("Error reading image file {}", img["path"])
             return None
 
     async def scan_images(self) -> list[dict[str, Any]]:
@@ -261,8 +264,8 @@ class LocalImagePlugin(ImagePlugin):
             # Return the new image
             image_id = hashlib.md5(str(file_path).encode()).hexdigest()
             return await self.get_image(image_id)
-        except Exception as e:
-            print(f"Error uploading image {filename}: {e}")
+        except Exception:
+            logger.exception("Error uploading image {}", filename)
             return None
 
     async def delete_image(self, image_id: str) -> bool:
@@ -293,8 +296,8 @@ class LocalImagePlugin(ImagePlugin):
             # Rescan to update list
             await self.scan_images()
             return True
-        except Exception as e:
-            print(f"Error deleting image {image_id}: {e}")
+        except Exception:
+            logger.exception("Error deleting image {}", image_id)
             return False
 
     def _get_thumbnail_path(self, image_id: str) -> Path:
@@ -328,8 +331,8 @@ class LocalImagePlugin(ImagePlugin):
 
                 # Save thumbnail as JPEG
                 img.save(thumbnail_path, "JPEG", quality=85, optimize=True)
-        except Exception as e:
-            print(f"Error generating thumbnail for {image_path}: {e}")
+        except Exception:
+            logger.exception("Error generating thumbnail for {}", image_path)
 
     def get_thumbnail_path(self, image_id: str) -> Path | None:
         """Get thumbnail path for an image by ID."""
