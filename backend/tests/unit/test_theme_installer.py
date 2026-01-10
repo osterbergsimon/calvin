@@ -359,7 +359,7 @@ class TestThemeInstaller:
             "variables": {},
         }
         (theme_dir / "theme.json").write_text(json.dumps(invalid_manifest))
-        with pytest.raises(ValueError, match="Unsupported theme format version"):
+        with pytest.raises(ValueError, match="Unsupported.*format version"):
             theme_installer._validate_theme_directory(theme_dir)
 
     def test_validate_theme_package_zip_unsupported_format_version(self, theme_installer, tmp_path):
@@ -375,7 +375,7 @@ class TestThemeInstaller:
         with zipfile.ZipFile(zip_path, "w") as zipf:
             zipf.writestr("theme.json", json.dumps(invalid_manifest))
 
-        with pytest.raises(ValueError, match="Unsupported theme format version"):
+        with pytest.raises(ValueError, match="Unsupported.*format version"):
             theme_installer.validate_theme_package(zip_path)
 
     def test_is_safe_path_valid(self, theme_installer, tmp_path):

@@ -1,11 +1,14 @@
 """Calendar service using plugin architecture."""
 
+import logging
 from datetime import datetime, timedelta
 
 from app.models.calendar import CalendarEvent
 from app.plugins.base import PluginType
 from app.plugins.manager import plugin_manager
 from app.plugins.protocols import CalendarPlugin
+
+logger = logging.getLogger(__name__)
 
 
 class PluginCalendarService:
@@ -15,10 +18,6 @@ class PluginCalendarService:
         """Initialize calendar service."""
         self._cache: dict = {}
         self._cache_ttl = timedelta(minutes=5)
-
-    async def get_sources_async(self) -> list[dict]:
-        """Get all calendar sources (async version)."""
-        return await self.get_sources()
 
     def clear_cache(self) -> None:
         """Clear the event cache."""
@@ -83,7 +82,10 @@ class PluginCalendarService:
 
                 events.extend(plugin_events)
             except Exception as e:
-                print(f"Error fetching events from calendar plugin {plugin.plugin_id}: {e}")
+                logger.error(
+                    f"Error fetching events from calendar plugin {plugin.plugin_id}: {e}",
+                    exc_info=True,
+                )
                 # Try to use cached data if available
                 if cache_key in self._cache:
                     events.extend(self._cache[cache_key]["events"])

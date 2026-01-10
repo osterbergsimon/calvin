@@ -1,11 +1,15 @@
 """Image endpoints."""
 
+import logging
 from pathlib import Path
 
-from fastapi import APIRouter, File, HTTPException, UploadFile
+from fastapi import APIRouter, File, UploadFile
 from fastapi.responses import FileResponse
 
 from app.services import plugin_image_service
+from app.utils.errors import ErrorResponse
+
+logger = logging.getLogger(__name__)
 
 router = APIRouter()
 
@@ -18,19 +22,19 @@ async def list_images():
     Returns:
         List of image metadata
     """
-    print("[API] /images/list called")
+    logger.debug("GET /images/list called")
 
     # Get randomize setting from config
     from app.services.config_service import config_service
 
     randomize_value = await config_service.get_value("randomize_images")
     randomize = randomize_value == "true" if randomize_value else False
-    print(f"[API] randomize_images config: {randomize_value}, randomize: {randomize}")
+    logger.debug(f"randomize_images config: {randomize_value}, randomize: {randomize}")
 
     # Use plugin service to aggregate images from all plugins
-    print("[API] Calling plugin_image_service.get_images()...")
+    logger.debug("Calling plugin_image_service.get_images()...")
     images = await plugin_image_service.get_images(randomize=randomize)
-    print(f"[API] plugin_image_service.get_images() returned {len(images)} images")
+    logger.debug(f"plugin_image_service.get_images() returned {len(images)} images")
 
     return {"images": images, "total": len(images)}
 
@@ -73,7 +77,7 @@ async def get_image_file(image_id: str):
     # Get image metadata
     image = await plugin_image_service.get_image_by_id(image_id)
     if not image:
-        raise HTTPException(status_code=404, detail="Image not found")
+        raise ErrorResponse.not_found("Image", image_id)
 
     # Check if this is a remote image (has URL but no local path)
     # For remote images, redirect to the URL instead of downloading
@@ -106,7 +110,7 @@ async def get_image_file(image_id: str):
     # Fallback: Get image data from plugin (download if needed)
     image_data = await plugin_image_service.get_image_data(image_id)
     if not image_data:
-        raise HTTPException(status_code=404, detail="Image file not found")
+        raise ErrorResponse.not_found("Image file", image_id)
 
     # Return image data directly
     from fastapi.responses import Response
@@ -137,17 +141,17 @@ async def get_image_thumbnail(image_id: str):
     # Get image metadata
     image = await plugin_image_service.get_image_by_id(image_id)
     if not image:
-        raise HTTPException(status_code=404, detail="Image not found")
+        raise ErrorResponse.not_found("Image", image_id)
 
     # Find which plugin owns this image
     source_plugin_id = image.get("source")
     if not source_plugin_id:
-        raise HTTPException(status_code=404, detail="Image source not found")
+        raise ErrorResponse.not_found("Image source")
 
     # Get the plugin
     plugin = plugin_manager.get_plugin(source_plugin_id)
     if not plugin or not isinstance(plugin, ImagePlugin):
-        raise HTTPException(status_code=404, detail="Image plugin not found")
+        raise ErrorResponse.not_found("Image plugin", source_plugin_id)
 
     # Get thumbnail path using protocol-defined method
     thumbnail_path = plugin.get_thumbnail_path(image_id)
@@ -163,7 +167,7 @@ async def get_image_thumbnail(image_id: str):
     # Fallback: generate thumbnail from image data
     image_data = await plugin_image_service.get_image_data(image_id)
     if not image_data:
-        raise HTTPException(status_code=404, detail="Image file not found")
+        raise ErrorResponse.not_found("Image file", image_id)
 
     # Generate thumbnail on the fly
     from io import BytesIO
@@ -201,7 +205,7 @@ async def get_image_thumbnail(image_id: str):
             },
         )
     except Exception as e:
-        raise HTTPException(status_code=500, detail=f"Failed to generate thumbnail: {str(e)}")
+        raise ErrorResponse.internal_error("Failed to generate thumbnail", e)
 
 
 @router.post("/images/next")
@@ -289,26 +293,23 @@ async def upload_image(file: UploadFile = File(...)):
     file_ext = Path(file.filename).suffix.lower()
     supported_formats = {".jpg", ".jpeg", ".png", ".webp", ".gif"}
     if file_ext not in supported_formats:
-        raise HTTPException(
-            status_code=400,
-            detail=f"Unsupported file format. Supported formats: {', '.join(supported_formats)}",
+        raise ErrorResponse.validation_error(
+            "file",
+            f"Unsupported file format. Supported formats: {', '.join(supported_formats)}",
         )
 
     # Validate file size (max 10MB)
     max_size = 10 * 1024 * 1024  # 10MB
     file_content = await file.read()
     if len(file_content) > max_size:
-        raise HTTPException(
-            status_code=400,
-            detail=f"File too large. Maximum size is {max_size / (1024 * 1024):.0f}MB",
+        raise ErrorResponse.validation_error(
+            "file", f"File too large. Maximum size is {max_size / (1024 * 1024):.0f}MB"
         )
 
     # Upload to plugin service (will try first plugin that supports upload)
     uploaded_image = await plugin_image_service.upload_image(file_content, file.filename)
     if not uploaded_image:
-        raise HTTPException(
-            status_code=500, detail="Failed to upload image: No plugin supports upload"
-        )
+        raise ErrorResponse.internal_error("Failed to upload image: No plugin supports upload")
 
     return {
         "message": "Image uploaded successfully",
@@ -330,6 +331,6 @@ async def delete_image(image_id: str):
     # Delete from plugin service (will find the plugin that owns the image)
     deleted = await plugin_image_service.delete_image(image_id)
     if not deleted:
-        raise HTTPException(status_code=404, detail="Image not found or deletion not supported")
+        raise ErrorResponse.not_found("Image", image_id)
 
     return {"message": "Image deleted successfully"}

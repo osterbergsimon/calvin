@@ -7,6 +7,14 @@ import zipfile
 from pathlib import Path
 from typing import Any
 
+from app.services.validation import (
+    validate_directory_structure,
+    validate_manifest_format_version,
+    validate_manifest_required_fields,
+    validate_theme_variables,
+    validate_zip_structure,
+)
+
 logger = logging.getLogger(__name__)
 
 # Constants
@@ -77,21 +85,15 @@ class ThemeInstaller:
             ValueError: If manifest is invalid
         """
         # Validate required fields
-        for field in REQUIRED_THEME_FIELDS:
-            if field not in manifest:
-                raise ValueError(f"Missing required field in theme.json: {field}")
+        validate_manifest_required_fields(manifest, REQUIRED_THEME_FIELDS, "theme.json")
 
         # Validate format version if specified
-        format_version = manifest.get("format_version", "1.0.0")
-        if format_version not in SUPPORTED_FORMAT_VERSIONS:
-            raise ValueError(
-                f"Unsupported theme format version: {format_version}. "
-                f"Supported versions: {', '.join(SUPPORTED_FORMAT_VERSIONS)}"
-            )
+        validate_manifest_format_version(
+            manifest, SUPPORTED_FORMAT_VERSIONS, default_version="1.0.0", manifest_type="theme.json"
+        )
 
         # Validate variables structure
-        if not isinstance(manifest["variables"], dict):
-            raise ValueError("variables must be an object")
+        validate_theme_variables(manifest["variables"])
 
     def validate_theme_package(self, theme_path: Path) -> dict[str, Any]:
         """
@@ -113,32 +115,16 @@ class ThemeInstaller:
         if not theme_path.suffix == ".zip":
             return self._validate_theme_directory(theme_path)
 
-        # For zip files, validate structure without extracting
-        with zipfile.ZipFile(theme_path, "r") as zip_ref:
-            # Find all theme.json files in the zip
-            theme_jsons = [name for name in zip_ref.namelist() if name.endswith("theme.json")]
+        # For zip files, use shared validation
+        manifest = validate_zip_structure(
+            zip_path=theme_path,
+            manifest_filename="theme.json",
+        )
 
-            if not theme_jsons:
-                raise ValueError("theme.json not found in theme package")
+        # Validate theme-specific fields
+        self._validate_manifest(manifest)
 
-            if len(theme_jsons) > 1:
-                raise ValueError(
-                    f"Zip file contains {len(theme_jsons)} themes. "
-                    "Zip files must contain exactly one theme."
-                )
-
-            # Read and validate the manifest from zip
-            theme_json_path = theme_jsons[0]
-            try:
-                with zip_ref.open(theme_json_path) as f:
-                    manifest = json.load(f)
-            except json.JSONDecodeError as e:
-                raise ValueError(f"Invalid JSON in theme.json: {e}")
-
-            # Validate manifest structure
-            self._validate_manifest(manifest)
-
-            return manifest
+        return manifest
 
     def _validate_theme_directory(self, theme_dir: Path) -> dict[str, Any]:
         """
@@ -153,19 +139,13 @@ class ThemeInstaller:
         Raises:
             ValueError: If theme directory is invalid
         """
-        # Check for theme.json
-        manifest_path = theme_dir / "theme.json"
-        if not manifest_path.exists():
-            raise ValueError(f"theme.json not found in {theme_dir}")
+        # Use shared validation for directory structure
+        manifest = validate_directory_structure(
+            directory=theme_dir,
+            manifest_filename="theme.json",
+        )
 
-        # Load and validate manifest
-        try:
-            with open(manifest_path, encoding="utf-8") as f:
-                manifest = json.load(f)
-        except json.JSONDecodeError as e:
-            raise ValueError(f"Invalid JSON in theme.json: {e}")
-
-        # Validate manifest structure
+        # Validate theme-specific fields
         self._validate_manifest(manifest)
 
         return manifest

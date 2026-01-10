@@ -20,11 +20,31 @@ app.use(VueQueryPlugin, {
       refetchOnReconnect: true,
       retry: 1,
       staleTime: 5 * 60 * 1000, // 5 minutes
+      // Enable caching for better performance
+      gcTime: 10 * 60 * 1000, // 10 minutes (cacheTime in v5+)
+      // Use network-first strategy for critical data
+      networkMode: "online",
+      // Enable structural sharing for better performance
+      structuralSharing: true,
     },
   },
 });
 
 // Initialize logger with config store getter
 initLogger(() => useConfigStore());
+
+// Register service worker for offline caching and performance
+if ("serviceWorker" in navigator && import.meta.env.PROD) {
+  window.addEventListener("load", () => {
+    navigator.serviceWorker
+      .register("/sw.js")
+      .then((registration) => {
+        console.log("Service Worker registered:", registration);
+      })
+      .catch((error) => {
+        console.error("Service Worker registration failed:", error);
+      });
+  });
+}
 
 app.mount("#app");

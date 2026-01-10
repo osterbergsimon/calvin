@@ -110,7 +110,20 @@ const services = computed(() => webServicesStore.services);
 const currentServiceIndex = computed(
   () => webServicesStore.currentServiceIndex,
 );
-const currentService = computed(() => webServicesStore.getCurrentService());
+const currentService = computed(() => {
+  const service = webServicesStore.getCurrentService();
+  if (service) {
+    console.log("[WebServiceViewer] Current service:", {
+      id: service.id,
+      name: service.name,
+      url: service.url,
+      config: service.config,
+      display_schema: service.display_schema,
+      plugin_id: service.plugin_id,
+    });
+  }
+  return service;
+});
 const loading = computed(() => webServicesStore.loading);
 
 // ServiceViewer now handles all service rendering logic
@@ -125,6 +138,7 @@ const close = () => {
 
   if (props.isFullscreen) {
     // Exit fullscreen mode - return to dashboard
+    // This will preserve the web service in the side panel
     modeStore.exitFullscreen();
   } else {
     // Return to calendar mode (home view)
@@ -155,6 +169,7 @@ const toggleFullscreen = () => {
 
   if (props.isFullscreen) {
     // Exit fullscreen - return to dashboard
+    // This will preserve the web service in the side panel
     modeStore.exitFullscreen();
   } else {
     // Enter fullscreen web services

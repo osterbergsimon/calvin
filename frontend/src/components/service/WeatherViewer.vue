@@ -18,6 +18,7 @@
     <WeatherWidget
       v-else-if="query.data.value"
       :data="query.data.value"
+      :service-name="serviceName"
       @refresh="query.refetch()"
     />
   </div>
@@ -31,6 +32,10 @@ const props = defineProps({
   serviceId: {
     type: String,
     required: true,
+  },
+  serviceName: {
+    type: String,
+    default: null,
   },
 });
 
@@ -95,4 +100,3 @@ const query = useWeatherData(props.serviceId, true);
   background: var(--bg-tertiary);
 }
 </style>
-

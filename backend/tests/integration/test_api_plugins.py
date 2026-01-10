@@ -26,10 +26,11 @@ class TestPluginInstallationAPI:
                         pass
         except Exception:
             pass
-        
+
         # Only clean up test-specific themes (don't remove user's themes)
         try:
             from app.services.theme_installer import theme_installer
+
             installed_themes = theme_installer.get_installed_themes()
             for theme in installed_themes:
                 # Only uninstall test themes (those starting with "test_")
@@ -50,16 +51,19 @@ class TestPluginInstallationAPI:
             # Response might be {"plugins": []} or just []
             if isinstance(data, dict):
                 assert "plugins" in data
-                # Filter out themes and test plugins - we're only testing that non-test plugins exist
+                # Filter out themes and test plugins - we're only testing
+                # that non-test plugins exist
                 # This test just verifies the endpoint works, not that it's empty
                 # (user may have real plugins installed)
                 _ = [
-                    p for p in data["plugins"] 
+                    p
+                    for p in data["plugins"]
                     if p.get("type") != "theme" and not p.get("id", "").startswith("test_")
                 ]
             else:
                 _ = [
-                    p for p in data 
+                    p
+                    for p in data
                     if p.get("type") != "theme" and not p.get("id", "").startswith("test_")
                 ]
 
@@ -232,7 +236,8 @@ def register_plugin_types() -> list[dict[str, Any]]:
             plugins = data.get("plugins", data) if isinstance(data, dict) else data
             # Filter out themes and non-test plugins - only test plugins should be gone
             plugins_only = [
-                p for p in plugins 
+                p
+                for p in plugins
                 if p.get("type") != "theme" and not p.get("id", "").startswith("test_")
             ]
             # The test plugin should be gone, but user's plugins may remain

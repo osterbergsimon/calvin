@@ -12,9 +12,9 @@
     <div v-else-if="data" class="service-data-content">
       <!-- Render based on display_schema render_template -->
       <!-- Generic component-based rendering -->
-      <component 
-        v-if="component"
+      <component
         :is="component"
+        v-if="component"
         :data="data"
         @refresh="loadData"
       />
@@ -59,7 +59,10 @@ const component = computed(() => {
 
 const getApiEndpoint = () => {
   if (props.service.display_schema?.api_endpoint) {
-    return props.service.display_schema.api_endpoint.replace("{service_id}", props.service.id);
+    return props.service.display_schema.api_endpoint.replace(
+      "{service_id}",
+      props.service.id,
+    );
   }
   return props.service.url;
 };
@@ -89,7 +92,7 @@ const loadData = async () => {
     const apiEndpoint = getApiEndpoint();
     const response = await axios.get(apiEndpoint);
     data.value = response.data;
-    
+
     // Cache the response
     setCachedData(cacheKey, response.data);
   } catch (err) {
@@ -97,14 +100,19 @@ const loadData = async () => {
     if (connectionStore.isFullyOnline()) {
       const cachedData = getCachedData(cacheKey, cacheTTL);
       if (cachedData) {
-        console.log(`[ServiceViewer] Request failed, using cached data for ${props.service.id}`);
+        console.log(
+          `[ServiceViewer] Request failed, using cached data for ${props.service.id}`,
+        );
         data.value = cachedData;
         loading.value = false;
         return;
       }
     }
-    
-    error.value = err.response?.data?.detail || err.message || "Failed to load service data";
+
+    error.value =
+      err.response?.data?.detail ||
+      err.message ||
+      "Failed to load service data";
     console.error("Error loading service data:", err);
     data.value = { error: error.value };
   } finally {
@@ -120,7 +128,7 @@ watch(
     error.value = null;
     loadData();
   },
-  { immediate: true }
+  { immediate: true },
 );
 </script>
 
@@ -207,4 +215,3 @@ watch(
   word-wrap: break-word;
 }
 </style>
-

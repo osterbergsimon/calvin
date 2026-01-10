@@ -1,11 +1,36 @@
 <template>
   <LayoutManager>
     <div class="dashboard">
+      <!-- Horizontal Clock Bar at Top -->
+      <ClockBarHorizontal
+        v-if="showHorizontalBarTop"
+        position="top"
+        :show-in-non-kiosk="configStore.clockBarShowInNonKiosk"
+        :show-in-kiosk="configStore.clockBarShowInKiosk"
+        :enabled="true"
+      />
+
       <div v-if="configStore.shouldShowUI" class="dashboard-header">
         <h1>Calvin Dashboard</h1>
+        <!-- Legacy clock widget in header (for backwards compatibility) -->
         <Clock
-          v-if="configStore.clockEnabled"
+          v-if="
+            configStore.clockEnabled &&
+            configStore.clockDisplayMode === 'header'
+          "
           :display-mode="configStore.clockDisplayMode"
+          :show-date="configStore.clockShowDate"
+        />
+        <!-- New clock widget in header -->
+        <Clock
+          v-if="
+            configStore.clockWidgetEnabled &&
+            !configStore.clockWidgetShowInKiosk &&
+            (configStore.clockWidgetPosition === 'top-left' ||
+              configStore.clockWidgetPosition === 'top-right' ||
+              configStore.clockWidgetPosition === 'top-center')
+          "
+          :display-mode="'header'"
           :show-date="configStore.clockShowDate"
         />
         <div class="header-controls">
@@ -61,7 +86,7 @@
 
       <!-- Minimal UI overlay (shown when UI is hidden) -->
       <MinimalUIOverlay v-if="!configStore.shouldShowUI" />
-      <ModeIndicator />
+      <!-- ModeIndicator removed - functionality merged into NotificationSystem -->
 
       <!-- Connection indicator (shown when offline) -->
       <ConnectionIndicator
@@ -69,14 +94,16 @@
         :show-label="configStore.shouldShowUI"
       />
 
-      <!-- Clock (when display mode is 'always' - only shown when UI is off) -->
+      <!-- Clock Widget in Kiosk Mode -->
       <Clock
         v-if="
-          configStore.clockEnabled &&
-          configStore.clockDisplayMode === 'always' &&
-          !configStore.shouldShowUI
+          (configStore.clockWidgetEnabled &&
+            configStore.clockWidgetShowInKiosk) ||
+          (configStore.clockEnabled &&
+            configStore.clockDisplayMode === 'always' &&
+            !configStore.shouldShowUI)
         "
-        :display-mode="configStore.clockDisplayMode"
+        :display-mode="'always'"
         :show-date="configStore.clockShowDate"
         :class="clockClass"
       />
@@ -110,64 +137,138 @@
             sideViewPositionClass,
           ]"
         >
-          <!-- Calendar Section (configurable percentage) -->
-          <div
-            class="calendar-section"
-            :style="{ width: calendarWidth, height: calendarHeight }"
-          >
-            <CalendarView />
-          </div>
+          <!-- Render elements in computed order - no CSS order needed! -->
+          <template v-for="elementType in layoutOrder" :key="elementType">
+            <!-- Vertical Clock Bar at Left -->
+            <ClockBarVertical
+              v-if="elementType === 'verticalBarLeft'"
+              position="left"
+              :show-in-non-kiosk="configStore.clockBarShowInNonKiosk"
+              :show-in-kiosk="configStore.clockBarShowInKiosk"
+              :enabled="true"
+            />
 
-          <!-- Right/Bottom Section (secondary view) - Shows current mode content -->
-          <div
-            class="secondary-section"
-            :style="{ width: secondaryWidth, height: secondaryHeight }"
-          >
-            <!-- Show content based on current mode -->
-            <!-- When in calendar mode, show last side view mode (preserve state) -->
-            <WebServiceViewer
-              v-if="
-                modeStore.currentMode === modeStore.MODES.WEB_SERVICES ||
-                (modeStore.currentMode === modeStore.MODES.CALENDAR &&
-                  configStore.lastSideViewMode === 'web_services')
-              "
-              :is-fullscreen="false"
+            <!-- Calendar Section -->
+            <div
+              v-else-if="elementType === 'calendar'"
+              class="calendar-section"
+              :style="{
+                width: calendarWidth,
+                height: calendarHeight,
+              }"
+            >
+              <CalendarView />
+            </div>
+
+            <!-- Horizontal Clock Bar Between (Portrait) -->
+            <ClockBarHorizontal
+              v-else-if="elementType === 'horizontalBarBetween'"
+              position="between"
+              :show-in-non-kiosk="configStore.clockBarShowInNonKiosk"
+              :show-in-kiosk="configStore.clockBarShowInKiosk"
+              :enabled="true"
             />
-            <PhotoSlideshow
-              v-else-if="
-                modeStore.currentMode === modeStore.MODES.PHOTOS ||
-                (modeStore.currentMode === modeStore.MODES.CALENDAR &&
-                  configStore.lastSideViewMode !== 'web_services')
-              "
-              :is-fullscreen="false"
-              :auto-rotate="true"
-              :rotation-interval="configStore.photoRotationInterval * 1000"
+
+            <!-- Vertical Clock Bar Between (Landscape) -->
+            <ClockBarVertical
+              v-else-if="elementType === 'verticalBarBetween'"
+              position="between"
+              :show-in-non-kiosk="configStore.clockBarShowInNonKiosk"
+              :show-in-kiosk="configStore.clockBarShowInKiosk"
+              :enabled="true"
             />
-          </div>
+
+            <!-- Secondary Section -->
+            <div
+              v-else-if="elementType === 'secondary'"
+              class="secondary-section"
+              :style="{
+                width: secondaryWidth,
+                height: secondaryHeight,
+              }"
+            >
+              <!-- Show content based on current mode -->
+              <!-- When in calendar mode, show last side view mode (preserve state) -->
+              <WebServiceViewer
+                v-if="
+                  modeStore.currentMode === modeStore.MODES.WEB_SERVICES ||
+                  (modeStore.currentMode === modeStore.MODES.CALENDAR &&
+                    configStore.lastSideViewMode === 'web_services')
+                "
+                :is-fullscreen="false"
+              />
+              <PhotoSlideshow
+                v-else-if="
+                  modeStore.currentMode === modeStore.MODES.PHOTOS ||
+                  (modeStore.currentMode === modeStore.MODES.CALENDAR &&
+                    configStore.lastSideViewMode !== 'web_services')
+                "
+                :is-fullscreen="false"
+                :auto-rotate="true"
+                :rotation-interval="configStore.photoRotationInterval * 1000"
+              />
+            </div>
+
+            <!-- Vertical Clock Bar at Right -->
+            <ClockBarVertical
+              v-else-if="elementType === 'verticalBarRight'"
+              position="right"
+              :show-in-non-kiosk="configStore.clockBarShowInNonKiosk"
+              :show-in-kiosk="configStore.clockBarShowInKiosk"
+              :enabled="true"
+            />
+          </template>
         </div>
+
+        <!-- Horizontal Clock Bar at Bottom -->
+        <ClockBarHorizontal
+          v-if="showHorizontalBarBottom"
+          position="bottom"
+          :show-in-non-kiosk="configStore.clockBarShowInNonKiosk"
+          :show-in-kiosk="configStore.clockBarShowInKiosk"
+          :enabled="true"
+        />
       </div>
     </div>
   </LayoutManager>
 </template>
 
 <script setup>
-import { ref, onMounted, onUnmounted, computed, watch } from "vue";
+import {
+  ref,
+  onMounted,
+  onUnmounted,
+  computed,
+  watch,
+  defineAsyncComponent,
+} from "vue";
 import axios from "axios";
 import LayoutManager from "../components/LayoutManager.vue";
-import CalendarView from "../components/CalendarView.vue";
-import PhotoSlideshow from "../components/PhotoSlideshow.vue";
-import WebServiceViewer from "../components/WebServiceViewer.vue";
 import MinimalUIOverlay from "../components/MinimalUIOverlay.vue";
-import ModeIndicator from "../components/ModeIndicator.vue";
-import Clock from "../components/Clock.vue";
+import Clock from "../components/Clock.vue"; // Legacy - keeping for backwards compatibility
+import ClockBarHorizontal from "../components/ClockBarHorizontal.vue";
+import ClockBarVertical from "../components/ClockBarVertical.vue";
 import ConnectionIndicator from "../components/ConnectionIndicator.vue";
+
+// Lazy load mode-specific components for better code splitting
+const CalendarView = defineAsyncComponent(
+  () => import("../components/CalendarView.vue"),
+);
+const PhotoSlideshow = defineAsyncComponent(
+  () => import("../components/PhotoSlideshow.vue"),
+);
+const WebServiceViewer = defineAsyncComponent(
+  () => import("../components/WebServiceViewer.vue"),
+);
 import { useConfigStore } from "../stores/config";
 import { useModeStore } from "../stores/mode";
-import { useRouter } from "vue-router";
+import { useRouter, useRoute } from "vue-router";
+import { getLayoutOrder } from "../utils/layout";
 
 const configStore = useConfigStore();
 const modeStore = useModeStore();
 const router = useRouter();
+const route = useRoute();
 
 const status = ref("checking...");
 const statusClass = computed(() => {
@@ -231,10 +332,85 @@ const sideViewPositionIcon = computed(() => {
 });
 
 const clockClass = computed(() => {
-  return [
-    "clock-overlay",
-    "position-" + (configStore.clockPosition || "top-right"),
-  ];
+  // Use new widget position if widget is enabled, otherwise fall back to legacy position
+  const position =
+    configStore.clockWidgetEnabled && configStore.clockWidgetPosition
+      ? configStore.clockWidgetPosition
+      : configStore.clockPosition || "top-right";
+  return ["clock-overlay", "position-" + position];
+});
+
+// Computed properties for clock bar rendering
+const shouldShowHorizontalBar = computed(() => {
+  return (
+    configStore.clockBarEnabled && configStore.clockBarMode === "horizontal"
+  );
+});
+
+const shouldShowVerticalBar = computed(() => {
+  return configStore.clockBarEnabled && configStore.clockBarMode === "vertical";
+});
+
+const showHorizontalBarTop = computed(() => {
+  return (
+    shouldShowHorizontalBar.value &&
+    configStore.clockBarPosition === "top" &&
+    (configStore.clockBarShowInNonKiosk || configStore.clockBarShowInKiosk)
+  );
+});
+
+const showHorizontalBarBottom = computed(() => {
+  return (
+    shouldShowHorizontalBar.value &&
+    configStore.clockBarPosition === "bottom" &&
+    (configStore.clockBarShowInNonKiosk || configStore.clockBarShowInKiosk)
+  );
+});
+
+const showHorizontalBarBetween = computed(() => {
+  return (
+    shouldShowHorizontalBar.value &&
+    configStore.clockBarPosition === "between" &&
+    configStore.orientation === "portrait" &&
+    (configStore.clockBarShowInNonKiosk || configStore.clockBarShowInKiosk)
+  );
+});
+
+const showVerticalBarLeft = computed(() => {
+  return (
+    shouldShowVerticalBar.value &&
+    configStore.clockBarPosition === "left" &&
+    (configStore.clockBarShowInNonKiosk || configStore.clockBarShowInKiosk)
+  );
+});
+
+const showVerticalBarRight = computed(() => {
+  return (
+    shouldShowVerticalBar.value &&
+    configStore.clockBarPosition === "right" &&
+    (configStore.clockBarShowInNonKiosk || configStore.clockBarShowInKiosk)
+  );
+});
+
+const showVerticalBarBetween = computed(() => {
+  return (
+    shouldShowVerticalBar.value &&
+    configStore.clockBarPosition === "between" &&
+    configStore.orientation === "landscape" &&
+    (configStore.clockBarShowInNonKiosk || configStore.clockBarShowInKiosk)
+  );
+});
+
+// Computed layout order - determines the order elements should be rendered
+const layoutOrder = computed(() => {
+  return getLayoutOrder({
+    orientation: configStore.orientation,
+    sideViewPosition: configStore.sideViewPosition,
+    showVerticalBarLeft: showVerticalBarLeft.value,
+    showVerticalBarRight: showVerticalBarRight.value,
+    showVerticalBarBetween: showVerticalBarBetween.value,
+    showHorizontalBarBetween: showHorizontalBarBetween.value,
+  });
 });
 
 const toggleOrientation = () => {
@@ -323,6 +499,19 @@ watch(
   () => configStore.configPollInterval,
   () => {
     startConfigPolling();
+  },
+);
+
+// Watch for route changes to reload config when returning from settings
+watch(
+  () => route.path,
+  async (newPath) => {
+    if (newPath === "/") {
+      // Reload config when returning to dashboard
+      await configStore.fetchConfig();
+      // Restore previous mode if returning from settings
+      modeStore.returnFromSettings();
+    }
   },
 );
 
@@ -549,39 +738,8 @@ onUnmounted(() => {
   flex-direction: row; /* Landscape: side by side */
 }
 
-/* Side view position: Landscape (left/right) */
-.mode-content.dashboard-view.layout-landscape.side-left .calendar-section {
-  order: 2; /* Calendar on right */
-}
-
-.mode-content.dashboard-view.layout-landscape.side-left .secondary-section {
-  order: 1; /* Secondary on left */
-}
-
-.mode-content.dashboard-view.layout-landscape.side-right .calendar-section {
-  order: 1; /* Calendar on left */
-}
-
-.mode-content.dashboard-view.layout-landscape.side-right .secondary-section {
-  order: 2; /* Secondary on right */
-}
-
-/* Side view position: Portrait (top/bottom) */
-.mode-content.dashboard-view.layout-portrait.side-top .calendar-section {
-  order: 2; /* Calendar on bottom */
-}
-
-.mode-content.dashboard-view.layout-portrait.side-top .secondary-section {
-  order: 1; /* Secondary on top */
-}
-
-.mode-content.dashboard-view.layout-portrait.side-bottom .calendar-section {
-  order: 1; /* Calendar on top */
-}
-
-.mode-content.dashboard-view.layout-portrait.side-bottom .secondary-section {
-  order: 2; /* Secondary on bottom */
-}
+/* Clock bar positioning is now handled via inline styles using computed order values */
+/* This makes the layout more maintainable and less dependent on CSS specificity */
 
 .mode-content.photos-mode,
 .mode-content.web-services-mode {
@@ -638,6 +796,12 @@ onUnmounted(() => {
   left: 0.5rem;
 }
 
+.clock-overlay.position-top-center {
+  top: 0.5rem;
+  left: 50%;
+  transform: translateX(-50%);
+}
+
 .clock-overlay.position-top-right {
   top: 0.5rem;
   right: 1rem;
@@ -647,6 +811,12 @@ onUnmounted(() => {
 .clock-overlay.position-bottom-left {
   bottom: 0.5rem;
   left: 0.5rem;
+}
+
+.clock-overlay.position-bottom-center {
+  bottom: 0.5rem;
+  left: 50%;
+  transform: translateX(-50%);
 }
 
 .clock-overlay.position-bottom-right {

@@ -10,7 +10,12 @@ try:
 except ImportError:
     pytz = None  # pytz not available, will use system timezone
 
+import logging
+
 from app.services.config_service import config_service
+from app.utils.platform import has_x11, is_raspberry_pi
+
+logger = logging.getLogger(__name__)
 
 
 class DisplayPowerService:
@@ -199,82 +204,84 @@ class DisplayPowerService:
         # Try multiple methods to ensure display turns on
 
         # Method 1: vcgencmd (Raspberry Pi HDMI power control)
-        try:
-            result = subprocess.run(
-                ["vcgencmd", "display_power", "1"],
-                capture_output=True,
-                text=True,
-                timeout=5,
-            )
-            if result.returncode == 0:
-                print(f"Display turned on via vcgencmd: {result.stdout.strip()}")
-            else:
-                print(f"vcgencmd returned non-zero: {result.stderr}")
-        except (subprocess.TimeoutExpired, FileNotFoundError) as e:
-            print(f"vcgencmd failed: {e}")
+        if is_raspberry_pi():
+            try:
+                result = subprocess.run(
+                    ["vcgencmd", "display_power", "1"],
+                    capture_output=True,
+                    text=True,
+                    timeout=5,
+                )
+                if result.returncode == 0:
+                    logger.debug(f"Display turned on via vcgencmd: {result.stdout.strip()}")
+                else:
+                    logger.debug(f"vcgencmd returned non-zero: {result.stderr}")
+            except (subprocess.TimeoutExpired, FileNotFoundError) as e:
+                logger.debug(f"vcgencmd failed: {e}")
 
         # Method 2: xset dpms force on (X11 DPMS wake)
-        try:
-            result = subprocess.run(
-                ["xset", "dpms", "force", "on"],
-                capture_output=True,
-                text=True,
-                timeout=5,
-                env=x11_env,
-            )
-            if result.returncode == 0:
-                print("Display turned on via xset dpms force on")
-            else:
-                print(f"xset dpms force on returned non-zero: {result.stderr}")
-        except (subprocess.TimeoutExpired, FileNotFoundError) as e:
-            print(f"xset dpms force on failed: {e}")
+        if has_x11():
+            try:
+                result = subprocess.run(
+                    ["xset", "dpms", "force", "on"],
+                    capture_output=True,
+                    text=True,
+                    timeout=5,
+                    env=x11_env,
+                )
+                if result.returncode == 0:
+                    logger.debug("Display turned on via xset dpms force on")
+                else:
+                    logger.debug(f"xset dpms force on returned non-zero: {result.stderr}")
+            except (subprocess.TimeoutExpired, FileNotFoundError) as e:
+                logger.debug(f"xset dpms force on failed: {e}")
 
-        # Method 3: Disable DPMS and wake display
-        try:
-            # Disable DPMS temporarily to wake display
-            subprocess.run(
-                ["xset", "-dpms"],
-                capture_output=True,
-                timeout=5,
-                env=x11_env,
-            )
-            # Re-enable DPMS
-            subprocess.run(
-                ["xset", "+dpms"],
-                capture_output=True,
-                timeout=5,
-                env=x11_env,
-            )
-            # Force display on
-            result = subprocess.run(
-                ["xset", "dpms", "force", "on"],
-                capture_output=True,
-                text=True,
-                timeout=5,
-                env=x11_env,
-            )
-            if result.returncode == 0:
-                print("Display turned on via xset dpms cycle")
-            else:
-                print(f"xset dpms cycle returned non-zero: {result.stderr}")
-        except (subprocess.TimeoutExpired, FileNotFoundError) as e:
-            print(f"xset dpms cycle failed: {e}")
+            # Method 3: Disable DPMS and wake display
+            try:
+                # Disable DPMS temporarily to wake display
+                subprocess.run(
+                    ["xset", "-dpms"],
+                    capture_output=True,
+                    timeout=5,
+                    env=x11_env,
+                )
+                # Re-enable DPMS
+                subprocess.run(
+                    ["xset", "+dpms"],
+                    capture_output=True,
+                    timeout=5,
+                    env=x11_env,
+                )
+                # Force display on
+                result = subprocess.run(
+                    ["xset", "dpms", "force", "on"],
+                    capture_output=True,
+                    text=True,
+                    timeout=5,
+                    env=x11_env,
+                )
+                if result.returncode == 0:
+                    logger.debug("Display turned on via xset dpms cycle")
+                else:
+                    logger.debug(f"xset dpms cycle returned non-zero: {result.stderr}")
+            except (subprocess.TimeoutExpired, FileNotFoundError) as e:
+                logger.debug(f"xset dpms cycle failed: {e}")
 
-        # Method 4: Send a dummy key event to wake display (if xdotool is available)
-        try:
-            result = subprocess.run(
-                ["xdotool", "key", "Shift"],
-                capture_output=True,
-                text=True,
-                timeout=5,
-                env=x11_env,
-            )
-            if result.returncode == 0:
-                print("Display woken via xdotool")
-            else:
-                print(f"xdotool returned non-zero: {result.stderr}")
-        except (subprocess.TimeoutExpired, FileNotFoundError):
-            pass  # xdotool not available, skip
+            # Method 4: Send a dummy key event to wake display (if xdotool is available)
+            try:
+                result = subprocess.run(
+                    ["xdotool", "key", "Shift"],
+                    capture_output=True,
+                    text=True,
+                    timeout=5,
+                    env=x11_env,
+                )
+                if result.returncode == 0:
+                    logger.debug("Display woken via xdotool")
+                else:
+                    logger.debug(f"xdotool returned non-zero: {result.stderr}")
+            except (subprocess.TimeoutExpired, FileNotFoundError):
+                pass  # xdotool not available, skip silently
 
     async def turn_display_off(self):
         """Turn display off."""
@@ -288,54 +295,57 @@ class DisplayPowerService:
         # Try multiple methods to ensure display turns off
 
         # Method 1: vcgencmd (Raspberry Pi HDMI power control)
-        try:
-            result = subprocess.run(
-                ["vcgencmd", "display_power", "0"],
-                capture_output=True,
-                text=True,
-                timeout=5,
-            )
-            if result.returncode == 0:
-                print(f"Display turned off via vcgencmd: {result.stdout.strip()}")
-            else:
-                print(f"vcgencmd returned non-zero: {result.stderr}")
-        except (subprocess.TimeoutExpired, FileNotFoundError) as e:
-            print(f"vcgencmd failed: {e}")
+        if is_raspberry_pi():
+            try:
+                result = subprocess.run(
+                    ["vcgencmd", "display_power", "0"],
+                    capture_output=True,
+                    text=True,
+                    timeout=5,
+                )
+                if result.returncode == 0:
+                    logger.debug(f"Display turned off via vcgencmd: {result.stdout.strip()}")
+                else:
+                    logger.debug(f"vcgencmd returned non-zero: {result.stderr}")
+            except (subprocess.TimeoutExpired, FileNotFoundError) as e:
+                logger.debug(f"vcgencmd failed: {e}")
 
         # Method 2: xset dpms force off (X11 DPMS sleep)
-        try:
-            result = subprocess.run(
-                ["xset", "dpms", "force", "off"],
-                capture_output=True,
-                text=True,
-                timeout=5,
-                env=x11_env,
-            )
-            if result.returncode == 0:
-                print("Display turned off via xset dpms force off")
-            else:
-                print(f"xset dpms force off returned non-zero: {result.stderr}")
-        except (subprocess.TimeoutExpired, FileNotFoundError) as e:
-            print(f"xset dpms force off failed: {e}")
+        if has_x11():
+            try:
+                result = subprocess.run(
+                    ["xset", "dpms", "force", "off"],
+                    capture_output=True,
+                    text=True,
+                    timeout=5,
+                    env=x11_env,
+                )
+                if result.returncode == 0:
+                    logger.debug("Display turned off via xset dpms force off")
+                else:
+                    logger.debug(f"xset dpms force off returned non-zero: {result.stderr}")
+            except (subprocess.TimeoutExpired, FileNotFoundError) as e:
+                logger.debug(f"xset dpms force off failed: {e}")
 
     async def get_display_state(self) -> dict:
         """Get current display power state."""
-        try:
-            # Try vcgencmd first
-            result = subprocess.run(
-                ["vcgencmd", "display_power"],
-                capture_output=True,
-                text=True,
-                timeout=5,
-            )
-            if result.returncode == 0:
-                # Parse output like "display_power=1"
-                output = result.stdout.strip()
-                if "=" in output:
-                    state = output.split("=")[1]
-                    return {"state": "on" if state == "1" else "off", "method": "vcgencmd"}
-        except (subprocess.TimeoutExpired, FileNotFoundError):
-            pass
+        # Try vcgencmd first (Raspberry Pi only)
+        if is_raspberry_pi():
+            try:
+                result = subprocess.run(
+                    ["vcgencmd", "display_power"],
+                    capture_output=True,
+                    text=True,
+                    timeout=5,
+                )
+                if result.returncode == 0:
+                    # Parse output like "display_power=1"
+                    output = result.stdout.strip()
+                    if "=" in output:
+                        state = output.split("=")[1]
+                        return {"state": "on" if state == "1" else "off", "method": "vcgencmd"}
+            except (subprocess.TimeoutExpired, FileNotFoundError):
+                pass
 
         # Fallback: assume on if we can't determine
         return {"state": "unknown", "method": "unknown"}
@@ -365,6 +375,11 @@ class DisplayPowerService:
             "HOME": "/home/calvin",
             "XAUTHORITY": "/home/calvin/.Xauthority",
         }
+
+        # Only attempt xset commands if X11 is available
+        if not has_x11():
+            logger.debug("X11 not available, skipping display timeout configuration")
+            return
 
         # Only enable timeout if explicitly enabled AND timeout > 0
         # Default: keep display on (disable timeout)

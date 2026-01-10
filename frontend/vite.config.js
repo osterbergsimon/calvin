@@ -82,13 +82,57 @@ export default defineConfig({
   },
   build: {
     rollupOptions: {
-      // Ensure plugin components are included in the build
-      // Vite's glob will automatically include them, but we can be explicit
+      // Optimize chunk splitting for better caching
       output: {
-        // Use consistent chunk naming for better caching
-        manualChunks: undefined, // Let Vite handle chunking automatically
+        manualChunks: (id) => {
+          // Split vendor chunks
+          if (id.includes("node_modules")) {
+            // Vue ecosystem
+            if (
+              id.includes("vue") ||
+              id.includes("vue-router") ||
+              id.includes("pinia")
+            ) {
+              return "vendor-vue";
+            }
+            // Vue Query
+            if (id.includes("@tanstack/vue-query")) {
+              return "vendor-query";
+            }
+            // VueUse
+            if (id.includes("@vueuse")) {
+              return "vendor-vueuse";
+            }
+            // Other large dependencies
+            if (id.includes("axios") || id.includes("vuedraggable")) {
+              return "vendor-utils";
+            }
+            // All other node_modules
+            return "vendor";
+          }
+          // Split plugin components into separate chunks
+          if (id.includes("/components/plugins/")) {
+            return "plugins";
+          }
+          // Split settings components into separate chunks
+          if (id.includes("/components/settings/")) {
+            return "settings";
+          }
+        },
+        // Optimize chunk file names for caching
+        chunkFileNames: "assets/js/[name]-[hash].js",
+        entryFileNames: "assets/js/[name]-[hash].js",
+        assetFileNames: "assets/[ext]/[name]-[hash].[ext]",
+      },
+      // Enable tree shaking
+      treeshake: {
+        preset: "recommended",
       },
     },
+    // Optimize chunk size warnings
+    chunkSizeWarningLimit: 1000,
+    // Enable source maps for production debugging (optional)
+    sourcemap: false,
   },
   server: {
     proxy: {

@@ -49,7 +49,9 @@ export const useThemesStore = defineStore("themes", () => {
     try {
       const response = await axios.get("/api/plugins/installed");
       // Filter to only themes
-      response.data.plugins = (response.data.plugins || []).filter(p => p.type === "theme");
+      response.data.plugins = (response.data.plugins || []).filter(
+        (p) => p.type === "theme",
+      );
       installedThemes.value = response.data.themes || [];
       return installedThemes.value;
     } catch (err) {
@@ -94,7 +96,10 @@ export const useThemesStore = defineStore("themes", () => {
       await fetchThemes();
       await fetchInstalledThemes();
 
-      logInfo("[ThemesStore]", `Theme installed: ${response.data.manifest?.id}`);
+      logInfo(
+        "[ThemesStore]",
+        `Theme installed: ${response.data.manifest?.id}`,
+      );
       return response.data;
     } catch (err) {
       error.value = err.message;
@@ -108,11 +113,15 @@ export const useThemesStore = defineStore("themes", () => {
   /**
    * Install a theme from GitHub
    */
-  const installThemeFromGitHub = async (repoUrl, themePath, branch = "main") => {
+  const installThemeFromGitHub = async (
+    repoUrl,
+    themePath,
+    branch = "main",
+  ) => {
     loading.value = true;
     error.value = null;
     try {
-      const response = await axios.post("/api/plugins/install-from-github", {
+      const response = await axios.post("/api/plugins/github/install", {
         repo_url: repoUrl,
         theme_path: themePath,
         branch: branch,
@@ -122,7 +131,10 @@ export const useThemesStore = defineStore("themes", () => {
       await fetchThemes();
       await fetchInstalledThemes();
 
-      logInfo("[ThemesStore]", `Theme installed from GitHub: ${response.data.manifest?.id}`);
+      logInfo(
+        "[ThemesStore]",
+        `Theme installed from GitHub: ${response.data.manifest?.id}`,
+      );
       return response.data;
     } catch (err) {
       error.value = err.message;
@@ -140,11 +152,9 @@ export const useThemesStore = defineStore("themes", () => {
     loading.value = true;
     error.value = null;
     try {
-      const response = await axios.get("/api/plugins/enumerate-from-github", {
-        params: {
-          repo_url: repoUrl,
-          branch: branch,
-        },
+      const response = await axios.post("/api/plugins/github/enumerate", {
+        repo_url: repoUrl,
+        branch: branch,
       });
       // Extract themes from response (plugins API returns both plugins and themes)
       if (response.data.themes) {
@@ -224,4 +234,3 @@ export const useThemesStore = defineStore("themes", () => {
     customThemes,
   };
 });
-

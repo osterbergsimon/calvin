@@ -64,7 +64,7 @@ class TestPluginRegistry:
         assert plugin_registry_instance._initialized is True
 
     @pytest.mark.asyncio
-    @patch("app.plugins.registry.plugin_loader")
+    @patch("app.plugins.registry.loader.plugin_loader")
     @patch("app.plugins.registry.instance_manager")
     async def test_load_plugins_from_db_existing_instance(
         self,
@@ -121,8 +121,8 @@ class TestPluginRegistry:
         assert plugin_registry_instance._initialized is True
 
     @pytest.mark.asyncio
-    @patch("app.plugins.registry.plugin_loader")
-    @patch("app.plugins.registry.instance_manager")
+    @patch("app.plugins.registry.manager.plugin_loader")
+    @patch("app.plugins.registry.manager.instance_manager")
     async def test_register_plugin(
         self,
         mock_instance_manager,
@@ -132,9 +132,13 @@ class TestPluginRegistry:
     ):
         """Test registering a new plugin."""
         # Mock plugin creation
+        from app.plugins.base import PluginType
+
         mock_plugin = MagicMock()
         mock_plugin.configure = AsyncMock()
         mock_plugin.initialize = AsyncMock()
+        mock_plugin.plugin_type = PluginType.SERVICE  # Required attribute
+        mock_plugin.plugin_id = "test-1"  # Required attribute
         mock_plugin_loader.create_plugin_instance.return_value = mock_plugin
 
         # Mock plugin types
@@ -189,7 +193,7 @@ class TestPluginRegistry:
             assert db_plugin.enabled is True
 
     @pytest.mark.asyncio
-    @patch("app.plugins.registry.plugin_loader")
+    @patch("app.plugins.registry.manager.plugin_loader")
     async def test_register_plugin_failed_creation(
         self,
         mock_plugin_loader,
@@ -207,7 +211,7 @@ class TestPluginRegistry:
             )
 
     @pytest.mark.asyncio
-    @patch("app.plugins.registry.instance_manager")
+    @patch("app.plugins.registry.manager.instance_manager")
     async def test_unregister_plugin(
         self,
         mock_instance_manager,
@@ -215,10 +219,12 @@ class TestPluginRegistry:
         test_db,
     ):
         """Test unregistering a plugin."""
-        # Create a plugin in database
+        # Create a plugin in database using AsyncSessionLocal (which is patched by test_db)
+        from app.database import AsyncSessionLocal
         from app.models.db_models import PluginDB
 
-        async with test_db as session:
+        # Use AsyncSessionLocal directly (it's patched by test_db fixture)
+        async with AsyncSessionLocal() as session:
             db_plugin = PluginDB(
                 id="test-1",
                 type_id="test_plugin",
@@ -269,7 +275,7 @@ class TestPluginRegistry:
         assert result is False
 
     @pytest.mark.asyncio
-    @patch("app.plugins.registry.plugin_loader")
+    @patch("app.plugins.registry.loader.plugin_loader")
     async def test_load_plugin_types_new(
         self,
         mock_plugin_loader,
@@ -290,7 +296,9 @@ class TestPluginRegistry:
             }
         ]
 
-        await plugin_registry_instance._load_plugin_types()
+        from app.plugins.registry.loader import load_plugin_types
+
+        await load_plugin_types()
 
         # Verify plugin type was created in database
         from sqlalchemy import select
@@ -308,7 +316,7 @@ class TestPluginRegistry:
             assert db_type.enabled is False  # Default to disabled
 
     @pytest.mark.asyncio
-    @patch("app.plugins.registry.plugin_loader")
+    @patch("app.plugins.registry.loader.plugin_loader")
     async def test_load_plugin_types_update_existing(
         self,
         mock_plugin_loader,
@@ -343,7 +351,9 @@ class TestPluginRegistry:
             }
         ]
 
-        await plugin_registry_instance._load_plugin_types()
+        from app.plugins.registry.loader import load_plugin_types
+
+        await load_plugin_types()
 
         # Verify plugin type was updated
         from sqlalchemy import select
