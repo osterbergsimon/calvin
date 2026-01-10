@@ -22,6 +22,8 @@
           :alt="imagesStore.currentImage?.filename || 'Photo'"
           :class="['photo-image', `photo-image-${displayMode}`]"
           :style="imageStyle"
+          decoding="async"
+          loading="eager"
           @load="onImageLoad"
           @error="onImageError"
         />

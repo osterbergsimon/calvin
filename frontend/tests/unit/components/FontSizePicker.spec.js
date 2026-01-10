@@ -103,6 +103,9 @@ describe("FontSizePicker", () => {
       const input = wrapper.find(".font-size-input");
       await input.setValue(18);
 
+      // Wait for debounce (200ms)
+      await new Promise((resolve) => setTimeout(resolve, 250));
+
       expect(wrapper.emitted("update:modelValue")).toBeTruthy();
       expect(wrapper.emitted("update:modelValue")[0][0]).toBe(18);
     });
@@ -122,6 +125,9 @@ describe("FontSizePicker", () => {
       const input = wrapper.find(".font-size-input");
       await input.setValue(5);
 
+      // Wait for debounce (200ms)
+      await new Promise((resolve) => setTimeout(resolve, 250));
+
       expect(wrapper.emitted("update:modelValue")[0][0]).toBe(10);
     });
 
@@ -139,6 +145,9 @@ describe("FontSizePicker", () => {
 
       const input = wrapper.find(".font-size-input");
       await input.setValue(100);
+
+      // Wait for debounce (200ms)
+      await new Promise((resolve) => setTimeout(resolve, 250));
 
       expect(wrapper.emitted("update:modelValue")[0][0]).toBe(72);
     });

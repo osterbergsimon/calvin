@@ -19,6 +19,8 @@
             <img
               :src="`https://openweathermap.org/img/wn/${data.current.icon}@2x.png`"
               :alt="data.current.description"
+              loading="lazy"
+              decoding="async"
             />
           </div>
           <div class="weather-temp">
@@ -76,6 +78,8 @@
               <img
                 :src="`https://openweathermap.org/img/wn/${day.icon}@2x.png`"
                 :alt="day.description"
+                loading="lazy"
+                decoding="async"
               />
             </div>
             <div class="forecast-temps">

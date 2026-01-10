@@ -21,9 +21,11 @@ app.use(VueQueryPlugin, {
       retry: 1,
       staleTime: 5 * 60 * 1000, // 5 minutes
       // Enable caching for better performance
-      cacheTime: 10 * 60 * 1000, // 10 minutes
+      gcTime: 10 * 60 * 1000, // 10 minutes (cacheTime in v5+)
       // Use network-first strategy for critical data
       networkMode: "online",
+      // Enable structural sharing for better performance
+      structuralSharing: true,
     },
   },
 });

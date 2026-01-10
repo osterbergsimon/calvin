@@ -42,6 +42,7 @@
 
 <script setup>
 import { computed, ref, watch } from "vue";
+import { useDebounceFn } from "@vueuse/core";
 import { useConfigStore } from "@/stores/config";
 
 const configStore = useConfigStore();
@@ -98,13 +99,28 @@ watch(
   { immediate: true },
 );
 
+// Handler for both slider and number input
+// For number inputs, we debounce the emit to reduce API calls during typing
+const handleInputDebounced = useDebounceFn((clampedValue) => {
+  emit("update:modelValue", clampedValue);
+}, 200);
+
 const handleInput = (event) => {
+  if (!event?.target) return;
+
   const value = parseFloat(event.target.value);
   if (!isNaN(value)) {
     // Clamp value to min/max
     const clampedValue = Math.max(props.min, Math.min(props.max, value));
     localValue.value = clampedValue;
-    emit("update:modelValue", clampedValue);
+
+    // For slider (range), emit immediately for responsive UI
+    // For number input, debounce the emit to reduce rapid API calls
+    if (event.target.type === "range") {
+      emit("update:modelValue", clampedValue);
+    } else {
+      handleInputDebounced(clampedValue);
+    }
   }
 };
 

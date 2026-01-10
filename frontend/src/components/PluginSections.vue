@@ -77,6 +77,8 @@
                 :src="`/api/images/${image.id}/thumbnail`"
                 :alt="image.filename"
                 class="thumbnail-img"
+                loading="lazy"
+                decoding="async"
                 @error="handleThumbnailError"
               />
             </div>
