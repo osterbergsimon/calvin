@@ -87,10 +87,21 @@ import { useRouter } from "vue-router";
 import { useConfigForm } from "@/composables";
 import { useSystem } from "@/composables";
 import { useModeStore } from "@/stores/mode";
-import LayoutCategory from "@/components/settings/categories/LayoutCategory.vue";
-import ContentCategory from "@/components/settings/categories/ContentCategory.vue";
-import PluginsCategory from "@/components/settings/categories/PluginsCategory.vue";
-import SystemCategory from "@/components/settings/categories/SystemCategory.vue";
+import { defineAsyncComponent } from "vue";
+
+// Lazy load category components for better code splitting
+const LayoutCategory = defineAsyncComponent(
+  () => import("@/components/settings/categories/LayoutCategory.vue"),
+);
+const ContentCategory = defineAsyncComponent(
+  () => import("@/components/settings/categories/ContentCategory.vue"),
+);
+const PluginsCategory = defineAsyncComponent(
+  () => import("@/components/settings/categories/PluginsCategory.vue"),
+);
+const SystemCategory = defineAsyncComponent(
+  () => import("@/components/settings/categories/SystemCategory.vue"),
+);
 
 const router = useRouter();
 const modeStore = useModeStore();

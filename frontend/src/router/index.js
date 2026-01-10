@@ -1,6 +1,8 @@
 import { createRouter, createWebHistory } from "vue-router";
-import Dashboard from "../views/Dashboard.vue";
-import Settings from "../views/Settings.vue";
+
+// Lazy load routes for better code splitting
+const Dashboard = () => import("../views/Dashboard.vue");
+const Settings = () => import("../views/Settings.vue");
 
 const router = createRouter({
   history: createWebHistory(import.meta.env.BASE_URL),

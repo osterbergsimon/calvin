@@ -234,17 +234,32 @@
 </template>
 
 <script setup>
-import { ref, onMounted, onUnmounted, computed, watch } from "vue";
+import {
+  ref,
+  onMounted,
+  onUnmounted,
+  computed,
+  watch,
+  defineAsyncComponent,
+} from "vue";
 import axios from "axios";
 import LayoutManager from "../components/LayoutManager.vue";
-import CalendarView from "../components/CalendarView.vue";
-import PhotoSlideshow from "../components/PhotoSlideshow.vue";
-import WebServiceViewer from "../components/WebServiceViewer.vue";
 import MinimalUIOverlay from "../components/MinimalUIOverlay.vue";
 import Clock from "../components/Clock.vue"; // Legacy - keeping for backwards compatibility
 import ClockBarHorizontal from "../components/ClockBarHorizontal.vue";
 import ClockBarVertical from "../components/ClockBarVertical.vue";
 import ConnectionIndicator from "../components/ConnectionIndicator.vue";
+
+// Lazy load mode-specific components for better code splitting
+const CalendarView = defineAsyncComponent(
+  () => import("../components/CalendarView.vue"),
+);
+const PhotoSlideshow = defineAsyncComponent(
+  () => import("../components/PhotoSlideshow.vue"),
+);
+const WebServiceViewer = defineAsyncComponent(
+  () => import("../components/WebServiceViewer.vue"),
+);
 import { useConfigStore } from "../stores/config";
 import { useModeStore } from "../stores/mode";
 import { useRouter, useRoute } from "vue-router";
