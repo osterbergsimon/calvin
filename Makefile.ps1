@@ -8,7 +8,9 @@ param(
 function Show-Help {
     Write-Host "Available commands:" -ForegroundColor Cyan
     Write-Host "  .\Makefile.ps1 install        - Install all dependencies" -ForegroundColor White
-    Write-Host "  .\Makefile.ps1 dev           - Start development servers" -ForegroundColor White
+    Write-Host "  .\Makefile.ps1 dev           - Start development servers (separate windows)" -ForegroundColor White
+    Write-Host "  .\Makefile.ps1 dev-logs      - Start development servers with visible logs" -ForegroundColor White
+    Write-Host "  .\Makefile.ps1 dev-logs-read - Read recent dev logs (useful for AI assistant)" -ForegroundColor White
     Write-Host "  .\Makefile.ps1 test          - Run all tests" -ForegroundColor White
     Write-Host "  .\Makefile.ps1 test-backend  - Run backend tests only" -ForegroundColor White
     Write-Host "  .\Makefile.ps1 test-frontend - Run frontend tests only" -ForegroundColor White
@@ -70,6 +72,180 @@ function Start-Dev {
     Write-Host "API Docs: http://localhost:8000/docs" -ForegroundColor Cyan
     Write-Host ""
     Write-Host "Press Ctrl+C in each window to stop the servers" -ForegroundColor Yellow
+}
+
+function Start-Dev-Logs {
+    Write-Host "Starting development servers with visible logs..." -ForegroundColor Yellow
+    Write-Host ""
+    
+    # Get the current directory and create log directory
+    $projectRoot = $PSScriptRoot
+    $logDir = Join-Path $projectRoot "logs"
+    if (-not (Test-Path $logDir)) {
+        New-Item -ItemType Directory -Path $logDir -Force | Out-Null
+    }
+    
+    $backendLogFile = Join-Path $logDir "dev-backend.log"
+    $frontendLogFile = Join-Path $logDir "dev-frontend.log"
+    $combinedLogFile = Join-Path $logDir "dev-combined.log"
+    
+    # Clear previous log files
+    "" | Out-File $backendLogFile -Force
+    "" | Out-File $frontendLogFile -Force
+    "" | Out-File $combinedLogFile -Force
+    
+    Write-Host "Logs are also being written to:" -ForegroundColor Gray
+    Write-Host "  Backend:  $backendLogFile" -ForegroundColor Gray
+    Write-Host "  Frontend: $frontendLogFile" -ForegroundColor Gray
+    Write-Host "  Combined: $combinedLogFile" -ForegroundColor Gray
+    Write-Host ""
+    
+    # Start backend as a job with proper output handling and file logging
+    Write-Host "Starting backend..." -ForegroundColor Yellow
+    $backendJob = Start-Job -ScriptBlock {
+        param($Root, $BackendLog, $CombinedLog)
+        Set-Location "$Root\backend"
+        $env:PYTHONUNBUFFERED = "1"
+        & uv run uvicorn app.main:app --reload --host 0.0.0.0 --port 8000 *>&1 | ForEach-Object {
+            $timestamp = Get-Date -Format "yyyy-MM-dd HH:mm:ss"
+            $logLine = "[$timestamp] [BACKEND] $_"
+            $logLine | Out-File -FilePath $BackendLog -Append -Encoding utf8
+            $logLine | Out-File -FilePath $CombinedLog -Append -Encoding utf8
+            "[BACKEND] $_"
+        }
+    } -ArgumentList $projectRoot, $backendLogFile, $combinedLogFile
+    
+    # Wait a moment for backend to start
+    Start-Sleep -Seconds 2
+    
+    # Start frontend as a job with proper output handling and file logging
+    Write-Host "Starting frontend..." -ForegroundColor Yellow
+    $frontendJob = Start-Job -ScriptBlock {
+        param($Root, $FrontendLog, $CombinedLog)
+        Set-Location "$Root\frontend"
+        & npm run dev *>&1 | ForEach-Object {
+            $timestamp = Get-Date -Format "yyyy-MM-dd HH:mm:ss"
+            $logLine = "[$timestamp] [FRONTEND] $_"
+            $logLine | Out-File -FilePath $FrontendLog -Append -Encoding utf8
+            $logLine | Out-File -FilePath $CombinedLog -Append -Encoding utf8
+            "[FRONTEND] $_"
+        }
+    } -ArgumentList $projectRoot, $frontendLogFile, $combinedLogFile
+    
+    Write-Host ""
+    Write-Host "✓ Servers starting (logs visible below and in log files)" -ForegroundColor Green
+    Write-Host ""
+    Write-Host "Backend: http://localhost:8000" -ForegroundColor Cyan
+    Write-Host "Frontend: http://localhost:5173" -ForegroundColor Cyan
+    Write-Host "API Docs: http://localhost:8000/docs" -ForegroundColor Cyan
+    Write-Host ""
+    Write-Host "Press Ctrl+C to stop both servers" -ForegroundColor Yellow
+    Write-Host ("─" * 80) -ForegroundColor DarkGray
+    Write-Host ""
+    
+    # Monitor both jobs and display output
+    try {
+        while ($backendJob.State -eq "Running" -or $frontendJob.State -eq "Running") {
+            # Receive and display backend output
+            $backendOutput = Receive-Job -Job $backendJob -ErrorAction SilentlyContinue
+            if ($backendOutput) {
+                foreach ($line in $backendOutput) {
+                    Write-Host $line -ForegroundColor Cyan
+                }
+            }
+            
+            # Receive and display frontend output
+            $frontendOutput = Receive-Job -Job $frontendJob -ErrorAction SilentlyContinue
+            if ($frontendOutput) {
+                foreach ($line in $frontendOutput) {
+                    Write-Host $line -ForegroundColor Magenta
+                }
+            }
+            
+            # Check if jobs have failed or completed
+            if ($backendJob.State -eq "Failed" -or $backendJob.State -eq "Completed") {
+                $allOutput = Receive-Job -Job $backendJob -ErrorAction SilentlyContinue
+                if ($allOutput) {
+                    foreach ($line in $allOutput) {
+                        Write-Host $line -ForegroundColor Cyan
+                    }
+                }
+                if ($backendJob.State -eq "Failed") {
+                    Write-Host "[ERROR] Backend job failed" -ForegroundColor Red
+                    break
+                }
+            }
+            
+            if ($frontendJob.State -eq "Failed" -or $frontendJob.State -eq "Completed") {
+                $allOutput = Receive-Job -Job $frontendJob -ErrorAction SilentlyContinue
+                if ($allOutput) {
+                    foreach ($line in $allOutput) {
+                        Write-Host $line -ForegroundColor Magenta
+                    }
+                }
+                if ($frontendJob.State -eq "Failed") {
+                    Write-Host "[ERROR] Frontend job failed" -ForegroundColor Red
+                    break
+                }
+            }
+            
+            Start-Sleep -Milliseconds 200
+        }
+    }
+    catch {
+        Write-Host "`n[ERROR] $($_.Exception.Message)" -ForegroundColor Red
+    }
+    finally {
+        # Clean up jobs
+        Write-Host ""
+        Write-Host "Stopping servers..." -ForegroundColor Yellow
+        Stop-Job -Job $backendJob, $frontendJob -ErrorAction SilentlyContinue | Out-Null
+        Remove-Job -Job $backendJob, $frontendJob -ErrorAction SilentlyContinue | Out-Null
+        Write-Host "Servers stopped. Logs saved to: $logDir" -ForegroundColor Green
+    }
+}
+
+function Read-Dev-Logs {
+    param(
+        [int]$Lines = 50,
+        [string]$Type = "combined"
+    )
+    
+    $projectRoot = $PSScriptRoot
+    $logDir = Join-Path $projectRoot "logs"
+    $combinedLogFile = Join-Path $logDir "dev-combined.log"
+    $backendLogFile = Join-Path $logDir "dev-backend.log"
+    $frontendLogFile = Join-Path $logDir "dev-frontend.log"
+    
+    if (-not (Test-Path $combinedLogFile)) {
+        Write-Host "No dev logs found. Have you started 'dev-logs' yet?" -ForegroundColor Yellow
+        Write-Host "Expected log files in: $logDir" -ForegroundColor Gray
+        return
+    }
+    
+    $logFile = switch ($Type.ToLower()) {
+        "backend" { $backendLogFile }
+        "frontend" { $frontendLogFile }
+        default { $combinedLogFile }
+    }
+    
+    if (Test-Path $logFile) {
+        Write-Host "Last $Lines lines from $Type log:" -ForegroundColor Cyan
+        Write-Host ("─" * 80) -ForegroundColor DarkGray
+        Get-Content $logFile -Tail $Lines -ErrorAction SilentlyContinue | ForEach-Object {
+            if ($_ -match "\[BACKEND\]") {
+                Write-Host $_ -ForegroundColor Cyan
+            } elseif ($_ -match "\[FRONTEND\]") {
+                Write-Host $_ -ForegroundColor Magenta
+            } else {
+                Write-Host $_
+            }
+        }
+        Write-Host ("─" * 80) -ForegroundColor DarkGray
+        Write-Host "Full log: $logFile" -ForegroundColor Gray
+    } else {
+        Write-Host "Log file not found: $logFile" -ForegroundColor Red
+    }
 }
 
 function Run-Tests {
@@ -221,6 +397,8 @@ switch ($Target.ToLower()) {
     "help" { Show-Help }
     "install" { Install-Dependencies }
     "dev" { Start-Dev }
+    "dev-logs" { Start-Dev-Logs }
+    "dev-logs-read" { Read-Dev-Logs }
     "test" { Run-Tests }
     "test-backend" { Run-Tests-Backend }
     "test-frontend" { Run-Tests-Frontend }
