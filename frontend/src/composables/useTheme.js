@@ -44,7 +44,9 @@ export function useTheme() {
       shouldBeDark = true;
     } else if (themeMode.value === "auto") {
       // Use system preference
-      shouldBeDark = window.matchMedia("(prefers-color-scheme: dark)").matches;
+      const matchMedia =
+        window.matchMedia && window.matchMedia("(prefers-color-scheme: dark)");
+      shouldBeDark = matchMedia ? matchMedia.matches : false;
     } else if (themeMode.value === "time") {
       // Use time-based switching
       shouldBeDark = isDarkTime();
@@ -226,38 +228,50 @@ export function useTheme() {
   });
 
   // Watch config store for theme changes (so changes from Settings page apply immediately)
-  watch(() => configStore.themeMode, async (newMode) => {
-    if (newMode !== undefined && newMode !== themeMode.value) {
-      themeMode.value = newMode;
-      await updateTheme();
-    }
-  });
-
-  watch(() => configStore.selectedTheme, async (newTheme) => {
-    if (newTheme !== undefined && newTheme !== selectedThemeId.value) {
-      selectedThemeId.value = newTheme;
-      themesStore.setSelectedTheme(newTheme);
-      await applyCustomTheme(newTheme);
-    }
-  });
-
-  watch(() => configStore.darkModeStart, async (newStart) => {
-    if (newStart !== undefined && newStart !== darkModeStart.value) {
-      darkModeStart.value = newStart;
-      if (themeMode.value === "time") {
+  watch(
+    () => configStore.themeMode,
+    async (newMode) => {
+      if (newMode !== undefined && newMode !== themeMode.value) {
+        themeMode.value = newMode;
         await updateTheme();
       }
-    }
-  });
+    },
+  );
 
-  watch(() => configStore.darkModeEnd, async (newEnd) => {
-    if (newEnd !== undefined && newEnd !== darkModeEnd.value) {
-      darkModeEnd.value = newEnd;
-      if (themeMode.value === "time") {
-        await updateTheme();
+  watch(
+    () => configStore.selectedTheme,
+    async (newTheme) => {
+      if (newTheme !== undefined && newTheme !== selectedThemeId.value) {
+        selectedThemeId.value = newTheme;
+        themesStore.setSelectedTheme(newTheme);
+        await applyCustomTheme(newTheme);
       }
-    }
-  });
+    },
+  );
+
+  watch(
+    () => configStore.darkModeStart,
+    async (newStart) => {
+      if (newStart !== undefined && newStart !== darkModeStart.value) {
+        darkModeStart.value = newStart;
+        if (themeMode.value === "time") {
+          await updateTheme();
+        }
+      }
+    },
+  );
+
+  watch(
+    () => configStore.darkModeEnd,
+    async (newEnd) => {
+      if (newEnd !== undefined && newEnd !== darkModeEnd.value) {
+        darkModeEnd.value = newEnd;
+        if (themeMode.value === "time") {
+          await updateTheme();
+        }
+      }
+    },
+  );
 
   // Initialize theme immediately and on mount
   if (typeof window !== "undefined") {
