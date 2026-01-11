@@ -3,7 +3,7 @@
 help:
 	@echo "Available commands:"
 	@echo "  make install        - Install all dependencies"
-	@echo "  make dev            - Start development servers (backend in background)"
+	@echo "  make dev            - Start development servers (backend, docs in background)"
 	@echo "  make dev-logs       - Start development servers with visible logs"
 	@echo "  make dev-logs-read  - Read recent dev logs (useful for AI assistant)"
 	@echo "  make test           - Run all tests"
@@ -28,7 +28,9 @@ dev:
 	@echo "Starting development servers..."
 	@echo "Backend: http://localhost:8000"
 	@echo "Frontend: http://localhost:5173"
+	@echo "Docs: http://localhost:8001"
 	cd backend && uv run uvicorn app.main:app --reload --host 0.0.0.0 --port 8000 &
+	uv run --project backend mkdocs serve --dev-addr 127.0.0.1:8001 &
 	cd frontend && npm run dev
 
 dev-logs:
@@ -42,15 +44,18 @@ dev-logs:
 	@echo ""
 	@echo "Backend: http://localhost:8000"
 	@echo "Frontend: http://localhost:5173"
+	@echo "Docs: http://localhost:8001"
 	@echo "API Docs: http://localhost:8000/docs"
 	@echo ""
-	@echo "Press Ctrl+C to stop both servers"
+	@echo "Press Ctrl+C to stop all servers"
 	@echo "────────────────────────────────────────────────────────────────────────────────"
 	@echo ""
-	@> logs/dev-backend.log && > logs/dev-frontend.log && > logs/dev-combined.log
+	@> logs/dev-backend.log && > logs/dev-frontend.log && > logs/dev-docs.log && > logs/dev-combined.log
 	@trap 'kill 0' EXIT INT TERM; \
 	(cd backend && PYTHONUNBUFFERED=1 uv run uvicorn app.main:app --reload --host 0.0.0.0 --port 8000 2>&1 | \
 		awk '{timestamp=strftime("%Y-%m-%d %H:%M:%S"); logline="["timestamp"] [BACKEND] "$$0; print logline >> "../logs/dev-backend.log"; print logline >> "../logs/dev-combined.log"; print "\033[36m[BACKEND]\033[0m "$$0; fflush()}') & \
+	(uv run --project backend mkdocs serve --dev-addr 127.0.0.1:8001 2>&1 | \
+		awk '{timestamp=strftime("%Y-%m-%d %H:%M:%S"); logline="["timestamp"] [DOCS] "$$0; print logline >> "logs/dev-docs.log"; print logline >> "logs/dev-combined.log"; print "\033[33m[DOCS]\033[0m "$$0; fflush()}') & \
 	(cd frontend && npm run dev 2>&1 | \
 		awk '{timestamp=strftime("%Y-%m-%d %H:%M:%S"); logline="["timestamp"] [FRONTEND] "$$0; print logline >> "../logs/dev-frontend.log"; print logline >> "../logs/dev-combined.log"; print "\033[35m[FRONTEND]\033[0m "$$0; fflush()}') & \
 	wait

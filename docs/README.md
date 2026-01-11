@@ -57,9 +57,6 @@ Historical and completed documentation.
 3. **Want to create a plugin?** Read the [Plugin Development Guide](./plugins/PLUGIN_DEVELOPMENT_GUIDE.md)
 4. **Setting up a remote dashboard?** Check [Remote Configuration](./configuration/REMOTE_CONFIG.md)
 
-### 📋 [Project Planning](./PROJECT_PLAN.md)
-Project architecture and implementation plan.
-
 ---
 
 ## 📖 Documentation Guidelines

@@ -47,7 +47,7 @@ function Install-Dependencies {
 function Start-Dev {
     Write-Host "Starting development servers..." -ForegroundColor Yellow
     Write-Host ""
-    Write-Host "Starting backend and frontend in separate windows..." -ForegroundColor Cyan
+    Write-Host "Starting backend, docs, and frontend in separate windows..." -ForegroundColor Cyan
     Write-Host ""
     
     # Get the current directory
@@ -60,6 +60,13 @@ function Start-Dev {
     # Wait a moment for backend to start
     Start-Sleep -Seconds 2
     
+    # Start docs in new PowerShell window
+    Write-Host "Starting docs..." -ForegroundColor Yellow
+    Start-Process powershell -ArgumentList "-NoExit", "-Command", "cd '$projectRoot'; uv run --project backend mkdocs serve --dev-addr 127.0.0.1:8001"
+    
+    # Wait a moment for docs to start
+    Start-Sleep -Seconds 1
+    
     # Start frontend in new PowerShell window
     Write-Host "Starting frontend..." -ForegroundColor Yellow
     Start-Process powershell -ArgumentList "-NoExit", "-Command", "cd '$projectRoot\frontend'; npm run dev"
@@ -69,6 +76,7 @@ function Start-Dev {
     Write-Host ""
     Write-Host "Backend: http://localhost:8000" -ForegroundColor Cyan
     Write-Host "Frontend: http://localhost:5173" -ForegroundColor Cyan
+    Write-Host "Docs: http://localhost:8001" -ForegroundColor Cyan
     Write-Host "API Docs: http://localhost:8000/docs" -ForegroundColor Cyan
     Write-Host ""
     Write-Host "Press Ctrl+C in each window to stop the servers" -ForegroundColor Yellow
@@ -87,16 +95,19 @@ function Start-Dev-Logs {
     
     $backendLogFile = Join-Path $logDir "dev-backend.log"
     $frontendLogFile = Join-Path $logDir "dev-frontend.log"
+    $docsLogFile = Join-Path $logDir "dev-docs.log"
     $combinedLogFile = Join-Path $logDir "dev-combined.log"
     
     # Clear previous log files
     "" | Out-File $backendLogFile -Force
     "" | Out-File $frontendLogFile -Force
+    "" | Out-File $docsLogFile -Force
     "" | Out-File $combinedLogFile -Force
     
     Write-Host "Logs are also being written to:" -ForegroundColor Gray
     Write-Host "  Backend:  $backendLogFile" -ForegroundColor Gray
     Write-Host "  Frontend: $frontendLogFile" -ForegroundColor Gray
+    Write-Host "  Docs:     $docsLogFile" -ForegroundColor Gray
     Write-Host "  Combined: $combinedLogFile" -ForegroundColor Gray
     Write-Host ""
     
@@ -118,6 +129,23 @@ function Start-Dev-Logs {
     # Wait a moment for backend to start
     Start-Sleep -Seconds 2
     
+    # Start docs as a job with proper output handling and file logging
+    Write-Host "Starting docs..." -ForegroundColor Yellow
+    $docsJob = Start-Job -ScriptBlock {
+        param($Root, $DocsLog, $CombinedLog)
+        Set-Location $Root
+        & uv run --project backend mkdocs serve --dev-addr 127.0.0.1:8001 *>&1 | ForEach-Object {
+            $timestamp = Get-Date -Format "yyyy-MM-dd HH:mm:ss"
+            $logLine = "[$timestamp] [DOCS] $_"
+            $logLine | Out-File -FilePath $DocsLog -Append -Encoding utf8
+            $logLine | Out-File -FilePath $CombinedLog -Append -Encoding utf8
+            "[DOCS] $_"
+        }
+    } -ArgumentList $projectRoot, $docsLogFile, $combinedLogFile
+    
+    # Wait a moment for docs to start
+    Start-Sleep -Seconds 1
+    
     # Start frontend as a job with proper output handling and file logging
     Write-Host "Starting frontend..." -ForegroundColor Yellow
     $frontendJob = Start-Job -ScriptBlock {
@@ -137,20 +165,29 @@ function Start-Dev-Logs {
     Write-Host ""
     Write-Host "Backend: http://localhost:8000" -ForegroundColor Cyan
     Write-Host "Frontend: http://localhost:5173" -ForegroundColor Cyan
+    Write-Host "Docs: http://localhost:8001" -ForegroundColor Cyan
     Write-Host "API Docs: http://localhost:8000/docs" -ForegroundColor Cyan
     Write-Host ""
-    Write-Host "Press Ctrl+C to stop both servers" -ForegroundColor Yellow
+    Write-Host "Press Ctrl+C to stop all servers" -ForegroundColor Yellow
     Write-Host ("─" * 80) -ForegroundColor DarkGray
     Write-Host ""
     
-    # Monitor both jobs and display output
+    # Monitor all jobs and display output
     try {
-        while ($backendJob.State -eq "Running" -or $frontendJob.State -eq "Running") {
+        while ($backendJob.State -eq "Running" -or $docsJob.State -eq "Running" -or $frontendJob.State -eq "Running") {
             # Receive and display backend output
             $backendOutput = Receive-Job -Job $backendJob -ErrorAction SilentlyContinue
             if ($backendOutput) {
                 foreach ($line in $backendOutput) {
                     Write-Host $line -ForegroundColor Cyan
+                }
+            }
+            
+            # Receive and display docs output
+            $docsOutput = Receive-Job -Job $docsJob -ErrorAction SilentlyContinue
+            if ($docsOutput) {
+                foreach ($line in $docsOutput) {
+                    Write-Host $line -ForegroundColor Yellow
                 }
             }
             
@@ -172,6 +209,19 @@ function Start-Dev-Logs {
                 }
                 if ($backendJob.State -eq "Failed") {
                     Write-Host "[ERROR] Backend job failed" -ForegroundColor Red
+                    break
+                }
+            }
+            
+            if ($docsJob.State -eq "Failed" -or $docsJob.State -eq "Completed") {
+                $allOutput = Receive-Job -Job $docsJob -ErrorAction SilentlyContinue
+                if ($allOutput) {
+                    foreach ($line in $allOutput) {
+                        Write-Host $line -ForegroundColor Yellow
+                    }
+                }
+                if ($docsJob.State -eq "Failed") {
+                    Write-Host "[ERROR] Docs job failed" -ForegroundColor Red
                     break
                 }
             }
@@ -199,8 +249,8 @@ function Start-Dev-Logs {
         # Clean up jobs
         Write-Host ""
         Write-Host "Stopping servers..." -ForegroundColor Yellow
-        Stop-Job -Job $backendJob, $frontendJob -ErrorAction SilentlyContinue | Out-Null
-        Remove-Job -Job $backendJob, $frontendJob -ErrorAction SilentlyContinue | Out-Null
+        Stop-Job -Job $backendJob, $docsJob, $frontendJob -ErrorAction SilentlyContinue | Out-Null
+        Remove-Job -Job $backendJob, $docsJob, $frontendJob -ErrorAction SilentlyContinue | Out-Null
         Write-Host "Servers stopped. Logs saved to: $logDir" -ForegroundColor Green
     }
 }
@@ -216,6 +266,7 @@ function Read-Dev-Logs {
     $combinedLogFile = Join-Path $logDir "dev-combined.log"
     $backendLogFile = Join-Path $logDir "dev-backend.log"
     $frontendLogFile = Join-Path $logDir "dev-frontend.log"
+    $docsLogFile = Join-Path $logDir "dev-docs.log"
     
     if (-not (Test-Path $combinedLogFile)) {
         Write-Host "No dev logs found. Have you started 'dev-logs' yet?" -ForegroundColor Yellow
@@ -226,6 +277,7 @@ function Read-Dev-Logs {
     $logFile = switch ($Type.ToLower()) {
         "backend" { $backendLogFile }
         "frontend" { $frontendLogFile }
+        "docs" { $docsLogFile }
         default { $combinedLogFile }
     }
     
@@ -237,6 +289,8 @@ function Read-Dev-Logs {
                 Write-Host $_ -ForegroundColor Cyan
             } elseif ($_ -match "\[FRONTEND\]") {
                 Write-Host $_ -ForegroundColor Magenta
+            } elseif ($_ -match "\[DOCS\]") {
+                Write-Host $_ -ForegroundColor Yellow
             } else {
                 Write-Host $_
             }

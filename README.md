@@ -227,20 +227,21 @@ The backend automatically handles platform differences:
 - Vite for build tooling
 - Pinia for state management
 
-**See [docs/PROJECT_PLAN.md](docs/PROJECT_PLAN.md) for detailed architecture and implementation plan.**
-
 ## 📚 Documentation
 
+Comprehensive documentation is available:
+
+- **Online Documentation**: [Documentation Site](https://calvin.readthedocs.io/) (hosted on Read the Docs)
+- **Local Documentation**: Run `mkdocs serve` from the project root to view documentation locally
+- **Documentation Index**: See [docs/README.md](docs/README.md) for the documentation structure
+
+**Quick Links:**
 - [Quick Start - Development](docs/setup/QUICKSTART_DEVELOP.md)
 - [Quick Start - Windows](docs/setup/QUICKSTART_WINDOWS.md)
 - [Linux Setup Guide](docs/setup/SETUP_LINUX.md)
 - [Windows Setup Guide](docs/setup/SETUP_WINDOWS.md)
-- [Add Google Calendar](docs/plugins/ADD_GOOGLE_CALENDAR.md)
-- [Plugin Development](docs/plugins/PLUGIN_DEVELOPMENT_GUIDE.md)
+- [Plugin Development Guide](docs/plugins/PLUGIN_DEVELOPMENT_GUIDE.md)
 - [Plugin Installation](docs/plugins/PLUGIN_INSTALLATION.md)
-- [Project Plan](docs/PROJECT_PLAN.md)
-- [Documentation Index](docs/README.md)
-- [Project Plan](PROJECT_PLAN.md)
 
 ## 📄 License
 

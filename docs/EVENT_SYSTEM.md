@@ -64,11 +64,142 @@ These events are emitted by the core system automatically:
 }
 ```
 
+### `plugin_enabled`
+
+**Emitted by**: `app/api/routes/plugins/management.py::update_plugin()` when a plugin type is enabled
+
+**When**: Plugin type enabled status is set to `true` (via `PUT /plugins/{plugin_id}` with `enabled: true`)
+
+**Event Data**:
+```python
+{
+    "plugin_id": str,        # Plugin type ID
+    "plugin_type": str,      # Plugin type (calendar, image, service, theme, etc.)
+    "enabled_at": str        # ISO timestamp
+}
+```
+
+### `plugin_disabled`
+
+**Emitted by**: `app/api/routes/plugins/management.py::update_plugin()` when a plugin type is disabled
+
+**When**: Plugin type enabled status is set to `false` (via `PUT /plugins/{plugin_id}` with `enabled: false`)
+
+**Event Data**:
+```python
+{
+    "plugin_id": str,        # Plugin type ID
+    "plugin_type": str,      # Plugin type
+    "disabled_at": str       # ISO timestamp
+}
+```
+
+### `plugin_installed`
+
+**Emitted by**: `app/api/routes/plugins/management.py::install_plugin()` when a plugin is successfully installed
+
+**When**: Plugin is installed via `POST /plugins/install`
+
+**Event Data**:
+```python
+{
+    "plugin_id": str,        # Plugin ID
+    "plugin_type": str,      # Plugin type
+    "version": str,          # Plugin version
+    "installed_at": str      # ISO timestamp
+}
+```
+
+### `plugin_uninstalled`
+
+**Emitted by**: `app/api/routes/plugins/management.py::uninstall_plugin()` when a plugin is uninstalled
+
+**When**: Plugin is uninstalled via `DELETE /plugins/installed/{plugin_id}`
+
+**Event Data**:
+```python
+{
+    "plugin_id": str,        # Plugin ID
+    "plugin_type": str,      # Plugin type
+    "uninstalled_at": str    # ISO timestamp
+}
+```
+
+### `plugin_instance_created`
+
+**Emitted by**: `app/api/routes/plugins/instances.py::update_plugin_instance()` when a plugin instance is created
+
+**When**: Plugin instance is created (when instance doesn't exist and is enabled)
+
+**Event Data**:
+```python
+{
+    "instance_id": str,      # Plugin instance ID
+    "plugin_id": str,        # Plugin type ID
+    "name": str,             # Instance name
+    "created_at": str        # ISO timestamp
+}
+```
+
+### `plugin_instance_updated`
+
+**Emitted by**: `app/api/routes/plugins/instances.py::update_plugin_instance()` when a plugin instance is updated
+
+**When**: Plugin instance is updated (config, enabled status, or name) via `PUT /plugins/instances/{instance_id}`
+
+**Event Data**:
+```python
+{
+    "instance_id": str,      # Plugin instance ID
+    "plugin_id": str,        # Plugin type ID
+    "changes": {             # What changed
+        "enabled": bool | None,
+        "config": dict | None,
+        "name": str | None
+    },
+    "updated_at": str        # ISO timestamp
+}
+```
+
+### `plugin_instance_started`
+
+**Emitted by**: `app/api/routes/plugins/instances.py::start_plugin_instance()` when a plugin instance starts
+
+**When**: Plugin instance is started via `POST /plugins/instances/{instance_id}/start` or auto-started
+
+**Event Data**:
+```python
+{
+    "instance_id": str,      # Plugin instance ID
+    "plugin_id": str,        # Plugin type ID
+    "started_at": str        # ISO timestamp
+}
+```
+
+### `plugin_instance_stopped`
+
+**Emitted by**: `app/api/routes/plugins/instances.py::stop_plugin_instance()` when a plugin instance stops
+
+**When**: Plugin instance is stopped via `POST /plugins/instances/{instance_id}/stop` or auto-stopped
+
+**Event Data**:
+```python
+{
+    "instance_id": str,      # Plugin instance ID
+    "plugin_id": str,        # Plugin type ID
+    "stopped_at": str        # ISO timestamp
+}
+```
+
 ### Future System Events
 
-- `plugin_enabled`: When a plugin is enabled
-- `plugin_disabled`: When a plugin is disabled
 - `config_changed`: When system configuration changes
+- `scheduled_task_started`: When a scheduled task starts
+- `scheduled_task_completed`: When a scheduled task completes
+- `scheduled_task_failed`: When a scheduled task fails
+- `calendar_events_refreshed`: When calendar events are fetched
+- `system_started`: When the system starts up
+- `system_shutting_down`: When the system is shutting down
 
 ## Plugin-Emitted Events
 
@@ -108,23 +239,52 @@ Plugins can emit custom events for plugin-to-plugin communication:
 
 ## Usage Examples
 
-### Subscribing to Events
+### Subscribing to System Events
+
+Plugins can subscribe to system events to react to changes in the application state:
 
 ```python
 class MyBackendPlugin(BackendPlugin):
     async def get_subscribed_events(self) -> list[str]:
-        """Subscribe to image_uploaded events."""
-        return ["image_uploaded"]
+        """Subscribe to multiple system events."""
+        return [
+            "image_uploaded",
+            "plugin_enabled",
+            "plugin_installed",
+            "plugin_instance_created",
+        ]
     
     async def handle_event(
         self, event_type: str, event_data: dict[str, Any]
     ) -> dict[str, Any] | None:
-        """Handle image_uploaded events."""
+        """Handle various system events."""
         if event_type == "image_uploaded":
             image_id = event_data["image_id"]
             filename = event_data["filename"]
             # Process the image...
             return {"success": True}
+        
+        elif event_type == "plugin_enabled":
+            plugin_id = event_data["plugin_id"]
+            plugin_type = event_data["plugin_type"]
+            # React to plugin being enabled...
+            logger.info(f"Plugin {plugin_id} ({plugin_type}) was enabled")
+            return {"success": True}
+        
+        elif event_type == "plugin_installed":
+            plugin_id = event_data["plugin_id"]
+            version = event_data["version"]
+            # Auto-configure newly installed plugin...
+            logger.info(f"Plugin {plugin_id} v{version} was installed")
+            return {"success": True}
+        
+        elif event_type == "plugin_instance_created":
+            instance_id = event_data["instance_id"]
+            plugin_id = event_data["plugin_id"]
+            # React to new instance creation...
+            logger.info(f"Instance {instance_id} of plugin {plugin_id} was created")
+            return {"success": True}
+        
         return None
 ```
 
@@ -153,7 +313,9 @@ class MyBackendPlugin(BackendPlugin):
         return {"success": True}
 ```
 
-## Event Flow Example: IMAP → Image Processor
+## Event Flow Examples
+
+### Example 1: IMAP → Image Processor
 
 1. **IMAP Plugin** downloads image from email
    - Saves image to `./data/images/photo.jpg`
@@ -168,6 +330,37 @@ class MyBackendPlugin(BackendPlugin):
    - Emits `image_processed` event (fire-and-forget)
 
 4. **Other Plugins** can subscribe to `image_processed` if needed
+
+### Example 2: Plugin Installation → Auto-Configuration
+
+1. **User** installs a new plugin via `POST /plugins/install`
+   - System installs plugin and reloads plugin list
+
+2. **System** emits `plugin_installed` event
+   - Event includes plugin_id, plugin_type, version, and timestamp
+
+3. **AutoConfigPlugin** subscribes to `plugin_installed` events
+   - Receives the event
+   - Automatically configures the new plugin with default settings
+   - May emit `plugin_instance_created` if it creates an instance
+
+4. **MonitoringPlugin** also subscribes to `plugin_installed`
+   - Logs the installation event for audit purposes
+
+### Example 3: Plugin Instance Lifecycle
+
+1. **User** creates a new plugin instance via `PUT /plugins/instances/{instance_id}`
+   - System creates the instance and enables it
+
+2. **System** emits `plugin_instance_created` event
+   - Event includes instance_id, plugin_id, name, and timestamp
+
+3. **System** automatically starts the instance
+   - Emits `plugin_instance_started` event
+
+4. **CoordinatorPlugin** subscribes to both events
+   - When instance is created: Sets up dependencies
+   - When instance is started: Starts related services
 
 ## Best Practices
 
