@@ -151,7 +151,7 @@ git reset --hard origin/develop
 
 ## Next Steps
 
-1. Read the main [README.md](README.md) for project overview
+1. Read the [documentation home](../index.md) for project overview
 2. Check the [Architecture documentation](../EVENT_SYSTEM.md) for system design details
 3. Start coding on a feature branch!
 

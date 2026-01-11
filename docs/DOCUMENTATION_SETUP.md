@@ -39,6 +39,10 @@ mkdocs serve
 
 This will start a local server (usually at http://127.0.0.1:8000) where you can view the documentation.
 
+**Auto-rebuild:** `mkdocs serve` automatically watches for changes in the `docs/` directory and `mkdocs.yml` file. When you save changes to any documentation file, MkDocs will automatically rebuild and refresh the browser. No need to manually restart the server!
+
+**Note:** If you see a warning about `README.md` being excluded, this is expected. MkDocs automatically excludes `README.md` files when they conflict with `index.md` files. This is normal behavior.
+
 ## Documentation Structure
 
 Documentation files are in the `docs/` directory:
