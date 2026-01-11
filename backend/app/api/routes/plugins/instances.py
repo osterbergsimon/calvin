@@ -1,6 +1,7 @@
 """Plugin instance management endpoints."""
 
 import logging
+from datetime import UTC, datetime
 from pathlib import Path
 from typing import Any
 
@@ -12,6 +13,7 @@ from app.database import AsyncSessionLocal
 from app.models.db_models import PluginDB
 from app.plugins.loader import plugin_loader
 from app.plugins.manager import plugin_manager
+from app.services.event_system import event_system
 
 logger = logging.getLogger(__name__)
 
@@ -79,6 +81,24 @@ async def start_plugin_instance(instance_id: str):
 
     success = await plugin_manager.start_plugin(instance_id)
     if success:
+        # Emit plugin_instance_started event
+        try:
+            await event_system.emit_event(
+                "plugin_instance_started",
+                {
+                    "instance_id": instance_id,
+                    "plugin_id": db_plugin.type_id,
+                    "started_at": datetime.now(UTC).isoformat(),
+                },
+                wait_for_handlers=False,  # Fire-and-forget
+            )
+            logger.debug(f"Emitted plugin_instance_started event for instance {instance_id}")
+        except Exception as e:
+            # Don't fail plugin start if event emission fails
+            logger.warning(
+                f"Failed to emit plugin_instance_started event for instance {instance_id}: {e}"
+            )
+
         return {
             "success": True,
             "message": f"Plugin {instance_id} started successfully",
@@ -129,6 +149,24 @@ async def stop_plugin_instance(instance_id: str):
 
     success = await plugin_manager.stop_plugin(instance_id)
     if success:
+        # Emit plugin_instance_stopped event
+        try:
+            await event_system.emit_event(
+                "plugin_instance_stopped",
+                {
+                    "instance_id": instance_id,
+                    "plugin_id": db_plugin.type_id,
+                    "stopped_at": datetime.now(UTC).isoformat(),
+                },
+                wait_for_handlers=False,  # Fire-and-forget
+            )
+            logger.debug(f"Emitted plugin_instance_stopped event for instance {instance_id}")
+        except Exception as e:
+            # Don't fail plugin stop if event emission fails
+            logger.warning(
+                f"Failed to emit plugin_instance_stopped event for instance {instance_id}: {e}"
+            )
+
         return {
             "success": True,
             "message": f"Plugin {instance_id} stopped successfully",
@@ -258,6 +296,9 @@ async def update_plugin_instance(instance_id: str, instance_data: dict[str, Any]
         # Update plugin instance in memory if it exists
         plugin = plugin_manager.get_plugin(instance_id)
 
+        # Track if this is a new instance creation
+        was_new_instance = False
+
         # If plugin doesn't exist in memory but is enabled in database, create it
         # (either enabled was set to True, or it was already True and we're just updating config)
         should_be_enabled = enabled if enabled is not None else db_plugin.enabled
@@ -269,6 +310,7 @@ async def update_plugin_instance(instance_id: str, instance_data: dict[str, Any]
                 config=db_plugin.config or {},
             )
             if plugin:
+                was_new_instance = True
                 try:
                     await plugin.configure(db_plugin.config or {})
                     plugin.enabled = db_plugin.enabled
@@ -281,6 +323,28 @@ async def update_plugin_instance(instance_id: str, instance_data: dict[str, Any]
 
                     if isinstance(plugin, BackendPlugin):
                         await backend_plugin_scheduler.register_plugin_tasks(plugin)
+
+                    # Emit plugin_instance_created event
+                    try:
+                        await event_system.emit_event(
+                            "plugin_instance_created",
+                            {
+                                "instance_id": instance_id,
+                                "plugin_id": db_plugin.type_id,
+                                "name": db_plugin.name,
+                                "created_at": datetime.now(UTC).isoformat(),
+                            },
+                            wait_for_handlers=False,  # Fire-and-forget
+                        )
+                        logger.debug(
+                            f"Emitted plugin_instance_created event for instance {instance_id}"
+                        )
+                    except Exception as e:
+                        # Don't fail instance creation if event emission fails
+                        logger.warning(
+                            f"Failed to emit plugin_instance_created event "
+                            f"for instance {instance_id}: {e}"
+                        )
                 except Exception as e:
                     logger.error(
                         f"Error creating and starting plugin {instance_id}: {e}", exc_info=True
@@ -331,6 +395,38 @@ async def update_plugin_instance(instance_id: str, instance_data: dict[str, Any]
                     logger.warning(
                         f"Error updating plugin {instance_id} config: {e}", exc_info=True
                     )
+
+        # Emit plugin_instance_updated event if instance was updated (but not newly created)
+        if (
+            plugin
+            and not was_new_instance
+            and (enabled is not None or updated_config is not None or "name" in instance_data)
+        ):
+            try:
+                changes = {}
+                if enabled is not None:
+                    changes["enabled"] = enabled
+                if updated_config is not None:
+                    changes["config"] = updated_config
+                if "name" in instance_data:
+                    changes["name"] = instance_data["name"]
+
+                await event_system.emit_event(
+                    "plugin_instance_updated",
+                    {
+                        "instance_id": instance_id,
+                        "plugin_id": db_plugin.type_id,
+                        "changes": changes,
+                        "updated_at": datetime.now(UTC).isoformat(),
+                    },
+                    wait_for_handlers=False,  # Fire-and-forget
+                )
+                logger.debug(f"Emitted plugin_instance_updated event for instance {instance_id}")
+            except Exception as e:
+                # Don't fail instance update if event emission fails
+                logger.warning(
+                    f"Failed to emit plugin_instance_updated event for instance {instance_id}: {e}"
+                )
 
         # Serialize config for response
         def serialize_value(val):

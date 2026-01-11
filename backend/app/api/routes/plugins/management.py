@@ -5,6 +5,7 @@ import json
 import logging
 import shutil
 import tempfile
+from datetime import UTC, datetime
 from pathlib import Path
 from typing import Any
 
@@ -19,6 +20,7 @@ from app.plugins.hooks import plugin_manager as hook_manager
 from app.plugins.loader import plugin_loader
 from app.plugins.manager import plugin_manager
 from app.services.config_service import config_service
+from app.services.event_system import event_system
 from app.services.plugin_installer import plugin_installer
 from app.services.theme_installer import theme_installer
 
@@ -242,6 +244,25 @@ async def install_plugin(
             # Reload plugins to include the newly installed one
             plugin_loader.load_installed_plugins()
 
+            # Emit plugin_installed event
+            try:
+                await event_system.emit_event(
+                    "plugin_installed",
+                    {
+                        "plugin_id": manifest["id"],
+                        "plugin_type": manifest.get("type", "unknown"),
+                        "version": manifest.get("version", "unknown"),
+                        "installed_at": datetime.now(UTC).isoformat(),
+                    },
+                    wait_for_handlers=False,  # Fire-and-forget
+                )
+                logger.debug(f"Emitted plugin_installed event for plugin {manifest['id']}")
+            except Exception as e:
+                # Don't fail plugin installation if event emission fails
+                logger.warning(
+                    f"Failed to emit plugin_installed event for plugin {manifest['id']}: {e}"
+                )
+
             return {
                 "success": True,
                 "message": f"Plugin {manifest['id']} installed successfully",
@@ -298,11 +319,34 @@ async def uninstall_plugin(plugin_id: str):
             )
             db_type = result.scalar_one_or_none()
 
+            plugin_type_str = None
+            if db_type:
+                plugin_type_str = db_type.plugin_type
+
             if db_type and db_type.plugin_type == PluginType.THEME.value:
                 # Uninstall theme
                 theme_installer.uninstall_theme(plugin_id)
                 # Remove theme from database
                 await _unregister_theme_from_db(plugin_id)
+
+                # Emit plugin_uninstalled event
+                try:
+                    await event_system.emit_event(
+                        "plugin_uninstalled",
+                        {
+                            "plugin_id": plugin_id,
+                            "plugin_type": PluginType.THEME.value,
+                            "uninstalled_at": datetime.now(UTC).isoformat(),
+                        },
+                        wait_for_handlers=False,  # Fire-and-forget
+                    )
+                    logger.debug(f"Emitted plugin_uninstalled event for theme {plugin_id}")
+                except Exception as e:
+                    # Don't fail plugin uninstallation if event emission fails
+                    logger.warning(
+                        f"Failed to emit plugin_uninstalled event for theme {plugin_id}: {e}"
+                    )
+
                 return {
                     "success": True,
                     "message": f"Theme {plugin_id} uninstalled successfully",
@@ -319,6 +363,24 @@ async def uninstall_plugin(plugin_id: str):
                     for m in plugin_loader._loaded_modules
                     if not m.startswith(f"installed_plugin_{plugin_id}")
                 }
+
+                # Emit plugin_uninstalled event
+                try:
+                    await event_system.emit_event(
+                        "plugin_uninstalled",
+                        {
+                            "plugin_id": plugin_id,
+                            "plugin_type": plugin_type_str or "unknown",
+                            "uninstalled_at": datetime.now(UTC).isoformat(),
+                        },
+                        wait_for_handlers=False,  # Fire-and-forget
+                    )
+                    logger.debug(f"Emitted plugin_uninstalled event for plugin {plugin_id}")
+                except Exception as e:
+                    # Don't fail plugin uninstallation if event emission fails
+                    logger.warning(
+                        f"Failed to emit plugin_uninstalled event for plugin {plugin_id}: {e}"
+                    )
 
                 return {
                     "success": True,
@@ -478,13 +540,42 @@ async def update_plugin(plugin_id: str, config: dict[str, Any]):
         if db_type and db_type.plugin_type == PluginType.THEME.value:
             # It's a theme - handle enabled status only (themes don't have config)
             if enabled is not None:
+                previous_enabled = db_type.enabled
                 db_type.enabled = enabled
                 await session.commit()
+
+                # Emit plugin_enabled or plugin_disabled events if enabled status changed
+                if previous_enabled is not None and previous_enabled != enabled:
+                    event_type = "plugin_enabled" if enabled else "plugin_disabled"
+                    try:
+                        await event_system.emit_event(
+                            event_type,
+                            {
+                                "plugin_id": plugin_id,
+                                "plugin_type": PluginType.THEME.value,
+                                f"{'enabled' if enabled else 'disabled'}_at": datetime.now(
+                                    UTC
+                                ).isoformat(),
+                            },
+                            wait_for_handlers=False,  # Fire-and-forget
+                        )
+                        logger.debug(f"Emitted {event_type} event for theme {plugin_id}")
+                    except Exception as e:
+                        # Don't fail plugin update if event emission fails
+                        logger.warning(
+                            f"Failed to emit {event_type} event for theme {plugin_id}: {e}"
+                        )
+
                 return {"success": True, "enabled": enabled}
             else:
                 # No enabled status to update
                 await session.commit()
                 return {"success": True}
+
+        # Store previous enabled state for event emission
+        previous_enabled = None
+        if db_type:
+            previous_enabled = db_type.enabled
 
         # If not found as plugin type, create it
         if not db_type:
@@ -535,6 +626,32 @@ async def update_plugin(plugin_id: str, config: dict[str, Any]):
             session=session,
         )
         await asyncio.gather(*update_coroutines, return_exceptions=True)
+
+        # Emit plugin_enabled or plugin_disabled events if enabled status changed
+        if enabled is not None and previous_enabled is not None and previous_enabled != enabled:
+            # Get plugin type as string
+            plugin_type_enum = type_info.get("plugin_type")
+            plugin_type_str = (
+                plugin_type_enum.value
+                if hasattr(plugin_type_enum, "value")
+                else str(plugin_type_enum)
+            )
+
+            event_type = "plugin_enabled" if enabled else "plugin_disabled"
+            try:
+                await event_system.emit_event(
+                    event_type,
+                    {
+                        "plugin_id": plugin_id,
+                        "plugin_type": plugin_type_str,
+                        f"{'enabled' if enabled else 'disabled'}_at": datetime.now(UTC).isoformat(),
+                    },
+                    wait_for_handlers=False,  # Fire-and-forget
+                )
+                logger.debug(f"Emitted {event_type} event for plugin {plugin_id}")
+            except Exception as e:
+                # Don't fail plugin update if event emission fails
+                logger.warning(f"Failed to emit {event_type} event for plugin {plugin_id}: {e}")
 
         # Commit all changes
         await session.commit()
