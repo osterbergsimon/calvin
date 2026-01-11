@@ -1,6 +1,9 @@
-# Docker Setup for Calvin Dashboard
+# Docker Overview
 
-This directory contains Docker configurations for different deployment scenarios.
+This document provides an overview of Docker deployment options for Calvin Dashboard.
+
+> **Note:** For detailed getting started instructions, see [Getting Started with Docker](GETTING_STARTED_DOCKER.md).  
+> For detailed build and run instructions, see [Docker Building and Running](DOCKER_BUILDING_AND_RUNNING.md).
 
 ## Overview
 
@@ -85,7 +88,7 @@ For a fully configured development environment in VS Code:
 3. Press `F1` and select "Dev Containers: Reopen in Container"
 4. VS Code will build and start the containers automatically
 
-See [.devcontainer/devcontainer.json](../.devcontainer/devcontainer.json) for configuration details.
+**Note:** If you don't have a `.devcontainer` directory yet, you can create one based on the Docker development setup. See the [Getting Started with Docker](GETTING_STARTED_DOCKER.md) guide for details.
 
 ## Image Types
 
@@ -330,28 +333,6 @@ If buildx fails:
 2. Create builder manually: `docker buildx create --name calvin-multiarch --use`
 3. Bootstrap builder: `docker buildx inspect --bootstrap`
 
-## Building and Running
-
-For detailed instructions on building and running containers, see the [documentation](../docs/setup/DOCKER_BUILDING_AND_RUNNING.md).
-
-> **Note:** The Docker documentation has been moved to the `docs/setup/` directory. For the most up-to-date information, see:
-> - [Getting Started with Docker](../docs/setup/GETTING_STARTED_DOCKER.md)
-> - [Docker Overview](../docs/setup/DOCKER_OVERVIEW.md)
-> - [Docker Building and Running](../docs/setup/DOCKER_BUILDING_AND_RUNNING.md)
-
-Quick reference:
-
-```bash
-# Development
-docker-compose -f docker/docker-compose.dev.yml up
-
-# Production (separate containers)
-docker-compose -f docker/docker-compose.prod-separate.yml up -d
-
-# Multi-architecture build
-cd docker && ./build-multiarch.sh --both --push --repo your-registry/calvin
-```
-
 ## Advantages of Docker Approach
 
 1. **Isolation**: Clean environment, no conflicts
@@ -370,3 +351,9 @@ cd docker && ./build-multiarch.sh --both --push --repo your-registry/calvin
 3. **Storage**: Images take up space
 
 For Raspberry Pi 3B+, Docker overhead is minimal and the benefits outweigh the costs.
+
+## Related Documentation
+
+- [Getting Started with Docker](GETTING_STARTED_DOCKER.md) - Complete getting started guide
+- [Docker Building and Running](DOCKER_BUILDING_AND_RUNNING.md) - Detailed build and run instructions
+- [Getting Started](GETTING_STARTED.md) - Native installation options
