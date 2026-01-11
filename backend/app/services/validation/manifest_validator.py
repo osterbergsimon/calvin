@@ -78,7 +78,7 @@ def validate_plugin_type(plugin_type: str) -> None:
     Raises:
         ValueError: If plugin type is invalid
     """
-    valid_types = ["calendar", "image", "service"]
+    valid_types = ["calendar", "image", "service", "backend"]
     if plugin_type not in valid_types:
         raise ValueError(f"Invalid plugin type: {plugin_type}. Must be one of {valid_types}")
 

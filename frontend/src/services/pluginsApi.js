@@ -184,25 +184,13 @@ export async function createPluginInstance(pluginId, instanceData) {
 
 /**
  * Update a plugin instance.
- * All plugins are updated by updating the plugin config,
- * which triggers the plugin's handle_plugin_config_update hook.
+ * Uses the dedicated instance update endpoint.
  */
 export async function updatePluginInstance(instanceId, instanceData) {
-  // We need the plugin type_id, not the instance_id
-  // For now, we'll need to get it from the instance or pass it separately
-  // This is a limitation - we should improve the API to accept instance_id directly
-  // For now, use plugin config update with instance ID passed in config
-  const configUpdate = {
-    ...instanceData.config,
-    _instance_id: instanceId, // Pass instance ID so hook knows which to update
-    _instance_name: instanceData.name,
-    _instance_enabled: instanceData.enabled,
-  };
-
-  // Try to get plugin type_id from instanceData if provided, otherwise use instanceId
-  // This is a workaround - ideally we'd have a GET /plugins/instances/{id} endpoint
-  const pluginTypeId = instanceData.plugin_id || instanceId;
-  const response = await api.put(`/plugins/${pluginTypeId}`, configUpdate);
+  const response = await api.put(
+    `/plugins/instances/${instanceId}`,
+    instanceData,
+  );
   return response.data;
 }
 

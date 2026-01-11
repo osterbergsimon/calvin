@@ -22,7 +22,6 @@ from app.services.config_service import config_service
 from app.services.plugin_installer import plugin_installer
 from app.services.theme_installer import theme_installer
 
-from .config import mask_sensitive_config
 from .themes import BUILTIN_THEMES, _unregister_theme_from_db
 
 logger = logging.getLogger(__name__)
@@ -38,7 +37,8 @@ async def get_plugins(
     Get all plugin types, optionally filtered by type.
 
     Args:
-        plugin_type: Optional plugin type filter ('calendar', 'image', 'service', 'theme')
+        plugin_type: Optional plugin type filter
+            ('calendar', 'image', 'service', 'theme', 'backend')
 
     Returns:
         List of plugin types with their common configuration
@@ -59,7 +59,7 @@ async def get_plugins(
                 only_themes = True
                 include_themes = True
         except ValueError:
-            valid_types = "calendar, image, service, theme"
+            valid_types = "calendar, image, service, theme, backend"
             raise HTTPException(
                 status_code=400,
                 detail=f"Invalid plugin type: {plugin_type}. Valid types: {valid_types}",
@@ -409,40 +409,14 @@ async def update_plugin(plugin_id: str, config: dict[str, Any]):
     """
     Update plugin type common configuration and enabled status.
 
+    This endpoint ONLY handles plugin types, not instances.
+    For instance updates, use PUT /plugins/instances/{instance_id}
+
     Args:
         plugin_id: Plugin type ID (e.g., 'google', 'ical', 'local', 'light', 'midnight')
         config: Configuration dictionary with common settings and/or enabled status
     """
-    logger.debug(f"Received update for plugin {plugin_id}")
-    logger.debug(f"Config keys: {list(config.keys())}")
-
-    # Check if it's a theme first
-    async with AsyncSessionLocal() as session:
-        result = await session.execute(
-            select(PluginTypeDB).where(PluginTypeDB.type_id == plugin_id)
-        )
-        db_type = result.scalar_one_or_none()
-
-        if db_type and db_type.plugin_type == PluginType.THEME.value:
-            # It's a theme - handle enabled status only (themes don't have config)
-            if "enabled" in config:
-                enabled = config["enabled"]
-                db_type.enabled = enabled
-                await session.commit()
-                return {"success": True, "enabled": enabled}
-            else:
-                # No enabled status to update
-                return {"success": True}
-
-    # Not a theme - get plugin type from pluggy hooks
-    plugin_types = plugin_loader.get_plugin_types()
-    type_info = next((t for t in plugin_types if t.get("type_id") == plugin_id), None)
-
-    if not type_info:
-        logger.warning(f"Plugin type {plugin_id} not found")
-        raise HTTPException(status_code=404, detail="Plugin type not found")
-
-    logger.debug(f"Found plugin type: {type_info.get('name')}")
+    logger.debug(f"Updating plugin type {plugin_id} with config keys: {list(config.keys())}")
 
     # Handle enabled status separately
     enabled = None
@@ -451,40 +425,68 @@ async def update_plugin(plugin_id: str, config: dict[str, Any]):
         # Remove enabled from config dict to avoid storing it in config
         config = {k: v for k, v in config.items() if k != "enabled"}
 
-    # Mask sensitive fields for logging
-    masked_config = mask_sensitive_config(config)
-    logger.debug(f"Updating plugin {plugin_id} with config: {masked_config}")
-
     # Clean config values - ensure all values are strings, not objects
     cleaned_config = {}
-    logger.debug("Cleaning config values...")
     for key, value in config.items():
         if isinstance(value, dict):
             # If it's a schema object, extract the actual value or default
             cleaned_value = value.get("value") or value.get("default") or ""
-            logger.debug(f"Extracted value from dict for '{key}': {cleaned_value}")
             cleaned_config[key] = cleaned_value
         elif isinstance(value, Path):
             # Handle Path objects - convert to string
             cleaned_config[key] = str(value)
-            logger.debug(f"Converted Path to string for '{key}': {cleaned_config[key]}")
         elif value is None:
             cleaned_config[key] = ""
-            logger.debug(f"Set to empty string for '{key}' (was None)")
         else:
             cleaned_config[key] = str(value)
 
     config = cleaned_config
-    masked_cleaned_config = mask_sensitive_config(config)
-    logger.debug(f"Final cleaned config: {masked_cleaned_config}")
 
-    # Update plugin type in database
+    # Get plugin type from pluggy hooks first
+    plugin_types = plugin_loader.get_plugin_types()
+    type_info = next((t for t in plugin_types if t.get("type_id") == plugin_id), None)
+
+    if not type_info:
+        # Check if it might be an instance ID to provide helpful error
+        async with AsyncSessionLocal() as session:
+            result = await session.execute(select(PluginDB).where(PluginDB.id == plugin_id))
+            db_plugin_instance = result.scalar_one_or_none()
+            if db_plugin_instance:
+                raise HTTPException(
+                    status_code=400,
+                    detail=(
+                        f"'{plugin_id}' is a plugin instance ID, not a plugin type ID. "
+                        f"Use PUT /plugins/instances/{plugin_id} to update instances."
+                    ),
+                )
+        raise HTTPException(
+            status_code=404,
+            detail=(
+                f"Plugin type '{plugin_id}' not found. "
+                f"If '{plugin_id}' is an instance ID, use PUT /plugins/instances/{plugin_id}"
+            ),
+        )
+
+    # Use a SINGLE session for the entire operation
     async with AsyncSessionLocal() as session:
+        # Check if it's a theme first (themes use type_id directly)
         result = await session.execute(
             select(PluginTypeDB).where(PluginTypeDB.type_id == plugin_id)
         )
         db_type = result.scalar_one_or_none()
 
+        if db_type and db_type.plugin_type == PluginType.THEME.value:
+            # It's a theme - handle enabled status only (themes don't have config)
+            if enabled is not None:
+                db_type.enabled = enabled
+                await session.commit()
+                return {"success": True, "enabled": enabled}
+            else:
+                # No enabled status to update
+                await session.commit()
+                return {"success": True}
+
+        # If not found as plugin type, create it
         if not db_type:
             # Create new plugin type in database
             plugin_type = type_info.get("plugin_type")
@@ -505,117 +507,42 @@ async def update_plugin(plugin_id: str, config: dict[str, Any]):
             if enabled is not None:
                 db_type.enabled = enabled
             if config:
-                # Update common config schema if provided
-                # Note: common_config_schema stores both schema AND values
                 current_schema = db_type.common_config_schema or {}
                 current_schema.update(config)
                 db_type.common_config_schema = current_schema
 
-        await session.commit()
-        await session.refresh(db_type)
-
-        # Sync plugin type and instance enabled states - they should always be the same
-        # From user's perspective, plugin type IS the plugin instance
-        if enabled is not None and db_type:
-            # Update plugin type enabled state
-            db_type.enabled = enabled
-            await session.commit()
-
-            # Find all instances of this plugin type and sync them
-            result = await session.execute(select(PluginDB).where(PluginDB.type_id == plugin_id))
-            instances = result.scalars().all()
-
-            for instance in instances:
-                instance.enabled = enabled
-                # Also update the plugin instance in memory
-                plugin = plugin_manager.get_plugin(instance.id)
-                if plugin:
-                    if enabled:
-                        plugin.enable()
-                        # Start the plugin if it's not running
-                        if not plugin.is_running():
-                            try:
-                                await plugin.initialize()
-                                plugin.start()
-                            except Exception as e:
-                                logger.error(
-                                    f"Error starting plugin {instance.id}: {e}", exc_info=True
-                                )
-                    else:
-                        plugin.disable()
-                        # Stop the plugin if it's running
-                        if plugin.is_running():
-                            try:
-                                plugin.stop()
-                                await plugin.cleanup()
-                            except Exception as e:
-                                logger.warning(
-                                    f"Error stopping plugin {instance.id}: {e}", exc_info=True
-                                )
-
-            if instances:
-                await session.commit()
-                logger.info(
-                    f"Synced plugin type and {len(instances)} "
-                    f"instance(s) enabled state to {enabled} for {plugin_id}"
-                )
-
         # Save common config to config service for backward compatibility
         if config:
             config_key = f"plugin_{plugin_id}_config"
-
-            # Ensure all values in config are JSON-serializable (strings, not Path objects)
             serializable_config = {}
             for key, value in config.items():
                 if isinstance(value, Path):
                     serializable_config[key] = str(value)
                 elif isinstance(value, dict):
-                    # Skip dict objects that might be schema objects
                     serializable_config[key] = value.get("value") or value.get("default") or ""
                 else:
                     serializable_config[key] = value
             config_json = json.dumps(serializable_config)
-            # Mask sensitive fields before logging
-            masked_serializable = mask_sensitive_config(serializable_config)
-            masked_json = json.dumps(masked_serializable)
-            logger.debug(f"Saving config to service: {masked_json}")
             await config_service.set_value(config_key, config_json)
 
         # Call plugin-specific config update handlers (if any)
-        # This allows plugins to handle their own instance creation/update logic
-        # Plugins are self-contained and should implement handle_plugin_config_update hook
-
-        # Pluggy returns a list of coroutines for async hooks, we need to await them
+        hook_config = cleaned_config.copy()
         update_coroutines = hook_manager.hook.handle_plugin_config_update(
             type_id=plugin_id,
-            config=cleaned_config,
+            config=hook_config,
             enabled=enabled,
             db_type=db_type,
             session=session,
         )
+        await asyncio.gather(*update_coroutines, return_exceptions=True)
 
-        # Await all hook implementations
-        update_results = await asyncio.gather(*update_coroutines, return_exceptions=True)
+        # Commit all changes
+        await session.commit()
 
-        # Check if any plugin handled the update
-        handled = False
-        for result in update_results:
-            # Skip exceptions (they're wrapped in the result)
-            if isinstance(result, Exception):
-                continue
-            if result is not None:
-                handled = True
-                logger.debug(f"Plugin {plugin_id} handled config update: {result}")
-                break
-
-        if not handled and cleaned_config:
-            # If no plugin handled it and we have config, log a warning
-            logger.warning(
-                f"No plugin handler found for {plugin_id}, "
-                f"config saved but no instance management performed"
-            )
-
-    return {"message": "Plugin type configuration updated", "plugin_id": plugin_id}
+    return {
+        "message": "Plugin type configuration updated",
+        "plugin_id": plugin_id,
+    }
 
 
 @router.post("/plugins/{plugin_id}/fetch")
@@ -687,7 +614,6 @@ async def get_plugin_data(
 
     from app.database import AsyncSessionLocal
     from app.models.db_models import PluginDB
-    from app.plugins.manager import plugin_manager
     from app.plugins.protocols import ServicePlugin
 
     # Get the plugin instance
@@ -948,3 +874,124 @@ async def test_plugin(plugin_id: str, test_config: dict[str, Any] | None = Body(
         "success": False,
         "message": "This plugin type does not support connection testing",
     }
+
+
+@router.post("/plugins/{plugin_id}/backend/run-task")
+async def run_backend_plugin_task(plugin_id: str):
+    """
+    Manually trigger scheduled task for a backend plugin.
+
+    Args:
+        plugin_id: Plugin instance ID
+
+    Returns:
+        Task execution result with success status and message
+    """
+    from app.plugins.protocols import BackendPlugin
+
+    plugin = plugin_manager.get_plugin(plugin_id)
+
+    if not plugin:
+        raise HTTPException(status_code=404, detail=f"Plugin instance '{plugin_id}' not found")
+
+    if not isinstance(plugin, BackendPlugin):
+        raise HTTPException(
+            status_code=400,
+            detail=f"Plugin '{plugin_id}' is not a backend plugin",
+        )
+
+    if not plugin.enabled:
+        return {
+            "success": False,
+            "message": f"Plugin '{plugin_id}' is disabled. Enable it first to run tasks.",
+        }
+
+    try:
+        # Check if plugin supports scheduled tasks
+        schedule_config = await plugin.get_schedule_config()
+        if not schedule_config:
+            return {
+                "success": False,
+                "message": f"Plugin '{plugin_id}' does not support scheduled tasks",
+            }
+
+        # Run the task
+        result = await plugin.run_scheduled_task()
+
+        if not isinstance(result, dict):
+            result = {"success": True, "message": "Task executed successfully", "data": result}
+
+        return result
+    except NotImplementedError:
+        return {
+            "success": False,
+            "message": f"Plugin '{plugin_id}' does not support scheduled tasks",
+        }
+    except Exception as e:
+        logger.exception(f"Error running task for backend plugin {plugin_id}")
+        return {
+            "success": False,
+            "message": f"Error running task: {str(e)}",
+        }
+
+
+@router.get("/plugins/{plugin_id}/backend/status")
+async def get_backend_plugin_status(plugin_id: str):
+    """
+    Get status information for a backend plugin.
+
+    Args:
+        plugin_id: Plugin instance ID
+
+    Returns:
+        Plugin status information
+    """
+    from app.plugins.protocols import BackendPlugin
+    from app.services.backend_scheduler import backend_plugin_scheduler
+
+    plugin = plugin_manager.get_plugin(plugin_id)
+
+    if not plugin:
+        raise HTTPException(status_code=404, detail=f"Plugin instance '{plugin_id}' not found")
+
+    if not isinstance(plugin, BackendPlugin):
+        raise HTTPException(
+            status_code=400,
+            detail=f"Plugin '{plugin_id}' is not a backend plugin",
+        )
+
+    plugin_status: dict[str, Any] = {
+        "plugin_id": plugin_id,
+        "name": plugin.name,
+        "enabled": plugin.enabled,
+        "running": plugin.is_running(),
+    }
+
+    # Get scheduled task information
+    schedule_config = await plugin.get_schedule_config()
+    if schedule_config:
+        plugin_status["scheduled_task"] = {
+            "enabled": schedule_config.get("enabled", False),
+            "interval": schedule_config.get("interval"),
+            "cron": schedule_config.get("cron"),
+            "max_concurrent": schedule_config.get("max_concurrent", 1),
+        }
+
+        # Check if task is registered in scheduler
+        registered_tasks = backend_plugin_scheduler.get_registered_tasks()
+        if plugin_id in registered_tasks:
+            plugin_status["scheduled_task"]["registered"] = True
+            plugin_status["scheduled_task"]["job_id"] = registered_tasks[plugin_id]
+        else:
+            plugin_status["scheduled_task"]["registered"] = False
+    else:
+        plugin_status["scheduled_task"] = None
+
+    # Get provided services
+    try:
+        provided_services = await plugin.get_provided_services()
+        plugin_status["provided_services"] = provided_services
+    except Exception:
+        plugin_status["provided_services"] = []
+
+    return plugin_status

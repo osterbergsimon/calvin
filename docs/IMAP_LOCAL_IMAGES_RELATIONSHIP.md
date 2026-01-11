@@ -15,15 +15,15 @@ The IMAP plugin and Local Images plugin are **separate, independent image plugin
   - Images are stored in the configured directory
   - Plugin scans the directory and serves images
 
-### IMAP Plugin
-- **Type**: `imap`
-- **Purpose**: Downloads images from email attachments
+### IMAP Plugin (Backend Plugin)
+- **Type**: `backend` (converted from `image` plugin)
+- **Purpose**: Downloads images from email attachments to local directory
 - **Default Directory**: `./data/images` (same as local images)
 - **Behavior**:
   - Connects to IMAP email server (Gmail, Outlook, etc.)
-  - Checks for emails with image attachments
+  - Checks for emails with image attachments (via scheduled tasks)
   - Downloads images to configured directory
-  - Scans the directory and serves images
+  - **Does NOT serve images directly** - relies on LocalImagePlugin for display
 
 ## Directory Relationship
 

@@ -43,6 +43,7 @@ const sortedPluginCategories = computed(() => {
     { type: "calendar", label: "Calendar", plugins: [] },
     { type: "image", label: "Image", plugins: [] },
     { type: "service", label: "Service", plugins: [] },
+    { type: "backend", label: "Backend", plugins: [] },
     { type: "theme", label: "Theme", plugins: [] },
   ];
 

@@ -277,3 +277,102 @@ class ServicePlugin(BasePlugin):
             True if configuration is valid
         """
         pass
+
+
+class BackendPlugin(BasePlugin):
+    """
+    Protocol for backend/infrastructure plugins.
+
+    Backend plugins provide background functionality such as:
+    - Scheduled tasks (cron-like jobs)
+    - Background workers (long-running processes)
+    - Service providers (provide services to other plugins)
+    - Data processors (transform/process data)
+
+    Plugins can implement any combination of optional capabilities.
+
+    MUST implement:
+    - validate_config()
+
+    CAN implement (optional):
+    - get_schedule_config(), run_scheduled_task() - Scheduled tasks
+    - start_worker(), stop_worker() - Background workers
+    - provide_service(), get_provided_services() - Service providers
+    """
+
+    @property
+    def plugin_type(self) -> PluginType:
+        """Return backend plugin type."""
+        return PluginType.BACKEND
+
+    # Optional: Scheduled tasks
+    async def get_schedule_config(self) -> dict[str, Any] | None:
+        """Return schedule configuration if this plugin runs scheduled tasks.
+
+        Returns dict with:
+        - interval: int (seconds between runs, e.g., 300 for 5 minutes)
+        - cron: str (cron expression, alternative to interval)
+        - enabled: bool (whether scheduling is enabled)
+        - max_concurrent: int (max concurrent executions, default: 1)
+
+        Returns None if plugin doesn't support scheduled tasks.
+        """
+        return None
+
+    async def run_scheduled_task(self) -> dict[str, Any]:
+        """Execute scheduled task. Called by scheduler if get_schedule_config() returns config.
+
+        Returns:
+            Dictionary with execution result:
+            - success: bool
+            - message: str (optional)
+            - data: dict (optional, plugin-specific data)
+        """
+        raise NotImplementedError("This plugin doesn't support scheduled tasks")
+
+    # Optional: Background workers
+    async def start_worker(self) -> None:
+        """Start background worker. Called when plugin is enabled.
+
+        This is for long-running background processes that don't fit
+        into scheduled tasks.
+        """
+        pass
+
+    async def stop_worker(self) -> None:
+        """Stop background worker. Called when plugin is disabled."""
+        pass
+
+    # Optional: Service provider (for other plugins to use)
+    async def provide_service(self, service_name: str, **kwargs) -> Any:
+        """Provide service to other plugins. Return None if service not supported.
+
+        Args:
+            service_name: Name of service (e.g., 'get_weather_data', 'process_image')
+            **kwargs: Service-specific arguments
+
+        Returns:
+            Service result (type depends on service), or None if not supported
+        """
+        return None
+
+    async def get_provided_services(self) -> list[str]:
+        """Return list of services this plugin provides.
+
+        Returns:
+            List of service names (e.g., ['get_weather_data', 'process_image'])
+        """
+        return []
+
+    # Required: Basic validation
+    @abstractmethod
+    async def validate_config(self, config: dict[str, Any]) -> bool:
+        """Validate plugin configuration.
+
+        Args:
+            config: Configuration dictionary
+
+        Returns:
+            True if configuration is valid
+        """
+        pass

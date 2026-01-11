@@ -305,6 +305,7 @@ async def _initialize_default_config():
 
 async def _start_schedulers():
     """Start background schedulers."""
+    from app.services.backend_scheduler import backend_plugin_scheduler
     from app.services.display_power_service import display_power_service
 
     await calendar_scheduler.start()
@@ -312,6 +313,9 @@ async def _start_schedulers():
 
     await display_power_service.start()
     logger.info("Display power scheduler started")
+
+    # Start backend plugin scheduler (plugins will register their tasks on initialization)
+    await backend_plugin_scheduler.start()
 
 
 async def _sync_display_orientation():
@@ -351,6 +355,7 @@ async def _sync_themes_to_db():
 async def _shutdown_services():
     """Shutdown all services and schedulers."""
     from app.plugins.manager import plugin_manager
+    from app.services.backend_scheduler import backend_plugin_scheduler
     from app.services.display_power_service import display_power_service
 
     await display_power_service.stop()
@@ -358,6 +363,9 @@ async def _shutdown_services():
 
     calendar_scheduler.stop()
     logger.info("Calendar scheduler stopped")
+
+    # Stop backend plugin scheduler (cleanup scheduled tasks)
+    backend_plugin_scheduler.stop()
 
     await plugin_manager.cleanup_all()
     logger.info("Plugins cleaned up")

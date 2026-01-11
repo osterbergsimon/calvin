@@ -125,9 +125,12 @@ class PluginLoader:
     def load_all_plugins(self) -> None:
         """Load all plugins from the plugins package and installed plugins."""
         # Load built-in plugins from calendar, image, and service subpackages
+        # Backend plugins are installed from the calvin-plugins repository
         self.load_plugins_from_package("app.plugins.calendar")
         self.load_plugins_from_package("app.plugins.image")
         self.load_plugins_from_package("app.plugins.service")
+        # Note: Backend plugins are installed from external repositories (e.g., calvin-plugins)
+        # They are loaded via load_installed_plugins() below
 
         # Load installed plugins
         self.load_installed_plugins()

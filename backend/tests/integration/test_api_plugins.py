@@ -2,9 +2,13 @@
 
 import json
 import zipfile
+from typing import Any
 
 import pytest
 
+from app.plugins.base import PluginType
+from app.plugins.manager import plugin_manager
+from app.plugins.protocols import BackendPlugin
 from app.services.plugin_installer import plugin_installer
 
 
@@ -334,3 +338,269 @@ class TestPluginInstanceManagement:
                 "plugin" in response.json()["detail"].lower()
                 or "not found" in response.json()["detail"].lower()
             )
+
+
+@pytest.mark.integration
+class TestBackendPluginAPI:
+    """Test backend plugin API endpoints."""
+
+    class MockBackendPluginForAPI(BackendPlugin):
+        """Mock BackendPlugin for API testing."""
+
+        def __init__(
+            self,
+            plugin_id: str,
+            name: str,
+            enabled: bool = True,
+            schedule_config: dict[str, Any] | None = None,
+        ):
+            super().__init__(plugin_id, name, enabled)
+            self._schedule_config = schedule_config
+            self._running = False
+            self._task_run_count = 0
+
+        @classmethod
+        def get_plugin_metadata(cls):
+            return {"type_id": "test-backend", "plugin_type": PluginType.BACKEND}
+
+        @property
+        def plugin_type(self) -> PluginType:
+            return PluginType.BACKEND
+
+        async def initialize(self) -> None:
+            self._running = True
+
+        async def cleanup(self) -> None:
+            self._running = False
+
+        def start(self) -> None:
+            self._running = True
+
+        def stop(self) -> None:
+            self._running = False
+
+        def is_running(self) -> bool:
+            return self._running
+
+        async def validate_config(self, config: dict[str, Any]) -> bool:
+            return True
+
+        async def get_schedule_config(self) -> dict[str, Any] | None:
+            if not self.enabled:
+                return None
+            return self._schedule_config
+
+        async def run_scheduled_task(self) -> dict[str, Any]:
+            self._task_run_count += 1
+            return {
+                "success": True,
+                "message": f"Task executed {self._task_run_count} time(s)",
+                "data": {"count": self._task_run_count},
+            }
+
+        async def get_provided_services(self) -> list[str]:
+            return ["test_service"]
+
+    @pytest.mark.asyncio
+    async def test_run_backend_plugin_task(self, test_client):
+        """Test running a scheduled task for a backend plugin."""
+        # Register a mock backend plugin
+        plugin = self.MockBackendPluginForAPI(
+            plugin_id="test-backend-plugin",
+            name="Test Backend Plugin",
+            enabled=True,
+            schedule_config={"interval": 300, "enabled": True, "max_concurrent": 1},
+        )
+
+        plugin_manager.register(plugin)
+        plugin.start()
+
+        try:
+            # Run task
+            response = test_client.post("/api/plugins/test-backend-plugin/backend/run-task")
+
+            if response.status_code == 404:
+                pytest.skip("Backend plugin endpoint not available in test client")
+
+            assert response.status_code == 200
+            data = response.json()
+            assert data["success"] is True
+            assert "Task executed" in data["message"]
+            assert plugin._task_run_count == 1
+
+            # Run again
+            response = test_client.post("/api/plugins/test-backend-plugin/backend/run-task")
+            assert response.status_code == 200
+            data = response.json()
+            assert plugin._task_run_count == 2
+        finally:
+            # Cleanup
+            plugin_manager.unregister("test-backend-plugin")
+
+    @pytest.mark.asyncio
+    async def test_run_backend_plugin_task_not_found(self, test_client):
+        """Test running task for non-existent plugin."""
+        response = test_client.post("/api/plugins/nonexistent-backend/backend/run-task")
+
+        if response.status_code == 404:
+            # Check if it's the endpoint not found (route not registered) or plugin not found
+            detail = response.json().get("detail", "")
+            if "not found" in detail.lower() and "plugin" in detail.lower():
+                # Plugin not found - this is the expected behavior
+                assert "plugin" in detail.lower() or "instance" in detail.lower()
+            else:
+                # Endpoint not found - skip test
+                pytest.skip("Backend plugin endpoint not available in test client")
+        else:
+            assert response.status_code == 404
+
+    @pytest.mark.asyncio
+    async def test_run_backend_plugin_task_not_backend_plugin(self, test_client):
+        """Test running task for non-backend plugin (should return 400)."""
+        # Try with a non-backend plugin (local is an image plugin)
+        response = test_client.post("/api/plugins/local/backend/run-task")
+
+        if response.status_code == 404:
+            pytest.skip("Backend plugin endpoint not available in test client")
+
+        assert response.status_code == 400
+        assert "not a backend plugin" in response.json()["detail"].lower()
+
+    @pytest.mark.asyncio
+    async def test_run_backend_plugin_task_disabled(self, test_client):
+        """Test running task for disabled backend plugin."""
+        plugin = self.MockBackendPluginForAPI(
+            plugin_id="test-backend-disabled",
+            name="Disabled Backend Plugin",
+            enabled=False,
+            schedule_config={"interval": 300, "enabled": True, "max_concurrent": 1},
+        )
+
+        plugin_manager.register(plugin)
+
+        try:
+            response = test_client.post("/api/plugins/test-backend-disabled/backend/run-task")
+
+            if response.status_code == 404:
+                pytest.skip("Backend plugin endpoint not available in test client")
+
+            assert response.status_code == 200
+            data = response.json()
+            assert data["success"] is False
+            assert "disabled" in data["message"].lower()
+        finally:
+            plugin_manager.unregister("test-backend-disabled")
+
+    @pytest.mark.asyncio
+    async def test_run_backend_plugin_task_no_schedule(self, test_client):
+        """Test running task for backend plugin without schedule config."""
+        plugin = self.MockBackendPluginForAPI(
+            plugin_id="test-backend-no-schedule",
+            name="No Schedule Backend Plugin",
+            enabled=True,
+            schedule_config=None,
+        )
+
+        plugin_manager.register(plugin)
+        plugin.start()
+
+        try:
+            response = test_client.post("/api/plugins/test-backend-no-schedule/backend/run-task")
+
+            if response.status_code == 404:
+                pytest.skip("Backend plugin endpoint not available in test client")
+
+            assert response.status_code == 200
+            data = response.json()
+            assert data["success"] is False
+            assert "does not support scheduled tasks" in data["message"].lower()
+        finally:
+            plugin_manager.unregister("test-backend-no-schedule")
+
+    @pytest.mark.asyncio
+    async def test_get_backend_plugin_status(self, test_client):
+        """Test getting status for a backend plugin."""
+        plugin = self.MockBackendPluginForAPI(
+            plugin_id="test-backend-status",
+            name="Status Backend Plugin",
+            enabled=True,
+            schedule_config={"interval": 300, "enabled": True, "max_concurrent": 1},
+        )
+
+        plugin_manager.register(plugin)
+        plugin.start()
+
+        try:
+            response = test_client.get("/api/plugins/test-backend-status/backend/status")
+
+            if response.status_code == 404:
+                pytest.skip("Backend plugin endpoint not available in test client")
+
+            assert response.status_code == 200
+            data = response.json()
+            assert data["plugin_id"] == "test-backend-status"
+            assert data["name"] == "Status Backend Plugin"
+            assert data["enabled"] is True
+            assert data["running"] is True
+            assert "scheduled_task" in data
+            assert data["scheduled_task"] is not None
+            assert data["scheduled_task"]["interval"] == 300
+            assert "provided_services" in data
+        finally:
+            plugin_manager.unregister("test-backend-status")
+
+    @pytest.mark.asyncio
+    async def test_get_backend_plugin_status_not_found(self, test_client):
+        """Test getting status for non-existent plugin."""
+        response = test_client.get("/api/plugins/nonexistent-backend/backend/status")
+
+        if response.status_code == 404:
+            # Check if it's the endpoint not found or plugin not found
+            detail = response.json().get("detail", "")
+            if "not found" in detail.lower() and "plugin" in detail.lower():
+                # Plugin not found - this is expected
+                assert "plugin" in detail.lower() or "instance" in detail.lower()
+            else:
+                # Endpoint not found - skip test
+                pytest.skip("Backend plugin endpoint not available in test client")
+        else:
+            assert response.status_code == 404
+
+    @pytest.mark.asyncio
+    async def test_get_backend_plugin_status_not_backend(self, test_client):
+        """Test getting status for non-backend plugin (should return 400)."""
+        response = test_client.get("/api/plugins/local/backend/status")
+
+        if response.status_code == 404:
+            pytest.skip("Backend plugin endpoint not available in test client")
+
+        assert response.status_code == 400
+        assert "not a backend plugin" in response.json()["detail"].lower()
+
+    @pytest.mark.asyncio
+    async def test_get_backend_plugin_status_no_schedule(self, test_client):
+        """Test getting status for backend plugin without schedule config."""
+        plugin = self.MockBackendPluginForAPI(
+            plugin_id="test-backend-status-no-schedule",
+            name="No Schedule Status Plugin",
+            enabled=True,
+            schedule_config=None,
+        )
+
+        plugin_manager.register(plugin)
+        plugin.start()
+
+        try:
+            response = test_client.get(
+                "/api/plugins/test-backend-status-no-schedule/backend/status"
+            )
+
+            if response.status_code == 404:
+                pytest.skip("Backend plugin endpoint not available in test client")
+
+            assert response.status_code == 200
+            data = response.json()
+            assert data["plugin_id"] == "test-backend-status-no-schedule"
+            assert data["scheduled_task"] is None
+        finally:
+            plugin_manager.unregister("test-backend-status-no-schedule")

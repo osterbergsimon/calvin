@@ -12,6 +12,7 @@ class PluginType(str, Enum):
     IMAGE = "image"
     SERVICE = "service"
     THEME = "theme"
+    BACKEND = "backend"
 
 
 class BasePlugin(ABC):

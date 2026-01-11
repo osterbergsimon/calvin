@@ -409,6 +409,11 @@ const handleInstanceOrderChange = (newOrder) => {
   color: #f57c00;
 }
 
+.plugin-type-badge.type-backend {
+  background: #e1bee7;
+  color: #6a1b9a;
+}
+
 .plugin-description {
   margin: 0;
   color: var(--text-secondary);

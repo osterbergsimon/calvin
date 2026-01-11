@@ -494,10 +494,8 @@ async def handle_plugin_config_update(
                 f"recreating with correct ID ({plugin_instance_id})"
             )
             session.delete(local_instance)
-            try:
-                await session.commit()
-            except TypeError:
-                session.commit()
+            # Don't commit here - the route will commit after all hooks complete
+            # Committing here causes rollback issues
             # Create the correct instance
             instance_enabled = (
                 enabled if enabled is not None else (db_type.enabled if db_type else True)
@@ -535,13 +533,9 @@ async def handle_plugin_config_update(
             enabled if enabled is not None else (db_type.enabled if db_type else True)
         )
 
-        # Update database
+        # Update database - but don't commit yet, we'll commit at the end
         if local_instance.enabled != instance_enabled:
             local_instance.enabled = instance_enabled
-            try:
-                await session.commit()
-            except TypeError:
-                session.commit()
 
         # Update plugin in memory
         plugin = plugin_manager.get_plugin(local_instance.id)
@@ -606,9 +600,9 @@ async def handle_plugin_config_update(
             # Update in database - keep config empty
             local_instance.config = {}  # No config needed
             local_instance.enabled = instance_enabled
-            if db_type:
-                db_type.enabled = instance_enabled
-            await session.commit()
+            # IMPORTANT: Don't commit here - the route will commit after all hooks complete
+            # Committing here causes rollback issues. The route handles all commits to ensure
+            # db_type.enabled and instance.enabled are both persisted correctly.
 
             return {
                 "instance_updated": True,

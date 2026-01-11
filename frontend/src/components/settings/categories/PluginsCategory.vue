@@ -403,7 +403,7 @@ onMounted(async () => {
 
   // Set initial active tab
   if (plugins.value.length > 0) {
-    const types = ["calendar", "image", "service", "theme"];
+    const types = ["calendar", "image", "service", "backend", "theme"];
     const firstType = types.find((type) =>
       plugins.value.some((p) => p.type === type),
     );
