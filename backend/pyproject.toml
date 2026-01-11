@@ -27,6 +27,7 @@ dependencies = [
     "pluggy>=1.3.0", # For dynamic plugin loading
     "alembic>=1.13.0", # For database migrations
     "loguru>=0.7.0", # For better logging (simpler and more reliable than standard logging)
+    "pre-commit>=4.3.0",
 ]
 
 # Platform-specific dependencies
