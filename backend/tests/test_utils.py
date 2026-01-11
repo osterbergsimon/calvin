@@ -94,7 +94,7 @@ def create_test_images_set(
     for i in range(count):
         format = formats[i % len(formats)]
         color = colors[i % len(colors)]
-        filename = f"test_image_{i+1}.{format.lower()}"
+        filename = f"test_image_{i + 1}.{format.lower()}"
         file_path = directory / filename
         create_test_image_file(
             file_path,

@@ -53,7 +53,7 @@ describe("Themes Store", () => {
         .mockResolvedValueOnce({ data: mockTheme2 });
 
       const store = useThemesStore();
-      const result = await store.fetchThemes();
+      await store.fetchThemes();
 
       expect(axios.get).toHaveBeenCalledWith("/api/plugins?plugin_type=theme");
       expect(axios.get).toHaveBeenCalledWith("/api/plugins/theme1");
@@ -73,7 +73,7 @@ describe("Themes Store", () => {
         .mockRejectedValueOnce(new Error("Theme not found"));
 
       const store = useThemesStore();
-      const result = await store.fetchThemes();
+      await store.fetchThemes();
 
       expect(store.themes.length).toBe(1);
       expect(store.themes[0]).toEqual({
@@ -109,7 +109,7 @@ describe("Themes Store", () => {
       axios.get.mockResolvedValue({ data: mockResponse });
 
       const store = useThemesStore();
-      const result = await store.fetchInstalledThemes();
+      await store.fetchInstalledThemes();
 
       expect(axios.get).toHaveBeenCalledWith("/api/plugins/installed");
       expect(store.loading).toBe(false);
@@ -170,7 +170,7 @@ describe("Themes Store", () => {
         .mockResolvedValueOnce({ data: { plugins: [] } });
 
       const store = useThemesStore();
-      const result = await store.installTheme(file);
+      await store.installTheme(file);
 
       expect(axios.post).toHaveBeenCalledWith(
         "/api/plugins/install",
@@ -218,7 +218,7 @@ describe("Themes Store", () => {
         .mockResolvedValueOnce({ data: { plugins: [] } });
 
       const store = useThemesStore();
-      const result = await store.installThemeFromGitHub(
+      await store.installThemeFromGitHub(
         "https://github.com/user/repo",
         "theme.json",
         "main",

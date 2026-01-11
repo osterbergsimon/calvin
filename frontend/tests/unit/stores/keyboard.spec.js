@@ -60,7 +60,7 @@ describe("Keyboard Store", () => {
       axios.get.mockResolvedValue({ data: mockMappings });
 
       const store = useKeyboardStore();
-      const result = await store.fetchMappings("5-button");
+      await store.fetchMappings("5-button");
 
       expect(axios.get).toHaveBeenCalledWith(
         "/api/keyboard/mappings?keyboard_type=5-button",
@@ -74,7 +74,7 @@ describe("Keyboard Store", () => {
       axios.get.mockRejectedValue(error);
 
       const store = useKeyboardStore();
-      const result = await store.fetchMappings().catch(() => {});
+      await store.fetchMappings().catch(() => {});
 
       expect(store.error).toBe("Network error");
       expect(store.available).toBe(false);

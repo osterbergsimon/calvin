@@ -150,8 +150,7 @@ async def unregister_plugin(plugin_id: str) -> bool:
                                     )
                                 else:
                                     logger.error(
-                                        f"Direct SQL delete found no rows to delete "
-                                        f"for {plugin_id}"
+                                        f"Direct SQL delete found no rows to delete for {plugin_id}"
                                     )
                                     deleted_from_db = False
                             except Exception as sql_error:
@@ -164,8 +163,7 @@ async def unregister_plugin(plugin_id: str) -> bool:
                                 deleted_from_db = False
                         else:
                             logger.info(
-                                f"Verified: Plugin {plugin_id} successfully removed "
-                                f"from database"
+                                f"Verified: Plugin {plugin_id} successfully removed from database"
                             )
                 except Exception as e:
                     logger.error(
@@ -190,12 +188,11 @@ async def unregister_plugin(plugin_id: str) -> bool:
                                 )
                             else:
                                 logger.warning(
-                                    f"Direct SQL delete found no rows to delete " f"for {plugin_id}"
+                                    f"Direct SQL delete found no rows to delete for {plugin_id}"
                                 )
                     except Exception as sql_error:
                         logger.error(
-                            f"Direct SQL delete fallback also failed for "
-                            f"{plugin_id}: {sql_error}",
+                            f"Direct SQL delete fallback also failed for {plugin_id}: {sql_error}",
                             exc_info=True,
                         )
                         # Re-raise the original ORM error

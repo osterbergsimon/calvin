@@ -62,7 +62,7 @@ test.describe("Keyboard Navigation", () => {
 
   test("should close modals with Escape key", async ({ page }) => {
     // Try to open a modal first (if available)
-    const modalTrigger = page
+    const _modalTrigger = page
       .locator('button[aria-label*="close" i], button:has-text("Close")')
       .first();
 

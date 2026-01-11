@@ -66,7 +66,7 @@ describe("Calendar Store", () => {
       mockConnectionStore.isFullyOnline.mockReturnValue(true);
 
       const store = useCalendarStore();
-      const result = await store.fetchSources();
+      await store.fetchSources();
 
       expect(axios.get).toHaveBeenCalledWith("/api/calendar/sources");
       expect(store.sources).toEqual(mockSources.sources);
@@ -87,7 +87,7 @@ describe("Calendar Store", () => {
       getCachedData.mockReturnValue(mockCachedSources);
 
       const store = useCalendarStore();
-      const result = await store.fetchSources();
+      await store.fetchSources();
 
       expect(axios.get).not.toHaveBeenCalled();
       expect(store.sources).toEqual(mockCachedSources.sources);
@@ -228,7 +228,7 @@ describe("Calendar Store", () => {
       mockConnectionStore.isFullyOnline.mockReturnValue(true);
 
       const store = useCalendarStore();
-      const result = await store.fetchEvents(startDate, endDate);
+      await store.fetchEvents(startDate, endDate);
 
       expect(axios.get).toHaveBeenCalledWith("/api/calendar/events", {
         params: {

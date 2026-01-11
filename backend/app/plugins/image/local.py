@@ -25,7 +25,7 @@ class LocalImagePlugin(ImagePlugin):
             "plugin_type": PluginType.IMAGE,
             "name": "Local Images",
             "description": (
-                "Upload and store images on the server. " "Images are stored in ./data/images"
+                "Upload and store images on the server. Images are stored in ./data/images"
             ),
             "version": "1.0.0",
             "common_config_schema": {},

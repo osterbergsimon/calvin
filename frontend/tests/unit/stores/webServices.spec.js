@@ -20,7 +20,7 @@ vi.mock("@/utils/cache", () => ({
   setCachedData: vi.fn(),
 }));
 
-import { getCachedData, setCachedData } from "@/utils/cache";
+import { getCachedData } from "@/utils/cache";
 
 describe("Web Services Store", () => {
   let mockConnectionStore;
@@ -87,7 +87,7 @@ describe("Web Services Store", () => {
       mockConnectionStore.isFullyOnline.mockReturnValue(true);
 
       const store = useWebServicesStore();
-      const result = await store.fetchServices();
+      await store.fetchServices();
 
       expect(axios.get).toHaveBeenCalledWith("/api/plugins", {
         params: { plugin_type: "service" },
@@ -316,7 +316,7 @@ describe("Web Services Store", () => {
       mockConnectionStore.isFullyOnline.mockReturnValue(true);
 
       const store = useWebServicesStore();
-      const result = await store.addService({
+      await store.addService({
         name: "New Service",
         url: "https://newsite.com",
         enabled: true,
@@ -338,7 +338,7 @@ describe("Web Services Store", () => {
     });
 
     it("should handle errors when adding service", async () => {
-      const error = new Error("Add failed");
+      const _error = new Error("Add failed");
       axios.get.mockResolvedValue({ data: { plugins: [] } });
 
       const store = useWebServicesStore();
@@ -400,7 +400,7 @@ describe("Web Services Store", () => {
       mockConnectionStore.isFullyOnline.mockReturnValue(true);
 
       const store = useWebServicesStore();
-      const result = await store.updateService("instance1", {
+      await store.updateService("instance1", {
         name: "Updated Service",
         url: "https://updated.com",
       });

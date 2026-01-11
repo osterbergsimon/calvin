@@ -279,7 +279,7 @@ describe("usePhotoFrameMode", () => {
 
   describe("Lifecycle hooks", () => {
     it("should fetch config on mount", async () => {
-      const photoFrame = usePhotoFrameMode();
+      const _photoFrame = usePhotoFrameMode();
 
       // Simulate onMounted
       await mockConfigStore.fetchConfig();

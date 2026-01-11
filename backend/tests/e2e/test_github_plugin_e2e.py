@@ -117,8 +117,7 @@ class TestGitHubPluginE2E:
 
         if enum_response.status_code != 200:
             pytest.skip(
-                f"Could not enumerate plugins from {DEFAULT_TEST_REPO}: "
-                f"{enum_response.status_code}"
+                f"Could not enumerate plugins from {DEFAULT_TEST_REPO}: {enum_response.status_code}"
             )
 
         enum_data = enum_response.json()

@@ -42,7 +42,7 @@ test.describe("Calendar Workflow", () => {
 
     // Look for event items
     const events = page.locator('.event-item, [class*="event"]');
-    const eventCount = await events.count();
+    const _eventCount = await events.count();
 
     // Events might not be present, but calendar should be visible
     const calendar = page.locator('.calendar, [class*="calendar"]').first();

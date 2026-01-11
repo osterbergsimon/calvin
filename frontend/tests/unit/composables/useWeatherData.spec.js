@@ -6,8 +6,6 @@ import { describe, it, expect, beforeEach, vi } from "vitest";
 import { ref } from "vue";
 import { useWeatherData } from "@/composables/useWeatherData";
 import { useConnectionStore } from "@/stores/connection";
-import axios from "axios";
-import { getCachedData, setCachedData } from "@/utils/cache";
 
 // Mock stores
 vi.mock("@/stores/connection", () => ({
@@ -38,7 +36,6 @@ vi.mock("@tanstack/vue-query", () => ({
 }));
 
 import { useQuery } from "@tanstack/vue-query";
-import { logInfo } from "@/utils/logger";
 
 describe("useWeatherData", () => {
   let mockConnectionStore;
@@ -62,7 +59,7 @@ describe("useWeatherData", () => {
     };
 
     // Reset mock implementation
-    useQuery.mockImplementation((options) => {
+    useQuery.mockImplementation((_options) => {
       return mockQueryResult;
     });
   });

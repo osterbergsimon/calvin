@@ -3,7 +3,7 @@
  * Tests functionality: displays connection status correctly
  */
 
-import { describe, it, expect, beforeEach, vi } from "vitest";
+import { describe, it, expect, beforeEach } from "vitest";
 import { mount } from "@vue/test-utils";
 import { setActivePinia, createPinia } from "pinia";
 import ConnectionIndicator from "@/components/ConnectionIndicator.vue";

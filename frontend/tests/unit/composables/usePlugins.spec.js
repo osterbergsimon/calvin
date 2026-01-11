@@ -45,7 +45,7 @@ describe("usePlugins", () => {
       pluginsApi.getPluginInstances.mockResolvedValue({ instances: [] });
       pluginsApi.getPluginConfig.mockResolvedValue({ config: {} });
 
-      const { plugins, sortedPluginCategories, loadPlugins } = usePlugins();
+      const { sortedPluginCategories, loadPlugins } = usePlugins();
       await loadPlugins();
 
       // Check that backend category exists
@@ -87,7 +87,7 @@ describe("usePlugins", () => {
       pluginsApi.getPluginInstances.mockResolvedValue({ instances: [] });
       pluginsApi.getPluginConfig.mockResolvedValue({ config: {} });
 
-      const { plugins, sortedPluginCategories, loadPlugins } = usePlugins();
+      const { sortedPluginCategories, loadPlugins } = usePlugins();
       await loadPlugins();
 
       // Check backend category has only backend plugins

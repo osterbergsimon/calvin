@@ -42,7 +42,7 @@ describe("Images Store", () => {
       });
 
       const store = useImagesStore();
-      const result = await store.fetchImages();
+      await store.fetchImages();
 
       expect(axios.get).toHaveBeenCalledWith("/api/images/list");
       expect(store.images).toEqual(mockImages.images);

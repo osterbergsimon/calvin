@@ -230,8 +230,7 @@ async def load_plugin_instances() -> None:
                             await session.commit()
                         except Exception as db_error:
                             logger.error(
-                                f"Error updating database for plugin "
-                                f"{db_plugin.id}: {db_error}",
+                                f"Error updating database for plugin {db_plugin.id}: {db_error}",
                                 exc_info=True,
                             )
                 else:
