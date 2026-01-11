@@ -7,7 +7,6 @@ from loguru import logger
 
 from app.models.calendar import CalendarEvent
 from app.plugins.base import PluginType
-from app.plugins.manager import plugin_manager
 from app.plugins.protocols import CalendarPlugin
 
 # Loguru automatically includes module/function info in logs
@@ -184,6 +183,8 @@ class PluginCalendarService:
         events: list[CalendarEvent] = []
 
         # Get all enabled calendar plugins
+        from app.plugins.manager import plugin_manager
+
         plugins = plugin_manager.get_plugins(PluginType.CALENDAR, enabled_only=True)
         logger.debug("Found {} enabled calendar plugins", len(plugins))
 
@@ -413,6 +414,8 @@ class PluginCalendarService:
                 config = db_plugin.config or {}
 
                 # Try to get plugin instance if it exists (only enabled plugins have instances)
+                from app.plugins.manager import plugin_manager
+
                 plugin = plugin_manager.get_plugin(db_plugin.id)
                 if plugin and isinstance(plugin, CalendarPlugin):
                     # Use live plugin data

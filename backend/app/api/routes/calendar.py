@@ -402,7 +402,7 @@ async def update_calendar_source(source_id: str, source: CalendarSource):
             if plugin:
                 await plugin.configure(config)
                 plugin.enable()
-                plugin_manager.register(plugin)
+                await plugin_manager.register(plugin)
                 # Initialize and start the plugin
                 await plugin.initialize()
                 plugin.start()
@@ -424,7 +424,7 @@ async def update_calendar_source(source_id: str, source: CalendarSource):
                     existing_plugin.stop()
                     await existing_plugin.cleanup()
                 # Then unregister it
-                plugin_manager.unregister(source_id)
+                await plugin_manager.unregister(source_id)
             except Exception:
                 import logging
 

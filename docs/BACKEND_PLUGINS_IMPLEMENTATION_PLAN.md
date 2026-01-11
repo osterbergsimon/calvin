@@ -734,6 +734,13 @@ class EventSystem:
 - `config_changed`: Configuration changed
   - `event_data`: `{"key": str, "old_value": Any, "new_value": Any}`
 
+**Plugin Event Emission**:
+- Plugins can emit events using `await self.emit_event(event_type, event_data, wait_for_handlers=False)`
+- All plugins inherit `emit_event()` from `BasePlugin`
+- Plugins can define custom event types for plugin-to-plugin communication
+- Example: A backend plugin processing images can emit `image_processed` events
+- Example: A sync plugin can emit `sync_completed` events
+
 **Testing**:
 - Create test plugin that subscribes to events
 - Emit test events (fire-and-forget)

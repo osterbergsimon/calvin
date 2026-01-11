@@ -412,7 +412,7 @@ class TestBackendPluginAPI:
             schedule_config={"interval": 300, "enabled": True, "max_concurrent": 1},
         )
 
-        plugin_manager.register(plugin)
+        await plugin_manager.register(plugin)
         plugin.start()
 
         try:
@@ -435,7 +435,7 @@ class TestBackendPluginAPI:
             assert plugin._task_run_count == 2
         finally:
             # Cleanup
-            plugin_manager.unregister("test-backend-plugin")
+            await plugin_manager.unregister("test-backend-plugin")
 
     @pytest.mark.asyncio
     async def test_run_backend_plugin_task_not_found(self, test_client):
@@ -476,7 +476,7 @@ class TestBackendPluginAPI:
             schedule_config={"interval": 300, "enabled": True, "max_concurrent": 1},
         )
 
-        plugin_manager.register(plugin)
+        await plugin_manager.register(plugin)
 
         try:
             response = test_client.post("/api/plugins/test-backend-disabled/backend/run-task")
@@ -489,7 +489,7 @@ class TestBackendPluginAPI:
             assert data["success"] is False
             assert "disabled" in data["message"].lower()
         finally:
-            plugin_manager.unregister("test-backend-disabled")
+            await plugin_manager.unregister("test-backend-disabled")
 
     @pytest.mark.asyncio
     async def test_run_backend_plugin_task_no_schedule(self, test_client):
@@ -501,7 +501,7 @@ class TestBackendPluginAPI:
             schedule_config=None,
         )
 
-        plugin_manager.register(plugin)
+        await plugin_manager.register(plugin)
         plugin.start()
 
         try:
@@ -515,7 +515,7 @@ class TestBackendPluginAPI:
             assert data["success"] is False
             assert "does not support scheduled tasks" in data["message"].lower()
         finally:
-            plugin_manager.unregister("test-backend-no-schedule")
+            await plugin_manager.unregister("test-backend-no-schedule")
 
     @pytest.mark.asyncio
     async def test_get_backend_plugin_status(self, test_client):
@@ -527,7 +527,7 @@ class TestBackendPluginAPI:
             schedule_config={"interval": 300, "enabled": True, "max_concurrent": 1},
         )
 
-        plugin_manager.register(plugin)
+        await plugin_manager.register(plugin)
         plugin.start()
 
         try:
@@ -547,7 +547,7 @@ class TestBackendPluginAPI:
             assert data["scheduled_task"]["interval"] == 300
             assert "provided_services" in data
         finally:
-            plugin_manager.unregister("test-backend-status")
+            await plugin_manager.unregister("test-backend-status")
 
     @pytest.mark.asyncio
     async def test_get_backend_plugin_status_not_found(self, test_client):
@@ -587,7 +587,7 @@ class TestBackendPluginAPI:
             schedule_config=None,
         )
 
-        plugin_manager.register(plugin)
+        await plugin_manager.register(plugin)
         plugin.start()
 
         try:
@@ -603,4 +603,4 @@ class TestBackendPluginAPI:
             assert data["plugin_id"] == "test-backend-status-no-schedule"
             assert data["scheduled_task"] is None
         finally:
-            plugin_manager.unregister("test-backend-status-no-schedule")
+            await plugin_manager.unregister("test-backend-status-no-schedule")

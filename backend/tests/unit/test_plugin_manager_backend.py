@@ -69,7 +69,8 @@ def plugin_manager():
 class TestPluginManagerBackendPlugins:
     """Test suite for PluginManager with backend plugins."""
 
-    def test_plugin_manager_tracks_backend_plugins(self, plugin_manager):
+    @pytest.mark.asyncio
+    async def test_plugin_manager_tracks_backend_plugins(self, plugin_manager):
         """Test that PluginManager tracks backend plugins."""
         plugin = MockBackendPlugin(
             plugin_id="backend-1",
@@ -78,7 +79,7 @@ class TestPluginManagerBackendPlugins:
             schedule_config={"interval": 300, "enabled": True, "max_concurrent": 1},
         )
 
-        plugin_manager.register(plugin)
+        await plugin_manager.register(plugin)
 
         assert plugin_manager.get_plugin("backend-1") == plugin
         backend_plugins = plugin_manager.get_plugins(PluginType.BACKEND, enabled_only=False)
@@ -91,26 +92,28 @@ class TestPluginManagerBackendPlugins:
         assert PluginType.BACKEND in plugin_manager._plugins_by_type
         assert plugin_manager._plugins_by_type[PluginType.BACKEND] == []
 
-    def test_plugin_manager_get_plugins_backend(self, plugin_manager):
+    @pytest.mark.asyncio
+    async def test_plugin_manager_get_plugins_backend(self, plugin_manager):
         """Test getting backend plugins by type."""
         plugin1 = MockBackendPlugin("backend-1", "Backend Plugin 1")
         plugin2 = MockBackendPlugin("backend-2", "Backend Plugin 2")
 
-        plugin_manager.register(plugin1)
-        plugin_manager.register(plugin2)
+        await plugin_manager.register(plugin1)
+        await plugin_manager.register(plugin2)
 
         backend_plugins = plugin_manager.get_plugins(PluginType.BACKEND, enabled_only=False)
         assert len(backend_plugins) == 2
         assert plugin1 in backend_plugins
         assert plugin2 in backend_plugins
 
-    def test_plugin_manager_get_plugin_count_backend(self, plugin_manager):
+    @pytest.mark.asyncio
+    async def test_plugin_manager_get_plugin_count_backend(self, plugin_manager):
         """Test getting backend plugin count."""
         plugin1 = MockBackendPlugin("backend-1", "Backend Plugin 1")
         plugin2 = MockBackendPlugin("backend-2", "Backend Plugin 2")
 
-        plugin_manager.register(plugin1)
-        plugin_manager.register(plugin2)
+        await plugin_manager.register(plugin1)
+        await plugin_manager.register(plugin2)
 
         count = plugin_manager.get_plugin_count(PluginType.BACKEND)
         assert count == 2
@@ -128,7 +131,7 @@ class TestPluginManagerBackendPlugins:
             schedule_config={"interval": 300, "enabled": True, "max_concurrent": 1},
         )
 
-        plugin_manager.register(plugin)
+        await plugin_manager.register(plugin)
 
         await plugin_manager.initialize_all()
 
@@ -152,7 +155,7 @@ class TestPluginManagerBackendPlugins:
             schedule_config={"interval": 300, "enabled": True, "max_concurrent": 1},
         )
 
-        plugin_manager.register(plugin)
+        await plugin_manager.register(plugin)
 
         await plugin_manager.initialize_all()
 
@@ -177,7 +180,7 @@ class TestPluginManagerBackendPlugins:
 
         plugin.initialize = failing_initialize
 
-        plugin_manager.register(plugin)
+        await plugin_manager.register(plugin)
 
         # Should not raise exception, just log error
         await plugin_manager.initialize_all()
@@ -196,10 +199,10 @@ class TestPluginManagerBackendPlugins:
         plugin = MockBackendPlugin("backend-1", "Test Backend Plugin", enabled=True)
         plugin.start()
 
-        plugin_manager.register(plugin)
+        await plugin_manager.register(plugin)
 
         # Unregister plugin
-        result = plugin_manager.unregister("backend-1")
+        result = await plugin_manager.unregister("backend-1")
 
         assert result is True
         assert plugin_manager.get_plugin("backend-1") is None
@@ -213,7 +216,7 @@ class TestPluginManagerBackendPlugins:
         """Test unregistering a non-existent backend plugin."""
         mock_scheduler.unregister_plugin_tasks = AsyncMock()
 
-        result = plugin_manager.unregister("nonexistent-backend")
+        result = await plugin_manager.unregister("nonexistent-backend")
 
         assert result is False
         # Scheduler should not be called if plugin doesn't exist
@@ -228,10 +231,10 @@ class TestPluginManagerBackendPlugins:
         plugin = MockBackendPlugin("backend-1", "Test Backend Plugin", enabled=True)
         plugin.start()
 
-        plugin_manager.register(plugin)
+        await plugin_manager.register(plugin)
 
         # Should not raise exception, just log warning
-        result = plugin_manager.unregister("backend-1")
+        result = await plugin_manager.unregister("backend-1")
 
         # Plugin should still be unregistered even if scheduler fails
         assert result is True
@@ -250,7 +253,7 @@ class TestPluginManagerBackendPlugins:
             schedule_config={"interval": 300, "enabled": True, "max_concurrent": 1},
         )
 
-        plugin_manager.register(plugin)
+        await plugin_manager.register(plugin)
 
         # Start plugin
         result = await plugin_manager.start_plugin("backend-1")
@@ -269,7 +272,7 @@ class TestPluginManagerBackendPlugins:
         plugin = MockBackendPlugin("backend-1", "Test Backend Plugin", enabled=True)
         plugin.start()
 
-        plugin_manager.register(plugin)
+        await plugin_manager.register(plugin)
 
         # Stop plugin
         result = await plugin_manager.stop_plugin("backend-1")

@@ -88,7 +88,7 @@ class TestInstanceUpdateLogic:
         from app.plugins.manager import plugin_manager
 
         plugin = MockBackendPlugin("test-plugin-1", "Test Plugin", enabled=False)
-        plugin_manager.register(plugin)
+        await plugin_manager.register(plugin)
 
         try:
             assert not plugin.is_running()
@@ -103,7 +103,7 @@ class TestInstanceUpdateLogic:
             assert plugin.enabled is True
             assert plugin.is_running() is True
         finally:
-            plugin_manager.unregister(plugin.plugin_id)
+            await plugin_manager.unregister(plugin.plugin_id)
 
     @pytest.mark.asyncio
     async def test_disable_plugin_stops_if_running(self):
@@ -112,7 +112,7 @@ class TestInstanceUpdateLogic:
 
         plugin = MockBackendPlugin("test-plugin-2", "Test Plugin", enabled=True)
         plugin.start()  # Start it first
-        plugin_manager.register(plugin)
+        await plugin_manager.register(plugin)
 
         try:
             assert plugin.is_running()
@@ -127,7 +127,7 @@ class TestInstanceUpdateLogic:
             assert plugin.enabled is False
             assert not plugin.is_running()
         finally:
-            plugin_manager.unregister(plugin.plugin_id)
+            await plugin_manager.unregister(plugin.plugin_id)
 
     @pytest.mark.asyncio
     async def test_backend_plugin_schedule_registration_on_enable(self):
@@ -135,7 +135,7 @@ class TestInstanceUpdateLogic:
         from app.plugins.manager import plugin_manager
 
         plugin = MockBackendPlugin("test-backend-1", "Test Backend Plugin", enabled=False)
-        plugin_manager.register(plugin)
+        await plugin_manager.register(plugin)
 
         try:
             # Start scheduler if not running
@@ -158,7 +158,7 @@ class TestInstanceUpdateLogic:
             # Cleanup
             await backend_plugin_scheduler.unregister_plugin_tasks(plugin.plugin_id)
         finally:
-            plugin_manager.unregister(plugin.plugin_id)
+            await plugin_manager.unregister(plugin.plugin_id)
 
     @pytest.mark.asyncio
     async def test_backend_plugin_schedule_unregistration_on_disable(self):
@@ -172,7 +172,7 @@ class TestInstanceUpdateLogic:
 
         plugin = MockBackendPlugin("test-backend-2", "Test Backend Plugin", enabled=True)
         plugin.start()
-        plugin_manager.register(plugin)
+        await plugin_manager.register(plugin)
 
         # Get current scheduler reference
         current_scheduler = scheduler_module.backend_plugin_scheduler
@@ -230,4 +230,4 @@ class TestInstanceUpdateLogic:
                     await test_scheduler.unregister_plugin_tasks(plugin.plugin_id)
                 except Exception:
                     pass  # Ignore cleanup errors
-            plugin_manager.unregister(plugin.plugin_id)
+            await plugin_manager.unregister(plugin.plugin_id)

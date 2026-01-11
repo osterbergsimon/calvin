@@ -288,6 +288,7 @@ class BackendPlugin(BasePlugin):
     - Background workers (long-running processes)
     - Service providers (provide services to other plugins)
     - Data processors (transform/process data)
+    - Event publishers (emit events for other plugins to consume)
 
     Plugins can implement any combination of optional capabilities.
 
@@ -298,6 +299,8 @@ class BackendPlugin(BasePlugin):
     - get_schedule_config(), run_scheduled_task() - Scheduled tasks
     - start_worker(), stop_worker() - Background workers
     - provide_service(), get_provided_services() - Service providers
+    - handle_event(), get_subscribed_events() - Event handlers (subscribe to events)
+    - emit_event() - Event publisher (publish events, inherited from BasePlugin)
     """
 
     @property
@@ -361,6 +364,29 @@ class BackendPlugin(BasePlugin):
 
         Returns:
             List of service names (e.g., ['get_weather_data', 'process_image'])
+        """
+        return []
+
+    # Optional: Event handlers
+    async def handle_event(
+        self, event_type: str, event_data: dict[str, Any]
+    ) -> dict[str, Any] | None:
+        """Handle system events. Called when events matching this plugin's interests occur.
+
+        Args:
+            event_type: Type of event (e.g., 'image_uploaded', 'plugin_enabled')
+            event_data: Event payload (plugin-specific)
+
+        Returns:
+            Dictionary with result, or None if event not handled
+        """
+        return None
+
+    async def get_subscribed_events(self) -> list[str]:
+        """Return list of event types this plugin subscribes to.
+
+        Returns:
+            List of event type strings (e.g., ['image_uploaded', 'config_changed'])
         """
         return []
 

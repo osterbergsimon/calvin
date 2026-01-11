@@ -8,6 +8,7 @@ from loguru import logger
 from app.plugins.base import BasePlugin, PluginType
 from app.plugins.manager import plugin_manager
 from app.plugins.protocols import ImagePlugin
+from app.services.event_system import event_system
 
 # Loguru automatically includes module/function info in logs
 
@@ -369,6 +370,17 @@ class PluginImageService:
                 if result:
                     # Refresh images list
                     await self.get_images()
+                    # Emit image_uploaded event (fire-and-forget)
+                    await event_system.emit_event(
+                        "image_uploaded",
+                        {
+                            "image_id": result.get("id"),
+                            "filename": filename,
+                            "path": result.get("path"),
+                            "plugin_id": plugin.plugin_id,
+                        },
+                        wait_for_handlers=False,
+                    )
                     return result
             except Exception as e:
                 logger.error(f"Error uploading image to plugin {plugin.plugin_id}: {e}")
@@ -404,6 +416,16 @@ class PluginImageService:
                         if self._current_image_id == image_id:
                             self._current_image_id = None
                             self._current_plugin_id = None
+                        # Emit image_deleted event (fire-and-forget)
+                        await event_system.emit_event(
+                            "image_deleted",
+                            {
+                                "image_id": image_id,
+                                "filename": img.get("filename"),
+                                "plugin_id": plugin.plugin_id,
+                            },
+                            wait_for_handlers=False,
+                        )
                         return True
             except Exception as e:
                 logger.error(f"Error deleting image {image_id} from plugin {plugin.plugin_id}: {e}")

@@ -132,7 +132,7 @@ async def load_plugin_instances() -> None:
                 if existing:
                     try:
                         await existing.cleanup()
-                        instance_manager.unregister(db_plugin.id)
+                        await instance_manager.unregister(db_plugin.id)
                     except Exception as e:
                         logger.warning(
                             f"Error cleaning up disabled plugin {db_plugin.id}: {e}",
@@ -210,7 +210,7 @@ async def load_plugin_instances() -> None:
                             plugin.enable()
 
                         # Register plugin
-                        instance_manager.register(plugin)
+                        await instance_manager.register(plugin)
 
                         # Initialize and start the plugin
                         try:

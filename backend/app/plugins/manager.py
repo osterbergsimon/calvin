@@ -1,5 +1,7 @@
 """Plugin manager for registering and managing plugins."""
 
+from typing import Any
+
 from loguru import logger
 
 from app.plugins.base import BasePlugin, PluginType
@@ -21,7 +23,7 @@ class PluginManager:
             PluginType.BACKEND: [],
         }
 
-    def register(self, plugin: BasePlugin) -> None:
+    async def register(self, plugin: BasePlugin) -> None:
         """
         Register a plugin.
 
@@ -42,7 +44,28 @@ class PluginManager:
             # Schedule registration will happen in start_plugin()
             pass
 
-    def unregister(self, plugin_id: str) -> bool:
+        # Subscribe backend plugin to events if applicable
+        if isinstance(plugin, BackendPlugin):
+            try:
+                from app.services.event_system import event_system
+
+                subscribed_events = await plugin.get_subscribed_events()
+                if subscribed_events:
+                    # Create handler wrapper
+                    async def event_handler(
+                        event_type: str, event_data: dict[str, Any]
+                    ) -> dict[str, Any] | None:
+                        return await plugin.handle_event(event_type, event_data)
+
+                    # Subscribe to events
+                    event_system.subscribe(plugin.plugin_id, subscribed_events, event_handler)
+            except Exception as e:
+                logger.warning(
+                    f"Error subscribing backend plugin {plugin.plugin_id} to events: {e}",
+                    exc_info=True,
+                )
+
+    async def unregister(self, plugin_id: str) -> bool:
         """
         Unregister a plugin.
 
@@ -66,6 +89,24 @@ class PluginManager:
             except ValueError:
                 # Plugin not in list, that's fine
                 pass
+
+        # Unsubscribe backend plugin from events if applicable
+        if isinstance(plugin, BackendPlugin):
+            try:
+                from app.services.event_system import event_system
+
+                subscribed_events = await plugin.get_subscribed_events()
+                if subscribed_events:
+                    event_system.unsubscribe(plugin.plugin_id, subscribed_events)
+                else:
+                    # Unsubscribe from all if no specific events
+                    event_system.unsubscribe(plugin.plugin_id)
+            except Exception as e:
+                logger.warning(
+                    f"Error unsubscribing backend plugin {plugin_id} from events: {e}",
+                    exc_info=True,
+                )
+
         return True
 
     def get_plugin(self, plugin_id: str) -> BasePlugin | None:
@@ -223,6 +264,36 @@ class PluginManager:
                         logger.error(
                             f"Error registering scheduled tasks for backend plugin "
                             f"{plugin_id}: {e}",
+                            exc_info=True,
+                        )
+
+                    # Subscribe to events if not already subscribed
+                    try:
+                        from app.services.event_system import event_system
+
+                        subscribed_events = await plugin.get_subscribed_events()
+                        if subscribed_events:
+                            # Check if already subscribed (simple check - if handler exists)
+                            already_subscribed = any(
+                                event_type in event_system._subscribers
+                                and any(
+                                    pid == plugin_id
+                                    for pid, _ in event_system._subscribers[event_type]
+                                )
+                                for event_type in subscribed_events
+                            )
+                            if not already_subscribed:
+                                # Create handler wrapper
+                                async def event_handler(
+                                    event_type: str, event_data: dict[str, Any]
+                                ) -> dict[str, Any] | None:
+                                    return await plugin.handle_event(event_type, event_data)
+
+                                # Subscribe to events
+                                event_system.subscribe(plugin_id, subscribed_events, event_handler)
+                    except Exception as e:
+                        logger.warning(
+                            f"Error subscribing backend plugin {plugin_id} to events: {e}",
                             exc_info=True,
                         )
 

@@ -60,7 +60,7 @@ async def start_plugin_instance(instance_id: str):
         if plugin:
             await plugin.configure(db_plugin.config or {})
             plugin.enabled = db_plugin.enabled
-            plugin_manager.register(plugin)
+            await plugin_manager.register(plugin)
         else:
             raise HTTPException(
                 status_code=500,
@@ -272,7 +272,7 @@ async def update_plugin_instance(instance_id: str, instance_data: dict[str, Any]
                 try:
                     await plugin.configure(db_plugin.config or {})
                     plugin.enabled = db_plugin.enabled
-                    plugin_manager.register(plugin)
+                    await plugin_manager.register(plugin)
                     await plugin.initialize()
                     plugin.start()
                     # Register scheduled tasks for backend plugins

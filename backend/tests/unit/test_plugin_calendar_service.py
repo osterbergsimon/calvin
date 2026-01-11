@@ -110,7 +110,7 @@ class TestPluginCalendarService:
     @pytest.mark.asyncio
     async def test_get_events_no_plugins(self, calendar_service):
         """Test getting events when no plugins are available."""
-        with patch("app.services.plugin_calendar_service.plugin_manager") as mock_manager:
+        with patch("app.plugins.manager.plugin_manager") as mock_manager:
             mock_manager.get_plugins.return_value = []
             start_date = datetime(2024, 1, 15)
             end_date = datetime(2024, 1, 20)
@@ -125,7 +125,7 @@ class TestPluginCalendarService:
         self, calendar_service, mock_calendar_plugin, sample_events
     ):
         """Test getting events from a single plugin."""
-        with patch("app.services.plugin_calendar_service.plugin_manager") as mock_manager:
+        with patch("app.plugins.manager.plugin_manager") as mock_manager:
             mock_manager.get_plugins.return_value = [mock_calendar_plugin]
 
             start_date = datetime(2024, 1, 15)
@@ -158,7 +158,7 @@ class TestPluginCalendarService:
             ],
         )
 
-        with patch("app.services.plugin_calendar_service.plugin_manager") as mock_manager:
+        with patch("app.plugins.manager.plugin_manager") as mock_manager:
             mock_manager.get_plugins.return_value = [plugin1, plugin2]
 
             start_date = datetime(2024, 1, 15)
@@ -177,7 +177,7 @@ class TestPluginCalendarService:
         plugin1 = MockCalendarPlugin("calendar-1", "Test Calendar 1", sample_events)
         plugin2 = MockCalendarPlugin("calendar-2", "Test Calendar 2", [])
 
-        with patch("app.services.plugin_calendar_service.plugin_manager") as mock_manager:
+        with patch("app.plugins.manager.plugin_manager") as mock_manager:
             mock_manager.get_plugins.return_value = [plugin1, plugin2]
 
             start_date = datetime(2024, 1, 15)
@@ -195,7 +195,7 @@ class TestPluginCalendarService:
         self, calendar_service, mock_calendar_plugin, sample_events
     ):
         """Test that naive datetimes are converted to timezone-aware."""
-        with patch("app.services.plugin_calendar_service.plugin_manager") as mock_manager:
+        with patch("app.plugins.manager.plugin_manager") as mock_manager:
             mock_manager.get_plugins.return_value = [mock_calendar_plugin]
 
             # Use naive datetimes
@@ -220,7 +220,7 @@ class TestPluginCalendarService:
 
         mock_calendar_plugin.fetch_events = fetch_events_side_effect
 
-        with patch("app.services.plugin_calendar_service.plugin_manager") as mock_manager:
+        with patch("app.plugins.manager.plugin_manager") as mock_manager:
             mock_manager.get_plugins.return_value = [mock_calendar_plugin]
 
             start_date = datetime(2024, 1, 15)
@@ -254,7 +254,7 @@ class TestPluginCalendarService:
 
         mock_calendar_plugin.fetch_events = fetch_events_side_effect
 
-        with patch("app.services.plugin_calendar_service.plugin_manager") as mock_manager:
+        with patch("app.plugins.manager.plugin_manager") as mock_manager:
             mock_manager.get_plugins.return_value = [mock_calendar_plugin]
 
             start_date = datetime(2024, 1, 15)
@@ -283,7 +283,7 @@ class TestPluginCalendarService:
     ):
         """Test that plugin errors are handled gracefully."""
         # First call succeeds and caches
-        with patch("app.services.plugin_calendar_service.plugin_manager") as mock_manager:
+        with patch("app.plugins.manager.plugin_manager") as mock_manager:
             mock_manager.get_plugins.return_value = [mock_calendar_plugin]
 
             start_date = datetime(2024, 1, 15)
@@ -314,7 +314,7 @@ class TestPluginCalendarService:
         non_calendar_plugin = MagicMock()
         non_calendar_plugin.plugin_id = "image-plugin-1"
 
-        with patch("app.services.plugin_calendar_service.plugin_manager") as mock_manager:
+        with patch("app.plugins.manager.plugin_manager") as mock_manager:
             mock_manager.get_plugins.return_value = [mock_calendar_plugin, non_calendar_plugin]
 
             start_date = datetime(2024, 1, 15)
@@ -360,7 +360,7 @@ class TestPluginCalendarService:
             mock_result.scalars.return_value.all.return_value = [mock_db_plugin]
             mock_session_instance.execute = AsyncMock(return_value=mock_result)
 
-            with patch("app.services.plugin_calendar_service.plugin_manager") as mock_manager:
+            with patch("app.plugins.manager.plugin_manager") as mock_manager:
                 # Create a proper CalendarPlugin instance
                 test_plugin = MockCalendarPlugin("test-calendar-1", "Test Calendar")
                 test_plugin._config = {
@@ -400,7 +400,7 @@ class TestPluginCalendarService:
             mock_result.scalars.return_value.all.return_value = [mock_db_plugin]
             mock_session_instance.execute = AsyncMock(return_value=mock_result)
 
-            with patch("app.services.plugin_calendar_service.plugin_manager") as mock_manager:
+            with patch("app.plugins.manager.plugin_manager") as mock_manager:
                 mock_manager.get_plugin.return_value = None  # No instance for disabled plugin
 
                 sources = await calendar_service.get_sources()
