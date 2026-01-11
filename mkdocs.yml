@@ -11,11 +11,6 @@ edit_uri: edit/main/docs/
 # Documentation directory
 docs_dir: docs
 
-# Exclude README.md since it conflicts with index.md
-# Using .gitignore pattern syntax
-exclude_docs:
-  - README.md
-
 # Copyright
 copyright: Copyright &copy; 2024 Calvin Contributors
 
@@ -75,6 +70,11 @@ markdown_extensions:
 nav:
   - Home: index.md
   - Getting Started:
+    - setup/GETTING_STARTED.md
+    - setup/GETTING_STARTED_DOCKER.md
+    - setup/DOCKER_OVERVIEW.md
+    - setup/DOCKER_BUILDING_AND_RUNNING.md
+    - setup/CI_CD.md
     - setup/QUICKSTART_DEVELOP.md
     - setup/QUICKSTART_WINDOWS.md
     - setup/SETUP_SCRIPTS.md
