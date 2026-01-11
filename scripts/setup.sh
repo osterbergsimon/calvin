@@ -75,7 +75,8 @@ main() {
         chromium \
         unclutter \
         xdotool \
-        x11-xserver-utils
+        x11-xserver-utils \
+        cron
     
     # Step 4: Install UV
     ensure_uv_installed "${CALVIN_USER}"
