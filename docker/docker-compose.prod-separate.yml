@@ -1,0 +1,68 @@
+version: '3.8'
+
+# Production compose with separate backend and frontend containers
+# Suitable for local deployment on same machine or distributed deployment
+# For distributed deployment, run backend and frontend separately with this file
+
+services:
+  calvin-backend:
+    build:
+      context: ..
+      dockerfile: docker/Dockerfile.backend-prod
+    image: calvin-backend:latest
+    container_name: calvin-backend
+    ports:
+      - "8000:8000"
+    volumes:
+      - calvin-data:/app/data
+      - calvin-logs:/app/logs
+    restart: unless-stopped
+    environment:
+      - DATABASE_URL=sqlite:///app/data/db/calvin.db
+      - IMAGE_DIR=/app/data/images
+      # CORS configuration - add frontend URLs here for distributed deployment
+      # Example: CORS_ORIGINS=http://localhost:80,http://192.168.1.100:80
+      - CORS_ORIGINS=${CORS_ORIGINS:-http://localhost:80}
+      - CORS_ALLOW_ALL=${CORS_ALLOW_ALL:-false}
+    networks:
+      - calvin-network
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8000/api/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 40s
+
+  calvin-frontend:
+    build:
+      context: ..
+      dockerfile: docker/Dockerfile.frontend-prod
+      args:
+        # Set the backend API URL
+        # For local deployment: /api (relative, same domain)
+        # For distributed deployment: http://backend-host:8000/api (absolute URL)
+        - VITE_API_URL=${VITE_API_URL:-/api}
+    image: calvin-frontend:latest
+    container_name: calvin-frontend
+    ports:
+      - "80:80"
+    restart: unless-stopped
+    networks:
+      - calvin-network
+    depends_on:
+      calvin-backend:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD", "wget", "--quiet", "--tries=1", "--spider", "http://localhost/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 10s
+
+volumes:
+  calvin-data:
+  calvin-logs:
+
+networks:
+  calvin-network:
+    driver: bridge
