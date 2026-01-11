@@ -10,11 +10,11 @@ RUN pip install uv
 WORKDIR /app
 
 # Install dependencies
-COPY pyproject.toml uv.lock ./
+COPY backend/pyproject.toml backend/uv.lock ./
 RUN uv sync --extra dev
 
 # Copy app code (will be mounted as volume in dev)
-COPY app ./app
+COPY backend/app ./app
 
 EXPOSE 8000
 

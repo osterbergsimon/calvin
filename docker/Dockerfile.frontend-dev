@@ -3,11 +3,11 @@ FROM node:20-slim
 WORKDIR /app
 
 # Install dependencies
-COPY package*.json ./
+COPY frontend/package*.json ./
 RUN npm ci
 
 # Copy app code (will be mounted as volume in dev)
-COPY . .
+COPY frontend/ .
 
 EXPOSE 5173
 

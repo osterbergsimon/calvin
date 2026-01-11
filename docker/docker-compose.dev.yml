@@ -4,13 +4,13 @@ version: '3.8'
 services:
   calvin-backend-dev:
     build:
-      context: ../backend
-      dockerfile: Dockerfile.backend-dev
+      context: ..
+      dockerfile: docker/Dockerfile.backend-dev
     container_name: calvin-backend-dev
     ports:
       - "8000:8000"
     volumes:
-      - ./backend:/app
+      - ../backend:/app
       - calvin-data:/app/data
       - calvin-logs:/app/logs
     restart: unless-stopped
@@ -23,13 +23,13 @@ services:
 
   calvin-frontend-dev:
     build:
-      context: ../frontend
-      dockerfile: Dockerfile.frontend-dev
+      context: ..
+      dockerfile: docker/Dockerfile.frontend-dev
     container_name: calvin-frontend-dev
     ports:
       - "5173:5173"
     volumes:
-      - ./frontend:/app
+      - ../frontend:/app
       - /app/node_modules
     restart: unless-stopped
     command: npm run dev
