@@ -722,24 +722,34 @@ class EventSystem:
         return processed
 ```
 
-**Event Types** (initial):
-- `image_uploaded`: Image was uploaded via LocalImagePlugin
+**System-Emitted Events** (emitted by core system):
+- `image_uploaded`: New image detected in LocalImagePlugin (via scan_images)
+  - Emitted when: LocalImagePlugin detects a new image file during scan
+  - Works for: Any image source (IMAP downloads, manual uploads, file system additions, etc.)
   - `event_data`: `{"image_id": str, "filename": str, "path": str, "plugin_id": str}`
+  - **Note**: Plugins that download images (like IMAP) don't need to emit this - the system detects new images automatically
 - `image_deleted`: Image was deleted via LocalImagePlugin
   - `event_data`: `{"image_id": str, "filename": str, "plugin_id": str}`
-- `plugin_enabled`: A plugin was enabled
+- `plugin_enabled`: A plugin was enabled (future)
   - `event_data`: `{"plugin_id": str, "plugin_type": str}`
-- `plugin_disabled`: A plugin was disabled
+- `plugin_disabled`: A plugin was disabled (future)
   - `event_data`: `{"plugin_id": str, "plugin_type": str}`
-- `config_changed`: Configuration changed
+- `config_changed`: Configuration changed (future)
   - `event_data`: `{"key": str, "old_value": Any, "new_value": Any}`
 
-**Plugin Event Emission**:
-- Plugins can emit events using `await self.emit_event(event_type, event_data, wait_for_handlers=False)`
+**Plugin-Emitted Events** (emitted by plugins):
+- Plugins can emit custom events using `await self.emit_event(event_type, event_data, wait_for_handlers=False)`
 - All plugins inherit `emit_event()` from `BasePlugin`
 - Plugins can define custom event types for plugin-to-plugin communication
-- Example: A backend plugin processing images can emit `image_processed` events
+- Example: ImageProcessorPlugin emits `image_processed` when processing completes
 - Example: A sync plugin can emit `sync_completed` events
+- Example: A data processor can emit `data_processed` events
+
+**Event Design Principles**:
+1. **System events**: Core system emits events for system-level operations (image detection, plugin lifecycle, etc.)
+2. **Plugin events**: Plugins emit custom events for plugin-specific operations
+3. **No duplication**: Plugins that add images to the local directory don't need to emit `image_uploaded` - the system detects it automatically
+4. **Centralized detection**: LocalImagePlugin.scan_images() detects new images and emits events, working for all sources
 
 **Testing**:
 - Create test plugin that subscribes to events

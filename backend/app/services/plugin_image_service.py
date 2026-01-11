@@ -370,17 +370,8 @@ class PluginImageService:
                 if result:
                     # Refresh images list
                     await self.get_images()
-                    # Emit image_uploaded event (fire-and-forget)
-                    await event_system.emit_event(
-                        "image_uploaded",
-                        {
-                            "image_id": result.get("id"),
-                            "filename": filename,
-                            "path": result.get("path"),
-                            "plugin_id": plugin.plugin_id,
-                        },
-                        wait_for_handlers=False,
-                    )
+                    # Note: image_uploaded event is emitted by LocalImagePlugin.scan_images()
+                    # when it detects the new image, so we don't need to emit it here
                     return result
             except Exception as e:
                 logger.error(f"Error uploading image to plugin {plugin.plugin_id}: {e}")
