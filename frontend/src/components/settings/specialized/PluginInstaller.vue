@@ -626,6 +626,11 @@ watch(
   color: #f57c00;
 }
 
+.plugin-type-badge-small.type-backend {
+  background: #e1bee7;
+  color: #6a1b9a;
+}
+
 .plugin-version-small {
   color: var(--text-secondary);
   font-size: 0.75rem;

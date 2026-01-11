@@ -147,6 +147,7 @@ export default defineConfig({
     environment: "jsdom",
     setupFiles: ["./tests/setup.js"],
     include: ["tests/**/*.spec.js", "tests/**/*.test.js"],
+    exclude: ["tests/e2e/**/*", "node_modules/**/*"],
     coverage: {
       provider: "v8",
       reporter: ["text", "json", "html"],

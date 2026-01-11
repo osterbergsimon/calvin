@@ -140,6 +140,7 @@ class TestPluginRegistry:
         mock_plugin.plugin_type = PluginType.SERVICE  # Required attribute
         mock_plugin.plugin_id = "test-1"  # Required attribute
         mock_plugin_loader.create_plugin_instance.return_value = mock_plugin
+        mock_instance_manager.register = AsyncMock(return_value=None)
 
         # Mock plugin types
         from app.plugins.base import PluginType
@@ -240,7 +241,7 @@ class TestPluginRegistry:
         mock_plugin = MagicMock()
         mock_plugin.cleanup = AsyncMock()
         mock_instance_manager.get_plugin.return_value = mock_plugin
-        mock_instance_manager.unregister.return_value = True
+        mock_instance_manager.unregister = AsyncMock(return_value=True)
 
         # Unregister plugin
         result = await plugin_registry_instance.unregister_plugin("test-1")
@@ -268,7 +269,7 @@ class TestPluginRegistry:
     ):
         """Test unregistering a non-existent plugin."""
         mock_instance_manager.get_plugin.return_value = None
-        mock_instance_manager.unregister.return_value = False
+        mock_instance_manager.unregister = AsyncMock(return_value=False)
 
         result = await plugin_registry_instance.unregister_plugin("nonexistent")
 

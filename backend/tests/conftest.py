@@ -528,7 +528,20 @@ def test_client(
                     loop_cleanup.run_until_complete(cleanup_plugin())
                 finally:
                     loop_cleanup.close()
-            plugin_manager.unregister(plugin_id)
+
+            # Unregister plugin
+            async def unregister_plugin():
+                try:
+                    await plugin_manager.unregister(plugin_id)
+                except Exception:
+                    pass  # Ignore unregister errors
+
+            loop_unregister = asyncio.new_event_loop()
+            asyncio.set_event_loop(loop_unregister)
+            try:
+                loop_unregister.run_until_complete(unregister_plugin())
+            finally:
+                loop_unregister.close()
         except Exception:
             pass  # Ignore errors during cleanup
 

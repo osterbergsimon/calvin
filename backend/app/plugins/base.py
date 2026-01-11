@@ -12,6 +12,7 @@ class PluginType(str, Enum):
     IMAGE = "image"
     SERVICE = "service"
     THEME = "theme"
+    BACKEND = "backend"
 
 
 class BasePlugin(ABC):
@@ -137,6 +138,54 @@ class BasePlugin(ABC):
     def running(self) -> bool:
         """Property to access running state."""
         return self._running
+
+    async def emit_event(
+        self,
+        event_type: str,
+        event_data: dict[str, Any],
+        wait_for_handlers: bool = False,
+    ) -> dict[str, Any] | None:
+        """
+        Emit an event to all subscribed plugins.
+
+        Plugins can use this method to publish events that other plugins can subscribe to.
+        This enables plugin-to-plugin communication through the event system.
+
+        Args:
+            event_type: Type of event (e.g., 'image_processed', 'data_synced')
+            event_data: Event payload (plugin-specific data)
+            wait_for_handlers: If True, wait for all handlers to complete (fire-and-wait)
+                              If False, return immediately (fire-and-forget, default)
+
+        Returns:
+            If wait_for_handlers=True: dict with handler results
+            If wait_for_handlers=False: None (returns immediately)
+
+        Example:
+            ```python
+            # Emit event (fire-and-forget)
+            await self.emit_event(
+                "image_processed",
+                {"image_id": "123", "status": "completed"},
+                wait_for_handlers=False
+            )
+
+            # Emit event and wait for handlers
+            results = await self.emit_event(
+                "critical_data_changed",
+                {"key": "config", "value": "new_value"},
+                wait_for_handlers=True
+            )
+            ```
+        """
+        # Lazy import to avoid circular dependencies
+        from app.services.event_system import event_system
+
+        return await event_system.emit_event(
+            event_type=event_type,
+            event_data=event_data,
+            wait_for_handlers=wait_for_handlers,
+        )
 
     def __repr__(self) -> str:
         """String representation of the plugin."""

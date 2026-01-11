@@ -54,7 +54,7 @@ async def register_plugin(
         plugin.disable()
 
     # Register plugin
-    instance_manager.register(plugin)
+    await instance_manager.register(plugin)
 
     # Save to database
     async with AsyncSessionLocal() as session:
@@ -213,7 +213,7 @@ async def unregister_plugin(plugin_id: str) -> bool:
 
     # Unregister from manager (this is just in-memory, so it's okay if it fails)
     # Do this even if plugin wasn't in database, in case it's in memory but not persisted
-    instance_manager.unregister(plugin_id)
+    await instance_manager.unregister(plugin_id)
 
     # Return True if we successfully deleted from database, or if plugin was in manager
     # (handles case where plugin exists in memory but not in DB yet)

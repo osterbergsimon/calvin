@@ -183,6 +183,9 @@ class LocalImagePlugin(ImagePlugin):
         logger.debug(f"[Local Images] image_dir: {self.image_dir}")
         logger.debug(f"[Local Images] image_dir exists: {self.image_dir.exists()}")
 
+        # Track existing image IDs to detect new images
+        existing_image_ids = {img["id"] for img in self._images} if self._images else set()
+
         images = []
         if not self.image_dir.exists():
             logger.warning(f"[Local Images] image_dir does not exist: {self.image_dir}")
@@ -209,18 +212,43 @@ class LocalImagePlugin(ImagePlugin):
                         if not thumbnail_path.exists():
                             self._generate_thumbnail(file_path, thumbnail_path)
 
-                        images.append(
-                            {
-                                "id": image_id,
-                                "filename": file_path.name,
-                                "path": str(file_path),
-                                "width": width,
-                                "height": height,
-                                "size": file_size,
-                                "format": file_path.suffix.lower(),
-                                "source": self.plugin_id,  # Mark which plugin provided this
-                            }
-                        )
+                        image_metadata = {
+                            "id": image_id,
+                            "filename": file_path.name,
+                            "path": str(file_path),
+                            "width": width,
+                            "height": height,
+                            "size": file_size,
+                            "format": file_path.suffix.lower(),
+                            "source": self.plugin_id,  # Mark which plugin provided this
+                        }
+                        images.append(image_metadata)
+
+                        # Emit image_uploaded event for new images (detected by scan)
+                        # This works for images added by any source (IMAP, manual upload, etc.)
+                        if image_id not in existing_image_ids:
+                            try:
+                                await self.emit_event(
+                                    "image_uploaded",
+                                    {
+                                        "image_id": image_id,
+                                        "filename": file_path.name,
+                                        "path": str(file_path),
+                                        "plugin_id": self.plugin_id,
+                                    },
+                                    wait_for_handlers=False,  # Fire-and-forget
+                                )
+                                logger.debug(
+                                    f"[Local Images] Emitted image_uploaded event for new image: "
+                                    f"{file_path.name}"
+                                )
+                            except Exception as e:
+                                # Don't fail scan if event emission fails
+                                logger.warning(
+                                    f"[Local Images] Failed to emit image_uploaded event for "
+                                    f"{file_path.name}: {e}"
+                                )
+
                         logger.debug(
                             f"[Local Images] Added image: {file_path.name} (id: {image_id})"
                         )
@@ -494,10 +522,8 @@ async def handle_plugin_config_update(
                 f"recreating with correct ID ({plugin_instance_id})"
             )
             session.delete(local_instance)
-            try:
-                await session.commit()
-            except TypeError:
-                session.commit()
+            # Don't commit here - the route will commit after all hooks complete
+            # Committing here causes rollback issues
             # Create the correct instance
             instance_enabled = (
                 enabled if enabled is not None else (db_type.enabled if db_type else True)
@@ -535,13 +561,9 @@ async def handle_plugin_config_update(
             enabled if enabled is not None else (db_type.enabled if db_type else True)
         )
 
-        # Update database
+        # Update database - but don't commit yet, we'll commit at the end
         if local_instance.enabled != instance_enabled:
             local_instance.enabled = instance_enabled
-            try:
-                await session.commit()
-            except TypeError:
-                session.commit()
 
         # Update plugin in memory
         plugin = plugin_manager.get_plugin(local_instance.id)
@@ -606,9 +628,9 @@ async def handle_plugin_config_update(
             # Update in database - keep config empty
             local_instance.config = {}  # No config needed
             local_instance.enabled = instance_enabled
-            if db_type:
-                db_type.enabled = instance_enabled
-            await session.commit()
+            # IMPORTANT: Don't commit here - the route will commit after all hooks complete
+            # Committing here causes rollback issues. The route handles all commits to ensure
+            # db_type.enabled and instance.enabled are both persisted correctly.
 
             return {
                 "instance_updated": True,

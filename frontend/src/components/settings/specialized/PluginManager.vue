@@ -187,13 +187,20 @@ const pluginTabs = computed(() => {
     { id: "calendar", label: "Calendar", icon: "📅" },
     { id: "image", label: "Image", icon: "🖼️" },
     { id: "service", label: "Service", icon: "⚙️" },
+    { id: "backend", label: "Backend", icon: "🔧" },
     { id: "theme", label: "Theme", icon: "🎨" },
   ];
 
-  // Only show tabs that have plugins
-  return categories.filter((cat) =>
-    props.plugins.some((p) => p.type === cat.id),
-  );
+  // Show tabs that have plugins OR show backend/theme tabs always (for installation)
+  // This allows users to see backend/theme tabs even when listing from repo
+  return categories.filter((cat) => {
+    // Always show backend and theme tabs (they can be installed from repos)
+    if (cat.id === "backend" || cat.id === "theme") {
+      return true;
+    }
+    // For other types, only show if there are plugins
+    return props.plugins.some((p) => p.type === cat.id);
+  });
 });
 
 const activePlugins = computed(() => {

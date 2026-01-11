@@ -5,7 +5,12 @@ import inspect
 import pytest
 
 from app.plugins.base import BasePlugin, PluginType
-from app.plugins.protocols import CalendarPlugin, ImagePlugin, ServicePlugin
+from app.plugins.protocols import (
+    BackendPlugin,
+    CalendarPlugin,
+    ImagePlugin,
+    ServicePlugin,
+)
 
 
 @pytest.mark.unit
@@ -166,6 +171,52 @@ class TestProtocolAdherence:
         assert callable(plugin.handle_webhook)
         assert callable(plugin.handle_api_request)
         assert callable(plugin.fetch_service_data)
+
+    def test_backend_plugin_protocol(self):
+        """Test BackendPlugin protocol definition."""
+        assert inspect.isabstract(BackendPlugin)
+
+        # Check MUST methods are marked as abstract
+        assert getattr(BackendPlugin.validate_config, "__isabstractmethod__", False)
+
+        # Check CAN methods have default implementations (not abstract)
+        assert not getattr(BackendPlugin.get_schedule_config, "__isabstractmethod__", False)
+        assert not getattr(BackendPlugin.run_scheduled_task, "__isabstractmethod__", False)
+        assert not getattr(BackendPlugin.start_worker, "__isabstractmethod__", False)
+        assert not getattr(BackendPlugin.stop_worker, "__isabstractmethod__", False)
+        assert not getattr(BackendPlugin.provide_service, "__isabstractmethod__", False)
+        assert not getattr(BackendPlugin.get_provided_services, "__isabstractmethod__", False)
+
+        # Create a mock implementation to test
+        class MockBackendPlugin(BackendPlugin):
+            @classmethod
+            def get_plugin_metadata(cls):
+                return {"type_id": "test", "plugin_type": PluginType.BACKEND}
+
+            @property
+            def plugin_type(self):
+                return PluginType.BACKEND
+
+            async def initialize(self):
+                pass
+
+            async def cleanup(self):
+                pass
+
+            async def validate_config(self, config):
+                return True
+
+        plugin = MockBackendPlugin("test-id", "Test")
+        assert isinstance(plugin, BackendPlugin)
+        assert plugin.plugin_type == PluginType.BACKEND
+
+        # Test optional methods exist and are callable
+        assert callable(plugin.get_schedule_config)
+        assert callable(plugin.run_scheduled_task)
+        assert callable(plugin.start_worker)
+        assert callable(plugin.stop_worker)
+        assert callable(plugin.provide_service)
+        assert callable(plugin.get_provided_services)
 
 
 @pytest.mark.unit
@@ -357,3 +408,94 @@ class TestProtocolViolations:
         # ❌ WRONG: Don't access attributes directly
         # url = getattr(plugin, "_url", "")  # Core should never do this
         # url = plugin._url  # Core should never do this
+
+    @pytest.mark.asyncio
+    async def test_backend_plugin_optional_methods_return_defaults(self):
+        """Test that optional BackendPlugin methods return defaults when not implemented."""
+
+        class MockBackendPlugin(BackendPlugin):
+            @classmethod
+            def get_plugin_metadata(cls):
+                return {"type_id": "test", "plugin_type": PluginType.BACKEND}
+
+            @property
+            def plugin_type(self):
+                return PluginType.BACKEND
+
+            async def initialize(self):
+                pass
+
+            async def cleanup(self):
+                pass
+
+            async def validate_config(self, config):
+                return True
+
+        plugin = MockBackendPlugin("test-id", "Test")
+
+        # Optional methods should return defaults
+        assert await plugin.get_schedule_config() is None
+        assert await plugin.get_provided_services() == []
+        assert await plugin.provide_service("test") is None
+
+        # run_scheduled_task should raise NotImplementedError by default
+        with pytest.raises(NotImplementedError):
+            await plugin.run_scheduled_task()
+
+    @pytest.mark.asyncio
+    async def test_backend_plugin_with_scheduled_tasks(self):
+        """Test BackendPlugin with scheduled tasks implementation."""
+
+        class MockScheduledBackendPlugin(BackendPlugin):
+            def __init__(self, plugin_id: str, name: str, enabled: bool = True):
+                super().__init__(plugin_id, name, enabled)
+                self.task_run_count = 0
+
+            @classmethod
+            def get_plugin_metadata(cls):
+                return {"type_id": "test", "plugin_type": PluginType.BACKEND}
+
+            @property
+            def plugin_type(self):
+                return PluginType.BACKEND
+
+            async def initialize(self):
+                pass
+
+            async def cleanup(self):
+                pass
+
+            async def validate_config(self, config):
+                return True
+
+            async def get_schedule_config(self):
+                return {
+                    "interval": 300,
+                    "enabled": True,
+                    "max_concurrent": 1,
+                }
+
+            async def run_scheduled_task(self):
+                self.task_run_count += 1
+                return {
+                    "success": True,
+                    "message": f"Task executed {self.task_run_count} time(s)",
+                    "data": {"count": self.task_run_count},
+                }
+
+        plugin = MockScheduledBackendPlugin("test-id", "Test")
+
+        # Test schedule config
+        schedule_config = await plugin.get_schedule_config()
+        assert schedule_config is not None
+        assert schedule_config["interval"] == 300
+        assert schedule_config["enabled"] is True
+
+        # Test running scheduled task
+        result = await plugin.run_scheduled_task()
+        assert result["success"] is True
+        assert plugin.task_run_count == 1
+
+        # Run again
+        result = await plugin.run_scheduled_task()
+        assert plugin.task_run_count == 2

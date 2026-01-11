@@ -172,6 +172,23 @@ class TestPluginInstaller:
         with pytest.raises(ValueError, match="Invalid plugin type"):
             plugin_installer.validate_plugin_package(plugin_dir)
 
+    def test_validate_plugin_directory_backend_type(self, plugin_installer, tmp_path):
+        """Test validating plugin directory with backend type."""
+        plugin_dir = tmp_path / "backend_plugin"
+        plugin_dir.mkdir()
+        manifest = {
+            "id": "test_backend",
+            "name": "Test Backend",
+            "version": "1.0.0",
+            "type": "backend",
+        }
+        (plugin_dir / "plugin.json").write_text(json.dumps(manifest))
+        (plugin_dir / "plugin.py").write_text("# Plugin code")
+
+        # Should not raise ValueError for backend type
+        validated_manifest = plugin_installer.validate_plugin_package(plugin_dir)
+        assert validated_manifest["type"] == "backend"
+
     def test_validate_plugin_zip_file(self, plugin_installer, plugin_zip_file):
         """Test validating a plugin zip file."""
         manifest = plugin_installer.validate_plugin_package(plugin_zip_file)

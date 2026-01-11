@@ -156,12 +156,15 @@ This document outlines potential improvements, dead code, complexity issues, mod
   - Extract thumbnail generation to a utility function
   - Better error handling for corrupted images
 
-#### `plugins/image/imap.py`
-**Issues:**
-- **Unneeded Complexity**: Multiple print statements (17+) - should use logging
-- **Easy Improvements**: 
-  - Replace all print statements with logging
-  - Extract IMAP connection logic to a helper class
+#### `plugins/image/imap.py` ✅ **COMPLETED**
+**Status**: IMAP plugin has been converted to a BackendPlugin and moved to calvin-plugins repository
+- **Type**: Now a `backend` plugin instead of `image` plugin
+- **Location**: `calvin-plugins/imap/plugin.py`
+- **Changes**: 
+  - Downloads images to local directory (works with LocalImagePlugin)
+  - No longer implements ImagePlugin interface
+  - Uses scheduled tasks for periodic email checks
+  - Removed ~300 lines of duplicate image serving code
   - Add connection pooling/reuse
 
 #### `plugins/service/yr_weather.py`
