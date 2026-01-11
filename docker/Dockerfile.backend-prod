@@ -5,6 +5,10 @@ FROM python:3.11-slim as builder
 RUN apt-get update && apt-get install -y \
     git \
     curl \
+    build-essential \
+    gcc \
+    g++ \
+    python3-dev \
     && rm -rf /var/lib/apt/lists/*
 
 # Install UV
