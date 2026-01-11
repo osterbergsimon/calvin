@@ -4,15 +4,10 @@
     class="clock"
     :class="{ 'dark-mode': isDark, [`size-${clockSize}`]: true }"
   >
-    <div
-      class="clock-time"
-    >
+    <div class="clock-time">
       {{ formattedTime }}
     </div>
-    <div
-      v-if="shouldShowDate"
-      class="clock-date"
-    >
+    <div v-if="shouldShowDate" class="clock-date">
       {{ formattedDate }}
     </div>
   </div>
@@ -32,7 +27,8 @@ const props = defineProps({
   displayMode: {
     type: String,
     default: null, // Will use configStore.clockDisplayMode if not provided
-    validator: (value) => value === null || ["always", "header", "off"].includes(value),
+    validator: (value) =>
+      value === null || ["always", "header", "off"].includes(value),
   },
   showDate: {
     type: Boolean,
@@ -50,10 +46,13 @@ let timeInterval = null;
 const shouldShow = computed(() => {
   // If clock is disabled in config, don't show
   if (!configStore.clockEnabled) return false;
-  
+
   // Use displayMode from props (which comes from config)
-  const mode = props.displayMode !== null ? props.displayMode : configStore.clockDisplayMode;
-  
+  const mode =
+    props.displayMode !== null
+      ? props.displayMode
+      : configStore.clockDisplayMode;
+
   if (mode === "off") return false;
   if (mode === "always") {
     // "always" mode means show only when UI is OFF (kiosk mode)
@@ -95,21 +94,21 @@ const clockSize = computed(() => {
 const formattedTime = computed(() => {
   const now = currentTime.value;
   const showSeconds = configStore.clockShowSeconds || false;
-  
+
   const options = {
     hour: "2-digit",
     minute: "2-digit",
     hour12: timeFormat.value === "12h",
   };
-  
+
   if (showSeconds) {
     options.second = "2-digit";
   }
-  
+
   if (timezone.value) {
     options.timeZone = timezone.value;
   }
-  
+
   try {
     return now.toLocaleTimeString(undefined, options);
   } catch {
@@ -129,7 +128,7 @@ const formattedTime = computed(() => {
 // Format date
 const formattedDate = computed(() => {
   if (!shouldShowDate.value) return "";
-  
+
   const now = currentTime.value;
   const options = {
     weekday: "short",
@@ -137,11 +136,11 @@ const formattedDate = computed(() => {
     month: "short",
     day: "numeric",
   };
-  
+
   if (timezone.value) {
     options.timeZone = timezone.value;
   }
-  
+
   try {
     return now.toLocaleDateString(undefined, options);
   } catch {
@@ -163,25 +162,28 @@ const updateTime = () => {
     timeInterval = setTimeout(updateTime, 1000);
     return;
   }
-  
+
   // Simply update the time value - let formatting handle timezone
   currentTime.value = new Date();
-  
+
   // Schedule next update based on whether seconds are shown
   const interval = configStore.clockShowSeconds ? 1000 : 60000;
   timeInterval = setTimeout(updateTime, interval);
 };
 
 // Watch for changes in clockShowSeconds to adjust update interval
-watch(() => configStore.clockShowSeconds, () => {
-  if (timeInterval) {
-    clearTimeout(timeInterval);
-    timeInterval = null;
-  }
-  if (shouldShow.value) {
-    updateTime();
-  }
-});
+watch(
+  () => configStore.clockShowSeconds,
+  () => {
+    if (timeInterval) {
+      clearTimeout(timeInterval);
+      timeInterval = null;
+    }
+    if (shouldShow.value) {
+      updateTime();
+    }
+  },
+);
 
 // Watch for shouldShow changes to start/stop updates
 watch(shouldShow, (newValue) => {

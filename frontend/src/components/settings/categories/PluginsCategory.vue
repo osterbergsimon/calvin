@@ -99,7 +99,6 @@ import ConfirmModal from "../shared/ConfirmModal.vue";
 const {
   plugins,
   pluginInstances,
-  pluginConfigs,
   loadingPlugins,
   installingPlugin,
   enumeratingPlugins,
@@ -281,7 +280,7 @@ const handleFetchNow = async (pluginId) => {
   }
 };
 
-const handleCustomAction = async (pluginId, action) => {
+const handleCustomAction = async (_pluginId, _action) => {
   // Handle custom plugin actions
   // TODO: Implement custom plugin actions if needed
 };

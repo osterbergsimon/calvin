@@ -258,7 +258,7 @@ export const useWebServicesStore = defineStore("webServices", () => {
     /** Refresh the current service's data by refetching services. */
     try {
       // Clear cache and refetch services
-      const cacheKey = "web_services";
+      const _cacheKey = "web_services";
       // Clear from cache utility if it has a clear method
       // For now, just refetch which will overwrite cache
       await fetchServices();

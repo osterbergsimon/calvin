@@ -16,15 +16,15 @@ export const useConnectionStore = defineStore("connection", () => {
     try {
       const controller = new AbortController();
       const timeoutId = setTimeout(() => controller.abort(), 3000); // 3 second timeout
-      
+
       const response = await fetch("/api/health", {
         method: "GET",
         signal: controller.signal,
         cache: "no-cache",
       });
-      
+
       clearTimeout(timeoutId);
-      
+
       if (response.ok) {
         isBackendOnline.value = true;
         lastBackendCheck.value = new Date();
@@ -60,7 +60,7 @@ export const useConnectionStore = defineStore("connection", () => {
   // Periodic backend health check (every 30 seconds when online)
   const startHealthCheck = () => {
     if (healthCheckInterval) return;
-    
+
     healthCheckInterval = setInterval(async () => {
       if (isOnline.value) {
         await checkBackend();
@@ -79,10 +79,10 @@ export const useConnectionStore = defineStore("connection", () => {
   const initialize = () => {
     window.addEventListener("online", handleOnline);
     window.addEventListener("offline", handleOffline);
-    
+
     // Initial backend check
     checkBackend();
-    
+
     // Start periodic health checks
     startHealthCheck();
   };
@@ -106,4 +106,3 @@ export const useConnectionStore = defineStore("connection", () => {
     cleanup,
   };
 });
-

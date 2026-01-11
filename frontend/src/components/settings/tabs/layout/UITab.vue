@@ -334,7 +334,7 @@
 </template>
 
 <script setup>
-import { ref, watch } from "vue";
+import { ref } from "vue";
 import CollapsibleSection from "../../shared/CollapsibleSection.vue";
 import SettingItem from "../../shared/SettingItem.vue";
 import ThemeSelector from "../../specialized/ThemeSelector.vue";
@@ -374,7 +374,7 @@ const loadThemes = async () => {
           ...themePlugin,
           ...themeDetail,
         });
-      } catch (error) {
+      } catch {
         // If theme details not found, use plugin data
         themesWithDetails.push(themePlugin);
       }

@@ -642,7 +642,7 @@ const isWeekend = (date) => {
 
 // Helper function to check if a date is a red day (holiday)
 // For now, this is a placeholder - actual holiday detection would need backend support
-const isRedDay = (date) => {
+const isRedDay = (_date) => {
   // TODO: Implement actual holiday detection when backend supports it
   // This could check against a holidays list or use a holiday API
   return false;

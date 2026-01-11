@@ -58,7 +58,7 @@ const imagePluginInstances = computed(() => {
   return instances;
 });
 
-const getInstanceSummary = (pluginId, config) => {
+const getInstanceSummary = (_pluginId, _config) => {
   // Simple summary - can be enhanced
   return null;
 };

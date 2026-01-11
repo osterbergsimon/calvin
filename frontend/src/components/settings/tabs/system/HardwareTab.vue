@@ -26,7 +26,7 @@ import { useConnectionStore } from "@/stores/connection";
 import CollapsibleSection from "../../shared/CollapsibleSection.vue";
 import SettingItem from "../../shared/SettingItem.vue";
 
-const props = defineProps({
+defineProps({
   version: {
     type: String,
     default: null,

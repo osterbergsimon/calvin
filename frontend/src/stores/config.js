@@ -1,7 +1,7 @@
 import { defineStore } from "pinia";
 import { ref, computed } from "vue";
 import axios from "axios";
-import { logError, logInfo } from "../utils/logger";
+import { logError } from "../utils/logger";
 
 export const useConfigStore = defineStore("config", () => {
   const orientation = ref("landscape"); // 'landscape' | 'portrait'

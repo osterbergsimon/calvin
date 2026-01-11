@@ -9,7 +9,7 @@
             :min="min"
             :max="max"
             :step="step"
-            :value="timeSize"
+            :value="localTimeSize"
             @input="handleTimeInput"
             class="font-size-slider"
           />
@@ -19,7 +19,7 @@
               :min="min"
               :max="max"
               :step="step"
-              :value="timeSize"
+              :value="localTimeSize"
               @input="handleTimeInput"
               class="font-size-input"
             />
@@ -36,7 +36,7 @@
             :min="min"
             :max="max"
             :step="step"
-            :value="dateSize"
+            :value="localDateSize"
             @input="handleDateInput"
             class="font-size-slider"
           />
@@ -46,7 +46,7 @@
               :min="min"
               :max="max"
               :step="step"
-              :value="dateSize"
+              :value="localDateSize"
               @input="handleDateInput"
               class="font-size-input"
             />
@@ -93,8 +93,8 @@
           :show-in-kiosk="false"
           :enabled="true"
           :preview-mode="true"
-          :preview-time-size="timeSize"
-          :preview-date-size="dateSize"
+          :preview-time-size="localTimeSize"
+          :preview-date-size="localDateSize"
           :preview-layout="layout"
           :preview-padding="localPadding"
         />
@@ -106,8 +106,8 @@
           :show-in-kiosk="false"
           :enabled="true"
           :preview-mode="true"
-          :preview-time-size="timeSize"
-          :preview-date-size="dateSize"
+          :preview-time-size="localTimeSize"
+          :preview-date-size="localDateSize"
           :preview-layout="layout"
           :preview-padding="localPadding"
         />
@@ -117,10 +117,9 @@
 </template>
 
 <script setup>
-import { ref, watch, computed } from "vue";
+import { ref, watch } from "vue";
 import ClockBarHorizontal from "@/components/ClockBarHorizontal.vue";
 import ClockBarVertical from "@/components/ClockBarVertical.vue";
-import { useConfigStore } from "@/stores/config";
 
 const props = defineProps({
   timeSize: {
@@ -166,8 +165,6 @@ const emit = defineEmits([
   "update:dateSize",
   "update:padding",
 ]);
-
-const configStore = useConfigStore();
 
 // Local reactive values for immediate updates
 const localTimeSize = ref(props.timeSize);
@@ -225,10 +222,6 @@ const handlePaddingInput = (event) => {
     emit("update:padding", clampedValue);
   }
 };
-
-// Use local values for preview
-const timeSize = computed(() => localTimeSize.value);
-const dateSize = computed(() => localDateSize.value);
 </script>
 
 <style scoped>

@@ -28,7 +28,6 @@
 <script setup>
 import { ref, computed, onMounted, onUnmounted, watch } from "vue";
 import { useConfigStore } from "../stores/config";
-import { useTheme } from "../composables/useTheme";
 
 defineOptions({
   name: "ClockBarVertical",
@@ -75,7 +74,6 @@ const props = defineProps({
 });
 
 const configStore = useConfigStore();
-const theme = useTheme();
 
 const currentTime = ref(new Date());
 let timeInterval = null;

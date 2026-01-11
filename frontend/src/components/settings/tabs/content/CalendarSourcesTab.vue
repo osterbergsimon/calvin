@@ -177,7 +177,7 @@ const loadCalendarSources = async () => {
               break;
             }
           }
-        } catch (error) {
+        } catch {
           // Ignore errors when checking instance status
         }
         return { ...source, running };

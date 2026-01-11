@@ -138,7 +138,7 @@ const selectEvent = (event) => {
   calendarStore.selectEvent(event);
 };
 
-const isEventMultiDay = (event) => {
+const _isEventMultiDay = (event) => {
   if (!event) return false;
   const start = new Date(event.start);
   const end = new Date(event.end);

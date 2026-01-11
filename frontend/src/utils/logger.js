@@ -42,7 +42,7 @@ function getLogSettings() {
       enabled: configStore.consoleLogEnabled ?? true, // Default to enabled for backwards compatibility
       level: configStore.consoleLogLevel ?? "info", // Default to 'info' level
     };
-  } catch (error) {
+  } catch {
     // If config store not available, default to showing errors and warnings
     return {
       enabled: false,

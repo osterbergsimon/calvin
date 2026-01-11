@@ -6,6 +6,14 @@ export default [
   js.configs.recommended,
   ...pluginVue.configs["flat/recommended"],
   {
+    ignores: [
+      "**/node_modules/**",
+      "**/dist/**",
+      "**/*.config.js",
+      "vite.config.js",
+    ],
+  },
+  {
     languageOptions: {
       globals: {
         ...globals.browser,
@@ -31,6 +39,14 @@ export default [
       ],
       // Vue templates can reference functions that appear unused to ESLint
       "vue/no-unused-vars": "off",
+      // Disable some Vue formatting rules that are too strict
+      "vue/max-attributes-per-line": "off",
+      "vue/singleline-html-element-content-newline": "off",
+      "vue/html-self-closing": "off",
+      "vue/html-indent": "off",
+      "vue/html-closing-bracket-newline": "off",
+      "vue/attributes-order": "off",
+      "vue/v-on-event-hyphenation": "off",
     },
   },
 ];

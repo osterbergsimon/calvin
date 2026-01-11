@@ -40,7 +40,7 @@ import UITab from "../tabs/layout/UITab.vue";
 import PhotosTab from "../tabs/layout/PhotosTab.vue";
 import KeyboardTab from "../tabs/layout/KeyboardTab.vue";
 
-const props = defineProps({
+defineProps({
   config: {
     type: Object,
     required: true,

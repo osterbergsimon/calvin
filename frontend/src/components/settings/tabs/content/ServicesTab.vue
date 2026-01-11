@@ -62,7 +62,7 @@ const servicePluginInstances = computed(() => {
 
 const servicePluginDisplayOrders = computed(() => pluginDisplayOrders.value);
 
-const getInstanceSummary = (pluginId, config) => {
+const getInstanceSummary = (_pluginId, _config) => {
   // Simple summary - can be enhanced
   return null;
 };

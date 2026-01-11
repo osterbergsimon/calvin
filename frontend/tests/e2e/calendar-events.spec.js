@@ -18,7 +18,7 @@ test.describe("Calendar Events", () => {
     const events = page.locator(
       ".event-item, [class*='event'], [class*='calendar-event']",
     );
-    const eventCount = await events.count();
+    const _eventCount = await events.count();
 
     // Events might not be present, but calendar should be visible
     const calendar = page.locator(".calendar, [class*='calendar']").first();

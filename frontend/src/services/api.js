@@ -36,7 +36,7 @@ api.interceptors.response.use(
   },
   async (error) => {
     const connectionStore = useConnectionStore();
-    
+
     // Check if it's a network error (offline or backend unreachable)
     if (!error.response) {
       // Network error - no response from server
@@ -61,7 +61,7 @@ api.interceptors.response.use(
         connectionStore.isBackendOnline = false;
       }
     }
-    
+
     return Promise.reject(error);
   },
 );

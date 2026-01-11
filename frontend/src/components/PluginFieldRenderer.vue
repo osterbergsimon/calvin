@@ -160,7 +160,7 @@ const props = defineProps({
   },
 });
 
-const emit = defineEmits(["update"]);
+defineEmits(["update"]);
 
 const ui = computed(() => {
   return props.schema && typeof props.schema === "object"

@@ -42,7 +42,7 @@ import HardwareTab from "../tabs/system/HardwareTab.vue";
 import UpdatesTab from "../tabs/system/UpdatesTab.vue";
 import DebugTab from "../tabs/system/DebugTab.vue";
 
-const props = defineProps({
+defineProps({
   config: {
     type: Object,
     required: true,

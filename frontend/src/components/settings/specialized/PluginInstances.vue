@@ -106,7 +106,7 @@
 <script setup>
 import draggable from "vuedraggable";
 
-const props = defineProps({
+defineProps({
   plugin: {
     type: Object,
     required: true,

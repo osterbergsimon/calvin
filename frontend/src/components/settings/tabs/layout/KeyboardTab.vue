@@ -92,7 +92,6 @@
 <script setup>
 import { ref, computed, onMounted, watch } from "vue";
 import { useKeyboardStore } from "@/stores/keyboard";
-import { useConfigStore } from "@/stores/config";
 import CollapsibleSection from "../../shared/CollapsibleSection.vue";
 import SettingItem from "../../shared/SettingItem.vue";
 
@@ -104,7 +103,6 @@ const props = defineProps({
 });
 
 const keyboardStore = useKeyboardStore();
-const configStore = useConfigStore();
 
 const emit = defineEmits(["update:config"]);
 

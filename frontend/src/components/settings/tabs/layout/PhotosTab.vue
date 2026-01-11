@@ -46,7 +46,7 @@
 import CollapsibleSection from "../../shared/CollapsibleSection.vue";
 import SettingItem from "../../shared/SettingItem.vue";
 
-const props = defineProps({
+defineProps({
   config: {
     type: Object,
     required: true,

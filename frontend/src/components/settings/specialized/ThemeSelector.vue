@@ -56,9 +56,9 @@
 </template>
 
 <script setup>
-import { computed } from "vue";
+// import { computed } from "vue";
 
-const props = defineProps({
+defineProps({
   themes: {
     type: Array,
     required: true,

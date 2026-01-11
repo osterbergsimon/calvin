@@ -8,7 +8,7 @@ const CACHE_TIMESTAMP_PREFIX = "calvin_cache_ts_";
 
 /**
  * Get cached data if it exists and is not expired.
- * 
+ *
  * @param {string} key - Cache key
  * @param {number} ttl - Time to live in milliseconds (default: 1 hour)
  * @returns {any|null} Cached data or null if expired/not found
@@ -17,14 +17,14 @@ export function getCachedData(key, ttl = 60 * 60 * 1000) {
   try {
     const cacheKey = `${CACHE_PREFIX}${key}`;
     const timestampKey = `${CACHE_TIMESTAMP_PREFIX}${key}`;
-    
+
     const cachedData = localStorage.getItem(cacheKey);
     const cachedTimestamp = localStorage.getItem(timestampKey);
-    
+
     if (!cachedData || !cachedTimestamp) {
       return null;
     }
-    
+
     const age = Date.now() - parseInt(cachedTimestamp, 10);
     if (age > ttl) {
       // Cache expired, remove it
@@ -32,7 +32,7 @@ export function getCachedData(key, ttl = 60 * 60 * 1000) {
       localStorage.removeItem(timestampKey);
       return null;
     }
-    
+
     return JSON.parse(cachedData);
   } catch (error) {
     console.error(`[Cache] Error reading cache for key ${key}:`, error);
@@ -42,7 +42,7 @@ export function getCachedData(key, ttl = 60 * 60 * 1000) {
 
 /**
  * Store data in cache with timestamp.
- * 
+ *
  * @param {string} key - Cache key
  * @param {any} data - Data to cache (will be JSON stringified)
  */
@@ -71,13 +71,13 @@ export function setCachedData(key, data) {
 
 /**
  * Clear cached data for a specific key.
- * 
+ *
  * @param {string} key - Cache key
  */
 export function clearCachedData(key) {
   const cacheKey = `${CACHE_PREFIX}${key}`;
   const timestampKey = `${CACHE_TIMESTAMP_PREFIX}${key}`;
-  
+
   localStorage.removeItem(cacheKey);
   localStorage.removeItem(timestampKey);
 }
@@ -87,15 +87,18 @@ export function clearCachedData(key) {
  */
 export function clearAllCache() {
   const keysToRemove = [];
-  
+
   for (let i = 0; i < localStorage.length; i++) {
     const key = localStorage.key(i);
-    if (key && (key.startsWith(CACHE_PREFIX) || key.startsWith(CACHE_TIMESTAMP_PREFIX))) {
+    if (
+      key &&
+      (key.startsWith(CACHE_PREFIX) || key.startsWith(CACHE_TIMESTAMP_PREFIX))
+    ) {
       keysToRemove.push(key);
     }
   }
-  
-  keysToRemove.forEach(key => localStorage.removeItem(key));
+
+  keysToRemove.forEach((key) => localStorage.removeItem(key));
 }
 
 /**
@@ -106,12 +109,12 @@ function clearOldCacheEntries() {
   const maxAge = 24 * 60 * 60 * 1000; // 24 hours
   const now = Date.now();
   const keysToRemove = [];
-  
+
   for (let i = 0; i < localStorage.length; i++) {
     const key = localStorage.key(i);
     if (key && key.startsWith(CACHE_TIMESTAMP_PREFIX)) {
       const timestamp = parseInt(localStorage.getItem(key), 10);
-      if (timestamp && (now - timestamp) > maxAge) {
+      if (timestamp && now - timestamp > maxAge) {
         // Extract the actual cache key
         const cacheKey = key.replace(CACHE_TIMESTAMP_PREFIX, CACHE_PREFIX);
         keysToRemove.push(key);
@@ -119,8 +122,8 @@ function clearOldCacheEntries() {
       }
     }
   }
-  
-  keysToRemove.forEach(key => localStorage.removeItem(key));
+
+  keysToRemove.forEach((key) => localStorage.removeItem(key));
   console.log(`[Cache] Cleared ${keysToRemove.length / 2} old cache entries`);
 }
 
@@ -133,17 +136,20 @@ export function getCacheStats() {
     totalSize: 0,
     entries: [],
   };
-  
+
   for (let i = 0; i < localStorage.length; i++) {
     const key = localStorage.key(i);
     if (key && key.startsWith(CACHE_PREFIX)) {
       const data = localStorage.getItem(key);
       const timestampKey = key.replace(CACHE_PREFIX, CACHE_TIMESTAMP_PREFIX);
       const timestamp = localStorage.getItem(timestampKey);
-      
+
       stats.totalEntries++;
-      stats.totalSize += (key.length + (data?.length || 0) + (timestampKey.length + (timestamp?.length || 0)));
-      
+      stats.totalSize +=
+        key.length +
+        (data?.length || 0) +
+        (timestampKey.length + (timestamp?.length || 0));
+
       stats.entries.push({
         key: key.replace(CACHE_PREFIX, ""),
         size: data?.length || 0,
@@ -151,7 +157,6 @@ export function getCacheStats() {
       });
     }
   }
-  
+
   return stats;
 }
-

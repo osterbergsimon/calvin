@@ -28,7 +28,6 @@
 <script setup>
 import { ref, computed, onMounted, onUnmounted, watch } from "vue";
 import { useConfigStore } from "../stores/config";
-import { useTheme } from "../composables/useTheme";
 
 defineOptions({
   name: "ClockBarHorizontal",
@@ -75,7 +74,6 @@ const props = defineProps({
 });
 
 const configStore = useConfigStore();
-const theme = useTheme();
 
 const currentTime = ref(new Date());
 let timeInterval = null;
@@ -109,11 +107,12 @@ const timeFormat = computed(() => {
 });
 
 // Get date format from config (if available)
-const dateFormat = computed(() => {
-  // Use locale-based formatting for now
-  // Can be enhanced with custom date format settings
-  return "locale";
-});
+// Note: dateFormat is currently not used but kept for future enhancement
+// const dateFormat = computed(() => {
+//   // Use locale-based formatting for now
+//   // Can be enhanced with custom date format settings
+//   return "locale";
+// });
 
 // Get show date setting
 const showDate = computed(() => {

@@ -2,18 +2,16 @@
   <div
     v-if="!isFullyOnline"
     class="connection-indicator"
-    :class="{ 'offline': !isOnline, 'backend-offline': isOnline && !isBackendOnline }"
+    :class="{
+      offline: !isOnline,
+      'backend-offline': isOnline && !isBackendOnline,
+    }"
     :title="connectionTooltip"
   >
-    <span
-      class="connection-icon"
-    >
+    <span class="connection-icon">
       {{ connectionIcon }}
     </span>
-    <span
-      v-if="showLabel"
-      class="connection-label"
-    >
+    <span v-if="showLabel" class="connection-label">
       {{ connectionLabel }}
     </span>
   </div>
@@ -102,4 +100,3 @@ const connectionTooltip = computed(() => {
   font-size: 0.875rem;
 }
 </style>
-

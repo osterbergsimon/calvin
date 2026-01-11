@@ -100,7 +100,7 @@ export function useTheme() {
     } else {
       // Reset to default theme variables (from theme.css)
       // This is handled by the CSS file, but we can explicitly reset if needed
-      const root = document.documentElement;
+      const _root = document.documentElement;
       // Remove any custom theme variables that might have been set
       // The default theme.css will take over
     }
