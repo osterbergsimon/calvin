@@ -15,6 +15,7 @@ function Show-Help {
     Write-Host "  .\Makefile.ps1 test-backend  - Run backend tests only" -ForegroundColor White
     Write-Host "  .\Makefile.ps1 test-frontend - Run frontend tests only" -ForegroundColor White
     Write-Host "  .\Makefile.ps1 test-coverage - Run tests with coverage" -ForegroundColor White
+    Write-Host "  .\Makefile.ps1 test-scripts  - Test setup scripts" -ForegroundColor White
     Write-Host "  .\Makefile.ps1 lint          - Run linters" -ForegroundColor White
     Write-Host "  .\Makefile.ps1 format        - Format code" -ForegroundColor White
     Write-Host "  .\Makefile.ps1 type-check    - Run type checkers" -ForegroundColor White
@@ -390,6 +391,23 @@ function Run-Tests-Coverage {
     Write-Host "Coverage reports generated!" -ForegroundColor Green
 }
 
+function Run-Tests-Scripts {
+    Write-Host "Testing setup scripts..." -ForegroundColor Yellow
+    
+    # Test PowerShell script with Pester
+    $pesterPath = Join-Path $PSScriptRoot "scripts" "tests" "setup-windows.Tests.ps1"
+    if (Test-Path $pesterPath) {
+        Write-Host "Running Pester tests for setup-windows.ps1..." -ForegroundColor Cyan
+        if (Get-Module -ListAvailable -Name Pester) {
+            Invoke-Pester $pesterPath
+        } else {
+            Write-Host "Warning: Pester not installed. Install with: Install-Module -Name Pester -Force" -ForegroundColor Yellow
+        }
+    }
+    
+    Write-Host "Note: Bash script tests require bats. Run 'make test-scripts' on Linux/macOS." -ForegroundColor Gray
+}
+
 function Run-Lint {
     Write-Host "Running linters..." -ForegroundColor Yellow
     Set-Location backend
@@ -457,6 +475,7 @@ switch ($Target.ToLower()) {
     "test-backend" { Run-Tests-Backend }
     "test-frontend" { Run-Tests-Frontend }
     "test-coverage" { Run-Tests-Coverage }
+    "test-scripts" { Run-Tests-Scripts }
     "lint" { Run-Lint }
     "format" { Format-Code }
     "type-check" { Type-Check }

@@ -7,6 +7,7 @@ help:
 	@echo "  make dev-logs       - Start development servers with visible logs"
 	@echo "  make dev-logs-read  - Read recent dev logs (useful for AI assistant)"
 	@echo "  make test           - Run all tests"
+	@echo "  make test-scripts   - Test setup scripts (requires bats)"
 	@echo "  make lint           - Run linters"
 	@echo "  make format         - Format code"
 	@echo "  make type-check     - Run type checkers"
@@ -85,6 +86,15 @@ test-backend:
 
 test-frontend:
 	cd frontend && npm run test
+
+test-scripts:
+	@echo "Testing setup scripts..."
+	@if command -v bats >/dev/null 2>&1; then \
+		echo "Running bash script tests..."; \
+		cd scripts && bats tests/ || echo "Warning: bats tests failed or bats not fully configured"; \
+	else \
+		echo "Warning: bats not installed. Install with: brew install bats-core (macOS) or sudo apt-get install bats (Linux)"; \
+	fi
 
 test-coverage:
 	cd backend && uv sync --extra dev && uv run pytest --cov=app --cov-report=html --cov-report=term

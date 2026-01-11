@@ -114,11 +114,16 @@ GIT_REPO=https://github.com/yourusername/calvin.git GIT_BRANCH=your-branch wget 
 
 **What the Setup Scripts Do:**
 - Install all system dependencies (Python, Node.js, etc.)
+- Create `calvin` user if needed
 - Clone the Calvin repository (from the specified branch)
 - Install backend and frontend dependencies
+- Build frontend (production) or configure dev server (development)
 - Set up systemd services for auto-start
 - Configure display and kiosk mode
 - Enable hot reload for both backend and frontend (dev mode only)
+- Verify installation and provide next steps
+
+**For detailed information about the setup scripts, see [Setup Scripts Documentation](docs/setup/SETUP_SCRIPTS.md)**
 
 ### Linux Development Setup
 

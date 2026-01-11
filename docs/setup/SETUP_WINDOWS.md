@@ -31,24 +31,47 @@ Verify: `uv --version`
 
 ## Setup Project
 
-### 1. Navigate to project directory
+### Option 1: Automated Setup (Recommended)
+
+Calvin provides an automated setup script that handles all prerequisites and dependencies:
+
+```powershell
+# From project root
+.\setup-windows.ps1
+```
+
+This script will:
+- Check for Python 3.11+, Node.js 20+, Git
+- Install UV if needed
+- Switch to develop branch (if Git available)
+- Install all backend dependencies (with dev extras)
+- Install all frontend dependencies
+- Provide instructions for starting development
+
+### Option 2: Manual Setup
+
+If you prefer manual setup or the script doesn't work for your environment:
+
+#### 1. Navigate to project directory
 ```powershell
 cd C:\Users\oster\code\calvin
 ```
 
-### 2. Install Backend Dependencies
+#### 2. Install Backend Dependencies
 ```powershell
 cd backend
-uv sync
+uv sync --extra dev
 cd ..
 ```
 
-### 3. Install Frontend Dependencies
+#### 3. Install Frontend Dependencies
 ```powershell
 cd frontend
 npm install
 cd ..
 ```
+
+For more details about the setup scripts, see [Setup Scripts Documentation](SETUP_SCRIPTS.md).
 
 ## Running the Application
 
