@@ -355,12 +355,12 @@ async def update_plugin_instance(instance_id: str, instance_data: dict[str, Any]
 
         if plugin:
             # Update enabled status
-            # Skip this block if plugin was just created (already initialized and started above)
-            if enabled is not None and not was_new_instance:
+            if enabled is not None:
                 if enabled:
                     plugin.enable()
                     # Start the plugin if it's not running
-                    if not plugin.is_running():
+                    # Skip initialize/start if plugin was just created (already done above)
+                    if not plugin.is_running() and not was_new_instance:
                         try:
                             await plugin.initialize()
                             plugin.start()
