@@ -158,12 +158,25 @@ On Linux, full keyboard support is available via `evdev`:
 ## Development vs Production
 
 ### Development
-- Use `uv sync --extra linux` to get all dependencies including `evdev`
+- Use `uv sync --extra linux --extra dev` to get all dependencies including `evdev`
 - Run with `--reload` flag for auto-reload on code changes
 - Full keyboard support available
 
 ### Production (Raspberry Pi)
-- Same setup as development
-- Use systemd services for auto-start
+- Use automated setup scripts: `scripts/setup.sh` (production) or `scripts/setup-dev.sh` (development)
+- See [Setup Scripts Documentation](SETUP_SCRIPTS.md) for details
 - Full keyboard support available
 
+**Quick Setup for Raspberry Pi:**
+
+Production:
+```bash
+wget -O- https://raw.githubusercontent.com/osterbergsimon/calvin/main/scripts/setup.sh | sudo sh
+```
+
+Development (with hot reload):
+```bash
+wget -O- https://raw.githubusercontent.com/osterbergsimon/calvin/main/scripts/setup-dev.sh | sudo sh
+```
+
+Both scripts handle the complete setup automatically. See [Setup Scripts Documentation](SETUP_SCRIPTS.md) for more information.
