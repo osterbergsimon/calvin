@@ -281,7 +281,9 @@ async def update_plugin_instance(instance_id: str, instance_data: dict[str, Any]
             config = instance_data["config"]
             # Merge with existing config if it's a partial update
             if isinstance(config, dict):
-                existing_config = db_plugin.config or {}
+                # Create a new dict to ensure SQLAlchemy detects the change
+                # (JSONEncodedDict doesn't detect in-place modifications)
+                existing_config = dict(db_plugin.config or {})
                 existing_config.update(config)
                 db_plugin.config = existing_config
                 updated_config = existing_config
@@ -353,7 +355,8 @@ async def update_plugin_instance(instance_id: str, instance_data: dict[str, Any]
 
         if plugin:
             # Update enabled status
-            if enabled is not None:
+            # Skip this block if plugin was just created (already initialized and started above)
+            if enabled is not None and not was_new_instance:
                 if enabled:
                     plugin.enable()
                     # Start the plugin if it's not running
