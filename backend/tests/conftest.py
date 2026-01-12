@@ -141,14 +141,23 @@ async def test_db(test_engine: AsyncEngine) -> AsyncGenerator[AsyncSession, None
     db_module.AsyncSessionLocal = async_session_factory
 
     try:
+        # Reload service modules that use AsyncSessionLocal
+        # IMPORTANT: Must reload AFTER patching AsyncSessionLocal so services get the new reference
+        import importlib
+        import sys
+
+        service_modules = [
+            "app.services.config_service",  # Uses AsyncSessionLocal at module level
+            "app.services.keyboard_mapping_service",  # Uses AsyncSessionLocal at module level
+        ]
+        for module_name in service_modules:
+            if module_name in sys.modules:
+                importlib.reload(sys.modules[module_name])
+
         # Also reload plugin_registry modules so they use the patched AsyncSessionLocal
         # This ensures plugin_registry operations use the test database
         # Note: We don't restore plugin_registry here because integration tests
         # (using test_client) will reload it with their own database setup
-        import importlib
-        import sys
-
-        # Reload all registry modules that use AsyncSessionLocal
         registry_modules = [
             "app.plugins.registry",
             "app.plugins.registry.loader",  # Must reload to use patched AsyncSessionLocal
@@ -275,6 +284,18 @@ def test_client(
     # If we reload before patching, modules will import the OLD AsyncSessionLocal
     import importlib
     import sys
+
+    # Reload service modules that use AsyncSessionLocal
+    # IMPORTANT: Must reload BEFORE routes so routes get services with new AsyncSessionLocal
+    service_modules = [
+        "app.services.config_service",  # Uses AsyncSessionLocal at module level
+        "app.services.keyboard_mapping_service",  # Uses AsyncSessionLocal at module level
+        "app.services.plugin_calendar_service",  # Uses AsyncSessionLocal
+        "app.services.plugin_image_service",  # Uses AsyncSessionLocal
+    ]
+    for module_name in service_modules:
+        if module_name in sys.modules:
+            importlib.reload(sys.modules[module_name])
 
     # Reload plugin_registry modules so they use the patched AsyncSessionLocal
     registry_modules = [
