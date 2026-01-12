@@ -7,7 +7,9 @@ import axios from "axios";
 
 // Mock axios globally to prevent network errors in tests
 // Store created instances so we can apply default mocks to them
-const createdAxiosInstances = [];
+const { createdAxiosInstances } = vi.hoisted(() => {
+  return { createdAxiosInstances: [] };
+});
 
 vi.mock("axios", () => {
   // Create a mock axios instance factory
