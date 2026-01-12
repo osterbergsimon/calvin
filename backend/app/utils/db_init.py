@@ -59,8 +59,9 @@ async def initialize_database(
     # to ensure consistency and proper schema management
     if run_migrations:
         # Use Alembic for migrations
-        from alembic import command
         from alembic.config import Config
+
+        from alembic import command
 
         # Get database URL for Alembic (convert async to sync)
         db_url = f"sqlite:///{database_path.resolve()}"
