@@ -101,7 +101,7 @@ class TestPluginErrorHandling:
             if db_type:
                 assert db_type.name == "no_name_plugin" or db_type.name == "Unknown Plugin"
 
-    @patch("app.plugins.registry.plugin_loader")
+    @patch("app.plugins.registry.loader.plugin_loader")
     @patch("app.plugins.registry.instance_manager")
     async def test_plugin_instance_creation_failure(
         self,
@@ -147,7 +147,7 @@ class TestPluginErrorHandling:
             if db_plugin:
                 assert db_plugin.enabled is False  # Should be disabled
 
-    @patch("app.plugins.registry.plugin_loader")
+    @patch("app.plugins.registry.loader.plugin_loader")
     @patch("app.plugins.registry.instance_manager")
     async def test_plugin_configure_failure(
         self,
@@ -217,7 +217,7 @@ class TestPluginErrorHandling:
             # that the server doesn't crash
             pass
 
-    @patch("app.plugins.registry.plugin_loader")
+    @patch("app.plugins.registry.loader.plugin_loader")
     @patch("app.plugins.registry.instance_manager")
     async def test_multiple_broken_plugins(
         self,
