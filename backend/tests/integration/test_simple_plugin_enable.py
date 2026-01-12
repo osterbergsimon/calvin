@@ -34,8 +34,8 @@ def test_simple_enable_plugin_type(test_client):
         get_response = test_client.get("/api/plugins/local")
         assert get_response.status_code == 200
         plugin_data = get_response.json()
-        assert (
-            plugin_data["enabled"] is True
-        ), f"Expected enabled=True, got {plugin_data.get('enabled')}"
+        assert plugin_data["enabled"] is True, (
+            f"Expected enabled=True, got {plugin_data.get('enabled')}"
+        )
     finally:
         loop.close()

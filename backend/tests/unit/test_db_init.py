@@ -113,9 +113,9 @@ async def test_initialize_database_without_migrations():
         table_status = verify_database_tables(db_path)
         # Check only the application tables, not alembic_version
         app_tables = {k: v for k, v in table_status.items() if k != "alembic_version"}
-        assert all(
-            app_tables.values()
-        ), f"Missing tables: {[k for k, v in app_tables.items() if not v]}"
+        assert all(app_tables.values()), (
+            f"Missing tables: {[k for k, v in app_tables.items() if not v]}"
+        )
     finally:
         if engine:
             await engine.dispose()

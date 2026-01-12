@@ -69,7 +69,21 @@ target-version = "py311"
 
 [tool.ruff.lint]
 select = ["E", "F", "I", "N", "W", "UP"]
-ignore = ["N815"]  # Allow mixedCase for Pydantic model fields
+ignore = [
+    "N815",  # Allow mixedCase for Pydantic model fields
+    # Formatting-related rules that conflict with ruff format
+    "E501",  # line-too-long (handled by formatter)
+    "W191",  # tab-indentation (handled by formatter)
+    "E111",  # indentation-with-invalid-multiple (handled by formatter)
+    "E114",  # indentation-with-invalid-multiple-comment (handled by formatter)
+    "E117",  # over-indented (handled by formatter)
+    "Q000",  # bad-quotes-inline-string (handled by formatter)
+    "Q001",  # bad-quotes-multiline-string (handled by formatter)
+    "Q002",  # bad-quotes-docstring (handled by formatter)
+    "Q003",  # avoidable-escaped-quote (handled by formatter)
+    "COM812",  # missing-trailing-comma (handled by formatter)
+    "COM819",  # prohibited-trailing-comma (handled by formatter)
+]
 # Auto-fix issues when possible
 fixable = ["ALL"]
 unfixable = []
