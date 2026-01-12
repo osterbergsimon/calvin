@@ -73,14 +73,20 @@ def temp_db_path_for_integration() -> Generator[Path, None, None]:
 @pytest_asyncio.fixture
 async def test_engine(temp_db_path: Path) -> AsyncGenerator[AsyncEngine, None]:
     """Create a test database engine."""
-    # CRITICAL: Import all models right before creating tables to ensure
-    # they're registered with Base.metadata (per StackOverflow advice:
-    # https://stackoverflow.com/questions/44941757/sqlalchemy-exc-operationalerror-sqlite3-operationalerror-no-such-table)
-    # Even though models are imported at module level, we import again here
-    # to ensure they're registered with Base.metadata before create_all()
+    # CRITICAL: Models are already imported at module level (lines 17-22),
+    # so they're registered with Base.metadata. No need to re-import here.
+    # Per StackOverflow advice, models must be imported before create_all():
+    # https://stackoverflow.com/questions/44941757/sqlalchemy-exc-operationalerror-sqlite3-operationalerror-no-such-table
 
     test_db_url = f"sqlite+aiosqlite:///{temp_db_path}"
     engine = create_async_engine(test_db_url, echo=False)
+
+    # Debug: Log what tables are registered in Base.metadata
+    registered_tables = list(Base.metadata.tables.keys())
+    logger.debug(
+        f"test_engine: Creating tables in {temp_db_path}. "
+        f"Registered tables in Base.metadata: {registered_tables}"
+    )
 
     # Create all tables
     async with engine.begin() as conn:
@@ -89,6 +95,38 @@ async def test_engine(temp_db_path: Path) -> AsyncGenerator[AsyncEngine, None]:
             Base.metadata.create_all(bind=sync_conn)
 
         await conn.run_sync(create_all_tables)
+
+    # Verify tables were actually created
+    import sqlite3
+
+    try:
+        conn = sqlite3.connect(str(temp_db_path))
+        cursor = conn.cursor()
+        cursor.execute("SELECT name FROM sqlite_master WHERE type='table'")
+        created_tables = {row[0] for row in cursor.fetchall()}
+        conn.close()
+
+        required_tables = {"config", "keyboard_mappings", "plugin_types", "plugins"}
+        missing_tables = required_tables - created_tables
+
+        if missing_tables:
+            logger.error(
+                f"test_engine: Tables NOT created in {temp_db_path}! "
+                f"Missing: {missing_tables}. Created: {sorted(created_tables)}. "
+                f"Registered in Base.metadata: {registered_tables}"
+            )
+            raise RuntimeError(
+                f"Failed to create tables in {temp_db_path}. "
+                f"Missing: {missing_tables}. Created: {sorted(created_tables)}"
+            )
+        else:
+            logger.debug(
+                f"test_engine: Successfully created tables in {temp_db_path}: "
+                f"{sorted(created_tables)}"
+            )
+    except Exception as e:
+        logger.error(f"test_engine: Error verifying tables in {temp_db_path}: {e}")
+        raise
 
     yield engine
 
@@ -147,12 +185,16 @@ def test_client(
     Uses Base.metadata.create_all() instead of migrations for simplicity and speed.
     """
     import asyncio
+    import logging
     import os
 
     from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker, create_async_engine
 
     import app.config
     from app.database import Base
+
+    # Get logger for this fixture
+    fixture_logger = logging.getLogger(__name__)
 
     # Set IMAGE_DIR environment variable before plugins are loaded
     original_image_dir = os.environ.get("IMAGE_DIR")
@@ -175,10 +217,17 @@ def test_client(
     # Setup: Create all tables using Base.metadata.create_all()
     # This is simpler and faster than running migrations for tests
     # All tables are defined in models, so this is sufficient
-    # CRITICAL: Import all models right before creating tables to ensure
-    # they're registered with Base.metadata (especially important after module reloads)
-    # Per StackOverflow: models must be imported before create_all() to register with Base.metadata
+    # CRITICAL: Models are already imported at module level (lines 17-22),
+    # so they're registered with Base.metadata. No need to re-import here.
+    # Per StackOverflow advice, models must be imported before create_all():
     # https://stackoverflow.com/questions/44941757/sqlalchemy-exc-operationalerror-sqlite3-operationalerror-no-such-table
+
+    # Debug: Log what tables are registered in Base.metadata
+    registered_tables = list(Base.metadata.tables.keys())
+    fixture_logger.debug(
+        f"test_client: Creating tables in {test_db_path_abs}. "
+        f"Registered tables in Base.metadata: {registered_tables}"
+    )
 
     loop = asyncio.new_event_loop()
     asyncio.set_event_loop(loop)
@@ -195,6 +244,38 @@ def test_client(
         loop.run_until_complete(create_tables())
     finally:
         loop.close()
+
+    # Verify tables were actually created (before module reloads)
+    import sqlite3
+
+    try:
+        conn = sqlite3.connect(str(test_db_path_abs))
+        cursor = conn.cursor()
+        cursor.execute("SELECT name FROM sqlite_master WHERE type='table'")
+        created_tables = {row[0] for row in cursor.fetchall()}
+        conn.close()
+
+        required_tables = {"config", "keyboard_mappings", "plugin_types", "plugins"}
+        missing_tables = required_tables - created_tables
+
+        if missing_tables:
+            fixture_logger.error(
+                f"test_client: Tables NOT created in {test_db_path_abs}! "
+                f"Missing: {missing_tables}. Created: {sorted(created_tables)}. "
+                f"Registered in Base.metadata: {registered_tables}"
+            )
+            raise RuntimeError(
+                f"Failed to create tables in {test_db_path_abs}. "
+                f"Missing: {missing_tables}. Created: {sorted(created_tables)}"
+            )
+        else:
+            fixture_logger.debug(
+                f"test_client: Successfully created tables in {test_db_path_abs}: "
+                f"{sorted(created_tables)}"
+            )
+    except Exception as e:
+        fixture_logger.error(f"test_client: Error verifying tables in {test_db_path_abs}: {e}")
+        raise
 
     # Patch the database module to use our test engine
     # IMPORTANT: Do this BEFORE importing any routes,
