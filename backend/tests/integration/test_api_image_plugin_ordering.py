@@ -2,7 +2,7 @@
 
 import pytest
 
-from app.database import AsyncSessionLocal
+import app.database as db_module
 from app.models.db_models import PluginDB, PluginTypeDB
 
 
@@ -20,7 +20,7 @@ class TestImagePluginOrderingAPI:
 
         # Verify the order was saved to database
         # Use a fresh session to ensure we see committed changes
-        async with AsyncSessionLocal() as session:
+        async with db_module.AsyncSessionLocal() as session:
             from sqlalchemy import select
 
             result = await session.execute(
@@ -48,7 +48,7 @@ class TestImagePluginOrderingAPI:
     async def test_update_image_instance_display_order(self, test_client):
         """Test updating display_order for image plugin instances."""
         # First, ensure plugin type exists
-        async with AsyncSessionLocal() as session:
+        async with db_module.AsyncSessionLocal() as session:
             from sqlalchemy import select
 
             result = await session.execute(
@@ -70,7 +70,7 @@ class TestImagePluginOrderingAPI:
                 await session.commit()
 
         # Create a test instance
-        async with AsyncSessionLocal() as session:
+        async with db_module.AsyncSessionLocal() as session:
             from sqlalchemy import delete
 
             # Clean up any existing test instance
@@ -104,7 +104,7 @@ class TestImagePluginOrderingAPI:
             pass
         else:
             # Verify the order was saved
-            async with AsyncSessionLocal() as session:
+            async with db_module.AsyncSessionLocal() as session:
                 from sqlalchemy import select
 
                 result = await session.execute(
@@ -116,7 +116,7 @@ class TestImagePluginOrderingAPI:
                     assert instance.display_order == 3
 
         # Cleanup
-        async with AsyncSessionLocal() as session:
+        async with db_module.AsyncSessionLocal() as session:
             from sqlalchemy import delete
 
             await session.execute(delete(PluginDB).where(PluginDB.id == "test-image-instance"))
@@ -125,7 +125,7 @@ class TestImagePluginOrderingAPI:
     async def test_get_plugin_instances_sorted_by_display_order(self, test_client):
         """Test that plugin instances are returned sorted by display_order."""
         # First, ensure plugin type exists
-        async with AsyncSessionLocal() as session:
+        async with db_module.AsyncSessionLocal() as session:
             from sqlalchemy import select
 
             result = await session.execute(
@@ -147,7 +147,7 @@ class TestImagePluginOrderingAPI:
                 await session.commit()
 
         # Create test instances with different display orders
-        async with AsyncSessionLocal() as session:
+        async with db_module.AsyncSessionLocal() as session:
             from sqlalchemy import delete
 
             # Clean up any existing test instances
@@ -200,7 +200,7 @@ class TestImagePluginOrderingAPI:
 
         # If no test instances found, verify they exist in the database
         if len(test_instances) == 0:
-            async with AsyncSessionLocal() as session:
+            async with db_module.AsyncSessionLocal() as session:
                 from sqlalchemy import select
 
                 result = await session.execute(select(PluginDB).where(PluginDB.type_id == "local"))
@@ -255,7 +255,7 @@ class TestImagePluginOrderingAPI:
             )
 
         # Cleanup
-        async with AsyncSessionLocal() as session:
+        async with db_module.AsyncSessionLocal() as session:
             from sqlalchemy import delete
 
             await session.execute(delete(PluginDB).where(PluginDB.id.like("test-image-%")))
