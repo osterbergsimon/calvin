@@ -74,7 +74,10 @@ def temp_db_path_for_integration() -> Generator[Path, None, None]:
 async def test_engine(temp_db_path: Path) -> AsyncGenerator[AsyncEngine, None]:
     """Create a test database engine."""
     # CRITICAL: Import all models right before creating tables to ensure
-    # they're registered with Base.metadata
+    # they're registered with Base.metadata (per StackOverflow advice:
+    # https://stackoverflow.com/questions/44941757/sqlalchemy-exc-operationalerror-sqlite3-operationalerror-no-such-table)
+    # Even though models are imported at module level, we import again here
+    # to ensure they're registered with Base.metadata before create_all()
 
     test_db_url = f"sqlite+aiosqlite:///{temp_db_path}"
     engine = create_async_engine(test_db_url, echo=False)
@@ -174,6 +177,8 @@ def test_client(
     # All tables are defined in models, so this is sufficient
     # CRITICAL: Import all models right before creating tables to ensure
     # they're registered with Base.metadata (especially important after module reloads)
+    # Per StackOverflow: models must be imported before create_all() to register with Base.metadata
+    # https://stackoverflow.com/questions/44941757/sqlalchemy-exc-operationalerror-sqlite3-operationalerror-no-such-table
 
     loop = asyncio.new_event_loop()
     asyncio.set_event_loop(loop)
