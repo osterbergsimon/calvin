@@ -83,10 +83,8 @@ async def test_engine(temp_db_path: Path) -> AsyncGenerator[AsyncEngine, None]:
 
     # Debug: Log what tables are registered in Base.metadata
     registered_tables = list(Base.metadata.tables.keys())
-    logger.debug(
-        f"test_engine: Creating tables in {temp_db_path}. "
-        f"Registered tables in Base.metadata: {registered_tables}"
-    )
+    print(f"[test_engine] Creating tables in {temp_db_path}")
+    print(f"[test_engine] Registered tables in Base.metadata: {registered_tables}")
 
     # Create all tables
     async with engine.begin() as conn:
@@ -110,22 +108,17 @@ async def test_engine(temp_db_path: Path) -> AsyncGenerator[AsyncEngine, None]:
         missing_tables = required_tables - created_tables
 
         if missing_tables:
-            logger.error(
-                f"test_engine: Tables NOT created in {temp_db_path}! "
+            error_msg = (
+                f"[test_engine] Tables NOT created in {temp_db_path}! "
                 f"Missing: {missing_tables}. Created: {sorted(created_tables)}. "
                 f"Registered in Base.metadata: {registered_tables}"
             )
-            raise RuntimeError(
-                f"Failed to create tables in {temp_db_path}. "
-                f"Missing: {missing_tables}. Created: {sorted(created_tables)}"
-            )
+            print(f"ERROR: {error_msg}")
+            raise RuntimeError(error_msg)
         else:
-            logger.debug(
-                f"test_engine: Successfully created tables in {temp_db_path}: "
-                f"{sorted(created_tables)}"
-            )
+            print(f"[test_engine] Successfully created tables: {sorted(created_tables)}")
     except Exception as e:
-        logger.error(f"test_engine: Error verifying tables in {temp_db_path}: {e}")
+        print(f"[test_engine] ERROR verifying tables in {temp_db_path}: {e}")
         raise
 
     yield engine
@@ -185,16 +178,12 @@ def test_client(
     Uses Base.metadata.create_all() instead of migrations for simplicity and speed.
     """
     import asyncio
-    import logging
     import os
 
     from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker, create_async_engine
 
     import app.config
     from app.database import Base
-
-    # Get logger for this fixture
-    fixture_logger = logging.getLogger(__name__)
 
     # Set IMAGE_DIR environment variable before plugins are loaded
     original_image_dir = os.environ.get("IMAGE_DIR")
@@ -224,10 +213,8 @@ def test_client(
 
     # Debug: Log what tables are registered in Base.metadata
     registered_tables = list(Base.metadata.tables.keys())
-    fixture_logger.debug(
-        f"test_client: Creating tables in {test_db_path_abs}. "
-        f"Registered tables in Base.metadata: {registered_tables}"
-    )
+    print(f"[test_client] Creating tables in {test_db_path_abs}")
+    print(f"[test_client] Registered tables in Base.metadata: {registered_tables}")
 
     loop = asyncio.new_event_loop()
     asyncio.set_event_loop(loop)
@@ -259,22 +246,17 @@ def test_client(
         missing_tables = required_tables - created_tables
 
         if missing_tables:
-            fixture_logger.error(
-                f"test_client: Tables NOT created in {test_db_path_abs}! "
+            error_msg = (
+                f"[test_client] Tables NOT created in {test_db_path_abs}! "
                 f"Missing: {missing_tables}. Created: {sorted(created_tables)}. "
                 f"Registered in Base.metadata: {registered_tables}"
             )
-            raise RuntimeError(
-                f"Failed to create tables in {test_db_path_abs}. "
-                f"Missing: {missing_tables}. Created: {sorted(created_tables)}"
-            )
+            print(f"ERROR: {error_msg}")
+            raise RuntimeError(error_msg)
         else:
-            fixture_logger.debug(
-                f"test_client: Successfully created tables in {test_db_path_abs}: "
-                f"{sorted(created_tables)}"
-            )
+            print(f"[test_client] Successfully created tables: {sorted(created_tables)}")
     except Exception as e:
-        fixture_logger.error(f"test_client: Error verifying tables in {test_db_path_abs}: {e}")
+        print(f"[test_client] ERROR verifying tables in {test_db_path_abs}: {e}")
         raise
 
     # Patch the database module to use our test engine
