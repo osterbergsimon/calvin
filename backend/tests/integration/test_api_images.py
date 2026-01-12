@@ -4,7 +4,7 @@ from pathlib import Path
 
 import pytest
 
-from app.database import AsyncSessionLocal
+import app.database as db_module
 from app.models.db_models import PluginDB
 from tests.test_utils import create_test_image, create_test_images_set
 
@@ -36,7 +36,7 @@ class TestImageAPI:
         try:
 
             async def check_instance():
-                async with AsyncSessionLocal() as session:
+                async with db_module.AsyncSessionLocal() as session:
                     result = await session.execute(
                         select(PluginDB).where(PluginDB.id == "local-images")
                     )
@@ -68,7 +68,7 @@ class TestImageAPI:
 
             # Verify instance exists
             async def verify_instance():
-                async with AsyncSessionLocal() as session:
+                async with db_module.AsyncSessionLocal() as session:
                     result = await session.execute(
                         select(PluginDB).where(PluginDB.id == "local-images")
                     )

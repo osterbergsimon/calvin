@@ -5,7 +5,7 @@ import asyncio
 import pytest
 from sqlalchemy import select
 
-from app.database import AsyncSessionLocal
+import app.database as db_module
 from app.models.db_models import PluginDB, PluginTypeDB
 from app.plugins.base import PluginType
 from app.plugins.manager import plugin_manager
@@ -26,7 +26,7 @@ class TestInstanceUpdate:
         try:
 
             async def setup_instance():
-                async with AsyncSessionLocal() as session:
+                async with db_module.AsyncSessionLocal() as session:
                     # First ensure plugin type exists
                     result = await session.execute(
                         select(PluginTypeDB).where(PluginTypeDB.type_id == "local")
@@ -84,7 +84,7 @@ class TestInstanceUpdate:
 
             # Verify in database
             async def verify_instance():
-                async with AsyncSessionLocal() as session:
+                async with db_module.AsyncSessionLocal() as session:
                     result = await session.execute(
                         select(PluginDB).where(PluginDB.id == instance_id)
                     )
@@ -96,7 +96,7 @@ class TestInstanceUpdate:
 
             # Cleanup
             async def cleanup_instance():
-                async with AsyncSessionLocal() as session:
+                async with db_module.AsyncSessionLocal() as session:
                     result = await session.execute(
                         select(PluginDB).where(PluginDB.id == instance_id)
                     )
@@ -118,7 +118,7 @@ class TestInstanceUpdate:
         try:
 
             async def setup_instance():
-                async with AsyncSessionLocal() as session:
+                async with db_module.AsyncSessionLocal() as session:
                     # Ensure plugin type exists
                     result = await session.execute(
                         select(PluginTypeDB).where(PluginTypeDB.type_id == "local")
@@ -172,7 +172,7 @@ class TestInstanceUpdate:
 
             # Verify in database
             async def verify_instance():
-                async with AsyncSessionLocal() as session:
+                async with db_module.AsyncSessionLocal() as session:
                     result = await session.execute(
                         select(PluginDB).where(PluginDB.id == instance_id)
                     )
@@ -184,7 +184,7 @@ class TestInstanceUpdate:
 
             # Cleanup
             async def cleanup_instance():
-                async with AsyncSessionLocal() as session:
+                async with db_module.AsyncSessionLocal() as session:
                     result = await session.execute(
                         select(PluginDB).where(PluginDB.id == instance_id)
                     )
@@ -219,7 +219,7 @@ class TestInstanceUpdate:
         try:
 
             async def setup_instance():
-                async with AsyncSessionLocal() as session:
+                async with db_module.AsyncSessionLocal() as session:
                     result = await session.execute(
                         select(PluginTypeDB).where(PluginTypeDB.type_id == "local")
                     )
@@ -271,7 +271,7 @@ class TestInstanceUpdate:
 
             # Verify config was merged
             async def verify_config():
-                async with AsyncSessionLocal() as session:
+                async with db_module.AsyncSessionLocal() as session:
                     result = await session.execute(
                         select(PluginDB).where(PluginDB.id == instance_id)
                     )
@@ -284,7 +284,7 @@ class TestInstanceUpdate:
 
             # Cleanup
             async def cleanup_instance():
-                async with AsyncSessionLocal() as session:
+                async with db_module.AsyncSessionLocal() as session:
                     result = await session.execute(
                         select(PluginDB).where(PluginDB.id == instance_id)
                     )
@@ -305,7 +305,7 @@ class TestInstanceUpdate:
         try:
 
             async def setup_instance():
-                async with AsyncSessionLocal() as session:
+                async with db_module.AsyncSessionLocal() as session:
                     result = await session.execute(
                         select(PluginTypeDB).where(PluginTypeDB.type_id == "local")
                     )
@@ -357,7 +357,7 @@ class TestInstanceUpdate:
 
             # Cleanup
             async def cleanup_instance():
-                async with AsyncSessionLocal() as session:
+                async with db_module.AsyncSessionLocal() as session:
                     result = await session.execute(
                         select(PluginDB).where(PluginDB.id == instance_id)
                     )
@@ -383,7 +383,7 @@ class TestBackendPluginInstanceUpdate:
         try:
 
             async def setup_instance():
-                async with AsyncSessionLocal() as session:
+                async with db_module.AsyncSessionLocal() as session:
                     # Create backend plugin type
                     result = await session.execute(
                         select(PluginTypeDB).where(PluginTypeDB.type_id == "test-backend-instance")
@@ -472,7 +472,7 @@ class TestBackendPluginInstanceUpdate:
 
             # Cleanup
             async def cleanup_instance():
-                async with AsyncSessionLocal() as session:
+                async with db_module.AsyncSessionLocal() as session:
                     result = await session.execute(
                         select(PluginDB).where(PluginDB.id == instance_id)
                     )
@@ -501,7 +501,7 @@ class TestBackendPluginInstanceUpdate:
         try:
 
             async def setup_instance():
-                async with AsyncSessionLocal() as session:
+                async with db_module.AsyncSessionLocal() as session:
                     # Create backend plugin type
                     result = await session.execute(
                         select(PluginTypeDB).where(PluginTypeDB.type_id == "test-backend-disable")
@@ -581,7 +581,7 @@ class TestBackendPluginInstanceUpdate:
 
             # Cleanup
             async def cleanup_instance():
-                async with AsyncSessionLocal() as session:
+                async with db_module.AsyncSessionLocal() as session:
                     result = await session.execute(
                         select(PluginDB).where(PluginDB.id == instance_id)
                     )
@@ -614,7 +614,7 @@ class TestPluginTypeEnableDisable:
         try:
 
             async def get_original_state():
-                async with AsyncSessionLocal() as session:
+                async with db_module.AsyncSessionLocal() as session:
                     result = await session.execute(
                         select(PluginTypeDB).where(PluginTypeDB.type_id == "local")
                     )
@@ -647,7 +647,7 @@ class TestPluginTypeEnableDisable:
                 if original_enabled is not None:
 
                     async def restore_state():
-                        async with AsyncSessionLocal() as session:
+                        async with db_module.AsyncSessionLocal() as session:
                             result = await session.execute(
                                 select(PluginTypeDB).where(PluginTypeDB.type_id == "local")
                             )
@@ -667,7 +667,7 @@ class TestPluginTypeEnableDisable:
         try:
 
             async def get_original_state():
-                async with AsyncSessionLocal() as session:
+                async with db_module.AsyncSessionLocal() as session:
                     result = await session.execute(
                         select(PluginTypeDB).where(PluginTypeDB.type_id == "local")
                     )
@@ -700,7 +700,7 @@ class TestPluginTypeEnableDisable:
                 if original_enabled is not None:
 
                     async def restore_state():
-                        async with AsyncSessionLocal() as session:
+                        async with db_module.AsyncSessionLocal() as session:
                             result = await session.execute(
                                 select(PluginTypeDB).where(PluginTypeDB.type_id == "local")
                             )

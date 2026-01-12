@@ -5,7 +5,7 @@ from unittest.mock import AsyncMock, MagicMock, patch
 import pytest
 from sqlalchemy import select
 
-from app.database import AsyncSessionLocal
+import app.database as db_module
 from app.models.db_models import PluginDB, PluginTypeDB
 from app.plugins.registry import PluginRegistry
 
@@ -53,7 +53,7 @@ class TestPluginErrorHandling:
         await plugin_registry_instance.load_plugins_from_db()
 
         # Verify broken plugin was marked as disabled with error
-        async with AsyncSessionLocal() as session:
+        async with db_module.AsyncSessionLocal() as session:
             result = await session.execute(
                 select(PluginTypeDB).where(PluginTypeDB.type_id == "broken_plugin")
             )
@@ -91,7 +91,7 @@ class TestPluginErrorHandling:
         await plugin_registry_instance.load_plugins_from_db()
 
         # Verify plugin was created with fallback name
-        async with AsyncSessionLocal() as session:
+        async with db_module.AsyncSessionLocal() as session:
             result = await session.execute(
                 select(PluginTypeDB).where(PluginTypeDB.type_id == "no_name_plugin")
             )
@@ -136,7 +136,7 @@ class TestPluginErrorHandling:
         # Verify plugin instance was disabled
         # Note: The plugin may not be in the database if creation failed before DB update
         # The important thing is that the server didn't crash
-        async with AsyncSessionLocal() as session:
+        async with db_module.AsyncSessionLocal() as session:
             result = await session.execute(
                 select(PluginDB).where(PluginDB.id == "broken-instance-1")
             )
@@ -186,7 +186,7 @@ class TestPluginErrorHandling:
 
         # Verify plugin instance was disabled
         # The important thing is that the server didn't crash
-        async with AsyncSessionLocal() as session:
+        async with db_module.AsyncSessionLocal() as session:
             result = await session.execute(
                 select(PluginDB).where(PluginDB.id == "configure-fail-1")
             )
@@ -255,7 +255,7 @@ class TestPluginErrorHandling:
         await plugin_registry_instance.load_plugins_from_db()
 
         # Verify working plugins were loaded
-        async with AsyncSessionLocal() as session:
+        async with db_module.AsyncSessionLocal() as session:
             result = await session.execute(
                 select(PluginTypeDB).where(
                     PluginTypeDB.type_id.in_(["working_plugin", "working_plugin_2"])
