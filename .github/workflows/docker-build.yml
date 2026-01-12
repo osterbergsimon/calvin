@@ -33,11 +33,18 @@ jobs:
     steps:
       - name: Checkout code
         uses: actions/checkout@v4
+        with:
+          # Fetch full history to ensure proper comparison
+          # For push events: compares HEAD^ to HEAD
+          # For PR events: compares PR branch to base branch
+          fetch-depth: 0
       
       - name: Check for changes
         uses: dorny/paths-filter@v2
         id: filter
         with:
+          # By default: PR events compare to base branch, push events compare HEAD^ to HEAD
+          # fetch-depth: 2 ensures HEAD^ is available for push events
           filters: |
             backend:
               - 'backend/app/**'
