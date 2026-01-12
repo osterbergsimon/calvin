@@ -73,12 +73,19 @@ def temp_db_path_for_integration() -> Generator[Path, None, None]:
 @pytest_asyncio.fixture
 async def test_engine(temp_db_path: Path) -> AsyncGenerator[AsyncEngine, None]:
     """Create a test database engine."""
+    # CRITICAL: Import all models right before creating tables to ensure
+    # they're registered with Base.metadata
+
     test_db_url = f"sqlite+aiosqlite:///{temp_db_path}"
     engine = create_async_engine(test_db_url, echo=False)
 
     # Create all tables
     async with engine.begin() as conn:
-        await conn.run_sync(Base.metadata.create_all)
+
+        def create_all_tables(sync_conn):
+            Base.metadata.create_all(bind=sync_conn)
+
+        await conn.run_sync(create_all_tables)
 
     yield engine
 
@@ -165,13 +172,20 @@ def test_client(
     # Setup: Create all tables using Base.metadata.create_all()
     # This is simpler and faster than running migrations for tests
     # All tables are defined in models, so this is sufficient
+    # CRITICAL: Import all models right before creating tables to ensure
+    # they're registered with Base.metadata (especially important after module reloads)
+
     loop = asyncio.new_event_loop()
     asyncio.set_event_loop(loop)
     try:
 
         async def create_tables():
             async with test_engine.begin() as conn:
-                await conn.run_sync(Base.metadata.create_all)
+
+                def create_all_tables(sync_conn):
+                    Base.metadata.create_all(bind=sync_conn)
+
+                await conn.run_sync(create_all_tables)
 
         loop.run_until_complete(create_tables())
     finally:
