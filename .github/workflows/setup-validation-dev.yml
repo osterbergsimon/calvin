@@ -181,6 +181,10 @@ jobs:
           export GIT_BRANCH="develop"
           
           # Pre-setup: copy repo to target location
+          # Create calvin user first (setup script expects it, or will create it)
+          if ! id calvin &>/dev/null; then
+            useradd -m -s /bin/bash calvin || true
+          fi
           mkdir -p /home/calvin
           cp -r /tmp/calvin-test /home/calvin/calvin
           chown -R calvin:calvin /home/calvin/calvin
@@ -354,6 +358,10 @@ jobs:
           export GIT_REPO="https://github.com/osterbergsimon/calvin.git"
           export GIT_BRANCH="develop"
           
+          # Create calvin user if it doesn't exist
+          if ! id calvin &>/dev/null; then
+            useradd -m -s /bin/bash calvin || true
+          fi
           mkdir -p /home/calvin
           cp -r /tmp/calvin-test2 /home/calvin/calvin
           chown -R calvin:calvin /home/calvin/calvin
