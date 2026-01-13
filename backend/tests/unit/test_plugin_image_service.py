@@ -464,14 +464,20 @@ class TestPluginImageService:
 
         images = [{"id": "img1", "source": "local-images"}]
 
-        with patch("app.services.plugin_image_service.plugin_manager") as mock_manager:
-            mock_plugin = MockImagePlugin("local-images", images)
-            mock_manager.get_plugins.return_value = [mock_plugin]
+        mock_plugin_type = MagicMock(
+            type_id="local", enabled=True, common_config_schema={"display_order": "0"}
+        )
+        mock_db_plugin = MagicMock(id="local-images", type_id="local", display_order=0)
 
-            result = await service.delete_image("img1")
+        with create_mock_session([mock_plugin_type], [mock_db_plugin]):
+            with patch("app.services.plugin_image_service.plugin_manager") as mock_manager:
+                mock_plugin = MockImagePlugin("local-images", images)
+                mock_manager.get_plugins.return_value = [mock_plugin]
 
-            assert result is True
-            assert service._current_image_id is None
+                result = await service.delete_image("img1")
+
+                assert result is True
+                assert service._current_image_id is None
 
     async def test_delete_image_clears_current(self):
         """Test delete_image clears current image if it was deleted."""
@@ -481,14 +487,20 @@ class TestPluginImageService:
 
         images = [{"id": "img1", "source": "local-images"}]
 
-        with patch("app.services.plugin_image_service.plugin_manager") as mock_manager:
-            mock_plugin = MockImagePlugin("local-images", images)
-            mock_manager.get_plugins.return_value = [mock_plugin]
+        mock_plugin_type = MagicMock(
+            type_id="local", enabled=True, common_config_schema={"display_order": "0"}
+        )
+        mock_db_plugin = MagicMock(id="local-images", type_id="local", display_order=0)
 
-            await service.delete_image("img1")
+        with create_mock_session([mock_plugin_type], [mock_db_plugin]):
+            with patch("app.services.plugin_image_service.plugin_manager") as mock_manager:
+                mock_plugin = MockImagePlugin("local-images", images)
+                mock_manager.get_plugins.return_value = [mock_plugin]
 
-            assert service._current_image_id is None
-            assert service._current_plugin_id is None
+                await service.delete_image("img1")
+
+                assert service._current_image_id is None
+                assert service._current_plugin_id is None
 
     async def test_delete_image_not_found(self):
         """Test delete_image returns False when image not found."""
