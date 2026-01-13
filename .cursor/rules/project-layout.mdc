@@ -1,5 +1,0 @@
----
-alwaysApply: true
----
-- Always use absolute paths
-- There are no dirs like ...backend/backend/...

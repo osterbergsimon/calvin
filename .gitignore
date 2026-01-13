@@ -55,6 +55,8 @@ dist-ssr/
 # IDE
 .vscode/
 .idea/
+.cursor/
+*.code-workspace
 *.swp
 *.swo
 *~
@@ -75,11 +77,8 @@ htmlcov/
 .tox/
 .hypothesis/
 *.cover
-
-# Playwright
-test-results/
-playwright-report/
-playwright/.cache/
+coverage.xml
+frontend/test-results/
 
 # Database
 *.db
@@ -88,15 +87,24 @@ playwright/.cache/
 
 # Data
 data/images/
-backend/data/
-# Exception: builtin.json should be tracked
-!backend/data/themes/builtin.json
+backend/data/images/
 data/db/
+backend/data/cache/
+backend/data/plugins/
+backend/data/themes/
+
+# Documentation
+docs/archive/
 
 # Build
 *.pyc
 *.pyo
 *.pyd
+
+# Backup files
+*.old
+*.bak
+*.backup
 
 # OS
 Thumbs.db
@@ -107,5 +115,3 @@ coverage/
 .coverage.*
 bandit-report.json
 
-docs/archive/CLEANUP_REPORT.md
-docs/archive/LEGACY_CALENDAR_SERVICE_ANALYSIS.md

@@ -1,6 +1,0 @@
----
-alwaysApply: true
----
-
-- Always use UV
-- Aloways create new tests for new functionality

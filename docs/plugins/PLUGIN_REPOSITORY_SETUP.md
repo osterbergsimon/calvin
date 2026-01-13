@@ -1,6 +1,6 @@
 # Plugin Repository Setup Guide
 
-This guide covers setting up a separate repository for additional Calvin plugins and how to work with it effectively in Cursor IDE.
+This guide covers setting up a separate repository for additional Calvin plugins and how to work with it effectively in your IDE.
 
 ## Should You Create a Separate Repository?
 
@@ -101,15 +101,15 @@ Community-contributed plugins for [Calvin Dashboard](https://github.com/your-org
 See [CONTRIBUTING.md](./CONTRIBUTING.md) for guidelines on creating plugins.
 ```
 
-## Working with Multiple Repositories in Cursor IDE
+## Working with Multiple Repositories
 
-Cursor supports multiple ways to work with multiple repositories. Here are the best approaches:
+Most modern IDEs (VS Code, Cursor, etc.) support multiple ways to work with multiple repositories. Here are the best approaches:
 
 ### Option 1: Multi-Root Workspace (Recommended)
 
 Create a workspace file that includes both repositories:
 
-**`.code-workspace` file** (create in your main `calvin` directory):
+**`.code-workspace` file** (create locally in your main `calvin` directory, not tracked in git):
 
 ```json
 {
@@ -134,8 +134,8 @@ Create a workspace file that includes both repositories:
 ```
 
 **Usage:**
-1. Create `calvin.code-workspace` in your `calvin` directory
-2. Open it in Cursor: `File → Open Workspace from File...`
+1. Create `calvin.code-workspace` locally in your `calvin` directory (this file is gitignored)
+2. Open it in your IDE: `File → Open Workspace from File...`
 3. Both repos appear in the sidebar
 4. You can navigate between them seamlessly
 5. Search works across both repositories
@@ -155,7 +155,7 @@ If you want to develop plugins alongside core code:
 git submodule add https://github.com/your-org/calvin-plugins.git plugins-repo
 ```
 
-Then in Cursor, the plugins appear as a subdirectory. You can edit them directly.
+Then in your IDE, the plugins appear as a subdirectory. You can edit them directly.
 
 **Benefits:**
 - ✅ Plugins are part of your workspace
@@ -187,7 +187,7 @@ Then the plugins appear as a directory in your workspace.
 **Benefits:**
 - ✅ Simple and straightforward
 - ✅ No workspace file needed
-- ✅ Works with existing Cursor setup
+- ✅ Works with existing IDE setup
 
 **Drawbacks:**
 - ⚠️ Symlinks can be confusing
@@ -195,10 +195,10 @@ Then the plugins appear as a directory in your workspace.
 
 ### Option 4: Separate Windows (Simple)
 
-Just open both folders in separate Cursor windows:
+Just open both folders in separate IDE windows:
 
-1. Open `calvin` in Cursor
-2. Open `calvin-plugins` in a new Cursor window (`File → New Window`)
+1. Open `calvin` in your IDE
+2. Open `calvin-plugins` in a new IDE window (`File → New Window`)
 
 **Benefits:**
 - ✅ Simplest approach
@@ -215,7 +215,7 @@ Just open both folders in separate Cursor windows:
 
 **Use Multi-Root Workspace:**
 
-1. Create `calvin.code-workspace`:
+1. Create `calvin.code-workspace` locally (this file is gitignored):
 ```json
 {
   "folders": [
@@ -242,7 +242,7 @@ Just open both folders in separate Cursor windows:
 }
 ```
 
-2. Open workspace in Cursor
+2. Open workspace in your IDE
 3. Both repos are accessible
 
 ### For Testing Plugins
@@ -265,7 +265,7 @@ When developing plugins, you can:
    - Test by installing from local path or GitHub
    - Commit and push when ready
 
-## Cursor-Specific Tips
+## IDE-Specific Tips
 
 ### 1. Configure Python Paths
 
@@ -280,14 +280,14 @@ In workspace settings, ensure Python can find both repos:
 }
 ```
 
-### 2. Use Cursor's Multi-Root Search
+### 2. Use Multi-Root Search
 
 - `Ctrl+Shift+F` (Windows) or `Cmd+Shift+F` (Mac) searches across all workspace folders
 - Use `files to include` filter to search specific repos
 
 ### 3. Configure Git
 
-If using multi-root workspace, Cursor handles Git for each folder separately. You can:
+If using multi-root workspace, your IDE handles Git for each folder separately. You can:
 - Commit to each repo independently
 - See separate Git status in source control panel
 
@@ -354,7 +354,7 @@ Extensions work across all workspace folders. Configure once, applies to both.
 ## Summary
 
 - ✅ **Create `calvin-plugins` repository** for better organization
-- ✅ **Use multi-root workspace** in Cursor for best development experience
+- ✅ **Use multi-root workspace** for best development experience
 - ✅ **Keep plugins independent** and well-documented
 - ✅ **Test locally** before publishing
 - ✅ **Version control separately** but coordinate releases
