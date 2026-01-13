@@ -422,7 +422,10 @@ install_systemd_service() {
     log "Installing systemd service: ${service_name}"
     
     cp "${service_file}" "/etc/systemd/system/" || error_exit "Failed to copy service file" 1
-    systemctl daemon-reload || error_exit "Failed to reload systemd daemon" 1
+    # systemctl daemon-reload may fail in CI environments without systemd, but file is still installed
+    if ! systemctl daemon-reload 2>/dev/null; then
+        log_warn "systemctl daemon-reload failed (non-fatal, may be running in CI environment without systemd)"
+    fi
     log "Service ${service_name} installed"
 }
 
