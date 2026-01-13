@@ -195,6 +195,15 @@ jobs:
           # Patch setup-dev.sh to make swap setup non-fatal in CI (swap doesn't work in Docker)
           python3 -c "import re; f=open('scripts/setup-dev.sh'); c=f.read(); f.close(); c=re.sub(r'    setup_swap_file \"4G\"', r'    setup_swap_file \"4G\" || { echo \"[CI] Swap setup failed (expected in Docker)\"; true; }', c); f=open('scripts/setup-dev.sh','w'); f.write(c); f.close()"
           
+          # Verify the patch was applied
+          if ! grep -q 'setup_swap_file "4G" ||' scripts/setup-dev.sh; then
+            echo "::error::Failed to patch setup-dev.sh for swap"
+            echo "Current line:"
+            grep 'setup_swap_file "4G"' scripts/setup-dev.sh || echo "Line not found"
+            exit 1
+          fi
+          echo "✓ Swap patch verified"
+          
           # Run the development setup script with timing
           echo "Running setup-dev.sh (development)..."
           SETUP_START=$(date +%s)
@@ -405,6 +414,15 @@ jobs:
           
           # Patch setup-dev.sh to make swap setup non-fatal in CI (swap doesn't work in Docker)
           python3 -c "import re; f=open('scripts/setup-dev.sh'); c=f.read(); f.close(); c=re.sub(r'    setup_swap_file \"4G\"', r'    setup_swap_file \"4G\" || { echo \"[CI] Swap setup failed (expected in Docker)\"; true; }', c); f=open('scripts/setup-dev.sh','w'); f.write(c); f.close()"
+          
+          # Verify the patch was applied
+          if ! grep -q 'setup_swap_file "4G" ||' scripts/setup-dev.sh; then
+            echo "::error::Failed to patch setup-dev.sh for swap"
+            echo "Current line:"
+            grep 'setup_swap_file "4G"' scripts/setup-dev.sh || echo "Line not found"
+            exit 1
+          fi
+          echo "✓ Swap patch verified"
           
           # Run setup first time
           echo "First setup run..."
