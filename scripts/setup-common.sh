@@ -1,6 +1,7 @@
 #!/bin/bash
 # Shared utilities for Calvin setup scripts
 # This script provides common functions used by setup.sh and setup-dev.sh
+# Requires Python 3.12+ (see backend/pyproject.toml for exact requirements)
 
 set -euo pipefail
 
