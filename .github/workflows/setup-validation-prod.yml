@@ -1,4 +1,4 @@
-name: Setup Validation (Production)
+name: Setup Validation Prod
 
 on:
   push:
