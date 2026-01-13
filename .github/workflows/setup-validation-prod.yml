@@ -306,14 +306,14 @@ jobs:
           chmod +x /tmp/ci-test-setup.sh
           
           # Run in Docker container
-          # Using debian:bookworm-slim to match target distro (setup scripts use apt-get)
-          # Setup scripts install Python themselves, so we use a clean Debian base
+          # Using debian:sid-slim - has Python 3.12 by default (meets backend >=3.12 requirement)
+          # Still Debian-based to match target distro (setup scripts use apt-get)
           docker run --rm --privileged \
             --tmpfs /tmp --tmpfs /run --tmpfs /run/lock \
             -v /sys/fs/cgroup:/sys/fs/cgroup:ro \
             -v "$PWD:/calvin:ro" \
             -v "/tmp/ci-test-setup.sh:/tmp/ci-test-setup.sh:ro" \
-            debian:bookworm-slim \
+            debian:sid-slim \
             bash -c "
               set -e
               export DEBIAN_FRONTEND=noninteractive
@@ -321,7 +321,7 @@ jobs:
               apt-get install -y -qq \
                 curl git sudo bash python3 python3-dev python3-venv python3-pip \
                 build-essential ca-certificates sed systemd systemd-sysv dbus
-              # Debian bookworm base - setup script will install Python 3.12+
+              # Debian sid has Python 3.12 by default (meets >=3.12 requirement)
               python3 --version
               curl -fsSL https://deb.nodesource.com/setup_20.x | bash -
               apt-get install -y -qq nodejs
@@ -414,7 +414,7 @@ jobs:
             -v /sys/fs/cgroup:/sys/fs/cgroup:ro \
             -v "$PWD:/calvin:ro" \
             -v "/tmp/ci-test-idempotency.sh:/tmp/ci-test-idempotency.sh:ro" \
-            debian:bookworm-slim \
+            debian:sid-slim \
             bash -c "
               set -e
               export DEBIAN_FRONTEND=noninteractive
@@ -422,7 +422,7 @@ jobs:
               apt-get install -y -qq \
                 curl git sudo bash python3 python3-dev python3-venv python3-pip \
                 build-essential ca-certificates sed systemd systemd-sysv dbus
-              # Debian bookworm base - setup script will install Python 3.12+
+              # Debian sid has Python 3.12 by default (meets >=3.12 requirement)
               python3 --version
               curl -fsSL https://deb.nodesource.com/setup_20.x | bash -
               apt-get install -y -qq nodejs
