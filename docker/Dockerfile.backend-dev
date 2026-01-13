@@ -1,11 +1,10 @@
-FROM python:3.11-slim
+# Using UV's official image with Python 3.12 and UV pre-installed
+FROM ghcr.io/astral-sh/uv:python3.12-bookworm-slim
 
 RUN apt-get update && apt-get install -y \
     git \
     curl \
     && rm -rf /var/lib/apt/lists/*
-
-RUN pip install uv
 
 WORKDIR /app
 

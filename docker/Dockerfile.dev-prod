@@ -1,5 +1,6 @@
 # Development Dockerfile with auto-pull from GitHub
-FROM python:3.11-slim
+# Using UV's official image with Python 3.12 and UV pre-installed
+FROM ghcr.io/astral-sh/uv:python3.12-bookworm-slim
 
 # Install system dependencies
 RUN apt-get update && apt-get install -y \
@@ -7,9 +8,6 @@ RUN apt-get update && apt-get install -y \
     curl \
     cron \
     && rm -rf /var/lib/apt/lists/*
-
-# Install UV
-RUN pip install uv
 
 # Install Node.js
 RUN curl -fsSL https://deb.nodesource.com/setup_20.x | bash - \

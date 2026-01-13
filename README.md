@@ -23,7 +23,7 @@ A lightweight, self-hosted home dashboard system for Raspberry Pi that displays 
 
 ### Prerequisites
 
-- **Python 3.11+**
+- **Python 3.12+**
 - **Node.js 20+** (LTS recommended)
 - **UV** (Python package manager - installed automatically)
 - **Git**
@@ -222,7 +222,7 @@ The backend automatically handles platform differences:
 ### Technology Stack
 
 **Backend:**
-- Python 3.11+ with FastAPI
+- Python 3.12+ with FastAPI
 - UV for package management
 - SQLite for data storage
 - APScheduler for scheduled tasks
