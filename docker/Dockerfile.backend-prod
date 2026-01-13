@@ -1,6 +1,9 @@
 # Production Dockerfile for Calvin Backend
-# Using UV's official image with Python 3.12 and UV pre-installed
-FROM ghcr.io/astral-sh/uv:python3.12-bookworm-slim as builder
+# Using Python 3.12 with UV copied from official distroless image
+FROM python:3.12-slim as builder
+
+# Copy UV from official distroless image
+COPY --from=ghcr.io/astral-sh/uv:latest /uv /uvx /bin/
 
 # Install system dependencies for building
 RUN apt-get update && apt-get install -y \
@@ -30,8 +33,11 @@ COPY backend/app ./app
 RUN uv sync --frozen --no-dev
 
 # Production image
-# Using UV's official image with Python 3.12 and UV pre-installed
-FROM ghcr.io/astral-sh/uv:python3.12-bookworm-slim
+# Using Python 3.12 with UV copied from official distroless image
+FROM python:3.12-slim
+
+# Copy UV from official distroless image
+COPY --from=ghcr.io/astral-sh/uv:latest /uv /uvx /bin/
 
 # Install runtime dependencies
 RUN apt-get update && apt-get install -y \

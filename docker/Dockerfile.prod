@@ -1,6 +1,9 @@
 # Production Dockerfile for Calvin Dashboard
-# Using UV's official image with Python 3.12 and UV pre-installed
-FROM ghcr.io/astral-sh/uv:python3.12-bookworm-slim as backend-builder
+# Using Python 3.12 with UV copied from official distroless image
+FROM python:3.12-slim as backend-builder
+
+# Copy UV from official distroless image
+COPY --from=ghcr.io/astral-sh/uv:latest /uv /uvx /bin/
 
 # Install system dependencies
 RUN apt-get update && apt-get install -y \
@@ -42,8 +45,11 @@ COPY frontend/ ./
 RUN npm run build
 
 # Production image
-# Using UV's official image with Python 3.12 and UV pre-installed
-FROM ghcr.io/astral-sh/uv:python3.12-bookworm-slim
+# Using Python 3.12 with UV copied from official distroless image
+FROM python:3.12-slim
+
+# Copy UV from official distroless image
+COPY --from=ghcr.io/astral-sh/uv:latest /uv /uvx /bin/
 
 # Install runtime dependencies
 RUN apt-get update && apt-get install -y \
