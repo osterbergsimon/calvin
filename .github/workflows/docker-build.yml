@@ -54,6 +54,7 @@ jobs:
               - 'backend/uv.lock'
               - 'docker/Dockerfile.backend-prod'
               - 'docker/docker-compose*.yml'
+              - '.github/workflows/docker-build.yml'
             frontend:
               - 'frontend/src/**'
               - 'frontend/public/**'
@@ -63,6 +64,7 @@ jobs:
               - 'docker/Dockerfile.frontend-prod'
               - 'docker/nginx.conf'
               - 'docker/docker-compose*.yml'
+              - '.github/workflows/docker-build.yml'
 
   build-backend:
     name: Build Backend Image
