@@ -186,7 +186,10 @@ main() {
     
     # Create and install dev-specific frontend service
     create_dev_frontend_service "${CALVIN_DIR}"
-    systemctl daemon-reload
+    # systemctl daemon-reload may fail in CI environments without systemd, but file is still created
+    if ! systemctl daemon-reload 2>/dev/null; then
+        log_warn "systemctl daemon-reload failed (non-fatal, may be running in CI environment without systemd)"
+    fi
     
     # Disable production frontend service if it exists
     if systemctl list-unit-files | grep -q calvin-frontend.service; then
