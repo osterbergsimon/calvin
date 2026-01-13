@@ -192,6 +192,9 @@ jobs:
           # Patch ensure_git_repo to skip git operations if directory exists (CI mode)
           python3 -c "import re; f=open('scripts/setup-common.sh'); c=f.read(); f.close(); p='    # CI override: if target exists, just ensure ownership\n    if [ -d \"\$3\" ]; then\n      echo \"[CI] Target directory exists, skipping git operations\"\n      chown -R \"\$4:\$4\" \"\$3\"\n      return 0\n    fi\n'; c=re.sub(r'(^ensure_git_repo\(\) \{)', r'\1\n'+p, c, flags=re.MULTILINE); f=open('scripts/setup-common.sh','w'); f.write(c); f.close()"
           
+          # Patch setup_swap_file to make swapon non-fatal in CI (swap doesn't work in Docker)
+          python3 -c "import re; f=open('scripts/setup-common.sh'); c=f.read(); f.close(); c=re.sub(r'swapon \"\$\{swap_file\}\"', r'swapon \"\${swap_file}\" || { echo \"[CI] Swap activation failed (expected in Docker)\"; return 0; }', c); f=open('scripts/setup-common.sh','w'); f.write(c); f.close()"
+          
           # Run the development setup script with timing
           echo "Running setup-dev.sh (development)..."
           SETUP_START=$(date +%s)
@@ -200,14 +203,20 @@ jobs:
             echo "Script exited with code $EXIT_CODE"
             
             # Check if failure was due to systemd/X (expected in CI)
-            if grep -E "systemd|Failed to start|Failed to enable|systemctl|daemon-reload" /tmp/setup-output.log > /dev/null; then
-              echo "[CI] Systemd/X server failures are expected in CI - checking core setup..."
+            if grep -E "systemd|Failed to start|Failed to enable|systemctl|daemon-reload|swapon.*failed" /tmp/setup-output.log > /dev/null; then
+              echo "[CI] Systemd/X server/swap failures are expected in CI - checking core setup..."
             else
               echo "::error::Setup script failed with unexpected error"
-              cat /tmp/setup-output.log
+              echo "=== Last 50 lines of setup output ==="
+              tail -50 /tmp/setup-output.log
               exit $EXIT_CODE
             fi
           }
+          
+          # Show UV installation status from setup log
+          echo ""
+          echo "=== UV Installation Status ==="
+          grep -i "uv\|installing\|installed" /tmp/setup-output.log | tail -10 || echo "No UV-related messages found"
           
           echo ""
           echo "=== Verification ==="
@@ -220,11 +229,36 @@ jobs:
           echo "✓ Directories created"
           
           # Check UV installation
-          if ! sudo -u calvin bash -c 'export PATH="$HOME/.local/bin:$HOME/.cargo/bin:$PATH" && command -v uv &> /dev/null'; then
-            echo "::error::UV not installed"
+          echo "Checking UV installation..."
+          # Try multiple ways to find UV
+          UV_FOUND=false
+          if sudo -u calvin bash -c 'export PATH="$HOME/.local/bin:$HOME/.cargo/bin:$PATH" && command -v uv &> /dev/null'; then
+            UV_FOUND=true
+            UV_VERSION=$(sudo -u calvin bash -c 'export PATH="$HOME/.local/bin:$HOME/.cargo/bin:$PATH" && uv --version' 2>&1 || echo "unknown")
+            echo "✓ UV installed (version: ${UV_VERSION})"
+          elif [ -f "/home/calvin/.local/bin/uv" ]; then
+            UV_FOUND=true
+            UV_VERSION=$(sudo -u calvin /home/calvin/.local/bin/uv --version 2>&1 || echo "unknown")
+            echo "✓ UV found at /home/calvin/.local/bin/uv (version: ${UV_VERSION})"
+          elif [ -f "/home/calvin/.cargo/bin/uv" ]; then
+            UV_FOUND=true
+            UV_VERSION=$(sudo -u calvin /home/calvin/.cargo/bin/uv --version 2>&1 || echo "unknown")
+            echo "✓ UV found at /home/calvin/.cargo/bin/uv (version: ${UV_VERSION})"
+          fi
+          
+          if [ "$UV_FOUND" = "false" ]; then
+            echo "::error::UV not installed or not found"
+            echo "Checking UV installation paths..."
+            echo "~/.local/bin/uv:"
+            sudo -u calvin ls -la /home/calvin/.local/bin/uv 2>&1 || echo "  Not found"
+            echo "~/.cargo/bin/uv:"
+            sudo -u calvin ls -la /home/calvin/.cargo/bin/uv 2>&1 || echo "  Not found"
+            echo "Home directory contents:"
+            sudo -u calvin ls -la /home/calvin/ 2>&1 | head -10
+            echo "Checking setup log for UV installation messages..."
+            grep -i "uv\|installing" /tmp/setup-output.log | tail -20 || echo "No UV messages in log"
             exit 1
           fi
-          echo "✓ UV installed"
           
           # Check backend dependencies (dev mode uses venv or UV with dev extras)
           if [ ! -d "${CALVIN_DIR}/backend/.venv" ] && ! sudo -u calvin bash -c "cd '${CALVIN_DIR}/backend' && export PATH=\"\$HOME/.local/bin:\$HOME/.cargo/bin:\$PATH\" && uv --version &> /dev/null"; then
@@ -368,6 +402,9 @@ jobs:
           
           # Patch ensure_git_repo to skip git operations if directory exists (CI mode)
           python3 -c "import re; f=open('scripts/setup-common.sh'); c=f.read(); f.close(); p='    # CI override: if target exists, just ensure ownership\n    if [ -d \"\$3\" ]; then\n      echo \"[CI] Target directory exists, skipping git operations\"\n      chown -R \"\$4:\$4\" \"\$3\"\n      return 0\n    fi\n'; c=re.sub(r'(^ensure_git_repo\(\) \{)', r'\1\n'+p, c, flags=re.MULTILINE); f=open('scripts/setup-common.sh','w'); f.write(c); f.close()"
+          
+          # Patch setup_swap_file to make swapon non-fatal in CI (swap doesn't work in Docker)
+          python3 -c "import re; f=open('scripts/setup-common.sh'); c=f.read(); f.close(); c=re.sub(r'swapon \"\$\{swap_file\}\"', r'swapon \"\${swap_file}\" || { echo \"[CI] Swap activation failed (expected in Docker)\"; return 0; }', c); f=open('scripts/setup-common.sh','w'); f.write(c); f.close()"
           
           # Run setup first time
           echo "First setup run..."
