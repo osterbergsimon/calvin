@@ -13,7 +13,7 @@ Main continuous integration workflow that runs on every push and pull request.
   - Ruff formatter check
   - MyPy type checker
   - Bandit security linter
-  - Pytest with coverage
+  - Pytest with coverage (unit + integration tests, including protocol adherence tests)
 - **Frontend Tests & Lint**: Runs on Node.js 20 and 22
   - ESLint
   - Prettier check

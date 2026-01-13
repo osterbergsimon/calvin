@@ -1,0 +1,110 @@
+site_name: Calvin Documentation
+site_description: Documentation for Calvin - A lightweight DAKBoard alternative
+site_author: Calvin Contributors
+site_url: https://calvin.readthedocs.io/
+
+# Repository
+repo_name: osterbergsimon/calvin
+repo_url: https://github.com/osterbergsimon/calvin
+edit_uri: edit/main/docs/
+
+# Documentation directory
+docs_dir: docs
+
+# Copyright
+copyright: Copyright &copy; 2024 Calvin Contributors
+
+# Theme
+theme:
+  name: material
+  palette:
+    - scheme: default
+      primary: blue
+      accent: blue
+      toggle:
+        icon: material/brightness-7
+        name: Switch to dark mode
+    - scheme: slate
+      primary: blue
+      accent: blue
+      toggle:
+        icon: material/brightness-4
+        name: Switch to light mode
+  features:
+    - navigation.tabs
+    - navigation.sections
+    - navigation.expand
+    - navigation.top
+    - search.suggest
+    - search.highlight
+    - content.code.annotate
+
+# Plugins
+plugins:
+  - search
+  - awesome-pages
+
+# Markdown extensions
+markdown_extensions:
+  - pymdownx.highlight:
+      anchor_linenums: true
+      line_spans: __span
+      pygments_lang_class: true
+  - pymdownx.inlinehilite
+  - pymdownx.snippets
+  - pymdownx.superfences:
+      custom_fences:
+        - name: mermaid
+          class: mermaid
+          format: !!python/name:pymdownx.superfences.fence_code_format
+  - admonition
+  - pymdownx.details
+  - pymdownx.tabbed:
+      alternate_style: true
+  - attr_list
+  - md_in_html
+  - toc:
+      permalink: true
+
+# Navigation
+nav:
+  - Home: index.md
+  - Getting Started:
+    - setup/GETTING_STARTED.md
+    - setup/GETTING_STARTED_DOCKER.md
+    - setup/DOCKER_OVERVIEW.md
+    - setup/DOCKER_BUILDING_AND_RUNNING.md
+    - setup/CI_CD.md
+    - setup/QUICKSTART_DEVELOP.md
+    - setup/QUICKSTART_WINDOWS.md
+    - setup/SETUP_SCRIPTS.md
+    - setup/SETUP_WINDOWS.md
+    - setup/SETUP_LINUX.md
+    - setup/SETUP_PRE_COMMIT.md
+    - setup/POLKIT_SERVICE_RESTART.md
+  - Plugins:
+    - plugins/PLUGIN_DEVELOPMENT_GUIDE.md
+    - plugins/PLUGIN_INTERFACE.md
+    - plugins/PLUGIN_INSTALLATION.md
+    - plugins/PLUGIN_PACKAGE_FORMAT.md
+    - plugins/PLUGIN_REPOSITORY_SETUP.md
+    - plugins/PLUGIN_FRONTEND_COMPONENTS.md
+    - plugins/PLUGIN_PERSISTENCE_AND_RESTART.md
+    - plugins/ADD_GOOGLE_CALENDAR.md
+  - Configuration:
+    - configuration/REMOTE_CONFIG.md
+    - configuration/SETTINGS_SAVE_BEHAVIOR.md
+  - Architecture:
+    - EVENT_SYSTEM.md
+    - IMAP_LOCAL_IMAGES_RELATIONSHIP.md
+  - Testing:
+    - testing/BACKEND_TESTS.md
+    - testing/TEST_COVERAGE_NEW_FEATURES.md
+    - testing/E2E_TEST_REPO_SETUP.md
+  - Contributing: CONTRIBUTING.md
+
+# Extra
+extra:
+  social:
+    - icon: fontawesome/brands/github
+      link: https://github.com/osterbergsimon/calvin

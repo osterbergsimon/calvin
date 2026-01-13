@@ -1,13 +1,17 @@
 """System management endpoints."""
 
-import asyncio
+import logging
 import os
+import re
 import subprocess
 from pathlib import Path
 
 from fastapi import APIRouter, HTTPException
 
+from app.config import settings
 from app.services.display_power_service import display_power_service
+
+logger = logging.getLogger(__name__)
 
 router = APIRouter()
 
@@ -18,20 +22,25 @@ async def trigger_update():
     Trigger manual update from GitHub.
     Runs the update script asynchronously and returns immediately.
     """
-    update_script = Path("/usr/local/bin/update-calvin.sh")
-    
+    from app.services.config_service import config_service
+
+    update_script = settings.update_script_path
+
     if not update_script.exists():
         raise HTTPException(
             status_code=404,
-            detail="Update script not found. Make sure the system is properly configured."
+            detail="Update script not found. Make sure the system is properly configured.",
         )
-    
+
     try:
+        # Get git branch from config
+        git_branch = await config_service.get_value("git_branch", "main")
+
         # Ensure log directory exists
-        log_dir = Path("/home/calvin/calvin/backend/logs")
+        log_dir = settings.repo_dir / "backend" / "logs"
         log_dir.mkdir(parents=True, exist_ok=True)
         log_file = log_dir / "calvin-update.log"
-        
+
         # Run update script in background (non-blocking)
         # Redirect both stdout and stderr to log file AND keep them for error checking
         with open(log_file, "a") as log_f:
@@ -40,36 +49,37 @@ async def trigger_update():
                 stdout=log_f,
                 stderr=subprocess.STDOUT,  # Merge stderr into stdout
                 text=True,
-                cwd="/home/calvin/calvin",  # Set working directory
+                cwd=str(settings.repo_dir),  # Set working directory
                 env={
                     **os.environ,
-                    "PATH": "/home/calvin/.local/bin:/usr/local/bin:/usr/bin:/bin",
+                    "PATH": settings.system_path,
+                    "GIT_BRANCH": git_branch,  # Pass git branch to update script
                 },
             )
-        
+
         # Wait a moment to see if process starts successfully
         import time
+
         time.sleep(0.5)
-        
+
         # Check if process is still running (didn't immediately fail)
         if process.poll() is not None:
             # Process already finished (likely an error)
             error_msg = "Update script exited immediately. "
             if log_file.exists():
                 try:
-                    with open(log_file, "r") as f:
+                    with open(log_file) as f:
                         last_lines = f.readlines()[-5:]
                         error_msg += "Last log: " + "".join(last_lines)
-                except:
+                except Exception:
                     error_msg += "Check log file for details."
             else:
-                error_msg += "Log file not created. Script may not be executable or may have failed."
-            
-            raise HTTPException(
-                status_code=500,
-                detail=error_msg
-            )
-        
+                error_msg += (
+                    "Log file not created. Script may not be executable or may have failed."
+                )
+
+            raise HTTPException(status_code=500, detail=error_msg)
+
         return {
             "status": "started",
             "message": f"Update process started (PID: {process.pid})",
@@ -79,10 +89,7 @@ async def trigger_update():
     except HTTPException:
         raise
     except Exception as e:
-        raise HTTPException(
-            status_code=500,
-            detail=f"Failed to start update process: {str(e)}"
-        )
+        raise HTTPException(status_code=500, detail=f"Failed to start update process: {str(e)}")
 
 
 @router.get("/update/status")
@@ -93,50 +100,133 @@ async def get_update_status():
     """
     # Try multiple possible log file locations
     log_locations = [
-        Path("/home/calvin/calvin/backend/logs/calvin-update.log"),
-        Path("/home/calvin/calvin-update.log"),
+        settings.repo_dir / "backend" / "logs" / "calvin-update.log",
+        settings.repo_dir.parent / "calvin-update.log",
         Path("/tmp/calvin-update.log"),
         Path("/var/log/calvin-update.log"),
     ]
-    
+
     log_file = None
     for loc in log_locations:
         if loc.exists():
             log_file = loc
             break
-    
+
     if not log_file or not log_file.exists():
         return {
             "status": "unknown",
             "message": "Update log not found. No updates have been run yet.",
+            "current_commit": None,
+            "current_commit_short": None,
+            "current_commit_msg": None,
+            "new_commit": None,
+            "new_commit_short": None,
+            "new_commit_msg": None,
+            "backend_restarted": False,
         }
-    
+
     try:
-        # Read last 30 lines of log for better context
-        with open(log_file, "r") as f:
+        # Read last 50 lines of log for better context (increased to capture commit info)
+        with open(log_file) as f:
             lines = f.readlines()
-            last_lines = lines[-30:] if len(lines) > 30 else lines
-        
+            last_lines = lines[-50:] if len(lines) > 50 else lines
+            all_lines = lines  # Keep all lines for commit extraction
+
+        # Extract commit information from logs
+        current_commit = None
+        current_commit_short = None
+        current_commit_msg = None
+        new_commit = None
+        new_commit_short = None
+        new_commit_msg = None
+
+        for line in all_lines:
+            # Extract current commit
+            match = re.search(r"Current commit: (\w+) \(([a-f0-9]+)\)", line)
+            if match:
+                current_commit_short = match.group(1)
+                current_commit = match.group(2)
+
+            match = re.search(r"Current commit message: (.+)", line)
+            if match:
+                current_commit_msg = match.group(1).strip()
+
+            # Extract new commit
+            match = re.search(r"Latest commit on remote: (\w+) \(([a-f0-9]+)\)", line)
+            if match:
+                new_commit_short = match.group(1)
+                new_commit = match.group(2)
+
+            match = re.search(r"Latest commit message: (.+)", line)
+            if match:
+                new_commit_msg = match.group(1).strip()
+
+            # Also check for "Successfully updated to commit"
+            match = re.search(r"Successfully updated to commit (\w+)", line)
+            if match:
+                new_commit_short = match.group(1)
+                # Try to get full commit hash
+                try:
+                    repo_path = settings.repo_dir
+                    if (repo_path / ".git").exists():
+                        result = subprocess.run(
+                            ["git", "rev-parse", new_commit_short],
+                            cwd=str(repo_path),
+                            capture_output=True,
+                            text=True,
+                            timeout=2,
+                        )
+                        if result.returncode == 0:
+                            new_commit = result.stdout.strip()
+                except Exception:
+                    pass
+
         # Check if update is currently running
         # Look for various indicators of update activity
         log_content = "".join(last_lines)
         has_started = "Starting Calvin update" in log_content or "Starting update" in log_content
-        has_completed = "Update complete!" in log_content or "Update completed" in log_content or "Calvin update complete" in log_content
-        has_error = "ERROR" in log_content or "error" in log_content or "failed" in log_content.lower()
-        
+        has_completed = (
+            "Update complete!" in log_content
+            or "Update completed" in log_content
+            or "Calvin update complete" in log_content
+        )
+        has_error = (
+            "ERROR" in log_content or "error" in log_content or "failed" in log_content.lower()
+        )
+
         # Check for specific update steps
-        has_pulling = "Pulling latest code" in log_content or "git pull" in log_content.lower() or "git fetch" in log_content.lower()
-        has_updating_deps = "Updating backend dependencies" in log_content or "Updating frontend dependencies" in log_content or "Installing" in log_content
-        has_building = "Building frontend" in log_content or "Rebuilding frontend" in log_content or "npm run build" in log_content.lower() or "vite build" in log_content.lower() or "transforming" in log_content.lower()
-        has_build_complete = "Frontend build completed successfully" in log_content or "build completed" in log_content.lower()
-        has_restarting = "Restarting services" in log_content or "systemctl restart" in log_content.lower()
-        
+        has_pulling = (
+            "Pulling latest code" in log_content
+            or "git pull" in log_content.lower()
+            or "git fetch" in log_content.lower()
+        )
+        has_updating_deps = (
+            "Updating backend dependencies" in log_content
+            or "Updating frontend dependencies" in log_content
+            or "Installing" in log_content
+        )
+        has_building = (
+            "Building frontend" in log_content
+            or "Rebuilding frontend" in log_content
+            or "npm run build" in log_content.lower()
+            or "vite build" in log_content.lower()
+            or "transforming" in log_content.lower()
+        )
+        has_build_complete = (
+            "Frontend build completed successfully" in log_content
+            or "build completed" in log_content.lower()
+        )
+        has_restarting = (
+            "Restarting services" in log_content or "systemctl restart" in log_content.lower()
+        )
+
         # Check if process is still running by checking for recent activity
         # If log was updated in last 60 seconds, assume it's running
         import time
+
         log_mtime = log_file.stat().st_mtime
         recently_updated = (time.time() - log_mtime) < 60
-        
+
         # Determine status based on log content and recent activity
         # Only mark as complete if we have BOTH the build completion AND the update complete message
         # This ensures the build actually finished before we mark it as done
@@ -153,7 +243,9 @@ async def get_update_status():
         elif has_error and not recently_updated:
             status = "error"
             message = "Update failed. Check logs for details."
-        elif has_started and (has_pulling or has_updating_deps or has_building or has_restarting or recently_updated):
+        elif has_started and (
+            has_pulling or has_updating_deps or has_building or has_restarting or recently_updated
+        ):
             status = "running"
             # Provide more specific message based on what's happening
             if has_restarting:
@@ -174,21 +266,41 @@ async def get_update_status():
         else:
             status = "unknown"
             message = "Update status unknown. Check logs for details."
-        
+
         # Get last 15 lines for display
         display_lines = "".join(last_lines[-15:])
-        
+
+        # Check if backend has restarted (indicates update is fully complete)
+        has_backend_restarted = (
+            "Backend service restarted successfully" in log_content
+            or "restarted successfully" in log_content.lower()
+        )
+
         return {
             "status": status,
             "last_log": display_lines,
             "message": message,
             "log_file": str(log_file),
+            "current_commit": current_commit,
+            "current_commit_short": current_commit_short,
+            "current_commit_msg": current_commit_msg,
+            "new_commit": new_commit,
+            "new_commit_short": new_commit_short,
+            "new_commit_msg": new_commit_msg,
+            "backend_restarted": has_backend_restarted,
         }
     except Exception as e:
         return {
             "status": "error",
             "message": f"Failed to read update log: {str(e)}",
             "last_log": "",
+            "current_commit": None,
+            "current_commit_short": None,
+            "current_commit_msg": None,
+            "new_commit": None,
+            "new_commit_short": None,
+            "new_commit_msg": None,
+            "backend_restarted": False,
         }
 
 
@@ -229,7 +341,194 @@ async def configure_display_timeout():
         await display_power_service.configure_display_timeout()
         return {"status": "success", "message": "Display timeout configured"}
     except Exception as e:
-        raise HTTPException(status_code=500, detail=f"Failed to configure display timeout: {str(e)}")
+        raise HTTPException(
+            status_code=500, detail=f"Failed to configure display timeout: {str(e)}"
+        )
+
+
+@router.post("/reload-ui")
+async def reload_ui():
+    """
+    Signal that the UI should be reloaded.
+    This endpoint doesn't actually reload anything server-side,
+    but can be used to trigger a client-side reload.
+    """
+    return {
+        "status": "success",
+        "message": "UI reload signal sent. Clients should reload.",
+    }
+
+
+@router.post("/restart-frontend")
+async def restart_frontend():
+    """
+    Restart the frontend service.
+    Uses systemctl to restart the calvin-frontend service.
+    """
+    try:
+        # Try to restart the frontend service
+        restart_attempted = False
+
+        # Method 1: systemctl restart (might work without sudo)
+        try:
+            result = subprocess.run(
+                ["systemctl", "restart", "calvin-frontend"],
+                capture_output=True,
+                timeout=5,
+            )
+            if result.returncode == 0:
+                logger.info("Frontend restart initiated via systemctl restart")
+                restart_attempted = True
+            else:
+                error_msg = result.stderr.decode()
+                logger.warning(f"systemctl restart failed: {error_msg}")
+        except FileNotFoundError:
+            logger.warning("systemctl not found")
+        except subprocess.TimeoutExpired:
+            logger.info("systemctl restart timed out (but may have initiated)")
+            restart_attempted = True
+        except Exception as e:
+            logger.error(f"systemctl restart error: {e}", exc_info=True)
+
+        # Method 2: Use dbus to call systemd-logind (alternative to systemctl)
+        if not restart_attempted:
+            try:
+                result = subprocess.run(
+                    [
+                        "dbus-send",
+                        "--system",
+                        "--print-reply",
+                        "--dest=org.freedesktop.systemd1",
+                        "/org/freedesktop/systemd1",
+                        "org.freedesktop.systemd1.Manager.RestartUnit",
+                        "string:calvin-frontend.service",
+                        "string:replace",
+                    ],
+                    capture_output=True,
+                    timeout=5,
+                )
+                if result.returncode == 0:
+                    logger.info("Frontend restart initiated via dbus")
+                    restart_attempted = True
+                else:
+                    error_msg = result.stderr.decode()
+                    logger.warning(f"dbus restart failed: {error_msg}")
+            except FileNotFoundError:
+                logger.warning("dbus-send not found")
+            except subprocess.TimeoutExpired:
+                logger.info("dbus restart timed out (but may have initiated)")
+                restart_attempted = True
+            except Exception as e:
+                logger.error(f"dbus restart error: {e}", exc_info=True)
+
+        if restart_attempted:
+            return {
+                "status": "success",
+                "message": "Frontend service restart initiated. The service will restart shortly.",
+            }
+        else:
+            # If all methods failed, return error with details
+            error_detail = (
+                "Failed to restart frontend service: All restart methods failed.\n"
+                "Note: Polkit rules must be configured to allow calvin user to restart services.\n"
+                "Check /etc/polkit-1/rules.d/50-calvin-restart.rules exists.\n"
+                "Alternatively, you can restart manually via SSH: "
+                "sudo systemctl restart calvin-frontend"
+            )
+            logger.error(error_detail)
+            raise HTTPException(status_code=500, detail=error_detail)
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"Frontend restart error: {e}", exc_info=True)
+        raise HTTPException(status_code=500, detail=f"Failed to restart frontend service: {str(e)}")
+
+
+@router.post("/restart-backend")
+async def restart_backend():
+    """
+    Restart the backend service.
+    Uses systemctl to restart the calvin-backend service.
+    """
+    try:
+        # Try to restart the backend service
+        # Note: The backend service runs with NoNewPrivileges=true, so sudo might not work
+        # Try systemctl restart first (might work if user has permissions)
+        restart_attempted = False
+
+        # Method 1: systemctl restart (might work without sudo)
+        try:
+            result = subprocess.run(
+                ["systemctl", "restart", "calvin-backend"],
+                capture_output=True,
+                timeout=5,
+            )
+            if result.returncode == 0:
+                logger.info("Backend restart initiated via systemctl restart")
+                restart_attempted = True
+            else:
+                error_msg = result.stderr.decode()
+                logger.warning(f"systemctl restart failed: {error_msg}")
+        except FileNotFoundError:
+            logger.warning("systemctl not found")
+        except subprocess.TimeoutExpired:
+            logger.info("systemctl restart timed out (but may have initiated)")
+            restart_attempted = True
+        except Exception as e:
+            logger.error(f"systemctl restart error: {e}", exc_info=True)
+
+        # Method 2: Use dbus to call systemd-logind (alternative to systemctl)
+        if not restart_attempted:
+            try:
+                result = subprocess.run(
+                    [
+                        "dbus-send",
+                        "--system",
+                        "--print-reply",
+                        "--dest=org.freedesktop.systemd1",
+                        "/org/freedesktop/systemd1",
+                        "org.freedesktop.systemd1.Manager.RestartUnit",
+                        "string:calvin-backend.service",
+                        "string:replace",
+                    ],
+                    capture_output=True,
+                    timeout=5,
+                )
+                if result.returncode == 0:
+                    logger.info("Backend restart initiated via dbus")
+                    restart_attempted = True
+                else:
+                    error_msg = result.stderr.decode()
+                    logger.warning(f"dbus restart failed: {error_msg}")
+            except FileNotFoundError:
+                logger.warning("dbus-send not found")
+            except subprocess.TimeoutExpired:
+                logger.info("dbus restart timed out (but may have initiated)")
+                restart_attempted = True
+            except Exception as e:
+                logger.error(f"dbus restart error: {e}", exc_info=True)
+
+        if restart_attempted:
+            return {
+                "status": "success",
+                "message": "Backend service restart initiated. The service will restart shortly.",
+            }
+        else:
+            # If all methods failed, return error with details
+            error_detail = (
+                "Failed to restart backend service: All restart methods failed.\n"
+                "Note: Polkit rules must be configured to allow calvin user to restart services.\n"
+                "Check /etc/polkit-1/rules.d/50-calvin-restart.rules exists.\n"
+                "Alternatively, you can restart manually via SSH: "
+                "sudo systemctl restart calvin-backend"
+            )
+            logger.error(error_detail)
+            raise HTTPException(status_code=500, detail=error_detail)
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"Backend restart error: {e}", exc_info=True)
+        raise HTTPException(status_code=500, detail=f"Failed to restart backend service: {str(e)}")
 
 
 @router.post("/reboot")
@@ -240,54 +539,58 @@ async def reboot_system():
         # Note: The backend service runs with NoNewPrivileges=true, so sudo might not work
         # Try systemctl reboot first (might work if user has permissions)
         reboot_attempted = False
-        
+
         # Method 1: systemctl reboot (might work without sudo)
         try:
             result = subprocess.run(
                 ["systemctl", "reboot"],
-                stdout=subprocess.PIPE,
-                stderr=subprocess.PIPE,
+                capture_output=True,
                 timeout=5,
             )
             if result.returncode == 0:
-                print("Reboot initiated via systemctl reboot")
+                logger.info("Reboot initiated via systemctl reboot")
                 reboot_attempted = True
             else:
-                print(f"systemctl reboot failed: {result.stderr.decode()}")
+                logger.warning(f"systemctl reboot failed: {result.stderr.decode()}")
         except FileNotFoundError:
-            print("systemctl not found")
+            logger.warning("systemctl not found")
         except subprocess.TimeoutExpired:
-            print("systemctl reboot timed out (but may have initiated)")
+            logger.info("systemctl reboot timed out (but may have initiated)")
             reboot_attempted = True
         except Exception as e:
-            print(f"systemctl reboot error: {e}")
-        
+            logger.error(f"systemctl reboot error: {e}", exc_info=True)
+
         # Method 2: Use dbus to call systemd-logind (alternative to systemctl)
         # This might work if polkit rules are configured
         if not reboot_attempted:
             try:
                 result = subprocess.run(
-                    ["dbus-send", "--system", "--print-reply", "--dest=org.freedesktop.login1",
-                     "/org/freedesktop/login1", "org.freedesktop.login1.Manager.Reboot",
-                     "boolean:false"],
-                    stdout=subprocess.PIPE,
-                    stderr=subprocess.PIPE,
+                    [
+                        "dbus-send",
+                        "--system",
+                        "--print-reply",
+                        "--dest=org.freedesktop.login1",
+                        "/org/freedesktop/login1",
+                        "org.freedesktop.login1.Manager.Reboot",
+                        "boolean:false",
+                    ],
+                    capture_output=True,
                     timeout=5,
                 )
                 if result.returncode == 0:
-                    print("Reboot initiated via dbus")
+                    logger.info("Reboot initiated via dbus")
                     reboot_attempted = True
                 else:
                     error_msg = result.stderr.decode()
-                    print(f"dbus reboot failed: {error_msg}")
+                    logger.warning(f"dbus reboot failed: {error_msg}")
             except FileNotFoundError:
-                print("dbus-send not found")
+                logger.warning("dbus-send not found")
             except subprocess.TimeoutExpired:
-                print("dbus reboot timed out (but may have initiated)")
+                logger.info("dbus reboot timed out (but may have initiated)")
                 reboot_attempted = True
             except Exception as e:
-                print(f"dbus reboot error: {e}")
-        
+                logger.error(f"dbus reboot error: {e}", exc_info=True)
+
         if reboot_attempted:
             return {"status": "success", "message": "System reboot initiated"}
         else:
@@ -298,11 +601,10 @@ async def reboot_system():
                 "Check /etc/polkit-1/rules.d/50-calvin-reboot.rules exists.\n"
                 "Check logs for details."
             )
-            print(error_detail)
+            logger.error(error_detail)
             raise HTTPException(status_code=500, detail=error_detail)
     except HTTPException:
         raise
     except Exception as e:
-        print(f"Reboot error: {e}")
+        logger.error(f"Reboot error: {e}", exc_info=True)
         raise HTTPException(status_code=500, detail=f"Failed to reboot system: {str(e)}")
-

@@ -1,88 +1,17 @@
 <template>
-  <div v-if="event" class="event-detail-panel" @keydown.esc="close">
+  <div v-if="event" class="event-detail-panel" @keydown="handleKeydown">
     <div class="event-detail-header">
-      <h3>{{ event.title }}</h3>
+      <div class="event-header-main">
+        <h3>{{ event.title }}</h3>
+        <div class="event-date-header">
+          {{ formatDate(selectedDate || event.start) }}
+        </div>
+      </div>
       <button class="btn-close" aria-label="Close" @click="close">×</button>
     </div>
     <div class="event-detail-content">
-      <!-- Show all events for the day if expanding "today" via keyboard -->
-      <div
-        v-if="showAllDayEvents && dayEvents.length > 1"
-        class="all-day-events-details"
-      >
-        <div class="day-events-header">
-          <span class="label"
-            >All Events for {{ formatDate(event.start) }} ({{
-              dayEvents.length
-            }})</span
-          >
-        </div>
-        <div class="all-events-list">
-          <div
-            v-for="dayEvent in dayEvents"
-            :key="dayEvent.id"
-            class="day-event-detail-card"
-            :class="{ active: dayEvent.id === event.id }"
-          >
-            <div class="day-event-detail-header">
-              <h4>{{ dayEvent.title }}</h4>
-            </div>
-            <div class="day-event-detail-content">
-              <div v-if="isEventMultiDay(dayEvent)" class="event-detail-row">
-                <span class="label">Start:</span>
-                <span class="value"
-                  >{{ formatDate(dayEvent.start)
-                  }}<span v-if="!dayEvent.all_day">
-                    {{ formatTime(dayEvent.start) }}</span
-                  ></span
-                >
-              </div>
-              <div v-if="isEventMultiDay(dayEvent)" class="event-detail-row">
-                <span class="label">End:</span>
-                <span class="value"
-                  >{{ formatDate(dayEvent.end)
-                  }}<span v-if="!dayEvent.all_day">
-                    {{ formatTime(dayEvent.end) }}</span
-                  ></span
-                >
-              </div>
-              <div v-if="!isEventMultiDay(dayEvent)" class="event-detail-row">
-                <span class="label">Date:</span>
-                <span class="value">{{ formatDate(dayEvent.start) }}</span>
-              </div>
-              <div
-                v-if="!isEventMultiDay(dayEvent) && !dayEvent.all_day"
-                class="event-detail-row"
-              >
-                <span class="label">Time:</span>
-                <span class="value"
-                  >{{ formatTime(dayEvent.start) }} -
-                  {{ formatTime(dayEvent.end) }}</span
-                >
-              </div>
-              <div
-                v-if="dayEvent.all_day && !isEventMultiDay(dayEvent)"
-                class="event-detail-row"
-              >
-                <span class="label">Time:</span>
-                <span class="value">All Day</span>
-              </div>
-              <div v-if="dayEvent.location" class="event-detail-row">
-                <span class="label">Location:</span>
-                <span class="value">{{ dayEvent.location }}</span>
-              </div>
-              <div v-if="dayEvent.description" class="event-detail-row">
-                <span class="label">Description:</span>
-                <div class="value description">
-                  {{ dayEvent.description }}
-                </div>
-              </div>
-            </div>
-          </div>
-        </div>
-      </div>
-      <!-- Show clickable list if not keyboard expand -->
-      <div v-else-if="dayEvents.length > 1" class="day-events-list">
+      <!-- Show compact clickable list if multiple events -->
+      <div v-if="dayEvents.length > 1" class="day-events-list">
         <div class="day-events-header">
           <span class="label">All Events ({{ dayEvents.length }})</span>
         </div>
@@ -106,11 +35,14 @@
           </div>
         </div>
       </div>
-      <!-- Current event details (only show if not showing all events) -->
-      <div
-        v-if="!showAllDayEvents || dayEvents.length === 1"
-        class="current-event-details"
-      >
+      <!-- Current event details (always show details of selected event) -->
+      <div class="current-event-details">
+        <div v-if="isMultiDay" class="event-detail-row">
+          <span class="label">Selected Date:</span>
+          <span class="value">{{
+            formatDate(selectedDate || event.start)
+          }}</span>
+        </div>
         <div v-if="isMultiDay" class="event-detail-row">
           <span class="label">Start:</span>
           <span class="value"
@@ -131,7 +63,21 @@
         </div>
         <div v-if="!isMultiDay" class="event-detail-row">
           <span class="label">Date:</span>
-          <span class="value">{{ formatDate(event.start) }}</span>
+          <span class="value">{{
+            formatDate(selectedDate || event.start)
+          }}</span>
+        </div>
+        <div
+          v-if="showAllDayEvents && dayEvents.length === 0"
+          class="event-detail-row"
+        >
+          <span
+            class="value"
+            style="font-style: italic; color: var(--text-secondary)"
+          >
+            No events scheduled for this day. Use arrow keys to navigate to
+            other days.
+          </span>
         </div>
         <div v-if="!isMultiDay && !event.all_day" class="event-detail-row">
           <span class="label">Time:</span>
@@ -151,7 +97,7 @@
         </div>
         <div class="event-detail-row">
           <span class="label">Source:</span>
-          <span class="value">{{ event.source }}</span>
+          <span class="value">{{ getSourceName(event.source) }}</span>
         </div>
       </div>
     </div>
@@ -176,12 +122,23 @@ const calendarStore = useCalendarStore();
 
 const dayEvents = computed(() => calendarStore.dayEvents);
 const showAllDayEvents = computed(() => calendarStore.showAllDayEvents);
+const selectedDate = computed(() => calendarStore.selectedDate);
+
+// Handle keyboard navigation - only handle Escape here
+// Arrow keys are handled by the global keyboard mapping system via generic_next/generic_prev
+const handleKeydown = (event) => {
+  if (event.key === "Escape") {
+    close();
+    event.preventDefault();
+  }
+  // Let ArrowLeft/ArrowRight be handled by the keyboard mapping system
+};
 
 const selectEvent = (event) => {
   calendarStore.selectEvent(event);
 };
 
-const isEventMultiDay = (event) => {
+const _isEventMultiDay = (event) => {
   if (!event) return false;
   const start = new Date(event.start);
   const end = new Date(event.end);
@@ -229,6 +186,13 @@ const isMultiDay = computed(() => {
     start.getDate() !== end.getDate()
   );
 });
+
+// Get calendar source name instead of plugin ID
+const getSourceName = (sourceId) => {
+  if (!sourceId) return "Unknown";
+  const source = calendarStore.sources.find((s) => s.id === sourceId);
+  return source?.name || sourceId;
+};
 </script>
 
 <style scoped>
@@ -258,10 +222,25 @@ const isMultiDay = computed(() => {
   align-items: center;
 }
 
+.event-header-main {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+}
+
 .event-detail-header h3 {
   margin: 0;
   font-size: 1.5rem;
   color: var(--text-primary);
+}
+
+.event-date-header {
+  font-size: 1rem;
+  font-weight: 600;
+  color: var(--accent-primary);
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
 }
 
 .btn-close {
@@ -296,10 +275,10 @@ const isMultiDay = computed(() => {
 }
 
 .event-detail-row {
-  margin-bottom: 1rem;
+  margin-bottom: 0.75rem;
   display: flex;
   flex-direction: column;
-  gap: 0.5rem;
+  gap: 0.25rem;
 }
 
 .event-detail-row:last-child {
@@ -328,28 +307,27 @@ const isMultiDay = computed(() => {
 }
 
 .day-events-list {
-  margin-bottom: 1.5rem;
-  padding-bottom: 1.5rem;
+  margin-bottom: 1rem;
+  padding-bottom: 1rem;
   border-bottom: 1px solid var(--border-color);
 }
 
 .day-events-header {
-  margin-bottom: 0.75rem;
+  margin-bottom: 0.5rem;
 }
 
 .day-events-items {
   display: flex;
   flex-direction: column;
-  gap: 0.5rem;
-  max-height: 200px;
-  overflow-y: auto;
+  gap: 0.25rem;
+  /* No max-height or overflow - all items must fit without scrolling */
 }
 
 .day-event-item {
   display: flex;
   align-items: center;
-  gap: 1rem;
-  padding: 0.75rem;
+  gap: 0.75rem;
+  padding: 0.5rem;
   border-radius: 4px;
   cursor: pointer;
   transition: background 0.2s;
@@ -368,63 +346,18 @@ const isMultiDay = computed(() => {
 .day-event-time {
   font-weight: 600;
   color: var(--text-secondary);
-  min-width: 80px;
-  font-size: 0.9rem;
+  min-width: 70px;
+  font-size: 0.85rem;
+  flex-shrink: 0;
 }
 
 .day-event-title {
   flex: 1;
   color: var(--text-primary);
+  font-size: 0.9rem;
 }
 
 .current-event-details {
-  margin-top: 1rem;
-}
-
-/* All day events details view (for keyboard expand) */
-.all-day-events-details {
-  margin-bottom: 1.5rem;
-}
-
-.all-events-list {
-  display: flex;
-  flex-direction: column;
-  gap: 1rem;
-  max-height: 60vh;
-  overflow-y: auto;
-  padding-right: 0.5rem;
-}
-
-.day-event-detail-card {
-  border: 1px solid var(--border-color);
-  border-radius: 6px;
-  padding: 1rem;
-  background: var(--bg-tertiary);
-  transition: all 0.2s;
-}
-
-.day-event-detail-card.active {
-  border-color: var(--accent-primary);
-  background: var(--calendar-today-bg);
-  box-shadow: 0 2px 8px var(--shadow);
-}
-
-.day-event-detail-header {
-  margin-bottom: 0.75rem;
-  padding-bottom: 0.75rem;
-  border-bottom: 1px solid var(--border-color);
-}
-
-.day-event-detail-header h4 {
-  margin: 0;
-  font-size: 1.1rem;
-  color: var(--text-primary);
-  font-weight: 600;
-}
-
-.day-event-detail-content {
-  display: flex;
-  flex-direction: column;
-  gap: 0.5rem;
+  margin-top: 0.75rem;
 }
 </style>

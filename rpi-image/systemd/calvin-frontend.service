@@ -19,6 +19,8 @@ ExecStartPre=/bin/bash -c 'timeout=60; elapsed=0; until curl -s http://localhost
 ExecStartPre=/bin/bash -c 'timeout=60; elapsed=0; until [ -S /tmp/.X11-unix/X0 ] || pgrep -x Xorg > /dev/null 2>&1; do if [ $elapsed -ge $timeout ]; then echo "X server not available after $timeout seconds"; exit 1; fi; sleep 1; elapsed=$((elapsed+1)); done'
 # Small delay to ensure X is fully ready
 ExecStartPre=/bin/sleep 2
+# Clear Chromium cache before starting to ensure fresh files are loaded
+ExecStartPre=/bin/bash -c 'rm -rf /home/calvin/.cache/chromium/Default/Cache/* /home/calvin/.cache/chromium/Default/Code\ Cache/* 2>/dev/null || true'
 ExecStart=/usr/bin/chromium \
     --kiosk \
     --noerrdialogs \
@@ -46,6 +48,13 @@ ExecStart=/usr/bin/chromium \
     --no-sandbox \
     --no-zygote \
     --use-mock-keychain \
+    --force-device-scale-factor=1 \
+    --disable-lcd-text \
+    --disable-application-cache \
+    --aggressive-cache-discard \
+    --disable-background-downloads \
+    --disk-cache-size=0 \
+    --media-cache-size=0 \
     http://localhost:8000
 Restart=always
 RestartSec=10

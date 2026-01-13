@@ -5,7 +5,7 @@
       <button
         class="btn-close-fullscreen"
         title="Close Fullscreen (ESC)"
-        @click="close"
+        @click.stop="handleCloseFullscreen"
       >
         ×
       </button>
@@ -39,11 +39,13 @@
         <button
           class="btn-fullscreen"
           :title="isFullscreen ? 'Exit Fullscreen' : 'Enter Fullscreen'"
-          @click="toggleFullscreen"
+          @click.stop="handleToggleFullscreen"
         >
           {{ isFullscreen ? "⤓" : "⤢" }}
         </button>
-        <button class="btn-close" title="Close" @click="close">×</button>
+        <button class="btn-close" title="Close" @click.stop="handleClose">
+          ×
+        </button>
       </div>
     </div>
 
@@ -77,53 +79,20 @@
         <p class="help-text">Add web services in Settings</p>
       </div>
 
-      <!-- Service Iframe -->
+      <!-- Service Content (uses ServiceViewer for routing) -->
       <div v-else-if="currentService" class="service-container">
-        <iframe
-          ref="serviceIframe"
-          :src="currentService.url"
-          class="service-iframe"
-          :class="{ 'iframe-error': iframeError }"
-          frameborder="0"
-          allowfullscreen
-          @load="handleIframeLoad"
-          @error="handleIframeError"
-        />
-
-        <!-- CORS/Iframe Error Message -->
-        <div v-if="iframeError" class="iframe-error-message">
-          <div class="error-content">
-            <h3>⚠️ Cannot Display Service</h3>
-            <p>
-              This service cannot be embedded in an iframe due to security
-              restrictions (CORS/X-Frame-Options).
-            </p>
-            <p class="service-url">
-              {{ currentService.url }}
-            </p>
-            <div class="error-actions">
-              <a
-                :href="currentService.url"
-                target="_blank"
-                rel="noopener noreferrer"
-                class="btn-open-new"
-              >
-                Open in New Window
-              </a>
-              <button class="btn-retry" @click="retryLoad">Retry</button>
-            </div>
-          </div>
-        </div>
+        <ServiceViewer :key="currentService.id" :service="currentService" />
       </div>
     </div>
   </div>
 </template>
 
 <script setup>
-import { ref, computed, onMounted, watch, onUnmounted } from "vue";
+import { computed, onMounted, onUnmounted } from "vue";
 import { useConfigStore } from "../stores/config";
 import { useWebServicesStore } from "../stores/webServices";
 import { useModeStore } from "../stores/mode";
+import ServiceViewer from "./service/ServiceViewer.vue";
 
 const props = defineProps({
   isFullscreen: {
@@ -136,136 +105,109 @@ const configStore = useConfigStore();
 const webServicesStore = useWebServicesStore();
 const modeStore = useModeStore();
 
-const showHeader = computed(() => configStore.showUI);
+const showHeader = computed(() => configStore.shouldShowUI);
 const services = computed(() => webServicesStore.services);
 const currentServiceIndex = computed(
   () => webServicesStore.currentServiceIndex,
 );
-const currentService = computed(() => webServicesStore.getCurrentService());
+const currentService = computed(() => {
+  const service = webServicesStore.getCurrentService();
+  if (service) {
+    console.log("[WebServiceViewer] Current service:", {
+      id: service.id,
+      name: service.name,
+      url: service.url,
+      config: service.config,
+      display_schema: service.display_schema,
+      plugin_id: service.plugin_id,
+    });
+  }
+  return service;
+});
 const loading = computed(() => webServicesStore.loading);
 
-const serviceIframe = ref(null);
-const iframeError = ref(false);
-const iframeLoadTimeout = ref(null);
+// ServiceViewer now handles all service rendering logic
+
+// Prevent multiple rapid clicks
+let isHandlingClose = false;
+let isHandlingToggle = false;
 
 const close = () => {
+  if (isHandlingClose) return;
+  isHandlingClose = true;
+
   if (props.isFullscreen) {
     // Exit fullscreen mode - return to dashboard
+    // This will preserve the web service in the side panel
     modeStore.exitFullscreen();
   } else {
     // Return to calendar mode (home view)
     modeStore.setMode(modeStore.MODES.CALENDAR);
   }
+
+  // Reset flag after a short delay
+  setTimeout(() => {
+    isHandlingClose = false;
+  }, 300);
+};
+
+const handleClose = (event) => {
+  event.preventDefault();
+  event.stopPropagation();
+  close();
+};
+
+const handleCloseFullscreen = (event) => {
+  event.preventDefault();
+  event.stopPropagation();
+  close();
 };
 
 const toggleFullscreen = () => {
+  if (isHandlingToggle) return;
+  isHandlingToggle = true;
+
   if (props.isFullscreen) {
     // Exit fullscreen - return to dashboard
+    // This will preserve the web service in the side panel
     modeStore.exitFullscreen();
   } else {
     // Enter fullscreen web services
     modeStore.enterFullscreen(modeStore.MODES.WEB_SERVICES);
   }
+
+  // Reset flag after a short delay
+  setTimeout(() => {
+    isHandlingToggle = false;
+  }, 300);
+};
+
+const handleToggleFullscreen = (event) => {
+  event.preventDefault();
+  event.stopPropagation();
+  toggleFullscreen();
 };
 
 const nextService = () => {
   webServicesStore.nextService();
-  iframeError.value = false;
 };
 
 const previousService = () => {
   webServicesStore.previousService();
-  iframeError.value = false;
 };
 
 const setServiceIndex = (index) => {
   webServicesStore.setServiceIndex(index);
-  iframeError.value = false;
 };
 
-const handleIframeLoad = () => {
-  // Clear any timeout
-  if (iframeLoadTimeout.value) {
-    clearTimeout(iframeLoadTimeout.value);
-    iframeLoadTimeout.value = null;
-  }
-
-  // Check if iframe actually loaded content
-  // Some sites block iframes but still trigger load event
-  try {
-    // Try to access iframe content (will fail if blocked by CORS)
-    const iframe = serviceIframe.value;
-    if (iframe && iframe.contentWindow) {
-      // If we can access contentWindow, it might be loaded
-      // But we can't reliably check content due to CORS
-      // So we'll assume it's loaded unless we get an error
-      iframeError.value = false;
-    }
-  } catch (e) {
-    // CORS error - can't access iframe content
-    // This is expected for cross-origin iframes, not necessarily an error
-    console.log("Cannot access iframe content (CORS):", e.message);
-  }
-};
-
-const handleIframeError = () => {
-  iframeError.value = true;
-  if (iframeLoadTimeout.value) {
-    clearTimeout(iframeLoadTimeout.value);
-    iframeLoadTimeout.value = null;
-  }
-};
-
-const retryLoad = () => {
-  iframeError.value = false;
-  if (serviceIframe.value && currentService.value) {
-    // Force reload by setting src again
-    const url = currentService.value.url;
-    serviceIframe.value.src = "";
-    setTimeout(() => {
-      if (serviceIframe.value) {
-        serviceIframe.value.src = url;
-      }
-    }, 100);
-  }
-};
-
-// Watch for service changes to reset error state
-watch(
-  () => currentService.value?.id,
-  () => {
-    iframeError.value = false;
-    // Set a timeout to detect if iframe doesn't load
-    if (iframeLoadTimeout.value) {
-      clearTimeout(iframeLoadTimeout.value);
-    }
-    iframeLoadTimeout.value = setTimeout(() => {
-      // If iframe hasn't loaded after 5 seconds, show error
-      // This is a fallback for services that silently fail
-      if (serviceIframe.value) {
-        try {
-          // Try to check if iframe has content
-          const iframe = serviceIframe.value;
-          if (
-            iframe.contentDocument === null &&
-            iframe.contentWindow === null
-          ) {
-            iframeError.value = true;
-          }
-        } catch (e) {
-          // CORS error is expected, not necessarily a problem
-          console.log("Cannot check iframe content (CORS):", e.message);
-        }
-      }
-    }, 5000);
-  },
-);
+// ServiceViewer handles all service rendering logic
 
 // Handle Escape key to close fullscreen
 const handleKeydown = (event) => {
-  if (event.key === "Escape" && props.isFullscreen) {
+  if (event.key === "Escape" && props.isFullscreen && !isHandlingClose) {
     close();
     event.preventDefault();
+    event.stopPropagation();
   }
 };
 
@@ -276,9 +218,6 @@ onMounted(async () => {
 });
 
 onUnmounted(() => {
-  if (iframeLoadTimeout.value) {
-    clearTimeout(iframeLoadTimeout.value);
-  }
   // Remove keyboard listener
   window.removeEventListener("keydown", handleKeydown);
 });
@@ -573,5 +512,215 @@ onUnmounted(() => {
   background: rgba(0, 0, 0, 0.9);
   border-color: rgba(255, 255, 255, 0.8);
   transform: scale(1.1);
+}
+
+/* API-based Service Styles */
+.api-service-container {
+  padding: 1.5rem;
+  overflow-y: auto;
+}
+
+.service-data-content {
+  width: 100%;
+  height: 100%;
+}
+
+.meal-plan-content {
+  width: 100%;
+  height: 100%;
+  padding: 2rem;
+  overflow-y: auto;
+  max-height: 100%;
+  background: var(--bg-primary);
+}
+
+.meal-plan-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 2rem;
+  padding-bottom: 1.5rem;
+  border-bottom: 2px solid var(--border-color);
+}
+
+.meal-plan-header h3 {
+  margin: 0;
+  font-size: 1.75rem;
+  font-weight: 700;
+  color: var(--text-primary);
+  letter-spacing: -0.02em;
+}
+
+.meal-plan-dates {
+  font-size: 0.95rem;
+  color: var(--text-secondary);
+  font-weight: 500;
+}
+
+.meal-plan-items {
+  display: grid;
+  gap: 1rem;
+}
+
+/* Card size variants */
+.meal-plan-content.card-size-small .meal-plan-items {
+  grid-template-columns: repeat(auto-fill, minmax(200px, 1fr));
+}
+
+.meal-plan-content.card-size-medium .meal-plan-items {
+  grid-template-columns: repeat(auto-fill, minmax(240px, 1fr));
+}
+
+.meal-plan-content.card-size-large .meal-plan-items {
+  grid-template-columns: repeat(auto-fill, minmax(300px, 1fr));
+}
+
+/* Portrait mode: stack cards vertically */
+@media (orientation: portrait) {
+  .meal-plan-items {
+    grid-template-columns: 1fr !important;
+    gap: 0.75rem;
+  }
+
+  .meal-plan-item {
+    padding: 1rem;
+  }
+
+  .meal-plan-header {
+    margin-bottom: 1rem;
+    padding-bottom: 1rem;
+  }
+}
+
+/* Smaller screens */
+@media (max-width: 768px) {
+  .meal-plan-items {
+    grid-template-columns: 1fr !important;
+    gap: 0.75rem;
+  }
+}
+
+.meal-plan-item {
+  background: var(--bg-secondary);
+  border: 1px solid var(--border-color);
+  border-radius: 12px;
+  padding: 1.5rem;
+  transition: all 0.3s ease;
+  box-shadow: 0 2px 4px rgba(0, 0, 0, 0.05);
+}
+
+.meal-plan-item:hover {
+  background: var(--bg-tertiary);
+  border-color: var(--accent-primary);
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1);
+  transform: translateY(-2px);
+}
+
+.meal-plan-date {
+  font-weight: 700;
+  font-size: 0.9rem;
+  color: var(--text-primary);
+  margin-bottom: 1rem;
+  padding-bottom: 0.75rem;
+  border-bottom: 1px solid var(--border-color);
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+}
+
+.meal-plan-meals {
+  display: flex;
+  flex-direction: column;
+  gap: 0.75rem;
+}
+
+.meal-item {
+  display: flex;
+  gap: 1rem;
+  align-items: center;
+  padding: 0.75rem 1rem;
+  background: var(--bg-primary);
+  border-radius: 8px;
+  transition: all 0.2s ease;
+  border: 1px solid transparent;
+}
+
+.meal-item.clickable {
+  cursor: pointer;
+}
+
+.meal-item.clickable:hover {
+  background: var(--bg-tertiary);
+  border-color: var(--accent-primary);
+  transform: translateX(6px);
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
+}
+
+.meal-item.clickable .meal-name {
+  color: var(--accent-primary);
+  font-weight: 500;
+  transition: all 0.2s ease;
+}
+
+.meal-item.clickable:hover .meal-name {
+  color: var(--accent-primary);
+  font-weight: 600;
+}
+
+.meal-type {
+  font-weight: 700;
+  color: var(--accent-primary);
+  min-width: 90px;
+  text-transform: capitalize;
+  font-size: 0.85rem;
+  letter-spacing: 0.05em;
+  padding: 0.25rem 0.5rem;
+  background: var(--bg-tertiary);
+  border-radius: 4px;
+  text-align: center;
+}
+
+.meal-name {
+  color: var(--text-primary);
+  flex: 1;
+  font-size: 1rem;
+  line-height: 1.5;
+}
+
+.no-meals {
+  text-align: center;
+  padding: 4rem 2rem;
+  color: var(--text-tertiary);
+  font-size: 1.1rem;
+}
+
+.no-meals-day {
+  text-align: center;
+  padding: 1rem;
+  color: var(--text-tertiary);
+  font-style: italic;
+  font-size: 0.95rem;
+  background: var(--bg-tertiary);
+  border-radius: 6px;
+  border: 1px dashed var(--border-color);
+}
+
+.error-state {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  height: 100%;
+  padding: 2rem;
+  text-align: center;
+}
+
+.error-state h3 {
+  margin: 0 0 1rem 0;
+  color: var(--accent-error);
+}
+
+.error-state p {
+  margin: 0 0 1.5rem 0;
+  color: var(--text-secondary);
 }
 </style>

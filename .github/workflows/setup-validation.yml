@@ -1,0 +1,182 @@
+name: Setup Validation
+
+on:
+  push:
+    branches: [main, develop]
+    paths:
+      - 'scripts/**'
+      - 'backend/pyproject.toml'
+      - 'backend/uv.lock'
+      - 'frontend/package.json'
+      - 'frontend/package-lock.json'
+  pull_request:
+    branches: [main, develop]
+    paths:
+      - 'scripts/**'
+      - 'backend/pyproject.toml'
+      - 'backend/uv.lock'
+      - 'frontend/package.json'
+      - 'frontend/package-lock.json'
+  workflow_dispatch:
+
+jobs:
+  validate-scripts:
+    name: Validate Setup Scripts
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+      
+      - name: Check bash script syntax
+        run: |
+          echo "Checking bash script syntax..."
+          find scripts -name "*.sh" -type f | while read script; do
+            echo "Checking $script..."
+            bash -n "$script" || exit 1
+          done
+          echo "All bash scripts have valid syntax ✓"
+      
+      - name: Check script permissions
+        run: |
+          echo "Checking script permissions..."
+          find scripts -name "*.sh" -type f | while read script; do
+            if [ ! -x "$script" ]; then
+              echo "::warning file=$script::Script should be executable"
+            fi
+          done
+      
+      - name: Security checks
+        run: |
+          echo "Running security checks..."
+          # Check for potential hardcoded secrets
+          if grep -r "password.*=.*['\"].*[a-zA-Z0-9]" scripts/*.sh 2>/dev/null | grep -v "#.*password" | grep -v "GIT_REPO\|GIT_BRANCH"; then
+            echo "::warning::Potential hardcoded credentials found in setup scripts"
+          fi
+          # Check for unsafe eval/exec patterns
+          if grep -E "eval\s|exec\s.*\$" scripts/*.sh; then
+            echo "::warning::Potentially unsafe eval/exec patterns found"
+          fi
+          echo "Security checks completed ✓"
+      
+      - name: Validate setup-common.sh functions
+        run: |
+          echo "Validating setup-common.sh..."
+          source scripts/setup-common.sh || true
+          REQUIRED_FUNCTIONS=("ensure_uv_installed" "install_backend_deps" "install_frontend_deps" "ensure_user_exists" "create_data_directories")
+          MISSING_FUNCTIONS=()
+          for func in "${REQUIRED_FUNCTIONS[@]}"; do
+            if ! declare -f "$func" > /dev/null; then
+              MISSING_FUNCTIONS+=("$func")
+            fi
+          done
+          if [ ${#MISSING_FUNCTIONS[@]} -gt 0 ]; then
+            echo "::error::Missing required functions in setup-common.sh: ${MISSING_FUNCTIONS[*]}"
+            exit 1
+          fi
+          echo "Key functions validated ✓"
+
+  test-dependency-installation:
+    name: Test Dependency Installation
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    strategy:
+      matrix:
+        test-type: [backend, frontend]
+    
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+      
+      - name: Cache UV packages
+        if: matrix.test-type == 'backend'
+        uses: actions/cache@v4
+        with:
+          path: |
+            ~/.cache/uv
+            backend/.venv
+          key: ${{ runner.os }}-uv-${{ hashFiles('backend/uv.lock', 'backend/pyproject.toml') }}
+          restore-keys: |
+            ${{ runner.os }}-uv-
+      
+      - name: Test Backend Dependencies
+        if: matrix.test-type == 'backend'
+        working-directory: ./backend
+        run: |
+          echo "::group::Backend Dependency Installation"
+          echo "Testing backend dependency installation..."
+          curl -LsSf https://astral.sh/uv/install.sh | sh
+          export PATH="$HOME/.local/bin:$HOME/.cargo/bin:$PATH"
+          echo "Installing backend dependencies with UV..."
+          START_TIME=$(date +%s)
+          uv sync --extra linux || uv sync --extra linux
+          END_TIME=$(date +%s)
+          DURATION=$((END_TIME - START_TIME))
+          echo "Installation took ${DURATION} seconds"
+          uv run python -c "import app; print('Backend imports successfully')" || exit 1
+          echo "Backend dependencies installed successfully ✓"
+          echo "::endgroup::"
+      
+      - name: Cache npm packages
+        if: matrix.test-type == 'frontend'
+        uses: actions/cache@v4
+        with:
+          path: frontend/node_modules
+          key: ${{ runner.os }}-npm-${{ hashFiles('frontend/package-lock.json') }}
+          restore-keys: |
+            ${{ runner.os }}-npm-
+      
+      - name: Test Frontend Dependencies
+        if: matrix.test-type == 'frontend'
+        working-directory: ./frontend
+        run: |
+          echo "::group::Frontend Dependency Installation"
+          echo "Testing frontend dependency installation..."
+          curl -fsSL https://deb.nodesource.com/setup_20.x | sudo -E bash -
+          sudo apt-get install -y nodejs
+          echo "Installing frontend dependencies..."
+          START_TIME=$(date +%s)
+          npm ci || npm install
+          END_TIME=$(date +%s)
+          DURATION=$((END_TIME - START_TIME))
+          echo "Installation took ${DURATION} seconds"
+          if [ ! -d "node_modules" ] || [ ! -d "node_modules/axios" ]; then
+            echo "::error::Frontend dependencies not installed correctly"
+            exit 1
+          fi
+          echo "Frontend dependencies installed successfully ✓"
+          echo "::endgroup::"
+
+  # Note: Full setup script testing is now in separate workflows:
+  # - setup-validation-prod.yml (for setup.sh - production setup)
+  # - setup-validation-dev.yml (for setup-dev.sh - development setup)
+
+  validate-windows-setup:
+    name: Validate Windows Setup Script
+    runs-on: windows-latest
+    # Only check if PowerShell script exists and is valid
+    if: github.ref == 'refs/heads/main' || github.ref == 'refs/heads/develop' || github.event_name == 'workflow_dispatch'
+    
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+      
+      - name: Validate PowerShell script syntax
+        run: |
+          if (Test-Path "setup-windows.ps1") {
+            Write-Host "Checking PowerShell script syntax..."
+            $errors = $null
+            $null = [System.Management.Automation.PSParser]::Tokenize(
+              (Get-Content "setup-windows.ps1" -Raw),
+              [ref]$errors
+            )
+            if ($errors.Count -gt 0) {
+              Write-Host "::error::PowerShell script has syntax errors:"
+              $errors | ForEach-Object { Write-Host "  $($_.Message)" }
+              exit 1
+            }
+            Write-Host "PowerShell script syntax is valid ✓"
+          } else {
+            Write-Host "No setup-windows.ps1 found, skipping..."
+          }

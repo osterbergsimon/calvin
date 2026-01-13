@@ -1,51 +1,211 @@
 """Main FastAPI application entry point."""
 
-import os
-from pathlib import Path
+import logging
+import sys
 from contextlib import asynccontextmanager
+from pathlib import Path
 
-from fastapi import FastAPI
-from fastapi.middleware.cors import CORSMiddleware
-from fastapi.staticfiles import StaticFiles
-from fastapi.responses import FileResponse
+# Configure loguru for better, simpler logging
+from loguru import logger
 
-from app.api.routes import calendar, config, health, images, keyboard, system, web_services
+# Configure logging FIRST, before any other imports that might trigger database initialization
+# Import settings first to get log level
 from app.config import settings
-from app.database import init_db
-from app.services import image_service as image_service_module
-from app.services.calendar_service import calendar_service
-from app.services.image_service import ImageService
-from app.services.scheduler import calendar_scheduler
+
+# Remove loguru's default handler and configure our own
+logger.remove()
+
+# Map settings log level to loguru levels
+log_level_map = {
+    "DEBUG": "DEBUG",
+    "INFO": "INFO",
+    "WARNING": "WARNING",
+    "ERROR": "ERROR",
+    "CRITICAL": "CRITICAL",
+}
+log_level = log_level_map.get(settings.log_level.upper(), "INFO")
+
+# Add handler with our desired format
+logger.add(
+    sys.stderr,
+    format=(
+        "<green>{time:YYYY-MM-DD HH:mm:ss}</green> | "
+        "<level>{level: <8}</level> | "
+        "<cyan>{name}</cyan>:<cyan>{function}</cyan>:<cyan>{line}</cyan> - "
+        "<level>{message}</level>"
+    ),
+    level=log_level,
+    colorize=True,  # Enable colors for better readability
+)
 
 
-@asynccontextmanager
-async def lifespan(app: FastAPI):
-    """Lifespan context manager for startup/shutdown."""
-    # Startup
-    # Initialize database
-    await init_db()
-    print("Database initialized")
+# Intercept standard logging and redirect to loguru
+#
+# WHY WE NEED THIS:
+# Many third-party libraries (SQLAlchemy, FastAPI, uvicorn, httpx, etc.) use Python's
+# standard logging module, not loguru. Without InterceptHandler, those library logs would
+# go through standard logging with its own format/handlers, creating inconsistent output.
+#
+# InterceptHandler catches ALL standard logging calls and redirects them to loguru, so:
+# - All logs use the same format and handlers (unified output)
+# - All logs respect our log level configuration
+# - We get consistent log formatting across the entire application
+#
+# This is especially important for SQLAlchemy query logs, FastAPI request logs, etc.
+class InterceptHandler(logging.Handler):
+    """Intercept standard logging messages and route them to loguru."""
 
-    # Run migrations
-    from app.utils.migrations import migrate_database
+    def emit(self, record):
+        # Map standard logging numeric levels to loguru level names
+        level_map = {
+            logging.DEBUG: "DEBUG",
+            logging.INFO: "INFO",
+            logging.WARNING: "WARNING",
+            logging.ERROR: "ERROR",
+            logging.CRITICAL: "CRITICAL",
+        }
+        # Get loguru level name from the numeric level
+        level_name = level_map.get(record.levelno, "INFO")
 
-    await migrate_database()
-    print("Database migrations completed")
+        # Find the caller frame that's not in logging module
+        try:
+            frame = sys._getframe(6)  # Skip logging internals
+            depth = 6
+            while frame and frame.f_code.co_filename == logging.__file__:
+                frame = frame.f_back
+                depth += 1
+        except (ValueError, AttributeError):
+            depth = 0
 
-    # Load calendar sources from database
-    await calendar_service.load_sources_from_db()
-    print(f"Loaded {len(calendar_service.sources)} calendar sources from database")
+        # Use loguru's opt to log with proper exception info and depth
+        # Import logger here to avoid circular import issues
+        from loguru import logger as loguru_logger
 
-    # Initialize default keyboard mappings if none exist
-    from app.services.config_service import config_service
+        loguru_logger.opt(depth=depth, exception=record.exc_info).log(
+            level_name, record.getMessage()
+        )
+
+
+# Set up standard logging interception for compatibility
+logging.basicConfig(handlers=[InterceptHandler()], level=0, force=True)
+
+# Reduce SQLAlchemy verbosity by setting its loggers to WARNING
+# This must be done BEFORE database.py is imported (which creates the engine)
+sqlalchemy_loggers = [
+    "sqlalchemy.engine",
+    "sqlalchemy.pool",
+    "sqlalchemy.dialects",
+]
+for sql_logger_name in sqlalchemy_loggers:
+    sql_logger = logging.getLogger(sql_logger_name)
+    sql_logger.setLevel(logging.WARNING)
+    sql_logger.handlers = [InterceptHandler()]
+    sql_logger.propagate = False
+
+logger.info(f"Loguru logging configured with level: {log_level}")
+
+from fastapi import FastAPI  # noqa: E402
+from fastapi.middleware.cors import CORSMiddleware  # noqa: E402
+from fastapi.responses import FileResponse  # noqa: E402
+
+from app.api.routes import (  # noqa: E402
+    calendar,
+    config,
+    health,
+    images,
+    keyboard,
+    plugins,
+    system,
+)
+from app.services.scheduler import calendar_scheduler  # noqa: E402
+
+# Plugins are auto-discovered via pluggy hooks when modules are imported
+
+# Use loguru logger (already imported at top of file)
+
+
+async def _initialize_database():
+    """Initialize database and run migrations."""
+    from pathlib import Path
+
+    from app.database import engine
+    from app.utils.db_init import initialize_database
+
+    # Extract database path from settings
+    db_path_str = settings.database_url.replace("sqlite:///", "")
+    db_path = Path(db_path_str) if db_path_str.startswith("/") else Path(db_path_str).resolve()
+
+    # Use the unified initialization function
+    await initialize_database(db_path, engine=engine, run_migrations=True)
+    logger.info("Database initialized and migrations completed")
+
+
+async def _create_default_plugin_instance(
+    plugin_registry, session, type_id: str, plugin_id: str, name: str, config: dict
+):
+    """Create a default plugin instance if the plugin type is enabled and no instance exists."""
+    from sqlalchemy import select
+
+    from app.models.db_models import PluginDB, PluginTypeDB
+
+    # Check if plugin type exists and is enabled (default to enabled if not in DB)
+    result = await session.execute(select(PluginTypeDB).where(PluginTypeDB.type_id == type_id))
+    plugin_type = result.scalar_one_or_none()
+    is_enabled = plugin_type.enabled if plugin_type else True
+
+    if not is_enabled:
+        return
+
+    # Check if an instance already exists
+    result = await session.execute(select(PluginDB).where(PluginDB.type_id == type_id))
+    instance = result.scalar_one_or_none()
+
+    if not instance:
+        logger.info(f"Creating default {name} plugin instance...")
+        try:
+            await plugin_registry.register_plugin(
+                plugin_id=plugin_id,
+                type_id=type_id,
+                name=name,
+                config=config,
+                enabled=True,
+            )
+            logger.info(f"Default {name} plugin instance created")
+        except Exception as e:
+            logger.warning(f"Failed to create default {name} instance: {e}")
+
+
+async def _initialize_plugins():
+    """Load plugins from database and create default instances."""
+    from app.database import AsyncSessionLocal
+    from app.plugins.registry import plugin_registry
+
+    await plugin_registry.load_plugins_from_db()
+    logger.info("Loaded plugins from database")
+
+    # Auto-create default instances for image plugins if enabled and no instance exists
+    async with AsyncSessionLocal() as session:
+        # Local images plugin
+        await _create_default_plugin_instance(
+            plugin_registry,
+            session,
+            type_id="local",
+            plugin_id="local-images",
+            name="Local Images",
+            config={
+                "image_dir": "./data/images",
+                "thumbnail_dir": "./data/images/thumbnails",
+            },
+        )
+
+
+async def _initialize_keyboard_mappings():
+    """Initialize default keyboard mappings if none exist."""
     from app.services.keyboard_mapping_service import keyboard_mapping_service
 
-    # Check if keyboard mappings exist, if not, create defaults
     mappings = await keyboard_mapping_service.get_all_mappings()
     if not mappings:
         # Set default 7-button keyboard mappings
-        # Generic buttons (context-aware): KEY_1, KEY_2, KEY_3
-        # Mode buttons: KEY_4, KEY_5, KEY_6, KEY_7
         default_7button = {
             "KEY_1": "generic_next",
             "KEY_2": "generic_prev",
@@ -58,132 +218,176 @@ async def lifespan(app: FastAPI):
         await keyboard_mapping_service.set_mappings("7-button", default_7button)
 
         # Set default standard keyboard mappings
-        # Layout: 3 generic buttons (next, prev, expand/close) +
-        # 4 mode buttons (calendar, photos, services, spare)
         default_standard = {
-            "KEY_RIGHT": "generic_next",  # Generic Next (context-aware)
-            "KEY_LEFT": "generic_prev",  # Generic Previous (context-aware)
-            "KEY_UP": "generic_expand_close",  # Generic Expand/Close (context-aware)
-            "KEY_DOWN": "mode_calendar",  # Mode: Calendar
-            "KEY_SPACE": "mode_photos",  # Mode: Photos
-            "KEY_1": "mode_web_services",  # Mode: Web Services
-            "KEY_2": "mode_spare",  # Mode: Spare
-            "KEY_S": "mode_settings",  # Settings (separate)
+            "KEY_RIGHT": "generic_next",
+            "KEY_LEFT": "generic_prev",
+            "KEY_UP": "generic_expand_close",
+            "KEY_DOWN": "mode_calendar",
+            "KEY_SPACE": "mode_photos",
+            "KEY_1": "mode_web_services",
+            "KEY_2": "mode_spare",
+            "KEY_S": "mode_settings",
         }
         await keyboard_mapping_service.set_mappings("standard", default_standard)
-        print("Initialized default keyboard mappings")
+        logger.info("Initialized default keyboard mappings")
 
-    # Initialize image service
-    thumbnail_dir = settings.image_cache_dir / "thumbnails"
-    image_service_module.image_service = ImageService(settings.image_dir, thumbnail_dir)
-    # Do initial scan
-    image_service_module.image_service.scan_images()
-    image_count = len(image_service_module.image_service.get_images())
-    print(f"Image service initialized: {image_count} images found")
 
-    # Initialize default config if not present
-    orientation = await config_service.get_value("orientation")
-    if orientation is None:
-        await config_service.set_value("orientation", "landscape")
-    calendar_split = await config_service.get_value("calendar_split")
-    if calendar_split is None:
-        await config_service.set_value("calendar_split", 70.0)
-    keyboard_type = await config_service.get_value("keyboard_type")
-    if keyboard_type is None:
-        await config_service.set_value("keyboard_type", "7-button")
-    photo_frame_enabled = await config_service.get_value("photo_frame_enabled")
-    if photo_frame_enabled is None:
-        await config_service.set_value("photo_frame_enabled", False)
-    photo_frame_timeout = await config_service.get_value("photo_frame_timeout")
-    if photo_frame_timeout is None:
-        await config_service.set_value("photo_frame_timeout", 300)  # 5 minutes
-    show_ui = await config_service.get_value("show_ui")
-    if show_ui is None:
-        await config_service.set_value("show_ui", True)
-    photo_rotation_interval = await config_service.get_value("photo_rotation_interval")
-    if photo_rotation_interval is None:
-        await config_service.set_value("photo_rotation_interval", 30)  # 30 seconds
-    calendar_view_mode = await config_service.get_value("calendar_view_mode")
-    if calendar_view_mode is None:
-        await config_service.set_value("calendar_view_mode", "month")  # 'month' or 'rolling'
-    time_format = await config_service.get_value("time_format")
-    if time_format is None:
-        await config_service.set_value("time_format", "24h")  # '12h' or '24h' (default: '24h')
-    mode_indicator_timeout = await config_service.get_value("mode_indicator_timeout")
-    if mode_indicator_timeout is None:
-        await config_service.set_value("mode_indicator_timeout", 5)  # 5 seconds default
-    week_start_day = await config_service.get_value("week_start_day")
-    if week_start_day is None:
-        await config_service.set_value("week_start_day", 0)  # Sunday default
-    show_week_numbers = await config_service.get_value("show_week_numbers")
-    if show_week_numbers is None:
-        await config_service.set_value("show_week_numbers", False)  # Hide by default
-    side_view_position = await config_service.get_value("side_view_position")
-    if side_view_position is None:
-        await config_service.set_value("side_view_position", "right")  # Right/bottom default
-    theme_mode = await config_service.get_value("theme_mode")
-    if theme_mode is None:
-        await config_service.set_value("theme_mode", "auto")  # Auto theme by default
-    dark_mode_start = await config_service.get_value("dark_mode_start")
-    if dark_mode_start is None:
-        await config_service.set_value("dark_mode_start", 18)  # 6 PM default
-    dark_mode_end = await config_service.get_value("dark_mode_end")
-    if dark_mode_end is None:
-        await config_service.set_value("dark_mode_end", 6)  # 6 AM default
-    display_schedule_enabled = await config_service.get_value("display_schedule_enabled")
-    if display_schedule_enabled is None:
-        await config_service.set_value("display_schedule_enabled", False)  # Disabled by default
-    display_off_time = await config_service.get_value("display_off_time")
-    if display_off_time is None:
-        await config_service.set_value("display_off_time", "22:00")  # 10 PM default
-    display_on_time = await config_service.get_value("display_on_time")
-    if display_on_time is None:
-        await config_service.set_value("display_on_time", "06:00")  # 6 AM default
-    # Initialize display schedule if not exists (per-day schedule)
+async def _initialize_image_service():
+    """Initialize plugin image service and perform initial scan."""
+    from app.services.plugin_image_service import PluginImageService
+
+    plugin_image_service = PluginImageService()
+    await plugin_image_service.scan_images()
+    plugin_image_count = len(await plugin_image_service.get_images())
+    logger.info(f"Plugin image service initialized: {plugin_image_count} images found")
+
+
+async def _set_default_config_if_missing(config_service, key: str, default_value):
+    """Set config value if it doesn't exist."""
+    current = await config_service.get_value(key)
+    if current is None:
+        await config_service.set_value(key, default_value)
+
+
+async def _initialize_default_config():
+    """Initialize default configuration values if not present."""
+    import json
+
+    from app.services.config_service import config_service
+
+    # Define all default config values
+    default_configs = {
+        "orientation": "landscape",
+        "apply_display_rotation": True,
+        "calendar_split": 70.0,
+        "keyboard_type": "7-button",
+        "photo_frame_enabled": False,
+        "photo_frame_timeout": 300,  # 5 minutes
+        "config_poll_interval": 30,  # 30 seconds
+        "show_ui": True,
+        "photo_rotation_interval": 30,  # 30 seconds
+        "calendar_view_mode": "month",  # 'month' | 'week' | 'day' | 'rolling'
+        "time_format": "24h",  # '12h' or '24h'
+        "mode_indicator_timeout": 5,  # 5 seconds
+        "keyboard_feedback_enabled": True,
+        "keyboard_feedback_mode": "normal",
+        "week_start_day": 0,  # Sunday
+        "show_week_numbers": False,
+        "side_view_position": "right",
+        "theme_mode": "auto",
+        "dark_mode_start": 18,  # 6 PM
+        "dark_mode_end": 6,  # 6 AM
+        "display_schedule_enabled": False,
+        "display_off_time": "22:00",  # 10 PM
+        "display_on_time": "06:00",  # 6 AM
+        "reboot_combo_key1": "KEY_1",
+        "reboot_combo_key2": "KEY_7",
+        "reboot_combo_duration": 10000,  # 10 seconds
+        "display_timeout_enabled": False,
+        "display_timeout": 0,  # 0 = never
+        "image_display_mode": "smart",
+        "randomize_images": "false",
+    }
+
+    # Set all defaults
+    for key, value in default_configs.items():
+        await _set_default_config_if_missing(config_service, key, value)
+
+    # Handle display schedule separately (it's a JSON string)
     display_schedule = await config_service.get_value("display_schedule")
     if display_schedule is None:
-        # Default: all days enabled, 06:00-22:00
-        import json
         default_schedule = [
             {"day": i, "enabled": True, "onTime": "06:00", "offTime": "22:00"}
             for i in range(7)  # 0=Monday, 6=Sunday
         ]
         await config_service.set_value("display_schedule", json.dumps(default_schedule))
-    reboot_combo_key1 = await config_service.get_value("reboot_combo_key1")
-    if reboot_combo_key1 is None:
-        await config_service.set_value("reboot_combo_key1", "KEY_1")  # Default first key
-    reboot_combo_key2 = await config_service.get_value("reboot_combo_key2")
-    if reboot_combo_key2 is None:
-        await config_service.set_value("reboot_combo_key2", "KEY_7")  # Default second key
-    reboot_combo_duration = await config_service.get_value("reboot_combo_duration")
-    if reboot_combo_duration is None:
-        await config_service.set_value("reboot_combo_duration", 10000)  # 10 seconds default
-    # Initialize display timeout settings (default: disabled - keep display on)
-    display_timeout_enabled = await config_service.get_value("display_timeout_enabled")
-    if display_timeout_enabled is None:
-        await config_service.set_value("display_timeout_enabled", False)  # Disabled by default - keep display on
-    display_timeout = await config_service.get_value("display_timeout")
-    if display_timeout is None:
-        await config_service.set_value("display_timeout", 0)  # 0 = never (disabled by default - keep display on)
-    image_display_mode = await config_service.get_value("image_display_mode")
-    if image_display_mode is None:
-        await config_service.set_value("image_display_mode", "smart")  # Smart mode by default
 
-    # Start schedulers
-    calendar_scheduler.start()
-    print("Calendar scheduler started - refreshing every 15 minutes")
-    
-    # Start display power scheduler
+
+async def _start_schedulers():
+    """Start background schedulers."""
+    from app.services.backend_scheduler import backend_plugin_scheduler
     from app.services.display_power_service import display_power_service
+
+    await calendar_scheduler.start()
+    # Log message is now handled in scheduler.start()
+
     await display_power_service.start()
-    print("Display power scheduler started")
-    
-    yield
-    # Shutdown
+    logger.info("Display power scheduler started")
+
+    # Start backend plugin scheduler (plugins will register their tasks on initialization)
+    await backend_plugin_scheduler.start()
+
+
+async def _sync_display_orientation():
+    """Sync display orientation with config (on Raspberry Pi, if enabled)."""
+    from app.services.config_service import config_service
+    from app.services.display_orientation_service import display_orientation_service
+
+    try:
+        apply_rotation = await config_service.get_value("apply_display_rotation", True)
+        if apply_rotation:
+            result = await display_orientation_service.sync_with_config()
+            if result.get("success"):
+                logger.info(f"Display orientation synced: {result.get('message')}")
+            elif result.get("message") and "Not running on Raspberry Pi" not in result.get(
+                "message", ""
+            ):
+                logger.info(f"Display orientation sync: {result.get('message')}")
+        else:
+            logger.info("Display rotation is disabled - skipping physical display rotation")
+    except Exception as e:
+        # Don't fail startup if orientation sync fails
+        logger.warning(f"Failed to sync display orientation on startup: {e}")
+
+
+async def _sync_themes_to_db():
+    """Sync all themes (built-in + installed) to PluginTypeDB on startup."""
+    from app.api.routes.plugins import sync_themes_to_db
+
+    try:
+        await sync_themes_to_db()
+        logger.info("Themes synced to database")
+    except Exception as e:
+        # Don't fail startup if theme sync fails
+        logger.warning(f"Failed to sync themes to database on startup: {e}")
+
+
+async def _shutdown_services():
+    """Shutdown all services and schedulers."""
+    from app.plugins.manager import plugin_manager
+    from app.services.backend_scheduler import backend_plugin_scheduler
+    from app.services.display_power_service import display_power_service
+
     await display_power_service.stop()
-    print("Display power scheduler stopped")
+    logger.info("Display power scheduler stopped")
+
     calendar_scheduler.stop()
-    print("Calendar scheduler stopped")
+    logger.info("Calendar scheduler stopped")
+
+    # Stop backend plugin scheduler (cleanup scheduled tasks)
+    backend_plugin_scheduler.stop()
+
+    await plugin_manager.cleanup_all()
+    logger.info("Plugins cleaned up")
+
+
+@asynccontextmanager
+async def lifespan(app: FastAPI):
+    """Lifespan context manager for startup/shutdown."""
+    # Startup
+    await _initialize_database()
+    await _initialize_plugins()
+    await _initialize_keyboard_mappings()
+    await _initialize_image_service()
+    await _initialize_default_config()
+    await _start_schedulers()
+    await _sync_display_orientation()
+    await _sync_themes_to_db()
+
+    yield
+
+    # Shutdown
+    await _shutdown_services()
 
 
 app = FastAPI(
@@ -194,9 +398,17 @@ app = FastAPI(
 )
 
 # CORS middleware
+# Parse CORS origins from config
+if settings.cors_allow_all:
+    # Allow all origins (development only)
+    cors_origins = ["*"]
+else:
+    # Parse comma-separated origins from config
+    cors_origins = [origin.strip() for origin in settings.cors_origins.split(",") if origin.strip()]
+
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["http://localhost:5173", "http://localhost:8000"],
+    allow_origins=cors_origins,
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
@@ -208,7 +420,7 @@ app.include_router(config.router, prefix="/api", tags=["config"])
 app.include_router(calendar.router, prefix="/api", tags=["calendar"])
 app.include_router(keyboard.router, prefix="/api", tags=["keyboard"])
 app.include_router(images.router, prefix="/api", tags=["images"])
-app.include_router(web_services.router, prefix="/api", tags=["web-services"])
+app.include_router(plugins.router, prefix="/api", tags=["plugins"])
 app.include_router(system.router, prefix="/api/system", tags=["system"])
 
 # Serve static files from frontend dist directory
@@ -216,25 +428,51 @@ app.include_router(system.router, prefix="/api/system", tags=["system"])
 project_root = Path(__file__).parent.parent.parent
 frontend_dist = project_root / "frontend" / "dist"
 
-# Mount static assets (JS, CSS, images, etc.)
+# Mount static assets (JS, CSS, images, etc.) with cache control headers
 # This must be mounted BEFORE the catch-all route to take precedence
 if frontend_dist.exists():
     assets_dir = frontend_dist / "assets"
     if assets_dir.exists():
-        app.mount("/assets", StaticFiles(directory=str(assets_dir)), name="assets")
-        print(f"Mounted static assets from: {assets_dir}")
+        # Use custom static file handler to add cache control headers
+        @app.get("/assets/{file_path:path}")
+        async def serve_asset(file_path: str):
+            """Serve static assets with cache control headers for development."""
+            asset_path = assets_dir / file_path
+            if asset_path.exists() and asset_path.is_file():
+                # In development/debug mode, disable caching to ensure updates are visible
+                # In production, you might want to enable caching with a hash-based filename
+                return FileResponse(
+                    str(asset_path),
+                    headers={
+                        "Cache-Control": "no-cache, no-store, must-revalidate",
+                        "Pragma": "no-cache",
+                        "Expires": "0",
+                    },
+                )
+            from fastapi import HTTPException
+
+            raise HTTPException(status_code=404, detail="Asset not found")
+
+        logger.info(f"Mounted static assets from: {assets_dir} (with no-cache headers)")
     else:
-        print(f"WARNING: Assets directory not found: {assets_dir}")
-    
+        logger.warning(f"Assets directory not found: {assets_dir}")
+
     # Serve index.html for root path
     @app.get("/")
     async def serve_frontend_root():
         """Serve frontend index.html for root path."""
         index_path = frontend_dist / "index.html"
         if index_path.exists():
-            return FileResponse(str(index_path))
+            return FileResponse(
+                str(index_path),
+                headers={
+                    "Cache-Control": "no-cache, no-store, must-revalidate",
+                    "Pragma": "no-cache",
+                    "Expires": "0",
+                },
+            )
         return {"message": "Calvin Dashboard API", "version": "0.1.0"}
-    
+
     # Serve index.html for all other non-API routes (SPA routing)
     # This must come after API routes and asset mounts to avoid intercepting them
     # Only handle GET requests for SPA routing - POST requests should only go to API routes
@@ -242,17 +480,27 @@ if frontend_dist.exists():
     async def serve_frontend_get(full_path: str):
         """Serve frontend index.html for SPA routing (GET only)."""
         # Don't handle API routes, docs, or assets (already handled by mounts/routers)
-        if (full_path.startswith("api/") or 
-            full_path.startswith("docs") or 
-            full_path.startswith("openapi.json") or
-            full_path.startswith("assets/")):
+        if (
+            full_path.startswith("api/")
+            or full_path.startswith("docs")
+            or full_path.startswith("openapi.json")
+            or full_path.startswith("assets/")
+        ):
             # Return 404 for API routes that don't exist (let routers handle it)
             from fastapi import HTTPException
+
             raise HTTPException(status_code=404, detail="Not found")
-        
+
         index_path = frontend_dist / "index.html"
         if index_path.exists():
-            return FileResponse(str(index_path))
+            return FileResponse(
+                str(index_path),
+                headers={
+                    "Cache-Control": "no-cache, no-store, must-revalidate",
+                    "Pragma": "no-cache",
+                    "Expires": "0",
+                },
+            )
         return {"message": "Calvin Dashboard API", "version": "0.1.0"}
 else:
     # Fallback if frontend dist doesn't exist (development mode)

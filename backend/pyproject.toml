@@ -3,7 +3,7 @@ name = "calvin-backend"
 version = "0.1.0"
 description = "Calvin Dashboard Backend"
 license = {text = "GPL-3.0"}
-requires-python = ">=3.11"
+requires-python = ">=3.12"
 dependencies = [
     "fastapi>=0.104.1",
     "uvicorn[standard]>=0.24.0",
@@ -24,6 +24,10 @@ dependencies = [
     "httpx>=0.25.0",
     "python-multipart>=0.0.6", # Required for FastAPI file uploads (UploadFile)
     "pytz>=2023.3", # For timezone support in display schedule
+    "pluggy>=1.3.0", # For dynamic plugin loading
+    "alembic>=1.13.0", # For database migrations
+    "loguru>=0.7.0", # For better logging (simpler and more reliable than standard logging)
+    "pre-commit>=4.3.0",
 ]
 
 # Platform-specific dependencies
@@ -45,6 +49,12 @@ dev = [
     "bandit>=1.7.5",
     "pre-commit>=3.5.0",
 ]
+docs = [
+    "mkdocs>=1.5.0",
+    "mkdocs-material>=9.5.0",
+    "mkdocs-awesome-pages-plugin>=2.9.0",
+    "pymdown-extensions>=10.0.0",
+]
 
 [build-system]
 requires = ["hatchling"]
@@ -55,14 +65,41 @@ packages = ["app"]
 
 [tool.ruff]
 line-length = 100
-target-version = "py311"
+target-version = "py312"
 
 [tool.ruff.lint]
 select = ["E", "F", "I", "N", "W", "UP"]
-ignore = ["N815"]  # Allow mixedCase for Pydantic model fields
+ignore = [
+    "N815",  # Allow mixedCase for Pydantic model fields
+    # Formatting-related rules that conflict with ruff format
+    "E501",  # line-too-long (handled by formatter)
+    "W191",  # tab-indentation (handled by formatter)
+    "E111",  # indentation-with-invalid-multiple (handled by formatter)
+    "E114",  # indentation-with-invalid-multiple-comment (handled by formatter)
+    "E117",  # over-indented (handled by formatter)
+    "Q000",  # bad-quotes-inline-string (handled by formatter)
+    "Q001",  # bad-quotes-multiline-string (handled by formatter)
+    "Q002",  # bad-quotes-docstring (handled by formatter)
+    "Q003",  # avoidable-escaped-quote (handled by formatter)
+    "COM812",  # missing-trailing-comma (handled by formatter)
+    "COM819",  # prohibited-trailing-comma (handled by formatter)
+]
+# Auto-fix issues when possible
+fixable = ["ALL"]
+unfixable = []
+
+[tool.ruff.format]
+# Use double quotes for strings (Black-compatible)
+quote-style = "double"
+# Use spaces for indentation
+indent-style = "space"
+# Respect magic trailing comma
+skip-magic-trailing-comma = false
+# Line ending style
+line-ending = "auto"
 
 [tool.mypy]
-python_version = "3.11"
+python_version = "3.12"
 warn_return_any = true
 warn_unused_configs = true
 disallow_untyped_defs = false
@@ -77,6 +114,10 @@ addopts = [
     "-v",
     "--strict-markers",
     "--tb=short",
+]
+filterwarnings = [
+    "ignore::DeprecationWarning:sqlalchemy.*",
+    "ignore:datetime.datetime.utcnow.*:DeprecationWarning",
 ]
 markers = [
     "unit: Unit tests",

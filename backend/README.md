@@ -40,11 +40,24 @@ uv run uvicorn app.main:app --reload --host 0.0.0.0 --port 8000
 # Run tests
 uv run pytest
 
-# Lint
-uv run ruff check .
+# Lint (with auto-fix)
+uv run ruff check --fix .
+uv run ruff check .  # Verify no issues remain
 
 # Format
 uv run ruff format .
+
+# Or use the convenience script (Linux/Mac)
+./scripts/fix-lint.sh
+
+# Or use the PowerShell script (Windows)
+./scripts/fix-lint.ps1
+
+# Setup pre-commit hooks (one-time)
+# Note: Pre-commit will run ruff-format (Black-compatible) and ruff check automatically
+# Ruff format handles formatting (whitespace, indentation, quotes) - it's Black-compatible
+# Ruff check handles linting (including line length) - some E501 errors may need manual fixes
+uv run pre-commit install
 
 # Type check
 uv run mypy app/

@@ -1,5 +1,7 @@
 <template>
-  <div :class="['layout-manager', `layout-${orientation}`]">
+  <div
+    :class="['layout-manager', `layout-${orientation}`, { flipped: isFlipped }]"
+  >
     <slot />
   </div>
 </template>
@@ -11,6 +13,7 @@ import { useConfigStore } from "../stores/config";
 const configStore = useConfigStore();
 
 const orientation = computed(() => configStore.orientation);
+const isFlipped = computed(() => configStore.orientationFlipped);
 </script>
 
 <style scoped>
@@ -20,5 +23,9 @@ const orientation = computed(() => configStore.orientation);
   display: flex;
   flex-direction: column;
   overflow: hidden;
+}
+
+.layout-manager.flipped {
+  transform: rotate(180deg);
 }
 </style>

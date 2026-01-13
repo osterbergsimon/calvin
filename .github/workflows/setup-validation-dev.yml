@@ -1,0 +1,496 @@
+name: Setup Validation Dev
+
+on:
+  push:
+    branches: [develop, main]
+    paths:
+      - 'scripts/setup-dev.sh'
+      - 'scripts/setup-common.sh'
+      - 'backend/pyproject.toml'
+      - 'backend/uv.lock'
+      - 'frontend/package.json'
+      - 'frontend/package-lock.json'
+  pull_request:
+    branches: [develop, main]
+    paths:
+      - 'scripts/setup-dev.sh'
+      - 'scripts/setup-common.sh'
+      - 'backend/pyproject.toml'
+      - 'backend/uv.lock'
+      - 'frontend/package.json'
+      - 'frontend/package-lock.json'
+  workflow_dispatch:
+
+jobs:
+  validate-scripts:
+    name: Validate Setup Scripts
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+      
+      - name: Check bash script syntax
+        run: |
+          echo "Checking bash script syntax..."
+          bash -n scripts/setup-dev.sh || exit 1
+          bash -n scripts/setup-common.sh || exit 1
+          echo "All bash scripts have valid syntax ✓"
+      
+      - name: Check script permissions
+        run: |
+          if [ ! -x "scripts/setup-dev.sh" ]; then
+            echo "::warning file=scripts/setup-dev.sh::Script should be executable"
+          fi
+      
+      - name: Security checks
+        run: |
+          echo "Running security checks..."
+          # Check for potential hardcoded secrets
+          if grep -r "password.*=.*['\"].*[a-zA-Z0-9]" scripts/setup*.sh 2>/dev/null | grep -v "#.*password" | grep -v "GIT_REPO\|GIT_BRANCH"; then
+            echo "::warning::Potential hardcoded credentials found in setup scripts"
+          fi
+          # Check for unsafe eval/exec patterns
+          if grep -E "eval\s|exec\s.*\$" scripts/setup*.sh; then
+            echo "::warning::Potentially unsafe eval/exec patterns found"
+          fi
+          echo "Security checks completed ✓"
+      
+      - name: Validate setup-common.sh functions
+        run: |
+          echo "Validating setup-common.sh..."
+          source scripts/setup-common.sh || true
+          REQUIRED_FUNCTIONS=("ensure_uv_installed" "install_backend_deps" "install_frontend_deps" "ensure_user_exists" "create_data_directories")
+          MISSING_FUNCTIONS=()
+          for func in "${REQUIRED_FUNCTIONS[@]}"; do
+            if ! declare -f "$func" > /dev/null; then
+              MISSING_FUNCTIONS+=("$func")
+            fi
+          done
+          if [ ${#MISSING_FUNCTIONS[@]} -gt 0 ]; then
+            echo "::error::Missing required functions: ${MISSING_FUNCTIONS[*]}"
+            exit 1
+          fi
+          echo "Key functions validated ✓"
+
+  test-dependency-installation:
+    name: Test Dependency Installation
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    strategy:
+      matrix:
+        test-type: [backend, frontend]
+    
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+      
+      - name: Cache UV packages
+        if: matrix.test-type == 'backend'
+        uses: actions/cache@v4
+        with:
+          path: |
+            ~/.cache/uv
+            backend/.venv
+          key: ${{ runner.os }}-uv-dev-${{ hashFiles('backend/uv.lock', 'backend/pyproject.toml') }}
+          restore-keys: |
+            ${{ runner.os }}-uv-dev-
+      
+      - name: Test Backend Dependencies (Dev)
+        if: matrix.test-type == 'backend'
+        working-directory: ./backend
+        run: |
+          echo "::group::Backend Dependency Installation (Dev)"
+          echo "Testing backend dependency installation (dev mode)..."
+          curl -LsSf https://astral.sh/uv/install.sh | sh
+          export PATH="$HOME/.local/bin:$HOME/.cargo/bin:$PATH"
+          echo "Installing backend dependencies with UV (dev extras)..."
+          START_TIME=$(date +%s)
+          uv sync --extra linux --extra dev || uv sync --extra linux --extra dev
+          END_TIME=$(date +%s)
+          DURATION=$((END_TIME - START_TIME))
+          echo "Installation took ${DURATION} seconds"
+          uv run python -c "import app; print('Backend imports successfully')" || exit 1
+          echo "Backend dependencies installed successfully ✓"
+          echo "::endgroup::"
+      
+      - name: Cache npm packages
+        if: matrix.test-type == 'frontend'
+        uses: actions/cache@v4
+        with:
+          path: frontend/node_modules
+          key: ${{ runner.os }}-npm-${{ hashFiles('frontend/package-lock.json') }}
+          restore-keys: |
+            ${{ runner.os }}-npm-
+      
+      - name: Test Frontend Dependencies
+        if: matrix.test-type == 'frontend'
+        working-directory: ./frontend
+        run: |
+          echo "::group::Frontend Dependency Installation"
+          echo "Testing frontend dependency installation..."
+          curl -fsSL https://deb.nodesource.com/setup_20.x | sudo -E bash -
+          sudo apt-get install -y nodejs
+          echo "Installing frontend dependencies..."
+          START_TIME=$(date +%s)
+          npm ci || npm install
+          END_TIME=$(date +%s)
+          DURATION=$((END_TIME - START_TIME))
+          echo "Installation took ${DURATION} seconds"
+          if [ ! -d "node_modules" ] || [ ! -d "node_modules/axios" ]; then
+            echo "::error::Frontend dependencies not installed correctly"
+            exit 1
+          fi
+          echo "Frontend dependencies installed successfully ✓"
+          echo "::endgroup::"
+
+  test-development-setup:
+    name: Test Development Setup Script
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    # Run on develop/main branches or manual dispatch
+    if: github.ref == 'refs/heads/develop' || github.ref == 'refs/heads/main' || github.event_name == 'workflow_dispatch'
+    
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+      
+      - name: Test setup-dev.sh in Docker container
+        run: |
+          echo "::group::Development Setup Test"
+          
+          # Create test script that runs the actual setup script
+          cat > /tmp/ci-test-setup.sh << 'TEST_EOF'
+          #!/bin/bash
+          set -e
+          
+          # Copy calvin to writable location
+          cp -r /calvin /tmp/calvin-test
+          cd /tmp/calvin-test
+          chmod +x scripts/*.sh
+          
+          # Set environment variables
+          export CALVIN_DIR="/home/calvin/calvin"
+          export CALVIN_USER="calvin"
+          export LOG_FILE="/tmp/calvin-setup.log"
+          export GIT_REPO="https://github.com/osterbergsimon/calvin.git"
+          export GIT_BRANCH="develop"
+          
+          # Pre-setup: copy repo to target location
+          # Create calvin user first (setup script expects it, or will create it)
+          if ! id calvin &>/dev/null; then
+            useradd -m -s /bin/bash calvin || true
+          fi
+          mkdir -p /home/calvin
+          cp -r /tmp/calvin-test /home/calvin/calvin
+          chown -R calvin:calvin /home/calvin/calvin
+          
+          # Patch ensure_git_repo to skip git operations if directory exists (CI mode)
+          python3 -c "import re; f=open('scripts/setup-common.sh'); c=f.read(); f.close(); p='    # CI override: if target exists, just ensure ownership\n    if [ -d \"\$3\" ]; then\n      echo \"[CI] Target directory exists, skipping git operations\"\n      chown -R \"\$4:\$4\" \"\$3\"\n      return 0\n    fi\n'; c=re.sub(r'(^ensure_git_repo\(\) \{)', r'\1\n'+p, c, flags=re.MULTILINE); f=open('scripts/setup-common.sh','w'); f.write(c); f.close()"
+          
+          # Patch setup-dev.sh to make swap setup non-fatal in CI (swap doesn't work in Docker)
+          python3 -c "import re; f=open('scripts/setup-dev.sh'); c=f.read(); f.close(); c=re.sub(r'    setup_swap_file \"4G\"', r'    setup_swap_file \"4G\" || { echo \"[CI] Swap setup failed (expected in Docker)\"; true; }', c); f=open('scripts/setup-dev.sh','w'); f.write(c); f.close()"
+          
+          # Verify the patch was applied
+          if ! grep -q 'setup_swap_file "4G" ||' scripts/setup-dev.sh; then
+            echo "::error::Failed to patch setup-dev.sh for swap"
+            echo "Current line:"
+            grep 'setup_swap_file "4G"' scripts/setup-dev.sh || echo "Line not found"
+            exit 1
+          fi
+          echo "✓ Swap patch verified"
+          
+          # Run the development setup script with timing
+          echo "Running setup-dev.sh (development)..."
+          SETUP_START=$(date +%s)
+          timeout 1800 bash scripts/setup-dev.sh 2>&1 | tee /tmp/setup-output.log || {
+            EXIT_CODE=$?
+            echo "Script exited with code $EXIT_CODE"
+            
+            # Check if failure was due to systemd/X (expected in CI)
+            if grep -E "systemd|Failed to start|Failed to enable|systemctl|daemon-reload|swapon.*failed" /tmp/setup-output.log > /dev/null; then
+              echo "[CI] Systemd/X server/swap failures are expected in CI - checking core setup..."
+            else
+              echo "::error::Setup script failed with unexpected error"
+              echo "=== Last 50 lines of setup output ==="
+              tail -50 /tmp/setup-output.log
+              exit $EXIT_CODE
+            fi
+          }
+          
+          # Show UV installation status from setup log
+          echo ""
+          echo "=== UV Installation Status ==="
+          grep -i "uv\|installing\|installed" /tmp/setup-output.log | tail -10 || echo "No UV-related messages found"
+          
+          echo ""
+          echo "=== Verification ==="
+          
+          # Verify key components
+          if [ ! -d "${CALVIN_DIR}/backend" ] || [ ! -d "${CALVIN_DIR}/frontend" ]; then
+            echo "::error::Directories not created"
+            exit 1
+          fi
+          echo "✓ Directories created"
+          
+          # Check UV installation
+          echo "Checking UV installation..."
+          # Try multiple ways to find UV
+          UV_FOUND=false
+          if sudo -u calvin bash -c 'export PATH="$HOME/.local/bin:$HOME/.cargo/bin:$PATH" && command -v uv &> /dev/null'; then
+            UV_FOUND=true
+            UV_VERSION=$(sudo -u calvin bash -c 'export PATH="$HOME/.local/bin:$HOME/.cargo/bin:$PATH" && uv --version' 2>&1 || echo "unknown")
+            echo "✓ UV installed (version: ${UV_VERSION})"
+          elif [ -f "/home/calvin/.local/bin/uv" ]; then
+            UV_FOUND=true
+            UV_VERSION=$(sudo -u calvin /home/calvin/.local/bin/uv --version 2>&1 || echo "unknown")
+            echo "✓ UV found at /home/calvin/.local/bin/uv (version: ${UV_VERSION})"
+          elif [ -f "/home/calvin/.cargo/bin/uv" ]; then
+            UV_FOUND=true
+            UV_VERSION=$(sudo -u calvin /home/calvin/.cargo/bin/uv --version 2>&1 || echo "unknown")
+            echo "✓ UV found at /home/calvin/.cargo/bin/uv (version: ${UV_VERSION})"
+          fi
+          
+          if [ "$UV_FOUND" = "false" ]; then
+            echo "::error::UV not installed or not found"
+            echo "Checking UV installation paths..."
+            echo "~/.local/bin/uv:"
+            sudo -u calvin ls -la /home/calvin/.local/bin/uv 2>&1 || echo "  Not found"
+            echo "~/.cargo/bin/uv:"
+            sudo -u calvin ls -la /home/calvin/.cargo/bin/uv 2>&1 || echo "  Not found"
+            echo "Home directory contents:"
+            sudo -u calvin ls -la /home/calvin/ 2>&1 | head -10
+            echo "Checking setup log for UV installation messages..."
+            grep -i "uv\|installing" /tmp/setup-output.log | tail -20 || echo "No UV messages in log"
+            exit 1
+          fi
+          
+          # Check backend dependencies (dev mode uses venv or UV with dev extras)
+          if [ ! -d "${CALVIN_DIR}/backend/.venv" ] && ! sudo -u calvin bash -c "cd '${CALVIN_DIR}/backend' && export PATH=\"\$HOME/.local/bin:\$HOME/.cargo/bin:\$PATH\" && uv --version &> /dev/null"; then
+            echo "::error::Backend dependencies not installed"
+            exit 1
+          fi
+          echo "✓ Backend dependencies installed"
+          
+          # Check frontend dependencies (dev mode installs all deps, not production)
+          if [ ! -d "${CALVIN_DIR}/frontend/node_modules" ]; then
+            echo "::error::Frontend dependencies not installed"
+            echo "Checking frontend directory..."
+            ls -la "${CALVIN_DIR}/frontend/" || echo "Frontend directory not accessible"
+            echo "Checking setup log for frontend installation..."
+            grep -i "frontend\|npm" /tmp/setup-output.log | tail -20 || echo "No frontend messages in log"
+            exit 1
+          fi
+          echo "✓ Frontend dependencies installed"
+          
+          # Check .dev marker file (dev mode should create this)
+          if [ ! -f "${CALVIN_DIR}/backend/.dev" ]; then
+            echo "::error::.dev marker file not created (dev mode should create this)"
+            exit 1
+          fi
+          echo "✓ .dev marker file created"
+          
+          # Dev mode should NOT build frontend (uses dev server)
+          if [ -d "${CALVIN_DIR}/frontend/dist" ]; then
+            echo "⚠ Frontend dist exists (dev mode typically doesn't build)"
+          fi
+          
+          echo ""
+          echo "=== Service Validation ==="
+          
+          # Development setup should install these services
+          EXPECTED_SERVICES=("calvin-backend.service" "calvin-frontend-dev.service")
+          
+          for service in "${EXPECTED_SERVICES[@]}"; do
+            if [ ! -f "/etc/systemd/system/${service}" ]; then
+              echo "::error::Service file not found: ${service}"
+              exit 1
+            fi
+            echo "✓ Service file installed: ${service}"
+            
+            # Validate service file syntax
+            if command -v systemd-analyze >/dev/null 2>&1; then
+              if systemd-analyze verify "/etc/systemd/system/${service}" 2>&1 | grep -E "error|failed|Invalid" > /dev/null; then
+                echo "::error::Service file has syntax errors: ${service}"
+                systemd-analyze verify "/etc/systemd/system/${service}" || true
+                exit 1
+              fi
+              echo "✓ Service file syntax valid: ${service}"
+            fi
+          done
+          
+          # Try to use systemctl if available
+          if command -v systemctl >/dev/null 2>&1 && systemctl daemon-reload 2>/dev/null; then
+            echo "✓ Systemd daemon reloaded"
+            
+            for service in "${EXPECTED_SERVICES[@]}"; do
+              if systemctl show "${service}" >/dev/null 2>&1; then
+                echo "✓ Service can be loaded: ${service}"
+                
+                if systemctl is-enabled "${service}" >/dev/null 2>&1; then
+                  echo "✓ Service enabled: ${service}"
+                fi
+                
+                # Try to start (will likely fail in CI, but validates service file)
+                if systemctl start "${service}" 2>&1; then
+                  echo "✓ Service started: ${service}"
+                  systemctl stop "${service}" 2>/dev/null || true
+                else
+                  SERVICE_STATUS=$(systemctl status "${service}" --no-pager -l 2>&1 || true)
+                  if echo "$SERVICE_STATUS" | grep -E "dependency|not found|Failed to start" > /dev/null; then
+                    echo "⚠ Service start failed (expected in CI): ${service}"
+                  fi
+                fi
+              fi
+            done
+          fi
+          
+          SETUP_END=$(date +%s)
+          SETUP_DURATION=$((SETUP_END - SETUP_START))
+          echo ""
+          echo "=== Setup Performance ==="
+          echo "Setup completed in ${SETUP_DURATION} seconds ($(($SETUP_DURATION / 60)) minutes)"
+          echo ""
+          echo "Development setup validation completed successfully ✓"
+          TEST_EOF
+          
+          chmod +x /tmp/ci-test-setup.sh
+          
+          # Run in Docker container
+          # Using debian:sid-slim - has Python 3.12 by default (meets backend >=3.12 requirement)
+          # Still Debian-based to match target distro (setup scripts use apt-get)
+          docker run --rm --privileged \
+            --tmpfs /tmp --tmpfs /run --tmpfs /run/lock \
+            -v /sys/fs/cgroup:/sys/fs/cgroup:ro \
+            -v "$PWD:/calvin:ro" \
+            -v "/tmp/ci-test-setup.sh:/tmp/ci-test-setup.sh:ro" \
+            debian:sid-slim \
+            bash -c "
+              set -e
+              export DEBIAN_FRONTEND=noninteractive
+              apt-get update -qq
+              apt-get install -y -qq \
+                curl git sudo bash python3 python3-dev python3-venv python3-pip \
+                build-essential ca-certificates sed systemd systemd-sysv dbus
+              # Debian sid has Python 3.12 by default (meets >=3.12 requirement)
+              python3 --version
+              curl -fsSL https://deb.nodesource.com/setup_20.x | bash -
+              apt-get install -y -qq nodejs
+              bash /tmp/ci-test-setup.sh
+            " || {
+            echo "::error::Development setup script test failed"
+            exit 1
+          }
+          
+          echo "Development setup script validation passed ✓"
+          echo "::endgroup::"
+      
+      - name: Test idempotency
+        if: success()
+        run: |
+          echo "::group::Idempotency Test"
+          echo "Testing that setup script can be run twice without issues..."
+          
+          cat > /tmp/ci-test-idempotency.sh << 'IDEMPOTENCY_EOF'
+          #!/bin/bash
+          set -e
+          
+          cp -r /calvin /tmp/calvin-test2
+          cd /tmp/calvin-test2
+          chmod +x scripts/*.sh
+          
+          export CALVIN_DIR="/home/calvin/calvin"
+          export CALVIN_USER="calvin"
+          export LOG_FILE="/tmp/calvin-setup-idempotency.log"
+          export GIT_REPO="https://github.com/osterbergsimon/calvin.git"
+          export GIT_BRANCH="develop"
+          
+          # Create calvin user if it doesn't exist
+          if ! id calvin &>/dev/null; then
+            useradd -m -s /bin/bash calvin || true
+          fi
+          mkdir -p /home/calvin
+          cp -r /tmp/calvin-test2 /home/calvin/calvin
+          chown -R calvin:calvin /home/calvin/calvin
+          
+          # Patch ensure_git_repo to skip git operations if directory exists (CI mode)
+          python3 -c "import re; f=open('scripts/setup-common.sh'); c=f.read(); f.close(); p='    # CI override: if target exists, just ensure ownership\n    if [ -d \"\$3\" ]; then\n      echo \"[CI] Target directory exists, skipping git operations\"\n      chown -R \"\$4:\$4\" \"\$3\"\n      return 0\n    fi\n'; c=re.sub(r'(^ensure_git_repo\(\) \{)', r'\1\n'+p, c, flags=re.MULTILINE); f=open('scripts/setup-common.sh','w'); f.write(c); f.close()"
+          
+          # Patch setup-dev.sh to make swap setup non-fatal in CI (swap doesn't work in Docker)
+          python3 -c "import re; f=open('scripts/setup-dev.sh'); c=f.read(); f.close(); c=re.sub(r'    setup_swap_file \"4G\"', r'    setup_swap_file \"4G\" || { echo \"[CI] Swap setup failed (expected in Docker)\"; true; }', c); f=open('scripts/setup-dev.sh','w'); f.write(c); f.close()"
+          
+          # Verify the patch was applied
+          if ! grep -q 'setup_swap_file "4G" ||' scripts/setup-dev.sh; then
+            echo "::error::Failed to patch setup-dev.sh for swap"
+            echo "Current line:"
+            grep 'setup_swap_file "4G"' scripts/setup-dev.sh || echo "Line not found"
+            exit 1
+          fi
+          echo "✓ Swap patch verified"
+          
+          # Run setup first time
+          echo "First setup run..."
+          bash scripts/setup-dev.sh 2>&1 | tee /tmp/setup-first.log || {
+            EXIT_CODE=$?
+            if ! grep -E "systemd|Failed to start|Failed to enable" /tmp/setup-first.log > /dev/null; then
+              echo "::error::First setup run failed"
+              exit $EXIT_CODE
+            fi
+          }
+          
+          # Run setup second time (should be idempotent)
+          echo "Second setup run (idempotency test)..."
+          bash scripts/setup-dev.sh 2>&1 | tee /tmp/setup-second.log || {
+            EXIT_CODE=$?
+            if ! grep -E "systemd|Failed to start|Failed to enable" /tmp/setup-second.log > /dev/null; then
+              echo "::error::Second setup run failed (not idempotent)"
+              exit $EXIT_CODE
+            fi
+          }
+          
+          # Verify everything still works after second run
+          if [ ! -d "${CALVIN_DIR}/backend" ] || [ ! -d "${CALVIN_DIR}/frontend" ]; then
+            echo "::error::Directories missing after second run"
+            exit 1
+          fi
+          
+          if ! sudo -u calvin bash -c 'export PATH="$HOME/.local/bin:$HOME/.cargo/bin:$PATH" && command -v uv &> /dev/null'; then
+            echo "::error::UV missing after second run"
+            exit 1
+          fi
+          
+          # Verify .dev marker still exists
+          if [ ! -f "${CALVIN_DIR}/backend/.dev" ]; then
+            echo "::error::.dev marker missing after second run"
+            exit 1
+          fi
+          
+          echo "✓ Idempotency test passed - setup can be run multiple times safely"
+          IDEMPOTENCY_EOF
+          
+          chmod +x /tmp/ci-test-idempotency.sh
+          
+          docker run --rm --privileged \
+            --tmpfs /tmp --tmpfs /run --tmpfs /run/lock \
+            -v /sys/fs/cgroup:/sys/fs/cgroup:ro \
+            -v "$PWD:/calvin:ro" \
+            -v "/tmp/ci-test-idempotency.sh:/tmp/ci-test-idempotency.sh:ro" \
+            debian:sid-slim \
+            bash -c "
+              set -e
+              export DEBIAN_FRONTEND=noninteractive
+              apt-get update -qq
+              apt-get install -y -qq \
+                curl git sudo bash python3 python3-dev python3-venv python3-pip \
+                build-essential ca-certificates sed systemd systemd-sysv dbus
+              # Debian sid has Python 3.12 by default (meets >=3.12 requirement)
+              python3 --version
+              curl -fsSL https://deb.nodesource.com/setup_20.x | bash -
+              apt-get install -y -qq nodejs
+              bash /tmp/ci-test-idempotency.sh
+            " || {
+            echo "::error::Idempotency test failed"
+            exit 1
+          }
+          echo "::endgroup::"

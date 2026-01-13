@@ -1,0 +1,40 @@
+{
+  "folders": [
+    {
+      "path": ".",
+      "name": "Calvin"
+    },
+    {
+      "path": "../calvin-plugins",
+      "name": "Calvin Plugins"
+    }
+  ],
+  "settings": {
+    "python.defaultInterpreterPath": "${workspaceFolder:Calvin}/backend/.venv/bin/python",
+    "python.analysis.extraPaths": [
+      "${workspaceFolder:Calvin}/backend"
+    ],
+    "files.exclude": {
+      "**/__pycache__": true,
+      "**/.pyc": true,
+      "**/node_modules": true,
+      "**/.venv": true
+    },
+    "search.exclude": {
+      "**/node_modules": true,
+      "**/__pycache__": true,
+      "**/.venv": true,
+      "**/dist": true,
+      "**/build": true
+    }
+  },
+  "extensions": {
+    "recommendations": [
+      "ms-python.python",
+      "ms-python.vscode-pylance",
+      "vue.volar",
+      "dbaeumer.vscode-eslint"
+    ]
+  }
+}
+

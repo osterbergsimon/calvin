@@ -39,7 +39,6 @@
 
 - **[README.md](README.md)** - Overview and quick reference
 - **[ISSUES_FIXED.md](ISSUES_FIXED.md)** - Issues found and fixed
-- **[REVIEW.md](REVIEW.md)** - Configuration review notes
 
 ## 🎯 Choose Your Path
 

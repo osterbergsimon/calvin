@@ -4,8 +4,11 @@ from datetime import UTC, datetime
 
 import httpx
 from icalendar import Calendar
+from loguru import logger
 
 from app.models.calendar import CalendarEvent
+
+# Loguru automatically includes module/function info in logs via format string
 
 
 async def parse_ical_from_url(url: str) -> list[CalendarEvent]:
@@ -20,15 +23,28 @@ async def parse_ical_from_url(url: str) -> list[CalendarEvent]:
     """
     events: list[CalendarEvent] = []
 
+    logger.debug("Fetching iCal from URL: {}...", url[:100])
+
     try:
         async with httpx.AsyncClient(timeout=10.0, follow_redirects=True) as client:
+            logger.debug("Making HTTP GET request to: {}...", url[:100])
             response = await client.get(url)
+            logger.debug(
+                "HTTP response: status={}, content-type={}, content-length={} bytes",
+                response.status_code,
+                response.headers.get("content-type", "unknown"),
+                len(response.content),
+            )
             response.raise_for_status()
 
             # Check if we got valid iCal content
             content_type = response.headers.get("content-type", "").lower()
             if "text/calendar" not in content_type and "text/plain" not in content_type:
-                print(f"Warning: Unexpected content type {content_type} for iCal URL")
+                logger.warning(
+                    "Unexpected content type {} for iCal URL: {}...",
+                    content_type,
+                    url[:100],
+                )
 
             # Parse iCal content
             calendar = Calendar.from_ical(response.content)
@@ -39,16 +55,23 @@ async def parse_ical_from_url(url: str) -> list[CalendarEvent]:
                     if event:
                         events.append(event)
 
-            print(f"Parsed {len(events)} events from iCal URL")
+            logger.debug("Parsed {} events from iCal URL: {}...", len(events), url[:100])
+            if events:
+                logger.debug(
+                    "Event date range: earliest={}, latest={}",
+                    min((e.start for e in events), default="N/A"),
+                    max((e.end for e in events), default="N/A"),
+                )
     except httpx.HTTPStatusError as e:
-        print(f"HTTP error {e.response.status_code} when fetching iCal from URL: {url[:80]}...")
-        print(f"Response: {e.response.text[:200]}")
+        logger.error(
+            "HTTP error {} when fetching iCal from URL: {}... Response: {}",
+            e.response.status_code,
+            url[:100],
+            e.response.text[:200],
+        )
         raise
-    except Exception as e:
-        print(f"Error parsing iCal from URL {url[:80]}...: {e}")
-        import traceback
-
-        traceback.print_exc()
+    except Exception:
+        logger.exception("Error parsing iCal from URL {}...", url[:100])
         raise
 
     return events
@@ -138,7 +161,7 @@ def _parse_vevent(component) -> CalendarEvent | None:
 
         return event
     except Exception as e:
-        print(f"Error parsing VEVENT: {e}")
+        logger.debug("Error parsing VEVENT: {}", e)
         return None
 
 
@@ -163,8 +186,8 @@ async def parse_ical_from_file(file_path: str) -> list[CalendarEvent]:
                     event = _parse_vevent(component)
                     if event:
                         events.append(event)
-    except Exception as e:
-        print(f"Error parsing iCal from file {file_path}: {e}")
+    except Exception:
+        logger.exception("Error parsing iCal from file {}", file_path)
         raise
 
     return events

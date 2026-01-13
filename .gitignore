@@ -76,6 +76,11 @@ htmlcov/
 .hypothesis/
 *.cover
 
+# Playwright
+test-results/
+playwright-report/
+playwright/.cache/
+
 # Database
 *.db
 *.sqlite
@@ -83,7 +88,9 @@ htmlcov/
 
 # Data
 data/images/
-backend/data/images/
+backend/data/
+# Exception: builtin.json should be tracked
+!backend/data/themes/builtin.json
 data/db/
 
 # Build
@@ -100,3 +107,5 @@ coverage/
 .coverage.*
 bandit-report.json
 
+docs/archive/CLEANUP_REPORT.md
+docs/archive/LEGACY_CALENDAR_SERVICE_ANALYSIS.md

@@ -1,25 +1,109 @@
 """Configuration endpoints."""
 
-from typing import Union, List, Dict, Any
-from fastapi import APIRouter
-from pydantic import BaseModel
+import re
+import subprocess
+from pathlib import Path
+from typing import Any
+
+from fastapi import APIRouter, HTTPException
+from pydantic import BaseModel, ConfigDict
 
 from app.services.config_service import config_service
+from app.services.display_orientation_service import display_orientation_service
 
 router = APIRouter()
+
+
+def get_git_version() -> str | None:
+    """
+    Get the current git commit short hash.
+
+    Returns:
+        Short commit hash (7 characters) or None if git is not available
+    """
+    try:
+        # Get the project root (parent of backend directory)
+        project_root = Path(__file__).parent.parent.parent.parent
+        result = subprocess.run(
+            ["git", "rev-parse", "--short", "HEAD"],
+            cwd=project_root,
+            capture_output=True,
+            text=True,
+            timeout=5,
+        )
+        if result.returncode == 0:
+            return result.stdout.strip()
+        return None
+    except (subprocess.TimeoutExpired, FileNotFoundError, Exception):
+        # Git not available or error occurred
+        return None
+
+
+def get_frontend_version() -> str | None:
+    """
+    Get the frontend version from the built HTML file.
+
+    Returns:
+        Frontend version (git commit short hash) or None if not available
+    """
+    try:
+        # Get the project root (parent of backend directory)
+        project_root = Path(__file__).parent.parent.parent.parent
+        frontend_dist = project_root / "frontend" / "dist"
+        index_path = frontend_dist / "index.html"
+
+        if not index_path.exists():
+            # Try alternative path (in case backend is in a different location)
+            # This handles cases where the project structure might be different
+            alt_path = project_root / "dist" / "index.html"
+            if alt_path.exists():
+                index_path = alt_path
+            else:
+                return None
+
+        # Read the HTML file
+        html_content = index_path.read_text(encoding="utf-8")
+
+        # Extract frontend version from meta tag
+        # Try multiple patterns to be more flexible
+        patterns = [
+            r'<meta\s+name=["\']frontend-version["\']\s+content=["\']([^"\']+)["\']',
+            r'<meta\s+content=["\']([^"\']+)["\']\s+name=["\']frontend-version["\']',
+        ]
+
+        for pattern in patterns:
+            match = re.search(pattern, html_content, re.IGNORECASE)
+            if match:
+                version = match.group(1).strip()
+                if version:
+                    return version
+
+        return None
+    except Exception as e:
+        # File not found or error reading - log in debug mode
+        import logging
+
+        logger = logging.getLogger(__name__)
+        logger.debug(f"Could not read frontend version: {e}")
+        return None
 
 
 class ConfigUpdate(BaseModel):
     """Configuration update model."""
 
     orientation: str | None = None
+    orientationFlipped: bool | None = None  # Whether orientation is flipped (180° rotation)
+    applyDisplayRotation: bool | None = (
+        None  # Whether to physically rotate display on RPi (default: True)
+    )
     calendarSplit: float | None = None
+    lastSideViewMode: str | None = None  # Last side view mode ('photos' | 'web_services')
     keyboardType: str | None = None
     photoFrameEnabled: bool | None = None
     photoFrameTimeout: int | None = None
     showUI: bool | None = None
     photoRotationInterval: int | None = None  # Photo rotation interval in seconds
-    calendarViewMode: str | None = None  # 'month' or 'rolling'
+    calendarViewMode: str | None = None  # 'month' | 'week' | 'day' | 'rolling'
     timeFormat: str | None = None  # '12h' or '24h' (default: '24h')
     showModeIndicator: bool | None = None  # Show mode indicator icon
     modeIndicatorTimeout: int | None = (
@@ -31,23 +115,42 @@ class ConfigUpdate(BaseModel):
         None  # Side view position: 'left' | 'right' for landscape, 'top' | 'bottom' for portrait
     )
     themeMode: str | None = None  # Theme mode: 'light' | 'dark' | 'auto' | 'time'
+    selectedTheme: str | None = None  # Selected custom theme ID (null = use themeMode)
     darkModeStart: int | None = None  # Dark mode start hour (0-23)
     darkModeEnd: int | None = None  # Dark mode end hour (0-23)
     displayScheduleEnabled: bool | None = None  # Enable display power schedule
-    displayOffTime: str | None = None  # Display off time (format: "HH:MM") - deprecated, use displaySchedule
-    displayOnTime: str | None = None  # Display on time (format: "HH:MM") - deprecated, use displaySchedule
-    displaySchedule: Union[str, List[Dict[str, Any]], None] = None  # Display schedule as JSON string or array: [{"day": 0-6, "enabled": bool, "onTime": "HH:MM", "offTime": "HH:MM"}, ...]
+    # Display off time (format: "HH:MM") - deprecated, use displaySchedule
+    displayOffTime: str | None = None
+    # Display on time (format: "HH:MM") - deprecated, use displaySchedule
+    displayOnTime: str | None = None
+    # Display schedule as JSON string or array:
+    # [{"day": 0-6, "enabled": bool, "onTime": "HH:MM", "offTime": "HH:MM"}, ...]
+    displaySchedule: str | list[dict[str, Any]] | None = None
     displayTimeoutEnabled: bool | None = None  # Enable display timeout (screensaver)
     displayTimeout: int | None = None  # Display timeout in seconds (0 = never, default: 0)
     rebootComboKey1: str | None = None  # First key for reboot combo (e.g., "KEY_1")
     rebootComboKey2: str | None = None  # Second key for reboot combo (e.g., "KEY_7")
     rebootComboDuration: int | None = None  # Reboot combo duration in milliseconds (default: 10000)
-    imageDisplayMode: str | None = None  # Image display mode: 'fit', 'fill', 'crop', 'center', 'smart' (default: 'smart')
-    timezone: str | None = None  # Timezone (e.g., "America/New_York", "Europe/London", "UTC") - null = system timezone
+    keyboardFeedbackEnabled: bool | None = None  # Enable visual keyboard feedback (default: True)
+    keyboardFeedbackMode: str | None = (
+        None  # Keyboard feedback mode: 'normal' | 'small' (default: 'normal')
+    )
+    # Image display mode: 'fit', 'fill', 'crop', 'center', 'smart' (default: 'smart')
+    imageDisplayMode: str | None = None
+    randomizeImages: bool | None = None  # Randomize image order (default: False)
+    # Timezone (e.g., "America/New_York", "Europe/London", "UTC") - null = system timezone
+    timezone: str | None = None
+    gitRepoUrl: str | None = (
+        None  # Git repository URL for updates (default: 'https://github.com/osterbergsimon/calvin.git')
+    )
+    gitBranch: str | None = None  # Git branch to use for updates (default: 'main')
+    configPollInterval: int | None = None  # Config polling interval in seconds (default: 30)
+    calendarRefreshInterval: int | None = (
+        None  # Calendar cache refresh interval in minutes (default: 15)
+    )
 
     # Allow arbitrary fields for extensibility
-    class Config:
-        extra = "allow"
+    model_config = ConfigDict(extra="allow")
 
 
 @router.get("/config")
@@ -58,6 +161,14 @@ async def get_config():
     # Set defaults if not present
     if "orientation" not in config:
         config["orientation"] = "landscape"
+    if "orientationFlipped" not in config and "orientation_flipped" not in config:
+        config["orientationFlipped"] = False  # Default to not flipped
+    elif "orientation_flipped" in config and "orientationFlipped" not in config:
+        config["orientationFlipped"] = config["orientation_flipped"]
+    if "lastSideViewMode" not in config and "last_side_view_mode" not in config:
+        config["lastSideViewMode"] = "photos"  # Default to photos
+    elif "last_side_view_mode" in config and "lastSideViewMode" not in config:
+        config["lastSideViewMode"] = config["last_side_view_mode"]
     if "calendarSplit" not in config and "calendar_split" not in config:
         config["calendarSplit"] = 70.0
     elif "calendar_split" in config and "calendarSplit" not in config:
@@ -83,7 +194,7 @@ async def get_config():
     elif "photo_rotation_interval" in config and "photoRotationInterval" not in config:
         config["photoRotationInterval"] = config["photo_rotation_interval"]
     if "calendarViewMode" not in config and "calendar_view_mode" not in config:
-        config["calendarViewMode"] = "month"  # 'month' or 'rolling'
+        config["calendarViewMode"] = "month"  # 'month' | 'week' | 'day' | 'rolling'
     elif "calendar_view_mode" in config and "calendarViewMode" not in config:
         config["calendarViewMode"] = config["calendar_view_mode"]
     if "timeFormat" not in config and "time_format" not in config:
@@ -98,6 +209,14 @@ async def get_config():
         config["modeIndicatorTimeout"] = 5  # 5 seconds default
     elif "mode_indicator_timeout" in config and "modeIndicatorTimeout" not in config:
         config["modeIndicatorTimeout"] = config["mode_indicator_timeout"]
+    if "keyboardFeedbackEnabled" not in config and "keyboard_feedback_enabled" not in config:
+        config["keyboardFeedbackEnabled"] = True  # Enabled by default
+    elif "keyboard_feedback_enabled" in config and "keyboardFeedbackEnabled" not in config:
+        config["keyboardFeedbackEnabled"] = config["keyboard_feedback_enabled"]
+    if "keyboardFeedbackMode" not in config and "keyboard_feedback_mode" not in config:
+        config["keyboardFeedbackMode"] = "normal"  # Normal mode by default
+    elif "keyboard_feedback_mode" in config and "keyboardFeedbackMode" not in config:
+        config["keyboardFeedbackMode"] = config["keyboard_feedback_mode"]
     if "weekStartDay" not in config and "week_start_day" not in config:
         config["weekStartDay"] = 0  # Sunday default
     elif "week_start_day" in config and "weekStartDay" not in config:
@@ -118,6 +237,14 @@ async def get_config():
         pass
     else:
         config["themeMode"] = "auto"  # Auto theme by default
+    # Handle selectedTheme - prioritize saved value from database
+    if "selected_theme" in config:
+        config["selectedTheme"] = config["selected_theme"]
+    elif "selectedTheme" in config:
+        # Already in camelCase, keep it
+        pass
+    else:
+        config["selectedTheme"] = None  # No custom theme selected by default
     # Handle darkModeStart - prioritize saved value from database
     if "dark_mode_start" in config:
         config["darkModeStart"] = config["dark_mode_start"]
@@ -150,10 +277,15 @@ async def get_config():
     # Check if we have a valid schedule (not None, not empty string, not empty list)
     has_schedule = False
     schedule_value = None
-    
+
     if "displaySchedule" in config:
         schedule_value = config["displaySchedule"]
-        if schedule_value is not None and schedule_value != "" and (not isinstance(schedule_value, list) or len(schedule_value) > 0):
+        is_valid = (
+            schedule_value is not None
+            and schedule_value != ""
+            and (not isinstance(schedule_value, list) or len(schedule_value) > 0)
+        )
+        if is_valid:
             has_schedule = True
     elif "display_schedule" in config:
         schedule_value = config["display_schedule"]
@@ -161,6 +293,7 @@ async def get_config():
             # Parse JSON string if needed (if stored as string - old format)
             # If stored with value_type="json", it's already parsed by _parse_value()
             import json
+
             if isinstance(schedule_value, str):
                 try:
                     # Old format: stored as string, need to parse
@@ -171,7 +304,9 @@ async def get_config():
                         # Migrate old format to new format (update value_type to "json")
                         # This ensures future retrievals work correctly
                         try:
-                            await config_service.set_value("display_schedule", parsed, value_type="json")
+                            await config_service.set_value(
+                                "display_schedule", parsed, value_type="json"
+                            )
                         except Exception:
                             # Migration failed, but we can still use the parsed value
                             pass
@@ -187,13 +322,12 @@ async def get_config():
                 # Fallback for other types
                 config["displaySchedule"] = schedule_value
                 has_schedule = True
-    
+
     # If no valid schedule found, use default
     if not has_schedule:
         # Default: all days enabled, 06:00-22:00
         default_schedule = [
-            {"day": i, "enabled": True, "onTime": "06:00", "offTime": "22:00"}
-            for i in range(7)
+            {"day": i, "enabled": True, "onTime": "06:00", "offTime": "22:00"} for i in range(7)
         ]
         config["displaySchedule"] = default_schedule
     if "rebootComboKey1" not in config and "reboot_combo_key1" not in config:
@@ -220,9 +354,76 @@ async def get_config():
         config["imageDisplayMode"] = "smart"  # Smart mode by default
     elif "image_display_mode" in config and "imageDisplayMode" not in config:
         config["imageDisplayMode"] = config["image_display_mode"]
+    if "randomizeImages" not in config and "randomize_images" not in config:
+        config["randomizeImages"] = False  # Don't randomize by default
+    elif "randomize_images" in config and "randomizeImages" not in config:
+        randomize_value = config["randomize_images"]
+        is_randomize = (
+            randomize_value == "true" if isinstance(randomize_value, str) else bool(randomize_value)
+        )
+        config["randomizeImages"] = is_randomize
     if "timezone" not in config:
         config["timezone"] = None  # No timezone set by default (use system timezone)
     # Note: timezone is stored as-is (no camelCase conversion needed)
+    # Handle clock settings
+    if "clockEnabled" not in config and "clock_enabled" not in config:
+        config["clockEnabled"] = True  # Clock enabled by default
+    elif "clock_enabled" in config and "clockEnabled" not in config:
+        config["clockEnabled"] = config["clock_enabled"]
+    if "clockDisplayMode" not in config and "clock_display_mode" not in config:
+        config["clockDisplayMode"] = "header"  # Default: show only when header is visible
+    elif "clock_display_mode" in config and "clockDisplayMode" not in config:
+        config["clockDisplayMode"] = config["clock_display_mode"]
+    if "clockShowDate" not in config and "clock_show_date" not in config:
+        config["clockShowDate"] = False  # Don't show date by default
+    elif "clock_show_date" in config and "clockShowDate" not in config:
+        config["clockShowDate"] = config["clock_show_date"]
+    if "clockShowSeconds" not in config and "clock_show_seconds" not in config:
+        config["clockShowSeconds"] = False  # Don't show seconds by default
+    elif "clock_show_seconds" in config and "clockShowSeconds" not in config:
+        config["clockShowSeconds"] = config["clock_show_seconds"]
+    if "clockPosition" not in config and "clock_position" not in config:
+        config["clockPosition"] = "top-right"  # Default position
+    elif "clock_position" in config and "clockPosition" not in config:
+        config["clockPosition"] = config["clock_position"]
+    if "clockSize" not in config and "clock_size" not in config:
+        config["clockSize"] = "medium"  # Default size
+    elif "clock_size" in config and "clockSize" not in config:
+        config["clockSize"] = config["clock_size"]
+    if "mealPlanCardSize" not in config and "meal_plan_card_size" not in config:
+        config["mealPlanCardSize"] = "medium"  # Default size
+    elif "meal_plan_card_size" in config and "mealPlanCardSize" not in config:
+        config["mealPlanCardSize"] = config["meal_plan_card_size"]
+    if "gitRepoUrl" not in config and "git_repo_url" not in config:
+        config["gitRepoUrl"] = "https://github.com/osterbergsimon/calvin.git"  # Default repo
+    elif "git_repo_url" in config and "gitRepoUrl" not in config:
+        config["gitRepoUrl"] = config["git_repo_url"]
+    if "gitBranch" not in config and "git_branch" not in config:
+        config["gitBranch"] = "main"  # Default to main branch
+    elif "git_branch" in config and "gitBranch" not in config:
+        config["gitBranch"] = config["git_branch"]
+    if "consoleLogEnabled" not in config and "console_log_enabled" not in config:
+        config["consoleLogEnabled"] = True  # Default to enabled for backwards compatibility
+    elif "console_log_enabled" in config and "consoleLogEnabled" not in config:
+        config["consoleLogEnabled"] = config["console_log_enabled"]
+    if "consoleLogLevel" not in config and "console_log_level" not in config:
+        config["consoleLogLevel"] = "info"  # Default to 'info' level
+    elif "console_log_level" in config and "consoleLogLevel" not in config:
+        config["consoleLogLevel"] = config["console_log_level"]
+    if "configPollInterval" not in config and "config_poll_interval" not in config:
+        config["configPollInterval"] = 30  # Default to 30 seconds
+    elif "config_poll_interval" in config and "configPollInterval" not in config:
+        config["configPollInterval"] = config["config_poll_interval"]
+    if "calendarRefreshInterval" not in config and "calendar_refresh_interval" not in config:
+        config["calendarRefreshInterval"] = 15  # Default to 15 minutes
+    elif "calendar_refresh_interval" in config and "calendarRefreshInterval" not in config:
+        config["calendarRefreshInterval"] = config["calendar_refresh_interval"]
+
+    # Add backend version (git commit short hash)
+    config["version"] = get_git_version()
+
+    # Add frontend version (from built HTML)
+    config["frontendVersion"] = get_frontend_version()
 
     return config
 
@@ -233,6 +434,12 @@ async def update_config(config_update: ConfigUpdate):
     update_dict = config_update.model_dump(exclude_unset=True)
 
     # Convert camelCase to snake_case for storage
+    if "orientationFlipped" in update_dict:
+        update_dict["orientation_flipped"] = update_dict.pop("orientationFlipped")
+    if "applyDisplayRotation" in update_dict:
+        update_dict["apply_display_rotation"] = update_dict.pop("applyDisplayRotation")
+    if "lastSideViewMode" in update_dict:
+        update_dict["last_side_view_mode"] = update_dict.pop("lastSideViewMode")
     if "calendarSplit" in update_dict:
         update_dict["calendar_split"] = update_dict.pop("calendarSplit")
     if "keyboardType" in update_dict:
@@ -253,6 +460,10 @@ async def update_config(config_update: ConfigUpdate):
         update_dict["show_mode_indicator"] = update_dict.pop("showModeIndicator")
     if "modeIndicatorTimeout" in update_dict:
         update_dict["mode_indicator_timeout"] = update_dict.pop("modeIndicatorTimeout")
+    if "keyboardFeedbackEnabled" in update_dict:
+        update_dict["keyboard_feedback_enabled"] = update_dict.pop("keyboardFeedbackEnabled")
+    if "keyboardFeedbackMode" in update_dict:
+        update_dict["keyboard_feedback_mode"] = update_dict.pop("keyboardFeedbackMode")
     if "weekStartDay" in update_dict:
         update_dict["week_start_day"] = update_dict.pop("weekStartDay")
     if "showWeekNumbers" in update_dict:
@@ -261,6 +472,8 @@ async def update_config(config_update: ConfigUpdate):
         update_dict["side_view_position"] = update_dict.pop("sideViewPosition")
     if "themeMode" in update_dict:
         update_dict["theme_mode"] = update_dict.pop("themeMode")
+    if "selectedTheme" in update_dict:
+        update_dict["selected_theme"] = update_dict.pop("selectedTheme")
     if "darkModeStart" in update_dict:
         update_dict["dark_mode_start"] = update_dict.pop("darkModeStart")
     if "darkModeEnd" in update_dict:
@@ -275,6 +488,7 @@ async def update_config(config_update: ConfigUpdate):
         # Store schedule with explicit type
         # Pass the schedule directly (list/array) to set_value, which will serialize it
         import json
+
         schedule = update_dict.pop("displaySchedule")
         if isinstance(schedule, str):
             # If it's already a JSON string, parse it first so we store the actual data structure
@@ -283,7 +497,7 @@ async def update_config(config_update: ConfigUpdate):
             except json.JSONDecodeError:
                 # Invalid JSON, skip storing
                 pass
-        
+
         # Store with explicit value_type="json" so it gets parsed correctly on retrieval
         # Pass the list directly - set_value will serialize it with json.dumps()
         # This will also update any old entries that were stored with value_type="string"
@@ -300,11 +514,197 @@ async def update_config(config_update: ConfigUpdate):
         update_dict["display_timeout"] = update_dict.pop("displayTimeout")
     if "imageDisplayMode" in update_dict:
         update_dict["image_display_mode"] = update_dict.pop("imageDisplayMode")
+    if "randomizeImages" in update_dict:
+        # Convert boolean to string for storage
+        randomize_value = update_dict.pop("randomizeImages")
+        update_dict["randomize_images"] = "true" if randomize_value else "false"
     if "timezone" in update_dict:
         # Store timezone as-is (no camelCase conversion needed)
         update_dict["timezone"] = update_dict.pop("timezone")
+    if "gitRepoUrl" in update_dict:
+        update_dict["git_repo_url"] = update_dict.pop("gitRepoUrl")
+        # Also update /etc/default/calvin-update file
+        calvin_update_file = Path("/etc/default/calvin-update")
+        if calvin_update_file.exists():
+            try:
+                # Read existing file
+                with open(calvin_update_file) as f:
+                    lines = f.readlines()
+
+                # Update or add GIT_REPO line
+                updated = False
+                new_lines = []
+                for line in lines:
+                    if line.startswith("GIT_REPO="):
+                        new_lines.append(f"GIT_REPO={update_dict['git_repo_url']}\n")
+                        updated = True
+                    else:
+                        new_lines.append(line)
+
+                if not updated:
+                    # Add GIT_REPO if it doesn't exist
+                    new_lines.append(f"GIT_REPO={update_dict['git_repo_url']}\n")
+
+                # Write back
+                with open(calvin_update_file, "w") as f:
+                    f.writelines(new_lines)
+            except Exception as e:
+                # Log error but don't fail the config update
+                print(f"Warning: Failed to update /etc/default/calvin-update: {e}")
+    if "gitBranch" in update_dict:
+        update_dict["git_branch"] = update_dict.pop("gitBranch")
+        # Also update /etc/default/calvin-update file
+        calvin_update_file = Path("/etc/default/calvin-update")
+        if calvin_update_file.exists():
+            try:
+                # Read existing file
+                with open(calvin_update_file) as f:
+                    lines = f.readlines()
+
+                # Update or add GIT_BRANCH line
+                updated = False
+                new_lines = []
+                for line in lines:
+                    if line.startswith("GIT_BRANCH="):
+                        new_lines.append(f"GIT_BRANCH={update_dict['git_branch']}\n")
+                        updated = True
+                    else:
+                        new_lines.append(line)
+
+                if not updated:
+                    # Add GIT_BRANCH if it doesn't exist
+                    new_lines.append(f"GIT_BRANCH={update_dict['git_branch']}\n")
+
+                # Write back
+                with open(calvin_update_file, "w") as f:
+                    f.writelines(new_lines)
+            except Exception as e:
+                # Log error but don't fail the config update
+                print(f"Warning: Failed to update /etc/default/calvin-update: {e}")
+    if "consoleLogEnabled" in update_dict:
+        update_dict["console_log_enabled"] = update_dict.pop("consoleLogEnabled")
+    if "consoleLogLevel" in update_dict:
+        update_dict["console_log_level"] = update_dict.pop("consoleLogLevel")
+    if "configPollInterval" in update_dict:
+        update_dict["config_poll_interval"] = update_dict.pop("configPollInterval")
+    if "calendarRefreshInterval" in update_dict:
+        calendar_refresh_interval = update_dict.pop("calendarRefreshInterval")
+        update_dict["calendar_refresh_interval"] = calendar_refresh_interval
+        # Update scheduler with new interval
+        from app.services.scheduler import calendar_scheduler
+
+        await calendar_scheduler.set_refresh_interval(calendar_refresh_interval)
 
     await config_service.update_config(update_dict)
 
+    # Apply display orientation if orientation settings changed and rotation is enabled
+    if (
+        "orientation" in update_dict
+        or "orientation_flipped" in update_dict
+        or "apply_display_rotation" in update_dict
+    ):
+        try:
+            # Get the final config values (after update)
+            config = await config_service.get_config()
+            apply_rotation = config.get("apply_display_rotation", True) or config.get(
+                "applyDisplayRotation", True
+            )
+
+            # Only apply physical rotation if enabled
+            if apply_rotation:
+                orientation = config.get("orientation", "landscape")
+                flipped = config.get("orientation_flipped", False) or config.get(
+                    "orientationFlipped", False
+                )
+
+                # Apply display rotation on RPi
+                result = await display_orientation_service.apply_orientation(orientation, flipped)
+                if result.get("success"):
+                    print(f"Display orientation applied: {result.get('message')}")
+                else:
+                    print(f"Display orientation update failed: {result.get('message')}")
+            else:
+                print("Display rotation is disabled - only UI layout will change")
+        except Exception as e:
+            # Don't fail the config update if orientation application fails
+            print(f"Warning: Failed to apply display orientation: {e}")
+
     # Return updated config
     return await get_config()
+
+
+@router.get("/config/display/orientation")
+async def get_display_orientation():
+    """
+    Get current display orientation (Raspberry Pi only).
+
+    Returns:
+        Dictionary with current display orientation info
+    """
+    return await display_orientation_service.get_current_orientation()
+
+
+@router.get("/config/git/branches")
+async def get_git_branches(repo_url: str | None = None):
+    """
+    Fetch available branches from a git repository.
+
+    Args:
+        repo_url: Git repository URL (e.g., https://github.com/user/repo.git)
+                 If not provided, uses the configured git_repo_url or default
+
+    Returns:
+        List of branch names
+    """
+    import re
+    import subprocess
+
+    # Get repo URL from parameter, config, or default
+    if not repo_url:
+        from app.services.config_service import config_service
+
+        repo_url = await config_service.get_value("git_repo_url")
+        if not repo_url:
+            repo_url = "https://github.com/osterbergsimon/calvin.git"
+
+    try:
+        # Use git ls-remote to fetch branches without cloning
+        # This works for public repos and doesn't require authentication
+        result = subprocess.run(
+            ["git", "ls-remote", "--heads", repo_url],
+            capture_output=True,
+            text=True,
+            timeout=10,
+        )
+
+        if result.returncode != 0:
+            raise HTTPException(
+                status_code=400, detail=f"Failed to fetch branches: {result.stderr}"
+            )
+
+        # Parse branch names from output
+        # Format: <commit_hash>	refs/heads/branch_name
+        branches = []
+        for line in result.stdout.strip().split("\n"):
+            if line:
+                # Extract branch name from refs/heads/branch_name
+                match = re.search(r"refs/heads/(.+)$", line)
+                if match:
+                    branches.append(match.group(1))
+
+        # Sort branches (main/master first, then alphabetically)
+        def sort_key(branch):
+            if branch in ["main", "master"]:
+                return (0, branch)
+            return (1, branch)
+
+        branches.sort(key=sort_key)
+
+        return {"branches": branches, "repo_url": repo_url}
+
+    except subprocess.TimeoutExpired:
+        raise HTTPException(status_code=408, detail="Request timeout while fetching branches")
+    except FileNotFoundError:
+        raise HTTPException(status_code=500, detail="Git is not installed on this system")
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Failed to fetch branches: {str(e)}")

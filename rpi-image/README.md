@@ -45,59 +45,46 @@ This directory contains scripts and configurations for building flashable Raspbe
 
 ## Quick Start
 
-### Build Production Image
+### Production Setup
 ```bash
-./rpi-image/build-prod-image.sh
+wget -O- https://raw.githubusercontent.com/osterbergsimon/calvin/main/scripts/setup.sh | sudo sh
 ```
 
-### Build Development Image (Auto-pull from GitHub)
+### Development Setup (with hot reload)
 ```bash
-./rpi-image/build-dev-image.sh
+wget -O- https://raw.githubusercontent.com/osterbergsimon/calvin/main/scripts/setup-dev.sh | sudo sh
 ```
 
-## Image Building Methods
+Or using curl:
+```bash
+curl -fsSL https://raw.githubusercontent.com/osterbergsimon/calvin/main/scripts/setup.sh | sudo sh
+curl -fsSL https://raw.githubusercontent.com/osterbergsimon/calvin/main/scripts/setup-dev.sh | sudo sh
+```
 
-### Method 1: Raspberry Pi Imager (Recommended - Simplest)
-Uses official Raspberry Pi Imager with custom cloud-init configuration.
+## Setup Process
 
-**Requirements:**
-- Raspberry Pi Imager installed
-- SD card (8GB+ recommended)
-- Internet connection
-
-**Process:**
-1. Download Raspberry Pi OS Lite (64-bit)
-2. Flash to SD card with custom cloud-init config
-3. First boot runs setup script
-4. Image is ready
-
-### Method 2: pi-gen (Advanced - Fully Customizable)
-Builds complete custom image using pi-gen.
-
-**Requirements:**
-- Linux build machine
-- Docker or native build environment
-- More time and complexity
-
-## Image Contents
-
-Both images include:
-1. **Base System**: Raspberry Pi OS Lite (64-bit)
-2. **System Packages**:
+The setup scripts will:
+1. **Install System Dependencies**:
    - Python 3.11+
    - Node.js 20+
    - Chromium browser
    - UV (Python package manager)
    - Git
-3. **Calvin Application**:
-   - Backend and frontend code
-   - Systemd service files
-   - Configuration templates
-4. **Auto-Configuration**:
-   - WiFi setup via cloud-init
-   - SSH key configuration
-   - First-boot setup script
-   - Auto-start services
+   - X server and window manager
+2. **Clone Calvin Repository**:
+   - Clones from GitHub (or updates if already exists)
+3. **Install Application Dependencies**:
+   - Backend dependencies (production or dev)
+   - Frontend dependencies
+   - Build frontend (production only)
+4. **Configure Services**:
+   - Install systemd services
+   - Configure display and kiosk mode
+   - Set up auto-start on boot
+5. **Development Mode** (setup-dev.sh only):
+   - Enable hot reload for backend (uvicorn --reload)
+   - Enable hot reload for frontend (vite dev server)
+   - Frontend dev server runs on port 5173
 
 ## Development Image Auto-Update
 

@@ -157,6 +157,41 @@ fi
 EOF
 chown calvin:calvin /home/calvin/.bash_profile
 
+# Configure polkit to allow calvin user to reboot without password
+echo "[$(date)] Configuring polkit for reboot..." | tee -a "$LOG_FILE"
+mkdir -p /etc/polkit-1/rules.d
+cat > /etc/polkit-1/rules.d/50-calvin-reboot.rules << 'POLKIT_EOF'
+polkit.addRule(function(action, subject) {
+    if (action.id == "org.freedesktop.login1.reboot" ||
+        action.id == "org.freedesktop.login1.reboot-multiple-sessions" ||
+        action.id == "org.freedesktop.login1.power-off" ||
+        action.id == "org.freedesktop.login1.power-off-multiple-sessions") {
+        if (subject.user == "calvin") {
+            return polkit.Result.YES;
+        }
+    }
+});
+POLKIT_EOF
+chmod 644 /etc/polkit-1/rules.d/50-calvin-reboot.rules
+echo "[$(date)] Polkit configured to allow calvin user to reboot" | tee -a "$LOG_FILE"
+
+# Configure polkit to allow calvin user to restart services
+echo "[$(date)] Configuring polkit for service restarts..." | tee -a "$LOG_FILE"
+cat > /etc/polkit-1/rules.d/50-calvin-restart.rules << 'POLKIT_EOF'
+polkit.addRule(function(action, subject) {
+    if (action.id == "org.freedesktop.systemd1.manage-units" &&
+        subject.user == "calvin") {
+        // Allow managing calvin-backend and calvin-frontend services
+        var unit = action.lookup("unit");
+        if (unit == "calvin-backend.service" || unit == "calvin-frontend.service") {
+            return polkit.Result.YES;
+        }
+    }
+});
+POLKIT_EOF
+chmod 644 /etc/polkit-1/rules.d/50-calvin-restart.rules
+echo "[$(date)] Polkit configured to allow calvin user to restart services" | tee -a "$LOG_FILE"
+
 echo "[$(date)] Calvin production setup complete!" | tee -a "$LOG_FILE"
 echo "[$(date)] System will reboot in 30 seconds..." | tee -a "$LOG_FILE"
 

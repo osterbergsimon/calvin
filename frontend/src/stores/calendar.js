@@ -1,6 +1,8 @@
 import { defineStore } from "pinia";
 import { ref } from "vue";
 import axios from "axios";
+import { getCachedData, setCachedData } from "../utils/cache";
+import { useConnectionStore } from "./connection";
 
 export const useCalendarStore = defineStore("calendar", () => {
   const events = ref([]);
@@ -9,17 +11,54 @@ export const useCalendarStore = defineStore("calendar", () => {
   const error = ref(null);
   const currentDate = ref(new Date());
   const selectedEvent = ref(null); // Currently selected/expanded event
+  const selectedDate = ref(null); // The actual date that was selected (for multi-day events)
   const dayEvents = ref([]); // All events for the expanded day
   const showAllDayEvents = ref(false); // Flag to show all events' details when expanding "today"
 
   const fetchSources = async () => {
     loading.value = true;
     error.value = null;
+
+    const connectionStore = useConnectionStore();
+    const cacheKey = "calendar_sources";
+    const cacheTTL = 60 * 60 * 1000; // 1 hour
+
+    // Try to load from cache first if offline
+    if (!connectionStore.isFullyOnline()) {
+      const cachedSources = getCachedData(cacheKey, cacheTTL);
+      if (cachedSources) {
+        console.log(
+          `[Calendar] Using cached sources (${cachedSources.sources?.length || 0} sources)`,
+        );
+        sources.value = cachedSources.sources || [];
+        loading.value = false;
+        return cachedSources;
+      }
+    }
+
     try {
       const response = await axios.get("/api/calendar/sources");
-      sources.value = response.data.sources || [];
-      return response.data;
+      const responseData = response.data;
+      sources.value = responseData.sources || [];
+
+      // Cache the response
+      setCachedData(cacheKey, responseData);
+
+      return responseData;
     } catch (err) {
+      // If online but request failed, try cache
+      if (connectionStore.isFullyOnline()) {
+        const cachedSources = getCachedData(cacheKey, cacheTTL);
+        if (cachedSources) {
+          console.log(
+            `[Calendar] Request failed, using cached sources (${cachedSources.sources?.length || 0} sources)`,
+          );
+          sources.value = cachedSources.sources || [];
+          loading.value = false;
+          return cachedSources;
+        }
+      }
+
       error.value = err.message;
       console.error("Failed to fetch calendar sources:", err);
       throw err;
@@ -60,6 +99,24 @@ export const useCalendarStore = defineStore("calendar", () => {
   const fetchEvents = async (startDate, endDate, refreshParam = "") => {
     loading.value = true;
     error.value = null;
+
+    const connectionStore = useConnectionStore();
+    const cacheKey = `calendar_events_${startDate?.toISOString()}_${endDate?.toISOString()}`;
+    const cacheTTL = 30 * 60 * 1000; // 30 minutes
+
+    // Try to load from cache first if offline
+    if (!connectionStore.isFullyOnline()) {
+      const cachedEvents = getCachedData(cacheKey, cacheTTL);
+      if (cachedEvents) {
+        console.log(
+          `[Calendar] Using cached events (${cachedEvents.events?.length || 0} events)`,
+        );
+        events.value = cachedEvents.events || [];
+        loading.value = false;
+        return cachedEvents;
+      }
+    }
+
     try {
       const params = {
         start_date: startDate?.toISOString(),
@@ -84,13 +141,31 @@ export const useCalendarStore = defineStore("calendar", () => {
       }
 
       const response = await axios.get("/api/calendar/events", { params });
-      events.value = response.data.events || [];
+      const responseData = response.data;
+      events.value = responseData.events || [];
+
+      // Cache the response
+      setCachedData(cacheKey, responseData);
+
       console.log(`Fetched ${events.value.length} events from API`);
       if (events.value.length > 0) {
         console.log("Sample event:", events.value[0]);
       }
-      return response.data;
+      return responseData;
     } catch (err) {
+      // If online but request failed, try cache
+      if (connectionStore.isFullyOnline()) {
+        const cachedEvents = getCachedData(cacheKey, cacheTTL);
+        if (cachedEvents) {
+          console.log(
+            `[Calendar] Request failed, using cached events (${cachedEvents.events?.length || 0} events)`,
+          );
+          events.value = cachedEvents.events || [];
+          loading.value = false;
+          return cachedEvents;
+        }
+      }
+
       error.value = err.message;
       console.error("Failed to fetch events:", err);
       throw err;
@@ -103,7 +178,22 @@ export const useCalendarStore = defineStore("calendar", () => {
     currentDate.value = date;
   };
 
-  // Helper to get calendar date components (year, month, day only)
+  // Helper to normalize a date to calendar date (year, month, day only)
+  // For timed events: uses local time methods (to match calendar grid which is in local time)
+  const getCalendarDate = (date, useUTC = false) => {
+    const d = new Date(date);
+    if (useUTC) {
+      // Use UTC methods for all-day events (backend sends UTC dates)
+      return new Date(
+        Date.UTC(d.getUTCFullYear(), d.getUTCMonth(), d.getUTCDate()),
+      );
+    } else {
+      // Use local time methods for timed events (to match calendar grid)
+      return new Date(d.getFullYear(), d.getMonth(), d.getDate());
+    }
+  };
+
+  // Helper to get calendar date components (year, month, day only) for direct comparison
   const getDateComponents = (date, useUTC = false) => {
     const d = new Date(date);
     if (useUTC) {
@@ -124,64 +214,140 @@ export const useCalendarStore = defineStore("calendar", () => {
     return date1.day - date2.day;
   };
 
-  const selectEvent = (event) => {
-    selectedEvent.value = event;
-    // Also collect all events for the same day using the same logic as CalendarView
-    if (event) {
-      const eventStart = new Date(event.start);
+  const selectEvent = (event, selectedDayDate = null) => {
+    // Find the event in the main events array to ensure we're using the same object reference
+    // This helps with reactivity and ensures consistent comparisons
+    const eventFromMainArray = events.value.find((e) => {
+      // Compare IDs as strings to ensure consistent comparison
+      return String(e.id) === String(event.id);
+    });
+    // Assign the event - Vue should detect this change
+    selectedEvent.value = eventFromMainArray || event;
+    // Store the selected date (the actual day that was clicked, not the event's start date)
+    // This is important for multi-day events
+    // Normalize the date to ensure consistent comparison
+    if (selectedDayDate) {
+      // Normalize to calendar date (midnight) to match CalendarView's day.date
+      // This happens when clicking an event directly from the calendar view
+      selectedDate.value = getCalendarDate(selectedDayDate, false);
+    } else if (event && selectedDate.value) {
+      // If we already have a selectedDate and no selectedDayDate is provided,
+      // we're switching between events in the detail panel.
+      // Since all events in dayEvents are already filtered to be on the same day
+      // (the selectedDate), we should ALWAYS preserve the selectedDate when
+      // clicking any event in the detail panel. This ensures all events that
+      // were originally shown stay visible when switching between them.
+      // Just normalize it to ensure it's a calendar date
+      selectedDate.value = getCalendarDate(selectedDate.value, false);
+    } else if (event) {
+      // Fallback to event's start date if no day date provided and no existing selectedDate
+      selectedDate.value = getCalendarDate(event.start, false);
+    } else {
+      selectedDate.value = null;
+    }
 
-      // Get the calendar date of the selected event
-      let eventDateComponents;
-      if (event.all_day) {
-        // For all-day events, use the start date components
-        eventDateComponents = getDateComponents(eventStart, false);
-      } else {
-        // For timed events, use the start date
-        eventDateComponents = getDateComponents(eventStart, false);
-      }
+    // Also collect all events for the same day using the exact same logic as CalendarView.getEventsForDate
+    if (event && selectedDate.value) {
+      // Use the selected date (the actual day clicked) - already normalized to calendar date
+      // This matches CalendarView's day.date which is passed to getEventsForDate
+      const dateToUse = selectedDate.value;
 
-      dayEvents.value = events.value.filter((e) => {
-        const eStart = new Date(e.start);
-        const eEnd = new Date(e.end);
+      // Get the calendar date of the selected day (same logic as CalendarView line 315)
+      // Calendar grid date is in local time
+      const dateOnly = getCalendarDate(dateToUse, false); // false = use local time
+      const dateEnd = new Date(dateOnly);
+      dateEnd.setHours(23, 59, 59, 999);
 
-        if (e.all_day) {
-          // All-day events: compare calendar date components
-          const eStartComponents = getDateComponents(eStart, false);
+      // Get grid date components (local time) - same as CalendarView line 320
+      const gridDateComponents = getDateComponents(dateToUse, false);
 
-          // Calculate end date from start + duration for all-day events
-          const durationMs = eEnd.getTime() - eStart.getTime();
-          const durationDays = Math.floor(durationMs / (1000 * 60 * 60 * 24));
-          const eEndDate = new Date(eStart);
-          eEndDate.setDate(eStart.getDate() + durationDays);
-          const eEndComponentsCalc = getDateComponents(eEndDate, false);
+      // Filter events using the exact same logic as CalendarView.getEventsForDate
+      dayEvents.value = events.value
+        .filter((e) => {
+          const eStart = new Date(e.start);
+          const eEnd = new Date(e.end);
 
-          // Check if event date is between start and end (inclusive)
-          const startCompare = compareDateComponents(
-            eStartComponents,
-            eventDateComponents,
-          );
-          const endCompare = compareDateComponents(
-            eventDateComponents,
-            eEndComponentsCalc,
-          );
-          return startCompare <= 0 && endCompare <= 0;
-        } else {
-          // Timed events: check if event overlaps with the selected event's day
-          const eStartComponents = getDateComponents(eStart, false);
-          const eEndComponents = getDateComponents(eEnd, false);
+          if (e.all_day) {
+            // All-day events: compare calendar date components (same as CalendarView)
+            const eStartComponents = getDateComponents(eStart, false);
 
-          // Check if event date is between start and end (inclusive)
-          const startCompare = compareDateComponents(
-            eStartComponents,
-            eventDateComponents,
-          );
-          const endCompare = compareDateComponents(
-            eventDateComponents,
-            eEndComponents,
-          );
-          return startCompare <= 0 && endCompare <= 0;
-        }
-      });
+            // Calculate end date from start + duration for all-day events
+            const durationMs = eEnd.getTime() - eStart.getTime();
+            const durationDays = Math.floor(durationMs / (1000 * 60 * 60 * 24));
+            const eEndDate = new Date(eStart);
+            eEndDate.setDate(eStart.getDate() + durationDays);
+            const eEndComponentsCalc = getDateComponents(eEndDate, false);
+
+            // Check if event date is between start and end (inclusive)
+            const startCompare = compareDateComponents(
+              eStartComponents,
+              gridDateComponents,
+            );
+            const endCompare = compareDateComponents(
+              gridDateComponents,
+              eEndComponentsCalc,
+            );
+            return startCompare <= 0 && endCompare <= 0;
+          } else {
+            // Timed events: check if the date falls within the event's time range
+            // Event spans the day if: eventStart <= dateEnd AND eventEnd >= dateOnly
+            // (Same logic as CalendarView - must match exactly)
+            // Use direct Date comparison (same as CalendarView line 362)
+            return eStart <= dateEnd && eEnd >= dateOnly;
+          }
+        })
+        .sort((a, b) => {
+          // Sort events in the same order as CalendarView:
+          // 1. Multi-day events first
+          // 2. Then all-day events before timed events
+          // 3. Then by start time (earlier first)
+
+          // Check if events are multi-day
+          const aIsMultiDay = (() => {
+            const aStart = new Date(a.start);
+            const aEnd = new Date(a.end);
+            if (a.all_day) {
+              const durationMs = aEnd.getTime() - aStart.getTime();
+              const durationDays = Math.floor(
+                durationMs / (1000 * 60 * 60 * 24),
+              );
+              return durationDays > 0;
+            } else {
+              const aStartComp = getDateComponents(aStart, false);
+              const aEndComp = getDateComponents(aEnd, false);
+              return compareDateComponents(aStartComp, aEndComp) !== 0;
+            }
+          })();
+
+          const bIsMultiDay = (() => {
+            const bStart = new Date(b.start);
+            const bEnd = new Date(b.end);
+            if (b.all_day) {
+              const durationMs = bEnd.getTime() - bStart.getTime();
+              const durationDays = Math.floor(
+                durationMs / (1000 * 60 * 60 * 24),
+              );
+              return durationDays > 0;
+            } else {
+              const bStartComp = getDateComponents(bStart, false);
+              const bEndComp = getDateComponents(bEnd, false);
+              return compareDateComponents(bStartComp, bEndComp) !== 0;
+            }
+          })();
+
+          // Multi-day events first
+          if (aIsMultiDay && !bIsMultiDay) return -1;
+          if (!aIsMultiDay && bIsMultiDay) return 1;
+
+          // Then all-day events before timed events
+          if (a.all_day && !b.all_day) return -1;
+          if (!a.all_day && b.all_day) return 1;
+
+          // Then by start time (earlier first)
+          const aStart = new Date(a.start).getTime();
+          const bStart = new Date(b.start).getTime();
+          return aStart - bStart;
+        });
     }
   };
 
@@ -195,8 +361,41 @@ export const useCalendarStore = defineStore("calendar", () => {
 
   const clearSelectedEvent = () => {
     selectedEvent.value = null;
+    selectedDate.value = null;
     dayEvents.value = [];
     showAllDayEvents.value = false;
+  };
+
+  const refreshEvents = async () => {
+    /** Manually refresh calendar cache and reload events. */
+    try {
+      // Call the backend refresh endpoint to clear cache and reload
+      await axios.post("/api/calendar/refresh");
+
+      // Reload events for the current view
+      // Calculate the date range based on current date (same logic as CalendarView.loadEvents)
+      const currentYear = currentDate.value.getFullYear();
+      const currentMonth = currentDate.value.getMonth();
+
+      // Calculate start and end dates for the current month plus buffer for multi-day events
+      // This matches the logic in CalendarView.vue for month view
+      const startDate = new Date(currentYear, currentMonth, 1);
+      startDate.setDate(startDate.getDate() - 7); // 7 days before month start
+      startDate.setHours(0, 0, 0, 0);
+
+      const endDate = new Date(currentYear, currentMonth + 1, 0);
+      endDate.setDate(endDate.getDate() + 7); // 7 days after month end
+      endDate.setHours(23, 59, 59, 999);
+
+      // Reload events with refresh flag
+      await fetchEvents(startDate, endDate, true);
+
+      console.log("[Calendar] Events refreshed successfully");
+    } catch (err) {
+      error.value = err.message;
+      console.error("[Calendar] Failed to refresh events:", err);
+      throw err;
+    }
   };
 
   return {
@@ -206,6 +405,7 @@ export const useCalendarStore = defineStore("calendar", () => {
     error,
     currentDate,
     selectedEvent,
+    selectedDate,
     dayEvents,
     showAllDayEvents,
     fetchEvents,
@@ -218,5 +418,6 @@ export const useCalendarStore = defineStore("calendar", () => {
     setDayEvents,
     setShowAllDayEvents,
     clearSelectedEvent,
+    refreshEvents,
   };
 });

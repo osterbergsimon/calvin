@@ -1,5 +1,6 @@
 import { defineStore } from "pinia";
 import { ref } from "vue";
+import { useConfigStore } from "./config";
 
 export const useModeStore = defineStore("mode", () => {
   // Available modes
@@ -14,6 +15,7 @@ export const useModeStore = defineStore("mode", () => {
   const previousMode = ref(null); // For returning from settings
   const isFullscreen = ref(false); // Track if we're in fullscreen mode
   const fullscreenMode = ref(null); // Which mode is fullscreen (PHOTOS or WEB_SERVICES)
+  const modeBeforeFullscreen = ref(null); // Track mode before entering fullscreen
 
   const setMode = (mode) => {
     if (mode === MODES.SETTINGS) {
@@ -27,20 +29,49 @@ export const useModeStore = defineStore("mode", () => {
   };
 
   const enterFullscreen = (mode) => {
+    // Store current mode before entering fullscreen
+    modeBeforeFullscreen.value = currentMode.value;
     isFullscreen.value = true;
     fullscreenMode.value = mode;
   };
 
   const exitFullscreen = () => {
+    const wasWebServices = fullscreenMode.value === MODES.WEB_SERVICES;
+    const wasPhotos = fullscreenMode.value === MODES.PHOTOS;
     isFullscreen.value = false;
     fullscreenMode.value = null;
-    // Return to calendar mode (home view)
-    currentMode.value = MODES.CALENDAR;
+
+    // Restore the mode we were in before entering fullscreen
+    if (modeBeforeFullscreen.value) {
+      currentMode.value = modeBeforeFullscreen.value;
+      modeBeforeFullscreen.value = null;
+    } else {
+      // Fallback: if no previous mode tracked, preserve in side panel based on what was fullscreen
+      if (wasWebServices) {
+        const configStore = useConfigStore();
+        configStore.setLastSideViewMode("web_services");
+        currentMode.value = MODES.CALENDAR;
+      } else if (wasPhotos) {
+        const configStore = useConfigStore();
+        configStore.setLastSideViewMode("photos");
+        currentMode.value = MODES.CALENDAR;
+      } else {
+        currentMode.value = MODES.CALENDAR;
+      }
+    }
   };
 
   const returnFromSettings = () => {
     if (previousMode.value) {
       currentMode.value = previousMode.value;
+      // If returning to web services mode, ensure lastSideViewMode is set
+      if (previousMode.value === MODES.WEB_SERVICES) {
+        const configStore = useConfigStore();
+        configStore.setLastSideViewMode("web_services");
+      } else if (previousMode.value === MODES.PHOTOS) {
+        const configStore = useConfigStore();
+        configStore.setLastSideViewMode("photos");
+      }
       previousMode.value = null;
     } else {
       currentMode.value = MODES.CALENDAR;

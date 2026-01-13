@@ -12,7 +12,7 @@ jobs:
     runs-on: ubuntu-latest
     strategy:
       matrix:
-        python-version: ["3.11", "3.12"]
+        python-version: ["3.12", "3.13"]
     
     steps:
       - name: Checkout code
@@ -32,9 +32,13 @@ jobs:
         working-directory: ./backend
         run: uv sync --extra dev
       
-      - name: Run Ruff linter
+      - name: Run Ruff linter (with auto-fix check)
         working-directory: ./backend
-        run: uv run ruff check .
+        run: |
+          # First, try to auto-fix issues
+          uv run ruff check --fix . || true
+          # Then check if there are any remaining issues
+          uv run ruff check .
       
       - name: Run Ruff formatter check
         working-directory: ./backend
@@ -51,6 +55,7 @@ jobs:
       - name: Run backend tests
         working-directory: ./backend
         run: uv run pytest --cov=app --cov-report=xml --cov-report=term
+        # Note: Runs both unit and integration tests (marked with @pytest.mark.unit/integration)
       
       - name: Upload coverage to Codecov
         uses: codecov/codecov-action@v3

@@ -3,17 +3,22 @@
     <!-- This component handles keyboard events globally -->
     <span />
   </div>
+  <NotificationSystem ref="notificationRef" />
 </template>
 
 <script setup>
-import { onMounted, onUnmounted } from "vue";
+import { ref, onMounted, onUnmounted, watch } from "vue";
 import { useKeyboardStore } from "../stores/keyboard";
 import { useKeyboardActions } from "../composables/useKeyboardActions";
 import { usePhotoFrameMode } from "../composables/usePhotoFrameMode";
+import { useConfigStore } from "../stores/config";
+import NotificationSystem from "./NotificationSystem.vue";
 
 const keyboardStore = useKeyboardStore();
+const configStore = useConfigStore();
 const { handleAction } = useKeyboardActions();
 const { resetInactivityTimer } = usePhotoFrameMode();
+const notificationRef = ref(null);
 
 // Reboot combo tracking
 const pressedKeys = new Set();
@@ -48,7 +53,7 @@ const keyCodeMap = {
 const checkRebootCombo = () => {
   // Check if both reboot combo keys are pressed
   const comboKeysPressed = rebootComboKeys.every((key) => pressedKeys.has(key));
-  
+
   if (comboKeysPressed) {
     // Start tracking combo duration
     if (!rebootComboStartTime) {
@@ -59,7 +64,9 @@ const checkRebootCombo = () => {
       const elapsed = Date.now() - rebootComboStartTime;
       if (elapsed >= rebootComboDuration) {
         // Trigger reboot
-        console.log(`Reboot combo held for ${rebootComboDuration / 1000} seconds - rebooting system`);
+        console.log(
+          `Reboot combo held for ${rebootComboDuration / 1000} seconds - rebooting system`,
+        );
         triggerReboot();
         // Reset combo tracking
         rebootComboStartTime = null;
@@ -122,6 +129,10 @@ const onKeyDown = async (event) => {
     event.preventDefault();
     // Reset inactivity timer on any keyboard action
     resetInactivityTimer();
+    // Show visual feedback
+    if (notificationRef.value) {
+      notificationRef.value.showKeyboardFeedback(keyCode, action);
+    }
     handleAction(action);
   } else {
     // Even if no mapped action, reset timer on any keypress
@@ -132,10 +143,10 @@ const onKeyDown = async (event) => {
 const onKeyUp = (event) => {
   // Map browser key to our key code
   const keyCode = keyCodeMap[event.code] || event.code;
-  
+
   // Remove from pressed keys
   pressedKeys.delete(keyCode);
-  
+
   // Reset reboot combo if any combo key is released
   if (rebootComboKeys.includes(keyCode)) {
     rebootComboStartTime = null;
@@ -150,16 +161,23 @@ const loadKeyboardConfig = async () => {
     if (response.ok) {
       const config = await response.json();
       if (config.keyboardType || config.keyboard_type) {
-        keyboardStore.setKeyboardType(config.keyboardType || config.keyboard_type);
+        keyboardStore.setKeyboardType(
+          config.keyboardType || config.keyboard_type,
+        );
       }
       // Load reboot combo settings
       if (config.rebootComboKey1 || config.reboot_combo_key1) {
         const key1 = config.rebootComboKey1 || config.reboot_combo_key1;
-        const key2 = config.rebootComboKey2 || config.reboot_combo_key2 || "KEY_7";
+        const key2 =
+          config.rebootComboKey2 || config.reboot_combo_key2 || "KEY_7";
         rebootComboKeys = [key1, key2];
       }
-      if (config.rebootComboDuration !== undefined || config.reboot_combo_duration !== undefined) {
-        rebootComboDuration = config.rebootComboDuration || config.reboot_combo_duration || 10000;
+      if (
+        config.rebootComboDuration !== undefined ||
+        config.reboot_combo_duration !== undefined
+      ) {
+        rebootComboDuration =
+          config.rebootComboDuration || config.reboot_combo_duration || 10000;
       }
     }
   } catch (error) {
@@ -167,38 +185,61 @@ const loadKeyboardConfig = async () => {
   }
 };
 
+let keyboardConfigInterval = null;
+
+const startKeyboardConfigPolling = () => {
+  // Clear existing interval if any
+  if (keyboardConfigInterval) {
+    clearInterval(keyboardConfigInterval);
+    keyboardConfigInterval = null;
+  }
+
+  // Get polling interval from config (convert seconds to milliseconds)
+  const intervalMs = configStore.configPollInterval * 1000;
+
+  // Poll for keyboard config updates
+  // This allows keyboard settings changed from another device to take effect
+  keyboardConfigInterval = setInterval(async () => {
+    await loadKeyboardConfig();
+  }, intervalMs);
+};
+
+// Watch for changes to configPollInterval and restart polling
+watch(
+  () => configStore.configPollInterval,
+  () => {
+    startKeyboardConfigPolling();
+  },
+);
+
 onMounted(async () => {
   // Load keyboard mappings and config
   await loadKeyboardConfig();
-  
-  // Poll for keyboard config updates (every 30 seconds, same as dashboard config polling)
-  // This allows keyboard settings changed from another device to take effect
-  const keyboardConfigInterval = setInterval(async () => {
-    await loadKeyboardConfig();
-  }, 30000);
+
+  // Start keyboard config polling with configured interval
+  startKeyboardConfigPolling();
 
   // Add global keyboard listeners
   window.addEventListener("keydown", onKeyDown);
   window.addEventListener("keyup", onKeyUp);
-  
+
   // Start checking reboot combo periodically
   rebootComboCheckInterval = setInterval(checkRebootCombo, 100); // Check every 100ms
-  
-  // Clean up interval on unmount
-  onUnmounted(() => {
-    clearInterval(keyboardConfigInterval);
-    if (rebootComboCheckInterval) {
-      clearInterval(rebootComboCheckInterval);
-    }
-  });
 });
 
 onUnmounted(() => {
   // Remove keyboard listeners
   window.removeEventListener("keydown", onKeyDown);
   window.removeEventListener("keyup", onKeyUp);
+
+  // Clean up intervals
+  if (keyboardConfigInterval) {
+    clearInterval(keyboardConfigInterval);
+    keyboardConfigInterval = null;
+  }
   if (rebootComboCheckInterval) {
     clearInterval(rebootComboCheckInterval);
+    rebootComboCheckInterval = null;
   }
 });
 </script>
