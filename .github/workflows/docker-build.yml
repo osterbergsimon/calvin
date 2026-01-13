@@ -43,10 +43,10 @@ jobs:
         uses: dorny/paths-filter@v2
         id: filter
         with:
-          # For push events: compare HEAD^ to HEAD (previous commit to current commit)
+          # For push events: use github.event.before (previous commit SHA from push event)
           # For PR events: compare to base branch (github.base_ref)
-          # For tags/workflow_dispatch: compare HEAD^ to HEAD
-          base: ${{ github.event_name == 'pull_request' && github.base_ref || 'HEAD^' }}
+          # For tags/workflow_dispatch: omit base to use default behavior
+          base: ${{ github.event_name == 'pull_request' && github.base_ref || (github.event_name == 'push' && github.event.before || '') }}
           filters: |
             backend:
               - 'backend/app/**'
