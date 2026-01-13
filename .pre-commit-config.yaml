@@ -27,4 +27,6 @@ repos:
     hooks:
       - id: prettier
         files: ^frontend/.*\.(js|jsx|vue|json|css)$
+        # Exclude workflow files - they should not be autoformatted
+        exclude: ^\.github/workflows/.*\.yml$
 
