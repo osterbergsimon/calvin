@@ -192,8 +192,8 @@ jobs:
           # Patch ensure_git_repo to skip git operations if directory exists (CI mode)
           python3 -c "import re; f=open('scripts/setup-common.sh'); c=f.read(); f.close(); p='    # CI override: if target exists, just ensure ownership\n    if [ -d \"\$3\" ]; then\n      echo \"[CI] Target directory exists, skipping git operations\"\n      chown -R \"\$4:\$4\" \"\$3\"\n      return 0\n    fi\n'; c=re.sub(r'(^ensure_git_repo\(\) \{)', r'\1\n'+p, c, flags=re.MULTILINE); f=open('scripts/setup-common.sh','w'); f.write(c); f.close()"
           
-          # Patch setup_swap_file to make swapon non-fatal in CI (swap doesn't work in Docker)
-          python3 -c "import re; f=open('scripts/setup-common.sh'); c=f.read(); f.close(); c=re.sub(r'swapon \"\$\{swap_file\}\"', r'swapon \"\${swap_file}\" || { echo \"[CI] Swap activation failed (expected in Docker)\"; return 0; }', c); f=open('scripts/setup-common.sh','w'); f.write(c); f.close()"
+          # Patch setup-dev.sh to make swap setup non-fatal in CI (swap doesn't work in Docker)
+          python3 -c "import re; f=open('scripts/setup-dev.sh'); c=f.read(); f.close(); c=re.sub(r'    setup_swap_file \"4G\"', r'    setup_swap_file \"4G\" || { echo \"[CI] Swap setup failed (expected in Docker)\"; true; }', c); f=open('scripts/setup-dev.sh','w'); f.write(c); f.close()"
           
           # Run the development setup script with timing
           echo "Running setup-dev.sh (development)..."
@@ -403,8 +403,8 @@ jobs:
           # Patch ensure_git_repo to skip git operations if directory exists (CI mode)
           python3 -c "import re; f=open('scripts/setup-common.sh'); c=f.read(); f.close(); p='    # CI override: if target exists, just ensure ownership\n    if [ -d \"\$3\" ]; then\n      echo \"[CI] Target directory exists, skipping git operations\"\n      chown -R \"\$4:\$4\" \"\$3\"\n      return 0\n    fi\n'; c=re.sub(r'(^ensure_git_repo\(\) \{)', r'\1\n'+p, c, flags=re.MULTILINE); f=open('scripts/setup-common.sh','w'); f.write(c); f.close()"
           
-          # Patch setup_swap_file to make swapon non-fatal in CI (swap doesn't work in Docker)
-          python3 -c "import re; f=open('scripts/setup-common.sh'); c=f.read(); f.close(); c=re.sub(r'swapon \"\$\{swap_file\}\"', r'swapon \"\${swap_file}\" || { echo \"[CI] Swap activation failed (expected in Docker)\"; return 0; }', c); f=open('scripts/setup-common.sh','w'); f.write(c); f.close()"
+          # Patch setup-dev.sh to make swap setup non-fatal in CI (swap doesn't work in Docker)
+          python3 -c "import re; f=open('scripts/setup-dev.sh'); c=f.read(); f.close(); c=re.sub(r'    setup_swap_file \"4G\"', r'    setup_swap_file \"4G\" || { echo \"[CI] Swap setup failed (expected in Docker)\"; true; }', c); f=open('scripts/setup-dev.sh','w'); f.write(c); f.close()"
           
           # Run setup first time
           echo "First setup run..."
