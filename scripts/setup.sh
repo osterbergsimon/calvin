@@ -81,25 +81,35 @@ main() {
     # Step 4: Install UV
     ensure_uv_installed "${CALVIN_USER}"
     
-    # Step 5: Install Node.js
-    ensure_nodejs_installed 20
-    
-    # Step 6: Setup Git repository
+    # Step 5: Setup Git repository (needed before we can check for pre-built frontend)
     ensure_git_repo "${GIT_REPO}" "${GIT_BRANCH}" "${CALVIN_DIR}" "${CALVIN_USER}"
     
-    # Step 7: Install backend dependencies (production with linux extra for evdev)
+    # Step 6: Install backend dependencies (production with linux extra for evdev)
     install_backend_deps "${CALVIN_DIR}" "${CALVIN_USER}" "linux" false
     
-    # Step 8: Install frontend dependencies (production)
-    install_frontend_deps "${CALVIN_DIR}" "${CALVIN_USER}" true
+    # Step 7: Try to download pre-built frontend, fallback to building
+    local frontend_prebuilt=false
+    if download_prebuilt_frontend "${CALVIN_DIR}" "${CALVIN_USER}" "${GIT_REPO}" "${GIT_BRANCH}"; then
+        frontend_prebuilt=true
+        log "Using pre-built frontend - skipping Node.js installation and build"
+    else
+        log_warn "Pre-built frontend not available (CI/CD may not have completed or build failed)"
+        log_warn "Falling back to building on target machine (requires Node.js)"
+        
+        # Step 7a: Install Node.js (only needed if building)
+        ensure_nodejs_installed 20
+        
+        # Step 7b: Install frontend dependencies (need all dependencies including dev for build)
+        install_frontend_deps "${CALVIN_DIR}" "${CALVIN_USER}" false
+        
+        # Step 7c: Build frontend
+        build_frontend "${CALVIN_DIR}" "${CALVIN_USER}"
+    fi
     
-    # Step 9: Build frontend
-    build_frontend "${CALVIN_DIR}" "${CALVIN_USER}"
-    
-    # Step 10: Create data directories
+    # Step 8: Create data directories
     create_data_directories "${CALVIN_DIR}" "${CALVIN_USER}"
     
-    # Step 11: Install utility scripts
+    # Step 9: Install utility scripts
     install_script "${CALVIN_DIR}/scripts/update-calvin.sh" "/usr/local/bin/update-calvin.sh" "${CALVIN_USER}"
     
     if [ -f "${CALVIN_DIR}/scripts/reboot-calvin.sh" ]; then
@@ -110,18 +120,18 @@ main() {
         chmod 0440 /etc/sudoers.d/calvin-reboot
     fi
     
-    # Step 12: Configure polkit
+    # Step 10: Configure polkit
     configure_polkit_reboot "${CALVIN_USER}"
     
-    # Step 13: Create update configuration
+    # Step 11: Create update configuration
     create_update_config "${GIT_REPO}" "${GIT_BRANCH}" "${CALVIN_DIR}"
     
-    # Step 14: Install systemd services
+    # Step 12: Install systemd services
     log "Installing systemd services..."
     install_systemd_service "${CALVIN_DIR}/rpi-image/systemd/calvin-backend.service" "${CALVIN_DIR}"
     install_systemd_service "${CALVIN_DIR}/rpi-image/systemd/calvin-frontend.service" "${CALVIN_DIR}"
     
-    # Step 15: Enable and start services
+    # Step 13: Enable and start services
     enable_systemd_service "calvin-backend.service"
     enable_systemd_service "calvin-frontend.service"
     
@@ -130,13 +140,13 @@ main() {
     sleep 5  # Wait for backend to start
     start_systemd_service "calvin-frontend.service"
     
-    # Step 16: Configure display
+    # Step 14: Configure display
     configure_display "${CALVIN_USER}"
     
-    # Step 17: Configure Openbox autostart (production mode - port 8000)
+    # Step 15: Configure Openbox autostart (production mode - port 8000)
     configure_openbox_autostart "${CALVIN_USER}" "http://localhost:8000"
     
-    # Step 18: Verify setup
+    # Step 16: Verify setup
     verify_setup "${CALVIN_DIR}" "${CALVIN_USER}"
     
     # Final summary

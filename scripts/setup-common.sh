@@ -264,14 +264,108 @@ install_frontend_deps() {
     chown -R "${user}:${user}" "${calvin_dir}/frontend"
     
     if [ "${production}" = "true" ]; then
-        log "Installing production dependencies (npm ci)..."
+        log "Installing production dependencies only (npm ci --production)..."
         sudo -u "${user}" bash -c "cd '${calvin_dir}/frontend' && npm ci --production" || error_exit "Frontend production dependency installation failed" 1
     else
-        log "Installing all dependencies (npm install)..."
-        sudo -u "${user}" bash -c "cd '${calvin_dir}/frontend' && npm install" || error_exit "Frontend dependency installation failed" 1
+        log "Installing all dependencies (npm ci)..."
+        sudo -u "${user}" bash -c "cd '${calvin_dir}/frontend' && npm ci" || error_exit "Frontend dependency installation failed" 1
     fi
     
     log "Frontend dependencies installed successfully"
+}
+
+# Download pre-built frontend from GitHub releases
+# Returns 0 on success, 1 on failure
+download_prebuilt_frontend() {
+    local calvin_dir="${1:-$DEFAULT_CALVIN_DIR}"
+    local user="${2:-$DEFAULT_CALVIN_USER}"
+    local git_repo="${3:-$DEFAULT_GIT_REPO}"
+    local git_branch="${4:-$DEFAULT_GIT_BRANCH}"
+    
+    log "Attempting to download pre-built frontend from GitHub releases..."
+    
+    # Extract repo owner and name from git URL
+    # Supports: https://github.com/owner/repo.git or git@github.com:owner/repo.git
+    local repo_owner repo_name
+    if echo "${git_repo}" | grep -q "github.com[:/]"; then
+        repo_owner=$(echo "${git_repo}" | sed -E 's|.*github\.com[:/]([^/]+)/([^/]+)(\.git)?$|\1|')
+        repo_name=$(echo "${git_repo}" | sed -E 's|.*github\.com[:/]([^/]+)/([^/]+)(\.git)?$|\2|' | sed 's|\.git$||')
+    else
+        log_warn "Could not extract repo owner/name from ${git_repo}, skipping download"
+        return 1
+    fi
+    
+    # Get commit short hash from cloned repo
+    local commit_hash
+    commit_hash=$(sudo -u "${user}" bash -c "cd '${calvin_dir}' && git rev-parse --short HEAD" 2>/dev/null)
+    if [ -z "${commit_hash}" ]; then
+        log_warn "Could not get commit hash, skipping download"
+        return 1
+    fi
+    
+    # Get commit date (YYYY-MM-DD format) - CI/CD uses this date when creating the release
+    local date_str
+    date_str=$(sudo -u "${user}" bash -c "cd '${calvin_dir}' && git log -1 --format=%cd --date=short HEAD" 2>/dev/null)
+    if [ -z "${date_str}" ]; then
+        log_warn "Could not get commit date, skipping download"
+        return 1
+    fi
+    
+    # Determine release type and tag based on branch
+    local release_tag
+    if [ "${git_branch}" = "main" ]; then
+        release_tag="stable-${date_str}-${commit_hash}"
+    elif [ "${git_branch}" = "develop" ]; then
+        release_tag="nightly-${date_str}-${commit_hash}"
+    else
+        log_warn "Branch ${git_branch} is not main or develop, skipping download"
+        return 1
+    fi
+    
+    # Construct download URL
+    local download_url="https://github.com/${repo_owner}/${repo_name}/releases/download/${release_tag}/frontend-dist-${release_tag}.tar.gz"
+    
+    log "Downloading from: ${download_url}"
+    
+    # Create temporary directory for download
+    local temp_dir
+    temp_dir=$(mktemp -d)
+    local temp_file="${temp_dir}/frontend-dist-${release_tag}.tar.gz"
+    
+    # Download the release asset
+    if ! curl -fsSL -o "${temp_file}" "${download_url}" 2>/dev/null; then
+        rm -rf "${temp_dir}"
+        log_warn "Failed to download pre-built frontend (release may not exist or CI/CD build may have failed)"
+        return 1
+    fi
+    
+    # Verify the downloaded file exists and is not empty
+    if [ ! -s "${temp_file}" ]; then
+        rm -rf "${temp_dir}"
+        log_warn "Downloaded file is empty, skipping"
+        return 1
+    fi
+    
+    # Extract to frontend/dist/
+    log "Extracting pre-built frontend..."
+    sudo -u "${user}" bash -c "cd '${calvin_dir}/frontend' && mkdir -p dist && tar -xzf '${temp_file}' -C ." || {
+        rm -rf "${temp_dir}"
+        log_warn "Failed to extract pre-built frontend"
+        return 1
+    }
+    
+    # Verify dist/index.html exists
+    if ! sudo -u "${user}" bash -c "test -f '${calvin_dir}/frontend/dist/index.html'" 2>/dev/null; then
+        rm -rf "${temp_dir}"
+        log_warn "Extracted dist/ directory is invalid (missing index.html)"
+        return 1
+    fi
+    
+    # Cleanup
+    rm -rf "${temp_dir}"
+    
+    log "Successfully downloaded and extracted pre-built frontend"
+    return 0
 }
 
 # Build frontend
@@ -280,6 +374,12 @@ build_frontend() {
     local user="${2:-$DEFAULT_CALVIN_USER}"
     
     log "Building frontend..."
+    
+    # Check if vite is available (needed for build)
+    if ! sudo -u "${user}" bash -c "cd '${calvin_dir}/frontend' && test -f node_modules/.bin/vite" 2>/dev/null; then
+        error_exit "vite not found in node_modules/.bin/vite - frontend dependencies may not be installed correctly" 1
+    fi
+    
     sudo -u "${user}" bash -c "cd '${calvin_dir}/frontend' && npm run build" || error_exit "Frontend build failed" 1
     log "Frontend built successfully"
 }
