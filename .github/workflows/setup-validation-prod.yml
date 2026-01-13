@@ -188,14 +188,14 @@ jobs:
           
           # Patch ensure_git_repo to skip git operations if directory exists (CI mode)
           python3 << 'PYTHON_EOF'
-          import re
-          with open('scripts/setup-common.sh', 'r') as f:
-              content = f.read()
-          patch = '    # CI override: if target exists, just ensure ownership\n    if [ -d "$3" ]; then\n      echo "[CI] Target directory exists, skipping git operations"\n      chown -R "$4:$4" "$3"\n      return 0\n    fi\n'
-          content = re.sub(r'(^ensure_git_repo\(\) \{)', r'\1\n' + patch, content, flags=re.MULTILINE)
-          with open('scripts/setup-common.sh', 'w') as f:
-              f.write(content)
-          PYTHON_EOF
+import re
+with open('scripts/setup-common.sh', 'r') as f:
+    content = f.read()
+patch = '    # CI override: if target exists, just ensure ownership\n    if [ -d "$3" ]; then\n      echo "[CI] Target directory exists, skipping git operations"\n      chown -R "$4:$4" "$3"\n      return 0\n    fi\n'
+content = re.sub(r'(^ensure_git_repo\(\) \{)', r'\1\n' + patch, content, flags=re.MULTILINE)
+with open('scripts/setup-common.sh', 'w') as f:
+    f.write(content)
+PYTHON_EOF
           
           # Run the production setup script with timing
           echo "Running setup.sh (production)..."
@@ -371,14 +371,14 @@ jobs:
           
           # Patch ensure_git_repo to skip git operations if directory exists (CI mode)
           python3 << 'PYTHON_EOF'
-          import re
-          with open('scripts/setup-common.sh', 'r') as f:
-              content = f.read()
-          patch = '    # CI override: if target exists, just ensure ownership\n    if [ -d "$3" ]; then\n      echo "[CI] Target directory exists, skipping git operations"\n      chown -R "$4:$4" "$3"\n      return 0\n    fi\n'
-          content = re.sub(r'(^ensure_git_repo\(\) \{)', r'\1\n' + patch, content, flags=re.MULTILINE)
-          with open('scripts/setup-common.sh', 'w') as f:
-              f.write(content)
-          PYTHON_EOF
+import re
+with open('scripts/setup-common.sh', 'r') as f:
+    content = f.read()
+patch = '    # CI override: if target exists, just ensure ownership\n    if [ -d "$3" ]; then\n      echo "[CI] Target directory exists, skipping git operations"\n      chown -R "$4:$4" "$3"\n      return 0\n    fi\n'
+content = re.sub(r'(^ensure_git_repo\(\) \{)', r'\1\n' + patch, content, flags=re.MULTILINE)
+with open('scripts/setup-common.sh', 'w') as f:
+    f.write(content)
+PYTHON_EOF
           
           # Run setup first time
           echo "First setup run..."
