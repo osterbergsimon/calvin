@@ -107,7 +107,7 @@ jobs:
           export PATH="$HOME/.local/bin:$HOME/.cargo/bin:$PATH"
           echo "Installing backend dependencies with UV (dev extras)..."
           START_TIME=$(date +%s)
-          uv sync --extra linux,dev || uv sync --extra linux,dev
+          uv sync --extra linux --extra dev || uv sync --extra linux --extra dev
           END_TIME=$(date +%s)
           DURATION=$((END_TIME - START_TIME))
           echo "Installation took ${DURATION} seconds"

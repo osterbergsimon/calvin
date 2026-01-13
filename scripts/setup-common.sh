@@ -231,10 +231,16 @@ BACKEND_INSTALL_VENV_EOF
         sudo -u "${user}" bash << BACKEND_INSTALL_UV_EOF
             export PATH="/home/${user}/.local/bin:/home/${user}/.cargo/bin:\$PATH"
             cd ${calvin_dir}/backend
+            # Convert comma-separated extras to multiple --extra flags for UV
+            UV_EXTRAS=""
+            IFS=',' read -ra EXTRA_ARRAY <<< "${extras}"
+            for extra in "\${EXTRA_ARRAY[@]}"; do
+                UV_EXTRAS="\${UV_EXTRAS} --extra \${extra}"
+            done
             if [ -f uv.lock ]; then
-                uv sync --frozen --extra ${extras} || uv sync --extra ${extras}
+                uv sync --frozen \${UV_EXTRAS} || uv sync \${UV_EXTRAS}
             else
-                uv sync --extra ${extras}
+                uv sync \${UV_EXTRAS}
             fi
 BACKEND_INSTALL_UV_EOF
     fi
