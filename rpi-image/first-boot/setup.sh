@@ -147,6 +147,20 @@ fi
 EOF
 chown calvin:calvin /home/calvin/.bash_profile
 
+# Install restart services script
+echo "[$(date)] Installing restart services script..." | tee -a "$LOG_FILE"
+if [ -f "$CALVIN_DIR/scripts/restart-calvin-services.sh" ]; then
+    cp "$CALVIN_DIR/scripts/restart-calvin-services.sh" /usr/local/bin/restart-calvin-services.sh
+    chmod +x /usr/local/bin/restart-calvin-services.sh
+    chown calvin:calvin /usr/local/bin/restart-calvin-services.sh
+    # Allow calvin user to run restart script with sudo without password
+    echo "calvin ALL=(ALL) NOPASSWD: /usr/local/bin/restart-calvin-services.sh" > /etc/sudoers.d/calvin-restart
+    chmod 0440 /etc/sudoers.d/calvin-restart
+    echo "[$(date)] Restart services script installed with sudo permissions" | tee -a "$LOG_FILE"
+else
+    echo "[$(date)] WARNING: Restart services script not found at $CALVIN_DIR/scripts/restart-calvin-services.sh" | tee -a "$LOG_FILE"
+fi
+
 # Configure polkit to allow calvin user to reboot without password
 echo "[$(date)] Configuring polkit for reboot..." | tee -a "$LOG_FILE"
 mkdir -p /etc/polkit-1/rules.d

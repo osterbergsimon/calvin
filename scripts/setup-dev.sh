@@ -179,6 +179,14 @@ main() {
         chmod 0440 /etc/sudoers.d/calvin-reboot
     fi
     
+    if [ -f "${CALVIN_DIR}/scripts/restart-calvin-services.sh" ]; then
+        install_script "${CALVIN_DIR}/scripts/restart-calvin-services.sh" "/usr/local/bin/restart-calvin-services.sh" "${CALVIN_USER}"
+        # Configure sudoers for restart script
+        log "Configuring sudoers for restart script..."
+        echo "${CALVIN_USER} ALL=(ALL) NOPASSWD: /usr/local/bin/restart-calvin-services.sh" > /etc/sudoers.d/calvin-restart
+        chmod 0440 /etc/sudoers.d/calvin-restart
+    fi
+    
     # Step 13: Configure polkit
     configure_polkit_reboot "${CALVIN_USER}"
     

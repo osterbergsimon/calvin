@@ -42,7 +42,19 @@ async def register_plugin(
     )
 
     if not plugin:
-        raise ValueError(f"Failed to create plugin instance for type_id: {type_id}")
+        # Check if plugin type is registered
+        plugin_types = plugin_loader.get_plugin_types()
+        type_info = next((t for t in plugin_types if t.get("type_id") == type_id), None)
+        if not type_info:
+            raise ValueError(
+                f"Plugin type '{type_id}' is not installed or not loaded. "
+                f"Please install the plugin from the plugin repository first."
+            )
+        raise ValueError(
+            f"Failed to create plugin instance for type_id: {type_id}. "
+            f"The plugin type is registered but instance creation failed. "
+            f"Check the plugin's create_plugin_instance hook implementation."
+        )
 
     # Configure plugin
     await plugin.configure(config)

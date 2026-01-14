@@ -146,11 +146,24 @@ else
 fi
 
 # Restart services via systemd (non-blocking)
-# Use sudo if available, otherwise try without (might fail if not running as root)
+# Try helper script first (most reliable), then fall back to direct systemctl
 if systemctl is-active --quiet calvin-backend.service 2>/dev/null || sudo systemctl is-active --quiet calvin-backend.service 2>/dev/null; then
     echo "Restarting services via systemd..." | tee -a "$LOG_FILE"
-    if sudo systemctl restart calvin-backend 2>/dev/null; then
-        echo "Backend service restarted successfully" | tee -a "$LOG_FILE"
+    
+    # Try helper script first
+    if [ -f "/usr/local/bin/restart-calvin-services.sh" ]; then
+        if sudo /usr/local/bin/restart-calvin-services.sh backend 2>&1 | tee -a "$LOG_FILE"; then
+            echo "Backend service restarted successfully via helper script" | tee -a "$LOG_FILE"
+        elif sudo systemctl restart calvin-backend 2>/dev/null; then
+            echo "Backend service restarted successfully via systemctl" | tee -a "$LOG_FILE"
+        elif systemctl --user restart calvin-backend 2>/dev/null; then
+            echo "Backend service restarted successfully (user service)" | tee -a "$LOG_FILE"
+        else
+            echo "Warning: Failed to restart backend (may need sudo permissions)" | tee -a "$LOG_FILE"
+            echo "Please restart manually: sudo systemctl restart calvin-backend" | tee -a "$LOG_FILE"
+        fi
+    elif sudo systemctl restart calvin-backend 2>/dev/null; then
+        echo "Backend service restarted successfully via systemctl" | tee -a "$LOG_FILE"
     elif systemctl --user restart calvin-backend 2>/dev/null; then
         echo "Backend service restarted successfully (user service)" | tee -a "$LOG_FILE"
     else

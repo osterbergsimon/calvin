@@ -4,7 +4,7 @@ This document describes the documentation structure and how to build it.
 
 ## Documentation System
 
-Calvin uses **MkDocs** with the **Material** theme for documentation. The documentation is automatically built and hosted on **Read the Docs**.
+Calvin uses **MkDocs** with the **Material** theme for documentation. The documentation is automatically built and hosted on **GitHub Pages**.
 
 ## Building Documentation Locally
 
@@ -54,11 +54,11 @@ Documentation files are in the `docs/` directory:
 - `testing/` - Testing documentation
 - `archive/` - Archived/legacy documentation
 
-## Read the Docs Configuration
+## GitHub Pages Deployment
 
-The `.readthedocs.yaml` file configures automatic builds on Read the Docs. The documentation is automatically built from the main branch and available at:
+The documentation is automatically built and deployed to GitHub Pages via the `.github/workflows/docs.yml` workflow. The documentation is automatically built from the main branch when changes are pushed to the `docs/` directory or `mkdocs.yml` file, and is available at:
 
-https://calvin.readthedocs.io/
+https://osterbergsimon.github.io/calvin/
 
 ## Contributing Documentation
 
@@ -67,7 +67,7 @@ When adding or updating documentation:
 1. Edit files in the `docs/` directory
 2. Update `mkdocs.yml` navigation if adding new pages
 3. Test locally with `mkdocs serve`
-4. Commit and push - Read the Docs will automatically build
+4. Commit and push - GitHub Actions will automatically build and deploy to GitHub Pages
 
 ## Documentation Guidelines
 
