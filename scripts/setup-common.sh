@@ -346,18 +346,19 @@ download_prebuilt_frontend() {
         return 1
     fi
     
-    # Change ownership of temp file to user so they can extract it
-    chown "${user}:${user}" "${temp_file}" || {
-        rm -rf "${temp_dir}"
-        log_warn "Failed to change ownership of downloaded file"
-        return 1
-    }
-    
-    # Extract to frontend/dist/
+    # Extract to frontend/dist/ as root (since temp dir has restrictive permissions)
     log "Extracting pre-built frontend..."
-    sudo -u "${user}" bash -c "cd '${calvin_dir}/frontend' && mkdir -p dist && tar -xzf '${temp_file}' -C ." || {
+    mkdir -p "${calvin_dir}/frontend/dist"
+    if ! tar -xzf "${temp_file}" -C "${calvin_dir}/frontend" 2>/dev/null; then
         rm -rf "${temp_dir}"
         log_warn "Failed to extract pre-built frontend"
+        return 1
+    fi
+    
+    # Change ownership of extracted files to user
+    chown -R "${user}:${user}" "${calvin_dir}/frontend/dist" || {
+        rm -rf "${temp_dir}"
+        log_warn "Failed to change ownership of extracted files"
         return 1
     }
     
