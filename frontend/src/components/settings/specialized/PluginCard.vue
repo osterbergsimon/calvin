@@ -248,8 +248,8 @@ const emit = defineEmits([
 const hasSettings = computed(() => {
   return (
     Object.keys(props.plugin.config_schema || {}).length > 0 ||
-    props.instances.length > 0 ||
-    props.plugin.type === "service"
+    Object.keys(props.plugin.instance_config_schema || {}).length > 0 ||
+    props.instances.length > 0
   );
 });
 
