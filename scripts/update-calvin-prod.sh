@@ -72,12 +72,61 @@ else
     HAS_CHANGES=true
 fi
 
-# Update the update script itself if it exists in the repo
-if [ -f "$REPO_DIR/scripts/update-calvin-prod.sh" ] && [ -f "/usr/local/bin/update-calvin-prod.sh" ]; then
-    echo "Updating update script..." | tee -a "$LOG_FILE"
-    cp "$REPO_DIR/scripts/update-calvin-prod.sh" /usr/local/bin/update-calvin-prod.sh
-    chmod +x /usr/local/bin/update-calvin-prod.sh
-    chown calvin:calvin /usr/local/bin/update-calvin-prod.sh 2>/dev/null || true
+# Update the update script itself if there are changes
+if [ "$HAS_CHANGES" = true ] && [ -f "/usr/local/bin/update-calvin-prod.sh" ]; then
+    echo "Checking for update script updates..." | tee -a "$LOG_FILE"
+    
+    # Extract repo owner and name from git URL
+    repo_owner=$(echo "${GIT_REPO}" | sed -E 's|.*github\.com[:/]([^/]+)/([^/]+)(\.git)?$|\1|')
+    repo_name=$(echo "${GIT_REPO}" | sed -E 's|.*github\.com[:/]([^/]+)/([^/]+)(\.git)?$|\2|' | sed 's|\.git$||')
+    
+    if [ -n "${repo_owner}" ] && [ -n "${repo_name}" ]; then
+        SCRIPT_URL="https://raw.githubusercontent.com/${repo_owner}/${repo_name}/${GIT_BRANCH}/scripts/update-calvin-prod.sh"
+        TEMP_SCRIPT=$(mktemp)
+        
+        # Try to download updated script from GitHub
+        if command -v curl &> /dev/null; then
+            if curl -fsSL -o "$TEMP_SCRIPT" "$SCRIPT_URL"; then
+                echo "Updating update script from GitHub..." | tee -a "$LOG_FILE"
+                cp "$TEMP_SCRIPT" /usr/local/bin/update-calvin-prod.sh
+                chmod +x /usr/local/bin/update-calvin-prod.sh
+                chown calvin:calvin /usr/local/bin/update-calvin-prod.sh 2>/dev/null || true
+                rm -f "$TEMP_SCRIPT"
+            else
+                # Fallback to local if GitHub download fails
+                if [ -f "$REPO_DIR/scripts/update-calvin-prod.sh" ]; then
+                    echo "Updating update script from local repo..." | tee -a "$LOG_FILE"
+                    cp "$REPO_DIR/scripts/update-calvin-prod.sh" /usr/local/bin/update-calvin-prod.sh
+                    chmod +x /usr/local/bin/update-calvin-prod.sh
+                    chown calvin:calvin /usr/local/bin/update-calvin-prod.sh 2>/dev/null || true
+                fi
+                rm -f "$TEMP_SCRIPT"
+            fi
+        elif command -v wget &> /dev/null; then
+            if wget -q -O "$TEMP_SCRIPT" "$SCRIPT_URL"; then
+                echo "Updating update script from GitHub..." | tee -a "$LOG_FILE"
+                cp "$TEMP_SCRIPT" /usr/local/bin/update-calvin-prod.sh
+                chmod +x /usr/local/bin/update-calvin-prod.sh
+                chown calvin:calvin /usr/local/bin/update-calvin-prod.sh 2>/dev/null || true
+                rm -f "$TEMP_SCRIPT"
+            else
+                # Fallback to local if GitHub download fails
+                if [ -f "$REPO_DIR/scripts/update-calvin-prod.sh" ]; then
+                    echo "Updating update script from local repo..." | tee -a "$LOG_FILE"
+                    cp "$REPO_DIR/scripts/update-calvin-prod.sh" /usr/local/bin/update-calvin-prod.sh
+                    chmod +x /usr/local/bin/update-calvin-prod.sh
+                    chown calvin:calvin /usr/local/bin/update-calvin-prod.sh 2>/dev/null || true
+                fi
+                rm -f "$TEMP_SCRIPT"
+            fi
+        elif [ -f "$REPO_DIR/scripts/update-calvin-prod.sh" ]; then
+            # Fallback to local if no download tool available
+            echo "Updating update script from local repo..." | tee -a "$LOG_FILE"
+            cp "$REPO_DIR/scripts/update-calvin-prod.sh" /usr/local/bin/update-calvin-prod.sh
+            chmod +x /usr/local/bin/update-calvin-prod.sh
+            chown calvin:calvin /usr/local/bin/update-calvin-prod.sh 2>/dev/null || true
+        fi
+    fi
 fi
 
 # Only update frontend if there are changes
