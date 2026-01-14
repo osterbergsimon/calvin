@@ -595,6 +595,7 @@ configure_openbox_autostart() {
     local user="${1:-$DEFAULT_CALVIN_USER}"
     local user_home="/home/${user}"
     local frontend_url="${2:-http://localhost:8000}"  # Default to production
+    local start_chromium="${3:-true}"  # Whether to start Chromium (default true for backward compatibility)
     
     log "Configuring Openbox autostart..."
     mkdir -p "${user_home}/.config/openbox"
@@ -602,29 +603,35 @@ configure_openbox_autostart() {
     # Build autostart script
     {
         echo "#!/bin/bash"
-        echo "# Wait for backend to be ready"
-        echo "while ! curl -s http://localhost:8000/api/health > /dev/null; do"
-        echo "    sleep 1"
-        echo "done"
-        echo ""
-        # Add frontend wait if dev mode (port 5173)
-        if echo "${frontend_url}" | grep -q ":5173"; then
-            echo "# Wait for frontend dev server to be ready"
-            echo "while ! curl -s http://localhost:5173 > /dev/null; do"
+        if [ "${start_chromium}" = "true" ]; then
+            echo "# Wait for backend to be ready"
+            echo "while ! curl -s http://localhost:8000/api/health > /dev/null; do"
             echo "    sleep 1"
             echo "done"
             echo ""
+            # Add frontend wait if dev mode (port 5173)
+            if echo "${frontend_url}" | grep -q ":5173"; then
+                echo "# Wait for frontend dev server to be ready"
+                echo "while ! curl -s http://localhost:5173 > /dev/null; do"
+                echo "    sleep 1"
+                echo "done"
+                echo ""
+            fi
+            echo "# Start Chromium in kiosk mode"
+            echo "chromium \\"
+            echo "    --kiosk \\"
+            echo "    --noerrdialogs \\"
+            echo "    --disable-infobars \\"
+            echo "    --autoplay-policy=no-user-gesture-required \\"
+            echo "    --disable-features=TranslateUI \\"
+            echo "    --disable-ipc-flooding-protection \\"
+            echo "    ${frontend_url} &"
+            echo ""
+        else
+            echo "# Chromium is managed by systemd service (calvin-frontend.service)"
+            echo "# No need to start it here"
+            echo ""
         fi
-        echo "# Start Chromium in kiosk mode"
-        echo "chromium \\"
-        echo "    --kiosk \\"
-        echo "    --noerrdialogs \\"
-        echo "    --disable-infobars \\"
-        echo "    --autoplay-policy=no-user-gesture-required \\"
-        echo "    --disable-features=TranslateUI \\"
-        echo "    --disable-ipc-flooding-protection \\"
-        echo "    ${frontend_url} &"
-        echo ""
         echo "# Hide cursor after 3 seconds"
         echo "unclutter -idle 3 -root &"
     } > "${user_home}/.config/openbox/autostart"

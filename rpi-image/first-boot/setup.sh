@@ -125,23 +125,13 @@ chmod +x /home/calvin/.xinitrc
 chown calvin:calvin /home/calvin/.xinitrc
 
 # Configure autostart
+# Note: Chromium is managed by systemd service (calvin-frontend.service)
+# so we don't start it here to avoid conflicts
 mkdir -p /home/calvin/.config/openbox
 cat > /home/calvin/.config/openbox/autostart << 'EOF'
 #!/bin/bash
-# Wait for backend to be ready
-while ! curl -s http://localhost:8000/api/health > /dev/null; do
-    sleep 1
-done
-
-# Start Chromium in kiosk mode
-chromium-browser \
-    --kiosk \
-    --noerrdialogs \
-    --disable-infobars \
-    --autoplay-policy=no-user-gesture-required \
-    --disable-features=TranslateUI \
-    --disable-ipc-flooding-protection \
-    http://localhost:8000 &
+# Chromium is managed by systemd service (calvin-frontend.service)
+# No need to start it here
 
 # Hide cursor after 3 seconds
 unclutter -idle 3 -root &

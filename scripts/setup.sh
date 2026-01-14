@@ -189,7 +189,8 @@ main() {
     configure_display "${CALVIN_USER}"
     
     # Step 15: Configure Openbox autostart (production mode - port 8000)
-    configure_openbox_autostart "${CALVIN_USER}" "http://localhost:8000"
+    # Don't start Chromium in autostart since systemd service handles it
+    configure_openbox_autostart "${CALVIN_USER}" "http://localhost:8000" "false"
     
     # Step 16: Verify setup
     verify_setup "${CALVIN_DIR}" "${CALVIN_USER}"
