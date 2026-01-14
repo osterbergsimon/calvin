@@ -30,9 +30,9 @@ if [ -z "${COMMON_SCRIPT}" ] && [ -n "${BASH_VERSION:-}" ]; then
     fi
 fi
 
-# If we found setup-common.sh locally, source it
+# If we found setup-common.sh locally, source it (use . for POSIX compatibility)
 if [ -n "${COMMON_SCRIPT}" ] && [ -f "${COMMON_SCRIPT}" ]; then
-    source "${COMMON_SCRIPT}"
+    . "${COMMON_SCRIPT}"
 else
     # Not found locally - download from GitHub
     echo "Downloading setup-common.sh from GitHub..." >&2
@@ -71,7 +71,7 @@ else
         exit 1
     fi
     
-    source "${TEMP_DIR}/setup-common.sh"
+    . "${TEMP_DIR}/setup-common.sh"
 fi
 
 # Configuration (can be overridden by environment variables)
