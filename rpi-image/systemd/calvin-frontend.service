@@ -23,7 +23,7 @@ ExecStartPre=/bin/sleep 2
 ExecStartPre=/bin/bash -c 'pkill -u calvin chromium || pkill -u calvin chromium-browser || true'
 ExecStartPre=/bin/sleep 1
 # Clear Chromium cache before starting to ensure fresh files are loaded
-ExecStartPre=/bin/bash -c 'rm -rf /home/calvin/.cache/chromium/Default/Cache/* /home/calvin/.cache/chromium/Default/Code\ Cache/* 2>/dev/null || true'
+ExecStartPre=/bin/bash -c 'rm -rf /home/calvin/.cache/chromium/Default/Cache/* /home/calvin/.cache/chromium/Default/Code\\ Cache/* 2>/dev/null || true'
 ExecStart=/usr/bin/chromium \
     --kiosk \
     --noerrdialogs \
