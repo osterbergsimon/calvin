@@ -12,21 +12,67 @@
 
 set -euo pipefail
 
-# Get the directory where this script is located
-SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+# Determine if we're running from a pipe (wget/curl | sh)
+# When running from pipe, BASH_SOURCE[0] is empty or "-"
+RUNNING_FROM_PIPE=false
+if [ -z "${BASH_SOURCE[0]:-}" ] || [ "${BASH_SOURCE[0]}" = "-" ]; then
+    RUNNING_FROM_PIPE=true
+fi
+
+# Get the directory where this script is located (if not from pipe)
+if [ "${RUNNING_FROM_PIPE}" = "false" ]; then
+    SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+else
+    # When running from pipe, use a temp directory
+    SCRIPT_DIR="$(mktemp -d)"
+    trap "rm -rf '${SCRIPT_DIR}'" EXIT
+fi
 
 # Source shared utilities
-# If running from wget/curl, setup-common.sh should be in the same directory
+# If running from wget/curl, download setup-common.sh from GitHub
 if [ -f "${SCRIPT_DIR}/setup-common.sh" ]; then
     source "${SCRIPT_DIR}/setup-common.sh"
-else
+elif [ -f "./setup-common.sh" ]; then
     # Fallback: try to source from current directory if script is in PATH
-    if [ -f "./setup-common.sh" ]; then
-        source "./setup-common.sh"
-    else
-        echo "Error: setup-common.sh not found. Please ensure it's in the same directory as setup.sh" >&2
+    source "./setup-common.sh"
+elif [ "${RUNNING_FROM_PIPE}" = "true" ]; then
+    # Download setup-common.sh from GitHub
+    echo "Downloading setup-common.sh from GitHub..." >&2
+    
+    # Determine GitHub URL from environment or defaults
+    GIT_REPO="${GIT_REPO:-https://github.com/osterbergsimon/calvin.git}"
+    GIT_BRANCH="${GIT_BRANCH:-main}"
+    
+    # Extract repo owner and name from git URL
+    repo_owner=$(echo "${GIT_REPO}" | sed -E 's|.*github\.com[:/]([^/]+)/([^/]+)(\.git)?$|\1|')
+    repo_name=$(echo "${GIT_REPO}" | sed -E 's|.*github\.com[:/]([^/]+)/([^/]+)(\.git)?$|\2|' | sed 's|\.git$||')
+    
+    if [ -z "${repo_owner}" ] || [ -z "${repo_name}" ]; then
+        echo "Error: Could not extract repo owner/name from ${GIT_REPO}" >&2
         exit 1
     fi
+    
+    # Download setup-common.sh from raw.githubusercontent.com
+    common_url="https://raw.githubusercontent.com/${repo_owner}/${repo_name}/${GIT_BRANCH}/scripts/setup-common.sh"
+    if command -v curl &> /dev/null; then
+        if ! curl -fsSL -o "${SCRIPT_DIR}/setup-common.sh" "${common_url}"; then
+            echo "Error: Failed to download setup-common.sh from ${common_url}" >&2
+            exit 1
+        fi
+    elif command -v wget &> /dev/null; then
+        if ! wget -q -O "${SCRIPT_DIR}/setup-common.sh" "${common_url}"; then
+            echo "Error: Failed to download setup-common.sh from ${common_url}" >&2
+            exit 1
+        fi
+    else
+        echo "Error: Neither curl nor wget is available. Please install one of them." >&2
+        exit 1
+    fi
+    
+    source "${SCRIPT_DIR}/setup-common.sh"
+else
+    echo "Error: setup-common.sh not found. Please ensure it's in the same directory as setup.sh" >&2
+    exit 1
 fi
 
 # Configuration (can be overridden by environment variables)
