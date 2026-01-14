@@ -4,7 +4,10 @@
 
 import { describe, it, expect, beforeEach, afterEach, vi } from "vitest";
 import { setActivePinia, createPinia } from "pinia";
-import { usePhotoFrameMode } from "@/composables/usePhotoFrameMode";
+import {
+  usePhotoFrameMode,
+  resetPhotoFrameInstance,
+} from "@/composables/usePhotoFrameMode";
 import { useConfigStore } from "@/stores/config";
 import { useModeStore } from "@/stores/mode";
 import { useRouter } from "vue-router";
@@ -33,10 +36,15 @@ describe("usePhotoFrameMode", () => {
     vi.clearAllMocks();
     vi.useFakeTimers();
 
+    // Reset singleton instance between tests
+    resetPhotoFrameInstance();
+
     mockConfigStore = {
       photoFrameEnabled: false,
       photoFrameTimeout: 300,
+      lastSideViewMode: "photos",
       fetchConfig: vi.fn().mockResolvedValue({}),
+      setLastSideViewMode: vi.fn(),
     };
 
     mockModeStore = {
@@ -50,6 +58,11 @@ describe("usePhotoFrameMode", () => {
 
     mockRouter = {
       push: vi.fn(),
+      currentRoute: {
+        value: {
+          path: "/",
+        },
+      },
     };
 
     useConfigStore.mockReturnValue(mockConfigStore);
@@ -70,11 +83,14 @@ describe("usePhotoFrameMode", () => {
   });
 
   describe("resetInactivityTimer", () => {
-    it("should reset inactivity timer", () => {
+    it("should reset inactivity timer", async () => {
       mockConfigStore.photoFrameEnabled = true;
       mockConfigStore.photoFrameTimeout = 5; // 5 seconds
 
       const photoFrame = usePhotoFrameMode();
+
+      // Wait for any throttling to complete
+      vi.advanceTimersByTime(600);
 
       // Trigger activity
       photoFrame.resetInactivityTimer();
@@ -89,10 +105,15 @@ describe("usePhotoFrameMode", () => {
       expect(mockRouter.push).toHaveBeenCalledWith("/");
     });
 
-    it("should exit photo frame mode when resetting timer", () => {
+    it("should exit photo frame mode when resetting timer", async () => {
       mockConfigStore.photoFrameEnabled = true;
 
       const photoFrame = usePhotoFrameMode();
+
+      // Wait for any throttling to complete
+      vi.advanceTimersByTime(600);
+
+      // Manually set active state (bypassing enterPhotoFrameMode)
       photoFrame.isPhotoFrameActive.value = true;
 
       photoFrame.resetInactivityTimer();
@@ -113,11 +134,14 @@ describe("usePhotoFrameMode", () => {
       expect(mockModeStore.enterFullscreen).not.toHaveBeenCalled();
     });
 
-    it("should clear existing timer when resetting", () => {
+    it("should clear existing timer when resetting", async () => {
       mockConfigStore.photoFrameEnabled = true;
       mockConfigStore.photoFrameTimeout = 5;
 
       const photoFrame = usePhotoFrameMode();
+
+      // Wait for any throttling to complete
+      vi.advanceTimersByTime(600);
 
       // Start first timer
       photoFrame.resetInactivityTimer();
@@ -137,10 +161,13 @@ describe("usePhotoFrameMode", () => {
   });
 
   describe("enterPhotoFrameMode", () => {
-    it("should enter photo frame mode", () => {
+    it("should enter photo frame mode", async () => {
       mockConfigStore.photoFrameEnabled = true;
 
       const photoFrame = usePhotoFrameMode();
+
+      // Wait for any throttling to complete
+      vi.advanceTimersByTime(600);
 
       photoFrame.enterPhotoFrameMode();
 
@@ -164,8 +191,13 @@ describe("usePhotoFrameMode", () => {
   });
 
   describe("exitPhotoFrameMode", () => {
-    it("should exit photo frame mode", () => {
+    it("should exit photo frame mode", async () => {
       const photoFrame = usePhotoFrameMode();
+
+      // Wait for any throttling to complete
+      vi.advanceTimersByTime(600);
+
+      // Manually set active state (bypassing enterPhotoFrameMode)
       photoFrame.isPhotoFrameActive.value = true;
 
       photoFrame.exitPhotoFrameMode();
@@ -186,14 +218,22 @@ describe("usePhotoFrameMode", () => {
       expect(mockModeStore.exitFullscreen).toHaveBeenCalledTimes(exitCallCount);
     });
 
-    it("should reset timer after exiting", () => {
+    it("should reset timer after exiting", async () => {
       mockConfigStore.photoFrameEnabled = true;
       mockConfigStore.photoFrameTimeout = 5;
 
       const photoFrame = usePhotoFrameMode();
+
+      // Wait for any throttling to complete
+      vi.advanceTimersByTime(600);
+
+      // Manually set active state (bypassing enterPhotoFrameMode)
       photoFrame.isPhotoFrameActive.value = true;
 
       photoFrame.exitPhotoFrameMode();
+
+      // Wait for throttling from exit
+      vi.advanceTimersByTime(600);
 
       // Timer should be reset, so we need to wait the full timeout
       vi.advanceTimersByTime(5000);
@@ -203,11 +243,14 @@ describe("usePhotoFrameMode", () => {
   });
 
   describe("handleActivity", () => {
-    it("should reset inactivity timer on activity", () => {
+    it("should reset inactivity timer on activity", async () => {
       mockConfigStore.photoFrameEnabled = true;
       mockConfigStore.photoFrameTimeout = 5;
 
       const photoFrame = usePhotoFrameMode();
+
+      // Wait for any throttling to complete
+      vi.advanceTimersByTime(600);
 
       // Start timer
       photoFrame.resetInactivityTimer();
@@ -215,6 +258,9 @@ describe("usePhotoFrameMode", () => {
       // Simulate activity before timeout - handleActivity is called internally via resetInactivityTimer
       vi.advanceTimersByTime(3000);
       photoFrame.resetInactivityTimer(); // This calls handleActivity internally
+
+      // Wait for throttling
+      vi.advanceTimersByTime(600);
 
       // Should not have entered photo frame yet
       expect(mockModeStore.enterFullscreen).not.toHaveBeenCalled();
@@ -229,10 +275,16 @@ describe("usePhotoFrameMode", () => {
     it("should react to photoFrameEnabled changes", async () => {
       const photoFrame = usePhotoFrameMode();
 
+      // Wait for any throttling to complete
+      vi.advanceTimersByTime(600);
+
       // Enable photo frame
       mockConfigStore.photoFrameEnabled = true;
       // Trigger watch by accessing the store property (in real usage, Vue watch would trigger)
       await photoFrame.resetInactivityTimer();
+
+      // Wait for throttling
+      vi.advanceTimersByTime(600);
 
       vi.advanceTimersByTime(300000); // 5 minutes
 
@@ -256,16 +308,23 @@ describe("usePhotoFrameMode", () => {
       expect(mockModeStore.enterFullscreen).not.toHaveBeenCalled();
     });
 
-    it("should reset timer when timeout changes", () => {
+    it("should reset timer when timeout changes", async () => {
       mockConfigStore.photoFrameEnabled = true;
       mockConfigStore.photoFrameTimeout = 5;
 
       const photoFrame = usePhotoFrameMode();
+
+      // Wait for any throttling to complete
+      vi.advanceTimersByTime(600);
+
       photoFrame.resetInactivityTimer();
 
       // Change timeout
       mockConfigStore.photoFrameTimeout = 10;
       photoFrame.resetInactivityTimer();
+
+      // Wait for throttling
+      vi.advanceTimersByTime(600);
 
       // Old timeout should not trigger
       vi.advanceTimersByTime(5000);
@@ -293,8 +352,14 @@ describe("usePhotoFrameMode", () => {
 
       const photoFrame = usePhotoFrameMode();
 
+      // Wait for any throttling to complete
+      vi.advanceTimersByTime(600);
+
       await mockConfigStore.fetchConfig();
       photoFrame.resetInactivityTimer();
+
+      // Wait for throttling
+      vi.advanceTimersByTime(600);
 
       vi.advanceTimersByTime(5000);
 

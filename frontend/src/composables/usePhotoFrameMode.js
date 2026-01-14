@@ -17,6 +17,21 @@ const devLog = (...args) => {
   }
 };
 
+// Export reset function for testing
+export function resetPhotoFrameInstance() {
+  if (photoFrameInstance) {
+    // Clean up any timers
+    if (photoFrameInstance.inactivityTimer?.value) {
+      clearTimeout(photoFrameInstance.inactivityTimer.value);
+    }
+    if (photoFrameInstance.resetTimerThrottle?.value) {
+      clearTimeout(photoFrameInstance.resetTimerThrottle.value);
+    }
+  }
+  photoFrameInstance = null;
+  globalInitialized = false;
+}
+
 export function usePhotoFrameMode() {
   // Return existing instance if already created
   if (photoFrameInstance) {
@@ -63,8 +78,8 @@ export function usePhotoFrameMode() {
 
     // If photo frame is active, exit it
     if (isPhotoFrameActive.value) {
-      isResettingTimer.value = false;
       exitPhotoFrameMode();
+      isResettingTimer.value = false;
       return; // Don't start a new timer immediately after exiting
     }
 
@@ -309,6 +324,9 @@ export function usePhotoFrameMode() {
     enterPhotoFrameMode,
     exitPhotoFrameMode,
     resetInactivityTimer,
+    // Expose internal refs for testing cleanup
+    inactivityTimer,
+    resetTimerThrottle,
   };
 
   // Store instance for singleton pattern
