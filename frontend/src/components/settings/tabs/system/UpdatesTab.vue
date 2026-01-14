@@ -55,6 +55,37 @@
             <p v-if="updateStatus.progress !== undefined">
               <strong>Progress:</strong> {{ updateStatus.progress }}%
             </p>
+            <p v-if="updateStatus.log_file">
+              <strong>Log file:</strong> {{ updateStatus.log_file }}
+            </p>
+          </div>
+        </SettingItem>
+
+        <SettingItem v-if="updateStatus.last_log" label="Latest log output">
+          <pre class="update-log">{{ updateStatus.last_log }}</pre>
+        </SettingItem>
+
+        <SettingItem
+          v-if="
+            updateStatus.current_commit_short || updateStatus.new_commit_short
+          "
+          label="Commit info"
+        >
+          <div class="status-details">
+            <p v-if="updateStatus.current_commit_short">
+              <strong>Current:</strong>
+              {{ updateStatus.current_commit_short }}
+              <span v-if="updateStatus.current_commit_msg">
+                — {{ updateStatus.current_commit_msg }}
+              </span>
+            </p>
+            <p v-if="updateStatus.new_commit_short">
+              <strong>Latest:</strong>
+              {{ updateStatus.new_commit_short }}
+              <span v-if="updateStatus.new_commit_msg">
+                — {{ updateStatus.new_commit_msg }}
+              </span>
+            </p>
           </div>
         </SettingItem>
       </div>
@@ -209,5 +240,18 @@ watch(
 
 .status-details strong {
   color: var(--text-primary);
+}
+
+.update-log {
+  max-height: 260px;
+  overflow: auto;
+  background: rgba(0, 0, 0, 0.05);
+  border: 1px solid var(--border-color, rgba(0, 0, 0, 0.1));
+  border-radius: 4px;
+  padding: 0.75rem;
+  white-space: pre-wrap;
+  font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
+  font-size: 0.8rem;
+  line-height: 1.25rem;
 }
 </style>

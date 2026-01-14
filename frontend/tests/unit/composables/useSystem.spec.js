@@ -15,11 +15,12 @@ vi.mock("@/services/systemApi", () => ({
   restartFrontend: vi.fn(),
   triggerUpdate: vi.fn(),
   getUpdateStatus: vi.fn(),
+  getHealth: vi.fn(),
 }));
 
 describe("useSystem", () => {
   beforeEach(() => {
-    vi.clearAllMocks();
+    vi.resetAllMocks();
     vi.useFakeTimers();
   });
 
@@ -178,9 +179,10 @@ describe("useSystem", () => {
   describe("triggerUpdate", () => {
     it("should trigger update and update status", async () => {
       systemApi.triggerUpdate.mockResolvedValue({});
-      // Mock getUpdateStatus to return completed status immediately
+      systemApi.getHealth.mockResolvedValue({ status: "healthy" });
+      // Mock getUpdateStatus to return idle (completed) status immediately
       systemApi.getUpdateStatus.mockResolvedValue({
-        status: "completed",
+        status: "idle",
         message: "Update completed",
       });
 
@@ -190,8 +192,8 @@ describe("useSystem", () => {
       // Test functionality: update was triggered, status was checked, message was set
       expect(systemApi.triggerUpdate).toHaveBeenCalled();
       expect(system.updating.value).toBe(false); // Should be false after completion
-      expect(system.updateStatus.value?.status).toBe("completed");
-      expect(system.updateMessage.value).toContain("completed");
+      expect(system.updateStatus.value?.status).toBe("idle");
+      expect(system.updateMessage.value).toContain("completed successfully");
     });
 
     it("should handle update errors", async () => {
@@ -214,12 +216,7 @@ describe("useSystem", () => {
       });
 
       const system = useSystem();
-      const updatePromise = system.triggerUpdate();
-
-      // Fast-forward polling
-      vi.advanceTimersByTime(5000);
-
-      await updatePromise;
+      await system.triggerUpdate();
 
       expect(system.updateMessage.value).toBe("Update failed: Update failed");
       expect(system.updateMessageClass.value).toBe("error");
@@ -229,7 +226,7 @@ describe("useSystem", () => {
   describe("getUpdateStatus", () => {
     it("should get update status", async () => {
       const mockStatus = {
-        status: "in_progress",
+        status: "running",
         message: "Updating...",
       };
 
@@ -258,9 +255,10 @@ describe("useSystem", () => {
   describe("pollUpdateStatus", () => {
     it("should check update status and update store", async () => {
       const mockStatus = {
-        status: "completed",
+        status: "idle",
         message: "Update completed",
       };
+      systemApi.getHealth.mockResolvedValue({ status: "healthy" });
       systemApi.getUpdateStatus.mockResolvedValue(mockStatus);
 
       const system = useSystem();
@@ -269,17 +267,24 @@ describe("useSystem", () => {
       // Test functionality: status was checked and stored
       expect(systemApi.getUpdateStatus).toHaveBeenCalled();
       expect(system.updateStatus.value).toEqual(mockStatus);
-      expect(system.updateMessage.value).toContain("completed");
+      expect(system.updateMessage.value).toContain("completed successfully");
     });
 
     it("should handle in-progress status", async () => {
-      systemApi.getUpdateStatus.mockResolvedValue({ status: "in_progress" });
+      systemApi.getHealth.mockResolvedValue({ status: "healthy" });
+      systemApi.getUpdateStatus
+        .mockResolvedValueOnce({ status: "running", message: "Updating…" })
+        .mockResolvedValueOnce({ status: "idle", message: "Done" });
 
       const system = useSystem();
-      await system.pollUpdateStatus();
+      const p = system.pollUpdateStatus();
+      await vi.runAllTimersAsync();
+      await p;
 
-      // Test functionality: in-progress status is stored
-      expect(system.updateStatus.value?.status).toBe("in_progress");
+      // Test functionality: transitions from running -> idle
+      expect(system.updateStatus.value?.status).toBe("idle");
+      expect(system.updateMessage.value).toContain("completed successfully");
+      expect(systemApi.getUpdateStatus).toHaveBeenCalledTimes(2);
     });
 
     it("should handle error status", async () => {

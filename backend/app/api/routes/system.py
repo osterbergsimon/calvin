@@ -184,40 +184,62 @@ async def get_update_status():
         # Check if update is currently running
         # Look for various indicators of update activity
         log_content = "".join(last_lines)
-        has_started = "Starting Calvin update" in log_content or "Starting update" in log_content
+        log_lower = log_content.lower()
+
+        # Detect "start" across update scripts:
+        # - scripts/update-calvin.sh               -> "Starting Calvin update..."
+        # - scripts/update-calvin-dev.sh           -> "Starting Calvin development update..."
+        # - scripts/update-calvin-prod.sh          -> "Starting Calvin production update..."
+        has_started = "starting calvin" in log_lower and "update" in log_lower
+
+        # Detect completion across update scripts:
+        # - scripts/update-calvin.sh               -> "Update complete!"
+        # - scripts/update-calvin-dev.sh           -> "Development update complete!"
+        # - scripts/update-calvin-prod.sh          -> "Production update complete!"
         has_completed = (
-            "Update complete!" in log_content
-            or "Update completed" in log_content
-            or "Calvin update complete" in log_content
+            "update complete!" in log_lower
+            or "production update complete!" in log_lower
+            or "development update complete!" in log_lower
+            or "update completed" in log_lower
+            or "calvin update complete" in log_lower
         )
-        has_error = (
-            "ERROR" in log_content or "error" in log_content or "failed" in log_content.lower()
-        )
+
+        # Treat explicit ERROR, or common failure words, as error indicators.
+        # Note: we deliberately keep this broad because the update scripts log warnings in plain text.
+        has_error = ("error" in log_lower) or ("failed" in log_lower)
 
         # Check for specific update steps
         has_pulling = (
-            "Pulling latest code" in log_content
-            or "git pull" in log_content.lower()
-            or "git fetch" in log_content.lower()
+            "pulling latest code" in log_lower
+            or "fetching latest code" in log_lower
+            or "git pull" in log_lower
+            or "git fetch" in log_lower
         )
         has_updating_deps = (
-            "Updating backend dependencies" in log_content
-            or "Updating frontend dependencies" in log_content
-            or "Installing" in log_content
+            "updating backend dependencies" in log_lower
+            or "updating frontend dependencies" in log_lower
+            or "npm ci" in log_lower
+            or "uv sync" in log_lower
+            or "pip install" in log_lower
+            or "installing" in log_lower
         )
         has_building = (
-            "Building frontend" in log_content
-            or "Rebuilding frontend" in log_content
-            or "npm run build" in log_content.lower()
-            or "vite build" in log_content.lower()
-            or "transforming" in log_content.lower()
+            "building frontend" in log_lower
+            or "rebuilding frontend" in log_lower
+            or "npm run build" in log_lower
+            or "vite build" in log_lower
+            or "transforming" in log_lower
         )
         has_build_complete = (
-            "Frontend build completed successfully" in log_content
-            or "build completed" in log_content.lower()
+            "frontend build completed successfully" in log_lower
+            or "pre-built frontend installed successfully" in log_lower
+            or "build completed" in log_lower
         )
         has_restarting = (
-            "Restarting services" in log_content or "systemctl restart" in log_content.lower()
+            "restarting services" in log_lower
+            or "restarting backend service" in log_lower
+            or "restarting frontend" in log_lower
+            or "systemctl restart" in log_lower
         )
 
         # Check if process is still running by checking for recent activity
@@ -228,18 +250,11 @@ async def get_update_status():
         recently_updated = (time.time() - log_mtime) < 60
 
         # Determine status based on log content and recent activity
-        # Only mark as complete if we have BOTH the build completion AND the update complete message
-        # This ensures the build actually finished before we mark it as done
-        if has_completed and has_build_complete:
+        # We treat any of the known "...update complete!" markers as completion.
+        # Some update modes download pre-built frontend instead of building, so build markers may be absent.
+        if has_completed:
             status = "idle"
             message = "Update completed successfully"
-        elif has_completed and not has_build_complete and recently_updated:
-            # Update complete message exists but build hasn't finished yet - still running
-            status = "running"
-            if has_building:
-                message = "Building frontend... (this may take a few minutes)"
-            else:
-                message = "Update in progress..."
         elif has_error and not recently_updated:
             status = "error"
             message = "Update failed. Check logs for details."
@@ -263,6 +278,10 @@ async def get_update_status():
         elif has_started and not recently_updated:
             status = "error"
             message = "Update appears to have stalled or failed"
+        elif recently_updated:
+            # Log is being written, but we didn't match any other markers yet.
+            status = "running"
+            message = "Update in progress..."
         else:
             status = "unknown"
             message = "Update status unknown. Check logs for details."
@@ -272,8 +291,9 @@ async def get_update_status():
 
         # Check if backend has restarted (indicates update is fully complete)
         has_backend_restarted = (
-            "Backend service restarted successfully" in log_content
-            or "restarted successfully" in log_content.lower()
+            "backend service restarted successfully" in log_lower
+            or "backend service restarted successfully via" in log_lower
+            or "backend restart initiated" in log_lower
         )
 
         return {
@@ -363,80 +383,77 @@ async def reload_ui():
 async def restart_frontend():
     """
     Restart the frontend service.
-    Uses systemctl to restart the calvin-frontend service.
+    Uses a helper script with sudo permissions to restart the calvin-frontend service.
     """
     try:
-        # Try to restart the frontend service
-        restart_attempted = False
+        # Try to use the helper script first (most reliable)
+        helper_script = Path("/usr/local/bin/restart-calvin-services.sh")
+        if helper_script.exists():
+            try:
+                result = subprocess.run(
+                    ["sudo", str(helper_script), "frontend"],
+                    capture_output=True,
+                    timeout=10,
+                    text=True,
+                )
+                if result.returncode == 0:
+                    logger.info("Frontend restart initiated via helper script")
+                    return {
+                        "status": "success",
+                        "message": "Frontend service restart initiated. The service will restart shortly.",
+                    }
+                else:
+                    error_msg = result.stderr or result.stdout or "Unknown error"
+                    logger.warning(f"Helper script failed: {error_msg}")
+            except FileNotFoundError:
+                logger.warning("sudo not found")
+            except subprocess.TimeoutExpired:
+                logger.info("Helper script timed out (but may have initiated)")
+                return {
+                    "status": "success",
+                    "message": "Frontend service restart initiated. The service will restart shortly.",
+                }
+            except Exception as e:
+                logger.error(f"Helper script error: {e}", exc_info=True)
 
-        # Method 1: systemctl restart (might work without sudo)
+        # Fallback: Try systemctl restart (might work if user has permissions)
         try:
             result = subprocess.run(
                 ["systemctl", "restart", "calvin-frontend"],
                 capture_output=True,
                 timeout=5,
+                text=True,
             )
             if result.returncode == 0:
                 logger.info("Frontend restart initiated via systemctl restart")
-                restart_attempted = True
+                return {
+                    "status": "success",
+                    "message": "Frontend service restart initiated. The service will restart shortly.",
+                }
             else:
-                error_msg = result.stderr.decode()
+                error_msg = result.stderr or "Unknown error"
                 logger.warning(f"systemctl restart failed: {error_msg}")
         except FileNotFoundError:
             logger.warning("systemctl not found")
         except subprocess.TimeoutExpired:
             logger.info("systemctl restart timed out (but may have initiated)")
-            restart_attempted = True
-        except Exception as e:
-            logger.error(f"systemctl restart error: {e}", exc_info=True)
-
-        # Method 2: Use dbus to call systemd-logind (alternative to systemctl)
-        if not restart_attempted:
-            try:
-                result = subprocess.run(
-                    [
-                        "dbus-send",
-                        "--system",
-                        "--print-reply",
-                        "--dest=org.freedesktop.systemd1",
-                        "/org/freedesktop/systemd1",
-                        "org.freedesktop.systemd1.Manager.RestartUnit",
-                        "string:calvin-frontend.service",
-                        "string:replace",
-                    ],
-                    capture_output=True,
-                    timeout=5,
-                )
-                if result.returncode == 0:
-                    logger.info("Frontend restart initiated via dbus")
-                    restart_attempted = True
-                else:
-                    error_msg = result.stderr.decode()
-                    logger.warning(f"dbus restart failed: {error_msg}")
-            except FileNotFoundError:
-                logger.warning("dbus-send not found")
-            except subprocess.TimeoutExpired:
-                logger.info("dbus restart timed out (but may have initiated)")
-                restart_attempted = True
-            except Exception as e:
-                logger.error(f"dbus restart error: {e}", exc_info=True)
-
-        if restart_attempted:
             return {
                 "status": "success",
                 "message": "Frontend service restart initiated. The service will restart shortly.",
             }
-        else:
-            # If all methods failed, return error with details
-            error_detail = (
-                "Failed to restart frontend service: All restart methods failed.\n"
-                "Note: Polkit rules must be configured to allow calvin user to restart services.\n"
-                "Check /etc/polkit-1/rules.d/50-calvin-restart.rules exists.\n"
-                "Alternatively, you can restart manually via SSH: "
-                "sudo systemctl restart calvin-frontend"
-            )
-            logger.error(error_detail)
-            raise HTTPException(status_code=500, detail=error_detail)
+        except Exception as e:
+            logger.error(f"systemctl restart error: {e}", exc_info=True)
+
+        # If all methods failed, return error with details
+        error_detail = (
+            "Failed to restart frontend service: All restart methods failed.\n"
+            "Note: The restart helper script should be installed and configured with sudo permissions.\n"
+            "Check /usr/local/bin/restart-calvin-services.sh exists and /etc/sudoers.d/calvin-restart is configured.\n"
+            "Alternatively, you can restart manually via SSH: "
+            "sudo systemctl restart calvin-frontend"
+        )
+        logger.error(error_detail)
+        raise HTTPException(status_code=500, detail=error_detail)
     except HTTPException:
         raise
     except Exception as e:
@@ -448,82 +465,77 @@ async def restart_frontend():
 async def restart_backend():
     """
     Restart the backend service.
-    Uses systemctl to restart the calvin-backend service.
+    Uses a helper script with sudo permissions to restart the calvin-backend service.
     """
     try:
-        # Try to restart the backend service
-        # Note: The backend service runs with NoNewPrivileges=true, so sudo might not work
-        # Try systemctl restart first (might work if user has permissions)
-        restart_attempted = False
+        # Try to use the helper script first (most reliable)
+        helper_script = Path("/usr/local/bin/restart-calvin-services.sh")
+        if helper_script.exists():
+            try:
+                result = subprocess.run(
+                    ["sudo", str(helper_script), "backend"],
+                    capture_output=True,
+                    timeout=10,
+                    text=True,
+                )
+                if result.returncode == 0:
+                    logger.info("Backend restart initiated via helper script")
+                    return {
+                        "status": "success",
+                        "message": "Backend service restart initiated. The service will restart shortly.",
+                    }
+                else:
+                    error_msg = result.stderr or result.stdout or "Unknown error"
+                    logger.warning(f"Helper script failed: {error_msg}")
+            except FileNotFoundError:
+                logger.warning("sudo not found")
+            except subprocess.TimeoutExpired:
+                logger.info("Helper script timed out (but may have initiated)")
+                return {
+                    "status": "success",
+                    "message": "Backend service restart initiated. The service will restart shortly.",
+                }
+            except Exception as e:
+                logger.error(f"Helper script error: {e}", exc_info=True)
 
-        # Method 1: systemctl restart (might work without sudo)
+        # Fallback: Try systemctl restart (might work if user has permissions)
         try:
             result = subprocess.run(
                 ["systemctl", "restart", "calvin-backend"],
                 capture_output=True,
                 timeout=5,
+                text=True,
             )
             if result.returncode == 0:
                 logger.info("Backend restart initiated via systemctl restart")
-                restart_attempted = True
+                return {
+                    "status": "success",
+                    "message": "Backend service restart initiated. The service will restart shortly.",
+                }
             else:
-                error_msg = result.stderr.decode()
+                error_msg = result.stderr or "Unknown error"
                 logger.warning(f"systemctl restart failed: {error_msg}")
         except FileNotFoundError:
             logger.warning("systemctl not found")
         except subprocess.TimeoutExpired:
             logger.info("systemctl restart timed out (but may have initiated)")
-            restart_attempted = True
-        except Exception as e:
-            logger.error(f"systemctl restart error: {e}", exc_info=True)
-
-        # Method 2: Use dbus to call systemd-logind (alternative to systemctl)
-        if not restart_attempted:
-            try:
-                result = subprocess.run(
-                    [
-                        "dbus-send",
-                        "--system",
-                        "--print-reply",
-                        "--dest=org.freedesktop.systemd1",
-                        "/org/freedesktop/systemd1",
-                        "org.freedesktop.systemd1.Manager.RestartUnit",
-                        "string:calvin-backend.service",
-                        "string:replace",
-                    ],
-                    capture_output=True,
-                    timeout=5,
-                )
-                if result.returncode == 0:
-                    logger.info("Backend restart initiated via dbus")
-                    restart_attempted = True
-                else:
-                    error_msg = result.stderr.decode()
-                    logger.warning(f"dbus restart failed: {error_msg}")
-            except FileNotFoundError:
-                logger.warning("dbus-send not found")
-            except subprocess.TimeoutExpired:
-                logger.info("dbus restart timed out (but may have initiated)")
-                restart_attempted = True
-            except Exception as e:
-                logger.error(f"dbus restart error: {e}", exc_info=True)
-
-        if restart_attempted:
             return {
                 "status": "success",
                 "message": "Backend service restart initiated. The service will restart shortly.",
             }
-        else:
-            # If all methods failed, return error with details
-            error_detail = (
-                "Failed to restart backend service: All restart methods failed.\n"
-                "Note: Polkit rules must be configured to allow calvin user to restart services.\n"
-                "Check /etc/polkit-1/rules.d/50-calvin-restart.rules exists.\n"
-                "Alternatively, you can restart manually via SSH: "
-                "sudo systemctl restart calvin-backend"
-            )
-            logger.error(error_detail)
-            raise HTTPException(status_code=500, detail=error_detail)
+        except Exception as e:
+            logger.error(f"systemctl restart error: {e}", exc_info=True)
+
+        # If all methods failed, return error with details
+        error_detail = (
+            "Failed to restart backend service: All restart methods failed.\n"
+            "Note: The restart helper script should be installed and configured with sudo permissions.\n"
+            "Check /usr/local/bin/restart-calvin-services.sh exists and /etc/sudoers.d/calvin-restart is configured.\n"
+            "Alternatively, you can restart manually via SSH: "
+            "sudo systemctl restart calvin-backend"
+        )
+        logger.error(error_detail)
+        raise HTTPException(status_code=500, detail=error_detail)
     except HTTPException:
         raise
     except Exception as e:

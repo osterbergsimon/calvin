@@ -14,6 +14,29 @@ export function useSystem() {
   const updateMessage = ref("");
   const updateMessageClass = ref("");
 
+  const sleep = (ms) => new Promise((resolve) => setTimeout(resolve, ms));
+
+  const isUpdateDoneStatus = (status) => status === "idle";
+  const isUpdateRunningStatus = (status) => status === "running";
+  const isUpdateErrorStatus = (status) => status === "error";
+
+  const waitForBackendHealthy = async ({
+    timeoutMs = 120000,
+    intervalMs = 2000,
+  } = {}) => {
+    const startedAt = Date.now();
+    while (Date.now() - startedAt < timeoutMs) {
+      try {
+        await systemApi.getHealth();
+        return true;
+      } catch {
+        // Backend may be restarting; keep waiting.
+      }
+      await sleep(intervalMs);
+    }
+    return false;
+  };
+
   // Display power control
   const turnDisplayOn = async () => {
     try {
@@ -105,40 +128,61 @@ export function useSystem() {
   };
 
   const pollUpdateStatus = async () => {
-    const maxAttempts = 60; // 5 minutes max
-    let attempts = 0;
+    const timeoutMs = 10 * 60 * 1000; // 10 minutes
+    const pollIntervalMs = 5000;
+    const startedAt = Date.now();
 
-    const checkStatus = async () => {
+    while (Date.now() - startedAt < timeoutMs) {
       try {
         const status = await systemApi.getUpdateStatus();
         updateStatus.value = status;
 
-        if (status.status === "completed" || status.status === "error") {
+        if (isUpdateDoneStatus(status.status)) {
+          // Script says update is complete; confirm backend is reachable after restart.
           updateMessage.value =
-            status.status === "completed"
-              ? "Update completed successfully!"
-              : `Update failed: ${status.message || "Unknown error"}`;
-          updateMessageClass.value =
-            status.status === "completed" ? "success" : "error";
+            "Update complete. Waiting for backend to come back…";
+          updateMessageClass.value = "info";
+
+          const healthy = await waitForBackendHealthy();
+          if (!healthy) {
+            updateMessage.value =
+              "Update completed, but backend is not responding yet. Please wait or check logs.";
+            updateMessageClass.value = "warning";
+            return;
+          }
+
+          updateMessage.value = "Update completed successfully!";
+          updateMessageClass.value = "success";
           return;
         }
 
-        attempts++;
-        if (attempts < maxAttempts) {
-          setTimeout(checkStatus, 5000); // Check every 5 seconds
-        } else {
-          updateMessage.value =
-            "Update is taking longer than expected. Please check manually.";
-          updateMessageClass.value = "warning";
+        if (isUpdateErrorStatus(status.status)) {
+          updateMessage.value = `Update failed: ${status.message || "Unknown error"}`;
+          updateMessageClass.value = "error";
+          return;
+        }
+
+        if (isUpdateRunningStatus(status.status)) {
+          updateMessage.value = status.message || "Update in progress…";
+          updateMessageClass.value = "info";
         }
       } catch (error) {
-        console.error("Failed to check update status:", error);
-        updateMessage.value = "Failed to check update status";
-        updateMessageClass.value = "error";
+        // During restarts, the backend may be down; treat this as "waiting for health"
+        console.warn(
+          "Update status unavailable (backend may be restarting):",
+          error,
+        );
+        updateMessage.value = "Backend restarting… waiting for /api/health";
+        updateMessageClass.value = "warning";
+        await waitForBackendHealthy({ timeoutMs: 60000, intervalMs: 2000 });
       }
-    };
 
-    await checkStatus();
+      await sleep(pollIntervalMs);
+    }
+
+    updateMessage.value =
+      "Update is taking longer than expected. Please check logs or try again later.";
+    updateMessageClass.value = "warning";
   };
 
   const getUpdateStatus = async () => {

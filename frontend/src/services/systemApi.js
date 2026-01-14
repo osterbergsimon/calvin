@@ -61,3 +61,11 @@ export async function getUpdateStatus() {
   const response = await api.get("/system/update/status");
   return response.data;
 }
+
+/**
+ * Basic backend health check.
+ */
+export async function getHealth() {
+  const response = await api.get("/health");
+  return response.data;
+}
