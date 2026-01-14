@@ -27,17 +27,32 @@
 
       <SettingItem
         label="Enable Photo Frame Mode"
-        help="Display only photos, hiding calendar and other content"
+        help="Automatically enter photo frame mode after period of inactivity"
       >
         <label>
           <input
-            :checked="config.photoFrameMode"
+            :checked="config.photoFrameEnabled || config.photoFrameMode"
             type="checkbox"
             @change="handlePhotoFrameModeChange"
           />
           Enable Photo Frame Mode
         </label>
       </SettingItem>
+
+      <div v-if="config.photoFrameEnabled || config.photoFrameMode">
+        <SettingItem
+          label="Photo Frame Timeout (seconds)"
+          help="Time of inactivity before entering photo frame mode (5-3600 seconds)"
+        >
+          <input
+            :value="config.photoFrameTimeout"
+            type="number"
+            min="5"
+            max="3600"
+            @change="handlePhotoFrameTimeoutChange"
+          />
+        </SettingItem>
+      </div>
     </CollapsibleSection>
   </div>
 </template>
@@ -67,7 +82,18 @@ const handleImageDisplayModeChange = (event) => {
 };
 
 const handlePhotoFrameModeChange = (event) => {
-  emit("update:config", { photoFrameMode: event.target.checked });
+  // Map photoFrameMode to photoFrameEnabled for backend compatibility
+  emit("update:config", {
+    photoFrameEnabled: event.target.checked,
+    photoFrameMode: event.target.checked, // Keep for UI compatibility
+  });
+};
+
+const handlePhotoFrameTimeoutChange = (event) => {
+  const value = parseInt(event.target.value, 10);
+  if (!isNaN(value) && value >= 5 && value <= 3600) {
+    emit("update:config", { photoFrameTimeout: value });
+  }
 };
 </script>
 
