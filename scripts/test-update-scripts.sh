@@ -137,6 +137,13 @@ if [ -L "/usr/local/bin/update-calvin.sh" ]; then
         sudo chown -h "${CALVIN_USER}:${CALVIN_USER}" /usr/local/bin/update-calvin.sh
         echo "  ✓ Symlink updated"
     fi
+elif [ -e "/usr/local/bin/update-calvin.sh" ]; then
+    echo "⚠ File exists at /usr/local/bin/update-calvin.sh but is not a symlink"
+    echo "  Removing existing file and creating symlink..."
+    sudo rm -f /usr/local/bin/update-calvin.sh
+    sudo ln -s "$EXPECTED_SCRIPT" /usr/local/bin/update-calvin.sh
+    sudo chown -h "${CALVIN_USER}:${CALVIN_USER}" /usr/local/bin/update-calvin.sh
+    echo "  ✓ Symlink created"
 else
     echo "⚠ Symlink missing, creating..."
     sudo ln -s "$EXPECTED_SCRIPT" /usr/local/bin/update-calvin.sh
