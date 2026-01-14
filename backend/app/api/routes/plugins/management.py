@@ -355,6 +355,14 @@ async def uninstall_plugin(plugin_id: str):
                 # Uninstall regular plugin
                 plugin_installer.uninstall_plugin(plugin_id)
 
+                # Remove plugin from database (plugin_types table)
+                # Only remove if it exists in the database
+                # This ensures the plugin won't show up after uninstalling
+                if db_type:
+                    await session.delete(db_type)
+                    await session.commit()
+                    logger.info(f"Removed plugin {plugin_id} from database")
+
                 # Reload plugins to remove the uninstalled one
                 # Note: We can't easily unload a module from Python,
                 # but it won't be loaded on next restart
