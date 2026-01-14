@@ -95,6 +95,7 @@ backend/data/themes/
 
 # Documentation
 docs/archive/
+site/
 
 # Build
 *.pyc
