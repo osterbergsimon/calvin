@@ -12,32 +12,34 @@
 
 set -euo pipefail
 
-# Determine if we're running from a pipe (wget/curl | sh)
-# When running from pipe, BASH_SOURCE[0] is empty or "-"
-RUNNING_FROM_PIPE=false
-if [ -z "${BASH_SOURCE[0]:-}" ] || [ "${BASH_SOURCE[0]}" = "-" ]; then
-    RUNNING_FROM_PIPE=true
+# Try to find setup-common.sh locally first
+# If not found, download it from GitHub (works when running from pipe or when file is missing)
+COMMON_SCRIPT=""
+
+# Check current directory first (most common case when running locally)
+if [ -f "./setup-common.sh" ]; then
+    COMMON_SCRIPT="./setup-common.sh"
 fi
 
-# Get the directory where this script is located (if not from pipe)
-if [ "${RUNNING_FROM_PIPE}" = "false" ]; then
-    SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+# If running with bash, also check script's directory (avoid BASH_SOURCE syntax in sh)
+if [ -z "${COMMON_SCRIPT}" ] && [ -n "${BASH_VERSION:-}" ]; then
+    # Use bash to safely get script directory without causing errors in sh
+    _script_dir=$(bash -c 'if [ -n "${BASH_SOURCE[0]:-}" ] && [ "${BASH_SOURCE[0]}" != "-" ]; then cd "$(dirname "${BASH_SOURCE[0]}")" && pwd; fi' 2>/dev/null || echo "")
+    if [ -n "${_script_dir}" ] && [ -f "${_script_dir}/setup-common.sh" ]; then
+        COMMON_SCRIPT="${_script_dir}/setup-common.sh"
+    fi
+fi
+
+# If we found setup-common.sh locally, source it
+if [ -n "${COMMON_SCRIPT}" ] && [ -f "${COMMON_SCRIPT}" ]; then
+    source "${COMMON_SCRIPT}"
 else
-    # When running from pipe, use a temp directory
-    SCRIPT_DIR="$(mktemp -d)"
-    trap "rm -rf '${SCRIPT_DIR}'" EXIT
-fi
-
-# Source shared utilities
-# If running from wget/curl, download setup-common.sh from GitHub
-if [ -f "${SCRIPT_DIR}/setup-common.sh" ]; then
-    source "${SCRIPT_DIR}/setup-common.sh"
-elif [ -f "./setup-common.sh" ]; then
-    # Fallback: try to source from current directory if script is in PATH
-    source "./setup-common.sh"
-elif [ "${RUNNING_FROM_PIPE}" = "true" ]; then
-    # Download setup-common.sh from GitHub
+    # Not found locally - download from GitHub
     echo "Downloading setup-common.sh from GitHub..." >&2
+    
+    # Create temp directory for download
+    TEMP_DIR="$(mktemp -d)"
+    trap "rm -rf '${TEMP_DIR}'" EXIT 2>/dev/null || true
     
     # Determine GitHub URL from environment or defaults
     GIT_REPO="${GIT_REPO:-https://github.com/osterbergsimon/calvin.git}"
@@ -55,12 +57,12 @@ elif [ "${RUNNING_FROM_PIPE}" = "true" ]; then
     # Download setup-common.sh from raw.githubusercontent.com
     common_url="https://raw.githubusercontent.com/${repo_owner}/${repo_name}/${GIT_BRANCH}/scripts/setup-common.sh"
     if command -v curl &> /dev/null; then
-        if ! curl -fsSL -o "${SCRIPT_DIR}/setup-common.sh" "${common_url}"; then
+        if ! curl -fsSL -o "${TEMP_DIR}/setup-common.sh" "${common_url}"; then
             echo "Error: Failed to download setup-common.sh from ${common_url}" >&2
             exit 1
         fi
     elif command -v wget &> /dev/null; then
-        if ! wget -q -O "${SCRIPT_DIR}/setup-common.sh" "${common_url}"; then
+        if ! wget -q -O "${TEMP_DIR}/setup-common.sh" "${common_url}"; then
             echo "Error: Failed to download setup-common.sh from ${common_url}" >&2
             exit 1
         fi
@@ -69,10 +71,7 @@ elif [ "${RUNNING_FROM_PIPE}" = "true" ]; then
         exit 1
     fi
     
-    source "${SCRIPT_DIR}/setup-common.sh"
-else
-    echo "Error: setup-common.sh not found. Please ensure it's in the same directory as setup.sh" >&2
-    exit 1
+    source "${TEMP_DIR}/setup-common.sh"
 fi
 
 # Configuration (can be overridden by environment variables)
