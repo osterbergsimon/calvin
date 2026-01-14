@@ -1,52 +1,13 @@
 #!/bin/bash
 # Auto-update script for Calvin Dashboard
 # Pulls latest code from GitHub and restarts services
-# Usage: update-calvin.sh [--force]
-#   --force: Force dependency updates and rebuilds even if no git changes detected
 
 # Don't use set -e - we want to continue even if some steps fail
 set +e
 
-# Parse command line arguments
-FORCE_UPDATE=false
-for arg in "$@"; do
-    case "$arg" in
-        --force|-f)
-            FORCE_UPDATE=true
-            ;;
-        --help|-h)
-            echo "Usage: $0 [--force]"
-            echo "  --force, -f: Force dependency updates and rebuilds even if no git changes detected"
-            exit 0
-            ;;
-        *)
-            echo "Unknown option: $arg" >&2
-            echo "Use --help for usage information" >&2
-            exit 1
-            ;;
-    esac
-done
-
-# Save environment variables before sourcing config file
-# This ensures environment variables (passed from API) take precedence over file values
-SAVED_GIT_BRANCH="${GIT_BRANCH:-}"
-SAVED_GIT_REPO="${GIT_REPO:-}"
-SAVED_REPO_DIR="${REPO_DIR:-}"
-
 # Source environment file if it exists
 if [ -f /etc/default/calvin-update ]; then
     . /etc/default/calvin-update
-fi
-
-# Restore environment variables if they were set (they take precedence)
-if [ -n "$SAVED_GIT_BRANCH" ]; then
-    GIT_BRANCH="$SAVED_GIT_BRANCH"
-fi
-if [ -n "$SAVED_GIT_REPO" ]; then
-    GIT_REPO="$SAVED_GIT_REPO"
-fi
-if [ -n "$SAVED_REPO_DIR" ]; then
-    REPO_DIR="$SAVED_REPO_DIR"
 fi
 
 REPO_DIR="${REPO_DIR:-/home/calvin/calvin}"
@@ -57,51 +18,8 @@ GIT_BRANCH="${GIT_BRANCH:-main}"
 LOG_FILE="${REPO_DIR}/backend/logs/calvin-update.log"
 mkdir -p "$(dirname "$LOG_FILE")"
 
-
-# Helper function to get UV PATH
-get_uv_path() {
-    echo "/home/calvin/.local/bin:/home/calvin/.cargo/bin:$PATH"
-}
-
-# Helper function to ensure UV is installed
-ensure_uv() {
-    local uv_path
-    uv_path=$(get_uv_path)
-    export PATH="$uv_path"
-    
-    if command -v uv &> /dev/null; then
-        return 0
-    fi
-    
-    echo "UV not found, attempting to install..." | tee -a "$LOG_FILE"
-    
-    if [ "$(id -u)" = "0" ] || [ "$(id -un)" = "root" ]; then
-        sudo -u calvin bash << 'UV_INSTALL_EOF'
-            export PATH="$HOME/.local/bin:$HOME/.cargo/bin:$PATH"
-            if ! command -v uv &> /dev/null; then
-                curl -LsSf https://astral.sh/uv/install.sh | sh || exit 1
-                echo 'export PATH="$HOME/.local/bin:$HOME/.cargo/bin:$PATH"' >> ~/.bashrc
-                echo 'export PATH="$HOME/.local/bin:$HOME/.cargo/bin:$PATH"' >> ~/.profile
-                export PATH="$HOME/.local/bin:$HOME/.cargo/bin:$PATH"
-            fi
-UV_INSTALL_EOF
-        [ $? -eq 0 ] || return 1
-    else
-        export PATH="$HOME/.local/bin:$HOME/.cargo/bin:$PATH"
-        if ! command -v uv &> /dev/null; then
-            curl -LsSf https://astral.sh/uv/install.sh | sh || return 1
-            echo 'export PATH="$HOME/.local/bin:$HOME/.cargo/bin:$PATH"' >> ~/.bashrc
-            echo 'export PATH="$HOME/.local/bin:$HOME/.cargo/bin:$PATH"' >> ~/.profile
-            export PATH="$HOME/.local/bin:$HOME/.cargo/bin:$PATH"
-        fi
-    fi
-    
-    export PATH="$uv_path"
-    command -v uv &> /dev/null
-}
-
 # Ensure PATH includes UV
-export PATH=$(get_uv_path)
+export PATH="/home/calvin/.local/bin:$PATH"
 
 # Ensure we can write to the log file
 touch "$LOG_FILE" 2>/dev/null || {
@@ -119,12 +37,6 @@ cd "$REPO_DIR" || {
 }
 
 echo "[$(date)] Starting Calvin update..." | tee -a "$LOG_FILE"
-echo "[$(date)] Repository: $GIT_REPO" | tee -a "$LOG_FILE"
-if [ -n "$SAVED_GIT_BRANCH" ]; then
-    echo "[$(date)] Branch: $GIT_BRANCH (from environment variable)" | tee -a "$LOG_FILE"
-else
-    echo "[$(date)] Branch: $GIT_BRANCH (from /etc/default/calvin-update or default)" | tee -a "$LOG_FILE"
-fi
 
 # Check if git repo exists
 if [ ! -d ".git" ]; then
@@ -136,81 +48,25 @@ if [ ! -d ".git" ]; then
 else
     # Check current commit before fetching
     CURRENT_COMMIT=$(git rev-parse HEAD 2>/dev/null || echo "")
-    CURRENT_COMMIT_SHORT=$(git rev-parse --short HEAD 2>/dev/null || echo "")
-    CURRENT_COMMIT_MSG=$(git log -1 --pretty=format:"%s" HEAD 2>/dev/null || echo "")
-    CURRENT_BRANCH=$(git rev-parse --abbrev-ref HEAD 2>/dev/null || echo "")
     
-    if [ -n "$CURRENT_COMMIT" ]; then
-        echo "Current commit: $CURRENT_COMMIT_SHORT ($CURRENT_COMMIT)" | tee -a "$LOG_FILE"
-        echo "Current commit message: $CURRENT_COMMIT_MSG" | tee -a "$LOG_FILE"
-    fi
-    if [ -n "$CURRENT_BRANCH" ]; then
-        echo "Current branch: $CURRENT_BRANCH" | tee -a "$LOG_FILE"
-    fi
-    
-    # Fetch latest code first to ensure we have remote branch info
-    echo "Fetching latest code from origin (will use branch: $GIT_BRANCH)..." | tee -a "$LOG_FILE"
+    # Pull latest code
+    echo "Pulling latest code from $GIT_BRANCH..." | tee -a "$LOG_FILE"
     if ! git fetch origin; then
         echo "Warning: Failed to fetch from origin" | tee -a "$LOG_FILE"
         exit 0  # Don't fail the service, just skip this update
     fi
     
-    # Ensure we're on the correct branch
-    if [ "$CURRENT_BRANCH" != "$GIT_BRANCH" ]; then
-        echo "Switching to branch $GIT_BRANCH (currently on $CURRENT_BRANCH)..." | tee -a "$LOG_FILE"
-        # Try to checkout existing local branch, or create from origin
-        if git show-ref --verify --quiet refs/heads/"$GIT_BRANCH"; then
-            git checkout "$GIT_BRANCH" || { echo "Warning: Failed to checkout $GIT_BRANCH" | tee -a "$LOG_FILE"; exit 0; }
-        elif git show-ref --verify --quiet refs/remotes/origin/"$GIT_BRANCH"; then
-            git checkout -b "$GIT_BRANCH" "origin/$GIT_BRANCH" || { echo "Warning: Failed to create branch $GIT_BRANCH from origin" | tee -a "$LOG_FILE"; exit 0; }
-        else
-            echo "Warning: Branch $GIT_BRANCH does not exist on origin" | tee -a "$LOG_FILE"
-            exit 0
-        fi
-        echo "Successfully switched to branch $GIT_BRANCH" | tee -a "$LOG_FILE"
-    fi
-    
-    # Update current commit info after branch switch
-    CURRENT_COMMIT=$(git rev-parse HEAD 2>/dev/null || echo "")
-    CURRENT_COMMIT_SHORT=$(git rev-parse --short HEAD 2>/dev/null || echo "")
-    CURRENT_COMMIT_MSG=$(git log -1 --pretty=format:"%s" HEAD 2>/dev/null || echo "")
-    
     # Check if there are any changes
     NEW_COMMIT=$(git rev-parse "origin/$GIT_BRANCH" 2>/dev/null || echo "")
-    NEW_COMMIT_SHORT=$(git rev-parse --short "origin/$GIT_BRANCH" 2>/dev/null || echo "")
-    NEW_COMMIT_MSG=$(git log -1 --pretty=format:"%s" "origin/$GIT_BRANCH" 2>/dev/null || echo "")
-    
-    if [ -n "$NEW_COMMIT" ]; then
-        echo "Latest commit on remote: $NEW_COMMIT_SHORT ($NEW_COMMIT)" | tee -a "$LOG_FILE"
-        echo "Latest commit message: $NEW_COMMIT_MSG" | tee -a "$LOG_FILE"
-    fi
-    
     if [ "$CURRENT_COMMIT" = "$NEW_COMMIT" ]; then
-        if [ "$FORCE_UPDATE" = true ]; then
-            echo "No git changes detected, but --force flag is set. Will update dependencies anyway." | tee -a "$LOG_FILE"
-            HAS_CHANGES=true
-        else
-            echo "No changes detected. Already up to date at commit $CURRENT_COMMIT_SHORT" | tee -a "$LOG_FILE"
-            HAS_CHANGES=false
-        fi
+        echo "No changes detected. Already up to date at commit $CURRENT_COMMIT" | tee -a "$LOG_FILE"
+        HAS_CHANGES=false
     else
-        echo "Changes detected. Updating from $CURRENT_COMMIT_SHORT to $NEW_COMMIT_SHORT..." | tee -a "$LOG_FILE"
-        if [ -n "$CURRENT_COMMIT" ] && [ -n "$NEW_COMMIT" ]; then
-            # Show what files changed
-            CHANGED_FILES=$(git diff --name-only "$CURRENT_COMMIT" "$NEW_COMMIT" 2>/dev/null | head -20)
-            if [ -n "$CHANGED_FILES" ]; then
-                echo "Files to be updated:" | tee -a "$LOG_FILE"
-                echo "$CHANGED_FILES" | while read -r file; do
-                    echo "  - $file" | tee -a "$LOG_FILE"
-                done
-            fi
-        fi
-        
+        echo "Changes detected. Updating from $CURRENT_COMMIT to $NEW_COMMIT..." | tee -a "$LOG_FILE"
         if ! git reset --hard "origin/$GIT_BRANCH"; then
             echo "Warning: Failed to reset to $GIT_BRANCH" | tee -a "$LOG_FILE"
             exit 0  # Don't fail the service, just skip this update
         fi
-        echo "Successfully updated to commit $NEW_COMMIT_SHORT" | tee -a "$LOG_FILE"
         HAS_CHANGES=true
     fi
 fi
@@ -223,16 +79,8 @@ if [ -f "$REPO_DIR/scripts/update-calvin.sh" ] && [ -f "/usr/local/bin/update-ca
     chown calvin:calvin /usr/local/bin/update-calvin.sh 2>/dev/null || true
 fi
 
-# Track if updates completed successfully
-UPDATES_SUCCESSFUL=false
-# Track if frontend was running before we stopped it
-FRONTEND_WAS_RUNNING=false
-
-# Only update dependencies and rebuild if there are changes or --force is set
-if [ "$HAS_CHANGES" = true ] || [ "$FORCE_UPDATE" = true ]; then
-    if [ "$FORCE_UPDATE" = true ] && [ "$HAS_CHANGES" = false ]; then
-        echo "Force update requested. Updating dependencies and rebuilding..." | tee -a "$LOG_FILE"
-    fi
+# Only update dependencies and rebuild if there are changes
+if [ "$HAS_CHANGES" = true ]; then
     # Update backend dependencies
     echo "Updating backend dependencies..." | tee -a "$LOG_FILE"
     cd "$REPO_DIR/backend" || {
@@ -240,227 +88,82 @@ if [ "$HAS_CHANGES" = true ] || [ "$FORCE_UPDATE" = true ]; then
         exit 1
     }
 
-    # Detect if we have an existing .venv (could be from pip or UV)
-    HAS_EXISTING_VENV=false
-    if [ -d ".venv" ]; then
-        HAS_EXISTING_VENV=true
-        echo "Detected existing virtual environment (.venv directory)" | tee -a "$LOG_FILE"
-    fi
-
-    # Try to use UV (preferred method) - it will work with existing .venv or create new one
-    if ensure_uv; then
-        echo "Using UV for dependency management..." | tee -a "$LOG_FILE"
-        
-        # If we had an existing venv, note that we're migrating/updating to UV
-        if [ "$HAS_EXISTING_VENV" = true ]; then
-            echo "Updating/migrating to UV-managed environment..." | tee -a "$LOG_FILE"
-        fi
-        
-        # Use frozen lock file if available, fallback to non-frozen if it fails
-        UV_SYNC_SUCCESS=false
-        if [ -f uv.lock ]; then
-            if uv sync --frozen --extra linux 2>&1 | tee -a "$LOG_FILE"; then
-                UV_SYNC_SUCCESS=true
-            else
-                echo "Warning: Frozen sync failed, trying without frozen..." | tee -a "$LOG_FILE"
-                if uv sync --extra linux 2>&1 | tee -a "$LOG_FILE"; then
-                    UV_SYNC_SUCCESS=true
-                else
-                    echo "Warning: Failed to update backend dependencies with UV" | tee -a "$LOG_FILE"
-                fi
-            fi
-        else
-            if uv sync --extra linux 2>&1 | tee -a "$LOG_FILE"; then
-                UV_SYNC_SUCCESS=true
-            else
-                echo "Warning: Failed to update backend dependencies with UV" | tee -a "$LOG_FILE"
-            fi
-        fi
-        
-        if [ "$UV_SYNC_SUCCESS" = true ]; then
-            echo "UV dependency update completed successfully" | tee -a "$LOG_FILE"
-            
-            # Run database migrations with Alembic
-            echo "[$(date)] Running database migrations..." | tee -a "$LOG_FILE"
-            if [ -f "alembic.ini" ] && [ -d "alembic" ]; then
-                if uv run alembic upgrade head 2>&1 | tee -a "$LOG_FILE"; then
-                    echo "[$(date)] Database migrations completed successfully" | tee -a "$LOG_FILE"
-                else
-                    echo "[$(date)] Warning: Database migrations failed, but continuing..." | tee -a "$LOG_FILE"
-                    # Don't fail the update, but log the error
-                fi
-            else
-                echo "[$(date)] Warning: Alembic not configured, skipping migrations" | tee -a "$LOG_FILE"
-            fi
-        fi
-    else
-        # Fallback to pip/venv only if UV is not available
-        echo "Warning: UV not available, using pip/venv as fallback..." | tee -a "$LOG_FILE"
-        if [ "$HAS_EXISTING_VENV" = false ]; then
-            echo "Creating new virtual environment..." | tee -a "$LOG_FILE"
-            python3 -m venv .venv
-        else
-            echo "Using existing virtual environment..." | tee -a "$LOG_FILE"
-        fi
+    # Use venv if it exists (pip installation), otherwise use UV
+    # Production setup uses UV with only 'linux' extra, dev setup uses venv with 'linux,dev'
+    if [ -f .venv/bin/activate ]; then
         source .venv/bin/activate
         pip install --upgrade pip
-        pip install .[linux] 2>&1 | tee -a "$LOG_FILE"
-        
-        # Run database migrations with Alembic (pip/venv path)
-        echo "[$(date)] Running database migrations..." | tee -a "$LOG_FILE"
-        if [ -f "alembic.ini" ] && [ -d "alembic" ]; then
-            if alembic upgrade head 2>&1 | tee -a "$LOG_FILE"; then
-                echo "[$(date)] Database migrations completed successfully" | tee -a "$LOG_FILE"
-            else
-                echo "[$(date)] Warning: Database migrations failed, but continuing..." | tee -a "$LOG_FILE"
-                # Don't fail the update, but log the error
-            fi
-        else
-            echo "[$(date)] Warning: Alembic not configured, skipping migrations" | tee -a "$LOG_FILE"
-        fi
-    fi
-
-    # Always rebuild frontend when there are any changes to ensure cache busting
-    # This ensures users get the latest version even if only backend changed
-    echo "[$(date)] Starting frontend rebuild..." | tee -a "$LOG_FILE"
-    
-    # Stop frontend service during build to prevent restarts from interfering
-    FRONTEND_WAS_RUNNING=false
-    if systemctl is-active --quiet calvin-frontend.service 2>/dev/null || sudo systemctl is-active --quiet calvin-frontend.service 2>/dev/null; then
-        FRONTEND_WAS_RUNNING=true
-        echo "[$(date)] Stopping frontend service during build to prevent interference..." | tee -a "$LOG_FILE"
-        sudo systemctl stop calvin-frontend.service 2>/dev/null || systemctl --user stop calvin-frontend.service 2>/dev/null || true
-        sleep 1  # Give it a moment to fully stop
-    fi
-    
-    cd "$REPO_DIR/frontend" || {
-        echo "[$(date)] ERROR: Cannot cd to frontend directory" | tee -a "$LOG_FILE"
-        # Restart frontend if we stopped it
-        if [ "$FRONTEND_WAS_RUNNING" = true ]; then
-            echo "[$(date)] Restarting frontend service after error..." | tee -a "$LOG_FILE"
-            sudo systemctl start calvin-frontend.service 2>/dev/null || systemctl --user start calvin-frontend.service 2>/dev/null || true
-        fi
-        exit 0  # Don't fail the service
-    }
-    
-    echo "[$(date)] Installing frontend dependencies (npm ci)..." | tee -a "$LOG_FILE"
-    if ! npm ci 2>&1 | tee -a "$LOG_FILE"; then
-        echo "[$(date)] Warning: Failed to update frontend dependencies" | tee -a "$LOG_FILE"
-        # Restart frontend if we stopped it
-        if [ "$FRONTEND_WAS_RUNNING" = true ]; then
-            echo "[$(date)] Restarting frontend service after dependency install failure..." | tee -a "$LOG_FILE"
-            sudo systemctl start calvin-frontend.service 2>/dev/null || systemctl --user start calvin-frontend.service 2>/dev/null || true
-        fi
-        exit 0  # Don't fail the service
-    fi
-    echo "[$(date)] Frontend dependencies installed successfully" | tee -a "$LOG_FILE"
-
-    # Get current git commit hash for frontend version (ensure git is available)
-    CURRENT_FRONTEND_COMMIT=$(cd "$REPO_DIR" && git rev-parse --short HEAD 2>/dev/null || echo "")
-    if [ -n "$CURRENT_FRONTEND_COMMIT" ]; then
-        echo "[$(date)] Building frontend with git commit: $CURRENT_FRONTEND_COMMIT" | tee -a "$LOG_FILE"
-        export GIT_COMMIT_HASH="$CURRENT_FRONTEND_COMMIT"
+        # Install from pyproject.toml with linux and dev extras (dev setup)
+        pip install .[linux,dev] 2>&1 | tee -a "$LOG_FILE"
     else
-        echo "[$(date)] Warning: Could not get git commit hash for frontend version" | tee -a "$LOG_FILE"
+        export PATH="/home/calvin/.local/bin:/home/calvin/.cargo/bin:$PATH"
+        # Production setup uses only 'linux' extra (matches setup.sh)
+        if ! uv sync --extra linux 2>&1 | tee -a "$LOG_FILE"; then
+            echo "Warning: Failed to update backend dependencies with UV" | tee -a "$LOG_FILE"
+            # Try with pip as fallback
+            echo "Trying pip as fallback..." | tee -a "$LOG_FILE"
+            python3 -m venv .venv
+            source .venv/bin/activate
+            pip install --upgrade pip
+            # Install from pyproject.toml with linux extra only (production)
+            pip install .[linux] 2>&1 | tee -a "$LOG_FILE"
+        fi
     fi
 
-    # Rebuild frontend (this will update the build timestamp for cache busting)
-    # Add timeout to prevent hanging (30 minutes should be more than enough)
-    echo "[$(date)] Building frontend (npm run build) - this may take a few minutes..." | tee -a "$LOG_FILE"
-    echo "[$(date)] Build timeout set to 30 minutes to prevent hanging" | tee -a "$LOG_FILE"
-    BUILD_START=$(date +%s)
-    BUILD_TIMEOUT=1800  # 30 minutes in seconds
-    
-    # Run build with timeout and capture exit code separately from tee
-    timeout "$BUILD_TIMEOUT" npm run build > /tmp/calvin-build.log 2>&1
-    BUILD_EXIT_CODE=$?
-    
-    # Append build output to log
-    cat /tmp/calvin-build.log | tee -a "$LOG_FILE"
-    rm -f /tmp/calvin-build.log
-    
-    BUILD_END=$(date +%s)
-    BUILD_DURATION=$((BUILD_END - BUILD_START))
-    
-    if [ "$BUILD_EXIT_CODE" -ne 0 ]; then
-        if [ "$BUILD_EXIT_CODE" -eq 124 ]; then
-            echo "[$(date)] ERROR: Frontend build timed out after ${BUILD_DURATION} seconds (timeout: ${BUILD_TIMEOUT}s)" | tee -a "$LOG_FILE"
-        else
-            echo "[$(date)] ERROR: Frontend build failed after ${BUILD_DURATION} seconds (exit code: $BUILD_EXIT_CODE)" | tee -a "$LOG_FILE"
+    # Check if frontend files changed
+    FRONTEND_CHANGED=false
+    if [ -n "$CURRENT_COMMIT" ] && [ -n "$NEW_COMMIT" ]; then
+        # Check if any frontend files changed
+        if git diff --name-only "$CURRENT_COMMIT" "$NEW_COMMIT" | grep -q "^frontend/"; then
+            FRONTEND_CHANGED=true
         fi
-        echo "[$(date)] Skipping service restart due to build failure" | tee -a "$LOG_FILE"
-        # Restart frontend if we stopped it (even on failure, so user has a working frontend)
-        if [ "$FRONTEND_WAS_RUNNING" = true ]; then
-            echo "[$(date)] Restarting frontend service with old build..." | tee -a "$LOG_FILE"
-            sudo systemctl start calvin-frontend.service 2>/dev/null || systemctl --user start calvin-frontend.service 2>/dev/null || true
-        fi
-        UPDATES_SUCCESSFUL=false
     else
-        echo "[$(date)] Frontend build completed successfully in ${BUILD_DURATION} seconds" | tee -a "$LOG_FILE"
-        # Small delay to ensure all build files are fully written to disk
-        sleep 2
-        UPDATES_SUCCESSFUL=true
-        # Note: Frontend will be restarted later in the script after cache clearing
+        # If we don't have commit info, assume frontend changed
+        FRONTEND_CHANGED=true
+    fi
+
+    if [ "$FRONTEND_CHANGED" = true ]; then
+        # Update frontend dependencies
+        echo "Frontend files changed. Updating frontend dependencies..." | tee -a "$LOG_FILE"
+        cd "$REPO_DIR/frontend"
+        if ! npm ci; then
+            echo "Warning: Failed to update frontend dependencies" | tee -a "$LOG_FILE"
+            exit 0  # Don't fail the service
+        fi
+
+        # Rebuild frontend
+        echo "Rebuilding frontend..." | tee -a "$LOG_FILE"
+        if ! npm run build 2>&1 | tee -a "$LOG_FILE"; then
+            echo "Warning: Failed to build frontend" | tee -a "$LOG_FILE"
+            exit 0  # Don't fail the service
+        fi
+        echo "Frontend build completed successfully" | tee -a "$LOG_FILE"
+    else
+        echo "No frontend changes detected. Skipping frontend rebuild." | tee -a "$LOG_FILE"
     fi
 else
-    echo "[$(date)] No changes detected. Skipping dependency updates and rebuilds." | tee -a "$LOG_FILE"
-    # If no changes and not forced, don't restart services (they're already running the current code)
-    UPDATES_SUCCESSFUL=false
+    echo "No changes detected. Skipping dependency updates and rebuilds." | tee -a "$LOG_FILE"
 fi
 
-# Helper function to restart a systemd service
-restart_service() {
-    local service="$1"
-    if sudo systemctl restart "$service" 2>/dev/null; then
-        echo "$service restarted successfully" | tee -a "$LOG_FILE"
-        return 0
-    elif systemctl --user restart "$service" 2>/dev/null; then
-        echo "$service restarted successfully (user service)" | tee -a "$LOG_FILE"
-        return 0
+# Restart services via systemd (non-blocking)
+# Use sudo if available, otherwise try without (might fail if not running as root)
+if systemctl is-active --quiet calvin-backend.service 2>/dev/null || sudo systemctl is-active --quiet calvin-backend.service 2>/dev/null; then
+    echo "Restarting services via systemd..." | tee -a "$LOG_FILE"
+    if sudo systemctl restart calvin-backend 2>/dev/null; then
+        echo "Backend service restarted successfully" | tee -a "$LOG_FILE"
+    elif systemctl --user restart calvin-backend 2>/dev/null; then
+        echo "Backend service restarted successfully (user service)" | tee -a "$LOG_FILE"
     else
-        echo "Warning: Failed to restart $service" | tee -a "$LOG_FILE"
-        return 1
+        echo "Warning: Failed to restart backend (may need sudo permissions)" | tee -a "$LOG_FILE"
+        echo "Please restart manually: sudo systemctl restart calvin-backend" | tee -a "$LOG_FILE"
     fi
-}
-
-# Restart services via systemd (only after all updates are complete)
-# Only restart if we successfully completed all updates
-if [ "$UPDATES_SUCCESSFUL" = true ]; then
-    # Restart backend service
-    if systemctl is-active --quiet calvin-backend.service 2>/dev/null || sudo systemctl is-active --quiet calvin-backend.service 2>/dev/null; then
-        echo "[$(date)] All updates complete. Restarting backend service..." | tee -a "$LOG_FILE"
-        restart_service calvin-backend
-    fi
-    
-    # Restart frontend service (only if it was running before, or if we stopped it during build)
-    # Clear Chromium cache before restarting to ensure fresh files are loaded
-    echo "[$(date)] Clearing Chromium cache before restarting frontend..." | tee -a "$LOG_FILE"
-    CHROMIUM_CACHE_DIR="/home/calvin/.cache/chromium"
-    if [ -d "$CHROMIUM_CACHE_DIR" ]; then
-        if sudo rm -rf "$CHROMIUM_CACHE_DIR/Default/Cache"/* "$CHROMIUM_CACHE_DIR/Default/Code Cache"/* 2>/dev/null || \
-           rm -rf "$CHROMIUM_CACHE_DIR/Default/Cache"/* "$CHROMIUM_CACHE_DIR/Default/Code Cache"/* 2>/dev/null; then
-            echo "[$(date)] Chromium cache cleared successfully" | tee -a "$LOG_FILE"
-        else
-            echo "[$(date)] Warning: Failed to clear Chromium cache" | tee -a "$LOG_FILE"
-        fi
-    fi
-    
-    # Only restart frontend if we stopped it during build (it will be started fresh)
-    # or if it was already running
-    if [ "${FRONTEND_WAS_RUNNING:-false}" = true ]; then
-        echo "[$(date)] Restarting frontend service with new build..." | tee -a "$LOG_FILE"
-        restart_service calvin-frontend || {
-            echo "[$(date)] Please restart manually: sudo systemctl restart calvin-frontend" | tee -a "$LOG_FILE"
-            echo "[$(date)] Or clear Chromium cache manually: rm -rf ~/.cache/chromium" | tee -a "$LOG_FILE"
-        }
-    elif systemctl is-active --quiet calvin-frontend.service 2>/dev/null || sudo systemctl is-active --quiet calvin-frontend.service 2>/dev/null; then
-        # Frontend was running but we didn't stop it (shouldn't happen, but be safe)
-        echo "[$(date)] Restarting frontend service..." | tee -a "$LOG_FILE"
-        restart_service calvin-frontend
-    fi
+    # Frontend doesn't need restart (Chromium will reload)
+    # But we can restart it if needed
+    # systemctl restart calvin-frontend || true
 else
-    echo "[$(date)] Updates did not complete successfully. Services not restarted." | tee -a "$LOG_FILE"
+    echo "Services not running. Please start them manually." | tee -a "$LOG_FILE"
 fi
 
 echo "[$(date)] Update complete!" | tee -a "$LOG_FILE"
+
 

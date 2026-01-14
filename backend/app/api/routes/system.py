@@ -24,7 +24,7 @@ async def trigger_update():
     """
     from app.services.config_service import config_service
 
-    update_script = settings.update_script_path
+    update_script = settings.get_update_script_path()
 
     if not update_script.exists():
         raise HTTPException(

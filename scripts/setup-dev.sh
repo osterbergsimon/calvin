@@ -164,7 +164,12 @@ main() {
     chown "${CALVIN_USER}:${CALVIN_USER}" "${CALVIN_DIR}/backend/.dev"
     
     # Step 12: Install utility scripts
-    install_script "${CALVIN_DIR}/scripts/update-calvin.sh" "/usr/local/bin/update-calvin.sh" "${CALVIN_USER}"
+    install_script "${CALVIN_DIR}/scripts/update-calvin-dev.sh" "/usr/local/bin/update-calvin-dev.sh" "${CALVIN_USER}"
+    # Create symlink for backward compatibility
+    if [ -f "/usr/local/bin/update-calvin-dev.sh" ]; then
+        ln -sf /usr/local/bin/update-calvin-dev.sh /usr/local/bin/update-calvin.sh
+        chown -h "${CALVIN_USER}:${CALVIN_USER}" /usr/local/bin/update-calvin.sh 2>/dev/null || true
+    fi
     
     if [ -f "${CALVIN_DIR}/scripts/reboot-calvin.sh" ]; then
         install_script "${CALVIN_DIR}/scripts/reboot-calvin.sh" "/usr/local/bin/reboot-calvin.sh" "${CALVIN_USER}"

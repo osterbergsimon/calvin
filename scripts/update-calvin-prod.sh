@@ -1,0 +1,183 @@
+#!/bin/bash
+# Production update script for Calvin Dashboard
+# Minimal update: git pull, download pre-built frontend if available, restart services
+# Respects GIT_REPO and GIT_BRANCH from /etc/default/calvin-update or environment
+
+set +e  # Don't exit on errors - we want to continue even if some steps fail
+
+# Source environment file if it exists
+if [ -f /etc/default/calvin-update ]; then
+    . /etc/default/calvin-update
+fi
+
+REPO_DIR="${REPO_DIR:-/home/calvin/calvin}"
+GIT_REPO="${GIT_REPO:-https://github.com/osterbergsimon/calvin.git}"
+GIT_BRANCH="${GIT_BRANCH:-main}"
+
+# Use user-writable log location
+LOG_FILE="${REPO_DIR}/backend/logs/calvin-update.log"
+mkdir -p "$(dirname "$LOG_FILE")"
+
+# Ensure we can write to the log file
+touch "$LOG_FILE" 2>/dev/null || {
+    # Fallback to home directory if logs directory not writable
+    LOG_FILE="${HOME}/calvin-update.log"
+    touch "$LOG_FILE" 2>/dev/null || {
+        # Last resort: use /tmp
+        LOG_FILE="/tmp/calvin-update.log"
+    }
+}
+
+cd "$REPO_DIR" || {
+    echo "[$(date)] ERROR: Cannot cd to $REPO_DIR" | tee -a "$LOG_FILE"
+    exit 1
+}
+
+echo "[$(date)] Starting Calvin production update..." | tee -a "$LOG_FILE"
+echo "Repository: $GIT_REPO" | tee -a "$LOG_FILE"
+echo "Branch: $GIT_BRANCH" | tee -a "$LOG_FILE"
+
+# Check if git repo exists
+if [ ! -d ".git" ]; then
+    echo "ERROR: Not a git repository. Cannot update." | tee -a "$LOG_FILE"
+    exit 1
+fi
+
+# Check current commit before fetching
+CURRENT_COMMIT=$(git rev-parse HEAD 2>/dev/null || echo "")
+
+# Pull latest code
+echo "Fetching latest code from $GIT_BRANCH..." | tee -a "$LOG_FILE"
+if ! git fetch origin; then
+    echo "ERROR: Failed to fetch from origin" | tee -a "$LOG_FILE"
+    exit 1
+fi
+
+# Check if there are any changes
+NEW_COMMIT=$(git rev-parse "origin/$GIT_BRANCH" 2>/dev/null || echo "")
+if [ -z "$NEW_COMMIT" ]; then
+    echo "ERROR: Failed to get commit hash for origin/$GIT_BRANCH" | tee -a "$LOG_FILE"
+    exit 1
+fi
+
+if [ "$CURRENT_COMMIT" = "$NEW_COMMIT" ]; then
+    echo "No changes detected. Already up to date at commit $CURRENT_COMMIT" | tee -a "$LOG_FILE"
+    HAS_CHANGES=false
+else
+    echo "Changes detected. Updating from $CURRENT_COMMIT to $NEW_COMMIT..." | tee -a "$LOG_FILE"
+    if ! git reset --hard "origin/$GIT_BRANCH"; then
+        echo "ERROR: Failed to reset to $GIT_BRANCH" | tee -a "$LOG_FILE"
+        exit 1
+    fi
+    HAS_CHANGES=true
+fi
+
+# Update the update script itself if it exists in the repo
+if [ -f "$REPO_DIR/scripts/update-calvin-prod.sh" ] && [ -f "/usr/local/bin/update-calvin-prod.sh" ]; then
+    echo "Updating update script..." | tee -a "$LOG_FILE"
+    cp "$REPO_DIR/scripts/update-calvin-prod.sh" /usr/local/bin/update-calvin-prod.sh
+    chmod +x /usr/local/bin/update-calvin-prod.sh
+    chown calvin:calvin /usr/local/bin/update-calvin-prod.sh 2>/dev/null || true
+fi
+
+# Only update frontend if there are changes
+if [ "$HAS_CHANGES" = true ]; then
+    # Check if frontend files changed
+    FRONTEND_CHANGED=false
+    if [ -n "$CURRENT_COMMIT" ] && [ -n "$NEW_COMMIT" ]; then
+        # Check if any frontend files changed
+        if git diff --name-only "$CURRENT_COMMIT" "$NEW_COMMIT" | grep -q "^frontend/"; then
+            FRONTEND_CHANGED=true
+        fi
+    else
+        # If we don't have commit info, assume frontend changed
+        FRONTEND_CHANGED=true
+    fi
+
+    if [ "$FRONTEND_CHANGED" = true ]; then
+        echo "Frontend files changed. Attempting to download pre-built frontend..." | tee -a "$LOG_FILE"
+        
+        # Try to download pre-built frontend from GitHub releases
+        # Extract repo owner and name from git URL
+        repo_owner=$(echo "${GIT_REPO}" | sed -E 's|.*github\.com[:/]([^/]+)/([^/]+)(\.git)?$|\1|')
+        repo_name=$(echo "${GIT_REPO}" | sed -E 's|.*github\.com[:/]([^/]+)/([^/]+)(\.git)?$|\2|' | sed 's|\.git$||')
+        
+        if [ -n "${repo_owner}" ] && [ -n "${repo_name}" ]; then
+            # Get the latest release tag for this branch
+            SHORT_HASH=$(git rev-parse --short HEAD)
+            DATE=$(git log -1 --format=%cd --date=short HEAD)
+            
+            if [ "$GIT_BRANCH" = "main" ]; then
+                RELEASE_TAG="stable-${DATE}-${SHORT_HASH}"
+            elif [ "$GIT_BRANCH" = "develop" ]; then
+                RELEASE_TAG="nightly-${DATE}-${SHORT_HASH}"
+            else
+                # For other branches, try to find the latest release
+                RELEASE_TAG=$(git describe --tags --abbrev=0 2>/dev/null || echo "")
+            fi
+            
+            if [ -n "$RELEASE_TAG" ]; then
+                FRONTEND_DIST_URL="https://github.com/${repo_owner}/${repo_name}/releases/download/${RELEASE_TAG}/frontend-dist-${RELEASE_TAG}.tar.gz"
+                TEMP_DIR=$(mktemp -d)
+                
+                echo "Downloading pre-built frontend from release ${RELEASE_TAG}..." | tee -a "$LOG_FILE"
+                if command -v curl &> /dev/null; then
+                    if curl -fsSL -o "${TEMP_DIR}/frontend-dist.tar.gz" "${FRONTEND_DIST_URL}"; then
+                        echo "Extracting pre-built frontend..." | tee -a "$LOG_FILE"
+                        cd "$REPO_DIR/frontend"
+                        rm -rf dist
+                        tar -xzf "${TEMP_DIR}/frontend-dist.tar.gz" || {
+                            echo "Warning: Failed to extract frontend dist" | tee -a "$LOG_FILE"
+                        }
+                        rm -f "${TEMP_DIR}/frontend-dist.tar.gz"
+                        echo "Pre-built frontend installed successfully" | tee -a "$LOG_FILE"
+                    else
+                        echo "Warning: Pre-built frontend not available for this commit. Frontend will need to be built manually if needed." | tee -a "$LOG_FILE"
+                    fi
+                elif command -v wget &> /dev/null; then
+                    if wget -q -O "${TEMP_DIR}/frontend-dist.tar.gz" "${FRONTEND_DIST_URL}"; then
+                        echo "Extracting pre-built frontend..." | tee -a "$LOG_FILE"
+                        cd "$REPO_DIR/frontend"
+                        rm -rf dist
+                        tar -xzf "${TEMP_DIR}/frontend-dist.tar.gz" || {
+                            echo "Warning: Failed to extract frontend dist" | tee -a "$LOG_FILE"
+                        }
+                        rm -f "${TEMP_DIR}/frontend-dist.tar.gz"
+                        echo "Pre-built frontend installed successfully" | tee -a "$LOG_FILE"
+                    else
+                        echo "Warning: Pre-built frontend not available for this commit. Frontend will need to be built manually if needed." | tee -a "$LOG_FILE"
+                    fi
+                else
+                    echo "Warning: Neither curl nor wget available. Cannot download pre-built frontend." | tee -a "$LOG_FILE"
+                fi
+                rm -rf "${TEMP_DIR}"
+            else
+                echo "Warning: Could not determine release tag. Pre-built frontend not available." | tee -a "$LOG_FILE"
+            fi
+        else
+            echo "Warning: Could not extract repo information from ${GIT_REPO}" | tee -a "$LOG_FILE"
+        fi
+    else
+        echo "No frontend changes detected. Skipping frontend update." | tee -a "$LOG_FILE"
+    fi
+else
+    echo "No changes detected. Skipping updates." | tee -a "$LOG_FILE"
+fi
+
+# Restart services via systemd
+if systemctl is-active --quiet calvin-backend.service 2>/dev/null || sudo systemctl is-active --quiet calvin-backend.service 2>/dev/null; then
+    echo "Restarting backend service..." | tee -a "$LOG_FILE"
+    if sudo systemctl restart calvin-backend 2>/dev/null; then
+        echo "Backend service restarted successfully" | tee -a "$LOG_FILE"
+    elif systemctl --user restart calvin-backend 2>/dev/null; then
+        echo "Backend service restarted successfully (user service)" | tee -a "$LOG_FILE"
+    else
+        echo "Warning: Failed to restart backend (may need sudo permissions)" | tee -a "$LOG_FILE"
+        echo "Please restart manually: sudo systemctl restart calvin-backend" | tee -a "$LOG_FILE"
+    fi
+    # Frontend doesn't need restart (Chromium will reload)
+else
+    echo "Services not running. Please start them manually." | tee -a "$LOG_FILE"
+fi
+
+echo "[$(date)] Production update complete!" | tee -a "$LOG_FILE"

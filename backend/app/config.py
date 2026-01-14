@@ -50,6 +50,29 @@ class Settings(BaseSettings):
     repo_dir: Path = Path("/home/calvin/calvin")
     system_path: str = "/home/calvin/.local/bin:/usr/local/bin:/usr/bin:/bin"
 
+    @property
+    def is_dev_mode(self) -> bool:
+        """Check if running in development mode by looking for .dev marker file."""
+        dev_marker = self.repo_dir / "backend" / ".dev"
+        return dev_marker.exists()
+
+    def get_update_script_path(self) -> Path:
+        """Get the appropriate update script path based on dev/prod mode."""
+        if self.is_dev_mode:
+            # Development mode: use dev update script
+            dev_script = Path("/usr/local/bin/update-calvin-dev.sh")
+            if dev_script.exists():
+                return dev_script
+            # Fallback to generic script if dev-specific doesn't exist
+            return self.update_script_path
+        else:
+            # Production mode: use prod update script
+            prod_script = Path("/usr/local/bin/update-calvin-prod.sh")
+            if prod_script.exists():
+                return prod_script
+            # Fallback to generic script if prod-specific doesn't exist
+            return self.update_script_path
+
     model_config = SettingsConfigDict(
         env_file=".env",
         env_file_encoding="utf-8",
