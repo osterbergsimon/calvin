@@ -7,6 +7,19 @@ set -e
 REPO_DIR="${REPO_DIR:-/home/calvin/calvin}"
 CALVIN_USER="${CALVIN_USER:-calvin}"
 
+# Source environment file if it exists (contains GIT_REPO and GIT_BRANCH)
+if [ -f /etc/default/calvin-update ]; then
+    . /etc/default/calvin-update
+fi
+
+GIT_REPO="${GIT_REPO:-https://github.com/osterbergsimon/calvin.git}"
+GIT_BRANCH="${GIT_BRANCH:-main}"
+
+# Extract repo owner and name from git URL
+repo_owner=$(echo "${GIT_REPO}" | sed -E 's|.*github\.com[:/]([^/]+)/([^/]+)(\.git)?$|\1|')
+repo_name=$(echo "${GIT_REPO}" | sed -E 's|.*github\.com[:/]([^/]+)/([^/]+)(\.git)?$|\2|' | sed 's|\.git$||')
+GITHUB_BASE="https://raw.githubusercontent.com/${repo_owner}/${repo_name}/${GIT_BRANCH}"
+
 echo "=========================================="
 echo "Testing Update Scripts Installation"
 echo "=========================================="
@@ -34,25 +47,79 @@ else
     
     # Install the appropriate script
     if [ "$MODE" = "dev" ]; then
-        if [ -f "${REPO_DIR}/scripts/update-calvin-dev.sh" ]; then
-            sudo cp "${REPO_DIR}/scripts/update-calvin-dev.sh" "$EXPECTED_SCRIPT"
-            sudo chmod +x "$EXPECTED_SCRIPT"
-            sudo chown "${CALVIN_USER}:${CALVIN_USER}" "$EXPECTED_SCRIPT"
-            echo "  ✓ Installed update-calvin-dev.sh"
+        SCRIPT_NAME="update-calvin-dev.sh"
+        SCRIPT_URL="${GITHUB_BASE}/scripts/${SCRIPT_NAME}"
+        LOCAL_SOURCE="${REPO_DIR}/scripts/${SCRIPT_NAME}"
+        
+        if [ -f "$LOCAL_SOURCE" ]; then
+            echo "  Using local script: $LOCAL_SOURCE"
+            sudo cp "$LOCAL_SOURCE" "$EXPECTED_SCRIPT"
         else
-            echo "  ✗ Source script not found: ${REPO_DIR}/scripts/update-calvin-dev.sh"
-            exit 1
+            echo "  Downloading from GitHub: $SCRIPT_URL"
+            TEMP_SCRIPT=$(mktemp)
+            if command -v curl &> /dev/null; then
+                if curl -fsSL -o "$TEMP_SCRIPT" "$SCRIPT_URL"; then
+                    sudo cp "$TEMP_SCRIPT" "$EXPECTED_SCRIPT"
+                    rm -f "$TEMP_SCRIPT"
+                else
+                    echo "  ✗ Failed to download script from GitHub"
+                    rm -f "$TEMP_SCRIPT"
+                    exit 1
+                fi
+            elif command -v wget &> /dev/null; then
+                if wget -q -O "$TEMP_SCRIPT" "$SCRIPT_URL"; then
+                    sudo cp "$TEMP_SCRIPT" "$EXPECTED_SCRIPT"
+                    rm -f "$TEMP_SCRIPT"
+                else
+                    echo "  ✗ Failed to download script from GitHub"
+                    rm -f "$TEMP_SCRIPT"
+                    exit 1
+                fi
+            else
+                echo "  ✗ Neither curl nor wget available. Cannot download script."
+                exit 1
+            fi
         fi
+        sudo chmod +x "$EXPECTED_SCRIPT"
+        sudo chown "${CALVIN_USER}:${CALVIN_USER}" "$EXPECTED_SCRIPT"
+        echo "  ✓ Installed $SCRIPT_NAME"
     else
-        if [ -f "${REPO_DIR}/scripts/update-calvin-prod.sh" ]; then
-            sudo cp "${REPO_DIR}/scripts/update-calvin-prod.sh" "$EXPECTED_SCRIPT"
-            sudo chmod +x "$EXPECTED_SCRIPT"
-            sudo chown "${CALVIN_USER}:${CALVIN_USER}" "$EXPECTED_SCRIPT"
-            echo "  ✓ Installed update-calvin-prod.sh"
+        SCRIPT_NAME="update-calvin-prod.sh"
+        SCRIPT_URL="${GITHUB_BASE}/scripts/${SCRIPT_NAME}"
+        LOCAL_SOURCE="${REPO_DIR}/scripts/${SCRIPT_NAME}"
+        
+        if [ -f "$LOCAL_SOURCE" ]; then
+            echo "  Using local script: $LOCAL_SOURCE"
+            sudo cp "$LOCAL_SOURCE" "$EXPECTED_SCRIPT"
         else
-            echo "  ✗ Source script not found: ${REPO_DIR}/scripts/update-calvin-prod.sh"
-            exit 1
+            echo "  Downloading from GitHub: $SCRIPT_URL"
+            TEMP_SCRIPT=$(mktemp)
+            if command -v curl &> /dev/null; then
+                if curl -fsSL -o "$TEMP_SCRIPT" "$SCRIPT_URL"; then
+                    sudo cp "$TEMP_SCRIPT" "$EXPECTED_SCRIPT"
+                    rm -f "$TEMP_SCRIPT"
+                else
+                    echo "  ✗ Failed to download script from GitHub"
+                    rm -f "$TEMP_SCRIPT"
+                    exit 1
+                fi
+            elif command -v wget &> /dev/null; then
+                if wget -q -O "$TEMP_SCRIPT" "$SCRIPT_URL"; then
+                    sudo cp "$TEMP_SCRIPT" "$EXPECTED_SCRIPT"
+                    rm -f "$TEMP_SCRIPT"
+                else
+                    echo "  ✗ Failed to download script from GitHub"
+                    rm -f "$TEMP_SCRIPT"
+                    exit 1
+                fi
+            else
+                echo "  ✗ Neither curl nor wget available. Cannot download script."
+                exit 1
+            fi
         fi
+        sudo chmod +x "$EXPECTED_SCRIPT"
+        sudo chown "${CALVIN_USER}:${CALVIN_USER}" "$EXPECTED_SCRIPT"
+        echo "  ✓ Installed $SCRIPT_NAME"
     fi
 fi
 echo ""
