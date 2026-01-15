@@ -5,6 +5,11 @@ import sys
 from contextlib import asynccontextmanager
 from pathlib import Path
 
+from fastapi.responses import (
+    FileResponse,  # noqa: E402
+    JSONResponse,  # noqa: E402
+)
+
 # Configure loguru for better, simpler logging
 from loguru import logger
 
@@ -104,9 +109,10 @@ for sql_logger_name in sqlalchemy_loggers:
 
 logger.info(f"Loguru logging configured with level: {log_level}")
 
-from fastapi import FastAPI  # noqa: E402
+from fastapi import FastAPI, HTTPException, Request  # noqa: E402
+from fastapi.exceptions import RequestValidationError  # noqa: E402
 from fastapi.middleware.cors import CORSMiddleware  # noqa: E402
-from fastapi.responses import FileResponse  # noqa: E402
+from starlette.exceptions import HTTPException as StarletteHTTPException  # noqa: E402
 
 from app.api.routes import (  # noqa: E402
     calendar,
@@ -413,6 +419,72 @@ app.add_middleware(
     allow_methods=["*"],
     allow_headers=["*"],
 )
+
+
+# Global exception handlers for comprehensive error logging
+@app.exception_handler(StarletteHTTPException)
+async def http_exception_handler(request: Request, exc: StarletteHTTPException):
+    """Handle HTTP exceptions (404, 401, etc.) with logging."""
+    logger.warning(
+        f"HTTP {exc.status_code} error: {exc.detail} | "
+        f"Path: {request.url.path} | Method: {request.method}"
+    )
+    return JSONResponse(
+        status_code=exc.status_code,
+        content={"detail": exc.detail},
+    )
+
+
+@app.exception_handler(HTTPException)
+async def fastapi_http_exception_handler(request: Request, exc: HTTPException):
+    """Handle FastAPI HTTP exceptions with logging."""
+    logger.warning(
+        f"HTTP {exc.status_code} error: {exc.detail} | "
+        f"Path: {request.url.path} | Method: {request.method}"
+    )
+    return JSONResponse(
+        status_code=exc.status_code,
+        content={"detail": exc.detail},
+    )
+
+
+@app.exception_handler(RequestValidationError)
+async def validation_exception_handler(request: Request, exc: RequestValidationError):
+    """Handle request validation errors with detailed logging."""
+    errors = exc.errors()
+    # Try to get request body for logging, but don't fail if we can't read it
+    body_info = "N/A"
+    try:
+        if request.method in ("POST", "PUT", "PATCH"):
+            body = await request.body()
+            body_info = body.decode("utf-8", errors="replace")[:500]  # Limit length
+    except Exception:
+        pass  # Ignore errors reading body
+
+    logger.error(
+        f"Validation error: {errors} | "
+        f"Path: {request.url.path} | Method: {request.method} | "
+        f"Body: {body_info}"
+    )
+    return JSONResponse(
+        status_code=422,
+        content={"detail": errors, "body": "Validation error"},
+    )
+
+
+@app.exception_handler(Exception)
+async def general_exception_handler(request: Request, exc: Exception):
+    """Catch-all exception handler to log all unhandled errors."""
+    logger.exception(
+        f"Unhandled exception: {type(exc).__name__}: {exc} | "
+        f"Path: {request.url.path} | Method: {request.method} | "
+        f"Client: {request.client.host if request.client else 'unknown'}"
+    )
+    return JSONResponse(
+        status_code=500,
+        content={"detail": "Internal server error"},
+    )
+
 
 # Include routers
 app.include_router(health.router, prefix="/api", tags=["health"])

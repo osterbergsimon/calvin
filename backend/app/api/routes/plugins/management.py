@@ -2,7 +2,6 @@
 
 import asyncio
 import json
-import logging
 import shutil
 import tempfile
 from datetime import UTC, datetime
@@ -11,6 +10,7 @@ from typing import Any
 
 import httpx
 from fastapi import APIRouter, Body, File, HTTPException, Query, UploadFile
+from loguru import logger
 from sqlalchemy import select
 
 from app.database import AsyncSessionLocal
@@ -25,8 +25,6 @@ from app.services.plugin_installer import plugin_installer
 from app.services.theme_installer import theme_installer
 
 from .themes import BUILTIN_THEMES, _unregister_theme_from_db
-
-logger = logging.getLogger(__name__)
 
 router = APIRouter()
 
@@ -403,6 +401,15 @@ async def uninstall_plugin(plugin_id: str):
 @router.get("/plugins/{plugin_id}")
 async def get_plugin(plugin_id: str):
     """Get a specific plugin type or theme by ID."""
+    # Validate plugin_id - reject invalid values that indicate frontend bugs
+    if (
+        not plugin_id
+        or plugin_id.strip() == ""
+        or plugin_id.lower() in ("none", "null", "undefined")
+    ):
+        logger.warning(f"Invalid plugin_id received: {plugin_id} | Path: /api/plugins/{plugin_id}")
+        raise HTTPException(status_code=400, detail=f"Invalid plugin ID: {plugin_id}")
+
     # Check if it's a theme first (check built-in, then database, then installed)
     theme_manifest = None
 

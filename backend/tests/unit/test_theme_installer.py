@@ -444,7 +444,6 @@ class TestThemeInstaller:
             ],
         }
         (repo_dir / "plugins.json").write_text(json.dumps(plugins_json))
-
         result = theme_installer.enumerate_themes_from_repo(repo_dir)
         # Path traversal should be filtered out
         assert len(result["themes"]) == 0
