@@ -129,6 +129,7 @@
           plugin.ui_sections && plugin.ui_sections.length > 0 && plugin.enabled
         "
         :plugin-id="plugin.id"
+        :plugin-instances="instances"
         :sections="plugin.ui_sections"
         :images="images"
         :uploading="uploading"
@@ -264,7 +265,6 @@ const hasGlobalSettings = computed(() => {
 const showInstances = computed(() => {
   return (
     props.plugin.enabled &&
-    props.plugin.type !== "calendar" &&
     props.plugin.type !== "theme" &&
     props.plugin.supports_multiple_instances !== false
   );

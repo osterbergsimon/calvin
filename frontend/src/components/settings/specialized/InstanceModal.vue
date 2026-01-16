@@ -83,6 +83,40 @@
             </div>
           </template>
 
+          <!-- Calendar-specific fields (color and show_time) -->
+          <template v-if="currentPlugin?.type === 'calendar'">
+            <div class="form-group">
+              <label>Calendar Color</label>
+              <div style="display: flex; align-items: center; gap: 0.5rem">
+                <input
+                  v-model="formData.color"
+                  type="color"
+                  class="color-input"
+                  style="width: 60px; height: 40px; cursor: pointer"
+                />
+                <input
+                  v-model="formData.color"
+                  type="text"
+                  class="form-input"
+                  placeholder="#2196f3"
+                  style="flex: 1"
+                />
+              </div>
+              <span class="help-text">
+                Choose a color for events from this calendar source
+              </span>
+            </div>
+            <div class="form-group">
+              <label>
+                <input v-model="formData.show_time" type="checkbox" />
+                Show Event Times
+              </label>
+              <span class="help-text">
+                Display time information for events from this calendar
+              </span>
+            </div>
+          </template>
+
           <!-- Enable/Disable -->
           <div class="form-group">
             <label>
@@ -132,6 +166,8 @@
 import { ref, watch, computed } from "vue";
 import PluginFieldRenderer from "@/components/PluginFieldRenderer.vue";
 import * as pluginsApi from "@/services/pluginsApi";
+import * as calendarApi from "@/services/calendarApi";
+import { useCalendarStore } from "@/stores/calendar";
 
 const props = defineProps({
   show: {
@@ -148,13 +184,18 @@ const props = defineProps({
   },
 });
 
-const emit = defineEmits(["close", "save"]);
+const emit = defineEmits(["close", "save"]); // save event may include calendar config data
+
+const calendarStore = useCalendarStore();
 
 const currentPlugin = ref(null);
 const editingInstance = ref(null);
 const formData = ref({
   name: "",
   enabled: true,
+  // Calendar-specific fields
+  color: "#2196f3",
+  show_time: true,
 });
 const error = ref("");
 const saving = ref(false);
@@ -229,12 +270,15 @@ watch(
   },
 );
 
-const initializeForm = () => {
+const initializeForm = async () => {
   if (!currentPlugin.value) return;
 
   const form = {
     name: "",
     enabled: true,
+    // Calendar-specific defaults
+    color: "#2196f3",
+    show_time: true,
   };
 
   if (editingInstance.value) {
@@ -257,6 +301,46 @@ const initializeForm = () => {
               : schema.type === "boolean"
                 ? false
                 : "";
+      }
+    }
+
+    // Load calendar-specific settings if editing calendar instance
+    if (currentPlugin.value.type === "calendar") {
+      try {
+        await calendarStore.fetchSources();
+        const source = calendarStore.sources.find(
+          (s) => s.id === editingInstance.value.id,
+        );
+        if (source) {
+          // Convert color to hex format if needed
+          if (source.color) {
+            if (source.color.startsWith("#")) {
+              form.color = source.color;
+            } else {
+              // Convert named color to hex
+              const colorMap = {
+                green: "#4caf50",
+                red: "#f44336",
+                blue: "#2196f3",
+                yellow: "#ffeb3b",
+                orange: "#ff9800",
+                purple: "#9c27b0",
+                pink: "#e91e63",
+                cyan: "#00bcd4",
+                teal: "#009688",
+                indigo: "#3f51b5",
+                brown: "#795548",
+                grey: "#9e9e9e",
+                gray: "#9e9e9e",
+              };
+              form.color = colorMap[source.color.toLowerCase()] || "#2196f3";
+            }
+          }
+          form.show_time = source.show_time !== false;
+        }
+      } catch (error) {
+        console.error("Failed to load calendar source settings:", error);
+        // Continue with defaults
       }
     }
   } else {
@@ -480,6 +564,26 @@ const handleSave = async () => {
         enabled: config.enabled,
         plugin_id: editingInstance.value.plugin_id || pluginId, // Pass plugin type ID
       });
+
+      // Update calendar-specific settings if calendar plugin
+      if (plugin.type === "calendar") {
+        try {
+          await calendarStore.fetchSources();
+          const source = calendarStore.sources.find(
+            (s) => s.id === editingInstance.value.id,
+          );
+          if (source) {
+            await calendarStore.updateSource(editingInstance.value.id, {
+              ...source,
+              color: formData.value.color || "#2196f3",
+              show_time: formData.value.show_time !== false,
+            });
+          }
+        } catch (error) {
+          console.error("Failed to update calendar source settings:", error);
+          // Don't fail the whole save if calendar settings fail
+        }
+      }
     } else {
       // Create new instance
       await pluginsApi.createPluginInstance(pluginId, {
@@ -487,9 +591,29 @@ const handleSave = async () => {
         config,
         enabled: config.enabled,
       });
+
+      // Create calendar source if calendar plugin
+      // Note: We need to wait for the instance to be created and get its ID
+      // We'll emit 'save' which triggers a reload, then create the calendar source
+      // For now, pass calendar-specific data in the emit so parent can handle it
     }
 
-    emit("save");
+    // Emit save with calendar-specific data if needed
+    const saveData =
+      plugin.type === "calendar" && !editingInstance.value
+        ? {
+            isCalendar: true,
+            instanceName: formData.value.name.trim(),
+            calendarConfig: {
+              color: formData.value.color || "#2196f3",
+              show_time: formData.value.show_time !== false,
+              ical_url: config.ical_url || "",
+              type: pluginId,
+            },
+          }
+        : null;
+
+    emit("save", saveData);
     handleClose();
   } catch (err) {
     console.error("Failed to save instance:", err);

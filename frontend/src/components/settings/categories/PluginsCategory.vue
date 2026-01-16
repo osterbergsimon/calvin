@@ -89,6 +89,7 @@ import { usePlugins } from "@/composables";
 import { useSystem } from "@/composables";
 import { useImagesStore } from "@/stores/images";
 import * as pluginsApi from "@/services/pluginsApi";
+import * as calendarApi from "@/services/calendarApi";
 import CollapsibleSection from "../shared/CollapsibleSection.vue";
 import PluginInstaller from "../specialized/PluginInstaller.vue";
 import PluginManager from "../specialized/PluginManager.vue";
@@ -319,8 +320,40 @@ const handleCloseInstanceModal = () => {
   editingInstance.value = null;
 };
 
-const handleInstanceModalSave = async () => {
+const handleInstanceModalSave = async (calendarData) => {
   await loadPlugins();
+
+  // If a new calendar instance was created, create the calendar source
+  if (calendarData?.isCalendar && currentPlugin.value) {
+    try {
+      const pluginTypeId = currentPlugin.value.id;
+
+      // Wait a bit for plugins to fully reload
+      await new Promise((resolve) => setTimeout(resolve, 500));
+
+      // Find the instance that was just created by name
+      const instances = pluginInstances.value[pluginTypeId] || [];
+      const newInstance = instances.find(
+        (inst) => inst.name === calendarData.instanceName,
+      );
+
+      if (newInstance) {
+        // Create calendar source with the instance ID
+        await calendarApi.addCalendarSource({
+          id: newInstance.id,
+          type: pluginTypeId,
+          name: calendarData.instanceName,
+          ical_url: calendarData.calendarConfig.ical_url,
+          enabled: newInstance.enabled,
+          color: calendarData.calendarConfig.color,
+          show_time: calendarData.calendarConfig.show_time,
+        });
+      }
+    } catch (error) {
+      console.error("Failed to create calendar source:", error);
+      // Don't show error to user - the instance was created successfully
+    }
+  }
 };
 
 const handleDeleteInstance = async (instanceId) => {
@@ -355,18 +388,52 @@ const handleInstanceOrderChange = async (pluginId, newOrder) => {
   }
 };
 
-const handleUpload = async (file) => {
+const handleUpload = async (event) => {
   uploading.value = true;
   uploadError.value = "";
   uploadSuccess.value = "";
 
   try {
-    await imagesStore.uploadImage(file);
-    uploadSuccess.value = "Image uploaded successfully";
+    // Event is [filesArray, section] from PluginSections
+    // where filesArray is an Array of File objects
+    let filesArray;
+    if (Array.isArray(event) && event.length === 2) {
+      // Event format: [filesArray, section] from PluginSections
+      filesArray = event[0]; // This is an Array of File objects
+    } else if (Array.isArray(event)) {
+      // Event is directly an array of files
+      filesArray = event;
+    } else if (event instanceof FileList) {
+      // Event is a FileList (fallback)
+      filesArray = Array.from(event);
+    } else if (event instanceof File) {
+      // Event is a single File
+      filesArray = [event];
+    } else {
+      console.error("Invalid file input:", event);
+      throw new Error("Invalid file input: expected array of files or File");
+    }
+
+    if (!Array.isArray(filesArray) || filesArray.length === 0) {
+      throw new Error("No files selected");
+    }
+
+    // Verify all items are File objects
+    if (!filesArray.every((f) => f instanceof File)) {
+      throw new Error("Invalid file objects in selection");
+    }
+
+    // Upload each file sequentially to avoid overwhelming the server
+    for (const file of filesArray) {
+      await imagesStore.uploadImage(file);
+    }
+
+    uploadSuccess.value = `Successfully uploaded ${filesArray.length} image${filesArray.length > 1 ? "s" : ""}`;
     setTimeout(() => {
       uploadSuccess.value = "";
     }, 5000);
   } catch (error) {
+    console.error("Upload error:", error);
     uploadError.value =
       error.response?.data?.detail || error.message || "Failed to upload image";
     setTimeout(() => {
