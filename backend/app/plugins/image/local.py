@@ -1,6 +1,7 @@
 """Local filesystem image plugin."""
 
 import hashlib
+import os
 from pathlib import Path
 from typing import Any
 
@@ -10,6 +11,10 @@ from PIL import Image, ImageOps
 from app.plugins.base import PluginType
 from app.plugins.hooks import hookimpl
 from app.plugins.protocols import ImagePlugin
+from app.plugins.utils.instance_manager import (
+    InstanceManagerConfig,
+    handle_plugin_config_update_generic,
+)
 
 # Loguru automatically includes module/function info in logs
 
@@ -95,6 +100,20 @@ class LocalImagePlugin(ImagePlugin):
             config: Configuration dictionary
         """
         await super().configure(config)
+
+        # Check if IMAGE_DIR environment variable has changed
+        current_image_dir = os.getenv("IMAGE_DIR")
+        if current_image_dir:
+            new_image_dir = Path(current_image_dir).resolve()
+            if self.image_dir.resolve() != new_image_dir:
+                logger.info(
+                    f"[Local Images] IMAGE_DIR changed from {self.image_dir} "
+                    f"to {new_image_dir}, updating plugin"
+                )
+                self.image_dir = new_image_dir
+                self.image_dir.mkdir(parents=True, exist_ok=True)
+                self.thumbnail_dir = self.image_dir / "thumbnails"
+                self.thumbnail_dir.mkdir(parents=True, exist_ok=True)
 
         if "image_dir" in config and config["image_dir"]:
             # Extract actual value from config (handle schema objects)
@@ -426,221 +445,29 @@ async def handle_plugin_config_update(
     if type_id != "local":
         return None
 
-    import logging
+    def normalize_config(c: dict[str, Any]) -> dict[str, Any]:
+        """Normalize config values."""
+        # No config needed - uses hardcoded directory
+        return {}
 
-    from sqlalchemy import select
+    def on_instance_updated(plugin: Any, result: dict[str, Any]) -> None:
+        """Callback after instance update (IMAGE_DIR is handled in configure method)."""
+        # IMAGE_DIR environment variable changes are handled in the plugin's configure method
+        # which is called by the generic handler. No additional action needed here.
+        pass
 
-    from app.models.db_models import PluginDB
-    from app.plugins.manager import plugin_manager
-    from app.plugins.registry import plugin_registry
+    manager_config = InstanceManagerConfig(
+        type_id="local",
+        single_instance=True,
+        instance_id="local-images",
+        normalize_config=normalize_config,
+        default_instance_name="Local Images",
+        on_instance_updated=on_instance_updated,
+    )
 
-    logger = logging.getLogger(__name__)
-
-    # Local Images plugin is single-instance - always use fixed instance ID
-    # Always create/update the single instance when plugin type is enabled
-    plugin_instance_id = "local-images"
-
-    # Check if Local Images instance exists
-    # Note: session is async, but we're in an async function, so we can await
-    # However, the hook signature might pass a sync session, so we need to handle both
-    try:
-        # Try async first
-        result = await session.execute(select(PluginDB).where(PluginDB.type_id == "local"))
-        local_instance = result.scalar_one_or_none()
-    except TypeError:
-        # Fallback to sync if session is not async
-        result = session.execute(select(PluginDB).where(PluginDB.type_id == "local"))
-        local_instance = result.scalar_one_or_none()
-
-    if not local_instance:
-        # Create new Local Images instance with hardcoded config
-        logger.info(f"[Local Images] Creating single instance: {plugin_instance_id}")
-        try:
-            instance_enabled = (
-                enabled if enabled is not None else (db_type.enabled if db_type else True)
-            )
-            # Check if plugin is already registered in plugin_manager
-            existing_plugin = plugin_manager.get_plugin(plugin_instance_id)
-            if existing_plugin:
-                # Plugin already exists, just ensure it's enabled
-                logger.info(
-                    f"[Local Images] Plugin {plugin_instance_id} already registered, "
-                    f"ensuring it's enabled"
-                )
-                if instance_enabled and not existing_plugin.enabled:
-                    existing_plugin.enable()
-                elif not instance_enabled and existing_plugin.enabled:
-                    existing_plugin.disable()
-                return {
-                    "instance_created": False,
-                    "instance_id": plugin_instance_id,
-                    "already_exists": True,
-                }
-            # No config needed - uses hardcoded directory
-            plugin = await plugin_registry.register_plugin(
-                plugin_id=plugin_instance_id,
-                type_id="local",
-                name="Local Images",
-                config={},  # Empty config - uses hardcoded directory
-                enabled=instance_enabled,
-            )
-            return {
-                "instance_created": True,
-                "instance_id": plugin_instance_id,
-            }
-        except ValueError as e:
-            # Plugin already registered - this is okay, just ensure it's enabled
-            if "already registered" in str(e):
-                logger.info(
-                    f"[Local Images] Plugin {plugin_instance_id} already registered, "
-                    f"ensuring it's enabled"
-                )
-                existing_plugin = plugin_manager.get_plugin(plugin_instance_id)
-                if existing_plugin:
-                    instance_enabled = (
-                        enabled if enabled is not None else (db_type.enabled if db_type else True)
-                    )
-                    if instance_enabled and not existing_plugin.enabled:
-                        existing_plugin.enable()
-                    elif not instance_enabled and existing_plugin.enabled:
-                        existing_plugin.disable()
-                return {
-                    "instance_created": False,
-                    "instance_id": plugin_instance_id,
-                    "already_exists": True,
-                }
-            raise
-        except Exception as e:
-            logger.error(f"[Local Images] Failed to create instance: {e}", exc_info=True)
-            return {"instance_created": False, "error": str(e)}
-    else:
-        # Ensure we're using the correct instance ID (single-instance plugin)
-        if local_instance.id != plugin_instance_id:
-            # If there's an instance with a different ID, delete it and create the correct one
-            logger.warning(
-                f"[Local Images] Found instance with wrong ID ({local_instance.id}), "
-                f"recreating with correct ID ({plugin_instance_id})"
-            )
-            session.delete(local_instance)
-            # Don't commit here - the route will commit after all hooks complete
-            # Committing here causes rollback issues
-            # Create the correct instance
-            instance_enabled = (
-                enabled if enabled is not None else (db_type.enabled if db_type else True)
-            )
-            try:
-                plugin = await plugin_registry.register_plugin(
-                    plugin_id=plugin_instance_id,
-                    type_id="local",
-                    name="Local Images",
-                    config={},
-                    enabled=instance_enabled,
-                )
-                return {
-                    "instance_created": True,
-                    "instance_id": plugin_instance_id,
-                }
-            except ValueError as e:
-                # Plugin already registered - this is okay
-                if "already registered" in str(e):
-                    existing_plugin = plugin_manager.get_plugin(plugin_instance_id)
-                    if existing_plugin:
-                        if instance_enabled and not existing_plugin.enabled:
-                            existing_plugin.enable()
-                        elif not instance_enabled and existing_plugin.enabled:
-                            existing_plugin.disable()
-                    return {
-                        "instance_created": False,
-                        "instance_id": plugin_instance_id,
-                        "already_exists": True,
-                    }
-                raise
-        # Update existing Local Images instance
-        logger.info(f"[Local Images] Updating existing instance: {local_instance.id}")
-        instance_enabled = (
-            enabled if enabled is not None else (db_type.enabled if db_type else True)
-        )
-
-        # Update database - but don't commit yet, we'll commit at the end
-        if local_instance.enabled != instance_enabled:
-            local_instance.enabled = instance_enabled
-
-        # Update plugin in memory
-        plugin = plugin_manager.get_plugin(local_instance.id)
-        if plugin:
-            # Check if IMAGE_DIR environment variable has changed
-            import os
-
-            current_image_dir = os.getenv("IMAGE_DIR")
-            if current_image_dir:
-                new_image_dir = Path(current_image_dir).resolve()
-                if plugin.image_dir.resolve() != new_image_dir:
-                    logger.info(
-                        f"[Local Images] IMAGE_DIR changed from {plugin.image_dir} "
-                        f"to {new_image_dir}, updating plugin"
-                    )
-                    plugin.image_dir = new_image_dir
-                    plugin.image_dir.mkdir(parents=True, exist_ok=True)
-                    plugin.thumbnail_dir = plugin.image_dir / "thumbnails"
-                    plugin.thumbnail_dir.mkdir(parents=True, exist_ok=True)
-
-            # No config to update - uses hardcoded directory
-            if instance_enabled:
-                plugin.enable()
-                if not plugin.is_running():
-                    try:
-                        await plugin.initialize()
-                        plugin.start()
-                    except Exception as e:
-                        logger.error(f"[Local Images] Error starting plugin: {e}", exc_info=True)
-                else:
-                    # Plugin is already running, but re-scan for new images
-                    # Also ensure image_dir is correct (in case IMAGE_DIR changed)
-                    import os
-
-                    current_image_dir = os.getenv("IMAGE_DIR")
-                    if current_image_dir:
-                        new_image_dir = Path(current_image_dir).resolve()
-                        if plugin.image_dir.resolve() != new_image_dir:
-                            logger.info(
-                                f"[Local Images] Updating image_dir from {plugin.image_dir} "
-                                f"to {new_image_dir}"
-                            )
-                            plugin.image_dir = new_image_dir
-                            plugin.image_dir.mkdir(parents=True, exist_ok=True)
-                            plugin.thumbnail_dir = plugin.image_dir / "thumbnails"
-                            plugin.thumbnail_dir.mkdir(parents=True, exist_ok=True)
-                    try:
-                        await plugin.scan_images()
-                    except Exception as e:
-                        logger.warning(
-                            f"[Local Images] Error re-scanning images: {e}", exc_info=True
-                        )
-            else:
-                plugin.disable()
-                if plugin.is_running():
-                    try:
-                        plugin.stop()
-                        await plugin.cleanup()
-                    except Exception as e:
-                        logger.warning(f"[Local Images] Error stopping plugin: {e}", exc_info=True)
-
-            # Update in database - keep config empty
-            local_instance.config = {}  # No config needed
-            local_instance.enabled = instance_enabled
-            # IMPORTANT: Don't commit here - the route will commit after all hooks complete
-            # Committing here causes rollback issues. The route handles all commits to ensure
-            # db_type.enabled and instance.enabled are both persisted correctly.
-
-            return {
-                "instance_updated": True,
-                "instance_id": local_instance.id,
-            }
-        else:
-            logger.warning(
-                f"[Local Images] Plugin instance {local_instance.id} not found in manager"
-            )
-            return {"instance_updated": False, "error": "Plugin instance not found"}
+    return await handle_plugin_config_update_generic(
+        type_id, config, enabled, db_type, session, manager_config
+    )
 
 
 # Auto-register this module with pluggy when imported

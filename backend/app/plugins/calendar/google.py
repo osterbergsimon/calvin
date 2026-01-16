@@ -1,5 +1,6 @@
 """Google Calendar plugin."""
 
+import hashlib
 import re
 from datetime import datetime
 from typing import Any
@@ -12,6 +13,11 @@ from app.models.calendar import CalendarEvent
 from app.plugins.base import PluginType
 from app.plugins.hooks import hookimpl
 from app.plugins.protocols import CalendarPlugin
+from app.plugins.utils.config import extract_config_value, to_str
+from app.plugins.utils.instance_manager import (
+    InstanceManagerConfig,
+    handle_plugin_config_update_generic,
+)
 from app.utils.ical_parser import parse_ical_from_url
 
 # Loguru automatically includes module/function info in logs
@@ -89,6 +95,22 @@ class GoogleCalendarPlugin(CalendarPlugin):
             "description": "Google Calendar via iCal feed",
             "version": "1.0.0",
             "common_config_schema": {},
+            "instance_config_schema": {
+                "ical_url": {
+                    "type": "string",
+                    "description": "Google Calendar iCal URL or share URL",
+                    "default": "",
+                    "ui": {
+                        "component": "input",
+                        "placeholder": "https://calendar.google.com/calendar/ical/...",
+                        "validation": {
+                            "required": True,
+                            "type": "url",
+                        },
+                    },
+                },
+            },
+            "supports_multiple_instances": True,  # Multi-instance plugin
             "plugin_class": cls,
         }
 
@@ -194,12 +216,27 @@ class GoogleCalendarPlugin(CalendarPlugin):
         if "ical_url" not in config:
             return False
 
-        url = config["ical_url"]
-        if not isinstance(url, str) or not url.strip():
+        url = extract_config_value(config, "ical_url", converter=to_str)
+        if not url or not url.strip():
             return False
 
         # Check if it's a Google Calendar URL
         return "calendar.google.com" in url or "google.com/calendar" in url
+
+    async def configure(self, config: dict[str, Any]) -> None:
+        """
+        Configure the plugin with new settings.
+
+        Args:
+            config: Configuration dictionary
+        """
+        await super().configure(config)
+
+        ical_url = extract_config_value(config, "ical_url", converter=to_str)
+        if ical_url:
+            self.ical_url = ical_url
+            # Reset normalized URL so it gets recalculated on next use
+            self._normalized_url = None
 
 
 # Register this plugin with pluggy
@@ -221,11 +258,64 @@ def create_plugin_instance(
         return None
 
     enabled = config.get("enabled", False)  # Default to disabled
-    ical_url = config.get("ical_url", "")
+    ical_url = extract_config_value(config, "ical_url", default="", converter=to_str)
 
     return GoogleCalendarPlugin(
         plugin_id=plugin_id,
         name=name,
         ical_url=ical_url,
         enabled=enabled,
+    )
+
+
+@hookimpl
+async def handle_plugin_config_update(
+    type_id: str,
+    config: dict[str, Any],
+    enabled: bool | None,
+    db_type: Any,
+    session: Any,
+) -> dict[str, Any] | None:
+    """Handle Google Calendar plugin configuration update and instance management."""
+    if type_id != "google":
+        return None
+
+    def normalize_config(c: dict[str, Any]) -> dict[str, Any]:
+        """Normalize config values."""
+        ical_url = extract_config_value(c, "ical_url", converter=to_str)
+        return {"ical_url": ical_url or ""}
+
+    def validate_config(c: dict[str, Any]) -> bool:
+        """Validate config has required ical_url."""
+        if "ical_url" not in c:
+            return False
+
+        url = extract_config_value(c, "ical_url", converter=to_str)
+        if not url or not url.strip():
+            return False
+
+        # Check if it's a Google Calendar URL
+        return "calendar.google.com" in url or "google.com/calendar" in url
+
+    def generate_instance_id(c: dict[str, Any], t: str) -> str:
+        """Generate instance ID from ical_url."""
+        ical_url = extract_config_value(c, "ical_url", converter=to_str)
+        if ical_url:
+            # Generate hash from URL (same instance for same URL)
+            url_hash = hashlib.md5(ical_url.encode()).hexdigest()[:8]
+            return f"{t}-{url_hash}"
+        # Fallback ID if URL not available
+        return f"{t}-instance"
+
+    manager_config = InstanceManagerConfig(
+        type_id="google",
+        single_instance=False,  # Multi-instance plugin
+        normalize_config=normalize_config,
+        validate_config=validate_config,
+        generate_instance_id=generate_instance_id,
+        default_instance_name="Google Calendar",
+    )
+
+    return await handle_plugin_config_update_generic(
+        type_id, config, enabled, db_type, session, manager_config
     )

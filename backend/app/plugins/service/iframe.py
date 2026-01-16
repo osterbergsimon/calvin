@@ -1,10 +1,16 @@
 """Iframe service plugin for displaying web services."""
 
+import hashlib
 from typing import Any
 
 from app.plugins.base import PluginType
 from app.plugins.hooks import hookimpl
 from app.plugins.protocols import ServicePlugin
+from app.plugins.utils.config import extract_config_value, to_str
+from app.plugins.utils.instance_manager import (
+    InstanceManagerConfig,
+    handle_plugin_config_update_generic,
+)
 
 
 class IframeServicePlugin(ServicePlugin):
@@ -68,6 +74,7 @@ class IframeServicePlugin(ServicePlugin):
                 "render_template": "iframe",
                 "component": "iframe/IframeViewer.vue",  # Plugin-provided frontend component
             },
+            "supports_multiple_instances": True,  # Multi-instance plugin
             "plugin_class": cls,
         }
 
@@ -129,11 +136,28 @@ class IframeServicePlugin(ServicePlugin):
         if "url" not in config:
             return False
 
-        url = config["url"]
-        if not isinstance(url, str) or not url.strip():
+        url = extract_config_value(config, "url", converter=to_str)
+        if not url or not url.strip():
             return False
 
         return url.startswith("http://") or url.startswith("https://")
+
+    async def configure(self, config: dict[str, Any]) -> None:
+        """
+        Configure the plugin with new settings.
+
+        Args:
+            config: Configuration dictionary
+        """
+        await super().configure(config)
+
+        url = extract_config_value(config, "url", converter=to_str)
+        fullscreen = extract_config_value(config, "fullscreen", default=False)
+
+        if url:
+            self.url = url
+        if fullscreen is not None:
+            self.fullscreen = bool(fullscreen)
 
 
 # Register this plugin with pluggy
@@ -155,17 +179,8 @@ def create_plugin_instance(
         return None
 
     enabled = config.get("enabled", False)  # Default to disabled
-    url = config.get("url", "")
-    fullscreen = config.get("fullscreen", False)
-
-    # Handle schema objects
-    if isinstance(url, dict):
-        url = url.get("value") or url.get("default") or ""
-    url = str(url) if url else ""
-
-    if isinstance(fullscreen, dict):
-        fullscreen = fullscreen.get("value") or fullscreen.get("default") or False
-    fullscreen = bool(fullscreen) if not isinstance(fullscreen, bool) else fullscreen
+    url = extract_config_value(config, "url", default="", converter=to_str)
+    fullscreen = extract_config_value(config, "fullscreen", default=False)
 
     return IframeServicePlugin(
         plugin_id=plugin_id,
@@ -173,4 +188,60 @@ def create_plugin_instance(
         url=url,
         enabled=enabled,
         fullscreen=fullscreen,
+    )
+
+
+@hookimpl
+async def handle_plugin_config_update(
+    type_id: str,
+    config: dict[str, Any],
+    enabled: bool | None,
+    db_type: Any,
+    session: Any,
+) -> dict[str, Any] | None:
+    """Handle Iframe service plugin configuration update and instance management."""
+    if type_id != "iframe":
+        return None
+
+    def normalize_config(c: dict[str, Any]) -> dict[str, Any]:
+        """Normalize config values."""
+        url = extract_config_value(c, "url", converter=to_str)
+        fullscreen = extract_config_value(c, "fullscreen", default=False)
+        return {
+            "url": url or "",
+            "fullscreen": fullscreen or False,
+        }
+
+    def validate_config(c: dict[str, Any]) -> bool:
+        """Validate config has required url."""
+        if "url" not in c:
+            return False
+
+        url = extract_config_value(c, "url", converter=to_str)
+        if not url or not url.strip():
+            return False
+
+        return url.startswith("http://") or url.startswith("https://")
+
+    def generate_instance_id(c: dict[str, Any], t: str) -> str:
+        """Generate instance ID from url."""
+        url = extract_config_value(c, "url", converter=to_str)
+        if url:
+            # Generate hash from URL (same instance for same URL)
+            url_hash = hashlib.md5(url.encode()).hexdigest()[:8]
+            return f"{t}-{url_hash}"
+        # Fallback ID if URL not available
+        return f"{t}-instance"
+
+    manager_config = InstanceManagerConfig(
+        type_id="iframe",
+        single_instance=False,  # Multi-instance plugin
+        normalize_config=normalize_config,
+        validate_config=validate_config,
+        generate_instance_id=generate_instance_id,
+        default_instance_name="Iframe Service",
+    )
+
+    return await handle_plugin_config_update_generic(
+        type_id, config, enabled, db_type, session, manager_config
     )
