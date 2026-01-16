@@ -773,8 +773,12 @@ onUnmounted(() => {
 .secondary-section {
   min-width: 0; /* Important for flex children */
   min-height: 0;
+  width: 100%; /* Explicitly set width to 100% */
+  max-width: 100%; /* Ensure it doesn't exceed container */
   border-radius: 8px;
   overflow: hidden;
+  display: flex;
+  flex-direction: column;
 }
 
 .dashboard:not(:has(.dashboard-header)) .secondary-section {
