@@ -1,6 +1,6 @@
 <template>
   <div class="services-tab">
-    <div class="ordering-container" :class="{ loading: updatingOrder }">
+    <div class="ordering-container">
       <OrderingManager
         type="service"
         :plugins="servicePlugins"
@@ -10,22 +10,14 @@
         @plugin-order-change="handleServicePluginOrderChange"
         @instance-order-change="handleServiceInstanceOrderChange"
       />
-      <div v-if="updatingOrder" class="loading-overlay">
-        <div class="loading-spinner">
-          <div class="spinner" />
-          <div class="loading-text">Updating order...</div>
-        </div>
-      </div>
     </div>
   </div>
 </template>
 
 <script setup>
-import { computed, onMounted, ref } from "vue";
+import { computed, onMounted } from "vue";
 import { usePlugins } from "@/composables";
 import OrderingManager from "../../specialized/OrderingManager.vue";
-
-const updatingOrder = ref(false);
 
 const {
   plugins,
@@ -78,22 +70,42 @@ const getInstanceSummary = (_pluginId, _config) => {
 };
 
 const handleServicePluginOrderChange = async (newOrder) => {
-  updatingOrder.value = true;
-  try {
-    // Update plugin order for all plugins
-    // updatePluginOrder already updates local state, so no reload needed
-    for (let i = 0; i < newOrder.length; i++) {
-      await updatePluginOrder(newOrder[i].id, i);
+  // Update local state optimistically first for instant feedback
+  for (let i = 0; i < newOrder.length; i++) {
+    const plugin = newOrder[i];
+    if (plugin && plugin.id) {
+      pluginDisplayOrders.value[plugin.id] = i;
     }
-    // Brief delay for visual feedback, but keep it short
-    await new Promise((resolve) => setTimeout(resolve, 100));
+  }
+
+  // Update backend in parallel (fire and forget - errors are handled silently)
+  try {
+    const updatePromises = [];
+    for (let i = 0; i < newOrder.length; i++) {
+      const plugin = newOrder[i];
+      if (!plugin || !plugin.id) {
+        continue;
+      }
+      updatePromises.push(
+        updatePluginOrder(plugin.id, i).catch((error) => {
+          console.error(
+            `[ServicesTab] Failed to update order for ${plugin.id}:`,
+            error,
+          );
+          // Restore previous order on error
+          return loadPlugins().catch(() => {});
+        }),
+      );
+    }
+
+    // Wait for all updates to complete (in background, no blocking)
+    Promise.all(updatePromises).catch(() => {
+      // Silent error handling - already logged above
+    });
   } catch (error) {
     console.error("Failed to update plugin order:", error);
-    // Reload to restore correct state on error
+    // Restore state on critical error
     await loadPlugins();
-    throw error;
-  } finally {
-    updatingOrder.value = false;
   }
 };
 

@@ -95,6 +95,11 @@ export function usePlugins() {
             continue;
           }
 
+          // Get display_order from plugin's common_config_schema first (from plugin list)
+          // This is the source of truth and avoids needing to fetch config separately
+          const pluginSchema = plugin.common_config_schema || {};
+          let displayOrder = pluginSchema.display_order;
+
           const [instancesResponse, configResponse] = await Promise.all([
             pluginsApi
               .getPluginInstances(plugin.id)
@@ -105,18 +110,32 @@ export function usePlugins() {
           pluginInstances.value[plugin.id] = instancesResponse.instances || [];
           pluginConfigs.value[plugin.id] = configResponse.config || {};
 
-          // Load display orders from config
+          // Load display orders from config (fallback to config API if not in schema)
           const config = configResponse.config || {};
+          // Use config API value only if schema doesn't have it
+          if (displayOrder === undefined || displayOrder === null) {
+            displayOrder = config.display_order;
+          }
+
+          // Handle display_order being an object (from schema with type/description)
+          if (typeof displayOrder === "object" && displayOrder !== null) {
+            displayOrder = displayOrder.value || displayOrder.default || "0";
+          }
+
+          // Parse and set display order
+          let parsedOrder = parseInt(String(displayOrder || "0"), 10);
+          // Handle NaN case
+          if (isNaN(parsedOrder)) {
+            console.warn(
+              `[usePlugins] Invalid display_order for ${plugin.id}: ${displayOrder}, defaulting to 0`,
+            );
+            parsedOrder = 0;
+          }
+
           if (plugin.type === "service") {
-            pluginDisplayOrders.value[plugin.id] = parseInt(
-              config.display_order || "0",
-              10,
-            );
+            pluginDisplayOrders.value[plugin.id] = parsedOrder;
           } else if (plugin.type === "image") {
-            imagePluginDisplayOrders.value[plugin.id] = parseInt(
-              config.display_order || "0",
-              10,
-            );
+            imagePluginDisplayOrders.value[plugin.id] = parsedOrder;
           }
         } catch (error) {
           console.error(`Failed to load data for plugin ${plugin.id}:`, error);

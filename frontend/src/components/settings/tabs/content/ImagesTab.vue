@@ -1,6 +1,6 @@
 <template>
   <div class="images-tab">
-    <div class="ordering-container" :class="{ loading: updatingOrder }">
+    <div class="ordering-container">
       <OrderingManager
         type="image"
         :plugins="imagePlugins"
@@ -10,22 +10,14 @@
         @plugin-order-change="handleImagePluginOrderChange"
         @instance-order-change="handleImageInstanceOrderChange"
       />
-      <div v-if="updatingOrder" class="loading-overlay">
-        <div class="loading-spinner">
-          <div class="spinner" />
-          <div class="loading-text">Updating order...</div>
-        </div>
-      </div>
     </div>
   </div>
 </template>
 
 <script setup>
-import { computed, onMounted, ref } from "vue";
+import { computed, onMounted } from "vue";
 import { usePlugins } from "@/composables";
 import OrderingManager from "../../specialized/OrderingManager.vue";
-
-const updatingOrder = ref(false);
 
 const {
   plugins,
@@ -47,7 +39,7 @@ onMounted(async () => {
 const imagePlugins = computed(() => {
   const filtered = plugins.value.filter((p) => p.type === "image" && p.enabled);
   // Sort by display order
-  return filtered.sort((a, b) => {
+  return [...filtered].sort((a, b) => {
     const orderA = imagePluginDisplayOrders.value[a.id] ?? 0;
     const orderB = imagePluginDisplayOrders.value[b.id] ?? 0;
     return orderA - orderB;
@@ -74,22 +66,42 @@ const getInstanceSummary = (_pluginId, _config) => {
 };
 
 const handleImagePluginOrderChange = async (newOrder) => {
-  updatingOrder.value = true;
-  try {
-    // Update plugin order for all plugins
-    // updateImagePluginOrder already updates local state, so no reload needed
-    for (let i = 0; i < newOrder.length; i++) {
-      await updateImagePluginOrder(newOrder[i].id, i);
+  // Update local state optimistically first for instant feedback
+  for (let i = 0; i < newOrder.length; i++) {
+    const plugin = newOrder[i];
+    if (plugin && plugin.id) {
+      imagePluginDisplayOrders.value[plugin.id] = i;
     }
-    // Brief delay for visual feedback, but keep it short
-    await new Promise((resolve) => setTimeout(resolve, 100));
+  }
+
+  // Update backend in parallel (fire and forget - errors are handled silently)
+  try {
+    const updatePromises = [];
+    for (let i = 0; i < newOrder.length; i++) {
+      const plugin = newOrder[i];
+      if (!plugin || !plugin.id) {
+        continue;
+      }
+      updatePromises.push(
+        updateImagePluginOrder(plugin.id, i).catch((error) => {
+          console.error(
+            `[ImagesTab] Failed to update order for ${plugin.id}:`,
+            error,
+          );
+          // Restore previous order on error
+          return loadPlugins().catch(() => {});
+        }),
+      );
+    }
+
+    // Wait for all updates to complete (in background, no blocking)
+    Promise.all(updatePromises).catch(() => {
+      // Silent error handling - already logged above
+    });
   } catch (error) {
     console.error("Failed to update plugin order:", error);
-    // Reload to restore correct state on error
+    // Restore state on critical error
     await loadPlugins();
-    throw error;
-  } finally {
-    updatingOrder.value = false;
   }
 };
 
