@@ -39,6 +39,7 @@ class PluginRegistry:
         name: str,
         config: dict[str, Any],
         enabled: bool = False,
+        session: Any = None,
     ) -> Any:
         """
         Register a new plugin instance.
@@ -49,11 +50,12 @@ class PluginRegistry:
             name: Human-readable name
             config: Plugin configuration dictionary
             enabled: Whether the plugin is enabled
+            session: Optional database session. If provided, uses it and doesn't commit.
 
         Returns:
             Registered plugin instance
         """
-        return await register_plugin(plugin_id, type_id, name, config, enabled)
+        return await register_plugin(plugin_id, type_id, name, config, enabled, session)
 
     async def unregister_plugin(self, plugin_id: str) -> bool:
         """

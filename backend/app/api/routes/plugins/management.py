@@ -102,6 +102,15 @@ async def get_plugins(
             enabled = db_type.enabled if db_type else True  # Default to enabled
             error_message = db_type.error_message if db_type else None
 
+            # Merge plugin metadata common_config_schema with database common_config_schema
+            # This ensures user-set values (like display_order) are preserved
+            metadata_schema = type_info.get("common_config_schema", {}) or {}
+            db_schema = (
+                db_type.common_config_schema if db_type and db_type.common_config_schema else {}
+            )
+            # Merge: db_schema (user-set values) overrides metadata_schema (defaults)
+            merged_schema = {**metadata_schema, **db_schema}
+
             plugin_info: dict[str, Any] = {
                 "id": type_id,
                 "name": type_info.get("name", ""),
@@ -109,7 +118,8 @@ async def get_plugins(
                 if hasattr(plugin_type_enum, "value")
                 else str(plugin_type_enum),
                 "description": type_info.get("description", ""),
-                "config_schema": type_info.get("common_config_schema", {}),
+                "config_schema": merged_schema,  # Legacy name
+                "common_config_schema": merged_schema,  # Also send as common_config_schema for frontend
                 "instance_config_schema": type_info.get("instance_config_schema", {}),
                 "enabled": enabled,
                 "ui_actions": type_info.get("ui_actions", []),  # Plugin-specific actions (buttons)
@@ -460,6 +470,13 @@ async def get_plugin(plugin_id: str):
     enabled = db_type.enabled if db_type else True
     error_message = db_type.error_message if db_type else None
 
+    # Merge plugin metadata common_config_schema with database common_config_schema
+    # This ensures user-set values (like display_order) are preserved
+    metadata_schema = type_info.get("common_config_schema", {}) or {}
+    db_schema = db_type.common_config_schema if db_type and db_type.common_config_schema else {}
+    # Merge: db_schema (user-set values) overrides metadata_schema (defaults)
+    merged_schema = {**metadata_schema, **db_schema}
+
     plugin_info: dict[str, Any] = {
         "id": type_info.get("type_id"),
         "name": type_info.get("name", ""),
@@ -467,7 +484,7 @@ async def get_plugin(plugin_id: str):
         if hasattr(type_info.get("plugin_type"), "value")
         else str(type_info.get("plugin_type")),
         "description": type_info.get("description", ""),
-        "config_schema": type_info.get("common_config_schema", {}),
+        "config_schema": merged_schema,
         "display_schema": type_info.get(
             "display_schema"
         ),  # Include display_schema for frontend components

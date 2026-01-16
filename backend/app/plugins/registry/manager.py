@@ -19,6 +19,7 @@ async def register_plugin(
     name: str,
     config: dict[str, Any],
     enabled: bool = False,  # Default to disabled - user must explicitly enable
+    session: Any = None,  # Optional session to use instead of creating a new one
 ) -> Any:
     """
     Register a new plugin instance.
@@ -29,6 +30,8 @@ async def register_plugin(
         name: Human-readable name
         config: Plugin configuration dictionary
         enabled: Whether the plugin is enabled
+        session: Optional database session. If provided, uses it and doesn't commit.
+                 If None, creates a new session and commits.
 
     Returns:
         Registered plugin instance
@@ -69,7 +72,8 @@ async def register_plugin(
     await instance_manager.register(plugin)
 
     # Save to database
-    async with AsyncSessionLocal() as session:
+    if session is not None:
+        # Use provided session - don't commit, let caller handle it
         # Get plugin type to determine plugin_type
         result = await session.execute(select(PluginTypeDB).where(PluginTypeDB.type_id == type_id))
         db_type = result.scalar_one_or_none()
@@ -84,8 +88,28 @@ async def register_plugin(
             config=config,
         )
         session.add(db_plugin)
-        await session.commit()
-        await session.refresh(db_plugin)
+        # Don't commit - let the caller commit
+    else:
+        # Create new session and commit (backward compatibility)
+        async with AsyncSessionLocal() as new_session:
+            # Get plugin type to determine plugin_type
+            result = await new_session.execute(
+                select(PluginTypeDB).where(PluginTypeDB.type_id == type_id)
+            )
+            db_type = result.scalar_one_or_none()
+            plugin_type = db_type.plugin_type if db_type else "unknown"
+
+            db_plugin = PluginDB(
+                id=plugin_id,
+                type_id=type_id,
+                plugin_type=plugin_type,
+                name=name,
+                enabled=enabled,
+                config=config,
+            )
+            new_session.add(db_plugin)
+            await new_session.commit()
+            await new_session.refresh(db_plugin)
 
     # Initialize plugin
     await plugin.initialize()
