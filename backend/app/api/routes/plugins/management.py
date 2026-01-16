@@ -613,6 +613,13 @@ async def update_plugin(plugin_id: str, config: dict[str, Any]):
         if not db_type:
             # Create new plugin type in database
             plugin_type = type_info.get("plugin_type")
+            # Merge metadata schema with config (config takes precedence)
+            metadata_schema = type_info.get("common_config_schema", {}) or {}
+            initial_schema = {**metadata_schema, **config} if config else metadata_schema
+            logger.debug(
+                f"Creating new plugin type {plugin_id} with schema: {initial_schema}, "
+                f"config={config}, metadata_schema={metadata_schema}"
+            )
             db_type = PluginTypeDB(
                 type_id=plugin_id,
                 plugin_type=plugin_type.value
@@ -621,7 +628,7 @@ async def update_plugin(plugin_id: str, config: dict[str, Any]):
                 name=type_info.get("name", ""),
                 description=type_info.get("description", ""),
                 version=type_info.get("version"),
-                common_config_schema=type_info.get("common_config_schema", {}),
+                common_config_schema=initial_schema,
                 enabled=enabled if enabled is not None else True,
             )
             session.add(db_type)
@@ -631,8 +638,13 @@ async def update_plugin(plugin_id: str, config: dict[str, Any]):
                 db_type.enabled = enabled
             if config:
                 current_schema = db_type.common_config_schema or {}
-                current_schema.update(config)
-                db_type.common_config_schema = current_schema
+                # Create a new dict to ensure SQLAlchemy detects the change
+                updated_schema = {**current_schema, **config}
+                db_type.common_config_schema = updated_schema
+                logger.debug(
+                    f"Updated plugin {plugin_id} common_config_schema: "
+                    f"old={current_schema}, new={updated_schema}, config={config}"
+                )
 
         # Save common config to config service for backward compatibility
         if config:

@@ -70,7 +70,17 @@ async def load_plugin_types() -> None:
                     db_type.name = name
                     db_type.description = type_info.get("description")
                     db_type.version = type_info.get("version")
-                    db_type.common_config_schema = type_info.get("common_config_schema", {})
+
+                    # Merge plugin metadata schema with existing database schema
+                    # This preserves user-set values (like display_order) while updating
+                    # with new schema from plugin metadata
+                    metadata_schema = type_info.get("common_config_schema", {}) or {}
+                    existing_schema = db_type.common_config_schema or {}
+                    # Merge: existing schema takes precedence (preserves user-set values),
+                    # but metadata schema can add new fields
+                    merged_schema = {**metadata_schema, **existing_schema}
+                    db_type.common_config_schema = merged_schema
+
                     db_type.plugin_type = plugin_type_value
                     # Clear error message on successful load
                     db_type.error_message = None
