@@ -63,6 +63,18 @@ export const useImagesStore = defineStore("images", () => {
 
   const getCurrentImageUrl = computed(() => {
     if (!currentImage.value) return null;
+
+    // For remote images (like Picsum, Unsplash), use the URL directly
+    // This avoids unnecessary backend redirects and improves performance
+    const imageUrl = currentImage.value.url || currentImage.value.raw_url;
+    if (
+      imageUrl &&
+      (imageUrl.startsWith("http://") || imageUrl.startsWith("https://"))
+    ) {
+      return imageUrl;
+    }
+
+    // For local images, use the API endpoint
     return `/api/images/${currentImage.value.id}`;
   });
 

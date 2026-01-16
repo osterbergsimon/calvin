@@ -152,11 +152,55 @@ describe("Images Store", () => {
   });
 
   describe("getCurrentImageUrl", () => {
-    it("should return image URL when current image exists", () => {
+    it("should return API URL for local images (no URL field)", () => {
       const store = useImagesStore();
-      store.currentImage = { id: "1", filename: "image.jpg" };
+      store.currentImage = {
+        id: "1",
+        filename: "image.jpg",
+        path: "/images/image.jpg",
+      };
 
       expect(store.getCurrentImageUrl).toBe("/api/images/1");
+    });
+
+    it("should return direct URL for remote images (has URL field)", () => {
+      const store = useImagesStore();
+      store.currentImage = {
+        id: "1",
+        filename: "image.jpg",
+        url: "https://picsum.photos/id/123/800/600",
+      };
+
+      expect(store.getCurrentImageUrl).toBe(
+        "https://picsum.photos/id/123/800/600",
+      );
+    });
+
+    it("should prefer url over raw_url for remote images", () => {
+      const store = useImagesStore();
+      store.currentImage = {
+        id: "1",
+        filename: "image.jpg",
+        url: "https://picsum.photos/id/123/800/600",
+        raw_url: "https://picsum.photos/id/123/1920/1080",
+      };
+
+      expect(store.getCurrentImageUrl).toBe(
+        "https://picsum.photos/id/123/800/600",
+      );
+    });
+
+    it("should use raw_url if url is not available", () => {
+      const store = useImagesStore();
+      store.currentImage = {
+        id: "1",
+        filename: "image.jpg",
+        raw_url: "https://picsum.photos/id/123/1920/1080",
+      };
+
+      expect(store.getCurrentImageUrl).toBe(
+        "https://picsum.photos/id/123/1920/1080",
+      );
     });
 
     it("should return null when no current image", () => {

@@ -2,8 +2,26 @@
   <div class="photo-slideshow" :class="{ fullscreen: isFullscreen }">
     <div v-if="!isFullscreen && showHeader" class="slideshow-header">
       <h2>Photos</h2>
-      <div v-if="imagesStore.error" class="error-message">
-        {{ imagesStore.error }}
+      <div class="slideshow-controls">
+        <div v-if="imagesStore.error" class="error-message">
+          {{ imagesStore.error }}
+        </div>
+        <button
+          v-if="imagesStore.images.length > 1"
+          class="btn-icon"
+          title="Previous image"
+          @click="imagesStore.previousImage"
+        >
+          ‹
+        </button>
+        <button
+          v-if="imagesStore.images.length > 1"
+          class="btn-icon"
+          title="Next image"
+          @click="imagesStore.nextImage"
+        >
+          ›
+        </button>
       </div>
     </div>
     <div class="slideshow-content">
@@ -174,12 +192,16 @@ watch(
 <style scoped>
 .photo-slideshow {
   width: 100%;
+  max-width: 100%;
   height: 100%;
   display: flex;
   flex-direction: column;
   background: #000;
   border-radius: 8px;
   overflow: hidden;
+  min-height: 0;
+  min-width: 0;
+  box-sizing: border-box;
 }
 
 .photo-slideshow.fullscreen {
@@ -193,23 +215,63 @@ watch(
 }
 
 .slideshow-header {
-  padding: 0.75rem 1rem;
-  background: rgba(0, 0, 0, 0.7);
-  border-bottom: 1px solid rgba(255, 255, 255, 0.1);
+  padding: 1.4rem;
+  background: var(--bg-secondary);
+  border-bottom: 1px solid var(--border-color);
   display: flex;
   justify-content: space-between;
   align-items: center;
+  flex-shrink: 0;
+}
+
+.slideshow-controls {
+  display: flex;
+  align-items: center;
+  gap: 1rem;
 }
 
 .slideshow-header h2 {
   margin: 0;
-  font-size: 1.2rem;
-  color: #fff; /* Keep white for contrast on dark photo background */
+  font-size: 1.5rem;
+  color: var(--text-primary);
+}
+
+.btn-icon {
+  background: var(--bg-primary);
+  border: 1px solid var(--border-color);
+  border-radius: 4px;
+  width: 32px;
+  height: 32px;
+  font-size: 1.5rem;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: var(--text-primary);
+  transition: all 0.2s;
+}
+
+.btn-icon:hover {
+  background: var(--bg-secondary);
+  border-color: var(--text-secondary);
+}
+
+.btn-icon:active {
+  background: var(--bg-tertiary);
+}
+
+.btn-icon:focus {
+  outline: 2px solid var(--accent-primary);
+  outline-offset: 2px;
 }
 
 .error-message {
   color: var(--accent-error);
   font-size: 0.9rem;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  align-items: center;
 }
 
 .slideshow-content {
