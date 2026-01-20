@@ -7,13 +7,13 @@ import time
 from collections.abc import AsyncGenerator, Generator
 from pathlib import Path
 
+import databases
 import pytest
 import pytest_asyncio
 from fastapi.testclient import TestClient
-from sqlalchemy.ext.asyncio import AsyncEngine, AsyncSession, create_async_engine
-from sqlalchemy.orm import sessionmaker
+from sqlalchemy import create_engine
 
-from app.database import Base
+from app.database import metadata
 from app.models.db_models import (  # noqa: F401
     ConfigDB,
     KeyboardMappingDB,
@@ -23,7 +23,7 @@ from app.models.db_models import (  # noqa: F401
 
 logger = logging.getLogger(__name__)
 
-# Import all models to ensure they're registered in Base.metadata
+# Import all models to ensure they're registered in metadata
 # This must be done at module level, before any fixtures run
 
 
@@ -71,28 +71,27 @@ def temp_db_path_for_integration() -> Generator[Path, None, None]:
 
 
 @pytest_asyncio.fixture
-async def test_engine(temp_db_path: Path) -> AsyncGenerator[AsyncEngine, None]:
-    """Create a test database engine."""
+async def test_database(temp_db_path: Path) -> AsyncGenerator[databases.Database, None]:
+    """Create a test database connection."""
     # CRITICAL: Models are already imported at module level (lines 17-22),
-    # so they're registered with Base.metadata. No need to re-import here.
-    # Per StackOverflow advice, models must be imported before create_all():
-    # https://stackoverflow.com/questions/44941757/sqlalchemy-exc-operationalerror-sqlite3-operationalerror-no-such-table
+    # so they're registered with metadata. No need to re-import here.
 
     test_db_url = f"sqlite+aiosqlite:///{temp_db_path}"
-    engine = create_async_engine(test_db_url, echo=False)
+    test_db = databases.Database(test_db_url)
 
-    # Debug: Log what tables are registered in Base.metadata
-    registered_tables = list(Base.metadata.tables.keys())
-    print(f"[test_engine] Creating tables in {temp_db_path}")
-    print(f"[test_engine] Registered tables in Base.metadata: {registered_tables}")
+    # Connect to database
+    await test_db.connect()
 
-    # Create all tables
-    async with engine.begin() as conn:
+    # Debug: Log what tables are registered in metadata
+    registered_tables = list(metadata.tables.keys())
+    print(f"[test_database] Creating tables in {temp_db_path}")
+    print(f"[test_database] Registered tables in metadata: {registered_tables}")
 
-        def create_all_tables(sync_conn):
-            Base.metadata.create_all(bind=sync_conn)
-
-        await conn.run_sync(create_all_tables)
+    # Create all tables using sync engine
+    sync_url = f"sqlite:///{temp_db_path}"
+    sync_engine = create_engine(sync_url, echo=False)
+    metadata.create_all(sync_engine)
+    sync_engine.dispose()
 
     # Verify tables were actually created
     import sqlite3
@@ -109,71 +108,67 @@ async def test_engine(temp_db_path: Path) -> AsyncGenerator[AsyncEngine, None]:
 
         if missing_tables:
             error_msg = (
-                f"[test_engine] Tables NOT created in {temp_db_path}! "
+                f"[test_database] Tables NOT created in {temp_db_path}! "
                 f"Missing: {missing_tables}. Created: {sorted(created_tables)}. "
-                f"Registered in Base.metadata: {registered_tables}"
+                f"Registered in metadata: {registered_tables}"
             )
             print(f"ERROR: {error_msg}")
             raise RuntimeError(error_msg)
         else:
-            print(f"[test_engine] Successfully created tables: {sorted(created_tables)}")
+            print(f"[test_database] Successfully created tables: {sorted(created_tables)}")
     except Exception as e:
-        print(f"[test_engine] ERROR verifying tables in {temp_db_path}: {e}")
+        print(f"[test_database] ERROR verifying tables in {temp_db_path}: {e}")
         raise
 
-    yield engine
+    yield test_db
 
     # Cleanup
-    await engine.dispose()
+    await test_db.disconnect()
 
 
 @pytest_asyncio.fixture
-async def test_db(test_engine: AsyncEngine) -> AsyncGenerator[AsyncSession, None]:
-    """Create a test database session."""
-    # Patch AsyncSessionLocal for unit tests so plugin_registry uses the test database
+async def test_db(test_database: databases.Database) -> AsyncGenerator[databases.Database, None]:
+    """Create a test database connection (for backward compatibility with tests)."""
+    # Patch database for unit tests so plugin_registry uses the test database
     import app.database as db_module
 
-    original_session_factory = db_module.AsyncSessionLocal
+    original_database = db_module.database
 
-    # Create session factory for this test database
-    # Use the same factory so all sessions share the same engine/connection pool
-    async_session_factory = sessionmaker(test_engine, class_=AsyncSession, expire_on_commit=False)
-    db_module.AsyncSessionLocal = async_session_factory
+    # Patch database connection
+    db_module.database = test_database
 
     try:
-        # Reload service modules that use AsyncSessionLocal
-        # IMPORTANT: Must reload AFTER patching AsyncSessionLocal so services get the new reference
+        # Reload service modules that use database
+        # IMPORTANT: Must reload AFTER patching database so services get the new reference
         import importlib
         import sys
 
         service_modules = [
-            "app.services.config_service",  # Uses AsyncSessionLocal at module level
-            "app.services.keyboard_mapping_service",  # Uses AsyncSessionLocal at module level
+            "app.services.config_service",
+            "app.services.keyboard_mapping_service",
         ]
         for module_name in service_modules:
             if module_name in sys.modules:
                 importlib.reload(sys.modules[module_name])
 
-        # Also reload plugin_registry modules so they use the patched AsyncSessionLocal
+        # Also reload plugin_registry modules so they use the patched database
         # This ensures plugin_registry operations use the test database
         # Note: We don't restore plugin_registry here because integration tests
         # (using test_client) will reload it with their own database setup
         registry_modules = [
             "app.plugins.registry",
-            "app.plugins.registry.loader",  # Must reload to use patched AsyncSessionLocal
-            "app.plugins.registry.manager",  # Must reload to use patched AsyncSessionLocal
+            "app.plugins.registry.loader",
+            "app.plugins.registry.manager",
         ]
         for module_name in registry_modules:
             if module_name in sys.modules:
                 importlib.reload(sys.modules[module_name])
 
-        async_session = sessionmaker(test_engine, class_=AsyncSession, expire_on_commit=False)
-        async with async_session() as session:
-            yield session
+        yield test_database
     finally:
-        # Restore original session factory
+        # Restore original database connection
         # Don't reload plugin_registry here - let test_client handle it for integration tests
-        db_module.AsyncSessionLocal = original_session_factory
+        db_module.database = original_database
 
 
 @pytest.fixture
@@ -189,10 +184,8 @@ def test_client(
     import asyncio
     import os
 
-    from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker, create_async_engine
-
     import app.config
-    from app.database import Base
+    from app.database import metadata
 
     # Set IMAGE_DIR environment variable before plugins are loaded
     original_image_dir = os.environ.get("IMAGE_DIR")
@@ -203,41 +196,32 @@ def test_client(
     test_db_path_abs = temp_db_path_for_integration.resolve()
     app.config.settings.database_url = f"sqlite:///{test_db_path_abs}"
 
-    # Create engine for fresh test database
+    # Create database connection for fresh test database
     test_db_url = f"sqlite+aiosqlite:///{test_db_path_abs}"
-    test_engine = create_async_engine(test_db_url, echo=False, future=True)
-    test_session_factory = async_sessionmaker(
-        test_engine,
-        class_=AsyncSession,
-        expire_on_commit=False,
-    )
+    test_database = databases.Database(test_db_url)
 
-    # Setup: Create all tables using Base.metadata.create_all()
+    # Setup: Create all tables using metadata.create_all()
     # This is simpler and faster than running migrations for tests
     # All tables are defined in models, so this is sufficient
     # CRITICAL: Models are already imported at module level (lines 17-22),
-    # so they're registered with Base.metadata. No need to re-import here.
-    # Per StackOverflow advice, models must be imported before create_all():
-    # https://stackoverflow.com/questions/44941757/sqlalchemy-exc-operationalerror-sqlite3-operationalerror-no-such-table
+    # so they're registered with metadata. No need to re-import here.
 
-    # Debug: Log what tables are registered in Base.metadata
-    registered_tables = list(Base.metadata.tables.keys())
+    # Debug: Log what tables are registered in metadata
+    registered_tables = list(metadata.tables.keys())
     print(f"[test_client] Creating tables in {test_db_path_abs}")
-    print(f"[test_client] Registered tables in Base.metadata: {registered_tables}")
+    print(f"[test_client] Registered tables in metadata: {registered_tables}")
 
+    # Create tables using sync engine
+    sync_url = f"sqlite:///{test_db_path_abs}"
+    sync_engine = create_engine(sync_url, echo=False)
+    metadata.create_all(sync_engine)
+    sync_engine.dispose()
+
+    # Connect to database
     loop = asyncio.new_event_loop()
     asyncio.set_event_loop(loop)
     try:
-
-        async def create_tables():
-            async with test_engine.begin() as conn:
-
-                def create_all_tables(sync_conn):
-                    Base.metadata.create_all(bind=sync_conn)
-
-                await conn.run_sync(create_all_tables)
-
-        loop.run_until_complete(create_tables())
+        loop.run_until_complete(test_database.connect())
     finally:
         loop.close()
 
@@ -258,7 +242,7 @@ def test_client(
             error_msg = (
                 f"[test_client] Tables NOT created in {test_db_path_abs}! "
                 f"Missing: {missing_tables}. Created: {sorted(created_tables)}. "
-                f"Registered in Base.metadata: {registered_tables}"
+                f"Registered in metadata: {registered_tables}"
             )
             print(f"ERROR: {error_msg}")
             raise RuntimeError(error_msg)
@@ -268,52 +252,49 @@ def test_client(
         print(f"[test_client] ERROR verifying tables in {test_db_path_abs}: {e}")
         raise
 
-    # Patch the database module to use our test engine
-    # IMPORTANT: Do this BEFORE importing any routes,
-    # as they import AsyncSessionLocal at module level
+    # Patch the database module to use our test database
+    # IMPORTANT: Do this BEFORE importing any routes
     import app.database as db_module
 
-    original_engine = db_module.engine
-    original_session_factory = db_module.AsyncSessionLocal
+    original_database = db_module.database
 
-    db_module.engine = test_engine
-    db_module.AsyncSessionLocal = test_session_factory
+    db_module.database = test_database
 
     # CRITICAL: Reload modules AFTER patching database, not before
-    # This ensures all modules use the NEW patched AsyncSessionLocal
-    # If we reload before patching, modules will import the OLD AsyncSessionLocal
+    # This ensures all modules use the NEW patched database
+    # If we reload before patching, modules will import the OLD database
     import importlib
     import sys
 
-    # Reload service modules that use AsyncSessionLocal
-    # IMPORTANT: Must reload BEFORE routes so routes get services with new AsyncSessionLocal
+    # Reload service modules that use database
+    # IMPORTANT: Must reload BEFORE routes so routes get services with new database
     service_modules = [
-        "app.services.config_service",  # Uses AsyncSessionLocal at module level
-        "app.services.keyboard_mapping_service",  # Uses AsyncSessionLocal at module level
-        "app.services.plugin_calendar_service",  # Uses AsyncSessionLocal
-        "app.services.plugin_image_service",  # Uses AsyncSessionLocal
+        "app.services.config_service",
+        "app.services.keyboard_mapping_service",
+        "app.services.plugin_calendar_service",
+        "app.services.plugin_image_service",
     ]
     for module_name in service_modules:
         if module_name in sys.modules:
             importlib.reload(sys.modules[module_name])
 
-    # Reload plugin_registry modules so they use the patched AsyncSessionLocal
+    # Reload plugin_registry modules so they use the patched database
     registry_modules = [
         "app.plugins.registry",
-        "app.plugins.registry.loader",  # Must reload loader to use patched AsyncSessionLocal
-        "app.plugins.registry.manager",  # Must reload manager to use patched AsyncSessionLocal
+        "app.plugins.registry.loader",
+        "app.plugins.registry.manager",
     ]
     for module_name in registry_modules:
         if module_name in sys.modules:
             importlib.reload(sys.modules[module_name])
 
-    # Reload routes modules that use AsyncSessionLocal
-    # IMPORTANT: Must reload AFTER patching database so they get the new session
+    # Reload routes modules that use database
+    # IMPORTANT: Must reload AFTER patching database so they get the new database
     routes_modules = [
         "app.api.routes.plugins",
-        "app.api.routes.plugins.management",  # Uses AsyncSessionLocal at line 420
-        "app.api.routes.plugins.instances",  # Uses AsyncSessionLocal for plugin instances
-        "app.api.routes.plugins.themes",  # Must reload themes to use patched AsyncSessionLocal
+        "app.api.routes.plugins.management",
+        "app.api.routes.plugins.instances",
+        "app.api.routes.plugins.themes",
         "app.api.routes.config",
         "app.api.routes.calendar",
         "app.api.routes.images",
@@ -326,7 +307,7 @@ def test_client(
             importlib.reload(sys.modules[module_name])
 
     # Add test data to the fresh database
-    # (tables already created via Base.metadata.create_all above)
+    # (tables already created via metadata.create_all above)
     import logging
 
     logger = logging.getLogger(__name__)
@@ -337,69 +318,74 @@ def test_client(
     try:
 
         async def add_test_data():
-            async with test_session_factory() as session:
-                from datetime import datetime
+            from datetime import datetime
 
-                # Add plugin types
-                plugin_types = [
-                    PluginTypeDB(
-                        type_id="local",
-                        plugin_type="image",
-                        name="Local Images",
-                        description="Load images from local directory",
-                        version="1.0.0",
-                        enabled=True,
-                        created_at=datetime.utcnow(),
-                        updated_at=datetime.utcnow(),
-                    ),
-                    PluginTypeDB(
-                        type_id="ical",
-                        plugin_type="calendar",
-                        name="iCal",
-                        description="Load calendar from iCal URL",
-                        version="1.0.0",
-                        enabled=True,
-                        created_at=datetime.utcnow(),
-                        updated_at=datetime.utcnow(),
-                    ),
-                    PluginTypeDB(
-                        type_id="google",
-                        plugin_type="calendar",
-                        name="Google Calendar",
-                        description="Load calendar from Google Calendar API",
-                        version="1.0.0",
-                        enabled=True,
-                        created_at=datetime.utcnow(),
-                        updated_at=datetime.utcnow(),
-                    ),
-                    PluginTypeDB(
-                        type_id="weather",
-                        plugin_type="service",
-                        name="Weather",
-                        description="Weather service plugin",
-                        version="1.0.0",
-                        enabled=True,
-                        created_at=datetime.utcnow(),
-                        updated_at=datetime.utcnow(),
-                    ),
-                    PluginTypeDB(
-                        type_id="iframe",
-                        plugin_type="service",
-                        name="iFrame",
-                        description="iFrame service plugin",
-                        version="1.0.0",
-                        enabled=True,
-                        created_at=datetime.utcnow(),
-                        updated_at=datetime.utcnow(),
-                    ),
-                ]
+            # Patch database for test data creation
+            import app.database as db_module
 
-                for plugin_type in plugin_types:
-                    session.add(plugin_type)
+            original_db = db_module.database
+            db_module.database = test_database
 
-                # Add some default plugins
-                plugins = [
-                    PluginDB(
+            try:
+                import ormar
+
+                # Add plugin types (use get_or_create to avoid UNIQUE constraint errors)
+                async def get_or_create_plugin_type(
+                    type_id, plugin_type, name, description, version="1.0.0", enabled=True
+                ):
+                    """Get or create a plugin type."""
+                    try:
+                        existing = await PluginTypeDB.objects.get(type_id=type_id)
+                        return existing
+                    except ormar.NoMatch:
+                        return await PluginTypeDB.objects.create(
+                            type_id=type_id,
+                            plugin_type=plugin_type,
+                            name=name,
+                            description=description,
+                            version=version,
+                            enabled=enabled,
+                            created_at=datetime.utcnow(),
+                            updated_at=datetime.utcnow(),
+                        )
+
+                # Create plugin types (results not needed, just side effects)
+                await get_or_create_plugin_type(
+                    type_id="local",
+                    plugin_type="image",
+                    name="Local Images",
+                    description="Load images from local directory",
+                )
+                await get_or_create_plugin_type(
+                    type_id="ical",
+                    plugin_type="calendar",
+                    name="iCal",
+                    description="Load calendar from iCal URL",
+                )
+                await get_or_create_plugin_type(
+                    type_id="google",
+                    plugin_type="calendar",
+                    name="Google Calendar",
+                    description="Load calendar from Google Calendar API",
+                )
+                await get_or_create_plugin_type(
+                    type_id="weather",
+                    plugin_type="service",
+                    name="Weather",
+                    description="Weather service plugin",
+                )
+                await get_or_create_plugin_type(
+                    type_id="iframe",
+                    plugin_type="service",
+                    name="iFrame",
+                    description="iFrame service plugin",
+                )
+
+                # Add some default plugins (use get_or_create to avoid UNIQUE constraint errors)
+                try:
+                    await PluginDB.objects.get(id="local-images")
+                except ormar.NoMatch:
+                    await PluginDB.objects.create(
                         id="local-images",
                         type_id="local",
                         plugin_type="image",
@@ -408,41 +394,29 @@ def test_client(
                         display_order=0,
                         created_at=datetime.utcnow(),
                         updated_at=datetime.utcnow(),
-                    ),
-                ]
-
-                for plugin in plugins:
-                    session.add(plugin)
-
-                # Add some default config entries
-                config_entries = [
-                    ConfigDB(key="show_ui", value="true", value_type="bool"),
-                    ConfigDB(key="theme", value="default", value_type="string"),
-                ]
-
-                for config_entry in config_entries:
-                    session.add(config_entry)
-
-                # Add built-in themes to test database (same as migrations would do)
-                # Themes are plugin types with plugin_type='theme'
-                from app.api.routes.plugins.themes import BUILTIN_THEMES
-                from app.plugins.base import PluginType
-
-                for theme_id, theme_data in BUILTIN_THEMES.items():
-                    theme_type = PluginTypeDB(
-                        type_id=theme_id,
-                        plugin_type=PluginType.THEME.value,
-                        name=theme_data.get("name", theme_id),
-                        description=theme_data.get("description", ""),
-                        version=theme_data.get("version", "1.0.0"),
-                        enabled=True,
-                        created_at=datetime.utcnow(),
-                        updated_at=datetime.utcnow(),
                     )
-                    session.add(theme_type)
 
-                await session.commit()
+                # Add some default config entries (use get_or_create to avoid UNIQUE constraint errors)
+                async def get_or_create_config(key, value, value_type):
+                    """Get or create a config entry."""
+                    try:
+                        existing = await ConfigDB.objects.get(key=key)
+                        return existing
+                    except ormar.NoMatch:
+                        return await ConfigDB.objects.create(
+                            key=key, value=value, value_type=value_type
+                        )
+
+                await get_or_create_config(key="show_ui", value="true", value_type="bool")
+                await get_or_create_config(key="theme", value="default", value_type="string")
+
+                # Note: Themes are NOT stored in the database for fresh databases
+                # They are loaded from filesystem on-demand per ORMAR_MIGRATION_PLAN.md
+                # No theme plugin types need to be created here
+
                 logger.debug("Added test data (including themes) to test database")
+            finally:
+                db_module.database = original_db
 
         loop_data.run_until_complete(add_test_data())
     finally:
@@ -492,38 +466,43 @@ def test_client(
         # This is critical - without this, plugin instances exist in DB but aren't
         # registered in the plugin manager, causing "plugin not found" errors
         #
-        # IMPORTANT: Verify the session is using the correct database before loading
-        # The loader module was reloaded above, so it should use the patched AsyncSessionLocal
+        # IMPORTANT: Verify the database connection is using the correct database before loading
+        # The loader module was reloaded above, so it should use the patched database
         try:
-            # Quick verification that AsyncSessionLocal is using the test database
-            async def verify_session_db():
-                async with db_module.AsyncSessionLocal() as session:
-                    # Try a simple query to verify the database has tables
-                    from sqlalchemy import text
+            # Quick verification that database is using the test database
+            async def verify_database():
+                # Try a simple query to verify the database has tables
+                from app.models.db_models import PluginTypeDB
 
-                    result = await session.execute(
-                        text(
-                            "SELECT name FROM sqlite_master "
-                            "WHERE type='table' AND name='plugin_types'"
-                        )
+                # Try to query plugin_types table
+                count = await PluginTypeDB.objects.count()
+                if count == 0:
+                    # Check if table exists at least
+                    import sqlite3
+
+                    conn = sqlite3.connect(str(test_db_path_abs))
+                    cursor = conn.cursor()
+                    cursor.execute(
+                        "SELECT name FROM sqlite_master WHERE type='table' AND name='plugin_types'"
                     )
-                    row = result.fetchone()
+                    row = cursor.fetchone()
+                    conn.close()
                     if not row:
                         raise RuntimeError(
-                            f"Session is not using the correct database! "
+                            f"Database is not using the correct database! "
                             f"Expected plugin_types table in {test_db_path_abs}"
                         )
 
-            loop.run_until_complete(verify_session_db())
+            loop.run_until_complete(verify_database())
         except Exception as e:
-            logger.error(f"Session verification failed before load_plugin_instances(): {e}")
+            logger.error(f"Database verification failed before load_plugin_instances(): {e}")
             raise
 
         loop.run_until_complete(load_plugin_instances())
 
         # Themes are already in the base database, so we don't need to sync them
         # This avoids the "no such table" errors from sync_themes_to_db() using
-        # the wrong AsyncSessionLocal reference
+        # the wrong database reference
     finally:
         loop.close()
 
@@ -532,7 +511,7 @@ def test_client(
     # Create a test app without the complex lifespan
     # This avoids startup issues in tests
     # Note: plugin_registry and routes were already reloaded above (before database init)
-    # so they're already using the patched AsyncSessionLocal
+    # so they're already using the patched database
 
     from fastapi import FastAPI
     from fastapi.middleware.cors import CORSMiddleware
@@ -648,21 +627,20 @@ def test_client(
         except Exception:
             pass  # Ignore errors during cleanup
 
-    # Cleanup: dispose test engine and restore original database
+    # Cleanup: disconnect test database and restore original database
     try:
         loop = asyncio.new_event_loop()
         asyncio.set_event_loop(loop)
         try:
-            loop.run_until_complete(test_engine.dispose())
+            loop.run_until_complete(test_database.disconnect())
         finally:
             loop.close()
     except Exception:
         pass
 
-    # Restore original database URL and engine
+    # Restore original database URL and database connection
     app.config.settings.database_url = original_db_url
-    db_module.engine = original_engine
-    db_module.AsyncSessionLocal = original_session_factory
+    db_module.database = original_database
 
     # Restore original IMAGE_DIR environment variable
     if original_image_dir is None:

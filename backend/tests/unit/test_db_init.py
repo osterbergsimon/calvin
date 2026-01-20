@@ -4,8 +4,6 @@ import tempfile
 from pathlib import Path
 
 import pytest
-from sqlalchemy import select
-from sqlalchemy.ext.asyncio import create_async_engine
 
 from app.models.db_models import ConfigDB, KeyboardMappingDB, PluginDB, PluginTypeDB
 from app.utils.db_init import initialize_database, verify_database_tables
@@ -17,41 +15,32 @@ async def test_initialize_database_creates_tables():
     with tempfile.NamedTemporaryFile(suffix=".db", delete=False) as tmp:
         db_path = Path(tmp.name)
 
-    engine = None
+    database = None
     try:
         # Initialize database
-        engine = await initialize_database(db_path, run_migrations=True)
+        database = await initialize_database(db_path, run_migrations=True)
 
         # Verify tables exist
         table_status = verify_database_tables(db_path)
         missing_tables = [t for t, e in table_status.items() if not e]
         assert all(table_status.values()), f"Missing tables: {missing_tables}"
 
-        # Verify we can query the tables using SQLAlchemy
-        from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker
+        # Verify we can query the tables using Ormar
+        plugin_types = await PluginTypeDB.objects.all()
+        assert isinstance(plugin_types, list)
 
-        session_factory = async_sessionmaker(engine, class_=AsyncSession, expire_on_commit=False)
-        async with session_factory() as session:
-            # Query each table to ensure they're accessible
-            result = await session.execute(select(PluginTypeDB))
-            plugin_types = result.scalars().all()
-            assert isinstance(plugin_types, list)
+        plugins = await PluginDB.objects.all()
+        assert isinstance(plugins, list)
 
-            result = await session.execute(select(PluginDB))
-            plugins = result.scalars().all()
-            assert isinstance(plugins, list)
+        configs = await ConfigDB.objects.all()
+        assert isinstance(configs, list)
 
-            result = await session.execute(select(ConfigDB))
-            configs = result.scalars().all()
-            assert isinstance(configs, list)
-
-            result = await session.execute(select(KeyboardMappingDB))
-            mappings = result.scalars().all()
-            assert isinstance(mappings, list)
+        mappings = await KeyboardMappingDB.objects.all()
+        assert isinstance(mappings, list)
     finally:
-        # Cleanup - dispose engine first to release file lock
-        if engine:
-            await engine.dispose()
+        # Cleanup - disconnect database first to release file lock
+        if database:
+            await database.disconnect()
         # Small delay to ensure file is released on Windows
         import time
 
@@ -65,29 +54,32 @@ async def test_initialize_database_creates_tables():
 
 
 @pytest.mark.asyncio
-async def test_initialize_database_with_existing_engine():
-    """Test that initialize_database works with an existing engine."""
+async def test_initialize_database_with_existing_database():
+    """Test that initialize_database works with an existing database connection."""
     with tempfile.NamedTemporaryFile(suffix=".db", delete=False) as tmp:
         db_path = Path(tmp.name)
 
-    engine = None
+    database = None
     try:
-        # Create engine first
+        import databases
+
+        # Create database connection first
         db_url = f"sqlite+aiosqlite:///{db_path.resolve()}"
-        engine = create_async_engine(db_url, echo=False, future=True)
+        database = databases.Database(db_url)
+        await database.connect()
 
-        # Initialize database with existing engine
-        result_engine = await initialize_database(db_path, engine=engine, run_migrations=True)
+        # Initialize database with existing database connection
+        result_database = await initialize_database(db_path, database=database, run_migrations=True)
 
-        # Should return the same engine
-        assert result_engine is engine
+        # Should return the same database
+        assert result_database is database
 
         # Verify tables exist
         table_status = verify_database_tables(db_path)
         assert all(table_status.values())
     finally:
-        if engine:
-            await engine.dispose()
+        if database:
+            await database.disconnect()
         import time
 
         time.sleep(0.1)
@@ -118,7 +110,7 @@ async def test_initialize_database_without_migrations():
         )
     finally:
         if engine:
-            await engine.dispose()
+            await engine.disconnect()
         import time
 
         time.sleep(0.1)
@@ -209,7 +201,7 @@ async def test_initialize_database_idempotent():
         table_status1 = verify_database_tables(db_path)
 
         # Initialize second time
-        engine2 = await initialize_database(db_path, engine=engine1, run_migrations=True)
+        engine2 = await initialize_database(db_path, database=engine1, run_migrations=True)
         table_status2 = verify_database_tables(db_path)
 
         # Should be the same engine
@@ -220,7 +212,7 @@ async def test_initialize_database_idempotent():
         assert all(table_status2.values())
     finally:
         if engine1:
-            await engine1.dispose()
+            await engine1.disconnect()
         import time
 
         time.sleep(0.1)

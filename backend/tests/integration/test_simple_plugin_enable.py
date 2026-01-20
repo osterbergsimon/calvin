@@ -2,9 +2,6 @@
 
 import asyncio
 
-from sqlalchemy import select
-
-import app.database as db_module
 from app.models.db_models import PluginTypeDB
 
 
@@ -15,14 +12,10 @@ def test_simple_enable_plugin_type(test_client):
     try:
         # Step 1: Set enabled=False
         async def setup():
-            async with db_module.AsyncSessionLocal() as session:
-                result = await session.execute(
-                    select(PluginTypeDB).where(PluginTypeDB.type_id == "local")
-                )
-                db_type = result.scalar_one_or_none()
-                if db_type:
-                    db_type.enabled = False
-                    await session.commit()
+            db_type = await PluginTypeDB.objects.get_or_none(type_id="local")
+            if db_type:
+                db_type.enabled = False
+                await db_type.update()
 
         loop.run_until_complete(setup())
 

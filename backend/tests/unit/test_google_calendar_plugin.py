@@ -217,85 +217,84 @@ class TestGoogleCalendarPluginHooks:
             with patch("app.plugins.registry.manager.instance_manager") as mock_instance_mgr:
                 mock_instance_mgr.register = AsyncMock()
 
-                async with test_db as session:
-                    from app.models.db_models import PluginTypeDB
+                from app.models.db_models import PluginTypeDB
 
-                    # Create plugin type in database
-                    db_type = PluginTypeDB(
+                # Create plugin type in database (or get existing)
+                db_type = await PluginTypeDB.objects.get_or_none(type_id="google")
+                if not db_type:
+                    db_type = await PluginTypeDB.objects.create(
                         type_id="google",
                         plugin_type="calendar",
                         name="Google Calendar",
                         enabled=True,
                     )
-                    session.add(db_type)
-                    await session.commit()
+                else:
+                    db_type.enabled = True
+                    await db_type.update()
 
-                    # Test creating a new instance
-                    result = await handle_plugin_config_update(
-                        type_id="google",
-                        config={
-                            "ical_url": "https://calendar.google.com/calendar/ical/test%40example.com/public/basic.ics",
-                        },
-                        enabled=True,
-                        db_type=db_type,
-                        session=session,
-                    )
+                # Test creating a new instance
+                result = await handle_plugin_config_update(
+                    type_id="google",
+                    config={
+                        "ical_url": "https://calendar.google.com/calendar/ical/test%40example.com/public/basic.ics",
+                    },
+                    enabled=True,
+                    db_type=db_type,
+                    session=None,  # Session parameter ignored with Ormar
+                )
 
-                    assert result is not None
-                    assert result.get("instance_created") is True
-                    assert "instance_id" in result
-                    assert result["instance_id"].startswith("google-")
+                assert result is not None
+                assert result.get("instance_created") is True
+                assert "instance_id" in result
+                assert result["instance_id"].startswith("google-")
 
-                    # Verify plugin was registered
-                    mock_instance_mgr.register.assert_called_once()
+                # Verify plugin was registered
+                mock_instance_mgr.register.assert_called_once()
 
-                    # Verify database entry was created
-                    from sqlalchemy import select
+                # Verify database entry was created
+                from app.models.db_models import PluginDB
 
-                    from app.models.db_models import PluginDB
-
-                    result_query = await session.execute(
-                        select(PluginDB).where(PluginDB.type_id == "google")
-                    )
-                    db_plugins = result_query.scalars().all()
-                    assert len(db_plugins) > 0
-                    db_plugin = db_plugins[0]
-                    assert db_plugin.type_id == "google"
-                    assert "ical_url" in db_plugin.config
-                    assert "calendar.google.com" in db_plugin.config["ical_url"]
+                db_plugins = await PluginDB.objects.filter(type_id="google").all()
+                assert len(db_plugins) > 0
+                db_plugin = db_plugins[0]
+                assert db_plugin.type_id == "google"
+                assert "ical_url" in db_plugin.config
+                assert "calendar.google.com" in db_plugin.config["ical_url"]
 
     @pytest.mark.asyncio
     async def test_handle_plugin_config_update_invalid_url(self, test_db):
         """Test Google Calendar plugin handle_plugin_config_update with invalid URL."""
-        async with test_db as session:
-            from app.models.db_models import PluginTypeDB
+        import ormar
 
-            # Create plugin type in database
-            db_type = PluginTypeDB(
+        from app.models.db_models import PluginTypeDB
+
+        # Create plugin type in database (use get_or_create to avoid UNIQUE constraint)
+        try:
+            db_type = await PluginTypeDB.objects.get(type_id="google")
+        except ormar.NoMatch:
+            db_type = await PluginTypeDB.objects.create(
                 type_id="google",
                 plugin_type="calendar",
                 name="Google Calendar",
                 enabled=True,
             )
-            session.add(db_type)
-            await session.commit()
 
-            # Mock plugin_loader to avoid registration issues
-            with patch("app.plugins.registry.manager.plugin_loader") as mock_loader:
-                mock_loader.get_plugin_types.return_value = [
-                    {"type_id": "google", "plugin_type": "calendar", "name": "Google Calendar"}
-                ]
+        # Mock plugin_loader to avoid registration issues
+        with patch("app.plugins.registry.manager.plugin_loader") as mock_loader:
+            mock_loader.get_plugin_types.return_value = [
+                {"type_id": "google", "plugin_type": "calendar", "name": "Google Calendar"}
+            ]
 
-                # Test with invalid URL - should fail validation
-                result = await handle_plugin_config_update(
-                    type_id="google",
-                    config={
-                        "ical_url": "https://example.com/calendar.ics",  # Not a Google Calendar URL
-                    },
-                    enabled=True,
-                    db_type=db_type,
-                    session=session,
-                )
+            # Test with invalid URL - should fail validation
+            result = await handle_plugin_config_update(
+                type_id="google",
+                config={
+                    "ical_url": "https://example.com/calendar.ics",  # Not a Google Calendar URL
+                },
+                enabled=True,
+                db_type=db_type,
+                session=None,  # Session parameter ignored with Ormar
+            )
 
-                # Should return None or indicate validation failure
-                assert result is None or result.get("instance_created") is False
+            # Should return None or indicate validation failure
+            assert result is None or result.get("instance_created") is False

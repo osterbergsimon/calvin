@@ -3,9 +3,7 @@
 import asyncio
 
 import pytest
-from sqlalchemy import select
 
-import app.database as db_module
 from app.models.db_models import PluginDB, PluginTypeDB
 from app.plugins.base import PluginType
 from app.plugins.manager import plugin_manager
@@ -26,38 +24,27 @@ class TestInstanceUpdate:
         try:
 
             async def setup_instance():
-                async with db_module.AsyncSessionLocal() as session:
-                    # First ensure plugin type exists
-                    result = await session.execute(
-                        select(PluginTypeDB).where(PluginTypeDB.type_id == "local")
+                # First ensure plugin type exists
+                db_type = await PluginTypeDB.objects.get_or_none(type_id="local")
+                if not db_type:
+                    await PluginTypeDB.objects.create(
+                        type_id="local",
+                        plugin_type=PluginType.IMAGE.value,
+                        name="Local Images",
+                        enabled=True,
                     )
-                    db_type = result.scalar_one_or_none()
-                    if not db_type:
-                        db_type = PluginTypeDB(
-                            type_id="local",
-                            plugin_type=PluginType.IMAGE.value,
-                            name="Local Images",
-                            enabled=True,
-                        )
-                        session.add(db_type)
-                        await session.commit()
 
-                    # Create instance (if not exists)
-                    result = await session.execute(
-                        select(PluginDB).where(PluginDB.id == instance_id)
+                # Create instance (if not exists)
+                db_instance = await PluginDB.objects.get_or_none(id=instance_id)
+                if not db_instance:
+                    await PluginDB.objects.create(
+                        id=instance_id,
+                        type_id="local",
+                        plugin_type=PluginType.IMAGE.value,
+                        name="Test Instance",
+                        enabled=False,
+                        config={},
                     )
-                    db_instance = result.scalar_one_or_none()
-                    if not db_instance:
-                        db_instance = PluginDB(
-                            id=instance_id,
-                            type_id="local",
-                            plugin_type=PluginType.IMAGE.value,
-                            name="Test Instance",
-                            enabled=False,
-                            config={},
-                        )
-                        session.add(db_instance)
-                        await session.commit()
 
             loop.run_until_complete(setup_instance())
 
@@ -84,26 +71,17 @@ class TestInstanceUpdate:
 
             # Verify in database
             async def verify_instance():
-                async with db_module.AsyncSessionLocal() as session:
-                    result = await session.execute(
-                        select(PluginDB).where(PluginDB.id == instance_id)
-                    )
-                    db_instance = result.scalar_one_or_none()
-                    assert db_instance is not None
-                    assert db_instance.enabled is True
+                db_instance = await PluginDB.objects.get_or_none(id=instance_id)
+                assert db_instance is not None
+                assert db_instance.enabled is True
 
             loop.run_until_complete(verify_instance())
 
             # Cleanup
             async def cleanup_instance():
-                async with db_module.AsyncSessionLocal() as session:
-                    result = await session.execute(
-                        select(PluginDB).where(PluginDB.id == instance_id)
-                    )
-                    db_instance = result.scalar_one_or_none()
-                    if db_instance:
-                        await session.delete(db_instance)
-                        await session.commit()
+                db_instance = await PluginDB.objects.get_or_none(id=instance_id)
+                if db_instance:
+                    await db_instance.delete()
 
             loop.run_until_complete(cleanup_instance())
         finally:
@@ -118,38 +96,27 @@ class TestInstanceUpdate:
         try:
 
             async def setup_instance():
-                async with db_module.AsyncSessionLocal() as session:
-                    # Ensure plugin type exists
-                    result = await session.execute(
-                        select(PluginTypeDB).where(PluginTypeDB.type_id == "local")
+                # Ensure plugin type exists
+                db_type = await PluginTypeDB.objects.get_or_none(type_id="local")
+                if not db_type:
+                    await PluginTypeDB.objects.create(
+                        type_id="local",
+                        plugin_type=PluginType.IMAGE.value,
+                        name="Local Images",
+                        enabled=True,
                     )
-                    db_type = result.scalar_one_or_none()
-                    if not db_type:
-                        db_type = PluginTypeDB(
-                            type_id="local",
-                            plugin_type=PluginType.IMAGE.value,
-                            name="Local Images",
-                            enabled=True,
-                        )
-                        session.add(db_type)
-                        await session.commit()
 
-                    # Create instance (if not exists)
-                    result = await session.execute(
-                        select(PluginDB).where(PluginDB.id == instance_id)
+                # Create instance (if not exists)
+                db_instance = await PluginDB.objects.get_or_none(id=instance_id)
+                if not db_instance:
+                    await PluginDB.objects.create(
+                        id=instance_id,
+                        type_id="local",
+                        plugin_type=PluginType.IMAGE.value,
+                        name="Test Instance",
+                        enabled=True,
+                        config={},
                     )
-                    db_instance = result.scalar_one_or_none()
-                    if not db_instance:
-                        db_instance = PluginDB(
-                            id=instance_id,
-                            type_id="local",
-                            plugin_type=PluginType.IMAGE.value,
-                            name="Test Instance",
-                            enabled=True,
-                            config={},
-                        )
-                        session.add(db_instance)
-                        await session.commit()
 
             loop.run_until_complete(setup_instance())
 
@@ -172,26 +139,17 @@ class TestInstanceUpdate:
 
             # Verify in database
             async def verify_instance():
-                async with db_module.AsyncSessionLocal() as session:
-                    result = await session.execute(
-                        select(PluginDB).where(PluginDB.id == instance_id)
-                    )
-                    db_instance = result.scalar_one_or_none()
-                    assert db_instance is not None
-                    assert db_instance.enabled is False
+                db_instance = await PluginDB.objects.get_or_none(id=instance_id)
+                assert db_instance is not None
+                assert db_instance.enabled is False
 
             loop.run_until_complete(verify_instance())
 
             # Cleanup
             async def cleanup_instance():
-                async with db_module.AsyncSessionLocal() as session:
-                    result = await session.execute(
-                        select(PluginDB).where(PluginDB.id == instance_id)
-                    )
-                    db_instance = result.scalar_one_or_none()
-                    if db_instance:
-                        await session.delete(db_instance)
-                        await session.commit()
+                db_instance = await PluginDB.objects.get_or_none(id=instance_id)
+                if db_instance:
+                    await db_instance.delete()
 
             loop.run_until_complete(cleanup_instance())
         finally:
@@ -219,36 +177,25 @@ class TestInstanceUpdate:
         try:
 
             async def setup_instance():
-                async with db_module.AsyncSessionLocal() as session:
-                    result = await session.execute(
-                        select(PluginTypeDB).where(PluginTypeDB.type_id == "local")
+                db_type = await PluginTypeDB.objects.get_or_none(type_id="local")
+                if not db_type:
+                    await PluginTypeDB.objects.create(
+                        type_id="local",
+                        plugin_type=PluginType.IMAGE.value,
+                        name="Local Images",
+                        enabled=True,
                     )
-                    db_type = result.scalar_one_or_none()
-                    if not db_type:
-                        db_type = PluginTypeDB(
-                            type_id="local",
-                            plugin_type=PluginType.IMAGE.value,
-                            name="Local Images",
-                            enabled=True,
-                        )
-                        session.add(db_type)
-                        await session.commit()
 
-                    result = await session.execute(
-                        select(PluginDB).where(PluginDB.id == instance_id)
+                db_instance = await PluginDB.objects.get_or_none(id=instance_id)
+                if not db_instance:
+                    await PluginDB.objects.create(
+                        id=instance_id,
+                        type_id="local",
+                        plugin_type=PluginType.IMAGE.value,
+                        name="Test Instance",
+                        enabled=True,
+                        config={"key1": "value1"},
                     )
-                    db_instance = result.scalar_one_or_none()
-                    if not db_instance:
-                        db_instance = PluginDB(
-                            id=instance_id,
-                            type_id="local",
-                            plugin_type=PluginType.IMAGE.value,
-                            name="Test Instance",
-                            enabled=True,
-                            config={"key1": "value1"},
-                        )
-                        session.add(db_instance)
-                        await session.commit()
 
             loop.run_until_complete(setup_instance())
 
@@ -271,27 +218,18 @@ class TestInstanceUpdate:
 
             # Verify config was merged
             async def verify_config():
-                async with db_module.AsyncSessionLocal() as session:
-                    result = await session.execute(
-                        select(PluginDB).where(PluginDB.id == instance_id)
-                    )
-                    db_instance = result.scalar_one_or_none()
-                    assert db_instance is not None
-                    assert db_instance.config["key1"] == "updated_value"
-                    assert db_instance.config["key2"] == "new_value"
+                db_instance = await PluginDB.objects.get_or_none(id=instance_id)
+                assert db_instance is not None
+                assert db_instance.config["key1"] == "updated_value"
+                assert db_instance.config["key2"] == "new_value"
 
             loop.run_until_complete(verify_config())
 
             # Cleanup
             async def cleanup_instance():
-                async with db_module.AsyncSessionLocal() as session:
-                    result = await session.execute(
-                        select(PluginDB).where(PluginDB.id == instance_id)
-                    )
-                    db_instance = result.scalar_one_or_none()
-                    if db_instance:
-                        await session.delete(db_instance)
-                        await session.commit()
+                db_instance = await PluginDB.objects.get_or_none(id=instance_id)
+                if db_instance:
+                    await db_instance.delete()
 
             loop.run_until_complete(cleanup_instance())
         finally:
@@ -305,36 +243,25 @@ class TestInstanceUpdate:
         try:
 
             async def setup_instance():
-                async with db_module.AsyncSessionLocal() as session:
-                    result = await session.execute(
-                        select(PluginTypeDB).where(PluginTypeDB.type_id == "local")
+                db_type = await PluginTypeDB.objects.get_or_none(type_id="local")
+                if not db_type:
+                    await PluginTypeDB.objects.create(
+                        type_id="local",
+                        plugin_type=PluginType.IMAGE.value,
+                        name="Local Images",
+                        enabled=True,
                     )
-                    db_type = result.scalar_one_or_none()
-                    if not db_type:
-                        db_type = PluginTypeDB(
-                            type_id="local",
-                            plugin_type=PluginType.IMAGE.value,
-                            name="Local Images",
-                            enabled=True,
-                        )
-                        session.add(db_type)
-                        await session.commit()
 
-                    result = await session.execute(
-                        select(PluginDB).where(PluginDB.id == instance_id)
+                db_instance = await PluginDB.objects.get_or_none(id=instance_id)
+                if not db_instance:
+                    await PluginDB.objects.create(
+                        id=instance_id,
+                        type_id="local",
+                        plugin_type=PluginType.IMAGE.value,
+                        name="Old Name",
+                        enabled=True,
+                        config={},
                     )
-                    db_instance = result.scalar_one_or_none()
-                    if not db_instance:
-                        db_instance = PluginDB(
-                            id=instance_id,
-                            type_id="local",
-                            plugin_type=PluginType.IMAGE.value,
-                            name="Old Name",
-                            enabled=True,
-                            config={},
-                        )
-                        session.add(db_instance)
-                        await session.commit()
 
             loop.run_until_complete(setup_instance())
 
@@ -357,14 +284,9 @@ class TestInstanceUpdate:
 
             # Cleanup
             async def cleanup_instance():
-                async with db_module.AsyncSessionLocal() as session:
-                    result = await session.execute(
-                        select(PluginDB).where(PluginDB.id == instance_id)
-                    )
-                    db_instance = result.scalar_one_or_none()
-                    if db_instance:
-                        await session.delete(db_instance)
-                        await session.commit()
+                db_instance = await PluginDB.objects.get_or_none(id=instance_id)
+                if db_instance:
+                    await db_instance.delete()
 
             loop.run_until_complete(cleanup_instance())
         finally:
@@ -383,42 +305,31 @@ class TestBackendPluginInstanceUpdate:
         try:
 
             async def setup_instance():
-                async with db_module.AsyncSessionLocal() as session:
-                    # Create backend plugin type
-                    result = await session.execute(
-                        select(PluginTypeDB).where(PluginTypeDB.type_id == "test-backend-instance")
+                # Create backend plugin type
+                db_type = await PluginTypeDB.objects.get_or_none(type_id="test-backend-instance")
+                if not db_type:
+                    await PluginTypeDB.objects.create(
+                        type_id="test-backend-instance",
+                        plugin_type=PluginType.BACKEND.value,
+                        name="Test Backend Plugin",
+                        enabled=True,
                     )
-                    db_type = result.scalar_one_or_none()
-                    if not db_type:
-                        db_type = PluginTypeDB(
-                            type_id="test-backend-instance",
-                            plugin_type=PluginType.BACKEND.value,
-                            name="Test Backend Plugin",
-                            enabled=True,
-                        )
-                        session.add(db_type)
-                        await session.commit()
 
-                    # Create backend plugin instance
-                    result = await session.execute(
-                        select(PluginDB).where(PluginDB.id == instance_id)
+                # Create backend plugin instance
+                db_instance = await PluginDB.objects.get_or_none(id=instance_id)
+                if not db_instance:
+                    await PluginDB.objects.create(
+                        id=instance_id,
+                        type_id="test-backend-instance",
+                        plugin_type=PluginType.BACKEND.value,
+                        name="Test Backend Instance",
+                        enabled=False,
+                        config={
+                            "email_address": "test@example.com",
+                            "email_password": "test123",
+                            "check_interval": "300",
+                        },
                     )
-                    db_instance = result.scalar_one_or_none()
-                    if not db_instance:
-                        db_instance = PluginDB(
-                            id=instance_id,
-                            type_id="test-backend-instance",
-                            plugin_type=PluginType.BACKEND.value,
-                            name="Test Backend Instance",
-                            enabled=False,
-                            config={
-                                "email_address": "test@example.com",
-                                "email_password": "test123",
-                                "check_interval": "300",
-                            },
-                        )
-                        session.add(db_instance)
-                        await session.commit()
 
             loop.run_until_complete(setup_instance())
 
@@ -472,22 +383,13 @@ class TestBackendPluginInstanceUpdate:
 
             # Cleanup
             async def cleanup_instance():
-                async with db_module.AsyncSessionLocal() as session:
-                    result = await session.execute(
-                        select(PluginDB).where(PluginDB.id == instance_id)
-                    )
-                    db_instance = result.scalar_one_or_none()
-                    if db_instance:
-                        await session.delete(db_instance)
-                        await session.commit()
+                db_instance = await PluginDB.objects.get_or_none(id=instance_id)
+                if db_instance:
+                    await db_instance.delete()
 
-                    result = await session.execute(
-                        select(PluginTypeDB).where(PluginTypeDB.type_id == "test-backend-instance")
-                    )
-                    db_type = result.scalar_one_or_none()
-                    if db_type:
-                        await session.delete(db_type)
-                        await session.commit()
+                db_type = await PluginTypeDB.objects.get_or_none(type_id="test-backend-instance")
+                if db_type:
+                    await db_type.delete()
 
             loop.run_until_complete(cleanup_instance())
         finally:
@@ -501,38 +403,27 @@ class TestBackendPluginInstanceUpdate:
         try:
 
             async def setup_instance():
-                async with db_module.AsyncSessionLocal() as session:
-                    # Create backend plugin type
-                    result = await session.execute(
-                        select(PluginTypeDB).where(PluginTypeDB.type_id == "test-backend-disable")
+                # Create backend plugin type
+                db_type = await PluginTypeDB.objects.get_or_none(type_id="test-backend-disable")
+                if not db_type:
+                    await PluginTypeDB.objects.create(
+                        type_id="test-backend-disable",
+                        plugin_type=PluginType.BACKEND.value,
+                        name="Test Backend Plugin",
+                        enabled=True,
                     )
-                    db_type = result.scalar_one_or_none()
-                    if not db_type:
-                        db_type = PluginTypeDB(
-                            type_id="test-backend-disable",
-                            plugin_type=PluginType.BACKEND.value,
-                            name="Test Backend Plugin",
-                            enabled=True,
-                        )
-                        session.add(db_type)
-                        await session.commit()
 
-                    # Create enabled backend plugin instance
-                    result = await session.execute(
-                        select(PluginDB).where(PluginDB.id == instance_id)
+                # Create enabled backend plugin instance
+                db_instance = await PluginDB.objects.get_or_none(id=instance_id)
+                if not db_instance:
+                    await PluginDB.objects.create(
+                        id=instance_id,
+                        type_id="test-backend-disable",
+                        plugin_type=PluginType.BACKEND.value,
+                        name="Test Backend Instance",
+                        enabled=True,
+                        config={},
                     )
-                    db_instance = result.scalar_one_or_none()
-                    if not db_instance:
-                        db_instance = PluginDB(
-                            id=instance_id,
-                            type_id="test-backend-disable",
-                            plugin_type=PluginType.BACKEND.value,
-                            name="Test Backend Instance",
-                            enabled=True,
-                            config={},
-                        )
-                        session.add(db_instance)
-                        await session.commit()
 
             loop.run_until_complete(setup_instance())
 
@@ -581,22 +472,13 @@ class TestBackendPluginInstanceUpdate:
 
             # Cleanup
             async def cleanup_instance():
-                async with db_module.AsyncSessionLocal() as session:
-                    result = await session.execute(
-                        select(PluginDB).where(PluginDB.id == instance_id)
-                    )
-                    db_instance = result.scalar_one_or_none()
-                    if db_instance:
-                        await session.delete(db_instance)
-                        await session.commit()
+                db_instance = await PluginDB.objects.get_or_none(id=instance_id)
+                if db_instance:
+                    await db_instance.delete()
 
-                    result = await session.execute(
-                        select(PluginTypeDB).where(PluginTypeDB.type_id == "test-backend-disable")
-                    )
-                    db_type = result.scalar_one_or_none()
-                    if db_type:
-                        await session.delete(db_type)
-                        await session.commit()
+                db_type = await PluginTypeDB.objects.get_or_none(type_id="test-backend-disable")
+                if db_type:
+                    await db_type.delete()
 
             loop.run_until_complete(cleanup_instance())
         finally:
@@ -614,18 +496,14 @@ class TestPluginTypeEnableDisable:
         try:
 
             async def get_original_state():
-                async with db_module.AsyncSessionLocal() as session:
-                    result = await session.execute(
-                        select(PluginTypeDB).where(PluginTypeDB.type_id == "local")
-                    )
-                    db_type = result.scalar_one_or_none()
-                    if db_type:
-                        original_enabled = db_type.enabled
-                        # Temporarily disable for test
-                        db_type.enabled = False
-                        await session.commit()
-                        return original_enabled
-                    return None
+                db_type = await PluginTypeDB.objects.get_or_none(type_id="local")
+                if db_type:
+                    original_enabled = db_type.enabled
+                    # Temporarily disable for test
+                    db_type.enabled = False
+                    await db_type.update()
+                    return original_enabled
+                return None
 
             original_enabled = loop.run_until_complete(get_original_state())
 
@@ -647,14 +525,10 @@ class TestPluginTypeEnableDisable:
                 if original_enabled is not None:
 
                     async def restore_state():
-                        async with db_module.AsyncSessionLocal() as session:
-                            result = await session.execute(
-                                select(PluginTypeDB).where(PluginTypeDB.type_id == "local")
-                            )
-                            db_type = result.scalar_one_or_none()
-                            if db_type:
-                                db_type.enabled = original_enabled
-                                await session.commit()
+                        db_type = await PluginTypeDB.objects.get_or_none(type_id="local")
+                        if db_type:
+                            db_type.enabled = original_enabled
+                            await db_type.update()
 
                     loop.run_until_complete(restore_state())
         finally:
@@ -667,18 +541,14 @@ class TestPluginTypeEnableDisable:
         try:
 
             async def get_original_state():
-                async with db_module.AsyncSessionLocal() as session:
-                    result = await session.execute(
-                        select(PluginTypeDB).where(PluginTypeDB.type_id == "local")
-                    )
-                    db_type = result.scalar_one_or_none()
-                    if db_type:
-                        original_enabled = db_type.enabled
-                        # Temporarily enable for test
-                        db_type.enabled = True
-                        await session.commit()
-                        return original_enabled
-                    return None
+                db_type = await PluginTypeDB.objects.get_or_none(type_id="local")
+                if db_type:
+                    original_enabled = db_type.enabled
+                    # Temporarily enable for test
+                    db_type.enabled = True
+                    await db_type.update()
+                    return original_enabled
+                return None
 
             original_enabled = loop.run_until_complete(get_original_state())
 
@@ -700,14 +570,10 @@ class TestPluginTypeEnableDisable:
                 if original_enabled is not None:
 
                     async def restore_state():
-                        async with db_module.AsyncSessionLocal() as session:
-                            result = await session.execute(
-                                select(PluginTypeDB).where(PluginTypeDB.type_id == "local")
-                            )
-                            db_type = result.scalar_one_or_none()
-                            if db_type:
-                                db_type.enabled = original_enabled
-                                await session.commit()
+                        db_type = await PluginTypeDB.objects.get_or_none(type_id="local")
+                        if db_type:
+                            db_type.enabled = original_enabled
+                            await db_type.update()
 
                     loop.run_until_complete(restore_state())
         finally:

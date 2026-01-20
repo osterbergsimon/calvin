@@ -4,7 +4,6 @@ from pathlib import Path
 
 import pytest
 
-import app.database as db_module
 from app.models.db_models import PluginDB
 from tests.test_utils import create_test_image, create_test_images_set
 
@@ -22,8 +21,6 @@ class TestImageAPI:
         """Ensure the local image plugin is enabled and has an instance."""
         import asyncio
 
-        from sqlalchemy import select
-
         # Just enable the plugin type - the hook will handle instance creation
         # This matches how calendar tests work - they don't manually create instances
         response = test_client.put("/api/plugins/local", json={"enabled": True})
@@ -36,50 +33,38 @@ class TestImageAPI:
         try:
 
             async def check_instance():
-                async with db_module.AsyncSessionLocal() as session:
-                    result = await session.execute(
-                        select(PluginDB).where(PluginDB.id == "local-images")
-                    )
-                    instance = result.scalar_one_or_none()
-                    if not instance:
-                        # Instance doesn't exist, create it manually
-                        from datetime import datetime
+                from datetime import datetime
 
-                        instance = PluginDB(
-                            id="local-images",
-                            type_id="local",
-                            plugin_type="image",
-                            name="Local Images",
-                            enabled=True,
-                            display_order=0,
-                            created_at=datetime.utcnow(),
-                            updated_at=datetime.utcnow(),
-                        )
-                        session.add(instance)
-                        await session.commit()
-                    elif not instance.enabled:
-                        # Instance exists but is disabled, enable it
-                        instance.enabled = True
-                    await session.commit()
-                    # Flush to ensure the instance is visible to other sessions
-                    await session.flush()
+                instance = await PluginDB.objects.get_or_none(id="local-images")
+                if not instance:
+                    # Instance doesn't exist, create it manually
+                    await PluginDB.objects.create(
+                        id="local-images",
+                        type_id="local",
+                        plugin_type="image",
+                        name="Local Images",
+                        enabled=True,
+                        display_order=0,
+                        created_at=datetime.utcnow(),
+                        updated_at=datetime.utcnow(),
+                    )
+                elif not instance.enabled:
+                    # Instance exists but is disabled, enable it
+                    instance.enabled = True
+                    await instance.update()
 
             loop.run_until_complete(check_instance())
 
             # Verify instance exists
             async def verify_instance():
-                async with db_module.AsyncSessionLocal() as session:
-                    result = await session.execute(
-                        select(PluginDB).where(PluginDB.id == "local-images")
-                    )
-                    instance = result.scalar_one_or_none()
-                    instance_id = instance.id if instance else "NOT FOUND"
-                    instance_enabled = instance.enabled if instance else "N/A"
-                    print(
-                        f"[TEST DEBUG] Plugin instance in DB: {instance_id}, "
-                        f"enabled: {instance_enabled}"
-                    )
-                    return instance is not None
+                instance = await PluginDB.objects.get_or_none(id="local-images")
+                instance_id = instance.id if instance else "NOT FOUND"
+                instance_enabled = instance.enabled if instance else "N/A"
+                print(
+                    f"[TEST DEBUG] Plugin instance in DB: {instance_id}, "
+                    f"enabled: {instance_enabled}"
+                )
+                return instance is not None
 
             instance_exists = loop.run_until_complete(verify_instance())
             assert instance_exists, "Plugin instance was not created in database"

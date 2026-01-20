@@ -224,86 +224,85 @@ class TestIframeServicePluginHooks:
             with patch("app.plugins.registry.manager.instance_manager") as mock_instance_mgr:
                 mock_instance_mgr.register = AsyncMock()
 
-                async with test_db as session:
-                    from app.models.db_models import PluginTypeDB
+                from app.models.db_models import PluginTypeDB
 
-                    # Create plugin type in database
-                    db_type = PluginTypeDB(
+                # Create plugin type in database (or get existing)
+                db_type = await PluginTypeDB.objects.get_or_none(type_id="iframe")
+                if not db_type:
+                    db_type = await PluginTypeDB.objects.create(
                         type_id="iframe",
                         plugin_type="service",
                         name="Iframe Service",
                         enabled=True,
                     )
-                    session.add(db_type)
-                    await session.commit()
+                else:
+                    db_type.enabled = True
+                    await db_type.update()
 
-                    # Test creating a new instance
-                    result = await handle_plugin_config_update(
-                        type_id="iframe",
-                        config={
-                            "url": "https://example.com",
-                            "fullscreen": False,
-                        },
-                        enabled=True,
-                        db_type=db_type,
-                        session=session,
-                    )
+                # Test creating a new instance
+                result = await handle_plugin_config_update(
+                    type_id="iframe",
+                    config={
+                        "url": "https://example.com",
+                        "fullscreen": False,
+                    },
+                    enabled=True,
+                    db_type=db_type,
+                    session=None,  # Session parameter ignored with Ormar
+                )
 
-                    assert result is not None
-                    assert result.get("instance_created") is True
-                    assert "instance_id" in result
-                    assert result["instance_id"].startswith("iframe-")
+                assert result is not None
+                assert result.get("instance_created") is True
+                assert "instance_id" in result
+                assert result["instance_id"].startswith("iframe-")
 
-                    # Verify plugin was registered
-                    mock_instance_mgr.register.assert_called_once()
+                # Verify plugin was registered
+                mock_instance_mgr.register.assert_called_once()
 
-                    # Verify database entry was created
-                    from sqlalchemy import select
+                # Verify database entry was created
+                from app.models.db_models import PluginDB
 
-                    from app.models.db_models import PluginDB
-
-                    result_query = await session.execute(
-                        select(PluginDB).where(PluginDB.type_id == "iframe")
-                    )
-                    db_plugins = result_query.scalars().all()
-                    assert len(db_plugins) > 0
-                    db_plugin = db_plugins[0]
-                    assert db_plugin.type_id == "iframe"
-                    assert db_plugin.config.get("url") == "https://example.com"
-                    assert db_plugin.config.get("fullscreen") is False
+                db_plugins = await PluginDB.objects.filter(type_id="iframe").all()
+                assert len(db_plugins) > 0
+                db_plugin = db_plugins[0]
+                assert db_plugin.type_id == "iframe"
+                assert db_plugin.config.get("url") == "https://example.com"
+                assert db_plugin.config.get("fullscreen") is False
 
     @pytest.mark.asyncio
     async def test_handle_plugin_config_update_invalid_url(self, test_db):
         """Test Iframe Service plugin handle_plugin_config_update with invalid URL."""
-        async with test_db as session:
-            from app.models.db_models import PluginTypeDB
+        # Create plugin type in database (use get_or_create to avoid UNIQUE constraint)
+        import ormar
 
-            # Create plugin type in database
-            db_type = PluginTypeDB(
+        from app.models.db_models import PluginTypeDB
+
+        try:
+            db_type = await PluginTypeDB.objects.get(type_id="iframe")
+        except ormar.NoMatch:
+            db_type = await PluginTypeDB.objects.create(
                 type_id="iframe",
                 plugin_type="service",
                 name="Iframe Service",
                 enabled=True,
             )
-            session.add(db_type)
-            await session.commit()
 
-            # Mock plugin_loader to avoid registration issues
-            with patch("app.plugins.registry.manager.plugin_loader") as mock_loader:
-                mock_loader.get_plugin_types.return_value = [
-                    {"type_id": "iframe", "plugin_type": "service", "name": "Iframe Service"}
-                ]
+        # Mock plugin_loader to avoid registration issues
+        with patch("app.plugins.registry.manager.plugin_loader") as mock_loader:
+            mock_loader.get_plugin_types.return_value = [
+                {"type_id": "iframe", "plugin_type": "service", "name": "Iframe Service"}
+            ]
 
-                # Test with invalid URL - should fail validation
-                result = await handle_plugin_config_update(
-                    type_id="iframe",
-                    config={
-                        "url": "not-a-url",
-                    },
-                    enabled=True,
-                    db_type=db_type,
-                    session=session,
-                )
+            # Test with invalid URL - should fail validation
+            result = await handle_plugin_config_update(
+                type_id="iframe",
+                config={
+                    "url": "not-a-url",
+                },
+                enabled=True,
+                db_type=db_type,
+                session=None,  # Session parameter ignored with Ormar
+            )
 
-                # Should return None or indicate validation failure
-                assert result is None or result.get("instance_created") is False
+            # Should return None or indicate validation failure
+            assert result is None or result.get("instance_created") is False

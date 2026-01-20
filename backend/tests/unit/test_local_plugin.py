@@ -165,42 +165,39 @@ class TestLocalPluginHooks:
             with patch("app.plugins.registry.manager.instance_manager") as mock_instance_mgr:
                 mock_instance_mgr.register = AsyncMock()
 
-                async with test_db as session:
-                    # Create plugin type in database
-                    db_type = PluginTypeDB(
+                # Create plugin type in database (or get existing)
+                db_type = await PluginTypeDB.objects.get_or_none(type_id="local")
+                if not db_type:
+                    db_type = await PluginTypeDB.objects.create(
                         type_id="local",
                         plugin_type="image",
                         name="Local Images",
                         enabled=True,
                     )
-                    session.add(db_type)
-                    await session.commit()
+                else:
+                    db_type.enabled = True
+                    await db_type.update()
 
-                    # Test creating a new instance
-                    result = await handle_plugin_config_update(
-                        type_id="local",
-                        config={},  # Empty config - uses hardcoded directory
-                        enabled=True,
-                        db_type=db_type,
-                        session=session,
-                    )
+                # Test creating a new instance
+                result = await handle_plugin_config_update(
+                    type_id="local",
+                    config={},  # Empty config - uses hardcoded directory
+                    enabled=True,
+                    db_type=db_type,
+                    session=None,  # Session parameter ignored with Ormar
+                )
 
-                    assert result is not None
-                    assert result.get("instance_created") is True
-                    assert result.get("instance_id") == "local-images"
+                assert result is not None
+                assert result.get("instance_created") is True
+                assert result.get("instance_id") == "local-images"
 
-                    # Verify plugin was registered
-                    mock_instance_mgr.register.assert_called_once()
+                # Verify plugin was registered
+                mock_instance_mgr.register.assert_called_once()
 
-                    # Verify database entry was created
-                    from sqlalchemy import select
+                # Verify database entry was created
+                from app.models.db_models import PluginDB
 
-                    from app.models.db_models import PluginDB
-
-                    result_query = await session.execute(
-                        select(PluginDB).where(PluginDB.id == "local-images")
-                    )
-                    db_plugin = result_query.scalar_one_or_none()
-                    assert db_plugin is not None
-                    assert db_plugin.type_id == "local"
-                    assert db_plugin.config == {}  # Empty config
+                db_plugin = await PluginDB.objects.get_or_none(id="local-images")
+                assert db_plugin is not None
+                assert db_plugin.type_id == "local"
+                assert db_plugin.config == {}  # Empty config
