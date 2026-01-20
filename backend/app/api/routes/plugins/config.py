@@ -114,27 +114,20 @@ async def get_plugin_config(plugin_id: str):
     # Also check database common_config_schema for values that might not be in config_service
     # (e.g., display_order which is stored in common_config_schema)
     try:
-        from sqlalchemy import select
-
-        from app.database import AsyncSessionLocal
         from app.models.db_models import PluginTypeDB
 
-        async with AsyncSessionLocal() as session:
-            result = await session.execute(
-                select(PluginTypeDB).where(PluginTypeDB.type_id == plugin_id)
-            )
-            db_type = result.scalar_one_or_none()
-            if db_type and db_type.common_config_schema:
-                # Merge common_config_schema values into config (schema values override service values)
-                # This ensures display_order and other schema-level settings are included
-                db_schema = db_type.common_config_schema
-                for key, value in db_schema.items():
-                    # Only add if not already in config (config_service values take precedence)
-                    if key not in config:
-                        config[key] = value
-                    # For display_order, always use schema value if it exists (it's the source of truth)
-                    elif key == "display_order":
-                        config[key] = value
+        db_type = await PluginTypeDB.objects.get_or_none(type_id=plugin_id)
+        if db_type and db_type.common_config_schema:
+            # Merge common_config_schema values into config (schema values override service values)
+            # This ensures display_order and other schema-level settings are included
+            db_schema = db_type.common_config_schema
+            for key, value in db_schema.items():
+                # Only add if not already in config (config_service values take precedence)
+                if key not in config:
+                    config[key] = value
+                # For display_order, always use schema value if it exists (it's the source of truth)
+                elif key == "display_order":
+                    config[key] = value
     except Exception as e:
         logger.debug(f"Could not load schema from database for {plugin_id}: {e}")
         # Continue with config_service values only
