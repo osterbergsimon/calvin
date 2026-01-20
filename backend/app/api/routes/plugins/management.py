@@ -133,53 +133,54 @@ async def get_plugins(
 
             result.append(plugin_info)
 
-    # Add themes from database - they're just another plugin type, stored in PluginTypeDB
+    # Add themes from filesystem (no longer stored in database)
     # Include themes when:
     # 1. Explicitly requested (plugin_type == "theme")
     # 2. No filter specified (plugin_type is None) - show all types including themes
     if include_themes or plugin_type is None:
         try:
-            # Get themes from database (same as other plugins)
-            theme_db_types = {
-                tid: db_type
-                for tid, db_type in db_types.items()
-                if db_type.plugin_type == PluginType.THEME.value
-            }
-
-            for theme_id, db_type in theme_db_types.items():
-                # Get theme manifest for additional metadata (is_builtin, variables, etc.)
-                # This is still needed for theme-specific features,
-                # but DB is source of truth for listing
-                theme_manifest = None
-                try:
-                    if db_type.type_id in BUILTIN_THEMES:
-                        # Built-in theme - get from BUILTIN_THEMES
-                        theme_manifest = BUILTIN_THEMES.get(db_type.type_id)
-                    else:
-                        # Installed theme - get from disk (for now, could cache in DB later)
-                        theme_manifest = theme_installer.get_theme_manifest(db_type.type_id)
-                except Exception as e:
-                    logger.warning(
-                        f"[get_plugins] Error loading theme manifest for {theme_id}: {e}"
-                    )
-                    # Use DB data if manifest unavailable
-
-                # Determine if built-in
-                is_builtin = theme_manifest.get("is_builtin", False) if theme_manifest else False
-
+            # Get built-in themes from BUILTIN_THEMES
+            for theme_id, theme_manifest in BUILTIN_THEMES.items():
                 theme_entry = {
-                    "id": db_type.type_id,
-                    "name": db_type.name,
+                    "id": theme_id,
+                    "name": theme_manifest.get("name", theme_id),
                     "type": PluginType.THEME.value,
-                    "description": db_type.description or "",
+                    "description": theme_manifest.get("description", ""),
                     "config_schema": {},
                     "instance_config_schema": {},
-                    "enabled": db_type.enabled,
+                    "enabled": True,  # Built-in themes are always enabled
                     "ui_actions": [],
                     "ui_sections": [],
                     "supports_multiple_instances": False,
-                    "is_builtin": is_builtin,
-                    "version": db_type.version or "1.0.0",
+                    "is_builtin": True,
+                    "version": theme_manifest.get("version", "1.0.0"),
+                }
+                result.append(theme_entry)
+
+            # Get installed themes from filesystem
+            installed_themes = theme_installer.get_installed_themes()
+            for theme_manifest in installed_themes:
+                theme_id = theme_manifest.get("id")
+                if not theme_id:
+                    continue
+
+                # Skip if already added as built-in
+                if theme_id in BUILTIN_THEMES:
+                    continue
+
+                theme_entry = {
+                    "id": theme_id,
+                    "name": theme_manifest.get("name", theme_id),
+                    "type": PluginType.THEME.value,
+                    "description": theme_manifest.get("description", ""),
+                    "config_schema": {},
+                    "instance_config_schema": {},
+                    "enabled": True,  # Installed themes are enabled by default
+                    "ui_actions": [],
+                    "ui_sections": [],
+                    "supports_multiple_instances": False,
+                    "is_builtin": False,
+                    "version": theme_manifest.get("version", "1.0.0"),
                 }
                 result.append(theme_entry)
         except Exception as e:

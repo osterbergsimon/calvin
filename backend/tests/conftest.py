@@ -60,9 +60,42 @@ def temp_db_path() -> Generator[Path, None, None]:
     with tempfile.NamedTemporaryFile(suffix=".db", delete=False) as tmp:
         db_path = Path(tmp.name)
     yield db_path
-    # Cleanup
+    # Cleanup - handle Windows file locking with retry logic
     if db_path.exists():
-        db_path.unlink()
+        import sys
+
+        max_retries = 5
+        for attempt in range(max_retries):
+            try:
+                db_path.unlink()
+                break
+            except PermissionError:
+                if attempt < max_retries - 1:
+                    # Wait a bit for file handle to be released (Windows issue)
+                    time.sleep(0.1 * (attempt + 1))
+                else:
+                    # On Windows, sometimes the file is still locked even after disconnect
+                    # Try to force close any remaining connections
+                    import gc
+
+                    gc.collect()
+                    try:
+                        db_path.unlink()
+                    except PermissionError:
+                        # Last resort: mark for deletion on Windows
+                        if sys.platform == "win32":
+                            try:
+                                import os
+
+                                os.chmod(db_path, 0o777)  # Make writable
+                                db_path.unlink()
+                            except Exception:
+                                # If all else fails, just log and continue
+                                logger.warning(
+                                    f"Could not delete {db_path}, may need manual cleanup"
+                                )
+                        else:
+                            raise
 
 
 @pytest.fixture
@@ -198,7 +231,34 @@ async def test_database(temp_db_path: Path) -> AsyncGenerator[databases.Database
     yield test_db
 
     # Cleanup
-    await test_db.disconnect()
+    # Ensure database is fully disconnected
+    if test_db.is_connected:
+        await test_db.disconnect()
+
+    # On Windows, add a small delay to ensure file handles are released
+    import sys
+
+    if sys.platform == "win32":
+        import asyncio
+
+        await asyncio.sleep(0.1)
+
+
+def _update_ormar_models_database(new_database: databases.Database):
+    """
+    Update all ORMAR models to use a new database connection.
+
+    ORMAR models store the database connection in ormar_config.database at class
+    definition time. When we patch app.database.database, we also need to update
+    the models' ormar_config.database to use the new connection.
+    """
+    from app.models.db_models import ConfigDB, KeyboardMappingDB, PluginDB, PluginTypeDB
+
+    # Update database connection for all ORMAR models
+    ConfigDB.ormar_config.database = new_database
+    KeyboardMappingDB.ormar_config.database = new_database
+    PluginDB.ormar_config.database = new_database
+    PluginTypeDB.ormar_config.database = new_database
 
 
 @pytest_asyncio.fixture
@@ -211,6 +271,11 @@ async def test_db(test_database: databases.Database) -> AsyncGenerator[databases
 
     # Patch database connection
     db_module.database = test_database
+
+    # CRITICAL: Update ORMAR models to use the new database connection
+    # ORMAR models cache the database connection at class definition time,
+    # so we must explicitly update their ormar_config.database
+    _update_ormar_models_database(test_database)
 
     try:
         # Reload service modules that use database
@@ -241,6 +306,8 @@ async def test_db(test_database: databases.Database) -> AsyncGenerator[databases
 
         yield test_database
     finally:
+        # Restore ORMAR models BEFORE disconnecting to avoid connection issues
+        _update_ormar_models_database(original_database)
         # Restore original database connection
         # Don't reload plugin_registry here - let test_client handle it for integration tests
         db_module.database = original_database
@@ -385,6 +452,11 @@ def test_client(
 
     db_module.database = test_database
 
+    # CRITICAL: Update ORMAR models to use the new database connection
+    # ORMAR models cache the database connection at class definition time,
+    # so we must explicitly update their ormar_config.database
+    _update_ormar_models_database(test_database)
+
     # CRITICAL: Reload modules AFTER patching database, not before
     # This ensures all modules use the NEW patched database
     # If we reload before patching, modules will import the OLD database
@@ -450,6 +522,8 @@ def test_client(
 
             original_db = db_module.database
             db_module.database = test_database
+            # Update ORMAR models to use test database
+            _update_ormar_models_database(test_database)
 
             try:
                 import ormar
@@ -542,6 +616,8 @@ def test_client(
                 logger.debug("Added test data (including themes) to test database")
             finally:
                 db_module.database = original_db
+                # Restore ORMAR models to use original database
+                _update_ormar_models_database(original_db)
 
         loop_data.run_until_complete(add_test_data())
     finally:
@@ -766,6 +842,8 @@ def test_client(
     # Restore original database URL and database connection
     app.config.settings.database_url = original_db_url
     db_module.database = original_database
+    # Restore ORMAR models to use original database
+    _update_ormar_models_database(original_database)
 
     # Restore original IMAGE_DIR environment variable
     if original_image_dir is None:
