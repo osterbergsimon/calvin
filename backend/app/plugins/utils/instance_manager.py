@@ -9,8 +9,6 @@ import logging
 from collections.abc import Callable
 from typing import Any
 
-from sqlalchemy import select
-
 from app.models.db_models import PluginDB
 from app.plugins.manager import plugin_manager
 from app.plugins.registry import plugin_registry
@@ -77,7 +75,7 @@ async def handle_plugin_config_update_generic(
     config: dict[str, Any],
     enabled: bool | None,
     db_type: Any,
-    session: Any,
+    session: Any,  # Kept for backward compatibility with hooks, but not used
     manager_config: InstanceManagerConfig,
 ) -> dict[str, Any] | None:
     """
@@ -98,7 +96,7 @@ async def handle_plugin_config_update_generic(
         config: Configuration dictionary
         enabled: Whether plugin type is enabled
         db_type: PluginTypeDB instance
-        session: Database session (may be async or sync)
+        session: Database session (kept for backward compatibility, but not used with Ormar)
         manager_config: InstanceManagerConfig with plugin-specific callbacks
 
     Returns:
@@ -154,39 +152,37 @@ async def handle_plugin_config_update_generic(
     try:
         if plugin_instance_id:
             # Try to find by ID
-            try:
-                result = await session.execute(
-                    select(PluginDB).where(
-                        PluginDB.id == plugin_instance_id, PluginDB.type_id == type_id
+            db_instance = await PluginDB.objects.get_or_none(id=plugin_instance_id, type_id=type_id)
+            # If found, check if it's actually in the manager
+            if db_instance:
+                existing_plugin = plugin_manager.get_plugin(db_instance.id)
+                if not existing_plugin:
+                    # Instance exists in DB but not in manager - treat as new instance
+                    # (delete the orphaned DB entry)
+                    logger.info(
+                        f"[{type_id}] Instance {db_instance.id} exists in DB but not in manager, "
+                        "deleting orphaned entry and creating new instance"
                     )
-                )
-                db_instance = result.scalar_one_or_none()
-            except TypeError:
-                # Fallback to sync
-                result = session.execute(
-                    select(PluginDB).where(
-                        PluginDB.id == plugin_instance_id, PluginDB.type_id == type_id
-                    )
-                )
-                db_instance = result.scalar_one_or_none()
+                    await db_instance.delete()
+                    db_instance = None
 
         if not db_instance and manager_config.single_instance:
             # For single-instance, also check by type_id
-            try:
-                result = await session.execute(select(PluginDB).where(PluginDB.type_id == type_id))
-                db_instance = result.scalar_one_or_none()
-            except TypeError:
-                result = session.execute(select(PluginDB).where(PluginDB.type_id == type_id))
-                db_instance = result.scalar_one_or_none()
+            db_instance = await PluginDB.objects.get_or_none(type_id=type_id)
+            if db_instance:
+                existing_plugin = plugin_manager.get_plugin(db_instance.id)
+                if not existing_plugin:
+                    await db_instance.delete()
+                    db_instance = None
 
         if not db_instance and not plugin_instance_id and not instance_name:
             # Backward compatibility: find first instance of this type
-            try:
-                result = await session.execute(select(PluginDB).where(PluginDB.type_id == type_id))
-                db_instance = result.scalar_one_or_none()
-            except TypeError:
-                result = session.execute(select(PluginDB).where(PluginDB.type_id == type_id))
-                db_instance = result.scalar_one_or_none()
+            db_instance = await PluginDB.objects.get_or_none(type_id=type_id)
+            if db_instance:
+                existing_plugin = plugin_manager.get_plugin(db_instance.id)
+                if not existing_plugin:
+                    await db_instance.delete()
+                    db_instance = None
     except Exception as e:
         logger.warning(f"[{type_id}] Error querying database: {e}", exc_info=True)
         db_instance = None
@@ -217,16 +213,7 @@ async def handle_plugin_config_update_generic(
                 plugin_instance_id = f"{type_id}-{config_hash}"
 
         # Ensure uniqueness
-        try:
-            check_result = await session.execute(
-                select(PluginDB).where(PluginDB.id == plugin_instance_id)
-            )
-            existing = check_result.scalar_one_or_none()
-        except TypeError:
-            check_result = session.execute(
-                select(PluginDB).where(PluginDB.id == plugin_instance_id)
-            )
-            existing = check_result.scalar_one_or_none()
+        existing = await PluginDB.objects.get_or_none(id=plugin_instance_id)
 
         if existing:
             # Add timestamp to make unique
@@ -246,7 +233,6 @@ async def handle_plugin_config_update_generic(
                 name=instance_name or manager_config.default_instance_name,
                 config=instance_config,
                 enabled=instance_enabled,
-                session=session,  # Pass session to avoid creating a new one
             )
 
             result = {
@@ -333,16 +319,74 @@ async def handle_plugin_config_update_generic(
                 manager_config.on_instance_updated(plugin, result)
 
         else:
-            logger.warning(f"[{type_id}] Plugin instance {db_instance.id} not found in manager")
-            result = {"instance_updated": False, "error": "Plugin instance not found"}
+            # Instance exists in DB but not in manager - try to register it
+            # If plugin_loader can't create it, just update the DB entry
+            logger.info(f"[{type_id}] Instance {db_instance.id} exists in DB but not in manager")
+            try:
+                # Try to create plugin instance using pluggy hooks
+                from app.plugins.loader import plugin_loader
+
+                plugin = plugin_loader.create_plugin_instance(
+                    plugin_id=db_instance.id,
+                    type_id=type_id,
+                    name=db_instance.name,
+                    config={**instance_config, "enabled": final_enabled},
+                )
+
+                if plugin:
+                    # Configure and register plugin
+                    await plugin.configure(instance_config)
+                    if final_enabled:
+                        plugin.enable()
+                    else:
+                        plugin.disable()
+
+                    await plugin_manager.register(plugin)
+                    await plugin.initialize()
+
+                    result = {
+                        "instance_created": True,  # Treat as creation since it wasn't in manager
+                        "instance_id": db_instance.id,
+                    }
+
+                    if manager_config.on_instance_created:
+                        manager_config.on_instance_created(plugin, result)
+                else:
+                    # Plugin can't be created (e.g., plugin type not available)
+                    # Just update the DB entry
+                    logger.warning(
+                        f"[{type_id}] Cannot create plugin instance for {db_instance.id}, "
+                        "plugin type may not be available. Updating DB entry only."
+                    )
+                    result = {
+                        "instance_updated": True,
+                        "instance_id": db_instance.id,
+                        "warning": "Plugin instance updated in DB but not registered in manager",
+                    }
+            except Exception as e:
+                logger.error(
+                    f"[{type_id}] Failed to register existing instance: {e}", exc_info=True
+                )
+                # Still update the DB entry even if registration fails
+                result = {
+                    "instance_updated": True,
+                    "instance_id": db_instance.id,
+                    "warning": f"DB updated but registration failed: {str(e)}",
+                }
 
         # Update in database
         db_instance.config = instance_config
         db_instance.enabled = final_enabled
-        if db_type:
-            db_type.enabled = final_enabled
-
-        # Note: Don't commit here - the route will commit after all hooks complete
-        # Committing here causes rollback issues
+        await db_instance.save_with_timestamp()
+        if db_type and hasattr(db_type, "save_with_timestamp"):
+            # Only update if it's a real Ormar model (not a mock in tests)
+            try:
+                db_type.enabled = final_enabled
+                await db_type.save_with_timestamp()
+            except (AttributeError, TypeError):
+                # Fallback for mocks or if save_with_timestamp doesn't exist
+                if hasattr(db_type, "update"):
+                    db_type.enabled = final_enabled
+                    await db_type.update()
 
         return result
