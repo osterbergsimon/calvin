@@ -25,6 +25,17 @@ logger = logging.getLogger(__name__)
 
 # Import all models to ensure they're registered in metadata
 # This must be done at module level, before any fixtures run
+# Ormar models register their tables with metadata when imported
+# Verify that tables are registered (this will fail early if models aren't imported)
+_expected_tables = {"config", "keyboard_mappings", "plugin_types", "plugins"}
+_registered_tables = set(metadata.tables.keys())
+if not _registered_tables.issuperset(_expected_tables):
+    missing = _expected_tables - _registered_tables
+    raise RuntimeError(
+        f"Models not registered with metadata! Missing tables: {missing}. "
+        f"Registered: {_registered_tables}. "
+        "Make sure all Ormar models are imported before fixtures run."
+    )
 
 
 @pytest.fixture(scope="session")
@@ -74,24 +85,88 @@ def temp_db_path_for_integration() -> Generator[Path, None, None]:
 async def test_database(temp_db_path: Path) -> AsyncGenerator[databases.Database, None]:
     """Create a test database connection."""
     # CRITICAL: Models are already imported at module level (lines 17-22),
-    # so they're registered with metadata. No need to re-import here.
+    # so they're registered with metadata. Accessing them here ensures
+    # they're fully initialized (especially important in CI).
+    # We access the metadata through the models to force registration
+    _ = ConfigDB.ormar_config.metadata
+    _ = PluginDB.ormar_config.metadata
+    _ = PluginTypeDB.ormar_config.metadata
+    _ = KeyboardMappingDB.ormar_config.metadata
 
-    test_db_url = f"sqlite+aiosqlite:///{temp_db_path}"
-    test_db = databases.Database(test_db_url)
-
-    # Connect to database
-    await test_db.connect()
+    # CRITICAL: Create tables BEFORE connecting to avoid connection caching issues
+    # SQLite can cache the database state when a connection is opened, so we must
+    # create tables before any async connection is established
 
     # Debug: Log what tables are registered in metadata
     registered_tables = list(metadata.tables.keys())
     print(f"[test_database] Creating tables in {temp_db_path}")
     print(f"[test_database] Registered tables in metadata: {registered_tables}")
 
-    # Create all tables using sync engine
-    sync_url = f"sqlite:///{temp_db_path}"
+    # Verify metadata has tables before creating
+    # This is critical - if tables aren't registered, create_all will silently do nothing
+    if not metadata.tables:
+        # Try to force registration by accessing model metadata
+        try:
+            _ = ConfigDB.ormar_config.metadata
+            _ = PluginDB.ormar_config.metadata
+            _ = PluginTypeDB.ormar_config.metadata
+            _ = KeyboardMappingDB.ormar_config.metadata
+        except Exception as e:
+            raise RuntimeError(
+                f"Failed to access model metadata: {e}. Models may not be properly initialized."
+            ) from e
+
+        # Check again after accessing model metadata
+        if not metadata.tables:
+            raise RuntimeError(
+                f"No tables registered in metadata after model import! "
+                f"Expected tables: ['config', 'keyboard_mappings', 'plugin_types', 'plugins']. "
+                f"Metadata object: {metadata}. "
+                f"ConfigDB metadata: {ConfigDB.ormar_config.metadata}. "
+                f"Same object? {metadata is ConfigDB.ormar_config.metadata}"
+            )
+
+    # Create all tables using sync engine BEFORE connecting
+    # Use absolute path to ensure we're using the same file
+    abs_db_path = temp_db_path.resolve()
+    sync_url = f"sqlite:///{abs_db_path}"
     sync_engine = create_engine(sync_url, echo=False)
-    metadata.create_all(sync_engine)
-    sync_engine.dispose()
+    try:
+        # Explicitly create tables - this will fail if metadata is empty
+        if not metadata.tables:
+            raise RuntimeError(
+                f"Cannot create tables: metadata is empty! "
+                f"This means models weren't imported correctly. "
+                f"Metadata object: {metadata}"
+            )
+        metadata.create_all(sync_engine)
+        # Verify tables were actually created in the database
+        import sqlite3
+
+        with sqlite3.connect(str(abs_db_path)) as conn:
+            cursor = conn.cursor()
+            cursor.execute("SELECT name FROM sqlite_master WHERE type='table'")
+            created_tables = {row[0] for row in cursor.fetchall()}
+            if not created_tables:
+                raise RuntimeError(
+                    f"metadata.create_all() completed but no tables were created! "
+                    f"Database file: {abs_db_path}, "
+                    f"Metadata tables: {list(metadata.tables.keys())}"
+                )
+    except Exception as e:
+        print(f"[test_database] ERROR creating tables: {e}")
+        print(f"[test_database] Metadata tables: {list(metadata.tables.keys())}")
+        print(f"[test_database] Database path: {abs_db_path}")
+        print(f"[test_database] Database exists: {abs_db_path.exists()}")
+        raise
+    finally:
+        sync_engine.dispose()
+
+    # NOW connect to the database after tables are created
+    # Use absolute path to ensure we're using the same file
+    test_db_url = f"sqlite+aiosqlite:///{abs_db_path}"
+    test_db = databases.Database(test_db_url)
+    await test_db.connect()
 
     # Verify tables were actually created
     import sqlite3
@@ -196,28 +271,78 @@ def test_client(
     test_db_path_abs = temp_db_path_for_integration.resolve()
     app.config.settings.database_url = f"sqlite:///{test_db_path_abs}"
 
-    # Create database connection for fresh test database
-    test_db_url = f"sqlite+aiosqlite:///{test_db_path_abs}"
-    test_database = databases.Database(test_db_url)
+    # CRITICAL: Create tables BEFORE connecting to avoid connection caching issues
+    # SQLite can cache the database state when a connection is opened, so we must
+    # create tables before any async connection is established
 
     # Setup: Create all tables using metadata.create_all()
     # This is simpler and faster than running migrations for tests
     # All tables are defined in models, so this is sufficient
     # CRITICAL: Models are already imported at module level (lines 17-22),
-    # so they're registered with metadata. No need to re-import here.
+    # so they're registered with metadata. Accessing them here ensures
+    # they're fully initialized (especially important in CI).
+    _ = ConfigDB.ormar_config.metadata
+    _ = PluginDB.ormar_config.metadata
+    _ = PluginTypeDB.ormar_config.metadata
+    _ = KeyboardMappingDB.ormar_config.metadata
 
     # Debug: Log what tables are registered in metadata
     registered_tables = list(metadata.tables.keys())
     print(f"[test_client] Creating tables in {test_db_path_abs}")
     print(f"[test_client] Registered tables in metadata: {registered_tables}")
 
-    # Create tables using sync engine
+    # Verify metadata has tables before creating
+    # This is critical - if tables aren't registered, create_all will silently do nothing
+    if not metadata.tables:
+        # Try to force registration by accessing model metadata
+        try:
+            _ = ConfigDB.ormar_config.metadata
+            _ = PluginDB.ormar_config.metadata
+            _ = PluginTypeDB.ormar_config.metadata
+            _ = KeyboardMappingDB.ormar_config.metadata
+        except Exception as e:
+            raise RuntimeError(
+                f"Failed to access model metadata: {e}. Models may not be properly initialized."
+            ) from e
+
+        # Check again after accessing model metadata
+        if not metadata.tables:
+            raise RuntimeError(
+                f"No tables registered in metadata after model import! "
+                f"Expected tables: ['config', 'keyboard_mappings', 'plugin_types', 'plugins']. "
+                f"Metadata object: {metadata}. "
+                f"ConfigDB metadata: {ConfigDB.ormar_config.metadata}. "
+                f"Same object? {metadata is ConfigDB.ormar_config.metadata}"
+            )
+
+    # Create tables using sync engine BEFORE connecting
     sync_url = f"sqlite:///{test_db_path_abs}"
     sync_engine = create_engine(sync_url, echo=False)
-    metadata.create_all(sync_engine)
-    sync_engine.dispose()
+    try:
+        metadata.create_all(sync_engine)
+        # Verify tables were actually created
+        import sqlite3
 
-    # Connect to database
+        with sqlite3.connect(str(test_db_path_abs)) as conn:
+            cursor = conn.cursor()
+            cursor.execute("SELECT name FROM sqlite_master WHERE type='table'")
+            created_tables = {row[0] for row in cursor.fetchall()}
+            if not created_tables:
+                raise RuntimeError(
+                    f"metadata.create_all() completed but no tables were created! "
+                    f"Database file: {test_db_path_abs}, "
+                    f"Metadata tables: {list(metadata.tables.keys())}"
+                )
+    except Exception as e:
+        print(f"[test_client] ERROR creating tables: {e}")
+        print(f"[test_client] Metadata tables: {list(metadata.tables.keys())}")
+        raise
+    finally:
+        sync_engine.dispose()
+
+    # NOW connect to the database after tables are created
+    test_db_url = f"sqlite+aiosqlite:///{test_db_path_abs}"
+    test_database = databases.Database(test_db_url)
     loop = asyncio.new_event_loop()
     asyncio.set_event_loop(loop)
     try:
