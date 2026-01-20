@@ -6,9 +6,9 @@ from alembic import context
 
 # Import settings to get database URL
 from app.config import settings
-from app.database import Base
+from app.database import metadata
 
-# Import all models so they're registered with Base.metadata
+# Import all models so they're registered with metadata
 from app.models.db_models import (  # noqa: F401
     ConfigDB,
     KeyboardMappingDB,
@@ -26,7 +26,8 @@ if config.config_file_name is not None:
     fileConfig(config.config_file_name)
 
 # Set target_metadata for autogenerate support
-target_metadata = Base.metadata
+# Ormar models register themselves in metadata when imported
+target_metadata = metadata
 
 # Override sqlalchemy.url from settings if not set in alembic.ini
 # Convert async URL to sync URL for Alembic
