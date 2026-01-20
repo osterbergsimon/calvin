@@ -40,43 +40,35 @@ class PluginImageService:
         Returns:
             List of image metadata dictionaries
         """
-        from sqlalchemy import select
-
-        from app.database import AsyncSessionLocal
         from app.models.db_models import PluginDB, PluginTypeDB
 
         # Get enabled plugin types with their display_order from common_config_schema
-        async with AsyncSessionLocal() as session:
-            # Get all image plugin types and their enabled status + display_order
-            result = await session.execute(
-                select(PluginTypeDB).where(PluginTypeDB.plugin_type == "image")
-            )
-            plugin_types = result.scalars().all()
-            # Create maps: type_id -> enabled status, type_id -> display_order
-            enabled_type_map = {pt.type_id: pt.enabled for pt in plugin_types}
-            plugin_type_order_map = {}
-            for pt in plugin_types:
-                common_config = pt.common_config_schema or {}
-                # display_order is stored in common_config_schema (like service plugins)
-                display_order = common_config.get("display_order", 0)
-                try:
-                    display_order = int(display_order) if display_order else 0
-                except (ValueError, TypeError):
-                    display_order = 0
-                plugin_type_order_map[pt.type_id] = display_order
+        # Get all image plugin types and their enabled status + display_order
+        plugin_types = await PluginTypeDB.objects.filter(plugin_type="image").all()
+        # Create maps: type_id -> enabled status, type_id -> display_order
+        enabled_type_map = {pt.type_id: pt.enabled for pt in plugin_types}
+        plugin_type_order_map = {}
+        for pt in plugin_types:
+            common_config = pt.common_config_schema or {}
+            # display_order is stored in common_config_schema (like service plugins)
+            display_order = common_config.get("display_order", 0)
+            try:
+                display_order = int(display_order) if display_order else 0
+            except (ValueError, TypeError):
+                display_order = 0
+            plugin_type_order_map[pt.type_id] = display_order
 
-            # Get all image plugin instances with their display_order
-            result = await session.execute(
-                select(PluginDB)
-                .where(PluginDB.plugin_type == "image")
-                .order_by(PluginDB.display_order, PluginDB.name)
-            )
-            db_plugins = result.scalars().all()
-            # Create maps: plugin_id -> type_id, plugin_id -> display_order
-            plugin_type_map = {db_plugin.id: db_plugin.type_id for db_plugin in db_plugins}
-            plugin_order_map = {
-                db_plugin.id: (db_plugin.display_order or 0) for db_plugin in db_plugins
-            }
+        # Get all image plugin instances with their display_order
+        db_plugins = (
+            await PluginDB.objects.filter(plugin_type="image")
+            .order_by(["display_order", "name"])
+            .all()
+        )
+        # Create maps: plugin_id -> type_id, plugin_id -> display_order
+        plugin_type_map = {db_plugin.id: db_plugin.type_id for db_plugin in db_plugins}
+        plugin_order_map = {
+            db_plugin.id: (db_plugin.display_order or 0) for db_plugin in db_plugins
+        }
 
         # Get all enabled image plugins
         plugins = plugin_manager.get_plugins(PluginType.IMAGE, enabled_only=True)
