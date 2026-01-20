@@ -1,5 +1,6 @@
 """Service for managing keyboard mappings."""
 
+from app.database import database
 from app.models.db_models import KeyboardMappingDB
 
 
@@ -55,22 +56,25 @@ class KeyboardMappingService:
             keyboard_type: '7-button' or 'standard'
             mappings: Dictionary mapping key codes to actions
         """
-        # Delete existing mappings for this keyboard type
-        existing_mappings = await KeyboardMappingDB.objects.filter(
-            keyboard_type=keyboard_type
-        ).all()
-        for mapping in existing_mappings:
-            await mapping.delete()
+        # Wrap all operations in a transaction to ensure atomicity
+        # If any operation fails, all changes are rolled back
+        async with database.transaction():
+            # Delete existing mappings for this keyboard type
+            existing_mappings = await KeyboardMappingDB.objects.filter(
+                keyboard_type=keyboard_type
+            ).all()
+            for mapping in existing_mappings:
+                await mapping.delete()
 
-        # Add new mappings
-        for key_code, action in mappings.items():
-            await KeyboardMappingDB.objects.create(
-                keyboard_type=keyboard_type,
-                key_code=key_code,
-                action=action,
-            )
+            # Add new mappings
+            for key_code, action in mappings.items():
+                await KeyboardMappingDB.objects.create(
+                    keyboard_type=keyboard_type,
+                    key_code=key_code,
+                    action=action,
+                )
 
-        # Update cache
+        # Update cache only after successful transaction commit
         cache_key = f"mappings_{keyboard_type}"
         self._cache[cache_key] = mappings.copy()
 
@@ -117,10 +121,11 @@ class KeyboardMappingService:
             "mode_photos",
             "mode_web_services",
             "mode_spare",
-            # Generic context-aware buttons (3 buttons)
+            # Generic context-aware buttons (4 buttons)
             "generic_next",
             "generic_prev",
             "generic_expand_close",
+            "generic_refresh",
             # Legacy/Advanced actions
             "mode_settings",
             "mode_cycle",

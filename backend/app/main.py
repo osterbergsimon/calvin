@@ -206,13 +206,13 @@ async def _initialize_keyboard_mappings():
     if not mappings:
         # Set default 7-button keyboard mappings
         default_7button = {
-            "KEY_1": "generic_next",
-            "KEY_2": "generic_prev",
-            "KEY_3": "generic_expand_close",
+            "KEY_1": "generic_prev",
+            "KEY_2": "generic_expand_close",
+            "KEY_3": "generic_next",
             "KEY_4": "mode_calendar",
             "KEY_5": "mode_photos",
             "KEY_6": "mode_web_services",
-            "KEY_7": "mode_spare",
+            "KEY_7": "generic_refresh",
         }
         await keyboard_mapping_service.set_mappings("7-button", default_7button)
 

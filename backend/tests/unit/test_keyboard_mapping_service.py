@@ -228,3 +228,37 @@ async def test_set_mapping_new_keyboard_type(test_db):
 
     # Verify cache was created
     assert "mappings_custom-type" in service._cache
+
+
+@pytest.mark.asyncio
+@pytest.mark.unit
+async def test_set_mappings_successful_transaction(test_db):
+    """
+    Test that set_mappings succeeds when all operations complete successfully.
+
+    This complements the atomicity test by verifying the happy path.
+    """
+    service = KeyboardMappingService()
+
+    # Set initial mappings
+    initial_mappings = {"KEY_1": "mode_calendar", "KEY_2": "mode_photos"}
+    await service.set_mappings("7-button", initial_mappings)
+
+    # Set new mappings (should succeed completely)
+    new_mappings = {
+        "KEY_3": "generic_next",
+        "KEY_4": "generic_prev",
+        "KEY_5": "mode_web_services",
+    }
+    await service.set_mappings("7-button", new_mappings)
+
+    # Verify new mappings are present
+    mappings_after = await service.get_mappings("7-button")
+    assert mappings_after == new_mappings, "New mappings should be set after successful transaction"
+
+    # Verify old mappings are gone
+    assert "KEY_1" not in mappings_after
+    assert "KEY_2" not in mappings_after
+
+    # Verify cache was updated
+    assert service._cache["mappings_7-button"] == new_mappings
