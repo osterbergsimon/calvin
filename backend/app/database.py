@@ -2,8 +2,8 @@
 
 import logging
 
-from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker, create_async_engine
-from sqlalchemy.orm import declarative_base
+import databases
+from sqlalchemy import MetaData
 
 from app.config import settings
 
@@ -22,37 +22,36 @@ sqlalchemy_dialects_logger = logging.getLogger("sqlalchemy.dialects")
 sqlalchemy_dialects_logger.setLevel(logging.WARNING)
 sqlalchemy_dialects_logger.propagate = True
 
-# Create async engine
-# Set echo=False to prevent SQLAlchemy from creating its own handlers
-# SQL logging can be enabled via logger level if needed (set to DEBUG)
-# The echo parameter creates handlers that bypass logger level settings
-engine = create_async_engine(
-    settings.database_url.replace("sqlite:///", "sqlite+aiosqlite:///"),
-    echo=False,  # Disable echo to prevent handler creation - use logger level instead
-    future=True,
-)
+# Create database connection for Ormar
+database = databases.Database(settings.database_url.replace("sqlite:///", "sqlite+aiosqlite:///"))
 
-# Create async session factory
-AsyncSessionLocal = async_sessionmaker(
-    engine,
-    class_=AsyncSession,
-    expire_on_commit=False,
-)
-
-# Base class for models
-Base = declarative_base()
+# Create metadata for Ormar models
+metadata = MetaData()
 
 
-async def get_db() -> AsyncSession:
-    """Get database session."""
-    async with AsyncSessionLocal() as session:
-        try:
-            yield session
-        finally:
-            await session.close()
+async def connect_db():
+    """Connect to database."""
+    await database.connect()
+
+
+async def disconnect_db():
+    """Disconnect from database."""
+    await database.disconnect()
 
 
 async def init_db():
     """Initialize database (create tables)."""
-    async with engine.begin() as conn:
-        await conn.run_sync(Base.metadata.create_all)
+    # Connect if not already connected
+    if not database.is_connected:
+        await database.connect()
+
+    # Create tables using metadata
+    # Note: Ormar will create tables automatically when models are imported
+    # But we can also use metadata.create_all for explicit control
+    from sqlalchemy import create_engine
+
+    # For table creation, we need a sync engine
+    sync_url = settings.database_url.replace("sqlite+aiosqlite:///", "sqlite:///")
+    sync_engine = create_engine(sync_url, echo=False)
+    metadata.create_all(sync_engine)
+    sync_engine.dispose()
