@@ -45,8 +45,7 @@ def event_loop():
     yield loop
     loop.close()
 
-    # Removed base_test_db fixture - we now use Base.metadata.create_all() for each test
-    # This is simpler and provides better isolation
+    # Test database fixtures use Ormar metadata.create_all() for table creation
 
 
 @pytest.fixture
@@ -321,7 +320,7 @@ def test_client(
     Create a test client for FastAPI.
 
     Based on https://notes.kodekloud.com/docs/Python-API-Development-with-FastAPI/Testing/Create-Destroy-Database-After-Each-Test
-    Uses Base.metadata.create_all() instead of migrations for simplicity and speed.
+    Uses metadata.create_all() instead of migrations for simplicity and speed.
     """
     import asyncio
     import os
@@ -701,9 +700,7 @@ def test_client(
 
         loop.run_until_complete(load_plugin_instances())
 
-        # Themes are already in the base database, so we don't need to sync them
-        # This avoids the "no such table" errors from sync_themes_to_db() using
-        # the wrong database reference
+        # Themes are loaded from filesystem on-demand, no database sync needed
     finally:
         loop.close()
 

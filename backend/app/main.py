@@ -277,8 +277,6 @@ async def _initialize_default_config():
         "dark_mode_start": 18,  # 6 PM
         "dark_mode_end": 6,  # 6 AM
         "display_schedule_enabled": False,
-        "display_off_time": "22:00",  # 10 PM
-        "display_on_time": "06:00",  # 6 AM
         "reboot_combo_key1": "KEY_1",
         "reboot_combo_key2": "KEY_7",
         "reboot_combo_duration": 10000,  # 10 seconds

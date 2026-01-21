@@ -145,37 +145,12 @@ class DisplayPowerService:
                     await self.turn_display_on()
                     return
             except (json.JSONDecodeError, TypeError, AttributeError):
-                # Invalid schedule format, fall back to old format
-                pass
+                # Invalid schedule format, keep display on
+                await self.turn_display_on()
+                return
 
-        # Fall back to old format (single on/off time for all days)
-        display_off_time_str = config.get("display_off_time")
-        display_on_time_str = config.get("display_on_time")
-
-        if not display_off_time_str or not display_on_time_str:
-            # No schedule set, keep display on
-            await self.turn_display_on()
-            return
-
-        # Parse times (format: "HH:MM")
-        try:
-            off_hour, off_minute = map(int, display_off_time_str.split(":"))
-            on_hour, on_minute = map(int, display_on_time_str.split(":"))
-            display_off_time = time(off_hour, off_minute)
-            display_on_time = time(on_hour, on_minute)
-        except (ValueError, AttributeError):
-            # Invalid time format, keep display on
-            await self.turn_display_on()
-            return
-
-        # Get current time in configured timezone
-        if tz:
-            now = datetime.now(tz).time()
-        else:
-            now = datetime.now().time()
-
-        # Determine if display should be on or off
-        should_be_on = self._should_display_be_on(now, display_on_time, display_off_time)
+        # No schedule configured, keep display on
+        await self.turn_display_on()
 
         if should_be_on:
             await self.turn_display_on()

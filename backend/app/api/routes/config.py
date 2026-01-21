@@ -119,10 +119,6 @@ class ConfigUpdate(BaseModel):
     darkModeStart: int | None = None  # Dark mode start hour (0-23)
     darkModeEnd: int | None = None  # Dark mode end hour (0-23)
     displayScheduleEnabled: bool | None = None  # Enable display power schedule
-    # Display off time (format: "HH:MM") - deprecated, use displaySchedule
-    displayOffTime: str | None = None
-    # Display on time (format: "HH:MM") - deprecated, use displaySchedule
-    displayOnTime: str | None = None
     # Display schedule as JSON string or array:
     # [{"day": 0-6, "enabled": bool, "onTime": "HH:MM", "offTime": "HH:MM"}, ...]
     displaySchedule: str | list[dict[str, Any]] | None = None
@@ -265,14 +261,6 @@ async def get_config():
         config["displayScheduleEnabled"] = False  # Disabled by default
     elif "display_schedule_enabled" in config and "displayScheduleEnabled" not in config:
         config["displayScheduleEnabled"] = config["display_schedule_enabled"]
-    if "displayOffTime" not in config and "display_off_time" not in config:
-        config["displayOffTime"] = "22:00"  # 10 PM default
-    elif "display_off_time" in config and "displayOffTime" not in config:
-        config["displayOffTime"] = config["display_off_time"]
-    if "displayOnTime" not in config and "display_on_time" not in config:
-        config["displayOnTime"] = "06:00"  # 6 AM default
-    elif "display_on_time" in config and "displayOnTime" not in config:
-        config["displayOnTime"] = config["display_on_time"]
     # Handle display schedule (per-day schedule)
     # Check if we have a valid schedule (not None, not empty string, not empty list)
     has_schedule = False
@@ -480,10 +468,6 @@ async def update_config(config_update: ConfigUpdate):
         update_dict["dark_mode_end"] = update_dict.pop("darkModeEnd")
     if "displayScheduleEnabled" in update_dict:
         update_dict["display_schedule_enabled"] = update_dict.pop("displayScheduleEnabled")
-    if "displayOffTime" in update_dict:
-        update_dict["display_off_time"] = update_dict.pop("displayOffTime")
-    if "displayOnTime" in update_dict:
-        update_dict["display_on_time"] = update_dict.pop("displayOnTime")
     if "displaySchedule" in update_dict:
         # Store schedule with explicit type
         # Pass the schedule directly (list/array) to set_value, which will serialize it

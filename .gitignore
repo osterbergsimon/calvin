@@ -89,6 +89,7 @@ frontend/test-results/
 data/images/
 backend/data/images/
 data/db/
+backend/data/db/
 backend/data/cache/
 backend/data/plugins/
 backend/data/themes/

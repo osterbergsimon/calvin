@@ -7,7 +7,6 @@ from typing import Any
 
 from app.models.db_models import PluginTypeDB
 from app.plugins.base import PluginType
-from app.services.theme_installer import theme_installer
 
 logger = logging.getLogger(__name__)
 
@@ -99,36 +98,3 @@ async def _unregister_theme_from_db(theme_id: str) -> None:
 
     if db_type and db_type.plugin_type == PluginType.THEME.value:
         await db_type.delete()
-
-
-async def sync_themes_to_db() -> None:
-    """
-    Sync all themes (built-in + installed) to PluginTypeDB.
-    Should be called on startup to ensure themes are registered.
-    """
-    # Register built-in themes
-    logger.info(f"Syncing {len(BUILTIN_THEMES)} built-in themes to database")
-    for theme_id, theme_data in BUILTIN_THEMES.items():
-        try:
-            await _register_theme_in_db(theme_data)
-            logger.debug(f"Registered built-in theme: {theme_id}")
-        except Exception as e:
-            logger.error(f"Failed to register built-in theme {theme_id}: {e}", exc_info=True)
-            # Continue with other themes even if one fails
-
-    # Register installed themes
-    try:
-        installed_themes = theme_installer.get_installed_themes()
-        logger.info(f"Syncing {len(installed_themes)} installed themes to database")
-        for theme in installed_themes:
-            try:
-                await _register_theme_in_db(theme)
-                logger.debug(f"Registered installed theme: {theme.get('id', 'unknown')}")
-            except Exception as e:
-                logger.error(
-                    f"Failed to register installed theme {theme.get('id', 'unknown')}: {e}",
-                    exc_info=True,
-                )
-                # Continue with other themes even if one fails
-    except Exception as e:
-        logger.error(f"Failed to get installed themes: {e}", exc_info=True)

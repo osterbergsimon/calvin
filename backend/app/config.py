@@ -20,7 +20,30 @@ class Settings(BaseSettings):
     api_port: int = 8000
 
     # Database
+    # Use absolute path to avoid path resolution issues
     database_url: str = "sqlite:///./data/db/calvin.db"
+
+    @property
+    def database_path(self) -> Path:
+        """Get the absolute path to the database file."""
+        db_path_str = self.database_url.replace("sqlite:///", "").replace(
+            "sqlite+aiosqlite:///", ""
+        )
+        # Remove leading ./ if present
+        if db_path_str.startswith("./"):
+            db_path_str = db_path_str[2:]
+        # If path starts with /, it's already absolute
+        if db_path_str.startswith("/"):
+            return Path(db_path_str)
+        # Otherwise resolve relative to backend directory
+        # Find backend directory (where this config file is located)
+        backend_dir = Path(__file__).parent.parent
+        return (backend_dir / db_path_str).resolve()
+
+    @property
+    def database_url_absolute(self) -> str:
+        """Get the database URL with absolute path."""
+        return f"sqlite:///{self.database_path}"
 
     # Logging
     log_level: str = "INFO"
@@ -89,11 +112,8 @@ class Settings(BaseSettings):
         self.image_cache_dir.mkdir(parents=True, exist_ok=True)
         self.plugins_dir.mkdir(parents=True, exist_ok=True)
         # Extract database path and ensure directory exists
-        # Handle both absolute paths (sqlite:///path) and relative paths (sqlite:///./path)
-        db_path_str = self.database_url.replace("sqlite:///", "")
-        # If path starts with /, it's absolute;
-        # otherwise resolve relative to current working directory
-        db_path = Path(db_path_str) if db_path_str.startswith("/") else Path(db_path_str).resolve()
+        # Use the database_path property to get absolute path
+        db_path = self.database_path
         db_path.parent.mkdir(parents=True, exist_ok=True)
 
         # Migrate database from old incorrect location if it exists
@@ -116,9 +136,7 @@ class Settings(BaseSettings):
 
                         shutil.copy2(wrong_path, db_path)
                         logger.info(f"Database migrated successfully to {db_path}")
-                        # Optionally remove old file (commented out for safety)
-                        # wrong_path.unlink()
-                        # logger.info(f"Removed old database file: {wrong_path}")
+                        # Old file is kept for safety - user can remove manually if needed
                     except Exception as e:
                         logger.warning(f"Failed to migrate database: {e}", exc_info=True)
                     break

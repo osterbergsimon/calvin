@@ -23,7 +23,10 @@ sqlalchemy_dialects_logger.setLevel(logging.WARNING)
 sqlalchemy_dialects_logger.propagate = True
 
 # Create database connection for Ormar
-database = databases.Database(settings.database_url.replace("sqlite:///", "sqlite+aiosqlite:///"))
+# Use absolute path to avoid path resolution issues
+database = databases.Database(
+    settings.database_url_absolute.replace("sqlite:///", "sqlite+aiosqlite:///")
+)
 
 # Create metadata for Ormar models
 metadata = MetaData()
@@ -51,7 +54,8 @@ async def init_db():
     from sqlalchemy import create_engine
 
     # For table creation, we need a sync engine
-    sync_url = settings.database_url.replace("sqlite+aiosqlite:///", "sqlite:///")
+    # Use absolute path to avoid path resolution issues
+    sync_url = settings.database_url_absolute.replace("sqlite+aiosqlite:///", "sqlite:///")
     sync_engine = create_engine(sync_url, echo=False)
     metadata.create_all(sync_engine)
     sync_engine.dispose()

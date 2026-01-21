@@ -25,7 +25,7 @@ async def initialize_database(
 
     This function:
     1. Ensures the database file exists
-    2. Runs Alembic migrations to create all tables and handle data migrations
+    2. Runs Alembic migrations to create all tables
     3. If migrations are disabled, falls back to metadata.create_all()
 
     Args:
