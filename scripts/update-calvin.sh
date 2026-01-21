@@ -1,9 +1,18 @@
 #!/bin/bash
 # Auto-update script for Calvin Dashboard
 # Pulls latest code from GitHub and restarts services
+#
+# Usage: update-calvin.sh [--force]
+#   --force: Run full update even if no git changes are detected
 
 # Don't use set -e - we want to continue even if some steps fail
 set +e
+
+# Parse command line arguments
+FORCE_UPDATE=false
+if [[ "$1" == "--force" ]]; then
+    FORCE_UPDATE=true
+fi
 
 # Source environment file if it exists
 if [ -f /etc/default/calvin-update ]; then
@@ -59,8 +68,13 @@ else
     # Check if there are any changes
     NEW_COMMIT=$(git rev-parse "origin/$GIT_BRANCH" 2>/dev/null || echo "")
     if [ "$CURRENT_COMMIT" = "$NEW_COMMIT" ]; then
-        echo "No changes detected. Already up to date at commit $CURRENT_COMMIT" | tee -a "$LOG_FILE"
-        HAS_CHANGES=false
+        if [ "$FORCE_UPDATE" = true ]; then
+            echo "No git changes detected, but --force specified. Running full update anyway." | tee -a "$LOG_FILE"
+            HAS_CHANGES=true
+        else
+            echo "No changes detected. Already up to date at commit $CURRENT_COMMIT" | tee -a "$LOG_FILE"
+            HAS_CHANGES=false
+        fi
     else
         echo "Changes detected. Updating from $CURRENT_COMMIT to $NEW_COMMIT..." | tee -a "$LOG_FILE"
         if ! git reset --hard "origin/$GIT_BRANCH"; then
