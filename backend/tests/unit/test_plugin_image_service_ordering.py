@@ -8,29 +8,47 @@ from app.plugins.protocols import ImagePlugin
 from app.services.plugin_image_service import PluginImageService
 
 
-def create_mock_session(plugin_types, db_plugins):
-    """Helper to create a mock AsyncSessionLocal with proper async context manager."""
-    mock_session_instance = MagicMock()
-    mock_session_instance.__aenter__ = AsyncMock(return_value=mock_session_instance)
-    mock_session_instance.__aexit__ = AsyncMock(return_value=None)
+def create_mock_ormar_models(plugin_types, db_plugins):
+    """Helper to create mock Ormar model objects for testing.
 
-    # Mock execute results
-    mock_type_result = MagicMock()
-    mock_type_result.scalars.return_value.all.return_value = plugin_types
+    Patches the entire model classes in the db_models module to avoid property issues.
+    """
+    # Mock PluginTypeDB.objects
+    mock_plugin_type_manager = MagicMock()
+    mock_plugin_type_manager.filter.return_value.all = AsyncMock(return_value=plugin_types)
+    mock_plugin_type_manager.all = AsyncMock(return_value=plugin_types)
 
-    mock_db_result = MagicMock()
-    mock_db_result.scalars.return_value.all.return_value = db_plugins
+    # Mock PluginDB.objects
+    mock_plugin_db_manager = MagicMock()
+    mock_plugin_db_manager.filter.return_value.all = AsyncMock(return_value=db_plugins)
+    mock_plugin_db_manager.filter.return_value.order_by.return_value.all = AsyncMock(
+        return_value=db_plugins
+    )
+    mock_plugin_db_manager.all = AsyncMock(return_value=db_plugins)
 
-    # Make execute return different results for different queries
-    def execute_side_effect(query):
-        query_str = str(query)
-        if "plugin_types" in query_str.lower():
-            return mock_type_result
-        else:
-            return mock_db_result
+    # Create mock classes that have the objects property as a simple attribute
+    # This avoids the read-only property issue
+    class MockPluginTypeDB:
+        def __init__(self):
+            pass
 
-    mock_session_instance.execute = AsyncMock(side_effect=execute_side_effect)
-    return patch("app.database.AsyncSessionLocal", return_value=mock_session_instance)
+        objects = mock_plugin_type_manager
+
+    class MockPluginDB:
+        def __init__(self):
+            pass
+
+        objects = mock_plugin_db_manager
+
+    # Patch the entire classes in the db_models module
+    from unittest.mock import patch
+
+    from app.models import db_models
+
+    type_patch = patch.object(db_models, "PluginTypeDB", MockPluginTypeDB)
+    db_patch = patch.object(db_models, "PluginDB", MockPluginDB)
+
+    return (type_patch, db_patch)
 
 
 @pytest.mark.asyncio
@@ -59,7 +77,8 @@ class TestImagePluginOrdering:
             MagicMock(id="local-images", type_id="local", display_order=0),
         ]
 
-        with create_mock_session(mock_plugin_types, mock_db_plugins):
+        type_patch, db_patch = create_mock_ormar_models(mock_plugin_types, mock_db_plugins)
+        with type_patch, db_patch:
             # Mock plugin manager
             with patch("app.services.plugin_image_service.plugin_manager") as mock_manager:
                 mock_manager.get_plugins.return_value = mock_plugins
@@ -101,7 +120,8 @@ class TestImagePluginOrdering:
             MagicMock(id="imap-instance-2", type_id="imap", display_order=1),
         ]
 
-        with create_mock_session([mock_plugin_type], mock_db_plugins):
+        type_patch, db_patch = create_mock_ormar_models([mock_plugin_type], mock_db_plugins)
+        with type_patch, db_patch:
             # Mock plugin manager
             with patch("app.services.plugin_image_service.plugin_manager") as mock_manager:
                 mock_manager.get_plugins.return_value = mock_plugins
@@ -148,7 +168,8 @@ class TestImagePluginOrdering:
             MagicMock(id="imap-instance-1", type_id="imap", display_order=0),
         ]
 
-        with create_mock_session(mock_plugin_types, mock_db_plugins):
+        type_patch, db_patch = create_mock_ormar_models(mock_plugin_types, mock_db_plugins)
+        with type_patch, db_patch:
             # Mock plugin manager
             with patch("app.services.plugin_image_service.plugin_manager") as mock_manager:
                 mock_manager.get_plugins.return_value = mock_plugins
@@ -185,7 +206,8 @@ class TestImagePluginOrdering:
             MagicMock(id="local-images", type_id="local", display_order=0),
         ]
 
-        with create_mock_session([mock_plugin_type], mock_db_plugins):
+        type_patch, db_patch = create_mock_ormar_models([mock_plugin_type], mock_db_plugins)
+        with type_patch, db_patch:
             # Mock plugin manager
             with patch("app.services.plugin_image_service.plugin_manager") as mock_manager:
                 mock_manager.get_plugins.return_value = [mock_plugin]
@@ -230,7 +252,8 @@ class TestImagePluginOrdering:
             MagicMock(id="imap-instance-1", type_id="imap", display_order=0),
         ]
 
-        with create_mock_session(mock_plugin_types, mock_db_plugins):
+        type_patch, db_patch = create_mock_ormar_models(mock_plugin_types, mock_db_plugins)
+        with type_patch, db_patch:
             # Mock plugin manager
             with patch("app.services.plugin_image_service.plugin_manager") as mock_manager:
                 mock_manager.get_plugins.return_value = mock_plugins

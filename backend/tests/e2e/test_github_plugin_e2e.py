@@ -82,9 +82,9 @@ class TestGitHubPluginE2E:
 
     def test_enumerate_plugins_from_real_github_repo(self, test_client, network_available):
         """Test enumerating plugins from a real GitHub repository."""
-        response = test_client.get(
-            "/api/plugins/enumerate-from-github",
-            params={"repo_url": DEFAULT_TEST_REPO, "branch": DEFAULT_TEST_BRANCH},
+        response = test_client.post(
+            "/api/plugins/github/enumerate",
+            json={"repo_url": DEFAULT_TEST_REPO, "branch": DEFAULT_TEST_BRANCH},
         )
 
         if response.status_code == 404:
@@ -110,9 +110,9 @@ class TestGitHubPluginE2E:
     def test_install_plugin_from_real_github_repo(self, test_client, network_available):
         """Test installing a plugin from a real GitHub repository."""
         # First, enumerate to find available plugins
-        enum_response = test_client.get(
-            "/api/plugins/enumerate-from-github",
-            params={"repo_url": DEFAULT_TEST_REPO, "branch": DEFAULT_TEST_BRANCH},
+        enum_response = test_client.post(
+            "/api/plugins/github/enumerate",
+            json={"repo_url": DEFAULT_TEST_REPO, "branch": DEFAULT_TEST_BRANCH},
         )
 
         if enum_response.status_code != 200:
@@ -134,7 +134,7 @@ class TestGitHubPluginE2E:
 
         # Install the plugin
         install_response = test_client.post(
-            "/api/plugins/install-from-github",
+            "/api/plugins/github/install",
             json={
                 "repo_url": DEFAULT_TEST_REPO,
                 "plugin_path": plugin_path,
@@ -165,9 +165,9 @@ class TestGitHubPluginE2E:
         """Test branch fallback behavior with a real repository."""
         # Try to enumerate with a non-existent branch first
         # This should trigger fallback logic if the repo uses 'master' instead of 'main'
-        response = test_client.get(
-            "/api/plugins/enumerate-from-github",
-            params={"repo_url": DEFAULT_TEST_REPO},  # No branch specified, defaults to main
+        response = test_client.post(
+            "/api/plugins/github/enumerate",
+            json={"repo_url": DEFAULT_TEST_REPO},  # No branch specified, defaults to main
         )
 
         if response.status_code == 404:
@@ -186,9 +186,9 @@ class TestGitHubPluginE2E:
     def test_install_plugin_with_frontend_from_real_repo(self, test_client, network_available):
         """Test installing a plugin with frontend components from a real repository."""
         # First, enumerate to find plugins with frontend
-        enum_response = test_client.get(
-            "/api/plugins/enumerate-from-github",
-            params={"repo_url": DEFAULT_TEST_REPO, "branch": DEFAULT_TEST_BRANCH},
+        enum_response = test_client.post(
+            "/api/plugins/github/enumerate",
+            json={"repo_url": DEFAULT_TEST_REPO, "branch": DEFAULT_TEST_BRANCH},
         )
 
         if enum_response.status_code != 200:
@@ -213,7 +213,7 @@ class TestGitHubPluginE2E:
 
         # Install the plugin
         install_response = test_client.post(
-            "/api/plugins/install-from-github",
+            "/api/plugins/github/install",
             json={
                 "repo_url": DEFAULT_TEST_REPO,
                 "plugin_path": plugin_path,

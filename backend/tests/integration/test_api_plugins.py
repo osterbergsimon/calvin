@@ -230,8 +230,14 @@ def register_plugin_types() -> list[dict[str, Any]]:
 
         # Uninstall
         response = test_client.delete("/api/plugins/installed/test_uninstall_plugin")
-        assert response.status_code == 200
-        assert response.json()["success"] is True
+        assert response.status_code == 200, (
+            f"Expected 200, got {response.status_code}: {response.text}"
+        )
+        response_data = response.json()
+        assert response_data is not None, (
+            f"Response body is None. Status: {response.status_code}, Text: {response.text}"
+        )
+        assert response_data.get("success") is True
 
         # Verify it's removed
         response = test_client.get("/api/plugins/installed")
@@ -313,16 +319,23 @@ class TestPluginInstanceManagement:
         # We test this by checking that instance routes return 404 (not found)
         # rather than 405 (method not allowed) or other generic route errors
 
+        # Use a truly non-existent instance ID (not in database)
+        nonexistent_id = "definitely-does-not-exist-instance-12345"
+
         # Try to start a non-existent instance
-        response = test_client.post("/api/plugins/instances/test-instance/start")
+        response = test_client.post(f"/api/plugins/instances/{nonexistent_id}/start")
         # Should get 404 (not found) from instance route, not from generic route
-        assert response.status_code == 404
+        assert response.status_code == 404, (
+            f"Expected 404, got {response.status_code}: {response.text}"
+        )
         # The error message should be specific to instance not found
         assert "instance" in response.json()["detail"].lower()
 
         # Try to stop a non-existent instance
-        response = test_client.post("/api/plugins/instances/test-instance/stop")
-        assert response.status_code == 404
+        response = test_client.post(f"/api/plugins/instances/{nonexistent_id}/stop")
+        assert response.status_code == 404, (
+            f"Expected 404, got {response.status_code}: {response.text}"
+        )
         assert "instance" in response.json()["detail"].lower()
 
     def test_get_plugin_after_instance_route(self, test_client):

@@ -134,7 +134,7 @@ async def _initialize_database():
     """Initialize database and run migrations."""
     from pathlib import Path
 
-    from app.database import engine
+    from app.database import database
     from app.utils.db_init import initialize_database
 
     # Extract database path from settings
@@ -142,29 +142,25 @@ async def _initialize_database():
     db_path = Path(db_path_str) if db_path_str.startswith("/") else Path(db_path_str).resolve()
 
     # Use the unified initialization function
-    await initialize_database(db_path, engine=engine, run_migrations=True)
+    await initialize_database(db_path, database=database, run_migrations=True)
     logger.info("Database initialized and migrations completed")
 
 
 async def _create_default_plugin_instance(
-    plugin_registry, session, type_id: str, plugin_id: str, name: str, config: dict
+    plugin_registry, type_id: str, plugin_id: str, name: str, config: dict
 ):
     """Create a default plugin instance if the plugin type is enabled and no instance exists."""
-    from sqlalchemy import select
-
     from app.models.db_models import PluginDB, PluginTypeDB
 
     # Check if plugin type exists and is enabled (default to enabled if not in DB)
-    result = await session.execute(select(PluginTypeDB).where(PluginTypeDB.type_id == type_id))
-    plugin_type = result.scalar_one_or_none()
+    plugin_type = await PluginTypeDB.objects.get_or_none(type_id=type_id)
     is_enabled = plugin_type.enabled if plugin_type else True
 
     if not is_enabled:
         return
 
     # Check if an instance already exists
-    result = await session.execute(select(PluginDB).where(PluginDB.type_id == type_id))
-    instance = result.scalar_one_or_none()
+    instance = await PluginDB.objects.get_or_none(type_id=type_id)
 
     if not instance:
         logger.info(f"Creating default {name} plugin instance...")
@@ -183,26 +179,23 @@ async def _create_default_plugin_instance(
 
 async def _initialize_plugins():
     """Load plugins from database and create default instances."""
-    from app.database import AsyncSessionLocal
     from app.plugins.registry import plugin_registry
 
     await plugin_registry.load_plugins_from_db()
     logger.info("Loaded plugins from database")
 
     # Auto-create default instances for image plugins if enabled and no instance exists
-    async with AsyncSessionLocal() as session:
-        # Local images plugin
-        await _create_default_plugin_instance(
-            plugin_registry,
-            session,
-            type_id="local",
-            plugin_id="local-images",
-            name="Local Images",
-            config={
-                "image_dir": "./data/images",
-                "thumbnail_dir": "./data/images/thumbnails",
-            },
-        )
+    # Local images plugin
+    await _create_default_plugin_instance(
+        plugin_registry,
+        type_id="local",
+        plugin_id="local-images",
+        name="Local Images",
+        config={
+            "image_dir": "./data/images",
+            "thumbnail_dir": "./data/images/thumbnails",
+        },
+    )
 
 
 async def _initialize_keyboard_mappings():
@@ -213,13 +206,13 @@ async def _initialize_keyboard_mappings():
     if not mappings:
         # Set default 7-button keyboard mappings
         default_7button = {
-            "KEY_1": "generic_next",
-            "KEY_2": "generic_prev",
-            "KEY_3": "generic_expand_close",
+            "KEY_1": "generic_prev",
+            "KEY_2": "generic_expand_close",
+            "KEY_3": "generic_next",
             "KEY_4": "mode_calendar",
             "KEY_5": "mode_photos",
             "KEY_6": "mode_web_services",
-            "KEY_7": "mode_spare",
+            "KEY_7": "generic_refresh",
         }
         await keyboard_mapping_service.set_mappings("7-button", default_7button)
 
@@ -346,16 +339,8 @@ async def _sync_display_orientation():
         logger.warning(f"Failed to sync display orientation on startup: {e}")
 
 
-async def _sync_themes_to_db():
-    """Sync all themes (built-in + installed) to PluginTypeDB on startup."""
-    from app.api.routes.plugins import sync_themes_to_db
-
-    try:
-        await sync_themes_to_db()
-        logger.info("Themes synced to database")
-    except Exception as e:
-        # Don't fail startup if theme sync fails
-        logger.warning(f"Failed to sync themes to database on startup: {e}")
+# Theme sync removed - themes are loaded from filesystem on-demand
+# No database storage needed for themes (see ORMAR_MIGRATION_PLAN.md Part 7)
 
 
 async def _shutdown_services():
@@ -380,20 +365,40 @@ async def _shutdown_services():
 @asynccontextmanager
 async def lifespan(app: FastAPI):
     """Lifespan context manager for startup/shutdown."""
+    from app.database import connect_db, disconnect_db
+
     # Startup
-    await _initialize_database()
-    await _initialize_plugins()
-    await _initialize_keyboard_mappings()
-    await _initialize_image_service()
-    await _initialize_default_config()
-    await _start_schedulers()
-    await _sync_display_orientation()
-    await _sync_themes_to_db()
+    try:
+        logger.info("Starting application lifecycle...")
+        await connect_db()
+        logger.info("Database connected")
+        await _initialize_database()
+        logger.info("Database initialized")
+        await _initialize_plugins()
+        logger.info("Plugins initialized")
+        await _initialize_keyboard_mappings()
+        logger.info("Keyboard mappings initialized")
+        await _initialize_image_service()
+        logger.info("Image service initialized")
+        await _initialize_default_config()
+        logger.info("Default config initialized")
+        await _start_schedulers()
+        logger.info("Schedulers started")
+        await _sync_display_orientation()
+        logger.info("Display orientation synced")
+        # Themes are loaded from filesystem on-demand - no database sync needed
+        logger.info("Application startup complete - ready to serve requests")
+    except Exception as e:
+        logger.exception(f"Error during startup: {e}")
+        raise
 
     yield
 
     # Shutdown
+    logger.info("Shutting down application...")
     await _shutdown_services()
+    await disconnect_db()
+    logger.info("Application shutdown complete")
 
 
 app = FastAPI(
@@ -475,14 +480,24 @@ async def validation_exception_handler(request: Request, exc: RequestValidationE
 @app.exception_handler(Exception)
 async def general_exception_handler(request: Request, exc: Exception):
     """Catch-all exception handler to log all unhandled errors."""
-    logger.exception(
+    import traceback
+
+    # Log full exception details with stack trace
+    logger.error(
         f"Unhandled exception: {type(exc).__name__}: {exc} | "
         f"Path: {request.url.path} | Method: {request.method} | "
         f"Client: {request.client.host if request.client else 'unknown'}"
     )
+    logger.error(f"Full traceback:\n{traceback.format_exc()}")
+
+    # Include error details in response for debugging (only in development)
+    error_detail = (
+        str(exc) if settings.log_level.upper() in ("DEBUG", "INFO") else "Internal server error"
+    )
+
     return JSONResponse(
         status_code=500,
-        content={"detail": "Internal server error"},
+        content={"detail": error_detail, "type": type(exc).__name__},
     )
 
 

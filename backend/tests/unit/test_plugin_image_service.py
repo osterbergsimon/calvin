@@ -8,34 +8,52 @@ from app.plugins.protocols import ImagePlugin
 from app.services.plugin_image_service import PluginImageService
 
 
-def create_mock_session(plugin_types=None, db_plugins=None):
-    """Helper to create a mock AsyncSessionLocal with proper async context manager."""
+def create_mock_ormar_models(plugin_types=None, db_plugins=None):
+    """Helper to create mock Ormar model objects for testing.
+
+    Patches the entire model classes in the db_models module to avoid property issues.
+    """
     if plugin_types is None:
         plugin_types = []
     if db_plugins is None:
         db_plugins = []
 
-    mock_session_instance = MagicMock()
-    mock_session_instance.__aenter__ = AsyncMock(return_value=mock_session_instance)
-    mock_session_instance.__aexit__ = AsyncMock(return_value=None)
+    # Mock PluginTypeDB.objects
+    mock_plugin_type_manager = MagicMock()
+    mock_plugin_type_manager.filter.return_value.all = AsyncMock(return_value=plugin_types)
+    mock_plugin_type_manager.all = AsyncMock(return_value=plugin_types)
 
-    # Mock execute results
-    mock_type_result = MagicMock()
-    mock_type_result.scalars.return_value.all.return_value = plugin_types
+    # Mock PluginDB.objects
+    mock_plugin_db_manager = MagicMock()
+    mock_plugin_db_manager.filter.return_value.all = AsyncMock(return_value=db_plugins)
+    mock_plugin_db_manager.filter.return_value.order_by.return_value.all = AsyncMock(
+        return_value=db_plugins
+    )
+    mock_plugin_db_manager.all = AsyncMock(return_value=db_plugins)
 
-    mock_db_result = MagicMock()
-    mock_db_result.scalars.return_value.all.return_value = db_plugins
+    # Create mock classes that have the objects property as a simple attribute
+    # This avoids the read-only property issue
+    class MockPluginTypeDB:
+        def __init__(self):
+            pass
 
-    # Make execute return different results for different queries
-    def execute_side_effect(query):
-        query_str = str(query)
-        if "plugin_types" in query_str.lower() or "PluginTypeDB" in query_str:
-            return mock_type_result
-        else:
-            return mock_db_result
+        objects = mock_plugin_type_manager
 
-    mock_session_instance.execute = AsyncMock(side_effect=execute_side_effect)
-    return patch("app.database.AsyncSessionLocal", return_value=mock_session_instance)
+    class MockPluginDB:
+        def __init__(self):
+            pass
+
+        objects = mock_plugin_db_manager
+
+    # Patch the entire classes in the db_models module
+    from unittest.mock import patch
+
+    from app.models import db_models
+
+    type_patch = patch.object(db_models, "PluginTypeDB", MockPluginTypeDB)
+    db_patch = patch.object(db_models, "PluginDB", MockPluginDB)
+
+    return (type_patch, db_patch)
 
 
 class MockImagePlugin(ImagePlugin):
@@ -116,7 +134,8 @@ class TestPluginImageService:
         )
         mock_db_plugin = MagicMock(id="local-images", type_id="local", display_order=0)
 
-        with create_mock_session([mock_plugin_type], [mock_db_plugin]):
+        type_patch, db_patch = create_mock_ormar_models([mock_plugin_type], [mock_db_plugin])
+        with type_patch, db_patch:
             with patch("app.services.plugin_image_service.plugin_manager") as mock_manager:
                 mock_plugin = MockImagePlugin("local-images", [])
                 mock_manager.get_plugins.return_value = [mock_plugin]
@@ -139,7 +158,8 @@ class TestPluginImageService:
             {"id": "img2", "source": "local-images"},
         ]
 
-        with create_mock_session([mock_plugin_type], [mock_db_plugin]):
+        type_patch, db_patch = create_mock_ormar_models([mock_plugin_type], [mock_db_plugin])
+        with type_patch, db_patch:
             with patch("app.services.plugin_image_service.plugin_manager") as mock_manager:
                 mock_plugin = MockImagePlugin("local-images", images)
                 mock_manager.get_plugins.return_value = [mock_plugin]
@@ -164,7 +184,8 @@ class TestPluginImageService:
             {"id": "img2", "source": "local-images"},
         ]
 
-        with create_mock_session([mock_plugin_type], [mock_db_plugin]):
+        type_patch, db_patch = create_mock_ormar_models([mock_plugin_type], [mock_db_plugin])
+        with type_patch, db_patch:
             with patch("app.services.plugin_image_service.plugin_manager") as mock_manager:
                 mock_plugin = MockImagePlugin("local-images", images)
                 mock_manager.get_plugins.return_value = [mock_plugin]
@@ -189,7 +210,8 @@ class TestPluginImageService:
             {"id": "img3", "source": "local-images"},
         ]
 
-        with create_mock_session([mock_plugin_type], [mock_db_plugin]):
+        type_patch, db_patch = create_mock_ormar_models([mock_plugin_type], [mock_db_plugin])
+        with type_patch, db_patch:
             with patch("app.services.plugin_image_service.plugin_manager") as mock_manager:
                 mock_plugin = MockImagePlugin("local-images", images)
                 mock_manager.get_plugins.return_value = [mock_plugin]
@@ -215,7 +237,8 @@ class TestPluginImageService:
             {"id": "img3", "source": "local-images"},
         ]
 
-        with create_mock_session([mock_plugin_type], [mock_db_plugin]):
+        type_patch, db_patch = create_mock_ormar_models([mock_plugin_type], [mock_db_plugin])
+        with type_patch, db_patch:
             with patch("app.services.plugin_image_service.plugin_manager") as mock_manager:
                 mock_plugin = MockImagePlugin("local-images", images)
                 mock_manager.get_plugins.return_value = [mock_plugin]
@@ -246,7 +269,8 @@ class TestPluginImageService:
             {"id": "img3", "source": "local-images"},
         ]
 
-        with create_mock_session([mock_plugin_type], [mock_db_plugin]):
+        type_patch, db_patch = create_mock_ormar_models([mock_plugin_type], [mock_db_plugin])
+        with type_patch, db_patch:
             with patch("app.services.plugin_image_service.plugin_manager") as mock_manager:
                 mock_plugin = MockImagePlugin("local-images", images)
                 mock_manager.get_plugins.return_value = [mock_plugin]
@@ -272,7 +296,8 @@ class TestPluginImageService:
             {"id": "img3", "source": "local-images"},
         ]
 
-        with create_mock_session([mock_plugin_type], [mock_db_plugin]):
+        type_patch, db_patch = create_mock_ormar_models([mock_plugin_type], [mock_db_plugin])
+        with type_patch, db_patch:
             with patch("app.services.plugin_image_service.plugin_manager") as mock_manager:
                 mock_plugin = MockImagePlugin("local-images", images)
                 mock_manager.get_plugins.return_value = [mock_plugin]
@@ -298,7 +323,8 @@ class TestPluginImageService:
             {"id": "img3", "source": "local-images"},
         ]
 
-        with create_mock_session([mock_plugin_type], [mock_db_plugin]):
+        type_patch, db_patch = create_mock_ormar_models([mock_plugin_type], [mock_db_plugin])
+        with type_patch, db_patch:
             with patch("app.services.plugin_image_service.plugin_manager") as mock_manager:
                 mock_plugin = MockImagePlugin("local-images", images)
                 mock_manager.get_plugins.return_value = [mock_plugin]
@@ -322,7 +348,8 @@ class TestPluginImageService:
             {"id": "img2", "source": "local-images"},
         ]
 
-        with create_mock_session([mock_plugin_type], [mock_db_plugin]):
+        type_patch, db_patch = create_mock_ormar_models([mock_plugin_type], [mock_db_plugin])
+        with type_patch, db_patch:
             with patch("app.services.plugin_image_service.plugin_manager") as mock_manager:
                 mock_plugin = MockImagePlugin("local-images", images)
                 mock_manager.get_plugins.return_value = [mock_plugin]
@@ -346,7 +373,8 @@ class TestPluginImageService:
 
         images = [{"id": "img1", "source": "local-images"}]
 
-        with create_mock_session([mock_plugin_type], [mock_db_plugin]):
+        type_patch, db_patch = create_mock_ormar_models([mock_plugin_type], [mock_db_plugin])
+        with type_patch, db_patch:
             with patch("app.services.plugin_image_service.plugin_manager") as mock_manager:
                 mock_plugin = MockImagePlugin("local-images", images)
                 mock_manager.get_plugins.return_value = [mock_plugin]
@@ -370,7 +398,8 @@ class TestPluginImageService:
 
         images = [{"id": "img1", "source": "local-images"}]
 
-        with create_mock_session([mock_plugin_type], [mock_db_plugin]):
+        type_patch, db_patch = create_mock_ormar_models([mock_plugin_type], [mock_db_plugin])
+        with type_patch, db_patch:
             with patch("app.services.plugin_image_service.plugin_manager") as mock_manager:
                 mock_plugin = MockImagePlugin("local-images", images)
                 mock_manager.get_plugins.return_value = [mock_plugin]
@@ -421,7 +450,8 @@ class TestPluginImageService:
         file_data = b"fake image data"
         filename = "test.jpg"
 
-        with create_mock_session([mock_plugin_type], [mock_db_plugin]):
+        type_patch, db_patch = create_mock_ormar_models([mock_plugin_type], [mock_db_plugin])
+        with type_patch, db_patch:
             with patch("app.services.plugin_image_service.plugin_manager") as mock_manager:
                 mock_plugin = MockImagePlugin("local-images", [])
                 mock_manager.get_plugins.return_value = [mock_plugin]
@@ -469,7 +499,8 @@ class TestPluginImageService:
         )
         mock_db_plugin = MagicMock(id="local-images", type_id="local", display_order=0)
 
-        with create_mock_session([mock_plugin_type], [mock_db_plugin]):
+        type_patch, db_patch = create_mock_ormar_models([mock_plugin_type], [mock_db_plugin])
+        with type_patch, db_patch:
             with patch("app.services.plugin_image_service.plugin_manager") as mock_manager:
                 mock_plugin = MockImagePlugin("local-images", images)
                 mock_manager.get_plugins.return_value = [mock_plugin]
@@ -492,7 +523,8 @@ class TestPluginImageService:
         )
         mock_db_plugin = MagicMock(id="local-images", type_id="local", display_order=0)
 
-        with create_mock_session([mock_plugin_type], [mock_db_plugin]):
+        type_patch, db_patch = create_mock_ormar_models([mock_plugin_type], [mock_db_plugin])
+        with type_patch, db_patch:
             with patch("app.services.plugin_image_service.plugin_manager") as mock_manager:
                 mock_plugin = MockImagePlugin("local-images", images)
                 mock_manager.get_plugins.return_value = [mock_plugin]
@@ -583,7 +615,8 @@ class TestPluginImageService:
                     "description": "Test plugin that errors",
                 }
 
-        with create_mock_session([mock_plugin_type], [mock_db_plugin]):
+        type_patch, db_patch = create_mock_ormar_models([mock_plugin_type], [mock_db_plugin])
+        with type_patch, db_patch:
             with patch("app.services.plugin_image_service.plugin_manager") as mock_manager:
                 mock_plugin = ErrorPlugin("local-images", [])
                 mock_manager.get_plugins.return_value = [mock_plugin]
@@ -602,7 +635,8 @@ class TestPluginImageService:
         )
         mock_db_plugin = MagicMock(id="local-images", type_id="local", display_order=0)
 
-        with create_mock_session([mock_plugin_type], [mock_db_plugin]):
+        type_patch, db_patch = create_mock_ormar_models([mock_plugin_type], [mock_db_plugin])
+        with type_patch, db_patch:
             with patch("app.services.plugin_image_service.plugin_manager") as mock_manager:
                 # Create a non-ImagePlugin mock
                 mock_non_image = MagicMock()
@@ -623,7 +657,8 @@ class TestPluginImageService:
         # Don't include plugin in db_plugins, so type_id won't be found
         mock_db_plugins = []
 
-        with create_mock_session([mock_plugin_type], mock_db_plugins):
+        type_patch, db_patch = create_mock_ormar_models([mock_plugin_type], mock_db_plugins)
+        with type_patch, db_patch:
             with patch("app.services.plugin_image_service.plugin_manager") as mock_manager:
                 mock_plugin = MockImagePlugin("local-images", [])
                 mock_manager.get_plugins.return_value = [mock_plugin]
@@ -642,7 +677,8 @@ class TestPluginImageService:
         )
         mock_db_plugin = MagicMock(id="local-images", type_id="local", display_order=0)
 
-        with create_mock_session([mock_plugin_type], [mock_db_plugin]):
+        type_patch, db_patch = create_mock_ormar_models([mock_plugin_type], [mock_db_plugin])
+        with type_patch, db_patch:
             with patch("app.services.plugin_image_service.plugin_manager") as mock_manager:
                 mock_plugin = MockImagePlugin("local-images", [])
                 mock_manager.get_plugins.return_value = [mock_plugin]
@@ -672,7 +708,8 @@ class TestPluginImageService:
                     "description": "Test plugin that returns None",
                 }
 
-        with create_mock_session([mock_plugin_type], [mock_db_plugin]):
+        type_patch, db_patch = create_mock_ormar_models([mock_plugin_type], [mock_db_plugin])
+        with type_patch, db_patch:
             with patch("app.services.plugin_image_service.plugin_manager") as mock_manager:
                 mock_plugin = NonePlugin("local-images", [])
                 mock_manager.get_plugins.return_value = [mock_plugin]

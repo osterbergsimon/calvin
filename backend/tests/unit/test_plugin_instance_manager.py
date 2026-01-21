@@ -33,6 +33,7 @@ def mock_db_type():
     db_type = MagicMock()
     db_type.type_id = "test_plugin"
     db_type.enabled = False
+    db_type.update = AsyncMock()  # Make update async for Ormar compatibility
     return db_type
 
 
@@ -128,31 +129,29 @@ class TestHandlePluginConfigUpdateGeneric:
 
     async def test_wrong_type_id(self, manager_config, test_db):
         """Test that function returns None for wrong type_id."""
-        async with test_db as session:
-            result = await handle_plugin_config_update_generic(
-                type_id="wrong_type",
-                config={},
-                enabled=None,
-                db_type=None,
-                session=session,
-                manager_config=manager_config,
-            )
-            assert result is None
+        result = await handle_plugin_config_update_generic(
+            type_id="wrong_type",
+            config={},
+            enabled=None,
+            db_type=None,
+            session=None,  # Session parameter ignored with Ormar
+            manager_config=manager_config,
+        )
+        assert result is None
 
     async def test_config_validation_failure(self, manager_config, test_db, mock_db_type):
         """Test that invalid config prevents instance creation."""
-        async with test_db as session:
-            result = await handle_plugin_config_update_generic(
-                type_id="test_plugin",
-                config={"count": -1},  # Invalid count
-                enabled=None,
-                db_type=mock_db_type,
-                session=session,
-                manager_config=manager_config,
-            )
-            assert result is not None
-            assert result["instance_created"] is False
-            assert result["instance_updated"] is False
+        result = await handle_plugin_config_update_generic(
+            type_id="test_plugin",
+            config={"count": -1},  # Invalid count
+            enabled=None,
+            db_type=mock_db_type,
+            session=None,  # Session parameter ignored with Ormar
+            manager_config=manager_config,
+        )
+        assert result is not None
+        assert result["instance_created"] is False
+        assert result["instance_updated"] is False
 
     async def test_create_new_instance_multi_instance(
         self, manager_config, test_db, mock_db_type, mock_plugin
@@ -170,32 +169,38 @@ class TestHandlePluginConfigUpdateGeneric:
             with patch("app.plugins.registry.manager.instance_manager") as mock_instance_mgr:
                 mock_instance_mgr.register = AsyncMock()
 
-                async with test_db as session:
-                    # Create plugin type in database
-                    from app.models.db_models import PluginTypeDB
+                # Create plugin type in database (or get existing)
+                from app.models.db_models import PluginTypeDB
 
-                    db_type = PluginTypeDB(
+                real_db_type = await PluginTypeDB.objects.get_or_none(type_id="test_plugin")
+                if not real_db_type:
+                    real_db_type = await PluginTypeDB.objects.create(
                         type_id="test_plugin",
                         plugin_type="image",
                         name="Test Plugin",
                         enabled=True,
                     )
-                    session.add(db_type)
-                    await session.commit()
 
-                    result = await handle_plugin_config_update_generic(
-                        type_id="test_plugin",
-                        config={"count": 30, "_instance_name": "My Instance"},
-                        enabled=True,
-                        db_type=mock_db_type,
-                        session=session,
-                        manager_config=manager_config,
-                    )
+                # Delete any existing instances for this type_id to ensure we create a new one
+                from app.models.db_models import PluginDB
 
-                    # Should have created instance
-                    assert result is not None
-                    assert result.get("instance_created") is True
-                    assert "instance_id" in result
+                existing_plugins = await PluginDB.objects.filter(type_id="test_plugin").all()
+                for plugin in existing_plugins:
+                    await plugin.delete()
+
+                result = await handle_plugin_config_update_generic(
+                    type_id="test_plugin",
+                    config={"count": 30, "_instance_name": "My Instance"},
+                    enabled=True,
+                    db_type=real_db_type,  # Use real db_type instead of mock
+                    session=None,  # Session parameter ignored with Ormar
+                    manager_config=manager_config,
+                )
+
+                # Should have created instance
+                assert result is not None
+                assert result.get("instance_created") is True
+                assert "instance_id" in result
 
     async def test_create_new_instance_single_instance(
         self, single_instance_config, test_db, mock_db_type, mock_plugin
@@ -213,32 +218,38 @@ class TestHandlePluginConfigUpdateGeneric:
             with patch("app.plugins.registry.manager.instance_manager") as mock_instance_mgr:
                 mock_instance_mgr.register = AsyncMock()
 
-                async with test_db as session:
-                    # Create plugin type in database
-                    from app.models.db_models import PluginTypeDB
+                # Create plugin type in database (or get existing)
+                from app.models.db_models import PluginTypeDB
 
-                    db_type = PluginTypeDB(
+                real_db_type = await PluginTypeDB.objects.get_or_none(type_id="test_plugin")
+                if not real_db_type:
+                    real_db_type = await PluginTypeDB.objects.create(
                         type_id="test_plugin",
                         plugin_type="image",
                         name="Test Plugin",
                         enabled=True,
                     )
-                    session.add(db_type)
-                    await session.commit()
 
-                    result = await handle_plugin_config_update_generic(
-                        type_id="test_plugin",
-                        config={"count": 30},
-                        enabled=True,
-                        db_type=mock_db_type,
-                        session=session,
-                        manager_config=single_instance_config,
-                    )
+                # Delete any existing instances for this type_id to ensure we create a new one
+                from app.models.db_models import PluginDB
 
-                    # Should have created instance with fixed ID
-                    assert result is not None
-                    assert result.get("instance_created") is True
-                    assert result["instance_id"] == "test-instance"
+                existing_plugins = await PluginDB.objects.filter(type_id="test_plugin").all()
+                for plugin in existing_plugins:
+                    await plugin.delete()
+
+                result = await handle_plugin_config_update_generic(
+                    type_id="test_plugin",
+                    config={"count": 30},
+                    enabled=True,
+                    db_type=real_db_type,  # Use real db_type instead of mock
+                    session=None,  # Session parameter ignored with Ormar
+                    manager_config=single_instance_config,
+                )
+
+                # Should have created instance with fixed ID
+                assert result is not None
+                assert result.get("instance_created") is True
+                assert result["instance_id"] == "test-instance"
 
     async def test_update_existing_instance(
         self, manager_config, test_db, mock_db_type, mock_plugin
@@ -256,9 +267,15 @@ class TestHandlePluginConfigUpdateGeneric:
         # Add plugin to manager
         await plugin_manager.register(mock_plugin)
 
-        # Create database instance
-        async with test_db as session:
-            db_instance = PluginDB(
+        # Create database instance (or get existing)
+        existing_instance = await PluginDB.objects.get_or_none(id="test-instance")
+        if existing_instance:
+            # Update existing instance
+            existing_instance.enabled = False
+            existing_instance.config = {"count": 10}
+            await existing_instance.update()
+        else:
+            await PluginDB.objects.create(
                 id="test-instance",
                 type_id="test_plugin",
                 plugin_type="image",
@@ -266,29 +283,27 @@ class TestHandlePluginConfigUpdateGeneric:
                 enabled=False,
                 config={"count": 10},
             )
-            session.add(db_instance)
-            await session.commit()
 
-            result = await handle_plugin_config_update_generic(
-                type_id="test_plugin",
-                config={"count": 50, "_instance_id": "test-instance"},
-                enabled=True,
-                db_type=mock_db_type,
-                session=session,
-                manager_config=manager_config,
-            )
+        result = await handle_plugin_config_update_generic(
+            type_id="test_plugin",
+            config={"count": 50, "_instance_id": "test-instance"},
+            enabled=True,
+            db_type=mock_db_type,
+            session=None,  # Session parameter ignored with Ormar
+            manager_config=manager_config,
+        )
 
-            assert result is not None
-            assert result["instance_updated"] is True
-            assert result["instance_id"] == "test-instance"
+        assert result is not None
+        assert result["instance_updated"] is True
+        assert result["instance_id"] == "test-instance"
 
-            # Verify plugin was configured
-            assert mock_plugin.configure.called
-            # Verify plugin was enabled
-            assert mock_plugin.enable.called
+        # Verify plugin was configured
+        assert mock_plugin.configure.called
+        # Verify plugin was enabled
+        assert mock_plugin.enable.called
 
-            # Cleanup
-            await plugin_manager.unregister("test-instance")
+        # Cleanup
+        await plugin_manager.unregister("test-instance")
 
     async def test_update_existing_instance_disable(
         self, manager_config, test_db, mock_db_type, mock_plugin
@@ -308,9 +323,15 @@ class TestHandlePluginConfigUpdateGeneric:
         mock_plugin.is_running.return_value = True
         await plugin_manager.register(mock_plugin)
 
-        # Create database instance
-        async with test_db as session:
-            db_instance = PluginDB(
+        # Create database instance (or get existing)
+        existing_instance = await PluginDB.objects.get_or_none(id="test-instance")
+        if existing_instance:
+            # Update existing instance
+            existing_instance.enabled = True
+            existing_instance.config = {"count": 10}
+            await existing_instance.update()
+        else:
+            await PluginDB.objects.create(
                 id="test-instance",
                 type_id="test_plugin",
                 plugin_type="image",
@@ -318,28 +339,26 @@ class TestHandlePluginConfigUpdateGeneric:
                 enabled=True,
                 config={"count": 10},
             )
-            session.add(db_instance)
-            await session.commit()
 
-            result = await handle_plugin_config_update_generic(
-                type_id="test_plugin",
-                config={"_instance_id": "test-instance", "_instance_enabled": False},
-                enabled=None,
-                db_type=mock_db_type,
-                session=session,
-                manager_config=manager_config,
-            )
+        result = await handle_plugin_config_update_generic(
+            type_id="test_plugin",
+            config={"_instance_id": "test-instance", "_instance_enabled": False},
+            enabled=None,
+            db_type=mock_db_type,
+            session=None,  # Session parameter ignored with Ormar
+            manager_config=manager_config,
+        )
 
-            assert result is not None
-            assert result["instance_updated"] is True
+        assert result is not None
+        assert result["instance_updated"] is True
 
-            # Verify plugin was disabled and stopped
-            assert mock_plugin.disable.called
-            assert mock_plugin.stop.called
-            assert mock_plugin.cleanup.called
+        # Verify plugin was disabled and stopped
+        assert mock_plugin.disable.called
+        assert mock_plugin.stop.called
+        assert mock_plugin.cleanup.called
 
-            # Cleanup
-            await plugin_manager.unregister("test-instance")
+        # Cleanup
+        await plugin_manager.unregister("test-instance")
 
     async def test_normalize_config(self, manager_config, test_db, mock_db_type, mock_plugin):
         """Test that normalize_config is called."""
@@ -355,34 +374,40 @@ class TestHandlePluginConfigUpdateGeneric:
             with patch("app.plugins.registry.manager.instance_manager") as mock_instance_mgr:
                 mock_instance_mgr.register = AsyncMock()
 
-                async with test_db as session:
-                    # Create plugin type in database
-                    from app.models.db_models import PluginTypeDB
+                # Create plugin type in database (or get existing)
+                from app.models.db_models import PluginTypeDB
 
-                    db_type = PluginTypeDB(
+                db_type = await PluginTypeDB.objects.get_or_none(type_id="test_plugin")
+                if not db_type:
+                    await PluginTypeDB.objects.create(
                         type_id="test_plugin",
                         plugin_type="image",
                         name="Test Plugin",
                         enabled=True,
                     )
-                    session.add(db_type)
-                    await session.commit()
 
-                    result = await handle_plugin_config_update_generic(
-                        type_id="test_plugin",
-                        config={
-                            "count": "30",
-                            "_instance_name": "Test Instance",
-                        },  # String that needs normalization
-                        enabled=True,
-                        db_type=mock_db_type,
-                        session=session,
-                        manager_config=manager_config,
-                    )
+                # Delete any existing instances for this type_id to ensure we create a new one
+                from app.models.db_models import PluginDB
 
-                    # Verify normalize_config was called - result should indicate instance was created
-                    assert result is not None
-                    assert result.get("instance_created") is True
+                existing_plugins = await PluginDB.objects.filter(type_id="test_plugin").all()
+                for plugin in existing_plugins:
+                    await plugin.delete()
+
+                result = await handle_plugin_config_update_generic(
+                    type_id="test_plugin",
+                    config={
+                        "count": "30",
+                        "_instance_name": "Test Instance",
+                    },  # String that needs normalization
+                    enabled=True,
+                    db_type=mock_db_type,
+                    session=None,  # Session parameter ignored with Ormar
+                    manager_config=manager_config,
+                )
+
+                # Verify normalize_config was called - result should indicate instance was created
+                assert result is not None
+                assert result.get("instance_created") is True
 
     async def test_metadata_fields_removed(
         self, manager_config, test_db, mock_db_type, mock_plugin
@@ -400,25 +425,24 @@ class TestHandlePluginConfigUpdateGeneric:
             with patch("app.plugins.registry.manager.instance_manager") as mock_instance_mgr:
                 mock_instance_mgr.register = AsyncMock()
 
-                async with test_db as session:
-                    # Create plugin type in database
-                    from app.models.db_models import PluginTypeDB
+                # Create plugin type in database (or get existing)
+                from app.models.db_models import PluginTypeDB
 
-                    db_type = PluginTypeDB(
+                db_type = await PluginTypeDB.objects.get_or_none(type_id="test_plugin")
+                if not db_type:
+                    await PluginTypeDB.objects.create(
                         type_id="test_plugin",
                         plugin_type="image",
                         name="Test Plugin",
                         enabled=True,
                     )
-                    session.add(db_type)
-                    await session.commit()
 
-                    # Track what config was passed to register_plugin
-                    captured_config = {}
+                # Track what config was passed to register_plugin
+                captured_config = {}
 
-                    async def capture_register_plugin(*args, **kwargs):
-                        captured_config.update(kwargs.get("config", {}))
-                        return mock_plugin
+                async def capture_register_plugin(*args, **kwargs):
+                    captured_config.update(kwargs.get("config", {}))
+                    return mock_plugin
 
                 # Mock register_plugin to capture config - patch at the import location
                 with patch(
@@ -435,19 +459,19 @@ class TestHandlePluginConfigUpdateGeneric:
                         },
                         enabled=True,
                         db_type=mock_db_type,
-                        session=session,
+                        session=None,  # Session parameter ignored with Ormar
                         manager_config=manager_config,
                     )
 
-                    # Verify metadata fields are not in normalized config
-                    assert result is not None
-                    assert result.get("instance_created") is True
-                    assert mock_register.called
-                    call_kwargs = mock_register.call_args[1]
-                    normalized_config = call_kwargs["config"]
-                    assert "_instance_id" not in normalized_config
-                    assert "_instance_name" not in normalized_config
-                    assert "_instance_enabled" not in normalized_config
+                # Verify metadata fields are not in normalized config
+                assert result is not None
+                assert result.get("instance_created") is True
+                assert mock_register.called
+                call_kwargs = mock_register.call_args[1]
+                normalized_config = call_kwargs["config"]
+                assert "_instance_id" not in normalized_config
+                assert "_instance_name" not in normalized_config
+                assert "_instance_enabled" not in normalized_config
 
     async def test_prepare_instance_config_callback(self, test_db, mock_db_type, mock_plugin):
         """Test prepare_instance_config callback."""
@@ -490,43 +514,42 @@ class TestHandlePluginConfigUpdateGeneric:
                     "app.plugins.utils.instance_manager.plugin_registry.register_plugin",
                     side_effect=capture_register_plugin,
                 ) as mock_register:
-                    async with test_db as session:
-                        # Create plugin type in database
-                        from app.models.db_models import PluginTypeDB
+                    # Create plugin type in database
+                    from app.models.db_models import PluginTypeDB
 
-                        db_type = PluginTypeDB(
+                    db_type = await PluginTypeDB.objects.get_or_none(type_id="test_plugin")
+                    if not db_type:
+                        await PluginTypeDB.objects.create(
                             type_id="test_plugin",
                             plugin_type="image",
                             name="Test Plugin",
                             enabled=True,
                         )
-                        session.add(db_type)
-                        await session.commit()
 
-                        result = await handle_plugin_config_update_generic(
-                            type_id="test_plugin",
-                            config={
-                                "count": 30,
-                                "_instance_name": "My Instance",
-                                "_instance_enabled": True,
-                            },
-                            enabled=True,
-                            db_type=mock_db_type,
-                            session=session,
-                            manager_config=manager_config,
-                        )
+                    result = await handle_plugin_config_update_generic(
+                        type_id="test_plugin",
+                        config={
+                            "count": 30,
+                            "_instance_name": "My Instance",
+                            "_instance_enabled": True,
+                        },
+                        enabled=True,
+                        db_type=mock_db_type,
+                        session=None,  # Session parameter ignored with Ormar
+                        manager_config=manager_config,
+                    )
 
-                        # Verify prepare_instance_config was called
-                        assert result is not None
-                        assert result.get("instance_created") is True, (
-                            f"Expected instance_created=True, got {result}"
-                        )
-                        # Verify the prepared config was passed to register_plugin
-                        assert mock_register.called, "register_plugin should have been called"
-                        call_kwargs = mock_register.call_args[1]
-                        prepared_config = call_kwargs["config"]
-                        assert prepared_config["instance_name"] == "My Instance"
-                        assert prepared_config["enabled"] is True
+                    # Verify prepare_instance_config was called
+                    assert result is not None
+                    assert result.get("instance_created") is True, (
+                        f"Expected instance_created=True, got {result}"
+                    )
+                    # Verify the prepared config was passed to register_plugin
+                    assert mock_register.called, "register_plugin should have been called"
+                    call_kwargs = mock_register.call_args[1]
+                    prepared_config = call_kwargs["config"]
+                    assert prepared_config["instance_name"] == "My Instance"
+                    assert prepared_config["enabled"] is True
 
     async def test_on_instance_created_callback(
         self, manager_config, test_db, mock_db_type, mock_plugin
@@ -551,33 +574,39 @@ class TestHandlePluginConfigUpdateGeneric:
             with patch("app.plugins.registry.manager.instance_manager") as mock_instance_mgr:
                 mock_instance_mgr.register = AsyncMock()
 
-                async with test_db as session:
-                    # Create plugin type in database
-                    from app.models.db_models import PluginTypeDB
+                # Create plugin type in database (or get existing)
+                from app.models.db_models import PluginTypeDB
 
-                    db_type = PluginTypeDB(
+                db_type = await PluginTypeDB.objects.get_or_none(type_id="test_plugin")
+                if not db_type:
+                    await PluginTypeDB.objects.create(
                         type_id="test_plugin",
                         plugin_type="image",
                         name="Test Plugin",
                         enabled=True,
                     )
-                    session.add(db_type)
-                    await session.commit()
 
-                    result = await handle_plugin_config_update_generic(
-                        type_id="test_plugin",
-                        config={"count": 30, "_instance_name": "Test Instance"},
-                        enabled=True,
-                        db_type=mock_db_type,
-                        session=session,
-                        manager_config=manager_config,
-                    )
+                # Delete any existing instances for this type_id to ensure we create a new one
+                from app.models.db_models import PluginDB
 
-                    # Verify callback was called
-                    assert result is not None
-                    assert len(callback_called) == 1
-                    assert callback_called[0][0] == mock_plugin
-                    assert callback_called[0][1]["instance_created"] is True
+                existing_plugins = await PluginDB.objects.filter(type_id="test_plugin").all()
+                for plugin in existing_plugins:
+                    await plugin.delete()
+
+                result = await handle_plugin_config_update_generic(
+                    type_id="test_plugin",
+                    config={"count": 30, "_instance_name": "Test Instance"},
+                    enabled=True,
+                    db_type=mock_db_type,
+                    session=None,  # Session parameter ignored with Ormar
+                    manager_config=manager_config,
+                )
+
+                # Verify callback was called
+                assert result is not None
+                assert len(callback_called) == 1
+                assert callback_called[0][0] == mock_plugin
+                assert callback_called[0][1]["instance_created"] is True
 
     async def test_on_instance_updated_callback(
         self, manager_config, test_db, mock_db_type, mock_plugin
@@ -602,9 +631,15 @@ class TestHandlePluginConfigUpdateGeneric:
         # Add plugin to manager
         await plugin_manager.register(mock_plugin)
 
-        # Create database instance
-        async with test_db as session:
-            db_instance = PluginDB(
+        # Create database instance (or get existing)
+        existing_instance = await PluginDB.objects.get_or_none(id="test-instance")
+        if existing_instance:
+            # Update existing instance
+            existing_instance.enabled = True
+            existing_instance.config = {"count": 10}
+            await existing_instance.update()
+        else:
+            await PluginDB.objects.create(
                 id="test-instance",
                 type_id="test_plugin",
                 plugin_type="image",
@@ -612,22 +647,20 @@ class TestHandlePluginConfigUpdateGeneric:
                 enabled=True,
                 config={"count": 10},
             )
-            session.add(db_instance)
-            await session.commit()
 
-            await handle_plugin_config_update_generic(
-                type_id="test_plugin",
-                config={"count": 50, "_instance_id": "test-instance"},
-                enabled=True,
-                db_type=mock_db_type,
-                session=session,
-                manager_config=manager_config,
-            )
+        await handle_plugin_config_update_generic(
+            type_id="test_plugin",
+            config={"count": 50, "_instance_id": "test-instance"},
+            enabled=True,
+            db_type=mock_db_type,
+            session=None,  # Session parameter ignored with Ormar
+            manager_config=manager_config,
+        )
 
-            # Verify callback was called
-            assert len(callback_called) == 1
-            assert callback_called[0][0] == mock_plugin
-            assert callback_called[0][1]["instance_updated"] is True
+        # Verify callback was called
+        assert len(callback_called) == 1
+        assert callback_called[0][0] == mock_plugin
+        assert callback_called[0][1]["instance_updated"] is True
 
-            # Cleanup
-            await plugin_manager.unregister("test-instance")
+        # Cleanup
+        await plugin_manager.unregister("test-instance")

@@ -1,8 +1,6 @@
 """Service for managing keyboard mappings."""
 
-from sqlalchemy import delete, select
-
-from app.database import AsyncSessionLocal
+from app.database import database
 from app.models.db_models import KeyboardMappingDB
 
 
@@ -27,15 +25,11 @@ class KeyboardMappingService:
         if cache_key in self._cache:
             return self._cache[cache_key]
 
-        async with AsyncSessionLocal() as session:
-            result = await session.execute(
-                select(KeyboardMappingDB).where(KeyboardMappingDB.keyboard_type == keyboard_type)
-            )
-            mappings_db = result.scalars().all()
+        mappings_db = await KeyboardMappingDB.objects.filter(keyboard_type=keyboard_type).all()
 
-            mappings = {item.key_code: item.action for item in mappings_db}
-            self._cache[cache_key] = mappings
-            return mappings
+        mappings = {item.key_code: item.action for item in mappings_db}
+        self._cache[cache_key] = mappings
+        return mappings
 
     async def get_all_mappings(self) -> dict[str, dict[str, str]]:
         """
@@ -44,17 +38,15 @@ class KeyboardMappingService:
         Returns:
             Dictionary with keyboard types as keys and mappings as values
         """
-        async with AsyncSessionLocal() as session:
-            result = await session.execute(select(KeyboardMappingDB))
-            mappings_db = result.scalars().all()
+        mappings_db = await KeyboardMappingDB.objects.all()
 
-            all_mappings = {}
-            for item in mappings_db:
-                if item.keyboard_type not in all_mappings:
-                    all_mappings[item.keyboard_type] = {}
-                all_mappings[item.keyboard_type][item.key_code] = item.action
+        all_mappings = {}
+        for item in mappings_db:
+            if item.keyboard_type not in all_mappings:
+                all_mappings[item.keyboard_type] = {}
+            all_mappings[item.keyboard_type][item.key_code] = item.action
 
-            return all_mappings
+        return all_mappings
 
     async def set_mappings(self, keyboard_type: str, mappings: dict[str, str]) -> None:
         """
@@ -64,26 +56,27 @@ class KeyboardMappingService:
             keyboard_type: '7-button' or 'standard'
             mappings: Dictionary mapping key codes to actions
         """
-        async with AsyncSessionLocal() as session:
+        # Wrap all operations in a transaction to ensure atomicity
+        # If any operation fails, all changes are rolled back
+        async with database.transaction():
             # Delete existing mappings for this keyboard type
-            await session.execute(
-                delete(KeyboardMappingDB).where(KeyboardMappingDB.keyboard_type == keyboard_type)
-            )
+            existing_mappings = await KeyboardMappingDB.objects.filter(
+                keyboard_type=keyboard_type
+            ).all()
+            for mapping in existing_mappings:
+                await mapping.delete()
 
             # Add new mappings
             for key_code, action in mappings.items():
-                mapping = KeyboardMappingDB(
+                await KeyboardMappingDB.objects.create(
                     keyboard_type=keyboard_type,
                     key_code=key_code,
                     action=action,
                 )
-                session.add(mapping)
 
-            await session.commit()
-
-            # Update cache
-            cache_key = f"mappings_{keyboard_type}"
-            self._cache[cache_key] = mappings.copy()
+        # Update cache only after successful transaction commit
+        cache_key = f"mappings_{keyboard_type}"
+        self._cache[cache_key] = mappings.copy()
 
     async def set_mapping(self, keyboard_type: str, key_code: str, action: str) -> None:
         """
@@ -94,33 +87,26 @@ class KeyboardMappingService:
             key_code: Key code (e.g., 'KEY_1')
             action: Action name (e.g., 'calendar_next_month')
         """
-        async with AsyncSessionLocal() as session:
-            result = await session.execute(
-                select(KeyboardMappingDB).where(
-                    KeyboardMappingDB.keyboard_type == keyboard_type,
-                    KeyboardMappingDB.key_code == key_code,
-                )
+        mapping = await KeyboardMappingDB.objects.get_or_none(
+            keyboard_type=keyboard_type, key_code=key_code
+        )
+
+        if mapping:
+            mapping.action = action
+            await mapping.update()
+        else:
+            await KeyboardMappingDB.objects.create(
+                keyboard_type=keyboard_type,
+                key_code=key_code,
+                action=action,
             )
-            mapping = result.scalar_one_or_none()
 
-            if mapping:
-                mapping.action = action
-            else:
-                mapping = KeyboardMappingDB(
-                    keyboard_type=keyboard_type,
-                    key_code=key_code,
-                    action=action,
-                )
-                session.add(mapping)
-
-            await session.commit()
-
-            # Update cache
-            cache_key = f"mappings_{keyboard_type}"
-            if cache_key in self._cache:
-                self._cache[cache_key][key_code] = action
-            else:
-                self._cache[cache_key] = {key_code: action}
+        # Update cache
+        cache_key = f"mappings_{keyboard_type}"
+        if cache_key in self._cache:
+            self._cache[cache_key][key_code] = action
+        else:
+            self._cache[cache_key] = {key_code: action}
 
     async def get_available_actions(self) -> list[str]:
         """
@@ -135,10 +121,11 @@ class KeyboardMappingService:
             "mode_photos",
             "mode_web_services",
             "mode_spare",
-            # Generic context-aware buttons (3 buttons)
+            # Generic context-aware buttons (4 buttons)
             "generic_next",
             "generic_prev",
             "generic_expand_close",
+            "generic_refresh",
             # Legacy/Advanced actions
             "mode_settings",
             "mode_cycle",

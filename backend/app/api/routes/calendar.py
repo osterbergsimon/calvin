@@ -199,9 +199,6 @@ async def get_calendar_events(
 @router.get("/calendar/sources", response_model=CalendarSourcesResponse)
 async def get_calendar_sources():
     """Get all calendar sources from plugins (only from enabled plugin types)."""
-    from sqlalchemy import select
-
-    from app.database import AsyncSessionLocal
     from app.models.calendar import CalendarSource as CalendarSourceModel
     from app.models.db_models import PluginTypeDB
     from app.plugins.base import PluginType
@@ -217,16 +214,12 @@ async def get_calendar_sources():
         calendar_types = [t for t in plugin_types if t.get("plugin_type") == PluginType.CALENDAR]
 
         # Check enabled status from database
-        async with AsyncSessionLocal() as session:
-            for type_info in calendar_types:
-                type_id = type_info.get("type_id")
-                result = await session.execute(
-                    select(PluginTypeDB).where(PluginTypeDB.type_id == type_id)
-                )
-                db_type = result.scalar_one_or_none()
-                enabled = db_type.enabled if db_type else True  # Default to enabled
-                if enabled:
-                    enabled_plugin_types.add(type_id)
+        for type_info in calendar_types:
+            type_id = type_info.get("type_id")
+            db_type = await PluginTypeDB.objects.get_or_none(type_id=type_id)
+            enabled = db_type.enabled if db_type else True  # Default to enabled
+            if enabled:
+                enabled_plugin_types.add(type_id)
 
         # Filter sources to only include enabled plugin types
         legacy_types = ["google", "proton", "ical"]
@@ -332,9 +325,6 @@ async def add_calendar_source(source: CalendarSource):
 @router.put("/calendar/sources/{source_id}", response_model=CalendarSource)
 async def update_calendar_source(source_id: str, source: CalendarSource):
     """Update a calendar source plugin (e.g., color, show_time)."""
-    from sqlalchemy import select
-
-    from app.database import AsyncSessionLocal
     from app.models.db_models import PluginDB
     from app.plugins.loader import plugin_loader
     from app.plugins.manager import plugin_manager
@@ -364,27 +354,24 @@ async def update_calendar_source(source_id: str, source: CalendarSource):
         await validate_calendar_url(source.ical_url, source.type)
 
     # Update in database first
-    async with AsyncSessionLocal() as session:
-        result = await session.execute(select(PluginDB).where(PluginDB.id == source_id))
-        db_plugin = result.scalar_one_or_none()
-        if not db_plugin:
-            raise HTTPException(status_code=404, detail="Calendar source not found")
+    db_plugin = await PluginDB.objects.get_or_none(id=source_id)
+    if not db_plugin:
+        raise HTTPException(status_code=404, detail="Calendar source not found")
 
-        # Update database
-        db_plugin.name = source.name
-        db_plugin.enabled = source.enabled
-        config = db_plugin.config or {}
-        config.update(
-            {
-                "ical_url": source.ical_url,
-                "api_key": source.api_key,
-                "color": source.color,
-                "show_time": source.show_time,
-            }
-        )
-        db_plugin.config = config
-        await session.commit()
-        await session.refresh(db_plugin)
+    # Update database
+    db_plugin.name = source.name
+    db_plugin.enabled = source.enabled
+    config = db_plugin.config or {}
+    config.update(
+        {
+            "ical_url": source.ical_url,
+            "api_key": source.api_key,
+            "color": source.color,
+            "show_time": source.show_time,
+        }
+    )
+    db_plugin.config = config
+    await db_plugin.save_with_timestamp()
 
     # Handle instance creation/removal based on enabled status
     existing_plugin = plugin_manager.get_plugin(source_id)

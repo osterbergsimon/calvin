@@ -11,9 +11,7 @@ from typing import Any
 import httpx
 from fastapi import APIRouter, Body, File, HTTPException, Query, UploadFile
 from loguru import logger
-from sqlalchemy import select
 
-from app.database import AsyncSessionLocal
 from app.models.db_models import PluginDB, PluginTypeDB
 from app.plugins.base import PluginType
 from app.plugins.hooks import plugin_manager as hook_manager
@@ -77,9 +75,8 @@ async def get_plugins(
 
     # Load enabled status and error messages from database
     try:
-        async with AsyncSessionLocal() as session:
-            result = await session.execute(select(PluginTypeDB))
-            db_types = {db_type.type_id: db_type for db_type in result.scalars().all()}
+        db_types_list = await PluginTypeDB.objects.all()
+        db_types = {db_type.type_id: db_type for db_type in db_types_list}
     except Exception as e:
         logger.error(
             f"[get_plugins] Failed to load plugin types from database: {e}. "
@@ -136,53 +133,54 @@ async def get_plugins(
 
             result.append(plugin_info)
 
-    # Add themes from database - they're just another plugin type, stored in PluginTypeDB
+    # Add themes from filesystem (no longer stored in database)
     # Include themes when:
     # 1. Explicitly requested (plugin_type == "theme")
     # 2. No filter specified (plugin_type is None) - show all types including themes
     if include_themes or plugin_type is None:
         try:
-            # Get themes from database (same as other plugins)
-            theme_db_types = {
-                tid: db_type
-                for tid, db_type in db_types.items()
-                if db_type.plugin_type == PluginType.THEME.value
-            }
-
-            for theme_id, db_type in theme_db_types.items():
-                # Get theme manifest for additional metadata (is_builtin, variables, etc.)
-                # This is still needed for theme-specific features,
-                # but DB is source of truth for listing
-                theme_manifest = None
-                try:
-                    if db_type.type_id in BUILTIN_THEMES:
-                        # Built-in theme - get from BUILTIN_THEMES
-                        theme_manifest = BUILTIN_THEMES.get(db_type.type_id)
-                    else:
-                        # Installed theme - get from disk (for now, could cache in DB later)
-                        theme_manifest = theme_installer.get_theme_manifest(db_type.type_id)
-                except Exception as e:
-                    logger.warning(
-                        f"[get_plugins] Error loading theme manifest for {theme_id}: {e}"
-                    )
-                    # Use DB data if manifest unavailable
-
-                # Determine if built-in
-                is_builtin = theme_manifest.get("is_builtin", False) if theme_manifest else False
-
+            # Get built-in themes from BUILTIN_THEMES
+            for theme_id, theme_manifest in BUILTIN_THEMES.items():
                 theme_entry = {
-                    "id": db_type.type_id,
-                    "name": db_type.name,
+                    "id": theme_id,
+                    "name": theme_manifest.get("name", theme_id),
                     "type": PluginType.THEME.value,
-                    "description": db_type.description or "",
+                    "description": theme_manifest.get("description", ""),
                     "config_schema": {},
                     "instance_config_schema": {},
-                    "enabled": db_type.enabled,
+                    "enabled": True,  # Built-in themes are always enabled
                     "ui_actions": [],
                     "ui_sections": [],
                     "supports_multiple_instances": False,
-                    "is_builtin": is_builtin,
-                    "version": db_type.version or "1.0.0",
+                    "is_builtin": True,
+                    "version": theme_manifest.get("version", "1.0.0"),
+                }
+                result.append(theme_entry)
+
+            # Get installed themes from filesystem
+            installed_themes = theme_installer.get_installed_themes()
+            for theme_manifest in installed_themes:
+                theme_id = theme_manifest.get("id")
+                if not theme_id:
+                    continue
+
+                # Skip if already added as built-in
+                if theme_id in BUILTIN_THEMES:
+                    continue
+
+                theme_entry = {
+                    "id": theme_id,
+                    "name": theme_manifest.get("name", theme_id),
+                    "type": PluginType.THEME.value,
+                    "description": theme_manifest.get("description", ""),
+                    "config_schema": {},
+                    "instance_config_schema": {},
+                    "enabled": True,  # Installed themes are enabled by default
+                    "ui_actions": [],
+                    "ui_sections": [],
+                    "supports_multiple_instances": False,
+                    "is_builtin": False,
+                    "version": theme_manifest.get("version", "1.0.0"),
                 }
                 result.append(theme_entry)
         except Exception as e:
@@ -321,87 +319,82 @@ async def uninstall_plugin(plugin_id: str):
     """
     try:
         # Check if it's a theme by checking database
-        async with AsyncSessionLocal() as session:
-            result = await session.execute(
-                select(PluginTypeDB).where(PluginTypeDB.type_id == plugin_id)
-            )
-            db_type = result.scalar_one_or_none()
+        db_type = await PluginTypeDB.objects.get_or_none(type_id=plugin_id)
 
-            plugin_type_str = None
+        plugin_type_str = None
+        if db_type:
+            plugin_type_str = db_type.plugin_type
+
+        if db_type and db_type.plugin_type == PluginType.THEME.value:
+            # Uninstall theme
+            theme_installer.uninstall_theme(plugin_id)
+            # Remove theme from database
+            await _unregister_theme_from_db(plugin_id)
+
+            # Emit plugin_uninstalled event
+            try:
+                await event_system.emit_event(
+                    "plugin_uninstalled",
+                    {
+                        "plugin_id": plugin_id,
+                        "plugin_type": PluginType.THEME.value,
+                        "uninstalled_at": datetime.now(UTC).isoformat(),
+                    },
+                    wait_for_handlers=False,  # Fire-and-forget
+                )
+                logger.debug(f"Emitted plugin_uninstalled event for theme {plugin_id}")
+            except Exception as e:
+                # Don't fail plugin uninstallation if event emission fails
+                logger.warning(
+                    f"Failed to emit plugin_uninstalled event for theme {plugin_id}: {e}"
+                )
+
+            return {
+                "success": True,
+                "message": f"Theme {plugin_id} uninstalled successfully",
+            }
+        else:
+            # Uninstall regular plugin
+            plugin_installer.uninstall_plugin(plugin_id)
+
+            # Remove plugin from database (plugin_types table)
+            # Only remove if it exists in the database
+            # This ensures the plugin won't show up after uninstalling
             if db_type:
-                plugin_type_str = db_type.plugin_type
+                await db_type.delete()
+                logger.info(f"Removed plugin {plugin_id} from database")
 
-            if db_type and db_type.plugin_type == PluginType.THEME.value:
-                # Uninstall theme
-                theme_installer.uninstall_theme(plugin_id)
-                # Remove theme from database
-                await _unregister_theme_from_db(plugin_id)
+            # Reload plugins to remove the uninstalled one
+            # Note: We can't easily unload a module from Python,
+            # but it won't be loaded on next restart
+            plugin_loader._loaded_modules = {
+                m
+                for m in plugin_loader._loaded_modules
+                if not m.startswith(f"installed_plugin_{plugin_id}")
+            }
 
-                # Emit plugin_uninstalled event
-                try:
-                    await event_system.emit_event(
-                        "plugin_uninstalled",
-                        {
-                            "plugin_id": plugin_id,
-                            "plugin_type": PluginType.THEME.value,
-                            "uninstalled_at": datetime.now(UTC).isoformat(),
-                        },
-                        wait_for_handlers=False,  # Fire-and-forget
-                    )
-                    logger.debug(f"Emitted plugin_uninstalled event for theme {plugin_id}")
-                except Exception as e:
-                    # Don't fail plugin uninstallation if event emission fails
-                    logger.warning(
-                        f"Failed to emit plugin_uninstalled event for theme {plugin_id}: {e}"
-                    )
+            # Emit plugin_uninstalled event
+            try:
+                await event_system.emit_event(
+                    "plugin_uninstalled",
+                    {
+                        "plugin_id": plugin_id,
+                        "plugin_type": plugin_type_str or "unknown",
+                        "uninstalled_at": datetime.now(UTC).isoformat(),
+                    },
+                    wait_for_handlers=False,  # Fire-and-forget
+                )
+                logger.debug(f"Emitted plugin_uninstalled event for plugin {plugin_id}")
+            except Exception as e:
+                # Don't fail plugin uninstallation if event emission fails
+                logger.warning(
+                    f"Failed to emit plugin_uninstalled event for plugin {plugin_id}: {e}"
+                )
 
-                return {
-                    "success": True,
-                    "message": f"Theme {plugin_id} uninstalled successfully",
-                }
-            else:
-                # Uninstall regular plugin
-                plugin_installer.uninstall_plugin(plugin_id)
-
-                # Remove plugin from database (plugin_types table)
-                # Only remove if it exists in the database
-                # This ensures the plugin won't show up after uninstalling
-                if db_type:
-                    await session.delete(db_type)
-                    await session.commit()
-                    logger.info(f"Removed plugin {plugin_id} from database")
-
-                # Reload plugins to remove the uninstalled one
-                # Note: We can't easily unload a module from Python,
-                # but it won't be loaded on next restart
-                plugin_loader._loaded_modules = {
-                    m
-                    for m in plugin_loader._loaded_modules
-                    if not m.startswith(f"installed_plugin_{plugin_id}")
-                }
-
-                # Emit plugin_uninstalled event
-                try:
-                    await event_system.emit_event(
-                        "plugin_uninstalled",
-                        {
-                            "plugin_id": plugin_id,
-                            "plugin_type": plugin_type_str or "unknown",
-                            "uninstalled_at": datetime.now(UTC).isoformat(),
-                        },
-                        wait_for_handlers=False,  # Fire-and-forget
-                    )
-                    logger.debug(f"Emitted plugin_uninstalled event for plugin {plugin_id}")
-                except Exception as e:
-                    # Don't fail plugin uninstallation if event emission fails
-                    logger.warning(
-                        f"Failed to emit plugin_uninstalled event for plugin {plugin_id}: {e}"
-                    )
-
-                return {
-                    "success": True,
-                    "message": f"Plugin {plugin_id} uninstalled successfully",
-                }
+            return {
+                "success": True,
+                "message": f"Plugin {plugin_id} uninstalled successfully",
+            }
     except ValueError as e:
         raise HTTPException(status_code=404, detail=str(e))
     except Exception as e:
@@ -428,18 +421,14 @@ async def get_plugin(plugin_id: str):
         theme_manifest = BUILTIN_THEMES.get(plugin_id)
     else:
         # Check database
-        async with AsyncSessionLocal() as session:
-            result = await session.execute(
-                select(PluginTypeDB).where(PluginTypeDB.type_id == plugin_id)
-            )
-            db_type = result.scalar_one_or_none()
+        db_type = await PluginTypeDB.objects.get_or_none(type_id=plugin_id)
 
-            if db_type and db_type.plugin_type == PluginType.THEME.value:
-                # It's a theme in database - try to get manifest
-                try:
-                    theme_manifest = theme_installer.get_theme_manifest(plugin_id)
-                except Exception:
-                    pass
+        if db_type and db_type.plugin_type == PluginType.THEME.value:
+            # It's a theme in database - try to get manifest
+            try:
+                theme_manifest = theme_installer.get_theme_manifest(plugin_id)
+            except Exception:
+                pass
 
     # If still not found, try installed themes (might not be in DB yet)
     if not theme_manifest:
@@ -461,11 +450,7 @@ async def get_plugin(plugin_id: str):
         raise HTTPException(status_code=404, detail="Plugin type not found")
 
     # Get enabled status and error message from database
-    async with AsyncSessionLocal() as session:
-        result = await session.execute(
-            select(PluginTypeDB).where(PluginTypeDB.type_id == plugin_id)
-        )
-        db_type = result.scalar_one_or_none()
+    db_type = await PluginTypeDB.objects.get_or_none(type_id=plugin_id)
 
     enabled = db_type.enabled if db_type else True
     error_message = db_type.error_message if db_type else None
@@ -542,17 +527,15 @@ async def update_plugin(plugin_id: str, config: dict[str, Any]):
 
     if not type_info:
         # Check if it might be an instance ID to provide helpful error
-        async with AsyncSessionLocal() as session:
-            result = await session.execute(select(PluginDB).where(PluginDB.id == plugin_id))
-            db_plugin_instance = result.scalar_one_or_none()
-            if db_plugin_instance:
-                raise HTTPException(
-                    status_code=400,
-                    detail=(
-                        f"'{plugin_id}' is a plugin instance ID, not a plugin type ID. "
-                        f"Use PUT /plugins/instances/{plugin_id} to update instances."
-                    ),
-                )
+        db_plugin_instance = await PluginDB.objects.get_or_none(id=plugin_id)
+        if db_plugin_instance:
+            raise HTTPException(
+                status_code=400,
+                detail=(
+                    f"'{plugin_id}' is a plugin instance ID, not a plugin type ID. "
+                    f"Use PUT /plugins/instances/{plugin_id} to update instances."
+                ),
+            )
         raise HTTPException(
             status_code=404,
             detail=(
@@ -561,144 +544,129 @@ async def update_plugin(plugin_id: str, config: dict[str, Any]):
             ),
         )
 
-    # Use a SINGLE session for the entire operation
-    async with AsyncSessionLocal() as session:
-        # Check if it's a theme first (themes use type_id directly)
-        result = await session.execute(
-            select(PluginTypeDB).where(PluginTypeDB.type_id == plugin_id)
-        )
-        db_type = result.scalar_one_or_none()
+    # Check if it's a theme first (themes use type_id directly)
+    db_type = await PluginTypeDB.objects.get_or_none(type_id=plugin_id)
 
-        if db_type and db_type.plugin_type == PluginType.THEME.value:
-            # It's a theme - handle enabled status only (themes don't have config)
-            if enabled is not None:
-                previous_enabled = db_type.enabled
-                db_type.enabled = enabled
-                await session.commit()
-
-                # Emit plugin_enabled or plugin_disabled events if enabled status changed
-                if previous_enabled is not None and previous_enabled != enabled:
-                    event_type = "plugin_enabled" if enabled else "plugin_disabled"
-                    try:
-                        await event_system.emit_event(
-                            event_type,
-                            {
-                                "plugin_id": plugin_id,
-                                "plugin_type": PluginType.THEME.value,
-                                f"{'enabled' if enabled else 'disabled'}_at": datetime.now(
-                                    UTC
-                                ).isoformat(),
-                            },
-                            wait_for_handlers=False,  # Fire-and-forget
-                        )
-                        logger.debug(f"Emitted {event_type} event for theme {plugin_id}")
-                    except Exception as e:
-                        # Don't fail plugin update if event emission fails
-                        logger.warning(
-                            f"Failed to emit {event_type} event for theme {plugin_id}: {e}"
-                        )
-
-                return {"success": True, "enabled": enabled}
-            else:
-                # No enabled status to update
-                await session.commit()
-                return {"success": True}
-
-        # Store previous enabled state for event emission
-        previous_enabled = None
-        if db_type:
+    if db_type and db_type.plugin_type == PluginType.THEME.value:
+        # It's a theme - handle enabled status only (themes don't have config)
+        if enabled is not None:
             previous_enabled = db_type.enabled
+            db_type.enabled = enabled
+            await db_type.save_with_timestamp()
 
-        # If not found as plugin type, create it
-        if not db_type:
-            # Create new plugin type in database
-            plugin_type = type_info.get("plugin_type")
-            # Merge metadata schema with config (config takes precedence)
-            metadata_schema = type_info.get("common_config_schema", {}) or {}
-            initial_schema = {**metadata_schema, **config} if config else metadata_schema
-            logger.debug(
-                f"Creating new plugin type {plugin_id} with schema: {initial_schema}, "
-                f"config={config}, metadata_schema={metadata_schema}"
-            )
-            db_type = PluginTypeDB(
-                type_id=plugin_id,
-                plugin_type=plugin_type.value
-                if hasattr(plugin_type, "value")
-                else str(plugin_type),
-                name=type_info.get("name", ""),
-                description=type_info.get("description", ""),
-                version=type_info.get("version"),
-                common_config_schema=initial_schema,
-                enabled=enabled if enabled is not None else True,
-            )
-            session.add(db_type)
+            # Emit plugin_enabled or plugin_disabled events if enabled status changed
+            if previous_enabled is not None and previous_enabled != enabled:
+                event_type = "plugin_enabled" if enabled else "plugin_disabled"
+                try:
+                    await event_system.emit_event(
+                        event_type,
+                        {
+                            "plugin_id": plugin_id,
+                            "plugin_type": PluginType.THEME.value,
+                            f"{'enabled' if enabled else 'disabled'}_at": datetime.now(
+                                UTC
+                            ).isoformat(),
+                        },
+                        wait_for_handlers=False,  # Fire-and-forget
+                    )
+                    logger.debug(f"Emitted {event_type} event for theme {plugin_id}")
+                except Exception as e:
+                    # Don't fail plugin update if event emission fails
+                    logger.warning(f"Failed to emit {event_type} event for theme {plugin_id}: {e}")
+
+            return {"success": True, "enabled": enabled}
         else:
-            # Update existing plugin type
-            if enabled is not None:
-                db_type.enabled = enabled
-            if config:
-                current_schema = db_type.common_config_schema or {}
-                # Create a new dict to ensure SQLAlchemy detects the change
-                updated_schema = {**current_schema, **config}
-                db_type.common_config_schema = updated_schema
-                logger.debug(
-                    f"Updated plugin {plugin_id} common_config_schema: "
-                    f"old={current_schema}, new={updated_schema}, config={config}"
-                )
+            # No enabled status to update
+            return {"success": True}
 
-        # Save common config to config service for backward compatibility
-        if config:
-            config_key = f"plugin_{plugin_id}_config"
-            serializable_config = {}
-            for key, value in config.items():
-                if isinstance(value, Path):
-                    serializable_config[key] = str(value)
-                elif isinstance(value, dict):
-                    serializable_config[key] = value.get("value") or value.get("default") or ""
-                else:
-                    serializable_config[key] = value
-            config_json = json.dumps(serializable_config)
-            await config_service.set_value(config_key, config_json)
+    # Store previous enabled state for event emission
+    previous_enabled = None
+    if db_type:
+        previous_enabled = db_type.enabled
 
-        # Call plugin-specific config update handlers (if any)
-        hook_config = cleaned_config.copy()
-        update_coroutines = hook_manager.hook.handle_plugin_config_update(
-            type_id=plugin_id,
-            config=hook_config,
-            enabled=enabled,
-            db_type=db_type,
-            session=session,
+    # If not found as plugin type, create it
+    if not db_type:
+        # Create new plugin type in database
+        plugin_type = type_info.get("plugin_type")
+        # Merge metadata schema with config (config takes precedence)
+        metadata_schema = type_info.get("common_config_schema", {}) or {}
+        initial_schema = {**metadata_schema, **config} if config else metadata_schema
+        logger.debug(
+            f"Creating new plugin type {plugin_id} with schema: {initial_schema}, "
+            f"config={config}, metadata_schema={metadata_schema}"
         )
-        await asyncio.gather(*update_coroutines, return_exceptions=True)
-
-        # Emit plugin_enabled or plugin_disabled events if enabled status changed
-        if enabled is not None and previous_enabled is not None and previous_enabled != enabled:
-            # Get plugin type as string
-            plugin_type_enum = type_info.get("plugin_type")
-            plugin_type_str = (
-                plugin_type_enum.value
-                if hasattr(plugin_type_enum, "value")
-                else str(plugin_type_enum)
+        db_type = await PluginTypeDB.objects.create(
+            type_id=plugin_id,
+            plugin_type=plugin_type.value if hasattr(plugin_type, "value") else str(plugin_type),
+            name=type_info.get("name", ""),
+            description=type_info.get("description", ""),
+            version=type_info.get("version"),
+            common_config_schema=initial_schema,
+            enabled=enabled if enabled is not None else True,
+        )
+    else:
+        # Update existing plugin type
+        if enabled is not None:
+            db_type.enabled = enabled
+        if config:
+            current_schema = db_type.common_config_schema or {}
+            # Ormar JSON fields detect changes automatically
+            updated_schema = {**current_schema, **config}
+            db_type.common_config_schema = updated_schema
+            logger.debug(
+                f"Updated plugin {plugin_id} common_config_schema: "
+                f"old={current_schema}, new={updated_schema}, config={config}"
             )
+        await db_type.save_with_timestamp()
 
-            event_type = "plugin_enabled" if enabled else "plugin_disabled"
-            try:
-                await event_system.emit_event(
-                    event_type,
-                    {
-                        "plugin_id": plugin_id,
-                        "plugin_type": plugin_type_str,
-                        f"{'enabled' if enabled else 'disabled'}_at": datetime.now(UTC).isoformat(),
-                    },
-                    wait_for_handlers=False,  # Fire-and-forget
-                )
-                logger.debug(f"Emitted {event_type} event for plugin {plugin_id}")
-            except Exception as e:
-                # Don't fail plugin update if event emission fails
-                logger.warning(f"Failed to emit {event_type} event for plugin {plugin_id}: {e}")
+    # Save common config to config service for backward compatibility
+    if config:
+        config_key = f"plugin_{plugin_id}_config"
+        serializable_config = {}
+        for key, value in config.items():
+            if isinstance(value, Path):
+                serializable_config[key] = str(value)
+            elif isinstance(value, dict):
+                serializable_config[key] = value.get("value") or value.get("default") or ""
+            else:
+                serializable_config[key] = value
+        config_json = json.dumps(serializable_config)
+        await config_service.set_value(config_key, config_json)
 
-        # Commit all changes
-        await session.commit()
+    # Call plugin-specific config update handlers (if any)
+    hook_config = cleaned_config.copy()
+    update_coroutines = hook_manager.hook.handle_plugin_config_update(
+        type_id=plugin_id,
+        config=hook_config,
+        enabled=enabled,
+        db_type=db_type,
+        session=None,  # No session needed with Ormar
+    )
+    await asyncio.gather(*update_coroutines, return_exceptions=True)
+
+    # Emit plugin_enabled or plugin_disabled events if enabled status changed
+    if enabled is not None and previous_enabled is not None and previous_enabled != enabled:
+        # Get plugin type as string
+        plugin_type_enum = type_info.get("plugin_type")
+        plugin_type_str = (
+            plugin_type_enum.value if hasattr(plugin_type_enum, "value") else str(plugin_type_enum)
+        )
+
+        event_type = "plugin_enabled" if enabled else "plugin_disabled"
+        try:
+            await event_system.emit_event(
+                event_type,
+                {
+                    "plugin_id": plugin_id,
+                    "plugin_type": plugin_type_str,
+                    f"{'enabled' if enabled else 'disabled'}_at": datetime.now(UTC).isoformat(),
+                },
+                wait_for_handlers=False,  # Fire-and-forget
+            )
+            logger.debug(f"Emitted {event_type} event for plugin {plugin_id}")
+        except Exception as e:
+            # Don't fail plugin update if event emission fails
+            logger.warning(f"Failed to emit {event_type} event for plugin {plugin_id}: {e}")
 
     return {
         "message": "Plugin type configuration updated",
@@ -771,19 +739,14 @@ async def get_plugin_data(
     Returns:
         Plugin data (format depends on plugin type)
     """
-    from sqlalchemy import select
-
-    from app.database import AsyncSessionLocal
     from app.models.db_models import PluginDB
     from app.plugins.protocols import ServicePlugin
 
     # Get the plugin instance
-    async with AsyncSessionLocal() as session:
-        result = await session.execute(select(PluginDB).where(PluginDB.id == plugin_id))
-        db_plugin = result.scalar_one_or_none()
+    db_plugin = await PluginDB.objects.get_or_none(id=plugin_id)
 
-        if not db_plugin:
-            raise HTTPException(status_code=404, detail="Plugin instance not found")
+    if not db_plugin:
+        raise HTTPException(status_code=404, detail="Plugin instance not found")
 
         # Get plugin instance from manager
         plugin_instance = plugin_manager.get_plugin(plugin_id)
@@ -842,24 +805,22 @@ async def geocode_location(plugin_id: str, request: dict[str, Any] = Body(...)):
 
     # Verify plugin type (optional - allow geocoding even if plugin instance doesn't exist yet)
     # This allows users to geocode before saving the plugin configuration
-    async with AsyncSessionLocal() as session:
-        # Check if plugin exists and is yr_weather type
-        result = await session.execute(select(PluginDB).where(PluginDB.id == plugin_id))
-        db_plugin = result.scalar_one_or_none()
+    # Check if plugin exists and is yr_weather type
+    db_plugin = await PluginDB.objects.get_or_none(id=plugin_id)
 
-        # If plugin exists, verify it's the right type
-        if db_plugin and db_plugin.type_id != "yr_weather":
-            raise HTTPException(
-                status_code=400, detail="Geocoding is only available for Yr.no weather plugins"
-            )
+    # If plugin exists, verify it's the right type
+    if db_plugin and db_plugin.type_id != "yr_weather":
+        raise HTTPException(
+            status_code=400, detail="Geocoding is only available for Yr.no weather plugins"
+        )
 
-        # If plugin doesn't exist, check if the plugin_id matches the expected pattern
-        # This allows geocoding for new plugin instances before they're saved
-        # We'll allow it if the plugin_id looks like it could be a yr_weather plugin
-        # (starts with 'yr_weather' or is just 'yr_weather')
-        if not db_plugin:
-            # Allow geocoding for new instances - we'll validate the location instead
-            pass
+    # If plugin doesn't exist, check if the plugin_id matches the expected pattern
+    # This allows geocoding for new plugin instances before they're saved
+    # We'll allow it if the plugin_id looks like it could be a yr_weather plugin
+    # (starts with 'yr_weather' or is just 'yr_weather')
+    if not db_plugin:
+        # Allow geocoding for new instances - we'll validate the location instead
+        pass
 
     try:
         # Use OpenStreetMap Nominatim API (free, no API key required)

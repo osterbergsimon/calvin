@@ -350,16 +350,17 @@ class TestPluginCalendarService:
         mock_db_plugin.enabled = True
         mock_db_plugin.config = {"ical_url": "https://example.com/calendar.ics"}
 
-        with patch("app.database.AsyncSessionLocal") as mock_session:
-            mock_session_instance = AsyncMock()
-            mock_session_instance.__aenter__ = AsyncMock(return_value=mock_session_instance)
-            mock_session_instance.__aexit__ = AsyncMock(return_value=None)
-            mock_session.return_value = mock_session_instance
+        # Mock Ormar PluginDB.objects.filter() - patch where it's imported in the function
+        mock_filter = MagicMock()
+        mock_filter.all = AsyncMock(return_value=[mock_db_plugin])
+        mock_objects = MagicMock()
+        mock_objects.filter.return_value = mock_filter
 
-            mock_result = MagicMock()
-            mock_result.scalars.return_value.all.return_value = [mock_db_plugin]
-            mock_session_instance.execute = AsyncMock(return_value=mock_result)
+        # Create a mock PluginDB class with objects property
+        mock_plugin_db_class = MagicMock()
+        mock_plugin_db_class.objects = mock_objects
 
+        with patch("app.models.db_models.PluginDB", mock_plugin_db_class):
             with patch("app.plugins.manager.plugin_manager") as mock_manager:
                 # Create a proper CalendarPlugin instance
                 test_plugin = MockCalendarPlugin("test-calendar-1", "Test Calendar")
@@ -390,16 +391,17 @@ class TestPluginCalendarService:
         mock_db_plugin.enabled = False
         mock_db_plugin.config = {"ical_url": "https://example.com/calendar.ics"}
 
-        with patch("app.database.AsyncSessionLocal") as mock_session:
-            mock_session_instance = AsyncMock()
-            mock_session_instance.__aenter__ = AsyncMock(return_value=mock_session_instance)
-            mock_session_instance.__aexit__ = AsyncMock(return_value=None)
-            mock_session.return_value = mock_session_instance
+        # Mock Ormar PluginDB.objects.filter() - patch where it's imported in the function
+        mock_filter = MagicMock()
+        mock_filter.all = AsyncMock(return_value=[mock_db_plugin])
+        mock_objects = MagicMock()
+        mock_objects.filter.return_value = mock_filter
 
-            mock_result = MagicMock()
-            mock_result.scalars.return_value.all.return_value = [mock_db_plugin]
-            mock_session_instance.execute = AsyncMock(return_value=mock_result)
+        # Create a mock PluginDB class with objects property
+        mock_plugin_db_class = MagicMock()
+        mock_plugin_db_class.objects = mock_objects
 
+        with patch("app.models.db_models.PluginDB", mock_plugin_db_class):
             with patch("app.plugins.manager.plugin_manager") as mock_manager:
                 mock_manager.get_plugin.return_value = None  # No instance for disabled plugin
 

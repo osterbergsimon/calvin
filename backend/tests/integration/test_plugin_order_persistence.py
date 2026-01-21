@@ -8,7 +8,6 @@ These tests verify that plugin display_order persists correctly:
 
 import pytest
 
-import app.database as db_module
 from app.models.db_models import PluginTypeDB
 from app.plugins.registry.loader import load_plugin_types
 
@@ -33,22 +32,12 @@ class TestPluginOrderPersistence:
         assert response.status_code == 200
 
         # Verify it's saved in database
-        # Use a fresh session to ensure we see committed changes
-        async with db_module.AsyncSessionLocal() as session:
-            from sqlalchemy import select
+        plugin_type = await PluginTypeDB.objects.get_or_none(type_id="local")
+        assert plugin_type is not None
 
-            result = await session.execute(
-                select(PluginTypeDB).where(PluginTypeDB.type_id == "local")
-            )
-            plugin_type = result.scalar_one_or_none()
-            assert plugin_type is not None
-
-            # Refresh to get latest data
-            await session.refresh(plugin_type)
-
-            config = plugin_type.common_config_schema or {}
-            display_order = config.get("display_order")
-            assert display_order in ["10", 10], f"Expected '10' or 10, got {display_order}"
+        config = plugin_type.common_config_schema or {}
+        display_order = config.get("display_order")
+        assert display_order in ["10", 10], f"Expected '10' or 10, got {display_order}"
 
         # Verify it's returned by /plugins endpoint
         response = test_client.get("/api/plugins?plugin_type=image")
@@ -79,36 +68,24 @@ class TestPluginOrderPersistence:
         assert response.status_code == 200
 
         # Verify it's saved
-        async with db_module.AsyncSessionLocal() as session:
-            from sqlalchemy import select
-
-            result = await session.execute(
-                select(PluginTypeDB).where(PluginTypeDB.type_id == "local")
-            )
-            plugin_type = result.scalar_one_or_none()
-            assert plugin_type is not None
-            config_before = plugin_type.common_config_schema or {}
-            assert config_before.get("display_order") in ["5", 5]
+        plugin_type = await PluginTypeDB.objects.get_or_none(type_id="local")
+        assert plugin_type is not None
+        config_before = plugin_type.common_config_schema or {}
+        assert config_before.get("display_order") in ["5", 5]
 
         # Simulate plugin reload (what happens on server restart)
         await load_plugin_types()
 
         # Verify display_order is still there after reload
-        async with db_module.AsyncSessionLocal() as session:
-            from sqlalchemy import select
+        plugin_type = await PluginTypeDB.objects.get_or_none(type_id="local")
+        assert plugin_type is not None
 
-            result = await session.execute(
-                select(PluginTypeDB).where(PluginTypeDB.type_id == "local")
-            )
-            plugin_type = result.scalar_one_or_none()
-            assert plugin_type is not None
-
-            config_after = plugin_type.common_config_schema or {}
-            display_order_after = config_after.get("display_order")
-            assert display_order_after in ["5", 5], (
-                f"display_order was lost after reload! Expected '5' or 5, got {display_order_after}. "
-                f"Full config: {config_after}"
-            )
+        config_after = plugin_type.common_config_schema or {}
+        display_order_after = config_after.get("display_order")
+        assert display_order_after in ["5", 5], (
+            f"display_order was lost after reload! Expected '5' or 5, got {display_order_after}. "
+            f"Full config: {config_after}"
+        )
 
     async def test_multiple_plugins_ordering_persists(self, test_client):
         """Test that ordering for multiple plugins persists correctly."""
