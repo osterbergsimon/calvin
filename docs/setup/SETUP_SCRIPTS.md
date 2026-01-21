@@ -46,8 +46,10 @@ curl -fsSL https://raw.githubusercontent.com/osterbergsimon/calvin/main/scripts/
 **Using a Different Branch:**
 
 ```bash
-GIT_BRANCH=develop wget -O- https://raw.githubusercontent.com/osterbergsimon/calvin/main/scripts/setup.sh | sudo bash
+GIT_BRANCH=develop wget -O- https://raw.githubusercontent.com/osterbergsimon/calvin/main/scripts/setup.sh | sudo -E bash
 ```
+
+> **Note:** Use `sudo -E` to preserve environment variables. Without `-E`, `sudo` will not pass `GIT_BRANCH` or `GIT_REPO` to the script, and it will default to the `main` branch.
 
 **Using a Fork or Custom Repository:**
 
@@ -99,8 +101,10 @@ curl -fsSL https://raw.githubusercontent.com/osterbergsimon/calvin/main/scripts/
 **Using a Different Branch:**
 
 ```bash
-GIT_BRANCH=develop curl -fsSL https://raw.githubusercontent.com/osterbergsimon/calvin/main/scripts/setup-dev.sh | sudo bash
+GIT_BRANCH=develop curl -fsSL https://raw.githubusercontent.com/osterbergsimon/calvin/main/scripts/setup-dev.sh | sudo -E bash
 ```
+
+> **Note:** Use `sudo -E` to preserve environment variables. Without `-E`, `sudo` will not pass `GIT_BRANCH` or `GIT_REPO` to the script, and it will default to the `main` branch.
 
 **What Happens:**
 1. Same as production setup, but with development features
