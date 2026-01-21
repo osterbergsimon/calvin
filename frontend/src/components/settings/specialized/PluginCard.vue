@@ -274,6 +274,7 @@ const showInstances = computed(() => {
 // Helper functions (these would ideally come from a composable)
 const getGlobalConfigSchema = (plugin) => {
   const schema = plugin.common_config_schema || {};
+  const instanceSchema = plugin.instance_config_schema || {};
   const globalSchema = {};
 
   // Filter out internal instance management fields
@@ -283,20 +284,52 @@ const getGlobalConfigSchema = (plugin) => {
     "_instance_id",
   ];
 
-  // Special fields that should always be shown for service plugins (common settings)
-  const commonServiceFields = ["display_order"];
+  // Whitelist of fields that are truly global (not instance-specific)
+  // These can appear in Common Settings even if they're also in instance_config_schema
+  const globalOnlyFields = ["display_order"];
+
+  // Fields that should NEVER appear in Common Settings (instance-specific)
+  const instanceOnlyFields = [
+    "email_address",
+    "email_password",
+    "imap_server",
+    "imap_port",
+    "check_interval",
+    "target_directory",
+    "mark_as_read",
+    "ical_url",
+    "api_key",
+    "api_token",
+    "url",
+    "latitude",
+    "longitude",
+    "altitude",
+    "location",
+  ];
 
   for (const [key, fieldSchema] of Object.entries(schema)) {
     // Skip internal instance management fields
     if (internalFields.includes(key)) {
       continue;
     }
-    // For service plugins: show fields with global_only flag OR common service fields
-    // For non-service plugins: show all fields
+
+    // Skip fields that are instance-specific (should only be in instance_config_schema)
+    if (instanceOnlyFields.includes(key)) {
+      continue;
+    }
+
+    // Skip fields that are in instance_config_schema (they're instance-specific)
+    // unless they're in the globalOnlyFields whitelist
+    if (key in instanceSchema && !globalOnlyFields.includes(key)) {
+      continue;
+    }
+
+    // For service plugins: only show fields with global_only flag OR whitelisted global fields
+    // For other plugins: show fields that aren't instance-specific
     if (
       plugin.type === "service"
-        ? fieldSchema.global_only || commonServiceFields.includes(key)
-        : true
+        ? fieldSchema.global_only || globalOnlyFields.includes(key)
+        : !instanceOnlyFields.includes(key) && !(key in instanceSchema)
     ) {
       globalSchema[key] = fieldSchema;
     }

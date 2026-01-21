@@ -748,40 +748,54 @@ async def get_plugin_data(
     if not db_plugin:
         raise HTTPException(status_code=404, detail="Plugin instance not found")
 
-        # Get plugin instance from manager
-        plugin_instance = plugin_manager.get_plugin(plugin_id)
-        if not plugin_instance or not isinstance(plugin_instance, ServicePlugin):
-            raise HTTPException(
-                status_code=404, detail="Service plugin instance not found or not a service plugin"
-            )
-
-        # Ensure plugin is initialized and running
-        if not plugin_instance.is_running():
-            try:
-                await plugin_instance.initialize()
-                plugin_instance.start()
-            except Exception as e:
-                logger.error(f"Error initializing plugin {plugin_id}: {e}", exc_info=True)
-                raise HTTPException(
-                    status_code=500, detail=f"Failed to initialize plugin: {str(e)}"
-                )
-
-        # Call the plugin's fetch_service_data method (protocol-defined)
-        try:
-            data = await plugin_instance.fetch_service_data(
-                start_date=start_date, end_date=end_date
-            )
-            if data is not None:
-                return data
-        except Exception as e:
-            logger.error(f"Error calling fetch_service_data for {plugin_id}: {e}", exc_info=True)
-            raise HTTPException(status_code=500, detail=f"Failed to fetch plugin data: {str(e)}")
-
-        # If plugin returned None, it doesn't support data fetching
+    # Get plugin instance from manager
+    plugin_instance = plugin_manager.get_plugin(plugin_id)
+    if not plugin_instance or not isinstance(plugin_instance, ServicePlugin):
         raise HTTPException(
-            status_code=501,
-            detail="This plugin does not support data fetching via this endpoint",
+            status_code=404, detail="Service plugin instance not found or not a service plugin"
         )
+
+    # Ensure plugin is initialized and running
+    if not plugin_instance.is_running():
+        try:
+            await plugin_instance.initialize()
+            plugin_instance.start()
+        except Exception as e:
+            logger.error(f"Error initializing plugin {plugin_id}: {e}", exc_info=True)
+            raise HTTPException(status_code=500, detail=f"Failed to initialize plugin: {str(e)}")
+
+    # Try hook-based data fetching first (for external plugins)
+    try:
+        hook_coroutines = hook_manager.hook.fetch_service_data(
+            instance_id=plugin_id, start_date=start_date, end_date=end_date
+        )
+        # Process hook results (pluggy returns a list of coroutines)
+        if hook_coroutines:
+            hook_results = await asyncio.gather(*hook_coroutines, return_exceptions=True)
+            # Check if any plugin handled the fetch
+            for result in hook_results:
+                # Skip exceptions
+                if isinstance(result, Exception):
+                    continue
+                if result is not None:
+                    return result
+    except Exception as e:
+        logger.debug(f"Hook-based fetch_service_data failed for {plugin_id}: {e}")
+
+    # Fall back to protocol method (for built-in plugins)
+    try:
+        data = await plugin_instance.fetch_service_data(start_date=start_date, end_date=end_date)
+        if data is not None:
+            return data
+    except Exception as e:
+        logger.error(f"Error calling fetch_service_data for {plugin_id}: {e}", exc_info=True)
+        raise HTTPException(status_code=500, detail=f"Failed to fetch plugin data: {str(e)}")
+
+    # If plugin returned None, it doesn't support data fetching
+    raise HTTPException(
+        status_code=501,
+        detail="This plugin does not support data fetching via this endpoint",
+    )
 
 
 @router.post("/plugins/{plugin_id}/geocode")
