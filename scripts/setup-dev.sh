@@ -4,14 +4,21 @@
 # Or: curl -fsSL https://raw.githubusercontent.com/osterbergsimon/calvin/main/scripts/setup-dev.sh | sudo bash
 #
 # To use a different branch, set GIT_BRANCH environment variable:
-#   GIT_BRANCH=develop wget -O- https://raw.githubusercontent.com/osterbergsimon/calvin/main/scripts/setup-dev.sh | sudo -E bash
-#   GIT_BRANCH=develop curl -fsSL https://raw.githubusercontent.com/osterbergsimon/calvin/main/scripts/setup-dev.sh | sudo -E bash
+#   export GIT_BRANCH=develop
+#   wget -O- https://raw.githubusercontent.com/osterbergsimon/calvin/main/scripts/setup-dev.sh | sudo -E bash
+#   # Or with curl:
+#   curl -fsSL https://raw.githubusercontent.com/osterbergsimon/calvin/main/scripts/setup-dev.sh | sudo -E bash
 #
 # Note: Use 'sudo -E' to preserve environment variables. Without -E, sudo will not
 # pass GIT_BRANCH or GIT_REPO to the script.
+# IMPORTANT: Export the variable first (export GIT_BRANCH=develop) rather than
+# setting it inline (GIT_BRANCH=develop wget ...), as inline assignments don't
+# propagate through pipes to sudo.
 #
 # To use a different repository:
-#   GIT_REPO=https://github.com/yourusername/calvin.git GIT_BRANCH=develop wget -O- ... | sudo -E bash
+#   export GIT_REPO=https://github.com/yourusername/calvin.git
+#   export GIT_BRANCH=develop
+#   wget -O- ... | sudo -E bash
 
 set -euo pipefail
 
