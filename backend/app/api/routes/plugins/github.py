@@ -273,7 +273,17 @@ async def install_plugin_from_github(request: dict[str, Any] = Body(...)):
                 )
 
                 # Reload plugins to include the newly installed one
-                plugin_loader.load_installed_plugins()
+                # Wrap in try-except to handle loading errors gracefully
+                try:
+                    plugin_loader.load_installed_plugins()
+                except Exception as load_error:
+                    logger.warning(
+                        f"Plugin {manifest['id']} installed but failed to load: {load_error}. "
+                        "It will be available after server restart.",
+                        exc_info=True,
+                    )
+                    # Don't fail the installation - the plugin files are installed correctly
+                    # It just needs a restart to be loaded
 
                 actual_branch = "master" if branch_switched else branch
                 return {

@@ -26,8 +26,6 @@ async def register_plugin(
         name: Human-readable name
         config: Plugin configuration dictionary
         enabled: Whether the plugin is enabled
-        session: Optional database session. If provided, uses it and doesn't commit.
-                 If None, creates a new session and commits.
 
     Returns:
         Registered plugin instance
@@ -67,19 +65,25 @@ async def register_plugin(
     # Register plugin
     await instance_manager.register(plugin)
 
-    # Save to database
+    # Save to database with retry logic for SQLite concurrency
     # Get plugin type to determine plugin_type
-    db_type = await PluginTypeDB.objects.get_or_none(type_id=type_id)
-    plugin_type = db_type.plugin_type if db_type else "unknown"
+    from app.utils.db_retry import retry_on_db_locked
 
-    await PluginDB.objects.create(
-        id=plugin_id,
-        type_id=type_id,
-        plugin_type=plugin_type,
-        name=name,
-        enabled=enabled,
-        config=config,
-    )
+    @retry_on_db_locked(max_retries=5, initial_delay=0.1, max_delay=1.0)
+    async def _save_plugin_to_db():
+        db_type = await PluginTypeDB.objects.get_or_none(type_id=type_id)
+        plugin_type = db_type.plugin_type if db_type else "unknown"
+
+        await PluginDB.objects.create(
+            id=plugin_id,
+            type_id=type_id,
+            plugin_type=plugin_type,
+            name=name,
+            enabled=enabled,
+            config=config,
+        )
+
+    await _save_plugin_to_db()
 
     # Initialize plugin
     await plugin.initialize()

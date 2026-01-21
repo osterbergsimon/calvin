@@ -33,8 +33,22 @@ metadata = MetaData()
 
 
 async def connect_db():
-    """Connect to database."""
+    """Connect to database and configure SQLite for better concurrency."""
     await database.connect()
+
+    # Enable WAL mode for better concurrency (allows multiple readers and one writer)
+    # This significantly improves SQLite's ability to handle concurrent access
+    try:
+        await database.execute("PRAGMA journal_mode=WAL")
+        # Set busy timeout to handle temporary locks (wait up to 5 seconds)
+        await database.execute("PRAGMA busy_timeout=5000")
+        # Set synchronous mode to NORMAL for better performance (WAL mode makes this safe)
+        await database.execute("PRAGMA synchronous=NORMAL")
+    except Exception as e:
+        # If PRAGMA commands fail, log but don't fail connection
+        # (might happen if database is read-only or other issues)
+        logger = logging.getLogger(__name__)
+        logger.warning(f"Failed to configure SQLite PRAGMA settings: {e}")
 
 
 async def disconnect_db():
@@ -46,7 +60,7 @@ async def init_db():
     """Initialize database (create tables)."""
     # Connect if not already connected
     if not database.is_connected:
-        await database.connect()
+        await connect_db()  # Use connect_db() to ensure WAL mode is enabled
 
     # Create tables using metadata
     # Note: Ormar will create tables automatically when models are imported
@@ -57,5 +71,13 @@ async def init_db():
     # Use absolute path to avoid path resolution issues
     sync_url = settings.database_url_absolute.replace("sqlite+aiosqlite:///", "sqlite:///")
     sync_engine = create_engine(sync_url, echo=False)
+
+    # Enable WAL mode on sync engine as well (for table creation)
+    with sync_engine.connect() as conn:
+        conn.execute("PRAGMA journal_mode=WAL")
+        conn.execute("PRAGMA busy_timeout=5000")
+        conn.execute("PRAGMA synchronous=NORMAL")
+        conn.commit()
+
     metadata.create_all(sync_engine)
     sync_engine.dispose()

@@ -22,7 +22,7 @@
     >
       <div class="meal-plan-header">
         <h3>Meal Plan</h3>
-        <span v-if="dateRange" class="meal-plan-dates">
+        <span class="meal-plan-dates" v-if="dateRange">
           {{ dateRange }}
         </span>
       </div>
@@ -37,15 +37,15 @@
           class="meal-plan-item"
         >
           <div
-            v-if="item.date"
             class="meal-plan-date"
             :class="{ today: isToday(item.date) }"
+            v-if="item.date"
           >
             {{ formatDate(item.date) }}
           </div>
           <div
-            v-if="item.meals && item.meals.length > 0"
             class="meal-plan-meals"
+            v-if="item.meals && item.meals.length > 0"
           >
             <div
               v-for="meal in item.meals"
@@ -80,7 +80,13 @@ import { computed } from "vue";
 import { useQuery } from "@tanstack/vue-query";
 import axios from "axios";
 import { useConfigStore } from "../../../stores/config";
-import { logDebug, logWarn, isDebugEnabled } from "../../../utils/logger";
+import {
+  logDebug,
+  logWarn,
+  logInfo,
+  logError,
+  isDebugEnabled,
+} from "../../../utils/logger";
 
 const props = defineProps({
   serviceId: {

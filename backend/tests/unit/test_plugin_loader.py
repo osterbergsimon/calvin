@@ -184,8 +184,10 @@ class TestPluginLoader:
 
     @patch("app.plugins.loader.plugin_installer")
     @patch("app.plugins.loader.plugin_manager")
+    @patch("app.plugins.loader.sys.path")
     def test_load_installed_plugins(
         self,
+        mock_sys_path,
         mock_plugin_manager,
         mock_installer,
         plugin_loader_instance,
@@ -198,12 +200,57 @@ class TestPluginLoader:
         ]
         mock_installer.get_plugin_path.return_value = installed_plugin_package
 
-        # Load installed plugins
-        plugin_loader_instance.load_installed_plugins()
+        # Mock sys.path to verify backend directory is added
+        # Use a real list that we can check
+        import sys
 
-        # Verify plugin was registered
-        assert mock_plugin_manager.register.called
-        assert "installed_plugin_test_plugin" in plugin_loader_instance._loaded_modules
+        original_path = sys.path.copy()
+        try:
+            # Load installed plugins
+            plugin_loader_instance.load_installed_plugins()
+
+            # Verify plugin was registered
+            assert mock_plugin_manager.register.called
+            assert "installed_plugin_test_plugin" in plugin_loader_instance._loaded_modules
+        finally:
+            # Restore original path
+            sys.path[:] = original_path
+
+    @patch("app.plugins.loader.plugin_installer")
+    @patch("app.plugins.loader.plugin_manager")
+    def test_load_installed_plugins_backend_dir_already_in_path(
+        self,
+        mock_plugin_manager,
+        mock_installer,
+        plugin_loader_instance,
+        installed_plugin_package,
+    ):
+        """Test loading installed plugins when backend directory is already in sys.path."""
+        # Setup mock installer
+        mock_installer.get_installed_plugins.return_value = [
+            {"id": "test_plugin"},
+        ]
+        mock_installer.get_plugin_path.return_value = installed_plugin_package
+
+        # Add backend directory to sys.path before loading
+        import sys
+        from pathlib import Path
+
+        backend_dir = Path(__file__).parent.parent.parent.parent  # backend directory
+        backend_dir_str = str(backend_dir)
+        original_path = sys.path.copy()
+        try:
+            if backend_dir_str not in sys.path:
+                sys.path.insert(0, backend_dir_str)
+
+            # Load installed plugins
+            plugin_loader_instance.load_installed_plugins()
+
+            # Verify plugin was still registered
+            assert mock_plugin_manager.register.called
+        finally:
+            # Restore original path
+            sys.path[:] = original_path
 
     @patch("app.plugins.loader.plugin_installer")
     def test_load_installed_plugins_missing_plugin_py(

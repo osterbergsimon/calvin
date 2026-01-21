@@ -474,8 +474,30 @@ class PluginInstaller:
         install_id = plugin_id or manifest["id"]
 
         # Check if plugin already installed
-        if self.get_plugin_path(install_id).exists():
-            raise ValueError(f"Plugin {install_id} is already installed")
+        plugin_path = self.get_plugin_path(install_id)
+        if plugin_path.exists():
+            # Verify it's actually a valid installed plugin (not just a leftover directory)
+            existing_manifest = self.get_plugin_manifest(install_id)
+            if existing_manifest:
+                # Plugin is actually installed and valid
+                raise ValueError(f"Plugin {install_id} is already installed")
+            else:
+                # Plugin directory exists but is invalid/corrupted (no manifest)
+                # Remove it and allow reinstallation
+                import logging
+
+                logger = logging.getLogger(__name__)
+                logger.warning(
+                    f"Found corrupted/invalid plugin directory for {install_id}, "
+                    "removing and allowing reinstallation"
+                )
+                import shutil
+
+                shutil.rmtree(plugin_path)
+                # Also clean up frontend directory if it exists
+                frontend_path = self.get_frontend_plugin_path(install_id)
+                if frontend_path.exists():
+                    shutil.rmtree(frontend_path)
 
         # Install from directory
         return self.install_plugin(plugin_dir, install_id)

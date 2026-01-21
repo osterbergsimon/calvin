@@ -47,6 +47,13 @@ async def initialize_database(
         # Connect to database
         if not database.is_connected:
             await database.connect()
+            # Enable WAL mode for better concurrency
+            try:
+                await database.execute("PRAGMA journal_mode=WAL")
+                await database.execute("PRAGMA busy_timeout=5000")
+                await database.execute("PRAGMA synchronous=NORMAL")
+            except Exception as e:
+                logger.warning(f"Failed to configure SQLite PRAGMA settings during init: {e}")
 
     # Import all models to ensure they're registered in metadata
     # This is needed for Alembic to know about the models

@@ -35,48 +35,55 @@ async def load_plugin_types() -> None:
             # Check if plugin type exists in database
             db_type = await PluginTypeDB.objects.get_or_none(type_id=type_id)
 
-            if not db_type:
-                # Create new plugin type in database
-                plugin_type_value = (
-                    type_info["plugin_type"].value
-                    if hasattr(type_info["plugin_type"], "value")
-                    else str(type_info["plugin_type"])
-                )
-                await PluginTypeDB.objects.create(
-                    type_id=type_id,
-                    plugin_type=plugin_type_value,
-                    name=name,
-                    description=type_info.get("description"),
-                    version=type_info.get("version"),
-                    common_config_schema=type_info.get("common_config_schema", {}),
-                    enabled=False,  # Default to disabled - user must explicitly enable
-                    error_message=None,  # Clear any previous errors
-                )
-            else:
-                # Update existing plugin type if needed
-                plugin_type_value = (
-                    type_info["plugin_type"].value
-                    if hasattr(type_info["plugin_type"], "value")
-                    else str(type_info["plugin_type"])
-                )
-                db_type.name = name
-                db_type.description = type_info.get("description")
-                db_type.version = type_info.get("version")
+            # Use retry logic for database operations to handle SQLite concurrency
+            from app.utils.db_retry import retry_on_db_locked
 
-                # Merge plugin metadata schema with existing database schema
-                # This preserves user-set values (like display_order) while updating
-                # with new schema from plugin metadata
-                metadata_schema = type_info.get("common_config_schema", {}) or {}
-                existing_schema = db_type.common_config_schema or {}
-                # Merge: existing schema takes precedence (preserves user-set values),
-                # but metadata schema can add new fields
-                merged_schema = {**metadata_schema, **existing_schema}
-                db_type.common_config_schema = merged_schema
+            @retry_on_db_locked(max_retries=5, initial_delay=0.1, max_delay=1.0)
+            async def _save_plugin_type():
+                if not db_type:
+                    # Create new plugin type in database
+                    plugin_type_value = (
+                        type_info["plugin_type"].value
+                        if hasattr(type_info["plugin_type"], "value")
+                        else str(type_info["plugin_type"])
+                    )
+                    await PluginTypeDB.objects.create(
+                        type_id=type_id,
+                        plugin_type=plugin_type_value,
+                        name=name,
+                        description=type_info.get("description"),
+                        version=type_info.get("version"),
+                        common_config_schema=type_info.get("common_config_schema", {}),
+                        enabled=False,  # Default to disabled - user must explicitly enable
+                        error_message=None,  # Clear any previous errors
+                    )
+                else:
+                    # Update existing plugin type if needed
+                    plugin_type_value = (
+                        type_info["plugin_type"].value
+                        if hasattr(type_info["plugin_type"], "value")
+                        else str(type_info["plugin_type"])
+                    )
+                    db_type.name = name
+                    db_type.description = type_info.get("description")
+                    db_type.version = type_info.get("version")
 
-                db_type.plugin_type = plugin_type_value
-                # Clear error message on successful load
-                db_type.error_message = None
-                await db_type.save_with_timestamp()
+                    # Merge plugin metadata schema with existing database schema
+                    # This preserves user-set values (like display_order) while updating
+                    # with new schema from plugin metadata
+                    metadata_schema = type_info.get("common_config_schema", {}) or {}
+                    existing_schema = db_type.common_config_schema or {}
+                    # Merge: existing schema takes precedence (preserves user-set values),
+                    # but metadata schema can add new fields
+                    merged_schema = {**metadata_schema, **existing_schema}
+                    db_type.common_config_schema = merged_schema
+
+                    db_type.plugin_type = plugin_type_value
+                    # Clear error message on successful load
+                    db_type.error_message = None
+                    await db_type.save_with_timestamp()
+
+            await _save_plugin_type()
 
         except Exception as e:
             # Log the error and mark plugin as broken
@@ -88,7 +95,11 @@ async def load_plugin_types() -> None:
 
             if type_id:
                 # Try to update or create the plugin type with error status
-                try:
+                # Use retry logic for database operations
+                from app.utils.db_retry import retry_on_db_locked
+
+                @retry_on_db_locked(max_retries=3, initial_delay=0.1, max_delay=0.5)
+                async def _save_error_status():
                     db_type = await PluginTypeDB.objects.get_or_none(type_id=type_id)
 
                     if db_type:
@@ -108,6 +119,9 @@ async def load_plugin_types() -> None:
                             enabled=False,
                             error_message=error_message,
                         )
+
+                try:
+                    await _save_error_status()
                 except Exception as db_error:
                     logger.error(
                         f"Error updating database for broken plugin {type_id}: {db_error}",

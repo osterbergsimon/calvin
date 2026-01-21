@@ -80,6 +80,13 @@ class PluginLoader:
         """
         installed_plugins = plugin_installer.get_installed_plugins()
 
+        # Ensure backend directory is in sys.path so plugins can import from app.*
+        # Find backend directory (where this file is located: backend/app/plugins/loader.py)
+        backend_dir = Path(__file__).parent.parent.parent
+        backend_dir_str = str(backend_dir)
+        if backend_dir_str not in sys.path:
+            sys.path.insert(0, backend_dir_str)
+
         for plugin_manifest in installed_plugins:
             plugin_id = plugin_manifest["id"]
             plugin_path = plugin_installer.get_plugin_path(plugin_id)

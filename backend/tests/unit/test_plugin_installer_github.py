@@ -380,6 +380,55 @@ class TestPluginInstallFromRepo:
         with pytest.raises(ValueError, match="already installed"):
             plugin_installer.install_plugin_from_repo(mock_repo_structure, "plugin1")
 
+    def test_install_plugin_from_repo_corrupted_plugin_cleanup(
+        self, plugin_installer, mock_repo_structure, tmp_path
+    ):
+        """Test that corrupted/invalid plugin directories are cleaned up and allow reinstallation."""
+        plugin_id = "corrupted_plugin"
+        plugin_path = plugin_installer.get_plugin_path(plugin_id)
+        plugin_path.mkdir(parents=True)
+
+        # Create a corrupted plugin directory (exists but no valid manifest)
+        # This simulates a failed installation that left a directory behind
+        (plugin_path / "some_file.txt").write_text("corrupted")
+        # No plugin.json - this makes it invalid (get_plugin_manifest will fail)
+
+        # Create a mock repo structure for the corrupted plugin
+        corrupted_plugin_repo = tmp_path / "corrupted_plugin_repo"
+        corrupted_plugin_repo.mkdir()
+        plugin_dir = corrupted_plugin_repo / "plugin1"
+        plugin_dir.mkdir()
+        (plugin_dir / "plugin.json").write_text(
+            json.dumps(
+                {
+                    "id": "corrupted_plugin",
+                    "name": "Corrupted Plugin",
+                    "version": "1.0.0",
+                    "type": "service",
+                }
+            )
+        )
+        (plugin_dir / "plugin.py").write_text("# Plugin code")
+
+        # Verify corrupted directory exists before cleanup
+        assert plugin_path.exists()
+        assert not (plugin_path / "plugin.json").exists()
+
+        # Verify get_plugin_manifest returns None for corrupted plugin (no manifest file)
+        manifest_result = plugin_installer.get_plugin_manifest(plugin_id)
+        assert manifest_result is None, "Corrupted plugin should not have a valid manifest"
+
+        # Should clean up corrupted directory and allow installation
+        # The cleanup happens in install_plugin_from_repo when it detects the manifest is None
+        manifest = plugin_installer.install_plugin_from_repo(
+            corrupted_plugin_repo, "plugin1", plugin_id=plugin_id
+        )
+
+        # Verify plugin was installed successfully
+        assert manifest["id"] == "corrupted_plugin"
+        assert (plugin_path / "plugin.json").exists()
+        assert (plugin_path / "plugin.py").exists()
+
     def test_install_test_plugin_from_repo(self, plugin_installer, test_plugin_repo_structure):
         """Test installing the test plugin from repository."""
         manifest = plugin_installer.install_plugin_from_repo(

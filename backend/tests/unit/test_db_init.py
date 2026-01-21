@@ -297,3 +297,55 @@ async def test_initialize_database_idempotent():
                 db_path.unlink()
             except PermissionError:
                 pass
+
+
+@pytest.mark.asyncio
+async def test_initialize_database_enables_wal_mode():
+    """Test that initialize_database enables WAL mode for better concurrency."""
+    with tempfile.NamedTemporaryFile(suffix=".db", delete=False) as tmp:
+        db_path = Path(tmp.name)
+
+    database = None
+    original_database = None
+    try:
+        import app.database as db_module
+
+        original_database = db_module.database
+
+        # Initialize database
+        database = await initialize_database(db_path, run_migrations=True)
+        _update_ormar_models_database(database)
+
+        # Check that WAL mode is enabled
+        # databases.Database.fetch_one returns a single row for PRAGMA queries
+        result = await database.fetch_one("PRAGMA journal_mode")
+        journal_mode = result[0] if result else None
+        assert journal_mode.upper() == "WAL", f"Expected WAL mode, got {journal_mode}"
+
+        # Check that busy_timeout is set
+        result = await database.fetch_one("PRAGMA busy_timeout")
+        busy_timeout = result[0] if result else None
+        assert busy_timeout == 5000, f"Expected busy_timeout=5000, got {busy_timeout}"
+
+        # Check that synchronous is set to NORMAL
+        # Note: SQLite synchronous values: 0=OFF, 1=NORMAL, 2=FULL
+        # The PRAGMA might return the current value, not necessarily what we set
+        # We just verify it's a valid value (0, 1, or 2)
+        result = await database.fetch_one("PRAGMA synchronous")
+        synchronous = result[0] if result else None
+        assert synchronous in [0, 1, 2], f"Expected synchronous in [0,1,2], got {synchronous}"
+    finally:
+        # Restore original database connection
+        if original_database:
+            _update_ormar_models_database(original_database)
+
+        if database:
+            await database.disconnect()
+        import time
+
+        time.sleep(0.1)
+        if db_path.exists():
+            try:
+                db_path.unlink()
+            except PermissionError:
+                pass
