@@ -203,32 +203,42 @@ async def _initialize_keyboard_mappings():
     from app.services.keyboard_mapping_service import keyboard_mapping_service
 
     mappings = await keyboard_mapping_service.get_all_mappings()
-    if not mappings:
-        # Set default 7-button keyboard mappings
-        default_7button = {
-            "KEY_1": "generic_prev",
-            "KEY_2": "generic_expand_close",
-            "KEY_3": "generic_next",
-            "KEY_4": "mode_calendar",
-            "KEY_5": "mode_photos",
-            "KEY_6": "mode_web_services",
-            "KEY_7": "generic_refresh",
-        }
-        await keyboard_mapping_service.set_mappings("7-button", default_7button)
 
-        # Set default standard keyboard mappings
-        default_standard = {
-            "KEY_RIGHT": "generic_next",
-            "KEY_LEFT": "generic_prev",
-            "KEY_UP": "generic_expand_close",
-            "KEY_DOWN": "mode_calendar",
-            "KEY_SPACE": "mode_photos",
-            "KEY_1": "mode_web_services",
-            "KEY_2": "mode_spare",
-            "KEY_S": "mode_settings",
-        }
+    # Set default 7-button keyboard mappings
+    default_7button = {
+        "KEY_1": "generic_prev",
+        "KEY_2": "generic_expand_close",
+        "KEY_3": "generic_next",
+        "KEY_4": "mode_calendar",
+        "KEY_5": "mode_photos",
+        "KEY_6": "mode_web_services",
+        "KEY_7": "generic_refresh",
+    }
+
+    # Set default standard keyboard mappings (same pattern, different keys)
+    default_standard = {
+        "KEY_LEFT": "generic_prev",
+        "KEY_UP": "generic_expand_close",
+        "KEY_RIGHT": "generic_next",
+        "KEY_DOWN": "mode_calendar",
+        "KEY_SPACE": "mode_photos",
+        "KEY_1": "mode_web_services",
+        "KEY_2": "generic_refresh",
+    }
+
+    # Initialize mappings if none exist
+    if not mappings:
+        await keyboard_mapping_service.set_mappings("7-button", default_7button)
         await keyboard_mapping_service.set_mappings("standard", default_standard)
         logger.info("Initialized default keyboard mappings")
+    else:
+        # Ensure both keyboard types have mappings
+        if "7-button" not in mappings or not mappings["7-button"]:
+            await keyboard_mapping_service.set_mappings("7-button", default_7button)
+            logger.info("Initialized 7-button keyboard mappings")
+        if "standard" not in mappings or not mappings["standard"]:
+            await keyboard_mapping_service.set_mappings("standard", default_standard)
+            logger.info("Initialized standard keyboard mappings")
 
 
 async def _initialize_image_service():
