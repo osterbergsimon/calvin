@@ -427,9 +427,15 @@ install_systemd_service() {
     
     local service_name
     service_name=$(basename "${service_file}")
-    log "Installing systemd service: ${service_name}"
+    local target_file="/etc/systemd/system/${service_name}"
     
-    cp "${service_file}" "/etc/systemd/system/" || error_exit "Failed to copy service file" 1
+    if [ -f "${target_file}" ]; then
+        log "Overwriting existing systemd service: ${service_name}"
+    else
+        log "Installing systemd service: ${service_name}"
+    fi
+    
+    cp "${service_file}" "${target_file}" || error_exit "Failed to copy service file" 1
     # systemctl daemon-reload may fail in CI environments without systemd, but file is still installed
     if ! systemctl daemon-reload 2>/dev/null; then
         log_warn "systemctl daemon-reload failed (non-fatal, may be running in CI environment without systemd)"
