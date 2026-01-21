@@ -112,7 +112,8 @@
         v-if="
           plugin.type === 'service' &&
           !hasGlobalSettings &&
-          Object.keys(plugin.config_schema || {}).length > 0
+          Object.keys(plugin.instance_config_schema || {}).length > 0 &&
+          plugin.supports_multiple_instances !== false
         "
         class="plugin-instance-note"
       >
@@ -275,8 +276,28 @@ const getGlobalConfigSchema = (plugin) => {
   const schema = plugin.common_config_schema || {};
   const globalSchema = {};
 
+  // Filter out internal instance management fields
+  const internalFields = [
+    "_instance_name",
+    "_instance_enabled",
+    "_instance_id",
+  ];
+
+  // Special fields that should always be shown for service plugins (common settings)
+  const commonServiceFields = ["display_order"];
+
   for (const [key, fieldSchema] of Object.entries(schema)) {
-    if (fieldSchema.global_only || plugin.type !== "service") {
+    // Skip internal instance management fields
+    if (internalFields.includes(key)) {
+      continue;
+    }
+    // For service plugins: show fields with global_only flag OR common service fields
+    // For non-service plugins: show all fields
+    if (
+      plugin.type === "service"
+        ? fieldSchema.global_only || commonServiceFields.includes(key)
+        : true
+    ) {
       globalSchema[key] = fieldSchema;
     }
   }
