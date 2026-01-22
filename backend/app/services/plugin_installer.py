@@ -127,7 +127,11 @@ class PluginInstaller:
         return manifest
 
     def install_plugin(
-        self, source_path: Path, plugin_id: str | None = None, check_version: bool = True
+        self,
+        source_path: Path,
+        plugin_id: str | None = None,
+        check_version: bool = True,
+        force: bool = False,
     ) -> dict[str, Any]:
         """
         Install a plugin from a directory or zip file.
@@ -136,6 +140,7 @@ class PluginInstaller:
             source_path: Path to plugin directory or zip file
             plugin_id: Optional plugin ID (if not provided, uses manifest ID)
             check_version: If True, checks for existing version and raises if older
+            force: If True, uninstalls existing plugin before installing
 
         Returns:
             Plugin manifest dictionary
@@ -152,33 +157,41 @@ class PluginInstaller:
         # Check if plugin already installed
         plugin_path = self.get_plugin_path(install_id)
         if plugin_path.exists():
-            # Check version if requested
-            if check_version:
-                existing_manifest = self.get_plugin_manifest(install_id)
-                if existing_manifest:
-                    existing_version = existing_manifest.get("version", "0.0.0")
-                    new_version = manifest.get("version", "0.0.0")
-                    # Simple version comparison (assumes semantic versioning)
-                    try:
-                        from packaging import version
+            if force:
+                # Force reinstall: uninstall existing plugin first
+                import logging
 
-                        if version.parse(new_version) < version.parse(existing_version):
-                            raise ValueError(
-                                f"Plugin {install_id} version {new_version} is older than "
-                                f"installed version {existing_version}. "
-                                "Uninstall the existing plugin first."
-                            )
-                    except ImportError:
-                        # packaging not available, skip version check
-                        pass
-                    except Exception:
-                        # If version parsing fails, allow install but warn
-                        pass
+                logger = logging.getLogger(__name__)
+                logger.info(f"Force installing plugin {install_id}, removing existing installation")
+                self.uninstall_plugin(install_id)
+            else:
+                # Check version if requested
+                if check_version:
+                    existing_manifest = self.get_plugin_manifest(install_id)
+                    if existing_manifest:
+                        existing_version = existing_manifest.get("version", "0.0.0")
+                        new_version = manifest.get("version", "0.0.0")
+                        # Simple version comparison (assumes semantic versioning)
+                        try:
+                            from packaging import version
 
-            raise ValueError(
-                f"Plugin {install_id} is already installed. "
-                "Uninstall the existing plugin first or use force=True to override."
-            )
+                            if version.parse(new_version) < version.parse(existing_version):
+                                raise ValueError(
+                                    f"Plugin {install_id} version {new_version} is older than "
+                                    f"installed version {existing_version}. "
+                                    "Uninstall the existing plugin first."
+                                )
+                        except ImportError:
+                            # packaging not available, skip version check
+                            pass
+                        except Exception:
+                            # If version parsing fails, allow install but warn
+                            pass
+
+                raise ValueError(
+                    f"Plugin {install_id} is already installed. "
+                    "Uninstall the existing plugin first or use force=True to override."
+                )
 
         # Create plugin directory
         plugin_path.mkdir(parents=True, exist_ok=True)
@@ -445,7 +458,7 @@ class PluginInstaller:
         return result
 
     def install_plugin_from_repo(
-        self, repo_path: Path, plugin_path: str, plugin_id: str | None = None
+        self, repo_path: Path, plugin_path: str, plugin_id: str | None = None, force: bool = False
     ) -> dict[str, Any]:
         """
         Install a specific plugin from a repository.
@@ -454,6 +467,7 @@ class PluginInstaller:
             repo_path: Path to repository root directory
             plugin_path: Relative path to plugin directory within repo
             plugin_id: Optional plugin ID override
+            force: If True, uninstalls existing plugin before installing
 
         Returns:
             Plugin manifest dictionary
@@ -480,19 +494,28 @@ class PluginInstaller:
             existing_manifest = self.get_plugin_manifest(install_id)
             if existing_manifest:
                 # Plugin is actually installed and valid
-                raise ValueError(f"Plugin {install_id} is already installed")
+                if force:
+                    # Force reinstall: uninstall existing plugin first
+                    import logging
+
+                    logger = logging.getLogger(__name__)
+                    logger.info(
+                        f"Force installing plugin {install_id}, removing existing installation"
+                    )
+                    self.uninstall_plugin(install_id)
+                else:
+                    raise ValueError(f"Plugin {install_id} is already installed")
             else:
                 # Plugin directory exists but is invalid/corrupted (no manifest)
                 # Remove it and allow reinstallation
                 import logging
+                import shutil
 
                 logger = logging.getLogger(__name__)
                 logger.warning(
                     f"Found corrupted/invalid plugin directory for {install_id}, "
                     "removing and allowing reinstallation"
                 )
-                import shutil
-
                 shutil.rmtree(plugin_path)
                 # Also clean up frontend directory if it exists
                 frontend_path = self.get_frontend_plugin_path(install_id)
@@ -500,7 +523,7 @@ class PluginInstaller:
                     shutil.rmtree(frontend_path)
 
         # Install from directory
-        return self.install_plugin(plugin_dir, install_id)
+        return self.install_plugin(plugin_dir, install_id, check_version=True, force=False)
 
 
 # Global plugin installer instance

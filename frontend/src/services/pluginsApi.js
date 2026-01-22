@@ -111,11 +111,13 @@ export async function installPluginFromGitHub(
   repoUrl,
   pluginPath,
   branch = "main",
+  force = false,
 ) {
   const response = await api.post("/plugins/github/install", {
     repo_url: repoUrl,
     plugin_path: pluginPath,
     branch: branch,
+    force: force,
   });
   return response.data;
 }

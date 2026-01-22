@@ -83,7 +83,26 @@
       </div>
 
       <!-- Available Plugins List -->
-      <div v-if="availablePlugins.length > 0" class="available-plugins-compact">
+      <div v-if="filteredPlugins.length > 0" class="available-plugins-compact">
+        <!-- Search Bar -->
+        <div class="plugin-search-container">
+          <input
+            v-model="searchQuery"
+            type="text"
+            placeholder="🔍 Search plugins..."
+            class="plugin-search-input"
+            :disabled="installing"
+          />
+        </div>
+
+        <!-- Type Tabs -->
+        <TabNavigation
+          :tabs="pluginTypeTabs"
+          :active-tab="activeTypeTab"
+          @tab-change="activeTypeTab = $event"
+        />
+
+        <!-- Plugin List Header -->
         <div class="plugin-list-header">
           <label class="select-all-checkbox">
             <input
@@ -107,8 +126,10 @@
             }}
           </button>
         </div>
+
+        <!-- Plugins List -->
         <div
-          v-for="plugin in availablePlugins"
+          v-for="plugin in activeTypePlugins"
           :key="plugin.id"
           class="plugin-item-inline"
           :class="{ 'plugin-installed': plugin._installed }"
@@ -151,23 +172,35 @@
               }}
             </span>
           </div>
-          <button
-            type="button"
-            class="btn-install"
-            :class="{
-              'btn-update': plugin._installed,
-            }"
-            :disabled="installing"
-            @click="handleInstall(plugin.path)"
-          >
-            {{
-              installing
-                ? "Installing..."
-                : plugin._installed
-                  ? "🔄 Update"
-                  : "⬇️ Install"
-            }}
-          </button>
+          <div class="plugin-actions">
+            <button
+              v-if="plugin._installed"
+              type="button"
+              class="btn-force-update"
+              :disabled="installing"
+              @click="handleForceUpdate(plugin.path)"
+              title="Force reinstall (even if already on newest version)"
+            >
+              🔄 Force Update
+            </button>
+            <button
+              type="button"
+              class="btn-install"
+              :class="{
+                'btn-update': plugin._installed,
+              }"
+              :disabled="installing"
+              @click="handleInstall(plugin.path)"
+            >
+              {{
+                installing
+                  ? "Installing..."
+                  : plugin._installed
+                    ? "🔄 Update"
+                    : "⬇️ Install"
+              }}
+            </button>
+          </div>
         </div>
       </div>
     </div>
@@ -208,6 +241,7 @@
 
 <script setup>
 import { ref, computed, watch } from "vue";
+import TabNavigation from "../shared/TabNavigation.vue";
 
 const props = defineProps({
   installing: {
@@ -264,28 +298,95 @@ const emit = defineEmits([
   "restart",
   "update:repoUrl",
   "update:branch",
+  "force-update",
 ]);
 
 const installMethod = ref("zip");
 const selectedPluginIds = ref(new Set());
+const searchQuery = ref("");
+const activeTypeTab = ref("all");
+
+// Filter plugins by search query
+const filteredPlugins = computed(() => {
+  if (!searchQuery.value.trim()) {
+    return props.availablePlugins;
+  }
+  const query = searchQuery.value.toLowerCase();
+  return props.availablePlugins.filter(
+    (p) =>
+      (p.name || "").toLowerCase().includes(query) ||
+      (p.id || "").toLowerCase().includes(query) ||
+      (p.description || "").toLowerCase().includes(query),
+  );
+});
+
+// Group plugins by type
+const filteredPluginsByType = computed(() => {
+  const grouped = {
+    calendar: [],
+    image: [],
+    service: [],
+    backend: [],
+    theme: [],
+  };
+  filteredPlugins.value.forEach((plugin) => {
+    if (grouped[plugin.type]) {
+      grouped[plugin.type].push(plugin);
+    }
+  });
+  return grouped;
+});
+
+// Get plugin type tabs
+const pluginTypeTabs = computed(() => {
+  const tabs = [{ id: "all", label: "All", icon: "📦" }];
+  const typeLabels = {
+    calendar: { label: "Calendar", icon: "📅" },
+    image: { label: "Image", icon: "🖼️" },
+    service: { label: "Service", icon: "⚙️" },
+    backend: { label: "Backend", icon: "🔧" },
+    theme: { label: "Theme", icon: "🎨" },
+  };
+
+  Object.entries(filteredPluginsByType.value).forEach(([type, plugins]) => {
+    if (plugins.length > 0) {
+      tabs.push({
+        id: type,
+        label: typeLabels[type]?.label || type,
+        icon: typeLabels[type]?.icon || "📦",
+        badge: plugins.length.toString(),
+      });
+    }
+  });
+
+  return tabs;
+});
+
+// Get plugins for active tab
+const activeTypePlugins = computed(() => {
+  if (activeTypeTab.value === "all") {
+    return filteredPlugins.value;
+  }
+  return filteredPluginsByType.value[activeTypeTab.value] || [];
+});
 
 // Computed properties
 const selectedPlugins = computed(() => {
-  return props.availablePlugins.filter((p) =>
-    selectedPluginIds.value.has(p.id),
-  );
+  return filteredPlugins.value.filter((p) => selectedPluginIds.value.has(p.id));
 });
 
 const allSelected = computed(() => {
   return (
-    props.availablePlugins.length > 0 &&
-    props.availablePlugins.every((p) => selectedPluginIds.value.has(p.id))
+    activeTypePlugins.value.length > 0 &&
+    activeTypePlugins.value.every((p) => selectedPluginIds.value.has(p.id))
   );
 });
 
 const someSelected = computed(() => {
-  const selectedCount = selectedPluginIds.value.size;
-  return selectedCount > 0 && selectedCount < props.availablePlugins.length;
+  const selectedCount = activeTypePlugins.value.filter((p) =>
+    selectedPluginIds.value.has(p.id),
+  ).length;
+  return selectedCount > 0 && selectedCount < activeTypePlugins.value.length;
 });
 
 // Methods
@@ -303,9 +404,11 @@ const handleToggleSelect = (pluginId) => {
 
 const handleSelectAll = (event) => {
   if (event.target.checked) {
-    props.availablePlugins.forEach((p) => selectedPluginIds.value.add(p.id));
+    activeTypePlugins.value.forEach((p) => selectedPluginIds.value.add(p.id));
   } else {
-    selectedPluginIds.value.clear();
+    activeTypePlugins.value.forEach((p) =>
+      selectedPluginIds.value.delete(p.id),
+    );
   }
 };
 
@@ -342,6 +445,16 @@ const handleInstall = (pluginPath) => {
     path: pluginPath,
     repoUrl: props.repoUrl,
     branch: props.branch,
+    force: false,
+  });
+};
+
+const handleForceUpdate = (pluginPath) => {
+  emit("force-update", {
+    path: pluginPath,
+    repoUrl: props.repoUrl,
+    branch: props.branch,
+    force: true,
   });
 };
 
@@ -362,8 +475,21 @@ watch(
   () => props.availablePlugins.length,
   () => {
     selectedPluginIds.value.clear();
+    // Reset to "all" tab when plugins change
+    activeTypeTab.value = "all";
   },
 );
+
+// Watch for search query changes to reset to "all" tab
+watch(searchQuery, () => {
+  if (activeTypeTab.value !== "all") {
+    // If searching and on a specific tab, check if that tab still has results
+    const tabPlugins = filteredPluginsByType.value[activeTypeTab.value] || [];
+    if (tabPlugins.length === 0) {
+      activeTypeTab.value = "all";
+    }
+  }
+});
 </script>
 
 <style scoped>
@@ -513,6 +639,31 @@ watch(
   gap: 0.5rem;
 }
 
+.plugin-search-container {
+  margin-bottom: 1rem;
+}
+
+.plugin-search-input {
+  width: 100%;
+  padding: 0.75rem;
+  border: 1px solid var(--border-color);
+  border-radius: 4px;
+  background: var(--bg-secondary);
+  color: var(--text-primary);
+  font-size: 0.9rem;
+}
+
+.plugin-search-input:focus {
+  outline: none;
+  border-color: var(--accent-primary);
+  box-shadow: 0 0 0 2px rgba(var(--accent-primary-rgb, 33, 150, 243), 0.2);
+}
+
+.plugin-search-input:disabled {
+  opacity: 0.6;
+  cursor: not-allowed;
+}
+
 .plugin-list-header {
   display: flex;
   justify-content: space-between;
@@ -574,6 +725,12 @@ watch(
   border: 1px solid var(--border-color);
   border-radius: 6px;
   gap: 0.75rem;
+}
+
+.plugin-actions {
+  display: flex;
+  gap: 0.5rem;
+  align-items: center;
 }
 
 .plugin-item-inline.plugin-installed {
@@ -659,6 +816,31 @@ watch(
 
 .btn-update:hover:not(:disabled) {
   background: #ffb300 !important;
+}
+
+.btn-force-update {
+  padding: 0.5rem 1rem;
+  background: #ff9800;
+  color: white;
+  border: none;
+  border-radius: 4px;
+  font-size: 0.875rem;
+  font-weight: 600;
+  cursor: pointer;
+  transition: all 0.2s;
+  white-space: nowrap;
+}
+
+.btn-force-update:hover:not(:disabled) {
+  background: #f57c00;
+  transform: translateY(-1px);
+  box-shadow: 0 2px 4px var(--shadow);
+}
+
+.btn-force-update:disabled {
+  opacity: 0.6;
+  cursor: not-allowed;
+  transform: none;
 }
 
 .btn-install {

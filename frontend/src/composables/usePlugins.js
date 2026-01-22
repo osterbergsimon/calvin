@@ -204,6 +204,16 @@ export function usePlugins() {
         branch,
       );
       const enumeratedPlugins = response.plugins || [];
+      const enumeratedThemes = response.themes || [];
+
+      // Merge themes into plugins array (themes are also plugins for installation purposes)
+      const allItems = [
+        ...enumeratedPlugins,
+        ...enumeratedThemes.map((theme) => ({
+          ...theme,
+          type: "theme", // Ensure type is set to theme
+        })),
+      ];
 
       // Get installed plugins to compare versions
       let installedPluginsMap = {};
@@ -224,7 +234,7 @@ export function usePlugins() {
       }
 
       // Mark installed plugins and add version info
-      availablePlugins.value = enumeratedPlugins.map((plugin) => {
+      availablePlugins.value = allItems.map((plugin) => {
         const installed = installedPluginsMap[plugin.id];
         if (installed) {
           return {
@@ -261,6 +271,7 @@ export function usePlugins() {
     repoUrl,
     pluginPath,
     branch = "main",
+    force = false,
   ) => {
     installingPlugin.value = true;
     pluginInstallError.value = "";
@@ -274,6 +285,7 @@ export function usePlugins() {
         repoUrl,
         pluginPath,
         branch,
+        force,
       );
       pluginInstallSuccess.value = "Plugin installed successfully!";
       pluginRequiresRestart.value = response.requires_restart || false;
@@ -333,6 +345,7 @@ export function usePlugins() {
             repoUrl,
             plugin.path,
             branch,
+            false, // Don't force for bulk installs
           );
           results.success.push({
             id: plugin.id,

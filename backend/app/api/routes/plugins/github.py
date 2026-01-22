@@ -165,6 +165,7 @@ async def install_plugin_from_github(request: dict[str, Any] = Body(...)):
             - plugin_path: Relative path to plugin directory within repo
             - branch: Optional branch name (defaults to main/master)
             - plugin_id: Optional plugin ID override
+            - force: Optional boolean to force reinstall even if already installed
 
     Returns:
         Installation result with manifest
@@ -173,6 +174,7 @@ async def install_plugin_from_github(request: dict[str, Any] = Body(...)):
     plugin_path = request.get("plugin_path")
     branch = request.get("branch")
     plugin_id = request.get("plugin_id")
+    force = request.get("force", False)
 
     if not repo_url:
         raise HTTPException(status_code=400, detail="repo_url is required")
@@ -269,7 +271,7 @@ async def install_plugin_from_github(request: dict[str, Any] = Body(...)):
             elif plugin_path_check.exists():
                 # Install plugin
                 manifest = plugin_installer.install_plugin_from_repo(
-                    repo_root, plugin_path, plugin_id
+                    repo_root, plugin_path, plugin_id, force=force
                 )
 
                 # Reload plugins to include the newly installed one

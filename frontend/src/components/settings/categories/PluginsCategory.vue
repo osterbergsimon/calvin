@@ -19,6 +19,7 @@
         @list-plugins="handleListPlugins"
         @install="handleInstall"
         @install-selected="handleInstallSelected"
+        @force-update="handleForceUpdate"
         @restart="handleRestart"
       />
     </CollapsibleSection>
@@ -154,8 +155,12 @@ const handleListPlugins = async ({ repoUrl, branch }) => {
   await enumeratePluginsFromGitHub(repoUrl, branch);
 };
 
-const handleInstall = async ({ path, repoUrl, branch }) => {
-  await installPluginFromGitHub(repoUrl, path, branch);
+const handleInstall = async ({ path, repoUrl, branch, force }) => {
+  await installPluginFromGitHub(repoUrl, path, branch, force);
+};
+
+const handleForceUpdate = async ({ path, repoUrl, branch }) => {
+  await installPluginFromGitHub(repoUrl, path, branch, true);
 };
 
 const handleInstallSelected = async ({ plugins, repoUrl, branch }) => {
