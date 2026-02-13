@@ -280,7 +280,7 @@ async def _initialize_default_config():
         "mode_indicator_timeout": 5,  # 5 seconds
         "keyboard_feedback_enabled": True,
         "keyboard_feedback_mode": "normal",
-        "week_start_day": 0,  # Sunday
+        "week_start_day": 1,  # Monday
         "show_week_numbers": False,
         "side_view_position": "right",
         "theme_mode": "auto",

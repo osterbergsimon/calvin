@@ -214,7 +214,7 @@ async def get_config():
     elif "keyboard_feedback_mode" in config and "keyboardFeedbackMode" not in config:
         config["keyboardFeedbackMode"] = config["keyboard_feedback_mode"]
     if "weekStartDay" not in config and "week_start_day" not in config:
-        config["weekStartDay"] = 0  # Sunday default
+        config["weekStartDay"] = 1  # Monday default
     elif "week_start_day" in config and "weekStartDay" not in config:
         config["weekStartDay"] = config["week_start_day"]
     if "showWeekNumbers" not in config and "show_week_numbers" not in config:

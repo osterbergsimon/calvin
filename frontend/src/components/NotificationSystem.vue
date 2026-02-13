@@ -67,6 +67,11 @@ const actionLabels = {
   generic_next: "Next",
   generic_prev: "Previous",
   generic_expand_close: "Expand/Close",
+  generic_refresh: "Refresh",
+
+  // Refresh actions (context-aware)
+  calendar_refresh: "Refresh",
+  service_refresh: "Refresh",
 
   // Calendar actions
   calendar_next: "Next",

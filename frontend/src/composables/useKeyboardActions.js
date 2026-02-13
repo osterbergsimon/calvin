@@ -323,7 +323,7 @@ export function useKeyboardActions() {
     // dayOfWeek: 0=Sunday, 1=Monday, ..., 6=Saturday
     // weekStartDay: 0=Sunday, 1=Monday, ..., 6=Saturday
     // Return adjusted day where 0 = week start day
-    const weekStartDay = configStore.weekStartDay || 0;
+    const weekStartDay = configStore.weekStartDay ?? 1;
     return (dayOfWeek - weekStartDay + 7) % 7;
   };
 

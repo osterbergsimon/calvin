@@ -67,6 +67,26 @@
         </select>
       </SettingItem>
     </CollapsibleSection>
+
+    <CollapsibleSection title="Calendar" icon="📅">
+      <SettingItem
+        label="Week Start Day"
+        help="First day of the week in calendar view"
+      >
+        <select
+          :value="configValue.weekStartDay"
+          @change="handleWeekStartDayChange"
+        >
+          <option :value="0">Sunday</option>
+          <option :value="1">Monday</option>
+          <option :value="2">Tuesday</option>
+          <option :value="3">Wednesday</option>
+          <option :value="4">Thursday</option>
+          <option :value="5">Friday</option>
+          <option :value="6">Saturday</option>
+        </select>
+      </SettingItem>
+    </CollapsibleSection>
   </div>
 </template>
 
@@ -93,6 +113,7 @@ const configValue = computed(() => {
     orientationFlipped: config.orientationFlipped ?? false,
     calendarSplit: config.calendarSplit ?? 70,
     sideViewPosition: config.sideViewPosition ?? "right",
+    weekStartDay: config.weekStartDay ?? 1,
   };
 });
 
@@ -113,6 +134,13 @@ const handleCalendarSplitChange = (event) => {
 
 const handleSideViewPositionChange = (event) => {
   emit("update:config", { sideViewPosition: event.target.value });
+};
+
+const handleWeekStartDayChange = (event) => {
+  const value = parseInt(event.target.value, 10);
+  if (!isNaN(value)) {
+    emit("update:config", { weekStartDay: value });
+  }
 };
 </script>
 

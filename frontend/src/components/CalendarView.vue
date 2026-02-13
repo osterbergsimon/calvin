@@ -174,7 +174,7 @@ const configStore = useConfigStore();
 const showHeader = computed(() => configStore.shouldShowUI);
 const viewMode = computed(() => configStore.calendarViewMode);
 const showWeekNumbers = computed(() => configStore.showWeekNumbers);
-const weekStartDay = computed(() => configStore.weekStartDay || 0);
+const weekStartDay = computed(() => configStore.weekStartDay ?? 1);
 const weekendDays = computed(() => configStore.weekendDays || [0, 6]);
 const showRedDays = computed(() => configStore.showRedDays || false);
 
