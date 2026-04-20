@@ -5,6 +5,7 @@
 
 import { ref, computed } from "vue";
 import * as pluginsApi from "../services/pluginsApi";
+import { logError, logWarn } from "../utils/logger";
 
 // Shared state (singleton pattern)
 const plugins = ref([]);
@@ -69,7 +70,7 @@ export function usePlugins() {
           if (error.response?.status === 404) {
             return { plugins: [] };
           }
-          console.warn("Failed to load installed plugins:", error);
+          logWarn("[usePlugins]", "Failed to load installed plugins:", error);
           return { plugins: [] };
         }),
       ]);
@@ -126,8 +127,9 @@ export function usePlugins() {
           let parsedOrder = parseInt(String(displayOrder || "0"), 10);
           // Handle NaN case
           if (isNaN(parsedOrder)) {
-            console.warn(
-              `[usePlugins] Invalid display_order for ${plugin.id}: ${displayOrder}, defaulting to 0`,
+            logWarn(
+              "[usePlugins]",
+              `Invalid display_order for ${plugin.id}: ${displayOrder}, defaulting to 0`,
             );
             parsedOrder = 0;
           }
@@ -138,13 +140,13 @@ export function usePlugins() {
             imagePluginDisplayOrders.value[plugin.id] = parsedOrder;
           }
         } catch (error) {
-          console.error(`Failed to load data for plugin ${plugin.id}:`, error);
+          logError("[usePlugins]", `Failed to load data for plugin ${plugin.id}:`, error);
           pluginInstances.value[plugin.id] = [];
           pluginConfigs.value[plugin.id] = {};
         }
       }
     } catch (error) {
-      console.error("Failed to load plugins:", error);
+      logError("[usePlugins]", "Failed to load plugins:", error);
       plugins.value = [];
     } finally {
       loadingPlugins.value = false;
@@ -226,7 +228,8 @@ export function usePlugins() {
       } catch (error) {
         // Silently handle 404 for installed plugins endpoint
         if (error.response?.status !== 404) {
-          console.warn(
+          logWarn(
+            "[usePlugins]",
             "Failed to load installed plugins for comparison:",
             error,
           );
@@ -253,7 +256,7 @@ export function usePlugins() {
       pluginBranchSwitched.value = response.branch_switched || false;
       pluginActualBranch.value = response.branch || branch;
     } catch (error) {
-      console.error("Failed to enumerate plugins from GitHub:", error);
+      logError("[usePlugins]", "Failed to enumerate plugins from GitHub:", error);
       pluginInstallError.value =
         error.response?.data?.detail ||
         error.message ||
@@ -422,7 +425,7 @@ export function usePlugins() {
       await pluginsApi.uninstallPlugin(pluginId, pluginType);
       await loadPlugins();
     } catch (error) {
-      console.error("Failed to uninstall plugin:", error);
+      logError("[usePlugins]", "Failed to uninstall plugin:", error);
       throw error;
     }
   };
@@ -469,13 +472,14 @@ export function usePlugins() {
         const instancesResponse = await pluginsApi.getPluginInstances(pluginId);
         pluginInstances.value[pluginId] = instancesResponse.instances || [];
       } catch (error) {
-        console.error(
+        logError(
+          "[usePlugins]",
           `Failed to reload instances for plugin ${pluginId}:`,
           error,
         );
       }
     } catch (error) {
-      console.error("Failed to toggle plugin:", error);
+      logError("[usePlugins]", "Failed to toggle plugin:", error);
       // Revert optimistic update on error
       const plugin = plugins.value.find((p) => p.id === pluginId);
       if (plugin) {
@@ -509,7 +513,7 @@ export function usePlugins() {
       pluginConfigs.value[pluginId] = cleanedConfig;
       pluginDisplayOrders.value[pluginId] = order;
     } catch (error) {
-      console.error(`Failed to update order for plugin ${pluginId}:`, error);
+      logError("[usePlugins]", `Failed to update order for plugin ${pluginId}:`, error);
       throw error;
     }
   };
@@ -538,7 +542,8 @@ export function usePlugins() {
       pluginConfigs.value[pluginId] = cleanedConfig;
       imagePluginDisplayOrders.value[pluginId] = order;
     } catch (error) {
-      console.error(
+      logError(
+        "[usePlugins]",
         `Failed to update order for image plugin ${pluginId}:`,
         error,
       );
@@ -557,7 +562,7 @@ export function usePlugins() {
       const instancesResponse = await pluginsApi.getPluginInstances(pluginId);
       pluginInstances.value[pluginId] = instancesResponse.instances || [];
     } catch (error) {
-      console.error(`Failed to update instance order for ${pluginId}:`, error);
+      logError("[usePlugins]", `Failed to update instance order for ${pluginId}:`, error);
       throw error;
     }
   };
@@ -573,7 +578,8 @@ export function usePlugins() {
       const instancesResponse = await pluginsApi.getPluginInstances(pluginId);
       pluginInstances.value[pluginId] = instancesResponse.instances || [];
     } catch (error) {
-      console.error(
+      logError(
+        "[usePlugins]",
         `Failed to update image instance order for ${pluginId}:`,
         error,
       );

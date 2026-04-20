@@ -27,7 +27,6 @@
         help="Configure keyboard shortcuts and mappings for your keyboard type"
       >
         <div v-if="loading" class="loading-message">Loading mappings...</div>
-        <div v-else-if="error" class="error-message">{{ error }}</div>
         <div
           v-else-if="
             availableKeys.length === 0 && config.keyboardType !== 'standard'
@@ -36,7 +35,9 @@
         >
           No keys available for this keyboard type.
         </div>
-        <div v-else class="mappings-list">
+        <div v-else>
+          <div v-if="error" class="error-message" role="alert">{{ error }}</div>
+          <div class="mappings-list">
           <!-- Add new key button for standard keyboards -->
           <div
             v-if="config.keyboardType === 'standard'"
@@ -82,6 +83,7 @@
             >
               ×
             </button>
+          </div>
           </div>
         </div>
       </SettingItem>
@@ -283,7 +285,10 @@ const loadKeyboardMappings = async () => {
     }
   } catch (err) {
     console.error("Failed to load keyboard mappings:", err);
-    error.value = err.message || "Failed to load keyboard mappings";
+    error.value =
+      err.response?.data?.detail ||
+      err.message ||
+      "Failed to load keyboard mappings";
   } finally {
     loading.value = false;
   }
@@ -297,9 +302,13 @@ const saveKeyboardMappings = async () => {
       [keyboardType]: { ...currentMappings.value },
     };
     await keyboardStore.updateMappings(mappings);
+    error.value = null;
   } catch (err) {
     console.error("Failed to save keyboard mappings:", err);
-    error.value = err.message || "Failed to save keyboard mappings";
+    error.value =
+      err.response?.data?.detail ||
+      err.message ||
+      "Failed to save keyboard mappings";
     throw err;
   }
 };

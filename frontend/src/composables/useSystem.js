@@ -5,14 +5,16 @@
 import { ref } from "vue";
 import * as systemApi from "../services/systemApi";
 
+// Singleton refs so any component using useSystem() shares the same status
+const updating = ref(false);
+const updateStatus = ref(null);
+const updateMessage = ref("");
+const updateMessageClass = ref("");
+
 export function useSystem() {
   const displayOn = ref(false);
   const displayTimeout = ref(0);
   const displayTimeoutEnabled = ref(false);
-  const updating = ref(false);
-  const updateStatus = ref(null);
-  const updateMessage = ref("");
-  const updateMessageClass = ref("");
 
   const sleep = (ms) => new Promise((resolve) => setTimeout(resolve, ms));
 
@@ -70,37 +72,56 @@ export function useSystem() {
 
   // System restart
   const restartBackend = async () => {
+    updateMessage.value = "Restarting backend…";
+    updateMessageClass.value = "info";
     try {
       await systemApi.restartBackend();
-      updateMessage.value = "Backend restart initiated";
-      updateMessageClass.value = "success";
-      setTimeout(() => {
-        updateMessage.value = "";
-        updateMessageClass.value = "";
-      }, 5000);
     } catch (error) {
-      console.error("Failed to restart backend:", error);
-      updateMessage.value = "Failed to restart backend";
-      updateMessageClass.value = "error";
-      throw error;
+      // A network error here means the backend killed itself before sending the
+      // response (old behaviour). Treat it the same as a successful initiation.
+      if (error.response) {
+        updateMessage.value =
+          error.response?.data?.detail || "Failed to restart backend";
+        updateMessageClass.value = "error";
+        console.error("Failed to restart backend:", error);
+        return;
+      }
+      // No response → likely the process died mid-request; fall through.
+    }
+    updateMessage.value = "Backend restarting — waiting for it to come back…";
+    updateMessageClass.value = "info";
+    await sleep(2000); // give systemctl time to stop the service
+    const healthy = await waitForBackendHealthy({ timeoutMs: 60000 });
+    if (healthy) {
+      updateMessage.value = "Backend restarted successfully! Reloading…";
+      updateMessageClass.value = "success";
+      await sleep(1500);
+      window.location.reload();
+    } else {
+      updateMessage.value =
+        "Backend not responding after restart. Check the service manually.";
+      updateMessageClass.value = "warning";
     }
   };
 
   const restartFrontend = async () => {
+    updateMessage.value = "Restarting frontend…";
+    updateMessageClass.value = "info";
     try {
       await systemApi.restartFrontend();
-      updateMessage.value = "Frontend restart initiated";
-      updateMessageClass.value = "success";
-      setTimeout(() => {
-        updateMessage.value = "";
-        updateMessageClass.value = "";
-      }, 5000);
     } catch (error) {
-      console.error("Failed to restart frontend:", error);
-      updateMessage.value = "Failed to restart frontend";
-      updateMessageClass.value = "error";
-      throw error;
+      if (error.response) {
+        updateMessage.value =
+          error.response?.data?.detail || "Failed to restart frontend";
+        updateMessageClass.value = "error";
+        console.error("Failed to restart frontend:", error);
+        return;
+      }
     }
+    updateMessage.value = "Frontend restarting — reloading page shortly…";
+    updateMessageClass.value = "info";
+    await sleep(4000);
+    window.location.reload();
   };
 
   // System updates

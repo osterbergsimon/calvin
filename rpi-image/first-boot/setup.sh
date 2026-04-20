@@ -151,10 +151,10 @@ chown calvin:calvin /home/calvin/.bash_profile
 echo "[$(date)] Installing restart services script..." | tee -a "$LOG_FILE"
 if [ -f "$CALVIN_DIR/scripts/restart-calvin-services.sh" ]; then
     cp "$CALVIN_DIR/scripts/restart-calvin-services.sh" /usr/local/bin/restart-calvin-services.sh
-    chmod +x /usr/local/bin/restart-calvin-services.sh
-    chown calvin:calvin /usr/local/bin/restart-calvin-services.sh
-    # Allow calvin user to run restart script with sudo without password
-    echo "calvin ALL=(ALL) NOPASSWD: /usr/local/bin/restart-calvin-services.sh" > /etc/sudoers.d/calvin-restart
+    chown root:root /usr/local/bin/restart-calvin-services.sh
+    chmod 0755 /usr/local/bin/restart-calvin-services.sh
+    # Allow calvin user to run restart script with sudo without password (script not writable by calvin)
+    echo "calvin ALL=(root) NOPASSWD: /usr/local/bin/restart-calvin-services.sh" > /etc/sudoers.d/calvin-restart
     chmod 0440 /etc/sudoers.d/calvin-restart
     echo "[$(date)] Restart services script installed with sudo permissions" | tee -a "$LOG_FILE"
 else

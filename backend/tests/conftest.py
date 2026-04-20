@@ -738,7 +738,7 @@ def test_client(
     test_app.include_router(keyboard.router, prefix="/api", tags=["keyboard"])
     test_app.include_router(images.router, prefix="/api", tags=["images"])
     test_app.include_router(plugins.router, prefix="/api", tags=["plugins"])
-    test_app.include_router(system.router, prefix="/api", tags=["system"])
+    test_app.include_router(system.router, prefix="/api/system", tags=["system"])
 
     @test_app.get("/")
     async def root():

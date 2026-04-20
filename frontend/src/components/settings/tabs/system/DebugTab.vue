@@ -33,13 +33,36 @@
       <SettingItem
         label="Config Polling Interval (seconds)"
         help="How often to poll for config changes (5-300 seconds)"
+        input-id="config-poll-interval"
       >
         <input
+          id="config-poll-interval"
           v-model.number="configPollInterval"
           type="number"
           min="5"
           max="300"
+          step="1"
+          placeholder="30"
+          aria-label="Config polling interval in seconds"
           @change="handlePollIntervalChange"
+        />
+      </SettingItem>
+
+      <SettingItem
+        label="Calendar Refresh Interval (minutes)"
+        help="How often to refresh calendar data (5-120 minutes)"
+        input-id="calendar-refresh-interval"
+      >
+        <input
+          id="calendar-refresh-interval"
+          v-model.number="calendarRefreshInterval"
+          type="number"
+          min="5"
+          max="120"
+          step="1"
+          placeholder="15"
+          aria-label="Calendar refresh interval in minutes"
+          @change="handleCalendarRefreshChange"
         />
       </SettingItem>
     </CollapsibleSection>
@@ -63,6 +86,9 @@ const emit = defineEmits(["update:config"]);
 const consoleLogEnabled = ref(props.config.consoleLogEnabled ?? true);
 const consoleLogLevel = ref(props.config.consoleLogLevel || "info");
 const configPollInterval = ref(props.config.configPollInterval || 30);
+const calendarRefreshInterval = ref(
+  props.config.calendarRefreshInterval || 15,
+);
 
 watch(
   () => props.config,
@@ -70,6 +96,8 @@ watch(
     consoleLogEnabled.value = newConfig.consoleLogEnabled ?? true;
     consoleLogLevel.value = newConfig.consoleLogLevel || "info";
     configPollInterval.value = newConfig.configPollInterval || 30;
+    calendarRefreshInterval.value =
+      newConfig.calendarRefreshInterval || 15;
   },
   { deep: true },
 );
@@ -84,6 +112,13 @@ const handleConsoleLogChange = () => {
 const handlePollIntervalChange = () => {
   emit("update:config", {
     configPollInterval: configPollInterval.value,
+  });
+};
+
+const handleCalendarRefreshChange = () => {
+  const value = Math.max(5, Math.min(120, calendarRefreshInterval.value));
+  emit("update:config", {
+    calendarRefreshInterval: value,
   });
 };
 </script>

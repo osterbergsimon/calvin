@@ -3,7 +3,10 @@
 import logging
 import os
 import re
+import shutil
 import subprocess
+import threading
+import time
 from pathlib import Path
 
 from fastapi import APIRouter, HTTPException
@@ -14,6 +17,71 @@ from app.services.display_power_service import display_power_service
 logger = logging.getLogger(__name__)
 
 router = APIRouter()
+
+# Restart helper installed on Raspberry Pi images (see scripts/restart-calvin-services.sh).
+_RESTART_HELPER = Path("/usr/local/bin/restart-calvin-services.sh")
+# Delay before running `systemctl restart calvin-backend` so the HTTP response is sent first;
+# otherwise the client sees a network error even when restart succeeds.
+_BACKEND_RESTART_DELAY_SEC = 0.75
+
+
+def _restart_mechanism_available() -> bool:
+    """True if we have at least one way to ask systemd to restart a Calvin unit."""
+    if _RESTART_HELPER.is_file():
+        return True
+    return shutil.which("systemctl") is not None
+
+
+def _attempt_restart_calvin_service(service: str) -> bool:
+    """
+    Try helper script (sudo) then systemctl. Returns True if restart likely started
+    (including subprocess timeout cases where systemd may still be restarting).
+    """
+    if service not in ("backend", "frontend"):
+        raise ValueError(f"Invalid service: {service}")
+    unit = f"calvin-{service}"
+
+    if _RESTART_HELPER.is_file():
+        try:
+            result = subprocess.run(
+                ["sudo", str(_RESTART_HELPER), service],
+                capture_output=True,
+                timeout=10,
+                text=True,
+            )
+            if result.returncode == 0:
+                logger.info("%s restart initiated via helper script", service)
+                return True
+            error_msg = result.stderr or result.stdout or "Unknown error"
+            logger.warning("Helper script failed: %s", error_msg)
+        except FileNotFoundError:
+            logger.warning("sudo not found")
+        except subprocess.TimeoutExpired:
+            logger.info("Helper script timed out (but may have initiated)")
+            return True
+        except Exception as e:
+            logger.error("Helper script error: %s", e, exc_info=True)
+
+    try:
+        result = subprocess.run(
+            ["systemctl", "restart", unit],
+            capture_output=True,
+            timeout=5,
+            text=True,
+        )
+        if result.returncode == 0:
+            logger.info("%s restart initiated via systemctl restart", service)
+            return True
+        logger.warning("systemctl restart failed: %s", result.stderr or "Unknown error")
+    except FileNotFoundError:
+        logger.warning("systemctl not found")
+    except subprocess.TimeoutExpired:
+        logger.info("systemctl restart timed out (but may have initiated)")
+        return True
+    except Exception as e:
+        logger.error("systemctl restart error: %s", e, exc_info=True)
+
+    return False
 
 
 @router.post("/update")
@@ -386,78 +454,25 @@ async def restart_frontend():
     Uses a helper script with sudo permissions to restart the calvin-frontend service.
     """
     try:
-        # Try to use the helper script first (most reliable)
-        helper_script = Path("/usr/local/bin/restart-calvin-services.sh")
-        if helper_script.exists():
-            try:
-                result = subprocess.run(
-                    ["sudo", str(helper_script), "frontend"],
-                    capture_output=True,
-                    timeout=10,
-                    text=True,
-                )
-                if result.returncode == 0:
-                    logger.info("Frontend restart initiated via helper script")
-                    return {
-                        "status": "success",
-                        "message": "Frontend service restart initiated. The service will restart shortly.",
-                    }
-                else:
-                    error_msg = result.stderr or result.stdout or "Unknown error"
-                    logger.warning(f"Helper script failed: {error_msg}")
-            except FileNotFoundError:
-                logger.warning("sudo not found")
-            except subprocess.TimeoutExpired:
-                logger.info("Helper script timed out (but may have initiated)")
-                return {
-                    "status": "success",
-                    "message": "Frontend service restart initiated. The service will restart shortly.",
-                }
-            except Exception as e:
-                logger.error(f"Helper script error: {e}", exc_info=True)
-
-        # Fallback: Try systemctl restart (might work if user has permissions)
-        try:
-            result = subprocess.run(
-                ["systemctl", "restart", "calvin-frontend"],
-                capture_output=True,
-                timeout=5,
-                text=True,
+        if not _restart_mechanism_available():
+            raise HTTPException(
+                status_code=500,
+                detail=(
+                    "No restart method available (missing /usr/local/bin/restart-calvin-services.sh "
+                    "and systemctl not found)."
+                ),
             )
-            if result.returncode == 0:
-                logger.info("Frontend restart initiated via systemctl restart")
-                return {
-                    "status": "success",
-                    "message": "Frontend service restart initiated. The service will restart shortly.",
-                }
-            else:
-                error_msg = result.stderr or "Unknown error"
-                logger.warning(f"systemctl restart failed: {error_msg}")
-        except FileNotFoundError:
-            logger.warning("systemctl not found")
-        except subprocess.TimeoutExpired:
-            logger.info("systemctl restart timed out (but may have initiated)")
-            return {
-                "status": "success",
-                "message": "Frontend service restart initiated. The service will restart shortly.",
-            }
-        except Exception as e:
-            logger.error(f"systemctl restart error: {e}", exc_info=True)
-
-        # If all methods failed, return error with details
-        error_detail = (
-            "Failed to restart frontend service: All restart methods failed.\n"
-            "Note: The restart helper script should be installed and configured with sudo permissions.\n"
-            "Check /usr/local/bin/restart-calvin-services.sh exists and /etc/sudoers.d/calvin-restart is configured.\n"
-            "Alternatively, you can restart manually via SSH: "
-            "sudo systemctl restart calvin-frontend"
-        )
-        logger.error(error_detail)
-        raise HTTPException(status_code=500, detail=error_detail)
+        threading.Thread(
+            target=lambda: _attempt_restart_calvin_service("frontend"), daemon=True
+        ).start()
+        return {
+            "status": "success",
+            "message": "Frontend service restart initiated. The service will restart shortly.",
+        }
     except HTTPException:
         raise
     except Exception as e:
-        logger.error(f"Frontend restart error: {e}", exc_info=True)
+        logger.error("Frontend restart error: %s", e, exc_info=True)
         raise HTTPException(status_code=500, detail=f"Failed to restart frontend service: {str(e)}")
 
 
@@ -466,80 +481,41 @@ async def restart_backend():
     """
     Restart the backend service.
     Uses a helper script with sudo permissions to restart the calvin-backend service.
+
+    The actual restart runs after a short delay on a background thread so this process
+    can return HTTP 200 before systemd stops it; otherwise clients typically see a
+    network error even when the restart succeeds.
     """
     try:
-        # Try to use the helper script first (most reliable)
-        helper_script = Path("/usr/local/bin/restart-calvin-services.sh")
-        if helper_script.exists():
-            try:
-                result = subprocess.run(
-                    ["sudo", str(helper_script), "backend"],
-                    capture_output=True,
-                    timeout=10,
-                    text=True,
-                )
-                if result.returncode == 0:
-                    logger.info("Backend restart initiated via helper script")
-                    return {
-                        "status": "success",
-                        "message": "Backend service restart initiated. The service will restart shortly.",
-                    }
-                else:
-                    error_msg = result.stderr or result.stdout or "Unknown error"
-                    logger.warning(f"Helper script failed: {error_msg}")
-            except FileNotFoundError:
-                logger.warning("sudo not found")
-            except subprocess.TimeoutExpired:
-                logger.info("Helper script timed out (but may have initiated)")
-                return {
-                    "status": "success",
-                    "message": "Backend service restart initiated. The service will restart shortly.",
-                }
-            except Exception as e:
-                logger.error(f"Helper script error: {e}", exc_info=True)
-
-        # Fallback: Try systemctl restart (might work if user has permissions)
-        try:
-            result = subprocess.run(
-                ["systemctl", "restart", "calvin-backend"],
-                capture_output=True,
-                timeout=5,
-                text=True,
+        if not _restart_mechanism_available():
+            raise HTTPException(
+                status_code=500,
+                detail=(
+                    "No restart method available (missing /usr/local/bin/restart-calvin-services.sh "
+                    "and systemctl not found)."
+                ),
             )
-            if result.returncode == 0:
-                logger.info("Backend restart initiated via systemctl restart")
-                return {
-                    "status": "success",
-                    "message": "Backend service restart initiated. The service will restart shortly.",
-                }
-            else:
-                error_msg = result.stderr or "Unknown error"
-                logger.warning(f"systemctl restart failed: {error_msg}")
-        except FileNotFoundError:
-            logger.warning("systemctl not found")
-        except subprocess.TimeoutExpired:
-            logger.info("systemctl restart timed out (but may have initiated)")
-            return {
-                "status": "success",
-                "message": "Backend service restart initiated. The service will restart shortly.",
-            }
-        except Exception as e:
-            logger.error(f"systemctl restart error: {e}", exc_info=True)
 
-        # If all methods failed, return error with details
-        error_detail = (
-            "Failed to restart backend service: All restart methods failed.\n"
-            "Note: The restart helper script should be installed and configured with sudo permissions.\n"
-            "Check /usr/local/bin/restart-calvin-services.sh exists and /etc/sudoers.d/calvin-restart is configured.\n"
-            "Alternatively, you can restart manually via SSH: "
-            "sudo systemctl restart calvin-backend"
-        )
-        logger.error(error_detail)
-        raise HTTPException(status_code=500, detail=error_detail)
+        def _run_restart() -> None:
+            time.sleep(_BACKEND_RESTART_DELAY_SEC)
+            if not _attempt_restart_calvin_service("backend"):
+                logger.error(
+                    "Background backend restart failed after HTTP response was sent. "
+                    "Check sudoers for calvin-restart and journalctl -u calvin-backend."
+                )
+
+        threading.Thread(target=_run_restart, daemon=True).start()
+        return {
+            "status": "success",
+            "message": (
+                "Backend restart scheduled. The service will restart in a moment "
+                f"(after ~{_BACKEND_RESTART_DELAY_SEC:.0f}s)."
+            ),
+        }
     except HTTPException:
         raise
     except Exception as e:
-        logger.error(f"Backend restart error: {e}", exc_info=True)
+        logger.error("Backend restart error: %s", e, exc_info=True)
         raise HTTPException(status_code=500, detail=f"Failed to restart backend service: {str(e)}")
 
 

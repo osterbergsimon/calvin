@@ -473,6 +473,24 @@ install_script() {
     log "Script installed: ${target_path}"
 }
 
+# Scripts listed in sudoers as NOPASSWD for the Calvin user must NOT be owned by that
+# user (or the app could edit them and escalate via sudo). Installed root:root 0755.
+install_privileged_sudo_helper_script() {
+    local script_path="${1}"
+    local target_path="${2}"
+
+    if [ ! -f "${script_path}" ]; then
+        log_warn "Script file does not exist: ${script_path}, skipping installation"
+        return 0
+    fi
+
+    log "Installing privileged sudo helper (root-owned, not writable by app user): $(basename "${script_path}")"
+    cp "${script_path}" "${target_path}" || error_exit "Failed to copy script" 1
+    chown root:root "${target_path}" || error_exit "Failed to set script ownership" 1
+    chmod 0755 "${target_path}" || error_exit "Failed to set script permissions" 1
+    log "Script installed: ${target_path} (root:root 0755)"
+}
+
 # Configuration file creation
 create_update_config() {
     local git_repo="${1:-$DEFAULT_GIT_REPO}"

@@ -3,6 +3,7 @@ import { ref } from "vue";
 import axios from "axios";
 import { getCachedData, setCachedData } from "../utils/cache";
 import { useConnectionStore } from "./connection";
+import { logDebug, logError, logInfo } from "../utils/logger";
 
 export const useCalendarStore = defineStore("calendar", () => {
   const events = ref([]);
@@ -27,8 +28,9 @@ export const useCalendarStore = defineStore("calendar", () => {
     if (!connectionStore.isFullyOnline()) {
       const cachedSources = getCachedData(cacheKey, cacheTTL);
       if (cachedSources) {
-        console.log(
-          `[Calendar] Using cached sources (${cachedSources.sources?.length || 0} sources)`,
+        logInfo(
+          "[Calendar]",
+          `Using cached sources (${cachedSources.sources?.length || 0} sources)`,
         );
         sources.value = cachedSources.sources || [];
         loading.value = false;
@@ -50,8 +52,9 @@ export const useCalendarStore = defineStore("calendar", () => {
       if (connectionStore.isFullyOnline()) {
         const cachedSources = getCachedData(cacheKey, cacheTTL);
         if (cachedSources) {
-          console.log(
-            `[Calendar] Request failed, using cached sources (${cachedSources.sources?.length || 0} sources)`,
+          logInfo(
+            "[Calendar]",
+            `Request failed, using cached sources (${cachedSources.sources?.length || 0} sources)`,
           );
           sources.value = cachedSources.sources || [];
           loading.value = false;
@@ -60,7 +63,7 @@ export const useCalendarStore = defineStore("calendar", () => {
       }
 
       error.value = err.message;
-      console.error("Failed to fetch calendar sources:", err);
+      logError("[Calendar]", "Failed to fetch calendar sources:", err);
       throw err;
     } finally {
       loading.value = false;
@@ -81,7 +84,7 @@ export const useCalendarStore = defineStore("calendar", () => {
       return response.data;
     } catch (err) {
       error.value = err.message;
-      console.error("Failed to update calendar source:", err);
+      logError("[Calendar]", "Failed to update calendar source:", err);
       throw err;
     }
   };
@@ -108,8 +111,9 @@ export const useCalendarStore = defineStore("calendar", () => {
     if (!connectionStore.isFullyOnline()) {
       const cachedEvents = getCachedData(cacheKey, cacheTTL);
       if (cachedEvents) {
-        console.log(
-          `[Calendar] Using cached events (${cachedEvents.events?.length || 0} events)`,
+        logInfo(
+          "[Calendar]",
+          `Using cached events (${cachedEvents.events?.length || 0} events)`,
         );
         events.value = cachedEvents.events || [];
         loading.value = false;
@@ -147,9 +151,12 @@ export const useCalendarStore = defineStore("calendar", () => {
       // Cache the response
       setCachedData(cacheKey, responseData);
 
-      console.log(`Fetched ${events.value.length} events from API`);
+      logDebug(
+        "[Calendar]",
+        `Fetched ${events.value.length} events from API`,
+      );
       if (events.value.length > 0) {
-        console.log("Sample event:", events.value[0]);
+        logDebug("[Calendar]", "Sample event:", events.value[0]);
       }
       return responseData;
     } catch (err) {
@@ -157,8 +164,9 @@ export const useCalendarStore = defineStore("calendar", () => {
       if (connectionStore.isFullyOnline()) {
         const cachedEvents = getCachedData(cacheKey, cacheTTL);
         if (cachedEvents) {
-          console.log(
-            `[Calendar] Request failed, using cached events (${cachedEvents.events?.length || 0} events)`,
+          logInfo(
+            "[Calendar]",
+            `Request failed, using cached events (${cachedEvents.events?.length || 0} events)`,
           );
           events.value = cachedEvents.events || [];
           loading.value = false;
@@ -167,7 +175,7 @@ export const useCalendarStore = defineStore("calendar", () => {
       }
 
       error.value = err.message;
-      console.error("Failed to fetch events:", err);
+      logError("[Calendar]", "Failed to fetch events:", err);
       throw err;
     } finally {
       loading.value = false;
@@ -390,10 +398,10 @@ export const useCalendarStore = defineStore("calendar", () => {
       // Reload events with refresh flag
       await fetchEvents(startDate, endDate, true);
 
-      console.log("[Calendar] Events refreshed successfully");
+      logInfo("[Calendar]", "Events refreshed successfully");
     } catch (err) {
       error.value = err.message;
-      console.error("[Calendar] Failed to refresh events:", err);
+      logError("[Calendar]", "Failed to refresh events:", err);
       throw err;
     }
   };

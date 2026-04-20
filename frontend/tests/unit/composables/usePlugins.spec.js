@@ -7,6 +7,16 @@ import { describe, it, expect, beforeEach, vi } from "vitest";
 import { usePlugins } from "@/composables/usePlugins";
 import * as pluginsApi from "@/services/pluginsApi";
 
+const { logErrorMock, logWarnMock } = vi.hoisted(() => ({
+  logErrorMock: vi.fn(),
+  logWarnMock: vi.fn(),
+}));
+
+vi.mock("@/utils/logger", () => ({
+  logError: (...args) => logErrorMock(...args),
+  logWarn: (...args) => logWarnMock(...args),
+}));
+
 // Mock pluginsApi
 vi.mock("@/services/pluginsApi", () => ({
   getPlugins: vi.fn(),
@@ -19,6 +29,8 @@ vi.mock("@/services/pluginsApi", () => ({
 describe("usePlugins", () => {
   beforeEach(() => {
     vi.clearAllMocks();
+    logErrorMock.mockClear();
+    logWarnMock.mockClear();
   });
 
   describe("Backend Plugin Support", () => {
@@ -261,6 +273,24 @@ describe("usePlugins", () => {
       await loadPlugins();
 
       expect(plugins.value[0]._installed).toBe(true);
+    });
+  });
+
+  describe("logging", () => {
+    it("calls logError when getPlugins fails", async () => {
+      const err = new Error("network error");
+      pluginsApi.getPlugins.mockRejectedValue(err);
+      pluginsApi.getInstalledPlugins.mockResolvedValue({ plugins: [] });
+
+      const { loadPlugins, plugins } = usePlugins();
+      await loadPlugins();
+
+      expect(plugins.value).toEqual([]);
+      expect(logErrorMock).toHaveBeenCalledWith(
+        "[usePlugins]",
+        "Failed to load plugins:",
+        err,
+      );
     });
   });
 });

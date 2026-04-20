@@ -75,6 +75,29 @@ If the rules are working correctly, these commands should succeed without prompt
 - Only the `calvin` user is granted these permissions
 - The rules do not grant permission to manage other systemd units or perform other privileged operations
 
+## Privileged helper scripts (`sudo` NOPASSWD)
+
+The backend may run `/usr/local/bin/restart-calvin-services.sh` (and reboot via `/usr/local/bin/reboot-calvin.sh`) with `sudo` under a **narrow** sudoers rule, e.g.:
+
+`calvin ALL=(root) NOPASSWD: /usr/local/bin/restart-calvin-services.sh`
+
+Those files must be **immutable from the app’s perspective**:
+
+- **Owner/group:** `root:root`
+- **Mode:** `0755` (or stricter; `sudo` runs them as root, so the app user does not need write access)
+- **`/usr/local/bin`** should remain root-owned and not writable by `calvin` (default on most systems)
+
+If the script were owned by `calvin`, anyone who could modify code running as `calvin` could replace the helper and gain root the next time `sudo` executed that path.
+
+Setup scripts install these helpers with `install_privileged_sudo_helper_script` in `scripts/setup-common.sh` (root-owned). **Existing systems** that still have `chown calvin:calvin` on those files should fix permissions once:
+
+```bash
+sudo chown root:root /usr/local/bin/restart-calvin-services.sh /usr/local/bin/reboot-calvin.sh
+sudo chmod 0755 /usr/local/bin/restart-calvin-services.sh /usr/local/bin/reboot-calvin.sh
+```
+
+New installs use `ALL=(root)` in sudoers for these helpers; older systems may still have `ALL=(ALL)` until setup is re-run or `/etc/sudoers.d/calvin-*` is updated.
+
 ## Related Files
 
 - `/etc/polkit-1/rules.d/50-calvin-reboot.rules` - Allows calvin user to reboot the system

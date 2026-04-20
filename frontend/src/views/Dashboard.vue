@@ -86,7 +86,6 @@
 
       <!-- Minimal UI overlay (shown when UI is hidden) -->
       <MinimalUIOverlay v-if="!configStore.shouldShowUI" />
-      <!-- ModeIndicator removed - functionality merged into NotificationSystem -->
 
       <!-- Connection indicator (shown when offline) -->
       <ConnectionIndicator

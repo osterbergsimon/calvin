@@ -1,5 +1,12 @@
 <template>
   <div class="calendar-sources-tab">
+    <div
+      v-if="banner"
+      class="tab-banner"
+      :class="banner.type === 'error' ? 'tab-banner-error' : 'tab-banner-success'"
+    >
+      {{ banner.text }}
+    </div>
     <CollapsibleSection title="Calendar Sources" icon="📅" :expanded="true">
       <SettingItem
         label="Add New Calendar Source"
@@ -124,6 +131,15 @@
         </div>
       </SettingItem>
     </CollapsibleSection>
+
+    <ConfirmModal
+      :show="showRemoveConfirm"
+      title="Remove Calendar Source"
+      message="Are you sure you want to remove this calendar source?"
+      confirm-text="Remove"
+      @confirm="confirmRemoveSource"
+      @cancel="cancelRemoveSource"
+    />
   </div>
 </template>
 
@@ -135,6 +151,8 @@ import * as calendarApi from "@/services/calendarApi";
 import * as pluginsApi from "@/services/pluginsApi";
 import CollapsibleSection from "../../shared/CollapsibleSection.vue";
 import SettingItem from "../../shared/SettingItem.vue";
+import ConfirmModal from "../../shared/ConfirmModal.vue";
+import { logError } from "@/utils/logger";
 
 const calendarStore = useCalendarStore();
 const { pluginInstances } = usePlugins();
@@ -148,6 +166,34 @@ const newCalendarSource = ref({
   name: "",
   ical_url: "",
 });
+
+const banner = ref(null);
+let bannerTimer = null;
+
+const showRemoveConfirm = ref(false);
+const pendingRemoveId = ref(null);
+
+function setBanner(type, text, autoClearMs = 0) {
+  if (bannerTimer) {
+    clearTimeout(bannerTimer);
+    bannerTimer = null;
+  }
+  banner.value = { type, text };
+  if (autoClearMs > 0) {
+    bannerTimer = setTimeout(() => {
+      banner.value = null;
+      bannerTimer = null;
+    }, autoClearMs);
+  }
+}
+
+function clearBanner() {
+  if (bannerTimer) {
+    clearTimeout(bannerTimer);
+    bannerTimer = null;
+  }
+  banner.value = null;
+}
 
 const canAddCalendar = computed(() => {
   return (
@@ -185,8 +231,13 @@ const loadCalendarSources = async () => {
     );
     calendarSources.value = sourcesWithStatus;
   } catch (error) {
-    console.error("Failed to load calendar sources:", error);
+    logError("[CalendarSources]", "Failed to load calendar sources:", error);
     calendarSources.value = [];
+    setBanner(
+      "error",
+      error?.message || "Failed to load calendar sources",
+      8000,
+    );
   } finally {
     loadingSources.value = false;
   }
@@ -208,7 +259,7 @@ const loadCalendarPluginTypes = async () => {
       newCalendarSource.value.type = calendarPluginTypes.value[0].id;
     }
   } catch (error) {
-    console.error("Failed to load calendar plugin types:", error);
+    logError("[CalendarSources]", "Failed to load calendar plugin types:", error);
     // Fallback to hardcoded types
     calendarPluginTypes.value = [
       { id: "google", name: "Google Calendar" },
@@ -261,8 +312,9 @@ const getCalendarTypeHelpText = (type) => {
 };
 
 const handleAddCalendarSource = async () => {
+  clearBanner();
   if (!canAddCalendar.value) {
-    alert("Please fill in calendar name and URL");
+    setBanner("error", "Please fill in calendar name and URL", 6000);
     return;
   }
 
@@ -289,13 +341,14 @@ const handleAddCalendarSource = async () => {
 
     // Reload sources
     await loadCalendarSources();
+    setBanner("success", "Calendar source added", 4000);
   } catch (error) {
-    console.error("Failed to add calendar source:", error);
+    logError("[CalendarSources]", "Failed to add calendar source:", error);
     const errorMessage =
       error.response?.data?.detail ||
       error.message ||
       "Failed to add calendar source";
-    alert(`Error: ${errorMessage}`);
+    setBanner("error", errorMessage, 8000);
   }
 };
 
@@ -336,8 +389,14 @@ const handleUpdateSourceColor = async (sourceId, color) => {
       await loadCalendarSources();
     }
   } catch (error) {
-    console.error("Failed to update calendar source color:", error);
-    alert("Failed to update calendar source color");
+    logError("[CalendarSources]", "Failed to update calendar source color:", error);
+    setBanner(
+      "error",
+      error?.response?.data?.detail ||
+        error?.message ||
+        "Failed to update calendar source color",
+      8000,
+    );
   }
 };
 
@@ -352,8 +411,14 @@ const handleUpdateSourceShowTime = async (sourceId, showTime) => {
       await loadCalendarSources();
     }
   } catch (error) {
-    console.error("Failed to update calendar source show_time:", error);
-    alert("Failed to update calendar source");
+    logError("[CalendarSources]", "Failed to update show time:", error);
+    setBanner(
+      "error",
+      error?.response?.data?.detail ||
+        error?.message ||
+        "Failed to update calendar source",
+      8000,
+    );
   }
 };
 
@@ -365,23 +430,48 @@ const handleToggleSource = async (sourceId, enabled) => {
       await loadCalendarSources();
     }
   } catch (error) {
-    console.error("Failed to toggle calendar source:", error);
-    alert("Failed to update calendar source");
+    logError("[CalendarSources]", "Failed to toggle calendar source:", error);
+    setBanner(
+      "error",
+      error?.response?.data?.detail ||
+        error?.message ||
+        "Failed to update calendar source",
+      8000,
+    );
   }
 };
 
-const handleRemoveSource = async (sourceId) => {
-  if (!confirm("Are you sure you want to remove this calendar source?")) {
-    return;
-  }
+const handleRemoveSource = (sourceId) => {
+  clearBanner();
+  pendingRemoveId.value = sourceId;
+  showRemoveConfirm.value = true;
+};
+
+const confirmRemoveSource = async () => {
+  const sourceId = pendingRemoveId.value;
+  showRemoveConfirm.value = false;
+  pendingRemoveId.value = null;
+  if (!sourceId) return;
 
   try {
     await calendarApi.deleteCalendarSource(sourceId);
     await loadCalendarSources();
+    setBanner("success", "Calendar source removed", 4000);
   } catch (error) {
-    console.error("Failed to remove calendar source:", error);
-    alert("Failed to remove calendar source");
+    logError("[CalendarSources]", "Failed to remove calendar source:", error);
+    setBanner(
+      "error",
+      error?.response?.data?.detail ||
+        error?.message ||
+        "Failed to remove calendar source",
+      8000,
+    );
   }
+};
+
+const cancelRemoveSource = () => {
+  showRemoveConfirm.value = false;
+  pendingRemoveId.value = null;
 };
 
 onMounted(async () => {
@@ -393,6 +483,25 @@ onMounted(async () => {
 <style scoped>
 .calendar-sources-tab {
   width: 100%;
+}
+
+.tab-banner {
+  padding: 0.75rem 1rem;
+  border-radius: 6px;
+  margin-bottom: 1rem;
+  font-weight: 500;
+}
+
+.tab-banner-error {
+  background: rgba(244, 67, 54, 0.15);
+  color: var(--text-primary);
+  border: 1px solid rgba(244, 67, 54, 0.4);
+}
+
+.tab-banner-success {
+  background: rgba(76, 175, 80, 0.15);
+  color: var(--text-primary);
+  border: 1px solid rgba(76, 175, 80, 0.4);
 }
 
 .calendar-source-form {

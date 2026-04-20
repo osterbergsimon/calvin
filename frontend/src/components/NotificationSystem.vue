@@ -261,7 +261,12 @@ watch(
 watch(
   () => configStore.keyboardFeedbackEnabled,
   (enabled) => {
-    if (!enabled && visible.value && notificationType.value !== "info") {
+    if (
+      !enabled &&
+      visible.value &&
+      (notificationType.value === "keyboard" ||
+        notificationType.value === "mode")
+    ) {
       visible.value = false;
       if (hideTimeout) {
         clearTimeout(hideTimeout);

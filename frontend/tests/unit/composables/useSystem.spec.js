@@ -114,13 +114,15 @@ describe("useSystem", () => {
 
   describe("restartBackend", () => {
     it("should restart backend successfully", async () => {
-      systemApi.restartBackend.mockResolvedValue({});
+      systemApi.restartBackend.mockResolvedValue({
+        message: "Backend restart scheduled.",
+      });
 
       const system = useSystem();
       await system.restartBackend();
 
       expect(systemApi.restartBackend).toHaveBeenCalled();
-      expect(system.updateMessage.value).toBe("Backend restart initiated");
+      expect(system.updateMessage.value).toBe("Backend restart scheduled.");
       expect(system.updateMessageClass.value).toBe("success");
 
       // Fast-forward to clear message
@@ -146,13 +148,17 @@ describe("useSystem", () => {
 
   describe("restartFrontend", () => {
     it("should restart frontend successfully", async () => {
-      systemApi.restartFrontend.mockResolvedValue({});
+      systemApi.restartFrontend.mockResolvedValue({
+        message: "Frontend service restart initiated.",
+      });
 
       const system = useSystem();
       await system.restartFrontend();
 
       expect(systemApi.restartFrontend).toHaveBeenCalled();
-      expect(system.updateMessage.value).toBe("Frontend restart initiated");
+      expect(system.updateMessage.value).toBe(
+        "Frontend service restart initiated.",
+      );
       expect(system.updateMessageClass.value).toBe("success");
 
       // Fast-forward to clear message

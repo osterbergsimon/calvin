@@ -99,4 +99,18 @@ describe("DisplayTab", () => {
       ]);
     });
   });
+
+  describe("label / input association", () => {
+    it("exposes stable ids on key selects for labels and a11y", () => {
+      const wrapper = mount(DisplayTab, {
+        props: { config: {} },
+      });
+
+      expect(wrapper.find("#week-start-day").exists()).toBe(true);
+      expect(wrapper.find("#display-orientation").exists()).toBe(true);
+      expect(wrapper.find("#time-format").exists()).toBe(true);
+      expect(wrapper.find("#side-view-position").exists()).toBe(true);
+      expect(wrapper.find("#meal-plan-card-size").exists()).toBe(true);
+    });
+  });
 });

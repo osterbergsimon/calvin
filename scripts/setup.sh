@@ -196,18 +196,18 @@ main() {
     fi
     
     if [ -f "${CALVIN_DIR}/scripts/reboot-calvin.sh" ]; then
-        install_script "${CALVIN_DIR}/scripts/reboot-calvin.sh" "/usr/local/bin/reboot-calvin.sh" "${CALVIN_USER}"
+        install_privileged_sudo_helper_script "${CALVIN_DIR}/scripts/reboot-calvin.sh" "/usr/local/bin/reboot-calvin.sh"
         # Configure sudoers for reboot script
         log "Configuring sudoers for reboot script..."
-        echo "${CALVIN_USER} ALL=(ALL) NOPASSWD: /usr/local/bin/reboot-calvin.sh" > /etc/sudoers.d/calvin-reboot
+        echo "${CALVIN_USER} ALL=(root) NOPASSWD: /usr/local/bin/reboot-calvin.sh" > /etc/sudoers.d/calvin-reboot
         chmod 0440 /etc/sudoers.d/calvin-reboot
     fi
     
     if [ -f "${CALVIN_DIR}/scripts/restart-calvin-services.sh" ]; then
-        install_script "${CALVIN_DIR}/scripts/restart-calvin-services.sh" "/usr/local/bin/restart-calvin-services.sh" "${CALVIN_USER}"
+        install_privileged_sudo_helper_script "${CALVIN_DIR}/scripts/restart-calvin-services.sh" "/usr/local/bin/restart-calvin-services.sh"
         # Configure sudoers for restart script
         log "Configuring sudoers for restart script..."
-        echo "${CALVIN_USER} ALL=(ALL) NOPASSWD: /usr/local/bin/restart-calvin-services.sh" > /etc/sudoers.d/calvin-restart
+        echo "${CALVIN_USER} ALL=(root) NOPASSWD: /usr/local/bin/restart-calvin-services.sh" > /etc/sudoers.d/calvin-restart
         chmod 0440 /etc/sudoers.d/calvin-restart
     fi
     

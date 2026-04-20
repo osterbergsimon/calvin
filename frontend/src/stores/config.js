@@ -16,10 +16,10 @@ export const useConfigStore = defineStore("config", () => {
   const showUI = ref(true); // Show headers and UI controls (can be hidden for kiosk mode)
   const showUITemporary = ref(false); // Temporary UI override (doesn't persist)
   const temporaryUITimer = ref(null); // Timer for temporary UI override
-  const showModeIndicator = ref(true); // Show mode indicator icon (when UI is hidden)
-  const modeIndicatorTimeout = ref(5); // Mode indicator auto-hide timeout in seconds (0 = never hide, default 5)
+  const modeIndicatorTimeout = ref(5); // Mode change notification auto-hide timeout in seconds (0 = never hide, default 5)
   const photoRotationInterval = ref(30); // Photo rotation interval in seconds (default 30)
   const calendarViewMode = ref("month"); // Calendar view mode: 'month' | 'week' | 'day' | 'rolling'
+  const calendarRefreshInterval = ref(15); // Calendar refresh interval in minutes (default 15)
   const timeFormat = ref("24h"); // Time format: '12h' or '24h' (default: '24h')
   const weekStartDay = ref(1); // Week starting day (0=Sunday, 1=Monday, ..., 6=Saturday, default Monday)
   const showWeekNumbers = ref(false); // Show week numbers in calendar (default false)
@@ -31,8 +31,6 @@ export const useConfigStore = defineStore("config", () => {
   const darkModeStart = ref(18); // Dark mode start hour (0-23, default 18 = 6 PM)
   const darkModeEnd = ref(6); // Dark mode end hour (0-23, default 6 = 6 AM)
   const displayScheduleEnabled = ref(false); // Enable display power schedule
-  const displayOffTime = ref("22:00"); // Display off time (format: "HH:MM") - deprecated
-  const displayOnTime = ref("06:00"); // Display on time (format: "HH:MM") - deprecated
   const displaySchedule = ref([
     { day: 0, enabled: true, onTime: "06:00", offTime: "22:00" }, // Monday
     { day: 1, enabled: true, onTime: "06:00", offTime: "22:00" }, // Tuesday
@@ -68,7 +66,6 @@ export const useConfigStore = defineStore("config", () => {
   const clockBarShowInNonKiosk = ref(false); // Show bar in non-kiosk mode (UI visible)
   const clockBarShowInKiosk = ref(false); // Show bar in kiosk mode (UI hidden)
   const clockBarPosition = ref("top"); // Bar position (depends on mode): horizontal: 'top' | 'bottom' | 'between', vertical: 'left' | 'right' | 'between'
-  const clockBarSize = ref("medium"); // Bar clock size: 'small' | 'medium' | 'large' (deprecated, use clockBarFontSize)
   const clockBarFontSize = ref(16); // Bar clock font size in pixels
   const clockBarDateFontSize = ref(14); // Bar clock date font size in pixels
   const clockBarLayout = ref("single-line"); // Bar layout: 'single-line' | 'two-lines'
@@ -165,17 +162,16 @@ export const useConfigStore = defineStore("config", () => {
       if (response.data.calendar_view_mode !== undefined) {
         calendarViewMode.value = response.data.calendar_view_mode;
       }
+      if (response.data.calendarRefreshInterval !== undefined) {
+        calendarRefreshInterval.value = response.data.calendarRefreshInterval;
+      } else if (response.data.calendar_refresh_interval !== undefined) {
+        calendarRefreshInterval.value = response.data.calendar_refresh_interval;
+      }
       if (response.data.timeFormat !== undefined) {
         timeFormat.value = response.data.timeFormat;
       }
       if (response.data.time_format !== undefined) {
         timeFormat.value = response.data.time_format;
-      }
-      if (response.data.showModeIndicator !== undefined) {
-        showModeIndicator.value = response.data.showModeIndicator;
-      }
-      if (response.data.show_mode_indicator !== undefined) {
-        showModeIndicator.value = response.data.show_mode_indicator;
       }
       if (response.data.modeIndicatorTimeout !== undefined) {
         modeIndicatorTimeout.value = response.data.modeIndicatorTimeout;
@@ -260,18 +256,6 @@ export const useConfigStore = defineStore("config", () => {
       }
       if (response.data.display_schedule_enabled !== undefined) {
         displayScheduleEnabled.value = response.data.display_schedule_enabled;
-      }
-      if (response.data.displayOffTime !== undefined) {
-        displayOffTime.value = response.data.displayOffTime;
-      }
-      if (response.data.display_off_time !== undefined) {
-        displayOffTime.value = response.data.display_off_time;
-      }
-      if (response.data.displayOnTime !== undefined) {
-        displayOnTime.value = response.data.displayOnTime;
-      }
-      if (response.data.display_on_time !== undefined) {
-        displayOnTime.value = response.data.display_on_time;
       }
       if (response.data.displaySchedule !== undefined) {
         if (typeof response.data.displaySchedule === "string") {
@@ -415,13 +399,6 @@ export const useConfigStore = defineStore("config", () => {
       } else {
         clockBarPosition.value = "top"; // Default
       }
-      if (response.data.clockBarSize !== undefined) {
-        clockBarSize.value = response.data.clockBarSize;
-      } else if (response.data.clock_bar_size !== undefined) {
-        clockBarSize.value = response.data.clock_bar_size;
-      } else {
-        clockBarSize.value = "medium"; // Default
-      }
       if (response.data.clockBarFontSize !== undefined) {
         clockBarFontSize.value = response.data.clockBarFontSize;
       } else if (response.data.clock_bar_font_size !== undefined) {
@@ -510,6 +487,36 @@ export const useConfigStore = defineStore("config", () => {
       if (config.calendarSplit !== undefined) {
         calendarSplit.value = config.calendarSplit;
       }
+      if (config.showWeekNumbers !== undefined) {
+        showWeekNumbers.value = config.showWeekNumbers;
+      } else if (config.show_week_numbers !== undefined) {
+        showWeekNumbers.value = config.show_week_numbers;
+      }
+      if (config.timeFormat !== undefined) {
+        timeFormat.value = config.timeFormat;
+      } else if (config.time_format !== undefined) {
+        timeFormat.value = config.time_format;
+      }
+      if (config.maxVisibleEvents !== undefined) {
+        maxVisibleEvents.value = config.maxVisibleEvents;
+      } else if (config.max_visible_events !== undefined) {
+        maxVisibleEvents.value = config.max_visible_events;
+      }
+      if (config.weekendDays !== undefined) {
+        weekendDays.value = config.weekendDays;
+      } else if (config.weekend_days !== undefined) {
+        weekendDays.value = config.weekend_days;
+      }
+      if (config.showRedDays !== undefined) {
+        showRedDays.value = config.showRedDays;
+      } else if (config.show_red_days !== undefined) {
+        showRedDays.value = config.show_red_days;
+      }
+      if (config.mealPlanCardSize !== undefined) {
+        mealPlanCardSize.value = config.mealPlanCardSize;
+      } else if (config.meal_plan_card_size !== undefined) {
+        mealPlanCardSize.value = config.meal_plan_card_size;
+      }
       if (config.showUI !== undefined) {
         showUI.value = config.showUI;
       } else if (config.show_ui !== undefined) {
@@ -591,11 +598,6 @@ export const useConfigStore = defineStore("config", () => {
         clockBarPosition.value = config.clockBarPosition;
       } else if (config.clock_bar_position !== undefined) {
         clockBarPosition.value = config.clock_bar_position;
-      }
-      if (config.clockBarSize !== undefined) {
-        clockBarSize.value = config.clockBarSize;
-      } else if (config.clock_bar_size !== undefined) {
-        clockBarSize.value = config.clock_bar_size;
       }
       if (config.clockBarFontSize !== undefined) {
         clockBarFontSize.value = config.clockBarFontSize;
@@ -719,10 +721,6 @@ export const useConfigStore = defineStore("config", () => {
     timeFormat.value = format;
   };
 
-  const setShowModeIndicator = (show) => {
-    showModeIndicator.value = show;
-  };
-
   const setModeIndicatorTimeout = (timeout) => {
     modeIndicatorTimeout.value = timeout;
   };
@@ -790,12 +788,12 @@ export const useConfigStore = defineStore("config", () => {
     photoFrameEnabled,
     photoFrameTimeout,
     showUI,
-    showModeIndicator,
     modeIndicatorTimeout,
     keyboardFeedbackEnabled,
     keyboardFeedbackMode,
     photoRotationInterval,
     calendarViewMode,
+    calendarRefreshInterval,
     timeFormat,
     weekStartDay,
     showWeekNumbers,
@@ -808,8 +806,6 @@ export const useConfigStore = defineStore("config", () => {
     darkModeStart,
     darkModeEnd,
     displayScheduleEnabled,
-    displayOffTime,
-    displayOnTime,
     displaySchedule,
     displayTimeoutEnabled,
     displayTimeout,
@@ -832,7 +828,6 @@ export const useConfigStore = defineStore("config", () => {
     clockBarShowInNonKiosk,
     clockBarShowInKiosk,
     clockBarPosition,
-    clockBarSize,
     clockBarFontSize,
     clockBarDateFontSize,
     clockBarLayout,
@@ -857,7 +852,6 @@ export const useConfigStore = defineStore("config", () => {
     toggleUI,
     showUITemporarily,
     shouldShowUI,
-    setShowModeIndicator,
     setModeIndicatorTimeout,
     setPhotoRotationInterval,
     setCalendarViewMode,

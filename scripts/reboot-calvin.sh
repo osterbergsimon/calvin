@@ -1,6 +1,9 @@
 #!/bin/bash
-# Helper script to reboot the system
-# This script can be run with sudo permissions
+# Helper script to reboot the system (invoked via sudo NOPASSWD for the app user).
+#
+# When installed under /usr/local/bin it must be root-owned (e.g. root:root 0755), not
+# owned by the calvin user — otherwise a compromised app could replace this file and
+# escalate privileges the next time sudo runs it.
 
 set -e
 

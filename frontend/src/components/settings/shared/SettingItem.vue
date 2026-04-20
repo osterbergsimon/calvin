@@ -1,6 +1,6 @@
 <template>
   <div class="setting-item">
-    <label v-if="label">
+    <label v-if="label" :for="inputId || undefined">
       <slot name="label">
         {{ label }}
       </slot>
@@ -28,6 +28,10 @@ defineProps({
   required: {
     type: Boolean,
     default: false,
+  },
+  inputId: {
+    type: String,
+    default: null,
   },
 });
 </script>

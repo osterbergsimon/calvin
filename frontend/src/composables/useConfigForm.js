@@ -6,6 +6,7 @@ import { ref } from "vue";
 import { useConfigStore } from "../stores/config";
 import { useKeyboardStore } from "../stores/keyboard";
 import * as configApi from "../services/configApi";
+import { logError } from "../utils/logger";
 
 export function useConfigForm(initialConfig = {}) {
   const configStore = useConfigStore();
@@ -13,9 +14,11 @@ export function useConfigForm(initialConfig = {}) {
   const localConfig = ref({ ...initialConfig });
   const saving = ref(false);
   const error = ref("");
+  const saveSuccess = ref(false);
 
   // Initialize from config store
   const loadConfig = async () => {
+    error.value = "";
     try {
       // Fetch config from API (this updates the store)
       const response = await configApi.getConfig();
@@ -55,8 +58,6 @@ export function useConfigForm(initialConfig = {}) {
           response.randomizeImages ?? response.randomize_images ?? false,
         // UI
         showUI: response.showUI ?? response.show_ui ?? true,
-        showModeIndicator:
-          response.showModeIndicator ?? response.show_mode_indicator ?? true,
         modeIndicatorTimeout:
           response.modeIndicatorTimeout ?? response.mode_indicator_timeout ?? 5,
         // Calendar
@@ -81,10 +82,6 @@ export function useConfigForm(initialConfig = {}) {
           response.displayScheduleEnabled ??
           response.display_schedule_enabled ??
           false,
-        displayOffTime:
-          response.displayOffTime ?? response.display_off_time ?? "22:00",
-        displayOnTime:
-          response.displayOnTime ?? response.display_on_time ?? "06:00",
         displaySchedule: response.displaySchedule
           ? typeof response.displaySchedule === "string"
             ? JSON.parse(response.displaySchedule)
@@ -167,8 +164,6 @@ export function useConfigForm(initialConfig = {}) {
           false,
         clockBarPosition:
           response.clockBarPosition ?? response.clock_bar_position ?? "top",
-        clockBarSize:
-          response.clockBarSize ?? response.clock_bar_size ?? "medium",
         clockBarFontSize:
           response.clockBarFontSize ?? response.clock_bar_font_size ?? 16,
         clockBarDateFontSize:
@@ -188,6 +183,10 @@ export function useConfigForm(initialConfig = {}) {
           response.consoleLogLevel ?? response.console_log_level ?? "info",
         configPollInterval:
           response.configPollInterval ?? response.config_poll_interval ?? 30,
+        calendarRefreshInterval:
+          response.calendarRefreshInterval ??
+          response.calendar_refresh_interval ??
+          15,
         gitRepoUrl: response.gitRepoUrl ?? response.git_repo_url ?? null,
         gitBranch: response.gitBranch ?? response.git_branch ?? "main",
         version: response.version ?? null,
@@ -200,7 +199,7 @@ export function useConfigForm(initialConfig = {}) {
         keyboardStore.setKeyboardType(localConfig.value.keyboardType);
       }
     } catch (err) {
-      console.error("Failed to load config:", err);
+      logError("[useConfigForm]", "Failed to load config:", err);
       error.value = "Failed to load configuration";
     }
   };
@@ -221,13 +220,18 @@ export function useConfigForm(initialConfig = {}) {
   const saveConfig = async (updates = null) => {
     saving.value = true;
     error.value = "";
+    saveSuccess.value = false;
 
     try {
       const configToSave = updates || localConfig.value;
       await configApi.updateConfig(configToSave);
       await configStore.updateConfig(configToSave);
+      saveSuccess.value = true;
+      setTimeout(() => {
+        saveSuccess.value = false;
+      }, 2500);
     } catch (err) {
-      console.error("Failed to save config:", err);
+      logError("[useConfigForm]", "Failed to save config:", err);
       error.value =
         err.response?.data?.detail ||
         err.message ||
@@ -247,6 +251,7 @@ export function useConfigForm(initialConfig = {}) {
     localConfig,
     saving,
     error,
+    saveSuccess,
     loadConfig,
     updateConfigValue,
     updateConfig,

@@ -345,9 +345,7 @@ class TestThemeInstaller:
 
         # This should now fail (previously would have passed)
         with pytest.raises(ValueError, match="variables must be an object"):
-            theme_installer.validate_theme_package(zip_path)
-
-    def test_validate_theme_directory_unsupported_format_version(self, theme_installer, tmp_path):
+            theme_installer.validate_theme_package(zip_path)    def test_validate_theme_directory_unsupported_format_version(self, theme_installer, tmp_path):
         """Test validating theme directory with unsupported format version."""
         theme_dir = tmp_path / "invalid_theme"
         theme_dir.mkdir()

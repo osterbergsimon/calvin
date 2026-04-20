@@ -105,12 +105,15 @@ class ConfigUpdate(BaseModel):
     photoRotationInterval: int | None = None  # Photo rotation interval in seconds
     calendarViewMode: str | None = None  # 'month' | 'week' | 'day' | 'rolling'
     timeFormat: str | None = None  # '12h' or '24h' (default: '24h')
-    showModeIndicator: bool | None = None  # Show mode indicator icon
     modeIndicatorTimeout: int | None = (
         None  # Mode indicator auto-hide timeout in seconds (0 = never hide)
     )
     weekStartDay: int | None = None  # Week starting day (0=Sunday, 1=Monday, ..., 6=Saturday)
     showWeekNumbers: bool | None = None  # Show week numbers in calendar
+    weekendDays: list[int] | None = None  # Weekend days (e.g. [0, 6] for Sun+Sat)
+    maxVisibleEvents: int | None = None  # Max events visible per day cell
+    showRedDays: bool | None = None  # Highlight holidays/red days
+    mealPlanCardSize: str | None = None  # Meal plan card size: 'small' | 'medium' | 'large'
     sideViewPosition: str | None = (
         None  # Side view position: 'left' | 'right' for landscape, 'top' | 'bottom' for portrait
     )
@@ -197,10 +200,6 @@ async def get_config():
         config["timeFormat"] = "24h"  # '12h' or '24h' (default: '24h')
     elif "time_format" in config and "timeFormat" not in config:
         config["timeFormat"] = config["time_format"]
-    if "showModeIndicator" not in config and "show_mode_indicator" not in config:
-        config["showModeIndicator"] = True  # Show mode indicator by default
-    elif "show_mode_indicator" in config and "showModeIndicator" not in config:
-        config["showModeIndicator"] = config["show_mode_indicator"]
     if "modeIndicatorTimeout" not in config and "mode_indicator_timeout" not in config:
         config["modeIndicatorTimeout"] = 5  # 5 seconds default
     elif "mode_indicator_timeout" in config and "modeIndicatorTimeout" not in config:
@@ -444,8 +443,6 @@ async def update_config(config_update: ConfigUpdate):
         update_dict["calendar_view_mode"] = update_dict.pop("calendarViewMode")
     if "timeFormat" in update_dict:
         update_dict["time_format"] = update_dict.pop("timeFormat")
-    if "showModeIndicator" in update_dict:
-        update_dict["show_mode_indicator"] = update_dict.pop("showModeIndicator")
     if "modeIndicatorTimeout" in update_dict:
         update_dict["mode_indicator_timeout"] = update_dict.pop("modeIndicatorTimeout")
     if "keyboardFeedbackEnabled" in update_dict:
@@ -456,6 +453,14 @@ async def update_config(config_update: ConfigUpdate):
         update_dict["week_start_day"] = update_dict.pop("weekStartDay")
     if "showWeekNumbers" in update_dict:
         update_dict["show_week_numbers"] = update_dict.pop("showWeekNumbers")
+    if "weekendDays" in update_dict:
+        update_dict["weekend_days"] = update_dict.pop("weekendDays")
+    if "maxVisibleEvents" in update_dict:
+        update_dict["max_visible_events"] = update_dict.pop("maxVisibleEvents")
+    if "showRedDays" in update_dict:
+        update_dict["show_red_days"] = update_dict.pop("showRedDays")
+    if "mealPlanCardSize" in update_dict:
+        update_dict["meal_plan_card_size"] = update_dict.pop("mealPlanCardSize")
     if "sideViewPosition" in update_dict:
         update_dict["side_view_position"] = update_dict.pop("sideViewPosition")
     if "themeMode" in update_dict:

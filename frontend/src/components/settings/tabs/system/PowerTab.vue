@@ -109,6 +109,8 @@
           min="0"
           max="3600"
           step="60"
+          placeholder="0"
+          aria-label="Display timeout in seconds"
           @change="handleTimeoutChange"
         />
       </SettingItem>

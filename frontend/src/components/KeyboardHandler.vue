@@ -13,6 +13,7 @@ import { useKeyboardActions } from "../composables/useKeyboardActions";
 import { usePhotoFrameMode } from "../composables/usePhotoFrameMode";
 import { useConfigStore } from "../stores/config";
 import NotificationSystem from "./NotificationSystem.vue";
+import { showSystemRebootScheduled } from "../utils/systemNotifications";
 
 const keyboardStore = useKeyboardStore();
 const configStore = useConfigStore();
@@ -87,9 +88,7 @@ const triggerReboot = async () => {
       method: "POST",
     });
     if (response.ok) {
-      console.log("Reboot command sent successfully");
-      // Show a message (if possible before reboot)
-      alert("System rebooting in 3 seconds...");
+      showSystemRebootScheduled(notificationRef);
     } else {
       console.error("Failed to trigger reboot:", await response.text());
     }

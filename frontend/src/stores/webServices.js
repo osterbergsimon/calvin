@@ -3,6 +3,7 @@ import { ref } from "vue";
 import axios from "axios";
 import { getCachedData, setCachedData } from "../utils/cache";
 import { useConnectionStore } from "./connection";
+import { logDebug, logError, logInfo, logWarn } from "../utils/logger";
 
 export const useWebServicesStore = defineStore("webServices", () => {
   const services = ref([]);
@@ -22,7 +23,7 @@ export const useWebServicesStore = defineStore("webServices", () => {
     if (!connectionStore.isFullyOnline()) {
       const cachedServices = getCachedData(cacheKey, cacheTTL);
       if (cachedServices) {
-        console.log("[WebServicesStore] Using cached services");
+        logInfo("[WebServicesStore]", "Using cached services");
         const allServices = cachedServices.services || [];
         services.value = allServices.filter((s) => s.enabled);
         services.value.sort((a, b) => a.display_order - b.display_order);
@@ -51,7 +52,7 @@ export const useWebServicesStore = defineStore("webServices", () => {
               `/api/plugins/${plugin.id}`,
             );
             const pluginDetails = pluginDetailsResponse.data;
-            console.log(`[WebServicesStore] Plugin details for ${plugin.id}:`, {
+            logDebug(`[WebServicesStore] Plugin details for ${plugin.id}:`, {
               id: pluginDetails.id,
               name: pluginDetails.name,
               display_schema: pluginDetails.display_schema,
@@ -66,7 +67,7 @@ export const useWebServicesStore = defineStore("webServices", () => {
               // Use plugin's display_schema (from plugin metadata) as it's the source of truth
               const displaySchema =
                 pluginDetails.display_schema || instance.display_schema;
-              console.log(
+              logDebug(
                 `[WebServicesStore] Instance ${instance.id} display_schema:`,
                 displaySchema,
               );
@@ -82,7 +83,7 @@ export const useWebServicesStore = defineStore("webServices", () => {
             });
           } catch (err) {
             // Plugin might not have instances endpoint, skip
-            console.warn(`Failed to get instances for ${plugin.id}:`, err);
+            logWarn("[WebServicesStore]", `Failed to get instances for ${plugin.id}:`, err);
           }
         }
       }
@@ -107,7 +108,7 @@ export const useWebServicesStore = defineStore("webServices", () => {
       };
 
       const allServices = responseData.services || [];
-      console.log(
+      logDebug(
         "[WebServicesStore] All services from API:",
         allServices.map((s) => ({
           id: s.id,
@@ -116,7 +117,7 @@ export const useWebServicesStore = defineStore("webServices", () => {
         })),
       );
       services.value = allServices.filter((s) => s.enabled);
-      console.log(
+      logDebug(
         "[WebServicesStore] Enabled services:",
         services.value.map((s) => ({ id: s.id, name: s.name })),
       );
@@ -136,8 +137,9 @@ export const useWebServicesStore = defineStore("webServices", () => {
       if (connectionStore.isFullyOnline()) {
         const cachedServices = getCachedData(cacheKey, cacheTTL);
         if (cachedServices) {
-          console.log(
-            "[WebServicesStore] Request failed, using cached services",
+          logInfo(
+            "[WebServicesStore]",
+            "Request failed, using cached services",
           );
           const allServices = cachedServices.services || [];
           services.value = allServices.filter((s) => s.enabled);
@@ -151,7 +153,7 @@ export const useWebServicesStore = defineStore("webServices", () => {
       }
 
       error.value = err.message;
-      console.error("Failed to fetch web services:", err);
+      logError("[WebServicesStore]", "Failed to fetch web services:", err);
       throw err;
     } finally {
       loading.value = false;
@@ -191,7 +193,7 @@ export const useWebServicesStore = defineStore("webServices", () => {
       return response.data;
     } catch (err) {
       error.value = err.message;
-      console.error("Failed to add web service:", err);
+      logError("[WebServicesStore]", "Failed to add web service:", err);
       throw err;
     }
   };
@@ -212,7 +214,7 @@ export const useWebServicesStore = defineStore("webServices", () => {
       return response.data;
     } catch (err) {
       error.value = err.message;
-      console.error("Failed to update web service:", err);
+      logError("[WebServicesStore]", "Failed to update web service:", err);
       throw err;
     }
   };
@@ -224,7 +226,7 @@ export const useWebServicesStore = defineStore("webServices", () => {
       await fetchServices();
     } catch (err) {
       error.value = err.message;
-      console.error("Failed to remove web service:", err);
+      logError("[WebServicesStore]", "Failed to remove web service:", err);
       throw err;
     }
   };
@@ -262,10 +264,10 @@ export const useWebServicesStore = defineStore("webServices", () => {
       // Clear from cache utility if it has a clear method
       // For now, just refetch which will overwrite cache
       await fetchServices();
-      console.log("[WebServices] Current service refreshed");
+      logInfo("[WebServices]", "Current service refreshed");
     } catch (err) {
       error.value = err.message;
-      console.error("[WebServices] Failed to refresh current service:", err);
+      logError("[WebServices]", "Failed to refresh current service:", err);
       throw err;
     }
   };

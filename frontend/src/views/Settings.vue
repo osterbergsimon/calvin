@@ -15,14 +15,14 @@
             <button
               class="menu-item"
               title="Restart the backend server"
-              @click="restartBackend"
+              @click="showSystemMenu = false; restartBackend()"
             >
               🔄 Restart Backend
             </button>
             <button
               class="menu-item"
               title="Restart the frontend server"
-              @click="restartFrontend"
+              @click="showSystemMenu = false; restartFrontend()"
             >
               🔄 Restart Frontend
             </button>
@@ -37,6 +37,14 @@
         </div>
         <button class="btn-back" @click="goBack">← Back to Dashboard</button>
       </div>
+    </div>
+
+    <div
+      v-if="updateMessage"
+      class="system-status-banner"
+      :class="updateMessageClass"
+    >
+      {{ updateMessage }}
     </div>
 
     <div class="settings-layout">
@@ -58,6 +66,15 @@
 
       <!-- Main Content -->
       <div class="settings-content">
+        <div v-if="error" class="settings-banner settings-banner-error">
+          {{ error }}
+        </div>
+        <div
+          v-else-if="saveSuccess"
+          class="settings-banner settings-banner-success"
+        >
+          ✓ Saved
+        </div>
         <LayoutCategory
           v-if="activeCategory === 'layout' && localConfig"
           :config="localConfig"
@@ -118,10 +135,12 @@ const activeCategory = ref("layout");
 const showSystemMenu = ref(false);
 
 // Config management
-const { localConfig, loadConfig, updateConfig } = useConfigForm();
+const { localConfig, loadConfig, updateConfig, error, saveSuccess } =
+  useConfigForm();
 
 // System operations
-const { restartBackend, restartFrontend } = useSystem();
+const { restartBackend, restartFrontend, updateMessage, updateMessageClass } =
+  useSystem();
 
 // Version info
 const version = ref(null);
@@ -339,6 +358,54 @@ onMounted(async () => {
 
 .settings-content {
   min-width: 0;
+}
+
+.settings-banner {
+  padding: 0.75rem 1rem;
+  border-radius: 6px;
+  margin-bottom: 1rem;
+  font-weight: 500;
+}
+
+.settings-banner-error {
+  background: rgba(244, 67, 54, 0.15);
+  color: var(--text-primary);
+  border: 1px solid rgba(244, 67, 54, 0.4);
+}
+
+.settings-banner-success {
+  background: rgba(76, 175, 80, 0.15);
+  color: var(--text-primary);
+  border: 1px solid rgba(76, 175, 80, 0.4);
+}
+
+.system-status-banner {
+  padding: 0.75rem 1.5rem;
+  margin-bottom: 1rem;
+  font-size: 0.9rem;
+  font-weight: 500;
+  border-radius: 6px;
+  border: 1px solid transparent;
+}
+.system-status-banner.info {
+  background: rgba(33, 150, 243, 0.1);
+  border-color: rgba(33, 150, 243, 0.3);
+  color: #1565c0;
+}
+.system-status-banner.success {
+  background: rgba(40, 167, 69, 0.1);
+  border-color: rgba(40, 167, 69, 0.3);
+  color: #155724;
+}
+.system-status-banner.warning {
+  background: rgba(255, 193, 7, 0.1);
+  border-color: rgba(255, 193, 7, 0.3);
+  color: #856404;
+}
+.system-status-banner.error {
+  background: rgba(220, 53, 69, 0.1);
+  border-color: rgba(220, 53, 69, 0.3);
+  color: #721c24;
 }
 
 /* Responsive styles */

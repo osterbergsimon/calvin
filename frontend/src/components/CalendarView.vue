@@ -194,6 +194,17 @@ const route = useRoute();
 // Reactive today date that updates periodically to refresh the calendar
 const today = ref(new Date());
 let todayRefreshInterval = null;
+let calendarAutoRefreshInterval = null;
+
+const calendarRefreshIntervalMinutes = computed(
+  () => configStore.calendarRefreshInterval || 15,
+);
+
+const startCalendarAutoRefresh = () => {
+  if (calendarAutoRefreshInterval) clearInterval(calendarAutoRefreshInterval);
+  const ms = calendarRefreshIntervalMinutes.value * 60 * 1000;
+  calendarAutoRefreshInterval = setInterval(() => loadEvents(), ms);
+};
 
 // Load calendar sources on mount
 onMounted(async () => {
@@ -204,12 +215,21 @@ onMounted(async () => {
   todayRefreshInterval = setInterval(() => {
     today.value = new Date();
   }, 60000); // Update every minute
+
+  startCalendarAutoRefresh();
 });
 
 onUnmounted(() => {
   if (todayRefreshInterval) {
     clearInterval(todayRefreshInterval);
   }
+  if (calendarAutoRefreshInterval) {
+    clearInterval(calendarAutoRefreshInterval);
+  }
+});
+
+watch(calendarRefreshIntervalMinutes, () => {
+  startCalendarAutoRefresh();
 });
 
 const currentDate = computed(() => calendarStore.currentDate);
@@ -641,10 +661,8 @@ const isWeekend = (date) => {
 };
 
 // Helper function to check if a date is a red day (holiday)
-// For now, this is a placeholder - actual holiday detection would need backend support
+// Placeholder: holiday detection deferred until backend supports it
 const isRedDay = (_date) => {
-  // TODO: Implement actual holiday detection when backend supports it
-  // This could check against a holidays list or use a holiday API
   return false;
 };
 
@@ -955,13 +973,8 @@ onMounted(() => {
 
 // Reload events when component is activated (if using keep-alive)
 onActivated(() => {
-  // Only reload if events are empty or if we're on the dashboard route
-  if (
-    route.path === "/" &&
-    (events.value.length === 0 || !calendarStore.sources.length)
-  ) {
+  if (route.path === "/") {
     loadEvents();
-    // Also reload sources if they're empty
     if (calendarStore.sources.length === 0) {
       calendarStore.fetchSources();
     }

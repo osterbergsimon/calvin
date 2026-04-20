@@ -264,6 +264,18 @@ describe("NotificationSystem", () => {
       expect(wrapper.find(".notification").exists()).toBe(false);
     });
 
+    it("should not hide success notifications when keyboard feedback is disabled", async () => {
+      configStore.keyboardFeedbackEnabled = false;
+
+      const wrapper = mount(NotificationSystem);
+
+      wrapper.vm.show("success", "✓", "System rebooting…", 5000);
+      await wrapper.vm.$nextTick();
+
+      expect(wrapper.find(".notification").exists()).toBe(true);
+      expect(wrapper.find(".notification-message").text()).toContain("rebooting");
+    });
+
     it("should show mode indicator when UI becomes hidden", async () => {
       configStore.showUI = true;
 

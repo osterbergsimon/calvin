@@ -4,48 +4,70 @@ from unittest.mock import MagicMock, patch
 
 import pytest
 
+from app.api.routes import system as system_routes
+
+
+class _SyncThread:
+    """Runs the thread target synchronously so tests don't need time.sleep."""
+
+    def __init__(self, target=None, daemon=None):
+        self._target = target
+
+    def start(self):
+        if self._target:
+            self._target()
+
 
 @pytest.mark.integration
 class TestSystemRestartEndpoints:
     """Test system restart API endpoints."""
 
+    @patch("app.api.routes.system.threading.Thread", _SyncThread)
+    @patch("app.api.routes.system.time.sleep")
+    @patch("app.api.routes.system._restart_mechanism_available", return_value=True)
+    @patch("app.api.routes.system._RESTART_HELPER")
     @patch("subprocess.run")
-    def test_restart_backend_success(self, mock_run, test_client):
-        """Test successfully restarting the backend service."""
-        # Mock successful systemctl restart
+    def test_restart_backend_success(
+        self, mock_run, mock_helper, _mock_avail, _mock_sleep, test_client
+    ):
+        """Backend restart is scheduled on a thread; subprocess runs after HTTP returns."""
+        mock_helper.is_file.return_value = False
         mock_result = MagicMock()
         mock_result.returncode = 0
         mock_run.return_value = mock_result
 
         response = test_client.post("/api/system/restart-backend")
 
-        # Route might not be available in test client
         if response.status_code == 404:
             pytest.skip("Restart backend route not available in test client")
 
         assert response.status_code == 200
         data = response.json()
         assert data["status"] == "success"
-        assert "restart initiated" in data["message"].lower()
+        assert "scheduled" in data["message"].lower()
 
-        # Verify systemctl was called
         mock_run.assert_called()
         call_args = mock_run.call_args[0][0]
         assert "systemctl" in call_args
         assert "restart" in call_args
         assert "calvin-backend" in call_args
 
+    @patch("app.api.routes.system.threading.Thread", _SyncThread)
+    @patch("app.api.routes.system.time.sleep")
+    @patch("app.api.routes.system._restart_mechanism_available", return_value=True)
+    @patch("app.api.routes.system._RESTART_HELPER")
     @patch("subprocess.run")
-    def test_restart_backend_fallback_to_dbus(self, mock_run, test_client):
-        """Test restart falls back to dbus if systemctl fails."""
-        # Mock systemctl failure, dbus success
-        mock_result_systemctl = MagicMock()
-        mock_result_systemctl.returncode = 1  # systemctl fails
-
-        mock_result_dbus = MagicMock()
-        mock_result_dbus.returncode = 0  # dbus succeeds
-
-        mock_run.side_effect = [mock_result_systemctl, mock_result_dbus]
+    def test_restart_backend_helper_then_systemctl(
+        self, mock_run, mock_helper, _mock_avail, _mock_sleep, test_client
+    ):
+        """Helper script tried first; systemctl used when sudo helper fails."""
+        mock_helper.is_file.return_value = True
+        mock_fail = MagicMock()
+        mock_fail.returncode = 1
+        mock_fail.stderr = "sudo helper failed"
+        mock_ok = MagicMock()
+        mock_ok.returncode = 0
+        mock_run.side_effect = [mock_fail, mock_ok]
 
         response = test_client.post("/api/system/restart-backend")
 
@@ -53,15 +75,32 @@ class TestSystemRestartEndpoints:
             pytest.skip("Restart backend route not available in test client")
 
         assert response.status_code == 200
-        assert mock_run.call_count == 2  # systemctl + dbus
+        assert mock_run.call_count == 2
 
+    @patch("app.api.routes.system._restart_mechanism_available", return_value=False)
+    def test_restart_backend_no_mechanism(self, _mock_avail, test_client):
+        """Immediate error when neither helper nor systemctl is available."""
+        response = test_client.post("/api/system/restart-backend")
+
+        if response.status_code == 404:
+            pytest.skip("Restart backend route not available in test client")
+
+        assert response.status_code == 500
+        assert "restart method" in response.json()["detail"].lower()
+
+    @patch("app.api.routes.system.threading.Thread", _SyncThread)
+    @patch("app.api.routes.system.time.sleep")
+    @patch("app.api.routes.system._restart_mechanism_available", return_value=True)
+    @patch("app.api.routes.system._RESTART_HELPER")
     @patch("subprocess.run")
-    def test_restart_backend_all_methods_fail(self, mock_run, test_client):
-        """Test restart when all methods fail."""
-        # Mock all methods failing
+    def test_restart_backend_background_failure_logged(
+        self, mock_run, mock_helper, _mock_avail, _mock_sleep, test_client
+    ):
+        """HTTP 200 even when restart commands fail (failure only visible in logs)."""
+        mock_helper.is_file.return_value = False
         mock_result = MagicMock()
         mock_result.returncode = 1
-        mock_result.stderr = b"Permission denied"
+        mock_result.stderr = "Permission denied"
         mock_run.return_value = mock_result
 
         response = test_client.post("/api/system/restart-backend")
@@ -69,13 +108,16 @@ class TestSystemRestartEndpoints:
         if response.status_code == 404:
             pytest.skip("Restart backend route not available in test client")
 
-        assert response.status_code == 500
-        assert "failed" in response.json()["detail"].lower()
+        assert response.status_code == 200
+        mock_run.assert_called()
 
+    @patch("app.api.routes.system.threading.Thread", _SyncThread)
+    @patch("app.api.routes.system._restart_mechanism_available", return_value=True)
+    @patch("app.api.routes.system._RESTART_HELPER")
     @patch("subprocess.run")
-    def test_restart_frontend_success(self, mock_run, test_client):
+    def test_restart_frontend_success(self, mock_run, mock_helper, _mock_avail, test_client):
         """Test successfully restarting the frontend service."""
-        # Mock successful systemctl restart
+        mock_helper.is_file.return_value = False
         mock_result = MagicMock()
         mock_result.returncode = 0
         mock_run.return_value = mock_result
@@ -90,22 +132,24 @@ class TestSystemRestartEndpoints:
         assert data["status"] == "success"
         assert "restart initiated" in data["message"].lower()
 
-        # Verify systemctl was called with calvin-frontend
         mock_run.assert_called()
         call_args = mock_run.call_args[0][0]
         assert "calvin-frontend" in call_args
 
+    @patch("app.api.routes.system.threading.Thread", _SyncThread)
+    @patch("app.api.routes.system._restart_mechanism_available", return_value=True)
+    @patch("app.api.routes.system._RESTART_HELPER")
     @patch("subprocess.run")
-    def test_restart_frontend_fallback_to_dbus(self, mock_run, test_client):
-        """Test frontend restart falls back to dbus if systemctl fails."""
-        # Mock systemctl failure, dbus success
-        mock_result_systemctl = MagicMock()
-        mock_result_systemctl.returncode = 1
-
-        mock_result_dbus = MagicMock()
-        mock_result_dbus.returncode = 0
-
-        mock_run.side_effect = [mock_result_systemctl, mock_result_dbus]
+    def test_restart_frontend_helper_then_systemctl(
+        self, mock_run, mock_helper, _mock_avail, test_client
+    ):
+        """Frontend: helper script first, then systemctl."""
+        mock_helper.is_file.return_value = True
+        mock_fail = MagicMock()
+        mock_fail.returncode = 1
+        mock_ok = MagicMock()
+        mock_ok.returncode = 0
+        mock_run.side_effect = [mock_fail, mock_ok]
 
         response = test_client.post("/api/system/restart-frontend")
 
@@ -115,12 +159,18 @@ class TestSystemRestartEndpoints:
         assert response.status_code == 200
         assert mock_run.call_count == 2
 
+    @patch("app.api.routes.system.threading.Thread", _SyncThread)
+    @patch("app.api.routes.system._restart_mechanism_available", return_value=True)
+    @patch("app.api.routes.system._RESTART_HELPER")
     @patch("subprocess.run")
-    def test_restart_frontend_all_methods_fail(self, mock_run, test_client):
-        """Test frontend restart when all methods fail."""
+    def test_restart_frontend_background_failure_logged(
+        self, mock_run, mock_helper, _mock_avail, test_client
+    ):
+        """HTTP 200 even when frontend restart fails (failure only visible in logs)."""
+        mock_helper.is_file.return_value = False
         mock_result = MagicMock()
         mock_result.returncode = 1
-        mock_result.stderr = b"Permission denied"
+        mock_result.stderr = "Permission denied"
         mock_run.return_value = mock_result
 
         response = test_client.post("/api/system/restart-frontend")
@@ -128,8 +178,8 @@ class TestSystemRestartEndpoints:
         if response.status_code == 404:
             pytest.skip("Restart frontend route not available in test client")
 
-        assert response.status_code == 500
-        assert "failed" in response.json()["detail"].lower()
+        assert response.status_code == 200
+        mock_run.assert_called()
 
     def test_reload_ui(self, test_client):
         """Test reload UI endpoint."""
@@ -148,9 +198,10 @@ class TestSystemRestartEndpoints:
 class TestSystemUpdateEndpoints:
     """Test system update API endpoints."""
 
-    def test_get_update_status_no_log(self, test_client):
-        """Test getting update status when no log exists."""
-        response = test_client.get("/api/system/update/status")
+    def test_get_update_status_no_log(self, test_client, tmp_path):
+        """Test getting update status when no log exists (isolate from repo logs)."""
+        with patch.object(system_routes.settings, "repo_dir", tmp_path):
+            response = test_client.get("/api/system/update/status")
 
         if response.status_code == 404:
             pytest.skip("Update status route not available in test client")

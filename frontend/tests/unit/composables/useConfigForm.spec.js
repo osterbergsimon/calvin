@@ -9,6 +9,14 @@ import { useConfigStore } from "@/stores/config";
 import { useKeyboardStore } from "@/stores/keyboard";
 import * as configApi from "@/services/configApi";
 
+const { logErrorMock } = vi.hoisted(() => ({
+  logErrorMock: vi.fn(),
+}));
+
+vi.mock("@/utils/logger", () => ({
+  logError: (...args) => logErrorMock(...args),
+}));
+
 // Mock stores
 vi.mock("@/stores/config", () => ({
   useConfigStore: vi.fn(),
@@ -141,6 +149,11 @@ describe("useConfigForm", () => {
       await form.loadConfig();
 
       expect(form.error.value).toBe("Failed to load configuration");
+      expect(logErrorMock).toHaveBeenCalledWith(
+        "[useConfigForm]",
+        "Failed to load config:",
+        error,
+      );
     });
 
     it("should parse display schedule string", async () => {
@@ -230,6 +243,11 @@ describe("useConfigForm", () => {
 
       expect(form.error.value).toBe("Update failed");
       expect(form.saving.value).toBe(false);
+      expect(logErrorMock).toHaveBeenCalledWith(
+        "[useConfigForm]",
+        "Failed to save config:",
+        error,
+      );
     });
 
     it("should extract error detail from response", async () => {
