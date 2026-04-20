@@ -11,6 +11,24 @@ const updateStatus = ref(null);
 const updateMessage = ref("");
 const updateMessageClass = ref("");
 
+let _clearMsgTimer = null;
+
+const _scheduleMessageClear = (ms = 8000) => {
+  if (_clearMsgTimer) clearTimeout(_clearMsgTimer);
+  _clearMsgTimer = setTimeout(() => {
+    updateMessage.value = "";
+    updateMessageClass.value = "";
+    _clearMsgTimer = null;
+  }, ms);
+};
+
+const _cancelMessageClear = () => {
+  if (_clearMsgTimer) {
+    clearTimeout(_clearMsgTimer);
+    _clearMsgTimer = null;
+  }
+};
+
 export function useSystem() {
   const displayOn = ref(false);
   const displayTimeout = ref(0);
@@ -72,6 +90,7 @@ export function useSystem() {
 
   // System restart
   const restartBackend = async () => {
+    _cancelMessageClear();
     updateMessage.value = "Restarting backend…";
     updateMessageClass.value = "info";
     try {
@@ -83,6 +102,7 @@ export function useSystem() {
         updateMessage.value =
           error.response?.data?.detail || "Failed to restart backend";
         updateMessageClass.value = "error";
+        _scheduleMessageClear(8000);
         console.error("Failed to restart backend:", error);
         return;
       }
@@ -101,10 +121,12 @@ export function useSystem() {
       updateMessage.value =
         "Backend not responding after restart. Check the service manually.";
       updateMessageClass.value = "warning";
+      _scheduleMessageClear(12000);
     }
   };
 
   const restartFrontend = async () => {
+    _cancelMessageClear();
     updateMessage.value = "Restarting frontend…";
     updateMessageClass.value = "info";
     try {
@@ -114,6 +136,7 @@ export function useSystem() {
         updateMessage.value =
           error.response?.data?.detail || "Failed to restart frontend";
         updateMessageClass.value = "error";
+        _scheduleMessageClear(8000);
         console.error("Failed to restart frontend:", error);
         return;
       }
@@ -131,6 +154,7 @@ export function useSystem() {
       updateMessage.value =
         "Frontend not responding after restart. Check the service manually.";
       updateMessageClass.value = "warning";
+      _scheduleMessageClear(12000);
     }
   };
 
@@ -141,6 +165,7 @@ export function useSystem() {
     updateMessageClass.value = "";
 
     try {
+      _cancelMessageClear();
       await systemApi.triggerUpdate();
       updateMessage.value = "Update started. Check status below.";
       updateMessageClass.value = "info";
@@ -153,6 +178,7 @@ export function useSystem() {
         error.message ||
         "Failed to start update";
       updateMessageClass.value = "error";
+      _scheduleMessageClear(8000);
     } finally {
       updating.value = false;
     }
@@ -190,6 +216,7 @@ export function useSystem() {
         if (isUpdateErrorStatus(status.status)) {
           updateMessage.value = `Update failed: ${status.message || "Unknown error"}`;
           updateMessageClass.value = "error";
+          _scheduleMessageClear(8000);
           return;
         }
 
@@ -214,6 +241,7 @@ export function useSystem() {
     updateMessage.value =
       "Update is taking longer than expected. Please check logs or try again later.";
     updateMessageClass.value = "warning";
+    _scheduleMessageClear(12000);
   };
 
   const getUpdateStatus = async () => {

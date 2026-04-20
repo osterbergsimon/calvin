@@ -3,7 +3,7 @@
     <div class="settings-header">
       <h1>Settings & Configuration</h1>
       <div class="header-actions">
-        <div class="system-menu">
+        <div ref="systemMenuRef" class="system-menu">
           <button
             class="btn-system-menu"
             @click="showSystemMenu = !showSystemMenu"
@@ -101,7 +101,7 @@
 </template>
 
 <script setup>
-import { ref, onMounted } from "vue";
+import { ref, onMounted, onUnmounted } from "vue";
 import { useRouter } from "vue-router";
 import { useConfigForm } from "@/composables";
 import { useSystem } from "@/composables";
@@ -185,7 +185,16 @@ const goBack = () => {
 
 // Reload UI
 const reloadUI = () => {
+  showSystemMenu.value = false;
   window.location.reload();
+};
+
+// Click-outside closes the system menu
+const systemMenuRef = ref(null);
+const onDocumentClick = (e) => {
+  if (showSystemMenu.value && !systemMenuRef.value?.contains(e.target)) {
+    showSystemMenu.value = false;
+  }
 };
 
 // Initialize
@@ -194,6 +203,11 @@ onMounted(async () => {
   frontendVersion.value = getFrontendVersionFromMeta();
   // Version comes from config
   version.value = localConfig.value.version;
+  document.addEventListener("click", onDocumentClick, true);
+});
+
+onUnmounted(() => {
+  document.removeEventListener("click", onDocumentClick, true);
 });
 </script>
 

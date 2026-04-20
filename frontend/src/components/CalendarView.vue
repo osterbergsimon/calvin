@@ -195,9 +195,10 @@ const route = useRoute();
 const today = ref(new Date());
 let todayRefreshInterval = null;
 let calendarAutoRefreshInterval = null;
+let lastLoadedAt = 0;
 
 const calendarRefreshIntervalMinutes = computed(
-  () => configStore.calendarRefreshInterval || 15,
+  () => Math.max(1, configStore.calendarRefreshInterval || 15),
 );
 
 const startCalendarAutoRefresh = () => {
@@ -889,6 +890,7 @@ const previousMonth = navigatePrevious;
 const nextMonth = navigateNext;
 
 const loadEvents = async () => {
+  lastLoadedAt = Date.now();
   let startDate, endDate;
   const year = currentDate.value.getFullYear();
   const month = currentDate.value.getMonth();
@@ -971,10 +973,15 @@ onMounted(() => {
   }
 });
 
-// Reload events when component is activated (if using keep-alive)
+// Reload events when component is activated (if using keep-alive).
+// Skip if we loaded less than 30 s ago to avoid redundant API calls
+// when briefly navigating to settings and back.
+const ACTIVATED_DEBOUNCE_MS = 30_000;
 onActivated(() => {
   if (route.path === "/") {
-    loadEvents();
+    if (Date.now() - lastLoadedAt > ACTIVATED_DEBOUNCE_MS) {
+      loadEvents();
+    }
     if (calendarStore.sources.length === 0) {
       calendarStore.fetchSources();
     }

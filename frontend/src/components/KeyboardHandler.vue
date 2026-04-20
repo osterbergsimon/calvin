@@ -14,6 +14,7 @@ import { usePhotoFrameMode } from "../composables/usePhotoFrameMode";
 import { useConfigStore } from "../stores/config";
 import NotificationSystem from "./NotificationSystem.vue";
 import { showSystemRebootScheduled } from "../utils/systemNotifications";
+import { useSystem } from "../composables/useSystem";
 
 const keyboardStore = useKeyboardStore();
 const configStore = useConfigStore();
@@ -210,6 +211,23 @@ watch(
     startKeyboardConfigPolling();
   },
 );
+
+// Surface restart/update status as a toast so it's visible outside Settings
+const { updateMessage, updateMessageClass } = useSystem();
+const _msgClassToNotifType = { info: "info", success: "success", error: "error", warning: "warning" };
+const _msgClassToDuration = { info: 5000, success: 4000, error: 8000, warning: 8000 };
+const _msgClassToIcon = { info: "🔄", success: "✓", error: "✗", warning: "⚠" };
+watch(updateMessage, (msg) => {
+  if (!msg) return;
+  const cls = updateMessageClass.value || "info";
+  const type = _msgClassToNotifType[cls] ?? "info";
+  notificationRef.value?.show(
+    type,
+    _msgClassToIcon[cls] ?? "🔄",
+    msg,
+    _msgClassToDuration[cls] ?? 5000,
+  );
+});
 
 onMounted(async () => {
   // Load keyboard mappings and config
