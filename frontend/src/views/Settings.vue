@@ -15,6 +15,7 @@
             <button
               class="menu-item"
               title="Restart the backend server"
+              :disabled="!!updateMessage"
               @click="showSystemMenu = false; restartBackend()"
             >
               🔄 Restart Backend
@@ -22,6 +23,7 @@
             <button
               class="menu-item"
               title="Restart the frontend server"
+              :disabled="!!updateMessage"
               @click="showSystemMenu = false; restartFrontend()"
             >
               🔄 Restart Frontend
@@ -282,6 +284,11 @@ onMounted(async () => {
 
 .menu-item:hover {
   background: var(--bg-secondary);
+}
+
+.menu-item:disabled {
+  opacity: 0.45;
+  cursor: not-allowed;
 }
 
 .btn-back {

@@ -118,10 +118,20 @@ export function useSystem() {
         return;
       }
     }
-    updateMessage.value = "Frontend restarting — reloading page shortly…";
+    updateMessage.value = "Frontend restarting — waiting for it to come back…";
     updateMessageClass.value = "info";
-    await sleep(4000);
-    window.location.reload();
+    await sleep(2000); // give systemctl time to stop the service
+    const healthy = await waitForBackendHealthy({ timeoutMs: 60000 });
+    if (healthy) {
+      updateMessage.value = "Frontend restarted successfully! Reloading…";
+      updateMessageClass.value = "success";
+      await sleep(1500);
+      window.location.reload();
+    } else {
+      updateMessage.value =
+        "Frontend not responding after restart. Check the service manually.";
+      updateMessageClass.value = "warning";
+    }
   };
 
   // System updates
