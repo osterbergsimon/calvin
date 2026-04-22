@@ -13,7 +13,7 @@ from fastapi import APIRouter, Body, HTTPException
 
 from app.api.routes.plugins.themes import _register_theme_in_db
 from app.plugins.loader import plugin_loader
-from app.services.plugin_installer import plugin_installer
+from app.services.plugin_installer import frontend_build_manager, plugin_installer
 from app.services.theme_installer import theme_installer
 
 logger = logging.getLogger(__name__)
@@ -288,6 +288,11 @@ async def install_plugin_from_github(request: dict[str, Any] = Body(...)):
                     # It just needs a restart to be loaded
 
                 actual_branch = "master" if branch_switched else branch
+                frontend_rebuild_triggered = False
+                if manifest.get("_has_frontend"):
+                    frontend_rebuild_triggered = frontend_build_manager.trigger(
+                        plugin_installer.get_frontend_dir()
+                    )
                 return {
                     "success": True,
                     "message": f"Plugin {manifest['id']} installed successfully from {repo_url}",
@@ -295,6 +300,7 @@ async def install_plugin_from_github(request: dict[str, Any] = Body(...)):
                     "branch": actual_branch,
                     "branch_switched": branch_switched,
                     "requires_restart": True,
+                    "frontend_rebuild_triggered": frontend_rebuild_triggered,
                 }
             else:
                 raise HTTPException(

@@ -19,7 +19,7 @@ from app.plugins.loader import plugin_loader
 from app.plugins.manager import plugin_manager
 from app.services.config_service import config_service
 from app.services.event_system import event_system
-from app.services.plugin_installer import plugin_installer
+from app.services.plugin_installer import frontend_build_manager, plugin_installer
 from app.services.theme_installer import theme_installer
 
 from .themes import BUILTIN_THEMES, _unregister_theme_from_db
@@ -248,6 +248,15 @@ async def inspect_plugin(file: UploadFile = File(...)):
                 pass
 
 
+@router.get("/plugins/frontend-build-status")
+async def get_frontend_build_status():
+    """Return the current status of a background frontend rebuild triggered by plugin install."""
+    return {
+        "status": frontend_build_manager.status,
+        "message": frontend_build_manager.message,
+    }
+
+
 @router.post("/plugins/install")
 async def install_plugin(
     file: UploadFile = File(...),
@@ -300,11 +309,18 @@ async def install_plugin(
                     f"Failed to emit plugin_installed event for plugin {manifest['id']}: {e}"
                 )
 
+            frontend_rebuild_triggered = False
+            if manifest.get("_has_frontend"):
+                frontend_rebuild_triggered = frontend_build_manager.trigger(
+                    plugin_installer.get_frontend_dir()
+                )
+
             return {
                 "success": True,
                 "message": f"Plugin {manifest['id']} installed successfully",
                 "manifest": manifest,
                 "requires_restart": True,
+                "frontend_rebuild_triggered": frontend_rebuild_triggered,
             }
         except ValueError as e:
             raise HTTPException(status_code=400, detail=str(e))

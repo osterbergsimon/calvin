@@ -1,5 +1,21 @@
 <template>
   <div class="plugins-category">
+    <!-- Frontend rebuild banner -->
+    <div
+      v-if="rebuildStatus !== 'idle'"
+      :class="['rebuild-banner', `rebuild-banner--${rebuildStatus}`]"
+    >
+      <span v-if="rebuildStatus === 'building'" class="rebuild-spinner" />
+      <span class="rebuild-banner-text">{{ rebuildMessage }}</span>
+      <button
+        v-if="rebuildStatus === 'done'"
+        class="btn-refresh"
+        @click="() => window.location.reload()"
+      >
+        Refresh Now
+      </button>
+    </div>
+
     <!-- Plugin Installation Section -->
     <CollapsibleSection title="Install New Plugin" icon="📦" :expanded="true">
       <PluginInstaller
@@ -124,7 +140,7 @@
 </template>
 
 <script setup>
-import { ref, computed, onMounted } from "vue";
+import { ref, computed, onMounted, onUnmounted, watch } from "vue";
 import { usePlugins } from "@/composables";
 import { useSystem } from "@/composables";
 import { useImagesStore } from "@/stores/images";
@@ -151,6 +167,7 @@ const {
   pluginRequiresRestart,
   pluginBranchSwitched,
   pluginActualBranch,
+  pluginFrontendRebuildTriggered,
   loadPlugins,
   installPluginFromZip,
   enumeratePluginsFromGitHub,
@@ -209,6 +226,41 @@ const cancelPipInstall = () => {
   showPipWarningModal.value = false;
   pendingInstallAction.value = null;
 };
+
+// Frontend rebuild banner
+const rebuildStatus = ref("idle"); // idle | building | done | error
+const rebuildMessage = ref("");
+let rebuildPollInterval = null;
+
+const stopRebuildPolling = () => {
+  if (rebuildPollInterval) {
+    clearInterval(rebuildPollInterval);
+    rebuildPollInterval = null;
+  }
+};
+
+const pollRebuildStatus = async () => {
+  try {
+    const result = await pluginsApi.getFrontendBuildStatus();
+    rebuildStatus.value = result.status;
+    rebuildMessage.value = result.message;
+    if (result.status !== "building") {
+      stopRebuildPolling();
+    }
+  } catch {
+    // Silently ignore polling errors
+  }
+};
+
+watch(pluginFrontendRebuildTriggered, (triggered) => {
+  if (!triggered) return;
+  rebuildStatus.value = "building";
+  rebuildMessage.value = "Frontend rebuild in progress…";
+  stopRebuildPolling();
+  rebuildPollInterval = setInterval(pollRebuildStatus, 4000);
+});
+
+onUnmounted(stopRebuildPolling);
 
 // Handlers
 const handleZipSelect = async (file) => {
@@ -599,6 +651,70 @@ onMounted(async () => {
 <style scoped>
 .plugins-category {
   width: 100%;
+}
+
+/* Frontend rebuild banner */
+.rebuild-banner {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+  padding: 0.75rem 1rem;
+  border-radius: 6px;
+  margin-bottom: 1rem;
+  font-size: 0.9rem;
+}
+
+.rebuild-banner--building {
+  background: rgba(59, 130, 246, 0.15);
+  border: 1px solid rgba(59, 130, 246, 0.4);
+  color: #93c5fd;
+}
+
+.rebuild-banner--done {
+  background: rgba(34, 197, 94, 0.15);
+  border: 1px solid rgba(34, 197, 94, 0.4);
+  color: #86efac;
+}
+
+.rebuild-banner--error {
+  background: rgba(239, 68, 68, 0.15);
+  border: 1px solid rgba(239, 68, 68, 0.4);
+  color: #fca5a5;
+}
+
+.rebuild-banner-text {
+  flex: 1;
+}
+
+.rebuild-spinner {
+  width: 16px;
+  height: 16px;
+  border: 2px solid currentColor;
+  border-top-color: transparent;
+  border-radius: 50%;
+  animation: spin 0.8s linear infinite;
+  flex-shrink: 0;
+}
+
+@keyframes spin {
+  to {
+    transform: rotate(360deg);
+  }
+}
+
+.btn-refresh {
+  padding: 0.3rem 0.75rem;
+  background: rgba(34, 197, 94, 0.2);
+  color: inherit;
+  border: 1px solid currentColor;
+  border-radius: 4px;
+  cursor: pointer;
+  font-size: 0.85rem;
+  white-space: nowrap;
+}
+
+.btn-refresh:hover {
+  background: rgba(34, 197, 94, 0.35);
 }
 
 /* Pip warning modal — mirrors ConfirmModal layout */

@@ -25,6 +25,7 @@ const pluginInstallSuccess = ref("");
 const pluginRequiresRestart = ref(false);
 const pluginBranchSwitched = ref(false);
 const pluginActualBranch = ref("");
+const pluginFrontendRebuildTriggered = ref(false);
 const expandedPlugins = ref({});
 const pluginFormData = ref({});
 const savingPlugin = ref(null);
@@ -140,7 +141,11 @@ export function usePlugins() {
             imagePluginDisplayOrders.value[plugin.id] = parsedOrder;
           }
         } catch (error) {
-          logError("[usePlugins]", `Failed to load data for plugin ${plugin.id}:`, error);
+          logError(
+            "[usePlugins]",
+            `Failed to load data for plugin ${plugin.id}:`,
+            error,
+          );
           pluginInstances.value[plugin.id] = [];
           pluginConfigs.value[plugin.id] = {};
         }
@@ -164,6 +169,9 @@ export function usePlugins() {
       const response = await pluginsApi.installPluginFromZip(file);
       pluginInstallSuccess.value = "Plugin installed successfully!";
       pluginRequiresRestart.value = response.requires_restart || false;
+      if (response.frontend_rebuild_triggered) {
+        pluginFrontendRebuildTriggered.value = true;
+      }
 
       if (!pluginRequiresRestart.value) {
         setTimeout(() => {
@@ -256,7 +264,11 @@ export function usePlugins() {
       pluginBranchSwitched.value = response.branch_switched || false;
       pluginActualBranch.value = response.branch || branch;
     } catch (error) {
-      logError("[usePlugins]", "Failed to enumerate plugins from GitHub:", error);
+      logError(
+        "[usePlugins]",
+        "Failed to enumerate plugins from GitHub:",
+        error,
+      );
       pluginInstallError.value =
         error.response?.data?.detail ||
         error.message ||
@@ -294,6 +306,9 @@ export function usePlugins() {
       pluginRequiresRestart.value = response.requires_restart || false;
       pluginBranchSwitched.value = response.branch_switched || false;
       pluginActualBranch.value = response.branch || branch;
+      if (response.frontend_rebuild_triggered) {
+        pluginFrontendRebuildTriggered.value = true;
+      }
 
       availablePlugins.value = [];
       await loadPlugins();
@@ -361,6 +376,9 @@ export function usePlugins() {
           if (response.branch_switched) {
             pluginBranchSwitched.value = true;
             pluginActualBranch.value = response.branch || branch;
+          }
+          if (response.frontend_rebuild_triggered) {
+            pluginFrontendRebuildTriggered.value = true;
           }
         } catch (error) {
           results.failed.push({
@@ -513,7 +531,11 @@ export function usePlugins() {
       pluginConfigs.value[pluginId] = cleanedConfig;
       pluginDisplayOrders.value[pluginId] = order;
     } catch (error) {
-      logError("[usePlugins]", `Failed to update order for plugin ${pluginId}:`, error);
+      logError(
+        "[usePlugins]",
+        `Failed to update order for plugin ${pluginId}:`,
+        error,
+      );
       throw error;
     }
   };
@@ -562,7 +584,11 @@ export function usePlugins() {
       const instancesResponse = await pluginsApi.getPluginInstances(pluginId);
       pluginInstances.value[pluginId] = instancesResponse.instances || [];
     } catch (error) {
-      logError("[usePlugins]", `Failed to update instance order for ${pluginId}:`, error);
+      logError(
+        "[usePlugins]",
+        `Failed to update instance order for ${pluginId}:`,
+        error,
+      );
       throw error;
     }
   };
@@ -606,6 +632,7 @@ export function usePlugins() {
     pluginRequiresRestart,
     pluginBranchSwitched,
     pluginActualBranch,
+    pluginFrontendRebuildTriggered,
     expandedPlugins,
     pluginFormData,
     savingPlugin,
