@@ -11,6 +11,10 @@
         <span v-if="hasWeatherData" class="clock-weather-ghost">
           {{ weatherEmoji }} {{ weatherTemp }}{{ weatherUnit }}
         </span>
+        <span
+          v-if="isBackgroundRefreshing"
+          class="clock-refresh-icon clock-refresh-ghost"
+        />
       </div>
 
       <!-- Center: time + date -->
@@ -37,6 +41,11 @@
         <span v-if="hasWeatherData" class="clock-weather">
           {{ weatherEmoji }} {{ weatherTemp }}{{ weatherUnit }}
         </span>
+        <span
+          v-if="isBackgroundRefreshing"
+          class="clock-refresh-icon"
+          aria-hidden="true"
+        />
       </div>
     </div>
   </div>
@@ -47,6 +56,7 @@ import { ref, computed, onMounted, onUnmounted, watch } from "vue";
 import { useConfigStore } from "../stores/config";
 import { useWebServicesStore } from "../stores/webServices";
 import { useWeatherData } from "../composables/useWeatherData";
+import { useCalendarStore } from "../stores/calendar";
 
 defineOptions({
   name: "ClockBarHorizontal",
@@ -189,6 +199,14 @@ const weatherEnabled = computed(
 );
 
 const weatherQuery = useWeatherData(firstWeatherServiceId, weatherEnabled);
+
+const calendarStore = useCalendarStore();
+
+const isBackgroundRefreshing = computed(
+  () =>
+    (weatherQuery.isFetching.value && !weatherQuery.isLoading.value) ||
+    calendarStore.backgroundRefreshing,
+);
 
 const OWM_EMOJI = {
   "01": "☀️",
@@ -458,5 +476,28 @@ onUnmounted(() => {
   font-size: 0.875rem;
   color: var(--text-secondary);
   padding: 0 0.5rem;
+}
+
+.clock-refresh-icon {
+  display: inline-block;
+  width: 0.5rem;
+  height: 0.5rem;
+  border: 1.5px solid var(--text-secondary);
+  border-top-color: transparent;
+  border-radius: 50%;
+  margin: 0 0.5rem;
+  animation: clock-spin 1s linear infinite;
+  flex-shrink: 0;
+}
+
+.clock-refresh-ghost {
+  visibility: hidden;
+  animation: none;
+}
+
+@keyframes clock-spin {
+  to {
+    transform: rotate(360deg);
+  }
 }
 </style>

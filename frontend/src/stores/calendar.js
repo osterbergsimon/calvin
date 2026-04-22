@@ -9,6 +9,7 @@ export const useCalendarStore = defineStore("calendar", () => {
   const events = ref([]);
   const sources = ref([]); // Calendar sources with colors and show_time settings
   const loading = ref(false);
+  const backgroundRefreshing = ref(false);
   const error = ref(null);
   const currentDate = ref(new Date());
   const selectedEvent = ref(null); // Currently selected/expanded event
@@ -99,8 +100,17 @@ export const useCalendarStore = defineStore("calendar", () => {
     return source?.show_time !== false; // Default to true
   };
 
-  const fetchEvents = async (startDate, endDate, refreshParam = "") => {
-    loading.value = true;
+  const fetchEvents = async (
+    startDate,
+    endDate,
+    refreshParam = "",
+    background = false,
+  ) => {
+    if (background) {
+      backgroundRefreshing.value = true;
+    } else {
+      loading.value = true;
+    }
     error.value = null;
 
     const connectionStore = useConnectionStore();
@@ -151,10 +161,7 @@ export const useCalendarStore = defineStore("calendar", () => {
       // Cache the response
       setCachedData(cacheKey, responseData);
 
-      logDebug(
-        "[Calendar]",
-        `Fetched ${events.value.length} events from API`,
-      );
+      logDebug("[Calendar]", `Fetched ${events.value.length} events from API`);
       if (events.value.length > 0) {
         logDebug("[Calendar]", "Sample event:", events.value[0]);
       }
@@ -179,6 +186,7 @@ export const useCalendarStore = defineStore("calendar", () => {
       throw err;
     } finally {
       loading.value = false;
+      backgroundRefreshing.value = false;
     }
   };
 
@@ -410,6 +418,7 @@ export const useCalendarStore = defineStore("calendar", () => {
     events,
     sources,
     loading,
+    backgroundRefreshing,
     error,
     currentDate,
     selectedEvent,

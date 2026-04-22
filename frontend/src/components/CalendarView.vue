@@ -197,14 +197,14 @@ let todayRefreshInterval = null;
 let calendarAutoRefreshInterval = null;
 let lastLoadedAt = 0;
 
-const calendarRefreshIntervalMinutes = computed(
-  () => Math.max(1, configStore.calendarRefreshInterval || 15),
+const calendarRefreshIntervalMinutes = computed(() =>
+  Math.max(1, configStore.calendarRefreshInterval || 15),
 );
 
 const startCalendarAutoRefresh = () => {
   if (calendarAutoRefreshInterval) clearInterval(calendarAutoRefreshInterval);
   const ms = calendarRefreshIntervalMinutes.value * 60 * 1000;
-  calendarAutoRefreshInterval = setInterval(() => loadEvents(), ms);
+  calendarAutoRefreshInterval = setInterval(() => loadEvents(true), ms);
 };
 
 // Load calendar sources on mount
@@ -889,7 +889,7 @@ const navigateNext = () => {
 const previousMonth = navigatePrevious;
 const nextMonth = navigateNext;
 
-const loadEvents = async () => {
+const loadEvents = async (background = false) => {
   lastLoadedAt = Date.now();
   let startDate, endDate;
   const year = currentDate.value.getFullYear();
@@ -938,7 +938,7 @@ const loadEvents = async () => {
     // The cache TTL (5 minutes) and periodic refresh (15 minutes) will keep data fresh
     const refresh = false;
 
-    await calendarStore.fetchEvents(startDate, endDate, refresh);
+    await calendarStore.fetchEvents(startDate, endDate, refresh, background);
     console.log(
       `Loaded ${calendarStore.events.length} events for ${year}-${month + 1} (range: ${startDate.toISOString().split("T")[0]} to ${endDate.toISOString().split("T")[0]})`,
     );
