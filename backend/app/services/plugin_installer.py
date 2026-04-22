@@ -320,19 +320,28 @@ class PluginInstaller:
 
     @staticmethod
     def _resolve_pip() -> list[str]:
-        """Return the best pip invocation for the running venv.
+        """Return the best pip invocation prefix for the running venv.
 
-        Prefers the pip/pip3 binary sitting next to sys.executable so it
-        works even when pip is not importable as a module (e.g. when the
-        venv was created without ensurepip).  Falls back to -m pip as a
-        last resort.
+        Resolution order:
+        1. uv pip --python <exe>   — UV-managed venvs (no pip binary installed)
+        2. bin/pip or bin/pip3     — conventional venvs with a pip binary
+        3. python -m pip           — last resort
+
+        The returned list is prepended to ["install", <package>].
         """
+        # 1. Prefer uv when available — works even when pip is absent from the venv
+        uv = shutil.which("uv")
+        if uv:
+            return [uv, "pip", "--python", sys.executable]
+
+        # 2. pip/pip3 binary sitting next to the interpreter
         bin_dir = Path(sys.executable).parent
         for candidate in ("pip", "pip3"):
             pip_bin = bin_dir / candidate
             if pip_bin.exists():
                 return [str(pip_bin)]
-        # Last resort: hope -m pip works
+
+        # 3. Last resort
         return [sys.executable, "-m", "pip"]
 
     def uninstall_plugin(self, plugin_id: str) -> None:
