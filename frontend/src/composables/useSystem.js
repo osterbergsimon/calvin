@@ -159,18 +159,105 @@ export function useSystem() {
   };
 
   // System updates
+
+  const streamUpdateStatus = (logOffset) => {
+    return new Promise((resolve) => {
+      const es = new EventSource(systemApi.getUpdateStreamUrl(logOffset));
+      const logLines = [];
+
+      es.onmessage = (event) => {
+        try {
+          const data = JSON.parse(event.data);
+          if (data.type === "log") {
+            logLines.push(data.line);
+            updateStatus.value = {
+              ...(updateStatus.value || {}),
+              status: "running",
+              last_log: logLines.slice(-80).join("\n"),
+            };
+            const line = data.line.toLowerCase();
+            if (
+              line.includes("pulling latest code") ||
+              line.includes("fetching latest")
+            ) {
+              updateMessage.value = "Pulling latest code...";
+            } else if (
+              line.includes("updating") &&
+              line.includes("dependenc")
+            ) {
+              updateMessage.value = "Updating dependencies...";
+            } else if (
+              line.includes("building frontend") ||
+              (line.includes("vite") && line.includes("build"))
+            ) {
+              updateMessage.value =
+                "Building frontend... (this may take a few minutes)";
+            } else if (line.includes("restarting")) {
+              updateMessage.value = "Restarting services...";
+            }
+            updateMessageClass.value = "info";
+          } else if (data.type === "status") {
+            es.close();
+            resolve(data);
+          } else if (data.type === "timeout") {
+            es.close();
+            resolve({ status: "timeout" });
+          }
+        } catch {
+          // ignore parse errors
+        }
+      };
+
+      es.onerror = () => {
+        es.close();
+        resolve({ status: "disconnected" });
+      };
+    });
+  };
+
   const triggerUpdate = async () => {
     updating.value = true;
     updateMessage.value = "";
     updateMessageClass.value = "";
+    updateStatus.value = null;
+    _cancelMessageClear();
 
     try {
-      _cancelMessageClear();
-      await systemApi.triggerUpdate();
-      updateMessage.value = "Update started. Check status below.";
+      const response = await systemApi.triggerUpdate();
+      const logOffset = response.log_offset ?? 0;
+      updateMessage.value = "Update started...";
       updateMessageClass.value = "info";
-      // Poll for update status
-      await pollUpdateStatus();
+      updateStatus.value = {
+        status: "running",
+        last_log: "",
+        message: "Starting...",
+      };
+
+      const result = await streamUpdateStatus(logOffset);
+
+      if (result.status === "complete" || result.status === "disconnected") {
+        updateMessage.value =
+          "Update complete. Waiting for backend to come back\u2026";
+        updateMessageClass.value = "info";
+        const healthy = await waitForBackendHealthy();
+        if (healthy) {
+          updateMessage.value = "Update completed successfully!";
+          updateMessageClass.value = "success";
+        } else {
+          updateMessage.value =
+            "Update completed, but backend is not responding yet. Please wait or check logs.";
+          updateMessageClass.value = "warning";
+        }
+      } else if (result.status === "error") {
+        updateMessage.value = `Update failed: ${result.message || "Check logs for details."}`;
+        updateMessageClass.value = "error";
+        _scheduleMessageClear(8000);
+      } else {
+        updateMessage.value =
+          "Update is taking longer than expected. Please check logs or try again later.";
+        updateMessageClass.value = "warning";
+        _scheduleMessageClear(12000);
+      }
     } catch (error) {
       console.error("Failed to trigger update:", error);
       updateMessage.value =
@@ -271,6 +358,7 @@ export function useSystem() {
     restartBackend,
     restartFrontend,
     triggerUpdate,
+    streamUpdateStatus,
     getUpdateStatus,
     pollUpdateStatus,
   };

@@ -235,6 +235,49 @@ async def get_plugin_instances(plugin_id: str):
     return {"instances": instances, "total": len(instances)}
 
 
+@router.delete("/plugins/instances/{instance_id}")
+async def delete_plugin_instance(instance_id: str):
+    db_plugin = await PluginDB.objects.get_or_none(id=instance_id)
+
+    if not db_plugin:
+        raise HTTPException(
+            status_code=404, detail=f"Plugin instance {instance_id} not found in database"
+        )
+
+    plugin = plugin_manager.get_plugin(instance_id)
+    if plugin:
+        if plugin.is_running():
+            try:
+                plugin.stop()
+                from app.plugins.protocols import BackendPlugin
+                from app.services.backend_scheduler import backend_plugin_scheduler
+
+                if isinstance(plugin, BackendPlugin):
+                    await backend_plugin_scheduler.unregister_plugin_tasks(instance_id)
+                await plugin.cleanup()
+            except Exception as e:
+                logger.warning(f"Error stopping plugin {instance_id} during delete: {e}")
+        await plugin_manager.unregister(instance_id)
+
+    type_id = db_plugin.type_id
+    await db_plugin.delete()
+
+    try:
+        await event_system.emit_event(
+            "plugin_instance_deleted",
+            {
+                "instance_id": instance_id,
+                "plugin_id": type_id,
+                "deleted_at": datetime.now(UTC).isoformat(),
+            },
+            wait_for_handlers=False,
+        )
+    except Exception as e:
+        logger.warning(f"Failed to emit plugin_instance_deleted event for {instance_id}: {e}")
+
+    return {"success": True, "message": f"Plugin instance {instance_id} deleted successfully"}
+
+
 @router.put("/plugins/instances/{instance_id}")
 async def update_plugin_instance(instance_id: str, instance_data: dict[str, Any] = Body(...)):
     """

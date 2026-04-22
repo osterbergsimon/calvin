@@ -174,31 +174,37 @@
           </div>
           <div class="plugin-actions">
             <button
-              v-if="plugin._installed"
+              v-if="
+                plugin._installed &&
+                plugin._installedVersion &&
+                plugin.version &&
+                plugin._installedVersion !== plugin.version
+              "
               type="button"
-              class="btn-force-update"
-              :disabled="installing"
-              @click="handleForceUpdate(plugin.path)"
-              title="Force reinstall (even if already on newest version)"
-            >
-              🔄 Force Update
-            </button>
-            <button
-              type="button"
-              class="btn-install"
-              :class="{
-                'btn-update': plugin._installed,
-              }"
+              class="btn-install btn-update"
               :disabled="installing"
               @click="handleInstall(plugin.path)"
             >
-              {{
-                installing
-                  ? "Installing..."
-                  : plugin._installed
-                    ? "🔄 Update"
-                    : "⬇️ Install"
-              }}
+              {{ installing ? "Installing..." : "🔄 Update" }}
+            </button>
+            <button
+              v-else-if="plugin._installed"
+              type="button"
+              class="btn-install btn-reinstall"
+              :disabled="installing"
+              @click="handleForceUpdate(plugin.path)"
+              title="Reinstall this plugin"
+            >
+              {{ installing ? "Installing..." : "🔁 Reinstall" }}
+            </button>
+            <button
+              v-else
+              type="button"
+              class="btn-install"
+              :disabled="installing"
+              @click="handleInstall(plugin.path)"
+            >
+              {{ installing ? "Installing..." : "⬇️ Install" }}
             </button>
           </div>
         </div>
@@ -818,10 +824,11 @@ watch(searchQuery, () => {
   background: #ffb300 !important;
 }
 
-.btn-force-update {
+.btn-reinstall {
   padding: 0.5rem 1rem;
-  background: #ff9800;
-  color: white;
+  background: var(--bg-secondary);
+  color: var(--text-primary);
+  border: 1px solid var(--border-color);
   border: none;
   border-radius: 4px;
   font-size: 0.875rem;
@@ -831,13 +838,12 @@ watch(searchQuery, () => {
   white-space: nowrap;
 }
 
-.btn-force-update:hover:not(:disabled) {
-  background: #f57c00;
-  transform: translateY(-1px);
-  box-shadow: 0 2px 4px var(--shadow);
+.btn-reinstall:hover:not(:disabled) {
+  background: var(--bg-tertiary);
+  border-color: var(--accent-primary);
 }
 
-.btn-force-update:disabled {
+.btn-reinstall:disabled {
   opacity: 0.6;
   cursor: not-allowed;
   transform: none;

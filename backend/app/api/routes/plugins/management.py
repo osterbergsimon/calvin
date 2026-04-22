@@ -388,6 +388,30 @@ async def uninstall_plugin(plugin_id: str):
             # Uninstall regular plugin
             plugin_installer.uninstall_plugin(plugin_id)
 
+            # Stop and delete all instances of this plugin type
+            db_instances = await PluginDB.objects.filter(type_id=plugin_id).all()
+            for db_instance in db_instances:
+                plugin = plugin_manager.get_plugin(db_instance.id)
+                if plugin:
+                    if plugin.is_running():
+                        try:
+                            plugin.stop()
+                            from app.plugins.protocols import BackendPlugin
+                            from app.services.backend_scheduler import backend_plugin_scheduler
+
+                            if isinstance(plugin, BackendPlugin):
+                                await backend_plugin_scheduler.unregister_plugin_tasks(
+                                    db_instance.id
+                                )
+                            await plugin.cleanup()
+                        except Exception as e:
+                            logger.warning(
+                                f"Error stopping instance {db_instance.id} during uninstall: {e}"
+                            )
+                    await plugin_manager.unregister(db_instance.id)
+                await db_instance.delete()
+                logger.info(f"Removed plugin instance {db_instance.id} from database")
+
             # Remove plugin from database (plugin_types table)
             # Only remove if it exists in the database
             # This ensures the plugin won't show up after uninstalling

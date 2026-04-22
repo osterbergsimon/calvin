@@ -1,5 +1,7 @@
 """System management endpoints."""
 
+import asyncio
+import json
 import logging
 import os
 import re
@@ -10,6 +12,7 @@ import time
 from pathlib import Path
 
 from fastapi import APIRouter, HTTPException
+from fastapi.responses import StreamingResponse
 
 from app.config import settings
 from app.services.display_power_service import display_power_service
@@ -84,6 +87,22 @@ def _attempt_restart_calvin_service(service: str) -> bool:
     return False
 
 
+_UPDATE_LOG_LOCATIONS = [
+    lambda: settings.repo_dir / "backend" / "logs" / "calvin-update.log",
+    lambda: settings.repo_dir.parent / "calvin-update.log",
+    lambda: Path("/tmp/calvin-update.log"),
+    lambda: Path("/var/log/calvin-update.log"),
+]
+
+
+def _find_update_log() -> Path | None:
+    for loc_fn in _UPDATE_LOG_LOCATIONS:
+        p = loc_fn()
+        if p.exists():
+            return p
+    return None
+
+
 @router.post("/update")
 async def trigger_update():
     """
@@ -108,6 +127,10 @@ async def trigger_update():
         log_dir = settings.repo_dir / "backend" / "logs"
         log_dir.mkdir(parents=True, exist_ok=True)
         log_file = log_dir / "calvin-update.log"
+
+        # Capture current end-of-file position so the stream endpoint knows
+        # where this run's output begins (the log is appended, not truncated).
+        log_offset = int(log_file.stat().st_size) if log_file.exists() else 0
 
         # Run update script in background (non-blocking)
         # Redirect both stdout and stderr to log file AND keep them for error checking
@@ -153,6 +176,7 @@ async def trigger_update():
             "message": f"Update process started (PID: {process.pid})",
             "pid": process.pid,
             "log_file": str(log_file),
+            "log_offset": log_offset,
         }
     except HTTPException:
         raise
@@ -166,19 +190,7 @@ async def get_update_status():
     Get the status of the last update.
     Reads the last few lines from the update log.
     """
-    # Try multiple possible log file locations
-    log_locations = [
-        settings.repo_dir / "backend" / "logs" / "calvin-update.log",
-        settings.repo_dir.parent / "calvin-update.log",
-        Path("/tmp/calvin-update.log"),
-        Path("/var/log/calvin-update.log"),
-    ]
-
-    log_file = None
-    for loc in log_locations:
-        if loc.exists():
-            log_file = loc
-            break
+    log_file = _find_update_log()
 
     if not log_file or not log_file.exists():
         return {
@@ -390,6 +402,69 @@ async def get_update_status():
             "new_commit_msg": None,
             "backend_restarted": False,
         }
+
+
+@router.get("/update/stream")
+async def stream_update_log(log_offset: int = 0):
+    """Stream update log output as Server-Sent Events starting from log_offset bytes."""
+
+    async def event_generator():
+        current_pos = log_offset
+        start_time = time.time()
+        last_activity = time.time()
+        last_keepalive = time.time()
+        timeout_sec = 10 * 60
+        inactivity_timeout_sec = 90
+        has_started = False
+
+        while time.time() - start_time < timeout_sec:
+            if time.time() - last_keepalive > 15:
+                yield ": keepalive\n\n"
+                last_keepalive = time.time()
+
+            log_file = _find_update_log()
+            if log_file:
+                try:
+                    with open(log_file, "rb") as f:
+                        f.seek(current_pos)
+                        new_bytes = f.read()
+                    if new_bytes:
+                        current_pos += len(new_bytes)
+                        last_activity = time.time()
+                        new_content = new_bytes.decode("utf-8", errors="replace")
+                        for line in new_content.splitlines():
+                            if line.strip():
+                                yield f"data: {json.dumps({'type': 'log', 'line': line})}\n\n"
+                        content_lower = new_content.lower()
+                        if "starting calvin" in content_lower and "update" in content_lower:
+                            has_started = True
+                        if (
+                            "update complete!" in content_lower
+                            or "production update complete!" in content_lower
+                            or "development update complete!" in content_lower
+                        ):
+                            yield f"data: {json.dumps({'type': 'status', 'status': 'complete'})}\n\n"
+                            return
+                except Exception as e:
+                    yield f"data: {json.dumps({'type': 'log', 'line': f'[stream error: {e}]'})}\n\n"
+
+            if has_started and (time.time() - last_activity) > inactivity_timeout_sec:
+                yield f"data: {json.dumps({'type': 'status', 'status': 'error', 'message': 'Update appears to have stalled or failed. Check logs.'})}\n\n"
+                return
+
+            await asyncio.sleep(1)
+
+        yield f"data: {json.dumps({'type': 'timeout'})}\n\n"
+
+    return StreamingResponse(
+        event_generator(),
+        media_type="text/event-stream",
+        headers={
+            "Cache-Control": "no-cache",
+            "X-Accel-Buffering": "no",
+            "Connection": "keep-alive",
+        },
+    )
 
 
 @router.post("/display/power/on")

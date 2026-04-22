@@ -63,6 +63,14 @@ export async function getUpdateStatus() {
 }
 
 /**
+ * Return the SSE URL for streaming update log output from a given byte offset.
+ */
+export function getUpdateStreamUrl(logOffset = 0) {
+  const base = import.meta.env.VITE_API_URL || "/api";
+  return `${base}/system/update/stream?log_offset=${logOffset}`;
+}
+
+/**
  * Basic backend health check.
  */
 export async function getHealth() {
