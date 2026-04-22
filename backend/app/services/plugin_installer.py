@@ -303,7 +303,7 @@ class PluginInstaller:
         for req in requirements:
             try:
                 result = subprocess.run(
-                    [*pip_cmd, "install", req],
+                    [*pip_cmd, req],
                     capture_output=True,
                     text=True,
                     timeout=120,
@@ -323,26 +323,26 @@ class PluginInstaller:
         """Return the best pip invocation prefix for the running venv.
 
         Resolution order:
-        1. uv pip --python <exe>   — UV-managed venvs (no pip binary installed)
-        2. bin/pip or bin/pip3     — conventional venvs with a pip binary
-        3. python -m pip           — last resort
+        1. uv pip install --python <exe>   — UV-managed venvs (no pip binary installed)
+        2. bin/pip install / bin/pip3 install — conventional venvs with a pip binary
+        3. python -m pip install           — last resort
 
-        The returned list is prepended to ["install", <package>].
+        The returned list already includes "install"; append only the package name.
         """
         # 1. Prefer uv when available — works even when pip is absent from the venv
         uv = shutil.which("uv")
         if uv:
-            return [uv, "pip", "--python", sys.executable]
+            return [uv, "pip", "install", "--python", sys.executable]
 
         # 2. pip/pip3 binary sitting next to the interpreter
         bin_dir = Path(sys.executable).parent
         for candidate in ("pip", "pip3"):
             pip_bin = bin_dir / candidate
             if pip_bin.exists():
-                return [str(pip_bin)]
+                return [str(pip_bin), "install"]
 
         # 3. Last resort
-        return [sys.executable, "-m", "pip"]
+        return [sys.executable, "-m", "pip", "install"]
 
     def uninstall_plugin(self, plugin_id: str) -> None:
         """
