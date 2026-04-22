@@ -1,7 +1,10 @@
 """Plugin installation service for managing installed plugins."""
 
 import json
+import logging
 import shutil
+import subprocess
+import sys
 import zipfile
 from pathlib import Path
 from typing import Any
@@ -15,6 +18,8 @@ from app.services.validation import (
     validate_plugin_type,
     validate_zip_structure,
 )
+
+logger = logging.getLogger(__name__)
 
 
 class PluginInstaller:
@@ -258,6 +263,11 @@ class PluginInstaller:
                     shutil.rmtree(frontend_dest)
                 shutil.copytree(frontend_source, frontend_dest)
 
+            # Install plugin-specific Python packages
+            installed_packages = self._install_pip_requirements(manifest)
+            if installed_packages:
+                manifest["_installed_packages"] = installed_packages
+
             # Save manifest
             manifest_path = plugin_path / "plugin.json"
             with open(manifest_path, "w", encoding="utf-8") as f:
@@ -273,6 +283,36 @@ class PluginInstaller:
             if frontend_path.exists():
                 shutil.rmtree(frontend_path)
             raise ValueError(f"Failed to install plugin: {e}") from e
+
+    def _install_pip_requirements(self, manifest: dict[str, Any]) -> list[str]:
+        """Install Python packages declared in plugin.json under python_dependencies.
+
+        Uses the running interpreter so the packages land in the correct venv.
+        Raises ValueError if any package fails to install so the caller can roll back.
+        """
+        requirements: list[str] = manifest.get("python_dependencies", [])
+        if not requirements:
+            return []
+
+        logger.info(f"Installing pip packages for plugin {manifest.get('id')}: {requirements}")
+        installed: list[str] = []
+        for req in requirements:
+            try:
+                result = subprocess.run(
+                    [sys.executable, "-m", "pip", "install", req],
+                    capture_output=True,
+                    text=True,
+                    timeout=120,
+                )
+                if result.returncode == 0:
+                    logger.info(f"Installed: {req}")
+                    installed.append(req)
+                else:
+                    raise ValueError(f"pip install failed for '{req}':\n{result.stderr.strip()}")
+            except subprocess.TimeoutExpired:
+                raise ValueError(f"Timed out installing package '{req}' (120s limit)")
+
+        return installed
 
     def uninstall_plugin(self, plugin_id: str) -> None:
         """

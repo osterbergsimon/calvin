@@ -80,6 +80,19 @@ export async function stopPluginInstance(instanceId) {
 }
 
 /**
+ * Read plugin.json from a zip without installing it.
+ * Returns the manifest so callers can inspect python_dependencies before committing.
+ */
+export async function inspectPluginZip(file) {
+  const formData = new FormData();
+  formData.append("file", file);
+  const response = await api.post("/plugins/inspect", formData, {
+    headers: { "Content-Type": "multipart/form-data" },
+  });
+  return response.data;
+}
+
+/**
  * Install plugin from zip file.
  */
 export async function installPluginFromZip(file) {

@@ -125,6 +125,8 @@ async def get_plugins(
                 # Whether plugin supports multiple instances
                 # (defaults to True for backward compatibility)
                 "supports_multiple_instances": type_info.get("supports_multiple_instances", True),
+                # Human-readable label for a single instance (e.g. "Location", "Device")
+                "instance_label": type_info.get("instance_label"),
             }
 
             # Include error message if plugin is broken
@@ -215,6 +217,35 @@ async def get_installed_plugins():
         return {"plugins": plugins + themes}
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"Failed to get installed plugins: {str(e)}")
+
+
+@router.post("/plugins/inspect")
+async def inspect_plugin(file: UploadFile = File(...)):
+    """
+    Read plugin.json from a zip without installing it.
+
+    Returns the manifest so the caller can check python_dependencies and
+    show a security warning before committing to an install.
+    """
+    if not file.filename:
+        raise HTTPException(status_code=400, detail="No file provided")
+
+    temp_path = None
+    try:
+        with tempfile.NamedTemporaryFile(delete=False, suffix=".zip") as temp_file:
+            shutil.copyfileobj(file.file, temp_file)
+            temp_path = Path(temp_file.name)
+
+        manifest = plugin_installer.validate_plugin_package(temp_path)
+        return {"manifest": manifest}
+    except ValueError as e:
+        raise HTTPException(status_code=400, detail=str(e))
+    finally:
+        if temp_path and temp_path.exists():
+            try:
+                temp_path.unlink()
+            except (PermissionError, OSError):
+                pass
 
 
 @router.post("/plugins/install")

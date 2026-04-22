@@ -81,6 +81,45 @@
       @confirm="confirmUninstall"
       @cancel="cancelUninstall"
     />
+
+    <!-- Pip Security Warning Modal -->
+    <div
+      v-if="showPipWarningModal"
+      class="modal-overlay"
+      @click.self="cancelPipInstall"
+    >
+      <div class="modal-content pip-warning-modal">
+        <div class="modal-header">
+          <h3>⚠️ Security Warning</h3>
+          <button class="btn-close-modal" @click="cancelPipInstall">×</button>
+        </div>
+        <div class="modal-body">
+          <p>
+            <strong>{{ pipWarningPluginName }}</strong> requires installing the
+            following Python
+            {{ pipWarningPackages.length === 1 ? "package" : "packages" }}
+            into the server environment:
+          </p>
+          <ul class="pip-package-list">
+            <li v-for="pkg in pipWarningPackages" :key="pkg">
+              <code>{{ pkg }}</code>
+            </li>
+          </ul>
+          <p class="pip-warning-text">
+            Only install plugins from sources you trust. A malicious pip package
+            can execute arbitrary code on your server.
+          </p>
+        </div>
+        <div class="modal-footer">
+          <button class="btn-secondary" @click="cancelPipInstall">
+            Cancel
+          </button>
+          <button class="btn-danger" @click="confirmPipInstall">
+            Install Anyway
+          </button>
+        </div>
+      </div>
+    </div>
   </div>
 </template>
 
@@ -146,8 +185,45 @@ const hasInstalledThemes = computed(() => {
   return plugins.value.some((p) => p.type === "theme" && p._installed);
 });
 
+// Pip security warning modal state
+const showPipWarningModal = ref(false);
+const pipWarningPackages = ref([]);
+const pipWarningPluginName = ref("");
+const pendingInstallAction = ref(null);
+
+const triggerPipWarning = (packages, pluginName, onConfirm) => {
+  pipWarningPackages.value = [...new Set(packages)];
+  pipWarningPluginName.value = pluginName;
+  pendingInstallAction.value = onConfirm;
+  showPipWarningModal.value = true;
+};
+
+const confirmPipInstall = async () => {
+  showPipWarningModal.value = false;
+  const action = pendingInstallAction.value;
+  pendingInstallAction.value = null;
+  if (action) await action();
+};
+
+const cancelPipInstall = () => {
+  showPipWarningModal.value = false;
+  pendingInstallAction.value = null;
+};
+
 // Handlers
 const handleZipSelect = async (file) => {
+  try {
+    const result = await pluginsApi.inspectPluginZip(file);
+    const deps = result.manifest?.python_dependencies ?? [];
+    if (deps.length > 0) {
+      triggerPipWarning(deps, result.manifest?.name ?? file.name, () =>
+        installPluginFromZip(file),
+      );
+      return;
+    }
+  } catch {
+    // Inspection failed — let the install endpoint surface the real error
+  }
   await installPluginFromZip(file);
 };
 
@@ -156,15 +232,51 @@ const handleListPlugins = async ({ repoUrl, branch }) => {
 };
 
 const handleInstall = async ({ path, repoUrl, branch, force }) => {
-  await installPluginFromGitHub(repoUrl, path, branch, force);
+  const plugin = availablePlugins.value.find((p) => p.path === path);
+  const deps = plugin?.manifest?.python_dependencies ?? [];
+  const doInstall = () => installPluginFromGitHub(repoUrl, path, branch, force);
+  if (deps.length > 0) {
+    triggerPipWarning(deps, plugin?.name ?? path, doInstall);
+    return;
+  }
+  await doInstall();
 };
 
 const handleForceUpdate = async ({ path, repoUrl, branch }) => {
-  await installPluginFromGitHub(repoUrl, path, branch, true);
+  const plugin = availablePlugins.value.find((p) => p.path === path);
+  const deps = plugin?.manifest?.python_dependencies ?? [];
+  const doInstall = () => installPluginFromGitHub(repoUrl, path, branch, true);
+  if (deps.length > 0) {
+    triggerPipWarning(deps, plugin?.name ?? path, doInstall);
+    return;
+  }
+  await doInstall();
 };
 
-const handleInstallSelected = async ({ plugins, repoUrl, branch }) => {
-  await installPluginsFromGitHub(plugins, repoUrl, branch);
+const handleInstallSelected = async ({
+  plugins: pluginsToInstall,
+  repoUrl,
+  branch,
+}) => {
+  const allDeps = [];
+  const names = [];
+  for (const { path, id } of pluginsToInstall) {
+    const p = availablePlugins.value.find(
+      (ap) => ap.id === id || ap.path === path,
+    );
+    const deps = p?.manifest?.python_dependencies ?? [];
+    if (deps.length > 0) {
+      allDeps.push(...deps);
+      names.push(p?.name ?? id);
+    }
+  }
+  const doInstall = () =>
+    installPluginsFromGitHub(pluginsToInstall, repoUrl, branch);
+  if (allDeps.length > 0) {
+    triggerPipWarning(allDeps, names.join(", "), doInstall);
+    return;
+  }
+  await doInstall();
 };
 
 const handleRestart = async () => {
@@ -487,5 +599,147 @@ onMounted(async () => {
 <style scoped>
 .plugins-category {
   width: 100%;
+}
+
+/* Pip warning modal — mirrors ConfirmModal layout */
+.modal-overlay {
+  position: fixed;
+  inset: 0;
+  background: rgba(0, 0, 0, 0.5);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 1000;
+}
+
+.modal-content {
+  background: var(--bg-primary);
+  border-radius: 8px;
+  box-shadow: 0 4px 20px rgba(0, 0, 0, 0.3);
+  max-width: 480px;
+  width: 90%;
+  max-height: 90vh;
+  overflow: auto;
+  display: flex;
+  flex-direction: column;
+}
+
+.modal-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 1.25rem;
+  border-bottom: 1px solid var(--border-color);
+}
+
+.modal-header h3 {
+  margin: 0;
+  font-size: 1.1rem;
+  font-weight: 600;
+  color: var(--text-primary);
+}
+
+.btn-close-modal {
+  background: none;
+  border: none;
+  font-size: 1.5rem;
+  color: var(--text-secondary);
+  cursor: pointer;
+  padding: 0;
+  width: 2rem;
+  height: 2rem;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 4px;
+}
+
+.btn-close-modal:hover {
+  background: var(--bg-secondary);
+  color: var(--text-primary);
+}
+
+.modal-body {
+  padding: 1.25rem;
+  display: flex;
+  flex-direction: column;
+  gap: 0.75rem;
+}
+
+.modal-body p {
+  margin: 0;
+  color: var(--text-primary);
+  line-height: 1.5;
+  font-size: 0.9rem;
+}
+
+.pip-package-list {
+  margin: 0;
+  padding-left: 1.25rem;
+  display: flex;
+  flex-direction: column;
+  gap: 0.25rem;
+}
+
+.pip-package-list li {
+  font-size: 0.875rem;
+}
+
+.pip-package-list code {
+  background: var(--bg-tertiary);
+  border: 1px solid var(--border-color);
+  border-radius: 4px;
+  padding: 0.1rem 0.4rem;
+  font-family: monospace;
+  font-size: 0.85rem;
+  color: var(--text-primary);
+}
+
+.pip-warning-text {
+  color: #856404 !important;
+  background: rgba(255, 193, 7, 0.1);
+  border: 1px solid rgba(255, 193, 7, 0.3);
+  border-radius: 4px;
+  padding: 0.6rem 0.75rem;
+}
+
+.modal-footer {
+  display: flex;
+  justify-content: flex-end;
+  gap: 0.75rem;
+  padding: 1.25rem;
+  border-top: 1px solid var(--border-color);
+}
+
+.btn-secondary {
+  padding: 0.5rem 1rem;
+  background: var(--bg-secondary);
+  color: var(--text-primary);
+  border: 1px solid var(--border-color);
+  border-radius: 4px;
+  font-size: 0.9rem;
+  font-weight: 500;
+  cursor: pointer;
+  transition: all 0.2s;
+}
+
+.btn-secondary:hover {
+  background: var(--bg-tertiary);
+}
+
+.btn-danger {
+  padding: 0.5rem 1rem;
+  background: #dc3545;
+  color: white;
+  border: none;
+  border-radius: 4px;
+  font-size: 0.9rem;
+  font-weight: 600;
+  cursor: pointer;
+  transition: all 0.2s;
+}
+
+.btn-danger:hover {
+  background: #c82333;
 }
 </style>
