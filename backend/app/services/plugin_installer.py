@@ -294,12 +294,16 @@ class PluginInstaller:
         if not requirements:
             return []
 
-        logger.info(f"Installing pip packages for plugin {manifest.get('id')}: {requirements}")
+        pip_cmd = self._resolve_pip()
+        logger.info(
+            f"Installing pip packages for plugin {manifest.get('id')} "
+            f"using {pip_cmd}: {requirements}"
+        )
         installed: list[str] = []
         for req in requirements:
             try:
                 result = subprocess.run(
-                    [sys.executable, "-m", "pip", "install", req],
+                    [*pip_cmd, "install", req],
                     capture_output=True,
                     text=True,
                     timeout=120,
@@ -313,6 +317,23 @@ class PluginInstaller:
                 raise ValueError(f"Timed out installing package '{req}' (120s limit)")
 
         return installed
+
+    @staticmethod
+    def _resolve_pip() -> list[str]:
+        """Return the best pip invocation for the running venv.
+
+        Prefers the pip/pip3 binary sitting next to sys.executable so it
+        works even when pip is not importable as a module (e.g. when the
+        venv was created without ensurepip).  Falls back to -m pip as a
+        last resort.
+        """
+        bin_dir = Path(sys.executable).parent
+        for candidate in ("pip", "pip3"):
+            pip_bin = bin_dir / candidate
+            if pip_bin.exists():
+                return [str(pip_bin)]
+        # Last resort: hope -m pip works
+        return [sys.executable, "-m", "pip"]
 
     def uninstall_plugin(self, plugin_id: str) -> None:
         """
