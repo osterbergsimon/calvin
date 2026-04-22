@@ -5,22 +5,39 @@
     :class="[`position-${position}`, { 'show-date': showDate }]"
     :style="{ padding: `${barPadding}px` }"
   >
-    <div
-      class="clock-bar-content"
-      :class="{
-        'layout-single-line': layout === 'single-line',
-        'layout-two-lines': layout === 'two-lines',
-      }"
-    >
-      <span class="clock-time" :style="{ fontSize: `${fontSize}px` }">{{
-        formattedTime
-      }}</span>
-      <span
-        v-if="showDate"
-        class="clock-date"
-        :style="{ fontSize: `${dateFontSize}px` }"
-        >{{ formattedDate }}</span
+    <div class="clock-bar-outer">
+      <!-- Left spacer: invisible mirror of right weather to keep clock centered -->
+      <div class="clock-bar-side clock-bar-left" aria-hidden="true">
+        <span v-if="hasWeatherData" class="clock-weather-ghost">
+          {{ weatherEmoji }} {{ weatherTemp }}{{ weatherUnit }}
+        </span>
+      </div>
+
+      <!-- Center: time + date -->
+      <div
+        class="clock-bar-content"
+        :class="{
+          'layout-single-line': layout === 'single-line',
+          'layout-two-lines': layout === 'two-lines',
+        }"
       >
+        <span class="clock-time" :style="{ fontSize: `${fontSize}px` }">{{
+          formattedTime
+        }}</span>
+        <span
+          v-if="showDate"
+          class="clock-date"
+          :style="{ fontSize: `${dateFontSize}px` }"
+          >{{ formattedDate }}</span
+        >
+      </div>
+
+      <!-- Right: weather status -->
+      <div class="clock-bar-side clock-bar-right">
+        <span v-if="hasWeatherData" class="clock-weather">
+          {{ weatherEmoji }} {{ weatherTemp }}{{ weatherUnit }}
+        </span>
+      </div>
     </div>
   </div>
 </template>
@@ -28,6 +45,8 @@
 <script setup>
 import { ref, computed, onMounted, onUnmounted, watch } from "vue";
 import { useConfigStore } from "../stores/config";
+import { useWebServicesStore } from "../stores/webServices";
+import { useWeatherData } from "../composables/useWeatherData";
 
 defineOptions({
   name: "ClockBarHorizontal",
@@ -74,6 +93,7 @@ const props = defineProps({
 });
 
 const configStore = useConfigStore();
+const webServicesStore = useWebServicesStore();
 
 const currentTime = ref(new Date());
 let timeInterval = null;
@@ -152,6 +172,62 @@ const barPadding = computed(() => {
   }
   return configStore.clockBarPadding || 8;
 });
+
+// Weather integration
+const showWeather = computed(() => configStore.clockBarShowWeather || false);
+
+const firstWeatherServiceId = computed(() => {
+  if (!showWeather.value) return null;
+  const svc = webServicesStore.services.find(
+    (s) => s.display_schema?.render_template === "weather",
+  );
+  return svc?.id ?? null;
+});
+
+const weatherEnabled = computed(
+  () => showWeather.value && !!firstWeatherServiceId.value,
+);
+
+const weatherQuery = useWeatherData(firstWeatherServiceId, weatherEnabled);
+
+const OWM_EMOJI = {
+  "01": "☀️",
+  "02": "⛅",
+  "03": "☁️",
+  "04": "☁️",
+  "09": "🌧️",
+  10: "🌦️",
+  11: "⛈️",
+  13: "❄️",
+  50: "🌫️",
+};
+
+const weatherEmoji = computed(() => {
+  const icon = weatherQuery.data.value?.current?.icon;
+  if (!icon) return "";
+  return OWM_EMOJI[icon.slice(0, 2)] ?? "🌡️";
+});
+
+const weatherTemp = computed(() => {
+  const temp = weatherQuery.data.value?.current?.temperature;
+  if (temp === undefined || temp === null) return null;
+  return Math.round(temp);
+});
+
+const weatherUnit = computed(() => {
+  const units = weatherQuery.data.value?.units || "metric";
+  if (units === "imperial") return "°F";
+  if (units === "kelvin") return "K";
+  return "°C";
+});
+
+const hasWeatherData = computed(
+  () =>
+    showWeather.value &&
+    !weatherQuery.isLoading.value &&
+    !weatherQuery.isError.value &&
+    weatherTemp.value !== null,
+);
 
 // Format time
 const formattedTime = computed(() => {
@@ -257,9 +333,18 @@ watch(shouldShow, (newValue) => {
   }
 });
 
+watch(showWeather, (newVal) => {
+  if (newVal && webServicesStore.services.length === 0) {
+    webServicesStore.fetchServices();
+  }
+});
+
 onMounted(() => {
   if (shouldShow.value) {
     updateTime();
+  }
+  if (showWeather.value && webServicesStore.services.length === 0) {
+    webServicesStore.fetchServices();
   }
 });
 
@@ -331,5 +416,47 @@ onUnmounted(() => {
 
 .clock-bar-horizontal.position-between .clock-date {
   font-size: 0.75rem;
+}
+
+/* Three-column layout for weather integration */
+.clock-bar-outer {
+  display: flex;
+  align-items: center;
+  width: 100%;
+}
+
+.clock-bar-side {
+  flex: 1;
+  display: flex;
+  align-items: center;
+  min-width: 0;
+}
+
+.clock-bar-left {
+  justify-content: flex-start;
+}
+
+.clock-bar-right {
+  justify-content: flex-end;
+}
+
+.clock-bar-content {
+  flex: 0 1 auto;
+}
+
+.clock-weather-ghost {
+  visibility: hidden;
+  white-space: nowrap;
+  font-size: 0.875rem;
+  padding: 0 0.5rem;
+  pointer-events: none;
+  user-select: none;
+}
+
+.clock-weather {
+  white-space: nowrap;
+  font-size: 0.875rem;
+  color: var(--text-secondary);
+  padding: 0 0.5rem;
 }
 </style>

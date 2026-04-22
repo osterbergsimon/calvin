@@ -281,6 +281,21 @@
             @update:padding="handleBarPaddingChange"
           />
         </SettingItem>
+
+        <SettingItem
+          label="Show Weather in Bar"
+          help="Display current temperature and weather icon (requires a weather service to be configured)"
+        >
+          <label>
+            <input
+              name="clockBarShowWeather"
+              :checked="config.clockBarShowWeather"
+              type="checkbox"
+              @change="handleClockSettingsChange"
+            />
+            Show Weather in Bar
+          </label>
+        </SettingItem>
       </template>
     </CollapsibleSection>
 

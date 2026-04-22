@@ -63,9 +63,9 @@
 
     <!-- Plugin Config (when expanded) -->
     <div v-if="plugin.enabled && expanded" class="plugin-config">
-      <!-- Common Settings -->
+      <!-- Plugin Settings -->
       <div v-if="hasGlobalSettings">
-        <h4 class="config-section-title">Common Settings</h4>
+        <h4 class="config-section-title">Plugin Settings</h4>
         <div
           v-for="(schema, key) in globalConfigSchema"
           :key="key"
@@ -107,23 +107,6 @@
         />
       </div>
 
-      <!-- Service plugin note -->
-      <div
-        v-if="
-          plugin.type === 'service' &&
-          !hasGlobalSettings &&
-          Object.keys(plugin.instance_config_schema || {}).length > 0 &&
-          plugin.supports_multiple_instances !== false
-        "
-        class="plugin-instance-note"
-      >
-        <p class="help-text">
-          This plugin supports multiple instances. Configure settings for each
-          instance using the "Add Instance" button below. Plugin-global settings
-          are not available for this plugin type.
-        </p>
-      </div>
-
       <!-- Plugin Sections -->
       <PluginSections
         v-if="
@@ -145,6 +128,9 @@
         v-if="showInstances"
         :plugin="plugin"
         :instances="instances"
+        :get-instance-summary="
+          (instance) => getInstanceSummary(plugin, instance)
+        "
         @add-instance="$emit('add-instance', plugin.id)"
         @edit-instance="handleEditInstance"
         @delete-instance="$emit('delete-instance', $event)"
@@ -271,71 +257,27 @@ const showInstances = computed(() => {
   );
 });
 
-// Helper functions (these would ideally come from a composable)
+// Trust schema placement: common_config_schema = global, instance_config_schema = instance.
+// Skip internal _ fields and fields marked hidden in their UI config.
 const getGlobalConfigSchema = (plugin) => {
-  const schema = plugin.common_config_schema || {};
-  const instanceSchema = plugin.instance_config_schema || {};
-  const globalSchema = {};
+  return Object.fromEntries(
+    Object.entries(plugin.common_config_schema || {}).filter(
+      ([key, schema]) => !key.startsWith("_") && !schema.ui?.hidden,
+    ),
+  );
+};
 
-  // Filter out internal instance management fields
-  const internalFields = [
-    "_instance_name",
-    "_instance_enabled",
-    "_instance_id",
-  ];
-
-  // Whitelist of fields that are truly global (not instance-specific)
-  // These can appear in Common Settings even if they're also in instance_config_schema
-  const globalOnlyFields = ["display_order"];
-
-  // Fields that should NEVER appear in Common Settings (instance-specific)
-  const instanceOnlyFields = [
-    "email_address",
-    "email_password",
-    "imap_server",
-    "imap_port",
-    "check_interval",
-    "target_directory",
-    "mark_as_read",
-    "ical_url",
-    "api_key",
-    "api_token",
-    "url",
-    "latitude",
-    "longitude",
-    "altitude",
-    "location",
-  ];
-
+const getInstanceSummary = (plugin, instance) => {
+  const schema = plugin.instance_config_schema || {};
+  const config = instance.config || {};
   for (const [key, fieldSchema] of Object.entries(schema)) {
-    // Skip internal instance management fields
-    if (internalFields.includes(key)) {
-      continue;
-    }
-
-    // Skip fields that are instance-specific (should only be in instance_config_schema)
-    if (instanceOnlyFields.includes(key)) {
-      continue;
-    }
-
-    // Skip fields that are in instance_config_schema (they're instance-specific)
-    // unless they're in the globalOnlyFields whitelist
-    if (key in instanceSchema && !globalOnlyFields.includes(key)) {
-      continue;
-    }
-
-    // For service plugins: only show fields with global_only flag OR whitelisted global fields
-    // For other plugins: show fields that aren't instance-specific
-    if (
-      plugin.type === "service"
-        ? fieldSchema.global_only || globalOnlyFields.includes(key)
-        : !instanceOnlyFields.includes(key) && !(key in instanceSchema)
-    ) {
-      globalSchema[key] = fieldSchema;
+    if (key.startsWith("_") || fieldSchema.type !== "string") continue;
+    const val = config[key];
+    if (val && typeof val === "string" && val.trim()) {
+      return val.length > 60 ? val.slice(0, 57) + "..." : val;
     }
   }
-
-  return globalSchema;
+  return null;
 };
 
 const getFormValue = (key, schema) => {
@@ -568,14 +510,6 @@ input:checked + .slider:before {
 
 .plugin-setting {
   margin-bottom: 1rem;
-}
-
-.plugin-instance-note {
-  margin: 1rem 0;
-  padding: 0.75rem;
-  background: var(--bg-tertiary);
-  border-radius: 4px;
-  border-left: 3px solid var(--accent-primary);
 }
 
 .plugin-disabled-message {

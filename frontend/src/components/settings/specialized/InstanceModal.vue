@@ -6,7 +6,7 @@
           {{
             editingInstance
               ? `Edit ${currentPlugin?.name || "Instance"}`
-              : `Add ${currentPlugin?.name || "Instance"}`
+              : `Add ${currentPlugin?.name || ""} ${instanceLabel}`
           }}
         </h3>
         <button class="btn-close-modal" @click="handleClose">×</button>
@@ -164,6 +164,13 @@
 
 <script setup>
 import { ref, watch, computed } from "vue";
+
+const instanceLabelMap = {
+  calendar: "Calendar Source",
+  image: "Image Source",
+  backend: "Instance",
+  service: "Instance",
+};
 import PluginFieldRenderer from "@/components/PluginFieldRenderer.vue";
 import * as pluginsApi from "@/services/pluginsApi";
 import * as calendarApi from "@/services/calendarApi";
@@ -203,6 +210,13 @@ const testing = ref(false);
 const testStatus = ref(null);
 const geocoding = ref(false);
 const geocodeStatus = ref(null);
+
+const instanceLabel = computed(
+  () =>
+    currentPlugin.value?.instance_label ||
+    instanceLabelMap[currentPlugin.value?.type] ||
+    "Instance",
+);
 
 // Computed property for test action check
 const hasTestAction = computed(() => {

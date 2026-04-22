@@ -2,23 +2,24 @@
   <div class="plugin-instances">
     <div class="instances-header">
       <h4 class="config-section-title">
-        Instances
+        {{ instanceLabelPlural }}
         <span v-if="instances.length > 0" class="instance-count">
           ({{ instances.length }})
         </span>
       </h4>
       <button
         class="btn-add-instance"
-        title="Add new instance"
+        :title="`Add new ${instanceLabel}`"
         @click="$emit('add-instance')"
       >
-        + Add Instance
+        + Add {{ instanceLabel }}
       </button>
     </div>
 
     <div v-if="instances.length === 0" class="empty-instances">
       <p class="help-text">
-        No instances configured. Click "Add Instance" to create one.
+        No {{ instanceLabelPlural.toLowerCase() }} configured. Click "Add
+        {{ instanceLabel }}" to create one.
       </p>
     </div>
 
@@ -55,12 +56,12 @@
                 <h5>{{ instance.name }}</h5>
               </div>
               <div
-                v-if="instance.config && instanceSummary"
+                v-if="getInstanceSummary && getInstanceSummary(instance)"
                 class="instance-details"
               >
                 <div class="instance-detail-item">
                   <span class="instance-detail-value">{{
-                    instanceSummary
+                    getInstanceSummary(instance)
                   }}</span>
                 </div>
               </div>
@@ -91,7 +92,7 @@
               <button
                 class="btn-icon-only btn-action btn-action-danger"
                 title="Delete instance"
-                @click="$emit('delete-instance', instance.id)"
+                @click="handleDelete(instance.id, instance.name)"
               >
                 🗑️
               </button>
@@ -104,9 +105,10 @@
 </template>
 
 <script setup>
+import { computed } from "vue";
 import draggable from "vuedraggable";
 
-defineProps({
+const props = defineProps({
   plugin: {
     type: Object,
     required: true,
@@ -116,8 +118,8 @@ defineProps({
     required: true,
     default: () => [],
   },
-  instanceSummary: {
-    type: String,
+  getInstanceSummary: {
+    type: Function,
     default: null,
   },
 });
@@ -130,8 +132,32 @@ const emit = defineEmits([
   "order-change",
 ]);
 
+const instanceLabelMap = {
+  calendar: "Calendar Source",
+  image: "Image Source",
+  backend: "Instance",
+  service: "Instance",
+};
+
+const instanceLabel = computed(
+  () =>
+    props.plugin.instance_label ||
+    instanceLabelMap[props.plugin.type] ||
+    "Instance",
+);
+
+const instanceLabelPlural = computed(() => {
+  const label = instanceLabel.value;
+  return label.endsWith("s") ? label : label + "s";
+});
+
 const handleToggle = (instanceId, enabled) => {
   emit("toggle-instance", instanceId, enabled);
+};
+
+const handleDelete = (instanceId, instanceName) => {
+  if (!confirm(`Delete "${instanceName}"? This cannot be undone.`)) return;
+  emit("delete-instance", instanceId);
 };
 
 const handleOrderChange = (newOrder) => {

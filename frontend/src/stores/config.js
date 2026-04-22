@@ -70,6 +70,7 @@ export const useConfigStore = defineStore("config", () => {
   const clockBarDateFontSize = ref(14); // Bar clock date font size in pixels
   const clockBarLayout = ref("single-line"); // Bar layout: 'single-line' | 'two-lines'
   const clockBarPadding = ref(8); // Bar padding in pixels (all sides)
+  const clockBarShowWeather = ref(false); // Show weather icon in horizontal clock bar
   const mealPlanCardSize = ref("medium"); // Meal plan card size: 'small' | 'medium' | 'large'
   const consoleLogEnabled = ref(true); // Enable console logging (default: true for backwards compatibility)
   const consoleLogLevel = ref("info"); // Console log level: 'error' | 'warn' | 'info' | 'debug' (default: 'info')
@@ -427,6 +428,11 @@ export const useConfigStore = defineStore("config", () => {
       } else {
         clockBarPadding.value = 8; // Default
       }
+      if (response.data.clockBarShowWeather !== undefined) {
+        clockBarShowWeather.value = response.data.clockBarShowWeather;
+      } else if (response.data.clock_bar_show_weather !== undefined) {
+        clockBarShowWeather.value = response.data.clock_bar_show_weather;
+      }
       if (response.data.mealPlanCardSize !== undefined) {
         mealPlanCardSize.value = response.data.mealPlanCardSize;
       } else if (response.data.meal_plan_card_size !== undefined) {
@@ -618,6 +624,11 @@ export const useConfigStore = defineStore("config", () => {
         clockBarPadding.value = config.clockBarPadding;
       } else if (config.clock_bar_padding !== undefined) {
         clockBarPadding.value = config.clock_bar_padding;
+      }
+      if (config.clockBarShowWeather !== undefined) {
+        clockBarShowWeather.value = config.clockBarShowWeather;
+      } else if (config.clock_bar_show_weather !== undefined) {
+        clockBarShowWeather.value = config.clock_bar_show_weather;
       }
       return response.data;
     } catch (err) {
@@ -832,6 +843,7 @@ export const useConfigStore = defineStore("config", () => {
     clockBarDateFontSize,
     clockBarLayout,
     clockBarPadding,
+    clockBarShowWeather,
     mealPlanCardSize,
     consoleLogEnabled,
     consoleLogLevel,
