@@ -63,6 +63,49 @@
       </option>
     </select>
 
+    <!-- Select with scan button — fetches options from the backend -->
+    <div v-else-if="ui && ui.component === 'select-scan'" class="scan-select">
+      <div class="scan-select-row">
+        <select
+          :value="value"
+          class="form-input"
+          @change="$emit('update', $event.target.value)"
+        >
+          <option value="" disabled>
+            {{
+              scanning
+                ? "Scanning…"
+                : scannedOptions.length
+                  ? "— Select device —"
+                  : "— Click Scan to discover —"
+            }}
+          </option>
+          <option
+            v-if="value && !scannedOptions.find((o) => o.value === value)"
+            :value="value"
+          >
+            {{ value }}
+          </option>
+          <option
+            v-for="opt in scannedOptions"
+            :key="opt.value"
+            :value="opt.value"
+          >
+            {{ opt.label || opt.value }}
+          </option>
+        </select>
+        <button
+          type="button"
+          class="btn-secondary"
+          :disabled="scanning"
+          @click="runScan"
+        >
+          {{ scanning ? "Scanning…" : "Scan" }}
+        </button>
+      </div>
+      <span v-if="scanError" class="scan-error">{{ scanError }}</span>
+    </div>
+
     <!-- Textarea -->
     <textarea
       v-else-if="ui && ui.component === 'textarea'"
@@ -139,7 +182,8 @@
 </template>
 
 <script setup>
-import { computed } from "vue";
+import { computed, ref } from "vue";
+import axios from "axios";
 
 const props = defineProps({
   pluginId: {
@@ -167,6 +211,28 @@ const ui = computed(() => {
     ? props.schema.ui
     : null;
 });
+
+const scannedOptions = ref([]);
+const scanning = ref(false);
+const scanError = ref(null);
+
+async function runScan() {
+  scanning.value = true;
+  scanError.value = null;
+  try {
+    const res = await axios.get(`/api/plugins/${props.pluginId}/scan`, {
+      params: { field: props.fieldKey },
+    });
+    scannedOptions.value = res.data.options || [];
+    if (!scannedOptions.value.length) {
+      scanError.value = res.data.error || "No devices found";
+    }
+  } catch {
+    scanError.value = "Scan failed";
+  } finally {
+    scanning.value = false;
+  }
+}
 </script>
 
 <style scoped>
@@ -266,5 +332,22 @@ const ui = computed(() => {
 .checkbox-text {
   color: var(--text-primary);
   font-size: 0.9rem;
+}
+
+.scan-select-row {
+  display: flex;
+  gap: 0.5rem;
+  align-items: center;
+}
+
+.scan-select-row .form-input {
+  flex: 1;
+}
+
+.scan-error {
+  display: block;
+  margin-top: 0.4rem;
+  font-size: 0.8rem;
+  color: var(--color-error, #e05555);
 }
 </style>

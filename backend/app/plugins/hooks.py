@@ -132,6 +132,24 @@ class PluginHookSpec:
         pass
 
     @hookspec
+    async def scan_plugin_options(
+        self,
+        type_id: str,
+        field_key: str,
+    ) -> dict[str, Any] | None:
+        """
+        Scan/discover available options for a configuration field.
+
+        Args:
+            type_id: Plugin type ID (e.g., 'chromecast')
+            field_key: The config field to scan options for (e.g., 'device_name')
+
+        Returns:
+            Dict with 'options' list of {value, label} dicts, or None if not supported.
+        """
+        pass
+
+    @hookspec
     async def fetch_service_data(
         self,
         instance_id: str,

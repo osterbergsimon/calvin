@@ -3,6 +3,7 @@
 import asyncio
 import json
 import shutil
+import sys
 import tempfile
 from datetime import UTC, datetime
 from pathlib import Path
@@ -435,9 +436,16 @@ async def uninstall_plugin(plugin_id: str):
                 await db_type.delete()
                 logger.info(f"Removed plugin {plugin_id} from database")
 
-            # Reload plugins to remove the uninstalled one
-            # Note: We can't easily unload a module from Python,
-            # but it won't be loaded on next restart
+            # Unregister the plugin module from pluggy so it no longer appears in get_plugin_types()
+            module_name = f"installed_plugin_{plugin_id}"
+            registered_module = sys.modules.get(module_name)
+            if registered_module is not None:
+                try:
+                    hook_manager.unregister(registered_module)
+                except Exception as e:
+                    logger.warning(f"Failed to unregister plugin hook for {plugin_id}: {e}")
+                del sys.modules[module_name]
+
             plugin_loader._loaded_modules = {
                 m
                 for m in plugin_loader._loaded_modules
@@ -788,6 +796,41 @@ async def fetch_plugin(plugin_id: str):
         "images_downloaded": False,
         "image_count": 0,
     }
+
+
+@router.get("/plugins/{plugin_id}/scan")
+async def scan_plugin_options(
+    plugin_id: str, field: str = Query(..., description="Config field key to scan options for")
+):
+    """
+    Scan/discover available options for a plugin config field.
+
+    Args:
+        plugin_id: Plugin type ID (e.g., 'chromecast')
+        field: Config field key to scan (e.g., 'device_name')
+
+    Returns:
+        Dict with 'options' list of {value, label} dicts
+    """
+    plugin_types = plugin_loader.get_plugin_types()
+    type_info = next((t for t in plugin_types if t.get("type_id") == plugin_id), None)
+
+    if not type_info:
+        raise HTTPException(status_code=404, detail="Plugin type not found")
+
+    scan_coroutines = hook_manager.hook.scan_plugin_options(
+        type_id=plugin_id,
+        field_key=field,
+    )
+    results = await asyncio.gather(*scan_coroutines, return_exceptions=True)
+
+    for result in results:
+        if isinstance(result, Exception):
+            continue
+        if result is not None:
+            return result
+
+    return {"options": [], "error": "Plugin does not support option scanning for this field"}
 
 
 @router.get("/plugins/{plugin_id}/data")
