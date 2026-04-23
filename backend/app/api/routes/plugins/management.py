@@ -197,6 +197,15 @@ async def get_plugins(
 
 
 # Specific routes must come before parameterized routes to avoid path conflicts
+@router.get("/plugins/rebuild-status")
+async def get_rebuild_status():
+    """Return the current state of a background frontend rebuild."""
+    return {
+        "state": frontend_build_manager.state,
+        "message": frontend_build_manager.message,
+    }
+
+
 @router.get("/plugins/installed")
 async def get_installed_plugins():
     """
@@ -305,20 +314,15 @@ async def install_plugin(
                     f"Failed to emit plugin_installed event for plugin {manifest['id']}: {e}"
                 )
 
-            frontend_rebuild_success = None
-            frontend_rebuild_message = None
             if manifest.get("_has_frontend"):
-                frontend_rebuild_success, frontend_rebuild_message = frontend_build_manager.build(
-                    plugin_installer.get_frontend_dir()
-                )
+                frontend_build_manager.start_background_build(plugin_installer.get_frontend_dir())
 
             return {
                 "success": True,
                 "message": f"Plugin {manifest['id']} installed successfully",
                 "manifest": manifest,
                 "requires_restart": True,
-                "frontend_rebuild_success": frontend_rebuild_success,
-                "frontend_rebuild_message": frontend_rebuild_message,
+                "frontend_rebuild_in_progress": manifest.get("_has_frontend", False),
             }
         except ValueError as e:
             raise HTTPException(status_code=400, detail=str(e))

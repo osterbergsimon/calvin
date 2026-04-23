@@ -1,3 +1,6 @@
+# Dev mode marker — touch backend/.dev to enable dev features locally
+backend/.dev
+
 # Python
 __pycache__/
 *.py[cod]

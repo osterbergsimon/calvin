@@ -76,8 +76,11 @@ class Settings(BaseSettings):
     @property
     def is_dev_mode(self) -> bool:
         """Check if running in development mode by looking for .dev marker file."""
-        dev_marker = self.repo_dir / "backend" / ".dev"
-        return dev_marker.exists()
+        # Check repo_dir-relative path (production Pi path)
+        if (self.repo_dir / "backend" / ".dev").exists():
+            return True
+        # Also check relative to this file, so it works without setting REPO_DIR in dev
+        return (Path(__file__).parent.parent / ".dev").exists()
 
     def get_update_script_path(self) -> Path:
         """Get the appropriate update script path based on dev/prod mode."""

@@ -1,20 +1,5 @@
 <template>
   <div class="plugins-category">
-    <!-- Frontend rebuild banner -->
-    <div
-      v-if="rebuildStatus !== 'idle'"
-      :class="['rebuild-banner', `rebuild-banner--${rebuildStatus}`]"
-    >
-      <span class="rebuild-banner-text">{{ rebuildMessage }}</span>
-      <button
-        v-if="rebuildStatus === 'done'"
-        class="btn-refresh"
-        @click="() => window.location.reload()"
-      >
-        Refresh Now
-      </button>
-    </div>
-
     <!-- Plugin Installation Section -->
     <CollapsibleSection title="Install New Plugin" icon="📦" :expanded="true">
       <PluginInstaller
@@ -28,12 +13,17 @@
         :requires-restart="pluginRequiresRestart"
         :branch-switched="pluginBranchSwitched"
         :actual-branch="pluginActualBranch"
+        :dev-mode="configStore.devMode"
+        :rebuild-status="rebuildStatus"
+        :rebuild-message="rebuildMessage"
         @update:repoUrl="githubRepoUrl = $event"
         @update:branch="githubBranch = $event"
         @zip-select="handleZipSelect"
         @list-plugins="handleListPlugins"
         @install="handleInstall"
         @install-selected="handleInstallSelected"
+        @install-local="handleInstallLocal"
+        @install-selected-local="handleInstallSelectedLocal"
         @force-update="handleForceUpdate"
         @restart="handleRestart"
       />
@@ -142,6 +132,7 @@
 import { ref, computed, onMounted, watch } from "vue";
 import { usePlugins } from "@/composables";
 import { useSystem } from "@/composables";
+import { useConfigStore } from "@/stores/config";
 import { useImagesStore } from "@/stores/images";
 import * as pluginsApi from "@/services/pluginsApi";
 import * as calendarApi from "@/services/calendarApi";
@@ -172,11 +163,15 @@ const {
   enumeratePluginsFromGitHub,
   installPluginFromGitHub,
   installPluginsFromGitHub,
+  enumeratePluginsFromLocal,
+  installPluginFromLocal,
+  installPluginsFromLocal,
   uninstallPlugin,
   togglePlugin,
 } = usePlugins();
 
 const { restartBackend } = useSystem();
+const configStore = useConfigStore();
 const imagesStore = useImagesStore();
 
 // Local state
@@ -227,17 +222,22 @@ const cancelPipInstall = () => {
 };
 
 // Frontend rebuild banner
-const rebuildStatus = ref("idle"); // idle | done | error
+const rebuildStatus = ref("idle"); // idle | building | done | error
 const rebuildMessage = ref("");
 
 watch(pluginFrontendRebuildResult, (result) => {
   if (!result) return;
-  rebuildStatus.value = result.success ? "done" : "error";
-  rebuildMessage.value =
-    result.message ||
-    (result.success
-      ? "Frontend rebuilt — refresh the page to load new plugin components."
-      : "Frontend rebuild failed — rebuild manually with: npm run build");
+  if (result.building) {
+    rebuildStatus.value = "building";
+    rebuildMessage.value = result.message || "Building frontend…";
+  } else {
+    rebuildStatus.value = result.success ? "done" : "error";
+    rebuildMessage.value =
+      result.message ||
+      (result.success
+        ? "Frontend rebuilt — refresh the page to load new plugin components."
+        : "Frontend rebuild failed — rebuild manually with: npm run build");
+  }
 });
 
 // Handlers
@@ -257,8 +257,12 @@ const handleZipSelect = async (file) => {
   await installPluginFromZip(file);
 };
 
-const handleListPlugins = async ({ repoUrl, branch }) => {
-  await enumeratePluginsFromGitHub(repoUrl, branch);
+const handleListPlugins = async ({ repoUrl, branch, source, localPath }) => {
+  if (source === "local") {
+    await enumeratePluginsFromLocal(localPath);
+  } else {
+    await enumeratePluginsFromGitHub(repoUrl, branch);
+  }
 };
 
 const handleInstall = async ({ path, repoUrl, branch, force }) => {
@@ -302,6 +306,39 @@ const handleInstallSelected = async ({
   }
   const doInstall = () =>
     installPluginsFromGitHub(pluginsToInstall, repoUrl, branch);
+  if (allDeps.length > 0) {
+    triggerPipWarning(allDeps, names.join(", "), doInstall);
+    return;
+  }
+  await doInstall();
+};
+
+const handleInstallLocal = async ({ path, localPath, force }) => {
+  const plugin = availablePlugins.value.find((p) => p.path === path);
+  const deps = plugin?.manifest?.python_dependencies ?? [];
+  const doInstall = () => installPluginFromLocal(localPath, path, force);
+  if (deps.length > 0) {
+    triggerPipWarning(deps, plugin?.name ?? path, doInstall);
+    return;
+  }
+  await doInstall();
+};
+
+const handleInstallSelectedLocal = async ({
+  plugins: pluginsToInstall,
+  localPath,
+}) => {
+  const allDeps = [];
+  const names = [];
+  for (const { path, id } of pluginsToInstall) {
+    const p = availablePlugins.value.find(
+      (ap) => ap.id === id || ap.path === path,
+    );
+    const deps = p?.manifest?.python_dependencies ?? [];
+    if (deps.length > 0) allDeps.push(...deps);
+    names.push(p?.name ?? id);
+  }
+  const doInstall = () => installPluginsFromLocal(pluginsToInstall, localPath);
   if (allDeps.length > 0) {
     triggerPipWarning(allDeps, names.join(", "), doInstall);
     return;
@@ -629,48 +666,6 @@ onMounted(async () => {
 <style scoped>
 .plugins-category {
   width: 100%;
-}
-
-/* Frontend rebuild banner */
-.rebuild-banner {
-  display: flex;
-  align-items: center;
-  gap: 0.75rem;
-  padding: 0.75rem 1rem;
-  border-radius: 6px;
-  margin-bottom: 1rem;
-  font-size: 0.9rem;
-}
-
-.rebuild-banner--done {
-  background: rgba(34, 197, 94, 0.15);
-  border: 1px solid rgba(34, 197, 94, 0.4);
-  color: #86efac;
-}
-
-.rebuild-banner--error {
-  background: rgba(239, 68, 68, 0.15);
-  border: 1px solid rgba(239, 68, 68, 0.4);
-  color: #fca5a5;
-}
-
-.rebuild-banner-text {
-  flex: 1;
-}
-
-.btn-refresh {
-  padding: 0.3rem 0.75rem;
-  background: rgba(34, 197, 94, 0.2);
-  color: inherit;
-  border: 1px solid currentColor;
-  border-radius: 4px;
-  cursor: pointer;
-  font-size: 0.85rem;
-  white-space: nowrap;
-}
-
-.btn-refresh:hover {
-  background: rgba(34, 197, 94, 0.35);
 }
 
 /* Pip warning modal — mirrors ConfirmModal layout */

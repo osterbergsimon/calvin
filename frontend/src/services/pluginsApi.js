@@ -136,6 +136,48 @@ export async function installPluginFromGitHub(
 }
 
 /**
+ * Get the current state of a background frontend rebuild.
+ */
+export async function getRebuildStatus() {
+  const response = await api.get("/plugins/rebuild-status");
+  return response.data;
+}
+
+/**
+ * Suggest local plugin repo paths by scanning sibling directories (dev mode only).
+ */
+export async function suggestLocalPath() {
+  const response = await api.get("/plugins/local/suggest");
+  return response.data;
+}
+
+/**
+ * Enumerate plugins from a local directory (dev mode only).
+ */
+export async function enumeratePluginsFromLocal(localPath) {
+  const response = await api.post("/plugins/local/enumerate", {
+    local_path: localPath,
+  });
+  return response.data;
+}
+
+/**
+ * Install plugin from a local directory (dev mode only).
+ */
+export async function installPluginFromLocal(
+  localPath,
+  pluginPath,
+  force = false,
+) {
+  const response = await api.post("/plugins/local/install", {
+    local_path: localPath,
+    plugin_path: pluginPath,
+    force,
+  });
+  return response.data;
+}
+
+/**
  * Uninstall a plugin.
  */
 export async function uninstallPlugin(pluginId, pluginType = null) {

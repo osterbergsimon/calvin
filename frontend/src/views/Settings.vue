@@ -16,7 +16,10 @@
               class="menu-item"
               title="Restart the backend server"
               :disabled="!!updateMessage"
-              @click="showSystemMenu = false; restartBackend()"
+              @click="
+                showSystemMenu = false;
+                restartBackend();
+              "
             >
               🔄 Restart Backend
             </button>
@@ -24,7 +27,10 @@
               class="menu-item"
               title="Restart the frontend server"
               :disabled="!!updateMessage"
-              @click="showSystemMenu = false; restartFrontend()"
+              @click="
+                showSystemMenu = false;
+                restartFrontend();
+              "
             >
               🔄 Restart Frontend
             </button>
@@ -101,7 +107,7 @@
 </template>
 
 <script setup>
-import { ref, onMounted, onUnmounted } from "vue";
+import { ref, watch, onMounted, onUnmounted } from "vue";
 import { useRouter } from "vue-router";
 import { useConfigForm } from "@/composables";
 import { useSystem } from "@/composables";
@@ -133,7 +139,9 @@ const categories = [
   { id: "system", label: "System", icon: "⚙️" },
 ];
 
-const activeCategory = ref("layout");
+const _CATEGORY_KEY = "settings_active_category";
+const activeCategory = ref(sessionStorage.getItem(_CATEGORY_KEY) || "layout");
+watch(activeCategory, (val) => sessionStorage.setItem(_CATEGORY_KEY, val));
 const showSystemMenu = ref(false);
 
 // Config management

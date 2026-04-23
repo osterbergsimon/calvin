@@ -8,6 +8,7 @@ from typing import Any
 from fastapi import APIRouter, HTTPException
 from pydantic import BaseModel, ConfigDict
 
+from app.config import settings
 from app.services.config_service import config_service
 from app.services.display_orientation_service import display_orientation_service
 
@@ -411,6 +412,8 @@ async def get_config():
 
     # Add frontend version (from built HTML)
     config["frontendVersion"] = get_frontend_version()
+
+    config["devMode"] = settings.is_dev_mode
 
     return config
 

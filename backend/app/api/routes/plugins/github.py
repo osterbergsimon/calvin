@@ -1,4 +1,4 @@
-"""GitHub plugin installation endpoints."""
+"""GitHub and local plugin installation endpoints."""
 
 import logging
 import re
@@ -12,6 +12,7 @@ import httpx
 from fastapi import APIRouter, Body, HTTPException
 
 from app.api.routes.plugins.themes import _register_theme_in_db
+from app.config import settings
 from app.plugins.loader import plugin_loader
 from app.services.plugin_installer import frontend_build_manager, plugin_installer
 from app.services.theme_installer import theme_installer
@@ -288,11 +289,9 @@ async def install_plugin_from_github(request: dict[str, Any] = Body(...)):
                     # It just needs a restart to be loaded
 
                 actual_branch = "master" if branch_switched else branch
-                frontend_rebuild_success = None
-                frontend_rebuild_message = None
                 if manifest.get("_has_frontend"):
-                    frontend_rebuild_success, frontend_rebuild_message = (
-                        frontend_build_manager.build(plugin_installer.get_frontend_dir())
+                    frontend_build_manager.start_background_build(
+                        plugin_installer.get_frontend_dir()
                     )
                 return {
                     "success": True,
@@ -301,8 +300,7 @@ async def install_plugin_from_github(request: dict[str, Any] = Body(...)):
                     "branch": actual_branch,
                     "branch_switched": branch_switched,
                     "requires_restart": True,
-                    "frontend_rebuild_success": frontend_rebuild_success,
-                    "frontend_rebuild_message": frontend_rebuild_message,
+                    "frontend_rebuild_in_progress": manifest.get("_has_frontend", False),
                 }
             else:
                 raise HTTPException(
@@ -330,3 +328,166 @@ async def install_plugin_from_github(request: dict[str, Any] = Body(...)):
                 shutil.rmtree(temp_dir)
             except (PermissionError, OSError):
                 pass
+
+
+@router.get("/plugins/local/suggest")
+async def suggest_local_plugin_paths():
+    """
+    Suggest local plugin repository paths by scanning sibling directories (dev mode only).
+    Returns paths to directories containing plugins.json.
+    """
+    if not settings.is_dev_mode:
+        raise HTTPException(
+            status_code=403, detail="Local path install is only available in dev mode"
+        )
+
+    suggestions = []
+    seen = set()
+
+    # Derive repo root from this file's location, then check the parent directory
+    file_repo_root = Path(__file__).resolve().parent.parent.parent.parent.parent.parent
+    parent_dirs = {file_repo_root.parent}
+    if settings.repo_dir and settings.repo_dir.exists():
+        parent_dirs.add(settings.repo_dir.parent)
+
+    for parent in parent_dirs:
+        try:
+            if not parent.is_dir():
+                continue
+            for sibling in sorted(parent.iterdir()):
+                if not sibling.is_dir():
+                    continue
+                if (sibling / "plugins.json").exists():
+                    path_str = str(sibling)
+                    if path_str not in seen:
+                        seen.add(path_str)
+                        suggestions.append(path_str)
+        except Exception as e:
+            logger.warning(f"Failed to scan {parent} for plugin repo suggestions: {e}")
+
+    return {"suggestions": suggestions}
+
+
+@router.post("/plugins/local/enumerate")
+async def enumerate_plugins_from_local(request: dict[str, Any] = Body(...)):
+    """
+    Enumerate available plugins from a local directory (dev mode only).
+
+    Args:
+        request: Request body containing:
+            - local_path: Absolute path to the local plugin repository
+    """
+    if not settings.is_dev_mode:
+        raise HTTPException(
+            status_code=403, detail="Local path install is only available in dev mode"
+        )
+
+    local_path = request.get("local_path")
+    if not local_path or not local_path.strip():
+        raise HTTPException(status_code=400, detail="local_path is required")
+
+    repo_path = Path(local_path)
+    if not repo_path.exists() or not repo_path.is_dir():
+        raise HTTPException(
+            status_code=400, detail=f"Path not found or not a directory: {local_path}"
+        )
+
+    try:
+        plugins_result = plugin_installer.enumerate_plugins_from_repo(repo_path)
+    except Exception as e:
+        logger.warning(f"Failed to enumerate plugins from local path: {e}")
+        plugins_result = {"has_manifest": False, "plugins": []}
+
+    try:
+        themes_result = theme_installer.enumerate_themes_from_repo(repo_path)
+    except Exception as e:
+        logger.warning(f"Failed to enumerate themes from local path: {e}")
+        themes_result = {"has_manifest": False, "themes": []}
+
+    return {
+        "success": True,
+        "local_path": local_path,
+        "plugins": plugins_result.get("plugins", []),
+        "themes": themes_result.get("themes", []),
+    }
+
+
+@router.post("/plugins/local/install")
+async def install_plugin_from_local(request: dict[str, Any] = Body(...)):
+    """
+    Install a specific plugin from a local directory (dev mode only).
+
+    Args:
+        request: Request body containing:
+            - local_path: Absolute path to the local plugin repository
+            - plugin_path: Relative path to plugin directory within repo
+            - plugin_id: Optional plugin ID override
+            - force: Optional boolean to force reinstall
+    """
+    if not settings.is_dev_mode:
+        raise HTTPException(
+            status_code=403, detail="Local path install is only available in dev mode"
+        )
+
+    local_path = request.get("local_path")
+    plugin_path = request.get("plugin_path")
+    plugin_id = request.get("plugin_id")
+    force = request.get("force", False)
+
+    if not local_path:
+        raise HTTPException(status_code=400, detail="local_path is required")
+    if not plugin_path:
+        raise HTTPException(status_code=400, detail="plugin_path is required")
+
+    repo_path = Path(local_path)
+    if not repo_path.exists() or not repo_path.is_dir():
+        raise HTTPException(
+            status_code=400, detail=f"Path not found or not a directory: {local_path}"
+        )
+
+    theme_json = repo_path / plugin_path / "theme.json"
+    plugin_json_path = repo_path / plugin_path / "plugin.json"
+
+    try:
+        if theme_json.exists():
+            manifest = theme_installer.install_theme_from_repo(repo_path, plugin_path, plugin_id)
+            await _register_theme_in_db(manifest)
+            return {
+                "success": True,
+                "message": f"Theme {manifest['id']} installed successfully",
+                "manifest": manifest,
+                "requires_restart": False,
+            }
+        elif plugin_json_path.exists():
+            manifest = plugin_installer.install_plugin_from_repo(
+                repo_path, plugin_path, plugin_id, force=force
+            )
+            try:
+                plugin_loader.load_installed_plugins()
+            except Exception as load_error:
+                logger.warning(
+                    f"Plugin {manifest['id']} installed but failed to load: {load_error}. "
+                    "It will be available after server restart."
+                )
+
+            if manifest.get("_has_frontend"):
+                frontend_build_manager.start_background_build(plugin_installer.get_frontend_dir())
+            return {
+                "success": True,
+                "message": f"Plugin {manifest['id']} installed successfully",
+                "manifest": manifest,
+                "requires_restart": True,
+                "frontend_rebuild_in_progress": manifest.get("_has_frontend", False),
+            }
+        else:
+            raise HTTPException(
+                status_code=400,
+                detail=f"Neither plugin.json nor theme.json found in {plugin_path}",
+            )
+    except ValueError as e:
+        raise HTTPException(status_code=400, detail=str(e))
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"Failed to install plugin from local path: {e}", exc_info=True)
+        raise HTTPException(status_code=500, detail=f"Failed to install: {str(e)}")

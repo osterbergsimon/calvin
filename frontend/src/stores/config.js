@@ -75,6 +75,7 @@ export const useConfigStore = defineStore("config", () => {
   const consoleLogEnabled = ref(true); // Enable console logging (default: true for backwards compatibility)
   const consoleLogLevel = ref("info"); // Console log level: 'error' | 'warn' | 'info' | 'debug' (default: 'info')
   const configPollInterval = ref(30); // Config polling interval in seconds (default: 30)
+  const devMode = ref(false); // Whether the backend is running in dev mode (backend/.dev marker file)
   const loading = ref(false);
   const error = ref(null);
 
@@ -460,6 +461,9 @@ export const useConfigStore = defineStore("config", () => {
         configPollInterval.value = response.data.config_poll_interval;
       } else {
         configPollInterval.value = 30; // Default to 30 seconds
+      }
+      if (response.data.devMode !== undefined) {
+        devMode.value = response.data.devMode;
       }
       return response.data;
     } catch (err) {
@@ -848,6 +852,7 @@ export const useConfigStore = defineStore("config", () => {
     consoleLogEnabled,
     consoleLogLevel,
     configPollInterval,
+    devMode,
     loading,
     error,
     calendarWidth,

@@ -59,6 +59,42 @@ const sortedPluginCategories = computed(() => {
   return categories.filter((c) => c.plugins.length > 0);
 });
 
+// Poll the backend rebuild-status endpoint until building is complete,
+// updating pluginFrontendRebuildResult along the way.
+let _rebuildPollTimer = null;
+function _startRebuildPolling() {
+  if (_rebuildPollTimer !== null) return; // already polling
+  pluginFrontendRebuildResult.value = {
+    building: true,
+    success: null,
+    message: "Building frontend, this may take a minute…",
+  };
+
+  const poll = async () => {
+    try {
+      const status = await pluginsApi.getRebuildStatus();
+      if (status.state === "building") {
+        pluginFrontendRebuildResult.value = {
+          building: true,
+          success: null,
+          message: status.message,
+        };
+        _rebuildPollTimer = setTimeout(poll, 2000);
+      } else {
+        _rebuildPollTimer = null;
+        pluginFrontendRebuildResult.value = {
+          building: false,
+          success: status.state === "done",
+          message: status.message,
+        };
+      }
+    } catch {
+      _rebuildPollTimer = null;
+    }
+  };
+  _rebuildPollTimer = setTimeout(poll, 1000);
+}
+
 export function usePlugins() {
   // Load plugins
   const loadPlugins = async () => {
@@ -169,14 +205,8 @@ export function usePlugins() {
       const response = await pluginsApi.installPluginFromZip(file);
       pluginInstallSuccess.value = "Plugin installed successfully!";
       pluginRequiresRestart.value = response.requires_restart || false;
-      if (
-        response.frontend_rebuild_success !== null &&
-        response.frontend_rebuild_success !== undefined
-      ) {
-        pluginFrontendRebuildResult.value = {
-          success: response.frontend_rebuild_success,
-          message: response.frontend_rebuild_message,
-        };
+      if (response.frontend_rebuild_in_progress) {
+        _startRebuildPolling();
       }
 
       if (!pluginRequiresRestart.value) {
@@ -312,17 +342,24 @@ export function usePlugins() {
       pluginRequiresRestart.value = response.requires_restart || false;
       pluginBranchSwitched.value = response.branch_switched || false;
       pluginActualBranch.value = response.branch || branch;
-      if (
-        response.frontend_rebuild_success !== null &&
-        response.frontend_rebuild_success !== undefined
-      ) {
-        pluginFrontendRebuildResult.value = {
-          success: response.frontend_rebuild_success,
-          message: response.frontend_rebuild_message,
+      if (response.frontend_rebuild_in_progress) {
+        _startRebuildPolling();
+      }
+
+      // Mark the installed plugin in-place so the list stays visible
+      const installedId = response.manifest?.id || pluginPath;
+      const idx = availablePlugins.value.findIndex(
+        (p) => p.id === installedId || p.path === pluginPath,
+      );
+      if (idx !== -1) {
+        availablePlugins.value[idx] = {
+          ...availablePlugins.value[idx],
+          _installed: true,
+          _installedVersion:
+            response.manifest?.version || availablePlugins.value[idx].version,
         };
       }
 
-      availablePlugins.value = [];
       await loadPlugins();
 
       if (!pluginRequiresRestart.value) {
@@ -389,14 +426,8 @@ export function usePlugins() {
             pluginBranchSwitched.value = true;
             pluginActualBranch.value = response.branch || branch;
           }
-          if (
-            response.frontend_rebuild_success !== null &&
-            response.frontend_rebuild_success !== undefined
-          ) {
-            pluginFrontendRebuildResult.value = {
-              success: response.frontend_rebuild_success,
-              message: response.frontend_rebuild_message,
-            };
+          if (response.frontend_rebuild_in_progress) {
+            _startRebuildPolling();
           }
         } catch (error) {
           results.failed.push({
@@ -430,8 +461,22 @@ export function usePlugins() {
         pluginInstallError.value = `Failed to install ${results.failed.length} plugin(s): ${failedNames}. Details: ${failedDetails}`;
       }
 
-      // Refresh installed plugins list
-      // Only refresh if we had any successes
+      // Mark installed plugins in-place so the list stays visible
+      for (const s of results.success) {
+        const idx = availablePlugins.value.findIndex(
+          (p) => p.id === s.id || p.path === s.response?.manifest?.id,
+        );
+        if (idx !== -1) {
+          availablePlugins.value[idx] = {
+            ...availablePlugins.value[idx],
+            _installed: true,
+            _installedVersion:
+              s.response?.manifest?.version ||
+              availablePlugins.value[idx].version,
+          };
+        }
+      }
+
       if (results.success.length > 0) {
         await loadPlugins();
       }
@@ -447,6 +492,214 @@ export function usePlugins() {
         error.response?.data?.detail ||
         error.message ||
         "Failed to install plugins from GitHub";
+      setTimeout(() => {
+        pluginInstallError.value = "";
+      }, 10000);
+    } finally {
+      installingPlugin.value = false;
+    }
+  };
+
+  // Enumerate plugins from a local path (dev mode only)
+  const enumeratePluginsFromLocal = async (localPath) => {
+    if (!localPath || !localPath.trim()) {
+      pluginInstallError.value = "Local path is required";
+      setTimeout(() => {
+        pluginInstallError.value = "";
+      }, 10000);
+      return;
+    }
+
+    enumeratingPlugins.value = true;
+    availablePlugins.value = [];
+
+    try {
+      const response = await pluginsApi.enumeratePluginsFromLocal(localPath);
+      const enumeratedPlugins = response.plugins || [];
+      const enumeratedThemes = response.themes || [];
+
+      const allItems = [
+        ...enumeratedPlugins,
+        ...enumeratedThemes.map((theme) => ({ ...theme, type: "theme" })),
+      ];
+
+      let installedPluginsMap = {};
+      try {
+        const installedResponse = await pluginsApi.getInstalledPlugins();
+        installedPluginsMap = Object.fromEntries(
+          (installedResponse.plugins || []).map((p) => [p.id, p]),
+        );
+      } catch (error) {
+        if (error.response?.status !== 404) {
+          logWarn(
+            "[usePlugins]",
+            "Failed to load installed plugins for comparison:",
+            error,
+          );
+        }
+      }
+
+      availablePlugins.value = allItems.map((plugin) => {
+        const installed = installedPluginsMap[plugin.id];
+        return installed
+          ? {
+              ...plugin,
+              _installed: true,
+              _installedVersion: installed.version || null,
+            }
+          : { ...plugin, _installed: false, _installedVersion: null };
+      });
+    } catch (error) {
+      logError(
+        "[usePlugins]",
+        "Failed to enumerate plugins from local path:",
+        error,
+      );
+      pluginInstallError.value =
+        error.response?.data?.detail ||
+        error.message ||
+        "Failed to enumerate plugins from local path";
+      setTimeout(() => {
+        pluginInstallError.value = "";
+      }, 10000);
+    } finally {
+      enumeratingPlugins.value = false;
+    }
+  };
+
+  // Install a single plugin from a local path (dev mode only)
+  const installPluginFromLocal = async (
+    localPath,
+    pluginPath,
+    force = false,
+  ) => {
+    installingPlugin.value = true;
+    pluginInstallError.value = "";
+    pluginInstallSuccess.value = "";
+    pluginRequiresRestart.value = false;
+
+    try {
+      const response = await pluginsApi.installPluginFromLocal(
+        localPath,
+        pluginPath,
+        force,
+      );
+      pluginInstallSuccess.value = "Plugin installed successfully!";
+      pluginRequiresRestart.value = response.requires_restart || false;
+      if (response.frontend_rebuild_in_progress) {
+        _startRebuildPolling();
+      }
+
+      // Mark the installed plugin in-place so the list stays visible
+      const installedId = response.manifest?.id || pluginPath;
+      const idx = availablePlugins.value.findIndex(
+        (p) => p.id === installedId || p.path === pluginPath,
+      );
+      if (idx !== -1) {
+        availablePlugins.value[idx] = {
+          ...availablePlugins.value[idx],
+          _installed: true,
+          _installedVersion:
+            response.manifest?.version || availablePlugins.value[idx].version,
+        };
+      }
+
+      await loadPlugins();
+
+      if (!pluginRequiresRestart.value) {
+        setTimeout(() => {
+          pluginInstallSuccess.value = "";
+        }, 5000);
+      }
+    } catch (error) {
+      pluginInstallError.value =
+        error.response?.data?.detail ||
+        error.message ||
+        "Failed to install plugin from local path";
+      setTimeout(() => {
+        pluginInstallError.value = "";
+      }, 10000);
+    } finally {
+      installingPlugin.value = false;
+    }
+  };
+
+  // Install multiple plugins from a local path (dev mode only)
+  const installPluginsFromLocal = async (plugins, localPath) => {
+    installingPlugin.value = true;
+    pluginInstallError.value = "";
+    pluginInstallSuccess.value = "";
+    pluginRequiresRestart.value = false;
+
+    const results = { success: [], failed: [], requiresRestart: false };
+
+    try {
+      for (const plugin of plugins) {
+        try {
+          const response = await pluginsApi.installPluginFromLocal(
+            localPath,
+            plugin.path,
+            false,
+          );
+          results.success.push({
+            id: plugin.id,
+            name: plugin.name || plugin.id,
+            response,
+          });
+          if (response.requires_restart) results.requiresRestart = true;
+          if (response.frontend_rebuild_in_progress) {
+            _startRebuildPolling();
+          }
+        } catch (error) {
+          results.failed.push({
+            id: plugin.id,
+            name: plugin.name || plugin.id,
+            error:
+              error.response?.data?.detail || error.message || "Unknown error",
+          });
+        }
+      }
+
+      if (results.success.length > 0 && results.failed.length === 0) {
+        pluginInstallSuccess.value = `Successfully installed ${results.success.length} plugin(s): ${results.success.map((s) => s.name).join(", ")}`;
+        pluginRequiresRestart.value = results.requiresRestart;
+      } else if (results.success.length > 0) {
+        pluginInstallSuccess.value = `Successfully installed ${results.success.length} plugin(s): ${results.success.map((s) => s.name).join(", ")}`;
+        pluginInstallError.value = `Failed to install ${results.failed.length} plugin(s): ${results.failed.map((f) => f.name).join(", ")}`;
+        pluginRequiresRestart.value = results.requiresRestart;
+      } else {
+        pluginInstallError.value = `Failed to install ${results.failed.length} plugin(s): ${results.failed.map((f) => `${f.name}: ${f.error}`).join("; ")}`;
+      }
+
+      // Mark installed plugins in-place so the list stays visible
+      for (const s of results.success) {
+        const idx = availablePlugins.value.findIndex(
+          (p) => p.id === s.id || p.path === s.response?.manifest?.id,
+        );
+        if (idx !== -1) {
+          availablePlugins.value[idx] = {
+            ...availablePlugins.value[idx],
+            _installed: true,
+            _installedVersion:
+              s.response?.manifest?.version ||
+              availablePlugins.value[idx].version,
+          };
+        }
+      }
+
+      if (results.success.length > 0) await loadPlugins();
+
+      if (!pluginRequiresRestart.value) {
+        setTimeout(() => {
+          pluginInstallSuccess.value = "";
+          pluginInstallError.value = "";
+        }, 10000);
+      }
+    } catch (error) {
+      pluginInstallError.value =
+        error.response?.data?.detail ||
+        error.message ||
+        "Failed to install plugins from local path";
       setTimeout(() => {
         pluginInstallError.value = "";
       }, 10000);
@@ -668,6 +921,9 @@ export function usePlugins() {
     enumeratePluginsFromGitHub,
     installPluginFromGitHub,
     installPluginsFromGitHub,
+    enumeratePluginsFromLocal,
+    installPluginFromLocal,
+    installPluginsFromLocal,
     uninstallPlugin,
     togglePlugin,
     updatePluginOrder,
