@@ -404,6 +404,7 @@ async def uninstall_plugin(plugin_id: str):
             }
         else:
             # Uninstall regular plugin
+            had_frontend = plugin_installer.get_frontend_plugin_path(plugin_id).exists()
             plugin_installer.uninstall_plugin(plugin_id)
 
             # Stop and delete all instances of this plugin type
@@ -453,6 +454,9 @@ async def uninstall_plugin(plugin_id: str):
                 if not m.startswith(f"installed_plugin_{plugin_id}")
             }
 
+            if had_frontend:
+                frontend_build_manager.start_background_build(plugin_installer.get_frontend_dir())
+
             # Emit plugin_uninstalled event
             try:
                 await event_system.emit_event(
@@ -474,6 +478,7 @@ async def uninstall_plugin(plugin_id: str):
             return {
                 "success": True,
                 "message": f"Plugin {plugin_id} uninstalled successfully",
+                "frontend_rebuild_in_progress": had_frontend,
             }
     except ValueError as e:
         raise HTTPException(status_code=404, detail=str(e))

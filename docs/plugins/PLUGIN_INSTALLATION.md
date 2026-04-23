@@ -136,7 +136,7 @@ class MyServicePlugin(ServicePlugin):
             },
             "display_schema": {
                 "type": "api",
-                "api_endpoint": "/api/web-services/{service_id}/data",
+                "api_endpoint": "/api/plugins/{service_id}/data",
                 "method": "GET",
                 "component": "my_plugin/MyComponent.vue",  # Optional: custom frontend component
             },
@@ -160,7 +160,7 @@ class MyServicePlugin(ServicePlugin):
         """Get service content for display."""
         return {
             "type": "api",
-            "url": f"/api/web-services/{self.plugin_id}/data",
+            "url": f"/api/plugins/{self.plugin_id}/data",
         }
 
 
@@ -214,7 +214,7 @@ The component path in `display_schema.component` should be relative to `frontend
 ```python
 "display_schema": {
     "type": "api",
-    "api_endpoint": "/api/web-services/{service_id}/data",
+    "api_endpoint": "/api/plugins/{service_id}/data",
     "method": "GET",
     "component": "my_plugin/MyComponent.vue",  # {plugin_id}/ComponentName.vue
 }
@@ -341,4 +341,3 @@ Installed plugins are automatically discovered and loaded on application startup
 ## Example Plugin Package
 
 See the built-in plugins in `backend/app/plugins/` for reference implementations.
-

@@ -158,6 +158,14 @@ const {
   pluginBranchSwitched,
   pluginActualBranch,
   pluginFrontendRebuildResult,
+  expandedPlugins,
+  pluginFormData,
+  savingPlugin,
+  testingPlugin,
+  fetchingPlugin,
+  pluginSaveStatus,
+  pluginTestStatus,
+  pluginFetchStatus,
   loadPlugins,
   installPluginFromZip,
   enumeratePluginsFromGitHub,
@@ -167,6 +175,11 @@ const {
   installPluginFromLocal,
   installPluginsFromLocal,
   uninstallPlugin,
+  loadPluginConfig,
+  updatePluginFormValue,
+  savePluginConfig,
+  testPluginConnection,
+  fetchPluginNow,
   togglePlugin,
 } = usePlugins();
 
@@ -176,14 +189,6 @@ const imagesStore = useImagesStore();
 
 // Local state
 const activePluginTab = ref("calendar");
-const expandedPlugins = ref({});
-const pluginFormData = ref({});
-const savingPlugin = ref(null);
-const testingPlugin = ref({});
-const fetchingPlugin = ref({});
-const pluginSaveStatus = ref({});
-const pluginTestStatus = ref({});
-const pluginFetchStatus = ref({});
 const uploading = ref(false);
 const uploadError = ref("");
 const uploadSuccess = ref("");
@@ -354,7 +359,9 @@ const handleToggleExpand = (pluginId) => {
   expandedPlugins.value[pluginId] = !expandedPlugins.value[pluginId];
   if (expandedPlugins.value[pluginId]) {
     // Load plugin config when expanding
-    loadPluginConfig(pluginId);
+    void loadPluginConfig(pluginId).catch((error) => {
+      console.error(`Failed to load config for plugin ${pluginId}:`, error);
+    });
   }
 };
 
@@ -389,80 +396,19 @@ const cancelUninstall = () => {
 };
 
 const handleUpdateFormValue = (pluginId, key, value) => {
-  if (!pluginFormData.value[pluginId]) {
-    pluginFormData.value[pluginId] = {};
-  }
-  pluginFormData.value[pluginId][key] = value;
+  updatePluginFormValue(pluginId, key, value);
 };
 
 const handleSaveConfig = async (pluginId) => {
-  savingPlugin.value = pluginId;
-  pluginSaveStatus.value[pluginId] = null;
-
-  try {
-    const config = pluginFormData.value[pluginId] || {};
-    await pluginsApi.updatePlugin(pluginId, { config });
-    pluginSaveStatus.value[pluginId] = {
-      success: true,
-      message: "Configuration saved successfully",
-    };
-    setTimeout(() => {
-      pluginSaveStatus.value[pluginId] = null;
-    }, 5000);
-  } catch (error) {
-    pluginSaveStatus.value[pluginId] = {
-      success: false,
-      message:
-        error.response?.data?.detail ||
-        error.message ||
-        "Failed to save configuration",
-    };
-  } finally {
-    savingPlugin.value = null;
-  }
+  await savePluginConfig(pluginId);
 };
 
 const handleTestConnection = async (pluginId) => {
-  testingPlugin.value[pluginId] = true;
-  pluginTestStatus.value[pluginId] = null;
-
-  try {
-    const response = await pluginsApi.testPlugin(pluginId);
-    pluginTestStatus.value[pluginId] = {
-      success: response.success || false,
-      message: response.message || "Test completed",
-    };
-  } catch (error) {
-    pluginTestStatus.value[pluginId] = {
-      success: false,
-      message: error.response?.data?.detail || error.message || "Test failed",
-    };
-  } finally {
-    testingPlugin.value[pluginId] = false;
-  }
+  await testPluginConnection(pluginId);
 };
 
 const handleFetchNow = async (pluginId) => {
-  fetchingPlugin.value[pluginId] = true;
-  pluginFetchStatus.value[pluginId] = null;
-
-  try {
-    await pluginsApi.fetchPlugin(pluginId);
-    pluginFetchStatus.value[pluginId] = {
-      success: true,
-      message: "Fetch initiated successfully",
-    };
-  } catch (error) {
-    pluginFetchStatus.value[pluginId] = {
-      success: false,
-      message:
-        error.response?.data?.detail ||
-        error.message ||
-        "Failed to initiate fetch",
-    };
-  } finally {
-    fetchingPlugin.value[pluginId] = false;
-  }
+  await fetchPluginNow(pluginId);
 };
 
 const handleCustomAction = async (_pluginId, _action) => {
@@ -636,15 +582,6 @@ const handleDeleteImage = async (imageId) => {
 };
 
 // Helper functions
-const loadPluginConfig = async (pluginId) => {
-  try {
-    const response = await pluginsApi.getPluginConfig(pluginId);
-    pluginFormData.value[pluginId] = response.config || {};
-  } catch (error) {
-    console.error(`Failed to load config for plugin ${pluginId}:`, error);
-  }
-};
-
 // Initialize
 onMounted(async () => {
   await loadPlugins();

@@ -73,19 +73,10 @@ const renderTemplate = computed(() => {
 
 const apiEndpoint = computed(() => {
   if (props.service.display_schema?.api_endpoint) {
-    let endpoint = props.service.display_schema.api_endpoint.replace(
+    return props.service.display_schema.api_endpoint.replace(
       "{service_id}",
       props.service.id,
     );
-    // Migrate old web-services endpoints to new plugin API
-    if (endpoint.includes("/api/web-services/")) {
-      // Convert /api/web-services/{id}/weather or /api/web-services/{id}/data to /api/plugins/{id}/data
-      endpoint = endpoint.replace(
-        /\/api\/web-services\/([^/]+)\/(weather|data)/,
-        "/api/plugins/$1/data",
-      );
-    }
-    return endpoint;
   }
   // For plugins without api_endpoint in display_schema, use the new plugin API format
   if (props.service.plugin_id && props.service.id) {

@@ -41,7 +41,7 @@ The Mealie plugin (available in the calvin-plugins repository) demonstrates this
 ```python
 "display_schema": {
     "type": "api",
-    "api_endpoint": "/api/web-services/{service_id}/data",
+    "api_endpoint": "/api/plugins/{service_id}/data",
     "method": "GET",
     "component": "mealie/MealPlanViewer.vue",  # Plugin-provided frontend component
 }
@@ -115,4 +115,3 @@ To verify frontend components are installed correctly:
 2. Verify the component files are present
 3. Check that the plugin's `display_schema.component` path matches the installed location
 4. Rebuild the frontend and test the plugin
-
