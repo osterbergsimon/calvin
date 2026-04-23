@@ -6,11 +6,9 @@
     :style="{ padding: `${barPadding}px` }"
   >
     <div class="clock-bar-outer">
-      <!-- Left spacer: invisible mirror of right weather to keep clock centered -->
+      <!-- Left spacer: invisible mirror of right side to keep clock centered -->
       <div class="clock-bar-side clock-bar-left" aria-hidden="true">
-        <span v-if="hasWeatherData" class="clock-weather-ghost">
-          {{ weatherEmoji }} {{ weatherTemp }}{{ weatherUnit }}
-        </span>
+        <PluginStatusbarItems ghost />
         <span
           v-if="isBackgroundRefreshing"
           class="clock-refresh-icon clock-refresh-ghost"
@@ -36,11 +34,9 @@
         >
       </div>
 
-      <!-- Right: weather status -->
+      <!-- Right: plugin statusbar items -->
       <div class="clock-bar-side clock-bar-right">
-        <span v-if="hasWeatherData" class="clock-weather">
-          {{ weatherEmoji }} {{ weatherTemp }}{{ weatherUnit }}
-        </span>
+        <PluginStatusbarItems />
         <span
           v-if="isBackgroundRefreshing"
           class="clock-refresh-icon"
@@ -54,9 +50,8 @@
 <script setup>
 import { ref, computed, onMounted, onUnmounted, watch } from "vue";
 import { useConfigStore } from "../stores/config";
-import { useWebServicesStore } from "../stores/webServices";
-import { useWeatherData } from "../composables/useWeatherData";
 import { useCalendarStore } from "../stores/calendar";
+import PluginStatusbarItems from "./PluginStatusbarItems.vue";
 
 defineOptions({
   name: "ClockBarHorizontal",
@@ -103,7 +98,6 @@ const props = defineProps({
 });
 
 const configStore = useConfigStore();
-const webServicesStore = useWebServicesStore();
 
 const currentTime = ref(new Date());
 let timeInterval = null;
@@ -183,68 +177,10 @@ const barPadding = computed(() => {
   return configStore.clockBarPadding || 8;
 });
 
-// Weather integration
-const showWeather = computed(() => configStore.clockBarShowWeather || false);
-
-const firstWeatherServiceId = computed(() => {
-  if (!showWeather.value) return null;
-  const svc = webServicesStore.services.find(
-    (s) => s.display_schema?.render_template === "weather",
-  );
-  return svc?.id ?? null;
-});
-
-const weatherEnabled = computed(
-  () => showWeather.value && !!firstWeatherServiceId.value,
-);
-
-const weatherQuery = useWeatherData(firstWeatherServiceId, weatherEnabled);
-
 const calendarStore = useCalendarStore();
 
 const isBackgroundRefreshing = computed(
-  () =>
-    (weatherQuery.isFetching.value && !weatherQuery.isLoading.value) ||
-    calendarStore.backgroundRefreshing,
-);
-
-const OWM_EMOJI = {
-  "01": "☀️",
-  "02": "⛅",
-  "03": "☁️",
-  "04": "☁️",
-  "09": "🌧️",
-  10: "🌦️",
-  11: "⛈️",
-  13: "❄️",
-  50: "🌫️",
-};
-
-const weatherEmoji = computed(() => {
-  const icon = weatherQuery.data.value?.current?.icon;
-  if (!icon) return "";
-  return OWM_EMOJI[icon.slice(0, 2)] ?? "🌡️";
-});
-
-const weatherTemp = computed(() => {
-  const temp = weatherQuery.data.value?.current?.temperature;
-  if (temp === undefined || temp === null) return null;
-  return Math.round(temp);
-});
-
-const weatherUnit = computed(() => {
-  const units = weatherQuery.data.value?.units || "metric";
-  if (units === "imperial") return "°F";
-  if (units === "kelvin") return "K";
-  return "°C";
-});
-
-const hasWeatherData = computed(
-  () =>
-    showWeather.value &&
-    !weatherQuery.isLoading.value &&
-    !weatherQuery.isError.value &&
-    weatherTemp.value !== null,
+  () => calendarStore.backgroundRefreshing,
 );
 
 // Format time
@@ -351,18 +287,9 @@ watch(shouldShow, (newValue) => {
   }
 });
 
-watch(showWeather, (newVal) => {
-  if (newVal && webServicesStore.services.length === 0) {
-    webServicesStore.fetchServices();
-  }
-});
-
 onMounted(() => {
   if (shouldShow.value) {
     updateTime();
-  }
-  if (showWeather.value && webServicesStore.services.length === 0) {
-    webServicesStore.fetchServices();
   }
 });
 
@@ -436,7 +363,7 @@ onUnmounted(() => {
   font-size: 0.75rem;
 }
 
-/* Three-column layout for weather integration */
+/* Three-column layout: left mirror | center time | right plugin items */
 .clock-bar-outer {
   display: flex;
   align-items: center;
@@ -460,22 +387,6 @@ onUnmounted(() => {
 
 .clock-bar-content {
   flex: 0 1 auto;
-}
-
-.clock-weather-ghost {
-  visibility: hidden;
-  white-space: nowrap;
-  font-size: 0.875rem;
-  padding: 0 0.5rem;
-  pointer-events: none;
-  user-select: none;
-}
-
-.clock-weather {
-  white-space: nowrap;
-  font-size: 0.875rem;
-  color: var(--text-secondary);
-  padding: 0 0.5rem;
 }
 
 .clock-refresh-icon {

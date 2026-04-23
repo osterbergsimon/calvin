@@ -5,7 +5,6 @@
       v-if="rebuildStatus !== 'idle'"
       :class="['rebuild-banner', `rebuild-banner--${rebuildStatus}`]"
     >
-      <span v-if="rebuildStatus === 'building'" class="rebuild-spinner" />
       <span class="rebuild-banner-text">{{ rebuildMessage }}</span>
       <button
         v-if="rebuildStatus === 'done'"
@@ -140,7 +139,7 @@
 </template>
 
 <script setup>
-import { ref, computed, onMounted, onUnmounted, watch } from "vue";
+import { ref, computed, onMounted, watch } from "vue";
 import { usePlugins } from "@/composables";
 import { useSystem } from "@/composables";
 import { useImagesStore } from "@/stores/images";
@@ -167,7 +166,7 @@ const {
   pluginRequiresRestart,
   pluginBranchSwitched,
   pluginActualBranch,
-  pluginFrontendRebuildTriggered,
+  pluginFrontendRebuildResult,
   loadPlugins,
   installPluginFromZip,
   enumeratePluginsFromGitHub,
@@ -228,39 +227,18 @@ const cancelPipInstall = () => {
 };
 
 // Frontend rebuild banner
-const rebuildStatus = ref("idle"); // idle | building | done | error
+const rebuildStatus = ref("idle"); // idle | done | error
 const rebuildMessage = ref("");
-let rebuildPollInterval = null;
 
-const stopRebuildPolling = () => {
-  if (rebuildPollInterval) {
-    clearInterval(rebuildPollInterval);
-    rebuildPollInterval = null;
-  }
-};
-
-const pollRebuildStatus = async () => {
-  try {
-    const result = await pluginsApi.getFrontendBuildStatus();
-    rebuildStatus.value = result.status;
-    rebuildMessage.value = result.message;
-    if (result.status !== "building") {
-      stopRebuildPolling();
-    }
-  } catch {
-    // Silently ignore polling errors
-  }
-};
-
-watch(pluginFrontendRebuildTriggered, (triggered) => {
-  if (!triggered) return;
-  rebuildStatus.value = "building";
-  rebuildMessage.value = "Frontend rebuild in progress…";
-  stopRebuildPolling();
-  rebuildPollInterval = setInterval(pollRebuildStatus, 4000);
+watch(pluginFrontendRebuildResult, (result) => {
+  if (!result) return;
+  rebuildStatus.value = result.success ? "done" : "error";
+  rebuildMessage.value =
+    result.message ||
+    (result.success
+      ? "Frontend rebuilt — refresh the page to load new plugin components."
+      : "Frontend rebuild failed — rebuild manually with: npm run build");
 });
-
-onUnmounted(stopRebuildPolling);
 
 // Handlers
 const handleZipSelect = async (file) => {
@@ -664,12 +642,6 @@ onMounted(async () => {
   font-size: 0.9rem;
 }
 
-.rebuild-banner--building {
-  background: rgba(59, 130, 246, 0.15);
-  border: 1px solid rgba(59, 130, 246, 0.4);
-  color: #93c5fd;
-}
-
 .rebuild-banner--done {
   background: rgba(34, 197, 94, 0.15);
   border: 1px solid rgba(34, 197, 94, 0.4);
@@ -684,22 +656,6 @@ onMounted(async () => {
 
 .rebuild-banner-text {
   flex: 1;
-}
-
-.rebuild-spinner {
-  width: 16px;
-  height: 16px;
-  border: 2px solid currentColor;
-  border-top-color: transparent;
-  border-radius: 50%;
-  animation: spin 0.8s linear infinite;
-  flex-shrink: 0;
-}
-
-@keyframes spin {
-  to {
-    transform: rotate(360deg);
-  }
 }
 
 .btn-refresh {

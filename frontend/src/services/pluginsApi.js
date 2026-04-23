@@ -171,14 +171,6 @@ export async function geocodeLocation(pluginId, location) {
 }
 
 /**
- * Get the status of a background frontend rebuild triggered by plugin install.
- */
-export async function getFrontendBuildStatus() {
-  const response = await api.get("/plugins/frontend-build-status");
-  return response.data;
-}
-
-/**
  * Update plugin (general update).
  */
 export async function updatePlugin(pluginId, data) {

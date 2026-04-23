@@ -288,10 +288,11 @@ async def install_plugin_from_github(request: dict[str, Any] = Body(...)):
                     # It just needs a restart to be loaded
 
                 actual_branch = "master" if branch_switched else branch
-                frontend_rebuild_triggered = False
+                frontend_rebuild_success = None
+                frontend_rebuild_message = None
                 if manifest.get("_has_frontend"):
-                    frontend_rebuild_triggered = frontend_build_manager.trigger(
-                        plugin_installer.get_frontend_dir()
+                    frontend_rebuild_success, frontend_rebuild_message = (
+                        frontend_build_manager.build(plugin_installer.get_frontend_dir())
                     )
                 return {
                     "success": True,
@@ -300,7 +301,8 @@ async def install_plugin_from_github(request: dict[str, Any] = Body(...)):
                     "branch": actual_branch,
                     "branch_switched": branch_switched,
                     "requires_restart": True,
-                    "frontend_rebuild_triggered": frontend_rebuild_triggered,
+                    "frontend_rebuild_success": frontend_rebuild_success,
+                    "frontend_rebuild_message": frontend_rebuild_message,
                 }
             else:
                 raise HTTPException(

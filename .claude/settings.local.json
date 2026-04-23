@@ -1,0 +1,21 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(awk '{print $5, $9}')",
+      "Bash(git -C C:/Users/oster/code/calvin diff --stat HEAD)",
+      "Bash(git -C C:/Users/oster/code/calvin-plugins diff --stat HEAD)",
+      "Bash(git -C C:/Users/oster/code/calvin log --oneline -5)",
+      "Bash(git -C C:/Users/oster/code/calvin-plugins log --oneline -5)",
+      "Bash(git -C C:/Users/oster/code/calvin diff HEAD -- frontend/src/components/ClockBarHorizontal.vue frontend/src/components/settings/specialized/PluginCard.vue frontend/src/components/settings/specialized/PluginInstances.vue frontend/src/components/settings/tabs/layout/UITab.vue frontend/src/stores/config.js frontend/src/components/settings/specialized/InstanceModal.vue)",
+      "Bash(git -C C:/Users/oster/code/calvin diff HEAD -- frontend/src/stores/config.js frontend/src/components/settings/tabs/layout/UITab.vue)",
+      "Bash(git -C C:/Users/oster/code/calvin-plugins diff HEAD -- CREATING_PLUGINS.md imap/plugin.py mealie/plugin.py yr_weather/plugin.py)",
+      "Bash(grep -E \"\\\\.\\(ts|tsx|js|jsx|py\\)$\")",
+      "Bash(grep -E \"\\\\.\\(vue|ts|tsx|js|jsx\\)$\")",
+      "Bash(git add *)",
+      "Bash(git commit -m ' *)",
+      "Bash(xargs grep *)",
+      "Bash(grep -E \"\\\\.\\(js|ts|vue\\)$\")",
+      "Bash(xargs -I {} bash -c \"echo '=== {} ===' && head -30 {}\")"
+    ]
+  }
+}

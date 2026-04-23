@@ -106,8 +106,12 @@ async def get_plugins(
             db_schema = (
                 db_type.common_config_schema if db_type and db_type.common_config_schema else {}
             )
-            # Merge: db_schema (user-set values) overrides metadata_schema (defaults)
-            merged_schema = {**metadata_schema, **db_schema}
+            # Only override keys that are defined in the plugin's own metadata schema —
+            # prevents instance config fields that leaked into db_schema from showing here.
+            merged_schema = {**metadata_schema}
+            for key in metadata_schema:
+                if key in db_schema:
+                    merged_schema[key] = db_schema[key]
 
             plugin_info: dict[str, Any] = {
                 "id": type_id,
@@ -249,15 +253,6 @@ async def inspect_plugin(file: UploadFile = File(...)):
                 pass
 
 
-@router.get("/plugins/frontend-build-status")
-async def get_frontend_build_status():
-    """Return the current status of a background frontend rebuild triggered by plugin install."""
-    return {
-        "status": frontend_build_manager.status,
-        "message": frontend_build_manager.message,
-    }
-
-
 @router.post("/plugins/install")
 async def install_plugin(
     file: UploadFile = File(...),
@@ -310,9 +305,10 @@ async def install_plugin(
                     f"Failed to emit plugin_installed event for plugin {manifest['id']}: {e}"
                 )
 
-            frontend_rebuild_triggered = False
+            frontend_rebuild_success = None
+            frontend_rebuild_message = None
             if manifest.get("_has_frontend"):
-                frontend_rebuild_triggered = frontend_build_manager.trigger(
+                frontend_rebuild_success, frontend_rebuild_message = frontend_build_manager.build(
                     plugin_installer.get_frontend_dir()
                 )
 
@@ -321,7 +317,8 @@ async def install_plugin(
                 "message": f"Plugin {manifest['id']} installed successfully",
                 "manifest": manifest,
                 "requires_restart": True,
-                "frontend_rebuild_triggered": frontend_rebuild_triggered,
+                "frontend_rebuild_success": frontend_rebuild_success,
+                "frontend_rebuild_message": frontend_rebuild_message,
             }
         except ValueError as e:
             raise HTTPException(status_code=400, detail=str(e))
@@ -538,8 +535,12 @@ async def get_plugin(plugin_id: str):
     # This ensures user-set values (like display_order) are preserved
     metadata_schema = type_info.get("common_config_schema", {}) or {}
     db_schema = db_type.common_config_schema if db_type and db_type.common_config_schema else {}
-    # Merge: db_schema (user-set values) overrides metadata_schema (defaults)
-    merged_schema = {**metadata_schema, **db_schema}
+    # Only override keys that are defined in the plugin's own metadata schema —
+    # prevents instance config fields that leaked into db_schema from showing here.
+    merged_schema = {**metadata_schema}
+    for key in metadata_schema:
+        if key in db_schema:
+            merged_schema[key] = db_schema[key]
 
     plugin_info: dict[str, Any] = {
         "id": type_info.get("type_id"),
@@ -549,9 +550,8 @@ async def get_plugin(plugin_id: str):
         else str(type_info.get("plugin_type")),
         "description": type_info.get("description", ""),
         "config_schema": merged_schema,
-        "display_schema": type_info.get(
-            "display_schema"
-        ),  # Include display_schema for frontend components
+        "display_schema": type_info.get("display_schema"),
+        "statusbar_schema": type_info.get("statusbar_schema"),
         "enabled": enabled,
     }
 
@@ -667,9 +667,11 @@ async def update_plugin(plugin_id: str, config: dict[str, Any]):
     if not db_type:
         # Create new plugin type in database
         plugin_type = type_info.get("plugin_type")
-        # Merge metadata schema with config (config takes precedence)
+        # Only store keys that are defined in the plugin's own common_config_schema
         metadata_schema = type_info.get("common_config_schema", {}) or {}
-        initial_schema = {**metadata_schema, **config} if config else metadata_schema
+        allowed_keys = set(metadata_schema.keys())
+        filtered_config = {k: v for k, v in config.items() if k in allowed_keys} if config else {}
+        initial_schema = {**metadata_schema, **filtered_config}
         logger.debug(
             f"Creating new plugin type {plugin_id} with schema: {initial_schema}, "
             f"config={config}, metadata_schema={metadata_schema}"
@@ -689,8 +691,12 @@ async def update_plugin(plugin_id: str, config: dict[str, Any]):
             db_type.enabled = enabled
         if config:
             current_schema = db_type.common_config_schema or {}
-            # Ormar JSON fields detect changes automatically
-            updated_schema = {**current_schema, **config}
+            # Only allow keys defined in the plugin's own common_config_schema —
+            # prevents instance config fields from leaking into the type-level schema.
+            metadata_schema = type_info.get("common_config_schema", {}) or {}
+            allowed_keys = set(metadata_schema.keys())
+            filtered_config = {k: v for k, v in config.items() if k in allowed_keys}
+            updated_schema = {**current_schema, **filtered_config}
             db_type.common_config_schema = updated_schema
             logger.debug(
                 f"Updated plugin {plugin_id} common_config_schema: "

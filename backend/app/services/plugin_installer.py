@@ -5,7 +5,6 @@ import logging
 import shutil
 import subprocess
 import sys
-import threading
 import zipfile
 from pathlib import Path
 from typing import Any
@@ -24,71 +23,37 @@ logger = logging.getLogger(__name__)
 
 
 class FrontendBuildManager:
-    """Runs `npm run build` in a background thread when plugins with frontend components are installed."""
+    """Runs `npm run build` synchronously when plugins with frontend components are installed."""
 
-    def __init__(self) -> None:
-        self._status = "idle"  # idle | building | done | error
-        self._message = ""
-        self._lock = threading.Lock()
-
-    @property
-    def status(self) -> str:
-        with self._lock:
-            return self._status
-
-    @property
-    def message(self) -> str:
-        with self._lock:
-            return self._message
-
-    def trigger(self, frontend_dir: Path) -> bool:
-        """Start a rebuild if one is not already running. Returns True if started."""
-        with self._lock:
-            if self._status == "building":
-                return False
-            self._status = "building"
-            self._message = "Frontend rebuild in progress…"
-
-        thread = threading.Thread(
-            target=self._run,
-            args=(frontend_dir,),
-            daemon=True,
-        )
-        thread.start()
-        return True
-
-    def _run(self, frontend_dir: Path) -> None:
+    def build(self, frontend_dir: Path) -> tuple[bool, str]:
+        """Run the frontend build synchronously. Returns (success, message)."""
         npm = shutil.which("npm")
         if not npm:
-            with self._lock:
-                self._status = "error"
-                self._message = "npm not found — rebuild the frontend manually with: npm run build"
-            return
+            return False, "npm not found — rebuild the frontend manually with: npm run build"
+
+        # On Windows, .cmd files can't be executed by CreateProcess directly —
+        # they need cmd.exe as the interpreter.
+        if sys.platform == "win32":
+            cmd = ["cmd", "/c", npm, "run", "build"]
+        else:
+            cmd = [npm, "run", "build"]
 
         try:
             result = subprocess.run(
-                [npm, "run", "build"],
+                cmd,
                 cwd=str(frontend_dir),
                 capture_output=True,
                 text=True,
                 timeout=300,
             )
-            with self._lock:
-                if result.returncode == 0:
-                    self._status = "done"
-                    self._message = "Frontend rebuilt successfully — refresh the page to load new plugin components."
-                else:
-                    tail = (result.stderr or result.stdout or "unknown error")[-500:]
-                    self._status = "error"
-                    self._message = f"Frontend rebuild failed: {tail}"
+            if result.returncode == 0:
+                return True, "Frontend rebuilt successfully."
+            tail = (result.stderr or result.stdout or "unknown error")[-500:]
+            return False, f"Frontend rebuild failed: {tail}"
         except subprocess.TimeoutExpired:
-            with self._lock:
-                self._status = "error"
-                self._message = "Frontend rebuild timed out (5 min limit)"
+            return False, "Frontend rebuild timed out (5 min limit)"
         except Exception as exc:
-            with self._lock:
-                self._status = "error"
-                self._message = f"Frontend rebuild failed: {exc}"
+            return False, f"Frontend rebuild failed: {exc}"
 
 
 frontend_build_manager = FrontendBuildManager()

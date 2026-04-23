@@ -25,7 +25,7 @@ const pluginInstallSuccess = ref("");
 const pluginRequiresRestart = ref(false);
 const pluginBranchSwitched = ref(false);
 const pluginActualBranch = ref("");
-const pluginFrontendRebuildTriggered = ref(false);
+const pluginFrontendRebuildResult = ref(null); // null | { success: bool, message: str }
 const expandedPlugins = ref({});
 const pluginFormData = ref({});
 const savingPlugin = ref(null);
@@ -169,8 +169,14 @@ export function usePlugins() {
       const response = await pluginsApi.installPluginFromZip(file);
       pluginInstallSuccess.value = "Plugin installed successfully!";
       pluginRequiresRestart.value = response.requires_restart || false;
-      if (response.frontend_rebuild_triggered) {
-        pluginFrontendRebuildTriggered.value = true;
+      if (
+        response.frontend_rebuild_success !== null &&
+        response.frontend_rebuild_success !== undefined
+      ) {
+        pluginFrontendRebuildResult.value = {
+          success: response.frontend_rebuild_success,
+          message: response.frontend_rebuild_message,
+        };
       }
 
       if (!pluginRequiresRestart.value) {
@@ -306,8 +312,14 @@ export function usePlugins() {
       pluginRequiresRestart.value = response.requires_restart || false;
       pluginBranchSwitched.value = response.branch_switched || false;
       pluginActualBranch.value = response.branch || branch;
-      if (response.frontend_rebuild_triggered) {
-        pluginFrontendRebuildTriggered.value = true;
+      if (
+        response.frontend_rebuild_success !== null &&
+        response.frontend_rebuild_success !== undefined
+      ) {
+        pluginFrontendRebuildResult.value = {
+          success: response.frontend_rebuild_success,
+          message: response.frontend_rebuild_message,
+        };
       }
 
       availablePlugins.value = [];
@@ -377,8 +389,14 @@ export function usePlugins() {
             pluginBranchSwitched.value = true;
             pluginActualBranch.value = response.branch || branch;
           }
-          if (response.frontend_rebuild_triggered) {
-            pluginFrontendRebuildTriggered.value = true;
+          if (
+            response.frontend_rebuild_success !== null &&
+            response.frontend_rebuild_success !== undefined
+          ) {
+            pluginFrontendRebuildResult.value = {
+              success: response.frontend_rebuild_success,
+              message: response.frontend_rebuild_message,
+            };
           }
         } catch (error) {
           results.failed.push({
@@ -632,7 +650,7 @@ export function usePlugins() {
     pluginRequiresRestart,
     pluginBranchSwitched,
     pluginActualBranch,
-    pluginFrontendRebuildTriggered,
+    pluginFrontendRebuildResult,
     expandedPlugins,
     pluginFormData,
     savingPlugin,

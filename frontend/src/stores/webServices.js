@@ -75,15 +75,18 @@ export const useWebServicesStore = defineStore("webServices", () => {
                 ...instance,
                 plugin_id: plugin.id,
                 plugin_name: plugin.name,
-                // Use plugin's display_schema (from get_plugin_metadata)
                 display_schema: displaySchema,
-                // Ensure type_id is set for component loading
+                statusbar_schema: pluginDetails.statusbar_schema || null,
                 type_id: plugin.id,
               });
             });
           } catch (err) {
             // Plugin might not have instances endpoint, skip
-            logWarn("[WebServicesStore]", `Failed to get instances for ${plugin.id}:`, err);
+            logWarn(
+              "[WebServicesStore]",
+              `Failed to get instances for ${plugin.id}:`,
+              err,
+            );
           }
         }
       }
@@ -101,9 +104,9 @@ export const useWebServicesStore = defineStore("webServices", () => {
           fullscreen: instance.config?.fullscreen || false,
           plugin_id: instance.plugin_id,
           plugin_name: instance.plugin_name,
-          // Preserve any display_schema if present
           display_schema:
             instance.display_schema || instance.config?.display_schema,
+          statusbar_schema: instance.statusbar_schema || null,
         })),
       };
 
