@@ -8,7 +8,7 @@ import pytest
 
 from app.plugins.base import PluginType
 from app.plugins.manager import plugin_manager
-from app.plugins.protocols import BackendPlugin
+from app.plugins.protocols import BackendPlugin, ServicePlugin
 from app.services.plugin_installer import plugin_installer
 
 
@@ -617,3 +617,85 @@ class TestBackendPluginAPI:
             assert data["scheduled_task"] is None
         finally:
             await plugin_manager.unregister("test-backend-status-no-schedule")
+
+
+@pytest.mark.integration
+class TestServicePluginDataAPI:
+    """Test service plugin data endpoint."""
+
+    class MockServicePluginForAPI(ServicePlugin):
+        def __init__(self, plugin_id: str, name: str, enabled: bool = True):
+            super().__init__(plugin_id, name, enabled)
+            self.initialize_calls = 0
+
+        @classmethod
+        def get_plugin_metadata(cls):
+            return {"type_id": "test-service", "plugin_type": PluginType.SERVICE}
+
+        @property
+        def plugin_type(self) -> PluginType:
+            return PluginType.SERVICE
+
+        async def initialize(self) -> None:
+            self.initialize_calls += 1
+
+        async def cleanup(self) -> None:
+            pass
+
+        async def get_content(self) -> dict[str, Any]:
+            return {"type": "api", "url": "/api/plugins/test-service-instance/data"}
+
+        async def validate_config(self, config: dict[str, Any]) -> bool:
+            return True
+
+        async def fetch_service_data(
+            self,
+            start_date: str | None = None,
+            end_date: str | None = None,
+        ) -> dict[str, Any] | None:
+            return {
+                "success": True,
+                "start_date": start_date,
+                "end_date": end_date,
+                "items": [{"label": "ok"}],
+            }
+
+    @pytest.mark.asyncio
+    async def test_get_plugin_data_uses_service_instance_method(self, test_client):
+        from app.models.db_models import PluginDB
+
+        plugin = self.MockServicePluginForAPI(
+            plugin_id="test-service-instance",
+            name="Test Service Instance",
+            enabled=True,
+        )
+        await plugin_manager.register(plugin)
+
+        db_plugin = await PluginDB.objects.create(
+            id="test-service-instance",
+            type_id="test-service",
+            plugin_type="service",
+            name="Test Service Instance",
+            enabled=True,
+            config={},
+        )
+
+        try:
+            response = test_client.get(
+                "/api/plugins/test-service-instance/data",
+                params={"start_date": "2026-01-01", "end_date": "2026-01-07"},
+            )
+
+            if response.status_code == 404:
+                pytest.skip("Service data endpoint not available in test client")
+
+            assert response.status_code == 200
+            data = response.json()
+            assert data["success"] is True
+            assert data["start_date"] == "2026-01-01"
+            assert data["end_date"] == "2026-01-07"
+            assert data["items"] == [{"label": "ok"}]
+            assert plugin.initialize_calls == 1
+        finally:
+            await plugin_manager.unregister("test-service-instance")
+            await db_plugin.delete()

@@ -158,10 +158,11 @@ class PluginHookSpec:
         end_date: str | None = None,
     ) -> dict[str, Any] | None:
         """
-        Fetch service data from a service plugin instance.
+        Legacy hook for fetching service data from a service plugin instance.
 
-        This hook allows service plugins to implement their own data fetching logic
-        for the generic /api/plugins/{plugin_id}/data endpoint.
+        Deprecated in favor of implementing ServicePlugin.fetch_service_data()
+        on the resolved plugin instance directly. Kept for compatibility while
+        the runtime surface is being simplified.
 
         Args:
             instance_id: Plugin instance ID

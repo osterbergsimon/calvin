@@ -931,25 +931,6 @@ async def get_plugin_data(
             logger.error(f"Error initializing plugin {plugin_id}: {e}", exc_info=True)
             raise HTTPException(status_code=500, detail=f"Failed to initialize plugin: {str(e)}")
 
-    # Try hook-based data fetching first (for external plugins)
-    try:
-        hook_coroutines = hook_manager.hook.fetch_service_data(
-            instance_id=plugin_id, start_date=start_date, end_date=end_date
-        )
-        # Process hook results (pluggy returns a list of coroutines)
-        if hook_coroutines:
-            hook_results = await asyncio.gather(*hook_coroutines, return_exceptions=True)
-            # Check if any plugin handled the fetch
-            for result in hook_results:
-                # Skip exceptions
-                if isinstance(result, Exception):
-                    continue
-                if result is not None:
-                    return result
-    except Exception as e:
-        logger.debug(f"Hook-based fetch_service_data failed for {plugin_id}: {e}")
-
-    # Fall back to protocol method (for built-in plugins)
     try:
         data = await plugin_instance.fetch_service_data(start_date=start_date, end_date=end_date)
         if data is not None:
