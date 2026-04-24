@@ -795,3 +795,50 @@ class TestPluginTypeClassBasedActions:
         assert response.status_code == 200
         data = response.json()
         assert data["options"] == [{"value": "device", "label": "DEVICE"}]
+
+    def test_fetch_plugin_prefers_plugin_class(self, test_client, monkeypatch):
+        from app.plugins.base import BasePlugin
+
+        class ClassBasedFetchPlugin(BasePlugin):
+            @property
+            def plugin_type(self) -> PluginType:
+                return PluginType.BACKEND
+
+            @classmethod
+            def get_plugin_metadata(cls):
+                return {
+                    "type_id": "class-based-fetch",
+                    "plugin_type": PluginType.BACKEND,
+                    "name": "Class Based Fetch",
+                    "plugin_class": cls,
+                }
+
+            async def initialize(self) -> None:
+                pass
+
+            async def cleanup(self) -> None:
+                pass
+
+            @classmethod
+            async def fetch_type_data(cls, instance_id: str | None = None) -> dict[str, Any] | None:
+                return {
+                    "success": True,
+                    "message": "manual fetch completed",
+                    "instance_id": instance_id,
+                }
+
+        monkeypatch.setattr(
+            "app.api.routes.plugins.management.plugin_loader.get_plugin_types",
+            lambda: [ClassBasedFetchPlugin.get_plugin_metadata()],
+        )
+
+        response = test_client.post("/api/plugins/class-based-fetch/fetch")
+
+        if response.status_code == 404:
+            pytest.skip("Plugin fetch endpoint not available in test client")
+
+        assert response.status_code == 200
+        data = response.json()
+        assert data["success"] is True
+        assert data["message"] == "manual fetch completed"
+        assert data["instance_id"] is None

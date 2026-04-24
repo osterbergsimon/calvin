@@ -118,7 +118,12 @@ class PluginHookSpec:
         """
         Manually trigger plugin fetch/check operation.
 
-        This hook allows plugins to implement their own fetch logic (e.g., check for new emails).
+        This hook allows plugins to implement their own fetch logic (e.g., check for new
+        emails).
+
+        Legacy compatibility path:
+        New plugins should prefer BasePlugin.fetch_type_data() and let the core call the
+        plugin class directly.
 
         Args:
             type_id: Plugin type ID (e.g., 'imap')

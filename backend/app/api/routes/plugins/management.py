@@ -826,7 +826,13 @@ async def fetch_plugin(plugin_id: str):
     if not type_info:
         raise HTTPException(status_code=404, detail="Plugin type not found")
 
-    # Call plugin-specific fetch handlers via hooks
+    plugin_class = type_info.get("plugin_class")
+    if plugin_class is not None:
+        class_result = await plugin_class.fetch_type_data(instance_id=None)
+        if class_result is not None:
+            return class_result
+
+    # Legacy compatibility: fall back to hook-based fetch handlers
     # Pluggy returns a list of coroutines for async hooks, we need to await them
     fetch_coroutines = hook_manager.hook.fetch_plugin_data(
         type_id=plugin_id,

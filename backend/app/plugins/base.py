@@ -101,6 +101,16 @@ class BasePlugin(ABC):
         """
         return None
 
+    @classmethod
+    async def fetch_type_data(cls, instance_id: str | None = None) -> dict[str, Any] | None:
+        """
+        Manually trigger a type-level fetch/check operation.
+
+        Returns None by default, indicating the plugin does not implement a
+        class-based manual fetch path.
+        """
+        return None
+
     async def configure(self, config: dict[str, Any]) -> None:
         """
         Configure the plugin with settings.
