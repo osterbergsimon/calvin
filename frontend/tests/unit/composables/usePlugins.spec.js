@@ -23,7 +23,14 @@ vi.mock("@/services/pluginsApi", () => ({
   getInstalledPlugins: vi.fn(),
   getPluginInstances: vi.fn(),
   getPluginConfig: vi.fn(),
+  updatePlugin: vi.fn(),
+  updatePluginConfig: vi.fn(),
+  startPluginInstance: vi.fn(),
+  stopPluginInstance: vi.fn(),
+  updatePluginInstanceOrder: vi.fn(),
   updatePluginInstance: vi.fn(),
+  testPlugin: vi.fn(),
+  fetchPlugin: vi.fn(),
 }));
 
 describe("usePlugins", () => {
@@ -55,7 +62,7 @@ describe("usePlugins", () => {
       pluginsApi.getPlugins.mockResolvedValue(mockPlugins);
       pluginsApi.getInstalledPlugins.mockResolvedValue({ plugins: [] });
       pluginsApi.getPluginInstances.mockResolvedValue({ instances: [] });
-      pluginsApi.getPluginConfig.mockResolvedValue({ config: {} });
+      pluginsApi.getPluginConfig.mockResolvedValue({});
 
       const { sortedPluginCategories, loadPlugins } = usePlugins();
       await loadPlugins();
@@ -97,7 +104,7 @@ describe("usePlugins", () => {
       pluginsApi.getPlugins.mockResolvedValue(mockPlugins);
       pluginsApi.getInstalledPlugins.mockResolvedValue({ plugins: [] });
       pluginsApi.getPluginInstances.mockResolvedValue({ instances: [] });
-      pluginsApi.getPluginConfig.mockResolvedValue({ config: {} });
+      pluginsApi.getPluginConfig.mockResolvedValue({});
 
       const { sortedPluginCategories, loadPlugins } = usePlugins();
       await loadPlugins();
@@ -133,7 +140,7 @@ describe("usePlugins", () => {
       pluginsApi.getPlugins.mockResolvedValue(mockPlugins);
       pluginsApi.getInstalledPlugins.mockResolvedValue({ plugins: [] });
       pluginsApi.getPluginInstances.mockResolvedValue({ instances: [] });
-      pluginsApi.getPluginConfig.mockResolvedValue({ config: {} });
+      pluginsApi.getPluginConfig.mockResolvedValue({});
 
       const { plugins, loadPlugins } = usePlugins();
       await loadPlugins();
@@ -157,7 +164,7 @@ describe("usePlugins", () => {
       pluginsApi.getPlugins.mockResolvedValue(mockPlugins);
       pluginsApi.getInstalledPlugins.mockResolvedValue({ plugins: [] });
       pluginsApi.getPluginInstances.mockResolvedValue({ instances: [] });
-      pluginsApi.getPluginConfig.mockResolvedValue({ config: {} });
+      pluginsApi.getPluginConfig.mockResolvedValue({});
 
       const { sortedPluginCategories, loadPlugins } = usePlugins();
       await loadPlugins();
@@ -178,7 +185,7 @@ describe("usePlugins", () => {
       });
       pluginsApi.getInstalledPlugins.mockResolvedValue({ plugins: [] });
       pluginsApi.getPluginInstances.mockResolvedValue({ instances: [] });
-      pluginsApi.getPluginConfig.mockResolvedValue({ config: {} });
+      pluginsApi.getPluginConfig.mockResolvedValue({});
       pluginsApi.updatePluginInstance.mockResolvedValue({
         success: true,
         instance: { id: "imap-1", enabled: false },
@@ -201,7 +208,7 @@ describe("usePlugins", () => {
       });
       pluginsApi.getInstalledPlugins.mockResolvedValue({ plugins: [] });
       pluginsApi.getPluginInstances.mockResolvedValue({ instances: [] });
-      pluginsApi.getPluginConfig.mockResolvedValue({ config: {} });
+      pluginsApi.getPluginConfig.mockResolvedValue({});
       pluginsApi.updatePluginInstance.mockRejectedValue(
         new Error("Update failed"),
       );
@@ -238,7 +245,7 @@ describe("usePlugins", () => {
       pluginsApi.getPlugins.mockResolvedValue(mockPlugins);
       pluginsApi.getInstalledPlugins.mockResolvedValue({ plugins: [] });
       pluginsApi.getPluginInstances.mockResolvedValue({ instances: [] });
-      pluginsApi.getPluginConfig.mockResolvedValue({ config: {} });
+      pluginsApi.getPluginConfig.mockResolvedValue({});
 
       const { plugins, loadPlugins } = usePlugins();
       await loadPlugins();
@@ -267,7 +274,7 @@ describe("usePlugins", () => {
       pluginsApi.getPlugins.mockResolvedValue(mockPlugins);
       pluginsApi.getInstalledPlugins.mockResolvedValue(mockInstalled);
       pluginsApi.getPluginInstances.mockResolvedValue({ instances: [] });
-      pluginsApi.getPluginConfig.mockResolvedValue({ config: {} });
+      pluginsApi.getPluginConfig.mockResolvedValue({});
 
       const { plugins, loadPlugins } = usePlugins();
       await loadPlugins();

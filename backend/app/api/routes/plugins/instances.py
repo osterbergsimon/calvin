@@ -6,6 +6,7 @@ from pathlib import Path
 from typing import Any
 
 from fastapi import APIRouter, Body, HTTPException
+from pydantic import BaseModel
 
 from app.api.routes.plugins.config import mask_sensitive_config
 from app.models.db_models import PluginDB
@@ -18,7 +19,44 @@ logger = logging.getLogger(__name__)
 router = APIRouter()
 
 
-@router.post("/plugins/instances/{instance_id}/start")
+class PluginInstanceResponse(BaseModel):
+    id: str
+    name: str
+    enabled: bool
+    running: bool
+    config: dict[str, Any]
+    display_order: int
+
+
+class PluginInstanceListResponse(BaseModel):
+    instances: list[PluginInstanceResponse]
+    total: int
+
+
+class PluginInstanceActionResponse(BaseModel):
+    success: bool
+    message: str
+    running: bool
+
+
+class PluginInstanceDeleteResponse(BaseModel):
+    success: bool
+    message: str
+
+
+class PluginInstanceUpdateResponse(BaseModel):
+    success: bool
+    message: str
+    instance: PluginInstanceResponse
+
+
+class PluginInstanceOrderUpdateResponse(BaseModel):
+    success: bool
+    message: str
+    updated: int
+
+
+@router.post("/plugins/instances/{instance_id}/start", response_model=PluginInstanceActionResponse)
 async def start_plugin_instance(instance_id: str):
     """
     Start a plugin instance (if enabled).
@@ -104,7 +142,7 @@ async def start_plugin_instance(instance_id: str):
         raise HTTPException(status_code=500, detail=f"Failed to start plugin {instance_id}")
 
 
-@router.post("/plugins/instances/{instance_id}/stop")
+@router.post("/plugins/instances/{instance_id}/stop", response_model=PluginInstanceActionResponse)
 async def stop_plugin_instance(instance_id: str):
     """
     Stop a plugin instance.
@@ -170,7 +208,7 @@ async def stop_plugin_instance(instance_id: str):
         raise HTTPException(status_code=500, detail=f"Failed to stop plugin {instance_id}")
 
 
-@router.get("/plugins/{plugin_id}/instances")
+@router.get("/plugins/{plugin_id}/instances", response_model=PluginInstanceListResponse)
 async def get_plugin_instances(plugin_id: str):
     """
     Get all plugin instances for a plugin type, including running status.
@@ -235,7 +273,7 @@ async def get_plugin_instances(plugin_id: str):
     return {"instances": instances, "total": len(instances)}
 
 
-@router.delete("/plugins/instances/{instance_id}")
+@router.delete("/plugins/instances/{instance_id}", response_model=PluginInstanceDeleteResponse)
 async def delete_plugin_instance(instance_id: str):
     db_plugin = await PluginDB.objects.get_or_none(id=instance_id)
 
@@ -278,7 +316,7 @@ async def delete_plugin_instance(instance_id: str):
     return {"success": True, "message": f"Plugin instance {instance_id} deleted successfully"}
 
 
-@router.put("/plugins/instances/{instance_id}")
+@router.put("/plugins/instances/{instance_id}", response_model=PluginInstanceUpdateResponse)
 async def update_plugin_instance(instance_id: str, instance_data: dict[str, Any] = Body(...)):
     """
     Update a plugin instance (enabled status, config, etc.).
@@ -500,7 +538,10 @@ async def update_plugin_instance(instance_id: str, instance_data: dict[str, Any]
     }
 
 
-@router.put("/plugins/{plugin_id}/instances/order")
+@router.put(
+    "/plugins/{plugin_id}/instances/order",
+    response_model=PluginInstanceOrderUpdateResponse,
+)
 async def update_plugin_instances_order(
     plugin_id: str, instance_orders: dict[str, int] = Body(...)
 ):

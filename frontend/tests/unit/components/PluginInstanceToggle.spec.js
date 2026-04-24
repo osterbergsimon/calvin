@@ -56,7 +56,7 @@ describe("PluginInstanceToggle", () => {
           enabled: false,
         },
       });
-      pluginsApi.getPluginConfig.mockResolvedValue({ config: {} });
+      pluginsApi.getPluginConfig.mockResolvedValue({});
 
       const wrapper = mount(PluginsCategory, {
         global: {
@@ -113,7 +113,7 @@ describe("PluginInstanceToggle", () => {
       pluginsApi.updatePluginInstance.mockRejectedValue(
         new Error("Failed to toggle instance"),
       );
-      pluginsApi.getPluginConfig.mockResolvedValue({ config: {} });
+      pluginsApi.getPluginConfig.mockResolvedValue({});
 
       const consoleErrorSpy = vi
         .spyOn(console, "error")
@@ -188,7 +188,7 @@ describe("PluginInstanceToggle", () => {
           enabled: false,
         },
       });
-      pluginsApi.getPluginConfig.mockResolvedValue({ config: {} });
+      pluginsApi.getPluginConfig.mockResolvedValue({});
 
       const wrapper = mount(PluginsCategory, {
         global: {
@@ -245,7 +245,7 @@ describe("PluginInstanceToggle", () => {
           running: false,
         },
       });
-      pluginsApi.getPluginConfig.mockResolvedValue({ config: {} });
+      pluginsApi.getPluginConfig.mockResolvedValue({});
 
       const wrapper = mount(PluginsCategory, {
         global: {

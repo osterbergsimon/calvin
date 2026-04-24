@@ -95,22 +95,6 @@ function _startRebuildPolling() {
   _rebuildPollTimer = setTimeout(poll, 1000);
 }
 
-function _normalizePluginConfig(config = {}) {
-  const cleanedConfig = {};
-
-  for (const [key, value] of Object.entries(config)) {
-    if (value === null || value === undefined) {
-      cleanedConfig[key] = "";
-    } else if (typeof value === "object") {
-      cleanedConfig[key] = value.value || value.default || "";
-    } else {
-      cleanedConfig[key] = value;
-    }
-  }
-
-  return cleanedConfig;
-}
-
 export function usePlugins() {
   // Load plugins
   const loadPlugins = async () => {
@@ -158,14 +142,14 @@ export function usePlugins() {
             pluginsApi
               .getPluginInstances(plugin.id)
               .catch(() => ({ instances: [] })),
-            pluginsApi.getPluginConfig(plugin.id).catch(() => ({ config: {} })),
+            pluginsApi.getPluginConfig(plugin.id).catch(() => ({})),
           ]);
 
           pluginInstances.value[plugin.id] = instancesResponse.instances || [];
-          pluginConfigs.value[plugin.id] = configResponse.config || {};
+          pluginConfigs.value[plugin.id] = configResponse || {};
 
           // Load display orders from config (fallback to config API if not in schema)
-          const config = configResponse.config || {};
+          const config = configResponse || {};
           // Use config API value only if schema doesn't have it
           if (displayOrder === undefined || displayOrder === null) {
             displayOrder = config.display_order;
@@ -740,8 +724,7 @@ export function usePlugins() {
 
   const loadPluginConfig = async (pluginId) => {
     try {
-      const response = await pluginsApi.getPluginConfig(pluginId);
-      const config = response.config || {};
+      const config = await pluginsApi.getPluginConfig(pluginId);
       pluginConfigs.value[pluginId] = config;
       pluginFormData.value[pluginId] = { ...config };
       return config;
@@ -768,10 +751,10 @@ export function usePlugins() {
 
     try {
       const config = pluginFormData.value[pluginId] || {};
-      const cleanedConfig = _normalizePluginConfig(config);
-      await pluginsApi.updatePlugin(pluginId, cleanedConfig);
-      pluginConfigs.value[pluginId] = { ...cleanedConfig };
-      pluginFormData.value[pluginId] = { ...cleanedConfig };
+      await pluginsApi.updatePlugin(pluginId, config);
+      const normalizedConfig = await loadPluginConfig(pluginId);
+      pluginConfigs.value[pluginId] = { ...normalizedConfig };
+      pluginFormData.value[pluginId] = { ...normalizedConfig };
       pluginSaveStatus.value[pluginId] = {
         success: true,
         message: "Configuration saved successfully",
@@ -803,9 +786,7 @@ export function usePlugins() {
     pluginTestStatus.value[pluginId] = null;
 
     try {
-      const testConfig = _normalizePluginConfig(
-        pluginFormData.value[pluginId] || {},
-      );
+      const testConfig = pluginFormData.value[pluginId] || {};
       const response = await pluginsApi.testPlugin(pluginId, testConfig);
       pluginTestStatus.value[pluginId] = {
         success: response.success || false,
@@ -978,10 +959,11 @@ export function usePlugins() {
   // Update instance order for a plugin
   const updateInstanceOrder = async (pluginId, newOrder) => {
     try {
-      // newOrder is an array of instance objects from draggable
-      // Extract instance IDs in the new order
-      const instanceIds = newOrder.map((instance) => instance.id);
-      await pluginsApi.updatePluginInstancesOrder(pluginId, instanceIds);
+      const instanceOrders = {};
+      newOrder.forEach((instance, index) => {
+        instanceOrders[instance.id] = index;
+      });
+      await pluginsApi.updatePluginInstanceOrder(pluginId, instanceOrders);
       // Reload instances to get updated order
       const instancesResponse = await pluginsApi.getPluginInstances(pluginId);
       pluginInstances.value[pluginId] = instancesResponse.instances || [];
@@ -998,10 +980,11 @@ export function usePlugins() {
   // Update image instance order for a plugin
   const updateImageInstanceOrder = async (pluginId, newOrder) => {
     try {
-      // newOrder is an array of instance objects from draggable
-      // Extract instance IDs in the new order
-      const instanceIds = newOrder.map((instance) => instance.id);
-      await pluginsApi.updatePluginInstancesOrder(pluginId, instanceIds);
+      const instanceOrders = {};
+      newOrder.forEach((instance, index) => {
+        instanceOrders[instance.id] = index;
+      });
+      await pluginsApi.updatePluginInstanceOrder(pluginId, instanceOrders);
       // Reload instances to get updated order
       const instancesResponse = await pluginsApi.getPluginInstances(pluginId);
       pluginInstances.value[pluginId] = instancesResponse.instances || [];

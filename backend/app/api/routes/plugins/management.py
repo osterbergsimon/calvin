@@ -12,6 +12,7 @@ from typing import Any
 import httpx
 from fastapi import APIRouter, Body, File, HTTPException, Query, UploadFile
 from loguru import logger
+from pydantic import BaseModel
 
 from app.models.db_models import PluginDB, PluginTypeDB
 from app.plugins.base import PluginType
@@ -23,12 +24,41 @@ from app.services.event_system import event_system
 from app.services.plugin_installer import frontend_build_manager, plugin_installer
 from app.services.theme_installer import theme_installer
 
+from .config import normalize_plugin_config
 from .themes import BUILTIN_THEMES, _unregister_theme_from_db
 
 router = APIRouter()
 
 
-@router.get("/plugins")
+class RebuildStatusResponse(BaseModel):
+    state: str
+    message: str
+
+
+class PluginManifestEnvelope(BaseModel):
+    manifest: dict[str, Any]
+
+
+class PluginInstallResponse(BaseModel):
+    success: bool
+    message: str
+    manifest: dict[str, Any]
+    requires_restart: bool
+    frontend_rebuild_in_progress: bool
+
+
+class PluginDeleteResponse(BaseModel):
+    success: bool
+    message: str
+    frontend_rebuild_in_progress: bool = False
+
+
+class PluginListResponse(BaseModel):
+    plugins: list[dict[str, Any]]
+    total: int
+
+
+@router.get("/plugins", response_model=PluginListResponse)
 async def get_plugins(
     plugin_type: str | None = Query(None, description="Optional plugin type filter"),
 ):
@@ -197,7 +227,7 @@ async def get_plugins(
 
 
 # Specific routes must come before parameterized routes to avoid path conflicts
-@router.get("/plugins/rebuild-status")
+@router.get("/plugins/rebuild-status", response_model=RebuildStatusResponse)
 async def get_rebuild_status():
     """Return the current state of a background frontend rebuild."""
     return {
@@ -206,7 +236,7 @@ async def get_rebuild_status():
     }
 
 
-@router.get("/plugins/installed")
+@router.get("/plugins/installed", response_model=PluginListResponse)
 async def get_installed_plugins():
     """
     Get list of installed plugins and themes.
@@ -228,12 +258,13 @@ async def get_installed_plugins():
             # Add type field to distinguish from plugins
             theme["type"] = PluginType.THEME.value
 
-        return {"plugins": plugins + themes}
+        result = plugins + themes
+        return {"plugins": result, "total": len(result)}
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"Failed to get installed plugins: {str(e)}")
 
 
-@router.post("/plugins/inspect")
+@router.post("/plugins/inspect", response_model=PluginManifestEnvelope)
 async def inspect_plugin(file: UploadFile = File(...)):
     """
     Read plugin.json from a zip without installing it.
@@ -262,7 +293,7 @@ async def inspect_plugin(file: UploadFile = File(...)):
                 pass
 
 
-@router.post("/plugins/install")
+@router.post("/plugins/install", response_model=PluginInstallResponse)
 async def install_plugin(
     file: UploadFile = File(...),
     plugin_id: str | None = None,
@@ -355,7 +386,7 @@ async def get_installed_plugin(plugin_id: str):
     return manifest
 
 
-@router.delete("/plugins/installed/{plugin_id}")
+@router.delete("/plugins/installed/{plugin_id}", response_model=PluginDeleteResponse)
 async def uninstall_plugin(plugin_id: str):
     """
     Uninstall a plugin or theme.
@@ -593,20 +624,7 @@ async def update_plugin(plugin_id: str, config: dict[str, Any]):
         config = {k: v for k, v in config.items() if k != "enabled"}
 
     # Clean config values - ensure all values are strings, not objects
-    cleaned_config = {}
-    for key, value in config.items():
-        if isinstance(value, dict):
-            # If it's a schema object, extract the actual value or default
-            cleaned_value = value.get("value") or value.get("default") or ""
-            cleaned_config[key] = cleaned_value
-        elif isinstance(value, Path):
-            # Handle Path objects - convert to string
-            cleaned_config[key] = str(value)
-        elif value is None:
-            cleaned_config[key] = ""
-        else:
-            cleaned_config[key] = str(value)
-
+    cleaned_config = normalize_plugin_config(config)
     config = cleaned_config
 
     # Get plugin type from pluggy hooks first
@@ -716,15 +734,7 @@ async def update_plugin(plugin_id: str, config: dict[str, Any]):
     # Save common config to config service for backward compatibility
     if config:
         config_key = f"plugin_{plugin_id}_config"
-        serializable_config = {}
-        for key, value in config.items():
-            if isinstance(value, Path):
-                serializable_config[key] = str(value)
-            elif isinstance(value, dict):
-                serializable_config[key] = value.get("value") or value.get("default") or ""
-            else:
-                serializable_config[key] = value
-        config_json = json.dumps(serializable_config)
+        config_json = json.dumps(config)
         await config_service.set_value(config_key, config_json)
 
     # Call plugin-specific config update handlers (if any)
@@ -1104,7 +1114,7 @@ async def test_plugin(plugin_id: str, test_config: dict[str, Any] | None = Body(
 
     # Use provided test_config if available, otherwise get saved config
     if test_config:
-        config = test_config
+        config = normalize_plugin_config(test_config)
     else:
         # Get plugin config
         config_key = f"plugin_{plugin_id}_config"

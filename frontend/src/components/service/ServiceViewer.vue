@@ -43,6 +43,7 @@ import { computed, watch } from "vue";
 import WeatherViewer from "./WeatherViewer.vue";
 import GenericApiViewer from "./GenericApiViewer.vue";
 import { usePluginComponent } from "../../composables/usePluginComponent";
+import { logDebug, logError } from "../../utils/logger";
 
 const props = defineProps({
   service: {
@@ -98,7 +99,7 @@ const {
 watch(
   () => props.service,
   (service) => {
-    console.log("[ServiceViewer] Service data:", {
+    logDebug("[ServiceViewer]", "Service data:", {
       id: service?.id,
       name: service?.name,
       plugin_id: service?.plugin_id,
@@ -111,16 +112,16 @@ watch(
 );
 
 watch(componentPath, (path) => {
-  console.log("[ServiceViewer] Component path:", path);
+  logDebug("[ServiceViewer]", "Component path:", path);
 });
 
 watch(pluginComponent, (comp) => {
-  console.log("[ServiceViewer] Plugin component loaded:", comp);
+  logDebug("[ServiceViewer]", "Plugin component loaded:", comp);
 });
 
 watch(pluginComponentError, (err) => {
   if (err) {
-    console.error("[ServiceViewer] Component error:", err);
+    logError("[ServiceViewer]", "Component error:", err);
   }
 });
 </script>

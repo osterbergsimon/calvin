@@ -41,15 +41,7 @@ export async function getPluginInstances(pluginId) {
  */
 export async function getPluginConfig(pluginId) {
   const response = await api.get(`/plugins/${pluginId}/config`);
-  return response.data;
-}
-
-/**
- * Update plugin configuration.
- */
-export async function updatePluginConfig(pluginId, config) {
-  const response = await api.put(`/plugins/${pluginId}`, config);
-  return response.data;
+  return response.data || {};
 }
 
 /**
@@ -61,6 +53,24 @@ export async function updatePluginInstanceOrder(pluginId, orders) {
     orders,
   );
   return response.data;
+}
+
+/**
+ * Backward-compatible alias for callers using the older plural name.
+ * Accepts either an order map or an ordered array of instance ids.
+ */
+export async function updatePluginInstancesOrder(pluginId, ordersOrIds) {
+  const orders = Array.isArray(ordersOrIds)
+    ? Object.fromEntries(ordersOrIds.map((id, index) => [id, index]))
+    : ordersOrIds;
+  return updatePluginInstanceOrder(pluginId, orders);
+}
+
+/**
+ * Backward-compatible alias for callers using the older config-specific name.
+ */
+export async function updatePluginConfig(pluginId, config) {
+  return updatePlugin(pluginId, config);
 }
 
 /**
@@ -256,15 +266,5 @@ export async function updatePluginInstance(instanceId, instanceData) {
  */
 export async function deletePluginInstance(instanceId) {
   const response = await api.delete(`/plugins/instances/${instanceId}`);
-  return response.data;
-}
-
-/**
- * Update plugin instances order (takes array of instance IDs in order).
- */
-export async function updatePluginInstancesOrder(pluginId, instanceIds) {
-  const response = await api.put(`/plugins/${pluginId}/instances/order`, {
-    instance_ids: instanceIds,
-  });
   return response.data;
 }

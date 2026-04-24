@@ -14,6 +14,7 @@ vi.mock("@/services/pluginsApi", () => ({
   getPluginInstances: vi.fn(),
   getPluginConfig: vi.fn(),
   updatePlugin: vi.fn(),
+  updatePluginInstanceOrder: vi.fn(),
   updatePluginInstancesOrder: vi.fn(),
 }));
 
@@ -50,7 +51,7 @@ describe("usePlugins - Order Persistence", () => {
       pluginsApi.getPlugins.mockResolvedValue(mockPlugins);
       pluginsApi.getInstalledPlugins.mockResolvedValue({ plugins: [] });
       pluginsApi.getPluginInstances.mockResolvedValue({ instances: [] });
-      pluginsApi.getPluginConfig.mockResolvedValue({ config: {} });
+      pluginsApi.getPluginConfig.mockResolvedValue({});
 
       const { imagePluginDisplayOrders, loadPlugins } = usePlugins();
       await loadPlugins();
@@ -76,9 +77,7 @@ describe("usePlugins - Order Persistence", () => {
       pluginsApi.getPlugins.mockResolvedValue(mockPlugins);
       pluginsApi.getInstalledPlugins.mockResolvedValue({ plugins: [] });
       pluginsApi.getPluginInstances.mockResolvedValue({ instances: [] });
-      pluginsApi.getPluginConfig.mockResolvedValue({
-        config: { display_order: "5" },
-      });
+      pluginsApi.getPluginConfig.mockResolvedValue({ display_order: "5" });
 
       const { imagePluginDisplayOrders, loadPlugins } = usePlugins();
       await loadPlugins();
@@ -105,9 +104,7 @@ describe("usePlugins - Order Persistence", () => {
       pluginsApi.getPlugins.mockResolvedValue(mockPlugins);
       pluginsApi.getInstalledPlugins.mockResolvedValue({ plugins: [] });
       pluginsApi.getPluginInstances.mockResolvedValue({ instances: [] });
-      pluginsApi.getPluginConfig.mockResolvedValue({
-        config: { display_order: "5" }, // Config has 5
-      });
+      pluginsApi.getPluginConfig.mockResolvedValue({ display_order: "5" }); // Config has 5
 
       const { imagePluginDisplayOrders, loadPlugins } = usePlugins();
       await loadPlugins();
@@ -134,7 +131,7 @@ describe("usePlugins - Order Persistence", () => {
       pluginsApi.getPlugins.mockResolvedValue(mockPlugins);
       pluginsApi.getInstalledPlugins.mockResolvedValue({ plugins: [] });
       pluginsApi.getPluginInstances.mockResolvedValue({ instances: [] });
-      pluginsApi.getPluginConfig.mockResolvedValue({ config: {} });
+      pluginsApi.getPluginConfig.mockResolvedValue({});
 
       const { imagePluginDisplayOrders, loadPlugins } = usePlugins();
       await loadPlugins();
@@ -158,7 +155,7 @@ describe("usePlugins - Order Persistence", () => {
       pluginsApi.getPlugins.mockResolvedValue(mockPlugins);
       pluginsApi.getInstalledPlugins.mockResolvedValue({ plugins: [] });
       pluginsApi.getPluginInstances.mockResolvedValue({ instances: [] });
-      pluginsApi.getPluginConfig.mockResolvedValue({ config: {} }); // No display_order
+      pluginsApi.getPluginConfig.mockResolvedValue({}); // No display_order
 
       const { imagePluginDisplayOrders, loadPlugins } = usePlugins();
       await loadPlugins();
@@ -186,7 +183,7 @@ describe("usePlugins - Order Persistence", () => {
       pluginsApi.getPlugins.mockResolvedValue(mockPlugins);
       pluginsApi.getInstalledPlugins.mockResolvedValue({ plugins: [] });
       pluginsApi.getPluginInstances.mockResolvedValue({ instances: [] });
-      pluginsApi.getPluginConfig.mockResolvedValue({ config: {} });
+      pluginsApi.getPluginConfig.mockResolvedValue({});
 
       const { pluginDisplayOrders, loadPlugins } = usePlugins();
       await loadPlugins();
@@ -214,7 +211,7 @@ describe("usePlugins - Order Persistence", () => {
       pluginsApi.getPlugins.mockResolvedValue(mockPlugins);
       pluginsApi.getInstalledPlugins.mockResolvedValue({ plugins: [] });
       pluginsApi.getPluginInstances.mockResolvedValue({ instances: [] });
-      pluginsApi.getPluginConfig.mockResolvedValue({ config: {} });
+      pluginsApi.getPluginConfig.mockResolvedValue({});
       pluginsApi.updatePlugin.mockResolvedValue({ success: true });
 
       const { imagePluginDisplayOrders, loadPlugins, updateImagePluginOrder } =
@@ -264,7 +261,7 @@ describe("usePlugins - Order Persistence", () => {
       pluginsApi.getPlugins.mockResolvedValue(mockPlugins);
       pluginsApi.getInstalledPlugins.mockResolvedValue({ plugins: [] });
       pluginsApi.getPluginInstances.mockResolvedValue({ instances: [] });
-      pluginsApi.getPluginConfig.mockResolvedValue({ config: {} });
+      pluginsApi.getPluginConfig.mockResolvedValue({});
 
       const { imagePluginDisplayOrders, loadPlugins } = usePlugins();
       await loadPlugins();
@@ -298,7 +295,7 @@ describe("usePlugins - Order Persistence", () => {
       pluginsApi.getPlugins.mockResolvedValue(mockPlugins1);
       pluginsApi.getInstalledPlugins.mockResolvedValue({ plugins: [] });
       pluginsApi.getPluginInstances.mockResolvedValue({ instances: [] });
-      pluginsApi.getPluginConfig.mockResolvedValue({ config: {} });
+      pluginsApi.getPluginConfig.mockResolvedValue({});
 
       const { imagePluginDisplayOrders, loadPlugins } = usePlugins();
       await loadPlugins();
@@ -321,7 +318,7 @@ describe("usePlugins - Order Persistence", () => {
       };
 
       pluginsApi.getPlugins.mockResolvedValue(mockPlugins2);
-      pluginsApi.getPluginConfig.mockResolvedValue({ config: {} });
+      pluginsApi.getPluginConfig.mockResolvedValue({});
 
       await loadPlugins();
 

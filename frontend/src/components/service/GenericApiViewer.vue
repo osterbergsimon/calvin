@@ -31,6 +31,7 @@ import { ref, computed, watch } from "vue";
 import axios from "axios";
 import { getCachedData, setCachedData } from "../../utils/cache";
 import { useConnectionStore } from "../../stores/connection";
+import { logDebug, logError } from "../../utils/logger";
 
 const props = defineProps({
   service: {
@@ -81,7 +82,10 @@ const loadData = async () => {
   if (!connectionStore.isFullyOnline()) {
     const cachedData = getCachedData(cacheKey, cacheTTL);
     if (cachedData) {
-      console.log(`[ServiceViewer] Using cached data for ${props.service.id}`);
+      logDebug(
+        "[GenericApiViewer]",
+        `Using cached data for ${props.service.id}`,
+      );
       data.value = cachedData;
       loading.value = false;
       return;
@@ -100,8 +104,9 @@ const loadData = async () => {
     if (connectionStore.isFullyOnline()) {
       const cachedData = getCachedData(cacheKey, cacheTTL);
       if (cachedData) {
-        console.log(
-          `[ServiceViewer] Request failed, using cached data for ${props.service.id}`,
+        logDebug(
+          "[GenericApiViewer]",
+          `Request failed, using cached data for ${props.service.id}`,
         );
         data.value = cachedData;
         loading.value = false;
@@ -113,7 +118,7 @@ const loadData = async () => {
       err.response?.data?.detail ||
       err.message ||
       "Failed to load service data";
-    console.error("Error loading service data:", err);
+    logError("[GenericApiViewer]", "Error loading service data:", err);
     data.value = { error: error.value };
   } finally {
     loading.value = false;
