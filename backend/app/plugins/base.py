@@ -2,7 +2,10 @@
 
 from abc import ABC, abstractmethod
 from enum import Enum
-from typing import Any
+from typing import TYPE_CHECKING, Any
+
+if TYPE_CHECKING:
+    from app.plugins.definitions import PluginDefinition
 
 
 class PluginType(str, Enum):
@@ -40,7 +43,7 @@ class BasePlugin(ABC):
 
     @classmethod
     @abstractmethod
-    def get_plugin_metadata(cls) -> dict[str, Any]:
+    def get_plugin_metadata(cls) -> "PluginDefinition | dict[str, Any]":
         """
         Get plugin metadata for registration.
 

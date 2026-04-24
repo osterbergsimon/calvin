@@ -5,6 +5,7 @@ from typing import Any
 import pluggy
 
 from app.plugins.base import BasePlugin
+from app.plugins.definitions import PluginDefinition
 
 # Create pluggy hook specification manager
 hookspec = pluggy.HookspecMarker("calvin")
@@ -15,7 +16,7 @@ class PluginHookSpec:
     """Hook specifications for plugin registration."""
 
     @hookspec
-    def register_plugin_types(self) -> list[dict[str, Any]]:
+    def register_plugin_types(self) -> list[PluginDefinition | dict[str, Any]]:
         """
         Register plugin types.
 

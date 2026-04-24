@@ -3,6 +3,7 @@
 import logging
 
 from app.models.db_models import PluginDB, PluginTypeDB
+from app.plugins.definitions import PluginDefinition
 from app.plugins.loader import plugin_loader
 from app.plugins.manager import plugin_manager as instance_manager
 
@@ -20,17 +21,14 @@ async def load_plugin_types() -> None:
 
         try:
             # Validate required fields
-            if not isinstance(type_info, dict):
-                continue
-            if "type_id" not in type_info:
-                continue
-            if "plugin_type" not in type_info:
+            type_info = PluginDefinition.from_raw(type_info)
+            if not type_info.type_id:
                 continue
 
-            type_id = type_info["type_id"]
+            type_id = type_info.type_id
 
             # Get name with fallback
-            name = type_info.get("name") or type_id or "Unknown Plugin"
+            name = type_info.name or type_id or "Unknown Plugin"
 
             # Check if plugin type exists in database
             db_type = await PluginTypeDB.objects.get_or_none(type_id=type_id)
@@ -43,35 +41,35 @@ async def load_plugin_types() -> None:
                 if not db_type:
                     # Create new plugin type in database
                     plugin_type_value = (
-                        type_info["plugin_type"].value
-                        if hasattr(type_info["plugin_type"], "value")
-                        else str(type_info["plugin_type"])
+                        type_info.plugin_type.value
+                        if hasattr(type_info.plugin_type, "value")
+                        else str(type_info.plugin_type)
                     )
                     await PluginTypeDB.objects.create(
                         type_id=type_id,
                         plugin_type=plugin_type_value,
                         name=name,
-                        description=type_info.get("description"),
-                        version=type_info.get("version"),
-                        common_config_schema=type_info.get("common_config_schema", {}),
+                        description=type_info.description,
+                        version=type_info.version,
+                        common_config_schema=type_info.common_config_schema,
                         enabled=False,  # Default to disabled - user must explicitly enable
                         error_message=None,  # Clear any previous errors
                     )
                 else:
                     # Update existing plugin type if needed
                     plugin_type_value = (
-                        type_info["plugin_type"].value
-                        if hasattr(type_info["plugin_type"], "value")
-                        else str(type_info["plugin_type"])
+                        type_info.plugin_type.value
+                        if hasattr(type_info.plugin_type, "value")
+                        else str(type_info.plugin_type)
                     )
                     db_type.name = name
-                    db_type.description = type_info.get("description")
-                    db_type.version = type_info.get("version")
+                    db_type.description = type_info.description
+                    db_type.version = type_info.version
 
                     # Merge plugin metadata schema with existing database schema
                     # This preserves user-set values (like display_order) while updating
                     # with new schema from plugin metadata
-                    metadata_schema = type_info.get("common_config_schema", {}) or {}
+                    metadata_schema = type_info.common_config_schema or {}
                     existing_schema = db_type.common_config_schema or {}
                     # Merge: existing schema takes precedence (preserves user-set values),
                     # but metadata schema can add new fields
