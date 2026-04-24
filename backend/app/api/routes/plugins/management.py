@@ -871,6 +871,15 @@ async def scan_plugin_options(
     if not type_info:
         raise HTTPException(status_code=404, detail="Plugin type not found")
 
+    plugin_class = type_info.get("plugin_class")
+    if plugin_class:
+        try:
+            class_result = await plugin_class.scan_type_options(field)
+            if class_result is not None:
+                return class_result
+        except Exception as e:
+            logger.debug(f"Class-based scan_type_options failed for {plugin_id}: {e}")
+
     scan_coroutines = hook_manager.hook.scan_plugin_options(
         type_id=plugin_id,
         field_key=field,
@@ -1136,6 +1145,15 @@ async def test_plugin(plugin_id: str, test_config: dict[str, Any] | None = Body(
                 config = {}
         else:
             config = {}
+
+    plugin_class = type_info.get("plugin_class")
+    if plugin_class:
+        try:
+            class_result = await plugin_class.test_type_config(config)
+            if class_result is not None:
+                return class_result
+        except Exception as e:
+            logger.debug(f"Class-based test_type_config failed for {plugin_id}: {e}")
 
     # Call plugin-specific test handlers via hooks
     # Pluggy returns a list of coroutines for async hooks, we need to await them

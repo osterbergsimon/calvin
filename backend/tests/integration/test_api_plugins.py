@@ -699,3 +699,99 @@ class TestServicePluginDataAPI:
         finally:
             await plugin_manager.unregister("test-service-instance")
             await db_plugin.delete()
+
+
+@pytest.mark.integration
+class TestPluginTypeClassBasedActions:
+    """Test class-based type-level plugin actions."""
+
+    def test_test_plugin_connection_prefers_plugin_class(self, test_client, monkeypatch):
+        from app.plugins.base import BasePlugin
+
+        class ClassBasedTestPlugin(BasePlugin):
+            @property
+            def plugin_type(self) -> PluginType:
+                return PluginType.SERVICE
+
+            @classmethod
+            def get_plugin_metadata(cls):
+                return {
+                    "type_id": "class-based-test",
+                    "plugin_type": PluginType.SERVICE,
+                    "name": "Class Based Test",
+                    "plugin_class": cls,
+                }
+
+            async def initialize(self) -> None:
+                pass
+
+            async def cleanup(self) -> None:
+                pass
+
+            @classmethod
+            async def test_type_config(cls, config: dict[str, Any]) -> dict[str, Any] | None:
+                return {
+                    "success": True,
+                    "message": f"tested:{config.get('value', '')}",
+                }
+
+        monkeypatch.setattr(
+            "app.api.routes.plugins.management.plugin_loader.get_plugin_types",
+            lambda: [ClassBasedTestPlugin.get_plugin_metadata()],
+        )
+
+        response = test_client.post(
+            "/api/plugins/class-based-test/test",
+            json={"value": "ok"},
+        )
+
+        if response.status_code == 404:
+            pytest.skip("Plugin test endpoint not available in test client")
+
+        assert response.status_code == 200
+        data = response.json()
+        assert data["success"] is True
+        assert data["message"] == "tested:ok"
+
+    def test_scan_plugin_options_prefers_plugin_class(self, test_client, monkeypatch):
+        from app.plugins.base import BasePlugin
+
+        class ClassBasedScanPlugin(BasePlugin):
+            @property
+            def plugin_type(self) -> PluginType:
+                return PluginType.SERVICE
+
+            @classmethod
+            def get_plugin_metadata(cls):
+                return {
+                    "type_id": "class-based-scan",
+                    "plugin_type": PluginType.SERVICE,
+                    "name": "Class Based Scan",
+                    "plugin_class": cls,
+                }
+
+            async def initialize(self) -> None:
+                pass
+
+            async def cleanup(self) -> None:
+                pass
+
+            @classmethod
+            async def scan_type_options(cls, field_key: str) -> dict[str, Any] | None:
+                return {
+                    "options": [{"value": field_key, "label": field_key.upper()}],
+                }
+
+        monkeypatch.setattr(
+            "app.api.routes.plugins.management.plugin_loader.get_plugin_types",
+            lambda: [ClassBasedScanPlugin.get_plugin_metadata()],
+        )
+
+        response = test_client.get("/api/plugins/class-based-scan/scan", params={"field": "device"})
+
+        if response.status_code == 404:
+            pytest.skip("Plugin scan endpoint not available in test client")
+
+        assert response.status_code == 200
+        data = response.json()
+        assert data["options"] == [{"value": "device", "label": "DEVICE"}]

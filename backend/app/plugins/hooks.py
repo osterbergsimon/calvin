@@ -92,9 +92,10 @@ class PluginHookSpec:
         config: dict[str, Any],
     ) -> dict[str, Any] | None:
         """
-        Test plugin connection/configuration.
+        Legacy hook for testing plugin connection/configuration.
 
-        This hook allows plugins to implement their own connection testing logic.
+        Deprecated in favor of implementing BasePlugin.test_type_config() on
+        the plugin class and exposing that class via plugin metadata.
 
         Args:
             type_id: Plugin type ID (e.g., 'imap', 'mealie', 'yr_weather')
@@ -139,7 +140,10 @@ class PluginHookSpec:
         field_key: str,
     ) -> dict[str, Any] | None:
         """
-        Scan/discover available options for a configuration field.
+        Legacy hook for scanning/discovering available options for a configuration field.
+
+        Deprecated in favor of implementing BasePlugin.scan_type_options() on
+        the plugin class and exposing that class via plugin metadata.
 
         Args:
             type_id: Plugin type ID (e.g., 'chromecast')

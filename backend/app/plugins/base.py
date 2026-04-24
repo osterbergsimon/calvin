@@ -81,6 +81,26 @@ class BasePlugin(ABC):
         """
         pass
 
+    @classmethod
+    async def test_type_config(cls, config: dict[str, Any]) -> dict[str, Any] | None:
+        """
+        Test plugin type configuration without requiring a persisted instance.
+
+        Returns None by default, indicating the plugin does not implement a
+        class-based configuration test path.
+        """
+        return None
+
+    @classmethod
+    async def scan_type_options(cls, field_key: str) -> dict[str, Any] | None:
+        """
+        Discover options for a type-level config field without requiring an instance.
+
+        Returns None by default, indicating the plugin does not implement a
+        class-based option scan path.
+        """
+        return None
+
     async def configure(self, config: dict[str, Any]) -> None:
         """
         Configure the plugin with settings.
