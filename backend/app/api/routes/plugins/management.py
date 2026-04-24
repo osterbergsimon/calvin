@@ -58,6 +58,17 @@ class PluginListResponse(BaseModel):
     total: int
 
 
+class PluginTypeConfigUpdateRequest(BaseModel):
+    enabled: bool | None = None
+    config: dict[str, Any] = {}
+
+
+class PluginTypeConfigUpdateResponse(BaseModel):
+    success: bool
+    message: str
+    plugin_id: str
+
+
 @router.get("/plugins", response_model=PluginListResponse)
 async def get_plugins(
     plugin_type: str | None = Query(None, description="Optional plugin type filter"),
@@ -602,8 +613,11 @@ async def get_plugin(plugin_id: str):
     return plugin_info
 
 
-@router.put("/plugins/{plugin_id}")
-async def update_plugin(plugin_id: str, config: dict[str, Any]):
+async def _update_plugin_type(
+    plugin_id: str,
+    config: dict[str, Any],
+    enabled: bool | None = None,
+) -> dict[str, Any]:
     """
     Update plugin type common configuration and enabled status.
 
@@ -615,13 +629,6 @@ async def update_plugin(plugin_id: str, config: dict[str, Any]):
         config: Configuration dictionary with common settings and/or enabled status
     """
     logger.debug(f"Updating plugin type {plugin_id} with config keys: {list(config.keys())}")
-
-    # Handle enabled status separately
-    enabled = None
-    if "enabled" in config:
-        enabled = config["enabled"]
-        # Remove enabled from config dict to avoid storing it in config
-        config = {k: v for k, v in config.items() if k != "enabled"}
 
     # Clean config values - ensure all values are strings, not objects
     cleaned_config = normalize_plugin_config(config)
@@ -680,10 +687,18 @@ async def update_plugin(plugin_id: str, config: dict[str, Any]):
                     # Don't fail plugin update if event emission fails
                     logger.warning(f"Failed to emit {event_type} event for theme {plugin_id}: {e}")
 
-            return {"success": True, "enabled": enabled}
+            return {
+                "success": True,
+                "message": "Plugin type configuration updated",
+                "plugin_id": plugin_id,
+            }
         else:
             # No enabled status to update
-            return {"success": True}
+            return {
+                "success": True,
+                "message": "Plugin type configuration updated",
+                "plugin_id": plugin_id,
+            }
 
     # Store previous enabled state for event emission
     previous_enabled = None
@@ -773,9 +788,22 @@ async def update_plugin(plugin_id: str, config: dict[str, Any]):
             logger.warning(f"Failed to emit {event_type} event for plugin {plugin_id}: {e}")
 
     return {
+        "success": True,
         "message": "Plugin type configuration updated",
         "plugin_id": plugin_id,
     }
+
+
+@router.put("/plugins/{plugin_id}", response_model=PluginTypeConfigUpdateResponse)
+async def update_plugin(plugin_id: str, config: dict[str, Any]):
+    enabled = config.get("enabled") if "enabled" in config else None
+    config_without_enabled = {k: v for k, v in config.items() if k != "enabled"}
+    return await _update_plugin_type(plugin_id, config_without_enabled, enabled)
+
+
+@router.put("/plugins/{plugin_id}/config", response_model=PluginTypeConfigUpdateResponse)
+async def update_plugin_config(plugin_id: str, request: PluginTypeConfigUpdateRequest):
+    return await _update_plugin_type(plugin_id, request.config, request.enabled)
 
 
 @router.post("/plugins/{plugin_id}/fetch")
