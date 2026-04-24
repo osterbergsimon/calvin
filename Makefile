@@ -30,7 +30,7 @@ dev:
 	@echo "Backend: http://localhost:8000"
 	@echo "Frontend: http://localhost:5173"
 	@echo "Docs: http://localhost:8001"
-	cd backend && uv run uvicorn app.main:app --reload --host 0.0.0.0 --port 8000 &
+	cd backend && uv run uvicorn app.main:app --reload --reload-dir app --host 0.0.0.0 --port 8000 &
 	uv run --project backend mkdocs serve --dev-addr 127.0.0.1:8001 &
 	cd frontend && npm run dev
 
@@ -53,7 +53,7 @@ dev-logs:
 	@echo ""
 	@> logs/dev-backend.log && > logs/dev-frontend.log && > logs/dev-docs.log && > logs/dev-combined.log
 	@trap 'kill 0' EXIT INT TERM; \
-	(cd backend && PYTHONUNBUFFERED=1 uv run uvicorn app.main:app --reload --host 0.0.0.0 --port 8000 2>&1 | \
+	(cd backend && PYTHONUNBUFFERED=1 uv run uvicorn app.main:app --reload --reload-dir app --host 0.0.0.0 --port 8000 2>&1 | \
 		awk '{timestamp=strftime("%Y-%m-%d %H:%M:%S"); logline="["timestamp"] [BACKEND] "$$0; print logline >> "../logs/dev-backend.log"; print logline >> "../logs/dev-combined.log"; print "\033[36m[BACKEND]\033[0m "$$0; fflush()}') & \
 	(uv run --project backend mkdocs serve --dev-addr 127.0.0.1:8001 2>&1 | \
 		awk '{timestamp=strftime("%Y-%m-%d %H:%M:%S"); logline="["timestamp"] [DOCS] "$$0; print logline >> "logs/dev-docs.log"; print logline >> "logs/dev-combined.log"; print "\033[33m[DOCS]\033[0m "$$0; fflush()}') & \

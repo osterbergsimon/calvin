@@ -2,6 +2,7 @@
 
 import json
 import logging
+from pathlib import Path
 from typing import Any
 
 from fastapi import APIRouter, HTTPException
@@ -24,6 +25,23 @@ SENSITIVE_FIELDS = {
     "access_token",
     "refresh_token",
 }
+
+
+def normalize_plugin_config(config: dict[str, Any] | None) -> dict[str, Any]:
+    """Normalize plugin config values at the API boundary."""
+    normalized: dict[str, Any] = {}
+
+    for key, value in (config or {}).items():
+        if isinstance(value, dict):
+            normalized[key] = value.get("value") or value.get("default") or ""
+        elif isinstance(value, Path):
+            normalized[key] = str(value)
+        elif value is None:
+            normalized[key] = ""
+        else:
+            normalized[key] = str(value)
+
+    return normalized
 
 
 def mask_sensitive_config(

@@ -1,21 +1,5 @@
 <template>
   <div class="plugins-category">
-    <!-- Frontend rebuild banner -->
-    <div
-      v-if="rebuildStatus !== 'idle'"
-      :class="['rebuild-banner', `rebuild-banner--${rebuildStatus}`]"
-    >
-      <span v-if="rebuildStatus === 'building'" class="rebuild-spinner" />
-      <span class="rebuild-banner-text">{{ rebuildMessage }}</span>
-      <button
-        v-if="rebuildStatus === 'done'"
-        class="btn-refresh"
-        @click="() => window.location.reload()"
-      >
-        Refresh Now
-      </button>
-    </div>
-
     <!-- Plugin Installation Section -->
     <CollapsibleSection title="Install New Plugin" icon="📦" :expanded="true">
       <PluginInstaller
@@ -29,12 +13,17 @@
         :requires-restart="pluginRequiresRestart"
         :branch-switched="pluginBranchSwitched"
         :actual-branch="pluginActualBranch"
+        :dev-mode="configStore.devMode"
+        :rebuild-status="rebuildStatus"
+        :rebuild-message="rebuildMessage"
         @update:repoUrl="githubRepoUrl = $event"
         @update:branch="githubBranch = $event"
         @zip-select="handleZipSelect"
         @list-plugins="handleListPlugins"
         @install="handleInstall"
         @install-selected="handleInstallSelected"
+        @install-local="handleInstallLocal"
+        @install-selected-local="handleInstallSelectedLocal"
         @force-update="handleForceUpdate"
         @restart="handleRestart"
       />
@@ -140,9 +129,10 @@
 </template>
 
 <script setup>
-import { ref, computed, onMounted, onUnmounted, watch } from "vue";
+import { ref, computed, onMounted, watch } from "vue";
 import { usePlugins } from "@/composables";
 import { useSystem } from "@/composables";
+import { useConfigStore } from "@/stores/config";
 import { useImagesStore } from "@/stores/images";
 import * as pluginsApi from "@/services/pluginsApi";
 import * as calendarApi from "@/services/calendarApi";
@@ -167,29 +157,38 @@ const {
   pluginRequiresRestart,
   pluginBranchSwitched,
   pluginActualBranch,
-  pluginFrontendRebuildTriggered,
+  pluginFrontendRebuildResult,
+  expandedPlugins,
+  pluginFormData,
+  savingPlugin,
+  testingPlugin,
+  fetchingPlugin,
+  pluginSaveStatus,
+  pluginTestStatus,
+  pluginFetchStatus,
   loadPlugins,
   installPluginFromZip,
   enumeratePluginsFromGitHub,
   installPluginFromGitHub,
   installPluginsFromGitHub,
+  enumeratePluginsFromLocal,
+  installPluginFromLocal,
+  installPluginsFromLocal,
   uninstallPlugin,
+  loadPluginConfig,
+  updatePluginFormValue,
+  savePluginConfig,
+  testPluginConnection,
+  fetchPluginNow,
   togglePlugin,
 } = usePlugins();
 
 const { restartBackend } = useSystem();
+const configStore = useConfigStore();
 const imagesStore = useImagesStore();
 
 // Local state
 const activePluginTab = ref("calendar");
-const expandedPlugins = ref({});
-const pluginFormData = ref({});
-const savingPlugin = ref(null);
-const testingPlugin = ref({});
-const fetchingPlugin = ref({});
-const pluginSaveStatus = ref({});
-const pluginTestStatus = ref({});
-const pluginFetchStatus = ref({});
 const uploading = ref(false);
 const uploadError = ref("");
 const uploadSuccess = ref("");
@@ -230,37 +229,21 @@ const cancelPipInstall = () => {
 // Frontend rebuild banner
 const rebuildStatus = ref("idle"); // idle | building | done | error
 const rebuildMessage = ref("");
-let rebuildPollInterval = null;
 
-const stopRebuildPolling = () => {
-  if (rebuildPollInterval) {
-    clearInterval(rebuildPollInterval);
-    rebuildPollInterval = null;
+watch(pluginFrontendRebuildResult, (result) => {
+  if (!result) return;
+  if (result.building) {
+    rebuildStatus.value = "building";
+    rebuildMessage.value = result.message || "Building frontend…";
+  } else {
+    rebuildStatus.value = result.success ? "done" : "error";
+    rebuildMessage.value =
+      result.message ||
+      (result.success
+        ? "Frontend rebuilt — refresh the page to load new plugin components."
+        : "Frontend rebuild failed — rebuild manually with: npm run build");
   }
-};
-
-const pollRebuildStatus = async () => {
-  try {
-    const result = await pluginsApi.getFrontendBuildStatus();
-    rebuildStatus.value = result.status;
-    rebuildMessage.value = result.message;
-    if (result.status !== "building") {
-      stopRebuildPolling();
-    }
-  } catch {
-    // Silently ignore polling errors
-  }
-};
-
-watch(pluginFrontendRebuildTriggered, (triggered) => {
-  if (!triggered) return;
-  rebuildStatus.value = "building";
-  rebuildMessage.value = "Frontend rebuild in progress…";
-  stopRebuildPolling();
-  rebuildPollInterval = setInterval(pollRebuildStatus, 4000);
 });
-
-onUnmounted(stopRebuildPolling);
 
 // Handlers
 const handleZipSelect = async (file) => {
@@ -279,8 +262,12 @@ const handleZipSelect = async (file) => {
   await installPluginFromZip(file);
 };
 
-const handleListPlugins = async ({ repoUrl, branch }) => {
-  await enumeratePluginsFromGitHub(repoUrl, branch);
+const handleListPlugins = async ({ repoUrl, branch, source, localPath }) => {
+  if (source === "local") {
+    await enumeratePluginsFromLocal(localPath);
+  } else {
+    await enumeratePluginsFromGitHub(repoUrl, branch);
+  }
 };
 
 const handleInstall = async ({ path, repoUrl, branch, force }) => {
@@ -331,6 +318,39 @@ const handleInstallSelected = async ({
   await doInstall();
 };
 
+const handleInstallLocal = async ({ path, localPath, force }) => {
+  const plugin = availablePlugins.value.find((p) => p.path === path);
+  const deps = plugin?.manifest?.python_dependencies ?? [];
+  const doInstall = () => installPluginFromLocal(localPath, path, force);
+  if (deps.length > 0) {
+    triggerPipWarning(deps, plugin?.name ?? path, doInstall);
+    return;
+  }
+  await doInstall();
+};
+
+const handleInstallSelectedLocal = async ({
+  plugins: pluginsToInstall,
+  localPath,
+}) => {
+  const allDeps = [];
+  const names = [];
+  for (const { path, id } of pluginsToInstall) {
+    const p = availablePlugins.value.find(
+      (ap) => ap.id === id || ap.path === path,
+    );
+    const deps = p?.manifest?.python_dependencies ?? [];
+    if (deps.length > 0) allDeps.push(...deps);
+    names.push(p?.name ?? id);
+  }
+  const doInstall = () => installPluginsFromLocal(pluginsToInstall, localPath);
+  if (allDeps.length > 0) {
+    triggerPipWarning(allDeps, names.join(", "), doInstall);
+    return;
+  }
+  await doInstall();
+};
+
 const handleRestart = async () => {
   await restartBackend();
 };
@@ -339,7 +359,9 @@ const handleToggleExpand = (pluginId) => {
   expandedPlugins.value[pluginId] = !expandedPlugins.value[pluginId];
   if (expandedPlugins.value[pluginId]) {
     // Load plugin config when expanding
-    loadPluginConfig(pluginId);
+    void loadPluginConfig(pluginId).catch((error) => {
+      console.error(`Failed to load config for plugin ${pluginId}:`, error);
+    });
   }
 };
 
@@ -374,80 +396,19 @@ const cancelUninstall = () => {
 };
 
 const handleUpdateFormValue = (pluginId, key, value) => {
-  if (!pluginFormData.value[pluginId]) {
-    pluginFormData.value[pluginId] = {};
-  }
-  pluginFormData.value[pluginId][key] = value;
+  updatePluginFormValue(pluginId, key, value);
 };
 
 const handleSaveConfig = async (pluginId) => {
-  savingPlugin.value = pluginId;
-  pluginSaveStatus.value[pluginId] = null;
-
-  try {
-    const config = pluginFormData.value[pluginId] || {};
-    await pluginsApi.updatePlugin(pluginId, { config });
-    pluginSaveStatus.value[pluginId] = {
-      success: true,
-      message: "Configuration saved successfully",
-    };
-    setTimeout(() => {
-      pluginSaveStatus.value[pluginId] = null;
-    }, 5000);
-  } catch (error) {
-    pluginSaveStatus.value[pluginId] = {
-      success: false,
-      message:
-        error.response?.data?.detail ||
-        error.message ||
-        "Failed to save configuration",
-    };
-  } finally {
-    savingPlugin.value = null;
-  }
+  await savePluginConfig(pluginId);
 };
 
 const handleTestConnection = async (pluginId) => {
-  testingPlugin.value[pluginId] = true;
-  pluginTestStatus.value[pluginId] = null;
-
-  try {
-    const response = await pluginsApi.testPlugin(pluginId);
-    pluginTestStatus.value[pluginId] = {
-      success: response.success || false,
-      message: response.message || "Test completed",
-    };
-  } catch (error) {
-    pluginTestStatus.value[pluginId] = {
-      success: false,
-      message: error.response?.data?.detail || error.message || "Test failed",
-    };
-  } finally {
-    testingPlugin.value[pluginId] = false;
-  }
+  await testPluginConnection(pluginId);
 };
 
 const handleFetchNow = async (pluginId) => {
-  fetchingPlugin.value[pluginId] = true;
-  pluginFetchStatus.value[pluginId] = null;
-
-  try {
-    await pluginsApi.fetchPlugin(pluginId);
-    pluginFetchStatus.value[pluginId] = {
-      success: true,
-      message: "Fetch initiated successfully",
-    };
-  } catch (error) {
-    pluginFetchStatus.value[pluginId] = {
-      success: false,
-      message:
-        error.response?.data?.detail ||
-        error.message ||
-        "Failed to initiate fetch",
-    };
-  } finally {
-    fetchingPlugin.value[pluginId] = false;
-  }
+  await fetchPluginNow(pluginId);
 };
 
 const handleCustomAction = async (_pluginId, _action) => {
@@ -621,15 +582,6 @@ const handleDeleteImage = async (imageId) => {
 };
 
 // Helper functions
-const loadPluginConfig = async (pluginId) => {
-  try {
-    const response = await pluginsApi.getPluginConfig(pluginId);
-    pluginFormData.value[pluginId] = response.config || {};
-  } catch (error) {
-    console.error(`Failed to load config for plugin ${pluginId}:`, error);
-  }
-};
-
 // Initialize
 onMounted(async () => {
   await loadPlugins();
@@ -651,70 +603,6 @@ onMounted(async () => {
 <style scoped>
 .plugins-category {
   width: 100%;
-}
-
-/* Frontend rebuild banner */
-.rebuild-banner {
-  display: flex;
-  align-items: center;
-  gap: 0.75rem;
-  padding: 0.75rem 1rem;
-  border-radius: 6px;
-  margin-bottom: 1rem;
-  font-size: 0.9rem;
-}
-
-.rebuild-banner--building {
-  background: rgba(59, 130, 246, 0.15);
-  border: 1px solid rgba(59, 130, 246, 0.4);
-  color: #93c5fd;
-}
-
-.rebuild-banner--done {
-  background: rgba(34, 197, 94, 0.15);
-  border: 1px solid rgba(34, 197, 94, 0.4);
-  color: #86efac;
-}
-
-.rebuild-banner--error {
-  background: rgba(239, 68, 68, 0.15);
-  border: 1px solid rgba(239, 68, 68, 0.4);
-  color: #fca5a5;
-}
-
-.rebuild-banner-text {
-  flex: 1;
-}
-
-.rebuild-spinner {
-  width: 16px;
-  height: 16px;
-  border: 2px solid currentColor;
-  border-top-color: transparent;
-  border-radius: 50%;
-  animation: spin 0.8s linear infinite;
-  flex-shrink: 0;
-}
-
-@keyframes spin {
-  to {
-    transform: rotate(360deg);
-  }
-}
-
-.btn-refresh {
-  padding: 0.3rem 0.75rem;
-  background: rgba(34, 197, 94, 0.2);
-  color: inherit;
-  border: 1px solid currentColor;
-  border-radius: 4px;
-  cursor: pointer;
-  font-size: 0.85rem;
-  white-space: nowrap;
-}
-
-.btn-refresh:hover {
-  background: rgba(34, 197, 94, 0.35);
 }
 
 /* Pip warning modal — mirrors ConfirmModal layout */

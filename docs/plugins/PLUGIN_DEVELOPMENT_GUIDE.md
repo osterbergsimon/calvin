@@ -309,7 +309,7 @@ Service plugins can define how their content is displayed:
 ```python
 "display_schema": {
     "type": "api",  # "iframe" or "api"
-    "api_endpoint": "/api/web-services/{service_id}/endpoint",
+    "api_endpoint": "/api/plugins/{service_id}/data",
     "method": "GET",
     "render_template": "custom_template",  # Custom frontend template
     "data_schema": {
@@ -602,4 +602,3 @@ See the Mealie plugin in the calvin-plugins repository for a complete example of
 - Check `backend/app/plugins/base.py` for base classes
 - Review `backend/app/plugins/protocols.py` for interfaces
 - Look at `backend/app/plugins/hooks.py` for hook specifications
-

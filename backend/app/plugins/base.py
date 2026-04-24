@@ -2,7 +2,10 @@
 
 from abc import ABC, abstractmethod
 from enum import Enum
-from typing import Any
+from typing import TYPE_CHECKING, Any
+
+if TYPE_CHECKING:
+    from app.plugins.definitions import PluginDefinition
 
 
 class PluginType(str, Enum):
@@ -40,7 +43,7 @@ class BasePlugin(ABC):
 
     @classmethod
     @abstractmethod
-    def get_plugin_metadata(cls) -> dict[str, Any]:
+    def get_plugin_metadata(cls) -> "PluginDefinition | dict[str, Any]":
         """
         Get plugin metadata for registration.
 
@@ -77,6 +80,36 @@ class BasePlugin(ABC):
         as not running.
         """
         pass
+
+    @classmethod
+    async def test_type_config(cls, config: dict[str, Any]) -> dict[str, Any] | None:
+        """
+        Test plugin type configuration without requiring a persisted instance.
+
+        Returns None by default, indicating the plugin does not implement a
+        class-based configuration test path.
+        """
+        return None
+
+    @classmethod
+    async def scan_type_options(cls, field_key: str) -> dict[str, Any] | None:
+        """
+        Discover options for a type-level config field without requiring an instance.
+
+        Returns None by default, indicating the plugin does not implement a
+        class-based option scan path.
+        """
+        return None
+
+    @classmethod
+    async def fetch_type_data(cls, instance_id: str | None = None) -> dict[str, Any] | None:
+        """
+        Manually trigger a type-level fetch/check operation.
+
+        Returns None by default, indicating the plugin does not implement a
+        class-based manual fetch path.
+        """
+        return None
 
     async def configure(self, config: dict[str, Any]) -> None:
         """

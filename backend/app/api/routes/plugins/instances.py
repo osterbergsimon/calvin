@@ -1,14 +1,17 @@
 """Plugin instance management endpoints."""
 
+import asyncio
 import logging
 from datetime import UTC, datetime
 from pathlib import Path
 from typing import Any
 
 from fastapi import APIRouter, Body, HTTPException
+from pydantic import BaseModel
 
 from app.api.routes.plugins.config import mask_sensitive_config
-from app.models.db_models import PluginDB
+from app.models.db_models import PluginDB, PluginTypeDB
+from app.plugins.hooks import plugin_manager as hook_manager
 from app.plugins.loader import plugin_loader
 from app.plugins.manager import plugin_manager
 from app.services.event_system import event_system
@@ -18,7 +21,90 @@ logger = logging.getLogger(__name__)
 router = APIRouter()
 
 
-@router.post("/plugins/instances/{instance_id}/start")
+class PluginInstanceResponse(BaseModel):
+    id: str
+    name: str
+    enabled: bool
+    running: bool
+    config: dict[str, Any]
+    display_order: int
+
+
+class PluginInstanceListResponse(BaseModel):
+    instances: list[PluginInstanceResponse]
+    total: int
+
+
+class PluginInstanceActionResponse(BaseModel):
+    success: bool
+    message: str
+    running: bool
+
+
+class PluginInstanceDeleteResponse(BaseModel):
+    success: bool
+    message: str
+
+
+class PluginInstanceUpdateResponse(BaseModel):
+    success: bool
+    message: str
+    instance: PluginInstanceResponse
+
+
+class PluginInstanceOrderUpdateResponse(BaseModel):
+    success: bool
+    message: str
+    updated: int
+
+
+class PluginInstanceCreateRequest(BaseModel):
+    name: str
+    enabled: bool = True
+    config: dict[str, Any] = {}
+
+
+def _serialize_instance_config(config: dict[str, Any]) -> dict[str, Any]:
+    """Serialize config values to JSON-compatible primitives."""
+
+    def serialize_value(val):
+        if val is None:
+            return None
+        elif isinstance(val, str | int | float | bool):
+            return val
+        elif isinstance(val, Path):
+            return str(val)
+        elif isinstance(val, dict):
+            return {k: serialize_value(v) for k, v in val.items()}
+        elif isinstance(val, list):
+            return [serialize_value(item) for item in val]
+        else:
+            try:
+                if hasattr(val, "__str__"):
+                    return str(val)
+                elif hasattr(val, "path"):
+                    return str(val.path)
+                else:
+                    return str(val)
+            except Exception:
+                return "[Unable to serialize]"
+
+    return serialize_value(config) or {}
+
+
+def _build_instance_response(db_plugin: PluginDB, running: bool) -> PluginInstanceResponse:
+    serialized_config = _serialize_instance_config(db_plugin.config or {})
+    return PluginInstanceResponse(
+        id=db_plugin.id,
+        name=db_plugin.name,
+        enabled=db_plugin.enabled,
+        running=running,
+        config=mask_sensitive_config(serialized_config, mask_for_frontend=True),
+        display_order=db_plugin.display_order or 0,
+    )
+
+
+@router.post("/plugins/instances/{instance_id}/start", response_model=PluginInstanceActionResponse)
 async def start_plugin_instance(instance_id: str):
     """
     Start a plugin instance (if enabled).
@@ -104,7 +190,7 @@ async def start_plugin_instance(instance_id: str):
         raise HTTPException(status_code=500, detail=f"Failed to start plugin {instance_id}")
 
 
-@router.post("/plugins/instances/{instance_id}/stop")
+@router.post("/plugins/instances/{instance_id}/stop", response_model=PluginInstanceActionResponse)
 async def stop_plugin_instance(instance_id: str):
     """
     Stop a plugin instance.
@@ -170,7 +256,7 @@ async def stop_plugin_instance(instance_id: str):
         raise HTTPException(status_code=500, detail=f"Failed to stop plugin {instance_id}")
 
 
-@router.get("/plugins/{plugin_id}/instances")
+@router.get("/plugins/{plugin_id}/instances", response_model=PluginInstanceListResponse)
 async def get_plugin_instances(plugin_id: str):
     """
     Get all plugin instances for a plugin type, including running status.
@@ -193,49 +279,12 @@ async def get_plugin_instances(plugin_id: str):
         running = plugin.is_running() if plugin else False
 
         # Serialize config, converting Path objects and other non-serializable types to strings
-        def serialize_value(val):
-            """Recursively serialize values to JSON-serializable types."""
-            if val is None:
-                return None
-            elif isinstance(val, str | int | float | bool):
-                return val
-            elif isinstance(val, Path):
-                return str(val)
-            elif isinstance(val, dict):
-                return {k: serialize_value(v) for k, v in val.items()}
-            elif isinstance(val, list):
-                return [serialize_value(item) for item in val]
-            else:
-                # For any other type (including Path-like objects), convert to string
-                try:
-                    # Try to get string representation
-                    if hasattr(val, "__str__"):
-                        return str(val)
-                    elif hasattr(val, "path"):
-                        return str(val.path)
-                    else:
-                        return str(val)
-                except Exception:
-                    return "[Unable to serialize]"
-
-        config = db_plugin.config or {}
-        serialized_config = serialize_value(config)
-
-        instances.append(
-            {
-                "id": db_plugin.id,
-                "name": db_plugin.name,
-                "enabled": db_plugin.enabled,
-                "running": running,
-                "config": mask_sensitive_config(serialized_config, mask_for_frontend=True),
-                "display_order": db_plugin.display_order or 0,
-            }
-        )
+        instances.append(_build_instance_response(db_plugin, running).model_dump())
 
     return {"instances": instances, "total": len(instances)}
 
 
-@router.delete("/plugins/instances/{instance_id}")
+@router.delete("/plugins/instances/{instance_id}", response_model=PluginInstanceDeleteResponse)
 async def delete_plugin_instance(instance_id: str):
     db_plugin = await PluginDB.objects.get_or_none(id=instance_id)
 
@@ -278,7 +327,65 @@ async def delete_plugin_instance(instance_id: str):
     return {"success": True, "message": f"Plugin instance {instance_id} deleted successfully"}
 
 
-@router.put("/plugins/instances/{instance_id}")
+@router.post("/plugins/{plugin_id}/instances", response_model=PluginInstanceUpdateResponse)
+async def create_plugin_instance(
+    plugin_id: str,
+    request: PluginInstanceCreateRequest,
+):
+    """
+    Create a plugin instance via an explicit instance lifecycle endpoint.
+
+    This currently adapts to the existing plugin hook contract by translating
+    the typed payload into the legacy config-update metadata fields.
+    """
+    plugin_types = plugin_loader.get_plugin_types()
+    type_info = next((t for t in plugin_types if t.get("type_id") == plugin_id), None)
+
+    if not type_info:
+        raise HTTPException(status_code=404, detail="Plugin type not found")
+
+    instance_config = {
+        **request.config,
+        "_instance_name": request.name,
+        "_instance_enabled": request.enabled,
+    }
+
+    db_plugin_type = await PluginTypeDB.objects.get_or_none(type_id=plugin_id)
+
+    update_coroutines = hook_manager.hook.handle_plugin_config_update(
+        type_id=plugin_id,
+        config=instance_config,
+        enabled=None,
+        db_type=db_plugin_type,
+        session=None,
+    )
+    results = await asyncio.gather(*update_coroutines, return_exceptions=True)
+
+    created_instance_id = None
+    for result in results:
+        if isinstance(result, Exception) or result is None:
+            continue
+        created_instance_id = result.get("instance_id")
+        if created_instance_id:
+            break
+
+    if not created_instance_id:
+        raise HTTPException(status_code=400, detail="Plugin did not create an instance")
+
+    db_plugin = await PluginDB.objects.get_or_none(id=created_instance_id)
+    if not db_plugin:
+        raise HTTPException(status_code=500, detail="Created plugin instance not found in database")
+
+    plugin = plugin_manager.get_plugin(created_instance_id)
+    instance = _build_instance_response(db_plugin, plugin.is_running() if plugin else False)
+    return {
+        "success": True,
+        "message": f"Plugin instance {created_instance_id} created successfully",
+        "instance": instance,
+    }
+
+
+@router.put("/plugins/instances/{instance_id}", response_model=PluginInstanceUpdateResponse)
 async def update_plugin_instance(instance_id: str, instance_data: dict[str, Any] = Body(...)):
     """
     Update a plugin instance (enabled status, config, etc.).
@@ -456,51 +563,21 @@ async def update_plugin_instance(instance_id: str, instance_data: dict[str, Any]
                 f"Failed to emit plugin_instance_updated event for instance {instance_id}: {e}"
             )
 
-    # Serialize config for response
-    def serialize_value(val):
-        """Recursively serialize values to JSON-serializable types."""
-        if val is None:
-            return None
-        elif isinstance(val, str | int | float | bool):
-            return val
-        elif isinstance(val, Path):
-            return str(val)
-        elif isinstance(val, dict):
-            return {k: serialize_value(v) for k, v in val.items()}
-        elif isinstance(val, list):
-            return [serialize_value(item) for item in val]
-        else:
-            try:
-                if hasattr(val, "__str__"):
-                    return str(val)
-                elif hasattr(val, "path"):
-                    return str(val.path)
-                else:
-                    return str(val)
-            except Exception:
-                return "[Unable to serialize]"
-
-    config = db_plugin.config or {}
-    serialized_config = serialize_value(config)
-
     # Get updated plugin reference (may have been created above)
     plugin = plugin_manager.get_plugin(instance_id)
+    instance = _build_instance_response(db_plugin, plugin.is_running() if plugin else False)
 
     return {
         "success": True,
         "message": f"Plugin instance {instance_id} updated successfully",
-        "instance": {
-            "id": db_plugin.id,
-            "name": db_plugin.name,
-            "enabled": db_plugin.enabled,
-            "running": plugin.is_running() if plugin else False,
-            "config": mask_sensitive_config(serialized_config, mask_for_frontend=True),
-            "display_order": db_plugin.display_order or 0,
-        },
+        "instance": instance,
     }
 
 
-@router.put("/plugins/{plugin_id}/instances/order")
+@router.put(
+    "/plugins/{plugin_id}/instances/order",
+    response_model=PluginInstanceOrderUpdateResponse,
+)
 async def update_plugin_instances_order(
     plugin_id: str, instance_orders: dict[str, int] = Body(...)
 ):

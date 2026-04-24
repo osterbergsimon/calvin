@@ -12,6 +12,7 @@ from typing import Any
 import httpx
 from fastapi import APIRouter, Body, File, HTTPException, Query, UploadFile
 from loguru import logger
+from pydantic import BaseModel
 
 from app.models.db_models import PluginDB, PluginTypeDB
 from app.plugins.base import PluginType
@@ -23,12 +24,52 @@ from app.services.event_system import event_system
 from app.services.plugin_installer import frontend_build_manager, plugin_installer
 from app.services.theme_installer import theme_installer
 
+from .config import normalize_plugin_config
 from .themes import BUILTIN_THEMES, _unregister_theme_from_db
 
 router = APIRouter()
 
 
-@router.get("/plugins")
+class RebuildStatusResponse(BaseModel):
+    state: str
+    message: str
+
+
+class PluginManifestEnvelope(BaseModel):
+    manifest: dict[str, Any]
+
+
+class PluginInstallResponse(BaseModel):
+    success: bool
+    message: str
+    manifest: dict[str, Any]
+    requires_restart: bool
+    frontend_rebuild_in_progress: bool
+
+
+class PluginDeleteResponse(BaseModel):
+    success: bool
+    message: str
+    frontend_rebuild_in_progress: bool = False
+
+
+class PluginListResponse(BaseModel):
+    plugins: list[dict[str, Any]]
+    total: int
+
+
+class PluginTypeConfigUpdateRequest(BaseModel):
+    enabled: bool | None = None
+    config: dict[str, Any] = {}
+
+
+class PluginTypeConfigUpdateResponse(BaseModel):
+    success: bool
+    message: str
+    plugin_id: str
+
+
+@router.get("/plugins", response_model=PluginListResponse)
 async def get_plugins(
     plugin_type: str | None = Query(None, description="Optional plugin type filter"),
 ):
@@ -106,8 +147,12 @@ async def get_plugins(
             db_schema = (
                 db_type.common_config_schema if db_type and db_type.common_config_schema else {}
             )
-            # Merge: db_schema (user-set values) overrides metadata_schema (defaults)
-            merged_schema = {**metadata_schema, **db_schema}
+            # Only override keys that are defined in the plugin's own metadata schema —
+            # prevents instance config fields that leaked into db_schema from showing here.
+            merged_schema = {**metadata_schema}
+            for key in metadata_schema:
+                if key in db_schema:
+                    merged_schema[key] = db_schema[key]
 
             plugin_info: dict[str, Any] = {
                 "id": type_id,
@@ -193,7 +238,16 @@ async def get_plugins(
 
 
 # Specific routes must come before parameterized routes to avoid path conflicts
-@router.get("/plugins/installed")
+@router.get("/plugins/rebuild-status", response_model=RebuildStatusResponse)
+async def get_rebuild_status():
+    """Return the current state of a background frontend rebuild."""
+    return {
+        "state": frontend_build_manager.state,
+        "message": frontend_build_manager.message,
+    }
+
+
+@router.get("/plugins/installed", response_model=PluginListResponse)
 async def get_installed_plugins():
     """
     Get list of installed plugins and themes.
@@ -215,12 +269,13 @@ async def get_installed_plugins():
             # Add type field to distinguish from plugins
             theme["type"] = PluginType.THEME.value
 
-        return {"plugins": plugins + themes}
+        result = plugins + themes
+        return {"plugins": result, "total": len(result)}
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"Failed to get installed plugins: {str(e)}")
 
 
-@router.post("/plugins/inspect")
+@router.post("/plugins/inspect", response_model=PluginManifestEnvelope)
 async def inspect_plugin(file: UploadFile = File(...)):
     """
     Read plugin.json from a zip without installing it.
@@ -249,16 +304,7 @@ async def inspect_plugin(file: UploadFile = File(...)):
                 pass
 
 
-@router.get("/plugins/frontend-build-status")
-async def get_frontend_build_status():
-    """Return the current status of a background frontend rebuild triggered by plugin install."""
-    return {
-        "status": frontend_build_manager.status,
-        "message": frontend_build_manager.message,
-    }
-
-
-@router.post("/plugins/install")
+@router.post("/plugins/install", response_model=PluginInstallResponse)
 async def install_plugin(
     file: UploadFile = File(...),
     plugin_id: str | None = None,
@@ -310,18 +356,15 @@ async def install_plugin(
                     f"Failed to emit plugin_installed event for plugin {manifest['id']}: {e}"
                 )
 
-            frontend_rebuild_triggered = False
             if manifest.get("_has_frontend"):
-                frontend_rebuild_triggered = frontend_build_manager.trigger(
-                    plugin_installer.get_frontend_dir()
-                )
+                frontend_build_manager.start_background_build(plugin_installer.get_frontend_dir())
 
             return {
                 "success": True,
                 "message": f"Plugin {manifest['id']} installed successfully",
                 "manifest": manifest,
                 "requires_restart": True,
-                "frontend_rebuild_triggered": frontend_rebuild_triggered,
+                "frontend_rebuild_in_progress": manifest.get("_has_frontend", False),
             }
         except ValueError as e:
             raise HTTPException(status_code=400, detail=str(e))
@@ -354,7 +397,7 @@ async def get_installed_plugin(plugin_id: str):
     return manifest
 
 
-@router.delete("/plugins/installed/{plugin_id}")
+@router.delete("/plugins/installed/{plugin_id}", response_model=PluginDeleteResponse)
 async def uninstall_plugin(plugin_id: str):
     """
     Uninstall a plugin or theme.
@@ -403,6 +446,7 @@ async def uninstall_plugin(plugin_id: str):
             }
         else:
             # Uninstall regular plugin
+            had_frontend = plugin_installer.get_frontend_plugin_path(plugin_id).exists()
             plugin_installer.uninstall_plugin(plugin_id)
 
             # Stop and delete all instances of this plugin type
@@ -452,6 +496,9 @@ async def uninstall_plugin(plugin_id: str):
                 if not m.startswith(f"installed_plugin_{plugin_id}")
             }
 
+            if had_frontend:
+                frontend_build_manager.start_background_build(plugin_installer.get_frontend_dir())
+
             # Emit plugin_uninstalled event
             try:
                 await event_system.emit_event(
@@ -473,6 +520,7 @@ async def uninstall_plugin(plugin_id: str):
             return {
                 "success": True,
                 "message": f"Plugin {plugin_id} uninstalled successfully",
+                "frontend_rebuild_in_progress": had_frontend,
             }
     except ValueError as e:
         raise HTTPException(status_code=404, detail=str(e))
@@ -538,8 +586,12 @@ async def get_plugin(plugin_id: str):
     # This ensures user-set values (like display_order) are preserved
     metadata_schema = type_info.get("common_config_schema", {}) or {}
     db_schema = db_type.common_config_schema if db_type and db_type.common_config_schema else {}
-    # Merge: db_schema (user-set values) overrides metadata_schema (defaults)
-    merged_schema = {**metadata_schema, **db_schema}
+    # Only override keys that are defined in the plugin's own metadata schema —
+    # prevents instance config fields that leaked into db_schema from showing here.
+    merged_schema = {**metadata_schema}
+    for key in metadata_schema:
+        if key in db_schema:
+            merged_schema[key] = db_schema[key]
 
     plugin_info: dict[str, Any] = {
         "id": type_info.get("type_id"),
@@ -549,9 +601,8 @@ async def get_plugin(plugin_id: str):
         else str(type_info.get("plugin_type")),
         "description": type_info.get("description", ""),
         "config_schema": merged_schema,
-        "display_schema": type_info.get(
-            "display_schema"
-        ),  # Include display_schema for frontend components
+        "display_schema": type_info.get("display_schema"),
+        "statusbar_schema": type_info.get("statusbar_schema"),
         "enabled": enabled,
     }
 
@@ -562,8 +613,11 @@ async def get_plugin(plugin_id: str):
     return plugin_info
 
 
-@router.put("/plugins/{plugin_id}")
-async def update_plugin(plugin_id: str, config: dict[str, Any]):
+async def _update_plugin_type(
+    plugin_id: str,
+    config: dict[str, Any],
+    enabled: bool | None = None,
+) -> dict[str, Any]:
     """
     Update plugin type common configuration and enabled status.
 
@@ -576,28 +630,8 @@ async def update_plugin(plugin_id: str, config: dict[str, Any]):
     """
     logger.debug(f"Updating plugin type {plugin_id} with config keys: {list(config.keys())}")
 
-    # Handle enabled status separately
-    enabled = None
-    if "enabled" in config:
-        enabled = config["enabled"]
-        # Remove enabled from config dict to avoid storing it in config
-        config = {k: v for k, v in config.items() if k != "enabled"}
-
     # Clean config values - ensure all values are strings, not objects
-    cleaned_config = {}
-    for key, value in config.items():
-        if isinstance(value, dict):
-            # If it's a schema object, extract the actual value or default
-            cleaned_value = value.get("value") or value.get("default") or ""
-            cleaned_config[key] = cleaned_value
-        elif isinstance(value, Path):
-            # Handle Path objects - convert to string
-            cleaned_config[key] = str(value)
-        elif value is None:
-            cleaned_config[key] = ""
-        else:
-            cleaned_config[key] = str(value)
-
+    cleaned_config = normalize_plugin_config(config)
     config = cleaned_config
 
     # Get plugin type from pluggy hooks first
@@ -653,10 +687,18 @@ async def update_plugin(plugin_id: str, config: dict[str, Any]):
                     # Don't fail plugin update if event emission fails
                     logger.warning(f"Failed to emit {event_type} event for theme {plugin_id}: {e}")
 
-            return {"success": True, "enabled": enabled}
+            return {
+                "success": True,
+                "message": "Plugin type configuration updated",
+                "plugin_id": plugin_id,
+            }
         else:
             # No enabled status to update
-            return {"success": True}
+            return {
+                "success": True,
+                "message": "Plugin type configuration updated",
+                "plugin_id": plugin_id,
+            }
 
     # Store previous enabled state for event emission
     previous_enabled = None
@@ -667,9 +709,11 @@ async def update_plugin(plugin_id: str, config: dict[str, Any]):
     if not db_type:
         # Create new plugin type in database
         plugin_type = type_info.get("plugin_type")
-        # Merge metadata schema with config (config takes precedence)
+        # Only store keys that are defined in the plugin's own common_config_schema
         metadata_schema = type_info.get("common_config_schema", {}) or {}
-        initial_schema = {**metadata_schema, **config} if config else metadata_schema
+        allowed_keys = set(metadata_schema.keys())
+        filtered_config = {k: v for k, v in config.items() if k in allowed_keys} if config else {}
+        initial_schema = {**metadata_schema, **filtered_config}
         logger.debug(
             f"Creating new plugin type {plugin_id} with schema: {initial_schema}, "
             f"config={config}, metadata_schema={metadata_schema}"
@@ -689,8 +733,12 @@ async def update_plugin(plugin_id: str, config: dict[str, Any]):
             db_type.enabled = enabled
         if config:
             current_schema = db_type.common_config_schema or {}
-            # Ormar JSON fields detect changes automatically
-            updated_schema = {**current_schema, **config}
+            # Only allow keys defined in the plugin's own common_config_schema —
+            # prevents instance config fields from leaking into the type-level schema.
+            metadata_schema = type_info.get("common_config_schema", {}) or {}
+            allowed_keys = set(metadata_schema.keys())
+            filtered_config = {k: v for k, v in config.items() if k in allowed_keys}
+            updated_schema = {**current_schema, **filtered_config}
             db_type.common_config_schema = updated_schema
             logger.debug(
                 f"Updated plugin {plugin_id} common_config_schema: "
@@ -701,15 +749,7 @@ async def update_plugin(plugin_id: str, config: dict[str, Any]):
     # Save common config to config service for backward compatibility
     if config:
         config_key = f"plugin_{plugin_id}_config"
-        serializable_config = {}
-        for key, value in config.items():
-            if isinstance(value, Path):
-                serializable_config[key] = str(value)
-            elif isinstance(value, dict):
-                serializable_config[key] = value.get("value") or value.get("default") or ""
-            else:
-                serializable_config[key] = value
-        config_json = json.dumps(serializable_config)
+        config_json = json.dumps(config)
         await config_service.set_value(config_key, config_json)
 
     # Call plugin-specific config update handlers (if any)
@@ -748,9 +788,22 @@ async def update_plugin(plugin_id: str, config: dict[str, Any]):
             logger.warning(f"Failed to emit {event_type} event for plugin {plugin_id}: {e}")
 
     return {
+        "success": True,
         "message": "Plugin type configuration updated",
         "plugin_id": plugin_id,
     }
+
+
+@router.put("/plugins/{plugin_id}", response_model=PluginTypeConfigUpdateResponse)
+async def update_plugin(plugin_id: str, config: dict[str, Any]):
+    enabled = config.get("enabled") if "enabled" in config else None
+    config_without_enabled = {k: v for k, v in config.items() if k != "enabled"}
+    return await _update_plugin_type(plugin_id, config_without_enabled, enabled)
+
+
+@router.put("/plugins/{plugin_id}/config", response_model=PluginTypeConfigUpdateResponse)
+async def update_plugin_config(plugin_id: str, request: PluginTypeConfigUpdateRequest):
+    return await _update_plugin_type(plugin_id, request.config, request.enabled)
 
 
 @router.post("/plugins/{plugin_id}/fetch")
@@ -773,7 +826,13 @@ async def fetch_plugin(plugin_id: str):
     if not type_info:
         raise HTTPException(status_code=404, detail="Plugin type not found")
 
-    # Call plugin-specific fetch handlers via hooks
+    plugin_class = type_info.get("plugin_class")
+    if plugin_class is not None:
+        class_result = await plugin_class.fetch_type_data(instance_id=None)
+        if class_result is not None:
+            return class_result
+
+    # Legacy compatibility: fall back to hook-based fetch handlers
     # Pluggy returns a list of coroutines for async hooks, we need to await them
     fetch_coroutines = hook_manager.hook.fetch_plugin_data(
         type_id=plugin_id,
@@ -817,6 +876,15 @@ async def scan_plugin_options(
 
     if not type_info:
         raise HTTPException(status_code=404, detail="Plugin type not found")
+
+    plugin_class = type_info.get("plugin_class")
+    if plugin_class:
+        try:
+            class_result = await plugin_class.scan_type_options(field)
+            if class_result is not None:
+                return class_result
+        except Exception as e:
+            logger.debug(f"Class-based scan_type_options failed for {plugin_id}: {e}")
 
     scan_coroutines = hook_manager.hook.scan_plugin_options(
         type_id=plugin_id,
@@ -878,25 +946,6 @@ async def get_plugin_data(
             logger.error(f"Error initializing plugin {plugin_id}: {e}", exc_info=True)
             raise HTTPException(status_code=500, detail=f"Failed to initialize plugin: {str(e)}")
 
-    # Try hook-based data fetching first (for external plugins)
-    try:
-        hook_coroutines = hook_manager.hook.fetch_service_data(
-            instance_id=plugin_id, start_date=start_date, end_date=end_date
-        )
-        # Process hook results (pluggy returns a list of coroutines)
-        if hook_coroutines:
-            hook_results = await asyncio.gather(*hook_coroutines, return_exceptions=True)
-            # Check if any plugin handled the fetch
-            for result in hook_results:
-                # Skip exceptions
-                if isinstance(result, Exception):
-                    continue
-                if result is not None:
-                    return result
-    except Exception as e:
-        logger.debug(f"Hook-based fetch_service_data failed for {plugin_id}: {e}")
-
-    # Fall back to protocol method (for built-in plugins)
     try:
         data = await plugin_instance.fetch_service_data(start_date=start_date, end_date=end_date)
         if data is not None:
@@ -1089,7 +1138,7 @@ async def test_plugin(plugin_id: str, test_config: dict[str, Any] | None = Body(
 
     # Use provided test_config if available, otherwise get saved config
     if test_config:
-        config = test_config
+        config = normalize_plugin_config(test_config)
     else:
         # Get plugin config
         config_key = f"plugin_{plugin_id}_config"
@@ -1102,6 +1151,15 @@ async def test_plugin(plugin_id: str, test_config: dict[str, Any] | None = Body(
                 config = {}
         else:
             config = {}
+
+    plugin_class = type_info.get("plugin_class")
+    if plugin_class:
+        try:
+            class_result = await plugin_class.test_type_config(config)
+            if class_result is not None:
+                return class_result
+        except Exception as e:
+            logger.debug(f"Class-based test_type_config failed for {plugin_id}: {e}")
 
     # Call plugin-specific test handlers via hooks
     # Pluggy returns a list of coroutines for async hooks, we need to await them

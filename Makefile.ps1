@@ -56,7 +56,7 @@ function Start-Dev {
     
     # Start backend in new PowerShell window
     Write-Host "Starting backend..." -ForegroundColor Yellow
-    Start-Process powershell -ArgumentList "-NoExit", "-Command", "cd '$projectRoot\backend'; uv run uvicorn app.main:app --reload --host 0.0.0.0 --port 8000"
+    Start-Process powershell -ArgumentList "-NoExit", "-Command", "cd '$projectRoot\backend'; uv run uvicorn app.main:app --reload --reload-dir app --host 0.0.0.0 --port 8000"
     
     # Wait a moment for backend to start
     Start-Sleep -Seconds 2
@@ -118,7 +118,7 @@ function Start-Dev-Logs {
         param($Root, $BackendLog, $CombinedLog)
         Set-Location "$Root\backend"
         $env:PYTHONUNBUFFERED = "1"
-        & uv run uvicorn app.main:app --reload --host 0.0.0.0 --port 8000 *>&1 | ForEach-Object {
+        & uv run uvicorn app.main:app --reload --reload-dir app --host 0.0.0.0 --port 8000 *>&1 | ForEach-Object {
             $timestamp = Get-Date -Format "yyyy-MM-dd HH:mm:ss"
             $logLine = "[$timestamp] [BACKEND] $_"
             $logLine | Out-File -FilePath $BackendLog -Append -Encoding utf8

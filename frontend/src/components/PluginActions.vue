@@ -47,7 +47,7 @@
 </template>
 
 <script setup>
-// No imports needed
+import { logDebug, logWarn } from "../utils/logger";
 
 const props = defineProps({
   pluginId: {
@@ -95,7 +95,7 @@ const emit = defineEmits(["save", "test", "fetch", "custom-action"]);
 const getPluginIdFromAction = () => {
   // Always use the prop pluginId - the endpoint may contain {plugin_id} placeholder
   // that needs to be replaced later
-  console.log("[PluginActions] Using pluginId from prop:", props.pluginId);
+  logDebug("[PluginActions]", "Using pluginId from prop:", props.pluginId);
   return props.pluginId;
 };
 
@@ -116,7 +116,7 @@ const getActionLabel = (action) => {
 };
 
 const handleAction = (_action) => {
-  console.log("[PluginActions] handleAction called with:", _action);
+  logDebug("[PluginActions]", "handleAction called with:", _action);
   switch (_action.type) {
     case "save":
       emit("save");
@@ -132,16 +132,18 @@ const handleAction = (_action) => {
         ..._action,
         pluginId: getPluginIdFromAction(),
       };
-      console.log(
-        "[PluginActions] Emitting custom-action with:",
+      logDebug(
+        "[PluginActions]",
+        "Emitting custom-action with:",
         actionWithPluginId,
       );
       emit("custom-action", actionWithPluginId);
       break;
     }
     default:
-      console.warn(
-        `[PluginActions] Unknown action type: ${_action.type}`,
+      logWarn(
+        "[PluginActions]",
+        `Unknown action type: ${_action.type}`,
         _action,
       );
   }

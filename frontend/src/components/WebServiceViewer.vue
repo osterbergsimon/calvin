@@ -93,6 +93,7 @@ import { useConfigStore } from "../stores/config";
 import { useWebServicesStore } from "../stores/webServices";
 import { useModeStore } from "../stores/mode";
 import ServiceViewer from "./service/ServiceViewer.vue";
+import { logDebug } from "../utils/logger";
 
 const props = defineProps({
   isFullscreen: {
@@ -113,7 +114,7 @@ const currentServiceIndex = computed(
 const currentService = computed(() => {
   const service = webServicesStore.getCurrentService();
   if (service) {
-    console.log("[WebServiceViewer] Current service:", {
+    logDebug("[WebServiceViewer]", "Current service:", {
       id: service.id,
       name: service.name,
       url: service.url,

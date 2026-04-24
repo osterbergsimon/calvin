@@ -9,6 +9,7 @@ from typing import Any
 
 from loguru import logger
 
+from app.plugins.definitions import PluginDefinition
 from app.plugins.hooks import plugin_manager
 from app.services.plugin_installer import plugin_installer
 
@@ -142,26 +143,27 @@ class PluginLoader:
         # Load installed plugins
         self.load_installed_plugins()
 
-    def get_plugin_types(self) -> list[dict[str, Any]]:
+    def get_plugin_types(self) -> list[PluginDefinition]:
         """
-        Get all registered plugin types.
+        Get all registered plugin types, normalized into typed definitions.
 
         Returns:
-            List of plugin type dictionaries with error information if loading failed
+            List of normalized plugin definitions
         """
-        plugin_types = []
+        plugin_types: list[PluginDefinition] = []
         results = plugin_manager.hook.register_plugin_types()
         for result in results:
             if result:
-                try:
-                    plugin_types.extend(result if isinstance(result, list) else [result])
-                except Exception as e:
-                    # If a plugin's register_plugin_types hook raises an exception,
-                    # we can't include it but we should log the error
-                    import logging
-
-                    logger = logging.getLogger(__name__)
-                    logger.error(f"Error getting plugin types from hook result: {e}", exc_info=True)
+                raw_definitions = result if isinstance(result, list) else [result]
+                for raw_definition in raw_definitions:
+                    try:
+                        plugin_types.append(PluginDefinition.from_raw(raw_definition))
+                    except Exception as e:
+                        logger.error(
+                            "Error normalizing plugin type from hook result: {}",
+                            e,
+                            exc_info=True,
+                        )
         return plugin_types
 
     def create_plugin_instance(

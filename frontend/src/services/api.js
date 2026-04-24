@@ -1,5 +1,6 @@
 import axios from "axios";
 import { useConnectionStore } from "../stores/connection";
+import { logError } from "../utils/logger";
 
 const api = axios.create({
   baseURL: import.meta.env.VITE_API_URL || "/api",
@@ -53,10 +54,10 @@ api.interceptors.response.use(
       // HTTP error response
       if (error.response?.status === 401) {
         // Handle unauthorized
-        console.error("Unauthorized");
+        logError("[api]", "Unauthorized");
       } else if (error.response?.status >= 500) {
         // Handle server errors
-        console.error("Server error:", error.response.data);
+        logError("[api]", "Server error:", error.response.data);
         // Server error might indicate backend issues
         connectionStore.isBackendOnline = false;
       }

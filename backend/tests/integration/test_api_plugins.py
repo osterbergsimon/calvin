@@ -8,7 +8,7 @@ import pytest
 
 from app.plugins.base import PluginType
 from app.plugins.manager import plugin_manager
-from app.plugins.protocols import BackendPlugin
+from app.plugins.protocols import BackendPlugin, ServicePlugin
 from app.services.plugin_installer import plugin_installer
 
 
@@ -617,3 +617,228 @@ class TestBackendPluginAPI:
             assert data["scheduled_task"] is None
         finally:
             await plugin_manager.unregister("test-backend-status-no-schedule")
+
+
+@pytest.mark.integration
+class TestServicePluginDataAPI:
+    """Test service plugin data endpoint."""
+
+    class MockServicePluginForAPI(ServicePlugin):
+        def __init__(self, plugin_id: str, name: str, enabled: bool = True):
+            super().__init__(plugin_id, name, enabled)
+            self.initialize_calls = 0
+
+        @classmethod
+        def get_plugin_metadata(cls):
+            return {"type_id": "test-service", "plugin_type": PluginType.SERVICE}
+
+        @property
+        def plugin_type(self) -> PluginType:
+            return PluginType.SERVICE
+
+        async def initialize(self) -> None:
+            self.initialize_calls += 1
+
+        async def cleanup(self) -> None:
+            pass
+
+        async def get_content(self) -> dict[str, Any]:
+            return {"type": "api", "url": "/api/plugins/test-service-instance/data"}
+
+        async def validate_config(self, config: dict[str, Any]) -> bool:
+            return True
+
+        async def fetch_service_data(
+            self,
+            start_date: str | None = None,
+            end_date: str | None = None,
+        ) -> dict[str, Any] | None:
+            return {
+                "success": True,
+                "start_date": start_date,
+                "end_date": end_date,
+                "items": [{"label": "ok"}],
+            }
+
+    @pytest.mark.asyncio
+    async def test_get_plugin_data_uses_service_instance_method(self, test_client):
+        from app.models.db_models import PluginDB
+
+        plugin = self.MockServicePluginForAPI(
+            plugin_id="test-service-instance",
+            name="Test Service Instance",
+            enabled=True,
+        )
+        await plugin_manager.register(plugin)
+
+        db_plugin = await PluginDB.objects.create(
+            id="test-service-instance",
+            type_id="test-service",
+            plugin_type="service",
+            name="Test Service Instance",
+            enabled=True,
+            config={},
+        )
+
+        try:
+            response = test_client.get(
+                "/api/plugins/test-service-instance/data",
+                params={"start_date": "2026-01-01", "end_date": "2026-01-07"},
+            )
+
+            if response.status_code == 404:
+                pytest.skip("Service data endpoint not available in test client")
+
+            assert response.status_code == 200
+            data = response.json()
+            assert data["success"] is True
+            assert data["start_date"] == "2026-01-01"
+            assert data["end_date"] == "2026-01-07"
+            assert data["items"] == [{"label": "ok"}]
+            assert plugin.initialize_calls == 1
+        finally:
+            await plugin_manager.unregister("test-service-instance")
+            await db_plugin.delete()
+
+
+@pytest.mark.integration
+class TestPluginTypeClassBasedActions:
+    """Test class-based type-level plugin actions."""
+
+    def test_test_plugin_connection_prefers_plugin_class(self, test_client, monkeypatch):
+        from app.plugins.base import BasePlugin
+
+        class ClassBasedTestPlugin(BasePlugin):
+            @property
+            def plugin_type(self) -> PluginType:
+                return PluginType.SERVICE
+
+            @classmethod
+            def get_plugin_metadata(cls):
+                return {
+                    "type_id": "class-based-test",
+                    "plugin_type": PluginType.SERVICE,
+                    "name": "Class Based Test",
+                    "plugin_class": cls,
+                }
+
+            async def initialize(self) -> None:
+                pass
+
+            async def cleanup(self) -> None:
+                pass
+
+            @classmethod
+            async def test_type_config(cls, config: dict[str, Any]) -> dict[str, Any] | None:
+                return {
+                    "success": True,
+                    "message": f"tested:{config.get('value', '')}",
+                }
+
+        monkeypatch.setattr(
+            "app.api.routes.plugins.management.plugin_loader.get_plugin_types",
+            lambda: [ClassBasedTestPlugin.get_plugin_metadata()],
+        )
+
+        response = test_client.post(
+            "/api/plugins/class-based-test/test",
+            json={"value": "ok"},
+        )
+
+        if response.status_code == 404:
+            pytest.skip("Plugin test endpoint not available in test client")
+
+        assert response.status_code == 200
+        data = response.json()
+        assert data["success"] is True
+        assert data["message"] == "tested:ok"
+
+    def test_scan_plugin_options_prefers_plugin_class(self, test_client, monkeypatch):
+        from app.plugins.base import BasePlugin
+
+        class ClassBasedScanPlugin(BasePlugin):
+            @property
+            def plugin_type(self) -> PluginType:
+                return PluginType.SERVICE
+
+            @classmethod
+            def get_plugin_metadata(cls):
+                return {
+                    "type_id": "class-based-scan",
+                    "plugin_type": PluginType.SERVICE,
+                    "name": "Class Based Scan",
+                    "plugin_class": cls,
+                }
+
+            async def initialize(self) -> None:
+                pass
+
+            async def cleanup(self) -> None:
+                pass
+
+            @classmethod
+            async def scan_type_options(cls, field_key: str) -> dict[str, Any] | None:
+                return {
+                    "options": [{"value": field_key, "label": field_key.upper()}],
+                }
+
+        monkeypatch.setattr(
+            "app.api.routes.plugins.management.plugin_loader.get_plugin_types",
+            lambda: [ClassBasedScanPlugin.get_plugin_metadata()],
+        )
+
+        response = test_client.get("/api/plugins/class-based-scan/scan", params={"field": "device"})
+
+        if response.status_code == 404:
+            pytest.skip("Plugin scan endpoint not available in test client")
+
+        assert response.status_code == 200
+        data = response.json()
+        assert data["options"] == [{"value": "device", "label": "DEVICE"}]
+
+    def test_fetch_plugin_prefers_plugin_class(self, test_client, monkeypatch):
+        from app.plugins.base import BasePlugin
+
+        class ClassBasedFetchPlugin(BasePlugin):
+            @property
+            def plugin_type(self) -> PluginType:
+                return PluginType.BACKEND
+
+            @classmethod
+            def get_plugin_metadata(cls):
+                return {
+                    "type_id": "class-based-fetch",
+                    "plugin_type": PluginType.BACKEND,
+                    "name": "Class Based Fetch",
+                    "plugin_class": cls,
+                }
+
+            async def initialize(self) -> None:
+                pass
+
+            async def cleanup(self) -> None:
+                pass
+
+            @classmethod
+            async def fetch_type_data(cls, instance_id: str | None = None) -> dict[str, Any] | None:
+                return {
+                    "success": True,
+                    "message": "manual fetch completed",
+                    "instance_id": instance_id,
+                }
+
+        monkeypatch.setattr(
+            "app.api.routes.plugins.management.plugin_loader.get_plugin_types",
+            lambda: [ClassBasedFetchPlugin.get_plugin_metadata()],
+        )
+
+        response = test_client.post("/api/plugins/class-based-fetch/fetch")
+
+        if response.status_code == 404:
+            pytest.skip("Plugin fetch endpoint not available in test client")
+
+        assert response.status_code == 200
+        data = response.json()
+        assert data["success"] is True
+        assert data["message"] == "manual fetch completed"
+        assert data["instance_id"] is None

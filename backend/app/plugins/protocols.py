@@ -251,9 +251,9 @@ class ServicePlugin(BasePlugin):
         """
         Fetch service data for display (optional - not all services support data fetching).
 
-        This method is called by the core when fetching data via /api/plugins/{plugin_id}/data.
-        Plugins can implement this to provide their own data fetching logic.
-        Alternatively, plugins can use the fetch_service_data hook for more complex scenarios.
+        This method is called by the core when fetching data via
+        /api/plugins/{plugin_id}/data.
+        Plugins should implement this on the resolved instance directly.
 
         Args:
             start_date: Optional start date (YYYY-MM-DD format, plugin-specific)

@@ -41,15 +41,7 @@ export async function getPluginInstances(pluginId) {
  */
 export async function getPluginConfig(pluginId) {
   const response = await api.get(`/plugins/${pluginId}/config`);
-  return response.data;
-}
-
-/**
- * Update plugin configuration.
- */
-export async function updatePluginConfig(pluginId, config) {
-  const response = await api.put(`/plugins/${pluginId}`, config);
-  return response.data;
+  return response.data || {};
 }
 
 /**
@@ -61,6 +53,24 @@ export async function updatePluginInstanceOrder(pluginId, orders) {
     orders,
   );
   return response.data;
+}
+
+/**
+ * Backward-compatible alias for callers using the older plural name.
+ * Accepts either an order map or an ordered array of instance ids.
+ */
+export async function updatePluginInstancesOrder(pluginId, ordersOrIds) {
+  const orders = Array.isArray(ordersOrIds)
+    ? Object.fromEntries(ordersOrIds.map((id, index) => [id, index]))
+    : ordersOrIds;
+  return updatePluginInstanceOrder(pluginId, orders);
+}
+
+/**
+ * Backward-compatible alias for callers using the older config-specific name.
+ */
+export async function updatePluginConfig(pluginId, config) {
+  return updatePlugin(pluginId, config);
 }
 
 /**
@@ -136,6 +146,48 @@ export async function installPluginFromGitHub(
 }
 
 /**
+ * Get the current state of a background frontend rebuild.
+ */
+export async function getRebuildStatus() {
+  const response = await api.get("/plugins/rebuild-status");
+  return response.data;
+}
+
+/**
+ * Suggest local plugin repo paths by scanning sibling directories (dev mode only).
+ */
+export async function suggestLocalPath() {
+  const response = await api.get("/plugins/local/suggest");
+  return response.data;
+}
+
+/**
+ * Enumerate plugins from a local directory (dev mode only).
+ */
+export async function enumeratePluginsFromLocal(localPath) {
+  const response = await api.post("/plugins/local/enumerate", {
+    local_path: localPath,
+  });
+  return response.data;
+}
+
+/**
+ * Install plugin from a local directory (dev mode only).
+ */
+export async function installPluginFromLocal(
+  localPath,
+  pluginPath,
+  force = false,
+) {
+  const response = await api.post("/plugins/local/install", {
+    local_path: localPath,
+    plugin_path: pluginPath,
+    force,
+  });
+  return response.data;
+}
+
+/**
  * Uninstall a plugin.
  */
 export async function uninstallPlugin(pluginId, pluginType = null) {
@@ -167,14 +219,6 @@ export async function fetchPlugin(pluginId) {
  */
 export async function geocodeLocation(pluginId, location) {
   const response = await api.post(`/plugins/${pluginId}/geocode`, { location });
-  return response.data;
-}
-
-/**
- * Get the status of a background frontend rebuild triggered by plugin install.
- */
-export async function getFrontendBuildStatus() {
-  const response = await api.get("/plugins/frontend-build-status");
   return response.data;
 }
 
@@ -222,15 +266,5 @@ export async function updatePluginInstance(instanceId, instanceData) {
  */
 export async function deletePluginInstance(instanceId) {
   const response = await api.delete(`/plugins/instances/${instanceId}`);
-  return response.data;
-}
-
-/**
- * Update plugin instances order (takes array of instance IDs in order).
- */
-export async function updatePluginInstancesOrder(pluginId, instanceIds) {
-  const response = await api.put(`/plugins/${pluginId}/instances/order`, {
-    instance_ids: instanceIds,
-  });
   return response.data;
 }

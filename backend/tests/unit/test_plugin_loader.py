@@ -5,6 +5,8 @@ from unittest.mock import MagicMock, patch
 
 import pytest
 
+from app.plugins.base import PluginType
+from app.plugins.definitions import PluginDefinition
 from app.plugins.loader import PluginLoader
 
 
@@ -126,18 +128,26 @@ class TestPluginLoader:
         assert mock_import_module.called
 
     def test_get_plugin_types(self, plugin_loader_instance):
-        """Test getting plugin types."""
+        """Test getting plugin types normalized into typed definitions."""
         with patch("app.plugins.loader.plugin_manager") as mock_manager:
             mock_manager.hook.register_plugin_types.return_value = [
-                [{"type_id": "test1", "name": "Test 1"}],
-                {"type_id": "test2", "name": "Test 2"},
+                [{"type_id": "test1", "plugin_type": PluginType.SERVICE, "name": "Test 1"}],
+                PluginDefinition(
+                    type_id="test2",
+                    plugin_type=PluginType.IMAGE,
+                    name="Test 2",
+                ),
             ]
 
             types = plugin_loader_instance.get_plugin_types()
 
             assert len(types) == 2
+            assert isinstance(types[0], PluginDefinition)
+            assert isinstance(types[1], PluginDefinition)
             assert types[0]["type_id"] == "test1"
             assert types[1]["type_id"] == "test2"
+            assert types[0].plugin_type == PluginType.SERVICE
+            assert types[1].plugin_type == PluginType.IMAGE
 
     def test_get_plugin_types_empty(self, plugin_loader_instance):
         """Test getting plugin types when none are registered."""
@@ -147,6 +157,21 @@ class TestPluginLoader:
             types = plugin_loader_instance.get_plugin_types()
 
             assert types == []
+
+    def test_get_plugin_types_skips_invalid_hook_results(self, plugin_loader_instance):
+        """Test invalid hook results are skipped without breaking valid ones."""
+        with patch("app.plugins.loader.plugin_manager") as mock_manager:
+            mock_manager.hook.register_plugin_types.return_value = [
+                [
+                    {"type_id": "valid", "plugin_type": PluginType.SERVICE, "name": "Valid"},
+                    {"type_id": "invalid-missing-type", "name": "Invalid"},
+                ]
+            ]
+
+            types = plugin_loader_instance.get_plugin_types()
+
+            assert len(types) == 1
+            assert types[0].type_id == "valid"
 
     def test_create_plugin_instance(self, plugin_loader_instance):
         """Test creating a plugin instance."""

@@ -24,71 +24,82 @@ logger = logging.getLogger(__name__)
 
 
 class FrontendBuildManager:
-    """Runs `npm run build` in a background thread when plugins with frontend components are installed."""
+    """Manages `npm run build` for plugin frontend components.
 
-    def __init__(self) -> None:
-        self._status = "idle"  # idle | building | done | error
-        self._message = ""
+    Runs builds in a background thread so install endpoints can return immediately.
+    Poll `state` / `message` for progress.
+    """
+
+    def __init__(self):
         self._lock = threading.Lock()
+        self._state = "idle"  # idle | building | done | failed
+        self._message = ""
 
     @property
-    def status(self) -> str:
+    def state(self) -> str:
         with self._lock:
-            return self._status
+            return self._state
 
     @property
     def message(self) -> str:
         with self._lock:
             return self._message
 
-    def trigger(self, frontend_dir: Path) -> bool:
-        """Start a rebuild if one is not already running. Returns True if started."""
+    def start_background_build(self, frontend_dir: Path) -> None:
+        """Kick off a build in a daemon thread. Returns immediately."""
         with self._lock:
-            if self._status == "building":
-                return False
-            self._status = "building"
-            self._message = "Frontend rebuild in progress…"
-
-        thread = threading.Thread(
-            target=self._run,
-            args=(frontend_dir,),
-            daemon=True,
-        )
+            if self._state == "building":
+                return  # already in progress
+            self._state = "building"
+            self._message = "Building frontend, this may take a minute…"
+        thread = threading.Thread(target=self._run_build, args=(frontend_dir,), daemon=True)
         thread.start()
-        return True
 
-    def _run(self, frontend_dir: Path) -> None:
+    def _run_build(self, frontend_dir: Path) -> None:
+        success, message = self._build(frontend_dir)
+        with self._lock:
+            self._state = "done" if success else "failed"
+            self._message = message
+
+    def _build(self, frontend_dir: Path) -> tuple[bool, str]:
         npm = shutil.which("npm")
         if not npm:
-            with self._lock:
-                self._status = "error"
-                self._message = "npm not found — rebuild the frontend manually with: npm run build"
-            return
+            return False, "npm not found — rebuild the frontend manually with: npm run build"
+
+        # On Windows, .cmd files can't be executed by CreateProcess directly —
+        # they need cmd.exe as the interpreter.
+        if sys.platform == "win32":
+            cmd = ["cmd", "/c", npm, "run", "build"]
+        else:
+            cmd = [npm, "run", "build"]
 
         try:
             result = subprocess.run(
-                [npm, "run", "build"],
+                cmd,
                 cwd=str(frontend_dir),
                 capture_output=True,
                 text=True,
                 timeout=300,
             )
-            with self._lock:
-                if result.returncode == 0:
-                    self._status = "done"
-                    self._message = "Frontend rebuilt successfully — refresh the page to load new plugin components."
-                else:
-                    tail = (result.stderr or result.stdout or "unknown error")[-500:]
-                    self._status = "error"
-                    self._message = f"Frontend rebuild failed: {tail}"
+            if result.returncode == 0:
+                return True, "Frontend rebuilt successfully."
+            tail = (result.stderr or result.stdout or "unknown error")[-500:]
+            return False, f"Frontend rebuild failed: {tail}"
         except subprocess.TimeoutExpired:
-            with self._lock:
-                self._status = "error"
-                self._message = "Frontend rebuild timed out (5 min limit)"
+            return False, "Frontend rebuild timed out (5 min limit)"
         except Exception as exc:
-            with self._lock:
-                self._status = "error"
-                self._message = f"Frontend rebuild failed: {exc}"
+            return False, f"Frontend rebuild failed: {exc}"
+
+    # Keep synchronous variant for callers that need to wait (e.g. startup resume)
+    def build(self, frontend_dir: Path) -> tuple[bool, str]:
+        with self._lock:
+            self._state = "building"
+            self._message = "Building frontend…"
+        success, message = self._build(frontend_dir)
+        with self._lock:
+            self._state = "done" if success else "failed"
+            self._message = message
+        return success, message
 
 
 frontend_build_manager = FrontendBuildManager()
@@ -353,12 +364,13 @@ class PluginInstaller:
             return manifest
 
         except Exception as e:
-            # Cleanup on error
+            # Cleanup on error — use ignore_errors so a locked file on Windows
+            # doesn't mask the real install error.
             if plugin_path.exists():
-                shutil.rmtree(plugin_path)
+                shutil.rmtree(plugin_path, ignore_errors=True)
             frontend_path = self.get_frontend_plugin_path(install_id)
             if frontend_path.exists():
-                shutil.rmtree(frontend_path)
+                shutil.rmtree(frontend_path, ignore_errors=True)
             raise ValueError(f"Failed to install plugin: {e}") from e
 
     def _install_pip_requirements(self, manifest: dict[str, Any]) -> list[str]:
@@ -378,20 +390,30 @@ class PluginInstaller:
         )
         installed: list[str] = []
         for req in requirements:
+            cmd = [*pip_cmd, req]
+            logger.info(f"Running: {' '.join(str(c) for c in cmd)}")
             try:
                 result = subprocess.run(
-                    [*pip_cmd, req],
+                    cmd,
                     capture_output=True,
                     text=True,
                     timeout=120,
                 )
+                logger.debug(f"pip stdout: {result.stdout!r}")
+                logger.debug(f"pip stderr: {result.stderr!r}")
+                logger.debug(f"pip returncode: {result.returncode}")
                 if result.returncode == 0:
                     logger.info(f"Installed: {req}")
                     installed.append(req)
                 else:
-                    raise ValueError(f"pip install failed for '{req}':\n{result.stderr.strip()}")
+                    error_output = (result.stderr or result.stdout or "(no output)").strip()
+                    raise ValueError(
+                        f"pip install failed for '{req}' (exit {result.returncode}):\n{error_output}"
+                    )
             except subprocess.TimeoutExpired:
                 raise ValueError(f"Timed out installing package '{req}' (120s limit)")
+            except OSError as e:
+                raise ValueError(f"Failed to launch pip for '{req}': {e}")
 
         return installed
 
@@ -406,10 +428,15 @@ class PluginInstaller:
 
         The returned list already includes "install"; append only the package name.
         """
-        # 1. Prefer uv when available — works even when pip is absent from the venv
+        # 1. Prefer uv when available — works even when pip is absent from the venv.
+        # On Windows, uv.exe must be launched via cmd /c (same pattern as npm) to avoid
+        # STATUS_FATAL_APP_EXIT when spawning from within a running Python process.
         uv = shutil.which("uv")
         if uv:
-            return [uv, "pip", "install", "--python", sys.executable]
+            cmd = [uv, "pip", "install", "--python", sys.executable]
+            if sys.platform == "win32":
+                return ["cmd", "/c"] + cmd
+            return cmd
 
         # 2. pip/pip3 binary sitting next to the interpreter
         bin_dir = Path(sys.executable).parent

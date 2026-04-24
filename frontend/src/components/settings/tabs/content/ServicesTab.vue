@@ -41,7 +41,7 @@ const servicePlugins = computed(() => {
     (p) => p.type === "service" && p.enabled,
   );
   // Sort by display order
-  return filtered.sort((a, b) => {
+  return [...filtered].sort((a, b) => {
     const orderA = pluginDisplayOrders.value[a.id] ?? 0;
     const orderB = pluginDisplayOrders.value[b.id] ?? 0;
     return orderA - orderB;
@@ -53,7 +53,7 @@ const servicePluginInstances = computed(() => {
   servicePlugins.value.forEach((plugin) => {
     const pluginInsts = pluginInstances.value[plugin.id] || [];
     // Sort instances by display_order
-    instances[plugin.id] = pluginInsts.sort((a, b) => {
+    instances[plugin.id] = [...pluginInsts].sort((a, b) => {
       const orderA = a.display_order ?? 0;
       const orderB = b.display_order ?? 0;
       return orderA - orderB;
