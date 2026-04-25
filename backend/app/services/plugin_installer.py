@@ -11,9 +11,11 @@ from pathlib import Path
 from typing import Any
 
 from app.config import settings
+from app.plugins.definitions import CURRENT_PLUGIN_PROTOCOL_VERSION
 from app.services.validation import (
     validate_directory_structure,
     validate_manifest_format_version,
+    validate_manifest_protocol_version,
     validate_manifest_required_fields,
     validate_plugin_optional_fields,
     validate_plugin_type,
@@ -183,6 +185,12 @@ class PluginInstaller:
         validate_manifest_format_version(
             manifest, ["1.0.0"], default_version="1.0.0", manifest_type="plugin.json"
         )
+        validate_manifest_protocol_version(
+            manifest,
+            [CURRENT_PLUGIN_PROTOCOL_VERSION],
+            default_version=CURRENT_PLUGIN_PROTOCOL_VERSION,
+            manifest_type="plugin.json",
+        )
         validate_plugin_optional_fields(manifest)
 
         return manifest
@@ -213,6 +221,12 @@ class PluginInstaller:
         validate_plugin_type(manifest["type"])
         validate_manifest_format_version(
             manifest, ["1.0.0"], default_version="1.0.0", manifest_type="plugin.json"
+        )
+        validate_manifest_protocol_version(
+            manifest,
+            [CURRENT_PLUGIN_PROTOCOL_VERSION],
+            default_version=CURRENT_PLUGIN_PROTOCOL_VERSION,
+            manifest_type="plugin.json",
         )
         validate_plugin_optional_fields(manifest)
 

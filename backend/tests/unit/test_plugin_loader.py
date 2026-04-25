@@ -173,6 +173,26 @@ class TestPluginLoader:
             assert len(types) == 1
             assert types[0].type_id == "valid"
 
+    def test_get_plugin_types_skips_unsupported_protocol_versions(self, plugin_loader_instance):
+        """Test future protocol versions are skipped without breaking valid plugins."""
+        with patch("app.plugins.loader.plugin_manager") as mock_manager:
+            mock_manager.hook.register_plugin_types.return_value = [
+                [
+                    {"type_id": "valid", "plugin_type": PluginType.SERVICE, "name": "Valid"},
+                    {
+                        "protocol_version": 2,
+                        "type_id": "future",
+                        "plugin_type": PluginType.SERVICE,
+                        "name": "Future Plugin",
+                    },
+                ]
+            ]
+
+            types = plugin_loader_instance.get_plugin_types()
+
+            assert len(types) == 1
+            assert types[0].type_id == "valid"
+
     def test_create_plugin_instance(self, plugin_loader_instance):
         """Test creating a plugin instance."""
         mock_plugin = MagicMock()
