@@ -2,7 +2,7 @@
  * Composable for managing configuration form state and updates.
  */
 
-import { ref } from "vue";
+import { computed, ref } from "vue";
 import { useConfigStore } from "../stores/config";
 import { useKeyboardStore } from "../stores/keyboard";
 import * as configApi from "../services/configApi";
@@ -15,6 +15,34 @@ export function useConfigForm(initialConfig = {}) {
   const saving = ref(false);
   const error = ref("");
   const saveSuccess = ref(false);
+  const lastSavedKeys = ref([]);
+  let saveSuccessTimer = null;
+
+  const saveStatus = computed(() => {
+    if (saving.value) {
+      return {
+        state: "saving",
+        message: "Saving settings...",
+      };
+    }
+    if (error.value) {
+      return {
+        state: "error",
+        message: error.value,
+      };
+    }
+    if (saveSuccess.value) {
+      const count = lastSavedKeys.value.length;
+      return {
+        state: "saved",
+        message: count > 0 ? `Saved ${count} setting${count === 1 ? "" : "s"}` : "Settings saved",
+      };
+    }
+    return {
+      state: "idle",
+      message: "Settings auto-save as you change them",
+    };
+  });
 
   // Initialize from config store
   const loadConfig = async () => {
@@ -168,9 +196,14 @@ export function useConfigForm(initialConfig = {}) {
       const configToSave = updates || localConfig.value;
       await configApi.updateConfig(configToSave);
       await configStore.updateConfig(configToSave);
+      lastSavedKeys.value = updates ? Object.keys(updates) : [];
       saveSuccess.value = true;
-      setTimeout(() => {
+      if (saveSuccessTimer) {
+        clearTimeout(saveSuccessTimer);
+      }
+      saveSuccessTimer = setTimeout(() => {
         saveSuccess.value = false;
+        saveSuccessTimer = null;
       }, 2500);
     } catch (err) {
       logError("[useConfigForm]", "Failed to save config:", err);
@@ -191,6 +224,8 @@ export function useConfigForm(initialConfig = {}) {
     saving,
     error,
     saveSuccess,
+    saveStatus,
+    lastSavedKeys,
     loadConfig,
     updateConfigValue,
     updateConfig,

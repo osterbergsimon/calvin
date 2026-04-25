@@ -113,6 +113,26 @@
       </SettingItem>
     </CollapsibleSection>
 
+    <CollapsibleSection title="Calendar Refresh" icon="🔄">
+      <SettingItem
+        label="Calendar Refresh Interval (minutes)"
+        help="How often to refresh calendar data (5-120 minutes)"
+        input-id="calendar-refresh-interval"
+      >
+        <input
+          id="calendar-refresh-interval"
+          :value="config.calendarRefreshInterval"
+          type="number"
+          min="5"
+          max="120"
+          step="1"
+          placeholder="15"
+          aria-label="Calendar refresh interval in minutes"
+          @change="handleCalendarRefreshChange"
+        />
+      </SettingItem>
+    </CollapsibleSection>
+
     <ConfirmModal
       :show="showRemoveConfirm"
       title="Remove Calendar Source"
@@ -134,6 +154,16 @@ import CollapsibleSection from "../../shared/CollapsibleSection.vue";
 import SettingItem from "../../shared/SettingItem.vue";
 import ConfirmModal from "../../shared/ConfirmModal.vue";
 import { logError } from "@/utils/logger";
+
+defineProps({
+  config: {
+    type: Object,
+    required: true,
+    default: () => ({}),
+  },
+});
+
+const emit = defineEmits(["update:config"]);
 
 const calendarStore = useCalendarStore();
 const { pluginInstances } = usePlugins();
@@ -438,6 +468,14 @@ const confirmRemoveSource = async () => {
 const cancelRemoveSource = () => {
   showRemoveConfirm.value = false;
   pendingRemoveId.value = null;
+};
+
+const handleCalendarRefreshChange = event => {
+  const rawValue = parseInt(event.target.value, 10);
+  if (isNaN(rawValue)) return;
+
+  const value = Math.max(5, Math.min(120, rawValue));
+  emit("update:config", { calendarRefreshInterval: value });
 };
 
 onMounted(async () => {

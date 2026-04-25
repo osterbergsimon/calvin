@@ -1,13 +1,19 @@
 <template>
   <section class="settings-section collapsible" :class="{ expanded: isExpanded }">
-    <div class="section-header" @click="toggle">
+    <button
+      type="button"
+      class="section-header"
+      :aria-expanded="isExpanded"
+      :aria-controls="contentId"
+      @click="toggle"
+    >
       <h2>
         <span v-if="icon" class="section-icon">{{ icon }}</span>
         {{ title }}
       </h2>
       <span class="toggle-icon">{{ isExpanded ? "▼" : "▶" }}</span>
-    </div>
-    <div v-show="isExpanded" class="section-content">
+    </button>
+    <div :id="contentId" v-show="isExpanded" class="section-content">
       <slot />
     </div>
   </section>
@@ -15,6 +21,8 @@
 
 <script setup>
 import { ref, watch } from "vue";
+
+let sectionId = 0;
 
 const props = defineProps({
   title: {
@@ -34,6 +42,7 @@ const props = defineProps({
 const emit = defineEmits(["update:expanded"]);
 
 const isExpanded = ref(props.expanded);
+const contentId = `settings-section-content-${++sectionId}`;
 
 watch(
   () => props.expanded,
@@ -64,6 +73,7 @@ const toggle = () => {
 }
 
 .section-header {
+  width: 100%;
   display: flex;
   justify-content: space-between;
   align-items: center;
@@ -71,11 +81,17 @@ const toggle = () => {
   cursor: pointer;
   user-select: none;
   background: var(--bg-secondary);
+  border: 0;
   transition: background 0.2s ease;
 }
 
 .section-header:hover {
   background: var(--bg-tertiary);
+}
+
+.section-header:focus-visible {
+  outline: 2px solid var(--accent-primary);
+  outline-offset: -2px;
 }
 
 .section-header h2 {

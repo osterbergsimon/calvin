@@ -3,6 +3,14 @@
     <div class="settings-header">
       <h1>Settings & Configuration</h1>
       <div class="header-actions">
+        <div
+          class="save-status"
+          :class="`save-status-${saveStatus.state}`"
+          role="status"
+          aria-live="polite"
+        >
+          {{ saveStatus.message }}
+        </div>
         <div ref="systemMenuRef" class="system-menu">
           <button class="btn-system-menu" @click="showSystemMenu = !showSystemMenu">
             ⚙️ System
@@ -15,7 +23,7 @@
               :disabled="!!updateMessage"
               @click="
                 showSystemMenu = false;
-                restartBackend();
+                requestSystemAction('restart-backend');
               "
             >
               🔄 Restart Backend
@@ -26,17 +34,57 @@
               :disabled="!!updateMessage"
               @click="
                 showSystemMenu = false;
-                restartFrontend();
+                requestSystemAction('restart-frontend');
               "
             >
               🔄 Restart Frontend
             </button>
-            <button class="menu-item" title="Reload the frontend page" @click="reloadUI">
+            <button
+              class="menu-item"
+              title="Reload the frontend page"
+              @click="
+                showSystemMenu = false;
+                requestSystemAction('reload-ui');
+              "
+            >
               🔄 Reload Page
             </button>
           </div>
         </div>
         <button class="btn-back" @click="goBack">← Back to Dashboard</button>
+      </div>
+    </div>
+
+    <div class="settings-search">
+      <label class="search-label" for="settings-search-input"> Find a setting </label>
+      <input
+        id="settings-search-input"
+        v-model="settingsSearchQuery"
+        class="search-input"
+        type="search"
+        placeholder="Search display, calendar, plugins, reboot, updates..."
+        autocomplete="off"
+      />
+      <div
+        v-if="settingsSearchQuery.trim()"
+        class="search-results"
+        role="listbox"
+        aria-label="Settings search results"
+      >
+        <button
+          v-for="result in filteredSettingsDestinations"
+          :key="result.id"
+          type="button"
+          class="search-result"
+          role="option"
+          @click="jumpToSetting(result)"
+        >
+          <span class="search-result-title">{{ result.label }}</span>
+          <span class="search-result-path">{{ result.path }}</span>
+        </button>
+        <div v-if="filteredSettingsDestinations.length === 0" class="search-empty">
+          No matching settings
+        </div>
       </div>
     </div>
 
@@ -53,7 +101,7 @@
             :key="category.id"
             class="category-btn"
             :class="{ active: activeCategory === category.id }"
-            @click="activeCategory = category.id"
+            @click="selectCategory(category.id)"
           >
             <span class="category-icon">{{ category.icon }}</span>
             <span class="category-label">{{ category.label }}</span>
@@ -67,18 +115,31 @@
           {{ error }}
         </div>
         <div v-else-if="saveSuccess" class="settings-banner settings-banner-success">✓ Saved</div>
-        <LayoutCategory
-          v-if="activeCategory === 'layout' && localConfig"
+        <DashboardCategory
+          v-if="activeCategory === 'dashboard' && localConfig"
+          :key="categoryRenderKey"
           :config="localConfig"
           @update:config="handleConfigUpdate"
         />
-        <ContentCategory v-if="activeCategory === 'content'" />
-        <PluginsCategory v-if="activeCategory === 'plugins'" />
-        <SystemCategory
-          v-if="activeCategory === 'system'"
+        <ContentSourcesCategory
+          v-if="activeCategory === 'content' && localConfig"
+          :key="categoryRenderKey"
+          :config="localConfig"
+          @update:config="handleConfigUpdate"
+        />
+        <PluginsCategory v-if="activeCategory === 'plugins'" :key="categoryRenderKey" />
+        <DeviceCategory
+          v-if="activeCategory === 'device'"
+          :key="categoryRenderKey"
           :config="localConfig"
           :version="version"
           :frontend-version="frontendVersion"
+          @update:config="handleConfigUpdate"
+        />
+        <MaintenanceCategory
+          v-if="activeCategory === 'maintenance'"
+          :key="categoryRenderKey"
+          :config="localConfig"
           :git-repo-url="localConfig.gitRepoUrl"
           :git-branch="localConfig.gitBranch"
           @update:config="handleConfigUpdate"
@@ -87,49 +148,154 @@
         />
       </div>
     </div>
+
+    <ConfirmModal
+      :show="!!pendingSystemAction"
+      :title="pendingSystemActionConfig.title"
+      :message="pendingSystemActionConfig.message"
+      :confirm-text="pendingSystemActionConfig.confirmText"
+      @confirm="confirmSystemAction"
+      @cancel="cancelSystemAction"
+    />
   </div>
 </template>
 
 <script setup>
-import { ref, watch, onMounted, onUnmounted } from "vue";
-import { useRouter } from "vue-router";
+import { computed, ref, watch, onMounted, onUnmounted } from "vue";
+import { useRoute, useRouter } from "vue-router";
 import { useConfigForm } from "@/composables";
 import { useSystem } from "@/composables";
 import { useModeStore } from "@/stores/mode";
 import { defineAsyncComponent } from "vue";
+import ConfirmModal from "@/components/settings/shared/ConfirmModal.vue";
+import {
+  SETTINGS_CATEGORY_STORAGE_KEY,
+  defaultSettingsCategoryId,
+  filterSettingsDestinations,
+  getSettingDestinationById,
+  isKnownSettingsCategory,
+  settingsCategories,
+} from "@/components/settings/settingsRegistry";
 
 // Lazy load category components for better code splitting
-const LayoutCategory = defineAsyncComponent(
-  () => import("@/components/settings/categories/LayoutCategory.vue")
+const DashboardCategory = defineAsyncComponent(
+  () => import("@/components/settings/categories/DashboardCategory.vue")
 );
-const ContentCategory = defineAsyncComponent(
-  () => import("@/components/settings/categories/ContentCategory.vue")
+const ContentSourcesCategory = defineAsyncComponent(
+  () => import("@/components/settings/categories/ContentSourcesCategory.vue")
 );
 const PluginsCategory = defineAsyncComponent(
   () => import("@/components/settings/categories/PluginsCategory.vue")
 );
-const SystemCategory = defineAsyncComponent(
-  () => import("@/components/settings/categories/SystemCategory.vue")
+const DeviceCategory = defineAsyncComponent(
+  () => import("@/components/settings/categories/DeviceCategory.vue")
+);
+const MaintenanceCategory = defineAsyncComponent(
+  () => import("@/components/settings/categories/MaintenanceCategory.vue")
 );
 
 const router = useRouter();
+const route = useRoute();
 const modeStore = useModeStore();
 
-// Category navigation
-const categories = [
-  { id: "layout", label: "Layout & Display", icon: "📐" },
-  { id: "content", label: "Content", icon: "📦" },
-  { id: "plugins", label: "Plugins", icon: "🔌" },
-  { id: "system", label: "System", icon: "⚙️" },
-];
+const categories = settingsCategories;
 
-const _CATEGORY_KEY = "settings_active_category";
-const activeCategory = ref(sessionStorage.getItem(_CATEGORY_KEY) || "layout");
-watch(activeCategory, val => sessionStorage.setItem(_CATEGORY_KEY, val));
+const getRouteSettingDestination = () => {
+  const settingId = route.query.setting;
+  return typeof settingId === "string" ? getSettingDestinationById(settingId) : null;
+};
+
+const initialRouteDestination = getRouteSettingDestination();
+if (initialRouteDestination?.tabKey && initialRouteDestination.tab) {
+  sessionStorage.setItem(initialRouteDestination.tabKey, initialRouteDestination.tab);
+}
+
+const getInitialCategory = () => {
+  if (initialRouteDestination) return initialRouteDestination.category;
+
+  const storedCategory = sessionStorage.getItem(SETTINGS_CATEGORY_STORAGE_KEY);
+  return isKnownSettingsCategory(storedCategory) ? storedCategory : defaultSettingsCategoryId;
+};
+const activeCategory = ref(getInitialCategory());
+watch(activeCategory, val => sessionStorage.setItem(SETTINGS_CATEGORY_STORAGE_KEY, val));
 const showSystemMenu = ref(false);
+const settingsSearchQuery = ref("");
+const categoryRenderKey = ref(0);
+const pendingSystemAction = ref(null);
+
+const systemActionConfigs = {
+  "restart-backend": {
+    title: "Restart Backend",
+    message:
+      "Restarting the backend can briefly interrupt plugins, calendar refresh, and API requests. Continue?",
+    confirmText: "Restart Backend",
+  },
+  "restart-frontend": {
+    title: "Restart Frontend",
+    message:
+      "Restarting the frontend service can briefly interrupt the dashboard display. Continue?",
+    confirmText: "Restart Frontend",
+  },
+  "reload-ui": {
+    title: "Reload Page",
+    message:
+      "Reloading the page refreshes the current settings UI. Auto-saved settings are kept, but in-progress plugin forms may be lost. Continue?",
+    confirmText: "Reload Page",
+  },
+};
+
+const pendingSystemActionConfig = computed(
+  () =>
+    systemActionConfigs[pendingSystemAction.value] || {
+      title: "",
+      message: "",
+      confirmText: "Continue",
+    }
+);
+
+const filteredSettingsDestinations = computed(() => {
+  return filterSettingsDestinations(settingsSearchQuery.value);
+});
+
+const applySettingDestination = destination => {
+  if (destination.tabKey && destination.tab) {
+    sessionStorage.setItem(destination.tabKey, destination.tab);
+  }
+  activeCategory.value = destination.category;
+  categoryRenderKey.value += 1;
+};
+
+const jumpToSetting = destination => {
+  applySettingDestination(destination);
+  settingsSearchQuery.value = "";
+  router.replace({
+    query: {
+      ...route.query,
+      setting: destination.id,
+    },
+  });
+};
+
+const selectCategory = categoryId => {
+  activeCategory.value = categoryId;
+  if (!route.query.setting) return;
+
+  const { setting: _setting, ...query } = route.query;
+  router.replace({ query });
+};
+
+watch(
+  () => route.query.setting,
+  () => {
+    const destination = getRouteSettingDestination();
+    if (destination) {
+      applySettingDestination(destination);
+    }
+  }
+);
 
 // Config management
-const { localConfig, loadConfig, updateConfig, error, saveSuccess } = useConfigForm();
+const { localConfig, loadConfig, updateConfig, error, saveSuccess, saveStatus } = useConfigForm();
 
 // System operations
 const { restartBackend, restartFrontend, updateMessage, updateMessageClass } = useSystem();
@@ -175,8 +341,28 @@ const goBack = () => {
 
 // Reload UI
 const reloadUI = () => {
-  showSystemMenu.value = false;
   window.location.reload();
+};
+
+const requestSystemAction = action => {
+  pendingSystemAction.value = action;
+};
+
+const cancelSystemAction = () => {
+  pendingSystemAction.value = null;
+};
+
+const confirmSystemAction = async () => {
+  const action = pendingSystemAction.value;
+  pendingSystemAction.value = null;
+
+  if (action === "restart-backend") {
+    await restartBackend();
+  } else if (action === "restart-frontend") {
+    await restartFrontend();
+  } else if (action === "reload-ui") {
+    reloadUI();
+  }
 };
 
 // Click-outside closes the system menu
@@ -229,6 +415,117 @@ onUnmounted(() => {
   display: flex;
   gap: 1rem;
   align-items: center;
+}
+
+.save-status {
+  padding: 0.45rem 0.75rem;
+  border: 1px solid var(--border-color);
+  border-radius: 999px;
+  background: var(--bg-secondary);
+  color: var(--text-secondary);
+  font-size: 0.82rem;
+  font-weight: 600;
+  white-space: nowrap;
+}
+
+.save-status-saving {
+  border-color: rgba(33, 150, 243, 0.4);
+  color: #1565c0;
+}
+
+.save-status-saved {
+  border-color: rgba(76, 175, 80, 0.45);
+  color: #2e7d32;
+}
+
+.save-status-error {
+  border-color: rgba(244, 67, 54, 0.45);
+  color: #c62828;
+}
+
+.settings-search {
+  position: relative;
+  margin-bottom: 1.5rem;
+  max-width: 720px;
+}
+
+.search-label {
+  display: block;
+  margin-bottom: 0.4rem;
+  color: var(--text-secondary);
+  font-size: 0.85rem;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+}
+
+.search-input {
+  width: 100%;
+  padding: 0.8rem 1rem;
+  background: var(--bg-secondary);
+  color: var(--text-primary);
+  border: 1px solid var(--border-color);
+  border-radius: 10px;
+  font-size: 0.95rem;
+  font-family: inherit;
+}
+
+.search-input:focus {
+  outline: none;
+  border-color: var(--accent-primary);
+  box-shadow: 0 0 0 3px rgba(33, 150, 243, 0.18);
+}
+
+.search-results {
+  position: absolute;
+  z-index: 1200;
+  top: calc(100% + 0.4rem);
+  left: 0;
+  right: 0;
+  overflow: hidden;
+  background: var(--bg-primary);
+  border: 1px solid var(--border-color);
+  border-radius: 10px;
+  box-shadow: 0 8px 24px var(--shadow);
+}
+
+.search-result {
+  display: flex;
+  flex-direction: column;
+  gap: 0.2rem;
+  width: 100%;
+  padding: 0.8rem 1rem;
+  background: transparent;
+  border: 0;
+  border-bottom: 1px solid var(--border-color);
+  color: var(--text-primary);
+  cursor: pointer;
+  text-align: left;
+}
+
+.search-result:last-child {
+  border-bottom: 0;
+}
+
+.search-result:hover,
+.search-result:focus-visible {
+  background: var(--bg-secondary);
+  outline: none;
+}
+
+.search-result-title {
+  font-weight: 700;
+}
+
+.search-result-path {
+  color: var(--text-secondary);
+  font-size: 0.82rem;
+}
+
+.search-empty {
+  padding: 0.9rem 1rem;
+  color: var(--text-secondary);
+  font-size: 0.9rem;
 }
 
 .system-menu {
