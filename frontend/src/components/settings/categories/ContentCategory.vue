@@ -9,7 +9,11 @@
     <SettingsTab>
       <ImagesTab v-if="activeTab === 'images'" />
       <ServicesTab v-if="activeTab === 'services'" />
-      <CalendarSourcesTab v-if="activeTab === 'calendar-sources'" />
+      <CalendarSourcesTab
+        v-if="activeTab === 'calendar-sources'"
+        :config="config"
+        @update:config="$emit('update:config', $event)"
+      />
     </SettingsTab>
   </div>
 </template>
@@ -24,6 +28,15 @@ import ServicesTab from "../tabs/content/ServicesTab.vue";
 import CalendarSourcesTab from "../tabs/content/CalendarSourcesTab.vue";
 
 const { loadPlugins } = usePlugins();
+
+defineProps({
+  config: {
+    type: Object,
+    default: () => ({}),
+  },
+});
+
+defineEmits(["update:config"]);
 
 const tabs = [
   { id: "images", label: "Images", icon: "🖼️" },

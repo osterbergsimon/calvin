@@ -23,6 +23,7 @@ const childStubs = {
   CalendarSourcesTab: true,
   PowerTab: true,
   KeyboardTab: true,
+  RebootComboTab: true,
   HardwareTab: true,
   UpdatesTab: true,
   DebugTab: true,
@@ -79,6 +80,7 @@ describe("settings category IA", () => {
     expect(tabs.map((tab) => tab.label)).toEqual([
       "Power & Display",
       "Keyboard",
+      "Reboot Combo",
       "Hardware",
     ]);
   });

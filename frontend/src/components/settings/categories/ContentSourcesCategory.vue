@@ -7,7 +7,11 @@
     />
 
     <SettingsTab>
-      <CalendarSourcesTab v-if="activeTab === 'calendars'" />
+      <CalendarSourcesTab
+        v-if="activeTab === 'calendars'"
+        :config="config"
+        @update:config="$emit('update:config', $event)"
+      />
       <PhotosTab
         v-if="activeTab === 'photos'"
         :config="config"

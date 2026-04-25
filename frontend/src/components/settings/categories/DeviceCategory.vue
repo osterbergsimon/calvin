@@ -17,6 +17,11 @@
         :config="config"
         @update:config="$emit('update:config', $event)"
       />
+      <RebootComboTab
+        v-if="activeTab === 'reboot'"
+        :config="config"
+        @update:config="$emit('update:config', $event)"
+      />
       <HardwareTab
         v-if="activeTab === 'hardware'"
         :version="version"
@@ -32,6 +37,7 @@ import TabNavigation from "../shared/TabNavigation.vue";
 import SettingsTab from "../shared/SettingsTab.vue";
 import PowerTab from "../tabs/system/PowerTab.vue";
 import KeyboardTab from "../tabs/layout/KeyboardTab.vue";
+import RebootComboTab from "../tabs/device/RebootComboTab.vue";
 import HardwareTab from "../tabs/system/HardwareTab.vue";
 
 defineProps({
@@ -54,6 +60,7 @@ defineEmits(["update:config"]);
 const tabs = [
   { id: "power", label: "Power & Display", icon: "⚡" },
   { id: "keyboard", label: "Keyboard", icon: "⌨️" },
+  { id: "reboot", label: "Reboot Combo", icon: "🔁" },
   { id: "hardware", label: "Hardware", icon: "🖥️" },
 ];
 

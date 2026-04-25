@@ -3,7 +3,9 @@
     <div
       v-if="banner"
       class="tab-banner"
-      :class="banner.type === 'error' ? 'tab-banner-error' : 'tab-banner-success'"
+      :class="
+        banner.type === 'error' ? 'tab-banner-error' : 'tab-banner-success'
+      "
     >
       {{ banner.text }}
     </div>
@@ -132,6 +134,26 @@
       </SettingItem>
     </CollapsibleSection>
 
+    <CollapsibleSection title="Calendar Refresh" icon="🔄">
+      <SettingItem
+        label="Calendar Refresh Interval (minutes)"
+        help="How often to refresh calendar data (5-120 minutes)"
+        input-id="calendar-refresh-interval"
+      >
+        <input
+          id="calendar-refresh-interval"
+          :value="config.calendarRefreshInterval"
+          type="number"
+          min="5"
+          max="120"
+          step="1"
+          placeholder="15"
+          aria-label="Calendar refresh interval in minutes"
+          @change="handleCalendarRefreshChange"
+        />
+      </SettingItem>
+    </CollapsibleSection>
+
     <ConfirmModal
       :show="showRemoveConfirm"
       title="Remove Calendar Source"
@@ -153,6 +175,16 @@ import CollapsibleSection from "../../shared/CollapsibleSection.vue";
 import SettingItem from "../../shared/SettingItem.vue";
 import ConfirmModal from "../../shared/ConfirmModal.vue";
 import { logError } from "@/utils/logger";
+
+defineProps({
+  config: {
+    type: Object,
+    required: true,
+    default: () => ({}),
+  },
+});
+
+const emit = defineEmits(["update:config"]);
 
 const calendarStore = useCalendarStore();
 const { pluginInstances } = usePlugins();
@@ -259,7 +291,11 @@ const loadCalendarPluginTypes = async () => {
       newCalendarSource.value.type = calendarPluginTypes.value[0].id;
     }
   } catch (error) {
-    logError("[CalendarSources]", "Failed to load calendar plugin types:", error);
+    logError(
+      "[CalendarSources]",
+      "Failed to load calendar plugin types:",
+      error,
+    );
     // Fallback to hardcoded types
     calendarPluginTypes.value = [
       { id: "google", name: "Google Calendar" },
@@ -389,7 +425,11 @@ const handleUpdateSourceColor = async (sourceId, color) => {
       await loadCalendarSources();
     }
   } catch (error) {
-    logError("[CalendarSources]", "Failed to update calendar source color:", error);
+    logError(
+      "[CalendarSources]",
+      "Failed to update calendar source color:",
+      error,
+    );
     setBanner(
       "error",
       error?.response?.data?.detail ||
@@ -472,6 +512,14 @@ const confirmRemoveSource = async () => {
 const cancelRemoveSource = () => {
   showRemoveConfirm.value = false;
   pendingRemoveId.value = null;
+};
+
+const handleCalendarRefreshChange = (event) => {
+  const rawValue = parseInt(event.target.value, 10);
+  if (isNaN(rawValue)) return;
+
+  const value = Math.max(5, Math.min(120, rawValue));
+  emit("update:config", { calendarRefreshInterval: value });
 };
 
 onMounted(async () => {
