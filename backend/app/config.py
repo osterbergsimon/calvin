@@ -16,7 +16,7 @@ class Settings(BaseSettings):
     debug: bool = True
 
     # API
-    api_host: str = "0.0.0.0"
+    api_host: str = "0.0.0.0"  # nosec B104 - intentional: Pi serves the LAN
     api_port: int = 8000
 
     # Database

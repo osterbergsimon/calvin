@@ -90,7 +90,7 @@ def _attempt_restart_calvin_service(service: str) -> bool:
 _UPDATE_LOG_LOCATIONS = [
     lambda: settings.repo_dir / "backend" / "logs" / "calvin-update.log",
     lambda: settings.repo_dir.parent / "calvin-update.log",
-    lambda: Path("/tmp/calvin-update.log"),
+    lambda: Path("/tmp/calvin-update.log"),  # nosec B108 - read-only fallback for log discovery
     lambda: Path("/var/log/calvin-update.log"),
 ]
 
