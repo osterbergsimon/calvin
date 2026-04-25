@@ -8,14 +8,16 @@ import httpx
 from loguru import logger
 
 from app.models.calendar import CalendarEvent
-from app.plugins.base import PluginType
 from app.plugins.hooks import hookimpl
 from app.plugins.protocols import CalendarPlugin
-from app.plugins.utils.config import extract_config_value, to_str
-from app.plugins.utils.instance_manager import (
-    InstanceManagerConfig,
-    handle_plugin_config_update_generic,
+from app.plugins.sdk.calendar import (
+    CalendarConfigField,
+    build_calendar_manager_config,
+    build_calendar_plugin_metadata,
+    create_calendar_plugin_instance,
 )
+from app.plugins.utils.config import extract_config_value, to_str
+from app.plugins.utils.instance_manager import handle_plugin_config_update_generic
 from app.utils.ical_parser import parse_ical_from_url
 
 # Loguru automatically includes module/function info in logs
@@ -24,17 +26,18 @@ from app.utils.ical_parser import parse_ical_from_url
 class ICalCalendarPlugin(CalendarPlugin):
     """Generic iCal calendar plugin for any iCal-compatible source."""
 
+    CALENDAR_FIELDS = (CalendarConfigField("ical_url", default="", converter=to_str),)
+
     @classmethod
     def get_plugin_metadata(cls) -> dict[str, Any]:
         """Get plugin metadata for registration."""
-        return {
-            "type_id": "ical",
-            "plugin_type": PluginType.CALENDAR,
-            "name": "iCal Feed",
-            "description": "Generic iCal feed (Proton, Outlook, etc.)",
-            "version": "1.0.0",
-            "common_config_schema": {},
-            "instance_config_schema": {
+        return build_calendar_plugin_metadata(
+            type_id="ical",
+            name="iCal Feed",
+            description="Generic iCal feed (Proton, Outlook, etc.)",
+            plugin_class=cls,
+            common_config_schema={},
+            instance_config_schema={
                 "ical_url": {
                     "type": "string",
                     "description": "iCal feed URL",
@@ -49,9 +52,8 @@ class ICalCalendarPlugin(CalendarPlugin):
                     },
                 },
             },
-            "supports_multiple_instances": True,  # Multi-instance plugin
-            "plugin_class": cls,
-        }
+            supports_multiple_instances=True,
+        )
 
     def __init__(self, plugin_id: str, name: str, ical_url: str, enabled: bool = True):
         """
@@ -178,15 +180,14 @@ def register_plugin_types() -> list[dict[str, Any]]:
     """Register ICalCalendarPlugin types (ical and proton)."""
     ical_metadata = ICalCalendarPlugin.get_plugin_metadata()
     # Also register as proton (same plugin, different type_id)
-    proton_metadata = {
-        "type_id": "proton",
-        "plugin_type": PluginType.CALENDAR,
-        "name": "Proton Calendar",
-        "description": "Proton Calendar via iCal feed",
-        "version": "1.0.0",
-        "common_config_schema": {},
-        "plugin_class": ICalCalendarPlugin,
-    }
+    proton_metadata = build_calendar_plugin_metadata(
+        type_id="proton",
+        name="Proton Calendar",
+        description="Proton Calendar via iCal feed",
+        plugin_class=ICalCalendarPlugin,
+        common_config_schema={},
+        supports_multiple_instances=True,
+    )
     return [ical_metadata, proton_metadata]
 
 
@@ -198,17 +199,14 @@ def create_plugin_instance(
     config: dict[str, Any],
 ) -> ICalCalendarPlugin | None:
     """Create an ICalCalendarPlugin instance."""
-    if type_id not in ("ical", "proton"):
-        return None
-
-    enabled = config.get("enabled", False)  # Default to disabled
-    ical_url = extract_config_value(config, "ical_url", default="", converter=to_str)
-
-    return ICalCalendarPlugin(
+    return create_calendar_plugin_instance(
+        ICalCalendarPlugin,
+        expected_type_ids=("ical", "proton"),
         plugin_id=plugin_id,
+        type_id=type_id,
         name=name,
-        ical_url=ical_url,
-        enabled=enabled,
+        config=config,
+        fields=ICalCalendarPlugin.CALENDAR_FIELDS,
     )
 
 
@@ -223,11 +221,6 @@ async def handle_plugin_config_update(
     """Handle iCal/Proton Calendar plugin configuration update and instance management."""
     if type_id not in ("ical", "proton"):
         return None
-
-    def normalize_config(c: dict[str, Any]) -> dict[str, Any]:
-        """Normalize config values."""
-        ical_url = extract_config_value(c, "ical_url", converter=to_str)
-        return {"ical_url": ical_url or ""}
 
     def validate_config(c: dict[str, Any]) -> bool:
         """Validate config has required ical_url."""
@@ -251,10 +244,10 @@ async def handle_plugin_config_update(
         # Fallback ID if URL not available
         return f"{t}-instance"
 
-    manager_config = InstanceManagerConfig(
+    manager_config = build_calendar_manager_config(
         type_id=type_id,  # Can be "ical" or "proton"
+        fields=ICalCalendarPlugin.CALENDAR_FIELDS,
         single_instance=False,  # Multi-instance plugin
-        normalize_config=normalize_config,
         validate_config=validate_config,
         generate_instance_id=generate_instance_id,
         default_instance_name="iCal Feed" if type_id == "ical" else "Proton Calendar",
