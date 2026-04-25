@@ -3,13 +3,20 @@
 import hashlib
 from typing import Any
 
-from app.plugins.base import PluginType
 from app.plugins.hooks import hookimpl
 from app.plugins.protocols import ServicePlugin
+from app.plugins.sdk.service import (
+    ServiceConfigField,
+    build_service_manager_config,
+    build_service_plugin_metadata,
+    create_service_plugin_instance,
+)
 from app.plugins.utils.config import extract_config_value, to_str
-from app.plugins.utils.instance_manager import (
-    InstanceManagerConfig,
-    handle_plugin_config_update_generic,
+from app.plugins.utils.instance_manager import handle_plugin_config_update_generic
+
+SERVICE_FIELDS = (
+    ServiceConfigField("url", default="", converter=to_str),
+    ServiceConfigField("fullscreen", default=False),
 )
 
 
@@ -19,13 +26,12 @@ class IframeServicePlugin(ServicePlugin):
     @classmethod
     def get_plugin_metadata(cls) -> dict[str, Any]:
         """Get plugin metadata for registration."""
-        return {
-            "type_id": "iframe",
-            "plugin_type": PluginType.SERVICE,
-            "name": "Iframe Service",
-            "description": "Web service displayed in iframe",
-            "version": "1.0.0",
-            "common_config_schema": {
+        return build_service_plugin_metadata(
+            type_id="iframe",
+            name="Iframe Service",
+            description="Web service displayed in iframe",
+            plugin_class=cls,
+            common_config_schema={
                 "display_order": {
                     "type": "integer",
                     "description": "Display order for service instances",
@@ -42,7 +48,7 @@ class IframeServicePlugin(ServicePlugin):
                     },
                 },
             },
-            "instance_config_schema": {
+            instance_config_schema={
                 "url": {
                     "type": "string",
                     "description": "Website URL",
@@ -66,7 +72,7 @@ class IframeServicePlugin(ServicePlugin):
                     },
                 },
             },
-            "display_schema": {
+            display_schema={
                 "type": "iframe",
                 "api_endpoint": None,  # Iframe services don't use API endpoints
                 "method": None,
@@ -74,9 +80,8 @@ class IframeServicePlugin(ServicePlugin):
                 "render_template": "iframe",
                 "component": "iframe/IframeViewer.vue",  # Plugin-provided frontend component
             },
-            "supports_multiple_instances": True,  # Multi-instance plugin
-            "plugin_class": cls,
-        }
+            supports_multiple_instances=True,
+        )
 
     def __init__(
         self, plugin_id: str, name: str, url: str, enabled: bool = True, fullscreen: bool = False
@@ -175,19 +180,14 @@ def create_plugin_instance(
     config: dict[str, Any],
 ) -> IframeServicePlugin | None:
     """Create an IframeServicePlugin instance."""
-    if type_id != "iframe":
-        return None
-
-    enabled = config.get("enabled", False)  # Default to disabled
-    url = extract_config_value(config, "url", default="", converter=to_str)
-    fullscreen = extract_config_value(config, "fullscreen", default=False)
-
-    return IframeServicePlugin(
+    return create_service_plugin_instance(
+        IframeServicePlugin,
+        expected_type_id="iframe",
         plugin_id=plugin_id,
+        type_id=type_id,
         name=name,
-        url=url,
-        enabled=enabled,
-        fullscreen=fullscreen,
+        config=config,
+        fields=SERVICE_FIELDS,
     )
 
 
@@ -202,15 +202,6 @@ async def handle_plugin_config_update(
     """Handle Iframe service plugin configuration update and instance management."""
     if type_id != "iframe":
         return None
-
-    def normalize_config(c: dict[str, Any]) -> dict[str, Any]:
-        """Normalize config values."""
-        url = extract_config_value(c, "url", converter=to_str)
-        fullscreen = extract_config_value(c, "fullscreen", default=False)
-        return {
-            "url": url or "",
-            "fullscreen": fullscreen or False,
-        }
 
     def validate_config(c: dict[str, Any]) -> bool:
         """Validate config has required url."""
@@ -233,10 +224,10 @@ async def handle_plugin_config_update(
         # Fallback ID if URL not available
         return f"{t}-instance"
 
-    manager_config = InstanceManagerConfig(
+    manager_config = build_service_manager_config(
         type_id="iframe",
+        fields=SERVICE_FIELDS,
         single_instance=False,  # Multi-instance plugin
-        normalize_config=normalize_config,
         validate_config=validate_config,
         generate_instance_id=generate_instance_id,
         default_instance_name="Iframe Service",
