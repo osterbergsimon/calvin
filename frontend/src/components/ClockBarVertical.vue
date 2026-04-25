@@ -12,15 +12,10 @@
         'layout-two-lines': layout === 'two-lines',
       }"
     >
-      <span class="clock-time" :style="{ fontSize: `${fontSize}px` }">{{
-        formattedTime
+      <span class="clock-time" :style="{ fontSize: `${fontSize}px` }">{{ formattedTime }}</span>
+      <span v-if="showDate" class="clock-date" :style="{ fontSize: `${dateFontSize}px` }">{{
+        formattedDate
       }}</span>
-      <span
-        v-if="showDate"
-        class="clock-date"
-        :style="{ fontSize: `${dateFontSize}px` }"
-        >{{ formattedDate }}</span
-      >
     </div>
   </div>
 </template>
@@ -37,7 +32,7 @@ const props = defineProps({
   position: {
     type: String,
     required: true,
-    validator: (value) => ["left", "right", "between"].includes(value),
+    validator: value => ["left", "right", "between"].includes(value),
   },
   showInNonKiosk: {
     type: Boolean,
@@ -232,11 +227,11 @@ watch(
     if (shouldShow.value) {
       updateTime();
     }
-  },
+  }
 );
 
 // Watch for shouldShow changes to start/stop updates
-watch(shouldShow, (newValue) => {
+watch(shouldShow, newValue => {
   if (newValue) {
     if (!timeInterval) {
       updateTime();

@@ -24,9 +24,7 @@
             @click="selectEvent(dayEvent)"
           >
             <div class="day-event-time">
-              <span v-if="!dayEvent.all_day">{{
-                formatTime(dayEvent.start)
-              }}</span>
+              <span v-if="!dayEvent.all_day">{{ formatTime(dayEvent.start) }}</span>
               <span v-else>All Day</span>
             </div>
             <div class="day-event-title">
@@ -39,51 +37,34 @@
       <div class="current-event-details">
         <div v-if="isMultiDay" class="event-detail-row">
           <span class="label">Selected Date:</span>
-          <span class="value">{{
-            formatDate(selectedDate || event.start)
-          }}</span>
+          <span class="value">{{ formatDate(selectedDate || event.start) }}</span>
         </div>
         <div v-if="isMultiDay" class="event-detail-row">
           <span class="label">Start:</span>
           <span class="value"
             >{{ formatDate(event.start)
-            }}<span v-if="!event.all_day">
-              {{ formatTime(event.start) }}</span
-            ></span
+            }}<span v-if="!event.all_day"> {{ formatTime(event.start) }}</span></span
           >
         </div>
         <div v-if="isMultiDay" class="event-detail-row">
           <span class="label">End:</span>
           <span class="value"
             >{{ formatDate(event.end)
-            }}<span v-if="!event.all_day">
-              {{ formatTime(event.end) }}</span
-            ></span
+            }}<span v-if="!event.all_day"> {{ formatTime(event.end) }}</span></span
           >
         </div>
         <div v-if="!isMultiDay" class="event-detail-row">
           <span class="label">Date:</span>
-          <span class="value">{{
-            formatDate(selectedDate || event.start)
-          }}</span>
+          <span class="value">{{ formatDate(selectedDate || event.start) }}</span>
         </div>
-        <div
-          v-if="showAllDayEvents && dayEvents.length === 0"
-          class="event-detail-row"
-        >
-          <span
-            class="value"
-            style="font-style: italic; color: var(--text-secondary)"
-          >
-            No events scheduled for this day. Use arrow keys to navigate to
-            other days.
+        <div v-if="showAllDayEvents && dayEvents.length === 0" class="event-detail-row">
+          <span class="value" style="font-style: italic; color: var(--text-secondary)">
+            No events scheduled for this day. Use arrow keys to navigate to other days.
           </span>
         </div>
         <div v-if="!isMultiDay && !event.all_day" class="event-detail-row">
           <span class="label">Time:</span>
-          <span class="value"
-            >{{ formatTime(event.start) }} - {{ formatTime(event.end) }}</span
-          >
+          <span class="value">{{ formatTime(event.start) }} - {{ formatTime(event.end) }}</span>
         </div>
         <div v-if="event.location" class="event-detail-row">
           <span class="label">Location:</span>
@@ -126,7 +107,7 @@ const selectedDate = computed(() => calendarStore.selectedDate);
 
 // Handle keyboard navigation - only handle Escape here
 // Arrow keys are handled by the global keyboard mapping system via generic_next/generic_prev
-const handleKeydown = (event) => {
+const handleKeydown = event => {
   if (event.key === "Escape") {
     close();
     event.preventDefault();
@@ -134,11 +115,11 @@ const handleKeydown = (event) => {
   // Let ArrowLeft/ArrowRight be handled by the keyboard mapping system
 };
 
-const selectEvent = (event) => {
+const selectEvent = event => {
   calendarStore.selectEvent(event);
 };
 
-const _isEventMultiDay = (event) => {
+const _isEventMultiDay = event => {
   if (!event) return false;
   const start = new Date(event.start);
   const end = new Date(event.end);
@@ -154,7 +135,7 @@ const close = () => {
   emit("close");
 };
 
-const formatDate = (dateString) => {
+const formatDate = dateString => {
   const date = new Date(dateString);
   return date.toLocaleDateString("en-US", {
     weekday: "long",
@@ -164,7 +145,7 @@ const formatDate = (dateString) => {
   });
 };
 
-const formatTime = (dateString) => {
+const formatTime = dateString => {
   const date = new Date(dateString);
   const timeFormat = configStore.timeFormat || "24h";
   const timeOptions =
@@ -188,9 +169,9 @@ const isMultiDay = computed(() => {
 });
 
 // Get calendar source name instead of plugin ID
-const getSourceName = (sourceId) => {
+const getSourceName = sourceId => {
   if (!sourceId) return "Unknown";
-  const source = calendarStore.sources.find((s) => s.id === sourceId);
+  const source = calendarStore.sources.find(s => s.id === sourceId);
   return source?.name || sourceId;
 };
 </script>

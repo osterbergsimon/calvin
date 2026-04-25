@@ -160,11 +160,7 @@ const props = defineProps({
   },
 });
 
-const emit = defineEmits([
-  "update:timeSize",
-  "update:dateSize",
-  "update:padding",
-]);
+const emit = defineEmits(["update:timeSize", "update:dateSize", "update:padding"]);
 
 // Local reactive values for immediate updates
 const localTimeSize = ref(props.timeSize);
@@ -174,29 +170,29 @@ const localPadding = ref(props.padding);
 // Sync with props
 watch(
   () => props.timeSize,
-  (newValue) => {
+  newValue => {
     localTimeSize.value = newValue;
   },
-  { immediate: true },
+  { immediate: true }
 );
 
 watch(
   () => props.dateSize,
-  (newValue) => {
+  newValue => {
     localDateSize.value = newValue;
   },
-  { immediate: true },
+  { immediate: true }
 );
 
 watch(
   () => props.padding,
-  (newValue) => {
+  newValue => {
     localPadding.value = newValue;
   },
-  { immediate: true },
+  { immediate: true }
 );
 
-const handleTimeInput = (event) => {
+const handleTimeInput = event => {
   const value = parseFloat(event.target.value);
   if (!isNaN(value)) {
     const clampedValue = Math.max(props.min, Math.min(props.max, value));
@@ -205,7 +201,7 @@ const handleTimeInput = (event) => {
   }
 };
 
-const handleDateInput = (event) => {
+const handleDateInput = event => {
   const value = parseFloat(event.target.value);
   if (!isNaN(value)) {
     const clampedValue = Math.max(props.min, Math.min(props.max, value));
@@ -214,7 +210,7 @@ const handleDateInput = (event) => {
   }
 };
 
-const handlePaddingInput = (event) => {
+const handlePaddingInput = event => {
   const value = parseFloat(event.target.value);
   if (!isNaN(value)) {
     const clampedValue = Math.max(0, Math.min(32, value));

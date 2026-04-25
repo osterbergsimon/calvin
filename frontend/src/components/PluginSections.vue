@@ -8,7 +8,7 @@
         </h4>
         <input
           :ref="
-            (el) => {
+            el => {
               if (el) fileInputs[section.id] = el;
             }
           "
@@ -18,11 +18,7 @@
           style="display: none"
           @change="handleFileSelect"
         />
-        <button
-          class="btn-upload"
-          :disabled="uploading"
-          @click="triggerFileInput(section.id)"
-        >
+        <button class="btn-upload" :disabled="uploading" @click="triggerFileInput(section.id)">
           {{ uploading ? "Uploading..." : "Choose Files" }}
         </button>
         <span v-if="section.help_text" class="help-text">
@@ -71,17 +67,12 @@
           class="images-list"
           style="margin-top: 1rem; max-height: 400px; overflow-y: auto"
         >
-          <div
-            v-for="image in filteredImages"
-            :key="image.id"
-            class="image-item"
-          >
+          <div v-for="image in filteredImages" :key="image.id" class="image-item">
             <div class="image-thumbnail">
               <img
                 v-if="
                   !image.url ||
-                  (!image.url.startsWith('http://') &&
-                    !image.url.startsWith('https://'))
+                  (!image.url.startsWith('http://') && !image.url.startsWith('https://'))
                 "
                 :src="`/api/images/${image.id}/thumbnail`"
                 :alt="image.filename"
@@ -110,8 +101,7 @@
             <button
               v-if="
                 !image.url ||
-                (!image.url.startsWith('http://') &&
-                  !image.url.startsWith('https://'))
+                (!image.url.startsWith('http://') && !image.url.startsWith('https://'))
               "
               class="btn-remove"
               title="Delete image"
@@ -119,11 +109,7 @@
             >
               Delete
             </button>
-            <span
-              v-else
-              class="btn-remove-disabled"
-              title="Cannot delete remote images"
-            >
+            <span v-else class="btn-remove-disabled" title="Cannot delete remote images">
               Remote
             </span>
           </div>
@@ -180,9 +166,7 @@ const fileInputs = ref({});
 // For single-instance plugins, also match against common instance_id patterns
 const filteredImages = computed(() => {
   // Get all instance plugin_ids for this plugin type
-  const instanceIds = props.pluginInstances.map(
-    (inst) => inst.id || inst.plugin_id,
-  );
+  const instanceIds = props.pluginInstances.map(inst => inst.id || inst.plugin_id);
 
   // Also add common single-instance patterns (e.g., "local-images" for "local" plugin)
   const commonInstanceIds = [
@@ -194,7 +178,7 @@ const filteredImages = computed(() => {
   const allPluginIds = [...instanceIds, ...commonInstanceIds, props.pluginId];
 
   // Filter images where source matches any of the plugin_ids
-  return props.images.filter((image) => {
+  return props.images.filter(image => {
     if (!image.source) return false;
     return allPluginIds.includes(image.source);
   });
@@ -204,22 +188,22 @@ const imageCount = computed(() => {
   return filteredImages.value.length;
 });
 
-const toggleSection = (sectionId) => {
+const toggleSection = sectionId => {
   expandedSections.value[sectionId] = !expandedSections.value[sectionId];
 };
 
-const triggerFileInput = (sectionId) => {
+const triggerFileInput = sectionId => {
   const input = fileInputs.value[sectionId];
   if (input) {
     input.click();
   }
 };
 
-const handleFileSelect = (event) => {
+const handleFileSelect = event => {
   const files = event.target.files;
   if (files && files.length > 0) {
     // Find the section that matches this file input
-    const section = props.sections.find((s) => s.type === "upload");
+    const section = props.sections.find(s => s.type === "upload");
     if (section) {
       // Convert FileList to Array to avoid serialization issues
       const filesArray = Array.from(files);
@@ -229,11 +213,11 @@ const handleFileSelect = (event) => {
   event.target.value = "";
 };
 
-const handleThumbnailError = (event) => {
+const handleThumbnailError = event => {
   event.target.src = "/placeholder-thumbnail.png";
 };
 
-const formatFileSize = (bytes) => {
+const formatFileSize = bytes => {
   if (!bytes) return "0 B";
   const k = 1024;
   const sizes = ["B", "KB", "MB", "GB"];

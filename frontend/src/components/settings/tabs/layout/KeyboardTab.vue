@@ -14,9 +14,8 @@
           <option value="standard">Standard Keyboard</option>
         </select>
         <span class="help-text">
-          Choose your keyboard type. 7-button keyboards have 7 physical buttons
-          (KEY_1 through KEY_7), while standard keyboards use arrow keys, space,
-          and other standard keys.
+          Choose your keyboard type. 7-button keyboards have 7 physical buttons (KEY_1 through
+          KEY_7), while standard keyboards use arrow keys, space, and other standard keys.
         </span>
       </SettingItem>
     </CollapsibleSection>
@@ -28,9 +27,7 @@
       >
         <div v-if="loading" class="loading-message">Loading mappings...</div>
         <div
-          v-else-if="
-            availableKeys.length === 0 && config.keyboardType !== 'standard'
-          "
+          v-else-if="availableKeys.length === 0 && config.keyboardType !== 'standard'"
           class="no-keys-message"
         >
           No keys available for this keyboard type.
@@ -38,52 +35,39 @@
         <div v-else>
           <div v-if="error" class="error-message" role="alert">{{ error }}</div>
           <div class="mappings-list">
-          <!-- Add new key button for standard keyboards -->
-          <div
-            v-if="config.keyboardType === 'standard'"
-            class="add-key-section"
-          >
-            <select v-model="newKeyToAdd" class="key-selector">
-              <option value="">-- Add a key to map --</option>
-              <option
-                v-for="key in STANDARD_KEYS.filter(
-                  (k) => !availableKeys.includes(k),
-                )"
-                :key="key"
-                :value="key"
-              >
-                {{ formatKeyName(key) }}
-              </option>
-            </select>
-            <button v-if="newKeyToAdd" class="btn-add-key" @click="addNewKey">
-              Add Key
-            </button>
-          </div>
-          <div v-for="key in availableKeys" :key="key" class="mapping-item">
-            <div class="mapping-key">
-              <strong>{{ formatKeyName(key) }}</strong>
+            <!-- Add new key button for standard keyboards -->
+            <div v-if="config.keyboardType === 'standard'" class="add-key-section">
+              <select v-model="newKeyToAdd" class="key-selector">
+                <option value="">-- Add a key to map --</option>
+                <option
+                  v-for="key in STANDARD_KEYS.filter(k => !availableKeys.includes(k))"
+                  :key="key"
+                  :value="key"
+                >
+                  {{ formatKeyName(key) }}
+                </option>
+              </select>
+              <button v-if="newKeyToAdd" class="btn-add-key" @click="addNewKey">Add Key</button>
             </div>
-            <select
-              :value="currentMappings[key] || 'none'"
-              class="mapping-action"
-              @change="updateMapping(key, $event.target.value)"
-            >
-              <option
-                v-for="action in availableActions"
-                :key="action.value"
-                :value="action.value"
+            <div v-for="key in availableKeys" :key="key" class="mapping-item">
+              <div class="mapping-key">
+                <strong>{{ formatKeyName(key) }}</strong>
+              </div>
+              <select
+                :value="currentMappings[key] || 'none'"
+                class="mapping-action"
+                @change="updateMapping(key, $event.target.value)"
               >
-                {{ action.label }}
-              </option>
-            </select>
-            <button
-              class="btn-clear"
-              title="Clear mapping"
-              @click="clearMapping(key)"
-            >
-              ×
-            </button>
-          </div>
+                <option
+                  v-for="action in availableActions"
+                  :key="action.value"
+                  :value="action.value"
+                >
+                  {{ action.label }}
+                </option>
+              </select>
+              <button class="btn-clear" title="Clear mapping" @click="clearMapping(key)">×</button>
+            </div>
           </div>
         </div>
       </SettingItem>
@@ -265,7 +249,7 @@ const availableKeys = computed(() => {
 });
 
 // Format key name for display
-const formatKeyName = (key) => {
+const formatKeyName = key => {
   return key.replace("KEY_", "").replace(/_/g, " ").toLowerCase();
 };
 
@@ -285,10 +269,7 @@ const loadKeyboardMappings = async () => {
     }
   } catch (err) {
     console.error("Failed to load keyboard mappings:", err);
-    error.value =
-      err.response?.data?.detail ||
-      err.message ||
-      "Failed to load keyboard mappings";
+    error.value = err.response?.data?.detail || err.message || "Failed to load keyboard mappings";
   } finally {
     loading.value = false;
   }
@@ -305,10 +286,7 @@ const saveKeyboardMappings = async () => {
     error.value = null;
   } catch (err) {
     console.error("Failed to save keyboard mappings:", err);
-    error.value =
-      err.response?.data?.detail ||
-      err.message ||
-      "Failed to save keyboard mappings";
+    error.value = err.response?.data?.detail || err.message || "Failed to save keyboard mappings";
     throw err;
   }
 };
@@ -320,7 +298,7 @@ const updateMapping = async (key, action) => {
 };
 
 // Clear a mapping
-const clearMapping = async (key) => {
+const clearMapping = async key => {
   // For standard keyboards, remove the key entirely
   if (props.config.keyboardType === "standard") {
     delete currentMappings.value[key];
@@ -340,7 +318,7 @@ const addNewKey = async () => {
 };
 
 // Handle keyboard type change
-const handleKeyboardTypeChange = async (event) => {
+const handleKeyboardTypeChange = async event => {
   const newType = event.target.value;
   // Update keyboard store first
   keyboardStore.setKeyboardType(newType);
@@ -358,7 +336,7 @@ watch(
       keyboardStore.setKeyboardType(newType);
       await loadKeyboardMappings();
     }
-  },
+  }
 );
 
 // Load mappings on mount

@@ -1,10 +1,6 @@
 <template>
   <Transition name="notification">
-    <div
-      v-if="visible"
-      class="notification"
-      :class="[typeClass, sizeClass, positionClass]"
-    >
+    <div v-if="visible" class="notification" :class="[typeClass, sizeClass, positionClass]">
       <div class="notification-content">
         <div class="notification-icon">
           {{ icon }}
@@ -165,10 +161,7 @@ const typeClass = computed(() => {
       return "notification-mode";
     } else if (action?.startsWith("Calendar:")) {
       return "notification-calendar";
-    } else if (
-      action?.startsWith("Images:") ||
-      action?.startsWith("Web Service:")
-    ) {
+    } else if (action?.startsWith("Images:") || action?.startsWith("Web Service:")) {
       return "notification-media";
     }
   }
@@ -194,10 +187,7 @@ let hideTimeout = null;
 
 const show = (type, iconValue, messageValue, duration = null) => {
   // Only show if enabled in config (for keyboard and mode notifications)
-  if (
-    (type === "keyboard" || type === "mode") &&
-    !configStore.keyboardFeedbackEnabled
-  ) {
+  if ((type === "keyboard" || type === "mode") && !configStore.keyboardFeedbackEnabled) {
     return;
   }
 
@@ -246,26 +236,21 @@ const showModeChange = () => {
 
 // Watch for mode changes to show mode indicator
 watch(
-  () => [
-    modeStore.currentMode,
-    modeStore.isFullscreen,
-    modeStore.fullscreenMode,
-  ],
+  () => [modeStore.currentMode, modeStore.isFullscreen, modeStore.fullscreenMode],
   () => {
     showModeChange();
   },
-  { immediate: false },
+  { immediate: false }
 );
 
 // Watch for config changes
 watch(
   () => configStore.keyboardFeedbackEnabled,
-  (enabled) => {
+  enabled => {
     if (
       !enabled &&
       visible.value &&
-      (notificationType.value === "keyboard" ||
-        notificationType.value === "mode")
+      (notificationType.value === "keyboard" || notificationType.value === "mode")
     ) {
       visible.value = false;
       if (hideTimeout) {
@@ -273,13 +258,13 @@ watch(
         hideTimeout = null;
       }
     }
-  },
+  }
 );
 
 // Watch for UI visibility changes (show mode when UI is hidden)
 watch(
   () => configStore.shouldShowUI,
-  (showUI) => {
+  showUI => {
     if (!showUI) {
       // Show mode indicator when UI is hidden
       showModeChange();
@@ -291,7 +276,7 @@ watch(
         hideTimeout = null;
       }
     }
-  },
+  }
 );
 
 // Expose methods for parent components

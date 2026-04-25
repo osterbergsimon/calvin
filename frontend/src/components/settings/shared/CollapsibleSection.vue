@@ -1,8 +1,5 @@
 <template>
-  <section
-    class="settings-section collapsible"
-    :class="{ expanded: isExpanded }"
-  >
+  <section class="settings-section collapsible" :class="{ expanded: isExpanded }">
     <div class="section-header" @click="toggle">
       <h2>
         <span v-if="icon" class="section-icon">{{ icon }}</span>
@@ -40,9 +37,9 @@ const isExpanded = ref(props.expanded);
 
 watch(
   () => props.expanded,
-  (newVal) => {
+  newVal => {
     isExpanded.value = newVal;
-  },
+  }
 );
 
 const toggle = () => {

@@ -182,6 +182,13 @@ async def install_plugin_from_github(request: dict[str, Any] = Body(...)):
     if not plugin_path:
         raise HTTPException(status_code=400, detail="plugin_path is required")
 
+    # Reject path traversal attempts before doing any network I/O
+    if ".." in Path(plugin_path).parts or Path(plugin_path).is_absolute():
+        raise HTTPException(
+            status_code=400,
+            detail=f"Invalid plugin_path '{plugin_path}': path traversal is not allowed",
+        )
+
     # Parse GitHub URL
     github_pattern = r"github\.com[/:]([^/]+)/([^/]+?)(?:\.git)?/?$"
     match = re.search(github_pattern, repo_url)

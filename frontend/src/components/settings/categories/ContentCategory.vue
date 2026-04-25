@@ -1,10 +1,6 @@
 <template>
   <div class="content-category">
-    <TabNavigation
-      :tabs="tabs"
-      :active-tab="activeTab"
-      @tab-change="handleTabChange"
-    />
+    <TabNavigation :tabs="tabs" :active-tab="activeTab" @tab-change="handleTabChange" />
 
     <SettingsTab>
       <ImagesTab v-if="activeTab === 'images'" />
@@ -33,7 +29,7 @@ const tabs = [
 
 const activeTab = ref("images");
 
-const handleTabChange = (tabId) => {
+const handleTabChange = tabId => {
   activeTab.value = tabId;
 };
 

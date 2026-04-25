@@ -26,32 +26,30 @@ defineProps({
 const webServicesStore = useWebServicesStore();
 
 const statusbarServices = computed(() =>
-  webServicesStore.services.filter((s) => {
+  webServicesStore.services.filter(s => {
     if (!s.statusbar_schema?.component) return false;
     // If the plugin uses the show_in_statusbar convention, respect it.
     // Absence of the key means the plugin controls visibility itself (e.g. yr_weather).
     const cfg = s.config || {};
     if ("show_in_statusbar" in cfg) return !!cfg.show_in_statusbar;
     return true;
-  }),
+  })
 );
 
 const loadedItems = ref([]);
 
 watch(
   statusbarServices,
-  async (services) => {
+  async services => {
     const items = await Promise.all(
-      services.map(async (service) => {
-        const component = await loadPluginComponent(
-          service.statusbar_schema.component,
-        );
+      services.map(async service => {
+        const component = await loadPluginComponent(service.statusbar_schema.component);
         return component ? { serviceId: service.id, component } : null;
-      }),
+      })
     );
     loadedItems.value = items.filter(Boolean);
   },
-  { immediate: true },
+  { immediate: true }
 );
 
 onMounted(() => {

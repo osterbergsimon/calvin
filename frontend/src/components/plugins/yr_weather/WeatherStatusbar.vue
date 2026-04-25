@@ -58,10 +58,7 @@ const weatherUnit = computed(() => {
 });
 
 const hasWeatherData = computed(
-  () =>
-    !weatherQuery.isLoading.value &&
-    !weatherQuery.isError.value &&
-    weatherTemp.value !== null,
+  () => !weatherQuery.isLoading.value && !weatherQuery.isError.value && weatherTemp.value !== null
 );
 </script>
 

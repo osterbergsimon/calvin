@@ -25,7 +25,7 @@ export const useWebServicesStore = defineStore("webServices", () => {
       if (cachedServices) {
         logInfo("[WebServicesStore]", "Using cached services");
         const allServices = cachedServices.services || [];
-        services.value = allServices.filter((s) => s.enabled);
+        services.value = allServices.filter(s => s.enabled);
         services.value.sort((a, b) => a.display_order - b.display_order);
         if (currentServiceIndex.value >= services.value.length) {
           currentServiceIndex.value = 0;
@@ -48,9 +48,7 @@ export const useWebServicesStore = defineStore("webServices", () => {
         if (plugin.enabled) {
           try {
             // Get plugin details to access display_schema
-            const pluginDetailsResponse = await axios.get(
-              `/api/plugins/${plugin.id}`,
-            );
+            const pluginDetailsResponse = await axios.get(`/api/plugins/${plugin.id}`);
             const pluginDetails = pluginDetailsResponse.data;
             logDebug(`[WebServicesStore] Plugin details for ${plugin.id}:`, {
               id: pluginDetails.id,
@@ -58,19 +56,13 @@ export const useWebServicesStore = defineStore("webServices", () => {
               display_schema: pluginDetails.display_schema,
             });
 
-            const instancesResponse = await axios.get(
-              `/api/plugins/${plugin.id}/instances`,
-            );
+            const instancesResponse = await axios.get(`/api/plugins/${plugin.id}/instances`);
             const instances = instancesResponse.data.instances || [];
             // Add plugin info and display_schema to each instance
-            instances.forEach((instance) => {
+            instances.forEach(instance => {
               // Use plugin's display_schema (from plugin metadata) as it's the source of truth
-              const displaySchema =
-                pluginDetails.display_schema || instance.display_schema;
-              logDebug(
-                `[WebServicesStore] Instance ${instance.id} display_schema:`,
-                displaySchema,
-              );
+              const displaySchema = pluginDetails.display_schema || instance.display_schema;
+              logDebug(`[WebServicesStore] Instance ${instance.id} display_schema:`, displaySchema);
               allInstances.push({
                 ...instance,
                 plugin_id: plugin.id,
@@ -82,11 +74,7 @@ export const useWebServicesStore = defineStore("webServices", () => {
             });
           } catch (err) {
             // Plugin might not have instances endpoint, skip
-            logWarn(
-              "[WebServicesStore]",
-              `Failed to get instances for ${plugin.id}:`,
-              err,
-            );
+            logWarn("[WebServicesStore]", `Failed to get instances for ${plugin.id}:`, err);
           }
         }
       }
@@ -94,7 +82,7 @@ export const useWebServicesStore = defineStore("webServices", () => {
       // Format as services for compatibility
       // Need to preserve both old format (url) and new format (config.url)
       const responseData = {
-        services: allInstances.map((instance) => ({
+        services: allInstances.map(instance => ({
           id: instance.id,
           name: instance.name,
           url: instance.config?.url || instance.url || "", // Support both formats
@@ -104,8 +92,7 @@ export const useWebServicesStore = defineStore("webServices", () => {
           fullscreen: instance.config?.fullscreen || false,
           plugin_id: instance.plugin_id,
           plugin_name: instance.plugin_name,
-          display_schema:
-            instance.display_schema || instance.config?.display_schema,
+          display_schema: instance.display_schema || instance.config?.display_schema,
           statusbar_schema: instance.statusbar_schema || null,
         })),
       };
@@ -113,16 +100,16 @@ export const useWebServicesStore = defineStore("webServices", () => {
       const allServices = responseData.services || [];
       logDebug(
         "[WebServicesStore] All services from API:",
-        allServices.map((s) => ({
+        allServices.map(s => ({
           id: s.id,
           name: s.name,
           enabled: s.enabled,
-        })),
+        }))
       );
-      services.value = allServices.filter((s) => s.enabled);
+      services.value = allServices.filter(s => s.enabled);
       logDebug(
         "[WebServicesStore] Enabled services:",
-        services.value.map((s) => ({ id: s.id, name: s.name })),
+        services.value.map(s => ({ id: s.id, name: s.name }))
       );
       // Sort by display_order
       services.value.sort((a, b) => a.display_order - b.display_order);
@@ -140,12 +127,9 @@ export const useWebServicesStore = defineStore("webServices", () => {
       if (connectionStore.isFullyOnline()) {
         const cachedServices = getCachedData(cacheKey, cacheTTL);
         if (cachedServices) {
-          logInfo(
-            "[WebServicesStore]",
-            "Request failed, using cached services",
-          );
+          logInfo("[WebServicesStore]", "Request failed, using cached services");
           const allServices = cachedServices.services || [];
-          services.value = allServices.filter((s) => s.enabled);
+          services.value = allServices.filter(s => s.enabled);
           services.value.sort((a, b) => a.display_order - b.display_order);
           if (currentServiceIndex.value >= services.value.length) {
             currentServiceIndex.value = 0;
@@ -163,7 +147,7 @@ export const useWebServicesStore = defineStore("webServices", () => {
     }
   };
 
-  const addService = async (service) => {
+  const addService = async service => {
     try {
       // Web services are now plugin instances
       // Find the iframe service plugin (or use a default)
@@ -172,26 +156,22 @@ export const useWebServicesStore = defineStore("webServices", () => {
       });
       const servicePlugins = pluginsResponse.data.plugins || [];
       // Find iframe plugin or use first service plugin
-      const iframePlugin =
-        servicePlugins.find((p) => p.id === "iframe") || servicePlugins[0];
+      const iframePlugin = servicePlugins.find(p => p.id === "iframe") || servicePlugins[0];
 
       if (!iframePlugin) {
         throw new Error("No service plugin available");
       }
 
       // Create instance using plugin API
-      const response = await axios.post(
-        `/api/plugins/${iframePlugin.id}/instances`,
-        {
-          name: service.name,
-          config: {
-            url: service.url,
-            fullscreen: service.fullscreen || false,
-            display_order: service.display_order || 0,
-          },
-          enabled: service.enabled !== false,
+      const response = await axios.post(`/api/plugins/${iframePlugin.id}/instances`, {
+        name: service.name,
+        config: {
+          url: service.url,
+          fullscreen: service.fullscreen || false,
+          display_order: service.display_order || 0,
         },
-      );
+        enabled: service.enabled !== false,
+      });
       await fetchServices();
       return response.data;
     } catch (err) {
@@ -222,7 +202,7 @@ export const useWebServicesStore = defineStore("webServices", () => {
     }
   };
 
-  const removeService = async (serviceId) => {
+  const removeService = async serviceId => {
     try {
       // Delete using plugin instance API
       await axios.delete(`/api/plugins/instances/${serviceId}`);
@@ -241,19 +221,16 @@ export const useWebServicesStore = defineStore("webServices", () => {
 
   const nextService = () => {
     if (services.value.length === 0) return;
-    currentServiceIndex.value =
-      (currentServiceIndex.value + 1) % services.value.length;
+    currentServiceIndex.value = (currentServiceIndex.value + 1) % services.value.length;
   };
 
   const previousService = () => {
     if (services.value.length === 0) return;
     currentServiceIndex.value =
-      currentServiceIndex.value === 0
-        ? services.value.length - 1
-        : currentServiceIndex.value - 1;
+      currentServiceIndex.value === 0 ? services.value.length - 1 : currentServiceIndex.value - 1;
   };
 
-  const setServiceIndex = (index) => {
+  const setServiceIndex = index => {
     if (index >= 0 && index < services.value.length) {
       currentServiceIndex.value = index;
     }

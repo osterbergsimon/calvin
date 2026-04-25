@@ -1,11 +1,7 @@
 <template>
   <div class="display-tab">
     <CollapsibleSection title="Screen Orientation" icon="🖥️">
-      <SettingItem
-        label="Orientation"
-        help="Screen orientation"
-        input-id="display-orientation"
-      >
+      <SettingItem label="Orientation" help="Screen orientation" input-id="display-orientation">
         <select
           id="display-orientation"
           :value="configValue.orientation"
@@ -80,18 +76,10 @@
           aria-label="Side view position"
           @change="handleSideViewPositionChange"
         >
-          <option v-if="configValue.orientation === 'landscape'" value="left">
-            Left
-          </option>
-          <option v-if="configValue.orientation === 'landscape'" value="right">
-            Right
-          </option>
-          <option v-if="configValue.orientation === 'portrait'" value="top">
-            Top
-          </option>
-          <option v-if="configValue.orientation === 'portrait'" value="bottom">
-            Bottom
-          </option>
+          <option v-if="configValue.orientation === 'landscape'" value="left">Left</option>
+          <option v-if="configValue.orientation === 'landscape'" value="right">Right</option>
+          <option v-if="configValue.orientation === 'portrait'" value="top">Top</option>
+          <option v-if="configValue.orientation === 'portrait'" value="bottom">Bottom</option>
         </select>
       </SettingItem>
     </CollapsibleSection>
@@ -118,10 +106,7 @@
         </select>
       </SettingItem>
 
-      <SettingItem
-        label="Show Week Numbers"
-        help="Display ISO week numbers in calendar view"
-      >
+      <SettingItem label="Show Week Numbers" help="Display ISO week numbers in calendar view">
         <label>
           <input
             :checked="configValue.showWeekNumbers"
@@ -166,16 +151,9 @@
         />
       </SettingItem>
 
-      <SettingItem
-        label="Weekend Days"
-        help="Days to highlight as weekend"
-      >
+      <SettingItem label="Weekend Days" help="Days to highlight as weekend">
         <div class="weekend-days">
-          <label
-            v-for="day in dayOptions"
-            :key="day.value"
-            class="weekend-day-checkbox"
-          >
+          <label v-for="day in dayOptions" :key="day.value" class="weekend-day-checkbox">
             <input
               type="checkbox"
               :checked="configValue.weekendDays.includes(day.value)"
@@ -260,23 +238,21 @@ const configValue = computed(() => {
     showWeekNumbers: config.showWeekNumbers ?? false,
     timeFormat: config.timeFormat ?? "24h",
     maxVisibleEvents: config.maxVisibleEvents ?? 4,
-    weekendDays: Array.isArray(config.weekendDays)
-      ? config.weekendDays
-      : [0, 6],
+    weekendDays: Array.isArray(config.weekendDays) ? config.weekendDays : [0, 6],
     showRedDays: config.showRedDays ?? false,
     mealPlanCardSize: config.mealPlanCardSize ?? "medium",
   };
 });
 
-const handleOrientationChange = (event) => {
+const handleOrientationChange = event => {
   emit("update:config", { orientation: event.target.value });
 };
 
-const handleOrientationFlippedChange = (event) => {
+const handleOrientationFlippedChange = event => {
   emit("update:config", { orientationFlipped: event.target.checked });
 };
 
-const handleCalendarSplitChange = (event) => {
+const handleCalendarSplitChange = event => {
   const value = parseInt(event.target.value, 10);
   if (!isNaN(value)) {
     const clamped = Math.max(10, Math.min(90, value));
@@ -284,30 +260,30 @@ const handleCalendarSplitChange = (event) => {
   }
 };
 
-const handleSideViewPositionChange = (event) => {
+const handleSideViewPositionChange = event => {
   emit("update:config", { sideViewPosition: event.target.value });
 };
 
-const handleWeekStartDayChange = (event) => {
+const handleWeekStartDayChange = event => {
   const value = parseInt(event.target.value, 10);
   if (!isNaN(value)) {
     emit("update:config", { weekStartDay: value });
   }
 };
 
-const handleApplyDisplayRotationChange = (event) => {
+const handleApplyDisplayRotationChange = event => {
   emit("update:config", { applyDisplayRotation: event.target.checked });
 };
 
-const handleShowWeekNumbersChange = (event) => {
+const handleShowWeekNumbersChange = event => {
   emit("update:config", { showWeekNumbers: event.target.checked });
 };
 
-const handleTimeFormatChange = (event) => {
+const handleTimeFormatChange = event => {
   emit("update:config", { timeFormat: event.target.value });
 };
 
-const handleMaxVisibleEventsChange = (event) => {
+const handleMaxVisibleEventsChange = event => {
   const value = parseInt(event.target.value, 10);
   if (!isNaN(value) && value >= 1 && value <= 20) {
     emit("update:config", { maxVisibleEvents: value });
@@ -318,15 +294,15 @@ const handleWeekendDayChange = (dayValue, event) => {
   const current = configValue.value.weekendDays;
   const next = event.target.checked
     ? [...current, dayValue].sort((a, b) => a - b)
-    : current.filter((d) => d !== dayValue);
+    : current.filter(d => d !== dayValue);
   emit("update:config", { weekendDays: next });
 };
 
-const handleShowRedDaysChange = (event) => {
+const handleShowRedDaysChange = event => {
   emit("update:config", { showRedDays: event.target.checked });
 };
 
-const handleMealPlanCardSizeChange = (event) => {
+const handleMealPlanCardSizeChange = event => {
   emit("update:config", { mealPlanCardSize: event.target.value });
 };
 </script>

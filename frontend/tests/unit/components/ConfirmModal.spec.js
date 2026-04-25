@@ -71,7 +71,7 @@ describe("ConfirmModal", () => {
       });
 
       expect(wrapper.find(".modal-body p").text()).toBe(
-        "Are you sure you want to delete this item?",
+        "Are you sure you want to delete this item?"
       );
     });
 

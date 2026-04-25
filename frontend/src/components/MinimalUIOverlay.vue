@@ -1,9 +1,5 @@
 <template>
-  <div
-    v-if="!configStore.shouldShowUI"
-    class="minimal-ui-overlay"
-    :class="buttonPositionClass"
-  >
+  <div v-if="!configStore.shouldShowUI" class="minimal-ui-overlay" :class="buttonPositionClass">
     <button
       class="ui-toggle-btn"
       title="Show UI"
