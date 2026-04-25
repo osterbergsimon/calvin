@@ -57,7 +57,9 @@ dist-ssr/
 .env.production
 
 # IDE
-.vscode/
+.vscode/*
+!.vscode/launch.json
+!.vscode/settings.json.example
 .idea/
 .cursor/
 *.code-workspace

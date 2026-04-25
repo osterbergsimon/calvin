@@ -1,7 +1,9 @@
 """Main FastAPI application entry point."""
 
 import logging
+import os
 import sys
+import time
 from contextlib import asynccontextmanager
 from pathlib import Path
 
@@ -432,6 +434,24 @@ app.add_middleware(
     allow_methods=["*"],
     allow_headers=["*"],
 )
+
+
+# Dev-only HTTP request logging — enable with CALVIN_DEV_LOG_HTTP=1
+if os.environ.get("CALVIN_DEV_LOG_HTTP") == "1":
+    from starlette.middleware.base import BaseHTTPMiddleware
+
+    class DevHTTPLogMiddleware(BaseHTTPMiddleware):
+        async def dispatch(self, request, call_next):
+            start = time.perf_counter()
+            response = await call_next(request)
+            duration_ms = (time.perf_counter() - start) * 1000
+            logger.info(
+                f"{request.method} {request.url.path} {response.status_code} {duration_ms:.1f}ms"
+            )
+            return response
+
+    app.add_middleware(DevHTTPLogMiddleware)
+    logger.info("Dev HTTP logging enabled (CALVIN_DEV_LOG_HTTP=1)")
 
 
 # Global exception handlers for comprehensive error logging
