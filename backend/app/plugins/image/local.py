@@ -8,13 +8,13 @@ from typing import Any
 from loguru import logger
 from PIL import Image, ImageOps
 
-from app.plugins.base import PluginType
 from app.plugins.hooks import hookimpl
 from app.plugins.protocols import ImagePlugin
-from app.plugins.utils.instance_manager import (
-    InstanceManagerConfig,
-    handle_plugin_config_update_generic,
+from app.plugins.sdk.image import (
+    build_image_manager_config,
+    build_image_plugin_metadata,
 )
+from app.plugins.utils.instance_manager import handle_plugin_config_update_generic
 
 # Loguru automatically includes module/function info in logs
 
@@ -25,35 +25,32 @@ class LocalImagePlugin(ImagePlugin):
     @classmethod
     def get_plugin_metadata(cls) -> dict[str, Any]:
         """Get plugin metadata for registration."""
-        return {
-            "type_id": "local",
-            "plugin_type": PluginType.IMAGE,
-            "name": "Local Images",
-            "description": (
-                "Upload and store images on the server. Images are stored in ./data/images"
-            ),
-            "version": "1.0.0",
-            "common_config_schema": {},
-            "instance_config_schema": {},  # No configuration needed - uses hardcoded directory
-            "supports_multiple_instances": False,  # Single-instance plugin
-            "ui_sections": [
-                {
-                    "id": "upload",
-                    "type": "upload",
-                    "title": "Upload Images",
-                    "accept": "image/*",
-                    "multiple": True,
-                    "help_text": "Select one or more image files to upload (JPG, PNG, WebP, GIF)",
-                },
-                {
-                    "id": "manage",
-                    "type": "manage_images",
-                    "title": "Manage Images",
-                    "collapsible": True,
-                },
-            ],
-            "plugin_class": cls,
-        }
+        metadata = build_image_plugin_metadata(
+            type_id="local",
+            name="Local Images",
+            description="Upload and store images on the server. Images are stored in ./data/images",
+            plugin_class=cls,
+            common_config_schema={},
+            instance_config_schema={},
+            supports_multiple_instances=False,
+        )
+        metadata["ui_sections"] = [
+            {
+                "id": "upload",
+                "type": "upload",
+                "title": "Upload Images",
+                "accept": "image/*",
+                "multiple": True,
+                "help_text": "Select one or more image files to upload (JPG, PNG, WebP, GIF)",
+            },
+            {
+                "id": "manage",
+                "type": "manage_images",
+                "title": "Manage Images",
+                "collapsible": True,
+            },
+        ]
+        return metadata
 
     def __init__(
         self,
@@ -445,22 +442,16 @@ async def handle_plugin_config_update(
     if type_id != "local":
         return None
 
-    def normalize_config(c: dict[str, Any]) -> dict[str, Any]:
-        """Normalize config values."""
-        # No config needed - uses hardcoded directory
-        return {}
-
     def on_instance_updated(plugin: Any, result: dict[str, Any]) -> None:
         """Callback after instance update (IMAGE_DIR is handled in configure method)."""
         # IMAGE_DIR environment variable changes are handled in the plugin's configure method
         # which is called by the generic handler. No additional action needed here.
         pass
 
-    manager_config = InstanceManagerConfig(
+    manager_config = build_image_manager_config(
         type_id="local",
         single_instance=True,
         instance_id="local-images",
-        normalize_config=normalize_config,
         default_instance_name="Local Images",
         on_instance_updated=on_instance_updated,
     )
