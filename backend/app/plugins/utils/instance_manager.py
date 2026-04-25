@@ -209,7 +209,9 @@ async def handle_plugin_config_update_generic(
                 import hashlib
 
                 config_str = str(sorted(config.items()))
-                config_hash = hashlib.md5(config_str.encode()).hexdigest()[:8]
+                config_hash = hashlib.md5(config_str.encode(), usedforsecurity=False).hexdigest()[
+                    :8
+                ]
                 plugin_instance_id = f"{type_id}-{config_hash}"
 
         # Ensure uniqueness

@@ -219,7 +219,7 @@ async def handle_plugin_config_update(
         url = extract_config_value(c, "url", converter=to_str)
         if url:
             # Generate hash from URL (same instance for same URL)
-            url_hash = hashlib.md5(url.encode()).hexdigest()[:8]
+            url_hash = hashlib.md5(url.encode(), usedforsecurity=False).hexdigest()[:8]
             return f"{t}-{url_hash}"
         # Fallback ID if URL not available
         return f"{t}-instance"

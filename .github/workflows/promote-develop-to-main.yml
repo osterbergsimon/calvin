@@ -1,0 +1,51 @@
+name: Promote develop to main
+
+on:
+  workflow_run:
+    workflows: ["CI"]
+    types: [completed]
+    branches: [develop]
+
+permissions:
+  contents: read
+  pull-requests: write
+
+jobs:
+  open-promotion-pr:
+    if: ${{ github.event.workflow_run.conclusion == 'success' }}
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Open or update develop -> main PR
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          set -euo pipefail
+
+          # Skip if develop is not ahead of main.
+          ahead=$(git rev-list --count origin/main..origin/develop)
+          if [ "$ahead" -eq 0 ]; then
+            echo "develop is not ahead of main; nothing to promote."
+            exit 0
+          fi
+
+          existing=$(gh pr list --base main --head develop --state open --json number --jq '.[0].number // empty')
+
+          commits=$(git log --pretty=format:'- %h %s' origin/main..origin/develop)
+          body=$(printf '%s\n\n%s\n\n%s\n' \
+            "Auto-opened by \`promote-develop-to-main.yml\` after CI succeeded on \`develop\`." \
+            "**Commits ($ahead ahead of main):**" \
+            "$commits")
+
+          if [ -z "$existing" ]; then
+            gh pr create --base main --head develop \
+              --title "Promote develop to main" \
+              --body "$body"
+          else
+            echo "PR #$existing already open; updating body."
+            gh pr edit "$existing" --body "$body"
+          fi
