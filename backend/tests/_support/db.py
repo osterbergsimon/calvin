@@ -2,9 +2,12 @@
 
 Why this module exists:
     conftest.py was 920 lines with three repeated patterns: (1) Windows-tolerant
-    file deletion, (2) sync-engine table creation + sqlite3 verification, and
-    (3) re-pointing Ormar models at a different `databases.Database` instance.
-    Extracting them keeps conftest focused on fixture orchestration.
+    file deletion, (2) Alembic-driven schema creation + sqlite3 verification,
+    and (3) re-pointing Ormar models at a different `databases.Database`
+    instance. Extracting them keeps conftest focused on fixture orchestration.
+
+Tests build schema via `alembic upgrade head`, not `metadata.create_all` — so
+a broken migration fails the suite instead of slipping through to prod.
 """
 
 from __future__ import annotations
@@ -19,8 +22,9 @@ import time
 from pathlib import Path
 
 import databases
-from sqlalchemy import create_engine
+from alembic.config import Config
 
+from alembic import command
 from app.database import metadata
 
 logger = logging.getLogger(__name__)
@@ -28,6 +32,23 @@ logger = logging.getLogger(__name__)
 REQUIRED_TABLES: frozenset[str] = frozenset(
     {"config", "keyboard_mappings", "plugin_types", "plugins"}
 )
+
+_BACKEND_DIR = Path(__file__).resolve().parents[2]
+_ALEMBIC_INI = _BACKEND_DIR / "alembic.ini"
+
+
+def _alembic_config(db_path: Path) -> Config:
+    """Build an Alembic Config pointed at `db_path`.
+
+    `script_location` is forced to an absolute path so the helper works
+    regardless of cwd. The URL override is honored by env.py because we set
+    a real URL here (the .ini ships with a placeholder env.py replaces).
+    """
+    abs_path = db_path.resolve()
+    cfg = Config(str(_ALEMBIC_INI))
+    cfg.set_main_option("script_location", str(_BACKEND_DIR / "alembic"))
+    cfg.set_main_option("sqlalchemy.url", f"sqlite:///{abs_path}")
+    return cfg
 
 
 def assert_models_registered() -> None:
@@ -84,11 +105,13 @@ def cleanup_db_file(db_path: Path) -> None:
 
 
 def create_tables_with_verify(db_path: Path) -> None:
-    """Create all metadata tables in a SQLite file and verify they exist.
+    """Apply Alembic migrations to a fresh SQLite file and verify the schema.
 
-    Runs synchronously (sync engine) on purpose: SQLite caches database state
-    on first async connect, so tables MUST exist before any aiosqlite connection
-    is opened.
+    Runs `alembic upgrade head` synchronously so tables exist before any
+    aiosqlite connection is opened (SQLite caches DB state on first async
+    connect). Using migrations rather than `metadata.create_all` means tests
+    actually exercise the migration chain — a broken migration now fails the
+    suite instead of slipping through to prod.
     """
     if not metadata.tables:
         raise RuntimeError(
@@ -97,11 +120,7 @@ def create_tables_with_verify(db_path: Path) -> None:
         )
 
     abs_path = db_path.resolve()
-    sync_engine = create_engine(f"sqlite:///{abs_path}", echo=False)
-    try:
-        metadata.create_all(sync_engine)
-    finally:
-        sync_engine.dispose()
+    command.upgrade(_alembic_config(abs_path), "head")
 
     assert_required_tables(abs_path)
 

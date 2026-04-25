@@ -1,5 +1,19 @@
 # Backend tests
 
+## Schema is built from Alembic migrations
+
+`create_tables_with_verify()` runs `alembic upgrade head` against each test's
+temp SQLite file. This means a broken migration fails the suite instead of
+slipping through — `metadata.create_all()` would have hidden it.
+
+If you change a model: generate a migration (`alembic revision --autogenerate`)
+and run the tests. If you change a migration: the existing tests are your
+parity check.
+
+The Alembic env (`backend/alembic/env.py`) honors a programmatic URL set via
+`Config.set_main_option("sqlalchemy.url", ...)`; it only falls back to
+`settings.database_url` when the .ini's placeholder is still in place.
+
 ## Ormar model registration ordering
 
 The single most important rule for working in `conftest.py` and `_support/db.py`:
@@ -45,7 +59,7 @@ database.
 |---|---|
 | `assert_models_registered()` | Once at conftest top — fails fast if imports drifted |
 | `cleanup_db_file(path)` | Tearing down a temp SQLite file (handles Windows file-lock races) |
-| `create_tables_with_verify(path)` | After creating a temp DB file, before connecting async |
+| `create_tables_with_verify(path)` | After creating a temp DB file, before connecting async — runs `alembic upgrade head` |
 | `assert_required_tables(path, retries=N)` | Final readiness check before yielding a TestClient |
 | `update_ormar_models_database(db)` | Whenever you patch `app.database.database` in a fixture |
 | `windows_settle()` | After `disconnect()` in async fixtures, to release file handles |
