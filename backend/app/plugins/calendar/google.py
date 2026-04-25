@@ -10,14 +10,16 @@ import httpx
 from loguru import logger
 
 from app.models.calendar import CalendarEvent
-from app.plugins.base import PluginType
 from app.plugins.hooks import hookimpl
 from app.plugins.protocols import CalendarPlugin
-from app.plugins.utils.config import extract_config_value, to_str
-from app.plugins.utils.instance_manager import (
-    InstanceManagerConfig,
-    handle_plugin_config_update_generic,
+from app.plugins.sdk.calendar import (
+    CalendarConfigField,
+    build_calendar_manager_config,
+    build_calendar_plugin_metadata,
+    create_calendar_plugin_instance,
 )
+from app.plugins.utils.config import extract_config_value, to_str
+from app.plugins.utils.instance_manager import handle_plugin_config_update_generic
 from app.utils.ical_parser import parse_ical_from_url
 
 # Loguru automatically includes module/function info in logs
@@ -85,17 +87,18 @@ def _normalize_google_calendar_url(url: str) -> str:
 class GoogleCalendarPlugin(CalendarPlugin):
     """Google Calendar plugin using iCal feeds."""
 
+    CALENDAR_FIELDS = (CalendarConfigField("ical_url", default="", converter=to_str),)
+
     @classmethod
     def get_plugin_metadata(cls) -> dict[str, Any]:
         """Get plugin metadata for registration."""
-        return {
-            "type_id": "google",
-            "plugin_type": PluginType.CALENDAR,
-            "name": "Google Calendar",
-            "description": "Google Calendar via iCal feed",
-            "version": "1.0.0",
-            "common_config_schema": {},
-            "instance_config_schema": {
+        return build_calendar_plugin_metadata(
+            type_id="google",
+            name="Google Calendar",
+            description="Google Calendar via iCal feed",
+            plugin_class=cls,
+            common_config_schema={},
+            instance_config_schema={
                 "ical_url": {
                     "type": "string",
                     "description": "Google Calendar iCal URL or share URL",
@@ -110,9 +113,8 @@ class GoogleCalendarPlugin(CalendarPlugin):
                     },
                 },
             },
-            "supports_multiple_instances": True,  # Multi-instance plugin
-            "plugin_class": cls,
-        }
+            supports_multiple_instances=True,
+        )
 
     def __init__(self, plugin_id: str, name: str, ical_url: str, enabled: bool = True):
         """
@@ -254,17 +256,14 @@ def create_plugin_instance(
     config: dict[str, Any],
 ) -> GoogleCalendarPlugin | None:
     """Create a GoogleCalendarPlugin instance."""
-    if type_id != "google":
-        return None
-
-    enabled = config.get("enabled", False)  # Default to disabled
-    ical_url = extract_config_value(config, "ical_url", default="", converter=to_str)
-
-    return GoogleCalendarPlugin(
+    return create_calendar_plugin_instance(
+        GoogleCalendarPlugin,
+        expected_type_ids="google",
         plugin_id=plugin_id,
+        type_id=type_id,
         name=name,
-        ical_url=ical_url,
-        enabled=enabled,
+        config=config,
+        fields=GoogleCalendarPlugin.CALENDAR_FIELDS,
     )
 
 
@@ -279,11 +278,6 @@ async def handle_plugin_config_update(
     """Handle Google Calendar plugin configuration update and instance management."""
     if type_id != "google":
         return None
-
-    def normalize_config(c: dict[str, Any]) -> dict[str, Any]:
-        """Normalize config values."""
-        ical_url = extract_config_value(c, "ical_url", converter=to_str)
-        return {"ical_url": ical_url or ""}
 
     def validate_config(c: dict[str, Any]) -> bool:
         """Validate config has required ical_url."""
@@ -307,10 +301,10 @@ async def handle_plugin_config_update(
         # Fallback ID if URL not available
         return f"{t}-instance"
 
-    manager_config = InstanceManagerConfig(
+    manager_config = build_calendar_manager_config(
         type_id="google",
+        fields=GoogleCalendarPlugin.CALENDAR_FIELDS,
         single_instance=False,  # Multi-instance plugin
-        normalize_config=normalize_config,
         validate_config=validate_config,
         generate_instance_id=generate_instance_id,
         default_instance_name="Google Calendar",
