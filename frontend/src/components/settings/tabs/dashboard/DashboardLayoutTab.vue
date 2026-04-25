@@ -1,11 +1,7 @@
 <template>
   <div class="dashboard-layout-tab">
     <CollapsibleSection title="Screen Orientation" icon="🖥️">
-      <SettingItem
-        label="Orientation"
-        help="Screen orientation"
-        input-id="display-orientation"
-      >
+      <SettingItem label="Orientation" help="Screen orientation" input-id="display-orientation">
         <select
           id="display-orientation"
           :value="configValue.orientation"
@@ -80,18 +76,10 @@
           aria-label="Side view position"
           @change="handleSideViewPositionChange"
         >
-          <option v-if="configValue.orientation === 'landscape'" value="left">
-            Left
-          </option>
-          <option v-if="configValue.orientation === 'landscape'" value="right">
-            Right
-          </option>
-          <option v-if="configValue.orientation === 'portrait'" value="top">
-            Top
-          </option>
-          <option v-if="configValue.orientation === 'portrait'" value="bottom">
-            Bottom
-          </option>
+          <option v-if="configValue.orientation === 'landscape'" value="left">Left</option>
+          <option v-if="configValue.orientation === 'landscape'" value="right">Right</option>
+          <option v-if="configValue.orientation === 'portrait'" value="top">Top</option>
+          <option v-if="configValue.orientation === 'portrait'" value="bottom">Bottom</option>
         </select>
       </SettingItem>
     </CollapsibleSection>
@@ -124,19 +112,19 @@ const configValue = computed(() => {
   };
 });
 
-const handleOrientationChange = (event) => {
+const handleOrientationChange = event => {
   emit("update:config", { orientation: event.target.value });
 };
 
-const handleOrientationFlippedChange = (event) => {
+const handleOrientationFlippedChange = event => {
   emit("update:config", { orientationFlipped: event.target.checked });
 };
 
-const handleApplyDisplayRotationChange = (event) => {
+const handleApplyDisplayRotationChange = event => {
   emit("update:config", { applyDisplayRotation: event.target.checked });
 };
 
-const handleCalendarSplitChange = (event) => {
+const handleCalendarSplitChange = event => {
   const value = parseInt(event.target.value, 10);
   if (!isNaN(value)) {
     const clamped = Math.max(10, Math.min(90, value));
@@ -144,7 +132,7 @@ const handleCalendarSplitChange = (event) => {
   }
 };
 
-const handleSideViewPositionChange = (event) => {
+const handleSideViewPositionChange = event => {
   emit("update:config", { sideViewPosition: event.target.value });
 };
 </script>

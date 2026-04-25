@@ -16,16 +16,9 @@
       </SettingItem>
 
       <div v-if="displayScheduleEnabled">
-        <SettingItem
-          label="Daily Schedule"
-          help="Configure on/off times for each day"
-        >
+        <SettingItem label="Daily Schedule" help="Configure on/off times for each day">
           <div class="schedule-days">
-            <div
-              v-for="(dayConfig, index) in displaySchedule"
-              :key="index"
-              class="schedule-day"
-            >
+            <div v-for="(dayConfig, index) in displaySchedule" :key="index" class="schedule-day">
               <div class="schedule-day-header">
                 <label>
                   <input
@@ -39,19 +32,11 @@
               <div v-if="dayConfig.enabled" class="schedule-day-times">
                 <div class="schedule-time">
                   <label>On:</label>
-                  <input
-                    v-model="dayConfig.onTime"
-                    type="time"
-                    @change="handleScheduleChange"
-                  />
+                  <input v-model="dayConfig.onTime" type="time" @change="handleScheduleChange" />
                 </div>
                 <div class="schedule-time">
                   <label>Off:</label>
-                  <input
-                    v-model="dayConfig.offTime"
-                    type="time"
-                    @change="handleScheduleChange"
-                  />
+                  <input v-model="dayConfig.offTime" type="time" @change="handleScheduleChange" />
                 </div>
               </div>
             </div>
@@ -69,9 +54,7 @@
           <option value="America/New_York">America/New_York (EST/EDT)</option>
           <option value="America/Chicago">America/Chicago (CST/CDT)</option>
           <option value="America/Denver">America/Denver (MST/MDT)</option>
-          <option value="America/Los_Angeles">
-            America/Los_Angeles (PST/PDT)
-          </option>
+          <option value="America/Los_Angeles">America/Los_Angeles (PST/PDT)</option>
           <option value="Europe/London">Europe/London (GMT/BST)</option>
           <option value="Europe/Paris">Europe/Paris (CET/CEST)</option>
           <option value="Europe/Berlin">Europe/Berlin (CET/CEST)</option>
@@ -117,17 +100,10 @@
     </CollapsibleSection>
 
     <CollapsibleSection title="Manual Display Control" icon="🎛️">
-      <SettingItem
-        label="Manual Display Control"
-        help="Manually control display power"
-      >
+      <SettingItem label="Manual Display Control" help="Manually control display power">
         <div class="button-group">
-          <button class="btn-secondary" @click="handleTurnDisplayOn">
-            Turn Display On
-          </button>
-          <button class="btn-secondary" @click="handleTurnDisplayOff">
-            Turn Display Off
-          </button>
+          <button class="btn-secondary" @click="handleTurnDisplayOn">Turn Display On</button>
+          <button class="btn-secondary" @click="handleTurnDisplayOff">Turn Display Off</button>
         </div>
       </SettingItem>
     </CollapsibleSection>
@@ -148,16 +124,10 @@ const props = defineProps({
   },
 });
 
-const emit = defineEmits([
-  "update:config",
-  "turn-display-on",
-  "turn-display-off",
-]);
+const emit = defineEmits(["update:config", "turn-display-on", "turn-display-off"]);
 
 // Local state
-const displayScheduleEnabled = ref(
-  props.config.displayScheduleEnabled || false,
-);
+const displayScheduleEnabled = ref(props.config.displayScheduleEnabled || false);
 const displaySchedule = ref(
   props.config.displaySchedule || [
     { day: 0, enabled: true, onTime: "06:00", offTime: "22:00" },
@@ -167,7 +137,7 @@ const displaySchedule = ref(
     { day: 4, enabled: true, onTime: "06:00", offTime: "22:00" },
     { day: 5, enabled: true, onTime: "06:00", offTime: "22:00" },
     { day: 6, enabled: true, onTime: "06:00", offTime: "22:00" },
-  ],
+  ]
 );
 const timezone = ref(props.config.timezone || null);
 const displayTimeoutEnabled = ref(props.config.displayTimeoutEnabled || false);
@@ -178,17 +148,17 @@ const { turnDisplayOn, turnDisplayOff } = useSystem();
 // Watch for prop changes
 watch(
   () => props.config,
-  (newConfig) => {
+  newConfig => {
     displayScheduleEnabled.value = newConfig.displayScheduleEnabled || false;
     displaySchedule.value = newConfig.displaySchedule || displaySchedule.value;
     timezone.value = newConfig.timezone || null;
     displayTimeoutEnabled.value = newConfig.displayTimeoutEnabled || false;
     displayTimeout.value = newConfig.displayTimeout || 0;
   },
-  { deep: true },
+  { deep: true }
 );
 
-const getDayName = (day) => {
+const getDayName = day => {
   const days = ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"];
   return days[day] || `Day ${day}`;
 };

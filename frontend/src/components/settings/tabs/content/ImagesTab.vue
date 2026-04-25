@@ -37,7 +37,7 @@ onMounted(async () => {
 });
 
 const imagePlugins = computed(() => {
-  const filtered = plugins.value.filter((p) => p.type === "image" && p.enabled);
+  const filtered = plugins.value.filter(p => p.type === "image" && p.enabled);
   // Sort by display order
   return [...filtered].sort((a, b) => {
     const orderA = imagePluginDisplayOrders.value[a.id] ?? 0;
@@ -48,7 +48,7 @@ const imagePlugins = computed(() => {
 
 const imagePluginInstances = computed(() => {
   const instances = {};
-  imagePlugins.value.forEach((plugin) => {
+  imagePlugins.value.forEach(plugin => {
     const pluginInsts = pluginInstances.value[plugin.id] || [];
     // Sort instances by display_order
     instances[plugin.id] = [...pluginInsts].sort((a, b) => {
@@ -65,7 +65,7 @@ const getInstanceSummary = (_pluginId, _config) => {
   return null;
 };
 
-const handleImagePluginOrderChange = async (newOrder) => {
+const handleImagePluginOrderChange = async newOrder => {
   // Update local state optimistically first for instant feedback
   for (let i = 0; i < newOrder.length; i++) {
     const plugin = newOrder[i];
@@ -83,14 +83,11 @@ const handleImagePluginOrderChange = async (newOrder) => {
         continue;
       }
       updatePromises.push(
-        updateImagePluginOrder(plugin.id, i).catch((error) => {
-          console.error(
-            `[ImagesTab] Failed to update order for ${plugin.id}:`,
-            error,
-          );
+        updateImagePluginOrder(plugin.id, i).catch(error => {
+          console.error(`[ImagesTab] Failed to update order for ${plugin.id}:`, error);
           // Restore previous order on error
           return loadPlugins().catch(() => {});
-        }),
+        })
       );
     }
 

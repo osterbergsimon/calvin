@@ -121,9 +121,7 @@ describe("Themes Store", () => {
 
       const store = useThemesStore();
 
-      await expect(store.fetchInstalledThemes()).rejects.toThrow(
-        "Network error",
-      );
+      await expect(store.fetchInstalledThemes()).rejects.toThrow("Network error");
       expect(store.error).toBe("Network error");
       expect(store.loading).toBe(false);
       expect(logError).toHaveBeenCalled();
@@ -172,15 +170,11 @@ describe("Themes Store", () => {
       const store = useThemesStore();
       await store.installTheme(file);
 
-      expect(axios.post).toHaveBeenCalledWith(
-        "/api/plugins/install",
-        expect.any(FormData),
-        {
-          headers: {
-            "Content-Type": "multipart/form-data",
-          },
+      expect(axios.post).toHaveBeenCalledWith("/api/plugins/install", expect.any(FormData), {
+        headers: {
+          "Content-Type": "multipart/form-data",
         },
-      );
+      });
       expect(store.loading).toBe(false);
       expect(store.error).toBe(null);
       expect(logInfo).toHaveBeenCalled();
@@ -195,9 +189,7 @@ describe("Themes Store", () => {
 
       const store = useThemesStore();
 
-      await expect(store.installTheme(file)).rejects.toThrow(
-        "Installation failed",
-      );
+      await expect(store.installTheme(file)).rejects.toThrow("Installation failed");
       expect(store.error).toBe("Installation failed");
       expect(store.loading).toBe(false);
       expect(logError).toHaveBeenCalled();
@@ -218,11 +210,7 @@ describe("Themes Store", () => {
         .mockResolvedValueOnce({ data: { plugins: [] } });
 
       const store = useThemesStore();
-      await store.installThemeFromGitHub(
-        "https://github.com/user/repo",
-        "theme.json",
-        "main",
-      );
+      await store.installThemeFromGitHub("https://github.com/user/repo", "theme.json", "main");
 
       expect(axios.post).toHaveBeenCalledWith("/api/plugins/github/install", {
         repo_url: "https://github.com/user/repo",
@@ -247,10 +235,7 @@ describe("Themes Store", () => {
         .mockResolvedValueOnce({ data: { plugins: [] } });
 
       const store = useThemesStore();
-      await store.installThemeFromGitHub(
-        "https://github.com/user/repo",
-        "theme.json",
-      );
+      await store.installThemeFromGitHub("https://github.com/user/repo", "theme.json");
 
       expect(axios.post).toHaveBeenCalledWith("/api/plugins/github/install", {
         repo_url: "https://github.com/user/repo",
@@ -266,10 +251,7 @@ describe("Themes Store", () => {
       const store = useThemesStore();
 
       await expect(
-        store.installThemeFromGitHub(
-          "https://github.com/user/repo",
-          "theme.json",
-        ),
+        store.installThemeFromGitHub("https://github.com/user/repo", "theme.json")
       ).rejects.toThrow("GitHub installation failed");
       expect(store.error).toBe("GitHub installation failed");
       expect(store.loading).toBe(false);
@@ -291,10 +273,7 @@ describe("Themes Store", () => {
       axios.post.mockResolvedValue(mockResponse);
 
       const store = useThemesStore();
-      const result = await store.enumerateThemesFromGitHub(
-        "https://github.com/user/repo",
-        "main",
-      );
+      const result = await store.enumerateThemesFromGitHub("https://github.com/user/repo", "main");
 
       expect(axios.post).toHaveBeenCalledWith("/api/plugins/github/enumerate", {
         repo_url: "https://github.com/user/repo",
@@ -311,9 +290,7 @@ describe("Themes Store", () => {
       axios.post.mockResolvedValue(mockResponse);
 
       const store = useThemesStore();
-      const result = await store.enumerateThemesFromGitHub(
-        "https://github.com/user/repo",
-      );
+      const result = await store.enumerateThemesFromGitHub("https://github.com/user/repo");
 
       expect(result).toEqual({ themes: [] });
     });
@@ -324,9 +301,9 @@ describe("Themes Store", () => {
 
       const store = useThemesStore();
 
-      await expect(
-        store.enumerateThemesFromGitHub("https://github.com/user/repo"),
-      ).rejects.toThrow("Network error");
+      await expect(store.enumerateThemesFromGitHub("https://github.com/user/repo")).rejects.toThrow(
+        "Network error"
+      );
       expect(store.error).toBe("Network error");
       expect(store.loading).toBe(false);
       expect(logError).toHaveBeenCalled();
@@ -343,9 +320,7 @@ describe("Themes Store", () => {
       const store = useThemesStore();
       const result = await store.uninstallTheme("theme1");
 
-      expect(axios.delete).toHaveBeenCalledWith(
-        "/api/plugins/installed/theme1",
-      );
+      expect(axios.delete).toHaveBeenCalledWith("/api/plugins/installed/theme1");
       expect(result).toEqual({ success: true });
       expect(store.loading).toBe(false);
       expect(logInfo).toHaveBeenCalled();
@@ -357,9 +332,7 @@ describe("Themes Store", () => {
 
       const store = useThemesStore();
 
-      await expect(store.uninstallTheme("theme1")).rejects.toThrow(
-        "Uninstall failed",
-      );
+      await expect(store.uninstallTheme("theme1")).rejects.toThrow("Uninstall failed");
       expect(store.error).toBe("Uninstall failed");
       expect(store.loading).toBe(false);
       expect(logError).toHaveBeenCalled();

@@ -90,15 +90,12 @@ export function clearAllCache() {
 
   for (let i = 0; i < localStorage.length; i++) {
     const key = localStorage.key(i);
-    if (
-      key &&
-      (key.startsWith(CACHE_PREFIX) || key.startsWith(CACHE_TIMESTAMP_PREFIX))
-    ) {
+    if (key && (key.startsWith(CACHE_PREFIX) || key.startsWith(CACHE_TIMESTAMP_PREFIX))) {
       keysToRemove.push(key);
     }
   }
 
-  keysToRemove.forEach((key) => localStorage.removeItem(key));
+  keysToRemove.forEach(key => localStorage.removeItem(key));
 }
 
 /**
@@ -123,7 +120,7 @@ function clearOldCacheEntries() {
     }
   }
 
-  keysToRemove.forEach((key) => localStorage.removeItem(key));
+  keysToRemove.forEach(key => localStorage.removeItem(key));
   console.log(`[Cache] Cleared ${keysToRemove.length / 2} old cache entries`);
 }
 
@@ -146,9 +143,7 @@ export function getCacheStats() {
 
       stats.totalEntries++;
       stats.totalSize +=
-        key.length +
-        (data?.length || 0) +
-        (timestampKey.length + (timestamp?.length || 0));
+        key.length + (data?.length || 0) + (timestampKey.length + (timestamp?.length || 0));
 
       stats.entries.push({
         key: key.replace(CACHE_PREFIX, ""),

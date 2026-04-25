@@ -140,9 +140,7 @@ describe("useConfigForm", () => {
       const form = useConfigForm();
       await form.loadConfig();
 
-      expect(mockKeyboardStore.setKeyboardType).toHaveBeenCalledWith(
-        "5-button",
-      );
+      expect(mockKeyboardStore.setKeyboardType).toHaveBeenCalledWith("5-button");
     });
 
     it("should handle errors when loading config", async () => {
@@ -153,17 +151,11 @@ describe("useConfigForm", () => {
       await form.loadConfig();
 
       expect(form.error.value).toBe("Failed to load configuration");
-      expect(logErrorMock).toHaveBeenCalledWith(
-        "[useConfigForm]",
-        "Failed to load config:",
-        error,
-      );
+      expect(logErrorMock).toHaveBeenCalledWith("[useConfigForm]", "Failed to load config:", error);
     });
 
     it("should parse display schedule string", async () => {
-      const mockSchedule = [
-        { day: 0, enabled: true, onTime: "06:00", offTime: "22:00" },
-      ];
+      const mockSchedule = [{ day: 0, enabled: true, onTime: "06:00", offTime: "22:00" }];
       const mockConfig = {
         display_schedule: JSON.stringify(mockSchedule),
       };
@@ -177,9 +169,7 @@ describe("useConfigForm", () => {
     });
 
     it("should use display schedule object directly", async () => {
-      const mockSchedule = [
-        { day: 0, enabled: true, onTime: "06:00", offTime: "22:00" },
-      ];
+      const mockSchedule = [{ day: 0, enabled: true, onTime: "06:00", offTime: "22:00" }];
       const mockConfig = {
         displaySchedule: mockSchedule,
       };
@@ -246,9 +236,9 @@ describe("useConfigForm", () => {
       const form = useConfigForm();
       await form.loadConfig();
 
-      await expect(
-        form.updateConfigValue("orientation", "portrait"),
-      ).rejects.toThrow("Update failed");
+      await expect(form.updateConfigValue("orientation", "portrait")).rejects.toThrow(
+        "Update failed"
+      );
 
       expect(form.error.value).toBe("Update failed");
       expect(form.saveStatus.value).toEqual({
@@ -256,11 +246,7 @@ describe("useConfigForm", () => {
         message: "Update failed",
       });
       expect(form.saving.value).toBe(false);
-      expect(logErrorMock).toHaveBeenCalledWith(
-        "[useConfigForm]",
-        "Failed to save config:",
-        error,
-      );
+      expect(logErrorMock).toHaveBeenCalledWith("[useConfigForm]", "Failed to save config:", error);
     });
 
     it("should extract error detail from response", async () => {
@@ -279,9 +265,7 @@ describe("useConfigForm", () => {
       const form = useConfigForm();
       await form.loadConfig();
 
-      await expect(
-        form.updateConfigValue("orientation", "portrait"),
-      ).rejects.toThrow();
+      await expect(form.updateConfigValue("orientation", "portrait")).rejects.toThrow();
 
       expect(form.error.value).toBe("Validation error");
     });
@@ -345,12 +329,8 @@ describe("useConfigForm", () => {
 
       await form.saveConfig();
 
-      expect(configApi.updateConfig).toHaveBeenCalledWith(
-        form.localConfig.value,
-      );
-      expect(mockConfigStore.updateConfig).toHaveBeenCalledWith(
-        form.localConfig.value,
-      );
+      expect(configApi.updateConfig).toHaveBeenCalledWith(form.localConfig.value);
+      expect(mockConfigStore.updateConfig).toHaveBeenCalledWith(form.localConfig.value);
     });
 
     it("should save specific updates", async () => {

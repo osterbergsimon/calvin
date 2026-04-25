@@ -1,10 +1,7 @@
 <template>
   <div class="updates-tab">
     <CollapsibleSection title="Update Settings" icon="🔄" :expanded="true">
-      <SettingItem
-        label="Git Repository URL"
-        help="GitHub repository URL for updates"
-      >
+      <SettingItem label="Git Repository URL" help="GitHub repository URL for updates">
         <input
           v-model="localGitRepoUrl"
           type="text"
@@ -16,11 +13,7 @@
 
       <SettingItem label="Git Branch" help="Branch to update from">
         <select :value="gitBranch" @change="handleGitBranchChange">
-          <option
-            v-for="branch in availableBranches"
-            :key="branch"
-            :value="branch"
-          >
+          <option v-for="branch in availableBranches" :key="branch" :value="branch">
             {{ branch }}
           </option>
         </select>
@@ -28,21 +21,13 @@
 
       <SettingItem label="Update Actions" help="Trigger system update">
         <div class="button-group">
-          <button
-            class="btn-primary"
-            :disabled="updating"
-            @click="handleTriggerUpdate"
-          >
+          <button class="btn-primary" :disabled="updating" @click="handleTriggerUpdate">
             {{ updating ? "Updating..." : "🔄 Trigger Update" }}
           </button>
         </div>
       </SettingItem>
 
-      <div
-        v-if="updateMessage"
-        :class="updateMessageClass"
-        class="update-message"
-      >
+      <div v-if="updateMessage" :class="updateMessageClass" class="update-message">
         {{ updateMessage }}
       </div>
 
@@ -50,9 +35,7 @@
         <SettingItem label="Update Status">
           <div class="status-details">
             <p><strong>Status:</strong> {{ updateStatus.status }}</p>
-            <p v-if="updateStatus.message">
-              <strong>Message:</strong> {{ updateStatus.message }}
-            </p>
+            <p v-if="updateStatus.message"><strong>Message:</strong> {{ updateStatus.message }}</p>
             <p v-if="updateStatus.progress !== undefined">
               <strong>Progress:</strong> {{ updateStatus.progress }}%
             </p>
@@ -67,9 +50,7 @@
         </SettingItem>
 
         <SettingItem
-          v-if="
-            updateStatus.current_commit_short || updateStatus.new_commit_short
-          "
+          v-if="updateStatus.current_commit_short || updateStatus.new_commit_short"
           label="Commit info"
         >
           <div class="status-details">
@@ -83,9 +64,7 @@
             <p v-if="updateStatus.new_commit_short">
               <strong>Latest:</strong>
               {{ updateStatus.new_commit_short }}
-              <span v-if="updateStatus.new_commit_msg">
-                — {{ updateStatus.new_commit_msg }}
-              </span>
+              <span v-if="updateStatus.new_commit_msg"> — {{ updateStatus.new_commit_msg }} </span>
             </p>
           </div>
         </SettingItem>
@@ -114,13 +93,7 @@ const props = defineProps({
 
 const emit = defineEmits(["update:gitRepoUrl", "update:gitBranch"]);
 
-const {
-  updating,
-  updateStatus,
-  updateMessage,
-  updateMessageClass,
-  triggerUpdate,
-} = useSystem();
+const { updating, updateStatus, updateMessage, updateMessageClass, triggerUpdate } = useSystem();
 
 const availableBranches = ref([props.gitBranch || "main"]);
 const localGitRepoUrl = ref(props.gitRepoUrl || "");
@@ -136,7 +109,7 @@ const handleGitRepoChange = () => {
   }
 };
 
-const handleGitBranchChange = (event) => {
+const handleGitBranchChange = event => {
   emit("update:gitBranch", event.target.value);
 };
 
@@ -159,13 +132,13 @@ onMounted(() => {
 
 watch(
   () => props.gitRepoUrl,
-  (repoUrl) => {
+  repoUrl => {
     localGitRepoUrl.value = repoUrl || "";
     lastEmittedGitRepoUrl.value = repoUrl || "";
     if (repoUrl) {
       loadBranches();
     }
-  },
+  }
 );
 </script>
 

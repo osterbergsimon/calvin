@@ -37,9 +37,7 @@ onMounted(async () => {
 });
 
 const servicePlugins = computed(() => {
-  const filtered = plugins.value.filter(
-    (p) => p.type === "service" && p.enabled,
-  );
+  const filtered = plugins.value.filter(p => p.type === "service" && p.enabled);
   // Sort by display order
   return [...filtered].sort((a, b) => {
     const orderA = pluginDisplayOrders.value[a.id] ?? 0;
@@ -50,7 +48,7 @@ const servicePlugins = computed(() => {
 
 const servicePluginInstances = computed(() => {
   const instances = {};
-  servicePlugins.value.forEach((plugin) => {
+  servicePlugins.value.forEach(plugin => {
     const pluginInsts = pluginInstances.value[plugin.id] || [];
     // Sort instances by display_order
     instances[plugin.id] = [...pluginInsts].sort((a, b) => {
@@ -69,7 +67,7 @@ const getInstanceSummary = (_pluginId, _config) => {
   return null;
 };
 
-const handleServicePluginOrderChange = async (newOrder) => {
+const handleServicePluginOrderChange = async newOrder => {
   // Update local state optimistically first for instant feedback
   for (let i = 0; i < newOrder.length; i++) {
     const plugin = newOrder[i];
@@ -87,14 +85,11 @@ const handleServicePluginOrderChange = async (newOrder) => {
         continue;
       }
       updatePromises.push(
-        updatePluginOrder(plugin.id, i).catch((error) => {
-          console.error(
-            `[ServicesTab] Failed to update order for ${plugin.id}:`,
-            error,
-          );
+        updatePluginOrder(plugin.id, i).catch(error => {
+          console.error(`[ServicesTab] Failed to update order for ${plugin.id}:`, error);
           // Restore previous order on error
           return loadPlugins().catch(() => {});
-        }),
+        })
       );
     }
 

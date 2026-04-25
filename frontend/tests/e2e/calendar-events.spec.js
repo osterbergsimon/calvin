@@ -15,9 +15,7 @@ test.describe("Calendar Events", () => {
     await page.waitForTimeout(2000); // Wait for events to load
 
     // Look for event items
-    const events = page.locator(
-      ".event-item, [class*='event'], [class*='calendar-event']",
-    );
+    const events = page.locator(".event-item, [class*='event'], [class*='calendar-event']");
     const _eventCount = await events.count();
 
     // Events might not be present, but calendar should be visible
@@ -31,19 +29,17 @@ test.describe("Calendar Events", () => {
     await page.waitForTimeout(2000); // Wait for events to load
 
     // Look for event items
-    const events = page
-      .locator(".event-item, [class*='event'], [class*='calendar-event']")
-      .first();
+    const events = page.locator(".event-item, [class*='event'], [class*='calendar-event']").first();
     if ((await events.count()) > 0) {
       await events.click();
       await page.waitForTimeout(500);
 
       // Event should be selected (might open details panel)
       const detailsPanel = page.locator(
-        ".event-detail, [class*='event-detail'], [class*='detail-panel']",
+        ".event-detail, [class*='event-detail'], [class*='detail-panel']"
       );
       const selectedEvent = page.locator(
-        ".event-item.selected, [class*='event'].selected, [class*='selected']",
+        ".event-item.selected, [class*='event'].selected, [class*='selected']"
       );
 
       // Either details panel or selected class should be present
@@ -57,18 +53,14 @@ test.describe("Calendar Events", () => {
     await page.waitForTimeout(2000); // Wait for events to load
 
     // Click on an event
-    const events = page
-      .locator(".event-item, [class*='event'], [class*='calendar-event']")
-      .first();
+    const events = page.locator(".event-item, [class*='event'], [class*='calendar-event']").first();
     if ((await events.count()) > 0) {
       await events.click();
       await page.waitForTimeout(500);
 
       // Details panel should be visible
       const detailsPanel = page
-        .locator(
-          ".event-detail, [class*='event-detail'], [class*='detail-panel']",
-        )
+        .locator(".event-detail, [class*='event-detail'], [class*='detail-panel']")
         .first();
       if ((await detailsPanel.count()) > 0) {
         await expect(detailsPanel).toBeVisible();
@@ -80,18 +72,14 @@ test.describe("Calendar Events", () => {
     await page.waitForTimeout(2000); // Wait for events to load
 
     // Click on an event to open details
-    const events = page
-      .locator(".event-item, [class*='event'], [class*='calendar-event']")
-      .first();
+    const events = page.locator(".event-item, [class*='event'], [class*='calendar-event']").first();
     if ((await events.count()) > 0) {
       await events.click();
       await page.waitForTimeout(500);
 
       // Look for close button
       const closeButton = page
-        .locator(
-          'button[aria-label*="close" i], button:has-text("Close"), .close-button',
-        )
+        .locator('button[aria-label*="close" i], button:has-text("Close"), .close-button')
         .first();
       if ((await closeButton.count()) > 0) {
         await closeButton.click();

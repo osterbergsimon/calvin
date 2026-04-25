@@ -1,10 +1,6 @@
 <template>
   <div class="content-sources-category">
-    <TabNavigation
-      :tabs="tabs"
-      :active-tab="activeTab"
-      @tab-change="handleTabChange"
-    />
+    <TabNavigation :tabs="tabs" :active-tab="activeTab" @tab-change="handleTabChange" />
 
     <SettingsTab>
       <CalendarSourcesTab
@@ -54,10 +50,10 @@ const tabs = [
 
 const { activeTab, setActiveTab } = usePersistedSettingTab(
   "settings_tab_content_sources",
-  "calendars",
+  "calendars"
 );
 
-const handleTabChange = (tabId) => {
+const handleTabChange = tabId => {
   setActiveTab(tabId);
 };
 

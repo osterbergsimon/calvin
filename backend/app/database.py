@@ -1,26 +1,30 @@
 """Database configuration and session management."""
 
 import logging
+import os
 
 import databases
 from sqlalchemy import MetaData
 
 from app.config import settings
 
-# Ensure SQLAlchemy loggers are set to WARNING to reduce noise
-# This must be done BEFORE creating the engine
-# Set level explicitly to override any default or inherited level
-sqlalchemy_engine_logger = logging.getLogger("sqlalchemy.engine")
-sqlalchemy_engine_logger.setLevel(logging.WARNING)
-sqlalchemy_engine_logger.propagate = True
+# CALVIN_SQL_ECHO=1 turns on SQL statement logging without editing this file.
+#
+# Runtime queries go Ormar -> `databases` lib -> aiosqlite (NOT through a SQLAlchemy
+# engine), so the useful logger is `databases`. We also flip the SQLAlchemy loggers
+# because metadata.create_all() in init/tests does run through a sync SA engine.
+# All emitted records flow through loguru via InterceptHandler in app.main.
+_SQL_ECHO = os.environ.get("CALVIN_SQL_ECHO") == "1"
+_sql_log_level = logging.DEBUG if _SQL_ECHO else logging.WARNING
 
-sqlalchemy_pool_logger = logging.getLogger("sqlalchemy.pool")
-sqlalchemy_pool_logger.setLevel(logging.WARNING)
-sqlalchemy_pool_logger.propagate = True
+# Runtime queries — Ormar/databases lib
+logging.getLogger("databases").setLevel(_sql_log_level)
 
-sqlalchemy_dialects_logger = logging.getLogger("sqlalchemy.dialects")
-sqlalchemy_dialects_logger.setLevel(logging.WARNING)
-sqlalchemy_dialects_logger.propagate = True
+# Schema/init — SQLAlchemy core (metadata.create_all, sync engine in init_db)
+for _name in ("sqlalchemy.engine", "sqlalchemy.pool", "sqlalchemy.dialects"):
+    _lg = logging.getLogger(_name)
+    _lg.setLevel(_sql_log_level)
+    _lg.propagate = True
 
 # Create database connection for Ormar
 # Use absolute path to avoid path resolution issues

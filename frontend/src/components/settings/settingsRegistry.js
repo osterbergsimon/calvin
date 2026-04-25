@@ -18,15 +18,7 @@ export const settingsDestinations = [
     category: "dashboard",
     tabKey: "settings_tab_dashboard",
     tab: "layout",
-    keywords: [
-      "display",
-      "orientation",
-      "split",
-      "calendar",
-      "week",
-      "time format",
-      "meal plan",
-    ],
+    keywords: ["display", "orientation", "split", "calendar", "week", "time format", "meal plan"],
   },
   {
     id: "dashboard-calendar",
@@ -35,14 +27,7 @@ export const settingsDestinations = [
     category: "dashboard",
     tabKey: "settings_tab_dashboard",
     tab: "calendar",
-    keywords: [
-      "calendar",
-      "week",
-      "time format",
-      "weekend",
-      "red days",
-      "events",
-    ],
+    keywords: ["calendar", "week", "time format", "weekend", "red days", "events"],
   },
   {
     id: "dashboard-plugin-display",
@@ -179,24 +164,20 @@ export const settingsDestinations = [
   },
 ];
 
-export const isKnownSettingsCategory = (categoryId) =>
-  settingsCategories.some((category) => category.id === categoryId);
+export const isKnownSettingsCategory = categoryId =>
+  settingsCategories.some(category => category.id === categoryId);
 
-export const getSettingDestinationById = (destinationId) =>
-  settingsDestinations.find((destination) => destination.id === destinationId);
+export const getSettingDestinationById = destinationId =>
+  settingsDestinations.find(destination => destination.id === destinationId);
 
-export const getSettingsDestinationSearchText = (destination) =>
-  [destination.label, destination.path, ...(destination.keywords || [])]
-    .join(" ")
-    .toLowerCase();
+export const getSettingsDestinationSearchText = destination =>
+  [destination.label, destination.path, ...(destination.keywords || [])].join(" ").toLowerCase();
 
 export const filterSettingsDestinations = (query, limit = 8) => {
   const normalizedQuery = query.trim().toLowerCase();
   if (!normalizedQuery) return [];
 
   return settingsDestinations
-    .filter((destination) =>
-      getSettingsDestinationSearchText(destination).includes(normalizedQuery),
-    )
+    .filter(destination => getSettingsDestinationSearchText(destination).includes(normalizedQuery))
     .slice(0, limit);
 };

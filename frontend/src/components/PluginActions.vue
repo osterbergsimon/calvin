@@ -2,13 +2,7 @@
   <div
     v-if="actions && actions.length > 0"
     class="plugin-actions"
-    style="
-      margin-top: 1rem;
-      display: flex;
-      gap: 1rem;
-      align-items: center;
-      flex-wrap: wrap;
-    "
+    style="margin-top: 1rem; display: flex; gap: 1rem; align-items: center; flex-wrap: wrap"
   >
     <button
       v-for="action in actions"
@@ -99,7 +93,7 @@ const getPluginIdFromAction = () => {
   return props.pluginId;
 };
 
-const isActionDisabled = (action) => {
+const isActionDisabled = action => {
   if (props.saving) return true;
   if (action.type === "test" && props.testing) return true;
   if (action.type === "fetch" && props.fetching) return true;
@@ -107,7 +101,7 @@ const isActionDisabled = (action) => {
   return false;
 };
 
-const getActionLabel = (action) => {
+const getActionLabel = action => {
   if (action.type === "save" && props.saving) return "Saving...";
   if (action.type === "test" && props.testing) return "Testing...";
   if (action.type === "fetch" && props.fetching) return "Fetching...";
@@ -115,7 +109,7 @@ const getActionLabel = (action) => {
   return action.label || action.id;
 };
 
-const handleAction = (_action) => {
+const handleAction = _action => {
   logDebug("[PluginActions]", "handleAction called with:", _action);
   switch (_action.type) {
     case "save":
@@ -132,20 +126,12 @@ const handleAction = (_action) => {
         ..._action,
         pluginId: getPluginIdFromAction(),
       };
-      logDebug(
-        "[PluginActions]",
-        "Emitting custom-action with:",
-        actionWithPluginId,
-      );
+      logDebug("[PluginActions]", "Emitting custom-action with:", actionWithPluginId);
       emit("custom-action", actionWithPluginId);
       break;
     }
     default:
-      logWarn(
-        "[PluginActions]",
-        `Unknown action type: ${_action.type}`,
-        _action,
-      );
+      logWarn("[PluginActions]", `Unknown action type: ${_action.type}`, _action);
   }
 };
 </script>

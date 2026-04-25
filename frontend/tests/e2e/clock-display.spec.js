@@ -11,9 +11,7 @@ test.describe("Clock Display", () => {
     await page.waitForLoadState("networkidle");
   });
 
-  test("should display current time when clock is enabled", async ({
-    page,
-  }) => {
+  test("should display current time when clock is enabled", async ({ page }) => {
     // Look for clock component
     const clock = page.locator(".clock, [class*='clock']").first();
     if ((await clock.count()) > 0) {
@@ -38,9 +36,7 @@ test.describe("Clock Display", () => {
 
   test("should display date when date display is enabled", async ({ page }) => {
     // Navigate to settings to enable date display
-    const settingsButton = page
-      .locator('button:has-text("Settings"), a[href*="settings"]')
-      .first();
+    const settingsButton = page.locator('button:has-text("Settings"), a[href*="settings"]').first();
     if ((await settingsButton.count()) > 0) {
       await settingsButton.click();
       await page.waitForLoadState("networkidle");
@@ -48,7 +44,7 @@ test.describe("Clock Display", () => {
       // Look for clock date setting and enable it
       const dateCheckbox = page
         .locator(
-          'input[type="checkbox"][name*="date" i], input[type="checkbox"][aria-label*="date" i]',
+          'input[type="checkbox"][name*="date" i], input[type="checkbox"][aria-label*="date" i]'
         )
         .first();
       if ((await dateCheckbox.count()) > 0) {

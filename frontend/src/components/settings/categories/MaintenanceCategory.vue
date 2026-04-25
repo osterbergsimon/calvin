@@ -1,10 +1,6 @@
 <template>
   <div class="maintenance-category">
-    <TabNavigation
-      :tabs="tabs"
-      :active-tab="activeTab"
-      @tab-change="handleTabChange"
-    />
+    <TabNavigation :tabs="tabs" :active-tab="activeTab" @tab-change="handleTabChange" />
 
     <SettingsTab>
       <UpdatesTab
@@ -52,12 +48,9 @@ const tabs = [
   { id: "diagnostics", label: "Diagnostics", icon: "🐛" },
 ];
 
-const { activeTab, setActiveTab } = usePersistedSettingTab(
-  "settings_tab_maintenance",
-  "updates",
-);
+const { activeTab, setActiveTab } = usePersistedSettingTab("settings_tab_maintenance", "updates");
 
-const handleTabChange = (tabId) => {
+const handleTabChange = tabId => {
   setActiveTab(tabId);
 };
 </script>

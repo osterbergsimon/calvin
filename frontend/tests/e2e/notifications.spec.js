@@ -15,7 +15,7 @@ test.describe("Notifications", () => {
     // Notifications are typically triggered by user actions
     // Check if notification container exists
     const notificationContainer = page.locator(
-      ".notification, .notification-system, [class*='notification']",
+      ".notification, .notification-system, [class*='notification']"
     );
     const count = await notificationContainer.count();
     // Notification container should exist in DOM

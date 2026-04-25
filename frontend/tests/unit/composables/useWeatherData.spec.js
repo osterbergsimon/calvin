@@ -59,50 +59,36 @@ describe("useWeatherData", () => {
     };
 
     // Reset mock implementation
-    useQuery.mockImplementation((_options) => {
+    useQuery.mockImplementation(_options => {
       return mockQueryResult;
     });
   });
 
   describe("Query configuration", () => {
+    const lastCallOptions = () => useQuery.mock.calls[useQuery.mock.calls.length - 1][0];
+
     it("should configure query with correct key", () => {
       useWeatherData("weather-service-1", true);
 
-      expect(useQuery).toHaveBeenCalledWith(
-        expect.objectContaining({
-          queryKey: ["weather", "weather-service-1"],
-        }),
-      );
+      expect(lastCallOptions().queryKey.value).toEqual(["weather", "weather-service-1"]);
     });
 
     it("should be disabled when serviceId is null", () => {
       useWeatherData(null, true);
 
-      expect(useQuery).toHaveBeenCalledWith(
-        expect.objectContaining({
-          enabled: false,
-        }),
-      );
+      expect(lastCallOptions().enabled.value).toBe(false);
     });
 
     it("should be disabled when enabled parameter is false", () => {
       useWeatherData("weather-service-1", false);
 
-      expect(useQuery).toHaveBeenCalledWith(
-        expect.objectContaining({
-          enabled: false,
-        }),
-      );
+      expect(lastCallOptions().enabled.value).toBe(false);
     });
 
     it("should be enabled when serviceId and enabled are provided", () => {
       useWeatherData("weather-service-1", true);
 
-      expect(useQuery).toHaveBeenCalledWith(
-        expect.objectContaining({
-          enabled: true,
-        }),
-      );
+      expect(lastCallOptions().enabled.value).toBe(true);
     });
   });
 
@@ -160,7 +146,7 @@ describe("useWeatherData", () => {
       expect(useQuery).toHaveBeenCalledWith(
         expect.objectContaining({
           staleTime: 5 * 60 * 1000, // 5 minutes
-        }),
+        })
       );
     });
 
@@ -170,7 +156,7 @@ describe("useWeatherData", () => {
       expect(useQuery).toHaveBeenCalledWith(
         expect.objectContaining({
           gcTime: 10 * 60 * 1000, // 10 minutes
-        }),
+        })
       );
     });
 
@@ -202,7 +188,7 @@ describe("useWeatherData", () => {
       expect(useQuery).toHaveBeenCalledWith(
         expect.objectContaining({
           retry: 1,
-        }),
+        })
       );
     });
   });

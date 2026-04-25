@@ -62,15 +62,15 @@ defineProps({
 
 const emit = defineEmits(["update:config"]);
 
-const handleKeyboardFeedbackEnabledChange = (event) => {
+const handleKeyboardFeedbackEnabledChange = event => {
   emit("update:config", { keyboardFeedbackEnabled: event.target.checked });
 };
 
-const handleKeyboardFeedbackModeChange = (event) => {
+const handleKeyboardFeedbackModeChange = event => {
   emit("update:config", { keyboardFeedbackMode: event.target.value });
 };
 
-const handleModeIndicatorTimeoutChange = (event) => {
+const handleModeIndicatorTimeoutChange = event => {
   const value = parseInt(event.target.value, 10);
   if (!isNaN(value)) {
     emit("update:config", { modeIndicatorTimeout: value });

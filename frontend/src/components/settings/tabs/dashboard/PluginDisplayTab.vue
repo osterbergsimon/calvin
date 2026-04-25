@@ -40,7 +40,7 @@ const configValue = computed(() => ({
   mealPlanCardSize: props.config?.mealPlanCardSize ?? "medium",
 }));
 
-const handleMealPlanCardSizeChange = (event) => {
+const handleMealPlanCardSizeChange = event => {
   emit("update:config", { mealPlanCardSize: event.target.value });
 };
 </script>

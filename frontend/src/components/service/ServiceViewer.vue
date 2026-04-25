@@ -27,12 +27,9 @@
       <p v-if="pluginComponentError" class="error-text">
         Component error: {{ pluginComponentError }}
       </p>
-      <p v-if="componentPath" class="error-text">
-        Component path: {{ componentPath }}
-      </p>
+      <p v-if="componentPath" class="error-text">Component path: {{ componentPath }}</p>
       <p v-if="!componentPath && displayType === 'iframe'" class="error-text">
-        No component path found for iframe service. Check
-        display_schema.component.
+        No component path found for iframe service. Check display_schema.component.
       </p>
     </div>
   </div>
@@ -74,10 +71,7 @@ const renderTemplate = computed(() => {
 
 const apiEndpoint = computed(() => {
   if (props.service.display_schema?.api_endpoint) {
-    return props.service.display_schema.api_endpoint.replace(
-      "{service_id}",
-      props.service.id,
-    );
+    return props.service.display_schema.api_endpoint.replace("{service_id}", props.service.id);
   }
   // For plugins without api_endpoint in display_schema, use the new plugin API format
   if (props.service.plugin_id && props.service.id) {
@@ -98,7 +92,7 @@ const {
 // Debug logging
 watch(
   () => props.service,
-  (service) => {
+  service => {
     logDebug("[ServiceViewer]", "Service data:", {
       id: service?.id,
       name: service?.name,
@@ -108,18 +102,18 @@ watch(
       config: service?.config,
     });
   },
-  { immediate: true },
+  { immediate: true }
 );
 
-watch(componentPath, (path) => {
+watch(componentPath, path => {
   logDebug("[ServiceViewer]", "Component path:", path);
 });
 
-watch(pluginComponent, (comp) => {
+watch(pluginComponent, comp => {
   logDebug("[ServiceViewer]", "Plugin component loaded:", comp);
 });
 
-watch(pluginComponentError, (err) => {
+watch(pluginComponentError, err => {
   if (err) {
     logError("[ServiceViewer]", "Component error:", err);
   }

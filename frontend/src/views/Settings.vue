@@ -12,10 +12,7 @@
           {{ saveStatus.message }}
         </div>
         <div ref="systemMenuRef" class="system-menu">
-          <button
-            class="btn-system-menu"
-            @click="showSystemMenu = !showSystemMenu"
-          >
+          <button class="btn-system-menu" @click="showSystemMenu = !showSystemMenu">
             ⚙️ System
             <span class="menu-arrow">{{ showSystemMenu ? "▲" : "▼" }}</span>
           </button>
@@ -59,9 +56,7 @@
     </div>
 
     <div class="settings-search">
-      <label class="search-label" for="settings-search-input">
-        Find a setting
-      </label>
+      <label class="search-label" for="settings-search-input"> Find a setting </label>
       <input
         id="settings-search-input"
         v-model="settingsSearchQuery"
@@ -87,20 +82,13 @@
           <span class="search-result-title">{{ result.label }}</span>
           <span class="search-result-path">{{ result.path }}</span>
         </button>
-        <div
-          v-if="filteredSettingsDestinations.length === 0"
-          class="search-empty"
-        >
+        <div v-if="filteredSettingsDestinations.length === 0" class="search-empty">
           No matching settings
         </div>
       </div>
     </div>
 
-    <div
-      v-if="updateMessage"
-      class="system-status-banner"
-      :class="updateMessageClass"
-    >
+    <div v-if="updateMessage" class="system-status-banner" :class="updateMessageClass">
       {{ updateMessage }}
     </div>
 
@@ -126,12 +114,7 @@
         <div v-if="error" class="settings-banner settings-banner-error">
           {{ error }}
         </div>
-        <div
-          v-else-if="saveSuccess"
-          class="settings-banner settings-banner-success"
-        >
-          ✓ Saved
-        </div>
+        <div v-else-if="saveSuccess" class="settings-banner settings-banner-success">✓ Saved</div>
         <DashboardCategory
           v-if="activeCategory === 'dashboard' && localConfig"
           :key="categoryRenderKey"
@@ -144,10 +127,7 @@
           :config="localConfig"
           @update:config="handleConfigUpdate"
         />
-        <PluginsCategory
-          v-if="activeCategory === 'plugins'"
-          :key="categoryRenderKey"
-        />
+        <PluginsCategory v-if="activeCategory === 'plugins'" :key="categoryRenderKey" />
         <DeviceCategory
           v-if="activeCategory === 'device'"
           :key="categoryRenderKey"
@@ -199,19 +179,19 @@ import {
 
 // Lazy load category components for better code splitting
 const DashboardCategory = defineAsyncComponent(
-  () => import("@/components/settings/categories/DashboardCategory.vue"),
+  () => import("@/components/settings/categories/DashboardCategory.vue")
 );
 const ContentSourcesCategory = defineAsyncComponent(
-  () => import("@/components/settings/categories/ContentSourcesCategory.vue"),
+  () => import("@/components/settings/categories/ContentSourcesCategory.vue")
 );
 const PluginsCategory = defineAsyncComponent(
-  () => import("@/components/settings/categories/PluginsCategory.vue"),
+  () => import("@/components/settings/categories/PluginsCategory.vue")
 );
 const DeviceCategory = defineAsyncComponent(
-  () => import("@/components/settings/categories/DeviceCategory.vue"),
+  () => import("@/components/settings/categories/DeviceCategory.vue")
 );
 const MaintenanceCategory = defineAsyncComponent(
-  () => import("@/components/settings/categories/MaintenanceCategory.vue"),
+  () => import("@/components/settings/categories/MaintenanceCategory.vue")
 );
 
 const router = useRouter();
@@ -222,31 +202,22 @@ const categories = settingsCategories;
 
 const getRouteSettingDestination = () => {
   const settingId = route.query.setting;
-  return typeof settingId === "string"
-    ? getSettingDestinationById(settingId)
-    : null;
+  return typeof settingId === "string" ? getSettingDestinationById(settingId) : null;
 };
 
 const initialRouteDestination = getRouteSettingDestination();
 if (initialRouteDestination?.tabKey && initialRouteDestination.tab) {
-  sessionStorage.setItem(
-    initialRouteDestination.tabKey,
-    initialRouteDestination.tab,
-  );
+  sessionStorage.setItem(initialRouteDestination.tabKey, initialRouteDestination.tab);
 }
 
 const getInitialCategory = () => {
   if (initialRouteDestination) return initialRouteDestination.category;
 
   const storedCategory = sessionStorage.getItem(SETTINGS_CATEGORY_STORAGE_KEY);
-  return isKnownSettingsCategory(storedCategory)
-    ? storedCategory
-    : defaultSettingsCategoryId;
+  return isKnownSettingsCategory(storedCategory) ? storedCategory : defaultSettingsCategoryId;
 };
 const activeCategory = ref(getInitialCategory());
-watch(activeCategory, (val) =>
-  sessionStorage.setItem(SETTINGS_CATEGORY_STORAGE_KEY, val),
-);
+watch(activeCategory, val => sessionStorage.setItem(SETTINGS_CATEGORY_STORAGE_KEY, val));
 const showSystemMenu = ref(false);
 const settingsSearchQuery = ref("");
 const categoryRenderKey = ref(0);
@@ -279,14 +250,14 @@ const pendingSystemActionConfig = computed(
       title: "",
       message: "",
       confirmText: "Continue",
-    },
+    }
 );
 
 const filteredSettingsDestinations = computed(() => {
   return filterSettingsDestinations(settingsSearchQuery.value);
 });
 
-const applySettingDestination = (destination) => {
+const applySettingDestination = destination => {
   if (destination.tabKey && destination.tab) {
     sessionStorage.setItem(destination.tabKey, destination.tab);
   }
@@ -294,7 +265,7 @@ const applySettingDestination = (destination) => {
   categoryRenderKey.value += 1;
 };
 
-const jumpToSetting = (destination) => {
+const jumpToSetting = destination => {
   applySettingDestination(destination);
   settingsSearchQuery.value = "";
   router.replace({
@@ -305,7 +276,7 @@ const jumpToSetting = (destination) => {
   });
 };
 
-const selectCategory = (categoryId) => {
+const selectCategory = categoryId => {
   activeCategory.value = categoryId;
   if (!route.query.setting) return;
 
@@ -320,22 +291,14 @@ watch(
     if (destination) {
       applySettingDestination(destination);
     }
-  },
+  }
 );
 
 // Config management
-const {
-  localConfig,
-  loadConfig,
-  updateConfig,
-  error,
-  saveSuccess,
-  saveStatus,
-} = useConfigForm();
+const { localConfig, loadConfig, updateConfig, error, saveSuccess, saveStatus } = useConfigForm();
 
 // System operations
-const { restartBackend, restartFrontend, updateMessage, updateMessageClass } =
-  useSystem();
+const { restartBackend, restartFrontend, updateMessage, updateMessageClass } = useSystem();
 
 // Version info
 const version = ref(null);
@@ -355,17 +318,17 @@ const getFrontendVersionFromMeta = () => {
 };
 
 // Handle config updates
-const handleConfigUpdate = async (updates) => {
+const handleConfigUpdate = async updates => {
   await updateConfig(updates);
 };
 
 // Handle git repo URL update
-const handleGitRepoUrlUpdate = async (url) => {
+const handleGitRepoUrlUpdate = async url => {
   await updateConfig({ gitRepoUrl: url });
 };
 
 // Handle git branch update
-const handleGitBranchUpdate = async (branch) => {
+const handleGitBranchUpdate = async branch => {
   await updateConfig({ gitBranch: branch });
 };
 
@@ -381,7 +344,7 @@ const reloadUI = () => {
   window.location.reload();
 };
 
-const requestSystemAction = (action) => {
+const requestSystemAction = action => {
   pendingSystemAction.value = action;
 };
 
@@ -404,7 +367,7 @@ const confirmSystemAction = async () => {
 
 // Click-outside closes the system menu
 const systemMenuRef = ref(null);
-const onDocumentClick = (e) => {
+const onDocumentClick = e => {
   if (showSystemMenu.value && !systemMenuRef.value?.contains(e.target)) {
     showSystemMenu.value = false;
   }

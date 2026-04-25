@@ -348,17 +348,18 @@ async def update_calendar_source(source_id: str, source: CalendarSource):
                 detail="Invalid Proton Calendar URL. Must include '/calendar.ics' endpoint.",
             )
 
-    # Update in database first
+    # Validate the URL before the existence check so callers get a 400 for a
+    # bad URL even when the source doesn't exist yet. Skip the outbound HTTP
+    # request when the URL is unchanged on an existing source (just updating
+    # color, show_time, etc.).
     db_plugin = await PluginDB.objects.get_or_none(id=source_id)
-    if not db_plugin:
-        raise HTTPException(status_code=404, detail="Calendar source not found")
-
-    # Only validate the URL if it actually changed — skips the outbound HTTP
-    # request when the user is just updating color, show_time, etc.
-    existing_url = (db_plugin.config or {}).get("ical_url")
+    existing_url = (db_plugin.config or {}).get("ical_url") if db_plugin else None
     url_changed = source.ical_url is not None and source.ical_url != existing_url
     if url_changed:
         await validate_calendar_url(source.ical_url, source.type)
+
+    if not db_plugin:
+        raise HTTPException(status_code=404, detail="Calendar source not found")
 
     # Update database
     db_plugin.name = source.name

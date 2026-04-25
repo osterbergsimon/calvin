@@ -1,10 +1,6 @@
 <template>
   <div class="device-category">
-    <TabNavigation
-      :tabs="tabs"
-      :active-tab="activeTab"
-      @tab-change="handleTabChange"
-    />
+    <TabNavigation :tabs="tabs" :active-tab="activeTab" @tab-change="handleTabChange" />
 
     <SettingsTab>
       <PowerTab
@@ -64,12 +60,9 @@ const tabs = [
   { id: "hardware", label: "Hardware", icon: "🖥️" },
 ];
 
-const { activeTab, setActiveTab } = usePersistedSettingTab(
-  "settings_tab_device",
-  "power",
-);
+const { activeTab, setActiveTab } = usePersistedSettingTab("settings_tab_device", "power");
 
-const handleTabChange = (tabId) => {
+const handleTabChange = tabId => {
   setActiveTab(tabId);
 };
 </script>

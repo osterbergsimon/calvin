@@ -15,12 +15,7 @@ describe("Layout Utilities", () => {
         showHorizontalBarBetween: false,
       });
 
-      expect(order).toEqual([
-        "verticalBarLeft",
-        "secondary",
-        "calendar",
-        "verticalBarRight",
-      ]);
+      expect(order).toEqual(["verticalBarLeft", "secondary", "calendar", "verticalBarRight"]);
     });
 
     it("should return correct order for landscape with side view on right", () => {
@@ -33,12 +28,7 @@ describe("Layout Utilities", () => {
         showHorizontalBarBetween: false,
       });
 
-      expect(order).toEqual([
-        "verticalBarLeft",
-        "calendar",
-        "secondary",
-        "verticalBarRight",
-      ]);
+      expect(order).toEqual(["verticalBarLeft", "calendar", "secondary", "verticalBarRight"]);
     });
 
     it("should return correct order for portrait with side view on top", () => {

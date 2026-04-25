@@ -1,27 +1,14 @@
 <template>
-  <div
-    ref="calendarView"
-    class="calendar-view"
-    tabindex="0"
-    @keydown="handleKeydown"
-  >
+  <div ref="calendarView" class="calendar-view" tabindex="0" @keydown="handleKeydown">
     <div v-if="showHeader" class="calendar-header">
       <h2>Calendar</h2>
       <div class="calendar-controls">
-        <button
-          class="btn-icon"
-          @click="previousMonth"
-          @keydown.enter="previousMonth"
-        >
-          ‹
-        </button>
+        <button class="btn-icon" @click="previousMonth" @keydown.enter="previousMonth">‹</button>
         <div class="calendar-title-group">
           <span class="current-month">{{ currentMonthYear }}</span>
           <span class="view-mode-indicator">{{ viewModeLabel }}</span>
         </div>
-        <button class="btn-icon" @click="nextMonth" @keydown.enter="nextMonth">
-          ›
-        </button>
+        <button class="btn-icon" @click="nextMonth" @keydown.enter="nextMonth">›</button>
       </div>
     </div>
     <div v-else class="calendar-header-minimal">
@@ -70,9 +57,7 @@
         <!-- Day headers -->
         <div class="calendar-weekdays">
           <div
-            v-for="day in viewMode === 'day'
-              ? [getCurrentWeekdayName()]
-              : weekDays"
+            v-for="day in viewMode === 'day' ? [getCurrentWeekdayName()] : weekDays"
             :key="day"
             class="weekday"
           >
@@ -104,10 +89,7 @@
               <div class="day-number">
                 {{ day.date.getDate() }}
               </div>
-              <div
-                v-if="showWeekNumbers && isWeekStart(dayIndex)"
-                class="week-number"
-              >
+              <div v-if="showWeekNumbers && isWeekStart(dayIndex)" class="week-number">
                 {{ getWeekNumberForDay(dayIndex) }}
               </div>
             </div>
@@ -116,7 +98,7 @@
               <CalendarEventItem
                 v-for="(event, eventIndex) in getVisibleEvents(day.events)"
                 :key="`${event.id}-${day.date.toISOString()}-${eventIndex}`"
-                :ref="(el) => setEventRef(el, dayIndex, eventIndex)"
+                :ref="el => setEventRef(el, dayIndex, eventIndex)"
                 :event="event"
                 :day-index="dayIndex"
                 :event-index="eventIndex"
@@ -155,15 +137,7 @@
 </template>
 
 <script setup>
-import {
-  ref,
-  computed,
-  watch,
-  onMounted,
-  onUnmounted,
-  onActivated,
-  nextTick,
-} from "vue";
+import { ref, computed, watch, onMounted, onUnmounted, onActivated, nextTick } from "vue";
 import { useRoute } from "vue-router";
 import { useCalendarStore } from "../stores/calendar";
 import { useConfigStore } from "../stores/config";
@@ -198,7 +172,7 @@ let calendarAutoRefreshInterval = null;
 let lastLoadedAt = 0;
 
 const calendarRefreshIntervalMinutes = computed(() =>
-  Math.max(1, configStore.calendarRefreshInterval || 15),
+  Math.max(1, configStore.calendarRefreshInterval || 15)
 );
 
 const startCalendarAutoRefresh = () => {
@@ -304,9 +278,7 @@ const getCalendarDate = (date, useUTC = false) => {
   const d = new Date(date);
   if (useUTC) {
     // Use UTC methods for all-day events (backend sends UTC dates)
-    return new Date(
-      Date.UTC(d.getUTCFullYear(), d.getUTCMonth(), d.getUTCDate()),
-    );
+    return new Date(Date.UTC(d.getUTCFullYear(), d.getUTCMonth(), d.getUTCDate()));
   } else {
     // Use local time methods for timed events (to match calendar grid)
     return new Date(d.getFullYear(), d.getMonth(), d.getDate());
@@ -335,7 +307,7 @@ const compareDateComponents = (date1, date2) => {
 };
 
 // Helper function to get events for a specific date
-const getEventsForDate = (date) => {
+const getEventsForDate = date => {
   if (!events.value || events.value.length === 0) return [];
 
   // Calendar grid date is in local time
@@ -347,7 +319,7 @@ const getEventsForDate = (date) => {
   const gridDateComponents = getDateComponents(date, false);
 
   return events.value
-    .filter((event) => {
+    .filter(event => {
       const eventStart = new Date(event.start);
       const eventEnd = new Date(event.end);
 
@@ -372,14 +344,8 @@ const getEventsForDate = (date) => {
         const eventEndComponents = getDateComponents(eventEndDate, false); // Local
 
         // Compare grid date (local) with event dates
-        const startCompare = compareDateComponents(
-          eventStartComponents,
-          gridDateComponents,
-        );
-        const endCompare = compareDateComponents(
-          gridDateComponents,
-          eventEndComponents,
-        );
+        const startCompare = compareDateComponents(eventStartComponents, gridDateComponents);
+        const endCompare = compareDateComponents(gridDateComponents, eventEndComponents);
 
         // Event should show if: gridDate is between eventStart and eventEnd (inclusive)
         return startCompare <= 0 && endCompare <= 0;
@@ -389,7 +355,7 @@ const getEventsForDate = (date) => {
         return eventStart <= dateEnd && eventEnd >= dateOnly;
       }
     })
-    .map((event) => {
+    .map(event => {
       // Add metadata about event position for styling
       const eventStart = new Date(event.start);
       const eventEnd = new Date(event.end);
@@ -413,14 +379,11 @@ const getEventsForDate = (date) => {
       }
 
       // Check if event spans multiple calendar days
-      const isMultiDay =
-        compareDateComponents(eventStartComponents, eventEndComponents) !== 0;
+      const isMultiDay = compareDateComponents(eventStartComponents, eventEndComponents) !== 0;
 
       // Check if current date is the start or end day
-      const isStart =
-        compareDateComponents(eventStartComponents, gridDateComponents) === 0;
-      const isEnd =
-        compareDateComponents(eventEndComponents, gridDateComponents) === 0;
+      const isStart = compareDateComponents(eventStartComponents, gridDateComponents) === 0;
+      const isEnd = compareDateComponents(eventEndComponents, gridDateComponents) === 0;
 
       return {
         ...event,
@@ -445,7 +408,7 @@ const getEventsForDate = (date) => {
 
 // Get visible events (limited) for a day
 // Note: Overflow limiting only applies to month/rolling views, not week/day views
-const getVisibleEvents = (events) => {
+const getVisibleEvents = events => {
   if (!events || events.length === 0) return [];
   // Don't limit events in week or day view where we have more space
   if (viewMode.value === "week" || viewMode.value === "day") {
@@ -457,7 +420,7 @@ const getVisibleEvents = (events) => {
 
 // Get count of overflow events
 // Note: Overflow indicator only shows in month/rolling views
-const getOverflowCount = (events) => {
+const getOverflowCount = events => {
   if (!events || events.length === 0) return 0;
   // Don't show overflow indicator in week or day view
   if (viewMode.value === "week" || viewMode.value === "day") {
@@ -470,10 +433,8 @@ const getOverflowCount = (events) => {
 // Event helper functions moved to useEventHelpers composable
 
 // Helper function to get week number for a date (ISO 8601 week numbering)
-const getWeekNumber = (date) => {
-  const d = new Date(
-    Date.UTC(date.getFullYear(), date.getMonth(), date.getDate()),
-  );
+const getWeekNumber = date => {
+  const d = new Date(Date.UTC(date.getFullYear(), date.getMonth(), date.getDate()));
   const dayNum = d.getUTCDay() || 7;
   d.setUTCDate(d.getUTCDate() + 4 - dayNum);
   const yearStart = new Date(Date.UTC(d.getUTCFullYear(), 0, 1));
@@ -481,7 +442,7 @@ const getWeekNumber = (date) => {
 };
 
 // Helper function to adjust day of week based on week start day
-const adjustDayOfWeek = (dayOfWeek) => {
+const adjustDayOfWeek = dayOfWeek => {
   // dayOfWeek: 0=Sunday, 1=Monday, ..., 6=Saturday
   // weekStartDay: 0=Sunday, 1=Monday, ..., 6=Saturday
   // Return adjusted day where 0 = week start day
@@ -489,7 +450,7 @@ const adjustDayOfWeek = (dayOfWeek) => {
 };
 
 // Helper function to get date at start of week for a given date
-const getWeekStart = (date) => {
+const getWeekStart = date => {
   const d = new Date(date);
   const dayOfWeek = d.getDay();
   const adjustedDay = adjustDayOfWeek(dayOfWeek);
@@ -605,8 +566,7 @@ const calendarDays = computed(() => {
       dateOnly.setHours(0, 0, 0, 0);
 
       // Ensure current month days are never marked as otherMonth
-      const isCurrentMonth =
-        date.getMonth() === month && date.getFullYear() === year;
+      const isCurrentMonth = date.getMonth() === month && date.getFullYear() === year;
 
       days.push({
         date,
@@ -633,7 +593,7 @@ const calendarDays = computed(() => {
 });
 
 // Helper function to check if a day is the start of a week
-const isWeekStart = (dayIndex) => {
+const isWeekStart = dayIndex => {
   // First day of calendar is always a week start
   if (dayIndex === 0) return true;
   // Every 7th day is a week start (based on week start day setting)
@@ -641,7 +601,7 @@ const isWeekStart = (dayIndex) => {
 };
 
 // Helper function to get week number for a specific day
-const getWeekNumberForDay = (dayIndex) => {
+const getWeekNumberForDay = dayIndex => {
   if (!showWeekNumbers.value || dayIndex >= calendarDays.value.length) {
     return null;
   }
@@ -656,14 +616,14 @@ const getWeekNumberForDay = (dayIndex) => {
 };
 
 // Helper function to check if a date is a weekend day
-const isWeekend = (date) => {
+const isWeekend = date => {
   const dayOfWeek = date.getDay();
   return weekendDays.value.includes(dayOfWeek);
 };
 
 // Helper function to check if a date is a red day (holiday)
 // Placeholder: holiday detection deferred until backend supports it
-const isRedDay = (_date) => {
+const isRedDay = _date => {
   return false;
 };
 
@@ -690,9 +650,7 @@ const setEventRef = (el, dayIndex, eventIndex) => {
 };
 
 const isFocused = (dayIndex, eventIndex) => {
-  return (
-    focusedDayIndex.value === dayIndex && focusedEventIndex.value === eventIndex
-  );
+  return focusedDayIndex.value === dayIndex && focusedEventIndex.value === eventIndex;
 };
 
 // Simple function that checks if an event is selected for a specific day
@@ -756,15 +714,13 @@ const closeEventDetail = () => {
   }
 };
 
-const navigateEvents = (direction) => {
+const navigateEvents = direction => {
   if (allEvents.value.length === 0) return;
 
   let currentIndex = -1;
   if (focusedDayIndex.value !== null && focusedEventIndex.value !== null) {
     currentIndex = allEvents.value.findIndex(
-      (item) =>
-        item.dayIndex === focusedDayIndex.value &&
-        item.eventIndex === focusedEventIndex.value,
+      item => item.dayIndex === focusedDayIndex.value && item.eventIndex === focusedEventIndex.value
     );
   }
 
@@ -788,7 +744,7 @@ const navigateEvents = (direction) => {
   }
 };
 
-const handleKeydown = (event) => {
+const handleKeydown = event => {
   // Don't handle if event detail panel is open (let it handle its own keys)
   if (selectedEvent.value) {
     if (event.key === "Escape") {
@@ -820,10 +776,7 @@ const handleKeydown = (event) => {
       if (focusedDayIndex.value !== null) {
         const day = calendarDays.value[focusedDayIndex.value];
         if (day && day.events.length > 0) {
-          if (
-            focusedEventIndex.value !== null &&
-            focusedEventIndex.value < day.events.length
-          ) {
+          if (focusedEventIndex.value !== null && focusedEventIndex.value < day.events.length) {
             // Expand the focused event
             selectEvent(day.events[focusedEventIndex.value], day.date);
           } else {
@@ -940,7 +893,7 @@ const loadEvents = async (background = false) => {
 
     await calendarStore.fetchEvents(startDate, endDate, refresh, background);
     console.log(
-      `Loaded ${calendarStore.events.length} events for ${year}-${month + 1} (range: ${startDate.toISOString().split("T")[0]} to ${endDate.toISOString().split("T")[0]})`,
+      `Loaded ${calendarStore.events.length} events for ${year}-${month + 1} (range: ${startDate.toISOString().split("T")[0]} to ${endDate.toISOString().split("T")[0]})`
     );
   } catch (error) {
     console.error("Failed to load events:", error);
@@ -962,7 +915,7 @@ watch(
       calendarStore.fetchSources();
     }
   },
-  { immediate: false },
+  { immediate: false }
 );
 
 onMounted(() => {

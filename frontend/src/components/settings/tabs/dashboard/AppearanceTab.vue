@@ -59,11 +59,7 @@
         help="Hide headers to maximize content space (kiosk mode)"
       >
         <label>
-          <input
-            :checked="config.showUI"
-            type="checkbox"
-            @change="handleShowUIChange"
-          />
+          <input :checked="config.showUI" type="checkbox" @change="handleShowUIChange" />
           Show Headers and UI Controls
         </label>
       </SettingItem>
@@ -97,7 +93,7 @@ const loadThemes = async () => {
   try {
     const response = await pluginsApi.getPlugins({ plugin_type: "theme" });
     const allItems = response.plugins || [];
-    const themePlugins = allItems.filter((p) => p.type === "theme");
+    const themePlugins = allItems.filter(p => p.type === "theme");
 
     const themesWithDetails = [];
     for (const themePlugin of themePlugins) {
@@ -123,7 +119,7 @@ const loadThemes = async () => {
 
 loadThemes();
 
-const handleThemeSelect = async (themeId) => {
+const handleThemeSelect = async themeId => {
   try {
     emit("update:config", { selectedTheme: themeId });
     await theme.setSelectedTheme(themeId);
@@ -132,14 +128,12 @@ const handleThemeSelect = async (themeId) => {
   }
 };
 
-const handleThemeModeChange = (event) => {
+const handleThemeModeChange = event => {
   emit("update:config", { themeMode: event.target.value });
 };
 
-const handleDarkModeTimeChange = (event) => {
-  const field = event.target.previousElementSibling?.textContent.includes(
-    "Start",
-  )
+const handleDarkModeTimeChange = event => {
+  const field = event.target.previousElementSibling?.textContent.includes("Start")
     ? "darkModeStart"
     : "darkModeEnd";
   const value = parseInt(event.target.value, 10);
@@ -148,7 +142,7 @@ const handleDarkModeTimeChange = (event) => {
   }
 };
 
-const handleShowUIChange = (event) => {
+const handleShowUIChange = event => {
   emit("update:config", { showUI: event.target.checked });
 };
 </script>

@@ -1,8 +1,5 @@
 <template>
-  <section
-    class="settings-section collapsible"
-    :class="{ expanded: isExpanded }"
-  >
+  <section class="settings-section collapsible" :class="{ expanded: isExpanded }">
     <button
       type="button"
       class="section-header"
@@ -49,9 +46,9 @@ const contentId = `settings-section-content-${++sectionId}`;
 
 watch(
   () => props.expanded,
-  (newVal) => {
+  newVal => {
     isExpanded.value = newVal;
-  },
+  }
 );
 
 const toggle = () => {

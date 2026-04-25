@@ -22,10 +22,7 @@
         </select>
       </SettingItem>
 
-      <SettingItem
-        label="Show Week Numbers"
-        help="Display ISO week numbers in calendar view"
-      >
+      <SettingItem label="Show Week Numbers" help="Display ISO week numbers in calendar view">
         <label>
           <input
             :checked="configValue.showWeekNumbers"
@@ -72,11 +69,7 @@
 
       <SettingItem label="Weekend Days" help="Days to highlight as weekend">
         <div class="weekend-days">
-          <label
-            v-for="day in dayOptions"
-            :key="day.value"
-            class="weekend-day-checkbox"
-          >
+          <label v-for="day in dayOptions" :key="day.value" class="weekend-day-checkbox">
             <input
               type="checkbox"
               :checked="configValue.weekendDays.includes(day.value)"
@@ -136,29 +129,27 @@ const configValue = computed(() => {
     showWeekNumbers: config.showWeekNumbers ?? false,
     timeFormat: config.timeFormat ?? "24h",
     maxVisibleEvents: config.maxVisibleEvents ?? 4,
-    weekendDays: Array.isArray(config.weekendDays)
-      ? config.weekendDays
-      : [0, 6],
+    weekendDays: Array.isArray(config.weekendDays) ? config.weekendDays : [0, 6],
     showRedDays: config.showRedDays ?? false,
   };
 });
 
-const handleWeekStartDayChange = (event) => {
+const handleWeekStartDayChange = event => {
   const value = parseInt(event.target.value, 10);
   if (!isNaN(value)) {
     emit("update:config", { weekStartDay: value });
   }
 };
 
-const handleShowWeekNumbersChange = (event) => {
+const handleShowWeekNumbersChange = event => {
   emit("update:config", { showWeekNumbers: event.target.checked });
 };
 
-const handleTimeFormatChange = (event) => {
+const handleTimeFormatChange = event => {
   emit("update:config", { timeFormat: event.target.value });
 };
 
-const handleMaxVisibleEventsChange = (event) => {
+const handleMaxVisibleEventsChange = event => {
   const value = parseInt(event.target.value, 10);
   if (!isNaN(value) && value >= 1 && value <= 20) {
     emit("update:config", { maxVisibleEvents: value });
@@ -169,11 +160,11 @@ const handleWeekendDayChange = (dayValue, event) => {
   const current = configValue.value.weekendDays;
   const next = event.target.checked
     ? [...current, dayValue].sort((a, b) => a - b)
-    : current.filter((d) => d !== dayValue);
+    : current.filter(d => d !== dayValue);
   emit("update:config", { weekendDays: next });
 };
 
-const handleShowRedDaysChange = (event) => {
+const handleShowRedDaysChange = event => {
   emit("update:config", { showRedDays: event.target.checked });
 };
 </script>

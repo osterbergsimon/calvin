@@ -119,9 +119,7 @@ export function usePhotoFrameMode() {
     // Don't enter if user is on settings page
     const currentPath = router.currentRoute.value.path;
     if (currentPath === "/settings") {
-      devLog(
-        "[PhotoFrame] Cannot enter photo frame mode: user is on settings page",
-      );
+      devLog("[PhotoFrame] Cannot enter photo frame mode: user is on settings page");
       return;
     }
 
@@ -182,7 +180,7 @@ export function usePhotoFrameMode() {
 
     // Set up activity listeners
     const events = ["mousedown", "mousemove", "keydown", "touchstart", "click"];
-    events.forEach((event) => {
+    events.forEach(event => {
       window.addEventListener(event, handleActivity, { passive: true });
     });
 
@@ -194,7 +192,7 @@ export function usePhotoFrameMode() {
     if (!listenersSetup) return;
 
     const events = ["mousedown", "mousemove", "keydown", "touchstart", "click"];
-    events.forEach((event) => {
+    events.forEach(event => {
       window.removeEventListener(event, handleActivity);
     });
 
@@ -205,7 +203,7 @@ export function usePhotoFrameMode() {
   // Watch for config changes
   watch(
     () => configStore.photoFrameEnabled,
-    (enabled) => {
+    enabled => {
       if (enabled) {
         resetInactivityTimer();
       } else {
@@ -219,7 +217,7 @@ export function usePhotoFrameMode() {
         }
       }
     },
-    { immediate: false }, // Don't run on initial setup, we handle that in onMounted
+    { immediate: false } // Don't run on initial setup, we handle that in onMounted
   );
 
   watch(
@@ -229,7 +227,7 @@ export function usePhotoFrameMode() {
         resetInactivityTimer();
       }
     },
-    { immediate: false }, // Don't run on initial setup, we handle that in onMounted
+    { immediate: false } // Don't run on initial setup, we handle that in onMounted
   );
 
   // Watch for route changes to prevent activation on settings page
@@ -250,15 +248,13 @@ export function usePhotoFrameMode() {
         !isPhotoFrameActive.value
       ) {
         // Restart timer if navigating away from settings to dashboard and photo frame is enabled
-        devLog(
-          "[PhotoFrame] User navigated away from settings to dashboard, restarting timer",
-        );
+        devLog("[PhotoFrame] User navigated away from settings to dashboard, restarting timer");
         // Only restart if we don't already have a timer
         if (!inactivityTimer.value) {
           resetInactivityTimer();
         }
       }
-    },
+    }
   );
 
   // Initialize on first call (not tied to component lifecycle)
@@ -285,10 +281,7 @@ export function usePhotoFrameMode() {
     // Initialize timer if photo frame mode is enabled (loaded from server)
     // This ensures the setting from the server is properly applied
     if (configStore.photoFrameEnabled) {
-      devLog(
-        "[PhotoFrame] Initializing timer with timeout:",
-        configStore.photoFrameTimeout,
-      );
+      devLog("[PhotoFrame] Initializing timer with timeout:", configStore.photoFrameTimeout);
       resetInactivityTimer();
     } else {
       devLog("[PhotoFrame] Photo frame mode is disabled, not starting timer");

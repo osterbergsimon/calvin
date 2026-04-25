@@ -59,14 +59,8 @@
               </button>
               <div
                 v-if="key === 'location' && geocodeStatus"
-                :class="
-                  geocodeStatus.success ? 'success-message' : 'error-message'
-                "
-                style="
-                  margin-top: 0.5rem;
-                  padding: 0.5rem 1rem;
-                  border-radius: 4px;
-                "
+                :class="geocodeStatus.success ? 'success-message' : 'error-message'"
+                style="margin-top: 0.5rem; padding: 0.5rem 1rem; border-radius: 4px"
               >
                 {{ geocodeStatus.message }}
               </div>
@@ -77,8 +71,7 @@
           <template v-else>
             <div class="form-group">
               <p class="help-text">
-                This plugin type does not support instance-specific
-                configuration.
+                This plugin type does not support instance-specific configuration.
               </p>
             </div>
           </template>
@@ -102,9 +95,7 @@
                   style="flex: 1"
                 />
               </div>
-              <span class="help-text">
-                Choose a color for events from this calendar source
-              </span>
+              <span class="help-text"> Choose a color for events from this calendar source </span>
             </div>
             <div class="form-group">
               <label>
@@ -127,31 +118,20 @@
 
           <!-- Test Connection Button (if plugin supports it) -->
           <div v-if="hasTestAction" class="form-group">
-            <button
-              type="button"
-              class="btn-secondary"
-              :disabled="testing"
-              @click="handleTest"
-            >
+            <button type="button" class="btn-secondary" :disabled="testing" @click="handleTest">
               {{ testing ? "Testing..." : "Test Connection" }}
             </button>
             <div
               v-if="testStatus"
               :class="testStatus.success ? 'success-message' : 'error-message'"
-              style="
-                margin-top: 0.5rem;
-                padding: 0.5rem 1rem;
-                border-radius: 4px;
-              "
+              style="margin-top: 0.5rem; padding: 0.5rem 1rem; border-radius: 4px"
             >
               {{ testStatus.message }}
             </div>
           </div>
 
           <div class="modal-actions">
-            <button type="button" class="btn-secondary" @click="handleClose">
-              Cancel
-            </button>
+            <button type="button" class="btn-secondary" @click="handleClose">Cancel</button>
             <button type="submit" class="btn-primary" :disabled="saving">
               {{ saving ? "Saving..." : "Save" }}
             </button>
@@ -173,7 +153,6 @@ const instanceLabelMap = {
 };
 import PluginFieldRenderer from "@/components/PluginFieldRenderer.vue";
 import * as pluginsApi from "@/services/pluginsApi";
-import * as calendarApi from "@/services/calendarApi";
 import { useCalendarStore } from "@/stores/calendar";
 
 const props = defineProps({
@@ -213,16 +192,14 @@ const geocodeStatus = ref(null);
 
 const instanceLabel = computed(
   () =>
-    currentPlugin.value?.instance_label ||
-    instanceLabelMap[currentPlugin.value?.type] ||
-    "Instance",
+    currentPlugin.value?.instance_label || instanceLabelMap[currentPlugin.value?.type] || "Instance"
 );
 
 // Computed property for test action check
 const hasTestAction = computed(() => {
   return (
     currentPlugin.value?.ui_actions &&
-    currentPlugin.value.ui_actions.some((action) => action.type === "test")
+    currentPlugin.value.ui_actions.some(action => action.type === "test")
   );
 });
 
@@ -233,8 +210,7 @@ const hasGeocodeAction = computed(() => {
   const hasGeocodeInActions =
     currentPlugin.value.ui_actions &&
     currentPlugin.value.ui_actions.some(
-      (action) =>
-        action.type === "geocode" || action.endpoint?.includes("geocode"),
+      action => action.type === "geocode" || action.endpoint?.includes("geocode")
     );
   // Also check plugin ID or type for common weather plugins
   const isWeatherPlugin =
@@ -247,29 +223,29 @@ const hasGeocodeAction = computed(() => {
 // Watch for plugin/instance changes
 watch(
   () => props.plugin,
-  (newPlugin) => {
+  newPlugin => {
     if (newPlugin) {
       currentPlugin.value = newPlugin;
       initializeForm();
     }
   },
-  { immediate: true },
+  { immediate: true }
 );
 
 watch(
   () => props.instance,
-  (newInstance) => {
+  newInstance => {
     editingInstance.value = newInstance;
     if (newInstance) {
       initializeForm();
     }
   },
-  { immediate: true },
+  { immediate: true }
 );
 
 watch(
   () => props.show,
-  (newShow) => {
+  newShow => {
     if (newShow) {
       initializeForm();
     } else {
@@ -281,7 +257,7 @@ watch(
       geocoding.value = false;
       geocodeStatus.value = null;
     }
-  },
+  }
 );
 
 const initializeForm = async () => {
@@ -299,14 +275,10 @@ const initializeForm = async () => {
     // Editing: use instance values
     form.name = editingInstance.value.name || "";
     form.enabled =
-      editingInstance.value.enabled !== undefined
-        ? editingInstance.value.enabled
-        : true;
+      editingInstance.value.enabled !== undefined ? editingInstance.value.enabled : true;
 
     if (currentPlugin.value.instance_config_schema) {
-      for (const [key, schema] of Object.entries(
-        currentPlugin.value.instance_config_schema,
-      )) {
+      for (const [key, schema] of Object.entries(currentPlugin.value.instance_config_schema)) {
         form[key] =
           editingInstance.value.config?.[key] !== undefined
             ? editingInstance.value.config[key]
@@ -322,9 +294,7 @@ const initializeForm = async () => {
     if (currentPlugin.value.type === "calendar") {
       try {
         await calendarStore.fetchSources();
-        const source = calendarStore.sources.find(
-          (s) => s.id === editingInstance.value.id,
-        );
+        const source = calendarStore.sources.find(s => s.id === editingInstance.value.id);
         if (source) {
           // Convert color to hex format if needed
           if (source.color) {
@@ -360,9 +330,7 @@ const initializeForm = async () => {
   } else {
     // New instance: use schema defaults
     if (currentPlugin.value.instance_config_schema) {
-      for (const [key, schema] of Object.entries(
-        currentPlugin.value.instance_config_schema,
-      )) {
+      for (const [key, schema] of Object.entries(currentPlugin.value.instance_config_schema)) {
         if (schema.default !== undefined) {
           form[key] = schema.default;
         } else if (schema.type === "boolean") {
@@ -413,10 +381,7 @@ const handleGeocode = async () => {
       return;
     }
 
-    const result = await pluginsApi.geocodeLocation(
-      currentPlugin.value.id,
-      location,
-    );
+    const result = await pluginsApi.geocodeLocation(currentPlugin.value.id, location);
 
     if (result.success) {
       // Update coordinates if they exist in the schema
@@ -434,9 +399,7 @@ const handleGeocode = async () => {
 
       geocodeStatus.value = {
         success: true,
-        message:
-          result.message ||
-          `Coordinates found: ${result.latitude}, ${result.longitude}`,
+        message: result.message || `Coordinates found: ${result.latitude}, ${result.longitude}`,
       };
 
       // Clear message after 5 seconds
@@ -453,10 +416,7 @@ const handleGeocode = async () => {
     console.error("Failed to geocode location:", err);
     geocodeStatus.value = {
       success: false,
-      message:
-        err.response?.data?.detail ||
-        err.message ||
-        "Failed to geocode location",
+      message: err.response?.data?.detail || err.message || "Failed to geocode location",
     };
   } finally {
     geocoding.value = false;
@@ -477,9 +437,7 @@ const handleTest = async () => {
     // Build test config from instance form data
     const testConfig = {};
     if (plugin.instance_config_schema) {
-      for (const [key, schema] of Object.entries(
-        plugin.instance_config_schema,
-      )) {
+      for (const [key, schema] of Object.entries(plugin.instance_config_schema)) {
         // Skip display_order - it's a global plugin setting
         if (key === "display_order") {
           continue;
@@ -519,10 +477,7 @@ const handleTest = async () => {
     console.error("Failed to test instance connection:", err);
     testStatus.value = {
       success: false,
-      message:
-        err.response?.data?.detail ||
-        err.message ||
-        "Failed to test connection",
+      message: err.response?.data?.detail || err.message || "Failed to test connection",
     };
   } finally {
     testing.value = false;
@@ -543,9 +498,7 @@ const handleSave = async () => {
     // Exclude display_order - it's a global plugin setting, not instance-specific
     const config = {};
     if (plugin.instance_config_schema) {
-      for (const [key, schema] of Object.entries(
-        plugin.instance_config_schema,
-      )) {
+      for (const [key, schema] of Object.entries(plugin.instance_config_schema)) {
         // Skip display_order - it's handled at the plugin level
         if (key === "display_order") {
           continue;
@@ -583,9 +536,7 @@ const handleSave = async () => {
       if (plugin.type === "calendar") {
         try {
           await calendarStore.fetchSources();
-          const source = calendarStore.sources.find(
-            (s) => s.id === editingInstance.value.id,
-          );
+          const source = calendarStore.sources.find(s => s.id === editingInstance.value.id);
           if (source) {
             await calendarStore.updateSource(editingInstance.value.id, {
               ...source,
@@ -631,8 +582,7 @@ const handleSave = async () => {
     handleClose();
   } catch (err) {
     console.error("Failed to save instance:", err);
-    error.value =
-      err.response?.data?.detail || err.message || "Failed to save instance";
+    error.value = err.response?.data?.detail || err.message || "Failed to save instance";
   } finally {
     saving.value = false;
   }

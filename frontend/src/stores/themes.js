@@ -49,9 +49,7 @@ export const useThemesStore = defineStore("themes", () => {
     try {
       const response = await axios.get("/api/plugins/installed");
       // Filter to only themes
-      response.data.plugins = (response.data.plugins || []).filter(
-        (p) => p.type === "theme",
-      );
+      response.data.plugins = (response.data.plugins || []).filter(p => p.type === "theme");
       installedThemes.value = response.data.themes || [];
       return installedThemes.value;
     } catch (err) {
@@ -66,7 +64,7 @@ export const useThemesStore = defineStore("themes", () => {
   /**
    * Get a specific theme by ID
    */
-  const getTheme = async (themeId) => {
+  const getTheme = async themeId => {
     try {
       const response = await axios.get(`/api/plugins/${themeId}`);
       return response.data;
@@ -79,7 +77,7 @@ export const useThemesStore = defineStore("themes", () => {
   /**
    * Install a theme from a zip file
    */
-  const installTheme = async (file) => {
+  const installTheme = async file => {
     loading.value = true;
     error.value = null;
     try {
@@ -96,10 +94,7 @@ export const useThemesStore = defineStore("themes", () => {
       await fetchThemes();
       await fetchInstalledThemes();
 
-      logInfo(
-        "[ThemesStore]",
-        `Theme installed: ${response.data.manifest?.id}`,
-      );
+      logInfo("[ThemesStore]", `Theme installed: ${response.data.manifest?.id}`);
       return response.data;
     } catch (err) {
       error.value = err.message;
@@ -113,11 +108,7 @@ export const useThemesStore = defineStore("themes", () => {
   /**
    * Install a theme from GitHub
    */
-  const installThemeFromGitHub = async (
-    repoUrl,
-    themePath,
-    branch = "main",
-  ) => {
+  const installThemeFromGitHub = async (repoUrl, themePath, branch = "main") => {
     loading.value = true;
     error.value = null;
     try {
@@ -131,10 +122,7 @@ export const useThemesStore = defineStore("themes", () => {
       await fetchThemes();
       await fetchInstalledThemes();
 
-      logInfo(
-        "[ThemesStore]",
-        `Theme installed from GitHub: ${response.data.manifest?.id}`,
-      );
+      logInfo("[ThemesStore]", `Theme installed from GitHub: ${response.data.manifest?.id}`);
       return response.data;
     } catch (err) {
       error.value = err.message;
@@ -174,7 +162,7 @@ export const useThemesStore = defineStore("themes", () => {
   /**
    * Uninstall a theme
    */
-  const uninstallTheme = async (themeId) => {
+  const uninstallTheme = async themeId => {
     loading.value = true;
     error.value = null;
     try {
@@ -198,7 +186,7 @@ export const useThemesStore = defineStore("themes", () => {
   /**
    * Set the selected theme
    */
-  const setSelectedTheme = (themeId) => {
+  const setSelectedTheme = themeId => {
     selectedTheme.value = themeId;
   };
 
@@ -206,14 +194,14 @@ export const useThemesStore = defineStore("themes", () => {
    * Get built-in themes
    */
   const builtInThemes = computed(() => {
-    return themes.value.filter((theme) => theme.is_builtin === true);
+    return themes.value.filter(theme => theme.is_builtin === true);
   });
 
   /**
    * Get installed (non-built-in) themes
    */
   const customThemes = computed(() => {
-    return themes.value.filter((theme) => theme.is_builtin !== true);
+    return themes.value.filter(theme => theme.is_builtin !== true);
   });
 
   return {

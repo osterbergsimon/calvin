@@ -212,17 +212,30 @@ class TestSystemUpdateEndpoints:
         assert "log not found" in data["message"].lower() or data["status"] == "unknown"
 
     @patch("subprocess.Popen")
-    @patch("pathlib.Path.exists")
-    def test_trigger_update_success(self, mock_exists, mock_popen, test_client):
+    def test_trigger_update_success(self, mock_popen, test_client, tmp_path, monkeypatch):
         """Test successfully triggering an update."""
-        # Mock update script exists
-        mock_exists.return_value = True
+        # Create a fake update script so settings.get_update_script_path().exists() is True
+        script_path = tmp_path / "update.sh"
+        script_path.write_text("#!/bin/bash\n")
 
         # Mock process
         mock_process = MagicMock()
         mock_process.pid = 12345
         mock_process.poll.return_value = None  # Process still running
         mock_popen.return_value = mock_process
+
+        # Pydantic models forbid attribute mutation, so swap the whole settings
+        # binding in the route module with a stand-in for the duration of the test.
+        original_settings = system_routes.settings
+
+        class _StubSettings:
+            repo_dir = tmp_path
+            system_path = original_settings.system_path
+
+            def get_update_script_path(self):
+                return script_path
+
+        monkeypatch.setattr(system_routes, "settings", _StubSettings())
 
         response = test_client.post("/api/system/update")
 

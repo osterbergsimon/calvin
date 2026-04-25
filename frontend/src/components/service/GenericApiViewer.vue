@@ -12,12 +12,7 @@
     <div v-else-if="data" class="service-data-content">
       <!-- Render based on display_schema render_template -->
       <!-- Generic component-based rendering -->
-      <component
-        :is="component"
-        v-if="component"
-        :data="data"
-        @refresh="loadData"
-      />
+      <component :is="component" v-if="component" :data="data" @refresh="loadData" />
       <!-- Generic API data display (fallback) -->
       <div v-else class="generic-api-content">
         <pre>{{ JSON.stringify(data, null, 2) }}</pre>
@@ -60,10 +55,7 @@ const component = computed(() => {
 
 const getApiEndpoint = () => {
   if (props.service.display_schema?.api_endpoint) {
-    return props.service.display_schema.api_endpoint.replace(
-      "{service_id}",
-      props.service.id,
-    );
+    return props.service.display_schema.api_endpoint.replace("{service_id}", props.service.id);
   }
   return props.service.url;
 };
@@ -82,10 +74,7 @@ const loadData = async () => {
   if (!connectionStore.isFullyOnline()) {
     const cachedData = getCachedData(cacheKey, cacheTTL);
     if (cachedData) {
-      logDebug(
-        "[GenericApiViewer]",
-        `Using cached data for ${props.service.id}`,
-      );
+      logDebug("[GenericApiViewer]", `Using cached data for ${props.service.id}`);
       data.value = cachedData;
       loading.value = false;
       return;
@@ -104,20 +93,14 @@ const loadData = async () => {
     if (connectionStore.isFullyOnline()) {
       const cachedData = getCachedData(cacheKey, cacheTTL);
       if (cachedData) {
-        logDebug(
-          "[GenericApiViewer]",
-          `Request failed, using cached data for ${props.service.id}`,
-        );
+        logDebug("[GenericApiViewer]", `Request failed, using cached data for ${props.service.id}`);
         data.value = cachedData;
         loading.value = false;
         return;
       }
     }
 
-    error.value =
-      err.response?.data?.detail ||
-      err.message ||
-      "Failed to load service data";
+    error.value = err.response?.data?.detail || err.message || "Failed to load service data";
     logError("[GenericApiViewer]", "Error loading service data:", err);
     data.value = { error: error.value };
   } finally {
@@ -133,7 +116,7 @@ watch(
     error.value = null;
     loadData();
   },
-  { immediate: true },
+  { immediate: true }
 );
 </script>
 

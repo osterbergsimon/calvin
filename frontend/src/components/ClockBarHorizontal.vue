@@ -9,10 +9,7 @@
       <!-- Left spacer: invisible mirror of right side to keep clock centered -->
       <div class="clock-bar-side clock-bar-left" aria-hidden="true">
         <PluginStatusbarItems ghost />
-        <span
-          v-if="isBackgroundRefreshing"
-          class="clock-refresh-icon clock-refresh-ghost"
-        />
+        <span v-if="isBackgroundRefreshing" class="clock-refresh-icon clock-refresh-ghost" />
       </div>
 
       <!-- Center: time + date -->
@@ -23,25 +20,16 @@
           'layout-two-lines': layout === 'two-lines',
         }"
       >
-        <span class="clock-time" :style="{ fontSize: `${fontSize}px` }">{{
-          formattedTime
+        <span class="clock-time" :style="{ fontSize: `${fontSize}px` }">{{ formattedTime }}</span>
+        <span v-if="showDate" class="clock-date" :style="{ fontSize: `${dateFontSize}px` }">{{
+          formattedDate
         }}</span>
-        <span
-          v-if="showDate"
-          class="clock-date"
-          :style="{ fontSize: `${dateFontSize}px` }"
-          >{{ formattedDate }}</span
-        >
       </div>
 
       <!-- Right: plugin statusbar items -->
       <div class="clock-bar-side clock-bar-right">
         <PluginStatusbarItems />
-        <span
-          v-if="isBackgroundRefreshing"
-          class="clock-refresh-icon"
-          aria-hidden="true"
-        />
+        <span v-if="isBackgroundRefreshing" class="clock-refresh-icon" aria-hidden="true" />
       </div>
     </div>
   </div>
@@ -61,7 +49,7 @@ const props = defineProps({
   position: {
     type: String,
     required: true,
-    validator: (value) => ["top", "bottom", "between"].includes(value),
+    validator: value => ["top", "bottom", "between"].includes(value),
   },
   showInNonKiosk: {
     type: Boolean,
@@ -179,9 +167,7 @@ const barPadding = computed(() => {
 
 const calendarStore = useCalendarStore();
 
-const isBackgroundRefreshing = computed(
-  () => calendarStore.backgroundRefreshing,
-);
+const isBackgroundRefreshing = computed(() => calendarStore.backgroundRefreshing);
 
 // Format time
 const formattedTime = computed(() => {
@@ -270,11 +256,11 @@ watch(
     if (shouldShow.value) {
       updateTime();
     }
-  },
+  }
 );
 
 // Watch for shouldShow changes to start/stop updates
-watch(shouldShow, (newValue) => {
+watch(shouldShow, newValue => {
   if (newValue) {
     if (!timeInterval) {
       updateTime();

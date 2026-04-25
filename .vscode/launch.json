@@ -1,0 +1,59 @@
+{
+  "version": "0.2.0",
+  "configurations": [
+    {
+      "name": "Python: FastAPI (uvicorn)",
+      "type": "debugpy",
+      "request": "launch",
+      "module": "uvicorn",
+      "args": [
+        "app.main:app",
+        "--reload",
+        "--host",
+        "0.0.0.0",
+        "--port",
+        "8000"
+      ],
+      "cwd": "${workspaceFolder}/backend",
+      "env": {
+        "PYTHONUNBUFFERED": "1"
+      },
+      "justMyCode": false,
+      "console": "integratedTerminal"
+    },
+    {
+      "name": "Pytest: current file",
+      "type": "debugpy",
+      "request": "launch",
+      "module": "pytest",
+      "args": ["${file}", "-v"],
+      "cwd": "${workspaceFolder}/backend",
+      "justMyCode": false,
+      "console": "integratedTerminal"
+    },
+    {
+      "name": "Pytest: failed",
+      "type": "debugpy",
+      "request": "launch",
+      "module": "pytest",
+      "args": ["--last-failed", "-v"],
+      "cwd": "${workspaceFolder}/backend",
+      "justMyCode": false,
+      "console": "integratedTerminal"
+    },
+    {
+      "name": "Vite: Chrome",
+      "type": "chrome",
+      "request": "launch",
+      "url": "http://localhost:5173",
+      "webRoot": "${workspaceFolder}/frontend",
+      "sourceMaps": true
+    }
+  ],
+  "compounds": [
+    {
+      "name": "Full stack",
+      "configurations": ["Python: FastAPI (uvicorn)", "Vite: Chrome"]
+    }
+  ]
+}

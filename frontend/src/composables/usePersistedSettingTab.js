@@ -11,7 +11,7 @@ export function usePersistedSettingTab(storageKey, defaultTab) {
 
   const activeTab = ref(readInitialTab());
 
-  watch(activeTab, (tabId) => {
+  watch(activeTab, tabId => {
     try {
       sessionStorage.setItem(storageKey, tabId);
     } catch {
@@ -19,7 +19,7 @@ export function usePersistedSettingTab(storageKey, defaultTab) {
     }
   });
 
-  const setActiveTab = (tabId) => {
+  const setActiveTab = tabId => {
     activeTab.value = tabId;
   };
 

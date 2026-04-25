@@ -34,16 +34,13 @@ export function useSystem() {
   const displayTimeout = ref(0);
   const displayTimeoutEnabled = ref(false);
 
-  const sleep = (ms) => new Promise((resolve) => setTimeout(resolve, ms));
+  const sleep = ms => new Promise(resolve => setTimeout(resolve, ms));
 
-  const isUpdateDoneStatus = (status) => status === "idle";
-  const isUpdateRunningStatus = (status) => status === "running";
-  const isUpdateErrorStatus = (status) => status === "error";
+  const isUpdateDoneStatus = status => status === "idle";
+  const isUpdateRunningStatus = status => status === "running";
+  const isUpdateErrorStatus = status => status === "error";
 
-  const waitForBackendHealthy = async ({
-    timeoutMs = 120000,
-    intervalMs = 2000,
-  } = {}) => {
+  const waitForBackendHealthy = async ({ timeoutMs = 120000, intervalMs = 2000 } = {}) => {
     const startedAt = Date.now();
     while (Date.now() - startedAt < timeoutMs) {
       try {
@@ -78,7 +75,7 @@ export function useSystem() {
     }
   };
 
-  const configureDisplayTimeout = async (timeout) => {
+  const configureDisplayTimeout = async timeout => {
     try {
       await systemApi.configureDisplayTimeout(timeout);
       displayTimeout.value = timeout;
@@ -99,8 +96,7 @@ export function useSystem() {
       // A network error here means the backend killed itself before sending the
       // response (old behaviour). Treat it the same as a successful initiation.
       if (error.response) {
-        updateMessage.value =
-          error.response?.data?.detail || "Failed to restart backend";
+        updateMessage.value = error.response?.data?.detail || "Failed to restart backend";
         updateMessageClass.value = "error";
         _scheduleMessageClear(8000);
         console.error("Failed to restart backend:", error);
@@ -118,8 +114,7 @@ export function useSystem() {
       await sleep(1500);
       window.location.reload();
     } else {
-      updateMessage.value =
-        "Backend not responding after restart. Check the service manually.";
+      updateMessage.value = "Backend not responding after restart. Check the service manually.";
       updateMessageClass.value = "warning";
       _scheduleMessageClear(12000);
     }
@@ -133,8 +128,7 @@ export function useSystem() {
       await systemApi.restartFrontend();
     } catch (error) {
       if (error.response) {
-        updateMessage.value =
-          error.response?.data?.detail || "Failed to restart frontend";
+        updateMessage.value = error.response?.data?.detail || "Failed to restart frontend";
         updateMessageClass.value = "error";
         _scheduleMessageClear(8000);
         console.error("Failed to restart frontend:", error);
@@ -151,8 +145,7 @@ export function useSystem() {
       await sleep(1500);
       window.location.reload();
     } else {
-      updateMessage.value =
-        "Frontend not responding after restart. Check the service manually.";
+      updateMessage.value = "Frontend not responding after restart. Check the service manually.";
       updateMessageClass.value = "warning";
       _scheduleMessageClear(12000);
     }
@@ -160,12 +153,12 @@ export function useSystem() {
 
   // System updates
 
-  const streamUpdateStatus = (logOffset) => {
-    return new Promise((resolve) => {
+  const streamUpdateStatus = logOffset => {
+    return new Promise(resolve => {
       const es = new EventSource(systemApi.getUpdateStreamUrl(logOffset));
       const logLines = [];
 
-      es.onmessage = (event) => {
+      es.onmessage = event => {
         try {
           const data = JSON.parse(event.data);
           if (data.type === "log") {
@@ -176,22 +169,15 @@ export function useSystem() {
               last_log: logLines.slice(-80).join("\n"),
             };
             const line = data.line.toLowerCase();
-            if (
-              line.includes("pulling latest code") ||
-              line.includes("fetching latest")
-            ) {
+            if (line.includes("pulling latest code") || line.includes("fetching latest")) {
               updateMessage.value = "Pulling latest code...";
-            } else if (
-              line.includes("updating") &&
-              line.includes("dependenc")
-            ) {
+            } else if (line.includes("updating") && line.includes("dependenc")) {
               updateMessage.value = "Updating dependencies...";
             } else if (
               line.includes("building frontend") ||
               (line.includes("vite") && line.includes("build"))
             ) {
-              updateMessage.value =
-                "Building frontend... (this may take a few minutes)";
+              updateMessage.value = "Building frontend... (this may take a few minutes)";
             } else if (line.includes("restarting")) {
               updateMessage.value = "Restarting services...";
             }
@@ -236,8 +222,7 @@ export function useSystem() {
       const result = await streamUpdateStatus(logOffset);
 
       if (result.status === "complete" || result.status === "disconnected") {
-        updateMessage.value =
-          "Update complete. Waiting for backend to come back\u2026";
+        updateMessage.value = "Update complete. Waiting for backend to come back\u2026";
         updateMessageClass.value = "info";
         const healthy = await waitForBackendHealthy();
         if (healthy) {
@@ -261,9 +246,7 @@ export function useSystem() {
     } catch (error) {
       console.error("Failed to trigger update:", error);
       updateMessage.value =
-        error.response?.data?.detail ||
-        error.message ||
-        "Failed to start update";
+        error.response?.data?.detail || error.message || "Failed to start update";
       updateMessageClass.value = "error";
       _scheduleMessageClear(8000);
     } finally {
@@ -283,8 +266,7 @@ export function useSystem() {
 
         if (isUpdateDoneStatus(status.status)) {
           // Script says update is complete; confirm backend is reachable after restart.
-          updateMessage.value =
-            "Update complete. Waiting for backend to come back…";
+          updateMessage.value = "Update complete. Waiting for backend to come back…";
           updateMessageClass.value = "info";
 
           const healthy = await waitForBackendHealthy();
@@ -313,10 +295,7 @@ export function useSystem() {
         }
       } catch (error) {
         // During restarts, the backend may be down; treat this as "waiting for health"
-        console.warn(
-          "Update status unavailable (backend may be restarting):",
-          error,
-        );
+        console.warn("Update status unavailable (backend may be restarting):", error);
         updateMessage.value = "Backend restarting… waiting for /api/health";
         updateMessageClass.value = "warning";
         await waitForBackendHealthy({ timeoutMs: 60000, intervalMs: 2000 });

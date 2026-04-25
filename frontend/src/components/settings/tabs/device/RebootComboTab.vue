@@ -69,12 +69,12 @@ const rebootComboDuration = ref(props.config.rebootComboDuration || 10000);
 
 watch(
   () => props.config,
-  (newConfig) => {
+  newConfig => {
     rebootComboKey1.value = newConfig.rebootComboKey1 || "KEY_1";
     rebootComboKey2.value = newConfig.rebootComboKey2 || "KEY_7";
     rebootComboDuration.value = newConfig.rebootComboDuration || 10000;
   },
-  { deep: true },
+  { deep: true }
 );
 
 const handleRebootComboChange = () => {

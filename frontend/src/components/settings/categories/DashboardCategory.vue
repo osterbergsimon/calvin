@@ -1,10 +1,6 @@
 <template>
   <div class="dashboard-category">
-    <TabNavigation
-      :tabs="tabs"
-      :active-tab="activeTab"
-      @tab-change="handleTabChange"
-    />
+    <TabNavigation :tabs="tabs" :active-tab="activeTab" @tab-change="handleTabChange" />
 
     <SettingsTab>
       <DashboardLayoutTab
@@ -71,12 +67,9 @@ const tabs = [
   { id: "notifications", label: "Notifications", icon: "🔔" },
 ];
 
-const { activeTab, setActiveTab } = usePersistedSettingTab(
-  "settings_tab_dashboard",
-  "layout",
-);
+const { activeTab, setActiveTab } = usePersistedSettingTab("settings_tab_dashboard", "layout");
 
-const handleTabChange = (tabId) => {
+const handleTabChange = tabId => {
   setActiveTab(tabId);
 };
 </script>

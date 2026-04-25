@@ -31,10 +31,7 @@
         </label>
       </SettingItem>
 
-      <SettingItem
-        label="Enable Clock Widget"
-        help="Show floating clock widget on dashboard"
-      >
+      <SettingItem label="Enable Clock Widget" help="Show floating clock widget on dashboard">
         <label>
           <input
             name="clockWidgetEnabled"
@@ -47,10 +44,7 @@
       </SettingItem>
 
       <template v-if="config.clockWidgetEnabled">
-        <SettingItem
-          label="Show Widget in Kiosk Mode"
-          help="Display widget when UI is hidden"
-        >
+        <SettingItem label="Show Widget in Kiosk Mode" help="Display widget when UI is hidden">
           <label>
             <input
               name="clockWidgetShowInKiosk"
@@ -62,10 +56,7 @@
           </label>
         </SettingItem>
 
-        <SettingItem
-          label="Widget Position"
-          help="Position of the clock widget"
-        >
+        <SettingItem label="Widget Position" help="Position of the clock widget">
           <select
             name="clockWidgetPosition"
             :value="config.clockWidgetPosition"
@@ -80,10 +71,7 @@
           </select>
         </SettingItem>
 
-        <SettingItem
-          label="Widget Font Size"
-          help="Font size for the clock widget (in pixels)"
-        >
+        <SettingItem label="Widget Font Size" help="Font size for the clock widget (in pixels)">
           <FontSizePicker
             :model-value="getWidgetFontSize()"
             :show-date="config.clockShowDate"
@@ -119,10 +107,7 @@
           </select>
         </SettingItem>
 
-        <SettingItem
-          label="Show Bar in Non-Kiosk Mode"
-          help="Display bar when UI is visible"
-        >
+        <SettingItem label="Show Bar in Non-Kiosk Mode" help="Display bar when UI is visible">
           <label>
             <input
               name="clockBarShowInNonKiosk"
@@ -134,10 +119,7 @@
           </label>
         </SettingItem>
 
-        <SettingItem
-          label="Show Bar in Kiosk Mode"
-          help="Display bar when UI is hidden"
-        >
+        <SettingItem label="Show Bar in Kiosk Mode" help="Display bar when UI is hidden">
           <label>
             <input
               name="clockBarShowInKiosk"
@@ -158,30 +140,21 @@
             <template v-if="config.clockBarMode === 'horizontal'">
               <option value="top">Top Header</option>
               <option value="bottom">Bottom Bar</option>
-              <option
-                value="between"
-                :disabled="config.orientation !== 'portrait'"
-              >
+              <option value="between" :disabled="config.orientation !== 'portrait'">
                 Between Calendar/Side View (Portrait Only)
               </option>
             </template>
             <template v-else>
               <option value="left">Far Left</option>
               <option value="right">Far Right</option>
-              <option
-                value="between"
-                :disabled="config.orientation !== 'landscape'"
-              >
+              <option value="between" :disabled="config.orientation !== 'landscape'">
                 Between Calendar/Side View (Landscape Only)
               </option>
             </template>
           </select>
         </SettingItem>
 
-        <SettingItem
-          label="Bar Layout"
-          help="Display clock and date on one line or two lines"
-        >
+        <SettingItem label="Bar Layout" help="Display clock and date on one line or two lines">
           <select
             name="clockBarLayout"
             :value="config.clockBarLayout || 'single-line'"
@@ -243,7 +216,7 @@ const props = defineProps({
 
 const emit = defineEmits(["update:config"]);
 
-const handleClockSettingsChange = (event) => {
+const handleClockSettingsChange = event => {
   const field = event.target.name || event.target.id;
   if (!field) {
     console.warn("Clock setting change event missing field name/id");
@@ -272,7 +245,7 @@ const sizeToPixels = {
   large: 20,
 };
 
-const pixelsToSize = (px) => {
+const pixelsToSize = px => {
   const sizes = Object.entries(sizeToPixels);
   const closest = sizes.reduce((prev, curr) => {
     return Math.abs(curr[1] - px) < Math.abs(prev[1] - px) ? curr : prev;
@@ -284,20 +257,20 @@ const getWidgetFontSize = () => {
   return sizeToPixels[props.config.clockSize] || 16;
 };
 
-const handleWidgetFontSizeChange = (px) => {
+const handleWidgetFontSizeChange = px => {
   const size = pixelsToSize(px);
   emit("update:config", { clockSize: size });
 };
 
-const handleBarFontSizeChange = (px) => {
+const handleBarFontSizeChange = px => {
   emit("update:config", { clockBarFontSize: px });
 };
 
-const handleBarDateFontSizeChange = (px) => {
+const handleBarDateFontSizeChange = px => {
   emit("update:config", { clockBarDateFontSize: px });
 };
 
-const handleBarPaddingChange = (px) => {
+const handleBarPaddingChange = px => {
   emit("update:config", { clockBarPadding: px });
 };
 </script>
