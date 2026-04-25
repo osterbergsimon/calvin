@@ -1,5 +1,5 @@
 <template>
-  <div class="system-category">
+  <div class="device-category">
     <TabNavigation :tabs="tabs" :active-tab="activeTab" @tab-change="handleTabChange" />
 
     <SettingsTab>
@@ -8,35 +8,33 @@
         :config="config"
         @update:config="$emit('update:config', $event)"
       />
+      <KeyboardTab
+        v-if="activeTab === 'keyboard'"
+        :config="config"
+        @update:config="$emit('update:config', $event)"
+      />
+      <RebootComboTab
+        v-if="activeTab === 'reboot'"
+        :config="config"
+        @update:config="$emit('update:config', $event)"
+      />
       <HardwareTab
         v-if="activeTab === 'hardware'"
         :version="version"
         :frontend-version="frontendVersion"
-      />
-      <UpdatesTab
-        v-if="activeTab === 'updates'"
-        :git-repo-url="gitRepoUrl"
-        :git-branch="gitBranch"
-        @update:gitRepoUrl="$emit('update:gitRepoUrl', $event)"
-        @update:gitBranch="$emit('update:gitBranch', $event)"
-      />
-      <DebugTab
-        v-if="activeTab === 'debug'"
-        :config="config"
-        @update:config="$emit('update:config', $event)"
       />
     </SettingsTab>
   </div>
 </template>
 
 <script setup>
-import { ref } from "vue";
+import { usePersistedSettingTab } from "@/composables";
 import TabNavigation from "../shared/TabNavigation.vue";
 import SettingsTab from "../shared/SettingsTab.vue";
 import PowerTab from "../tabs/system/PowerTab.vue";
+import KeyboardTab from "../tabs/layout/KeyboardTab.vue";
+import RebootComboTab from "../tabs/device/RebootComboTab.vue";
 import HardwareTab from "../tabs/system/HardwareTab.vue";
-import UpdatesTab from "../tabs/system/UpdatesTab.vue";
-import DebugTab from "../tabs/system/DebugTab.vue";
 
 defineProps({
   config: {
@@ -51,34 +49,26 @@ defineProps({
     type: String,
     default: null,
   },
-  gitRepoUrl: {
-    type: String,
-    default: "",
-  },
-  gitBranch: {
-    type: String,
-    default: "main",
-  },
 });
 
-defineEmits(["update:config", "update:gitRepoUrl", "update:gitBranch"]);
+defineEmits(["update:config"]);
 
 const tabs = [
-  { id: "power", label: "Power", icon: "⚡" },
+  { id: "power", label: "Power & Display", icon: "⚡" },
+  { id: "keyboard", label: "Keyboard", icon: "⌨️" },
+  { id: "reboot", label: "Reboot Combo", icon: "🔁" },
   { id: "hardware", label: "Hardware", icon: "🖥️" },
-  { id: "updates", label: "Updates", icon: "🔄" },
-  { id: "debug", label: "Debug", icon: "🐛" },
 ];
 
-const activeTab = ref("power");
+const { activeTab, setActiveTab } = usePersistedSettingTab("settings_tab_device", "power");
 
 const handleTabChange = tabId => {
-  activeTab.value = tabId;
+  setActiveTab(tabId);
 };
 </script>
 
 <style scoped>
-.system-category {
+.device-category {
   width: 100%;
 }
 </style>

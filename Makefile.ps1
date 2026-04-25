@@ -1,4 +1,4 @@
-# PowerShell Makefile equivalent for Calvin Dashboard
+﻿# PowerShell Makefile equivalent for Calvin Dashboard
 
 param(
     [Parameter(Position=0)]

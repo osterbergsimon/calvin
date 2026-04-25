@@ -1,10 +1,15 @@
 <template>
-  <div class="tab-navigation">
+  <div class="tab-navigation" role="tablist" @keydown="handleKeydown">
     <button
       v-for="tab in tabs"
       :key="tab.id"
+      :ref="el => setTabRef(tab.id, el)"
       class="tab-button"
       :class="{ active: activeTab === tab.id }"
+      type="button"
+      role="tab"
+      :aria-selected="activeTab === tab.id"
+      :tabindex="activeTab === tab.id ? 0 : -1"
       @click="selectTab(tab.id)"
     >
       <span v-if="tab.icon" class="tab-icon">{{ tab.icon }}</span>
@@ -15,6 +20,8 @@
 </template>
 
 <script setup>
+import { nextTick, ref } from "vue";
+
 const props = defineProps({
   tabs: {
     type: Array,
@@ -38,11 +45,47 @@ const props = defineProps({
 });
 
 const emit = defineEmits(["tab-change"]);
+const tabRefs = ref({});
+
+const setTabRef = (tabId, el) => {
+  if (el) {
+    tabRefs.value[tabId] = el;
+  } else {
+    delete tabRefs.value[tabId];
+  }
+};
 
 const selectTab = tabId => {
   if (tabId !== props.activeTab) {
     emit("tab-change", tabId);
   }
+};
+
+const focusTab = async tabId => {
+  selectTab(tabId);
+  await nextTick();
+  tabRefs.value[tabId]?.focus();
+};
+
+const handleKeydown = event => {
+  const currentIndex = props.tabs.findIndex(tab => tab.id === props.activeTab);
+  if (currentIndex === -1) return;
+
+  let nextIndex = currentIndex;
+  if (event.key === "ArrowRight" || event.key === "ArrowDown") {
+    nextIndex = (currentIndex + 1) % props.tabs.length;
+  } else if (event.key === "ArrowLeft" || event.key === "ArrowUp") {
+    nextIndex = (currentIndex - 1 + props.tabs.length) % props.tabs.length;
+  } else if (event.key === "Home") {
+    nextIndex = 0;
+  } else if (event.key === "End") {
+    nextIndex = props.tabs.length - 1;
+  } else {
+    return;
+  }
+
+  event.preventDefault();
+  void focusTab(props.tabs[nextIndex].id);
 };
 </script>
 
@@ -52,8 +95,9 @@ const selectTab = tabId => {
   gap: 0.5rem;
   border-bottom: 2px solid var(--border-color);
   margin-bottom: 1.5rem;
-  overflow-x: hidden;
+  overflow-x: auto;
   overflow-y: hidden;
+  scrollbar-width: thin;
 }
 
 .tab-button {
