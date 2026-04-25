@@ -3,7 +3,7 @@ from unittest.mock import MagicMock, patch
 import httpx
 import pytest
 
-from app.plugins.sdk.image import fetch_image_data
+from app.plugins.sdk.image import SelfHostedGalleryImagePlugin, fetch_image_data
 
 
 @pytest.mark.asyncio
@@ -62,3 +62,80 @@ async def test_fetch_image_data_returns_none_on_http_error():
         )
 
         assert data is None
+
+
+class DummyGalleryPlugin(SelfHostedGalleryImagePlugin):
+    sdk_plugin_name = "Dummy Gallery"
+    api_base_path = "/api/v2"
+    auth_header_name = "x-api-key"
+
+    @classmethod
+    def get_plugin_metadata(cls) -> dict[str, object]:
+        return {}
+
+    async def initialize(self) -> None:
+        pass
+
+    async def cleanup(self) -> None:
+        pass
+
+    async def get_images(self) -> list[dict[str, object]]:
+        return []
+
+    async def get_image(self, image_id: str) -> dict[str, object] | None:
+        return None
+
+    async def get_image_data(self, image_id: str) -> bytes | None:
+        return None
+
+    async def scan_images(self) -> list[dict[str, object]]:
+        return []
+
+    async def validate_config(self, config: dict[str, object]) -> bool:
+        return True
+
+
+def test_self_hosted_gallery_build_auth_headers():
+    assert DummyGalleryPlugin.build_auth_headers("secret") == {
+        "x-api-key": "secret",
+        "Accept": "application/json",
+    }
+
+
+def test_self_hosted_gallery_api_url_and_init():
+    plugin = DummyGalleryPlugin(
+        plugin_id="dummy-gallery",
+        name="Dummy Gallery",
+        url="https://photos.example.com/",
+        api_key="secret",
+    )
+
+    assert plugin.base_url == "https://photos.example.com"
+    assert plugin.auth_headers() == {
+        "x-api-key": "secret",
+        "Accept": "application/json",
+    }
+    assert plugin.api_url("albums/123") == "https://photos.example.com/api/v2/albums/123"
+
+
+@pytest.mark.asyncio
+async def test_self_hosted_gallery_fetch_protected_image_data():
+    plugin = DummyGalleryPlugin(
+        plugin_id="dummy-gallery",
+        name="Dummy Gallery",
+        url="https://photos.example.com/",
+        api_key="secret",
+    )
+
+    with patch("app.plugins.sdk.image.fetch_image_data", autospec=True) as mock_fetch:
+        mock_fetch.return_value = b"image-bytes"
+
+        data = await plugin.fetch_protected_image_data("https://photos.example.com/image.jpg")
+
+        assert data == b"image-bytes"
+        mock_fetch.assert_awaited_once_with(
+            "https://photos.example.com/image.jpg",
+            plugin_name="Dummy Gallery",
+            headers={"x-api-key": "secret", "Accept": "application/json"},
+            follow_redirects=True,
+        )
