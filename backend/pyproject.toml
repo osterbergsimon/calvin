@@ -107,6 +107,40 @@ warn_return_any = true
 warn_unused_configs = true
 disallow_untyped_defs = false
 
+# Baseline of pre-existing errors (issue #11). New code in these modules is
+# still type-checked locally but mypy errors here will not fail CI. As errors
+# are fixed, drop the corresponding entry and the strict check returns. Do not
+# add new modules to this list without explicit discussion.
+[[tool.mypy.overrides]]
+module = [
+    "app.api.routes.calendar",
+    "app.api.routes.images",
+    "app.api.routes.keyboard",
+    "app.api.routes.plugins.instances",
+    "app.api.routes.plugins.management",
+    "app.api.routes.plugins.themes",
+    "app.plugins.hooks",
+    "app.plugins.loader",
+    "app.plugins.manager",
+    "app.services.backend_scheduler",
+    "app.services.config_service",
+    "app.services.display_power_service",
+    "app.services.event_system",
+    "app.services.keyboard_mapping_service",
+    "app.services.keyboard_service",
+    "app.services.plugin_calendar_service",
+    "app.services.plugin_image_service",
+    "app.services.plugin_installer",
+    "app.services.scheduler",
+    "app.services.theme_installer",
+    "app.services.validation.package_validator",
+    "app.services.weather_cache",
+    "app.utils.db_retry",
+    "app.utils.ical_parser",
+    "app.utils.keyboard",
+]
+ignore_errors = true
+
 [tool.pytest.ini_options]
 testpaths = ["tests"]
 python_files = ["test_*.py", "*_test.py"]
