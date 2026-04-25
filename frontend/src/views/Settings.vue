@@ -26,7 +26,7 @@
               :disabled="!!updateMessage"
               @click="
                 showSystemMenu = false;
-                restartBackend();
+                requestSystemAction('restart-backend');
               "
             >
               🔄 Restart Backend
@@ -37,7 +37,7 @@
               :disabled="!!updateMessage"
               @click="
                 showSystemMenu = false;
-                restartFrontend();
+                requestSystemAction('restart-frontend');
               "
             >
               🔄 Restart Frontend
@@ -45,7 +45,10 @@
             <button
               class="menu-item"
               title="Reload the frontend page"
-              @click="reloadUI"
+              @click="
+                showSystemMenu = false;
+                requestSystemAction('reload-ui');
+              "
             >
               🔄 Reload Page
             </button>
@@ -165,6 +168,15 @@
         />
       </div>
     </div>
+
+    <ConfirmModal
+      :show="!!pendingSystemAction"
+      :title="pendingSystemActionConfig.title"
+      :message="pendingSystemActionConfig.message"
+      :confirm-text="pendingSystemActionConfig.confirmText"
+      @confirm="confirmSystemAction"
+      @cancel="cancelSystemAction"
+    />
   </div>
 </template>
 
@@ -175,6 +187,7 @@ import { useConfigForm } from "@/composables";
 import { useSystem } from "@/composables";
 import { useModeStore } from "@/stores/mode";
 import { defineAsyncComponent } from "vue";
+import ConfirmModal from "@/components/settings/shared/ConfirmModal.vue";
 
 // Lazy load category components for better code splitting
 const DashboardCategory = defineAsyncComponent(
@@ -368,6 +381,37 @@ watch(activeCategory, (val) => sessionStorage.setItem(_CATEGORY_KEY, val));
 const showSystemMenu = ref(false);
 const settingsSearchQuery = ref("");
 const categoryRenderKey = ref(0);
+const pendingSystemAction = ref(null);
+
+const systemActionConfigs = {
+  "restart-backend": {
+    title: "Restart Backend",
+    message:
+      "Restarting the backend can briefly interrupt plugins, calendar refresh, and API requests. Continue?",
+    confirmText: "Restart Backend",
+  },
+  "restart-frontend": {
+    title: "Restart Frontend",
+    message:
+      "Restarting the frontend service can briefly interrupt the dashboard display. Continue?",
+    confirmText: "Restart Frontend",
+  },
+  "reload-ui": {
+    title: "Reload Page",
+    message:
+      "Reloading the page refreshes the current settings UI. Auto-saved settings are kept, but in-progress plugin forms may be lost. Continue?",
+    confirmText: "Reload Page",
+  },
+};
+
+const pendingSystemActionConfig = computed(
+  () =>
+    systemActionConfigs[pendingSystemAction.value] || {
+      title: "",
+      message: "",
+      confirmText: "Continue",
+    },
+);
 
 const filteredSettingsDestinations = computed(() => {
   const query = settingsSearchQuery.value.trim().toLowerCase();
@@ -451,8 +495,28 @@ const goBack = () => {
 
 // Reload UI
 const reloadUI = () => {
-  showSystemMenu.value = false;
   window.location.reload();
+};
+
+const requestSystemAction = (action) => {
+  pendingSystemAction.value = action;
+};
+
+const cancelSystemAction = () => {
+  pendingSystemAction.value = null;
+};
+
+const confirmSystemAction = async () => {
+  const action = pendingSystemAction.value;
+  pendingSystemAction.value = null;
+
+  if (action === "restart-backend") {
+    await restartBackend();
+  } else if (action === "restart-frontend") {
+    await restartFrontend();
+  } else if (action === "reload-ui") {
+    reloadUI();
+  }
 };
 
 // Click-outside closes the system menu
