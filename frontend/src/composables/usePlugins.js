@@ -131,10 +131,9 @@ export function usePlugins() {
             continue;
           }
 
-          // Get display_order from plugin's common_config_schema first (from plugin list)
-          // This is the source of truth and avoids needing to fetch config separately
-          const pluginSchema = plugin.common_config_schema || {};
-          let displayOrder = pluginSchema.display_order;
+          // Get display_order from the plugin list first; it is app-managed,
+          // not part of the plugin-owned common_config_schema.
+          let displayOrder = plugin.display_order;
 
           const [instancesResponse, configResponse] = await Promise.all([
             pluginsApi.getPluginInstances(plugin.id).catch(() => ({ instances: [] })),

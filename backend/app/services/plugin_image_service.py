@@ -42,21 +42,12 @@ class PluginImageService:
         """
         from app.models.db_models import PluginDB, PluginTypeDB
 
-        # Get enabled plugin types with their display_order from common_config_schema
+        # Get enabled plugin types with their display_order from app-managed columns
         # Get all image plugin types and their enabled status + display_order
         plugin_types = await PluginTypeDB.objects.filter(plugin_type="image").all()
         # Create maps: type_id -> enabled status, type_id -> display_order
         enabled_type_map = {pt.type_id: pt.enabled for pt in plugin_types}
-        plugin_type_order_map = {}
-        for pt in plugin_types:
-            common_config = pt.common_config_schema or {}
-            # display_order is stored in common_config_schema (like service plugins)
-            display_order = common_config.get("display_order", 0)
-            try:
-                display_order = int(display_order) if display_order else 0
-            except (ValueError, TypeError):
-                display_order = 0
-            plugin_type_order_map[pt.type_id] = display_order
+        plugin_type_order_map = {pt.type_id: pt.display_order or 0 for pt in plugin_types}
 
         # Get all image plugin instances with their display_order
         db_plugins = (

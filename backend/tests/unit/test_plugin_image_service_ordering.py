@@ -13,6 +13,15 @@ def create_mock_ormar_models(plugin_types, db_plugins):
 
     Patches the entire model classes in the db_models module to avoid property issues.
     """
+    for plugin_type in plugin_types:
+        display_order = getattr(plugin_type, "display_order", None)
+        if not isinstance(display_order, int):
+            common_config = getattr(plugin_type, "common_config_schema", {}) or {}
+            try:
+                plugin_type.display_order = int(common_config.get("display_order", 0))
+            except (TypeError, ValueError):
+                plugin_type.display_order = 0
+
     # Mock PluginTypeDB.objects
     mock_plugin_type_manager = MagicMock()
     mock_plugin_type_manager.filter.return_value.all = AsyncMock(return_value=plugin_types)
@@ -56,7 +65,7 @@ class TestImagePluginOrdering:
     """Test image plugin ordering functionality."""
 
     async def test_get_images_sorts_plugins_by_display_order(self):
-        """Test that plugins are sorted by display_order from common_config."""
+        """Test that plugins are sorted by app-managed display_order."""
         service = PluginImageService()
 
         # Mock plugin types with different display orders

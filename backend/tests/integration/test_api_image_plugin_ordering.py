@@ -21,18 +21,8 @@ class TestImagePluginOrderingAPI:
         plugin_type = await PluginTypeDB.objects.get_or_none(type_id="local")
         assert plugin_type is not None, "Plugin type 'local' should exist"
 
-        # The value should be in common_config_schema
-        config = plugin_type.common_config_schema or {}
-        # Value might be stored as string "5" or integer 5
-        display_order = config.get("display_order")
-        # If it's None, the update didn't work - check if config is empty
-        if display_order is None:
-            # The config might be stored in the config service instead
-            # For now, we'll just verify the API call succeeded
-            # The actual storage location (DB vs config service) is an implementation detail
-            assert response.status_code == 200
-        else:
-            assert display_order in ["5", 5], f"Expected '5' or 5, got {display_order}"
+        assert plugin_type.display_order == 5
+        assert "display_order" not in (plugin_type.common_config_schema or {})
 
     async def test_update_image_instance_display_order(self, test_client):
         """Test updating display_order for image plugin instances."""

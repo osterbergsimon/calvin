@@ -16,7 +16,7 @@ from pydantic import BaseModel
 
 from app.models.db_models import PluginDB, PluginTypeDB
 from app.plugins.base import PluginType
-from app.plugins.definitions import APP_MANAGED_CONFIG_FIELD_KEYS
+from app.plugins.definitions import strip_app_managed_config_fields
 from app.plugins.hooks import plugin_manager as hook_manager
 from app.plugins.loader import plugin_loader
 from app.plugins.manager import plugin_manager
@@ -30,10 +30,31 @@ from .themes import BUILTIN_THEMES, _unregister_theme_from_db
 
 router = APIRouter()
 
+
 # Cross-cutting type-level config values that all plugins support, regardless of
 # whether they declare them in their own common_config_schema. These are values,
 # not schema fields, so they should not be returned as common_config_schema.
-UNIVERSAL_TYPE_CONFIG_KEYS = APP_MANAGED_CONFIG_FIELD_KEYS
+def _parse_display_order(value: Any) -> int:
+    if isinstance(value, dict):
+        value = value.get("value", value.get("default", 0))
+    try:
+        return int(value) if value not in (None, "") else 0
+    except (TypeError, ValueError):
+        return 0
+
+
+def _split_type_config(
+    type_info: dict[str, Any], config: dict[str, Any]
+) -> tuple[dict[str, Any], int | None]:
+    metadata_schema = strip_app_managed_config_fields(
+        type_info.get("common_config_schema", {}) or {}
+    )
+    plugin_keys = set(metadata_schema.keys())
+    plugin_config = {key: value for key, value in config.items() if key in plugin_keys}
+    display_order = (
+        _parse_display_order(config["display_order"]) if "display_order" in config else None
+    )
+    return plugin_config, display_order
 
 
 class RebuildStatusResponse(BaseModel):
@@ -151,11 +172,10 @@ async def get_plugins(
             # leaked instance fields or raw values into common_config_schema;
             # those values are still exposed by /plugins/{id}/config when needed.
             metadata_schema = type_info.get("common_config_schema", {}) or {}
-            global_schema = {
-                key: schema
-                for key, schema in metadata_schema.items()
-                if key not in UNIVERSAL_TYPE_CONFIG_KEYS
-            }
+            global_schema = strip_app_managed_config_fields(metadata_schema)
+            instance_schema = strip_app_managed_config_fields(
+                type_info.get("instance_config_schema", {}) or {}
+            )
 
             plugin_info: dict[str, Any] = {
                 "id": type_id,
@@ -166,8 +186,9 @@ async def get_plugins(
                 "description": type_info.get("description", ""),
                 "config_schema": global_schema,  # Legacy name
                 "common_config_schema": global_schema,  # Also send as common_config_schema for frontend
-                "instance_config_schema": type_info.get("instance_config_schema", {}),
+                "instance_config_schema": instance_schema,
                 "enabled": enabled,
+                "display_order": db_type.display_order if db_type else 0,
                 "ui_actions": type_info.get("ui_actions", []),  # Plugin-specific actions (buttons)
                 # Plugin-specific sections (upload, manage, etc.)
                 "ui_sections": type_info.get("ui_sections", []),
@@ -588,11 +609,7 @@ async def get_plugin(plugin_id: str):
     # Keep schema and saved values separate. Saved values are exposed by
     # /plugins/{id}/config and should not be rendered as schema fields.
     metadata_schema = type_info.get("common_config_schema", {}) or {}
-    global_schema = {
-        key: schema
-        for key, schema in metadata_schema.items()
-        if key not in UNIVERSAL_TYPE_CONFIG_KEYS
-    }
+    global_schema = strip_app_managed_config_fields(metadata_schema)
 
     plugin_info: dict[str, Any] = {
         "id": type_info.get("type_id"),
@@ -606,6 +623,7 @@ async def get_plugin(plugin_id: str):
         "display_schema": type_info.get("display_schema"),
         "statusbar_schema": type_info.get("statusbar_schema"),
         "enabled": enabled,
+        "display_order": db_type.display_order if db_type else 0,
     }
 
     # Include error message if plugin is broken
@@ -712,9 +730,10 @@ async def _update_plugin_type(
         # Create new plugin type in database
         plugin_type = type_info.get("plugin_type")
         # Only store keys that are defined in the plugin's own common_config_schema
-        metadata_schema = type_info.get("common_config_schema", {}) or {}
-        allowed_keys = set(metadata_schema.keys()) | UNIVERSAL_TYPE_CONFIG_KEYS
-        filtered_config = {k: v for k, v in config.items() if k in allowed_keys} if config else {}
+        metadata_schema = strip_app_managed_config_fields(
+            type_info.get("common_config_schema", {}) or {}
+        )
+        filtered_config, display_order = _split_type_config(type_info, config)
         initial_schema = {**metadata_schema, **filtered_config}
         logger.debug(
             f"Creating new plugin type {plugin_id} with schema: {initial_schema}, "
@@ -727,6 +746,7 @@ async def _update_plugin_type(
             description=type_info.get("description", ""),
             version=type_info.get("version"),
             common_config_schema=initial_schema,
+            display_order=display_order if display_order is not None else 0,
             enabled=enabled if enabled is not None else True,
         )
     else:
@@ -734,14 +754,14 @@ async def _update_plugin_type(
         if enabled is not None:
             db_type.enabled = enabled
         if config:
-            current_schema = db_type.common_config_schema or {}
+            current_schema = strip_app_managed_config_fields(db_type.common_config_schema or {})
             # Only allow keys defined in the plugin's own common_config_schema —
             # prevents instance config fields from leaking into the type-level schema.
-            metadata_schema = type_info.get("common_config_schema", {}) or {}
-            allowed_keys = set(metadata_schema.keys()) | UNIVERSAL_TYPE_CONFIG_KEYS
-            filtered_config = {k: v for k, v in config.items() if k in allowed_keys}
+            filtered_config, display_order = _split_type_config(type_info, config)
             updated_schema = {**current_schema, **filtered_config}
             db_type.common_config_schema = updated_schema
+            if display_order is not None:
+                db_type.display_order = display_order
             logger.debug(
                 f"Updated plugin {plugin_id} common_config_schema: "
                 f"old={current_schema}, new={updated_schema}, config={config}"
@@ -749,13 +769,16 @@ async def _update_plugin_type(
         await db_type.save_with_timestamp()
 
     # Save common config to config service for backward compatibility
-    if config:
+    persisted_config, display_order = _split_type_config(type_info, config)
+    if display_order is not None:
+        persisted_config["display_order"] = display_order
+    if persisted_config:
         config_key = f"plugin_{plugin_id}_config"
-        config_json = json.dumps(config)
+        config_json = json.dumps(persisted_config)
         await config_service.set_value(config_key, config_json)
 
     # Call plugin-specific config update handlers (if any)
-    hook_config = cleaned_config.copy()
+    hook_config = persisted_config.copy()
     update_coroutines = hook_manager.hook.handle_plugin_config_update(
         type_id=plugin_id,
         config=hook_config,

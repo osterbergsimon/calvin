@@ -58,6 +58,7 @@ class PluginTypeDB(ormar.Model):
         nullable=True
     )  # Common config schema (JSON) - Built-in JSON!
     enabled: bool = ormar.Boolean(default=True, nullable=False)  # Whether plugin type is enabled
+    display_order: int = ormar.Integer(default=0, nullable=False)  # Display order for plugin types
     error_message: str | None = ormar.Text(nullable=True)  # Error message if plugin failed to load
     created_at: datetime = ormar.DateTime(default=datetime.utcnow, nullable=False)
     updated_at: datetime = ormar.DateTime(default=datetime.utcnow, nullable=False)

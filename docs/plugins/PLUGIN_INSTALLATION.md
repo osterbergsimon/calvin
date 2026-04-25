@@ -182,6 +182,7 @@ def create_plugin_instance(
     if type_id != "my_plugin":
         return None
 
+    # enabled is supplied by Calvin's instance lifecycle; do not declare it in schemas.
     enabled = config.get("enabled", False)
     api_key = config.get("api_key", "")
 

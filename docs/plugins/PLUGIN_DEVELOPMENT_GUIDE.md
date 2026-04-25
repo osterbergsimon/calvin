@@ -399,6 +399,7 @@ def create_plugin_instance(
         return None
     
     url = config.get("url", "")
+    # enabled is supplied by Calvin's instance lifecycle; do not declare it in schemas.
     enabled = config.get("enabled", True)
     
     return IframeServicePlugin(
@@ -502,6 +503,7 @@ def create_plugin_instance(
         return None
     
     image_dir = config.get("image_dir", "./data/images")
+    # enabled is supplied by Calvin's instance lifecycle; do not declare it in schemas.
     enabled = config.get("enabled", True)
     
     return LocalImagePlugin(

@@ -83,10 +83,10 @@ def extract_config_value(
         Extracted and normalized value, optionally converted
 
     Examples:
-        >>> config = {"count": "30", "enabled": {"value": "true"}}
+        >>> config = {"count": "30", "active": {"value": "true"}}
         >>> extract_config_value(config, "count", default=10, converter=int)
         30
-        >>> extract_config_value(config, "enabled", default=False, converter=lambda x: str(x).lower() in ("true", "1", "yes"))
+        >>> extract_config_value(config, "active", default=False, converter=lambda x: str(x).lower() in ("true", "1", "yes"))
         True
         >>> extract_config_value(config, "missing", default="default")
         'default'
@@ -120,12 +120,12 @@ def normalize_config_dict(
         Normalized config dictionary with all schema objects resolved
 
     Examples:
-        >>> config = {"count": {"value": "30"}, "enabled": {"default": True}}
+        >>> config = {"count": {"value": "30"}, "active": {"default": True}}
         >>> normalize_config_dict(config)
-        {'count': '30', 'enabled': True}
+        {'count': '30', 'active': True}
         >>> schema = {"count": {"default": 10, "type": int}}
         >>> normalize_config_dict(config, schema)
-        {'count': 30, 'enabled': True}
+        {'count': 30, 'active': True}
     """
     normalized = {}
 

@@ -7,6 +7,7 @@ from typing import Any
 
 from fastapi import APIRouter, HTTPException
 
+from app.plugins.definitions import strip_app_managed_config_fields
 from app.plugins.loader import plugin_loader
 from app.services.config_service import config_service
 
@@ -129,22 +130,19 @@ async def get_plugin_config(plugin_id: str):
     else:
         config = {}
 
-    # Also check database common_config_schema for values that might not be in config_service
-    # (e.g., display_order which is stored in common_config_schema)
+    # Also check database for values that might not be in config_service.
+    # App-managed values live on explicit columns, not plugin-owned schemas.
     try:
         from app.models.db_models import PluginTypeDB
 
         db_type = await PluginTypeDB.objects.get_or_none(type_id=plugin_id)
+        if db_type:
+            config["display_order"] = db_type.display_order or 0
         if db_type and db_type.common_config_schema:
-            # Merge common_config_schema values into config (schema values override service values)
-            # This ensures display_order and other schema-level settings are included
-            db_schema = db_type.common_config_schema
+            db_schema = strip_app_managed_config_fields(db_type.common_config_schema)
             for key, value in db_schema.items():
                 # Only add if not already in config (config_service values take precedence)
                 if key not in config:
-                    config[key] = value
-                # For display_order, always use schema value if it exists (it's the source of truth)
-                elif key == "display_order":
                     config[key] = value
     except Exception as e:
         logger.debug(f"Could not load schema from database for {plugin_id}: {e}")

@@ -705,6 +705,86 @@ class TestServicePluginDataAPI:
 class TestPluginTypeClassBasedActions:
     """Test class-based type-level plugin actions."""
 
+    def test_get_plugins_strips_reserved_schema_fields(self, test_client, monkeypatch):
+        monkeypatch.setattr(
+            "app.api.routes.plugins.management.plugin_loader.get_plugin_types",
+            lambda: [
+                {
+                    "type_id": "reserved-schema-test",
+                    "plugin_type": PluginType.SERVICE,
+                    "name": "Reserved Schema Test",
+                    "description": "Test plugin",
+                    "common_config_schema": {
+                        "display_order": {"type": "integer"},
+                        "api_key": {"type": "password"},
+                    },
+                    "instance_config_schema": {
+                        "enabled": {"type": "boolean"},
+                        "location": {"type": "string"},
+                    },
+                    "supports_multiple_instances": True,
+                    "instance_label": "Location",
+                }
+            ],
+        )
+
+        response = test_client.get("/api/plugins")
+
+        if response.status_code == 404:
+            pytest.skip("Plugin list endpoint not available in test client")
+
+        assert response.status_code == 200
+        plugin = next(p for p in response.json()["plugins"] if p["id"] == "reserved-schema-test")
+        assert plugin["common_config_schema"] == {"api_key": {"type": "password"}}
+        assert plugin["instance_config_schema"] == {"location": {"type": "string"}}
+        assert plugin["display_order"] == 0
+
+    @pytest.mark.asyncio
+    async def test_update_plugin_keeps_reserved_values_out_of_schema(
+        self, test_client, monkeypatch
+    ):
+        from app.models.db_models import PluginTypeDB
+
+        monkeypatch.setattr(
+            "app.api.routes.plugins.management.plugin_loader.get_plugin_types",
+            lambda: [
+                {
+                    "type_id": "reserved-update-test",
+                    "plugin_type": PluginType.SERVICE,
+                    "name": "Reserved Update Test",
+                    "description": "Test plugin",
+                    "common_config_schema": {
+                        "api_key": {"type": "password"},
+                    },
+                    "supports_multiple_instances": False,
+                }
+            ],
+        )
+
+        existing = await PluginTypeDB.objects.get_or_none(type_id="reserved-update-test")
+        if existing:
+            await existing.delete()
+
+        response = test_client.put(
+            "/api/plugins/reserved-update-test",
+            json={
+                "api_key": "secret",
+                "display_order": "4",
+                "instance_label": "Bad",
+                "supports_multiple_instances": False,
+            },
+        )
+
+        assert response.status_code == 200
+        db_type = await PluginTypeDB.objects.get(type_id="reserved-update-test")
+        assert db_type.display_order == 4
+        assert db_type.common_config_schema == {
+            "api_key": "secret",
+        }
+        assert "display_order" not in db_type.common_config_schema
+        assert "instance_label" not in db_type.common_config_schema
+        assert "supports_multiple_instances" not in db_type.common_config_schema
+
     def test_test_plugin_connection_prefers_plugin_class(self, test_client, monkeypatch):
         from app.plugins.base import BasePlugin
 

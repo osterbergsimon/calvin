@@ -3,11 +3,22 @@
 import logging
 
 from app.models.db_models import PluginDB, PluginTypeDB
-from app.plugins.definitions import PluginDefinition
+from app.plugins.definitions import PluginDefinition, strip_app_managed_config_fields
 from app.plugins.loader import plugin_loader
 from app.plugins.manager import plugin_manager as instance_manager
 
 logger = logging.getLogger(__name__)
+
+
+def _parse_display_order(value: object) -> int:
+    if isinstance(value, dict):
+        value = value.get("value", value.get("default", 0))
+    if not isinstance(value, str | bytes | int | float):
+        return 0
+    try:
+        return int(value) if value not in (None, "") else 0
+    except (TypeError, ValueError):
+        return 0
 
 
 async def load_plugin_types() -> None:
@@ -52,6 +63,7 @@ async def load_plugin_types() -> None:
                         description=type_info.description,
                         version=type_info.version,
                         common_config_schema=type_info.common_config_schema,
+                        display_order=0,
                         enabled=False,  # Default to disabled - user must explicitly enable
                         error_message=None,  # Clear any previous errors
                     )
@@ -66,13 +78,14 @@ async def load_plugin_types() -> None:
                     db_type.description = type_info.description
                     db_type.version = type_info.version
 
-                    # Merge plugin metadata schema with existing database schema
-                    # This preserves user-set values (like display_order) while updating
-                    # with new schema from plugin metadata
-                    metadata_schema = type_info.common_config_schema or {}
+                    metadata_schema = strip_app_managed_config_fields(
+                        type_info.common_config_schema or {}
+                    )
                     existing_schema = db_type.common_config_schema or {}
-                    # Merge: existing schema takes precedence (preserves user-set values),
-                    # but metadata schema can add new fields
+                    legacy_display_order = existing_schema.get("display_order")
+                    if legacy_display_order is not None:
+                        db_type.display_order = _parse_display_order(legacy_display_order)
+                    existing_schema = strip_app_managed_config_fields(existing_schema)
                     merged_schema = {**metadata_schema, **existing_schema}
                     db_type.common_config_schema = merged_schema
 
@@ -114,6 +127,7 @@ async def load_plugin_types() -> None:
                             description=None,
                             version=None,
                             common_config_schema={},
+                            display_order=0,
                             enabled=False,
                             error_message=error_message,
                         )

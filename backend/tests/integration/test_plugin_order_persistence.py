@@ -35,9 +35,8 @@ class TestPluginOrderPersistence:
         plugin_type = await PluginTypeDB.objects.get_or_none(type_id="local")
         assert plugin_type is not None
 
-        config = plugin_type.common_config_schema or {}
-        display_order = config.get("display_order")
-        assert display_order in ["10", 10], f"Expected '10' or 10, got {display_order}"
+        assert plugin_type.display_order == 10
+        assert "display_order" not in (plugin_type.common_config_schema or {})
 
         # Verify it's returned by /plugins endpoint
         response = test_client.get("/api/plugins?plugin_type=image")
@@ -46,11 +45,8 @@ class TestPluginOrderPersistence:
         local_plugin_after = next((p for p in plugins_after if p["id"] == "local"), None)
         assert local_plugin_after is not None
 
-        # Check common_config_schema in response
-        schema = local_plugin_after.get("common_config_schema", {})
-        assert schema.get("display_order") in ["10", 10], (
-            f"Expected '10' or 10 in schema, got {schema.get('display_order')}"
-        )
+        assert local_plugin_after.get("display_order") == 10
+        assert "display_order" not in local_plugin_after.get("common_config_schema", {})
 
         # Verify it's returned by /config endpoint
         response = test_client.get("/api/plugins/local/config")
@@ -70,8 +66,8 @@ class TestPluginOrderPersistence:
         # Verify it's saved
         plugin_type = await PluginTypeDB.objects.get_or_none(type_id="local")
         assert plugin_type is not None
-        config_before = plugin_type.common_config_schema or {}
-        assert config_before.get("display_order") in ["5", 5]
+        assert plugin_type.display_order == 5
+        assert "display_order" not in (plugin_type.common_config_schema or {})
 
         # Simulate plugin reload (what happens on server restart)
         await load_plugin_types()
@@ -80,12 +76,8 @@ class TestPluginOrderPersistence:
         plugin_type = await PluginTypeDB.objects.get_or_none(type_id="local")
         assert plugin_type is not None
 
-        config_after = plugin_type.common_config_schema or {}
-        display_order_after = config_after.get("display_order")
-        assert display_order_after in ["5", 5], (
-            f"display_order was lost after reload! Expected '5' or 5, got {display_order_after}. "
-            f"Full config: {config_after}"
-        )
+        assert plugin_type.display_order == 5
+        assert "display_order" not in (plugin_type.common_config_schema or {})
 
     async def test_multiple_plugins_ordering_persists(self, test_client):
         """Test that ordering for multiple plugins persists correctly."""
@@ -124,23 +116,16 @@ class TestPluginOrderPersistence:
         assert plugin1_after is not None
         assert plugin2_after is not None
 
-        schema1 = plugin1_after.get("common_config_schema", {})
-        schema2 = plugin2_after.get("common_config_schema", {})
+        order1 = plugin1_after.get("display_order", 0)
+        order2 = plugin2_after.get("display_order", 0)
 
-        order1 = schema1.get("display_order")
-        order2 = schema2.get("display_order")
-
-        # Parse as ints for comparison
-        order1_int = int(order1) if order1 is not None else 0
-        order2_int = int(order2) if order2 is not None else 0
-
-        assert order1_int == 1, f"Plugin {plugin1['id']} should have order 1, got {order1}"
-        assert order2_int == 0, f"Plugin {plugin2['id']} should have order 0, got {order2}"
+        assert order1 == 1, f"Plugin {plugin1['id']} should have order 1, got {order1}"
+        assert order2 == 0, f"Plugin {plugin2['id']} should have order 0, got {order2}"
 
         # Verify plugin2 comes before plugin1 when sorted
         sorted_plugins = sorted(
             [p for p in plugins_after if p.get("id") in [plugin1["id"], plugin2["id"]]],
-            key=lambda p: int(p.get("common_config_schema", {}).get("display_order", 0)),
+            key=lambda p: int(p.get("display_order", 0)),
         )
 
         assert sorted_plugins[0]["id"] == plugin2["id"], (
@@ -148,8 +133,8 @@ class TestPluginOrderPersistence:
             f"{[p['id'] for p in sorted_plugins]}"
         )
 
-    async def test_plugin_list_includes_display_order_in_schema(self, test_client):
-        """Test that /plugins endpoint returns display_order in common_config_schema."""
+    async def test_plugin_list_includes_display_order_value(self, test_client):
+        """Test that /plugins endpoint returns display_order as an app-managed value."""
         # Set display_order
         response = test_client.put("/api/plugins/local", json={"display_order": "7"})
         assert response.status_code == 200
@@ -162,17 +147,11 @@ class TestPluginOrderPersistence:
         local_plugin = next((p for p in plugins if p["id"] == "local"), None)
         assert local_plugin is not None
 
-        # Verify common_config_schema exists and has display_order
+        # Verify common_config_schema exists but does not own display_order
         schema = local_plugin.get("common_config_schema")
         assert schema is not None, "common_config_schema should exist in plugin response"
         assert isinstance(schema, dict), (
             f"common_config_schema should be a dict, got {type(schema)}"
         )
-
-        display_order = schema.get("display_order")
-        assert display_order is not None, (
-            f"display_order should be in common_config_schema. Schema: {schema}"
-        )
-        assert display_order in ["7", 7], (
-            f"Expected '7' or 7, got {display_order} (type: {type(display_order)})"
-        )
+        assert "display_order" not in schema
+        assert local_plugin.get("display_order") == 7
