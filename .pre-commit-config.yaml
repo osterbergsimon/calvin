@@ -15,7 +15,7 @@ repos:
       - id: eslint
         name: eslint
         language: system
-        entry: bash -c 'cd frontend && npx --no-install eslint --fix --config eslint.config.js "$@"' --
+        entry: bash -c 'cd frontend && exec npx --no-install eslint --fix --config eslint.config.js "${@#frontend/}"' --
         files: ^frontend/.*\.(js|vue)$
         types_or: [file]
 
