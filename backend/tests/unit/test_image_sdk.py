@@ -3,7 +3,15 @@ from unittest.mock import MagicMock, patch
 import httpx
 import pytest
 
-from app.plugins.sdk.image import SelfHostedGalleryImagePlugin, fetch_image_data
+from app.plugins.sdk.image import (
+    ImageConfigField,
+    SelfHostedGalleryImagePlugin,
+    build_image_manager_config,
+    build_image_plugin_metadata,
+    create_image_plugin_instance,
+    extract_image_config,
+    fetch_image_data,
+)
 
 
 @pytest.mark.asyncio
@@ -95,6 +103,14 @@ class DummyGalleryPlugin(SelfHostedGalleryImagePlugin):
         return True
 
 
+class DummyImagePlugin:
+    def __init__(self, plugin_id: str, name: str, enabled: bool = True, **kwargs):
+        self.plugin_id = plugin_id
+        self.name = name
+        self.enabled = enabled
+        self.kwargs = kwargs
+
+
 def test_self_hosted_gallery_build_auth_headers():
     assert DummyGalleryPlugin.build_auth_headers("secret") == {
         "x-api-key": "secret",
@@ -139,3 +155,106 @@ async def test_self_hosted_gallery_fetch_protected_image_data():
             headers={"x-api-key": "secret", "Accept": "application/json"},
             follow_redirects=True,
         )
+
+
+def test_build_image_plugin_metadata():
+    metadata = build_image_plugin_metadata(
+        type_id="dummy_image",
+        name="Dummy Image",
+        description="Dummy",
+        plugin_class=DummyImagePlugin,
+        supports_multiple_instances=False,
+        instance_label="Source",
+    )
+
+    assert metadata["type_id"] == "dummy_image"
+    assert metadata["plugin_type"].value == "image"
+    assert metadata["supports_multiple_instances"] is False
+    assert metadata["instance_label"] == "Source"
+    assert metadata["plugin_class"] is DummyImagePlugin
+
+
+def test_extract_image_config_uses_defaults_and_transforms():
+    fields = (
+        ImageConfigField("token", default="", converter=str, transform=str.strip),
+        ImageConfigField("count", default=1, converter=int),
+        ImageConfigField("alias", default="", arg_name="label"),
+    )
+
+    values = extract_image_config(
+        {"token": "  abc  ", "count": "4", "alias": "Name"},
+        fields,
+    )
+
+    assert values == {
+        "token": "abc",
+        "count": 4,
+        "label": "Name",
+    }
+
+
+def test_create_image_plugin_instance_builds_kwargs():
+    fields = (
+        ImageConfigField("token", default="", converter=str),
+        ImageConfigField("count", default=1, converter=int),
+    )
+
+    plugin = create_image_plugin_instance(
+        DummyImagePlugin,
+        expected_type_id="dummy_image",
+        plugin_id="dummy-instance",
+        type_id="dummy_image",
+        name="Dummy",
+        config={"enabled": True, "token": "abc", "count": "2"},
+        fields=fields,
+        extra_kwargs=lambda config: {"source": config.get("source", "default")},
+    )
+
+    assert plugin is not None
+    assert plugin.plugin_id == "dummy-instance"
+    assert plugin.enabled is True
+    assert plugin.kwargs == {"token": "abc", "count": 2, "source": "default"}
+
+
+def test_create_image_plugin_instance_returns_none_for_other_type():
+    plugin = create_image_plugin_instance(
+        DummyImagePlugin,
+        expected_type_id="dummy_image",
+        plugin_id="dummy-instance",
+        type_id="other_image",
+        name="Dummy",
+        config={},
+    )
+
+    assert plugin is None
+
+
+def test_build_image_manager_config_normalizes_fields_and_extras():
+    fields = (
+        ImageConfigField("token", default="", converter=str, transform=str.strip),
+        ImageConfigField("count", default=1, converter=int),
+        ImageConfigField("alias", default="", arg_name="label"),
+    )
+
+    manager_config = build_image_manager_config(
+        type_id="dummy_image",
+        fields=fields,
+        single_instance=True,
+        instance_id="dummy-instance",
+        extra_normalize=lambda config: {"enabled_flag": config.get("enabled", False)},
+        default_instance_name="Dummy Image",
+    )
+
+    normalized = manager_config.normalize_config(
+        {"token": "  abc  ", "count": "3", "alias": "Shown", "enabled": True}
+    )
+
+    assert manager_config.single_instance is True
+    assert manager_config.instance_id == "dummy-instance"
+    assert manager_config.default_instance_name == "Dummy Image"
+    assert normalized == {
+        "token": "abc",
+        "count": 3,
+        "alias": "Shown",
+        "enabled_flag": True,
+    }
