@@ -32,13 +32,13 @@
 </template>
 
 <script setup>
-import { ref } from "vue";
 import TabNavigation from "../shared/TabNavigation.vue";
 import SettingsTab from "../shared/SettingsTab.vue";
 import DisplayTab from "../tabs/layout/DisplayTab.vue";
 import UITab from "../tabs/layout/UITab.vue";
 import PhotosTab from "../tabs/layout/PhotosTab.vue";
 import KeyboardTab from "../tabs/layout/KeyboardTab.vue";
+import { usePersistedSettingTab } from "@/composables";
 
 defineProps({
   config: {
@@ -57,10 +57,13 @@ const tabs = [
   { id: "keyboard", label: "Keyboard", icon: "⌨️" },
 ];
 
-const activeTab = ref("display");
+const { activeTab, setActiveTab } = usePersistedSettingTab(
+  "settings_tab_layout",
+  "display",
+);
 
 const handleTabChange = (tabId) => {
-  activeTab.value = tabId;
+  setActiveTab(tabId);
 };
 </script>
 

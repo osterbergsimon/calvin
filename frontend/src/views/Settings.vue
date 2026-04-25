@@ -3,6 +3,14 @@
     <div class="settings-header">
       <h1>Settings & Configuration</h1>
       <div class="header-actions">
+        <div
+          class="save-status"
+          :class="`save-status-${saveStatus.state}`"
+          role="status"
+          aria-live="polite"
+        >
+          {{ saveStatus.message }}
+        </div>
         <div ref="systemMenuRef" class="system-menu">
           <button
             class="btn-system-menu"
@@ -145,8 +153,14 @@ watch(activeCategory, (val) => sessionStorage.setItem(_CATEGORY_KEY, val));
 const showSystemMenu = ref(false);
 
 // Config management
-const { localConfig, loadConfig, updateConfig, error, saveSuccess } =
-  useConfigForm();
+const {
+  localConfig,
+  loadConfig,
+  updateConfig,
+  error,
+  saveSuccess,
+  saveStatus,
+} = useConfigForm();
 
 // System operations
 const { restartBackend, restartFrontend, updateMessage, updateMessageClass } =
@@ -247,6 +261,32 @@ onUnmounted(() => {
   display: flex;
   gap: 1rem;
   align-items: center;
+}
+
+.save-status {
+  padding: 0.45rem 0.75rem;
+  border: 1px solid var(--border-color);
+  border-radius: 999px;
+  background: var(--bg-secondary);
+  color: var(--text-secondary);
+  font-size: 0.82rem;
+  font-weight: 600;
+  white-space: nowrap;
+}
+
+.save-status-saving {
+  border-color: rgba(33, 150, 243, 0.4);
+  color: #1565c0;
+}
+
+.save-status-saved {
+  border-color: rgba(76, 175, 80, 0.45);
+  color: #2e7d32;
+}
+
+.save-status-error {
+  border-color: rgba(244, 67, 54, 0.45);
+  color: #c62828;
 }
 
 .system-menu {

@@ -6,10 +6,11 @@
         help="GitHub repository URL for updates"
       >
         <input
-          :value="gitRepoUrl"
+          v-model="localGitRepoUrl"
           type="text"
           placeholder="https://github.com/user/repo.git"
-          @input="handleGitRepoInput"
+          @change="handleGitRepoChange"
+          @blur="handleGitRepoChange"
         />
       </SettingItem>
 
@@ -122,13 +123,21 @@ const {
 } = useSystem();
 
 const availableBranches = ref([props.gitBranch || "main"]);
+const localGitRepoUrl = ref(props.gitRepoUrl || "");
+const lastEmittedGitRepoUrl = ref(props.gitRepoUrl || "");
 
-const handleGitRepoInput = (event) => {
-  emit("update:gitRepoUrl", event.target.value);
+const handleGitRepoChange = () => {
+  if (
+    localGitRepoUrl.value !== props.gitRepoUrl &&
+    localGitRepoUrl.value !== lastEmittedGitRepoUrl.value
+  ) {
+    lastEmittedGitRepoUrl.value = localGitRepoUrl.value;
+    emit("update:gitRepoUrl", localGitRepoUrl.value);
+  }
 };
 
-const handleGitBranchChange = () => {
-  emit("update:gitBranch", props.gitBranch);
+const handleGitBranchChange = (event) => {
+  emit("update:gitBranch", event.target.value);
 };
 
 const handleTriggerUpdate = async () => {
@@ -150,8 +159,10 @@ onMounted(() => {
 
 watch(
   () => props.gitRepoUrl,
-  () => {
-    if (props.gitRepoUrl) {
+  (repoUrl) => {
+    localGitRepoUrl.value = repoUrl || "";
+    lastEmittedGitRepoUrl.value = repoUrl || "";
+    if (repoUrl) {
       loadBranches();
     }
   },

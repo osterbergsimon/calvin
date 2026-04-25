@@ -15,8 +15,8 @@
 </template>
 
 <script setup>
-import { ref, onMounted } from "vue";
-import { usePlugins } from "@/composables";
+import { onMounted } from "vue";
+import { usePersistedSettingTab, usePlugins } from "@/composables";
 import TabNavigation from "../shared/TabNavigation.vue";
 import SettingsTab from "../shared/SettingsTab.vue";
 import ImagesTab from "../tabs/content/ImagesTab.vue";
@@ -31,10 +31,13 @@ const tabs = [
   { id: "calendar-sources", label: "Calendar Sources", icon: "📅" },
 ];
 
-const activeTab = ref("images");
+const { activeTab, setActiveTab } = usePersistedSettingTab(
+  "settings_tab_content",
+  "images",
+);
 
 const handleTabChange = (tabId) => {
-  activeTab.value = tabId;
+  setActiveTab(tabId);
 };
 
 // Load plugins when component mounts

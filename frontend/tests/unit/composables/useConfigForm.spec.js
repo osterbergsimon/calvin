@@ -60,6 +60,10 @@ describe("useConfigForm", () => {
       expect(form.localConfig.value).toEqual({});
       expect(form.saving.value).toBe(false);
       expect(form.error.value).toBe("");
+      expect(form.saveStatus.value).toEqual({
+        state: "idle",
+        message: "Settings auto-save as you change them",
+      });
     });
 
     it("should initialize with initial config", () => {
@@ -208,6 +212,11 @@ describe("useConfigForm", () => {
       expect(mockConfigStore.updateConfig).toHaveBeenCalledWith({
         orientation: "portrait",
       });
+      expect(form.lastSavedKeys.value).toEqual(["orientation"]);
+      expect(form.saveStatus.value).toEqual({
+        state: "saved",
+        message: "Saved 1 setting",
+      });
     });
 
     it("should set saving flag during update", async () => {
@@ -242,6 +251,10 @@ describe("useConfigForm", () => {
       ).rejects.toThrow("Update failed");
 
       expect(form.error.value).toBe("Update failed");
+      expect(form.saveStatus.value).toEqual({
+        state: "error",
+        message: "Update failed",
+      });
       expect(form.saving.value).toBe(false);
       expect(logErrorMock).toHaveBeenCalledWith(
         "[useConfigForm]",

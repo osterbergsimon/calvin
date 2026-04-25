@@ -34,13 +34,13 @@
 </template>
 
 <script setup>
-import { ref } from "vue";
 import TabNavigation from "../shared/TabNavigation.vue";
 import SettingsTab from "../shared/SettingsTab.vue";
 import PowerTab from "../tabs/system/PowerTab.vue";
 import HardwareTab from "../tabs/system/HardwareTab.vue";
 import UpdatesTab from "../tabs/system/UpdatesTab.vue";
 import DebugTab from "../tabs/system/DebugTab.vue";
+import { usePersistedSettingTab } from "@/composables";
 
 defineProps({
   config: {
@@ -74,10 +74,13 @@ const tabs = [
   { id: "debug", label: "Debug", icon: "🐛" },
 ];
 
-const activeTab = ref("power");
+const { activeTab, setActiveTab } = usePersistedSettingTab(
+  "settings_tab_system",
+  "power",
+);
 
 const handleTabChange = (tabId) => {
-  activeTab.value = tabId;
+  setActiveTab(tabId);
 };
 </script>
 
