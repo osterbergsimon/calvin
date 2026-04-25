@@ -7,8 +7,18 @@
     />
 
     <SettingsTab>
-      <DisplayTab
+      <DashboardLayoutTab
         v-if="activeTab === 'layout'"
+        :config="config"
+        @update:config="$emit('update:config', $event)"
+      />
+      <CalendarDisplayTab
+        v-if="activeTab === 'calendar'"
+        :config="config"
+        @update:config="$emit('update:config', $event)"
+      />
+      <PluginDisplayTab
+        v-if="activeTab === 'plugin-display'"
         :config="config"
         @update:config="$emit('update:config', $event)"
       />
@@ -25,7 +35,9 @@
 import { usePersistedSettingTab } from "@/composables";
 import TabNavigation from "../shared/TabNavigation.vue";
 import SettingsTab from "../shared/SettingsTab.vue";
-import DisplayTab from "../tabs/layout/DisplayTab.vue";
+import DashboardLayoutTab from "../tabs/dashboard/DashboardLayoutTab.vue";
+import CalendarDisplayTab from "../tabs/dashboard/CalendarDisplayTab.vue";
+import PluginDisplayTab from "../tabs/dashboard/PluginDisplayTab.vue";
 import UITab from "../tabs/layout/UITab.vue";
 
 defineProps({
@@ -39,7 +51,9 @@ defineProps({
 defineEmits(["update:config"]);
 
 const tabs = [
-  { id: "layout", label: "Layout & Calendar", icon: "📐" },
+  { id: "layout", label: "Layout", icon: "📐" },
+  { id: "calendar", label: "Calendar Display", icon: "📅" },
+  { id: "plugin-display", label: "Plugin Display", icon: "📦" },
   { id: "ui", label: "UI, Theme & Clock", icon: "🎨" },
 ];
 

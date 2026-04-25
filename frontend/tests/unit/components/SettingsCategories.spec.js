@@ -15,7 +15,9 @@ const config = {
 
 const childStubs = {
   SettingsTab: { template: "<div><slot /></div>" },
-  DisplayTab: true,
+  DashboardLayoutTab: true,
+  CalendarDisplayTab: true,
+  PluginDisplayTab: true,
   UITab: true,
   PhotosTab: true,
   ImagesTab: true,
@@ -44,7 +46,9 @@ describe("settings category IA", () => {
     const tabs = wrapper.findComponent(TabNavigation).props("tabs");
 
     expect(tabs.map((tab) => tab.label)).toEqual([
-      "Layout & Calendar",
+      "Layout",
+      "Calendar Display",
+      "Plugin Display",
       "UI, Theme & Clock",
     ]);
   });
