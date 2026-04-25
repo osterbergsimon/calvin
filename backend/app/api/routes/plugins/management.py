@@ -29,6 +29,10 @@ from .themes import BUILTIN_THEMES, _unregister_theme_from_db
 
 router = APIRouter()
 
+# Cross-cutting type-level keys that all plugins support, regardless of
+# whether they declare them in their own common_config_schema.
+UNIVERSAL_TYPE_CONFIG_KEYS = frozenset({"display_order"})
+
 
 class RebuildStatusResponse(BaseModel):
     state: str
@@ -151,6 +155,9 @@ async def get_plugins(
             # prevents instance config fields that leaked into db_schema from showing here.
             merged_schema = {**metadata_schema}
             for key in metadata_schema:
+                if key in db_schema:
+                    merged_schema[key] = db_schema[key]
+            for key in UNIVERSAL_TYPE_CONFIG_KEYS:
                 if key in db_schema:
                     merged_schema[key] = db_schema[key]
 
@@ -711,7 +718,7 @@ async def _update_plugin_type(
         plugin_type = type_info.get("plugin_type")
         # Only store keys that are defined in the plugin's own common_config_schema
         metadata_schema = type_info.get("common_config_schema", {}) or {}
-        allowed_keys = set(metadata_schema.keys())
+        allowed_keys = set(metadata_schema.keys()) | UNIVERSAL_TYPE_CONFIG_KEYS
         filtered_config = {k: v for k, v in config.items() if k in allowed_keys} if config else {}
         initial_schema = {**metadata_schema, **filtered_config}
         logger.debug(
@@ -736,7 +743,7 @@ async def _update_plugin_type(
             # Only allow keys defined in the plugin's own common_config_schema —
             # prevents instance config fields from leaking into the type-level schema.
             metadata_schema = type_info.get("common_config_schema", {}) or {}
-            allowed_keys = set(metadata_schema.keys())
+            allowed_keys = set(metadata_schema.keys()) | UNIVERSAL_TYPE_CONFIG_KEYS
             filtered_config = {k: v for k, v in config.items() if k in allowed_keys}
             updated_schema = {**current_schema, **filtered_config}
             db_type.common_config_schema = updated_schema
