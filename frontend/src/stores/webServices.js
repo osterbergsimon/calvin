@@ -5,6 +5,12 @@ import { getCachedData, setCachedData } from "../utils/cache";
 import { useConnectionStore } from "./connection";
 import { logDebug, logError, logInfo, logWarn } from "../utils/logger";
 
+/**
+ * Generated API types from backend OpenAPI snapshot.
+ * Run `npm run gen:api` to refresh after backend route/schema changes.
+ * @typedef {import("../api/types").components["schemas"]["PluginListResponse"]} PluginListResponse
+ */
+
 export const useWebServicesStore = defineStore("webServices", () => {
   const services = ref([]);
   const currentServiceIndex = ref(0);
@@ -40,7 +46,9 @@ export const useWebServicesStore = defineStore("webServices", () => {
       const response = await axios.get("/api/plugins", {
         params: { plugin_type: "service" },
       });
-      const plugins = response.data.plugins || [];
+      /** @type {PluginListResponse} */
+      const pluginsResponseData = response.data;
+      const plugins = pluginsResponseData.plugins || [];
 
       // Get instances for each service plugin
       const allInstances = [];
