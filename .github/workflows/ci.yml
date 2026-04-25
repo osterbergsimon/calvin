@@ -32,13 +32,9 @@ jobs:
         working-directory: ./backend
         run: uv sync --extra dev
       
-      - name: Run Ruff linter (with auto-fix check)
+      - name: Run Ruff linter
         working-directory: ./backend
-        run: |
-          # First, try to auto-fix issues
-          uv run ruff check --fix . || true
-          # Then check if there are any remaining issues
-          uv run ruff check .
+        run: uv run ruff check .
       
       - name: Run Ruff formatter check
         working-directory: ./backend
@@ -50,7 +46,7 @@ jobs:
       
       - name: Run Bandit security linter
         working-directory: ./backend
-        run: uv run bandit -r app -f json -o bandit-report.json || true
+        run: uv run bandit -r app -ll
       
       - name: Run backend tests
         working-directory: ./backend

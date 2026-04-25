@@ -221,7 +221,9 @@ class LocalImagePlugin(ImagePlugin):
                         file_size = file_path.stat().st_size
 
                         # Generate image ID from file path hash
-                        image_id = hashlib.md5(str(file_path).encode()).hexdigest()
+                        image_id = hashlib.md5(
+                            str(file_path).encode(), usedforsecurity=False
+                        ).hexdigest()
 
                         # Generate thumbnail if it doesn't exist
                         thumbnail_path = self._get_thumbnail_path(image_id)
@@ -306,7 +308,7 @@ class LocalImagePlugin(ImagePlugin):
             await self.scan_images()
 
             # Return the new image
-            image_id = hashlib.md5(str(file_path).encode()).hexdigest()
+            image_id = hashlib.md5(str(file_path).encode(), usedforsecurity=False).hexdigest()
             return await self.get_image(image_id)
         except Exception:
             logger.exception("Error uploading image {}", filename)
