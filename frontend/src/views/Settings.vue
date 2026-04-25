@@ -113,7 +113,7 @@
             :key="category.id"
             class="category-btn"
             :class="{ active: activeCategory === category.id }"
-            @click="activeCategory = category.id"
+            @click="selectCategory(category.id)"
           >
             <span class="category-icon">{{ category.icon }}</span>
             <span class="category-label">{{ category.label }}</span>
@@ -182,7 +182,7 @@
 
 <script setup>
 import { computed, ref, watch, onMounted, onUnmounted } from "vue";
-import { useRouter } from "vue-router";
+import { useRoute, useRouter } from "vue-router";
 import { useConfigForm } from "@/composables";
 import { useSystem } from "@/composables";
 import { useModeStore } from "@/stores/mode";
@@ -192,6 +192,7 @@ import {
   SETTINGS_CATEGORY_STORAGE_KEY,
   defaultSettingsCategoryId,
   filterSettingsDestinations,
+  getSettingDestinationById,
   isKnownSettingsCategory,
   settingsCategories,
 } from "@/components/settings/settingsRegistry";
@@ -214,11 +215,29 @@ const MaintenanceCategory = defineAsyncComponent(
 );
 
 const router = useRouter();
+const route = useRoute();
 const modeStore = useModeStore();
 
 const categories = settingsCategories;
 
+const getRouteSettingDestination = () => {
+  const settingId = route.query.setting;
+  return typeof settingId === "string"
+    ? getSettingDestinationById(settingId)
+    : null;
+};
+
+const initialRouteDestination = getRouteSettingDestination();
+if (initialRouteDestination?.tabKey && initialRouteDestination.tab) {
+  sessionStorage.setItem(
+    initialRouteDestination.tabKey,
+    initialRouteDestination.tab,
+  );
+}
+
 const getInitialCategory = () => {
+  if (initialRouteDestination) return initialRouteDestination.category;
+
   const storedCategory = sessionStorage.getItem(SETTINGS_CATEGORY_STORAGE_KEY);
   return isKnownSettingsCategory(storedCategory)
     ? storedCategory
@@ -267,14 +286,42 @@ const filteredSettingsDestinations = computed(() => {
   return filterSettingsDestinations(settingsSearchQuery.value);
 });
 
-const jumpToSetting = (destination) => {
+const applySettingDestination = (destination) => {
   if (destination.tabKey && destination.tab) {
     sessionStorage.setItem(destination.tabKey, destination.tab);
   }
   activeCategory.value = destination.category;
-  settingsSearchQuery.value = "";
   categoryRenderKey.value += 1;
 };
+
+const jumpToSetting = (destination) => {
+  applySettingDestination(destination);
+  settingsSearchQuery.value = "";
+  router.replace({
+    query: {
+      ...route.query,
+      setting: destination.id,
+    },
+  });
+};
+
+const selectCategory = (categoryId) => {
+  activeCategory.value = categoryId;
+  if (!route.query.setting) return;
+
+  const { setting: _setting, ...query } = route.query;
+  router.replace({ query });
+};
+
+watch(
+  () => route.query.setting,
+  () => {
+    const destination = getRouteSettingDestination();
+    if (destination) {
+      applySettingDestination(destination);
+    }
+  },
+);
 
 // Config management
 const {
