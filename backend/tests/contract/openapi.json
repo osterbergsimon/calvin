@@ -1,0 +1,3673 @@
+{
+  "components": {
+    "schemas": {
+      "Body_inspect_plugin_api_plugins_inspect_post": {
+        "properties": {
+          "file": {
+            "format": "binary",
+            "title": "File",
+            "type": "string"
+          }
+        },
+        "required": [
+          "file"
+        ],
+        "title": "Body_inspect_plugin_api_plugins_inspect_post",
+        "type": "object"
+      },
+      "Body_install_plugin_api_plugins_install_post": {
+        "properties": {
+          "file": {
+            "format": "binary",
+            "title": "File",
+            "type": "string"
+          }
+        },
+        "required": [
+          "file"
+        ],
+        "title": "Body_install_plugin_api_plugins_install_post",
+        "type": "object"
+      },
+      "Body_upload_image_api_images_upload_post": {
+        "properties": {
+          "file": {
+            "format": "binary",
+            "title": "File",
+            "type": "string"
+          }
+        },
+        "required": [
+          "file"
+        ],
+        "title": "Body_upload_image_api_images_upload_post",
+        "type": "object"
+      },
+      "CalendarEvent": {
+        "description": "Calendar event model.",
+        "properties": {
+          "all_day": {
+            "default": false,
+            "title": "All Day",
+            "type": "boolean"
+          },
+          "color": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Color"
+          },
+          "description": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Description"
+          },
+          "end": {
+            "format": "date-time",
+            "title": "End",
+            "type": "string"
+          },
+          "id": {
+            "title": "Id",
+            "type": "string"
+          },
+          "location": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Location"
+          },
+          "source": {
+            "title": "Source",
+            "type": "string"
+          },
+          "start": {
+            "format": "date-time",
+            "title": "Start",
+            "type": "string"
+          },
+          "title": {
+            "title": "Title",
+            "type": "string"
+          }
+        },
+        "required": [
+          "id",
+          "title",
+          "start",
+          "end",
+          "source"
+        ],
+        "title": "CalendarEvent",
+        "type": "object"
+      },
+      "CalendarEventsResponse": {
+        "description": "Response model for calendar events.",
+        "properties": {
+          "end_date": {
+            "format": "date-time",
+            "title": "End Date",
+            "type": "string"
+          },
+          "events": {
+            "items": {
+              "$ref": "#/components/schemas/CalendarEvent"
+            },
+            "title": "Events",
+            "type": "array"
+          },
+          "start_date": {
+            "format": "date-time",
+            "title": "Start Date",
+            "type": "string"
+          },
+          "total": {
+            "default": 0,
+            "title": "Total",
+            "type": "integer"
+          }
+        },
+        "required": [
+          "start_date",
+          "end_date"
+        ],
+        "title": "CalendarEventsResponse",
+        "type": "object"
+      },
+      "CalendarSource": {
+        "description": "Calendar source model.",
+        "properties": {
+          "api_key": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Api Key"
+          },
+          "color": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Color"
+          },
+          "enabled": {
+            "default": true,
+            "title": "Enabled",
+            "type": "boolean"
+          },
+          "ical_url": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Ical Url"
+          },
+          "id": {
+            "title": "Id",
+            "type": "string"
+          },
+          "name": {
+            "title": "Name",
+            "type": "string"
+          },
+          "running": {
+            "default": false,
+            "title": "Running",
+            "type": "boolean"
+          },
+          "show_time": {
+            "default": true,
+            "title": "Show Time",
+            "type": "boolean"
+          },
+          "type": {
+            "title": "Type",
+            "type": "string"
+          }
+        },
+        "required": [
+          "id",
+          "type",
+          "name"
+        ],
+        "title": "CalendarSource",
+        "type": "object"
+      },
+      "CalendarSourcesResponse": {
+        "description": "Response model for calendar sources.",
+        "properties": {
+          "sources": {
+            "items": {
+              "$ref": "#/components/schemas/CalendarSource"
+            },
+            "title": "Sources",
+            "type": "array"
+          },
+          "total": {
+            "default": 0,
+            "title": "Total",
+            "type": "integer"
+          }
+        },
+        "title": "CalendarSourcesResponse",
+        "type": "object"
+      },
+      "ConfigUpdate": {
+        "additionalProperties": true,
+        "description": "Configuration update model.",
+        "properties": {
+          "applyDisplayRotation": {
+            "anyOf": [
+              {
+                "type": "boolean"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Applydisplayrotation"
+          },
+          "calendarRefreshInterval": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Calendarrefreshinterval"
+          },
+          "calendarSplit": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Calendarsplit"
+          },
+          "calendarViewMode": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Calendarviewmode"
+          },
+          "configPollInterval": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Configpollinterval"
+          },
+          "darkModeEnd": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Darkmodeend"
+          },
+          "darkModeStart": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Darkmodestart"
+          },
+          "displaySchedule": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "items": {
+                  "additionalProperties": true,
+                  "type": "object"
+                },
+                "type": "array"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Displayschedule"
+          },
+          "displayScheduleEnabled": {
+            "anyOf": [
+              {
+                "type": "boolean"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Displayscheduleenabled"
+          },
+          "displayTimeout": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Displaytimeout"
+          },
+          "displayTimeoutEnabled": {
+            "anyOf": [
+              {
+                "type": "boolean"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Displaytimeoutenabled"
+          },
+          "gitBranch": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Gitbranch"
+          },
+          "gitRepoUrl": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Gitrepourl"
+          },
+          "imageDisplayMode": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Imagedisplaymode"
+          },
+          "keyboardFeedbackEnabled": {
+            "anyOf": [
+              {
+                "type": "boolean"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Keyboardfeedbackenabled"
+          },
+          "keyboardFeedbackMode": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Keyboardfeedbackmode"
+          },
+          "keyboardType": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Keyboardtype"
+          },
+          "lastSideViewMode": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Lastsideviewmode"
+          },
+          "maxVisibleEvents": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Maxvisibleevents"
+          },
+          "mealPlanCardSize": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Mealplancardsize"
+          },
+          "modeIndicatorTimeout": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Modeindicatortimeout"
+          },
+          "orientation": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Orientation"
+          },
+          "orientationFlipped": {
+            "anyOf": [
+              {
+                "type": "boolean"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Orientationflipped"
+          },
+          "photoFrameEnabled": {
+            "anyOf": [
+              {
+                "type": "boolean"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Photoframeenabled"
+          },
+          "photoFrameTimeout": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Photoframetimeout"
+          },
+          "photoRotationInterval": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Photorotationinterval"
+          },
+          "randomizeImages": {
+            "anyOf": [
+              {
+                "type": "boolean"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Randomizeimages"
+          },
+          "rebootComboDuration": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Rebootcomboduration"
+          },
+          "rebootComboKey1": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Rebootcombokey1"
+          },
+          "rebootComboKey2": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Rebootcombokey2"
+          },
+          "selectedTheme": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Selectedtheme"
+          },
+          "showRedDays": {
+            "anyOf": [
+              {
+                "type": "boolean"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Showreddays"
+          },
+          "showUI": {
+            "anyOf": [
+              {
+                "type": "boolean"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Showui"
+          },
+          "showWeekNumbers": {
+            "anyOf": [
+              {
+                "type": "boolean"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Showweeknumbers"
+          },
+          "sideViewPosition": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Sideviewposition"
+          },
+          "themeMode": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Thememode"
+          },
+          "timeFormat": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Timeformat"
+          },
+          "timezone": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Timezone"
+          },
+          "weekStartDay": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Weekstartday"
+          },
+          "weekendDays": {
+            "anyOf": [
+              {
+                "items": {
+                  "type": "integer"
+                },
+                "type": "array"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Weekenddays"
+          }
+        },
+        "title": "ConfigUpdate",
+        "type": "object"
+      },
+      "HTTPValidationError": {
+        "properties": {
+          "detail": {
+            "items": {
+              "$ref": "#/components/schemas/ValidationError"
+            },
+            "title": "Detail",
+            "type": "array"
+          }
+        },
+        "title": "HTTPValidationError",
+        "type": "object"
+      },
+      "KeyboardMappingUpdate": {
+        "description": "Single keyboard mapping update model.",
+        "properties": {
+          "action": {
+            "title": "Action",
+            "type": "string"
+          },
+          "key_code": {
+            "title": "Key Code",
+            "type": "string"
+          },
+          "keyboard_type": {
+            "title": "Keyboard Type",
+            "type": "string"
+          }
+        },
+        "required": [
+          "keyboard_type",
+          "key_code",
+          "action"
+        ],
+        "title": "KeyboardMappingUpdate",
+        "type": "object"
+      },
+      "KeyboardMappings": {
+        "description": "Keyboard mappings model.",
+        "properties": {
+          "mappings": {
+            "additionalProperties": {
+              "additionalProperties": {
+                "type": "string"
+              },
+              "type": "object"
+            },
+            "title": "Mappings",
+            "type": "object"
+          }
+        },
+        "required": [
+          "mappings"
+        ],
+        "title": "KeyboardMappings",
+        "type": "object"
+      },
+      "PluginDeleteResponse": {
+        "properties": {
+          "frontend_rebuild_in_progress": {
+            "default": false,
+            "title": "Frontend Rebuild In Progress",
+            "type": "boolean"
+          },
+          "message": {
+            "title": "Message",
+            "type": "string"
+          },
+          "success": {
+            "title": "Success",
+            "type": "boolean"
+          }
+        },
+        "required": [
+          "success",
+          "message"
+        ],
+        "title": "PluginDeleteResponse",
+        "type": "object"
+      },
+      "PluginInstallResponse": {
+        "properties": {
+          "frontend_rebuild_in_progress": {
+            "title": "Frontend Rebuild In Progress",
+            "type": "boolean"
+          },
+          "manifest": {
+            "additionalProperties": true,
+            "title": "Manifest",
+            "type": "object"
+          },
+          "message": {
+            "title": "Message",
+            "type": "string"
+          },
+          "requires_restart": {
+            "title": "Requires Restart",
+            "type": "boolean"
+          },
+          "success": {
+            "title": "Success",
+            "type": "boolean"
+          }
+        },
+        "required": [
+          "success",
+          "message",
+          "manifest",
+          "requires_restart",
+          "frontend_rebuild_in_progress"
+        ],
+        "title": "PluginInstallResponse",
+        "type": "object"
+      },
+      "PluginInstanceActionResponse": {
+        "properties": {
+          "message": {
+            "title": "Message",
+            "type": "string"
+          },
+          "running": {
+            "title": "Running",
+            "type": "boolean"
+          },
+          "success": {
+            "title": "Success",
+            "type": "boolean"
+          }
+        },
+        "required": [
+          "success",
+          "message",
+          "running"
+        ],
+        "title": "PluginInstanceActionResponse",
+        "type": "object"
+      },
+      "PluginInstanceCreateRequest": {
+        "properties": {
+          "config": {
+            "additionalProperties": true,
+            "default": {},
+            "title": "Config",
+            "type": "object"
+          },
+          "enabled": {
+            "default": true,
+            "title": "Enabled",
+            "type": "boolean"
+          },
+          "name": {
+            "title": "Name",
+            "type": "string"
+          }
+        },
+        "required": [
+          "name"
+        ],
+        "title": "PluginInstanceCreateRequest",
+        "type": "object"
+      },
+      "PluginInstanceDeleteResponse": {
+        "properties": {
+          "message": {
+            "title": "Message",
+            "type": "string"
+          },
+          "success": {
+            "title": "Success",
+            "type": "boolean"
+          }
+        },
+        "required": [
+          "success",
+          "message"
+        ],
+        "title": "PluginInstanceDeleteResponse",
+        "type": "object"
+      },
+      "PluginInstanceListResponse": {
+        "properties": {
+          "instances": {
+            "items": {
+              "$ref": "#/components/schemas/PluginInstanceResponse"
+            },
+            "title": "Instances",
+            "type": "array"
+          },
+          "total": {
+            "title": "Total",
+            "type": "integer"
+          }
+        },
+        "required": [
+          "instances",
+          "total"
+        ],
+        "title": "PluginInstanceListResponse",
+        "type": "object"
+      },
+      "PluginInstanceOrderUpdateResponse": {
+        "properties": {
+          "message": {
+            "title": "Message",
+            "type": "string"
+          },
+          "success": {
+            "title": "Success",
+            "type": "boolean"
+          },
+          "updated": {
+            "title": "Updated",
+            "type": "integer"
+          }
+        },
+        "required": [
+          "success",
+          "message",
+          "updated"
+        ],
+        "title": "PluginInstanceOrderUpdateResponse",
+        "type": "object"
+      },
+      "PluginInstanceResponse": {
+        "properties": {
+          "config": {
+            "additionalProperties": true,
+            "title": "Config",
+            "type": "object"
+          },
+          "display_order": {
+            "title": "Display Order",
+            "type": "integer"
+          },
+          "enabled": {
+            "title": "Enabled",
+            "type": "boolean"
+          },
+          "id": {
+            "title": "Id",
+            "type": "string"
+          },
+          "name": {
+            "title": "Name",
+            "type": "string"
+          },
+          "running": {
+            "title": "Running",
+            "type": "boolean"
+          }
+        },
+        "required": [
+          "id",
+          "name",
+          "enabled",
+          "running",
+          "config",
+          "display_order"
+        ],
+        "title": "PluginInstanceResponse",
+        "type": "object"
+      },
+      "PluginInstanceUpdateResponse": {
+        "properties": {
+          "instance": {
+            "$ref": "#/components/schemas/PluginInstanceResponse"
+          },
+          "message": {
+            "title": "Message",
+            "type": "string"
+          },
+          "success": {
+            "title": "Success",
+            "type": "boolean"
+          }
+        },
+        "required": [
+          "success",
+          "message",
+          "instance"
+        ],
+        "title": "PluginInstanceUpdateResponse",
+        "type": "object"
+      },
+      "PluginListResponse": {
+        "properties": {
+          "plugins": {
+            "items": {
+              "additionalProperties": true,
+              "type": "object"
+            },
+            "title": "Plugins",
+            "type": "array"
+          },
+          "total": {
+            "title": "Total",
+            "type": "integer"
+          }
+        },
+        "required": [
+          "plugins",
+          "total"
+        ],
+        "title": "PluginListResponse",
+        "type": "object"
+      },
+      "PluginManifestEnvelope": {
+        "properties": {
+          "manifest": {
+            "additionalProperties": true,
+            "title": "Manifest",
+            "type": "object"
+          }
+        },
+        "required": [
+          "manifest"
+        ],
+        "title": "PluginManifestEnvelope",
+        "type": "object"
+      },
+      "PluginTypeConfigUpdateRequest": {
+        "properties": {
+          "config": {
+            "additionalProperties": true,
+            "default": {},
+            "title": "Config",
+            "type": "object"
+          },
+          "enabled": {
+            "anyOf": [
+              {
+                "type": "boolean"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Enabled"
+          }
+        },
+        "title": "PluginTypeConfigUpdateRequest",
+        "type": "object"
+      },
+      "PluginTypeConfigUpdateResponse": {
+        "properties": {
+          "message": {
+            "title": "Message",
+            "type": "string"
+          },
+          "plugin_id": {
+            "title": "Plugin Id",
+            "type": "string"
+          },
+          "success": {
+            "title": "Success",
+            "type": "boolean"
+          }
+        },
+        "required": [
+          "success",
+          "message",
+          "plugin_id"
+        ],
+        "title": "PluginTypeConfigUpdateResponse",
+        "type": "object"
+      },
+      "RebuildStatusResponse": {
+        "properties": {
+          "message": {
+            "title": "Message",
+            "type": "string"
+          },
+          "state": {
+            "title": "State",
+            "type": "string"
+          }
+        },
+        "required": [
+          "state",
+          "message"
+        ],
+        "title": "RebuildStatusResponse",
+        "type": "object"
+      },
+      "ValidationError": {
+        "properties": {
+          "loc": {
+            "items": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "integer"
+                }
+              ]
+            },
+            "title": "Location",
+            "type": "array"
+          },
+          "msg": {
+            "title": "Message",
+            "type": "string"
+          },
+          "type": {
+            "title": "Error Type",
+            "type": "string"
+          }
+        },
+        "required": [
+          "loc",
+          "msg",
+          "type"
+        ],
+        "title": "ValidationError",
+        "type": "object"
+      }
+    }
+  },
+  "info": {
+    "description": "Lightweight DAKBoard alternative for Raspberry Pi",
+    "title": "Calvin Dashboard API",
+    "version": "0.1.0"
+  },
+  "openapi": "3.1.0",
+  "paths": {
+    "/": {
+      "get": {
+        "description": "Root endpoint.",
+        "operationId": "root__get",
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            },
+            "description": "Successful Response"
+          }
+        },
+        "summary": "Root"
+      }
+    },
+    "/api/calendar/events": {
+      "get": {
+        "description": "Get calendar events for a date range.\n\nIf start_date and end_date are not provided, defaults to current month.",
+        "operationId": "get_calendar_events_api_calendar_events_get",
+        "parameters": [
+          {
+            "description": "Start date for events",
+            "in": "query",
+            "name": "start_date",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "format": "date-time",
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "description": "Start date for events",
+              "title": "Start Date"
+            }
+          },
+          {
+            "description": "End date for events",
+            "in": "query",
+            "name": "end_date",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "format": "date-time",
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "description": "End date for events",
+              "title": "End Date"
+            }
+          },
+          {
+            "description": "Comma-separated source IDs",
+            "in": "query",
+            "name": "source_ids",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "description": "Comma-separated source IDs",
+              "title": "Source Ids"
+            }
+          },
+          {
+            "description": "Force refresh (clear cache)",
+            "in": "query",
+            "name": "refresh",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "boolean"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "default": false,
+              "description": "Force refresh (clear cache)",
+              "title": "Refresh"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/CalendarEventsResponse"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Get Calendar Events",
+        "tags": [
+          "calendar"
+        ]
+      }
+    },
+    "/api/calendar/refresh": {
+      "post": {
+        "description": "Manually refresh calendar cache.\n\nIf month and year are provided, only refreshes that specific month.\nOtherwise, refreshes all cached months (current, previous, next).",
+        "operationId": "refresh_calendar_cache_api_calendar_refresh_post",
+        "parameters": [
+          {
+            "description": "Optional month (1-12) to refresh specific month",
+            "in": "query",
+            "name": "month",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "integer"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "description": "Optional month (1-12) to refresh specific month",
+              "title": "Month"
+            }
+          },
+          {
+            "description": "Optional year to refresh specific month",
+            "in": "query",
+            "name": "year",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "integer"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "description": "Optional year to refresh specific month",
+              "title": "Year"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Refresh Calendar Cache",
+        "tags": [
+          "calendar"
+        ]
+      }
+    },
+    "/api/calendar/sources": {
+      "get": {
+        "description": "Get all calendar sources from plugins (only from enabled plugin types).",
+        "operationId": "get_calendar_sources_api_calendar_sources_get",
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/CalendarSourcesResponse"
+                }
+              }
+            },
+            "description": "Successful Response"
+          }
+        },
+        "summary": "Get Calendar Sources",
+        "tags": [
+          "calendar"
+        ]
+      },
+      "post": {
+        "description": "Add a new calendar source plugin.\n\nFor Google Calendar:\n- type: \"google\"\n- ical_url: The public iCal URL or share URL from Google Calendar\n- Share URL example: https://calendar.google.com/calendar/u/0?cid=...\n- iCal URL example: https://calendar.google.com/calendar/ical/.../basic.ics\n- The service will automatically convert share URLs to iCal format.\n\nFor Proton Calendar or other iCal sources:\n- type: \"proton\" or \"ical\"\n- ical_url: The iCal feed URL\n- URL format: https://calendar.proton.me/api/calendar/v1/url/{calendar_id}/calendar.ics?CacheKey=...&PassphraseKey=...\n- You can get this URL from Proton Calendar's sharing settings.\n- The URL includes authentication parameters (CacheKey and PassphraseKey) in the query string.\n\nCalendar events are cached for 5 minutes and automatically refreshed.\n\nNote: Google Calendar URLs are automatically normalized by the plugin during initialization.",
+        "operationId": "add_calendar_source_api_calendar_sources_post",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/CalendarSource"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/CalendarSource"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Add Calendar Source",
+        "tags": [
+          "calendar"
+        ]
+      }
+    },
+    "/api/calendar/sources/{source_id}": {
+      "delete": {
+        "description": "Remove a calendar source plugin.",
+        "operationId": "remove_calendar_source_api_calendar_sources__source_id__delete",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "source_id",
+            "required": true,
+            "schema": {
+              "title": "Source Id",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Remove Calendar Source",
+        "tags": [
+          "calendar"
+        ]
+      },
+      "put": {
+        "description": "Update a calendar source plugin (e.g., color, show_time).",
+        "operationId": "update_calendar_source_api_calendar_sources__source_id__put",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "source_id",
+            "required": true,
+            "schema": {
+              "title": "Source Id",
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/CalendarSource"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/CalendarSource"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Update Calendar Source",
+        "tags": [
+          "calendar"
+        ]
+      }
+    },
+    "/api/config": {
+      "get": {
+        "description": "Get current configuration.",
+        "operationId": "get_config_api_config_get",
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            },
+            "description": "Successful Response"
+          }
+        },
+        "summary": "Get Config",
+        "tags": [
+          "config"
+        ]
+      },
+      "post": {
+        "description": "Update configuration.",
+        "operationId": "update_config_api_config_post",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ConfigUpdate"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Update Config",
+        "tags": [
+          "config"
+        ]
+      }
+    },
+    "/api/config/display/orientation": {
+      "get": {
+        "description": "Get current display orientation (Raspberry Pi only).\n\nReturns:\n    Dictionary with current display orientation info",
+        "operationId": "get_display_orientation_api_config_display_orientation_get",
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            },
+            "description": "Successful Response"
+          }
+        },
+        "summary": "Get Display Orientation",
+        "tags": [
+          "config"
+        ]
+      }
+    },
+    "/api/config/git/branches": {
+      "get": {
+        "description": "Fetch available branches from a git repository.\n\nArgs:\n    repo_url: Git repository URL (e.g., https://github.com/user/repo.git)\n             If not provided, uses the configured git_repo_url or default\n\nReturns:\n    List of branch names",
+        "operationId": "get_git_branches_api_config_git_branches_get",
+        "parameters": [
+          {
+            "in": "query",
+            "name": "repo_url",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Repo Url"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Get Git Branches",
+        "tags": [
+          "config"
+        ]
+      }
+    },
+    "/api/health": {
+      "get": {
+        "description": "Basic health check endpoint.",
+        "operationId": "health_check_api_health_get",
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            },
+            "description": "Successful Response"
+          }
+        },
+        "summary": "Health Check",
+        "tags": [
+          "health"
+        ]
+      }
+    },
+    "/api/health/detailed": {
+      "get": {
+        "description": "Detailed health check with system status.",
+        "operationId": "detailed_health_check_api_health_detailed_get",
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            },
+            "description": "Successful Response"
+          }
+        },
+        "summary": "Detailed Health Check",
+        "tags": [
+          "health"
+        ]
+      }
+    },
+    "/api/health/test-db": {
+      "get": {
+        "description": "Test database connection and Ormar models.",
+        "operationId": "test_db_health_check_api_health_test_db_get",
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            },
+            "description": "Successful Response"
+          }
+        },
+        "summary": "Test Db Health Check",
+        "tags": [
+          "health"
+        ]
+      }
+    },
+    "/api/images/config": {
+      "get": {
+        "description": "Get image service configuration from plugins.\n\nReturns:\n    Configuration dictionary",
+        "operationId": "get_image_config_api_images_config_get",
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            },
+            "description": "Successful Response"
+          }
+        },
+        "summary": "Get Image Config",
+        "tags": [
+          "images"
+        ]
+      }
+    },
+    "/api/images/current": {
+      "get": {
+        "description": "Get current image metadata from plugin service.\n\nReturns:\n    Current image metadata",
+        "operationId": "get_current_image_api_images_current_get",
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            },
+            "description": "Successful Response"
+          }
+        },
+        "summary": "Get Current Image",
+        "tags": [
+          "images"
+        ]
+      }
+    },
+    "/api/images/list": {
+      "get": {
+        "description": "Get list of all images from all enabled image plugins.\n\nReturns:\n    List of image metadata",
+        "operationId": "list_images_api_images_list_get",
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            },
+            "description": "Successful Response"
+          }
+        },
+        "summary": "List Images",
+        "tags": [
+          "images"
+        ]
+      }
+    },
+    "/api/images/next": {
+      "post": {
+        "description": "Move to next image and return it from plugin service.\n\nReturns:\n    Next image metadata",
+        "operationId": "next_image_api_images_next_post",
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            },
+            "description": "Successful Response"
+          }
+        },
+        "summary": "Next Image",
+        "tags": [
+          "images"
+        ]
+      }
+    },
+    "/api/images/previous": {
+      "post": {
+        "description": "Move to previous image and return it from plugin service.\n\nReturns:\n    Previous image metadata",
+        "operationId": "previous_image_api_images_previous_post",
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            },
+            "description": "Successful Response"
+          }
+        },
+        "summary": "Previous Image",
+        "tags": [
+          "images"
+        ]
+      }
+    },
+    "/api/images/upload": {
+      "post": {
+        "description": "Upload an image file to the first plugin that supports upload.\n\nArgs:\n    file: Image file to upload\n\nReturns:\n    Uploaded image metadata",
+        "operationId": "upload_image_api_images_upload_post",
+        "requestBody": {
+          "content": {
+            "multipart/form-data": {
+              "schema": {
+                "$ref": "#/components/schemas/Body_upload_image_api_images_upload_post"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Upload Image",
+        "tags": [
+          "images"
+        ]
+      }
+    },
+    "/api/images/{image_id}": {
+      "delete": {
+        "description": "Delete an image by ID from plugin service.\n\nArgs:\n    image_id: Image ID\n\nReturns:\n    Success message",
+        "operationId": "delete_image_api_images__image_id__delete",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "image_id",
+            "required": true,
+            "schema": {
+              "title": "Image Id",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Delete Image",
+        "tags": [
+          "images"
+        ]
+      },
+      "get": {
+        "description": "Get image file by ID from plugin service.\n\nFor remote images, downloads and serves via the local cache (avoids rate limits,\nenables stale-on-error). For local images, serves the file directly.\n\nArgs:\n    image_id: Image ID\n\nReturns:\n    Image file response",
+        "operationId": "get_image_file_api_images__image_id__get",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "image_id",
+            "required": true,
+            "schema": {
+              "title": "Image Id",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Get Image File",
+        "tags": [
+          "images"
+        ]
+      }
+    },
+    "/api/images/{image_id}/thumbnail": {
+      "get": {
+        "description": "Get thumbnail for an image by ID from plugin service.\n\nArgs:\n    image_id: Image ID\n\nReturns:\n    Thumbnail image file",
+        "operationId": "get_image_thumbnail_api_images__image_id__thumbnail_get",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "image_id",
+            "required": true,
+            "schema": {
+              "title": "Image Id",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Get Image Thumbnail",
+        "tags": [
+          "images"
+        ]
+      }
+    },
+    "/api/keyboard/actions": {
+      "get": {
+        "description": "Get list of available keyboard actions.\n\nReturns:\n    List of available action names",
+        "operationId": "get_available_actions_api_keyboard_actions_get",
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            },
+            "description": "Successful Response"
+          }
+        },
+        "summary": "Get Available Actions",
+        "tags": [
+          "keyboard"
+        ]
+      }
+    },
+    "/api/keyboard/mappings": {
+      "get": {
+        "description": "Get keyboard mappings.\n\nArgs:\n    keyboard_type: Optional keyboard type filter ('7-button' or 'standard')\n\nReturns:\n    Dictionary of keyboard mappings",
+        "operationId": "get_keyboard_mappings_api_keyboard_mappings_get",
+        "parameters": [
+          {
+            "in": "query",
+            "name": "keyboard_type",
+            "required": false,
+            "schema": {
+              "title": "Keyboard Type",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Get Keyboard Mappings",
+        "tags": [
+          "keyboard"
+        ]
+      },
+      "post": {
+        "description": "Update keyboard mappings.\n\nArgs:\n    mappings: Dictionary of keyboard type to key mappings",
+        "operationId": "update_keyboard_mappings_api_keyboard_mappings_post",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/KeyboardMappings"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Update Keyboard Mappings",
+        "tags": [
+          "keyboard"
+        ]
+      }
+    },
+    "/api/keyboard/mappings/{keyboard_type}/{key_code}": {
+      "put": {
+        "description": "Update a single keyboard mapping.\n\nArgs:\n    keyboard_type: Keyboard type ('7-button' or 'standard')\n    key_code: Key code (e.g., 'KEY_1')\n    mapping_update: Mapping update data",
+        "operationId": "update_single_mapping_api_keyboard_mappings__keyboard_type___key_code__put",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "keyboard_type",
+            "required": true,
+            "schema": {
+              "title": "Keyboard Type",
+              "type": "string"
+            }
+          },
+          {
+            "in": "path",
+            "name": "key_code",
+            "required": true,
+            "schema": {
+              "title": "Key Code",
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/KeyboardMappingUpdate"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Update Single Mapping",
+        "tags": [
+          "keyboard"
+        ]
+      }
+    },
+    "/api/plugins": {
+      "get": {
+        "description": "Get all plugin types, optionally filtered by type.\n\nArgs:\n    plugin_type: Optional plugin type filter\n        ('calendar', 'image', 'service', 'theme', 'backend')\n\nReturns:\n    List of plugin types with their common configuration",
+        "operationId": "get_plugins_api_plugins_get",
+        "parameters": [
+          {
+            "description": "Optional plugin type filter",
+            "in": "query",
+            "name": "plugin_type",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "description": "Optional plugin type filter",
+              "title": "Plugin Type"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PluginListResponse"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Get Plugins",
+        "tags": [
+          "plugins"
+        ]
+      }
+    },
+    "/api/plugins/github/enumerate": {
+      "post": {
+        "description": "Enumerate available plugins from a GitHub repository.\n\nArgs:\n    request: Request body containing:\n        - repo_url: GitHub repository URL (e.g., https://github.com/user/repo)\n        - branch: Optional branch name (defaults to main/master)\n\nReturns:\n    Dictionary with manifest info and list of available plugins",
+        "operationId": "enumerate_plugins_from_github_api_plugins_github_enumerate_post",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "additionalProperties": true,
+                "title": "Request",
+                "type": "object"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Enumerate Plugins From Github",
+        "tags": [
+          "plugins"
+        ]
+      }
+    },
+    "/api/plugins/github/install": {
+      "post": {
+        "description": "Install a specific plugin from a GitHub repository.\n\nArgs:\n    request: Request body containing:\n        - repo_url: GitHub repository URL\n        - plugin_path: Relative path to plugin directory within repo\n        - branch: Optional branch name (defaults to main/master)\n        - plugin_id: Optional plugin ID override\n        - force: Optional boolean to force reinstall even if already installed\n\nReturns:\n    Installation result with manifest",
+        "operationId": "install_plugin_from_github_api_plugins_github_install_post",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "additionalProperties": true,
+                "title": "Request",
+                "type": "object"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Install Plugin From Github",
+        "tags": [
+          "plugins"
+        ]
+      }
+    },
+    "/api/plugins/inspect": {
+      "post": {
+        "description": "Read plugin.json from a zip without installing it.\n\nReturns the manifest so the caller can check python_dependencies and\nshow a security warning before committing to an install.",
+        "operationId": "inspect_plugin_api_plugins_inspect_post",
+        "requestBody": {
+          "content": {
+            "multipart/form-data": {
+              "schema": {
+                "$ref": "#/components/schemas/Body_inspect_plugin_api_plugins_inspect_post"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PluginManifestEnvelope"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Inspect Plugin",
+        "tags": [
+          "plugins"
+        ]
+      }
+    },
+    "/api/plugins/install": {
+      "post": {
+        "description": "Install a plugin from a zip file or directory.\n\nArgs:\n    file: Plugin package zip file\n    plugin_id: Optional plugin ID override\n\nReturns:\n    Plugin manifest",
+        "operationId": "install_plugin_api_plugins_install_post",
+        "parameters": [
+          {
+            "in": "query",
+            "name": "plugin_id",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Plugin Id"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "multipart/form-data": {
+              "schema": {
+                "$ref": "#/components/schemas/Body_install_plugin_api_plugins_install_post"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PluginInstallResponse"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Install Plugin",
+        "tags": [
+          "plugins"
+        ]
+      }
+    },
+    "/api/plugins/installed": {
+      "get": {
+        "description": "Get list of installed plugins and themes.\n\nReturns:\n    List of installed plugin and theme manifests",
+        "operationId": "get_installed_plugins_api_plugins_installed_get",
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PluginListResponse"
+                }
+              }
+            },
+            "description": "Successful Response"
+          }
+        },
+        "summary": "Get Installed Plugins",
+        "tags": [
+          "plugins"
+        ]
+      }
+    },
+    "/api/plugins/installed/{plugin_id}": {
+      "delete": {
+        "description": "Uninstall a plugin or theme.\n\nArgs:\n    plugin_id: Plugin/theme identifier\n\nReturns:\n    Success message",
+        "operationId": "uninstall_plugin_api_plugins_installed__plugin_id__delete",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "plugin_id",
+            "required": true,
+            "schema": {
+              "title": "Plugin Id",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PluginDeleteResponse"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Uninstall Plugin",
+        "tags": [
+          "plugins"
+        ]
+      },
+      "get": {
+        "description": "Get manifest for an installed plugin.\n\nArgs:\n    plugin_id: Plugin identifier\n\nReturns:\n    Plugin manifest",
+        "operationId": "get_installed_plugin_api_plugins_installed__plugin_id__get",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "plugin_id",
+            "required": true,
+            "schema": {
+              "title": "Plugin Id",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Get Installed Plugin",
+        "tags": [
+          "plugins"
+        ]
+      }
+    },
+    "/api/plugins/instances/{instance_id}": {
+      "delete": {
+        "operationId": "delete_plugin_instance_api_plugins_instances__instance_id__delete",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "instance_id",
+            "required": true,
+            "schema": {
+              "title": "Instance Id",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PluginInstanceDeleteResponse"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Delete Plugin Instance",
+        "tags": [
+          "plugins"
+        ]
+      },
+      "put": {
+        "description": "Update a plugin instance (enabled status, config, etc.).\n\nArgs:\n    instance_id: Plugin instance ID (e.g., 'imap-6444', 'mealie-7040')\n    instance_data: Dictionary with fields to update:\n        - enabled: bool (optional) - Enable/disable instance\n        - config: dict (optional) - Update instance configuration\n        - name: str (optional) - Update instance name\n\nReturns:\n    Success status and updated instance information",
+        "operationId": "update_plugin_instance_api_plugins_instances__instance_id__put",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "instance_id",
+            "required": true,
+            "schema": {
+              "title": "Instance Id",
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "additionalProperties": true,
+                "title": "Instance Data",
+                "type": "object"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PluginInstanceUpdateResponse"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Update Plugin Instance",
+        "tags": [
+          "plugins"
+        ]
+      }
+    },
+    "/api/plugins/instances/{instance_id}/start": {
+      "post": {
+        "description": "Start a plugin instance (if enabled).\n\nArgs:\n    instance_id: Plugin instance ID\n\nReturns:\n    Success status and message",
+        "operationId": "start_plugin_instance_api_plugins_instances__instance_id__start_post",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "instance_id",
+            "required": true,
+            "schema": {
+              "title": "Instance Id",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PluginInstanceActionResponse"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Start Plugin Instance",
+        "tags": [
+          "plugins"
+        ]
+      }
+    },
+    "/api/plugins/instances/{instance_id}/stop": {
+      "post": {
+        "description": "Stop a plugin instance.\n\nArgs:\n    instance_id: Plugin instance ID\n\nReturns:\n    Success status and message",
+        "operationId": "stop_plugin_instance_api_plugins_instances__instance_id__stop_post",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "instance_id",
+            "required": true,
+            "schema": {
+              "title": "Instance Id",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PluginInstanceActionResponse"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Stop Plugin Instance",
+        "tags": [
+          "plugins"
+        ]
+      }
+    },
+    "/api/plugins/local/enumerate": {
+      "post": {
+        "description": "Enumerate available plugins from a local directory (dev mode only).\n\nArgs:\n    request: Request body containing:\n        - local_path: Absolute path to the local plugin repository",
+        "operationId": "enumerate_plugins_from_local_api_plugins_local_enumerate_post",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "additionalProperties": true,
+                "title": "Request",
+                "type": "object"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Enumerate Plugins From Local",
+        "tags": [
+          "plugins"
+        ]
+      }
+    },
+    "/api/plugins/local/install": {
+      "post": {
+        "description": "Install a specific plugin from a local directory (dev mode only).\n\nArgs:\n    request: Request body containing:\n        - local_path: Absolute path to the local plugin repository\n        - plugin_path: Relative path to plugin directory within repo\n        - plugin_id: Optional plugin ID override\n        - force: Optional boolean to force reinstall",
+        "operationId": "install_plugin_from_local_api_plugins_local_install_post",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "additionalProperties": true,
+                "title": "Request",
+                "type": "object"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Install Plugin From Local",
+        "tags": [
+          "plugins"
+        ]
+      }
+    },
+    "/api/plugins/local/suggest": {
+      "get": {
+        "description": "Suggest local plugin repository paths by scanning sibling directories (dev mode only).\nReturns paths to directories containing plugins.json.",
+        "operationId": "suggest_local_plugin_paths_api_plugins_local_suggest_get",
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            },
+            "description": "Successful Response"
+          }
+        },
+        "summary": "Suggest Local Plugin Paths",
+        "tags": [
+          "plugins"
+        ]
+      }
+    },
+    "/api/plugins/rebuild-status": {
+      "get": {
+        "description": "Return the current state of a background frontend rebuild.",
+        "operationId": "get_rebuild_status_api_plugins_rebuild_status_get",
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/RebuildStatusResponse"
+                }
+              }
+            },
+            "description": "Successful Response"
+          }
+        },
+        "summary": "Get Rebuild Status",
+        "tags": [
+          "plugins"
+        ]
+      }
+    },
+    "/api/plugins/{plugin_id}": {
+      "get": {
+        "description": "Get a specific plugin type or theme by ID.",
+        "operationId": "get_plugin_api_plugins__plugin_id__get",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "plugin_id",
+            "required": true,
+            "schema": {
+              "title": "Plugin Id",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Get Plugin",
+        "tags": [
+          "plugins"
+        ]
+      },
+      "put": {
+        "operationId": "update_plugin_api_plugins__plugin_id__put",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "plugin_id",
+            "required": true,
+            "schema": {
+              "title": "Plugin Id",
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "additionalProperties": true,
+                "title": "Config",
+                "type": "object"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PluginTypeConfigUpdateResponse"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Update Plugin",
+        "tags": [
+          "plugins"
+        ]
+      }
+    },
+    "/api/plugins/{plugin_id}/backend/run-task": {
+      "post": {
+        "description": "Manually trigger scheduled task for a backend plugin.\n\nArgs:\n    plugin_id: Plugin instance ID\n\nReturns:\n    Task execution result with success status and message",
+        "operationId": "run_backend_plugin_task_api_plugins__plugin_id__backend_run_task_post",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "plugin_id",
+            "required": true,
+            "schema": {
+              "title": "Plugin Id",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Run Backend Plugin Task",
+        "tags": [
+          "plugins"
+        ]
+      }
+    },
+    "/api/plugins/{plugin_id}/backend/status": {
+      "get": {
+        "description": "Get status information for a backend plugin.\n\nArgs:\n    plugin_id: Plugin instance ID\n\nReturns:\n    Plugin status information",
+        "operationId": "get_backend_plugin_status_api_plugins__plugin_id__backend_status_get",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "plugin_id",
+            "required": true,
+            "schema": {
+              "title": "Plugin Id",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Get Backend Plugin Status",
+        "tags": [
+          "plugins"
+        ]
+      }
+    },
+    "/api/plugins/{plugin_id}/config": {
+      "get": {
+        "description": "Get plugin type common configuration.",
+        "operationId": "get_plugin_config_api_plugins__plugin_id__config_get",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "plugin_id",
+            "required": true,
+            "schema": {
+              "title": "Plugin Id",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Get Plugin Config",
+        "tags": [
+          "plugins"
+        ]
+      },
+      "put": {
+        "operationId": "update_plugin_config_api_plugins__plugin_id__config_put",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "plugin_id",
+            "required": true,
+            "schema": {
+              "title": "Plugin Id",
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/PluginTypeConfigUpdateRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PluginTypeConfigUpdateResponse"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Update Plugin Config",
+        "tags": [
+          "plugins"
+        ]
+      }
+    },
+    "/api/plugins/{plugin_id}/data": {
+      "get": {
+        "description": "Get data from a service plugin instance.\n\nThis is a generic endpoint that works for all service plugins that implement\nthe fetch_service_data() method (e.g., weather plugins).\n\nArgs:\n    plugin_id: Plugin instance ID\n    start_date: Optional start date (plugin-specific)\n    end_date: Optional end date (plugin-specific)\n\nReturns:\n    Plugin data (format depends on plugin type)",
+        "operationId": "get_plugin_data_api_plugins__plugin_id__data_get",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "plugin_id",
+            "required": true,
+            "schema": {
+              "title": "Plugin Id",
+              "type": "string"
+            }
+          },
+          {
+            "description": "Start date (YYYY-MM-DD)",
+            "in": "query",
+            "name": "start_date",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "description": "Start date (YYYY-MM-DD)",
+              "title": "Start Date"
+            }
+          },
+          {
+            "description": "End date (YYYY-MM-DD)",
+            "in": "query",
+            "name": "end_date",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "description": "End date (YYYY-MM-DD)",
+              "title": "End Date"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Get Plugin Data",
+        "tags": [
+          "plugins"
+        ]
+      }
+    },
+    "/api/plugins/{plugin_id}/fetch": {
+      "post": {
+        "description": "Manually trigger plugin fetch/check operation.\n\nUses plugin hooks to allow plugins to implement their own fetch logic.\n\nArgs:\n    plugin_id: Plugin type ID (e.g., 'imap')\n\nReturns:\n    Fetch result with success status, message, and details",
+        "operationId": "fetch_plugin_api_plugins__plugin_id__fetch_post",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "plugin_id",
+            "required": true,
+            "schema": {
+              "title": "Plugin Id",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Fetch Plugin",
+        "tags": [
+          "plugins"
+        ]
+      }
+    },
+    "/api/plugins/{plugin_id}/geocode": {
+      "post": {
+        "description": "Geocode a location name to coordinates using OpenStreetMap Nominatim API.\n\nThis endpoint is used by plugins (e.g., Yr.no weather) to convert location\nnames to latitude/longitude coordinates.\n\nArgs:\n    plugin_id: Plugin instance ID\n    request: Request body with \"location\" field\n\nReturns:\n    Dictionary with latitude, longitude, and display_name",
+        "operationId": "geocode_location_api_plugins__plugin_id__geocode_post",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "plugin_id",
+            "required": true,
+            "schema": {
+              "title": "Plugin Id",
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "additionalProperties": true,
+                "title": "Request",
+                "type": "object"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Geocode Location",
+        "tags": [
+          "plugins"
+        ]
+      }
+    },
+    "/api/plugins/{plugin_id}/instances": {
+      "get": {
+        "description": "Get all plugin instances for a plugin type, including running status.\n\nArgs:\n    plugin_id: Plugin type ID\n\nReturns:\n    List of plugin instances with their running status",
+        "operationId": "get_plugin_instances_api_plugins__plugin_id__instances_get",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "plugin_id",
+            "required": true,
+            "schema": {
+              "title": "Plugin Id",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PluginInstanceListResponse"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Get Plugin Instances",
+        "tags": [
+          "plugins"
+        ]
+      },
+      "post": {
+        "description": "Create a plugin instance via an explicit instance lifecycle endpoint.\n\nThis currently adapts to the existing plugin hook contract by translating\nthe typed payload into the legacy config-update metadata fields.",
+        "operationId": "create_plugin_instance_api_plugins__plugin_id__instances_post",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "plugin_id",
+            "required": true,
+            "schema": {
+              "title": "Plugin Id",
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/PluginInstanceCreateRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PluginInstanceUpdateResponse"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Create Plugin Instance",
+        "tags": [
+          "plugins"
+        ]
+      }
+    },
+    "/api/plugins/{plugin_id}/instances/order": {
+      "put": {
+        "description": "Update display order for plugin instances.\n\nArgs:\n    plugin_id: Plugin type ID\n    instance_orders: Dictionary mapping instance IDs to their new display_order values\n\nReturns:\n    Success status and message",
+        "operationId": "update_plugin_instances_order_api_plugins__plugin_id__instances_order_put",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "plugin_id",
+            "required": true,
+            "schema": {
+              "title": "Plugin Id",
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "additionalProperties": {
+                  "type": "integer"
+                },
+                "title": "Instance Orders",
+                "type": "object"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PluginInstanceOrderUpdateResponse"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Update Plugin Instances Order",
+        "tags": [
+          "plugins"
+        ]
+      }
+    },
+    "/api/plugins/{plugin_id}/scan": {
+      "get": {
+        "description": "Scan/discover available options for a plugin config field.\n\nArgs:\n    plugin_id: Plugin type ID (e.g., 'chromecast')\n    field: Config field key to scan (e.g., 'device_name')\n\nReturns:\n    Dict with 'options' list of {value, label} dicts",
+        "operationId": "scan_plugin_options_api_plugins__plugin_id__scan_get",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "plugin_id",
+            "required": true,
+            "schema": {
+              "title": "Plugin Id",
+              "type": "string"
+            }
+          },
+          {
+            "description": "Config field key to scan options for",
+            "in": "query",
+            "name": "field",
+            "required": true,
+            "schema": {
+              "description": "Config field key to scan options for",
+              "title": "Field",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Scan Plugin Options",
+        "tags": [
+          "plugins"
+        ]
+      }
+    },
+    "/api/plugins/{plugin_id}/test": {
+      "post": {
+        "description": "Test plugin connection/configuration.\n\nUses plugin hooks to allow plugins to implement their own connection testing logic.\n\nArgs:\n    plugin_id: Plugin type ID (e.g., 'imap', 'mealie')\n    test_config: Optional config to use for testing (if not provided, uses saved config)\n\nReturns:\n    Test result with success status and message",
+        "operationId": "test_plugin_api_plugins__plugin_id__test_post",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "plugin_id",
+            "required": true,
+            "schema": {
+              "title": "Plugin Id",
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "anyOf": [
+                  {
+                    "additionalProperties": true,
+                    "type": "object"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "title": "Test Config"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Test Plugin",
+        "tags": [
+          "plugins"
+        ]
+      }
+    },
+    "/api/system/display/power/off": {
+      "post": {
+        "description": "Turn display off.",
+        "operationId": "turn_display_off_api_system_display_power_off_post",
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            },
+            "description": "Successful Response"
+          }
+        },
+        "summary": "Turn Display Off",
+        "tags": [
+          "system"
+        ]
+      }
+    },
+    "/api/system/display/power/on": {
+      "post": {
+        "description": "Turn display on.",
+        "operationId": "turn_display_on_api_system_display_power_on_post",
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            },
+            "description": "Successful Response"
+          }
+        },
+        "summary": "Turn Display On",
+        "tags": [
+          "system"
+        ]
+      }
+    },
+    "/api/system/display/power/state": {
+      "get": {
+        "description": "Get current display power state.",
+        "operationId": "get_display_state_api_system_display_power_state_get",
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            },
+            "description": "Successful Response"
+          }
+        },
+        "summary": "Get Display State",
+        "tags": [
+          "system"
+        ]
+      }
+    },
+    "/api/system/display/timeout/configure": {
+      "post": {
+        "description": "Apply display timeout settings immediately.",
+        "operationId": "configure_display_timeout_api_system_display_timeout_configure_post",
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            },
+            "description": "Successful Response"
+          }
+        },
+        "summary": "Configure Display Timeout",
+        "tags": [
+          "system"
+        ]
+      }
+    },
+    "/api/system/reboot": {
+      "post": {
+        "description": "Reboot the Raspberry Pi.",
+        "operationId": "reboot_system_api_system_reboot_post",
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            },
+            "description": "Successful Response"
+          }
+        },
+        "summary": "Reboot System",
+        "tags": [
+          "system"
+        ]
+      }
+    },
+    "/api/system/reload-ui": {
+      "post": {
+        "description": "Signal that the UI should be reloaded.\nThis endpoint doesn't actually reload anything server-side,\nbut can be used to trigger a client-side reload.",
+        "operationId": "reload_ui_api_system_reload_ui_post",
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            },
+            "description": "Successful Response"
+          }
+        },
+        "summary": "Reload Ui",
+        "tags": [
+          "system"
+        ]
+      }
+    },
+    "/api/system/restart-backend": {
+      "post": {
+        "description": "Restart the backend service.\nUses a helper script with sudo permissions to restart the calvin-backend service.\n\nThe actual restart runs after a short delay on a background thread so this process\ncan return HTTP 200 before systemd stops it; otherwise clients typically see a\nnetwork error even when the restart succeeds.",
+        "operationId": "restart_backend_api_system_restart_backend_post",
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            },
+            "description": "Successful Response"
+          }
+        },
+        "summary": "Restart Backend",
+        "tags": [
+          "system"
+        ]
+      }
+    },
+    "/api/system/restart-frontend": {
+      "post": {
+        "description": "Restart the frontend service.\nUses a helper script with sudo permissions to restart the calvin-frontend service.",
+        "operationId": "restart_frontend_api_system_restart_frontend_post",
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            },
+            "description": "Successful Response"
+          }
+        },
+        "summary": "Restart Frontend",
+        "tags": [
+          "system"
+        ]
+      }
+    },
+    "/api/system/update": {
+      "post": {
+        "description": "Trigger manual update from GitHub.\nRuns the update script asynchronously and returns immediately.",
+        "operationId": "trigger_update_api_system_update_post",
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            },
+            "description": "Successful Response"
+          }
+        },
+        "summary": "Trigger Update",
+        "tags": [
+          "system"
+        ]
+      }
+    },
+    "/api/system/update/status": {
+      "get": {
+        "description": "Get the status of the last update.\nReads the last few lines from the update log.",
+        "operationId": "get_update_status_api_system_update_status_get",
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            },
+            "description": "Successful Response"
+          }
+        },
+        "summary": "Get Update Status",
+        "tags": [
+          "system"
+        ]
+      }
+    },
+    "/api/system/update/stream": {
+      "get": {
+        "description": "Stream update log output as Server-Sent Events starting from log_offset bytes.",
+        "operationId": "stream_update_log_api_system_update_stream_get",
+        "parameters": [
+          {
+            "in": "query",
+            "name": "log_offset",
+            "required": false,
+            "schema": {
+              "default": 0,
+              "title": "Log Offset",
+              "type": "integer"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Stream Update Log",
+        "tags": [
+          "system"
+        ]
+      }
+    }
+  }
+}

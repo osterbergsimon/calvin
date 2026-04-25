@@ -6,7 +6,13 @@ export default [
   js.configs.recommended,
   ...pluginVue.configs["flat/recommended"],
   {
-    ignores: ["**/node_modules/**", "**/dist/**", "**/*.config.js", "vite.config.js"],
+    ignores: [
+      "**/node_modules/**",
+      "**/dist/**",
+      "**/*.config.js",
+      "vite.config.js",
+      "src/api/types.ts",
+    ],
   },
   {
     languageOptions: {

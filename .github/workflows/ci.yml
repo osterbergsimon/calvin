@@ -95,6 +95,16 @@ jobs:
         working-directory: ./frontend
         run: npx prettier --check "src/**/*.{js,jsx,vue,json,css}"
       
+      - name: Verify generated API types are up to date
+        working-directory: ./frontend
+        run: |
+          npm run gen:api
+          if ! git diff --exit-code -- src/api/types.ts; then
+            echo "::error::frontend/src/api/types.ts is out of date with backend/tests/contract/openapi.json."
+            echo "Run 'npm run gen:api' in frontend/ and commit the result."
+            exit 1
+          fi
+
       - name: Run frontend tests
         working-directory: ./frontend
         run: npm run test -- --coverage --reporter=verbose
