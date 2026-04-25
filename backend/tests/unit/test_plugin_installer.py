@@ -121,6 +121,26 @@ class TestPluginInstaller:
         assert manifest["id"] == "test_plugin"
         assert manifest["name"] == "Test Plugin"
 
+    def test_validate_plugin_directory_defaults_protocol_version(
+        self, plugin_installer, valid_plugin_package
+    ):
+        """Test plugin manifests default to protocol version 1 when omitted."""
+        manifest = plugin_installer.validate_plugin_package(valid_plugin_package)
+        assert manifest.get("protocol_version", 1) == 1
+
+    def test_validate_plugin_directory_unsupported_protocol_version(
+        self, plugin_installer, tmp_path, valid_plugin_manifest
+    ):
+        """Test validating plugin directory with unsupported protocol version."""
+        plugin_dir = tmp_path / "invalid_plugin"
+        plugin_dir.mkdir()
+        manifest = {**valid_plugin_manifest, "protocol_version": 2}
+        (plugin_dir / "plugin.json").write_text(json.dumps(manifest))
+        (plugin_dir / "plugin.py").write_text("# Plugin code")
+
+        with pytest.raises(ValueError, match="Unsupported plugin.json protocol version"):
+            plugin_installer.validate_plugin_package(plugin_dir)
+
     def test_validate_plugin_directory_missing_manifest(self, plugin_installer, tmp_path):
         """Test validating plugin directory without plugin.json."""
         plugin_dir = tmp_path / "invalid_plugin"

@@ -11,6 +11,9 @@ from pydantic import BaseModel, ConfigDict, Field
 
 from app.plugins.base import PluginType
 
+CURRENT_PLUGIN_PROTOCOL_VERSION = 1
+SUPPORTED_PLUGIN_PROTOCOL_VERSIONS = {CURRENT_PLUGIN_PROTOCOL_VERSION}
+
 
 class ConfigFieldDefinition(BaseModel):
     """Typed config field metadata with permissive extra support."""
@@ -71,7 +74,7 @@ class CapabilitySet(BaseModel):
 class PluginDefinition(BaseModel):
     """Normalized plugin definition consumed by the app."""
 
-    protocol_version: int = 1
+    protocol_version: int = CURRENT_PLUGIN_PROTOCOL_VERSION
     type_id: str
     plugin_type: PluginType
     name: str
@@ -94,10 +97,22 @@ class PluginDefinition(BaseModel):
     def from_raw(cls, raw: "PluginDefinition | dict[str, Any]") -> "PluginDefinition":
         """Normalize a raw plugin definition into the typed model."""
         if isinstance(raw, cls):
-            return raw
+            return raw.ensure_supported()
         if isinstance(raw, dict):
-            return cls.model_validate(raw)
+            return cls.model_validate(raw).ensure_supported()
         raise TypeError(f"Unsupported plugin definition type: {type(raw)!r}")
+
+    def ensure_supported(self) -> "PluginDefinition":
+        """Validate that this plugin definition targets a supported protocol version."""
+        if self.protocol_version not in SUPPORTED_PLUGIN_PROTOCOL_VERSIONS:
+            supported = ", ".join(
+                str(version) for version in sorted(SUPPORTED_PLUGIN_PROTOCOL_VERSIONS)
+            )
+            raise ValueError(
+                f"Unsupported plugin protocol version: {self.protocol_version}. "
+                f"Supported versions: {supported}"
+            )
+        return self
 
     def get(self, key: str, default: Any = None) -> Any:
         """Mapping-style compatibility for legacy callers."""

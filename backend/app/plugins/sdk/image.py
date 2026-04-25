@@ -8,6 +8,7 @@ import httpx
 from loguru import logger
 
 from app.plugins.base import PluginType
+from app.plugins.definitions import CURRENT_PLUGIN_PROTOCOL_VERSION
 from app.plugins.protocols import ImagePlugin
 from app.plugins.utils.config import extract_config_value
 from app.plugins.utils.instance_manager import InstanceManagerConfig
@@ -70,6 +71,7 @@ def build_image_plugin_metadata(
     description: str,
     plugin_class: type[Any],
     version: str = "1.0.0",
+    protocol_version: int = CURRENT_PLUGIN_PROTOCOL_VERSION,
     supports_multiple_instances: bool = True,
     instance_label: str | None = None,
     common_config_schema: dict[str, Any] | None = None,
@@ -77,6 +79,7 @@ def build_image_plugin_metadata(
 ) -> dict[str, Any]:
     """Build standard metadata for an image plugin."""
     metadata = {
+        "protocol_version": protocol_version,
         "type_id": type_id,
         "plugin_type": PluginType.IMAGE,
         "name": name,
