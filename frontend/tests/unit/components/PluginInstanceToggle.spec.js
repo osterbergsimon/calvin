@@ -56,7 +56,7 @@ describe("PluginInstanceToggle", () => {
           enabled: false,
         },
       });
-      pluginsApi.getPluginConfig.mockResolvedValue({ config: {} });
+      pluginsApi.getPluginConfig.mockResolvedValue({});
 
       const wrapper = mount(PluginsCategory, {
         global: {
@@ -79,12 +79,9 @@ describe("PluginInstanceToggle", () => {
       }
 
       // Verify API was called correctly
-      expect(pluginsApi.updatePluginInstance).toHaveBeenCalledWith(
-        "imap-6444",
-        {
-          enabled: false,
-        },
-      );
+      expect(pluginsApi.updatePluginInstance).toHaveBeenCalledWith("imap-6444", {
+        enabled: false,
+      });
     });
 
     it("should handle toggle instance error", async () => {
@@ -110,14 +107,10 @@ describe("PluginInstanceToggle", () => {
           },
         ],
       });
-      pluginsApi.updatePluginInstance.mockRejectedValue(
-        new Error("Failed to toggle instance"),
-      );
-      pluginsApi.getPluginConfig.mockResolvedValue({ config: {} });
+      pluginsApi.updatePluginInstance.mockRejectedValue(new Error("Failed to toggle instance"));
+      pluginsApi.getPluginConfig.mockResolvedValue({});
 
-      const consoleErrorSpy = vi
-        .spyOn(console, "error")
-        .mockImplementation(() => {});
+      const consoleErrorSpy = vi.spyOn(console, "error").mockImplementation(() => {});
 
       const wrapper = mount(PluginsCategory, {
         global: {
@@ -149,7 +142,7 @@ describe("PluginInstanceToggle", () => {
       if (wrapper.vm.handleToggleInstance) {
         expect(consoleErrorSpy).toHaveBeenCalledWith(
           "Failed to toggle instance:",
-          expect.any(Error),
+          expect.any(Error)
         );
       } else {
         expect(pluginsApi.updatePluginInstance).toHaveBeenCalled();
@@ -188,7 +181,7 @@ describe("PluginInstanceToggle", () => {
           enabled: false,
         },
       });
-      pluginsApi.getPluginConfig.mockResolvedValue({ config: {} });
+      pluginsApi.getPluginConfig.mockResolvedValue({});
 
       const wrapper = mount(PluginsCategory, {
         global: {
@@ -245,7 +238,7 @@ describe("PluginInstanceToggle", () => {
           running: false,
         },
       });
-      pluginsApi.getPluginConfig.mockResolvedValue({ config: {} });
+      pluginsApi.getPluginConfig.mockResolvedValue({});
 
       const wrapper = mount(PluginsCategory, {
         global: {
@@ -261,12 +254,9 @@ describe("PluginInstanceToggle", () => {
       // Toggle backend plugin instance
       await wrapper.vm.handleToggleInstance("imap-backend-1", false);
 
-      expect(pluginsApi.updatePluginInstance).toHaveBeenCalledWith(
-        "imap-backend-1",
-        {
-          enabled: false,
-        },
-      );
+      expect(pluginsApi.updatePluginInstance).toHaveBeenCalledWith("imap-backend-1", {
+        enabled: false,
+      });
     });
   });
 });

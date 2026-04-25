@@ -16,19 +16,14 @@
       <div class="error-content">
         <h3>⚠️ Cannot Display Service</h3>
         <p>
-          This service cannot be embedded in an iframe due to security
-          restrictions (CORS/X-Frame-Options).
+          This service cannot be embedded in an iframe due to security restrictions
+          (CORS/X-Frame-Options).
         </p>
         <p class="service-url">
           {{ iframeUrl }}
         </p>
         <div class="error-actions">
-          <a
-            :href="iframeUrl"
-            target="_blank"
-            rel="noopener noreferrer"
-            class="btn-open-new"
-          >
+          <a :href="iframeUrl" target="_blank" rel="noopener noreferrer" class="btn-open-new">
             Open in New Window
           </a>
           <button class="btn-retry" @click="retryLoad">Retry</button>
@@ -106,10 +101,7 @@ watch(
       if (iframe.value) {
         try {
           const iframeEl = iframe.value;
-          if (
-            iframeEl.contentDocument === null &&
-            iframeEl.contentWindow === null
-          ) {
+          if (iframeEl.contentDocument === null && iframeEl.contentWindow === null) {
             iframeError.value = true;
           }
         } catch (e) {
@@ -119,7 +111,7 @@ watch(
       }
     }, 5000);
   },
-  { immediate: true },
+  { immediate: true }
 );
 
 onUnmounted(() => {

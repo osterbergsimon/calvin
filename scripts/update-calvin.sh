@@ -1,9 +1,18 @@
 #!/bin/bash
 # Auto-update script for Calvin Dashboard
 # Pulls latest code from GitHub and restarts services
+#
+# Usage: update-calvin.sh [--force]
+#   --force: Run full update even if no git changes are detected
 
 # Don't use set -e - we want to continue even if some steps fail
 set +e
+
+# Parse command line arguments
+FORCE_UPDATE=false
+if [[ "$1" == "--force" ]]; then
+    FORCE_UPDATE=true
+fi
 
 # Source environment file if it exists
 if [ -f /etc/default/calvin-update ]; then
@@ -59,8 +68,13 @@ else
     # Check if there are any changes
     NEW_COMMIT=$(git rev-parse "origin/$GIT_BRANCH" 2>/dev/null || echo "")
     if [ "$CURRENT_COMMIT" = "$NEW_COMMIT" ]; then
-        echo "No changes detected. Already up to date at commit $CURRENT_COMMIT" | tee -a "$LOG_FILE"
-        HAS_CHANGES=false
+        if [ "$FORCE_UPDATE" = true ]; then
+            echo "No git changes detected, but --force specified. Running full update anyway." | tee -a "$LOG_FILE"
+            HAS_CHANGES=true
+        else
+            echo "No changes detected. Already up to date at commit $CURRENT_COMMIT" | tee -a "$LOG_FILE"
+            HAS_CHANGES=false
+        fi
     else
         echo "Changes detected. Updating from $CURRENT_COMMIT to $NEW_COMMIT..." | tee -a "$LOG_FILE"
         if ! git reset --hard "origin/$GIT_BRANCH"; then
@@ -88,26 +102,28 @@ if [ "$HAS_CHANGES" = true ]; then
         exit 1
     }
 
-    # Use venv if it exists (pip installation), otherwise use UV
-    # Production setup uses UV with only 'linux' extra, dev setup uses venv with 'linux,dev'
-    if [ -f .venv/bin/activate ]; then
+    # Ensure PATH includes UV locations
+    export PATH="/home/calvin/.local/bin:/home/calvin/.cargo/bin:$PATH"
+    
+    # Check if UV is available (preferred method)
+    if command -v uv &> /dev/null; then
+        # Production setup uses only 'linux' extra (matches setup.sh)
+        echo "Using UV to update backend dependencies..." | tee -a "$LOG_FILE"
+        if ! uv sync --extra linux 2>&1 | tee -a "$LOG_FILE"; then
+            echo "ERROR: Failed to update backend dependencies with UV" | tee -a "$LOG_FILE"
+            exit 1
+        fi
+    elif [ -f .venv/bin/activate ]; then
+        # Fallback to venv if it already exists (legacy setup)
+        echo "UV not found. Using existing venv..." | tee -a "$LOG_FILE"
         source .venv/bin/activate
         pip install --upgrade pip
         # Install from pyproject.toml with linux and dev extras (dev setup)
         pip install .[linux,dev] 2>&1 | tee -a "$LOG_FILE"
     else
-        export PATH="/home/calvin/.local/bin:/home/calvin/.cargo/bin:$PATH"
-        # Production setup uses only 'linux' extra (matches setup.sh)
-        if ! uv sync --extra linux 2>&1 | tee -a "$LOG_FILE"; then
-            echo "Warning: Failed to update backend dependencies with UV" | tee -a "$LOG_FILE"
-            # Try with pip as fallback
-            echo "Trying pip as fallback..." | tee -a "$LOG_FILE"
-            python3 -m venv .venv
-            source .venv/bin/activate
-            pip install --upgrade pip
-            # Install from pyproject.toml with linux extra only (production)
-            pip install .[linux] 2>&1 | tee -a "$LOG_FILE"
-        fi
+        echo "ERROR: UV not found and no venv exists. Please install UV or set up a venv." | tee -a "$LOG_FILE"
+        echo "Install UV with: curl -LsSf https://astral.sh/uv/install.sh | sh" | tee -a "$LOG_FILE"
+        exit 1
     fi
 
     # Check if frontend files changed

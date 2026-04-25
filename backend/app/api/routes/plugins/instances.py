@@ -1,16 +1,17 @@
 """Plugin instance management endpoints."""
 
+import asyncio
 import logging
 from datetime import UTC, datetime
 from pathlib import Path
 from typing import Any
 
 from fastapi import APIRouter, Body, HTTPException
-from sqlalchemy import asc, select
+from pydantic import BaseModel
 
 from app.api.routes.plugins.config import mask_sensitive_config
-from app.database import AsyncSessionLocal
-from app.models.db_models import PluginDB
+from app.models.db_models import PluginDB, PluginTypeDB
+from app.plugins.hooks import plugin_manager as hook_manager
 from app.plugins.loader import plugin_loader
 from app.plugins.manager import plugin_manager
 from app.services.event_system import event_system
@@ -20,7 +21,90 @@ logger = logging.getLogger(__name__)
 router = APIRouter()
 
 
-@router.post("/plugins/instances/{instance_id}/start")
+class PluginInstanceResponse(BaseModel):
+    id: str
+    name: str
+    enabled: bool
+    running: bool
+    config: dict[str, Any]
+    display_order: int
+
+
+class PluginInstanceListResponse(BaseModel):
+    instances: list[PluginInstanceResponse]
+    total: int
+
+
+class PluginInstanceActionResponse(BaseModel):
+    success: bool
+    message: str
+    running: bool
+
+
+class PluginInstanceDeleteResponse(BaseModel):
+    success: bool
+    message: str
+
+
+class PluginInstanceUpdateResponse(BaseModel):
+    success: bool
+    message: str
+    instance: PluginInstanceResponse
+
+
+class PluginInstanceOrderUpdateResponse(BaseModel):
+    success: bool
+    message: str
+    updated: int
+
+
+class PluginInstanceCreateRequest(BaseModel):
+    name: str
+    enabled: bool = True
+    config: dict[str, Any] = {}
+
+
+def _serialize_instance_config(config: dict[str, Any]) -> dict[str, Any]:
+    """Serialize config values to JSON-compatible primitives."""
+
+    def serialize_value(val):
+        if val is None:
+            return None
+        elif isinstance(val, str | int | float | bool):
+            return val
+        elif isinstance(val, Path):
+            return str(val)
+        elif isinstance(val, dict):
+            return {k: serialize_value(v) for k, v in val.items()}
+        elif isinstance(val, list):
+            return [serialize_value(item) for item in val]
+        else:
+            try:
+                if hasattr(val, "__str__"):
+                    return str(val)
+                elif hasattr(val, "path"):
+                    return str(val.path)
+                else:
+                    return str(val)
+            except Exception:
+                return "[Unable to serialize]"
+
+    return serialize_value(config) or {}
+
+
+def _build_instance_response(db_plugin: PluginDB, running: bool) -> PluginInstanceResponse:
+    serialized_config = _serialize_instance_config(db_plugin.config or {})
+    return PluginInstanceResponse(
+        id=db_plugin.id,
+        name=db_plugin.name,
+        enabled=db_plugin.enabled,
+        running=running,
+        config=mask_sensitive_config(serialized_config, mask_for_frontend=True),
+        display_order=db_plugin.display_order or 0,
+    )
+
+
+@router.post("/plugins/instances/{instance_id}/start", response_model=PluginInstanceActionResponse)
 async def start_plugin_instance(instance_id: str):
     """
     Start a plugin instance (if enabled).
@@ -32,20 +116,18 @@ async def start_plugin_instance(instance_id: str):
         Success status and message
     """
     # Check if instance exists in database first
-    async with AsyncSessionLocal() as session:
-        result = await session.execute(select(PluginDB).where(PluginDB.id == instance_id))
-        db_plugin = result.scalar_one_or_none()
+    db_plugin = await PluginDB.objects.get_or_none(id=instance_id)
 
-        if not db_plugin:
-            raise HTTPException(
-                status_code=404, detail=f"Plugin instance {instance_id} not found in database"
-            )
+    if not db_plugin:
+        raise HTTPException(
+            status_code=404, detail=f"Plugin instance {instance_id} not found in database"
+        )
 
-        if not db_plugin.enabled:
-            raise HTTPException(
-                status_code=400,
-                detail=f"Cannot start disabled plugin {instance_id}. Enable it first.",
-            )
+    if not db_plugin.enabled:
+        raise HTTPException(
+            status_code=400,
+            detail=f"Cannot start disabled plugin {instance_id}. Enable it first.",
+        )
 
     # Try to get plugin from manager
     plugin = plugin_manager.get_plugin(instance_id)
@@ -108,7 +190,7 @@ async def start_plugin_instance(instance_id: str):
         raise HTTPException(status_code=500, detail=f"Failed to start plugin {instance_id}")
 
 
-@router.post("/plugins/instances/{instance_id}/stop")
+@router.post("/plugins/instances/{instance_id}/stop", response_model=PluginInstanceActionResponse)
 async def stop_plugin_instance(instance_id: str):
     """
     Stop a plugin instance.
@@ -120,14 +202,12 @@ async def stop_plugin_instance(instance_id: str):
         Success status and message
     """
     # Check if instance exists in database first
-    async with AsyncSessionLocal() as session:
-        result = await session.execute(select(PluginDB).where(PluginDB.id == instance_id))
-        db_plugin = result.scalar_one_or_none()
+    db_plugin = await PluginDB.objects.get_or_none(id=instance_id)
 
-        if not db_plugin:
-            raise HTTPException(
-                status_code=404, detail=f"Plugin instance {instance_id} not found in database"
-            )
+    if not db_plugin:
+        raise HTTPException(
+            status_code=404, detail=f"Plugin instance {instance_id} not found in database"
+        )
 
     # Try to get plugin from manager
     plugin = plugin_manager.get_plugin(instance_id)
@@ -176,7 +256,7 @@ async def stop_plugin_instance(instance_id: str):
         raise HTTPException(status_code=500, detail=f"Failed to stop plugin {instance_id}")
 
 
-@router.get("/plugins/{plugin_id}/instances")
+@router.get("/plugins/{plugin_id}/instances", response_model=PluginInstanceListResponse)
 async def get_plugin_instances(plugin_id: str):
     """
     Get all plugin instances for a plugin type, including running status.
@@ -188,13 +268,9 @@ async def get_plugin_instances(plugin_id: str):
         List of plugin instances with their running status
     """
     # Get instances from database, sorted by display_order
-    async with AsyncSessionLocal() as session:
-        result = await session.execute(
-            select(PluginDB)
-            .where(PluginDB.type_id == plugin_id)
-            .order_by(asc(PluginDB.display_order), asc(PluginDB.name))
-        )
-        db_plugins = result.scalars().all()
+    db_plugins = (
+        await PluginDB.objects.filter(type_id=plugin_id).order_by(["display_order", "name"]).all()
+    )
 
     instances = []
     for db_plugin in db_plugins:
@@ -203,49 +279,113 @@ async def get_plugin_instances(plugin_id: str):
         running = plugin.is_running() if plugin else False
 
         # Serialize config, converting Path objects and other non-serializable types to strings
-        def serialize_value(val):
-            """Recursively serialize values to JSON-serializable types."""
-            if val is None:
-                return None
-            elif isinstance(val, str | int | float | bool):
-                return val
-            elif isinstance(val, Path):
-                return str(val)
-            elif isinstance(val, dict):
-                return {k: serialize_value(v) for k, v in val.items()}
-            elif isinstance(val, list):
-                return [serialize_value(item) for item in val]
-            else:
-                # For any other type (including Path-like objects), convert to string
-                try:
-                    # Try to get string representation
-                    if hasattr(val, "__str__"):
-                        return str(val)
-                    elif hasattr(val, "path"):
-                        return str(val.path)
-                    else:
-                        return str(val)
-                except Exception:
-                    return "[Unable to serialize]"
-
-        config = db_plugin.config or {}
-        serialized_config = serialize_value(config)
-
-        instances.append(
-            {
-                "id": db_plugin.id,
-                "name": db_plugin.name,
-                "enabled": db_plugin.enabled,
-                "running": running,
-                "config": mask_sensitive_config(serialized_config, mask_for_frontend=True),
-                "display_order": db_plugin.display_order or 0,
-            }
-        )
+        instances.append(_build_instance_response(db_plugin, running).model_dump())
 
     return {"instances": instances, "total": len(instances)}
 
 
-@router.put("/plugins/instances/{instance_id}")
+@router.delete("/plugins/instances/{instance_id}", response_model=PluginInstanceDeleteResponse)
+async def delete_plugin_instance(instance_id: str):
+    db_plugin = await PluginDB.objects.get_or_none(id=instance_id)
+
+    if not db_plugin:
+        raise HTTPException(
+            status_code=404, detail=f"Plugin instance {instance_id} not found in database"
+        )
+
+    plugin = plugin_manager.get_plugin(instance_id)
+    if plugin:
+        if plugin.is_running():
+            try:
+                plugin.stop()
+                from app.plugins.protocols import BackendPlugin
+                from app.services.backend_scheduler import backend_plugin_scheduler
+
+                if isinstance(plugin, BackendPlugin):
+                    await backend_plugin_scheduler.unregister_plugin_tasks(instance_id)
+                await plugin.cleanup()
+            except Exception as e:
+                logger.warning(f"Error stopping plugin {instance_id} during delete: {e}")
+        await plugin_manager.unregister(instance_id)
+
+    type_id = db_plugin.type_id
+    await db_plugin.delete()
+
+    try:
+        await event_system.emit_event(
+            "plugin_instance_deleted",
+            {
+                "instance_id": instance_id,
+                "plugin_id": type_id,
+                "deleted_at": datetime.now(UTC).isoformat(),
+            },
+            wait_for_handlers=False,
+        )
+    except Exception as e:
+        logger.warning(f"Failed to emit plugin_instance_deleted event for {instance_id}: {e}")
+
+    return {"success": True, "message": f"Plugin instance {instance_id} deleted successfully"}
+
+
+@router.post("/plugins/{plugin_id}/instances", response_model=PluginInstanceUpdateResponse)
+async def create_plugin_instance(
+    plugin_id: str,
+    request: PluginInstanceCreateRequest,
+):
+    """
+    Create a plugin instance via an explicit instance lifecycle endpoint.
+
+    This currently adapts to the existing plugin hook contract by translating
+    the typed payload into the legacy config-update metadata fields.
+    """
+    plugin_types = plugin_loader.get_plugin_types()
+    type_info = next((t for t in plugin_types if t.get("type_id") == plugin_id), None)
+
+    if not type_info:
+        raise HTTPException(status_code=404, detail="Plugin type not found")
+
+    instance_config = {
+        **request.config,
+        "_instance_name": request.name,
+        "_instance_enabled": request.enabled,
+    }
+
+    db_plugin_type = await PluginTypeDB.objects.get_or_none(type_id=plugin_id)
+
+    update_coroutines = hook_manager.hook.handle_plugin_config_update(
+        type_id=plugin_id,
+        config=instance_config,
+        enabled=None,
+        db_type=db_plugin_type,
+        session=None,
+    )
+    results = await asyncio.gather(*update_coroutines, return_exceptions=True)
+
+    created_instance_id = None
+    for result in results:
+        if isinstance(result, Exception) or result is None:
+            continue
+        created_instance_id = result.get("instance_id")
+        if created_instance_id:
+            break
+
+    if not created_instance_id:
+        raise HTTPException(status_code=400, detail="Plugin did not create an instance")
+
+    db_plugin = await PluginDB.objects.get_or_none(id=created_instance_id)
+    if not db_plugin:
+        raise HTTPException(status_code=500, detail="Created plugin instance not found in database")
+
+    plugin = plugin_manager.get_plugin(created_instance_id)
+    instance = _build_instance_response(db_plugin, plugin.is_running() if plugin else False)
+    return {
+        "success": True,
+        "message": f"Plugin instance {created_instance_id} created successfully",
+        "instance": instance,
+    }
+
+
+@router.put("/plugins/instances/{instance_id}", response_model=PluginInstanceUpdateResponse)
 async def update_plugin_instance(instance_id: str, instance_data: dict[str, Any] = Body(...)):
     """
     Update a plugin instance (enabled status, config, etc.).
@@ -260,222 +400,184 @@ async def update_plugin_instance(instance_id: str, instance_data: dict[str, Any]
     Returns:
         Success status and updated instance information
     """
-    async with AsyncSessionLocal() as session:
-        # Get instance from database
-        result = await session.execute(select(PluginDB).where(PluginDB.id == instance_id))
-        db_plugin = result.scalar_one_or_none()
+    # Get instance from database
+    db_plugin = await PluginDB.objects.get_or_none(id=instance_id)
 
-        if not db_plugin:
-            raise HTTPException(
-                status_code=404, detail=f"Plugin instance {instance_id} not found in database"
-            )
+    if not db_plugin:
+        raise HTTPException(
+            status_code=404, detail=f"Plugin instance {instance_id} not found in database"
+        )
 
-        # Update enabled status if provided
-        enabled = instance_data.get("enabled")
+    # Update enabled status if provided
+    enabled = instance_data.get("enabled")
+    if enabled is not None:
+        db_plugin.enabled = enabled
+
+    # Update config if provided
+    updated_config = None
+    if "config" in instance_data:
+        config = instance_data["config"]
+        # Merge with existing config if it's a partial update
+        if isinstance(config, dict):
+            # Ormar JSON fields detect changes automatically
+            existing_config = dict(db_plugin.config or {})
+            existing_config.update(config)
+            db_plugin.config = existing_config
+            updated_config = existing_config
+
+    # Update name if provided
+    if "name" in instance_data:
+        db_plugin.name = instance_data["name"]
+
+    await db_plugin.save_with_timestamp()
+
+    # Update plugin instance in memory if it exists
+    plugin = plugin_manager.get_plugin(instance_id)
+
+    # Track if this is a new instance creation
+    was_new_instance = False
+
+    # If plugin doesn't exist in memory but is enabled in database, create it
+    # (either enabled was set to True, or it was already True and we're just updating config)
+    should_be_enabled = enabled if enabled is not None else db_plugin.enabled
+    if not plugin and should_be_enabled:
+        plugin = plugin_loader.create_plugin_instance(
+            plugin_id=instance_id,
+            type_id=db_plugin.type_id,
+            name=db_plugin.name,
+            config=db_plugin.config or {},
+        )
+        if plugin:
+            was_new_instance = True
+            try:
+                await plugin.configure(db_plugin.config or {})
+                plugin.enabled = db_plugin.enabled
+                await plugin_manager.register(plugin)
+                await plugin.initialize()
+                plugin.start()
+                # Register scheduled tasks for backend plugins
+                from app.plugins.protocols import BackendPlugin
+                from app.services.backend_scheduler import backend_plugin_scheduler
+
+                if isinstance(plugin, BackendPlugin):
+                    await backend_plugin_scheduler.register_plugin_tasks(plugin)
+
+                # Emit plugin_instance_created event
+                try:
+                    await event_system.emit_event(
+                        "plugin_instance_created",
+                        {
+                            "instance_id": instance_id,
+                            "plugin_id": db_plugin.type_id,
+                            "name": db_plugin.name,
+                            "created_at": datetime.now(UTC).isoformat(),
+                        },
+                        wait_for_handlers=False,  # Fire-and-forget
+                    )
+                    logger.debug(
+                        f"Emitted plugin_instance_created event for instance {instance_id}"
+                    )
+                except Exception as e:
+                    # Don't fail instance creation if event emission fails
+                    logger.warning(
+                        f"Failed to emit plugin_instance_created event "
+                        f"for instance {instance_id}: {e}"
+                    )
+            except Exception as e:
+                logger.error(
+                    f"Error creating and starting plugin {instance_id}: {e}", exc_info=True
+                )
+                plugin = None
+
+    if plugin:
+        # Update enabled status
         if enabled is not None:
-            db_plugin.enabled = enabled
+            if enabled:
+                plugin.enable()
+                # Start the plugin if it's not running
+                # Skip initialize/start if plugin was just created (already done above)
+                if not plugin.is_running() and not was_new_instance:
+                    try:
+                        await plugin.initialize()
+                        plugin.start()
+                        # Register scheduled tasks for backend plugins
+                        from app.plugins.protocols import BackendPlugin
+                        from app.services.backend_scheduler import backend_plugin_scheduler
+
+                        if isinstance(plugin, BackendPlugin):
+                            await backend_plugin_scheduler.register_plugin_tasks(plugin)
+                    except Exception as e:
+                        logger.error(f"Error starting plugin {instance_id}: {e}", exc_info=True)
+            else:
+                plugin.disable()
+                # Stop the plugin if it's running
+                if plugin.is_running():
+                    try:
+                        plugin.stop()
+                        # Unregister scheduled tasks for backend plugins
+                        from app.plugins.protocols import BackendPlugin
+                        from app.services.backend_scheduler import backend_plugin_scheduler
+
+                        if isinstance(plugin, BackendPlugin):
+                            await backend_plugin_scheduler.unregister_plugin_tasks(instance_id)
+                        await plugin.cleanup()
+                    except Exception as e:
+                        logger.warning(f"Error stopping plugin {instance_id}: {e}", exc_info=True)
 
         # Update config if provided
-        updated_config = None
-        if "config" in instance_data:
-            config = instance_data["config"]
-            # Merge with existing config if it's a partial update
-            if isinstance(config, dict):
-                # Create a new dict to ensure SQLAlchemy detects the change
-                # (JSONEncodedDict doesn't detect in-place modifications)
-                existing_config = dict(db_plugin.config or {})
-                existing_config.update(config)
-                db_plugin.config = existing_config
-                updated_config = existing_config
-
-        # Update name if provided
-        if "name" in instance_data:
-            db_plugin.name = instance_data["name"]
-
-        await session.commit()
-        await session.refresh(db_plugin)
-
-        # Update plugin instance in memory if it exists
-        plugin = plugin_manager.get_plugin(instance_id)
-
-        # Track if this is a new instance creation
-        was_new_instance = False
-
-        # If plugin doesn't exist in memory but is enabled in database, create it
-        # (either enabled was set to True, or it was already True and we're just updating config)
-        should_be_enabled = enabled if enabled is not None else db_plugin.enabled
-        if not plugin and should_be_enabled:
-            plugin = plugin_loader.create_plugin_instance(
-                plugin_id=instance_id,
-                type_id=db_plugin.type_id,
-                name=db_plugin.name,
-                config=db_plugin.config or {},
-            )
-            if plugin:
-                was_new_instance = True
-                try:
-                    await plugin.configure(db_plugin.config or {})
-                    plugin.enabled = db_plugin.enabled
-                    await plugin_manager.register(plugin)
-                    await plugin.initialize()
-                    plugin.start()
-                    # Register scheduled tasks for backend plugins
-                    from app.plugins.protocols import BackendPlugin
-                    from app.services.backend_scheduler import backend_plugin_scheduler
-
-                    if isinstance(plugin, BackendPlugin):
-                        await backend_plugin_scheduler.register_plugin_tasks(plugin)
-
-                    # Emit plugin_instance_created event
-                    try:
-                        await event_system.emit_event(
-                            "plugin_instance_created",
-                            {
-                                "instance_id": instance_id,
-                                "plugin_id": db_plugin.type_id,
-                                "name": db_plugin.name,
-                                "created_at": datetime.now(UTC).isoformat(),
-                            },
-                            wait_for_handlers=False,  # Fire-and-forget
-                        )
-                        logger.debug(
-                            f"Emitted plugin_instance_created event for instance {instance_id}"
-                        )
-                    except Exception as e:
-                        # Don't fail instance creation if event emission fails
-                        logger.warning(
-                            f"Failed to emit plugin_instance_created event "
-                            f"for instance {instance_id}: {e}"
-                        )
-                except Exception as e:
-                    logger.error(
-                        f"Error creating and starting plugin {instance_id}: {e}", exc_info=True
-                    )
-                    plugin = None
-
-        if plugin:
-            # Update enabled status
-            if enabled is not None:
-                if enabled:
-                    plugin.enable()
-                    # Start the plugin if it's not running
-                    # Skip initialize/start if plugin was just created (already done above)
-                    if not plugin.is_running() and not was_new_instance:
-                        try:
-                            await plugin.initialize()
-                            plugin.start()
-                            # Register scheduled tasks for backend plugins
-                            from app.plugins.protocols import BackendPlugin
-                            from app.services.backend_scheduler import backend_plugin_scheduler
-
-                            if isinstance(plugin, BackendPlugin):
-                                await backend_plugin_scheduler.register_plugin_tasks(plugin)
-                        except Exception as e:
-                            logger.error(f"Error starting plugin {instance_id}: {e}", exc_info=True)
-                else:
-                    plugin.disable()
-                    # Stop the plugin if it's running
-                    if plugin.is_running():
-                        try:
-                            plugin.stop()
-                            # Unregister scheduled tasks for backend plugins
-                            from app.plugins.protocols import BackendPlugin
-                            from app.services.backend_scheduler import backend_plugin_scheduler
-
-                            if isinstance(plugin, BackendPlugin):
-                                await backend_plugin_scheduler.unregister_plugin_tasks(instance_id)
-                            await plugin.cleanup()
-                        except Exception as e:
-                            logger.warning(
-                                f"Error stopping plugin {instance_id}: {e}", exc_info=True
-                            )
-
-            # Update config if provided
-            if updated_config is not None:
-                try:
-                    await plugin.configure(updated_config)
-                except Exception as e:
-                    logger.warning(
-                        f"Error updating plugin {instance_id} config: {e}", exc_info=True
-                    )
-
-        # Emit plugin_instance_updated event if instance was updated (but not newly created)
-        if (
-            plugin
-            and not was_new_instance
-            and (enabled is not None or updated_config is not None or "name" in instance_data)
-        ):
+        if updated_config is not None:
             try:
-                changes = {}
-                if enabled is not None:
-                    changes["enabled"] = enabled
-                if updated_config is not None:
-                    changes["config"] = updated_config
-                if "name" in instance_data:
-                    changes["name"] = instance_data["name"]
-
-                await event_system.emit_event(
-                    "plugin_instance_updated",
-                    {
-                        "instance_id": instance_id,
-                        "plugin_id": db_plugin.type_id,
-                        "changes": changes,
-                        "updated_at": datetime.now(UTC).isoformat(),
-                    },
-                    wait_for_handlers=False,  # Fire-and-forget
-                )
-                logger.debug(f"Emitted plugin_instance_updated event for instance {instance_id}")
+                await plugin.configure(updated_config)
             except Exception as e:
-                # Don't fail instance update if event emission fails
-                logger.warning(
-                    f"Failed to emit plugin_instance_updated event for instance {instance_id}: {e}"
-                )
+                logger.warning(f"Error updating plugin {instance_id} config: {e}", exc_info=True)
 
-        # Serialize config for response
-        def serialize_value(val):
-            """Recursively serialize values to JSON-serializable types."""
-            if val is None:
-                return None
-            elif isinstance(val, str | int | float | bool):
-                return val
-            elif isinstance(val, Path):
-                return str(val)
-            elif isinstance(val, dict):
-                return {k: serialize_value(v) for k, v in val.items()}
-            elif isinstance(val, list):
-                return [serialize_value(item) for item in val]
-            else:
-                try:
-                    if hasattr(val, "__str__"):
-                        return str(val)
-                    elif hasattr(val, "path"):
-                        return str(val.path)
-                    else:
-                        return str(val)
-                except Exception:
-                    return "[Unable to serialize]"
+    # Emit plugin_instance_updated event if instance was updated (but not newly created)
+    if (
+        plugin
+        and not was_new_instance
+        and (enabled is not None or updated_config is not None or "name" in instance_data)
+    ):
+        try:
+            changes = {}
+            if enabled is not None:
+                changes["enabled"] = enabled
+            if updated_config is not None:
+                changes["config"] = updated_config
+            if "name" in instance_data:
+                changes["name"] = instance_data["name"]
 
-        config = db_plugin.config or {}
-        serialized_config = serialize_value(config)
+            await event_system.emit_event(
+                "plugin_instance_updated",
+                {
+                    "instance_id": instance_id,
+                    "plugin_id": db_plugin.type_id,
+                    "changes": changes,
+                    "updated_at": datetime.now(UTC).isoformat(),
+                },
+                wait_for_handlers=False,  # Fire-and-forget
+            )
+            logger.debug(f"Emitted plugin_instance_updated event for instance {instance_id}")
+        except Exception as e:
+            # Don't fail instance update if event emission fails
+            logger.warning(
+                f"Failed to emit plugin_instance_updated event for instance {instance_id}: {e}"
+            )
 
-        # Get updated plugin reference (may have been created above)
-        plugin = plugin_manager.get_plugin(instance_id)
+    # Get updated plugin reference (may have been created above)
+    plugin = plugin_manager.get_plugin(instance_id)
+    instance = _build_instance_response(db_plugin, plugin.is_running() if plugin else False)
 
-        return {
-            "success": True,
-            "message": f"Plugin instance {instance_id} updated successfully",
-            "instance": {
-                "id": db_plugin.id,
-                "name": db_plugin.name,
-                "enabled": db_plugin.enabled,
-                "running": plugin.is_running() if plugin else False,
-                "config": mask_sensitive_config(serialized_config, mask_for_frontend=True),
-                "display_order": db_plugin.display_order or 0,
-            },
-        }
+    return {
+        "success": True,
+        "message": f"Plugin instance {instance_id} updated successfully",
+        "instance": instance,
+    }
 
 
-@router.put("/plugins/{plugin_id}/instances/order")
+@router.put(
+    "/plugins/{plugin_id}/instances/order",
+    response_model=PluginInstanceOrderUpdateResponse,
+)
 async def update_plugin_instances_order(
     plugin_id: str, instance_orders: dict[str, int] = Body(...)
 ):
@@ -489,24 +591,22 @@ async def update_plugin_instances_order(
     Returns:
         Success status and message
     """
-    async with AsyncSessionLocal() as session:
-        # Get all instances for this plugin type
-        result = await session.execute(select(PluginDB).where(PluginDB.type_id == plugin_id))
-        db_plugins = result.scalars().all()
+    # Get all instances for this plugin type
+    db_plugins = await PluginDB.objects.filter(type_id=plugin_id).all()
 
-        # Update display_order for each instance
-        updated_count = 0
-        for db_plugin in db_plugins:
-            if db_plugin.id in instance_orders:
-                db_plugin.display_order = instance_orders[db_plugin.id]
-                updated_count += 1
+    # Update display_order for each instance
+    updated_count = 0
+    for db_plugin in db_plugins:
+        if db_plugin.id in instance_orders:
+            db_plugin.display_order = instance_orders[db_plugin.id]
+            await db_plugin.save_with_timestamp()
+            updated_count += 1
 
-        if updated_count > 0:
-            await session.commit()
-            return {
-                "success": True,
-                "message": f"Updated display order for {updated_count} instance(s)",
-                "updated": updated_count,
-            }
-        else:
-            return {"success": False, "message": "No instances were updated", "updated": 0}
+    if updated_count > 0:
+        return {
+            "success": True,
+            "message": f"Updated display order for {updated_count} instance(s)",
+            "updated": updated_count,
+        }
+    else:
+        return {"success": False, "message": "No instances were updated", "updated": 0}

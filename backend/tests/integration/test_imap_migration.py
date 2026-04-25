@@ -3,16 +3,15 @@
 import json
 from datetime import datetime
 
+import databases
 import pytest
-from sqlalchemy import text
-from sqlalchemy.ext.asyncio import AsyncSession
 
 
 @pytest.mark.asyncio
 class TestImapMigration:
     """Test IMAP plugin migration from image to backend type."""
 
-    async def test_migration_handles_imap_image_plugin_instances(self, test_db: AsyncSession):
+    async def test_migration_handles_imap_image_plugin_instances(self, test_db: databases.Database):
         """Test that migration correctly converts IMAP ImagePlugin instances to BackendPlugin."""
         # Create a test IMAP ImagePlugin instance
         test_plugin_id = "test-imap-instance"
@@ -26,7 +25,7 @@ class TestImapMigration:
 
         # Insert test IMAP ImagePlugin instance
         await test_db.execute(
-            text("""
+            """
                 INSERT INTO plugins (
                     id, type_id, plugin_type, name, enabled, config, display_order,
                     created_at, updated_at
@@ -35,7 +34,7 @@ class TestImapMigration:
                     :id, 'imap', 'image', 'Test IMAP Plugin', :enabled, :config, 0,
                     :created_at, :updated_at
                 )
-            """),
+            """,
             {
                 "id": test_plugin_id,
                 "enabled": True,
@@ -47,7 +46,7 @@ class TestImapMigration:
 
         # Insert test IMAP plugin type as 'image'
         await test_db.execute(
-            text("""
+            """
                 INSERT INTO plugin_types (
                     type_id, plugin_type, name, description, version,
                     enabled, created_at, updated_at
@@ -56,7 +55,7 @@ class TestImapMigration:
                     'imap', 'image', 'Email (IMAP)', 'IMAP email plugin', '1.0.0',
                     :enabled, :created_at, :updated_at
                 )
-            """),
+            """,
             {
                 "enabled": True,
                 "created_at": datetime.utcnow(),
@@ -64,17 +63,15 @@ class TestImapMigration:
             },
         )
 
-        await test_db.commit()
-
         # Verify instance exists as 'image' type
-        result = await test_db.execute(
-            text("SELECT id, plugin_type, config FROM plugins WHERE id = :id"),
+        result = await test_db.fetch_one(
+            "SELECT id, plugin_type, config FROM plugins WHERE id = :id",
             {"id": test_plugin_id},
         )
-        row = result.fetchone()
+        row = result
         assert row is not None
-        assert row[1] == "image"  # plugin_type
-        config = json.loads(row[2]) if row[2] else {}
+        assert row["plugin_type"] == "image"  # plugin_type
+        config = json.loads(row["config"]) if row["config"] else {}
         assert "image_dir" in config
         assert config["image_dir"] == "./data/images/imap"
 
@@ -82,7 +79,7 @@ class TestImapMigration:
         # For now, this test just verifies we can create the test data correctly
         # The actual migration would be tested via alembic upgrade/downgrade
 
-    async def test_migration_preserves_other_config_fields(self, test_db: AsyncSession):
+    async def test_migration_preserves_other_config_fields(self, test_db: databases.Database):
         """Test that migration preserves non-image_dir config fields."""
         test_plugin_id = "test-imap-instance-2"
         test_config = {
@@ -95,7 +92,7 @@ class TestImapMigration:
         }
 
         await test_db.execute(
-            text("""
+            """
                 INSERT INTO plugins (
                     id, type_id, plugin_type, name, enabled, config, display_order,
                     created_at, updated_at
@@ -104,7 +101,7 @@ class TestImapMigration:
                     :id, 'imap', 'image', 'Test IMAP Plugin 2', :enabled, :config, 0,
                     :created_at, :updated_at
                 )
-            """),
+            """,
             {
                 "id": test_plugin_id,
                 "enabled": True,
@@ -113,21 +110,19 @@ class TestImapMigration:
                 "updated_at": datetime.utcnow(),
             },
         )
-        await test_db.commit()
 
         # Verify config has all expected fields
-        result = await test_db.execute(
-            text("SELECT config FROM plugins WHERE id = :id"),
+        result = await test_db.fetch_one(
+            "SELECT config FROM plugins WHERE id = :id",
             {"id": test_plugin_id},
         )
-        row = result.fetchone()
-        assert row is not None
-        config = json.loads(row[0]) if row[0] else {}
+        assert result is not None
+        config = json.loads(result["config"]) if result["config"] else {}
         assert "email_address" in config
         assert "check_interval" in config
         assert config["check_interval"] == 600
 
-    async def test_migration_handles_missing_image_dir(self, test_db: AsyncSession):
+    async def test_migration_handles_missing_image_dir(self, test_db: databases.Database):
         """Test that migration handles configs without image_dir field."""
         test_plugin_id = "test-imap-instance-3"
         test_config = {
@@ -139,7 +134,7 @@ class TestImapMigration:
         }
 
         await test_db.execute(
-            text("""
+            """
                 INSERT INTO plugins (
                     id, type_id, plugin_type, name, enabled, config, display_order,
                     created_at, updated_at
@@ -148,7 +143,7 @@ class TestImapMigration:
                     :id, 'imap', 'image', 'Test IMAP Plugin 3', :enabled, :config, 0,
                     :created_at, :updated_at
                 )
-            """),
+            """,
             {
                 "id": test_plugin_id,
                 "enabled": True,
@@ -157,12 +152,10 @@ class TestImapMigration:
                 "updated_at": datetime.utcnow(),
             },
         )
-        await test_db.commit()
 
         # Verify instance was created successfully
-        result = await test_db.execute(
-            text("SELECT id FROM plugins WHERE id = :id"),
+        result = await test_db.fetch_one(
+            "SELECT id FROM plugins WHERE id = :id",
             {"id": test_plugin_id},
         )
-        row = result.fetchone()
-        assert row is not None
+        assert result is not None

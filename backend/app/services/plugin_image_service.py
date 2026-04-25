@@ -1,6 +1,7 @@
 """Image service using plugin architecture."""
 
 import random
+from datetime import datetime, timedelta
 from typing import Any
 
 from loguru import logger
@@ -22,6 +23,8 @@ class PluginImageService:
         self._current_plugin_id: str | None = None
         self._all_images: list[dict[str, Any]] = []
         self._randomized_order: list[dict[str, Any]] = []
+        self._images_cache_time: datetime | None = None
+        self._images_cache_ttl = timedelta(seconds=30)  # Cache for 30 seconds
 
     async def get_images(
         self, randomize: bool = False, randomize_per_plugin: bool = False
@@ -37,43 +40,26 @@ class PluginImageService:
         Returns:
             List of image metadata dictionaries
         """
-        from sqlalchemy import select
-
-        from app.database import AsyncSessionLocal
         from app.models.db_models import PluginDB, PluginTypeDB
 
-        # Get enabled plugin types with their display_order from common_config_schema
-        async with AsyncSessionLocal() as session:
-            # Get all image plugin types and their enabled status + display_order
-            result = await session.execute(
-                select(PluginTypeDB).where(PluginTypeDB.plugin_type == "image")
-            )
-            plugin_types = result.scalars().all()
-            # Create maps: type_id -> enabled status, type_id -> display_order
-            enabled_type_map = {pt.type_id: pt.enabled for pt in plugin_types}
-            plugin_type_order_map = {}
-            for pt in plugin_types:
-                common_config = pt.common_config_schema or {}
-                # display_order is stored in common_config_schema (like service plugins)
-                display_order = common_config.get("display_order", 0)
-                try:
-                    display_order = int(display_order) if display_order else 0
-                except (ValueError, TypeError):
-                    display_order = 0
-                plugin_type_order_map[pt.type_id] = display_order
+        # Get enabled plugin types with their display_order from app-managed columns
+        # Get all image plugin types and their enabled status + display_order
+        plugin_types = await PluginTypeDB.objects.filter(plugin_type="image").all()
+        # Create maps: type_id -> enabled status, type_id -> display_order
+        enabled_type_map = {pt.type_id: pt.enabled for pt in plugin_types}
+        plugin_type_order_map = {pt.type_id: pt.display_order or 0 for pt in plugin_types}
 
-            # Get all image plugin instances with their display_order
-            result = await session.execute(
-                select(PluginDB)
-                .where(PluginDB.plugin_type == "image")
-                .order_by(PluginDB.display_order, PluginDB.name)
-            )
-            db_plugins = result.scalars().all()
-            # Create maps: plugin_id -> type_id, plugin_id -> display_order
-            plugin_type_map = {db_plugin.id: db_plugin.type_id for db_plugin in db_plugins}
-            plugin_order_map = {
-                db_plugin.id: (db_plugin.display_order or 0) for db_plugin in db_plugins
-            }
+        # Get all image plugin instances with their display_order
+        db_plugins = (
+            await PluginDB.objects.filter(plugin_type="image")
+            .order_by(["display_order", "name"])
+            .all()
+        )
+        # Create maps: plugin_id -> type_id, plugin_id -> display_order
+        plugin_type_map = {db_plugin.id: db_plugin.type_id for db_plugin in db_plugins}
+        plugin_order_map = {
+            db_plugin.id: (db_plugin.display_order or 0) for db_plugin in db_plugins
+        }
 
         # Get all enabled image plugins
         plugins = plugin_manager.get_plugins(PluginType.IMAGE, enabled_only=True)
@@ -163,6 +149,7 @@ class PluginImageService:
 
         # Store original order
         self._all_images = images.copy()
+        self._images_cache_time = datetime.now()
         logger.info("Total images collected: {}", len(images))
 
         # Apply global randomization if requested (overrides per-plugin randomization)
@@ -188,8 +175,8 @@ class PluginImageService:
         Returns:
             Current image metadata or None if no images
         """
-        # Get images (with randomization if requested)
-        if not self._all_images:
+        # Get images (with randomization if requested), only refresh if cache is stale
+        if not self._all_images or self._is_cache_stale():
             await self.get_images(randomize=randomize)
         elif randomize and not self._randomized_order:
             # Re-randomize if requested
@@ -220,8 +207,12 @@ class PluginImageService:
         Returns:
             Next image metadata or None if no images
         """
-        # Always refresh images to ensure we have the latest from enabled plugins
-        await self.get_images(randomize=randomize)
+        # Only refresh images if cache is stale (not on every navigation)
+        if not self._all_images or self._is_cache_stale():
+            await self.get_images(randomize=randomize)
+        elif randomize and not self._randomized_order:
+            # Need randomized order but don't have it
+            await self.get_images(randomize=True)
 
         # Use randomized order if randomize is True, otherwise use original order
         images = self._randomized_order if randomize else self._all_images
@@ -256,8 +247,12 @@ class PluginImageService:
         Returns:
             Previous image metadata or None if no images
         """
-        # Always refresh images to ensure we have the latest from enabled plugins
-        await self.get_images(randomize=randomize)
+        # Only refresh images if cache is stale (not on every navigation)
+        if not self._all_images or self._is_cache_stale():
+            await self.get_images(randomize=randomize)
+        elif randomize and not self._randomized_order:
+            # Need randomized order but don't have it
+            await self.get_images(randomize=True)
 
         # Use randomized order if randomize is True, otherwise use original order
         images = self._randomized_order if randomize else self._all_images
@@ -293,7 +288,8 @@ class PluginImageService:
             Image metadata or None if not found
         """
         # Find which plugin owns this image
-        if not self._all_images:
+        # Only refresh if cache is stale or empty
+        if not self._all_images or self._is_cache_stale():
             await self.get_images()
 
         # First, try to find in cached list
@@ -368,7 +364,8 @@ class PluginImageService:
             try:
                 result = await plugin.upload_image(file_data, filename)
                 if result:
-                    # Refresh images list
+                    # Invalidate cache and refresh images list
+                    self.invalidate_cache()
                     await self.get_images()
                     # Note: image_uploaded event is emitted by LocalImagePlugin.scan_images()
                     # when it detects the new image, so we don't need to emit it here
@@ -401,7 +398,8 @@ class PluginImageService:
                     # Delete from the plugin
                     result = await plugin.delete_image(image_id)
                     if result:
-                        # Refresh images list
+                        # Invalidate cache and refresh images list
+                        self.invalidate_cache()
                         await self.get_images()
                         # Clear current image if it was deleted
                         if self._current_image_id == image_id:
@@ -446,5 +444,25 @@ class PluginImageService:
 
         # Update cached list
         self._all_images = images
+        self._images_cache_time = datetime.now()
 
         return images
+
+    def _is_cache_stale(self) -> bool:
+        """
+        Check if the images cache is stale.
+
+        Returns:
+            True if cache is stale or doesn't exist, False otherwise
+        """
+        if self._images_cache_time is None:
+            return True
+
+        age = datetime.now() - self._images_cache_time
+        return age > self._images_cache_ttl
+
+    def invalidate_cache(self) -> None:
+        """Invalidate the images cache to force refresh on next call."""
+        self._images_cache_time = None
+        self._all_images = []
+        self._randomized_order = []

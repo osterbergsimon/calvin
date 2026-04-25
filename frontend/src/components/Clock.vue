@@ -27,8 +27,7 @@ const props = defineProps({
   displayMode: {
     type: String,
     default: null, // Will use configStore.clockDisplayMode if not provided
-    validator: (value) =>
-      value === null || ["always", "header", "off"].includes(value),
+    validator: value => value === null || ["always", "header", "off"].includes(value),
   },
   showDate: {
     type: Boolean,
@@ -48,10 +47,7 @@ const shouldShow = computed(() => {
   if (!configStore.clockEnabled) return false;
 
   // Use displayMode from props (which comes from config)
-  const mode =
-    props.displayMode !== null
-      ? props.displayMode
-      : configStore.clockDisplayMode;
+  const mode = props.displayMode !== null ? props.displayMode : configStore.clockDisplayMode;
 
   if (mode === "off") return false;
   if (mode === "always") {
@@ -182,11 +178,11 @@ watch(
     if (shouldShow.value) {
       updateTime();
     }
-  },
+  }
 );
 
 // Watch for shouldShow changes to start/stop updates
-watch(shouldShow, (newValue) => {
+watch(shouldShow, newValue => {
   if (newValue) {
     if (!timeInterval) {
       updateTime();

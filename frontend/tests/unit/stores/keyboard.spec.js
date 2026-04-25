@@ -62,9 +62,7 @@ describe("Keyboard Store", () => {
       const store = useKeyboardStore();
       await store.fetchMappings("5-button");
 
-      expect(axios.get).toHaveBeenCalledWith(
-        "/api/keyboard/mappings?keyboard_type=5-button",
-      );
+      expect(axios.get).toHaveBeenCalledWith("/api/keyboard/mappings?keyboard_type=5-button");
       expect(store.mappings).toEqual(mockMappings.mappings);
       expect(store.available).toBe(true);
     });

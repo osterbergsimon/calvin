@@ -8,7 +8,7 @@
         </h4>
         <input
           :ref="
-            (el) => {
+            el => {
               if (el) fileInputs[section.id] = el;
             }
           "
@@ -18,11 +18,7 @@
           style="display: none"
           @change="handleFileSelect"
         />
-        <button
-          class="btn-upload"
-          :disabled="uploading"
-          @click="triggerFileInput(section.id)"
-        >
+        <button class="btn-upload" :disabled="uploading" @click="triggerFileInput(section.id)">
           {{ uploading ? "Uploading..." : "Choose Files" }}
         </button>
         <span v-if="section.help_text" class="help-text">
@@ -71,10 +67,23 @@
           class="images-list"
           style="margin-top: 1rem; max-height: 400px; overflow-y: auto"
         >
-          <div v-for="image in images" :key="image.id" class="image-item">
+          <div v-for="image in filteredImages" :key="image.id" class="image-item">
             <div class="image-thumbnail">
               <img
+                v-if="
+                  !image.url ||
+                  (!image.url.startsWith('http://') && !image.url.startsWith('https://'))
+                "
                 :src="`/api/images/${image.id}/thumbnail`"
+                :alt="image.filename"
+                class="thumbnail-img"
+                loading="lazy"
+                decoding="async"
+                @error="handleThumbnailError"
+              />
+              <img
+                v-else
+                :src="image.url || image.raw_url"
                 :alt="image.filename"
                 class="thumbnail-img"
                 loading="lazy"
@@ -90,14 +99,21 @@
               </span>
             </div>
             <button
+              v-if="
+                !image.url ||
+                (!image.url.startsWith('http://') && !image.url.startsWith('https://'))
+              "
               class="btn-remove"
               title="Delete image"
               @click="$emit('delete-image', image.id)"
             >
               Delete
             </button>
+            <span v-else class="btn-remove-disabled" title="Cannot delete remote images">
+              Remote
+            </span>
           </div>
-          <div v-if="images.length === 0" class="empty-state">
+          <div v-if="filteredImages.length === 0" class="empty-state">
             <p>No images available</p>
           </div>
         </div>
@@ -113,6 +129,10 @@ const props = defineProps({
   pluginId: {
     type: String,
     required: true,
+  },
+  pluginInstances: {
+    type: Array,
+    default: () => [],
   },
   sections: {
     type: Array,
@@ -141,38 +161,63 @@ const emit = defineEmits(["upload", "delete-image"]);
 const expandedSections = ref({});
 const fileInputs = ref({});
 
-const imageCount = computed(() => {
-  return props.images.length;
+// Filter images to only show those belonging to this plugin
+// Match by instance plugin_id (image.source) against plugin instances
+// For single-instance plugins, also match against common instance_id patterns
+const filteredImages = computed(() => {
+  // Get all instance plugin_ids for this plugin type
+  const instanceIds = props.pluginInstances.map(inst => inst.id || inst.plugin_id);
+
+  // Also add common single-instance patterns (e.g., "local-images" for "local" plugin)
+  const commonInstanceIds = [
+    `${props.pluginId}-images`, // e.g., "local-images"
+    `${props.pluginId}-instance`, // e.g., "local-instance"
+  ];
+
+  // Combine all possible plugin_ids
+  const allPluginIds = [...instanceIds, ...commonInstanceIds, props.pluginId];
+
+  // Filter images where source matches any of the plugin_ids
+  return props.images.filter(image => {
+    if (!image.source) return false;
+    return allPluginIds.includes(image.source);
+  });
 });
 
-const toggleSection = (sectionId) => {
+const imageCount = computed(() => {
+  return filteredImages.value.length;
+});
+
+const toggleSection = sectionId => {
   expandedSections.value[sectionId] = !expandedSections.value[sectionId];
 };
 
-const triggerFileInput = (sectionId) => {
+const triggerFileInput = sectionId => {
   const input = fileInputs.value[sectionId];
   if (input) {
     input.click();
   }
 };
 
-const handleFileSelect = (event) => {
+const handleFileSelect = event => {
   const files = event.target.files;
   if (files && files.length > 0) {
     // Find the section that matches this file input
-    const section = props.sections.find((s) => s.type === "upload");
+    const section = props.sections.find(s => s.type === "upload");
     if (section) {
-      emit("upload", files, section);
+      // Convert FileList to Array to avoid serialization issues
+      const filesArray = Array.from(files);
+      emit("upload", filesArray, section);
     }
   }
   event.target.value = "";
 };
 
-const handleThumbnailError = (event) => {
+const handleThumbnailError = event => {
   event.target.src = "/placeholder-thumbnail.png";
 };
 
-const formatFileSize = (bytes) => {
+const formatFileSize = bytes => {
   if (!bytes) return "0 B";
   const k = 1024;
   const sizes = ["B", "KB", "MB", "GB"];
@@ -284,6 +329,14 @@ const formatFileSize = (bytes) => {
 .btn-remove:hover {
   background: var(--accent-error, #ef4444);
   opacity: 0.9;
+}
+
+.btn-remove-disabled {
+  color: var(--text-secondary);
+  font-size: 0.875rem;
+  padding: 0.5rem 1rem;
+  opacity: 0.6;
+  user-select: none;
 }
 
 .success-message {

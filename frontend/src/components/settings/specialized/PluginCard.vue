@@ -38,11 +38,7 @@
           <button
             v-if="plugin._installed"
             class="btn-remove btn-icon-only"
-            :title="
-              plugin.type === 'theme'
-                ? 'Uninstall this theme'
-                : 'Uninstall this plugin'
-            "
+            :title="plugin.type === 'theme' ? 'Uninstall this theme' : 'Uninstall this plugin'"
             @click="$emit('uninstall', plugin.id, plugin.type)"
           >
             🗑️
@@ -51,9 +47,7 @@
             <input
               type="checkbox"
               :checked="plugin.enabled"
-              @change="
-                $emit('toggle-enabled', plugin.id, $event.target.checked)
-              "
+              @change="$emit('toggle-enabled', plugin.id, $event.target.checked)"
             />
             <span class="slider" />
           </label>
@@ -63,14 +57,10 @@
 
     <!-- Plugin Config (when expanded) -->
     <div v-if="plugin.enabled && expanded" class="plugin-config">
-      <!-- Common Settings -->
+      <!-- Plugin Settings -->
       <div v-if="hasGlobalSettings">
-        <h4 class="config-section-title">Common Settings</h4>
-        <div
-          v-for="(schema, key) in globalConfigSchema"
-          :key="key"
-          class="plugin-setting"
-        >
+        <h4 class="config-section-title">Plugin Settings</h4>
+        <div v-for="(schema, key) in globalConfigSchema" :key="key" class="plugin-setting">
           <PluginFieldRenderer
             :plugin-id="plugin.id"
             :field-key="key"
@@ -82,20 +72,12 @@
 
         <!-- Plugin Actions -->
         <PluginActions
-          v-if="plugin.ui_actions && plugin.ui_actions.length > 0"
+          v-if="globalPluginActions.length > 0"
           :plugin-id="plugin.id"
-          :actions="plugin.ui_actions"
+          :actions="globalPluginActions"
           :saving="saving === plugin.id ? plugin.id : null"
-          :testing="
-            typeof testing === 'object' && testing
-              ? testing[plugin.id] || {}
-              : {}
-          "
-          :fetching="
-            typeof fetching === 'object' && fetching
-              ? fetching[plugin.id] || {}
-              : {}
-          "
+          :testing="typeof testing === 'object' && testing ? testing[plugin.id] || {} : {}"
+          :fetching="typeof fetching === 'object' && fetching ? fetching[plugin.id] || {} : {}"
           :save-status="saveStatus"
           :test-status="testStatus"
           :fetch-status="fetchStatus"
@@ -107,28 +89,11 @@
         />
       </div>
 
-      <!-- Service plugin note -->
-      <div
-        v-if="
-          plugin.type === 'service' &&
-          !hasGlobalSettings &&
-          Object.keys(plugin.config_schema || {}).length > 0
-        "
-        class="plugin-instance-note"
-      >
-        <p class="help-text">
-          This plugin supports multiple instances. Configure settings for each
-          instance using the "Add Instance" button below. Plugin-global settings
-          are not available for this plugin type.
-        </p>
-      </div>
-
       <!-- Plugin Sections -->
       <PluginSections
-        v-if="
-          plugin.ui_sections && plugin.ui_sections.length > 0 && plugin.enabled
-        "
+        v-if="plugin.ui_sections && plugin.ui_sections.length > 0 && plugin.enabled"
         :plugin-id="plugin.id"
+        :plugin-instances="instances"
         :sections="plugin.ui_sections"
         :images="images"
         :uploading="uploading"
@@ -143,6 +108,7 @@
         v-if="showInstances"
         :plugin="plugin"
         :instances="instances"
+        :get-instance-summary="instance => getInstanceSummary(plugin, instance)"
         @add-instance="$emit('add-instance', plugin.id)"
         @edit-instance="handleEditInstance"
         @delete-instance="$emit('delete-instance', $event)"
@@ -154,8 +120,8 @@
     <!-- Disabled Message -->
     <div v-else-if="!plugin.enabled" class="plugin-disabled-message">
       <p class="help-text">
-        This plugin type is disabled. It won't appear in dropdowns and existing
-        instances will be hidden (but not deleted).
+        This plugin type is disabled. It won't appear in dropdowns and existing instances will be
+        hidden (but not deleted).
       </p>
     </div>
   </div>
@@ -261,39 +227,63 @@ const hasGlobalSettings = computed(() => {
   return Object.keys(globalConfigSchema.value).length > 0;
 });
 
+const globalPluginActions = computed(() => {
+  const actions = props.plugin.ui_actions || [];
+  const hasInstances =
+    props.plugin.supports_multiple_instances !== false && props.plugin.type !== "theme";
+
+  return actions.filter(action => {
+    if (action.scope === "instance") {
+      return false;
+    }
+    if (action.scope === "global") {
+      return true;
+    }
+    if (hasInstances && ["test", "fetch", "geocode"].includes(action.type)) {
+      return false;
+    }
+    return true;
+  });
+});
+
 const showInstances = computed(() => {
   return (
     props.plugin.enabled &&
-    props.plugin.type !== "calendar" &&
     props.plugin.type !== "theme" &&
     props.plugin.supports_multiple_instances !== false
   );
 });
 
-// Helper functions (these would ideally come from a composable)
-const getGlobalConfigSchema = (plugin) => {
-  const schema = plugin.common_config_schema || {};
-  const globalSchema = {};
-
-  for (const [key, fieldSchema] of Object.entries(schema)) {
-    if (fieldSchema.global_only || plugin.type !== "service") {
-      globalSchema[key] = fieldSchema;
-    }
-  }
-
-  return globalSchema;
-};
-
-const getFormValue = (key, schema) => {
-  return (
-    props.formData[key] ??
-    schema.default ??
-    (schema.type === "boolean" ? false : "")
+// Trust schema placement: common_config_schema = global, instance_config_schema = instance.
+// Skip internal _ fields and fields marked hidden in their UI config.
+const getGlobalConfigSchema = plugin => {
+  return Object.fromEntries(
+    Object.entries(plugin.common_config_schema || {}).filter(
+      ([key, schema]) =>
+        !key.startsWith("_") && schema && typeof schema === "object" && !schema.ui?.hidden
+    )
   );
 };
 
-const getAggregatedRunningClass = (instances) => {
-  const runningCount = instances.filter((i) => i.running).length;
+const getInstanceSummary = (plugin, instance) => {
+  const schema = plugin.instance_config_schema || {};
+  const config = instance.config || {};
+  for (const [key, fieldSchema] of Object.entries(schema)) {
+    if (key.startsWith("_") || fieldSchema.type !== "string") continue;
+    const val = config[key];
+    if (val && typeof val === "string" && val.trim()) {
+      return val.length > 60 ? val.slice(0, 57) + "..." : val;
+    }
+  }
+  return null;
+};
+
+const getFormValue = (key, schema) => {
+  return props.formData[key] ?? schema.default ?? (schema.type === "boolean" ? false : "");
+};
+
+const getAggregatedRunningClass = instances => {
+  const runningCount = instances.filter(i => i.running).length;
   const totalCount = instances.length;
 
   if (runningCount === 0) return "all-stopped";
@@ -301,14 +291,14 @@ const getAggregatedRunningClass = (instances) => {
   return "partial-running";
 };
 
-const getAggregatedRunningTooltip = (instances) => {
-  const runningCount = instances.filter((i) => i.running).length;
+const getAggregatedRunningTooltip = instances => {
+  const runningCount = instances.filter(i => i.running).length;
   const totalCount = instances.length;
   return `${runningCount}/${totalCount} instances running`;
 };
 
-const getAggregatedRunningSymbol = (instances) => {
-  const runningCount = instances.filter((i) => i.running).length;
+const getAggregatedRunningSymbol = instances => {
+  const runningCount = instances.filter(i => i.running).length;
   const totalCount = instances.length;
 
   if (runningCount === 0) return "○";
@@ -320,11 +310,11 @@ const handleUpdateFormValue = (key, value) => {
   emit("update-form-value", props.plugin.id, key, value);
 };
 
-const handleCustomAction = (action) => {
+const handleCustomAction = action => {
   emit("custom-action", props.plugin.id, action);
 };
 
-const handleEditInstance = (instance) => {
+const handleEditInstance = instance => {
   emit("edit-instance", props.plugin.id, instance);
 };
 
@@ -332,7 +322,7 @@ const handleToggleInstance = (instanceId, enabled) => {
   emit("toggle-instance", instanceId, enabled);
 };
 
-const handleInstanceOrderChange = (newOrder) => {
+const handleInstanceOrderChange = newOrder => {
   emit("instance-order-change", props.plugin.id, newOrder);
 };
 </script>
@@ -514,14 +504,6 @@ input:checked + .slider:before {
 
 .plugin-setting {
   margin-bottom: 1rem;
-}
-
-.plugin-instance-note {
-  margin: 1rem 0;
-  padding: 0.75rem;
-  background: var(--bg-tertiary);
-  border-radius: 4px;
-  border-left: 3px solid var(--accent-primary);
 }
 
 .plugin-disabled-message {

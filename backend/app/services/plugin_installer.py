@@ -1,20 +1,110 @@
 """Plugin installation service for managing installed plugins."""
 
 import json
+import logging
 import shutil
+import subprocess
+import sys
+import threading
 import zipfile
 from pathlib import Path
 from typing import Any
 
 from app.config import settings
+from app.plugins.definitions import CURRENT_PLUGIN_PROTOCOL_VERSION
 from app.services.validation import (
     validate_directory_structure,
     validate_manifest_format_version,
+    validate_manifest_protocol_version,
     validate_manifest_required_fields,
     validate_plugin_optional_fields,
     validate_plugin_type,
     validate_zip_structure,
 )
+
+logger = logging.getLogger(__name__)
+
+
+class FrontendBuildManager:
+    """Manages `npm run build` for plugin frontend components.
+
+    Runs builds in a background thread so install endpoints can return immediately.
+    Poll `state` / `message` for progress.
+    """
+
+    def __init__(self):
+        self._lock = threading.Lock()
+        self._state = "idle"  # idle | building | done | failed
+        self._message = ""
+
+    @property
+    def state(self) -> str:
+        with self._lock:
+            return self._state
+
+    @property
+    def message(self) -> str:
+        with self._lock:
+            return self._message
+
+    def start_background_build(self, frontend_dir: Path) -> None:
+        """Kick off a build in a daemon thread. Returns immediately."""
+        with self._lock:
+            if self._state == "building":
+                return  # already in progress
+            self._state = "building"
+            self._message = "Building frontend, this may take a minute…"
+        thread = threading.Thread(target=self._run_build, args=(frontend_dir,), daemon=True)
+        thread.start()
+
+    def _run_build(self, frontend_dir: Path) -> None:
+        success, message = self._build(frontend_dir)
+        with self._lock:
+            self._state = "done" if success else "failed"
+            self._message = message
+
+    def _build(self, frontend_dir: Path) -> tuple[bool, str]:
+        npm = shutil.which("npm")
+        if not npm:
+            return False, "npm not found — rebuild the frontend manually with: npm run build"
+
+        # On Windows, .cmd files can't be executed by CreateProcess directly —
+        # they need cmd.exe as the interpreter.
+        if sys.platform == "win32":
+            cmd = ["cmd", "/c", npm, "run", "build"]
+        else:
+            cmd = [npm, "run", "build"]
+
+        try:
+            result = subprocess.run(
+                cmd,
+                cwd=str(frontend_dir),
+                capture_output=True,
+                text=True,
+                timeout=300,
+            )
+            if result.returncode == 0:
+                return True, "Frontend rebuilt successfully."
+            tail = (result.stderr or result.stdout or "unknown error")[-500:]
+            return False, f"Frontend rebuild failed: {tail}"
+        except subprocess.TimeoutExpired:
+            return False, "Frontend rebuild timed out (5 min limit)"
+        except Exception as exc:
+            return False, f"Frontend rebuild failed: {exc}"
+
+    # Keep synchronous variant for callers that need to wait (e.g. startup resume)
+    def build(self, frontend_dir: Path) -> tuple[bool, str]:
+        with self._lock:
+            self._state = "building"
+            self._message = "Building frontend…"
+        success, message = self._build(frontend_dir)
+        with self._lock:
+            self._state = "done" if success else "failed"
+            self._message = message
+        return success, message
+
+
+frontend_build_manager = FrontendBuildManager()
 
 
 class PluginInstaller:
@@ -57,6 +147,10 @@ class PluginInstaller:
         """
         return self.frontend_plugins_dir / plugin_id
 
+    def get_frontend_dir(self) -> Path:
+        """Return the root of the frontend source tree (frontend/)."""
+        return self.frontend_plugins_dir.parents[2]
+
     def validate_plugin_package(self, plugin_path: Path) -> dict[str, Any]:
         """
         Validate a plugin package structure.
@@ -91,6 +185,12 @@ class PluginInstaller:
         validate_manifest_format_version(
             manifest, ["1.0.0"], default_version="1.0.0", manifest_type="plugin.json"
         )
+        validate_manifest_protocol_version(
+            manifest,
+            [CURRENT_PLUGIN_PROTOCOL_VERSION],
+            default_version=CURRENT_PLUGIN_PROTOCOL_VERSION,
+            manifest_type="plugin.json",
+        )
         validate_plugin_optional_fields(manifest)
 
         return manifest
@@ -122,12 +222,22 @@ class PluginInstaller:
         validate_manifest_format_version(
             manifest, ["1.0.0"], default_version="1.0.0", manifest_type="plugin.json"
         )
+        validate_manifest_protocol_version(
+            manifest,
+            [CURRENT_PLUGIN_PROTOCOL_VERSION],
+            default_version=CURRENT_PLUGIN_PROTOCOL_VERSION,
+            manifest_type="plugin.json",
+        )
         validate_plugin_optional_fields(manifest)
 
         return manifest
 
     def install_plugin(
-        self, source_path: Path, plugin_id: str | None = None, check_version: bool = True
+        self,
+        source_path: Path,
+        plugin_id: str | None = None,
+        check_version: bool = True,
+        force: bool = False,
     ) -> dict[str, Any]:
         """
         Install a plugin from a directory or zip file.
@@ -136,6 +246,7 @@ class PluginInstaller:
             source_path: Path to plugin directory or zip file
             plugin_id: Optional plugin ID (if not provided, uses manifest ID)
             check_version: If True, checks for existing version and raises if older
+            force: If True, uninstalls existing plugin before installing
 
         Returns:
             Plugin manifest dictionary
@@ -152,33 +263,41 @@ class PluginInstaller:
         # Check if plugin already installed
         plugin_path = self.get_plugin_path(install_id)
         if plugin_path.exists():
-            # Check version if requested
-            if check_version:
-                existing_manifest = self.get_plugin_manifest(install_id)
-                if existing_manifest:
-                    existing_version = existing_manifest.get("version", "0.0.0")
-                    new_version = manifest.get("version", "0.0.0")
-                    # Simple version comparison (assumes semantic versioning)
-                    try:
-                        from packaging import version
+            if force:
+                # Force reinstall: uninstall existing plugin first
+                import logging
 
-                        if version.parse(new_version) < version.parse(existing_version):
-                            raise ValueError(
-                                f"Plugin {install_id} version {new_version} is older than "
-                                f"installed version {existing_version}. "
-                                "Uninstall the existing plugin first."
-                            )
-                    except ImportError:
-                        # packaging not available, skip version check
-                        pass
-                    except Exception:
-                        # If version parsing fails, allow install but warn
-                        pass
+                logger = logging.getLogger(__name__)
+                logger.info(f"Force installing plugin {install_id}, removing existing installation")
+                self.uninstall_plugin(install_id)
+            else:
+                # Check version if requested
+                if check_version:
+                    existing_manifest = self.get_plugin_manifest(install_id)
+                    if existing_manifest:
+                        existing_version = existing_manifest.get("version", "0.0.0")
+                        new_version = manifest.get("version", "0.0.0")
+                        # Simple version comparison (assumes semantic versioning)
+                        try:
+                            from packaging import version
 
-            raise ValueError(
-                f"Plugin {install_id} is already installed. "
-                "Uninstall the existing plugin first or use force=True to override."
-            )
+                            if version.parse(new_version) < version.parse(existing_version):
+                                raise ValueError(
+                                    f"Plugin {install_id} version {new_version} is older than "
+                                    f"installed version {existing_version}. "
+                                    "Uninstall the existing plugin first."
+                                )
+                        except ImportError:
+                            # packaging not available, skip version check
+                            pass
+                        except Exception:
+                            # If version parsing fails, allow install but warn
+                            pass
+
+                raise ValueError(
+                    f"Plugin {install_id} is already installed. "
+                    "Uninstall the existing plugin first or use force=True to override."
+                )
 
         # Create plugin directory
         plugin_path.mkdir(parents=True, exist_ok=True)
@@ -244,6 +363,12 @@ class PluginInstaller:
                 if frontend_dest.exists():
                     shutil.rmtree(frontend_dest)
                 shutil.copytree(frontend_source, frontend_dest)
+                manifest["_has_frontend"] = True
+
+            # Install plugin-specific Python packages
+            installed_packages = self._install_pip_requirements(manifest)
+            if installed_packages:
+                manifest["_installed_packages"] = installed_packages
 
             # Save manifest
             manifest_path = plugin_path / "plugin.json"
@@ -253,13 +378,89 @@ class PluginInstaller:
             return manifest
 
         except Exception as e:
-            # Cleanup on error
+            # Cleanup on error — use ignore_errors so a locked file on Windows
+            # doesn't mask the real install error.
             if plugin_path.exists():
-                shutil.rmtree(plugin_path)
+                shutil.rmtree(plugin_path, ignore_errors=True)
             frontend_path = self.get_frontend_plugin_path(install_id)
             if frontend_path.exists():
-                shutil.rmtree(frontend_path)
+                shutil.rmtree(frontend_path, ignore_errors=True)
             raise ValueError(f"Failed to install plugin: {e}") from e
+
+    def _install_pip_requirements(self, manifest: dict[str, Any]) -> list[str]:
+        """Install Python packages declared in plugin.json under python_dependencies.
+
+        Uses the running interpreter so the packages land in the correct venv.
+        Raises ValueError if any package fails to install so the caller can roll back.
+        """
+        requirements: list[str] = manifest.get("python_dependencies", [])
+        if not requirements:
+            return []
+
+        pip_cmd = self._resolve_pip()
+        logger.info(
+            f"Installing pip packages for plugin {manifest.get('id')} "
+            f"using {pip_cmd}: {requirements}"
+        )
+        installed: list[str] = []
+        for req in requirements:
+            cmd = [*pip_cmd, req]
+            logger.info(f"Running: {' '.join(str(c) for c in cmd)}")
+            try:
+                result = subprocess.run(
+                    cmd,
+                    capture_output=True,
+                    text=True,
+                    timeout=120,
+                )
+                logger.debug(f"pip stdout: {result.stdout!r}")
+                logger.debug(f"pip stderr: {result.stderr!r}")
+                logger.debug(f"pip returncode: {result.returncode}")
+                if result.returncode == 0:
+                    logger.info(f"Installed: {req}")
+                    installed.append(req)
+                else:
+                    error_output = (result.stderr or result.stdout or "(no output)").strip()
+                    raise ValueError(
+                        f"pip install failed for '{req}' (exit {result.returncode}):\n{error_output}"
+                    )
+            except subprocess.TimeoutExpired:
+                raise ValueError(f"Timed out installing package '{req}' (120s limit)")
+            except OSError as e:
+                raise ValueError(f"Failed to launch pip for '{req}': {e}")
+
+        return installed
+
+    @staticmethod
+    def _resolve_pip() -> list[str]:
+        """Return the best pip invocation prefix for the running venv.
+
+        Resolution order:
+        1. uv pip install --python <exe>   — UV-managed venvs (no pip binary installed)
+        2. bin/pip install / bin/pip3 install — conventional venvs with a pip binary
+        3. python -m pip install           — last resort
+
+        The returned list already includes "install"; append only the package name.
+        """
+        # 1. Prefer uv when available — works even when pip is absent from the venv.
+        # On Windows, uv.exe must be launched via cmd /c (same pattern as npm) to avoid
+        # STATUS_FATAL_APP_EXIT when spawning from within a running Python process.
+        uv = shutil.which("uv")
+        if uv:
+            cmd = [uv, "pip", "install", "--python", sys.executable]
+            if sys.platform == "win32":
+                return ["cmd", "/c"] + cmd
+            return cmd
+
+        # 2. pip/pip3 binary sitting next to the interpreter
+        bin_dir = Path(sys.executable).parent
+        for candidate in ("pip", "pip3"):
+            pip_bin = bin_dir / candidate
+            if pip_bin.exists():
+                return [str(pip_bin), "install"]
+
+        # 3. Last resort
+        return [sys.executable, "-m", "pip", "install"]
 
     def uninstall_plugin(self, plugin_id: str) -> None:
         """
@@ -445,7 +646,7 @@ class PluginInstaller:
         return result
 
     def install_plugin_from_repo(
-        self, repo_path: Path, plugin_path: str, plugin_id: str | None = None
+        self, repo_path: Path, plugin_path: str, plugin_id: str | None = None, force: bool = False
     ) -> dict[str, Any]:
         """
         Install a specific plugin from a repository.
@@ -454,6 +655,7 @@ class PluginInstaller:
             repo_path: Path to repository root directory
             plugin_path: Relative path to plugin directory within repo
             plugin_id: Optional plugin ID override
+            force: If True, uninstalls existing plugin before installing
 
         Returns:
             Plugin manifest dictionary
@@ -474,11 +676,42 @@ class PluginInstaller:
         install_id = plugin_id or manifest["id"]
 
         # Check if plugin already installed
-        if self.get_plugin_path(install_id).exists():
-            raise ValueError(f"Plugin {install_id} is already installed")
+        plugin_path = self.get_plugin_path(install_id)
+        if plugin_path.exists():
+            # Verify it's actually a valid installed plugin (not just a leftover directory)
+            existing_manifest = self.get_plugin_manifest(install_id)
+            if existing_manifest:
+                # Plugin is actually installed and valid
+                if force:
+                    # Force reinstall: uninstall existing plugin first
+                    import logging
+
+                    logger = logging.getLogger(__name__)
+                    logger.info(
+                        f"Force installing plugin {install_id}, removing existing installation"
+                    )
+                    self.uninstall_plugin(install_id)
+                else:
+                    raise ValueError(f"Plugin {install_id} is already installed")
+            else:
+                # Plugin directory exists but is invalid/corrupted (no manifest)
+                # Remove it and allow reinstallation
+                import logging
+                import shutil
+
+                logger = logging.getLogger(__name__)
+                logger.warning(
+                    f"Found corrupted/invalid plugin directory for {install_id}, "
+                    "removing and allowing reinstallation"
+                )
+                shutil.rmtree(plugin_path)
+                # Also clean up frontend directory if it exists
+                frontend_path = self.get_frontend_plugin_path(install_id)
+                if frontend_path.exists():
+                    shutil.rmtree(frontend_path)
 
         # Install from directory
-        return self.install_plugin(plugin_dir, install_id)
+        return self.install_plugin(plugin_dir, install_id, check_version=True, force=False)
 
 
 # Global plugin installer instance

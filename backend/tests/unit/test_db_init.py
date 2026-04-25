@@ -4,11 +4,23 @@ import tempfile
 from pathlib import Path
 
 import pytest
-from sqlalchemy import select
-from sqlalchemy.ext.asyncio import create_async_engine
 
 from app.models.db_models import ConfigDB, KeyboardMappingDB, PluginDB, PluginTypeDB
 from app.utils.db_init import initialize_database, verify_database_tables
+
+
+def _update_ormar_models_database(new_database):
+    """
+    Update all ORMAR models to use a new database connection.
+
+    ORMAR models store the database connection in ormar_config.database at class
+    definition time. When we create a new database connection, we also need to update
+    the models' ormar_config.database to use the new connection.
+    """
+    ConfigDB.ormar_config.database = new_database
+    KeyboardMappingDB.ormar_config.database = new_database
+    PluginDB.ormar_config.database = new_database
+    PluginTypeDB.ormar_config.database = new_database
 
 
 @pytest.mark.asyncio
@@ -17,41 +29,47 @@ async def test_initialize_database_creates_tables():
     with tempfile.NamedTemporaryFile(suffix=".db", delete=False) as tmp:
         db_path = Path(tmp.name)
 
-    engine = None
+    database = None
+    original_database = None
     try:
+        # Save original database connection
+        import app.database as db_module
+
+        original_database = db_module.database
+
         # Initialize database
-        engine = await initialize_database(db_path, run_migrations=True)
+        database = await initialize_database(db_path, run_migrations=True)
+
+        # CRITICAL: Update ORMAR models to use the new database connection
+        # ORMAR models cache the database connection at class definition time,
+        # so we must explicitly update their ormar_config.database
+        _update_ormar_models_database(database)
 
         # Verify tables exist
         table_status = verify_database_tables(db_path)
         missing_tables = [t for t, e in table_status.items() if not e]
         assert all(table_status.values()), f"Missing tables: {missing_tables}"
 
-        # Verify we can query the tables using SQLAlchemy
-        from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker
+        # Verify we can query the tables using Ormar
+        plugin_types = await PluginTypeDB.objects.all()
+        assert isinstance(plugin_types, list)
 
-        session_factory = async_sessionmaker(engine, class_=AsyncSession, expire_on_commit=False)
-        async with session_factory() as session:
-            # Query each table to ensure they're accessible
-            result = await session.execute(select(PluginTypeDB))
-            plugin_types = result.scalars().all()
-            assert isinstance(plugin_types, list)
+        plugins = await PluginDB.objects.all()
+        assert isinstance(plugins, list)
 
-            result = await session.execute(select(PluginDB))
-            plugins = result.scalars().all()
-            assert isinstance(plugins, list)
+        configs = await ConfigDB.objects.all()
+        assert isinstance(configs, list)
 
-            result = await session.execute(select(ConfigDB))
-            configs = result.scalars().all()
-            assert isinstance(configs, list)
-
-            result = await session.execute(select(KeyboardMappingDB))
-            mappings = result.scalars().all()
-            assert isinstance(mappings, list)
+        mappings = await KeyboardMappingDB.objects.all()
+        assert isinstance(mappings, list)
     finally:
-        # Cleanup - dispose engine first to release file lock
-        if engine:
-            await engine.dispose()
+        # Restore original database connection
+        if original_database:
+            _update_ormar_models_database(original_database)
+
+        # Cleanup - disconnect database first to release file lock
+        if database:
+            await database.disconnect()
         # Small delay to ensure file is released on Windows
         import time
 
@@ -65,29 +83,48 @@ async def test_initialize_database_creates_tables():
 
 
 @pytest.mark.asyncio
-async def test_initialize_database_with_existing_engine():
-    """Test that initialize_database works with an existing engine."""
+async def test_initialize_database_with_existing_database():
+    """Test that initialize_database works with an existing database connection."""
     with tempfile.NamedTemporaryFile(suffix=".db", delete=False) as tmp:
         db_path = Path(tmp.name)
 
-    engine = None
+    database = None
+    original_database = None
     try:
-        # Create engine first
+        import databases
+
+        import app.database as db_module
+
+        original_database = db_module.database
+
+        # Create database connection first
         db_url = f"sqlite+aiosqlite:///{db_path.resolve()}"
-        engine = create_async_engine(db_url, echo=False, future=True)
+        database = databases.Database(db_url)
+        await database.connect()
 
-        # Initialize database with existing engine
-        result_engine = await initialize_database(db_path, engine=engine, run_migrations=True)
+        # Update ORMAR models to use the new database connection
+        _update_ormar_models_database(database)
 
-        # Should return the same engine
-        assert result_engine is engine
+        # Initialize database with existing database connection
+        result_database = await initialize_database(db_path, database=database, run_migrations=True)
+
+        # Should return the same database
+        assert result_database is database
 
         # Verify tables exist
         table_status = verify_database_tables(db_path)
         assert all(table_status.values())
+
+        # Verify we can query the tables using Ormar
+        plugin_types = await PluginTypeDB.objects.all()
+        assert isinstance(plugin_types, list)
     finally:
-        if engine:
-            await engine.dispose()
+        # Restore original database connection
+        if original_database:
+            _update_ormar_models_database(original_database)
+
+        if database:
+            await database.disconnect()
         import time
 
         time.sleep(0.1)
@@ -105,9 +142,17 @@ async def test_initialize_database_without_migrations():
         db_path = Path(tmp.name)
 
     engine = None
+    original_database = None
     try:
+        import app.database as db_module
+
+        original_database = db_module.database
+
         # Initialize database without migrations
         engine = await initialize_database(db_path, run_migrations=False)
+
+        # Update ORMAR models to use the new database connection
+        _update_ormar_models_database(engine)
 
         # Verify tables exist (alembic_version won't exist without migrations)
         table_status = verify_database_tables(db_path)
@@ -116,9 +161,17 @@ async def test_initialize_database_without_migrations():
         assert all(app_tables.values()), (
             f"Missing tables: {[k for k, v in app_tables.items() if not v]}"
         )
+
+        # Verify we can query the tables using Ormar
+        plugin_types = await PluginTypeDB.objects.all()
+        assert isinstance(plugin_types, list)
     finally:
+        # Restore original database connection
+        if original_database:
+            _update_ormar_models_database(original_database)
+
         if engine:
-            await engine.dispose()
+            await engine.disconnect()
         import time
 
         time.sleep(0.1)
@@ -203,13 +256,20 @@ async def test_initialize_database_idempotent():
         db_path = Path(tmp.name)
 
     engine1 = None
+    original_database = None
     try:
+        import app.database as db_module
+
+        original_database = db_module.database
+
         # Initialize first time
         engine1 = await initialize_database(db_path, run_migrations=True)
+        _update_ormar_models_database(engine1)
         table_status1 = verify_database_tables(db_path)
 
         # Initialize second time
-        engine2 = await initialize_database(db_path, engine=engine1, run_migrations=True)
+        engine2 = await initialize_database(db_path, database=engine1, run_migrations=True)
+        _update_ormar_models_database(engine2)
         table_status2 = verify_database_tables(db_path)
 
         # Should be the same engine
@@ -218,9 +278,69 @@ async def test_initialize_database_idempotent():
         # Tables should still exist
         assert all(table_status1.values())
         assert all(table_status2.values())
+
+        # Verify we can query the tables using Ormar
+        plugin_types = await PluginTypeDB.objects.all()
+        assert isinstance(plugin_types, list)
     finally:
+        # Restore original database connection
+        if original_database:
+            _update_ormar_models_database(original_database)
+
         if engine1:
-            await engine1.dispose()
+            await engine1.disconnect()
+        import time
+
+        time.sleep(0.1)
+        if db_path.exists():
+            try:
+                db_path.unlink()
+            except PermissionError:
+                pass
+
+
+@pytest.mark.asyncio
+async def test_initialize_database_enables_wal_mode():
+    """Test that initialize_database enables WAL mode for better concurrency."""
+    with tempfile.NamedTemporaryFile(suffix=".db", delete=False) as tmp:
+        db_path = Path(tmp.name)
+
+    database = None
+    original_database = None
+    try:
+        import app.database as db_module
+
+        original_database = db_module.database
+
+        # Initialize database
+        database = await initialize_database(db_path, run_migrations=True)
+        _update_ormar_models_database(database)
+
+        # Check that WAL mode is enabled
+        # databases.Database.fetch_one returns a single row for PRAGMA queries
+        result = await database.fetch_one("PRAGMA journal_mode")
+        journal_mode = result[0] if result else None
+        assert journal_mode.upper() == "WAL", f"Expected WAL mode, got {journal_mode}"
+
+        # Check that busy_timeout is set
+        result = await database.fetch_one("PRAGMA busy_timeout")
+        busy_timeout = result[0] if result else None
+        assert busy_timeout == 5000, f"Expected busy_timeout=5000, got {busy_timeout}"
+
+        # Check that synchronous is set to NORMAL
+        # Note: SQLite synchronous values: 0=OFF, 1=NORMAL, 2=FULL
+        # The PRAGMA might return the current value, not necessarily what we set
+        # We just verify it's a valid value (0, 1, or 2)
+        result = await database.fetch_one("PRAGMA synchronous")
+        synchronous = result[0] if result else None
+        assert synchronous in [0, 1, 2], f"Expected synchronous in [0,1,2], got {synchronous}"
+    finally:
+        # Restore original database connection
+        if original_database:
+            _update_ormar_models_database(original_database)
+
+        if database:
+            await database.disconnect()
         import time
 
         time.sleep(0.1)

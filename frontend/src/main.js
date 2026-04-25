@@ -5,7 +5,7 @@ import App from "./App.vue";
 import router from "./router";
 import "./styles/main.css";
 import "./styles/theme.css";
-import { initLogger } from "./utils/logger";
+import { initLogger, logError, logInfo } from "./utils/logger";
 import { useConfigStore } from "./stores/config";
 
 const app = createApp(App);
@@ -38,11 +38,11 @@ if ("serviceWorker" in navigator && import.meta.env.PROD) {
   window.addEventListener("load", () => {
     navigator.serviceWorker
       .register("/sw.js")
-      .then((registration) => {
-        console.log("Service Worker registered:", registration);
+      .then(registration => {
+        logInfo("[main]", "Service Worker registered:", registration);
       })
-      .catch((error) => {
-        console.error("Service Worker registration failed:", error);
+      .catch(error => {
+        logError("[main]", "Service Worker registration failed:", error);
       });
   });
 }

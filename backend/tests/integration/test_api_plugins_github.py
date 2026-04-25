@@ -705,7 +705,9 @@ class TestPluginUninstallAPI:
         response = test_client.delete("/api/plugins/installed/test_uninstall_api")
 
         assert response.status_code == 200
-        assert response.json()["success"] is True
+        response_data = response.json()
+        assert response_data is not None
+        assert response_data.get("success") is True
 
         # Verify plugin is removed
         plugin_path = plugin_installer.get_plugin_path("test_uninstall_api")

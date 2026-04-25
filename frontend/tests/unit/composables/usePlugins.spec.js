@@ -7,18 +7,37 @@ import { describe, it, expect, beforeEach, vi } from "vitest";
 import { usePlugins } from "@/composables/usePlugins";
 import * as pluginsApi from "@/services/pluginsApi";
 
+const { logErrorMock, logWarnMock } = vi.hoisted(() => ({
+  logErrorMock: vi.fn(),
+  logWarnMock: vi.fn(),
+}));
+
+vi.mock("@/utils/logger", () => ({
+  logError: (...args) => logErrorMock(...args),
+  logWarn: (...args) => logWarnMock(...args),
+}));
+
 // Mock pluginsApi
 vi.mock("@/services/pluginsApi", () => ({
   getPlugins: vi.fn(),
   getInstalledPlugins: vi.fn(),
   getPluginInstances: vi.fn(),
   getPluginConfig: vi.fn(),
+  updatePlugin: vi.fn(),
+  updatePluginConfig: vi.fn(),
+  startPluginInstance: vi.fn(),
+  stopPluginInstance: vi.fn(),
+  updatePluginInstanceOrder: vi.fn(),
   updatePluginInstance: vi.fn(),
+  testPlugin: vi.fn(),
+  fetchPlugin: vi.fn(),
 }));
 
 describe("usePlugins", () => {
   beforeEach(() => {
     vi.clearAllMocks();
+    logErrorMock.mockClear();
+    logWarnMock.mockClear();
   });
 
   describe("Backend Plugin Support", () => {
@@ -43,15 +62,13 @@ describe("usePlugins", () => {
       pluginsApi.getPlugins.mockResolvedValue(mockPlugins);
       pluginsApi.getInstalledPlugins.mockResolvedValue({ plugins: [] });
       pluginsApi.getPluginInstances.mockResolvedValue({ instances: [] });
-      pluginsApi.getPluginConfig.mockResolvedValue({ config: {} });
+      pluginsApi.getPluginConfig.mockResolvedValue({});
 
       const { sortedPluginCategories, loadPlugins } = usePlugins();
       await loadPlugins();
 
       // Check that backend category exists
-      const backendCategory = sortedPluginCategories.value.find(
-        (cat) => cat.type === "backend",
-      );
+      const backendCategory = sortedPluginCategories.value.find(cat => cat.type === "backend");
       expect(backendCategory).toBeDefined();
       expect(backendCategory.label).toBe("Backend");
       expect(backendCategory.plugins).toHaveLength(1);
@@ -85,23 +102,19 @@ describe("usePlugins", () => {
       pluginsApi.getPlugins.mockResolvedValue(mockPlugins);
       pluginsApi.getInstalledPlugins.mockResolvedValue({ plugins: [] });
       pluginsApi.getPluginInstances.mockResolvedValue({ instances: [] });
-      pluginsApi.getPluginConfig.mockResolvedValue({ config: {} });
+      pluginsApi.getPluginConfig.mockResolvedValue({});
 
       const { sortedPluginCategories, loadPlugins } = usePlugins();
       await loadPlugins();
 
       // Check backend category has only backend plugins
-      const backendCategory = sortedPluginCategories.value.find(
-        (cat) => cat.type === "backend",
-      );
+      const backendCategory = sortedPluginCategories.value.find(cat => cat.type === "backend");
       expect(backendCategory).toBeDefined();
       expect(backendCategory.plugins).toHaveLength(1);
       expect(backendCategory.plugins[0].type).toBe("backend");
 
       // Check other categories
-      const imageCategory = sortedPluginCategories.value.find(
-        (cat) => cat.type === "image",
-      );
+      const imageCategory = sortedPluginCategories.value.find(cat => cat.type === "image");
       expect(imageCategory.plugins).toHaveLength(1);
       expect(imageCategory.plugins[0].type).toBe("image");
     });
@@ -121,7 +134,7 @@ describe("usePlugins", () => {
       pluginsApi.getPlugins.mockResolvedValue(mockPlugins);
       pluginsApi.getInstalledPlugins.mockResolvedValue({ plugins: [] });
       pluginsApi.getPluginInstances.mockResolvedValue({ instances: [] });
-      pluginsApi.getPluginConfig.mockResolvedValue({ config: {} });
+      pluginsApi.getPluginConfig.mockResolvedValue({});
 
       const { plugins, loadPlugins } = usePlugins();
       await loadPlugins();
@@ -145,13 +158,13 @@ describe("usePlugins", () => {
       pluginsApi.getPlugins.mockResolvedValue(mockPlugins);
       pluginsApi.getInstalledPlugins.mockResolvedValue({ plugins: [] });
       pluginsApi.getPluginInstances.mockResolvedValue({ instances: [] });
-      pluginsApi.getPluginConfig.mockResolvedValue({ config: {} });
+      pluginsApi.getPluginConfig.mockResolvedValue({});
 
       const { sortedPluginCategories, loadPlugins } = usePlugins();
       await loadPlugins();
 
       // Check that all categories including backend are present
-      const categoryTypes = sortedPluginCategories.value.map((cat) => cat.type);
+      const categoryTypes = sortedPluginCategories.value.map(cat => cat.type);
       expect(categoryTypes).toContain("backend");
       expect(categoryTypes).toContain("calendar");
       expect(categoryTypes).toContain("image");
@@ -166,7 +179,7 @@ describe("usePlugins", () => {
       });
       pluginsApi.getInstalledPlugins.mockResolvedValue({ plugins: [] });
       pluginsApi.getPluginInstances.mockResolvedValue({ instances: [] });
-      pluginsApi.getPluginConfig.mockResolvedValue({ config: {} });
+      pluginsApi.getPluginConfig.mockResolvedValue({});
       pluginsApi.updatePluginInstance.mockResolvedValue({
         success: true,
         instance: { id: "imap-1", enabled: false },
@@ -189,10 +202,8 @@ describe("usePlugins", () => {
       });
       pluginsApi.getInstalledPlugins.mockResolvedValue({ plugins: [] });
       pluginsApi.getPluginInstances.mockResolvedValue({ instances: [] });
-      pluginsApi.getPluginConfig.mockResolvedValue({ config: {} });
-      pluginsApi.updatePluginInstance.mockRejectedValue(
-        new Error("Update failed"),
-      );
+      pluginsApi.getPluginConfig.mockResolvedValue({});
+      pluginsApi.updatePluginInstance.mockRejectedValue(new Error("Update failed"));
 
       const { loadPlugins } = usePlugins();
       await loadPlugins();
@@ -226,7 +237,7 @@ describe("usePlugins", () => {
       pluginsApi.getPlugins.mockResolvedValue(mockPlugins);
       pluginsApi.getInstalledPlugins.mockResolvedValue({ plugins: [] });
       pluginsApi.getPluginInstances.mockResolvedValue({ instances: [] });
-      pluginsApi.getPluginConfig.mockResolvedValue({ config: {} });
+      pluginsApi.getPluginConfig.mockResolvedValue({});
 
       const { plugins, loadPlugins } = usePlugins();
       await loadPlugins();
@@ -255,12 +266,26 @@ describe("usePlugins", () => {
       pluginsApi.getPlugins.mockResolvedValue(mockPlugins);
       pluginsApi.getInstalledPlugins.mockResolvedValue(mockInstalled);
       pluginsApi.getPluginInstances.mockResolvedValue({ instances: [] });
-      pluginsApi.getPluginConfig.mockResolvedValue({ config: {} });
+      pluginsApi.getPluginConfig.mockResolvedValue({});
 
       const { plugins, loadPlugins } = usePlugins();
       await loadPlugins();
 
       expect(plugins.value[0]._installed).toBe(true);
+    });
+  });
+
+  describe("logging", () => {
+    it("calls logError when getPlugins fails", async () => {
+      const err = new Error("network error");
+      pluginsApi.getPlugins.mockRejectedValue(err);
+      pluginsApi.getInstalledPlugins.mockResolvedValue({ plugins: [] });
+
+      const { loadPlugins, plugins } = usePlugins();
+      await loadPlugins();
+
+      expect(plugins.value).toEqual([]);
+      expect(logErrorMock).toHaveBeenCalledWith("[usePlugins]", "Failed to load plugins:", err);
     });
   });
 });

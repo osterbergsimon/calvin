@@ -9,6 +9,7 @@ from typing import Any
 
 from loguru import logger
 
+from app.plugins.definitions import PluginDefinition
 from app.plugins.hooks import plugin_manager
 from app.services.plugin_installer import plugin_installer
 
@@ -80,6 +81,13 @@ class PluginLoader:
         """
         installed_plugins = plugin_installer.get_installed_plugins()
 
+        # Ensure backend directory is in sys.path so plugins can import from app.*
+        # Find backend directory (where this file is located: backend/app/plugins/loader.py)
+        backend_dir = Path(__file__).parent.parent.parent
+        backend_dir_str = str(backend_dir)
+        if backend_dir_str not in sys.path:
+            sys.path.insert(0, backend_dir_str)
+
         for plugin_manifest in installed_plugins:
             plugin_id = plugin_manifest["id"]
             plugin_path = plugin_installer.get_plugin_path(plugin_id)
@@ -135,26 +143,27 @@ class PluginLoader:
         # Load installed plugins
         self.load_installed_plugins()
 
-    def get_plugin_types(self) -> list[dict[str, Any]]:
+    def get_plugin_types(self) -> list[PluginDefinition]:
         """
-        Get all registered plugin types.
+        Get all registered plugin types, normalized into typed definitions.
 
         Returns:
-            List of plugin type dictionaries with error information if loading failed
+            List of normalized plugin definitions
         """
-        plugin_types = []
+        plugin_types: list[PluginDefinition] = []
         results = plugin_manager.hook.register_plugin_types()
         for result in results:
             if result:
-                try:
-                    plugin_types.extend(result if isinstance(result, list) else [result])
-                except Exception as e:
-                    # If a plugin's register_plugin_types hook raises an exception,
-                    # we can't include it but we should log the error
-                    import logging
-
-                    logger = logging.getLogger(__name__)
-                    logger.error(f"Error getting plugin types from hook result: {e}", exc_info=True)
+                raw_definitions = result if isinstance(result, list) else [result]
+                for raw_definition in raw_definitions:
+                    try:
+                        plugin_types.append(PluginDefinition.from_raw(raw_definition))
+                    except Exception as e:
+                        logger.error(
+                            "Error normalizing plugin type from hook result: {}",
+                            e,
+                            exc_info=True,
+                        )
         return plugin_types
 
     def create_plugin_instance(

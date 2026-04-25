@@ -43,17 +43,12 @@
         >
           {{ isFullscreen ? "⤓" : "⤢" }}
         </button>
-        <button class="btn-close" title="Close" @click.stop="handleClose">
-          ×
-        </button>
+        <button class="btn-close" title="Close" @click.stop="handleClose">×</button>
       </div>
     </div>
 
     <!-- Service Selection (if multiple services) -->
-    <div
-      v-if="showHeader && !isFullscreen && services.length > 1"
-      class="service-selector"
-    >
+    <div v-if="showHeader && !isFullscreen && services.length > 1" class="service-selector">
       <button
         v-for="(service, index) in services"
         :key="service.id"
@@ -93,6 +88,7 @@ import { useConfigStore } from "../stores/config";
 import { useWebServicesStore } from "../stores/webServices";
 import { useModeStore } from "../stores/mode";
 import ServiceViewer from "./service/ServiceViewer.vue";
+import { logDebug } from "../utils/logger";
 
 const props = defineProps({
   isFullscreen: {
@@ -107,13 +103,11 @@ const modeStore = useModeStore();
 
 const showHeader = computed(() => configStore.shouldShowUI);
 const services = computed(() => webServicesStore.services);
-const currentServiceIndex = computed(
-  () => webServicesStore.currentServiceIndex,
-);
+const currentServiceIndex = computed(() => webServicesStore.currentServiceIndex);
 const currentService = computed(() => {
   const service = webServicesStore.getCurrentService();
   if (service) {
-    console.log("[WebServiceViewer] Current service:", {
+    logDebug("[WebServiceViewer]", "Current service:", {
       id: service.id,
       name: service.name,
       url: service.url,
@@ -151,13 +145,13 @@ const close = () => {
   }, 300);
 };
 
-const handleClose = (event) => {
+const handleClose = event => {
   event.preventDefault();
   event.stopPropagation();
   close();
 };
 
-const handleCloseFullscreen = (event) => {
+const handleCloseFullscreen = event => {
   event.preventDefault();
   event.stopPropagation();
   close();
@@ -182,7 +176,7 @@ const toggleFullscreen = () => {
   }, 300);
 };
 
-const handleToggleFullscreen = (event) => {
+const handleToggleFullscreen = event => {
   event.preventDefault();
   event.stopPropagation();
   toggleFullscreen();
@@ -196,14 +190,14 @@ const previousService = () => {
   webServicesStore.previousService();
 };
 
-const setServiceIndex = (index) => {
+const setServiceIndex = index => {
   webServicesStore.setServiceIndex(index);
 };
 
 // ServiceViewer handles all service rendering logic
 
 // Handle Escape key to close fullscreen
-const handleKeydown = (event) => {
+const handleKeydown = event => {
   if (event.key === "Escape" && props.isFullscreen && !isHandlingClose) {
     close();
     event.preventDefault();

@@ -8,44 +8,54 @@ import asyncio
 import logging
 from pathlib import Path
 
-from sqlalchemy.ext.asyncio import AsyncEngine, create_async_engine
+import databases
 
-from app.database import Base
+from app.database import metadata
 
 logger = logging.getLogger(__name__)
 
 
 async def initialize_database(
     database_path: Path,
-    engine: AsyncEngine | None = None,
+    database: databases.Database | None = None,
     run_migrations: bool = True,
-) -> AsyncEngine:
+) -> databases.Database:
     """
     Initialize a database: run migrations to create all tables.
 
     This function:
     1. Ensures the database file exists
-    2. Runs Alembic migrations to create all tables and handle data migrations
-    3. If migrations are disabled, falls back to Base.metadata.create_all()
+    2. Runs Alembic migrations to create all tables
+    3. If migrations are disabled, falls back to metadata.create_all()
 
     Args:
         database_path: Path to the SQLite database file
-        engine: Optional existing async engine. If None, creates a new one.
+        database: Optional existing database connection. If None, creates a new one.
         run_migrations: Whether to run migrations (default: True).
-                       If False, uses Base.metadata.create_all() instead.
+                       If False, uses metadata.create_all() instead.
 
     Returns:
-        The async engine (either the provided one or a newly created one)
+        The database connection (either the provided one or a newly created one)
     """
     # Ensure database directory exists
     database_path.parent.mkdir(parents=True, exist_ok=True)
 
-    # Create engine if not provided
-    if engine is None:
+    # Create database connection if not provided
+    if database is None:
         db_url = f"sqlite+aiosqlite:///{database_path.resolve()}"
-        engine = create_async_engine(db_url, echo=False, future=True)
+        database = databases.Database(db_url)
+        # Connect to database
+        if not database.is_connected:
+            await database.connect()
+            # Enable WAL mode for better concurrency
+            try:
+                await database.execute("PRAGMA journal_mode=WAL")
+                await database.execute("PRAGMA busy_timeout=5000")
+                await database.execute("PRAGMA synchronous=NORMAL")
+            except Exception as e:
+                logger.warning(f"Failed to configure SQLite PRAGMA settings during init: {e}")
 
-    # Import all models to ensure they're registered in Base.metadata
+    # Import all models to ensure they're registered in metadata
     # This is needed for Alembic to know about the models
     from app.models.db_models import (  # noqa: F401
         ConfigDB,
@@ -55,7 +65,7 @@ async def initialize_database(
     )
 
     # Run migrations if requested - migrations will create all tables
-    # We rely on Alembic migrations instead of Base.metadata.create_all()
+    # We rely on Alembic migrations instead of metadata.create_all()
     # to ensure consistency and proper schema management
     if run_migrations:
         # Use Alembic for migrations
@@ -104,7 +114,7 @@ async def initialize_database(
                 f"Tried: {backend_dir / 'alembic.ini'}, {Path.cwd() / 'alembic.ini'}"
             )
             # Don't fail, just skip migrations
-            return engine
+            return database
 
         # Configure Alembic
         # IMPORTANT: Known issue - alembic/env.py reads settings.database_url at import time
@@ -189,18 +199,15 @@ async def initialize_database(
     else:
         # If migrations are disabled, fall back to create_all() for backward compatibility
         # This should only be used in special cases
-        async def create_tables():
-            async with engine.begin() as conn:
+        from sqlalchemy import create_engine
 
-                def create_all_tables(sync_conn):
-                    Base.metadata.create_all(bind=sync_conn)
+        sync_url = f"sqlite:///{database_path.resolve()}"
+        sync_engine = create_engine(sync_url, echo=False)
+        metadata.create_all(sync_engine)
+        sync_engine.dispose()
+        logger.debug(f"Created all tables using metadata.create_all() in {database_path}")
 
-                await conn.run_sync(create_all_tables)
-
-        await create_tables()
-        logger.debug(f"Created all tables using Base.metadata.create_all() in {database_path}")
-
-    return engine
+    return database
 
 
 def verify_database_tables(database_path: Path) -> dict[str, bool]:

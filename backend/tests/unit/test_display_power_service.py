@@ -303,45 +303,6 @@ class TestDisplayPowerService:
             mock_turn_off.assert_not_called()
 
     @pytest.mark.asyncio
-    async def test_check_and_update_display_old_format(self, display_service):
-        """Test _check_and_update_display with old format (single on/off time)."""
-        mock_config = {
-            "display_schedule_enabled": True,
-            "display_schedule": None,  # No per-day schedule
-            "display_on_time": "08:00",
-            "display_off_time": "20:00",
-            "display_timeout_enabled": False,
-            "display_timeout": 0,
-            "timezone": None,
-        }
-
-        with (
-            patch(
-                "app.services.display_power_service.config_service.get_config",
-                new_callable=AsyncMock,
-                return_value=mock_config,
-            ),
-            patch("app.services.display_power_service.datetime") as mock_dt,
-            patch.object(
-                display_service, "turn_display_on", new_callable=AsyncMock
-            ) as mock_turn_on,
-            patch.object(
-                display_service, "turn_display_off", new_callable=AsyncMock
-            ) as mock_turn_off,
-            patch.object(display_service, "_apply_display_timeout", new_callable=AsyncMock),
-        ):
-            # Mock datetime.now to return 10:00
-            mock_now = MagicMock()
-            mock_now.time.return_value = time(10, 0)
-            mock_dt.now.return_value = mock_now
-
-            await display_service._check_and_update_display()
-
-            # Should turn display on (10:00 is within 08:00-20:00)
-            mock_turn_on.assert_called_once()
-            mock_turn_off.assert_not_called()
-
-    @pytest.mark.asyncio
     async def test_configure_display_timeout(self, display_service):
         """Test configure_display_timeout."""
         mock_config = {

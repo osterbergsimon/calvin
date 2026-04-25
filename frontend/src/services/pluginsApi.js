@@ -41,26 +41,33 @@ export async function getPluginInstances(pluginId) {
  */
 export async function getPluginConfig(pluginId) {
   const response = await api.get(`/plugins/${pluginId}/config`);
-  return response.data;
-}
-
-/**
- * Update plugin configuration.
- */
-export async function updatePluginConfig(pluginId, config) {
-  const response = await api.put(`/plugins/${pluginId}`, config);
-  return response.data;
+  return response.data || {};
 }
 
 /**
  * Update plugin instance order.
  */
 export async function updatePluginInstanceOrder(pluginId, orders) {
-  const response = await api.put(
-    `/plugins/${pluginId}/instances/order`,
-    orders,
-  );
+  const response = await api.put(`/plugins/${pluginId}/instances/order`, orders);
   return response.data;
+}
+
+/**
+ * Backward-compatible alias for callers using the older plural name.
+ * Accepts either an order map or an ordered array of instance ids.
+ */
+export async function updatePluginInstancesOrder(pluginId, ordersOrIds) {
+  const orders = Array.isArray(ordersOrIds)
+    ? Object.fromEntries(ordersOrIds.map((id, index) => [id, index]))
+    : ordersOrIds;
+  return updatePluginInstanceOrder(pluginId, orders);
+}
+
+/**
+ * Backward-compatible alias for callers using the older config-specific name.
+ */
+export async function updatePluginConfig(pluginId, config) {
+  return updatePlugin(pluginId, config);
 }
 
 /**
@@ -76,6 +83,19 @@ export async function startPluginInstance(instanceId) {
  */
 export async function stopPluginInstance(instanceId) {
   const response = await api.post(`/plugins/instances/${instanceId}/stop`);
+  return response.data;
+}
+
+/**
+ * Read plugin.json from a zip without installing it.
+ * Returns the manifest so callers can inspect python_dependencies before committing.
+ */
+export async function inspectPluginZip(file) {
+  const formData = new FormData();
+  formData.append("file", file);
+  const response = await api.post("/plugins/inspect", formData, {
+    headers: { "Content-Type": "multipart/form-data" },
+  });
   return response.data;
 }
 
@@ -107,15 +127,50 @@ export async function enumeratePluginsFromGitHub(repoUrl, branch = "main") {
 /**
  * Install plugin from GitHub.
  */
-export async function installPluginFromGitHub(
-  repoUrl,
-  pluginPath,
-  branch = "main",
-) {
+export async function installPluginFromGitHub(repoUrl, pluginPath, branch = "main", force = false) {
   const response = await api.post("/plugins/github/install", {
     repo_url: repoUrl,
     plugin_path: pluginPath,
     branch: branch,
+    force: force,
+  });
+  return response.data;
+}
+
+/**
+ * Get the current state of a background frontend rebuild.
+ */
+export async function getRebuildStatus() {
+  const response = await api.get("/plugins/rebuild-status");
+  return response.data;
+}
+
+/**
+ * Suggest local plugin repo paths by scanning sibling directories (dev mode only).
+ */
+export async function suggestLocalPath() {
+  const response = await api.get("/plugins/local/suggest");
+  return response.data;
+}
+
+/**
+ * Enumerate plugins from a local directory (dev mode only).
+ */
+export async function enumeratePluginsFromLocal(localPath) {
+  const response = await api.post("/plugins/local/enumerate", {
+    local_path: localPath,
+  });
+  return response.data;
+}
+
+/**
+ * Install plugin from a local directory (dev mode only).
+ */
+export async function installPluginFromLocal(localPath, pluginPath, force = false) {
+  const response = await api.post("/plugins/local/install", {
+    local_path: localPath,
+    plugin_path: pluginPath,
+    force,
   });
   return response.data;
 }
@@ -175,8 +230,7 @@ export async function createPluginInstance(pluginId, instanceData) {
   const configUpdate = {
     ...instanceData.config,
     _instance_name: instanceData.name, // Pass instance name as a special field
-    _instance_enabled:
-      instanceData.enabled !== undefined ? instanceData.enabled : true,
+    _instance_enabled: instanceData.enabled !== undefined ? instanceData.enabled : true,
   };
   const response = await api.put(`/plugins/${pluginId}`, configUpdate);
   return response.data;
@@ -187,10 +241,7 @@ export async function createPluginInstance(pluginId, instanceData) {
  * Uses the dedicated instance update endpoint.
  */
 export async function updatePluginInstance(instanceId, instanceData) {
-  const response = await api.put(
-    `/plugins/instances/${instanceId}`,
-    instanceData,
-  );
+  const response = await api.put(`/plugins/instances/${instanceId}`, instanceData);
   return response.data;
 }
 
@@ -199,15 +250,5 @@ export async function updatePluginInstance(instanceId, instanceData) {
  */
 export async function deletePluginInstance(instanceId) {
   const response = await api.delete(`/plugins/instances/${instanceId}`);
-  return response.data;
-}
-
-/**
- * Update plugin instances order (takes array of instance IDs in order).
- */
-export async function updatePluginInstancesOrder(pluginId, instanceIds) {
-  const response = await api.put(`/plugins/${pluginId}/instances/order`, {
-    instance_ids: instanceIds,
-  });
   return response.data;
 }

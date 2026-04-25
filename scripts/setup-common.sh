@@ -427,9 +427,15 @@ install_systemd_service() {
     
     local service_name
     service_name=$(basename "${service_file}")
-    log "Installing systemd service: ${service_name}"
+    local target_file="/etc/systemd/system/${service_name}"
     
-    cp "${service_file}" "/etc/systemd/system/" || error_exit "Failed to copy service file" 1
+    if [ -f "${target_file}" ]; then
+        log "Overwriting existing systemd service: ${service_name}"
+    else
+        log "Installing systemd service: ${service_name}"
+    fi
+    
+    cp "${service_file}" "${target_file}" || error_exit "Failed to copy service file" 1
     # systemctl daemon-reload may fail in CI environments without systemd, but file is still installed
     if ! systemctl daemon-reload 2>/dev/null; then
         log_warn "systemctl daemon-reload failed (non-fatal, may be running in CI environment without systemd)"
@@ -465,6 +471,24 @@ install_script() {
     chmod +x "${target_path}" || error_exit "Failed to make script executable" 1
     chown "${user}:${user}" "${target_path}" || error_exit "Failed to set script ownership" 1
     log "Script installed: ${target_path}"
+}
+
+# Scripts listed in sudoers as NOPASSWD for the Calvin user must NOT be owned by that
+# user (or the app could edit them and escalate via sudo). Installed root:root 0755.
+install_privileged_sudo_helper_script() {
+    local script_path="${1}"
+    local target_path="${2}"
+
+    if [ ! -f "${script_path}" ]; then
+        log_warn "Script file does not exist: ${script_path}, skipping installation"
+        return 0
+    fi
+
+    log "Installing privileged sudo helper (root-owned, not writable by app user): $(basename "${script_path}")"
+    cp "${script_path}" "${target_path}" || error_exit "Failed to copy script" 1
+    chown root:root "${target_path}" || error_exit "Failed to set script ownership" 1
+    chmod 0755 "${target_path}" || error_exit "Failed to set script permissions" 1
+    log "Script installed: ${target_path} (root:root 0755)"
 }
 
 # Configuration file creation

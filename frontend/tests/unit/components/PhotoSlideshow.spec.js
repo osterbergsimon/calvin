@@ -80,9 +80,7 @@ describe("PhotoSlideshow", () => {
       const wrapper = createWrapper();
 
       expect(wrapper.find(".photo-placeholder").exists()).toBe(true);
-      expect(wrapper.find(".photo-placeholder").text()).toContain(
-        "No images available",
-      );
+      expect(wrapper.find(".photo-placeholder").text()).toContain("No images available");
       expect(wrapper.find(".photo-info").text()).toContain("data/images");
     });
 
@@ -95,9 +93,7 @@ describe("PhotoSlideshow", () => {
 
       expect(wrapper.find(".photo-container").exists()).toBe(true);
       expect(wrapper.find(".photo-image").exists()).toBe(true);
-      expect(wrapper.find(".photo-image").attributes("src")).toBe(
-        "/api/images/1",
-      );
+      expect(wrapper.find(".photo-image").attributes("src")).toBe("/api/images/1");
     });
 
     it("should show error message when error exists", () => {
@@ -106,9 +102,7 @@ describe("PhotoSlideshow", () => {
       const wrapper = createWrapper();
 
       expect(wrapper.find(".error-message").exists()).toBe(true);
-      expect(wrapper.find(".error-message").text()).toBe(
-        "Failed to load images",
-      );
+      expect(wrapper.find(".error-message").text()).toBe("Failed to load images");
     });
   });
 
@@ -163,9 +157,7 @@ describe("PhotoSlideshow", () => {
       configStore.imageDisplayMode = "fill";
       const wrapper = createWrapper();
 
-      expect(wrapper.find(".photo-image").classes()).toContain(
-        "photo-image-fill",
-      );
+      expect(wrapper.find(".photo-image").classes()).toContain("photo-image-fill");
     });
 
     it("should apply smart mode class", () => {
@@ -174,9 +166,7 @@ describe("PhotoSlideshow", () => {
       configStore.imageDisplayMode = "smart";
       const wrapper = createWrapper();
 
-      expect(wrapper.find(".photo-image").classes()).toContain(
-        "photo-image-smart",
-      );
+      expect(wrapper.find(".photo-image").classes()).toContain("photo-image-smart");
     });
 
     it("should calculate smart mode styling for landscape images", () => {
@@ -196,17 +186,13 @@ describe("PhotoSlideshow", () => {
     it("should apply fullscreen class when isFullscreen is true", () => {
       const wrapper = createWrapper({ isFullscreen: true });
 
-      expect(wrapper.find(".photo-slideshow").classes()).toContain(
-        "fullscreen",
-      );
+      expect(wrapper.find(".photo-slideshow").classes()).toContain("fullscreen");
     });
 
     it("should not apply fullscreen class when isFullscreen is false", () => {
       const wrapper = createWrapper({ isFullscreen: false });
 
-      expect(wrapper.find(".photo-slideshow").classes()).not.toContain(
-        "fullscreen",
-      );
+      expect(wrapper.find(".photo-slideshow").classes()).not.toContain("fullscreen");
     });
   });
 
@@ -332,9 +318,7 @@ describe("PhotoSlideshow", () => {
     });
 
     it("should handle image error event", async () => {
-      const consoleSpy = vi
-        .spyOn(console, "error")
-        .mockImplementation(() => {});
+      const consoleSpy = vi.spyOn(console, "error").mockImplementation(() => {});
       const image = createImage();
       imagesStore.currentImage = image;
       const wrapper = createWrapper();

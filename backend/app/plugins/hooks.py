@@ -5,6 +5,7 @@ from typing import Any
 import pluggy
 
 from app.plugins.base import BasePlugin
+from app.plugins.definitions import PluginDefinition
 
 # Create pluggy hook specification manager
 hookspec = pluggy.HookspecMarker("calvin")
@@ -15,7 +16,7 @@ class PluginHookSpec:
     """Hook specifications for plugin registration."""
 
     @hookspec
-    def register_plugin_types(self) -> list[dict[str, Any]]:
+    def register_plugin_types(self) -> list[PluginDefinition | dict[str, Any]]:
         """
         Register plugin types.
 
@@ -91,9 +92,10 @@ class PluginHookSpec:
         config: dict[str, Any],
     ) -> dict[str, Any] | None:
         """
-        Test plugin connection/configuration.
+        Legacy hook for testing plugin connection/configuration.
 
-        This hook allows plugins to implement their own connection testing logic.
+        Deprecated in favor of implementing BasePlugin.test_type_config() on
+        the plugin class and exposing that class via plugin metadata.
 
         Args:
             type_id: Plugin type ID (e.g., 'imap', 'mealie', 'yr_weather')
@@ -116,7 +118,12 @@ class PluginHookSpec:
         """
         Manually trigger plugin fetch/check operation.
 
-        This hook allows plugins to implement their own fetch logic (e.g., check for new emails).
+        This hook allows plugins to implement their own fetch logic (e.g., check for new
+        emails).
+
+        Legacy compatibility path:
+        New plugins should prefer BasePlugin.fetch_type_data() and let the core call the
+        plugin class directly.
 
         Args:
             type_id: Plugin type ID (e.g., 'imap')
@@ -132,6 +139,27 @@ class PluginHookSpec:
         pass
 
     @hookspec
+    async def scan_plugin_options(
+        self,
+        type_id: str,
+        field_key: str,
+    ) -> dict[str, Any] | None:
+        """
+        Legacy hook for scanning/discovering available options for a configuration field.
+
+        Deprecated in favor of implementing BasePlugin.scan_type_options() on
+        the plugin class and exposing that class via plugin metadata.
+
+        Args:
+            type_id: Plugin type ID (e.g., 'chromecast')
+            field_key: The config field to scan options for (e.g., 'device_name')
+
+        Returns:
+            Dict with 'options' list of {value, label} dicts, or None if not supported.
+        """
+        pass
+
+    @hookspec
     async def fetch_service_data(
         self,
         instance_id: str,
@@ -139,10 +167,11 @@ class PluginHookSpec:
         end_date: str | None = None,
     ) -> dict[str, Any] | None:
         """
-        Fetch service data from a service plugin instance.
+        Legacy hook for fetching service data from a service plugin instance.
 
-        This hook allows service plugins to implement their own data fetching logic
-        for the generic /api/plugins/{plugin_id}/data endpoint.
+        Deprecated in favor of implementing ServicePlugin.fetch_service_data()
+        on the resolved plugin instance directly. Kept for compatibility while
+        the runtime surface is being simplified.
 
         Args:
             instance_id: Plugin instance ID

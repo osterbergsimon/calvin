@@ -5,6 +5,8 @@ from unittest.mock import MagicMock, patch
 
 import pytest
 
+from app.plugins.base import PluginType
+from app.plugins.definitions import PluginDefinition
 from app.plugins.loader import PluginLoader
 
 
@@ -126,18 +128,26 @@ class TestPluginLoader:
         assert mock_import_module.called
 
     def test_get_plugin_types(self, plugin_loader_instance):
-        """Test getting plugin types."""
+        """Test getting plugin types normalized into typed definitions."""
         with patch("app.plugins.loader.plugin_manager") as mock_manager:
             mock_manager.hook.register_plugin_types.return_value = [
-                [{"type_id": "test1", "name": "Test 1"}],
-                {"type_id": "test2", "name": "Test 2"},
+                [{"type_id": "test1", "plugin_type": PluginType.SERVICE, "name": "Test 1"}],
+                PluginDefinition(
+                    type_id="test2",
+                    plugin_type=PluginType.IMAGE,
+                    name="Test 2",
+                ),
             ]
 
             types = plugin_loader_instance.get_plugin_types()
 
             assert len(types) == 2
+            assert isinstance(types[0], PluginDefinition)
+            assert isinstance(types[1], PluginDefinition)
             assert types[0]["type_id"] == "test1"
             assert types[1]["type_id"] == "test2"
+            assert types[0].plugin_type == PluginType.SERVICE
+            assert types[1].plugin_type == PluginType.IMAGE
 
     def test_get_plugin_types_empty(self, plugin_loader_instance):
         """Test getting plugin types when none are registered."""
@@ -147,6 +157,41 @@ class TestPluginLoader:
             types = plugin_loader_instance.get_plugin_types()
 
             assert types == []
+
+    def test_get_plugin_types_skips_invalid_hook_results(self, plugin_loader_instance):
+        """Test invalid hook results are skipped without breaking valid ones."""
+        with patch("app.plugins.loader.plugin_manager") as mock_manager:
+            mock_manager.hook.register_plugin_types.return_value = [
+                [
+                    {"type_id": "valid", "plugin_type": PluginType.SERVICE, "name": "Valid"},
+                    {"type_id": "invalid-missing-type", "name": "Invalid"},
+                ]
+            ]
+
+            types = plugin_loader_instance.get_plugin_types()
+
+            assert len(types) == 1
+            assert types[0].type_id == "valid"
+
+    def test_get_plugin_types_skips_unsupported_protocol_versions(self, plugin_loader_instance):
+        """Test future protocol versions are skipped without breaking valid plugins."""
+        with patch("app.plugins.loader.plugin_manager") as mock_manager:
+            mock_manager.hook.register_plugin_types.return_value = [
+                [
+                    {"type_id": "valid", "plugin_type": PluginType.SERVICE, "name": "Valid"},
+                    {
+                        "protocol_version": 2,
+                        "type_id": "future",
+                        "plugin_type": PluginType.SERVICE,
+                        "name": "Future Plugin",
+                    },
+                ]
+            ]
+
+            types = plugin_loader_instance.get_plugin_types()
+
+            assert len(types) == 1
+            assert types[0].type_id == "valid"
 
     def test_create_plugin_instance(self, plugin_loader_instance):
         """Test creating a plugin instance."""
@@ -184,8 +229,10 @@ class TestPluginLoader:
 
     @patch("app.plugins.loader.plugin_installer")
     @patch("app.plugins.loader.plugin_manager")
+    @patch("app.plugins.loader.sys.path")
     def test_load_installed_plugins(
         self,
+        mock_sys_path,
         mock_plugin_manager,
         mock_installer,
         plugin_loader_instance,
@@ -198,12 +245,57 @@ class TestPluginLoader:
         ]
         mock_installer.get_plugin_path.return_value = installed_plugin_package
 
-        # Load installed plugins
-        plugin_loader_instance.load_installed_plugins()
+        # Mock sys.path to verify backend directory is added
+        # Use a real list that we can check
+        import sys
 
-        # Verify plugin was registered
-        assert mock_plugin_manager.register.called
-        assert "installed_plugin_test_plugin" in plugin_loader_instance._loaded_modules
+        original_path = sys.path.copy()
+        try:
+            # Load installed plugins
+            plugin_loader_instance.load_installed_plugins()
+
+            # Verify plugin was registered
+            assert mock_plugin_manager.register.called
+            assert "installed_plugin_test_plugin" in plugin_loader_instance._loaded_modules
+        finally:
+            # Restore original path
+            sys.path[:] = original_path
+
+    @patch("app.plugins.loader.plugin_installer")
+    @patch("app.plugins.loader.plugin_manager")
+    def test_load_installed_plugins_backend_dir_already_in_path(
+        self,
+        mock_plugin_manager,
+        mock_installer,
+        plugin_loader_instance,
+        installed_plugin_package,
+    ):
+        """Test loading installed plugins when backend directory is already in sys.path."""
+        # Setup mock installer
+        mock_installer.get_installed_plugins.return_value = [
+            {"id": "test_plugin"},
+        ]
+        mock_installer.get_plugin_path.return_value = installed_plugin_package
+
+        # Add backend directory to sys.path before loading
+        import sys
+        from pathlib import Path
+
+        backend_dir = Path(__file__).parent.parent.parent.parent  # backend directory
+        backend_dir_str = str(backend_dir)
+        original_path = sys.path.copy()
+        try:
+            if backend_dir_str not in sys.path:
+                sys.path.insert(0, backend_dir_str)
+
+            # Load installed plugins
+            plugin_loader_instance.load_installed_plugins()
+
+            # Verify plugin was still registered
+            assert mock_plugin_manager.register.called
+        finally:
+            # Restore original path
+            sys.path[:] = original_path
 
     @patch("app.plugins.loader.plugin_installer")
     def test_load_installed_plugins_missing_plugin_py(

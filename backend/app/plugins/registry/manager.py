@@ -3,9 +3,6 @@
 import logging
 from typing import Any
 
-from sqlalchemy import select, text
-
-from app.database import AsyncSessionLocal
 from app.models.db_models import PluginDB, PluginTypeDB
 from app.plugins.loader import plugin_loader
 from app.plugins.manager import plugin_manager as instance_manager
@@ -68,14 +65,16 @@ async def register_plugin(
     # Register plugin
     await instance_manager.register(plugin)
 
-    # Save to database
-    async with AsyncSessionLocal() as session:
-        # Get plugin type to determine plugin_type
-        result = await session.execute(select(PluginTypeDB).where(PluginTypeDB.type_id == type_id))
-        db_type = result.scalar_one_or_none()
+    # Save to database with retry logic for SQLite concurrency
+    # Get plugin type to determine plugin_type
+    from app.utils.db_retry import retry_on_db_locked
+
+    @retry_on_db_locked(max_retries=5, initial_delay=0.1, max_delay=1.0)
+    async def _save_plugin_to_db():
+        db_type = await PluginTypeDB.objects.get_or_none(type_id=type_id)
         plugin_type = db_type.plugin_type if db_type else "unknown"
 
-        db_plugin = PluginDB(
+        await PluginDB.objects.create(
             id=plugin_id,
             type_id=type_id,
             plugin_type=plugin_type,
@@ -83,9 +82,8 @@ async def register_plugin(
             enabled=enabled,
             config=config,
         )
-        session.add(db_plugin)
-        await session.commit()
-        await session.refresh(db_plugin)
+
+    await _save_plugin_to_db()
 
     # Initialize plugin
     await plugin.initialize()
@@ -117,100 +115,37 @@ async def unregister_plugin(plugin_id: str) -> bool:
     # Remove from database - this must always happen, even if cleanup failed
     deleted_from_db = False
     try:
-        async with AsyncSessionLocal() as session:
-            result = await session.execute(select(PluginDB).where(PluginDB.id == plugin_id))
-            db_plugin = result.scalar_one_or_none()
-            if db_plugin:
-                logger.info(
-                    f"Found plugin {plugin_id} in database (name: {db_plugin.name}, "
-                    f"type: {db_plugin.type_id}, enabled: {db_plugin.enabled}), deleting..."
-                )
-                try:
-                    # Use ORM delete as primary method
-                    # The object should already be in the session from the query above
-                    # Delete it - in this codebase, delete() is async and must be awaited
-                    await session.delete(db_plugin)
-                    # Commit the transaction (flush happens automatically)
-                    await session.commit()
-                    deleted_from_db = True
-                    logger.info(f"Successfully deleted plugin {plugin_id} from database using ORM")
+        db_plugin = await PluginDB.objects.get_or_none(id=plugin_id)
+        if db_plugin:
+            logger.info(
+                f"Found plugin {plugin_id} in database (name: {db_plugin.name}, "
+                f"type: {db_plugin.type_id}, enabled: {db_plugin.enabled}), deleting..."
+            )
+            try:
+                # Use Ormar delete - much simpler!
+                await db_plugin.delete()
+                deleted_from_db = True
+                logger.info(f"Successfully deleted plugin {plugin_id} from database")
 
-                    # Verify deletion by querying again in a new session
-                    async with AsyncSessionLocal() as verify_session:
-                        verify_result = await verify_session.execute(
-                            select(PluginDB).where(PluginDB.id == plugin_id)
-                        )
-                        verify_plugin = verify_result.scalar_one_or_none()
-                        if verify_plugin:
-                            logger.warning(
-                                f"Plugin {plugin_id} still exists after ORM deletion. "
-                                "Attempting direct SQL delete as fallback."
-                            )
-                            # Fallback: try direct SQL delete
-                            try:
-                                sql_result = await verify_session.execute(
-                                    text("DELETE FROM plugins WHERE id = :plugin_id"),
-                                    {"plugin_id": plugin_id},
-                                )
-                                await verify_session.commit()
-                                rows_deleted = sql_result.rowcount
-                                if rows_deleted > 0:
-                                    deleted_from_db = True
-                                    logger.info(
-                                        f"Successfully deleted {plugin_id} using direct SQL "
-                                        f"fallback ({rows_deleted} row(s) deleted)"
-                                    )
-                                else:
-                                    logger.error(
-                                        f"Direct SQL delete found no rows to delete for {plugin_id}"
-                                    )
-                                    deleted_from_db = False
-                            except Exception as sql_error:
-                                logger.error(
-                                    f"Direct SQL delete fallback also failed for "
-                                    f"{plugin_id}: {sql_error}",
-                                    exc_info=True,
-                                )
-                                await verify_session.rollback()
-                                deleted_from_db = False
-                        else:
-                            logger.info(
-                                f"Verified: Plugin {plugin_id} successfully removed from database"
-                            )
-                except Exception as e:
-                    logger.error(
-                        f"Error deleting plugin {plugin_id} from database using ORM: {e}",
-                        exc_info=True,
+                # Verify deletion by querying again
+                verify_plugin = await PluginDB.objects.get_or_none(id=plugin_id)
+                if verify_plugin:
+                    logger.warning(
+                        f"Plugin {plugin_id} still exists after deletion. "
+                        "This should not happen with Ormar."
                     )
-                    await session.rollback()
-                    # Try direct SQL delete as fallback
-                    try:
-                        async with AsyncSessionLocal() as fallback_session:
-                            sql_result = await fallback_session.execute(
-                                text("DELETE FROM plugins WHERE id = :plugin_id"),
-                                {"plugin_id": plugin_id},
-                            )
-                            await fallback_session.commit()
-                            rows_deleted = sql_result.rowcount
-                            if rows_deleted > 0:
-                                deleted_from_db = True
-                                logger.info(
-                                    f"Successfully deleted {plugin_id} using direct SQL "
-                                    f"fallback ({rows_deleted} row(s) deleted)"
-                                )
-                            else:
-                                logger.warning(
-                                    f"Direct SQL delete found no rows to delete for {plugin_id}"
-                                )
-                    except Exception as sql_error:
-                        logger.error(
-                            f"Direct SQL delete fallback also failed for {plugin_id}: {sql_error}",
-                            exc_info=True,
-                        )
-                        # Re-raise the original ORM error
-                        raise
-            else:
-                logger.warning(f"Plugin {plugin_id} not found in database during unregister")
+                    deleted_from_db = False
+                else:
+                    logger.info(f"Verified: Plugin {plugin_id} successfully removed from database")
+            except Exception as e:
+                logger.error(
+                    f"Error deleting plugin {plugin_id} from database: {e}",
+                    exc_info=True,
+                )
+                deleted_from_db = False
+                raise
+        else:
+            logger.warning(f"Plugin {plugin_id} not found in database during unregister")
     except Exception as e:
         logger.error(
             f"Unexpected error during database deletion of {plugin_id}: {e}",

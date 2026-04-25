@@ -61,7 +61,7 @@ class CalendarScheduler:
     async def refresh_calendars(self):
         """Refresh calendar events for all sources."""
         try:
-            # Preload current, previous, and next months
+            await plugin_calendar_service.clear_cache()
             await plugin_calendar_service.preload_months(months_to_preload=1)
             logger.info(f"Calendar cache refreshed at {datetime.now()}")
         except Exception as e:

@@ -2,8 +2,17 @@
 # Production update script for Calvin Dashboard
 # Minimal update: git pull, download pre-built frontend if available, restart services
 # Respects GIT_REPO and GIT_BRANCH from /etc/default/calvin-update or environment
+#
+# Usage: update-calvin-prod.sh [--force]
+#   --force: Run full update even if no git changes are detected
 
 set +e  # Don't exit on errors - we want to continue even if some steps fail
+
+# Parse command line arguments
+FORCE_UPDATE=false
+if [[ "$1" == "--force" ]]; then
+    FORCE_UPDATE=true
+fi
 
 # Source environment file if it exists
 if [ -f /etc/default/calvin-update ]; then
@@ -61,8 +70,13 @@ if [ -z "$NEW_COMMIT" ]; then
 fi
 
 if [ "$CURRENT_COMMIT" = "$NEW_COMMIT" ]; then
-    echo "No changes detected. Already up to date at commit $CURRENT_COMMIT" | tee -a "$LOG_FILE"
-    HAS_CHANGES=false
+    if [ "$FORCE_UPDATE" = true ]; then
+        echo "No git changes detected, but --force specified. Running full update anyway." | tee -a "$LOG_FILE"
+        HAS_CHANGES=true
+    else
+        echo "No changes detected. Already up to date at commit $CURRENT_COMMIT" | tee -a "$LOG_FILE"
+        HAS_CHANGES=false
+    fi
 else
     echo "Changes detected. Updating from $CURRENT_COMMIT to $NEW_COMMIT..." | tee -a "$LOG_FILE"
     if ! git reset --hard "origin/$GIT_BRANCH"; then
@@ -71,6 +85,9 @@ else
     fi
     HAS_CHANGES=true
 fi
+
+# Always get the current commit hash after potential reset
+CURRENT_COMMIT=$(git rev-parse HEAD 2>/dev/null || echo "")
 
 # Update the update script itself if there are changes
 if [ "$HAS_CHANGES" = true ] && [ -f "/usr/local/bin/update-calvin-prod.sh" ]; then
@@ -129,47 +146,51 @@ if [ "$HAS_CHANGES" = true ] && [ -f "/usr/local/bin/update-calvin-prod.sh" ]; t
     fi
 fi
 
-# Only update frontend if there are changes
-if [ "$HAS_CHANGES" = true ]; then
-    # Check if frontend files changed
-    FRONTEND_CHANGED=false
-    if [ -n "$CURRENT_COMMIT" ] && [ -n "$NEW_COMMIT" ]; then
-        # Check if any frontend files changed
-        if git diff --name-only "$CURRENT_COMMIT" "$NEW_COMMIT" | grep -q "^frontend/"; then
-            FRONTEND_CHANGED=true
-        fi
-    else
-        # If we don't have commit info, assume frontend changed
-        FRONTEND_CHANGED=true
-    fi
+# Always check if prebuilt frontend matches current commit (even if no code changes)
+# This prevents issues if the repo was manually updated but frontend wasn't
+echo "Checking if pre-built frontend matches current commit..." | tee -a "$LOG_FILE"
 
-    if [ "$FRONTEND_CHANGED" = true ]; then
-        echo "Frontend files changed. Attempting to download pre-built frontend..." | tee -a "$LOG_FILE"
+# Extract repo owner and name from git URL
+repo_owner=$(echo "${GIT_REPO}" | sed -E 's|.*github\.com[:/]([^/]+)/([^/]+)(\.git)?$|\1|')
+repo_name=$(echo "${GIT_REPO}" | sed -E 's|.*github\.com[:/]([^/]+)/([^/]+)(\.git)?$|\2|' | sed 's|\.git$||')
+
+if [ -n "${repo_owner}" ] && [ -n "${repo_name}" ]; then
+    # Get the current commit hash for the release tag
+    SHORT_HASH=$(git rev-parse --short HEAD 2>/dev/null || echo "")
+    DATE=$(git log -1 --format=%cd --date=short HEAD 2>/dev/null || echo "")
+    
+    if [ -z "$SHORT_HASH" ] || [ -z "$DATE" ]; then
+        echo "Warning: Cannot determine commit info for release tag" | tee -a "$LOG_FILE"
+    else
+        if [ "$GIT_BRANCH" = "main" ]; then
+            RELEASE_TAG="stable-${DATE}-${SHORT_HASH}"
+        elif [ "$GIT_BRANCH" = "develop" ]; then
+            RELEASE_TAG="nightly-${DATE}-${SHORT_HASH}"
+        else
+            # For other branches, try to find the latest release
+            RELEASE_TAG=$(git describe --tags --abbrev=0 2>/dev/null || echo "")
+        fi
         
-        # Try to download pre-built frontend from GitHub releases
-        # Extract repo owner and name from git URL
-        repo_owner=$(echo "${GIT_REPO}" | sed -E 's|.*github\.com[:/]([^/]+)/([^/]+)(\.git)?$|\1|')
-        repo_name=$(echo "${GIT_REPO}" | sed -E 's|.*github\.com[:/]([^/]+)/([^/]+)(\.git)?$|\2|' | sed 's|\.git$||')
-        
-        if [ -n "${repo_owner}" ] && [ -n "${repo_name}" ]; then
-            # Get the latest release tag for this branch
-            SHORT_HASH=$(git rev-parse --short HEAD)
-            DATE=$(git log -1 --format=%cd --date=short HEAD)
-            
-            if [ "$GIT_BRANCH" = "main" ]; then
-                RELEASE_TAG="stable-${DATE}-${SHORT_HASH}"
-            elif [ "$GIT_BRANCH" = "develop" ]; then
-                RELEASE_TAG="nightly-${DATE}-${SHORT_HASH}"
+        if [ -n "$RELEASE_TAG" ]; then
+            # Check if we need to update frontend by verifying current dist matches commit
+            FRONTEND_NEEDS_UPDATE=true
+            if [ -d "$REPO_DIR/frontend/dist" ] && [ -f "$REPO_DIR/frontend/dist/.commit-hash" ]; then
+                DIST_COMMIT=$(cat "$REPO_DIR/frontend/dist/.commit-hash" 2>/dev/null || echo "")
+                if [ "$DIST_COMMIT" = "$CURRENT_COMMIT" ]; then
+                    echo "Pre-built frontend already matches current commit ($CURRENT_COMMIT). Skipping download." | tee -a "$LOG_FILE"
+                    FRONTEND_NEEDS_UPDATE=false
+                else
+                    echo "Pre-built frontend commit ($DIST_COMMIT) does not match current commit ($CURRENT_COMMIT). Updating..." | tee -a "$LOG_FILE"
+                fi
             else
-                # For other branches, try to find the latest release
-                RELEASE_TAG=$(git describe --tags --abbrev=0 2>/dev/null || echo "")
+                echo "No commit hash found in frontend/dist or dist directory missing. Will download pre-built frontend." | tee -a "$LOG_FILE"
             fi
             
-            if [ -n "$RELEASE_TAG" ]; then
+            if [ "$FRONTEND_NEEDS_UPDATE" = true ]; then
                 FRONTEND_DIST_URL="https://github.com/${repo_owner}/${repo_name}/releases/download/${RELEASE_TAG}/frontend-dist-${RELEASE_TAG}.tar.gz"
                 TEMP_DIR=$(mktemp -d)
                 
-                echo "Downloading pre-built frontend from release ${RELEASE_TAG}..." | tee -a "$LOG_FILE"
+                echo "Downloading pre-built frontend from release ${RELEASE_TAG} for commit ${CURRENT_COMMIT}..." | tee -a "$LOG_FILE"
                 if command -v curl &> /dev/null; then
                     if curl -fsSL -o "${TEMP_DIR}/frontend-dist.tar.gz" "${FRONTEND_DIST_URL}"; then
                         echo "Extracting pre-built frontend..." | tee -a "$LOG_FILE"
@@ -178,6 +199,9 @@ if [ "$HAS_CHANGES" = true ]; then
                         tar -xzf "${TEMP_DIR}/frontend-dist.tar.gz" || {
                             echo "Warning: Failed to extract frontend dist" | tee -a "$LOG_FILE"
                         }
+                        # Store commit hash in dist for future checks
+                        mkdir -p dist
+                        echo "$CURRENT_COMMIT" > "$REPO_DIR/frontend/dist/.commit-hash"
                         rm -f "${TEMP_DIR}/frontend-dist.tar.gz"
                         echo "Pre-built frontend installed successfully" | tee -a "$LOG_FILE"
                     else
@@ -191,6 +215,9 @@ if [ "$HAS_CHANGES" = true ]; then
                         tar -xzf "${TEMP_DIR}/frontend-dist.tar.gz" || {
                             echo "Warning: Failed to extract frontend dist" | tee -a "$LOG_FILE"
                         }
+                        # Store commit hash in dist for future checks
+                        mkdir -p dist
+                        echo "$CURRENT_COMMIT" > "$REPO_DIR/frontend/dist/.commit-hash"
                         rm -f "${TEMP_DIR}/frontend-dist.tar.gz"
                         echo "Pre-built frontend installed successfully" | tee -a "$LOG_FILE"
                     else
@@ -200,17 +227,17 @@ if [ "$HAS_CHANGES" = true ]; then
                     echo "Warning: Neither curl nor wget available. Cannot download pre-built frontend." | tee -a "$LOG_FILE"
                 fi
                 rm -rf "${TEMP_DIR}"
-            else
-                echo "Warning: Could not determine release tag. Pre-built frontend not available." | tee -a "$LOG_FILE"
             fi
         else
-            echo "Warning: Could not extract repo information from ${GIT_REPO}" | tee -a "$LOG_FILE"
+            echo "Warning: Could not determine release tag. Pre-built frontend not available." | tee -a "$LOG_FILE"
         fi
-    else
-        echo "No frontend changes detected. Skipping frontend update." | tee -a "$LOG_FILE"
     fi
 else
-    echo "No changes detected. Skipping updates." | tee -a "$LOG_FILE"
+    echo "Warning: Could not extract repo information from ${GIT_REPO}" | tee -a "$LOG_FILE"
+fi
+
+if [ "$HAS_CHANGES" = false ] && [ "$FORCE_UPDATE" = false ]; then
+    echo "No changes detected. Skipping other updates." | tee -a "$LOG_FILE"
 fi
 
 # Restart services via systemd

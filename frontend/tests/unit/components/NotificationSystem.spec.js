@@ -95,9 +95,7 @@ describe("NotificationSystem", () => {
 
       expect(wrapper.find(".notification").exists()).toBe(true);
       expect(wrapper.find(".notification-icon").text()).toBe("1");
-      expect(wrapper.find(".notification-message").text()).toBe(
-        "Calendar Mode",
-      );
+      expect(wrapper.find(".notification-message").text()).toBe("Calendar Mode");
     });
 
     it("should not show keyboard feedback when disabled", async () => {
@@ -147,9 +145,7 @@ describe("NotificationSystem", () => {
 
       expect(wrapper.find(".notification").exists()).toBe(true);
       expect(wrapper.find(".notification-icon").text()).toBe("🌐");
-      expect(wrapper.find(".notification-message").text()).toBe(
-        "Web Services Mode",
-      );
+      expect(wrapper.find(".notification-message").text()).toBe("Web Services Mode");
     });
 
     it("should not show mode change when UI is visible", async () => {
@@ -183,9 +179,7 @@ describe("NotificationSystem", () => {
 
       expect(wrapper.find(".notification").exists()).toBe(true);
       expect(wrapper.find(".notification-icon").text()).toBe("📷");
-      expect(wrapper.find(".notification-message").text()).toBe(
-        "Fullscreen Photos",
-      );
+      expect(wrapper.find(".notification-message").text()).toBe("Fullscreen Photos");
     });
   });
 
@@ -203,9 +197,7 @@ describe("NotificationSystem", () => {
       vi.advanceTimersByTime(100);
       await wrapper.vm.$nextTick();
 
-      expect(wrapper.find(".notification").classes()).toContain(
-        "notification-photos",
-      );
+      expect(wrapper.find(".notification").classes()).toContain("notification-photos");
     });
 
     it("should apply correct size class based on feedback mode", async () => {
@@ -216,9 +208,7 @@ describe("NotificationSystem", () => {
       wrapper.vm.show("info", "ℹ️", "Test");
       await wrapper.vm.$nextTick();
 
-      expect(wrapper.find(".notification").classes()).toContain(
-        "notification-small",
-      );
+      expect(wrapper.find(".notification").classes()).toContain("notification-small");
     });
 
     it("should apply correct position class for small mode", async () => {
@@ -230,7 +220,7 @@ describe("NotificationSystem", () => {
       await wrapper.vm.$nextTick();
 
       expect(wrapper.find(".notification").classes()).toContain(
-        "notification-position-bottom-right",
+        "notification-position-bottom-right"
       );
     });
 
@@ -242,9 +232,7 @@ describe("NotificationSystem", () => {
       wrapper.vm.show("info", "ℹ️", "Test");
       await wrapper.vm.$nextTick();
 
-      expect(wrapper.find(".notification").classes()).toContain(
-        "notification-position-center",
-      );
+      expect(wrapper.find(".notification").classes()).toContain("notification-position-center");
     });
   });
 
@@ -262,6 +250,18 @@ describe("NotificationSystem", () => {
       await wrapper.vm.$nextTick();
 
       expect(wrapper.find(".notification").exists()).toBe(false);
+    });
+
+    it("should not hide success notifications when keyboard feedback is disabled", async () => {
+      configStore.keyboardFeedbackEnabled = false;
+
+      const wrapper = mount(NotificationSystem);
+
+      wrapper.vm.show("success", "✓", "System rebooting…", 5000);
+      await wrapper.vm.$nextTick();
+
+      expect(wrapper.find(".notification").exists()).toBe(true);
+      expect(wrapper.find(".notification-message").text()).toContain("rebooting");
     });
 
     it("should show mode indicator when UI becomes hidden", async () => {

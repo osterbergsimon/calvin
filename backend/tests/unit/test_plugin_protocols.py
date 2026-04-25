@@ -437,6 +437,7 @@ class TestProtocolViolations:
         assert await plugin.get_schedule_config() is None
         assert await plugin.get_provided_services() == []
         assert await plugin.provide_service("test") is None
+        assert await plugin.fetch_type_data() is None
 
         # run_scheduled_task should raise NotImplementedError by default
         with pytest.raises(NotImplementedError):

@@ -47,9 +47,7 @@ describe("MinimalUIOverlay", () => {
 
       const wrapper = mount(MinimalUIOverlay);
 
-      expect(wrapper.find(".minimal-ui-overlay").classes()).toContain(
-        "position-bottom-left",
-      );
+      expect(wrapper.find(".minimal-ui-overlay").classes()).toContain("position-bottom-left");
     });
 
     it("should position button in bottom-right when clock is in top-left", () => {
@@ -58,9 +56,7 @@ describe("MinimalUIOverlay", () => {
 
       const wrapper = mount(MinimalUIOverlay);
 
-      expect(wrapper.find(".minimal-ui-overlay").classes()).toContain(
-        "position-bottom-right",
-      );
+      expect(wrapper.find(".minimal-ui-overlay").classes()).toContain("position-bottom-right");
     });
 
     it("should position button in top-left when clock is in bottom-right", () => {
@@ -69,9 +65,7 @@ describe("MinimalUIOverlay", () => {
 
       const wrapper = mount(MinimalUIOverlay);
 
-      expect(wrapper.find(".minimal-ui-overlay").classes()).toContain(
-        "position-top-left",
-      );
+      expect(wrapper.find(".minimal-ui-overlay").classes()).toContain("position-top-left");
     });
 
     it("should position button in top-right when clock is in bottom-left", () => {
@@ -80,9 +74,7 @@ describe("MinimalUIOverlay", () => {
 
       const wrapper = mount(MinimalUIOverlay);
 
-      expect(wrapper.find(".minimal-ui-overlay").classes()).toContain(
-        "position-top-right",
-      );
+      expect(wrapper.find(".minimal-ui-overlay").classes()).toContain("position-top-right");
     });
 
     it("should default to bottom-left when clock position is invalid", () => {
@@ -91,9 +83,7 @@ describe("MinimalUIOverlay", () => {
 
       const wrapper = mount(MinimalUIOverlay);
 
-      expect(wrapper.find(".minimal-ui-overlay").classes()).toContain(
-        "position-bottom-left",
-      );
+      expect(wrapper.find(".minimal-ui-overlay").classes()).toContain("position-bottom-left");
     });
   });
 

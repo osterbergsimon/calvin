@@ -3,9 +3,6 @@
 import json
 from typing import Any
 
-from sqlalchemy import select
-
-from app.database import AsyncSessionLocal
 from app.models.db_models import ConfigDB
 
 
@@ -23,15 +20,13 @@ class ConfigService:
         Returns:
             Dictionary of configuration key-value pairs
         """
-        async with AsyncSessionLocal() as session:
-            result = await session.execute(select(ConfigDB))
-            config_items = result.scalars().all()
+        config_items = await ConfigDB.objects.all()
 
-            config = {}
-            for item in config_items:
-                config[item.key] = self._parse_value(item.value, item.value_type)
+        config = {}
+        for item in config_items:
+            config[item.key] = self._parse_value(item.value, item.value_type)
 
-            return config
+        return config
 
     async def get_value(self, key: str, default: Any = None) -> Any:
         """
@@ -45,13 +40,11 @@ class ConfigService:
             Configuration value or default
         """
         try:
-            async with AsyncSessionLocal() as session:
-                result = await session.execute(select(ConfigDB).where(ConfigDB.key == key))
-                item = result.scalar_one_or_none()
+            item = await ConfigDB.objects.get_or_none(key=key)
 
-                if item:
-                    return self._parse_value(item.value, item.value_type)
-                return default
+            if item:
+                return self._parse_value(item.value, item.value_type)
+            return default
         except Exception:
             # If table doesn't exist or any other error, return default
             # This is useful for tests where the config table might not be created
@@ -71,21 +64,17 @@ class ConfigService:
 
         serialized_value = self._serialize_value(value, value_type)
 
-        async with AsyncSessionLocal() as session:
-            result = await session.execute(select(ConfigDB).where(ConfigDB.key == key))
-            item = result.scalar_one_or_none()
+        item = await ConfigDB.objects.get_or_none(key=key)
 
-            if item:
-                item.value = serialized_value
-                item.value_type = value_type
-            else:
-                item = ConfigDB(key=key, value=serialized_value, value_type=value_type)
-                session.add(item)
+        if item:
+            item.value = serialized_value
+            item.value_type = value_type
+            await item.update()
+        else:
+            await ConfigDB.objects.create(key=key, value=serialized_value, value_type=value_type)
 
-            await session.commit()
-
-            # Update cache
-            self._cache[key] = value
+        # Update cache
+        self._cache[key] = value
 
     async def update_config(self, config: dict[str, Any]) -> None:
         """

@@ -23,6 +23,7 @@ describe("CollapsibleSection", () => {
 
       expect(wrapper.find("h2").text()).toBe("Test Section");
       expect(wrapper.find(".section-header").exists()).toBe(true);
+      expect(wrapper.find(".section-header").element.tagName).toBe("BUTTON");
     });
 
     it("should render with icon when provided", () => {
@@ -56,10 +57,9 @@ describe("CollapsibleSection", () => {
         },
       });
 
-      expect(wrapper.find(".settings-section").classes()).not.toContain(
-        "expanded",
-      );
+      expect(wrapper.find(".settings-section").classes()).not.toContain("expanded");
       expect(wrapper.find(".toggle-icon").text()).toBe("▶");
+      expect(wrapper.find(".section-header").attributes("aria-expanded")).toBe("false");
       expect(wrapper.find(".section-content").isVisible()).toBe(false);
     });
 
@@ -73,6 +73,7 @@ describe("CollapsibleSection", () => {
 
       expect(wrapper.find(".settings-section").classes()).toContain("expanded");
       expect(wrapper.find(".toggle-icon").text()).toBe("▼");
+      expect(wrapper.find(".section-header").attributes("aria-expanded")).toBe("true");
       expect(wrapper.find(".section-content").isVisible()).toBe(true);
     });
 
@@ -84,9 +85,7 @@ describe("CollapsibleSection", () => {
         },
       });
 
-      expect(wrapper.find(".settings-section").classes()).not.toContain(
-        "expanded",
-      );
+      expect(wrapper.find(".settings-section").classes()).not.toContain("expanded");
 
       await wrapper.setProps({ expanded: true });
       await wrapper.vm.$nextTick();
@@ -105,9 +104,7 @@ describe("CollapsibleSection", () => {
         },
       });
 
-      expect(wrapper.find(".settings-section").classes()).not.toContain(
-        "expanded",
-      );
+      expect(wrapper.find(".settings-section").classes()).not.toContain("expanded");
 
       await wrapper.find(".section-header").trigger("click");
       await wrapper.vm.$nextTick();
@@ -144,9 +141,7 @@ describe("CollapsibleSection", () => {
       await wrapper.find(".section-header").trigger("click");
       await wrapper.vm.$nextTick();
 
-      expect(wrapper.find(".settings-section").classes()).not.toContain(
-        "expanded",
-      );
+      expect(wrapper.find(".settings-section").classes()).not.toContain("expanded");
       expect(wrapper.find(".toggle-icon").text()).toBe("▶");
     });
   });

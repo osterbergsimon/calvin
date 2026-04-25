@@ -8,6 +8,7 @@ from typing import Any
 from fastapi import APIRouter, HTTPException
 from pydantic import BaseModel, ConfigDict
 
+from app.config import settings
 from app.services.config_service import config_service
 from app.services.display_orientation_service import display_orientation_service
 
@@ -105,12 +106,15 @@ class ConfigUpdate(BaseModel):
     photoRotationInterval: int | None = None  # Photo rotation interval in seconds
     calendarViewMode: str | None = None  # 'month' | 'week' | 'day' | 'rolling'
     timeFormat: str | None = None  # '12h' or '24h' (default: '24h')
-    showModeIndicator: bool | None = None  # Show mode indicator icon
     modeIndicatorTimeout: int | None = (
         None  # Mode indicator auto-hide timeout in seconds (0 = never hide)
     )
     weekStartDay: int | None = None  # Week starting day (0=Sunday, 1=Monday, ..., 6=Saturday)
     showWeekNumbers: bool | None = None  # Show week numbers in calendar
+    weekendDays: list[int] | None = None  # Weekend days (e.g. [0, 6] for Sun+Sat)
+    maxVisibleEvents: int | None = None  # Max events visible per day cell
+    showRedDays: bool | None = None  # Highlight holidays/red days
+    mealPlanCardSize: str | None = None  # Meal plan card size: 'small' | 'medium' | 'large'
     sideViewPosition: str | None = (
         None  # Side view position: 'left' | 'right' for landscape, 'top' | 'bottom' for portrait
     )
@@ -119,10 +123,6 @@ class ConfigUpdate(BaseModel):
     darkModeStart: int | None = None  # Dark mode start hour (0-23)
     darkModeEnd: int | None = None  # Dark mode end hour (0-23)
     displayScheduleEnabled: bool | None = None  # Enable display power schedule
-    # Display off time (format: "HH:MM") - deprecated, use displaySchedule
-    displayOffTime: str | None = None
-    # Display on time (format: "HH:MM") - deprecated, use displaySchedule
-    displayOnTime: str | None = None
     # Display schedule as JSON string or array:
     # [{"day": 0-6, "enabled": bool, "onTime": "HH:MM", "offTime": "HH:MM"}, ...]
     displaySchedule: str | list[dict[str, Any]] | None = None
@@ -201,10 +201,6 @@ async def get_config():
         config["timeFormat"] = "24h"  # '12h' or '24h' (default: '24h')
     elif "time_format" in config and "timeFormat" not in config:
         config["timeFormat"] = config["time_format"]
-    if "showModeIndicator" not in config and "show_mode_indicator" not in config:
-        config["showModeIndicator"] = True  # Show mode indicator by default
-    elif "show_mode_indicator" in config and "showModeIndicator" not in config:
-        config["showModeIndicator"] = config["show_mode_indicator"]
     if "modeIndicatorTimeout" not in config and "mode_indicator_timeout" not in config:
         config["modeIndicatorTimeout"] = 5  # 5 seconds default
     elif "mode_indicator_timeout" in config and "modeIndicatorTimeout" not in config:
@@ -218,7 +214,7 @@ async def get_config():
     elif "keyboard_feedback_mode" in config and "keyboardFeedbackMode" not in config:
         config["keyboardFeedbackMode"] = config["keyboard_feedback_mode"]
     if "weekStartDay" not in config and "week_start_day" not in config:
-        config["weekStartDay"] = 0  # Sunday default
+        config["weekStartDay"] = 1  # Monday default
     elif "week_start_day" in config and "weekStartDay" not in config:
         config["weekStartDay"] = config["week_start_day"]
     if "showWeekNumbers" not in config and "show_week_numbers" not in config:
@@ -265,14 +261,6 @@ async def get_config():
         config["displayScheduleEnabled"] = False  # Disabled by default
     elif "display_schedule_enabled" in config and "displayScheduleEnabled" not in config:
         config["displayScheduleEnabled"] = config["display_schedule_enabled"]
-    if "displayOffTime" not in config and "display_off_time" not in config:
-        config["displayOffTime"] = "22:00"  # 10 PM default
-    elif "display_off_time" in config and "displayOffTime" not in config:
-        config["displayOffTime"] = config["display_off_time"]
-    if "displayOnTime" not in config and "display_on_time" not in config:
-        config["displayOnTime"] = "06:00"  # 6 AM default
-    elif "display_on_time" in config and "displayOnTime" not in config:
-        config["displayOnTime"] = config["display_on_time"]
     # Handle display schedule (per-day schedule)
     # Check if we have a valid schedule (not None, not empty string, not empty list)
     has_schedule = False
@@ -425,6 +413,8 @@ async def get_config():
     # Add frontend version (from built HTML)
     config["frontendVersion"] = get_frontend_version()
 
+    config["devMode"] = settings.is_dev_mode
+
     return config
 
 
@@ -456,8 +446,6 @@ async def update_config(config_update: ConfigUpdate):
         update_dict["calendar_view_mode"] = update_dict.pop("calendarViewMode")
     if "timeFormat" in update_dict:
         update_dict["time_format"] = update_dict.pop("timeFormat")
-    if "showModeIndicator" in update_dict:
-        update_dict["show_mode_indicator"] = update_dict.pop("showModeIndicator")
     if "modeIndicatorTimeout" in update_dict:
         update_dict["mode_indicator_timeout"] = update_dict.pop("modeIndicatorTimeout")
     if "keyboardFeedbackEnabled" in update_dict:
@@ -468,6 +456,14 @@ async def update_config(config_update: ConfigUpdate):
         update_dict["week_start_day"] = update_dict.pop("weekStartDay")
     if "showWeekNumbers" in update_dict:
         update_dict["show_week_numbers"] = update_dict.pop("showWeekNumbers")
+    if "weekendDays" in update_dict:
+        update_dict["weekend_days"] = update_dict.pop("weekendDays")
+    if "maxVisibleEvents" in update_dict:
+        update_dict["max_visible_events"] = update_dict.pop("maxVisibleEvents")
+    if "showRedDays" in update_dict:
+        update_dict["show_red_days"] = update_dict.pop("showRedDays")
+    if "mealPlanCardSize" in update_dict:
+        update_dict["meal_plan_card_size"] = update_dict.pop("mealPlanCardSize")
     if "sideViewPosition" in update_dict:
         update_dict["side_view_position"] = update_dict.pop("sideViewPosition")
     if "themeMode" in update_dict:
@@ -480,10 +476,6 @@ async def update_config(config_update: ConfigUpdate):
         update_dict["dark_mode_end"] = update_dict.pop("darkModeEnd")
     if "displayScheduleEnabled" in update_dict:
         update_dict["display_schedule_enabled"] = update_dict.pop("displayScheduleEnabled")
-    if "displayOffTime" in update_dict:
-        update_dict["display_off_time"] = update_dict.pop("displayOffTime")
-    if "displayOnTime" in update_dict:
-        update_dict["display_on_time"] = update_dict.pop("displayOnTime")
     if "displaySchedule" in update_dict:
         # Store schedule with explicit type
         # Pass the schedule directly (list/array) to set_value, which will serialize it

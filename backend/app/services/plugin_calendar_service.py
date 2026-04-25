@@ -358,20 +358,13 @@ class PluginCalendarService:
                     )
                     try:
                         plugin.disable()
-                        from sqlalchemy import select
-
-                        from app.database import AsyncSessionLocal
                         from app.models.db_models import PluginDB
 
-                        async with AsyncSessionLocal() as session:
-                            result = await session.execute(
-                                select(PluginDB).where(PluginDB.id == plugin.plugin_id)
-                            )
-                            db_plugin = result.scalar_one_or_none()
-                            if db_plugin:
-                                db_plugin.enabled = False
-                                await session.commit()
-                                logger.info("Disabled {} in database due to 404", plugin.plugin_id)
+                        db_plugin = await PluginDB.objects.get_or_none(id=plugin.plugin_id)
+                        if db_plugin:
+                            db_plugin.enabled = False
+                            await db_plugin.save_with_timestamp()
+                            logger.info("Disabled {} in database due to 404", plugin.plugin_id)
                     except Exception:
                         logger.exception("Failed to disable {}", plugin.plugin_id)
                 else:
@@ -392,66 +385,56 @@ class PluginCalendarService:
         Returns:
             List of calendar source dictionaries
         """
-        from sqlalchemy import select
-
-        from app.database import AsyncSessionLocal
         from app.models.db_models import PluginDB
 
         sources = []
 
         # Query database for all calendar plugin instances
-        async with AsyncSessionLocal() as session:
-            result = await session.execute(
-                select(PluginDB).where(
-                    PluginDB.type_id.in_(
-                        ["google", "ical", "proton"]  # Calendar plugin type IDs
-                    )
+        # Note: Ormar doesn't support .in_() directly, so we use filter with multiple conditions
+        db_plugins = await PluginDB.objects.filter(
+            type_id__in=["google", "ical", "proton"]  # Calendar plugin type IDs
+        ).all()
+
+        for db_plugin in db_plugins:
+            config = db_plugin.config or {}
+
+            # Try to get plugin instance if it exists (only enabled plugins have instances)
+            from app.plugins.manager import plugin_manager
+
+            plugin = plugin_manager.get_plugin(db_plugin.id)
+            if plugin and isinstance(plugin, CalendarPlugin):
+                # Use live plugin data
+                plugin_config = plugin.get_config()
+                sources.append(
+                    {
+                        "id": plugin.plugin_id,
+                        "type": self._get_plugin_type_name(plugin),
+                        "name": plugin.name,
+                        "enabled": db_plugin.enabled,  # Use database enabled status
+                        "running": plugin.is_running(),  # Runtime state
+                        # Get plugin-specific config via protocol method (get_config)
+                        "ical_url": plugin_config.get("ical_url") or config.get("ical_url"),
+                        "api_key": plugin_config.get("api_key") or config.get("api_key"),
+                        "color": plugin_config.get("color") or config.get("color"),
+                        "show_time": plugin_config.get("show_time", config.get("show_time", True)),
+                    }
                 )
-            )
-            db_plugins = result.scalars().all()
-
-            for db_plugin in db_plugins:
-                config = db_plugin.config or {}
-
-                # Try to get plugin instance if it exists (only enabled plugins have instances)
-                from app.plugins.manager import plugin_manager
-
-                plugin = plugin_manager.get_plugin(db_plugin.id)
-                if plugin and isinstance(plugin, CalendarPlugin):
-                    # Use live plugin data
-                    plugin_config = plugin.get_config()
-                    sources.append(
-                        {
-                            "id": plugin.plugin_id,
-                            "type": self._get_plugin_type_name(plugin),
-                            "name": plugin.name,
-                            "enabled": db_plugin.enabled,  # Use database enabled status
-                            "running": plugin.is_running(),  # Runtime state
-                            # Get plugin-specific config via protocol method (get_config)
-                            "ical_url": plugin_config.get("ical_url") or config.get("ical_url"),
-                            "api_key": plugin_config.get("api_key") or config.get("api_key"),
-                            "color": plugin_config.get("color") or config.get("color"),
-                            "show_time": plugin_config.get(
-                                "show_time", config.get("show_time", True)
-                            ),
-                        }
-                    )
-                else:
-                    # Plugin instance doesn't exist (disabled), use database data
-                    type_id = db_plugin.type_id
-                    sources.append(
-                        {
-                            "id": db_plugin.id,
-                            "type": type_id,
-                            "name": db_plugin.name,
-                            "enabled": db_plugin.enabled,  # Use database enabled status
-                            "running": False,  # No instance = not running
-                            "ical_url": config.get("ical_url"),
-                            "api_key": config.get("api_key"),
-                            "color": config.get("color"),
-                            "show_time": config.get("show_time", True),
-                        }
-                    )
+            else:
+                # Plugin instance doesn't exist (disabled), use database data
+                type_id = db_plugin.type_id
+                sources.append(
+                    {
+                        "id": db_plugin.id,
+                        "type": type_id,
+                        "name": db_plugin.name,
+                        "enabled": db_plugin.enabled,  # Use database enabled status
+                        "running": False,  # No instance = not running
+                        "ical_url": config.get("ical_url"),
+                        "api_key": config.get("api_key"),
+                        "color": config.get("color"),
+                        "show_time": config.get("show_time", True),
+                    }
+                )
 
         return sources
 

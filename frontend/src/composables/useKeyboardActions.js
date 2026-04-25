@@ -39,10 +39,10 @@ export function useKeyboardActions() {
     if (typeof configStore.cycleCalendarViewMode === "function") {
       configStore
         .cycleCalendarViewMode()
-        .then((newMode) => {
+        .then(newMode => {
           logInfo("[Keyboard]", `Calendar view mode cycled to: ${newMode}`);
         })
-        .catch((err) => {
+        .catch(err => {
           logError("[Keyboard]", "Failed to cycle calendar view mode:", err);
         });
     } else {
@@ -54,14 +54,11 @@ export function useKeyboardActions() {
       configStore.setCalendarViewMode(newMode);
       // Try to persist to backend
       if (typeof configStore.updateConfig === "function") {
-        configStore.updateConfig({ calendarViewMode: newMode }).catch((err) => {
+        configStore.updateConfig({ calendarViewMode: newMode }).catch(err => {
           logError("[Keyboard]", "Failed to save calendar view mode:", err);
         });
       }
-      logInfo(
-        "[Keyboard]",
-        `Calendar view mode cycled to: ${newMode} (fallback)`,
-      );
+      logInfo("[Keyboard]", `Calendar view mode cycled to: ${newMode} (fallback)`);
     }
   };
 
@@ -87,7 +84,7 @@ export function useKeyboardActions() {
   };
 
   // Helper to check if an event is multi-day
-  const isEventMultiDay = (event) => {
+  const isEventMultiDay = event => {
     const eventStart = new Date(event.start);
     const eventEnd = new Date(event.end);
     if (event.all_day) {
@@ -103,13 +100,13 @@ export function useKeyboardActions() {
 
   // Helper to get events for a specific date (handles multi-day events)
   // Returns events sorted in the same order as the calendar store
-  const getEventsForDate = (date) => {
+  const getEventsForDate = date => {
     if (!calendarStore.events || calendarStore.events.length === 0) return [];
 
     const dateComponents = getDateComponents(date, false);
 
     return calendarStore.events
-      .filter((event) => {
+      .filter(event => {
         const eventStart = new Date(event.start);
         const eventEnd = new Date(event.end);
 
@@ -122,28 +119,16 @@ export function useKeyboardActions() {
           eEndDate.setDate(eventStart.getDate() + durationDays);
           const eEndComponents = getDateComponents(eEndDate, false);
 
-          const startCompare = compareDateComponents(
-            eStartComponents,
-            dateComponents,
-          );
-          const endCompare = compareDateComponents(
-            dateComponents,
-            eEndComponents,
-          );
+          const startCompare = compareDateComponents(eStartComponents, dateComponents);
+          const endCompare = compareDateComponents(dateComponents, eEndComponents);
           return startCompare <= 0 && endCompare <= 0;
         } else {
           // Timed events: check if event overlaps with the date
           const eStartComponents = getDateComponents(eventStart, false);
           const eEndComponents = getDateComponents(eventEnd, false);
 
-          const startCompare = compareDateComponents(
-            eStartComponents,
-            dateComponents,
-          );
-          const endCompare = compareDateComponents(
-            dateComponents,
-            eEndComponents,
-          );
+          const startCompare = compareDateComponents(eStartComponents, dateComponents);
+          const endCompare = compareDateComponents(dateComponents, eEndComponents);
           return startCompare <= 0 && endCompare <= 0;
         }
       })
@@ -180,18 +165,13 @@ export function useKeyboardActions() {
     const currentEvent = calendarStore.selectedEvent;
 
     // If no events for this day (placeholder event), go to next day
-    if (
-      dayEvents.length === 0 ||
-      currentEvent.id?.toString().startsWith("placeholder-")
-    ) {
+    if (dayEvents.length === 0 || currentEvent.id?.toString().startsWith("placeholder-")) {
       navigateToNextDayWithEvents();
       return;
     }
 
     // Find current event index in dayEvents
-    const currentIndex = dayEvents.findIndex(
-      (e) => String(e.id) === String(currentEvent.id),
-    );
+    const currentIndex = dayEvents.findIndex(e => String(e.id) === String(currentEvent.id));
 
     if (currentIndex >= 0 && currentIndex < dayEvents.length - 1) {
       // There's a next event in the same day
@@ -211,18 +191,13 @@ export function useKeyboardActions() {
     const currentEvent = calendarStore.selectedEvent;
 
     // If no events for this day (placeholder event), go to previous day
-    if (
-      dayEvents.length === 0 ||
-      currentEvent.id?.toString().startsWith("placeholder-")
-    ) {
+    if (dayEvents.length === 0 || currentEvent.id?.toString().startsWith("placeholder-")) {
       navigateToPreviousDayWithEvents();
       return;
     }
 
     // Find current event index in dayEvents
-    const currentIndex = dayEvents.findIndex(
-      (e) => String(e.id) === String(currentEvent.id),
-    );
+    const currentIndex = dayEvents.findIndex(e => String(e.id) === String(currentEvent.id));
 
     // If event not found in dayEvents (shouldn't happen, but handle gracefully)
     if (currentIndex === -1) {
@@ -308,10 +283,7 @@ export function useKeyboardActions() {
         // IMPORTANT: Select the LAST event of the previous day so that subsequent
         // prev presses will browse through that day's events in reverse order
         // (from last to first) before stepping to an earlier day
-        calendarStore.selectEvent(
-          eventsForDay[eventsForDay.length - 1],
-          searchDate,
-        );
+        calendarStore.selectEvent(eventsForDay[eventsForDay.length - 1], searchDate);
         return;
       }
       searchDate.setDate(searchDate.getDate() - 1);
@@ -319,16 +291,16 @@ export function useKeyboardActions() {
   };
 
   // Helper function to adjust day of week based on week start day
-  const adjustDayOfWeek = (dayOfWeek) => {
+  const adjustDayOfWeek = dayOfWeek => {
     // dayOfWeek: 0=Sunday, 1=Monday, ..., 6=Saturday
     // weekStartDay: 0=Sunday, 1=Monday, ..., 6=Saturday
     // Return adjusted day where 0 = week start day
-    const weekStartDay = configStore.weekStartDay || 0;
+    const weekStartDay = configStore.weekStartDay ?? 1;
     return (dayOfWeek - weekStartDay + 7) % 7;
   };
 
   // Helper function to get date at start of week for a given date
-  const getWeekStart = (date) => {
+  const getWeekStart = date => {
     const d = new Date(date);
     const dayOfWeek = d.getDay();
     const adjustedDay = adjustDayOfWeek(dayOfWeek);
@@ -337,13 +309,13 @@ export function useKeyboardActions() {
     return d;
   };
 
-  const handleAction = (action) => {
+  const handleAction = action => {
     logDebug(
       "[Keyboard]",
       "handleAction called with:",
       action,
       "currentMode:",
-      modeStore.currentMode,
+      modeStore.currentMode
     );
     // Handle generic actions that adapt to current mode
     if (action === "generic_next") {
@@ -509,7 +481,7 @@ export function useKeyboardActions() {
           }
 
           // Helper to get calendar date components
-          const getDateComponents = (date) => {
+          const getDateComponents = date => {
             const d = new Date(date);
             return {
               year: d.getFullYear(),
@@ -528,7 +500,7 @@ export function useKeyboardActions() {
           const targetComponents = getDateComponents(targetDate);
 
           // Get all events for the target date (including multi-day events that span it)
-          const targetEvents = calendarStore.events.filter((event) => {
+          const targetEvents = calendarStore.events.filter(event => {
             const eventStart = new Date(event.start);
             const eventEnd = new Date(event.end);
 
@@ -536,36 +508,22 @@ export function useKeyboardActions() {
               // All-day events: compare calendar date components
               const eStartComponents = getDateComponents(eventStart);
               const durationMs = eventEnd.getTime() - eventStart.getTime();
-              const durationDays = Math.floor(
-                durationMs / (1000 * 60 * 60 * 24),
-              );
+              const durationDays = Math.floor(durationMs / (1000 * 60 * 60 * 24));
               const eEndDate = new Date(eventStart);
               eEndDate.setDate(eventStart.getDate() + durationDays);
               const eEndComponents = getDateComponents(eEndDate);
 
-              const startCompare = compareDateComponents(
-                eStartComponents,
-                targetComponents,
-              );
+              const startCompare = compareDateComponents(eStartComponents, targetComponents);
 
-              const endCompare = compareDateComponents(
-                targetComponents,
-                eEndComponents,
-              );
+              const endCompare = compareDateComponents(targetComponents, eEndComponents);
               return startCompare <= 0 && endCompare <= 0;
             } else {
               // Timed events: check if event overlaps with target date
               const eStartComponents = getDateComponents(eventStart);
               const eEndComponents = getDateComponents(eventEnd);
 
-              const startCompare = compareDateComponents(
-                eStartComponents,
-                targetComponents,
-              );
-              const endCompare = compareDateComponents(
-                targetComponents,
-                eEndComponents,
-              );
+              const startCompare = compareDateComponents(eStartComponents, targetComponents);
+              const endCompare = compareDateComponents(targetComponents, eEndComponents);
               return startCompare <= 0 && endCompare <= 0;
             }
           });
@@ -583,9 +541,7 @@ export function useKeyboardActions() {
               id: `placeholder-${targetDate.getTime()}`,
               title: "No events",
               start: targetDate.toISOString(),
-              end: new Date(
-                targetDate.getTime() + 24 * 60 * 60 * 1000 - 1,
-              ).toISOString(), // End of day
+              end: new Date(targetDate.getTime() + 24 * 60 * 60 * 1000 - 1).toISOString(), // End of day
               all_day: true,
               location: null,
               description: null,
@@ -605,37 +561,25 @@ export function useKeyboardActions() {
         break;
       case "calendar_next_day":
         // Navigate to next day when event detail panel is open
-        if (
-          modeStore.currentMode === modeStore.MODES.CALENDAR &&
-          calendarStore.selectedEvent
-        ) {
+        if (modeStore.currentMode === modeStore.MODES.CALENDAR && calendarStore.selectedEvent) {
           navigateToNextDayWithEvents();
         }
         break;
       case "calendar_prev_day":
         // Navigate to previous day when event detail panel is open
-        if (
-          modeStore.currentMode === modeStore.MODES.CALENDAR &&
-          calendarStore.selectedEvent
-        ) {
+        if (modeStore.currentMode === modeStore.MODES.CALENDAR && calendarStore.selectedEvent) {
           navigateToPreviousDayWithEvents();
         }
         break;
       case "calendar_next_event":
         // Navigate to next event within day, or next day if on last event
-        if (
-          modeStore.currentMode === modeStore.MODES.CALENDAR &&
-          calendarStore.selectedEvent
-        ) {
+        if (modeStore.currentMode === modeStore.MODES.CALENDAR && calendarStore.selectedEvent) {
           navigateToNextEvent();
         }
         break;
       case "calendar_prev_event":
         // Navigate to previous event within day, or previous day if on first event
-        if (
-          modeStore.currentMode === modeStore.MODES.CALENDAR &&
-          calendarStore.selectedEvent
-        ) {
+        if (modeStore.currentMode === modeStore.MODES.CALENDAR && calendarStore.selectedEvent) {
           navigateToPreviousEvent();
         }
         break;
@@ -645,8 +589,7 @@ export function useKeyboardActions() {
         // Works in photos mode or fullscreen photos
         if (
           modeStore.currentMode === modeStore.MODES.PHOTOS ||
-          (modeStore.isFullscreen &&
-            modeStore.fullscreenMode === modeStore.MODES.PHOTOS) ||
+          (modeStore.isFullscreen && modeStore.fullscreenMode === modeStore.MODES.PHOTOS) ||
           modeStore.currentMode === modeStore.MODES.CALENDAR
         ) {
           imagesStore.nextImage();
@@ -656,8 +599,7 @@ export function useKeyboardActions() {
         // Works in photos mode or fullscreen photos
         if (
           modeStore.currentMode === modeStore.MODES.PHOTOS ||
-          (modeStore.isFullscreen &&
-            modeStore.fullscreenMode === modeStore.MODES.PHOTOS) ||
+          (modeStore.isFullscreen && modeStore.fullscreenMode === modeStore.MODES.PHOTOS) ||
           modeStore.currentMode === modeStore.MODES.CALENDAR
         ) {
           imagesStore.previousImage();
@@ -675,10 +617,7 @@ export function useKeyboardActions() {
         break;
       case "photos_exit_fullscreen":
         // Exit fullscreen - return to dashboard
-        if (
-          modeStore.isFullscreen &&
-          modeStore.fullscreenMode === modeStore.MODES.PHOTOS
-        ) {
+        if (modeStore.isFullscreen && modeStore.fullscreenMode === modeStore.MODES.PHOTOS) {
           modeStore.exitFullscreen();
           router.push("/");
         }
@@ -707,21 +646,20 @@ export function useKeyboardActions() {
         // Works in web services mode or fullscreen web services
         if (
           modeStore.currentMode === modeStore.MODES.WEB_SERVICES ||
-          (modeStore.isFullscreen &&
-            modeStore.fullscreenMode === modeStore.MODES.WEB_SERVICES)
+          (modeStore.isFullscreen && modeStore.fullscreenMode === modeStore.MODES.WEB_SERVICES)
         ) {
           logDebug(
             "[Keyboard]",
             "web_service_next: current index",
             webServicesStore.currentServiceIndex,
             "services count",
-            webServicesStore.services.length,
+            webServicesStore.services.length
           );
           webServicesStore.nextService();
           logDebug(
             "[Keyboard]",
             "web_service_next: new index",
-            webServicesStore.currentServiceIndex,
+            webServicesStore.currentServiceIndex
           );
         } else {
           // Switch to web services mode (side view)
@@ -733,21 +671,20 @@ export function useKeyboardActions() {
         // Works in web services mode or fullscreen web services
         if (
           modeStore.currentMode === modeStore.MODES.WEB_SERVICES ||
-          (modeStore.isFullscreen &&
-            modeStore.fullscreenMode === modeStore.MODES.WEB_SERVICES)
+          (modeStore.isFullscreen && modeStore.fullscreenMode === modeStore.MODES.WEB_SERVICES)
         ) {
           logDebug(
             "[Keyboard]",
             "web_service_prev: current index",
             webServicesStore.currentServiceIndex,
             "services count",
-            webServicesStore.services.length,
+            webServicesStore.services.length
           );
           webServicesStore.previousService();
           logDebug(
             "[Keyboard]",
             "web_service_prev: new index",
-            webServicesStore.currentServiceIndex,
+            webServicesStore.currentServiceIndex
           );
         } else {
           // Switch to web services mode (side view)
@@ -757,10 +694,7 @@ export function useKeyboardActions() {
         break;
       case "web_service_close":
         // Close web services fullscreen - return to dashboard
-        if (
-          modeStore.isFullscreen &&
-          modeStore.fullscreenMode === modeStore.MODES.WEB_SERVICES
-        ) {
+        if (modeStore.isFullscreen && modeStore.fullscreenMode === modeStore.MODES.WEB_SERVICES) {
           modeStore.exitFullscreen();
           router.push("/");
         }
@@ -782,7 +716,7 @@ export function useKeyboardActions() {
       case "calendar_refresh":
         if (modeStore.currentMode === modeStore.MODES.CALENDAR) {
           // Refresh calendar events
-          calendarStore.refreshEvents().catch((err) => {
+          calendarStore.refreshEvents().catch(err => {
             logError("[Keyboard]", "Failed to refresh calendar:", err);
           });
           logInfo("[Keyboard]", "Refreshing calendar events");
@@ -791,7 +725,7 @@ export function useKeyboardActions() {
       case "service_refresh":
         // Refresh service plugin data (for web services)
         if (modeStore.currentMode === modeStore.MODES.WEB_SERVICES) {
-          webServicesStore.refreshCurrentService().catch((err) => {
+          webServicesStore.refreshCurrentService().catch(err => {
             logError("[Keyboard]", "Failed to refresh service:", err);
           });
           logInfo("[Keyboard]", "Refreshing web service data");
@@ -810,9 +744,7 @@ export function useKeyboardActions() {
   // Get the appropriate action for generic_next based on current mode
   const getGenericNextAction = () => {
     // If in fullscreen, use fullscreen mode; otherwise use current mode
-    const activeMode = modeStore.isFullscreen
-      ? modeStore.fullscreenMode
-      : modeStore.currentMode;
+    const activeMode = modeStore.isFullscreen ? modeStore.fullscreenMode : modeStore.currentMode;
 
     if (activeMode === modeStore.MODES.CALENDAR) {
       // If event detail panel is open, navigate to next event (within day or next day)
@@ -833,9 +765,7 @@ export function useKeyboardActions() {
   // Get the appropriate action for generic_prev based on current mode
   const getGenericPrevAction = () => {
     // If in fullscreen, use fullscreen mode; otherwise use current mode
-    const activeMode = modeStore.isFullscreen
-      ? modeStore.fullscreenMode
-      : modeStore.currentMode;
+    const activeMode = modeStore.isFullscreen ? modeStore.fullscreenMode : modeStore.currentMode;
 
     if (activeMode === modeStore.MODES.CALENDAR) {
       // If event detail panel is open, navigate to previous event (within day or previous day)
@@ -886,9 +816,7 @@ export function useKeyboardActions() {
   // Get the appropriate action for generic_refresh based on current mode
   const getGenericRefreshAction = () => {
     // If in fullscreen, use fullscreen mode; otherwise use current mode
-    const activeMode = modeStore.isFullscreen
-      ? modeStore.fullscreenMode
-      : modeStore.currentMode;
+    const activeMode = modeStore.isFullscreen ? modeStore.fullscreenMode : modeStore.currentMode;
 
     if (activeMode === modeStore.MODES.CALENDAR) {
       return "calendar_refresh";

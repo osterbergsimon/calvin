@@ -39,7 +39,7 @@ describe("PluginManager", () => {
 
       // Backend tab should be in the tabs list even without plugins
       const tabProps = tabs.props("tabs");
-      const backendTab = tabProps.find((tab) => tab.id === "backend");
+      const backendTab = tabProps.find(tab => tab.id === "backend");
       expect(backendTab).toBeDefined();
       expect(backendTab.label).toBe("Backend");
       expect(backendTab.icon).toBe("🔧");
@@ -70,7 +70,7 @@ describe("PluginManager", () => {
 
       const tabs = wrapper.findComponent(TabNavigation);
       const tabProps = tabs.props("tabs");
-      const backendTab = tabProps.find((tab) => tab.id === "backend");
+      const backendTab = tabProps.find(tab => tab.id === "backend");
       expect(backendTab).toBeDefined();
     });
 
@@ -110,9 +110,7 @@ describe("PluginManager", () => {
     it("should show empty state message for backend tab", () => {
       const wrapper = mount(PluginManager, {
         props: {
-          plugins: [
-            { id: "local", name: "Local Images", type: "image", enabled: true },
-          ],
+          plugins: [{ id: "local", name: "Local Images", type: "image", enabled: true }],
           instances: {},
           loading: false,
           activeTab: "backend",
@@ -154,7 +152,7 @@ describe("PluginManager", () => {
 
       const tabs = wrapper.findComponent(TabNavigation);
       const tabProps = tabs.props("tabs");
-      const tabIds = tabProps.map((tab) => tab.id);
+      const tabIds = tabProps.map(tab => tab.id);
 
       expect(tabIds).toContain("calendar");
       expect(tabIds).toContain("image");

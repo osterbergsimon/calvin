@@ -27,12 +27,9 @@
       <p v-if="pluginComponentError" class="error-text">
         Component error: {{ pluginComponentError }}
       </p>
-      <p v-if="componentPath" class="error-text">
-        Component path: {{ componentPath }}
-      </p>
+      <p v-if="componentPath" class="error-text">Component path: {{ componentPath }}</p>
       <p v-if="!componentPath && displayType === 'iframe'" class="error-text">
-        No component path found for iframe service. Check
-        display_schema.component.
+        No component path found for iframe service. Check display_schema.component.
       </p>
     </div>
   </div>
@@ -43,6 +40,7 @@ import { computed, watch } from "vue";
 import WeatherViewer from "./WeatherViewer.vue";
 import GenericApiViewer from "./GenericApiViewer.vue";
 import { usePluginComponent } from "../../composables/usePluginComponent";
+import { logDebug, logError } from "../../utils/logger";
 
 const props = defineProps({
   service: {
@@ -73,19 +71,7 @@ const renderTemplate = computed(() => {
 
 const apiEndpoint = computed(() => {
   if (props.service.display_schema?.api_endpoint) {
-    let endpoint = props.service.display_schema.api_endpoint.replace(
-      "{service_id}",
-      props.service.id,
-    );
-    // Migrate old web-services endpoints to new plugin API
-    if (endpoint.includes("/api/web-services/")) {
-      // Convert /api/web-services/{id}/weather or /api/web-services/{id}/data to /api/plugins/{id}/data
-      endpoint = endpoint.replace(
-        /\/api\/web-services\/([^/]+)\/(weather|data)/,
-        "/api/plugins/$1/data",
-      );
-    }
-    return endpoint;
+    return props.service.display_schema.api_endpoint.replace("{service_id}", props.service.id);
   }
   // For plugins without api_endpoint in display_schema, use the new plugin API format
   if (props.service.plugin_id && props.service.id) {
@@ -106,8 +92,8 @@ const {
 // Debug logging
 watch(
   () => props.service,
-  (service) => {
-    console.log("[ServiceViewer] Service data:", {
+  service => {
+    logDebug("[ServiceViewer]", "Service data:", {
       id: service?.id,
       name: service?.name,
       plugin_id: service?.plugin_id,
@@ -116,20 +102,20 @@ watch(
       config: service?.config,
     });
   },
-  { immediate: true },
+  { immediate: true }
 );
 
-watch(componentPath, (path) => {
-  console.log("[ServiceViewer] Component path:", path);
+watch(componentPath, path => {
+  logDebug("[ServiceViewer]", "Component path:", path);
 });
 
-watch(pluginComponent, (comp) => {
-  console.log("[ServiceViewer] Plugin component loaded:", comp);
+watch(pluginComponent, comp => {
+  logDebug("[ServiceViewer]", "Plugin component loaded:", comp);
 });
 
-watch(pluginComponentError, (err) => {
+watch(pluginComponentError, err => {
   if (err) {
-    console.error("[ServiceViewer] Component error:", err);
+    logError("[ServiceViewer]", "Component error:", err);
   }
 });
 </script>

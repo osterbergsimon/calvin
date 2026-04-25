@@ -44,7 +44,7 @@ describe("serviceComponentRegistry", () => {
       expect(serviceComponentRegistry.test).toBe(mockComponent);
       expect(logDebug).toHaveBeenCalledWith(
         "[ServiceComponentRegistry]",
-        "Registered component: test",
+        "Registered component: test"
       );
     });
 

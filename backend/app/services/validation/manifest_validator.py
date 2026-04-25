@@ -49,6 +49,34 @@ def validate_manifest_format_version(
         )
 
 
+def validate_manifest_protocol_version(
+    manifest: dict[str, Any],
+    supported_versions: list[int],
+    default_version: int = 1,
+    manifest_type: str = "manifest",
+) -> None:
+    """
+    Validate manifest protocol version.
+
+    Args:
+        manifest: Manifest dictionary to validate
+        supported_versions: List of supported protocol versions
+        default_version: Default protocol version if not specified
+        manifest_type: Type of manifest (for error messages)
+
+    Raises:
+        ValueError: If protocol version is invalid or unsupported
+    """
+    protocol_version = manifest.get("protocol_version", default_version)
+    if not isinstance(protocol_version, int):
+        raise ValueError(f"{manifest_type} protocol_version must be an integer")
+    if protocol_version not in supported_versions:
+        raise ValueError(
+            f"Unsupported {manifest_type} protocol version: {protocol_version}. "
+            f"Supported versions: {', '.join(str(version) for version in supported_versions)}"
+        )
+
+
 def validate_path_traversal(path: str | Path, base_path: str | Path | None = None) -> None:
     """
     Validate that a path does not contain path traversal attempts.

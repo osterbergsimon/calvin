@@ -35,9 +35,7 @@ test.describe("Keyboard Navigation", () => {
     await page.waitForTimeout(500);
 
     // Check if mode changed (photos view might be visible or mode indicator updated)
-    const photosView = page
-      .locator(".photo-slideshow, [class*='photo']")
-      .first();
+    const photosView = page.locator(".photo-slideshow, [class*='photo']").first();
     const modeIndicator = page.locator(".mode-indicator").first();
 
     // At least one should indicate mode change
@@ -52,9 +50,7 @@ test.describe("Keyboard Navigation", () => {
     await page.waitForTimeout(500);
 
     // Check if settings page is visible
-    const settingsHeading = page
-      .locator("h1, h2")
-      .filter({ hasText: /settings/i });
+    const settingsHeading = page.locator("h1, h2").filter({ hasText: /settings/i });
     if ((await settingsHeading.count()) > 0) {
       await expect(settingsHeading.first()).toBeVisible();
     }

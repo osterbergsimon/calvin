@@ -17,7 +17,7 @@ export const useModeStore = defineStore("mode", () => {
   const fullscreenMode = ref(null); // Which mode is fullscreen (PHOTOS or WEB_SERVICES)
   const modeBeforeFullscreen = ref(null); // Track mode before entering fullscreen
 
-  const setMode = (mode) => {
+  const setMode = mode => {
     if (mode === MODES.SETTINGS) {
       // Store previous mode when entering settings
       previousMode.value = currentMode.value;
@@ -28,7 +28,7 @@ export const useModeStore = defineStore("mode", () => {
     currentMode.value = mode;
   };
 
-  const enterFullscreen = (mode) => {
+  const enterFullscreen = mode => {
     // Store current mode before entering fullscreen
     modeBeforeFullscreen.value = currentMode.value;
     isFullscreen.value = true;

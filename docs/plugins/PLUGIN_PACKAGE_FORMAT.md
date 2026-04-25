@@ -12,14 +12,19 @@ The plugin package format is versioned to allow for future changes while maintai
 
 - **Repository Manifest (`plugins.json`)**: The `version` field specifies the manifest format version
 - **Plugin Manifest (`plugin.json`)**: The `format_version` field (optional) specifies the plugin manifest format version
+- **Plugin Protocol (`plugin.json` and runtime metadata)**: The `protocol_version` field specifies the Calvin plugin protocol the plugin targets
 
 If `format_version` is not specified in `plugin.json`, it defaults to `1.0.0` (the current format).
+If `protocol_version` is not specified, it defaults to `1` for backward compatibility.
 
 ### Version Compatibility
 
 - **Format 1.0.0**: Initial format specification
   - Supports all current features (dependencies, files, requirements, etc.)
   - All plugins without `format_version` are treated as 1.0.0
+- **Protocol 1**: Current Calvin plugin protocol
+  - Plugins without `protocol_version` are treated as protocol 1
+  - Calvin rejects plugins that declare a newer unsupported protocol version
 
 Future format versions will be documented here with migration guides.
 
@@ -331,7 +336,8 @@ Each plugin **must** have a `plugin.json` file in its root directory. This manif
   "id": "my_plugin",
   "name": "My Plugin",
   "version": "1.0.0",
-  "type": "service"
+  "type": "service",
+  "protocol_version": 1
 }
 ```
 
@@ -352,6 +358,11 @@ Each plugin **must** have a `plugin.json` file in its root directory. This manif
 
 - **`type`** (string, required): Plugin type
   - Must be one of: `"calendar"`, `"image"`, or `"service"`
+
+- **`protocol_version`** (integer, optional): Calvin plugin protocol version
+  - Defaults to `1` if not specified
+  - Should match the runtime plugin protocol the plugin was authored against
+  - Calvin currently supports protocol version `1`
 
 ### Format Version Field
 

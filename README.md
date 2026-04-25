@@ -80,36 +80,44 @@ git checkout develop
 **Production Setup (One Command):**
 
 ```bash
-wget -O- https://raw.githubusercontent.com/osterbergsimon/calvin/main/scripts/setup.sh | sudo sh
+wget -O- https://raw.githubusercontent.com/osterbergsimon/calvin/main/scripts/setup.sh | sudo bash
 ```
 
 **Development Setup (with hot reload):**
 
 ```bash
-wget -O- https://raw.githubusercontent.com/osterbergsimon/calvin/main/scripts/setup-dev.sh | sudo sh
+wget -O- https://raw.githubusercontent.com/osterbergsimon/calvin/main/scripts/setup-dev.sh | sudo bash
 ```
 
 **Using curl:**
 
 ```bash
-curl -fsSL https://raw.githubusercontent.com/osterbergsimon/calvin/main/scripts/setup.sh | sudo sh
-curl -fsSL https://raw.githubusercontent.com/osterbergsimon/calvin/main/scripts/setup-dev.sh | sudo sh
+curl -fsSL https://raw.githubusercontent.com/osterbergsimon/calvin/main/scripts/setup.sh | sudo bash
+curl -fsSL https://raw.githubusercontent.com/osterbergsimon/calvin/main/scripts/setup-dev.sh | sudo bash
 ```
 
 **Using a Different Branch:**
 
 ```bash
 # Production setup with develop branch
-GIT_BRANCH=develop wget -O- https://raw.githubusercontent.com/osterbergsimon/calvin/main/scripts/setup.sh | sudo sh
+export GIT_BRANCH=develop
+wget -O- https://raw.githubusercontent.com/osterbergsimon/calvin/main/scripts/setup.sh | sudo -E bash
 
 # Development setup with develop branch
-GIT_BRANCH=develop curl -fsSL https://raw.githubusercontent.com/osterbergsimon/calvin/main/scripts/setup-dev.sh | sudo sh
+export GIT_BRANCH=develop
+curl -fsSL https://raw.githubusercontent.com/osterbergsimon/calvin/main/scripts/setup-dev.sh | sudo -E bash
 ```
+
+> **Note:** Use `sudo -E` to preserve environment variables. Without `-E`, `sudo` will not pass `GIT_BRANCH` or `GIT_REPO` to the script, and it will default to the `main` branch.
+> 
+> **Important:** Export the variable first (`export GIT_BRANCH=develop`) rather than setting it inline (`GIT_BRANCH=develop wget ...`), as inline assignments don't propagate through pipes to `sudo`.
 
 **Using a Fork or Different Repository:**
 
 ```bash
-GIT_REPO=https://github.com/yourusername/calvin.git GIT_BRANCH=your-branch wget -O- ... | sudo sh
+export GIT_REPO=https://github.com/yourusername/calvin.git
+export GIT_BRANCH=your-branch
+wget -O- ... | sudo -E bash
 ```
 
 **What the Setup Scripts Do:**

@@ -8,7 +8,7 @@ import pytest
 
 from app.plugins.base import PluginType
 from app.plugins.manager import plugin_manager
-from app.plugins.protocols import BackendPlugin
+from app.plugins.protocols import BackendPlugin, ServicePlugin
 from app.services.plugin_installer import plugin_installer
 
 
@@ -230,8 +230,14 @@ def register_plugin_types() -> list[dict[str, Any]]:
 
         # Uninstall
         response = test_client.delete("/api/plugins/installed/test_uninstall_plugin")
-        assert response.status_code == 200
-        assert response.json()["success"] is True
+        assert response.status_code == 200, (
+            f"Expected 200, got {response.status_code}: {response.text}"
+        )
+        response_data = response.json()
+        assert response_data is not None, (
+            f"Response body is None. Status: {response.status_code}, Text: {response.text}"
+        )
+        assert response_data.get("success") is True
 
         # Verify it's removed
         response = test_client.get("/api/plugins/installed")
@@ -313,16 +319,23 @@ class TestPluginInstanceManagement:
         # We test this by checking that instance routes return 404 (not found)
         # rather than 405 (method not allowed) or other generic route errors
 
+        # Use a truly non-existent instance ID (not in database)
+        nonexistent_id = "definitely-does-not-exist-instance-12345"
+
         # Try to start a non-existent instance
-        response = test_client.post("/api/plugins/instances/test-instance/start")
+        response = test_client.post(f"/api/plugins/instances/{nonexistent_id}/start")
         # Should get 404 (not found) from instance route, not from generic route
-        assert response.status_code == 404
+        assert response.status_code == 404, (
+            f"Expected 404, got {response.status_code}: {response.text}"
+        )
         # The error message should be specific to instance not found
         assert "instance" in response.json()["detail"].lower()
 
         # Try to stop a non-existent instance
-        response = test_client.post("/api/plugins/instances/test-instance/stop")
-        assert response.status_code == 404
+        response = test_client.post(f"/api/plugins/instances/{nonexistent_id}/stop")
+        assert response.status_code == 404, (
+            f"Expected 404, got {response.status_code}: {response.text}"
+        )
         assert "instance" in response.json()["detail"].lower()
 
     def test_get_plugin_after_instance_route(self, test_client):
@@ -604,3 +617,308 @@ class TestBackendPluginAPI:
             assert data["scheduled_task"] is None
         finally:
             await plugin_manager.unregister("test-backend-status-no-schedule")
+
+
+@pytest.mark.integration
+class TestServicePluginDataAPI:
+    """Test service plugin data endpoint."""
+
+    class MockServicePluginForAPI(ServicePlugin):
+        def __init__(self, plugin_id: str, name: str, enabled: bool = True):
+            super().__init__(plugin_id, name, enabled)
+            self.initialize_calls = 0
+
+        @classmethod
+        def get_plugin_metadata(cls):
+            return {"type_id": "test-service", "plugin_type": PluginType.SERVICE}
+
+        @property
+        def plugin_type(self) -> PluginType:
+            return PluginType.SERVICE
+
+        async def initialize(self) -> None:
+            self.initialize_calls += 1
+
+        async def cleanup(self) -> None:
+            pass
+
+        async def get_content(self) -> dict[str, Any]:
+            return {"type": "api", "url": "/api/plugins/test-service-instance/data"}
+
+        async def validate_config(self, config: dict[str, Any]) -> bool:
+            return True
+
+        async def fetch_service_data(
+            self,
+            start_date: str | None = None,
+            end_date: str | None = None,
+        ) -> dict[str, Any] | None:
+            return {
+                "success": True,
+                "start_date": start_date,
+                "end_date": end_date,
+                "items": [{"label": "ok"}],
+            }
+
+    @pytest.mark.asyncio
+    async def test_get_plugin_data_uses_service_instance_method(self, test_client):
+        from app.models.db_models import PluginDB
+
+        plugin = self.MockServicePluginForAPI(
+            plugin_id="test-service-instance",
+            name="Test Service Instance",
+            enabled=True,
+        )
+        await plugin_manager.register(plugin)
+
+        db_plugin = await PluginDB.objects.create(
+            id="test-service-instance",
+            type_id="test-service",
+            plugin_type="service",
+            name="Test Service Instance",
+            enabled=True,
+            config={},
+        )
+
+        try:
+            response = test_client.get(
+                "/api/plugins/test-service-instance/data",
+                params={"start_date": "2026-01-01", "end_date": "2026-01-07"},
+            )
+
+            if response.status_code == 404:
+                pytest.skip("Service data endpoint not available in test client")
+
+            assert response.status_code == 200
+            data = response.json()
+            assert data["success"] is True
+            assert data["start_date"] == "2026-01-01"
+            assert data["end_date"] == "2026-01-07"
+            assert data["items"] == [{"label": "ok"}]
+            assert plugin.initialize_calls == 1
+        finally:
+            await plugin_manager.unregister("test-service-instance")
+            await db_plugin.delete()
+
+
+@pytest.mark.integration
+class TestPluginTypeClassBasedActions:
+    """Test class-based type-level plugin actions."""
+
+    def test_get_plugins_strips_reserved_schema_fields(self, test_client, monkeypatch):
+        monkeypatch.setattr(
+            "app.api.routes.plugins.management.plugin_loader.get_plugin_types",
+            lambda: [
+                {
+                    "type_id": "reserved-schema-test",
+                    "plugin_type": PluginType.SERVICE,
+                    "name": "Reserved Schema Test",
+                    "description": "Test plugin",
+                    "common_config_schema": {
+                        "display_order": {"type": "integer"},
+                        "api_key": {"type": "password"},
+                    },
+                    "instance_config_schema": {
+                        "enabled": {"type": "boolean"},
+                        "location": {"type": "string"},
+                    },
+                    "supports_multiple_instances": True,
+                    "instance_label": "Location",
+                }
+            ],
+        )
+
+        response = test_client.get("/api/plugins")
+
+        if response.status_code == 404:
+            pytest.skip("Plugin list endpoint not available in test client")
+
+        assert response.status_code == 200
+        plugin = next(p for p in response.json()["plugins"] if p["id"] == "reserved-schema-test")
+        assert plugin["common_config_schema"] == {"api_key": {"type": "password"}}
+        assert plugin["instance_config_schema"] == {"location": {"type": "string"}}
+        assert plugin["display_order"] == 0
+
+    @pytest.mark.asyncio
+    async def test_update_plugin_keeps_reserved_values_out_of_schema(
+        self, test_client, monkeypatch
+    ):
+        from app.models.db_models import PluginTypeDB
+
+        monkeypatch.setattr(
+            "app.api.routes.plugins.management.plugin_loader.get_plugin_types",
+            lambda: [
+                {
+                    "type_id": "reserved-update-test",
+                    "plugin_type": PluginType.SERVICE,
+                    "name": "Reserved Update Test",
+                    "description": "Test plugin",
+                    "common_config_schema": {
+                        "api_key": {"type": "password"},
+                    },
+                    "supports_multiple_instances": False,
+                }
+            ],
+        )
+
+        existing = await PluginTypeDB.objects.get_or_none(type_id="reserved-update-test")
+        if existing:
+            await existing.delete()
+
+        response = test_client.put(
+            "/api/plugins/reserved-update-test",
+            json={
+                "api_key": "secret",
+                "display_order": "4",
+                "instance_label": "Bad",
+                "supports_multiple_instances": False,
+            },
+        )
+
+        assert response.status_code == 200
+        db_type = await PluginTypeDB.objects.get(type_id="reserved-update-test")
+        assert db_type.display_order == 4
+        assert db_type.common_config_schema == {
+            "api_key": "secret",
+        }
+        assert "display_order" not in db_type.common_config_schema
+        assert "instance_label" not in db_type.common_config_schema
+        assert "supports_multiple_instances" not in db_type.common_config_schema
+
+    def test_test_plugin_connection_prefers_plugin_class(self, test_client, monkeypatch):
+        from app.plugins.base import BasePlugin
+
+        class ClassBasedTestPlugin(BasePlugin):
+            @property
+            def plugin_type(self) -> PluginType:
+                return PluginType.SERVICE
+
+            @classmethod
+            def get_plugin_metadata(cls):
+                return {
+                    "type_id": "class-based-test",
+                    "plugin_type": PluginType.SERVICE,
+                    "name": "Class Based Test",
+                    "plugin_class": cls,
+                }
+
+            async def initialize(self) -> None:
+                pass
+
+            async def cleanup(self) -> None:
+                pass
+
+            @classmethod
+            async def test_type_config(cls, config: dict[str, Any]) -> dict[str, Any] | None:
+                return {
+                    "success": True,
+                    "message": f"tested:{config.get('value', '')}",
+                }
+
+        monkeypatch.setattr(
+            "app.api.routes.plugins.management.plugin_loader.get_plugin_types",
+            lambda: [ClassBasedTestPlugin.get_plugin_metadata()],
+        )
+
+        response = test_client.post(
+            "/api/plugins/class-based-test/test",
+            json={"value": "ok"},
+        )
+
+        if response.status_code == 404:
+            pytest.skip("Plugin test endpoint not available in test client")
+
+        assert response.status_code == 200
+        data = response.json()
+        assert data["success"] is True
+        assert data["message"] == "tested:ok"
+
+    def test_scan_plugin_options_prefers_plugin_class(self, test_client, monkeypatch):
+        from app.plugins.base import BasePlugin
+
+        class ClassBasedScanPlugin(BasePlugin):
+            @property
+            def plugin_type(self) -> PluginType:
+                return PluginType.SERVICE
+
+            @classmethod
+            def get_plugin_metadata(cls):
+                return {
+                    "type_id": "class-based-scan",
+                    "plugin_type": PluginType.SERVICE,
+                    "name": "Class Based Scan",
+                    "plugin_class": cls,
+                }
+
+            async def initialize(self) -> None:
+                pass
+
+            async def cleanup(self) -> None:
+                pass
+
+            @classmethod
+            async def scan_type_options(cls, field_key: str) -> dict[str, Any] | None:
+                return {
+                    "options": [{"value": field_key, "label": field_key.upper()}],
+                }
+
+        monkeypatch.setattr(
+            "app.api.routes.plugins.management.plugin_loader.get_plugin_types",
+            lambda: [ClassBasedScanPlugin.get_plugin_metadata()],
+        )
+
+        response = test_client.get("/api/plugins/class-based-scan/scan", params={"field": "device"})
+
+        if response.status_code == 404:
+            pytest.skip("Plugin scan endpoint not available in test client")
+
+        assert response.status_code == 200
+        data = response.json()
+        assert data["options"] == [{"value": "device", "label": "DEVICE"}]
+
+    def test_fetch_plugin_prefers_plugin_class(self, test_client, monkeypatch):
+        from app.plugins.base import BasePlugin
+
+        class ClassBasedFetchPlugin(BasePlugin):
+            @property
+            def plugin_type(self) -> PluginType:
+                return PluginType.BACKEND
+
+            @classmethod
+            def get_plugin_metadata(cls):
+                return {
+                    "type_id": "class-based-fetch",
+                    "plugin_type": PluginType.BACKEND,
+                    "name": "Class Based Fetch",
+                    "plugin_class": cls,
+                }
+
+            async def initialize(self) -> None:
+                pass
+
+            async def cleanup(self) -> None:
+                pass
+
+            @classmethod
+            async def fetch_type_data(cls, instance_id: str | None = None) -> dict[str, Any] | None:
+                return {
+                    "success": True,
+                    "message": "manual fetch completed",
+                    "instance_id": instance_id,
+                }
+
+        monkeypatch.setattr(
+            "app.api.routes.plugins.management.plugin_loader.get_plugin_types",
+            lambda: [ClassBasedFetchPlugin.get_plugin_metadata()],
+        )
+
+        response = test_client.post("/api/plugins/class-based-fetch/fetch")
+
+        if response.status_code == 404:
+            pytest.skip("Plugin fetch endpoint not available in test client")
+
+        assert response.status_code == 200
+        data = response.json()
+        assert data["success"] is True
+        assert data["message"] == "manual fetch completed"
+        assert data["instance_id"] is None

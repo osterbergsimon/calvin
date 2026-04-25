@@ -21,6 +21,7 @@ describe("Config Store", () => {
     expect(store.orientation).toBe("landscape");
     expect(store.calendarSplit).toBe(70);
     expect(store.showUI).toBe(true);
+    expect(store.weekStartDay).toBe(1); // Monday default
   });
 
   it("should set orientation", () => {

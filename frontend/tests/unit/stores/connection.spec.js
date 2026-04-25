@@ -154,10 +154,10 @@ describe("Connection Store", () => {
       await vi.waitFor(
         async () => {
           // Wait for backend check to complete
-          await new Promise((resolve) => setTimeout(resolve, 100));
+          await new Promise(resolve => setTimeout(resolve, 100));
           return global.fetch.mock.calls.length > 0;
         },
-        { timeout: 2000 },
+        { timeout: 2000 }
       );
 
       // After initialization and backend check, online state should be tracked
@@ -165,7 +165,7 @@ describe("Connection Store", () => {
         () => {
           return store.isBackendOnline.value === true;
         },
-        { timeout: 1000 },
+        { timeout: 1000 }
       );
     });
 
@@ -258,18 +258,9 @@ describe("Connection Store", () => {
 
       store.initialize();
 
-      expect(addEventListenerSpy).toHaveBeenCalledWith(
-        "online",
-        expect.any(Function),
-      );
-      expect(addEventListenerSpy).toHaveBeenCalledWith(
-        "offline",
-        expect.any(Function),
-      );
-      expect(global.fetch).toHaveBeenCalledWith(
-        "/api/health",
-        expect.any(Object),
-      );
+      expect(addEventListenerSpy).toHaveBeenCalledWith("online", expect.any(Function));
+      expect(addEventListenerSpy).toHaveBeenCalledWith("offline", expect.any(Function));
+      expect(global.fetch).toHaveBeenCalledWith("/api/health", expect.any(Object));
 
       // Cleanup
       store.cleanup();
@@ -281,14 +272,8 @@ describe("Connection Store", () => {
 
       store.cleanup();
 
-      expect(removeEventListenerSpy).toHaveBeenCalledWith(
-        "online",
-        expect.any(Function),
-      );
-      expect(removeEventListenerSpy).toHaveBeenCalledWith(
-        "offline",
-        expect.any(Function),
-      );
+      expect(removeEventListenerSpy).toHaveBeenCalledWith("online", expect.any(Function));
+      expect(removeEventListenerSpy).toHaveBeenCalledWith("offline", expect.any(Function));
       // healthCheckInterval is not exported, we verify cleanup works
       expect(() => store.startHealthCheck()).not.toThrow();
       store.stopHealthCheck();

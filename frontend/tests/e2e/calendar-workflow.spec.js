@@ -54,14 +54,10 @@ test.describe("Calendar Workflow", () => {
   test("should navigate between calendar months", async ({ page }) => {
     // Find month navigation buttons
     const nextButton = page
-      .locator(
-        'button:has-text("Next"), [aria-label*="next" i], [title*="next" i]',
-      )
+      .locator('button:has-text("Next"), [aria-label*="next" i], [title*="next" i]')
       .first();
     const prevButton = page
-      .locator(
-        'button:has-text("Previous"), [aria-label*="prev" i], [title*="prev" i]',
-      )
+      .locator('button:has-text("Previous"), [aria-label*="prev" i], [title*="prev" i]')
       .first();
 
     if ((await nextButton.count()) > 0 && (await prevButton.count()) > 0) {

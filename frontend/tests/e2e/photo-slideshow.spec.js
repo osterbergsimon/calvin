@@ -22,7 +22,7 @@ test.describe("Photo Slideshow", () => {
 
       // Look for photo slideshow
       const slideshow = page.locator(
-        ".photo-slideshow, [class*='photo-slideshow'], [class*='slideshow']",
+        ".photo-slideshow, [class*='photo-slideshow'], [class*='slideshow']"
       );
       if ((await slideshow.count()) > 0) {
         await expect(slideshow.first()).toBeVisible();
@@ -64,18 +64,14 @@ test.describe("Photo Slideshow", () => {
       await page.waitForTimeout(500);
 
       // Slideshow should still be visible
-      const slideshow = page
-        .locator(".photo-slideshow, [class*='photo-slideshow']")
-        .first();
+      const slideshow = page.locator(".photo-slideshow, [class*='photo-slideshow']").first();
       if ((await slideshow.count()) > 0) {
         await expect(slideshow).toBeVisible();
       }
     }
   });
 
-  test("should display placeholder when no images available", async ({
-    page,
-  }) => {
+  test("should display placeholder when no images available", async ({ page }) => {
     // Switch to photos mode
     const photosButton = page
       .locator('button:has-text("Photos"), [aria-label*="photos" i]')
@@ -86,11 +82,9 @@ test.describe("Photo Slideshow", () => {
 
       // Look for placeholder or empty state
       const placeholder = page.locator(
-        '[class*="placeholder"], [class*="empty"], [class*="no-images"]',
+        '[class*="placeholder"], [class*="empty"], [class*="no-images"]'
       );
-      const slideshow = page.locator(
-        ".photo-slideshow, [class*='photo-slideshow']",
-      );
+      const slideshow = page.locator(".photo-slideshow, [class*='photo-slideshow']");
 
       // Either placeholder or slideshow should be visible
       const placeholderCount = await placeholder.count();

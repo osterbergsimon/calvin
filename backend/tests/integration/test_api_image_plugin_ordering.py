@@ -2,7 +2,6 @@
 
 import pytest
 
-import app.database as db_module
 from app.models.db_models import PluginDB, PluginTypeDB
 
 
@@ -19,75 +18,46 @@ class TestImagePluginOrderingAPI:
         assert response.status_code == 200
 
         # Verify the order was saved to database
-        # Use a fresh session to ensure we see committed changes
-        async with db_module.AsyncSessionLocal() as session:
-            from sqlalchemy import select
+        plugin_type = await PluginTypeDB.objects.get_or_none(type_id="local")
+        assert plugin_type is not None, "Plugin type 'local' should exist"
 
-            result = await session.execute(
-                select(PluginTypeDB).where(PluginTypeDB.type_id == "local")
-            )
-            plugin_type = result.scalar_one_or_none()
-            assert plugin_type is not None, "Plugin type 'local' should exist"
-
-            # Refresh to get latest data
-            await session.refresh(plugin_type)
-
-            # The value should be in common_config_schema
-            config = plugin_type.common_config_schema or {}
-            # Value might be stored as string "5" or integer 5
-            display_order = config.get("display_order")
-            # If it's None, the update didn't work - check if config is empty
-            if display_order is None:
-                # The config might be stored in the config service instead
-                # For now, we'll just verify the API call succeeded
-                # The actual storage location (DB vs config service) is an implementation detail
-                assert response.status_code == 200
-            else:
-                assert display_order in ["5", 5], f"Expected '5' or 5, got {display_order}"
+        assert plugin_type.display_order == 5
+        assert "display_order" not in (plugin_type.common_config_schema or {})
 
     async def test_update_image_instance_display_order(self, test_client):
         """Test updating display_order for image plugin instances."""
         # First, ensure plugin type exists
-        async with db_module.AsyncSessionLocal() as session:
-            from sqlalchemy import select
+        plugin_type = await PluginTypeDB.objects.get_or_none(type_id="local")
 
-            result = await session.execute(
-                select(PluginTypeDB).where(PluginTypeDB.type_id == "local")
-            )
-            plugin_type = result.scalar_one_or_none()
-
-            if not plugin_type:
-                plugin_type = PluginTypeDB(
-                    type_id="local",
-                    plugin_type="image",
-                    name="Local Images",
-                    description="Local images plugin",
-                    version="1.0.0",
-                    common_config_schema={},
-                    enabled=True,
-                )
-                session.add(plugin_type)
-                await session.commit()
-
-        # Create a test instance
-        async with db_module.AsyncSessionLocal() as session:
-            from sqlalchemy import delete
-
-            # Clean up any existing test instance
-            await session.execute(delete(PluginDB).where(PluginDB.id == "test-image-instance"))
-            await session.commit()
-
-            # Create test instance
-            instance = PluginDB(
-                id="test-image-instance",
+        if not plugin_type:
+            await PluginTypeDB.objects.create(
                 type_id="local",
                 plugin_type="image",
-                name="Test Image Instance",
+                name="Local Images",
+                description="Local images plugin",
+                version="1.0.0",
+                common_config_schema={},
                 enabled=True,
-                display_order=0,
             )
-            session.add(instance)
-            await session.commit()
+        else:
+            # Update if it exists
+            plugin_type.enabled = True
+            await plugin_type.update()
+
+        # Clean up any existing test instance
+        existing_instance = await PluginDB.objects.get_or_none(id="test-image-instance")
+        if existing_instance:
+            await existing_instance.delete()
+
+        # Create test instance
+        await PluginDB.objects.create(
+            id="test-image-instance",
+            type_id="local",
+            plugin_type="image",
+            name="Test Image Instance",
+            enabled=True,
+            display_order=0,
+        )
 
         # Update instance order via API
         response = test_client.put(
@@ -104,86 +74,65 @@ class TestImagePluginOrderingAPI:
             pass
         else:
             # Verify the order was saved
-            async with db_module.AsyncSessionLocal() as session:
-                from sqlalchemy import select
-
-                result = await session.execute(
-                    select(PluginDB).where(PluginDB.id == "test-image-instance")
-                )
-                instance = result.scalar_one_or_none()
-                if instance:
-                    await session.refresh(instance)
-                    assert instance.display_order == 3
+            instance = await PluginDB.objects.get_or_none(id="test-image-instance")
+            if instance:
+                assert instance.display_order == 3
 
         # Cleanup
-        async with db_module.AsyncSessionLocal() as session:
-            from sqlalchemy import delete
-
-            await session.execute(delete(PluginDB).where(PluginDB.id == "test-image-instance"))
-            await session.commit()
+        instance = await PluginDB.objects.get_or_none(id="test-image-instance")
+        if instance:
+            await instance.delete()
 
     async def test_get_plugin_instances_sorted_by_display_order(self, test_client):
         """Test that plugin instances are returned sorted by display_order."""
         # First, ensure plugin type exists
-        async with db_module.AsyncSessionLocal() as session:
-            from sqlalchemy import select
+        plugin_type = await PluginTypeDB.objects.get_or_none(type_id="local")
 
-            result = await session.execute(
-                select(PluginTypeDB).where(PluginTypeDB.type_id == "local")
+        if not plugin_type:
+            await PluginTypeDB.objects.create(
+                type_id="local",
+                plugin_type="image",
+                name="Local Images",
+                description="Local images plugin",
+                version="1.0.0",
+                common_config_schema={},
+                enabled=True,
             )
-            plugin_type = result.scalar_one_or_none()
+        else:
+            # Update if it exists
+            plugin_type.enabled = True
+            await plugin_type.update()
 
-            if not plugin_type:
-                plugin_type = PluginTypeDB(
-                    type_id="local",
-                    plugin_type="image",
-                    name="Local Images",
-                    description="Local images plugin",
-                    version="1.0.0",
-                    common_config_schema={},
-                    enabled=True,
-                )
-                session.add(plugin_type)
-                await session.commit()
+        # Clean up any existing test instances
+        existing_instances = await PluginDB.objects.filter(id__startswith="test-image-").all()
+        for inst in existing_instances:
+            await inst.delete()
 
-        # Create test instances with different display orders
-        async with db_module.AsyncSessionLocal() as session:
-            from sqlalchemy import delete
-
-            # Clean up any existing test instances
-            await session.execute(delete(PluginDB).where(PluginDB.id.like("test-image-%")))
-            await session.commit()
-
-            # Create test instances with different orders
-            instances = [
-                PluginDB(
-                    id="test-image-2",
-                    type_id="local",
-                    plugin_type="image",
-                    name="Test Instance 2",
-                    enabled=True,
-                    display_order=2,
-                ),
-                PluginDB(
-                    id="test-image-1",
-                    type_id="local",
-                    plugin_type="image",
-                    name="Test Instance 1",
-                    enabled=True,
-                    display_order=1,
-                ),
-                PluginDB(
-                    id="test-image-0",
-                    type_id="local",
-                    plugin_type="image",
-                    name="Test Instance 0",
-                    enabled=True,
-                    display_order=0,
-                ),
-            ]
-            for instance in instances:
-                session.add(instance)
-            await session.commit()
+        # Create test instances with different orders
+        await PluginDB.objects.create(
+            id="test-image-2",
+            type_id="local",
+            plugin_type="image",
+            name="Test Instance 2",
+            enabled=True,
+            display_order=2,
+        )
+        await PluginDB.objects.create(
+            id="test-image-1",
+            type_id="local",
+            plugin_type="image",
+            name="Test Instance 1",
+            enabled=True,
+            display_order=1,
+        )
+        await PluginDB.objects.create(
+            id="test-image-0",
+            type_id="local",
+            plugin_type="image",
+            name="Test Instance 0",
+            enabled=True,
+            display_order=0,
+        )
 
         # Get instances via API
         response = test_client.get("/api/plugins/local/instances")
@@ -200,24 +149,20 @@ class TestImagePluginOrderingAPI:
 
         # If no test instances found, verify they exist in the database
         if len(test_instances) == 0:
-            async with db_module.AsyncSessionLocal() as session:
-                from sqlalchemy import select
-
-                result = await session.execute(select(PluginDB).where(PluginDB.type_id == "local"))
-                db_instances = result.scalars().all()
-                db_test_ids = [i.id for i in db_instances if i.id.startswith("test-image-")]
-                # If they exist in DB but not in API response, that's a bug
-                # For now, just verify they exist in DB
-                assert len(db_test_ids) >= 3, (
-                    f"Test instances not found in DB. Found: {db_test_ids}, "
-                    f"All API instances: {all_ids}"
-                )
-                # Re-query to get them for verification
-                test_instances = [
-                    {"id": i.id, "display_order": i.display_order}
-                    for i in db_instances
-                    if i.id.startswith("test-image-")
-                ]
+            db_instances = await PluginDB.objects.filter(type_id="local").all()
+            db_test_ids = [i.id for i in db_instances if i.id.startswith("test-image-")]
+            # If they exist in DB but not in API response, that's a bug
+            # For now, just verify they exist in DB
+            assert len(db_test_ids) >= 3, (
+                f"Test instances not found in DB. Found: {db_test_ids}, "
+                f"All API instances: {all_ids}"
+            )
+            # Re-query to get them for verification
+            test_instances = [
+                {"id": i.id, "display_order": i.display_order}
+                for i in db_instances
+                if i.id.startswith("test-image-")
+            ]
 
         # Verify they are sorted by display_order
         assert len(test_instances) >= 3
@@ -255,11 +200,9 @@ class TestImagePluginOrderingAPI:
             )
 
         # Cleanup
-        async with db_module.AsyncSessionLocal() as session:
-            from sqlalchemy import delete
-
-            await session.execute(delete(PluginDB).where(PluginDB.id.like("test-image-%")))
-            await session.commit()
+        test_instances = await PluginDB.objects.filter(id__startswith="test-image-").all()
+        for inst in test_instances:
+            await inst.delete()
 
     async def test_disabled_plugin_not_in_ordering(self, test_client):
         """Test that disabled plugins are excluded from image ordering."""

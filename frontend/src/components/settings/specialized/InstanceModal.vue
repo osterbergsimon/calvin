@@ -6,7 +6,7 @@
           {{
             editingInstance
               ? `Edit ${currentPlugin?.name || "Instance"}`
-              : `Add ${currentPlugin?.name || "Instance"}`
+              : `Add ${currentPlugin?.name || ""} ${instanceLabel}`
           }}
         </h3>
         <button class="btn-close-modal" @click="handleClose">×</button>
@@ -59,14 +59,8 @@
               </button>
               <div
                 v-if="key === 'location' && geocodeStatus"
-                :class="
-                  geocodeStatus.success ? 'success-message' : 'error-message'
-                "
-                style="
-                  margin-top: 0.5rem;
-                  padding: 0.5rem 1rem;
-                  border-radius: 4px;
-                "
+                :class="geocodeStatus.success ? 'success-message' : 'error-message'"
+                style="margin-top: 0.5rem; padding: 0.5rem 1rem; border-radius: 4px"
               >
                 {{ geocodeStatus.message }}
               </div>
@@ -77,9 +71,40 @@
           <template v-else>
             <div class="form-group">
               <p class="help-text">
-                This plugin type does not support instance-specific
-                configuration.
+                This plugin type does not support instance-specific configuration.
               </p>
+            </div>
+          </template>
+
+          <!-- Calendar-specific fields (color and show_time) -->
+          <template v-if="currentPlugin?.type === 'calendar'">
+            <div class="form-group">
+              <label>Calendar Color</label>
+              <div style="display: flex; align-items: center; gap: 0.5rem">
+                <input
+                  v-model="formData.color"
+                  type="color"
+                  class="color-input"
+                  style="width: 60px; height: 40px; cursor: pointer"
+                />
+                <input
+                  v-model="formData.color"
+                  type="text"
+                  class="form-input"
+                  placeholder="#2196f3"
+                  style="flex: 1"
+                />
+              </div>
+              <span class="help-text"> Choose a color for events from this calendar source </span>
+            </div>
+            <div class="form-group">
+              <label>
+                <input v-model="formData.show_time" type="checkbox" />
+                Show Event Times
+              </label>
+              <span class="help-text">
+                Display time information for events from this calendar
+              </span>
             </div>
           </template>
 
@@ -93,31 +118,20 @@
 
           <!-- Test Connection Button (if plugin supports it) -->
           <div v-if="hasTestAction" class="form-group">
-            <button
-              type="button"
-              class="btn-secondary"
-              :disabled="testing"
-              @click="handleTest"
-            >
+            <button type="button" class="btn-secondary" :disabled="testing" @click="handleTest">
               {{ testing ? "Testing..." : "Test Connection" }}
             </button>
             <div
               v-if="testStatus"
               :class="testStatus.success ? 'success-message' : 'error-message'"
-              style="
-                margin-top: 0.5rem;
-                padding: 0.5rem 1rem;
-                border-radius: 4px;
-              "
+              style="margin-top: 0.5rem; padding: 0.5rem 1rem; border-radius: 4px"
             >
               {{ testStatus.message }}
             </div>
           </div>
 
           <div class="modal-actions">
-            <button type="button" class="btn-secondary" @click="handleClose">
-              Cancel
-            </button>
+            <button type="button" class="btn-secondary" @click="handleClose">Cancel</button>
             <button type="submit" class="btn-primary" :disabled="saving">
               {{ saving ? "Saving..." : "Save" }}
             </button>
@@ -130,8 +144,16 @@
 
 <script setup>
 import { ref, watch, computed } from "vue";
+
+const instanceLabelMap = {
+  calendar: "Calendar Source",
+  image: "Image Source",
+  backend: "Instance",
+  service: "Instance",
+};
 import PluginFieldRenderer from "@/components/PluginFieldRenderer.vue";
 import * as pluginsApi from "@/services/pluginsApi";
+import { useCalendarStore } from "@/stores/calendar";
 
 const props = defineProps({
   show: {
@@ -148,13 +170,18 @@ const props = defineProps({
   },
 });
 
-const emit = defineEmits(["close", "save"]);
+const emit = defineEmits(["close", "save"]); // save event may include calendar config data
+
+const calendarStore = useCalendarStore();
 
 const currentPlugin = ref(null);
 const editingInstance = ref(null);
 const formData = ref({
   name: "",
   enabled: true,
+  // Calendar-specific fields
+  color: "#2196f3",
+  show_time: true,
 });
 const error = ref("");
 const saving = ref(false);
@@ -163,11 +190,16 @@ const testStatus = ref(null);
 const geocoding = ref(false);
 const geocodeStatus = ref(null);
 
+const instanceLabel = computed(
+  () =>
+    currentPlugin.value?.instance_label || instanceLabelMap[currentPlugin.value?.type] || "Instance"
+);
+
 // Computed property for test action check
 const hasTestAction = computed(() => {
   return (
     currentPlugin.value?.ui_actions &&
-    currentPlugin.value.ui_actions.some((action) => action.type === "test")
+    currentPlugin.value.ui_actions.some(action => action.type === "test")
   );
 });
 
@@ -178,8 +210,7 @@ const hasGeocodeAction = computed(() => {
   const hasGeocodeInActions =
     currentPlugin.value.ui_actions &&
     currentPlugin.value.ui_actions.some(
-      (action) =>
-        action.type === "geocode" || action.endpoint?.includes("geocode"),
+      action => action.type === "geocode" || action.endpoint?.includes("geocode")
     );
   // Also check plugin ID or type for common weather plugins
   const isWeatherPlugin =
@@ -192,29 +223,29 @@ const hasGeocodeAction = computed(() => {
 // Watch for plugin/instance changes
 watch(
   () => props.plugin,
-  (newPlugin) => {
+  newPlugin => {
     if (newPlugin) {
       currentPlugin.value = newPlugin;
       initializeForm();
     }
   },
-  { immediate: true },
+  { immediate: true }
 );
 
 watch(
   () => props.instance,
-  (newInstance) => {
+  newInstance => {
     editingInstance.value = newInstance;
     if (newInstance) {
       initializeForm();
     }
   },
-  { immediate: true },
+  { immediate: true }
 );
 
 watch(
   () => props.show,
-  (newShow) => {
+  newShow => {
     if (newShow) {
       initializeForm();
     } else {
@@ -226,29 +257,28 @@ watch(
       geocoding.value = false;
       geocodeStatus.value = null;
     }
-  },
+  }
 );
 
-const initializeForm = () => {
+const initializeForm = async () => {
   if (!currentPlugin.value) return;
 
   const form = {
     name: "",
     enabled: true,
+    // Calendar-specific defaults
+    color: "#2196f3",
+    show_time: true,
   };
 
   if (editingInstance.value) {
     // Editing: use instance values
     form.name = editingInstance.value.name || "";
     form.enabled =
-      editingInstance.value.enabled !== undefined
-        ? editingInstance.value.enabled
-        : true;
+      editingInstance.value.enabled !== undefined ? editingInstance.value.enabled : true;
 
     if (currentPlugin.value.instance_config_schema) {
-      for (const [key, schema] of Object.entries(
-        currentPlugin.value.instance_config_schema,
-      )) {
+      for (const [key, schema] of Object.entries(currentPlugin.value.instance_config_schema)) {
         form[key] =
           editingInstance.value.config?.[key] !== undefined
             ? editingInstance.value.config[key]
@@ -259,12 +289,48 @@ const initializeForm = () => {
                 : "";
       }
     }
+
+    // Load calendar-specific settings if editing calendar instance
+    if (currentPlugin.value.type === "calendar") {
+      try {
+        await calendarStore.fetchSources();
+        const source = calendarStore.sources.find(s => s.id === editingInstance.value.id);
+        if (source) {
+          // Convert color to hex format if needed
+          if (source.color) {
+            if (source.color.startsWith("#")) {
+              form.color = source.color;
+            } else {
+              // Convert named color to hex
+              const colorMap = {
+                green: "#4caf50",
+                red: "#f44336",
+                blue: "#2196f3",
+                yellow: "#ffeb3b",
+                orange: "#ff9800",
+                purple: "#9c27b0",
+                pink: "#e91e63",
+                cyan: "#00bcd4",
+                teal: "#009688",
+                indigo: "#3f51b5",
+                brown: "#795548",
+                grey: "#9e9e9e",
+                gray: "#9e9e9e",
+              };
+              form.color = colorMap[source.color.toLowerCase()] || "#2196f3";
+            }
+          }
+          form.show_time = source.show_time !== false;
+        }
+      } catch (error) {
+        console.error("Failed to load calendar source settings:", error);
+        // Continue with defaults
+      }
+    }
   } else {
     // New instance: use schema defaults
     if (currentPlugin.value.instance_config_schema) {
-      for (const [key, schema] of Object.entries(
-        currentPlugin.value.instance_config_schema,
-      )) {
+      for (const [key, schema] of Object.entries(currentPlugin.value.instance_config_schema)) {
         if (schema.default !== undefined) {
           form[key] = schema.default;
         } else if (schema.type === "boolean") {
@@ -315,10 +381,7 @@ const handleGeocode = async () => {
       return;
     }
 
-    const result = await pluginsApi.geocodeLocation(
-      currentPlugin.value.id,
-      location,
-    );
+    const result = await pluginsApi.geocodeLocation(currentPlugin.value.id, location);
 
     if (result.success) {
       // Update coordinates if they exist in the schema
@@ -336,9 +399,7 @@ const handleGeocode = async () => {
 
       geocodeStatus.value = {
         success: true,
-        message:
-          result.message ||
-          `Coordinates found: ${result.latitude}, ${result.longitude}`,
+        message: result.message || `Coordinates found: ${result.latitude}, ${result.longitude}`,
       };
 
       // Clear message after 5 seconds
@@ -355,10 +416,7 @@ const handleGeocode = async () => {
     console.error("Failed to geocode location:", err);
     geocodeStatus.value = {
       success: false,
-      message:
-        err.response?.data?.detail ||
-        err.message ||
-        "Failed to geocode location",
+      message: err.response?.data?.detail || err.message || "Failed to geocode location",
     };
   } finally {
     geocoding.value = false;
@@ -379,10 +437,8 @@ const handleTest = async () => {
     // Build test config from instance form data
     const testConfig = {};
     if (plugin.instance_config_schema) {
-      for (const [key, schema] of Object.entries(
-        plugin.instance_config_schema,
-      )) {
-        // Skip display_order - it's a global plugin setting
+      for (const [key, schema] of Object.entries(plugin.instance_config_schema)) {
+        // Skip display_order - instance order is managed by the instance list.
         if (key === "display_order") {
           continue;
         }
@@ -421,10 +477,7 @@ const handleTest = async () => {
     console.error("Failed to test instance connection:", err);
     testStatus.value = {
       success: false,
-      message:
-        err.response?.data?.detail ||
-        err.message ||
-        "Failed to test connection",
+      message: err.response?.data?.detail || err.message || "Failed to test connection",
     };
   } finally {
     testing.value = false;
@@ -442,13 +495,11 @@ const handleSave = async () => {
     const plugin = currentPlugin.value;
 
     // Build config from instance_config_schema fields
-    // Exclude display_order - it's a global plugin setting, not instance-specific
+    // Exclude display_order - instance order is managed by the instance list.
     const config = {};
     if (plugin.instance_config_schema) {
-      for (const [key, schema] of Object.entries(
-        plugin.instance_config_schema,
-      )) {
-        // Skip display_order - it's handled at the plugin level
+      for (const [key, schema] of Object.entries(plugin.instance_config_schema)) {
+        // Skip display_order - it's handled by drag ordering in the instance list.
         if (key === "display_order") {
           continue;
         }
@@ -480,6 +531,24 @@ const handleSave = async () => {
         enabled: config.enabled,
         plugin_id: editingInstance.value.plugin_id || pluginId, // Pass plugin type ID
       });
+
+      // Update calendar-specific settings if calendar plugin
+      if (plugin.type === "calendar") {
+        try {
+          await calendarStore.fetchSources();
+          const source = calendarStore.sources.find(s => s.id === editingInstance.value.id);
+          if (source) {
+            await calendarStore.updateSource(editingInstance.value.id, {
+              ...source,
+              color: formData.value.color || "#2196f3",
+              show_time: formData.value.show_time !== false,
+            });
+          }
+        } catch (error) {
+          console.error("Failed to update calendar source settings:", error);
+          // Don't fail the whole save if calendar settings fail
+        }
+      }
     } else {
       // Create new instance
       await pluginsApi.createPluginInstance(pluginId, {
@@ -487,14 +556,33 @@ const handleSave = async () => {
         config,
         enabled: config.enabled,
       });
+
+      // Create calendar source if calendar plugin
+      // Note: We need to wait for the instance to be created and get its ID
+      // We'll emit 'save' which triggers a reload, then create the calendar source
+      // For now, pass calendar-specific data in the emit so parent can handle it
     }
 
-    emit("save");
+    // Emit save with calendar-specific data if needed
+    const saveData =
+      plugin.type === "calendar" && !editingInstance.value
+        ? {
+            isCalendar: true,
+            instanceName: formData.value.name.trim(),
+            calendarConfig: {
+              color: formData.value.color || "#2196f3",
+              show_time: formData.value.show_time !== false,
+              ical_url: config.ical_url || "",
+              type: pluginId,
+            },
+          }
+        : null;
+
+    emit("save", saveData);
     handleClose();
   } catch (err) {
     console.error("Failed to save instance:", err);
-    error.value =
-      err.response?.data?.detail || err.message || "Failed to save instance";
+    error.value = err.response?.data?.detail || err.message || "Failed to save instance";
   } finally {
     saving.value = false;
   }

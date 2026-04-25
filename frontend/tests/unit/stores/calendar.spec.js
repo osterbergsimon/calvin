@@ -72,10 +72,7 @@ describe("Calendar Store", () => {
       expect(store.sources).toEqual(mockSources.sources);
       expect(store.loading).toBe(false);
       expect(store.error).toBe(null);
-      expect(setCachedData).toHaveBeenCalledWith(
-        "calendar_sources",
-        mockSources,
-      );
+      expect(setCachedData).toHaveBeenCalledWith("calendar_sources", mockSources);
     });
 
     it("should use cached sources when offline", async () => {
@@ -154,9 +151,7 @@ describe("Calendar Store", () => {
 
       const store = useCalendarStore();
 
-      await expect(store.updateSource("1", {})).rejects.toThrow(
-        "Update failed",
-      );
+      await expect(store.updateSource("1", {})).rejects.toThrow("Update failed");
       expect(store.error).toBe("Update failed");
     });
   });
@@ -265,9 +260,7 @@ describe("Calendar Store", () => {
       const startDate = new Date("2024-01-01");
       const endDate = new Date("2024-01-31");
       const mockCachedEvents = {
-        events: [
-          { id: "1", title: "Cached Event", start: "2024-01-15T10:00:00Z" },
-        ],
+        events: [{ id: "1", title: "Cached Event", start: "2024-01-15T10:00:00Z" }],
       };
 
       mockConnectionStore.isFullyOnline.mockReturnValue(false);
@@ -292,9 +285,7 @@ describe("Calendar Store", () => {
 
       const store = useCalendarStore();
 
-      await expect(store.fetchEvents(startDate, endDate)).rejects.toThrow(
-        "Network error",
-      );
+      await expect(store.fetchEvents(startDate, endDate)).rejects.toThrow("Network error");
       expect(store.error).toBe("Network error");
       expect(store.loading).toBe(false);
     });

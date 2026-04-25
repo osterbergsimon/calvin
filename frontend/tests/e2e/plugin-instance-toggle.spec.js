@@ -11,18 +11,14 @@ test.describe("Plugin Instance Toggle", () => {
     await page.waitForLoadState("networkidle");
 
     // Navigate to settings
-    const settingsButton = page
-      .locator('button:has-text("Settings"), a[href*="settings"]')
-      .first();
+    const settingsButton = page.locator('button:has-text("Settings"), a[href*="settings"]').first();
     if ((await settingsButton.count()) > 0) {
       await settingsButton.click();
       await page.waitForLoadState("networkidle");
     }
 
     // Navigate to plugins section
-    const pluginsLink = page
-      .locator('a[href*="plugin"], button:has-text("Plugin")')
-      .first();
+    const pluginsLink = page.locator('a[href*="plugin"], button:has-text("Plugin")').first();
     if ((await pluginsLink.count()) > 0) {
       await pluginsLink.click();
       await page.waitForLoadState("networkidle");
@@ -33,7 +29,7 @@ test.describe("Plugin Instance Toggle", () => {
     // Look for instance toggle checkbox or button
     const instanceToggle = page
       .locator(
-        'input[type="checkbox"][aria-label*="instance" i], input[type="checkbox"][class*="instance"]',
+        'input[type="checkbox"][aria-label*="instance" i], input[type="checkbox"][class*="instance"]'
       )
       .first();
 
@@ -65,7 +61,7 @@ test.describe("Plugin Instance Toggle", () => {
     // Navigate to backend tab
     const backendTab = page
       .locator(
-        'button:has-text("Backend"), [role="tab"]:has-text("Backend"), .tab:has-text("Backend")',
+        'button:has-text("Backend"), [role="tab"]:has-text("Backend"), .tab:has-text("Backend")'
       )
       .first();
 
@@ -76,7 +72,7 @@ test.describe("Plugin Instance Toggle", () => {
       // Look for backend plugin instance toggle
       const instanceToggle = page
         .locator(
-          'input[type="checkbox"][aria-label*="enabled" i], input[type="checkbox"][class*="enabled"]',
+          'input[type="checkbox"][aria-label*="enabled" i], input[type="checkbox"][class*="enabled"]'
         )
         .first();
 
@@ -105,7 +101,7 @@ test.describe("Plugin Instance Toggle", () => {
 
   test("should display error when toggle fails", async ({ page }) => {
     // Intercept API call to simulate failure
-    await page.route("**/api/plugins/instances/*", (route) => {
+    await page.route("**/api/plugins/instances/*", route => {
       route.fulfill({
         status: 500,
         contentType: "application/json",
@@ -116,7 +112,7 @@ test.describe("Plugin Instance Toggle", () => {
     // Look for instance toggle
     const instanceToggle = page
       .locator(
-        'input[type="checkbox"][aria-label*="instance" i], input[type="checkbox"][class*="enabled"]',
+        'input[type="checkbox"][aria-label*="instance" i], input[type="checkbox"][class*="enabled"]'
       )
       .first();
 
@@ -139,9 +135,7 @@ test.describe("Plugin Instance Toggle", () => {
     }
   });
 
-  test("should update instance running status after toggle", async ({
-    page,
-  }) => {
+  test("should update instance running status after toggle", async ({ page }) => {
     // Look for instance with running indicator
     const instanceItem = page
       .locator('.plugin-instance, [class*="instance"], .instance-item')
@@ -150,13 +144,11 @@ test.describe("Plugin Instance Toggle", () => {
     if ((await instanceItem.count()) > 0) {
       // Look for running status indicator
       const runningIndicator = instanceItem.locator(
-        ':has-text("running"), :has-text("Running"), [class*="running"]',
+        ':has-text("running"), :has-text("Running"), [class*="running"]'
       );
 
       // Get initial running state (might not exist)
-      const initialRunningText = await runningIndicator
-        .textContent()
-        .catch(() => null);
+      const initialRunningText = await runningIndicator.textContent().catch(() => null);
 
       // Find and toggle instance
       const toggle = instanceItem.locator('input[type="checkbox"]').first();
@@ -165,13 +157,9 @@ test.describe("Plugin Instance Toggle", () => {
         await page.waitForTimeout(1000); // Wait for state to update
 
         // Check if running status changed (or remained the same if toggle didn't affect it)
-        const newRunningText = await runningIndicator
-          .textContent()
-          .catch(() => null);
+        const newRunningText = await runningIndicator.textContent().catch(() => null);
         // Status might change or stay the same depending on plugin type
-        expect(
-          newRunningText !== undefined || initialRunningText !== undefined,
-        ).toBe(true);
+        expect(newRunningText !== undefined || initialRunningText !== undefined).toBe(true);
       }
     } else {
       // If no instances found, test passes

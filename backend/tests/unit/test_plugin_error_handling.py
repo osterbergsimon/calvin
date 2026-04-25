@@ -3,9 +3,7 @@
 from unittest.mock import AsyncMock, MagicMock, patch
 
 import pytest
-from sqlalchemy import select
 
-import app.database as db_module
 from app.models.db_models import PluginDB, PluginTypeDB
 from app.plugins.registry import PluginRegistry
 
@@ -53,15 +51,9 @@ class TestPluginErrorHandling:
         await plugin_registry_instance.load_plugins_from_db()
 
         # Verify broken plugin was marked as disabled with error
-        async with db_module.AsyncSessionLocal() as session:
-            result = await session.execute(
-                select(PluginTypeDB).where(PluginTypeDB.type_id == "broken_plugin")
-            )
-            result.scalar_one_or_none()
-
-            # Plugin should exist but be disabled
-            # Note: The current implementation will skip invalid plugins, so they may not be in DB
-            # But if they are, they should be disabled
+        # Note: The current implementation will skip invalid plugins, so they may not be in DB
+        # But if they are, they should be disabled
+        # (No assertion needed - plugin loading should complete without errors)
 
     @patch("app.plugins.registry.plugin_loader")
     @patch("app.plugins.registry.instance_manager")
@@ -91,15 +83,11 @@ class TestPluginErrorHandling:
         await plugin_registry_instance.load_plugins_from_db()
 
         # Verify plugin was created with fallback name
-        async with db_module.AsyncSessionLocal() as session:
-            result = await session.execute(
-                select(PluginTypeDB).where(PluginTypeDB.type_id == "no_name_plugin")
-            )
-            db_type = result.scalar_one_or_none()
+        db_type = await PluginTypeDB.objects.get_or_none(type_id="no_name_plugin")
 
-            # Plugin should use type_id as name fallback
-            if db_type:
-                assert db_type.name == "no_name_plugin" or db_type.name == "Unknown Plugin"
+        # Plugin should use type_id as name fallback
+        if db_type:
+            assert db_type.name == "no_name_plugin" or db_type.name == "Unknown Plugin"
 
     @patch("app.plugins.registry.loader.plugin_loader")
     @patch("app.plugins.registry.instance_manager")
@@ -111,9 +99,13 @@ class TestPluginErrorHandling:
         test_db,
     ):
         """Test that plugin instances that fail to create are disabled."""
-        # Create a plugin instance in database
-        async with test_db as session:
-            db_plugin = PluginDB(
+        # Create a plugin instance in database (use get_or_create to avoid UNIQUE constraint)
+        import ormar
+
+        try:
+            await PluginDB.objects.get(id="broken-instance-1")
+        except ormar.NoMatch:
+            await PluginDB.objects.create(
                 id="broken-instance-1",
                 type_id="test_plugin",
                 plugin_type="service",
@@ -121,8 +113,6 @@ class TestPluginErrorHandling:
                 enabled=True,
                 config={"key": "value"},
             )
-            session.add(db_plugin)
-            await session.commit()
 
         # Mock plugin loader to fail creating instance
         mock_plugin_loader.create_plugin_instance.side_effect = Exception("Failed to create plugin")
@@ -136,16 +126,12 @@ class TestPluginErrorHandling:
         # Verify plugin instance was disabled
         # Note: The plugin may not be in the database if creation failed before DB update
         # The important thing is that the server didn't crash
-        async with db_module.AsyncSessionLocal() as session:
-            result = await session.execute(
-                select(PluginDB).where(PluginDB.id == "broken-instance-1")
-            )
-            db_plugin = result.scalar_one_or_none()
+        db_plugin = await PluginDB.objects.get_or_none(id="broken-instance-1")
 
-            # Plugin should exist (was created in test setup)
-            # It should be disabled if error handling worked
-            if db_plugin:
-                assert db_plugin.enabled is False  # Should be disabled
+        # Plugin should exist (was created in test setup)
+        # It should be disabled if error handling worked
+        if db_plugin:
+            assert db_plugin.enabled is False  # Should be disabled
 
     @patch("app.plugins.registry.loader.plugin_loader")
     @patch("app.plugins.registry.instance_manager")
@@ -157,9 +143,13 @@ class TestPluginErrorHandling:
         test_db,
     ):
         """Test that plugins that fail during configuration are disabled."""
-        # Create a plugin instance in database
-        async with test_db as session:
-            db_plugin = PluginDB(
+        # Create a plugin instance in database (use get_or_create to avoid UNIQUE constraint)
+        import ormar
+
+        try:
+            await PluginDB.objects.get(id="configure-fail-1")
+        except ormar.NoMatch:
+            await PluginDB.objects.create(
                 id="configure-fail-1",
                 type_id="test_plugin",
                 plugin_type="service",
@@ -167,8 +157,6 @@ class TestPluginErrorHandling:
                 enabled=True,
                 config={"key": "value"},
             )
-            session.add(db_plugin)
-            await session.commit()
 
         # Mock plugin that fails during configure
         mock_plugin = MagicMock()
@@ -186,16 +174,12 @@ class TestPluginErrorHandling:
 
         # Verify plugin instance was disabled
         # The important thing is that the server didn't crash
-        async with db_module.AsyncSessionLocal() as session:
-            result = await session.execute(
-                select(PluginDB).where(PluginDB.id == "configure-fail-1")
-            )
-            db_plugin = result.scalar_one_or_none()
+        db_plugin = await PluginDB.objects.get_or_none(id="configure-fail-1")
 
-            # Plugin should exist (was created in test setup)
-            # It should be disabled if error handling worked
-            if db_plugin:
-                assert db_plugin.enabled is False  # Should be disabled
+        # Plugin should exist (was created in test setup)
+        # It should be disabled if error handling worked
+        if db_plugin:
+            assert db_plugin.enabled is False  # Should be disabled
 
     @patch("app.plugins.registry.plugin_loader")
     async def test_plugin_type_exception_during_load(
@@ -255,13 +239,9 @@ class TestPluginErrorHandling:
         await plugin_registry_instance.load_plugins_from_db()
 
         # Verify working plugins were loaded
-        async with db_module.AsyncSessionLocal() as session:
-            result = await session.execute(
-                select(PluginTypeDB).where(
-                    PluginTypeDB.type_id.in_(["working_plugin", "working_plugin_2"])
-                )
-            )
-            working_plugins = result.scalars().all()
+        working_plugins = await PluginTypeDB.objects.filter(
+            type_id__in=["working_plugin", "working_plugin_2"]
+        ).all()
 
-            # At least one working plugin should be loaded
-            assert len(working_plugins) >= 1
+        # At least one working plugin should be loaded
+        assert len(working_plugins) >= 1

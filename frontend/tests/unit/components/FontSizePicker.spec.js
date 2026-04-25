@@ -104,7 +104,7 @@ describe("FontSizePicker", () => {
       await input.setValue(18);
 
       // Wait for debounce (200ms)
-      await new Promise((resolve) => setTimeout(resolve, 250));
+      await new Promise(resolve => setTimeout(resolve, 250));
 
       expect(wrapper.emitted("update:modelValue")).toBeTruthy();
       expect(wrapper.emitted("update:modelValue")[0][0]).toBe(18);
@@ -126,7 +126,7 @@ describe("FontSizePicker", () => {
       await input.setValue(5);
 
       // Wait for debounce (200ms)
-      await new Promise((resolve) => setTimeout(resolve, 250));
+      await new Promise(resolve => setTimeout(resolve, 250));
 
       expect(wrapper.emitted("update:modelValue")[0][0]).toBe(10);
     });
@@ -147,7 +147,7 @@ describe("FontSizePicker", () => {
       await input.setValue(100);
 
       // Wait for debounce (200ms)
-      await new Promise((resolve) => setTimeout(resolve, 250));
+      await new Promise(resolve => setTimeout(resolve, 250));
 
       expect(wrapper.emitted("update:modelValue")[0][0]).toBe(72);
     });
@@ -217,9 +217,7 @@ describe("FontSizePicker", () => {
       });
 
       await wrapper.vm.$nextTick();
-      expect(wrapper.find(".font-size-preview").classes()).toContain(
-        "preview-vertical",
-      );
+      expect(wrapper.find(".font-size-preview").classes()).toContain("preview-vertical");
     });
 
     it("should not apply vertical styling when isVertical is false", async () => {
@@ -234,9 +232,7 @@ describe("FontSizePicker", () => {
       });
 
       await wrapper.vm.$nextTick();
-      expect(wrapper.find(".font-size-preview").classes()).not.toContain(
-        "preview-vertical",
-      );
+      expect(wrapper.find(".font-size-preview").classes()).not.toContain("preview-vertical");
     });
   });
 

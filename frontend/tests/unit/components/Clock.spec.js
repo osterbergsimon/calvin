@@ -222,7 +222,7 @@ describe("Clock", () => {
       // Mock window.matchMedia for dark mode detection
       Object.defineProperty(window, "matchMedia", {
         writable: true,
-        value: vi.fn().mockImplementation((query) => ({
+        value: vi.fn().mockImplementation(query => ({
           matches: query.includes("dark"),
           media: query,
           onchange: null,

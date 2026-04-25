@@ -1,5 +1,6 @@
 import axios from "axios";
 import { useConnectionStore } from "../stores/connection";
+import { logError } from "../utils/logger";
 
 const api = axios.create({
   baseURL: import.meta.env.VITE_API_URL || "/api",
@@ -11,7 +12,7 @@ const api = axios.create({
 
 // Request interceptor
 api.interceptors.request.use(
-  (config) => {
+  config => {
     // Add auth token if available
     // const token = localStorage.getItem('token')
     // if (token) {
@@ -19,14 +20,14 @@ api.interceptors.request.use(
     // }
     return config;
   },
-  (error) => {
+  error => {
     return Promise.reject(error);
-  },
+  }
 );
 
 // Response interceptor
 api.interceptors.response.use(
-  (response) => {
+  response => {
     // Mark backend as online on successful response
     const connectionStore = useConnectionStore();
     if (!connectionStore.isBackendOnline) {
@@ -34,7 +35,7 @@ api.interceptors.response.use(
     }
     return response;
   },
-  async (error) => {
+  async error => {
     const connectionStore = useConnectionStore();
 
     // Check if it's a network error (offline or backend unreachable)
@@ -53,17 +54,17 @@ api.interceptors.response.use(
       // HTTP error response
       if (error.response?.status === 401) {
         // Handle unauthorized
-        console.error("Unauthorized");
+        logError("[api]", "Unauthorized");
       } else if (error.response?.status >= 500) {
         // Handle server errors
-        console.error("Server error:", error.response.data);
+        logError("[api]", "Server error:", error.response.data);
         // Server error might indicate backend issues
         connectionStore.isBackendOnline = false;
       }
     }
 
     return Promise.reject(error);
-  },
+  }
 );
 
 export default api;

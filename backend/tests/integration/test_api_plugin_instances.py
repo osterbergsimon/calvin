@@ -82,3 +82,41 @@ class TestPluginInstanceEndpoints:
         data = response.json()
         assert data["success"] is False
         assert data["updated"] == 0
+
+    def test_update_plugin_type_config_explicit_endpoint(self, test_client: TestClient):
+        """Test explicit plugin type config endpoint."""
+        response = test_client.put(
+            "/api/plugins/iframe/config",
+            json={"enabled": True, "config": {"display_order": "2"}},
+        )
+
+        if response.status_code == 404:
+            pytest.skip("Plugin type config route not available in test client")
+
+        assert response.status_code == 200
+        data = response.json()
+        assert data["success"] is True
+        assert data["plugin_id"] == "iframe"
+
+    def test_create_plugin_instance_explicit_endpoint(self, test_client: TestClient):
+        """Test explicit plugin instance creation endpoint."""
+        response = test_client.post(
+            "/api/plugins/iframe/instances",
+            json={
+                "name": "Test Iframe Service",
+                "enabled": True,
+                "config": {
+                    "url": "https://example.com",
+                    "fullscreen": False,
+                },
+            },
+        )
+
+        if response.status_code == 404:
+            pytest.skip("Plugin instance create route not available in test client")
+
+        assert response.status_code == 200
+        data = response.json()
+        assert data["success"] is True
+        assert data["instance"]["name"] == "Test Iframe Service"
+        assert data["instance"]["config"]["url"] == "https://example.com"

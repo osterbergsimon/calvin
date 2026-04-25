@@ -1,5 +1,12 @@
 <template>
   <div class="calendar-sources-tab">
+    <div
+      v-if="banner"
+      class="tab-banner"
+      :class="banner.type === 'error' ? 'tab-banner-error' : 'tab-banner-success'"
+    >
+      {{ banner.text }}
+    </div>
     <CollapsibleSection title="Calendar Sources" icon="📅" :expanded="true">
       <SettingItem
         label="Add New Calendar Source"
@@ -9,11 +16,7 @@
           <div class="form-group">
             <label>Calendar Type</label>
             <select v-model="newCalendarSource.type" class="form-select">
-              <option
-                v-for="type in calendarPluginTypes"
-                :key="type.id"
-                :value="type.id"
-              >
+              <option v-for="type in calendarPluginTypes" :key="type.id" :value="type.id">
                 {{ type.name }}
               </option>
             </select>
@@ -39,11 +42,7 @@
               {{ getCalendarTypeHelpText(newCalendarSource.type) }}
             </span>
           </div>
-          <button
-            class="btn-add"
-            :disabled="!canAddCalendar"
-            @click="handleAddCalendarSource"
-          >
+          <button class="btn-add" :disabled="!canAddCalendar" @click="handleAddCalendarSource">
             Add Calendar
           </button>
         </div>
@@ -55,11 +54,7 @@
         help="Manage your calendar sources"
       >
         <div class="calendar-sources-list">
-          <div
-            v-for="source in calendarSources"
-            :key="source.id"
-            class="source-item"
-          >
+          <div v-for="source in calendarSources" :key="source.id" class="source-item">
             <div class="source-info">
               <strong>{{ source.name }}</strong>
               <span class="source-type">{{ source.type }}</span>
@@ -82,9 +77,7 @@
                   type="color"
                   :value="getColorValue(source.color)"
                   class="color-input"
-                  @change="
-                    handleUpdateSourceColor(source.id, $event.target.value)
-                  "
+                  @change="handleUpdateSourceColor(source.id, $event.target.value)"
                 />
               </div>
               <div class="source-setting">
@@ -92,12 +85,7 @@
                   <input
                     type="checkbox"
                     :checked="source.show_time !== false"
-                    @change="
-                      handleUpdateSourceShowTime(
-                        source.id,
-                        $event.target.checked,
-                      )
-                    "
+                    @change="handleUpdateSourceShowTime(source.id, $event.target.checked)"
                   />
                   Show Event Times
                 </label>
@@ -124,6 +112,35 @@
         </div>
       </SettingItem>
     </CollapsibleSection>
+
+    <CollapsibleSection title="Calendar Refresh" icon="🔄">
+      <SettingItem
+        label="Calendar Refresh Interval (minutes)"
+        help="How often to refresh calendar data (5-120 minutes)"
+        input-id="calendar-refresh-interval"
+      >
+        <input
+          id="calendar-refresh-interval"
+          :value="config.calendarRefreshInterval"
+          type="number"
+          min="5"
+          max="120"
+          step="1"
+          placeholder="15"
+          aria-label="Calendar refresh interval in minutes"
+          @change="handleCalendarRefreshChange"
+        />
+      </SettingItem>
+    </CollapsibleSection>
+
+    <ConfirmModal
+      :show="showRemoveConfirm"
+      title="Remove Calendar Source"
+      message="Are you sure you want to remove this calendar source?"
+      confirm-text="Remove"
+      @confirm="confirmRemoveSource"
+      @cancel="cancelRemoveSource"
+    />
   </div>
 </template>
 
@@ -135,6 +152,18 @@ import * as calendarApi from "@/services/calendarApi";
 import * as pluginsApi from "@/services/pluginsApi";
 import CollapsibleSection from "../../shared/CollapsibleSection.vue";
 import SettingItem from "../../shared/SettingItem.vue";
+import ConfirmModal from "../../shared/ConfirmModal.vue";
+import { logError } from "@/utils/logger";
+
+defineProps({
+  config: {
+    type: Object,
+    required: true,
+    default: () => ({}),
+  },
+});
+
+const emit = defineEmits(["update:config"]);
 
 const calendarStore = useCalendarStore();
 const { pluginInstances } = usePlugins();
@@ -149,10 +178,37 @@ const newCalendarSource = ref({
   ical_url: "",
 });
 
+const banner = ref(null);
+let bannerTimer = null;
+
+const showRemoveConfirm = ref(false);
+const pendingRemoveId = ref(null);
+
+function setBanner(type, text, autoClearMs = 0) {
+  if (bannerTimer) {
+    clearTimeout(bannerTimer);
+    bannerTimer = null;
+  }
+  banner.value = { type, text };
+  if (autoClearMs > 0) {
+    bannerTimer = setTimeout(() => {
+      banner.value = null;
+      bannerTimer = null;
+    }, autoClearMs);
+  }
+}
+
+function clearBanner() {
+  if (bannerTimer) {
+    clearTimeout(bannerTimer);
+    bannerTimer = null;
+  }
+  banner.value = null;
+}
+
 const canAddCalendar = computed(() => {
   return (
-    newCalendarSource.value.name.trim() !== "" &&
-    newCalendarSource.value.ical_url.trim() !== ""
+    newCalendarSource.value.name.trim() !== "" && newCalendarSource.value.ical_url.trim() !== ""
   );
 });
 
@@ -163,7 +219,7 @@ const loadCalendarSources = async () => {
     // Merge calendar sources with plugin instance data (for running status)
     const sources = calendarStore.sources || [];
     const sourcesWithStatus = await Promise.all(
-      sources.map(async (source) => {
+      sources.map(async source => {
         // Try to find matching plugin instance for running status
         let running = undefined;
         try {
@@ -171,7 +227,7 @@ const loadCalendarSources = async () => {
           // Check if this source ID matches any plugin instance
           for (const pluginId in pluginInstances.value) {
             const instances = pluginInstances.value[pluginId] || [];
-            const instance = instances.find((inst) => inst.id === source.id);
+            const instance = instances.find(inst => inst.id === source.id);
             if (instance) {
               running = instance.running;
               break;
@@ -181,12 +237,13 @@ const loadCalendarSources = async () => {
           // Ignore errors when checking instance status
         }
         return { ...source, running };
-      }),
+      })
     );
     calendarSources.value = sourcesWithStatus;
   } catch (error) {
-    console.error("Failed to load calendar sources:", error);
+    logError("[CalendarSources]", "Failed to load calendar sources:", error);
     calendarSources.value = [];
+    setBanner("error", error?.message || "Failed to load calendar sources", 8000);
   } finally {
     loadingSources.value = false;
   }
@@ -197,8 +254,8 @@ const loadCalendarPluginTypes = async () => {
     const response = await pluginsApi.getPlugins({ plugin_type: "calendar" });
     // Filter to only enabled calendar plugins and map to expected format
     calendarPluginTypes.value = (response.plugins || [])
-      .filter((p) => p.enabled !== false)
-      .map((p) => ({
+      .filter(p => p.enabled !== false)
+      .map(p => ({
         id: p.id,
         name: p.name,
         description: p.description,
@@ -208,7 +265,7 @@ const loadCalendarPluginTypes = async () => {
       newCalendarSource.value.type = calendarPluginTypes.value[0].id;
     }
   } catch (error) {
-    console.error("Failed to load calendar plugin types:", error);
+    logError("[CalendarSources]", "Failed to load calendar plugin types:", error);
     // Fallback to hardcoded types
     calendarPluginTypes.value = [
       { id: "google", name: "Google Calendar" },
@@ -222,8 +279,8 @@ const loadCalendarPluginTypes = async () => {
   }
 };
 
-const getCalendarTypePlaceholder = (type) => {
-  const typeInfo = calendarPluginTypes.value.find((t) => t.id === type);
+const getCalendarTypePlaceholder = type => {
+  const typeInfo = calendarPluginTypes.value.find(t => t.id === type);
   if (typeInfo && typeInfo.description) {
     return typeInfo.description;
   }
@@ -241,8 +298,8 @@ const getCalendarTypePlaceholder = (type) => {
   }
 };
 
-const getCalendarTypeHelpText = (type) => {
-  const typeInfo = calendarPluginTypes.value.find((t) => t.id === type);
+const getCalendarTypeHelpText = type => {
+  const typeInfo = calendarPluginTypes.value.find(t => t.id === type);
   if (typeInfo && typeInfo.description) {
     return typeInfo.description;
   }
@@ -261,8 +318,9 @@ const getCalendarTypeHelpText = (type) => {
 };
 
 const handleAddCalendarSource = async () => {
+  clearBanner();
   if (!canAddCalendar.value) {
-    alert("Please fill in calendar name and URL");
+    setBanner("error", "Please fill in calendar name and URL", 6000);
     return;
   }
 
@@ -289,18 +347,17 @@ const handleAddCalendarSource = async () => {
 
     // Reload sources
     await loadCalendarSources();
+    setBanner("success", "Calendar source added", 4000);
   } catch (error) {
-    console.error("Failed to add calendar source:", error);
+    logError("[CalendarSources]", "Failed to add calendar source:", error);
     const errorMessage =
-      error.response?.data?.detail ||
-      error.message ||
-      "Failed to add calendar source";
-    alert(`Error: ${errorMessage}`);
+      error.response?.data?.detail || error.message || "Failed to add calendar source";
+    setBanner("error", errorMessage, 8000);
   }
 };
 
 // Convert named colors to hex format
-const getColorValue = (color) => {
+const getColorValue = color => {
   if (!color) return "#2196f3";
   // If already hex format, return as is
   if (color.startsWith("#")) return color;
@@ -327,7 +384,7 @@ const handleUpdateSourceColor = async (sourceId, color) => {
   try {
     // Ensure color is in hex format
     const hexColor = color.startsWith("#") ? color : getColorValue(color);
-    const source = calendarSources.value.find((s) => s.id === sourceId);
+    const source = calendarSources.value.find(s => s.id === sourceId);
     if (source) {
       await calendarStore.updateSource(sourceId, {
         ...source,
@@ -336,14 +393,18 @@ const handleUpdateSourceColor = async (sourceId, color) => {
       await loadCalendarSources();
     }
   } catch (error) {
-    console.error("Failed to update calendar source color:", error);
-    alert("Failed to update calendar source color");
+    logError("[CalendarSources]", "Failed to update calendar source color:", error);
+    setBanner(
+      "error",
+      error?.response?.data?.detail || error?.message || "Failed to update calendar source color",
+      8000
+    );
   }
 };
 
 const handleUpdateSourceShowTime = async (sourceId, showTime) => {
   try {
-    const source = calendarSources.value.find((s) => s.id === sourceId);
+    const source = calendarSources.value.find(s => s.id === sourceId);
     if (source) {
       await calendarStore.updateSource(sourceId, {
         ...source,
@@ -352,36 +413,69 @@ const handleUpdateSourceShowTime = async (sourceId, showTime) => {
       await loadCalendarSources();
     }
   } catch (error) {
-    console.error("Failed to update calendar source show_time:", error);
-    alert("Failed to update calendar source");
+    logError("[CalendarSources]", "Failed to update show time:", error);
+    setBanner(
+      "error",
+      error?.response?.data?.detail || error?.message || "Failed to update calendar source",
+      8000
+    );
   }
 };
 
 const handleToggleSource = async (sourceId, enabled) => {
   try {
-    const source = calendarSources.value.find((s) => s.id === sourceId);
+    const source = calendarSources.value.find(s => s.id === sourceId);
     if (source) {
       await calendarStore.updateSource(sourceId, { ...source, enabled });
       await loadCalendarSources();
     }
   } catch (error) {
-    console.error("Failed to toggle calendar source:", error);
-    alert("Failed to update calendar source");
+    logError("[CalendarSources]", "Failed to toggle calendar source:", error);
+    setBanner(
+      "error",
+      error?.response?.data?.detail || error?.message || "Failed to update calendar source",
+      8000
+    );
   }
 };
 
-const handleRemoveSource = async (sourceId) => {
-  if (!confirm("Are you sure you want to remove this calendar source?")) {
-    return;
-  }
+const handleRemoveSource = sourceId => {
+  clearBanner();
+  pendingRemoveId.value = sourceId;
+  showRemoveConfirm.value = true;
+};
+
+const confirmRemoveSource = async () => {
+  const sourceId = pendingRemoveId.value;
+  showRemoveConfirm.value = false;
+  pendingRemoveId.value = null;
+  if (!sourceId) return;
 
   try {
     await calendarApi.deleteCalendarSource(sourceId);
     await loadCalendarSources();
+    setBanner("success", "Calendar source removed", 4000);
   } catch (error) {
-    console.error("Failed to remove calendar source:", error);
-    alert("Failed to remove calendar source");
+    logError("[CalendarSources]", "Failed to remove calendar source:", error);
+    setBanner(
+      "error",
+      error?.response?.data?.detail || error?.message || "Failed to remove calendar source",
+      8000
+    );
   }
+};
+
+const cancelRemoveSource = () => {
+  showRemoveConfirm.value = false;
+  pendingRemoveId.value = null;
+};
+
+const handleCalendarRefreshChange = event => {
+  const rawValue = parseInt(event.target.value, 10);
+  if (isNaN(rawValue)) return;
+
+  const value = Math.max(5, Math.min(120, rawValue));
+  emit("update:config", { calendarRefreshInterval: value });
 };
 
 onMounted(async () => {
@@ -393,6 +487,25 @@ onMounted(async () => {
 <style scoped>
 .calendar-sources-tab {
   width: 100%;
+}
+
+.tab-banner {
+  padding: 0.75rem 1rem;
+  border-radius: 6px;
+  margin-bottom: 1rem;
+  font-weight: 500;
+}
+
+.tab-banner-error {
+  background: rgba(244, 67, 54, 0.15);
+  color: var(--text-primary);
+  border: 1px solid rgba(244, 67, 54, 0.4);
+}
+
+.tab-banner-success {
+  background: rgba(76, 175, 80, 0.15);
+  color: var(--text-primary);
+  border: 1px solid rgba(76, 175, 80, 0.4);
 }
 
 .calendar-source-form {

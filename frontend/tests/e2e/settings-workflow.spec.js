@@ -11,9 +11,7 @@ test.describe("Settings Workflow", () => {
     await page.waitForLoadState("networkidle");
 
     // Navigate to settings
-    const settingsButton = page
-      .locator('button:has-text("Settings"), a[href*="settings"]')
-      .first();
+    const settingsButton = page.locator('button:has-text("Settings"), a[href*="settings"]').first();
     if ((await settingsButton.count()) > 0) {
       await settingsButton.click();
       await page.waitForLoadState("networkidle");
@@ -32,7 +30,7 @@ test.describe("Settings Workflow", () => {
     // Find a setting to change (e.g., clock enabled)
     const clockEnabledCheckbox = page
       .locator(
-        'input[type="checkbox"][name*="clock" i], input[type="checkbox"][aria-label*="clock" i]',
+        'input[type="checkbox"][name*="clock" i], input[type="checkbox"][aria-label*="clock" i]'
       )
       .first();
     if ((await clockEnabledCheckbox.count()) > 0) {
@@ -42,9 +40,7 @@ test.describe("Settings Workflow", () => {
       await page.waitForTimeout(300);
 
       // Look for save button
-      const saveButton = page
-        .locator('button:has-text("Save"), button[type="submit"]')
-        .first();
+      const saveButton = page.locator('button:has-text("Save"), button[type="submit"]').first();
       if ((await saveButton.count()) > 0) {
         await saveButton.click();
         await page.waitForTimeout(500);
@@ -76,9 +72,7 @@ test.describe("Settings Workflow", () => {
 
         // Validation message might appear
         const validationMessage = page
-          .locator(
-            ".error, .validation, [class*='error'], [class*='validation']",
-          )
+          .locator(".error, .validation, [class*='error'], [class*='validation']")
           .first();
         const count = await validationMessage.count();
         // Validation might be present

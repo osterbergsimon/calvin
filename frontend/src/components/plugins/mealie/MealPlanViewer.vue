@@ -22,31 +22,16 @@
     >
       <div class="meal-plan-header">
         <h3>Meal Plan</h3>
-        <span v-if="dateRange" class="meal-plan-dates">
+        <span class="meal-plan-dates" v-if="dateRange">
           {{ dateRange }}
         </span>
       </div>
-      <div
-        v-if="mealPlanItems.length > 0"
-        class="meal-plan-items"
-        :style="gridStyle"
-      >
-        <div
-          v-for="item in mealPlanItems"
-          :key="item.id || item.date"
-          class="meal-plan-item"
-        >
-          <div
-            v-if="item.date"
-            class="meal-plan-date"
-            :class="{ today: isToday(item.date) }"
-          >
+      <div v-if="mealPlanItems.length > 0" class="meal-plan-items" :style="gridStyle">
+        <div v-for="item in mealPlanItems" :key="item.id || item.date" class="meal-plan-item">
+          <div class="meal-plan-date" :class="{ today: isToday(item.date) }" v-if="item.date">
             {{ formatDate(item.date) }}
           </div>
-          <div
-            v-if="item.meals && item.meals.length > 0"
-            class="meal-plan-meals"
-          >
+          <div class="meal-plan-meals" v-if="item.meals && item.meals.length > 0">
             <div
               v-for="meal in item.meals"
               :key="meal.id || `${item.date}-${meal.type}`"
@@ -56,10 +41,7 @@
             >
               <span class="meal-type">{{ formatMealType(meal.type) }}</span>
               <span class="meal-name">{{
-                meal.recipeName ||
-                meal.recipe?.name ||
-                meal.title ||
-                "No recipe"
+                meal.recipeName || meal.recipe?.name || meal.title || "No recipe"
               }}</span>
             </div>
           </div>
@@ -139,7 +121,7 @@ const query = useQuery({
       logDebug(
         "[MealPlanViewer]",
         "Full Mealie API response data:",
-        JSON.parse(JSON.stringify(response.data)),
+        JSON.parse(JSON.stringify(response.data))
       );
       logDebug("[MealPlanViewer]", "API response summary:", {
         status: response.status,
@@ -147,12 +129,10 @@ const query = useQuery({
         isArray: Array.isArray(response.data),
         hasItems: !!response.data?.items,
         itemCount:
-          response.data?.items?.length ||
-          (Array.isArray(response.data) ? response.data.length : 0),
+          response.data?.items?.length || (Array.isArray(response.data) ? response.data.length : 0),
         keys: response.data ? Object.keys(response.data) : [],
         sampleItem:
-          response.data?.items?.[0] ||
-          (Array.isArray(response.data) ? response.data[0] : null),
+          response.data?.items?.[0] || (Array.isArray(response.data) ? response.data[0] : null),
       });
     }
 
@@ -190,30 +170,20 @@ const mealPlanItems = computed(() => {
   if (serviceData.items && Array.isArray(serviceData.items)) {
     rawItems = serviceData.items;
     if (DEBUG) {
-      logDebug(
-        "[MealPlanViewer]",
-        `Found ${rawItems.length} items in serviceData.items`,
-      );
+      logDebug("[MealPlanViewer]", `Found ${rawItems.length} items in serviceData.items`);
     }
   }
   // Handle direct array response: [...]
   else if (Array.isArray(serviceData)) {
     rawItems = serviceData;
     if (DEBUG) {
-      logDebug(
-        "[MealPlanViewer]",
-        `Service data is array with ${rawItems.length} items`,
-      );
+      logDebug("[MealPlanViewer]", `Service data is array with ${rawItems.length} items`);
     }
   }
   // Handle single item: { date: "...", meals: [...] }
   else if (serviceData.date && serviceData.meals) {
     if (DEBUG) {
-      logDebug(
-        "[MealPlanViewer]",
-        "Single item format with date:",
-        serviceData.date,
-      );
+      logDebug("[MealPlanViewer]", "Single item format with date:", serviceData.date);
     }
     // Filter out if it's a past day
     const today = new Date();
@@ -255,7 +225,7 @@ const mealPlanItems = computed(() => {
 
   // Group meals by date
   const mealsByDate = {};
-  rawItems.forEach((item) => {
+  rawItems.forEach(item => {
     const date = item.date;
     if (!date) {
       if (DEBUG) {
@@ -307,13 +277,9 @@ const mealPlanItems = computed(() => {
     logDebug(
       "[MealPlanViewer]",
       `Grouped into ${Object.keys(mealsByDate).length} dates:`,
-      Object.keys(mealsByDate),
+      Object.keys(mealsByDate)
     );
-    logDebug(
-      "[MealPlanViewer]",
-      "Meals by date:",
-      JSON.parse(JSON.stringify(mealsByDate)),
-    );
+    logDebug("[MealPlanViewer]", "Meals by date:", JSON.parse(JSON.stringify(mealsByDate)));
   }
 
   // Convert to array and sort by date (using Date objects for proper comparison)
@@ -329,10 +295,10 @@ const mealPlanItems = computed(() => {
     logDebug(
       "[MealPlanViewer]",
       "Grouped items after sorting:",
-      groupedItems.map((i) => ({
+      groupedItems.map(i => ({
         date: i.date,
         mealCount: i.meals.length,
-      })),
+      }))
     );
   }
 
@@ -345,11 +311,7 @@ const mealPlanItems = computed(() => {
   const today = new Date();
   today.setHours(0, 0, 0, 0);
   if (DEBUG) {
-    logDebug(
-      "[MealPlanViewer]",
-      "Today's date for filtering:",
-      today.toISOString().split("T")[0],
-    );
+    logDebug("[MealPlanViewer]", "Today's date for filtering:", today.toISOString().split("T")[0]);
   }
 
   if (startDate && endDate) {
@@ -377,7 +339,7 @@ const mealPlanItems = computed(() => {
       const day = String(current.getDate()).padStart(2, "0");
       const dateStr = `${year}-${month}-${day}`;
 
-      const existingDay = groupedItems.find((item) => {
+      const existingDay = groupedItems.find(item => {
         // Compare dates using Date objects to avoid string comparison issues
         const itemDate = new Date(item.date);
         itemDate.setHours(0, 0, 0, 0);
@@ -401,7 +363,7 @@ const mealPlanItems = computed(() => {
     if (DEBUG) {
       logDebug("[MealPlanViewer]", "No date range, filtering grouped items");
     }
-    const filtered = groupedItems.filter((item) => {
+    const filtered = groupedItems.filter(item => {
       if (!item.date) return false;
       // Use Date object comparison
       const itemDate = new Date(item.date);
@@ -411,10 +373,10 @@ const mealPlanItems = computed(() => {
     if (DEBUG) {
       logDebug(
         "[MealPlanViewer]",
-        `Filtered ${groupedItems.length} items to ${filtered.length} items`,
+        `Filtered ${groupedItems.length} items to ${filtered.length} items`
       );
       if (filtered.length < groupedItems.length) {
-        const filteredOut = groupedItems.filter((item) => {
+        const filteredOut = groupedItems.filter(item => {
           if (!item.date) return true;
           const itemDate = new Date(item.date);
           itemDate.setHours(0, 0, 0, 0);
@@ -423,7 +385,7 @@ const mealPlanItems = computed(() => {
         logDebug(
           "[MealPlanViewer]",
           "Filtered out dates:",
-          filteredOut.map((i) => i.date),
+          filteredOut.map(i => i.date)
         );
       }
     }
@@ -431,7 +393,7 @@ const mealPlanItems = computed(() => {
   }
 
   // Filter out any past days that might have been included (use Date object comparison)
-  const finalDays = allDays.filter((item) => {
+  const finalDays = allDays.filter(item => {
     if (!item.date) return false;
     const itemDate = new Date(item.date);
     itemDate.setHours(0, 0, 0, 0);
@@ -441,13 +403,9 @@ const mealPlanItems = computed(() => {
   if (DEBUG) {
     logDebug(
       "[MealPlanViewer]",
-      `Final result: ${finalDays.length} days (from ${allDays.length} total days)`,
+      `Final result: ${finalDays.length} days (from ${allDays.length} total days)`
     );
-    logDebug(
-      "[MealPlanViewer]",
-      "Final meal plan items:",
-      JSON.parse(JSON.stringify(finalDays)),
-    );
+    logDebug("[MealPlanViewer]", "Final meal plan items:", JSON.parse(JSON.stringify(finalDays)));
   }
   return finalDays;
 });
@@ -462,11 +420,10 @@ const getStartDate = () => {
   }
 
   // Calculate from items
-  const items =
-    serviceData.items || (Array.isArray(serviceData) ? serviceData : []);
+  const items = serviceData.items || (Array.isArray(serviceData) ? serviceData : []);
   if (items.length > 0) {
     const dates = items
-      .map((item) => item.date)
+      .map(item => item.date)
       .filter(Boolean)
       .sort();
     if (dates.length > 0) {
@@ -488,11 +445,10 @@ const getEndDate = () => {
   }
 
   // Calculate from items
-  const items =
-    serviceData.items || (Array.isArray(serviceData) ? serviceData : []);
+  const items = serviceData.items || (Array.isArray(serviceData) ? serviceData : []);
   if (items.length > 0) {
     const dates = items
-      .map((item) => item.date)
+      .map(item => item.date)
       .filter(Boolean)
       .sort();
     if (dates.length > 0) {
@@ -519,7 +475,7 @@ const dateRange = computed(() => {
   const items = mealPlanItems.value;
   if (items.length > 0) {
     const dates = items
-      .map((item) => item.date)
+      .map(item => item.date)
       .filter(Boolean)
       .sort();
     if (dates.length > 0) {
@@ -538,7 +494,7 @@ const getMealieUrl = () => {
   return null;
 };
 
-const getRecipeUrl = (meal) => {
+const getRecipeUrl = meal => {
   if (!meal) return null;
 
   const mealieUrl = getMealieUrl();
@@ -569,20 +525,20 @@ const getRecipeUrl = (meal) => {
   return `${mealieUrl}/g/home/r/${slug}`;
 };
 
-const openRecipe = (meal) => {
+const openRecipe = meal => {
   const url = getRecipeUrl(meal);
   if (url) {
     window.open(url, "_blank");
   }
 };
 
-const formatMealType = (type) => {
+const formatMealType = type => {
   if (!type) return "Meal";
   // Capitalize first letter
   return type.charAt(0).toUpperCase() + type.slice(1).toLowerCase();
 };
 
-const formatDate = (dateString) => {
+const formatDate = dateString => {
   if (!dateString) return "";
   const date = new Date(dateString);
   return date.toLocaleDateString("en-US", {
@@ -599,7 +555,7 @@ const formatDateRange = (startDate, endDate) => {
   return `${start.toLocaleDateString("en-US", { month: "short", day: "numeric" })} - ${end.toLocaleDateString("en-US", { month: "short", day: "numeric" })}`;
 };
 
-const isToday = (dateString) => {
+const isToday = dateString => {
   if (!dateString) return false;
   const today = new Date();
   today.setHours(0, 0, 0, 0);

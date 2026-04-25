@@ -65,14 +65,14 @@ async def get_image_file(image_id: str):
     """
     Get image file by ID from plugin service.
 
-    For remote images (like Unsplash), redirects to the image URL.
-    For local images, serves the file directly.
+    For remote images, downloads and serves via the local cache (avoids rate limits,
+    enables stale-on-error). For local images, serves the file directly.
 
     Args:
         image_id: Image ID
 
     Returns:
-        Image file or redirect to image URL
+        Image file response
     """
     # Get image metadata
     image = await plugin_image_service.get_image_by_id(image_id)
@@ -84,18 +84,6 @@ async def get_image_file(image_id: str):
     image_url = image.get("url") or image.get("raw_url")
     image_path = image.get("path")
 
-    # If it's a remote URL (starts with http), redirect to it
-    if image_url and image_url.startswith("http"):
-        from fastapi.responses import RedirectResponse
-
-        return RedirectResponse(
-            url=image_url,
-            status_code=302,
-            headers={
-                "Cache-Control": "public, max-age=3600",  # Cache for 1 hour
-            },
-        )
-
     # For local images, check if path exists
     if image_path and Path(image_path).exists():
         image_path_obj = Path(image_path)
@@ -103,16 +91,31 @@ async def get_image_file(image_id: str):
             image_path_obj,
             media_type=f"image/{image['format'].lstrip('.')}",
             headers={
-                "Cache-Control": "public, max-age=3600",  # Cache for 1 hour
+                "Cache-Control": "public, max-age=3600",
             },
         )
+
+    # For remote URLs, download and cache locally rather than redirecting.
+    # This avoids rate limits hitting the browser directly and enables stale-on-error.
+    if image_url and image_url.startswith("http"):
+        from fastapi.responses import Response
+
+        from app.services.remote_image_cache import remote_image_cache
+
+        image_data = await remote_image_cache.get_or_fetch(image_url)
+        if image_data:
+            fmt = image.get("format", "jpeg").lstrip(".")
+            return Response(
+                content=image_data,
+                media_type=f"image/{fmt}",
+                headers={"Cache-Control": "public, max-age=3600"},
+            )
 
     # Fallback: Get image data from plugin (download if needed)
     image_data = await plugin_image_service.get_image_data(image_id)
     if not image_data:
         raise ErrorResponse.not_found("Image file", image_id)
 
-    # Return image data directly
     from fastapi.responses import Response
 
     return Response(

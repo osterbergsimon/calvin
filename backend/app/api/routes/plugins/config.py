@@ -2,10 +2,12 @@
 
 import json
 import logging
+from pathlib import Path
 from typing import Any
 
 from fastapi import APIRouter, HTTPException
 
+from app.plugins.definitions import strip_app_managed_config_fields
 from app.plugins.loader import plugin_loader
 from app.services.config_service import config_service
 
@@ -24,6 +26,23 @@ SENSITIVE_FIELDS = {
     "access_token",
     "refresh_token",
 }
+
+
+def normalize_plugin_config(config: dict[str, Any] | None) -> dict[str, Any]:
+    """Normalize plugin config values at the API boundary."""
+    normalized: dict[str, Any] = {}
+
+    for key, value in (config or {}).items():
+        if isinstance(value, dict):
+            normalized[key] = value.get("value") or value.get("default") or ""
+        elif isinstance(value, Path):
+            normalized[key] = str(value)
+        elif value is None:
+            normalized[key] = ""
+        else:
+            normalized[key] = str(value)
+
+    return normalized
 
 
 def mask_sensitive_config(
@@ -110,6 +129,24 @@ async def get_plugin_config(plugin_id: str):
             config = {}
     else:
         config = {}
+
+    # Also check database for values that might not be in config_service.
+    # App-managed values live on explicit columns, not plugin-owned schemas.
+    try:
+        from app.models.db_models import PluginTypeDB
+
+        db_type = await PluginTypeDB.objects.get_or_none(type_id=plugin_id)
+        if db_type:
+            config["display_order"] = db_type.display_order or 0
+        if db_type and db_type.common_config_schema:
+            db_schema = strip_app_managed_config_fields(db_type.common_config_schema)
+            for key, value in db_schema.items():
+                # Only add if not already in config (config_service values take precedence)
+                if key not in config:
+                    config[key] = value
+    except Exception as e:
+        logger.debug(f"Could not load schema from database for {plugin_id}: {e}")
+        # Continue with config_service values only
 
     # Mask sensitive fields before returning
     return mask_sensitive_config(config, mask_for_frontend=True)

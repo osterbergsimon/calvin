@@ -5,22 +5,32 @@
     :class="[`position-${position}`, { 'show-date': showDate }]"
     :style="{ padding: `${barPadding}px` }"
   >
-    <div
-      class="clock-bar-content"
-      :class="{
-        'layout-single-line': layout === 'single-line',
-        'layout-two-lines': layout === 'two-lines',
-      }"
-    >
-      <span class="clock-time" :style="{ fontSize: `${fontSize}px` }">{{
-        formattedTime
-      }}</span>
-      <span
-        v-if="showDate"
-        class="clock-date"
-        :style="{ fontSize: `${dateFontSize}px` }"
-        >{{ formattedDate }}</span
+    <div class="clock-bar-outer">
+      <!-- Left spacer: invisible mirror of right side to keep clock centered -->
+      <div class="clock-bar-side clock-bar-left" aria-hidden="true">
+        <PluginStatusbarItems ghost />
+        <span v-if="isBackgroundRefreshing" class="clock-refresh-icon clock-refresh-ghost" />
+      </div>
+
+      <!-- Center: time + date -->
+      <div
+        class="clock-bar-content"
+        :class="{
+          'layout-single-line': layout === 'single-line',
+          'layout-two-lines': layout === 'two-lines',
+        }"
       >
+        <span class="clock-time" :style="{ fontSize: `${fontSize}px` }">{{ formattedTime }}</span>
+        <span v-if="showDate" class="clock-date" :style="{ fontSize: `${dateFontSize}px` }">{{
+          formattedDate
+        }}</span>
+      </div>
+
+      <!-- Right: plugin statusbar items -->
+      <div class="clock-bar-side clock-bar-right">
+        <PluginStatusbarItems />
+        <span v-if="isBackgroundRefreshing" class="clock-refresh-icon" aria-hidden="true" />
+      </div>
     </div>
   </div>
 </template>
@@ -28,6 +38,8 @@
 <script setup>
 import { ref, computed, onMounted, onUnmounted, watch } from "vue";
 import { useConfigStore } from "../stores/config";
+import { useCalendarStore } from "../stores/calendar";
+import PluginStatusbarItems from "./PluginStatusbarItems.vue";
 
 defineOptions({
   name: "ClockBarHorizontal",
@@ -37,7 +49,7 @@ const props = defineProps({
   position: {
     type: String,
     required: true,
-    validator: (value) => ["top", "bottom", "between"].includes(value),
+    validator: value => ["top", "bottom", "between"].includes(value),
   },
   showInNonKiosk: {
     type: Boolean,
@@ -153,6 +165,10 @@ const barPadding = computed(() => {
   return configStore.clockBarPadding || 8;
 });
 
+const calendarStore = useCalendarStore();
+
+const isBackgroundRefreshing = computed(() => calendarStore.backgroundRefreshing);
+
 // Format time
 const formattedTime = computed(() => {
   const now = currentTime.value;
@@ -240,11 +256,11 @@ watch(
     if (shouldShow.value) {
       updateTime();
     }
-  },
+  }
 );
 
 // Watch for shouldShow changes to start/stop updates
-watch(shouldShow, (newValue) => {
+watch(shouldShow, newValue => {
   if (newValue) {
     if (!timeInterval) {
       updateTime();
@@ -331,5 +347,54 @@ onUnmounted(() => {
 
 .clock-bar-horizontal.position-between .clock-date {
   font-size: 0.75rem;
+}
+
+/* Three-column layout: left mirror | center time | right plugin items */
+.clock-bar-outer {
+  display: flex;
+  align-items: center;
+  width: 100%;
+}
+
+.clock-bar-side {
+  flex: 1;
+  display: flex;
+  align-items: center;
+  min-width: 0;
+}
+
+.clock-bar-left {
+  justify-content: flex-start;
+}
+
+.clock-bar-right {
+  justify-content: flex-end;
+}
+
+.clock-bar-content {
+  flex: 0 1 auto;
+}
+
+.clock-refresh-icon {
+  display: inline-block;
+  width: 0.5rem;
+  height: 0.5rem;
+  border: 1.5px solid var(--text-secondary);
+  border-top-color: transparent;
+  border-radius: 50%;
+  margin: 0 0.5rem;
+  animation: clock-spin 1s linear infinite;
+  flex-shrink: 0;
+}
+
+.clock-refresh-ghost {
+  visibility: hidden;
+  animation: none;
+}
+
+@keyframes clock-spin {
+  to {
+    transform: rotate(360deg);
+  }
 }
 </style>

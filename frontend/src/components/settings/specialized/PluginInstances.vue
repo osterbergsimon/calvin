@@ -2,23 +2,22 @@
   <div class="plugin-instances">
     <div class="instances-header">
       <h4 class="config-section-title">
-        Instances
-        <span v-if="instances.length > 0" class="instance-count">
-          ({{ instances.length }})
-        </span>
+        {{ instanceLabelPlural }}
+        <span v-if="instances.length > 0" class="instance-count"> ({{ instances.length }}) </span>
       </h4>
       <button
         class="btn-add-instance"
-        title="Add new instance"
+        :title="`Add new ${instanceLabel}`"
         @click="$emit('add-instance')"
       >
-        + Add Instance
+        + Add {{ instanceLabel }}
       </button>
     </div>
 
     <div v-if="instances.length === 0" class="empty-instances">
       <p class="help-text">
-        No instances configured. Click "Add Instance" to create one.
+        No {{ instanceLabelPlural.toLowerCase() }} configured. Click "Add {{ instanceLabel }}" to
+        create one.
       </p>
     </div>
 
@@ -34,9 +33,7 @@
           <div class="instance-item" :class="{ disabled: !instance.enabled }">
             <div class="instance-info">
               <div class="instance-header">
-                <span class="instance-drag-handle" title="Drag to reorder">
-                  ⋮⋮
-                </span>
+                <span class="instance-drag-handle" title="Drag to reorder"> ⋮⋮ </span>
                 <span
                   v-if="instance.running !== undefined"
                   class="running-indicator"
@@ -45,9 +42,7 @@
                     stopped: !instance.running,
                   }"
                   :title="
-                    instance.running
-                      ? '● Green: Instance is running'
-                      : '○ Red: Instance is stopped'
+                    instance.running ? '● Green: Instance is running' : '○ Red: Instance is stopped'
                   "
                 >
                   {{ instance.running ? "●" : "○" }}
@@ -55,13 +50,11 @@
                 <h5>{{ instance.name }}</h5>
               </div>
               <div
-                v-if="instance.config && instanceSummary"
+                v-if="getInstanceSummary && getInstanceSummary(instance)"
                 class="instance-details"
               >
                 <div class="instance-detail-item">
-                  <span class="instance-detail-value">{{
-                    instanceSummary
-                  }}</span>
+                  <span class="instance-detail-value">{{ getInstanceSummary(instance) }}</span>
                 </div>
               </div>
             </div>
@@ -69,9 +62,7 @@
               <label
                 class="toggle-switch-small"
                 :title="
-                  instance.enabled
-                    ? 'Disable and stop instance'
-                    : 'Enable and start instance'
+                  instance.enabled ? 'Disable and stop instance' : 'Enable and start instance'
                 "
               >
                 <input
@@ -91,7 +82,7 @@
               <button
                 class="btn-icon-only btn-action btn-action-danger"
                 title="Delete instance"
-                @click="$emit('delete-instance', instance.id)"
+                @click="handleDelete(instance.id, instance.name)"
               >
                 🗑️
               </button>
@@ -104,9 +95,10 @@
 </template>
 
 <script setup>
+import { computed } from "vue";
 import draggable from "vuedraggable";
 
-defineProps({
+const props = defineProps({
   plugin: {
     type: Object,
     required: true,
@@ -116,8 +108,8 @@ defineProps({
     required: true,
     default: () => [],
   },
-  instanceSummary: {
-    type: String,
+  getInstanceSummary: {
+    type: Function,
     default: null,
   },
 });
@@ -130,11 +122,32 @@ const emit = defineEmits([
   "order-change",
 ]);
 
+const instanceLabelMap = {
+  calendar: "Calendar Source",
+  image: "Image Source",
+  backend: "Instance",
+  service: "Instance",
+};
+
+const instanceLabel = computed(
+  () => props.plugin.instance_label || instanceLabelMap[props.plugin.type] || "Instance"
+);
+
+const instanceLabelPlural = computed(() => {
+  const label = instanceLabel.value;
+  return label.endsWith("s") ? label : label + "s";
+});
+
 const handleToggle = (instanceId, enabled) => {
   emit("toggle-instance", instanceId, enabled);
 };
 
-const handleOrderChange = (newOrder) => {
+const handleDelete = (instanceId, instanceName) => {
+  if (!confirm(`Delete "${instanceName}"? This cannot be undone.`)) return;
+  emit("delete-instance", instanceId);
+};
+
+const handleOrderChange = newOrder => {
   emit("order-change", newOrder);
 };
 </script>

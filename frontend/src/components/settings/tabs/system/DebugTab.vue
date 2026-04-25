@@ -6,11 +6,7 @@
         help="Enable logging to browser console. When disabled, only errors will be shown."
       >
         <label>
-          <input
-            v-model="consoleLogEnabled"
-            type="checkbox"
-            @change="handleConsoleLogChange"
-          />
+          <input v-model="consoleLogEnabled" type="checkbox" @change="handleConsoleLogChange" />
           Enable Console Logging
         </label>
       </SettingItem>
@@ -28,17 +24,21 @@
         </select>
       </SettingItem>
     </CollapsibleSection>
-
     <CollapsibleSection title="Dashboard Refresh" icon="🔄">
       <SettingItem
         label="Config Polling Interval (seconds)"
         help="How often to poll for config changes (5-300 seconds)"
+        input-id="config-poll-interval"
       >
         <input
+          id="config-poll-interval"
           v-model.number="configPollInterval"
           type="number"
           min="5"
           max="300"
+          step="1"
+          placeholder="30"
+          aria-label="Config polling interval in seconds"
           @change="handlePollIntervalChange"
         />
       </SettingItem>
@@ -66,12 +66,12 @@ const configPollInterval = ref(props.config.configPollInterval || 30);
 
 watch(
   () => props.config,
-  (newConfig) => {
+  newConfig => {
     consoleLogEnabled.value = newConfig.consoleLogEnabled ?? true;
     consoleLogLevel.value = newConfig.consoleLogLevel || "info";
     configPollInterval.value = newConfig.configPollInterval || 30;
   },
-  { deep: true },
+  { deep: true }
 );
 
 const handleConsoleLogChange = () => {

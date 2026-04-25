@@ -91,7 +91,7 @@ describe("EventDetailPanel", () => {
 
       const locationRow = wrapper
         .findAll(".event-detail-row")
-        .find((row) => row.text().includes("Location:"));
+        .find(row => row.text().includes("Location:"));
       expect(locationRow.exists()).toBe(true);
       expect(locationRow.text()).toContain("Conference Room A");
     });
@@ -102,7 +102,7 @@ describe("EventDetailPanel", () => {
 
       const descriptionRow = wrapper
         .findAll(".event-detail-row")
-        .find((row) => row.text().includes("Description:"));
+        .find(row => row.text().includes("Description:"));
       expect(descriptionRow.exists()).toBe(true);
       expect(descriptionRow.text()).toContain("This is a test description");
     });
@@ -119,12 +119,12 @@ describe("EventDetailPanel", () => {
 
       const dateRow = wrapper
         .findAll(".event-detail-row")
-        .find((row) => row.text().includes("Date:"));
+        .find(row => row.text().includes("Date:"));
       expect(dateRow.exists()).toBe(true);
 
       const timeRow = wrapper
         .findAll(".event-detail-row")
-        .find((row) => row.text().includes("Time:"));
+        .find(row => row.text().includes("Time:"));
       expect(timeRow.exists()).toBe(true);
       expect(timeRow.text()).toMatch(/\d{1,2}:\d{2}/); // Time format
     });
@@ -156,17 +156,15 @@ describe("EventDetailPanel", () => {
 
       const selectedDateRow = wrapper
         .findAll(".event-detail-row")
-        .find((row) => row.text().includes("Selected Date:"));
+        .find(row => row.text().includes("Selected Date:"));
       expect(selectedDateRow.exists()).toBe(true);
 
       const startRow = wrapper
         .findAll(".event-detail-row")
-        .find((row) => row.text().includes("Start:"));
+        .find(row => row.text().includes("Start:"));
       expect(startRow.exists()).toBe(true);
 
-      const endRow = wrapper
-        .findAll(".event-detail-row")
-        .find((row) => row.text().includes("End:"));
+      const endRow = wrapper.findAll(".event-detail-row").find(row => row.text().includes("End:"));
       expect(endRow.exists()).toBe(true);
     });
   });
@@ -180,9 +178,7 @@ describe("EventDetailPanel", () => {
       const wrapper = createWrapper({ event: event1 });
 
       expect(wrapper.find(".day-events-list").exists()).toBe(true);
-      expect(wrapper.find(".day-events-header").text()).toContain(
-        "All Events (2)",
-      );
+      expect(wrapper.find(".day-events-header").text()).toContain("All Events (2)");
     });
 
     it("should highlight active event in events list", () => {
@@ -252,7 +248,7 @@ describe("EventDetailPanel", () => {
 
       const sourceRow = wrapper
         .findAll(".event-detail-row")
-        .find((row) => row.text().includes("Source:"));
+        .find(row => row.text().includes("Source:"));
       expect(sourceRow.exists()).toBe(true);
       expect(sourceRow.text()).toContain("Test Calendar");
     });
@@ -264,7 +260,7 @@ describe("EventDetailPanel", () => {
 
       const sourceRow = wrapper
         .findAll(".event-detail-row")
-        .find((row) => row.text().includes("Source:"));
+        .find(row => row.text().includes("Source:"));
       expect(sourceRow.exists()).toBe(true);
       expect(sourceRow.text()).toContain("unknown-source");
     });

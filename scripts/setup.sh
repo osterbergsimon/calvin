@@ -1,16 +1,47 @@
 #!/bin/bash
 # Calvin Dashboard - Production Setup Script
-# This script can be run via: wget -O- https://raw.githubusercontent.com/osterbergsimon/calvin/main/scripts/setup.sh | sudo sh
-# Or: curl -fsSL https://raw.githubusercontent.com/osterbergsimon/calvin/main/scripts/setup.sh | sudo sh
+# This script can be run via: wget -O- https://raw.githubusercontent.com/osterbergsimon/calvin/main/scripts/setup.sh | sudo bash
+# Or: curl -fsSL https://raw.githubusercontent.com/osterbergsimon/calvin/main/scripts/setup.sh | sudo bash
 #
 # To use a different branch, set GIT_BRANCH environment variable:
-#   GIT_BRANCH=develop wget -O- https://raw.githubusercontent.com/osterbergsimon/calvin/main/scripts/setup.sh | sudo sh
-#   GIT_BRANCH=develop curl -fsSL https://raw.githubusercontent.com/osterbergsimon/calvin/main/scripts/setup.sh | sudo sh
+#   export GIT_BRANCH=develop
+#   wget -O- https://raw.githubusercontent.com/osterbergsimon/calvin/main/scripts/setup.sh | sudo -E bash
+#   # Or with curl:
+#   curl -fsSL https://raw.githubusercontent.com/osterbergsimon/calvin/main/scripts/setup.sh | sudo -E bash
+#
+# Note: Use 'sudo -E' to preserve environment variables. Without -E, sudo will not
+# pass GIT_BRANCH or GIT_REPO to the script.
+# IMPORTANT: Export the variable first (export GIT_BRANCH=develop) rather than
+# setting it inline (GIT_BRANCH=develop wget ...), as inline assignments don't
+# propagate through pipes to sudo.
 #
 # To use a different repository:
-#   GIT_REPO=https://github.com/yourusername/calvin.git GIT_BRANCH=develop wget -O- ... | sudo sh
+#   export GIT_REPO=https://github.com/yourusername/calvin.git
+#   export GIT_BRANCH=develop
+#   wget -O- ... | sudo -E bash
 
 set -euo pipefail
+
+# Read GIT_BRANCH and GIT_REPO from environment early (before any defaults)
+# This ensures they're preserved when the script is piped through sudo
+# Also check /etc/default/calvin-update as fallback (for reinstall scenarios)
+# Environment variables take precedence over config file
+_ENV_GIT_BRANCH="${GIT_BRANCH:-}"
+_ENV_GIT_REPO="${GIT_REPO:-}"
+
+# If environment variables are not set, check /etc/default/calvin-update
+if [ -z "${_ENV_GIT_BRANCH}" ] && [ -f /etc/default/calvin-update ]; then
+    # Source the config file in a subshell to avoid polluting environment
+    # Extract just the values we need
+    _CONFIG_BRANCH=$(grep "^GIT_BRANCH=" /etc/default/calvin-update 2>/dev/null | cut -d'=' -f2- | tr -d '"' | tr -d "'" || echo "")
+    _CONFIG_REPO=$(grep "^GIT_REPO=" /etc/default/calvin-update 2>/dev/null | cut -d'=' -f2- | tr -d '"' | tr -d "'" || echo "")
+    if [ -n "${_CONFIG_BRANCH}" ]; then
+        _ENV_GIT_BRANCH="${_CONFIG_BRANCH}"
+    fi
+    if [ -n "${_CONFIG_REPO}" ]; then
+        _ENV_GIT_REPO="${_CONFIG_REPO}"
+    fi
+fi
 
 # Try to find setup-common.sh locally first
 # If not found, download it from GitHub (works when running from pipe or when file is missing)
@@ -42,8 +73,9 @@ else
     trap "rm -rf '${TEMP_DIR}'" EXIT 2>/dev/null || true
     
     # Determine GitHub URL from environment or defaults
-    GIT_REPO="${GIT_REPO:-https://github.com/osterbergsimon/calvin.git}"
-    GIT_BRANCH="${GIT_BRANCH:-main}"
+    # Use the environment variable if it was set, otherwise use defaults
+    GIT_REPO="${_ENV_GIT_REPO:-${GIT_REPO:-https://github.com/osterbergsimon/calvin.git}}"
+    GIT_BRANCH="${_ENV_GIT_BRANCH:-${GIT_BRANCH:-main}}"
     
     # Extract repo owner and name from git URL
     repo_owner=$(echo "${GIT_REPO}" | sed -E 's|.*github\.com[:/]([^/]+)/([^/]+)(\.git)?$|\1|')
@@ -75,8 +107,9 @@ else
 fi
 
 # Configuration (can be overridden by environment variables)
-GIT_REPO="${GIT_REPO:-$DEFAULT_GIT_REPO}"
-GIT_BRANCH="${GIT_BRANCH:-$DEFAULT_GIT_BRANCH}"
+# Use the environment variable if it was set at the start, otherwise use defaults
+GIT_REPO="${_ENV_GIT_REPO:-${GIT_REPO:-$DEFAULT_GIT_REPO}}"
+GIT_BRANCH="${_ENV_GIT_BRANCH:-${GIT_BRANCH:-$DEFAULT_GIT_BRANCH}}"
 CALVIN_DIR="${CALVIN_DIR:-$DEFAULT_CALVIN_DIR}"
 CALVIN_USER="${CALVIN_USER:-$DEFAULT_CALVIN_USER}"
 LOG_FILE="${LOG_FILE:-$DEFAULT_LOG_FILE}"
@@ -163,18 +196,18 @@ main() {
     fi
     
     if [ -f "${CALVIN_DIR}/scripts/reboot-calvin.sh" ]; then
-        install_script "${CALVIN_DIR}/scripts/reboot-calvin.sh" "/usr/local/bin/reboot-calvin.sh" "${CALVIN_USER}"
+        install_privileged_sudo_helper_script "${CALVIN_DIR}/scripts/reboot-calvin.sh" "/usr/local/bin/reboot-calvin.sh"
         # Configure sudoers for reboot script
         log "Configuring sudoers for reboot script..."
-        echo "${CALVIN_USER} ALL=(ALL) NOPASSWD: /usr/local/bin/reboot-calvin.sh" > /etc/sudoers.d/calvin-reboot
+        echo "${CALVIN_USER} ALL=(root) NOPASSWD: /usr/local/bin/reboot-calvin.sh" > /etc/sudoers.d/calvin-reboot
         chmod 0440 /etc/sudoers.d/calvin-reboot
     fi
     
     if [ -f "${CALVIN_DIR}/scripts/restart-calvin-services.sh" ]; then
-        install_script "${CALVIN_DIR}/scripts/restart-calvin-services.sh" "/usr/local/bin/restart-calvin-services.sh" "${CALVIN_USER}"
+        install_privileged_sudo_helper_script "${CALVIN_DIR}/scripts/restart-calvin-services.sh" "/usr/local/bin/restart-calvin-services.sh"
         # Configure sudoers for restart script
         log "Configuring sudoers for restart script..."
-        echo "${CALVIN_USER} ALL=(ALL) NOPASSWD: /usr/local/bin/restart-calvin-services.sh" > /etc/sudoers.d/calvin-restart
+        echo "${CALVIN_USER} ALL=(root) NOPASSWD: /usr/local/bin/restart-calvin-services.sh" > /etc/sudoers.d/calvin-restart
         chmod 0440 /etc/sudoers.d/calvin-restart
     fi
     

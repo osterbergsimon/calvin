@@ -1,10 +1,7 @@
 """Error handling utilities for consistent error responses."""
 
-import logging
-
 from fastapi import HTTPException
-
-logger = logging.getLogger(__name__)
+from loguru import logger
 
 
 class ErrorResponse:
@@ -53,7 +50,7 @@ class ErrorResponse:
             HTTPException with 500 status
         """
         if error:
-            logger.error(f"{message}: {error}", exc_info=True)
+            logger.exception(f"{message}: {error}")
         else:
             logger.error(message)
         return HTTPException(status_code=500, detail=message)
@@ -115,7 +112,7 @@ def handle_service_error(
         HTTPException with appropriate status code
     """
     error_message = str(error) if str(error) else (default_message or "An error occurred")
-    logger.error(f"Error during {operation}: {error}", exc_info=True)
+    logger.exception(f"Error during {operation}: {error}")
 
     # Determine status code based on error type
     if isinstance(error, ValueError):

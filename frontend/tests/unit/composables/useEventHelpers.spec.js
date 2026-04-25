@@ -55,9 +55,7 @@ describe("useEventHelpers", () => {
     });
 
     it("should return source color if event has no color", () => {
-      mockCalendarStore.sources = [
-        { id: "source1", name: "Source 1", color: "#00ff00" },
-      ];
+      mockCalendarStore.sources = [{ id: "source1", name: "Source 1", color: "#00ff00" }];
 
       const event = {
         id: "1",
@@ -175,8 +173,7 @@ describe("useEventHelpers", () => {
     });
 
     it("should truncate long titles", () => {
-      const title =
-        "This is a very long event title that exceeds the maximum length";
+      const title = "This is a very long event title that exceeds the maximum length";
       const truncated = eventHelpers.truncateEventTitle(title, 30);
 
       expect(truncated.length).toBe(30);

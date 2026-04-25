@@ -46,7 +46,7 @@ jobs:
       
       - name: Run MyPy type checker
         working-directory: ./backend
-        run: uv run mypy app || true  # Don't fail on type errors for now
+        run: uv run mypy app --ignore-missing-imports
       
       - name: Run Bandit security linter
         working-directory: ./backend
@@ -93,7 +93,7 @@ jobs:
       
       - name: Run Prettier check
         working-directory: ./frontend
-        run: npx prettier --check "src/**/*.{js,jsx,vue,json,css}" || true
+        run: npx prettier --check "src/**/*.{js,jsx,vue,json,css}"
       
       - name: Run frontend tests
         working-directory: ./frontend
@@ -106,6 +106,24 @@ jobs:
           flags: frontend
           name: frontend-coverage
           fail_ci_if_error: false
+
+  pre-commit:
+    name: Pre-commit
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+          cache: "npm"
+          cache-dependency-path: frontend/package-lock.json
+      - name: Install frontend deps (for local eslint hook)
+        working-directory: frontend
+        run: npm ci
+      - uses: pre-commit/action@v3.0.1
 
   build:
     name: Build Check

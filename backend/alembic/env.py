@@ -6,9 +6,9 @@ from alembic import context
 
 # Import settings to get database URL
 from app.config import settings
-from app.database import Base
+from app.database import metadata
 
-# Import all models so they're registered with Base.metadata
+# Import all models so they're registered with metadata
 from app.models.db_models import (  # noqa: F401
     ConfigDB,
     KeyboardMappingDB,
@@ -26,21 +26,28 @@ if config.config_file_name is not None:
     fileConfig(config.config_file_name)
 
 # Set target_metadata for autogenerate support
-target_metadata = Base.metadata
+# Ormar models register themselves in metadata when imported
+target_metadata = metadata
 
-# Override sqlalchemy.url from settings if not set in alembic.ini
-# Convert async URL to sync URL for Alembic
-db_url = settings.database_url
-if db_url.startswith("sqlite+aiosqlite:///"):
-    db_url = db_url.replace("sqlite+aiosqlite:///", "sqlite:///")
-elif db_url.startswith("sqlite:///"):
-    # Already sync URL
-    pass
-else:
-    # For other databases, remove async driver prefix if present
-    db_url = db_url.replace("+aiosqlite", "")
+# Override sqlalchemy.url from settings unless a real URL has already been set
+# programmatically (e.g. by the test suite passing a temp DB path via Config).
+# alembic.ini ships with a placeholder "driver://user:pass@localhost/dbname"
+# that we always replace; anything else is treated as a deliberate override.
+_PLACEHOLDER_URL = "driver://user:pass@localhost/dbname"
+_existing_url = config.get_main_option("sqlalchemy.url")
 
-config.set_main_option("sqlalchemy.url", db_url)
+if not _existing_url or _existing_url == _PLACEHOLDER_URL:
+    db_url = settings.database_url
+    if db_url.startswith("sqlite+aiosqlite:///"):
+        db_url = db_url.replace("sqlite+aiosqlite:///", "sqlite:///")
+    elif db_url.startswith("sqlite:///"):
+        # Already sync URL
+        pass
+    else:
+        # For other databases, remove async driver prefix if present
+        db_url = db_url.replace("+aiosqlite", "")
+
+    config.set_main_option("sqlalchemy.url", db_url)
 
 
 def run_migrations_offline() -> None:

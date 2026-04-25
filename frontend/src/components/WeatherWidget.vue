@@ -3,13 +3,7 @@
     <div v-if="data && !data.error" class="weather-content">
       <div class="weather-header">
         <h3>{{ serviceName || data.location || "Weather" }}</h3>
-        <button
-          class="btn-refresh"
-          title="Refresh weather"
-          @click="$emit('refresh')"
-        >
-          ↻
-        </button>
+        <button class="btn-refresh" title="Refresh weather" @click="$emit('refresh')">↻</button>
       </div>
 
       <!-- Current Weather -->
@@ -24,9 +18,7 @@
             />
           </div>
           <div class="weather-temp">
-            <span class="temp-value">{{
-              Math.round(data.current.temperature)
-            }}</span>
+            <span class="temp-value">{{ Math.round(data.current.temperature) }}</span>
             <span class="temp-unit">{{ getTempUnit() }}</span>
           </div>
           <div class="weather-desc">
@@ -37,8 +29,7 @@
           <div class="weather-detail-item">
             <span class="detail-label">Feels like</span>
             <span class="detail-value"
-              >{{ Math.round(data.current.feels_like)
-              }}{{ getTempUnit() }}</span
+              >{{ Math.round(data.current.feels_like) }}{{ getTempUnit() }}</span
             >
           </div>
           <div class="weather-detail-item">
@@ -48,8 +39,7 @@
           <div class="weather-detail-item">
             <span class="detail-label">Wind</span>
             <span class="detail-value"
-              >{{ formatWindSpeed(data.current.wind_speed) }}
-              {{ getWindUnit() }}</span
+              >{{ formatWindSpeed(data.current.wind_speed) }} {{ getWindUnit() }}</span
             >
           </div>
           <div class="weather-detail-item">
@@ -60,17 +50,10 @@
       </div>
 
       <!-- Forecast -->
-      <div
-        v-if="data.forecast && data.forecast.length > 0"
-        class="weather-forecast"
-      >
+      <div v-if="data.forecast && data.forecast.length > 0" class="weather-forecast">
         <h4>Forecast</h4>
         <div class="forecast-items">
-          <div
-            v-for="day in data.forecast"
-            :key="day.date"
-            class="forecast-item"
-          >
+          <div v-for="day in data.forecast" :key="day.date" class="forecast-item">
             <div class="forecast-date">
               {{ formatForecastDate(day.date) }}
             </div>
@@ -83,12 +66,8 @@
               />
             </div>
             <div class="forecast-temps">
-              <span class="temp-high"
-                >{{ Math.round(day.temp_max) }}{{ getTempUnit() }}</span
-              >
-              <span class="temp-low"
-                >{{ Math.round(day.temp_min) }}{{ getTempUnit() }}</span
-              >
+              <span class="temp-high">{{ Math.round(day.temp_max) }}{{ getTempUnit() }}</span>
+              <span class="temp-low">{{ Math.round(day.temp_min) }}{{ getTempUnit() }}</span>
             </div>
             <div class="forecast-desc">
               {{ capitalize(day.description) }}
@@ -138,12 +117,12 @@ const getWindUnit = () => {
   return "m/s";
 };
 
-const formatWindSpeed = (speed) => {
+const formatWindSpeed = speed => {
   if (!speed) return "0";
   return Math.round(speed);
 };
 
-const formatForecastDate = (dateString) => {
+const formatForecastDate = dateString => {
   if (!dateString) return "";
   const date = new Date(dateString);
   const today = new Date();
@@ -163,7 +142,7 @@ const formatForecastDate = (dateString) => {
   });
 };
 
-const capitalize = (str) => {
+const capitalize = str => {
   if (!str) return "";
   return str.charAt(0).toUpperCase() + str.slice(1);
 };

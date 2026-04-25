@@ -2,17 +2,16 @@
   <div class="ordering-manager">
     <div class="setting-item">
       <p class="help-text">
-        Configure the display order of {{ type }} plugins and their instances.
-        Drag plugins to reorder them, and drag instances within each plugin to
-        reorder instances. Each level can only be reordered within its own
-        scope.
+        Configure the display order of {{ type }} plugins and their instances. Drag plugins to
+        reorder them, and drag instances within each plugin to reorder instances. Each level can
+        only be reordered within its own scope.
       </p>
     </div>
 
     <div v-if="plugins.length === 0" class="no-plugins-message">
       <p class="help-text">
-        No {{ type }} plugins are currently enabled. Enable plugins in the
-        Plugins section to configure their display order here.
+        No {{ type }} plugins are currently enabled. Enable plugins in the Plugins section to
+        configure their display order here.
       </p>
     </div>
 
@@ -32,34 +31,19 @@
             <div class="plugin-tree-header">
               <div class="plugin-order-handle">
                 <span class="order-number">{{ index + 1 }}</span>
-                <span
-                  class="plugin-drag-handle"
-                  title="Drag to reorder plugins"
-                >
-                  ⋮⋮
-                </span>
+                <span class="plugin-drag-handle" title="Drag to reorder plugins"> ⋮⋮ </span>
               </div>
               <div class="plugin-info">
                 <strong>{{ plugin.name }}</strong>
-                <span
-                  v-if="pluginInstances[plugin.id]?.length > 0"
-                  class="instance-count-badge"
-                >
+                <span v-if="pluginInstances[plugin.id]?.length > 0" class="instance-count-badge">
                   {{ pluginInstances[plugin.id].length }}
-                  {{
-                    pluginInstances[plugin.id].length === 1
-                      ? "instance"
-                      : "instances"
-                  }}
+                  {{ pluginInstances[plugin.id].length === 1 ? "instance" : "instances" }}
                 </span>
               </div>
             </div>
 
             <!-- Nested instances list -->
-            <div
-              v-if="pluginInstances[plugin.id]?.length > 0"
-              class="plugin-instances-tree"
-            >
+            <div v-if="pluginInstances[plugin.id]?.length > 0" class="plugin-instances-tree">
               <draggable
                 :model-value="pluginInstances[plugin.id]"
                 :animation="200"
@@ -67,19 +51,14 @@
                 :group="`${type}-instances`"
                 :data-plugin-id="plugin.id"
                 item-key="id"
-                @update:model-value="
-                  handleInstanceOrderChange(plugin.id, $event)
-                "
+                @update:model-value="handleInstanceOrderChange(plugin.id, $event)"
                 @start="handleInstanceDragStart(plugin.id)"
                 @end="handleInstanceDragEnd(plugin.id)"
               >
                 <template #item="{ element: instance }">
                   <div class="instance-tree-item">
                     <div class="instance-tree-header">
-                      <span
-                        class="instance-drag-handle"
-                        title="Drag to reorder instances"
-                      >
+                      <span class="instance-drag-handle" title="Drag to reorder instances">
                         ⋮⋮
                       </span>
                       <span
@@ -99,10 +78,7 @@
                       </span>
                       <span class="instance-name">{{ instance.name }}</span>
                       <span
-                        v-if="
-                          instance.config &&
-                          getInstanceSummary(plugin.id, instance.config)
-                        "
+                        v-if="instance.config && getInstanceSummary(plugin.id, instance.config)"
                         class="instance-summary"
                       >
                         {{ getInstanceSummary(plugin.id, instance.config) }}
@@ -129,7 +105,7 @@ defineProps({
   type: {
     type: String,
     required: true,
-    validator: (value) => ["service", "image"].includes(value),
+    validator: value => ["service", "image"].includes(value),
   },
   plugins: {
     type: Array,
@@ -160,7 +136,7 @@ const emit = defineEmits([
   "instance-drag-end",
 ]);
 
-const handlePluginOrderChange = (newOrder) => {
+const handlePluginOrderChange = newOrder => {
   emit("plugin-order-change", newOrder);
 };
 
@@ -176,11 +152,11 @@ const handlePluginDragEnd = () => {
   emit("plugin-drag-end");
 };
 
-const handleInstanceDragStart = (pluginId) => {
+const handleInstanceDragStart = pluginId => {
   emit("instance-drag-start", pluginId);
 };
 
-const handleInstanceDragEnd = (pluginId) => {
+const handleInstanceDragEnd = pluginId => {
   emit("instance-drag-end", pluginId);
 };
 </script>
