@@ -5,6 +5,13 @@ import { getCachedData, setCachedData } from "../utils/cache";
 import { useConnectionStore } from "./connection";
 import { logDebug, logError, logInfo } from "../utils/logger";
 
+/**
+ * Generated API types from backend OpenAPI snapshot.
+ * Run `npm run gen:api` to refresh after backend route/schema changes.
+ * @typedef {import("../api/types").components["schemas"]["CalendarSourcesResponse"]} CalendarSourcesResponse
+ * @typedef {import("../api/types").components["schemas"]["CalendarEventsResponse"]} CalendarEventsResponse
+ */
+
 export const useCalendarStore = defineStore("calendar", () => {
   const events = ref([]);
   const sources = ref([]); // Calendar sources with colors and show_time settings
@@ -41,6 +48,7 @@ export const useCalendarStore = defineStore("calendar", () => {
 
     try {
       const response = await axios.get("/api/calendar/sources");
+      /** @type {CalendarSourcesResponse} */
       const responseData = response.data;
       sources.value = responseData.sources || [];
 
@@ -141,6 +149,7 @@ export const useCalendarStore = defineStore("calendar", () => {
       }
 
       const response = await axios.get("/api/calendar/events", { params });
+      /** @type {CalendarEventsResponse} */
       const responseData = response.data;
       events.value = responseData.events || [];
 
