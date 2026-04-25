@@ -9,7 +9,11 @@ from unittest.mock import AsyncMock, MagicMock, patch
 import pytest
 
 from app.plugins.base import PluginType
-from app.plugins.service.iframe import IframeServicePlugin, handle_plugin_config_update
+from app.plugins.service.iframe import (
+    IframeServicePlugin,
+    create_plugin_instance,
+    handle_plugin_config_update,
+)
 
 
 @pytest.fixture
@@ -39,6 +43,37 @@ class TestIframeServicePlugin:
         assert "instance_config_schema" in metadata
         assert "url" in metadata["instance_config_schema"]
         assert "fullscreen" in metadata["instance_config_schema"]
+
+    def test_create_plugin_instance(self):
+        """Test service SDK-backed plugin factory."""
+        plugin = create_plugin_instance(
+            plugin_id="iframe-instance",
+            type_id="iframe",
+            name="Iframe Service",
+            config={
+                "url": {"value": "https://example.com"},
+                "fullscreen": {"value": True},
+                "enabled": True,
+            },
+        )
+
+        assert isinstance(plugin, IframeServicePlugin)
+        assert plugin.plugin_id == "iframe-instance"
+        assert plugin.url == "https://example.com"
+        assert plugin.fullscreen is True
+        assert plugin.enabled is True
+
+    def test_create_plugin_instance_wrong_type(self):
+        """Test service SDK-backed plugin factory ignores other types."""
+        assert (
+            create_plugin_instance(
+                plugin_id="iframe-instance",
+                type_id="other",
+                name="Iframe Service",
+                config={"url": "https://example.com"},
+            )
+            is None
+        )
 
     def test_init(self, iframe_plugin):
         """Test plugin initialization."""
