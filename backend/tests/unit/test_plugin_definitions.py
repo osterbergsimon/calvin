@@ -47,3 +47,27 @@ class TestPluginDefinition:
                     "name": "Future Plugin",
                 }
             )
+
+    def test_from_raw_strips_app_managed_config_fields(self):
+        definition = PluginDefinition.from_raw(
+            {
+                "type_id": "test_plugin",
+                "plugin_type": PluginType.SERVICE,
+                "name": "Test Plugin",
+                "common_config_schema": {
+                    "display_order": {"type": "integer"},
+                    "enabled": {"type": "boolean"},
+                    "name": {"type": "string"},
+                    "api_key": {"type": "password"},
+                },
+                "instance_config_schema": {
+                    "display_order": {"type": "integer"},
+                    "enabled": {"type": "boolean"},
+                    "plugin_id": {"type": "string"},
+                    "location": {"type": "string"},
+                },
+            }
+        )
+
+        assert definition.common_config_schema == {"api_key": {"type": "password"}}
+        assert definition.instance_config_schema == {"location": {"type": "string"}}

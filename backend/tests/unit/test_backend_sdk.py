@@ -1,5 +1,7 @@
 from pathlib import Path
 
+import pytest
+
 from app.plugins.sdk.backend import (
     BackendConfigField,
     build_backend_manager_config,
@@ -41,6 +43,17 @@ def test_build_backend_plugin_metadata():
     assert metadata["instance_label"] == "Worker"
     assert metadata["ui_actions"] == [{"id": "fetch", "type": "fetch"}]
     assert metadata["plugin_class"] is DummyBackendPlugin
+
+
+def test_build_backend_plugin_metadata_rejects_app_managed_config_fields():
+    with pytest.raises(ValueError, match="app-managed config field"):
+        build_backend_plugin_metadata(
+            type_id="dummy_backend",
+            name="Dummy Backend",
+            description="Dummy",
+            plugin_class=DummyBackendPlugin,
+            instance_config_schema={"enabled": {"type": "boolean"}},
+        )
 
 
 def test_extract_backend_config_uses_defaults_and_transforms():

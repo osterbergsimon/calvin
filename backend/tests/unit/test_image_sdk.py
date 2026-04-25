@@ -174,6 +174,17 @@ def test_build_image_plugin_metadata():
     assert metadata["plugin_class"] is DummyImagePlugin
 
 
+def test_build_image_plugin_metadata_rejects_app_managed_config_fields():
+    with pytest.raises(ValueError, match="app-managed config field"):
+        build_image_plugin_metadata(
+            type_id="dummy_image",
+            name="Dummy Image",
+            description="Dummy",
+            plugin_class=DummyImagePlugin,
+            common_config_schema={"display_order": {"type": "integer"}},
+        )
+
+
 def test_extract_image_config_uses_defaults_and_transforms():
     fields = (
         ImageConfigField("token", default="", converter=str, transform=str.strip),

@@ -16,6 +16,7 @@ from pydantic import BaseModel
 
 from app.models.db_models import PluginDB, PluginTypeDB
 from app.plugins.base import PluginType
+from app.plugins.definitions import APP_MANAGED_CONFIG_FIELD_KEYS
 from app.plugins.hooks import plugin_manager as hook_manager
 from app.plugins.loader import plugin_loader
 from app.plugins.manager import plugin_manager
@@ -29,9 +30,10 @@ from .themes import BUILTIN_THEMES, _unregister_theme_from_db
 
 router = APIRouter()
 
-# Cross-cutting type-level keys that all plugins support, regardless of
-# whether they declare them in their own common_config_schema.
-UNIVERSAL_TYPE_CONFIG_KEYS = frozenset({"display_order"})
+# Cross-cutting type-level config values that all plugins support, regardless of
+# whether they declare them in their own common_config_schema. These are values,
+# not schema fields, so they should not be returned as common_config_schema.
+UNIVERSAL_TYPE_CONFIG_KEYS = APP_MANAGED_CONFIG_FIELD_KEYS
 
 
 class RebuildStatusResponse(BaseModel):
@@ -145,21 +147,15 @@ async def get_plugins(
             enabled = db_type.enabled if db_type else True  # Default to enabled
             error_message = db_type.error_message if db_type else None
 
-            # Merge plugin metadata common_config_schema with database common_config_schema
-            # This ensures user-set values (like display_order) are preserved
+            # Keep schema and saved values separate. Historical data may have
+            # leaked instance fields or raw values into common_config_schema;
+            # those values are still exposed by /plugins/{id}/config when needed.
             metadata_schema = type_info.get("common_config_schema", {}) or {}
-            db_schema = (
-                db_type.common_config_schema if db_type and db_type.common_config_schema else {}
-            )
-            # Only override keys that are defined in the plugin's own metadata schema —
-            # prevents instance config fields that leaked into db_schema from showing here.
-            merged_schema = {**metadata_schema}
-            for key in metadata_schema:
-                if key in db_schema:
-                    merged_schema[key] = db_schema[key]
-            for key in UNIVERSAL_TYPE_CONFIG_KEYS:
-                if key in db_schema:
-                    merged_schema[key] = db_schema[key]
+            global_schema = {
+                key: schema
+                for key, schema in metadata_schema.items()
+                if key not in UNIVERSAL_TYPE_CONFIG_KEYS
+            }
 
             plugin_info: dict[str, Any] = {
                 "id": type_id,
@@ -168,8 +164,8 @@ async def get_plugins(
                 if hasattr(plugin_type_enum, "value")
                 else str(plugin_type_enum),
                 "description": type_info.get("description", ""),
-                "config_schema": merged_schema,  # Legacy name
-                "common_config_schema": merged_schema,  # Also send as common_config_schema for frontend
+                "config_schema": global_schema,  # Legacy name
+                "common_config_schema": global_schema,  # Also send as common_config_schema for frontend
                 "instance_config_schema": type_info.get("instance_config_schema", {}),
                 "enabled": enabled,
                 "ui_actions": type_info.get("ui_actions", []),  # Plugin-specific actions (buttons)
@@ -589,16 +585,14 @@ async def get_plugin(plugin_id: str):
     enabled = db_type.enabled if db_type else True
     error_message = db_type.error_message if db_type else None
 
-    # Merge plugin metadata common_config_schema with database common_config_schema
-    # This ensures user-set values (like display_order) are preserved
+    # Keep schema and saved values separate. Saved values are exposed by
+    # /plugins/{id}/config and should not be rendered as schema fields.
     metadata_schema = type_info.get("common_config_schema", {}) or {}
-    db_schema = db_type.common_config_schema if db_type and db_type.common_config_schema else {}
-    # Only override keys that are defined in the plugin's own metadata schema —
-    # prevents instance config fields that leaked into db_schema from showing here.
-    merged_schema = {**metadata_schema}
-    for key in metadata_schema:
-        if key in db_schema:
-            merged_schema[key] = db_schema[key]
+    global_schema = {
+        key: schema
+        for key, schema in metadata_schema.items()
+        if key not in UNIVERSAL_TYPE_CONFIG_KEYS
+    }
 
     plugin_info: dict[str, Any] = {
         "id": type_info.get("type_id"),
@@ -607,7 +601,8 @@ async def get_plugin(plugin_id: str):
         if hasattr(type_info.get("plugin_type"), "value")
         else str(type_info.get("plugin_type")),
         "description": type_info.get("description", ""),
-        "config_schema": merged_schema,
+        "config_schema": global_schema,
+        "common_config_schema": global_schema,
         "display_schema": type_info.get("display_schema"),
         "statusbar_schema": type_info.get("statusbar_schema"),
         "enabled": enabled,

@@ -1,3 +1,5 @@
+import pytest
+
 from app.plugins.sdk.service import (
     ServiceConfigField,
     build_service_manager_config,
@@ -31,6 +33,17 @@ def test_build_service_plugin_metadata():
     assert metadata["supports_multiple_instances"] is False
     assert metadata["instance_label"] == "Source"
     assert metadata["plugin_class"] is DummyServicePlugin
+
+
+def test_build_service_plugin_metadata_rejects_app_managed_config_fields():
+    with pytest.raises(ValueError, match="app-managed config field"):
+        build_service_plugin_metadata(
+            type_id="dummy_service",
+            name="Dummy Service",
+            description="Dummy",
+            plugin_class=DummyServicePlugin,
+            common_config_schema={"display_order": {"type": "integer"}},
+        )
 
 
 def test_extract_service_config_uses_defaults_and_transforms():

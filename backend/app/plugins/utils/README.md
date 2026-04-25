@@ -13,7 +13,7 @@ from app.plugins.utils import extract_config_value, to_int, to_bool
 
 # In create_plugin_instance hook:
 count = extract_config_value(config, "count", default=30, converter=to_int)
-enabled = extract_config_value(config, "enabled", default=False, converter=to_bool)
+active = extract_config_value(config, "active", default=False, converter=to_bool)
 ```
 
 ### `normalize_config_value()`
@@ -36,7 +36,7 @@ from app.plugins.utils import normalize_config_dict
 
 normalized = normalize_config_dict(config, schema={
     "count": {"default": 30, "type": int},
-    "enabled": {"default": False, "converter": to_bool},
+    "active": {"default": False, "converter": to_bool},
 })
 ```
 
@@ -70,7 +70,7 @@ async def handle_plugin_config_update(type_id, config, enabled, db_type, session
         generate_instance_id=lambda c, t: f"{t}-{hash(str(c))}",
         normalize_config=lambda c: {
             "count": extract_config_value(c, "count", default=30, converter=to_int),
-            "enabled": extract_config_value(c, "enabled", default=False, converter=to_bool),
+            "active": extract_config_value(c, "active", default=False, converter=to_bool),
         },
         default_instance_name="My Plugin Instance",
     )

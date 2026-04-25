@@ -72,9 +72,9 @@
 
         <!-- Plugin Actions -->
         <PluginActions
-          v-if="plugin.ui_actions && plugin.ui_actions.length > 0"
+          v-if="globalPluginActions.length > 0"
           :plugin-id="plugin.id"
-          :actions="plugin.ui_actions"
+          :actions="globalPluginActions"
           :saving="saving === plugin.id ? plugin.id : null"
           :testing="typeof testing === 'object' && testing ? testing[plugin.id] || {} : {}"
           :fetching="typeof fetching === 'object' && fetching ? fetching[plugin.id] || {} : {}"
@@ -227,6 +227,25 @@ const hasGlobalSettings = computed(() => {
   return Object.keys(globalConfigSchema.value).length > 0;
 });
 
+const globalPluginActions = computed(() => {
+  const actions = props.plugin.ui_actions || [];
+  const hasInstances =
+    props.plugin.supports_multiple_instances !== false && props.plugin.type !== "theme";
+
+  return actions.filter(action => {
+    if (action.scope === "instance") {
+      return false;
+    }
+    if (action.scope === "global") {
+      return true;
+    }
+    if (hasInstances && ["test", "fetch", "geocode"].includes(action.type)) {
+      return false;
+    }
+    return true;
+  });
+});
+
 const showInstances = computed(() => {
   return (
     props.plugin.enabled &&
@@ -240,7 +259,8 @@ const showInstances = computed(() => {
 const getGlobalConfigSchema = plugin => {
   return Object.fromEntries(
     Object.entries(plugin.common_config_schema || {}).filter(
-      ([key, schema]) => !key.startsWith("_") && !schema.ui?.hidden
+      ([key, schema]) =>
+        !key.startsWith("_") && schema && typeof schema === "object" && !schema.ui?.hidden
     )
   );
 };

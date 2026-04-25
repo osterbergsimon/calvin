@@ -438,7 +438,7 @@ const handleTest = async () => {
     const testConfig = {};
     if (plugin.instance_config_schema) {
       for (const [key, schema] of Object.entries(plugin.instance_config_schema)) {
-        // Skip display_order - it's a global plugin setting
+        // Skip display_order - instance order is managed by the instance list.
         if (key === "display_order") {
           continue;
         }
@@ -495,11 +495,11 @@ const handleSave = async () => {
     const plugin = currentPlugin.value;
 
     // Build config from instance_config_schema fields
-    // Exclude display_order - it's a global plugin setting, not instance-specific
+    // Exclude display_order - instance order is managed by the instance list.
     const config = {};
     if (plugin.instance_config_schema) {
       for (const [key, schema] of Object.entries(plugin.instance_config_schema)) {
-        // Skip display_order - it's handled at the plugin level
+        // Skip display_order - it's handled by drag ordering in the instance list.
         if (key === "display_order") {
           continue;
         }

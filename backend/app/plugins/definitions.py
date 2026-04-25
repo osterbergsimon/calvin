@@ -14,6 +14,61 @@ from app.plugins.base import PluginType
 CURRENT_PLUGIN_PROTOCOL_VERSION = 1
 SUPPORTED_PLUGIN_PROTOCOL_VERSIONS = {CURRENT_PLUGIN_PROTOCOL_VERSION}
 
+# Field names owned by the Calvin app UI/data model. Plugins may still receive
+# these values in runtime config when the app supplies them, but they cannot
+# declare their own generated settings controls for them.
+APP_MANAGED_CONFIG_FIELD_KEYS = frozenset(
+    {
+        "common_config_schema",
+        "config",
+        "created_at",
+        "display_order",
+        "display_schema",
+        "enabled",
+        "id",
+        "instance_config_schema",
+        "instance_label",
+        "name",
+        "plugin_id",
+        "plugin_type",
+        "running",
+        "statusbar_schema",
+        "supports_multiple_instances",
+        "type",
+        "type_id",
+        "ui_actions",
+        "ui_sections",
+        "updated_at",
+    }
+)
+
+
+def strip_app_managed_config_fields(schema: dict[str, Any] | None) -> dict[str, Any]:
+    """Remove app-managed fields from plugin-declared config schemas."""
+    return {
+        key: value
+        for key, value in (schema or {}).items()
+        if key not in APP_MANAGED_CONFIG_FIELD_KEYS
+    }
+
+
+def validate_plugin_config_schema_keys(
+    *,
+    plugin_type_id: str,
+    schema_name: str,
+    schema: dict[str, Any] | None,
+) -> None:
+    """Raise if SDK-built plugin metadata declares app-managed settings fields."""
+    reserved_keys = sorted(set(schema or {}) & APP_MANAGED_CONFIG_FIELD_KEYS)
+    if not reserved_keys:
+        return
+
+    quoted = ", ".join(f"'{key}'" for key in reserved_keys)
+    raise ValueError(
+        f"Plugin '{plugin_type_id}' declares app-managed config field(s) in "
+        f"{schema_name}: {quoted}. These fields are owned by Calvin's settings UI/data model."
+    )
+
 
 class ConfigFieldDefinition(BaseModel):
     """Typed config field metadata with permissive extra support."""
@@ -112,6 +167,8 @@ class PluginDefinition(BaseModel):
                 f"Unsupported plugin protocol version: {self.protocol_version}. "
                 f"Supported versions: {supported}"
             )
+        self.common_config_schema = strip_app_managed_config_fields(self.common_config_schema)
+        self.instance_config_schema = strip_app_managed_config_fields(self.instance_config_schema)
         return self
 
     def get(self, key: str, default: Any = None) -> Any:

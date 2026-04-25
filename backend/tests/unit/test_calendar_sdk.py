@@ -1,3 +1,5 @@
+import pytest
+
 from app.plugins.sdk.calendar import (
     CalendarConfigField,
     build_calendar_manager_config,
@@ -30,6 +32,17 @@ def test_build_calendar_plugin_metadata():
     assert metadata["supports_multiple_instances"] is False
     assert metadata["instance_label"] == "Source"
     assert metadata["plugin_class"] is DummyCalendarPlugin
+
+
+def test_build_calendar_plugin_metadata_rejects_app_managed_config_fields():
+    with pytest.raises(ValueError, match="app-managed config field"):
+        build_calendar_plugin_metadata(
+            type_id="dummy_calendar",
+            name="Dummy Calendar",
+            description="Dummy",
+            plugin_class=DummyCalendarPlugin,
+            instance_config_schema={"enabled": {"type": "boolean"}},
+        )
 
 
 def test_extract_calendar_config_uses_defaults_and_transforms():

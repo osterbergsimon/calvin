@@ -31,23 +31,7 @@ class IframeServicePlugin(ServicePlugin):
             name="Iframe Service",
             description="Web service displayed in iframe",
             plugin_class=cls,
-            common_config_schema={
-                "display_order": {
-                    "type": "integer",
-                    "description": "Display order for service instances",
-                    "default": 0,
-                    "ui": {
-                        "component": "number",
-                        "help_text": (
-                            "Order for display/switching (lower numbers appear first). "
-                            "This applies to all instances of this plugin type."
-                        ),
-                        "validation": {
-                            "min": 0,
-                        },
-                    },
-                },
-            },
+            common_config_schema={},
             instance_config_schema={
                 "url": {
                     "type": "string",
