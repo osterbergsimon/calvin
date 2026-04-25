@@ -91,18 +91,27 @@
         >
           ✓ Saved
         </div>
-        <LayoutCategory
-          v-if="activeCategory === 'layout' && localConfig"
+        <DashboardCategory
+          v-if="activeCategory === 'dashboard' && localConfig"
           :config="localConfig"
           @update:config="handleConfigUpdate"
         />
-        <ContentCategory v-if="activeCategory === 'content'" />
+        <ContentSourcesCategory
+          v-if="activeCategory === 'content' && localConfig"
+          :config="localConfig"
+          @update:config="handleConfigUpdate"
+        />
         <PluginsCategory v-if="activeCategory === 'plugins'" />
-        <SystemCategory
-          v-if="activeCategory === 'system'"
+        <DeviceCategory
+          v-if="activeCategory === 'device'"
           :config="localConfig"
           :version="version"
           :frontend-version="frontendVersion"
+          @update:config="handleConfigUpdate"
+        />
+        <MaintenanceCategory
+          v-if="activeCategory === 'maintenance'"
+          :config="localConfig"
           :git-repo-url="localConfig.gitRepoUrl"
           :git-branch="localConfig.gitBranch"
           @update:config="handleConfigUpdate"
@@ -123,17 +132,20 @@ import { useModeStore } from "@/stores/mode";
 import { defineAsyncComponent } from "vue";
 
 // Lazy load category components for better code splitting
-const LayoutCategory = defineAsyncComponent(
-  () => import("@/components/settings/categories/LayoutCategory.vue"),
+const DashboardCategory = defineAsyncComponent(
+  () => import("@/components/settings/categories/DashboardCategory.vue"),
 );
-const ContentCategory = defineAsyncComponent(
-  () => import("@/components/settings/categories/ContentCategory.vue"),
+const ContentSourcesCategory = defineAsyncComponent(
+  () => import("@/components/settings/categories/ContentSourcesCategory.vue"),
 );
 const PluginsCategory = defineAsyncComponent(
   () => import("@/components/settings/categories/PluginsCategory.vue"),
 );
-const SystemCategory = defineAsyncComponent(
-  () => import("@/components/settings/categories/SystemCategory.vue"),
+const DeviceCategory = defineAsyncComponent(
+  () => import("@/components/settings/categories/DeviceCategory.vue"),
+);
+const MaintenanceCategory = defineAsyncComponent(
+  () => import("@/components/settings/categories/MaintenanceCategory.vue"),
 );
 
 const router = useRouter();
@@ -141,14 +153,21 @@ const modeStore = useModeStore();
 
 // Category navigation
 const categories = [
-  { id: "layout", label: "Layout & Display", icon: "📐" },
-  { id: "content", label: "Content", icon: "📦" },
+  { id: "dashboard", label: "Dashboard", icon: "📐" },
+  { id: "content", label: "Content Sources", icon: "📦" },
   { id: "plugins", label: "Plugins", icon: "🔌" },
-  { id: "system", label: "System", icon: "⚙️" },
+  { id: "device", label: "Device", icon: "🖥️" },
+  { id: "maintenance", label: "Maintenance", icon: "⚙️" },
 ];
 
 const _CATEGORY_KEY = "settings_active_category";
-const activeCategory = ref(sessionStorage.getItem(_CATEGORY_KEY) || "layout");
+const getInitialCategory = () => {
+  const storedCategory = sessionStorage.getItem(_CATEGORY_KEY);
+  return categories.some((category) => category.id === storedCategory)
+    ? storedCategory
+    : "dashboard";
+};
+const activeCategory = ref(getInitialCategory());
 watch(activeCategory, (val) => sessionStorage.setItem(_CATEGORY_KEY, val));
 const showSystemMenu = ref(false);
 
