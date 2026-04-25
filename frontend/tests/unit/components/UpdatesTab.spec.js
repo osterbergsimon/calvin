@@ -13,9 +13,7 @@ vi.mock("@/composables", () => ({
 }));
 
 vi.mock("@/services/configApi", () => ({
-  getGitBranches: vi.fn(() =>
-    Promise.resolve({ branches: ["main", "develop", "release"] }),
-  ),
+  getGitBranches: vi.fn(() => Promise.resolve({ branches: ["main", "develop", "release"] })),
 }));
 
 describe("UpdatesTab", () => {

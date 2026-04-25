@@ -9,7 +9,7 @@ import {
 
 describe("settings registry", () => {
   it("defines the primary settings categories in display order", () => {
-    expect(settingsCategories.map((category) => category.id)).toEqual([
+    expect(settingsCategories.map(category => category.id)).toEqual([
       "dashboard",
       "content",
       "plugins",
@@ -34,12 +34,8 @@ describe("settings registry", () => {
   });
 
   it("searches labels, paths, and keywords", () => {
-    expect(
-      filterSettingsDestinations("seconds").map((item) => item.id),
-    ).toEqual(["dashboard-clock"]);
-    expect(filterSettingsDestinations("github").map((item) => item.id)).toEqual(
-      ["plugins"],
-    );
+    expect(filterSettingsDestinations("seconds").map(item => item.id)).toEqual(["dashboard-clock"]);
+    expect(filterSettingsDestinations("github").map(item => item.id)).toEqual(["plugins"]);
   });
 
   it("limits search results", () => {

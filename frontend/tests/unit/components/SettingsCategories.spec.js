@@ -47,7 +47,7 @@ describe("settings category IA", () => {
 
     const tabs = wrapper.findComponent(TabNavigation).props("tabs");
 
-    expect(tabs.map((tab) => tab.label)).toEqual([
+    expect(tabs.map(tab => tab.label)).toEqual([
       "Layout",
       "Calendar Display",
       "Plugin Display",
@@ -65,7 +65,7 @@ describe("settings category IA", () => {
 
     const tabs = wrapper.findComponent(TabNavigation).props("tabs");
 
-    expect(tabs.map((tab) => tab.label)).toEqual([
+    expect(tabs.map(tab => tab.label)).toEqual([
       "Calendars",
       "Photos",
       "Image Sources",
@@ -85,7 +85,7 @@ describe("settings category IA", () => {
 
     const tabs = wrapper.findComponent(TabNavigation).props("tabs");
 
-    expect(tabs.map((tab) => tab.label)).toEqual([
+    expect(tabs.map(tab => tab.label)).toEqual([
       "Power & Display",
       "Keyboard",
       "Reboot Combo",
@@ -105,6 +105,6 @@ describe("settings category IA", () => {
 
     const tabs = wrapper.findComponent(TabNavigation).props("tabs");
 
-    expect(tabs.map((tab) => tab.label)).toEqual(["Updates", "Diagnostics"]);
+    expect(tabs.map(tab => tab.label)).toEqual(["Updates", "Diagnostics"]);
   });
 });

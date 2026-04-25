@@ -22,10 +22,7 @@ describe("usePersistedSettingTab", () => {
   });
 
   it("persists tab updates", async () => {
-    const { setActiveTab } = usePersistedSettingTab(
-      "settings_test_tab",
-      "main",
-    );
+    const { setActiveTab } = usePersistedSettingTab("settings_test_tab", "main");
 
     setActiveTab("advanced");
     await nextTick();

@@ -36,7 +36,7 @@ describe("dashboard display settings tabs", () => {
     const options = wrapper
       .find("#week-start-day")
       .findAll("option")
-      .map((option) => option.text());
+      .map(option => option.text());
 
     expect(wrapper.find("#week-start-day").element.value).toBe("1");
     expect(options).toEqual([
