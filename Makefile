@@ -1,4 +1,4 @@
-.PHONY: help install dev dev-logs dev-logs-read test lint format type-check build clean
+.PHONY: help install dev dev-logs dev-logs-read dev-verbose test test-watch test-watch-frontend lint format type-check build clean doctor
 
 help:
 	@echo "Available commands:"
@@ -6,7 +6,11 @@ help:
 	@echo "  make dev            - Start development servers (backend, docs in background)"
 	@echo "  make dev-logs       - Start development servers with visible logs"
 	@echo "  make dev-logs-read  - Read recent dev logs (useful for AI assistant)"
+	@echo "  make dev-verbose    - Like dev-logs but with HTTP request logging on"
+	@echo "  make doctor         - Check dev environment (versions, ports, venv)"
 	@echo "  make test           - Run all tests"
+	@echo "  make test-watch     - Re-run backend unit tests on file change"
+	@echo "  make test-watch-frontend - Re-run frontend tests on file change"
 	@echo "  make test-scripts   - Test setup scripts (requires bats)"
 	@echo "  make lint           - Run linters"
 	@echo "  make format         - Format code"
@@ -121,4 +125,34 @@ clean:
 	rm -rf frontend/dist
 	find . -type d -name __pycache__ -exec rm -r {} + 2>/dev/null || true
 	find . -type f -name "*.pyc" -delete
+
+dev-verbose:
+	@CALVIN_DEV_LOG_HTTP=1 $(MAKE) dev-logs
+
+test-watch:
+	cd backend && uv run ptw -- -m "unit and not slow"
+
+test-watch-frontend:
+	cd frontend && npm run test -- --watch
+
+doctor:
+	@echo "Calvin dev-environment doctor"
+	@echo "─────────────────────────────"
+	@printf "uv:         "; command -v uv >/dev/null 2>&1 && uv --version || echo "MISSING — install from https://docs.astral.sh/uv/"
+	@printf "python:     "; command -v python >/dev/null 2>&1 && python --version || echo "MISSING"
+	@printf "node:       "; command -v node >/dev/null 2>&1 && node --version || echo "MISSING"
+	@printf "npm:        "; command -v npm >/dev/null 2>&1 && npm --version || echo "MISSING"
+	@printf "pre-commit: "; command -v pre-commit >/dev/null 2>&1 && pre-commit --version || echo "MISSING — run: pip install pre-commit (or: uv tool install pre-commit)"
+	@echo ""
+	@echo "Backend venv:"
+	@if [ -d backend/.venv ]; then echo "  backend/.venv exists"; else echo "  MISSING — run: make install"; fi
+	@echo ""
+	@echo "Ports (8000 backend, 5173 frontend, 8001 docs):"
+	@for p in 8000 5173 8001; do \
+		if command -v lsof >/dev/null 2>&1 && lsof -i :$$p -sTCP:LISTEN >/dev/null 2>&1; then \
+			echo "  $$p: IN USE"; \
+		else \
+			echo "  $$p: free"; \
+		fi; \
+	done
 
