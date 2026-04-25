@@ -55,6 +55,44 @@
       </div>
     </div>
 
+    <div class="settings-search">
+      <label class="search-label" for="settings-search-input">
+        Find a setting
+      </label>
+      <input
+        id="settings-search-input"
+        v-model="settingsSearchQuery"
+        class="search-input"
+        type="search"
+        placeholder="Search display, calendar, plugins, reboot, updates..."
+        autocomplete="off"
+      />
+      <div
+        v-if="settingsSearchQuery.trim()"
+        class="search-results"
+        role="listbox"
+        aria-label="Settings search results"
+      >
+        <button
+          v-for="result in filteredSettingsDestinations"
+          :key="result.id"
+          type="button"
+          class="search-result"
+          role="option"
+          @click="jumpToSetting(result)"
+        >
+          <span class="search-result-title">{{ result.label }}</span>
+          <span class="search-result-path">{{ result.path }}</span>
+        </button>
+        <div
+          v-if="filteredSettingsDestinations.length === 0"
+          class="search-empty"
+        >
+          No matching settings
+        </div>
+      </div>
+    </div>
+
     <div
       v-if="updateMessage"
       class="system-status-banner"
@@ -93,17 +131,23 @@
         </div>
         <DashboardCategory
           v-if="activeCategory === 'dashboard' && localConfig"
+          :key="categoryRenderKey"
           :config="localConfig"
           @update:config="handleConfigUpdate"
         />
         <ContentSourcesCategory
           v-if="activeCategory === 'content' && localConfig"
+          :key="categoryRenderKey"
           :config="localConfig"
           @update:config="handleConfigUpdate"
         />
-        <PluginsCategory v-if="activeCategory === 'plugins'" />
+        <PluginsCategory
+          v-if="activeCategory === 'plugins'"
+          :key="categoryRenderKey"
+        />
         <DeviceCategory
           v-if="activeCategory === 'device'"
+          :key="categoryRenderKey"
           :config="localConfig"
           :version="version"
           :frontend-version="frontendVersion"
@@ -111,6 +155,7 @@
         />
         <MaintenanceCategory
           v-if="activeCategory === 'maintenance'"
+          :key="categoryRenderKey"
           :config="localConfig"
           :git-repo-url="localConfig.gitRepoUrl"
           :git-branch="localConfig.gitBranch"
@@ -124,7 +169,7 @@
 </template>
 
 <script setup>
-import { ref, watch, onMounted, onUnmounted } from "vue";
+import { computed, ref, watch, onMounted, onUnmounted } from "vue";
 import { useRouter } from "vue-router";
 import { useConfigForm } from "@/composables";
 import { useSystem } from "@/composables";
@@ -160,6 +205,132 @@ const categories = [
   { id: "maintenance", label: "Maintenance", icon: "⚙️" },
 ];
 
+const settingsDestinations = [
+  {
+    id: "dashboard-layout",
+    label: "Layout and calendar display",
+    path: "Dashboard / Layout & Calendar",
+    category: "dashboard",
+    tabKey: "settings_tab_dashboard",
+    tab: "layout",
+    keywords: [
+      "display",
+      "orientation",
+      "split",
+      "calendar",
+      "week",
+      "time format",
+      "meal plan",
+    ],
+  },
+  {
+    id: "dashboard-ui",
+    label: "UI, theme, clock, and notifications",
+    path: "Dashboard / UI, Theme & Clock",
+    category: "dashboard",
+    tabKey: "settings_tab_dashboard",
+    tab: "ui",
+    keywords: ["ui", "theme", "clock", "kiosk", "notifications", "weather"],
+  },
+  {
+    id: "content-calendars",
+    label: "Calendar sources and refresh",
+    path: "Content Sources / Calendars",
+    category: "content",
+    tabKey: "settings_tab_content_sources",
+    tab: "calendars",
+    keywords: ["calendar", "ical", "google", "source", "refresh"],
+  },
+  {
+    id: "content-photos",
+    label: "Photo slideshow behavior",
+    path: "Content Sources / Photos",
+    category: "content",
+    tabKey: "settings_tab_content_sources",
+    tab: "photos",
+    keywords: ["photos", "slideshow", "photo frame", "random", "image mode"],
+  },
+  {
+    id: "content-images",
+    label: "Image source ordering",
+    path: "Content Sources / Image Sources",
+    category: "content",
+    tabKey: "settings_tab_content_sources",
+    tab: "images",
+    keywords: ["image", "ordering", "sources", "plugins"],
+  },
+  {
+    id: "content-services",
+    label: "Service source ordering",
+    path: "Content Sources / Services",
+    category: "content",
+    tabKey: "settings_tab_content_sources",
+    tab: "services",
+    keywords: ["services", "web services", "ordering"],
+  },
+  {
+    id: "plugins",
+    label: "Install and manage plugins",
+    path: "Plugins",
+    category: "plugins",
+    keywords: ["plugins", "install", "github", "zip", "themes", "instances"],
+  },
+  {
+    id: "device-power",
+    label: "Power, display schedule, and timeout",
+    path: "Device / Power & Display",
+    category: "device",
+    tabKey: "settings_tab_device",
+    tab: "power",
+    keywords: ["power", "display", "schedule", "timeout", "screen"],
+  },
+  {
+    id: "device-keyboard",
+    label: "Keyboard type and mappings",
+    path: "Device / Keyboard",
+    category: "device",
+    tabKey: "settings_tab_device",
+    tab: "keyboard",
+    keywords: ["keyboard", "buttons", "mappings", "shortcuts"],
+  },
+  {
+    id: "device-reboot",
+    label: "Reboot button combo",
+    path: "Device / Reboot Combo",
+    category: "device",
+    tabKey: "settings_tab_device",
+    tab: "reboot",
+    keywords: ["reboot", "restart", "combo", "keys"],
+  },
+  {
+    id: "device-hardware",
+    label: "Hardware and version status",
+    path: "Device / Hardware",
+    category: "device",
+    tabKey: "settings_tab_device",
+    tab: "hardware",
+    keywords: ["hardware", "version", "status", "backend", "frontend"],
+  },
+  {
+    id: "maintenance-updates",
+    label: "Software updates",
+    path: "Maintenance / Updates",
+    category: "maintenance",
+    tabKey: "settings_tab_maintenance",
+    tab: "updates",
+    keywords: ["updates", "git", "repository", "branch"],
+  },
+  {
+    id: "maintenance-diagnostics",
+    label: "Diagnostics and console logging",
+    path: "Maintenance / Diagnostics",
+    category: "maintenance",
+    tabKey: "settings_tab_maintenance",
+    tab: "diagnostics",
+    keywords: ["diagnostics", "debug", "logs", "polling", "console"],
+  },
+];
+
 const _CATEGORY_KEY = "settings_active_category";
 const getInitialCategory = () => {
   const storedCategory = sessionStorage.getItem(_CATEGORY_KEY);
@@ -170,6 +341,35 @@ const getInitialCategory = () => {
 const activeCategory = ref(getInitialCategory());
 watch(activeCategory, (val) => sessionStorage.setItem(_CATEGORY_KEY, val));
 const showSystemMenu = ref(false);
+const settingsSearchQuery = ref("");
+const categoryRenderKey = ref(0);
+
+const filteredSettingsDestinations = computed(() => {
+  const query = settingsSearchQuery.value.trim().toLowerCase();
+  if (!query) return [];
+
+  return settingsDestinations
+    .filter((destination) => {
+      const haystack = [
+        destination.label,
+        destination.path,
+        ...(destination.keywords || []),
+      ]
+        .join(" ")
+        .toLowerCase();
+      return haystack.includes(query);
+    })
+    .slice(0, 8);
+});
+
+const jumpToSetting = (destination) => {
+  if (destination.tabKey && destination.tab) {
+    sessionStorage.setItem(destination.tabKey, destination.tab);
+  }
+  activeCategory.value = destination.category;
+  settingsSearchQuery.value = "";
+  categoryRenderKey.value += 1;
+};
 
 // Config management
 const {
@@ -306,6 +506,91 @@ onUnmounted(() => {
 .save-status-error {
   border-color: rgba(244, 67, 54, 0.45);
   color: #c62828;
+}
+
+.settings-search {
+  position: relative;
+  margin-bottom: 1.5rem;
+  max-width: 720px;
+}
+
+.search-label {
+  display: block;
+  margin-bottom: 0.4rem;
+  color: var(--text-secondary);
+  font-size: 0.85rem;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+}
+
+.search-input {
+  width: 100%;
+  padding: 0.8rem 1rem;
+  background: var(--bg-secondary);
+  color: var(--text-primary);
+  border: 1px solid var(--border-color);
+  border-radius: 10px;
+  font-size: 0.95rem;
+  font-family: inherit;
+}
+
+.search-input:focus {
+  outline: none;
+  border-color: var(--accent-primary);
+  box-shadow: 0 0 0 3px rgba(33, 150, 243, 0.18);
+}
+
+.search-results {
+  position: absolute;
+  z-index: 1200;
+  top: calc(100% + 0.4rem);
+  left: 0;
+  right: 0;
+  overflow: hidden;
+  background: var(--bg-primary);
+  border: 1px solid var(--border-color);
+  border-radius: 10px;
+  box-shadow: 0 8px 24px var(--shadow);
+}
+
+.search-result {
+  display: flex;
+  flex-direction: column;
+  gap: 0.2rem;
+  width: 100%;
+  padding: 0.8rem 1rem;
+  background: transparent;
+  border: 0;
+  border-bottom: 1px solid var(--border-color);
+  color: var(--text-primary);
+  cursor: pointer;
+  text-align: left;
+}
+
+.search-result:last-child {
+  border-bottom: 0;
+}
+
+.search-result:hover,
+.search-result:focus-visible {
+  background: var(--bg-secondary);
+  outline: none;
+}
+
+.search-result-title {
+  font-weight: 700;
+}
+
+.search-result-path {
+  color: var(--text-secondary);
+  font-size: 0.82rem;
+}
+
+.search-empty {
+  padding: 0.9rem 1rem;
+  color: var(--text-secondary);
+  font-size: 0.9rem;
 }
 
 .system-menu {
