@@ -16,12 +16,42 @@ vi.mock("@/services/systemApi", () => ({
   triggerUpdate: vi.fn(),
   getUpdateStatus: vi.fn(),
   getHealth: vi.fn(),
+  getUpdateStreamUrl: vi.fn(() => "/api/system/update/stream"),
 }));
+
+// Minimal EventSource stub for the streaming update flow. Tests drive
+// .onmessage / .onerror on FakeEventSource.last to simulate server events.
+class FakeEventSource {
+  constructor(url) {
+    this.url = url;
+    this.onmessage = null;
+    this.onerror = null;
+    this.closed = false;
+    FakeEventSource.last = this;
+  }
+  close() {
+    this.closed = true;
+  }
+}
+FakeEventSource.last = null;
+globalThis.EventSource = FakeEventSource;
+
+// Stub window.location.reload — restart flows call it on success.
+const reloadSpy = vi.fn();
+Object.defineProperty(window, "location", {
+  configurable: true,
+  value: { reload: reloadSpy },
+});
 
 describe("useSystem", () => {
   beforeEach(() => {
-    vi.resetAllMocks();
+    // restoreAllMocks (not resetAllMocks) so vi.spyOn-created spies revert to
+    // their original implementations between tests — otherwise globals like
+    // Date.now and setTimeout get stubbed out for the whole file.
+    vi.restoreAllMocks();
     vi.useFakeTimers();
+    FakeEventSource.last = null;
+    reloadSpy.mockClear();
   });
 
   afterEach(() => {
@@ -112,99 +142,148 @@ describe("useSystem", () => {
     });
   });
 
+  // Restart flows call `await sleep(N)` (2000ms then 1500ms) and a health-poll
+  // loop. We stub setTimeout to fire callbacks immediately ONLY for the
+  // sleep durations the flow uses — leaving the message-clear timers (8000,
+  // 12000) parked so they don't wipe the message before assertions.
+  const stubSleepTimers = () => {
+    vi.spyOn(globalThis, "setTimeout").mockImplementation((fn, ms) => {
+      if (ms === 2000 || ms === 1500) {
+        fn();
+        return 0;
+      }
+      return Math.floor(Math.random() * 1_000_000);
+    });
+  };
+
   describe("restartBackend", () => {
-    it("should restart backend successfully", async () => {
-      systemApi.restartBackend.mockResolvedValue({
-        message: "Backend restart scheduled.",
-      });
+    beforeEach(() => {
+      vi.useRealTimers();
+    });
+
+    it("calls systemApi.restartBackend, waits for health, and reloads on success", async () => {
+      systemApi.restartBackend.mockResolvedValue({});
+      systemApi.getHealth.mockResolvedValue({ status: "healthy" });
+      stubSleepTimers();
 
       const system = useSystem();
       await system.restartBackend();
 
       expect(systemApi.restartBackend).toHaveBeenCalled();
-      expect(system.updateMessage.value).toBe("Backend restart scheduled.");
+      expect(systemApi.getHealth).toHaveBeenCalled();
       expect(system.updateMessageClass.value).toBe("success");
-
-      // Fast-forward to clear message
-      vi.advanceTimersByTime(5000);
-
-      expect(system.updateMessage.value).toBe("");
-      expect(system.updateMessageClass.value).toBe("");
+      expect(reloadSpy).toHaveBeenCalled();
     });
 
-    it("should handle errors when restarting backend", async () => {
+    it("sets a warning when backend never comes back healthy", async () => {
+      systemApi.restartBackend.mockResolvedValue({});
+      systemApi.getHealth.mockRejectedValue(new Error("down"));
+      // Drive Date.now forward so the health-poll loop's timeoutMs check
+      // exits after a couple of iterations rather than running for real.
+      let now = 0;
+      vi.spyOn(Date, "now").mockImplementation(() => {
+        now += 30_000;
+        return now;
+      });
+      stubSleepTimers();
+
+      const system = useSystem();
+      await system.restartBackend();
+
+      expect(system.updateMessageClass.value).toBe("warning");
+      expect(reloadSpy).not.toHaveBeenCalled();
+    });
+
+    it("sets error message when restart returns an HTTP error response", async () => {
       const error = new Error("Failed to restart");
+      error.response = { data: { detail: "Service unavailable" } };
       systemApi.restartBackend.mockRejectedValue(error);
 
       const system = useSystem();
+      await system.restartBackend();
 
-      await expect(system.restartBackend()).rejects.toThrow(
-        "Failed to restart",
-      );
-      expect(system.updateMessage.value).toBe("Failed to restart backend");
+      expect(system.updateMessage.value).toBe("Service unavailable");
       expect(system.updateMessageClass.value).toBe("error");
+      expect(systemApi.getHealth).not.toHaveBeenCalled();
+    });
+
+    it("treats a network error (no response) as a successful initiation", async () => {
+      // Backend killed itself before sending the response — fall through to
+      // the health-poll branch.
+      systemApi.restartBackend.mockRejectedValue(new Error("ECONNRESET"));
+      systemApi.getHealth.mockResolvedValue({ status: "healthy" });
+      stubSleepTimers();
+
+      const system = useSystem();
+      await system.restartBackend();
+
+      expect(systemApi.getHealth).toHaveBeenCalled();
+      expect(system.updateMessageClass.value).toBe("success");
     });
   });
 
   describe("restartFrontend", () => {
-    it("should restart frontend successfully", async () => {
-      systemApi.restartFrontend.mockResolvedValue({
-        message: "Frontend service restart initiated.",
-      });
+    beforeEach(() => {
+      vi.useRealTimers();
+    });
+
+    it("calls systemApi.restartFrontend, waits for health, and reloads on success", async () => {
+      systemApi.restartFrontend.mockResolvedValue({});
+      systemApi.getHealth.mockResolvedValue({ status: "healthy" });
+      stubSleepTimers();
 
       const system = useSystem();
       await system.restartFrontend();
 
       expect(systemApi.restartFrontend).toHaveBeenCalled();
-      expect(system.updateMessage.value).toBe(
-        "Frontend service restart initiated.",
-      );
       expect(system.updateMessageClass.value).toBe("success");
-
-      // Fast-forward to clear message
-      vi.advanceTimersByTime(5000);
-
-      expect(system.updateMessage.value).toBe("");
-      expect(system.updateMessageClass.value).toBe("");
+      expect(reloadSpy).toHaveBeenCalled();
     });
 
-    it("should handle errors when restarting frontend", async () => {
+    it("sets error message when restart returns an HTTP error response", async () => {
       const error = new Error("Failed to restart");
+      error.response = { data: { detail: "Service unavailable" } };
       systemApi.restartFrontend.mockRejectedValue(error);
 
       const system = useSystem();
+      await system.restartFrontend();
 
-      await expect(system.restartFrontend()).rejects.toThrow(
-        "Failed to restart",
-      );
-      expect(system.updateMessage.value).toBe("Failed to restart frontend");
+      expect(system.updateMessage.value).toBe("Service unavailable");
       expect(system.updateMessageClass.value).toBe("error");
     });
   });
 
   describe("triggerUpdate", () => {
-    it("should trigger update and update status", async () => {
-      systemApi.triggerUpdate.mockResolvedValue({});
+    // Resolve once FakeEventSource.last has been populated by the call to
+    // streamUpdateStatus, then fire a single SSE message.
+    const fireStreamEvent = async (statusEvent) => {
+      while (!FakeEventSource.last) {
+        await Promise.resolve();
+      }
+      FakeEventSource.last.onmessage({ data: JSON.stringify(statusEvent) });
+    };
+
+    it("streams update progress and reports success when backend comes back", async () => {
+      systemApi.triggerUpdate.mockResolvedValue({ log_offset: 0 });
       systemApi.getHealth.mockResolvedValue({ status: "healthy" });
-      // Mock getUpdateStatus to return idle (completed) status immediately
-      systemApi.getUpdateStatus.mockResolvedValue({
-        status: "idle",
-        message: "Update completed",
-      });
+      // Use real timers; the happy path doesn't actually wait on any timer
+      // (waitForBackendHealthy returns true on first getHealth).
+      vi.useRealTimers();
 
       const system = useSystem();
-      await system.triggerUpdate();
+      const promise = system.triggerUpdate();
 
-      // Test functionality: update was triggered, status was checked, message was set
+      await fireStreamEvent({ type: "status", status: "complete" });
+      await promise;
+
       expect(systemApi.triggerUpdate).toHaveBeenCalled();
-      expect(system.updating.value).toBe(false); // Should be false after completion
-      expect(system.updateStatus.value?.status).toBe("idle");
+      expect(system.updating.value).toBe(false);
       expect(system.updateMessage.value).toContain("completed successfully");
+      expect(system.updateMessageClass.value).toBe("success");
     });
 
-    it("should handle update errors", async () => {
-      const error = new Error("Update failed");
-      systemApi.triggerUpdate.mockRejectedValue(error);
+    it("sets an error message when triggerUpdate itself fails", async () => {
+      systemApi.triggerUpdate.mockRejectedValue(new Error("Update failed"));
 
       const system = useSystem();
       await system.triggerUpdate();
@@ -214,17 +293,21 @@ describe("useSystem", () => {
       expect(system.updateMessageClass.value).toBe("error");
     });
 
-    it("should handle update status errors", async () => {
-      systemApi.triggerUpdate.mockResolvedValue({});
-      systemApi.getUpdateStatus.mockResolvedValue({
-        status: "error",
-        message: "Update failed",
-      });
+    it("sets an error message when the stream reports status=error", async () => {
+      systemApi.triggerUpdate.mockResolvedValue({ log_offset: 0 });
+      vi.useRealTimers();
 
       const system = useSystem();
-      await system.triggerUpdate();
+      const promise = system.triggerUpdate();
 
-      expect(system.updateMessage.value).toBe("Update failed: Update failed");
+      await fireStreamEvent({
+        type: "status",
+        status: "error",
+        message: "Build failed",
+      });
+      await promise;
+
+      expect(system.updateMessage.value).toBe("Update failed: Build failed");
       expect(system.updateMessageClass.value).toBe("error");
     });
   });
