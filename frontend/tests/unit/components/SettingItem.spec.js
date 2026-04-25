@@ -52,9 +52,7 @@ describe("SettingItem", () => {
       });
 
       expect(wrapper.find(".help-text").exists()).toBe(true);
-      expect(wrapper.find(".help-text").text()).toBe(
-        "This is helpful information",
-      );
+      expect(wrapper.find(".help-text").text()).toBe("This is helpful information");
     });
 
     it("should not render help text when help prop is not provided", () => {
@@ -149,14 +147,10 @@ describe("SettingItem", () => {
       });
 
       expect(wrapper.find("label").text()).toBe("Email Address");
-      expect(wrapper.find(".help-text").text()).toBe(
-        "Enter your email address",
-      );
+      expect(wrapper.find(".help-text").text()).toBe("Enter your email address");
       expect(wrapper.find(".required-indicator").text()).toBe("*");
       expect(wrapper.find("input[type='email']").exists()).toBe(true);
-      expect(wrapper.find("input").attributes("placeholder")).toBe(
-        "email@example.com",
-      );
+      expect(wrapper.find("input").attributes("placeholder")).toBe("email@example.com");
     });
   });
 });

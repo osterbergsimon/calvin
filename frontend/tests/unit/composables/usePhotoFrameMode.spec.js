@@ -4,10 +4,7 @@
 
 import { describe, it, expect, beforeEach, afterEach, vi } from "vitest";
 import { setActivePinia, createPinia } from "pinia";
-import {
-  usePhotoFrameMode,
-  resetPhotoFrameInstance,
-} from "@/composables/usePhotoFrameMode";
+import { usePhotoFrameMode, resetPhotoFrameInstance } from "@/composables/usePhotoFrameMode";
 import { useConfigStore } from "@/stores/config";
 import { useModeStore } from "@/stores/mode";
 import { useRouter } from "vue-router";
@@ -98,9 +95,7 @@ describe("usePhotoFrameMode", () => {
       // Fast-forward time
       vi.advanceTimersByTime(5000);
 
-      expect(mockModeStore.enterFullscreen).toHaveBeenCalledWith(
-        mockModeStore.MODES.PHOTOS,
-      );
+      expect(mockModeStore.enterFullscreen).toHaveBeenCalledWith(mockModeStore.MODES.PHOTOS);
       expect(photoFrame.isPhotoFrameActive.value).toBe(true);
       expect(mockRouter.push).toHaveBeenCalledWith("/");
     });
@@ -171,9 +166,7 @@ describe("usePhotoFrameMode", () => {
 
       photoFrame.enterPhotoFrameMode();
 
-      expect(mockModeStore.enterFullscreen).toHaveBeenCalledWith(
-        mockModeStore.MODES.PHOTOS,
-      );
+      expect(mockModeStore.enterFullscreen).toHaveBeenCalledWith(mockModeStore.MODES.PHOTOS);
       expect(photoFrame.isPhotoFrameActive.value).toBe(true);
       expect(mockRouter.push).toHaveBeenCalledWith("/");
     });

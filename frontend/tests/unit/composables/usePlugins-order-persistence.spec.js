@@ -214,8 +214,7 @@ describe("usePlugins - Order Persistence", () => {
       pluginsApi.getPluginConfig.mockResolvedValue({});
       pluginsApi.updatePlugin.mockResolvedValue({ success: true });
 
-      const { imagePluginDisplayOrders, loadPlugins, updateImagePluginOrder } =
-        usePlugins();
+      const { imagePluginDisplayOrders, loadPlugins, updateImagePluginOrder } = usePlugins();
       await loadPlugins();
 
       expect(imagePluginDisplayOrders.value["local"]).toBe(0);

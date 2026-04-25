@@ -25,7 +25,7 @@ describe("DisplayTab", () => {
 
       const weekStartSelect = wrapper
         .findAll("select")
-        .find((s) => s.findAll("option").some((o) => o.text() === "Monday"));
+        .find(s => s.findAll("option").some(o => o.text() === "Monday"));
       expect(weekStartSelect).toBeDefined();
       expect(weekStartSelect?.findAll("option").length).toBe(7);
     });
@@ -39,7 +39,7 @@ describe("DisplayTab", () => {
 
       const weekStartSelect = wrapper
         .findAll("select")
-        .find((s) => s.findAll("option").some((o) => o.text() === "Monday"));
+        .find(s => s.findAll("option").some(o => o.text() === "Monday"));
       expect(weekStartSelect).toBeDefined();
       expect(weekStartSelect?.element.value).toBe("1");
     });
@@ -53,7 +53,7 @@ describe("DisplayTab", () => {
 
       const weekStartSelect = wrapper
         .findAll("select")
-        .find((s) => s.findAll("option").some((o) => o.text() === "Sunday"));
+        .find(s => s.findAll("option").some(o => o.text() === "Sunday"));
       expect(weekStartSelect?.element.value).toBe("0");
     });
 
@@ -66,7 +66,7 @@ describe("DisplayTab", () => {
 
       const weekStartSelect = wrapper
         .findAll("select")
-        .find((s) => s.findAll("option").some((o) => o.text() === "Saturday"));
+        .find(s => s.findAll("option").some(o => o.text() === "Saturday"));
       await weekStartSelect?.setValue("6");
       await weekStartSelect?.trigger("change");
 
@@ -84,9 +84,9 @@ describe("DisplayTab", () => {
 
       const weekStartSelect = wrapper
         .findAll("select")
-        .find((s) => s.findAll("option").some((o) => o.text() === "Monday"));
+        .find(s => s.findAll("option").some(o => o.text() === "Monday"));
       const options = weekStartSelect?.findAll("option") || [];
-      const dayLabels = options.map((o) => o.text());
+      const dayLabels = options.map(o => o.text());
 
       expect(dayLabels).toEqual([
         "Sunday",

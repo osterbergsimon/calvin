@@ -37,9 +37,7 @@ describe("ConnectionIndicator", () => {
       const wrapper = mount(ConnectionIndicator);
 
       expect(wrapper.find(".connection-indicator").exists()).toBe(true);
-      expect(wrapper.find(".connection-indicator").classes()).toContain(
-        "offline",
-      );
+      expect(wrapper.find(".connection-indicator").classes()).toContain("offline");
     });
 
     it("should render when backend is offline but browser is online", () => {
@@ -49,9 +47,7 @@ describe("ConnectionIndicator", () => {
       const wrapper = mount(ConnectionIndicator);
 
       expect(wrapper.find(".connection-indicator").exists()).toBe(true);
-      expect(wrapper.find(".connection-indicator").classes()).toContain(
-        "backend-offline",
-      );
+      expect(wrapper.find(".connection-indicator").classes()).toContain("backend-offline");
     });
   });
 
@@ -67,9 +63,7 @@ describe("ConnectionIndicator", () => {
       const indicator = wrapper.find(".connection-indicator");
       expect(indicator.text()).toContain("📡");
       expect(indicator.text()).toContain("Offline");
-      expect(indicator.attributes("title")).toBe(
-        "No internet connection. Using cached data.",
-      );
+      expect(indicator.attributes("title")).toBe("No internet connection. Using cached data.");
     });
 
     it("should display warning icon and label when backend is offline", () => {
@@ -83,9 +77,7 @@ describe("ConnectionIndicator", () => {
       const indicator = wrapper.find(".connection-indicator");
       expect(indicator.text()).toContain("⚠️");
       expect(indicator.text()).toContain("No Connection");
-      expect(indicator.attributes("title")).toBe(
-        "Backend server unreachable. Using cached data.",
-      );
+      expect(indicator.attributes("title")).toBe("Backend server unreachable. Using cached data.");
     });
 
     it("should hide label when showLabel prop is false", () => {
@@ -109,7 +101,7 @@ describe("ConnectionIndicator", () => {
       const wrapper = mount(ConnectionIndicator);
 
       expect(wrapper.find(".connection-indicator").attributes("title")).toBe(
-        "No internet connection. Using cached data.",
+        "No internet connection. Using cached data."
       );
     });
 
@@ -120,7 +112,7 @@ describe("ConnectionIndicator", () => {
       const wrapper = mount(ConnectionIndicator);
 
       expect(wrapper.find(".connection-indicator").attributes("title")).toBe(
-        "Backend server unreachable. Using cached data.",
+        "Backend server unreachable. Using cached data."
       );
     });
   });

@@ -89,9 +89,7 @@ describe("useSystem", () => {
 
       const system = useSystem();
 
-      await expect(system.turnDisplayOn()).rejects.toThrow(
-        "Failed to turn display on",
-      );
+      await expect(system.turnDisplayOn()).rejects.toThrow("Failed to turn display on");
       expect(system.displayOn.value).toBe(false);
     });
   });
@@ -113,9 +111,7 @@ describe("useSystem", () => {
 
       const system = useSystem();
 
-      await expect(system.turnDisplayOff()).rejects.toThrow(
-        "Failed to turn display off",
-      );
+      await expect(system.turnDisplayOff()).rejects.toThrow("Failed to turn display off");
     });
   });
 
@@ -137,7 +133,7 @@ describe("useSystem", () => {
       const system = useSystem();
 
       await expect(system.configureDisplayTimeout(300)).rejects.toThrow(
-        "Failed to configure timeout",
+        "Failed to configure timeout"
       );
     });
   });
@@ -256,7 +252,7 @@ describe("useSystem", () => {
   describe("triggerUpdate", () => {
     // Resolve once FakeEventSource.last has been populated by the call to
     // streamUpdateStatus, then fire a single SSE message.
-    const fireStreamEvent = async (statusEvent) => {
+    const fireStreamEvent = async statusEvent => {
       while (!FakeEventSource.last) {
         await Promise.resolve();
       }
@@ -335,9 +331,7 @@ describe("useSystem", () => {
 
       const system = useSystem();
 
-      await expect(system.getUpdateStatus()).rejects.toThrow(
-        "Failed to get status",
-      );
+      await expect(system.getUpdateStatus()).rejects.toThrow("Failed to get status");
     });
   });
 

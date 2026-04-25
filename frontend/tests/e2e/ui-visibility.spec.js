@@ -31,16 +31,12 @@ test.describe("UI Visibility", () => {
   test("should display connection indicator when offline", async ({ page }) => {
     // Connection indicator might be hidden when online
     // But should exist in DOM
-    const connectionIndicator = page.locator(
-      ".connection-indicator, [class*='connection']",
-    );
+    const connectionIndicator = page.locator(".connection-indicator, [class*='connection']");
     const count = await connectionIndicator.count();
     expect(count).toBeGreaterThanOrEqual(0);
   });
 
-  test("should display minimal UI overlay when UI is hidden", async ({
-    page,
-  }) => {
+  test("should display minimal UI overlay when UI is hidden", async ({ page }) => {
     // Look for minimal UI overlay button (if UI is hidden)
     const minimalUI = page.locator(".minimal-ui-overlay, [class*='minimal']");
     const count = await minimalUI.count();

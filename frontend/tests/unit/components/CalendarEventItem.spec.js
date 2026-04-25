@@ -23,8 +23,8 @@ describe("CalendarEventItem", () => {
 
     mockEventHelpers = {
       getEventColor: vi.fn(() => "#2196F3"),
-      getEventTitle: vi.fn((event) => event.title || "Event"),
-      getEventDisplayText: vi.fn((event) => {
+      getEventTitle: vi.fn(event => event.title || "Event"),
+      getEventDisplayText: vi.fn(event => {
         if (event.start && event.end) {
           return `${event.title || "Event"} ${event.start} - ${event.end}`;
         }
@@ -111,9 +111,7 @@ describe("CalendarEventItem", () => {
 
       expect(wrapper.find(".event-continuation").exists()).toBe(true);
       expect(wrapper.find(".continuation-arrow").text()).toBe("←");
-      expect(wrapper.find(".continuation-text").text()).toBe(
-        "Long Multi-Day...",
-      );
+      expect(wrapper.find(".continuation-text").text()).toBe("Long Multi-Day...");
     });
   });
 
@@ -128,9 +126,7 @@ describe("CalendarEventItem", () => {
       const wrapper = createWrapper({ event });
 
       expect(wrapper.find(".event-item").classes()).toContain("event-start");
-      expect(wrapper.find(".event-item").classes()).toContain(
-        "event-multi-day",
-      );
+      expect(wrapper.find(".event-item").classes()).toContain("event-multi-day");
     });
 
     it("should apply end class for end segment", () => {
@@ -143,9 +139,7 @@ describe("CalendarEventItem", () => {
       const wrapper = createWrapper({ event });
 
       expect(wrapper.find(".event-item").classes()).toContain("event-end");
-      expect(wrapper.find(".event-item").classes()).toContain(
-        "event-multi-day",
-      );
+      expect(wrapper.find(".event-item").classes()).toContain("event-multi-day");
     });
 
     it("should apply middle class for middle segment", () => {
@@ -158,9 +152,7 @@ describe("CalendarEventItem", () => {
       const wrapper = createWrapper({ event });
 
       expect(wrapper.find(".event-item").classes()).toContain("event-middle");
-      expect(wrapper.find(".event-item").classes()).toContain(
-        "event-multi-day",
-      );
+      expect(wrapper.find(".event-item").classes()).toContain("event-multi-day");
     });
   });
 
@@ -195,7 +187,7 @@ describe("CalendarEventItem", () => {
       // Browser may convert hex to rgb, so check for either
       expect(
         style.includes("background-color: #FF5722") ||
-          style.includes("background-color: rgb(255, 87, 34)"),
+          style.includes("background-color: rgb(255, 87, 34)")
       ).toBe(true);
       expect(mockEventHelpers.getEventColor).toHaveBeenCalledWith(event);
     });
@@ -265,9 +257,7 @@ describe("CalendarEventItem", () => {
       mockEventHelpers.getEventTitle.mockReturnValue("Important Meeting");
       const wrapper = createWrapper({ event });
 
-      expect(wrapper.find(".event-item").attributes("title")).toBe(
-        "Important Meeting",
-      );
+      expect(wrapper.find(".event-item").attributes("title")).toBe("Important Meeting");
       expect(mockEventHelpers.getEventTitle).toHaveBeenCalledWith(event);
     });
 

@@ -36,9 +36,7 @@ test.describe("Responsive Layout", () => {
 
     // Look for orientation toggle button
     const orientationButton = page
-      .locator(
-        'button:has-text("Portrait"), button:has-text("Landscape"), .btn-orientation',
-      )
+      .locator('button:has-text("Portrait"), button:has-text("Landscape"), .btn-orientation')
       .first();
     if ((await orientationButton.count()) > 0) {
       await orientationButton.click();

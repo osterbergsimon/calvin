@@ -171,9 +171,7 @@ describe("Images Store", () => {
         url: "https://picsum.photos/id/123/800/600",
       };
 
-      expect(store.getCurrentImageUrl).toBe(
-        "https://picsum.photos/id/123/800/600",
-      );
+      expect(store.getCurrentImageUrl).toBe("https://picsum.photos/id/123/800/600");
     });
 
     it("should prefer url over raw_url for remote images", () => {
@@ -185,9 +183,7 @@ describe("Images Store", () => {
         raw_url: "https://picsum.photos/id/123/1920/1080",
       };
 
-      expect(store.getCurrentImageUrl).toBe(
-        "https://picsum.photos/id/123/800/600",
-      );
+      expect(store.getCurrentImageUrl).toBe("https://picsum.photos/id/123/800/600");
     });
 
     it("should use raw_url if url is not available", () => {
@@ -198,9 +194,7 @@ describe("Images Store", () => {
         raw_url: "https://picsum.photos/id/123/1920/1080",
       };
 
-      expect(store.getCurrentImageUrl).toBe(
-        "https://picsum.photos/id/123/1920/1080",
-      );
+      expect(store.getCurrentImageUrl).toBe("https://picsum.photos/id/123/1920/1080");
     });
 
     it("should return null when no current image", () => {
@@ -256,9 +250,7 @@ describe("Images Store", () => {
       const mockCurrentImage = { data: { image: mockImages.images[0] } };
 
       axios.delete.mockResolvedValue({ data: { success: true } });
-      axios.get
-        .mockResolvedValueOnce({ data: mockImages })
-        .mockResolvedValueOnce(mockCurrentImage);
+      axios.get.mockResolvedValueOnce({ data: mockImages }).mockResolvedValueOnce(mockCurrentImage);
 
       const store = useImagesStore();
       store.currentImage = { id: "1", filename: "image1.jpg" };
