@@ -61,12 +61,7 @@ const props = defineProps({
 
 const emit = defineEmits(["click", "focus"]);
 
-const {
-  getEventColor,
-  getEventTitle,
-  getEventDisplayText,
-  truncateEventTitle,
-} = useEventHelpers();
+const { getEventColor, getEventTitle, getEventDisplayText, truncateEventTitle } = useEventHelpers();
 
 const eventItemRef = ref(null);
 
@@ -82,14 +77,10 @@ defineExpose({
 const eventColor = computed(() => getEventColor(props.event));
 const eventTitle = computed(() => getEventTitle(props.event));
 const displayText = computed(() => getEventDisplayText(props.event));
-const truncatedTitle = computed(() =>
-  truncateEventTitle(props.event.title, 15),
-);
+const truncatedTitle = computed(() => truncateEventTitle(props.event.title, 15));
 
 // Show full text for start events or single-day events
-const showFullText = computed(
-  () => props.event._isStart || !props.event._isMultiDay,
-);
+const showFullText = computed(() => props.event._isStart || !props.event._isMultiDay);
 
 // Event handlers
 const handleClick = () => {

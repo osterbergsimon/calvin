@@ -1,7 +1,5 @@
 <template>
-  <div
-    :class="['layout-manager', `layout-${orientation}`, { flipped: isFlipped }]"
-  >
+  <div :class="['layout-manager', `layout-${orientation}`, { flipped: isFlipped }]">
     <slot />
   </div>
 </template>

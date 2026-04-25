@@ -1,8 +1,6 @@
 <template>
   <div class="plugin-field">
-    <label>{{
-      (schema && typeof schema === "object" && schema.description) || fieldKey
-    }}</label>
+    <label>{{ (schema && typeof schema === "object" && schema.description) || fieldKey }}</label>
 
     <!-- Directory input (no browse button - directory browser removed) -->
     <div v-if="ui && ui.component === 'directory'" class="directory-input">
@@ -54,11 +52,7 @@
       class="form-input"
       @change="$emit('update', $event.target.value)"
     >
-      <option
-        v-for="option in ui.options"
-        :key="option.value"
-        :value="option.value"
-      >
+      <option v-for="option in ui.options" :key="option.value" :value="option.value">
         {{ option.label || option.value }}
       </option>
     </select>
@@ -66,11 +60,7 @@
     <!-- Select with scan button — fetches options from the backend -->
     <div v-else-if="ui && ui.component === 'select-scan'" class="scan-select">
       <div class="scan-select-row">
-        <select
-          :value="value"
-          class="form-input"
-          @change="$emit('update', $event.target.value)"
-        >
+        <select :value="value" class="form-input" @change="$emit('update', $event.target.value)">
           <option value="" disabled>
             {{
               scanning
@@ -80,26 +70,14 @@
                   : "— Click Scan to discover —"
             }}
           </option>
-          <option
-            v-if="value && !scannedOptions.find((o) => o.value === value)"
-            :value="value"
-          >
+          <option v-if="value && !scannedOptions.find(o => o.value === value)" :value="value">
             {{ value }}
           </option>
-          <option
-            v-for="opt in scannedOptions"
-            :key="opt.value"
-            :value="opt.value"
-          >
+          <option v-for="opt in scannedOptions" :key="opt.value" :value="opt.value">
             {{ opt.label || opt.value }}
           </option>
         </select>
-        <button
-          type="button"
-          class="btn-secondary"
-          :disabled="scanning"
-          @click="runScan"
-        >
+        <button type="button" class="btn-secondary" :disabled="scanning" @click="runScan">
           {{ scanning ? "Scanning…" : "Scan" }}
         </button>
       </div>
@@ -126,35 +104,25 @@
     >
       <input
         type="checkbox"
-        :checked="
-          value === true || value === 'true' || value === 1 || value === '1'
-        "
+        :checked="value === true || value === 'true' || value === 1 || value === '1'"
         class="checkbox-input"
         @change="$emit('update', $event.target.checked)"
       />
       <span class="checkbox-text">
-        {{
-          ui && ui.help_text
-            ? ui.help_text
-            : (schema && schema.description) || fieldKey
-        }}
+        {{ ui && ui.help_text ? ui.help_text : (schema && schema.description) || fieldKey }}
       </span>
     </label>
 
     <!-- Fallback: Default input based on schema type -->
     <input
-      v-else-if="
-        schema && typeof schema === 'object' && schema.type === 'string'
-      "
+      v-else-if="schema && typeof schema === 'object' && schema.type === 'string'"
       type="text"
       :value="value"
       class="form-input"
       @input="$emit('update', $event.target.value)"
     />
     <input
-      v-else-if="
-        schema && typeof schema === 'object' && schema.type === 'password'
-      "
+      v-else-if="schema && typeof schema === 'object' && schema.type === 'password'"
       type="password"
       :value="value"
       class="form-input"
@@ -207,9 +175,7 @@ const props = defineProps({
 defineEmits(["update"]);
 
 const ui = computed(() => {
-  return props.schema && typeof props.schema === "object"
-    ? props.schema.ui
-    : null;
+  return props.schema && typeof props.schema === "object" ? props.schema.ui : null;
 });
 
 const scannedOptions = ref([]);

@@ -90,22 +90,22 @@ const localValue = ref(Number(props.modelValue) || 16);
 // Sync local value with prop changes
 watch(
   () => props.modelValue,
-  (newValue) => {
+  newValue => {
     const numValue = Number(newValue);
     if (!isNaN(numValue)) {
       localValue.value = numValue;
     }
   },
-  { immediate: true },
+  { immediate: true }
 );
 
 // Handler for both slider and number input
 // For number inputs, we debounce the emit to reduce API calls during typing
-const handleInputDebounced = useDebounceFn((clampedValue) => {
+const handleInputDebounced = useDebounceFn(clampedValue => {
   emit("update:modelValue", clampedValue);
 }, 200);
 
-const handleInput = (event) => {
+const handleInput = event => {
   if (!event?.target) return;
 
   const value = parseFloat(event.target.value);

@@ -20,10 +20,7 @@
       </SettingItem>
 
       <SettingItem label="Image Display Mode" help="How images are displayed">
-        <select
-          :value="config.imageDisplayMode"
-          @change="handleImageDisplayModeChange"
-        >
+        <select :value="config.imageDisplayMode" @change="handleImageDisplayModeChange">
           <option value="smart">Smart (Auto-detect best fit)</option>
           <option value="fit">Fit (Show entire image)</option>
           <option value="fill">Fill (Fill container, may crop)</option>
@@ -32,10 +29,7 @@
         </select>
       </SettingItem>
 
-      <SettingItem
-        label="Randomize Image Order"
-        help="Shuffle image order when displaying"
-      >
+      <SettingItem label="Randomize Image Order" help="Shuffle image order when displaying">
         <label>
           <input
             :checked="config.randomizeImages ?? false"
@@ -96,18 +90,18 @@ defineProps({
 
 const emit = defineEmits(["update:config"]);
 
-const handlePhotoRotationIntervalChange = (event) => {
+const handlePhotoRotationIntervalChange = event => {
   const value = parseInt(event.target.value, 10);
   if (!isNaN(value)) {
     emit("update:config", { photoRotationInterval: value });
   }
 };
 
-const handleImageDisplayModeChange = (event) => {
+const handleImageDisplayModeChange = event => {
   emit("update:config", { imageDisplayMode: event.target.value });
 };
 
-const handlePhotoFrameModeChange = (event) => {
+const handlePhotoFrameModeChange = event => {
   // Map photoFrameMode to photoFrameEnabled for backend compatibility
   emit("update:config", {
     photoFrameEnabled: event.target.checked,
@@ -115,14 +109,14 @@ const handlePhotoFrameModeChange = (event) => {
   });
 };
 
-const handlePhotoFrameTimeoutChange = (event) => {
+const handlePhotoFrameTimeoutChange = event => {
   const value = parseInt(event.target.value, 10);
   if (!isNaN(value) && value >= 5 && value <= 3600) {
     emit("update:config", { photoFrameTimeout: value });
   }
 };
 
-const handleRandomizeImagesChange = (event) => {
+const handleRandomizeImagesChange = event => {
   emit("update:config", { randomizeImages: event.target.checked });
 };
 </script>

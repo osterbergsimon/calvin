@@ -79,23 +79,23 @@ export const useConfigStore = defineStore("config", () => {
   const loading = ref(false);
   const error = ref(null);
 
-  const setOrientation = (newOrientation) => {
+  const setOrientation = newOrientation => {
     orientation.value = newOrientation;
   };
 
-  const setOrientationFlipped = (flipped) => {
+  const setOrientationFlipped = flipped => {
     orientationFlipped.value = flipped;
   };
 
-  const setApplyDisplayRotation = (apply) => {
+  const setApplyDisplayRotation = apply => {
     applyDisplayRotation.value = apply;
   };
 
-  const setLastSideViewMode = (mode) => {
+  const setLastSideViewMode = mode => {
     lastSideViewMode.value = mode;
   };
 
-  const setCalendarSplit = (percentage) => {
+  const setCalendarSplit = percentage => {
     // Clamp between 10 and 90 to prevent UI issues while allowing flexibility
     calendarSplit.value = Math.max(10, Math.min(90, percentage));
   };
@@ -386,8 +386,7 @@ export const useConfigStore = defineStore("config", () => {
       if (response.data.clockBarShowInNonKiosk !== undefined) {
         clockBarShowInNonKiosk.value = response.data.clockBarShowInNonKiosk;
       } else if (response.data.clock_bar_show_in_non_kiosk !== undefined) {
-        clockBarShowInNonKiosk.value =
-          response.data.clock_bar_show_in_non_kiosk;
+        clockBarShowInNonKiosk.value = response.data.clock_bar_show_in_non_kiosk;
       }
       if (response.data.clockBarShowInKiosk !== undefined) {
         clockBarShowInKiosk.value = response.data.clockBarShowInKiosk;
@@ -474,7 +473,7 @@ export const useConfigStore = defineStore("config", () => {
     }
   };
 
-  const updateConfig = async (config) => {
+  const updateConfig = async config => {
     loading.value = true;
     error.value = null;
     try {
@@ -644,15 +643,15 @@ export const useConfigStore = defineStore("config", () => {
     }
   };
 
-  const setPhotoFrameEnabled = (enabled) => {
+  const setPhotoFrameEnabled = enabled => {
     photoFrameEnabled.value = enabled;
   };
 
-  const setPhotoFrameTimeout = (timeout) => {
+  const setPhotoFrameTimeout = timeout => {
     photoFrameTimeout.value = timeout;
   };
 
-  const setShowUI = (show) => {
+  const setShowUI = show => {
     showUI.value = show;
   };
 
@@ -706,11 +705,11 @@ export const useConfigStore = defineStore("config", () => {
     return showUI.value || showUITemporary.value;
   });
 
-  const setPhotoRotationInterval = (interval) => {
+  const setPhotoRotationInterval = interval => {
     photoRotationInterval.value = interval;
   };
 
-  const setCalendarViewMode = (mode) => {
+  const setCalendarViewMode = mode => {
     calendarViewMode.value = mode;
   };
 
@@ -732,55 +731,53 @@ export const useConfigStore = defineStore("config", () => {
     return newMode;
   };
 
-  const setTimeFormat = (format) => {
+  const setTimeFormat = format => {
     timeFormat.value = format;
   };
 
-  const setModeIndicatorTimeout = (timeout) => {
+  const setModeIndicatorTimeout = timeout => {
     modeIndicatorTimeout.value = timeout;
   };
 
-  const setWeekStartDay = (day) => {
+  const setWeekStartDay = day => {
     weekStartDay.value = Math.max(0, Math.min(6, day));
   };
 
-  const setShowWeekNumbers = (show) => {
+  const setShowWeekNumbers = show => {
     showWeekNumbers.value = show;
   };
 
-  const setWeekendDays = (days) => {
+  const setWeekendDays = days => {
     // Ensure days is an array of valid day numbers (0-6)
     if (Array.isArray(days)) {
-      weekendDays.value = days.filter((d) => d >= 0 && d <= 6);
+      weekendDays.value = days.filter(d => d >= 0 && d <= 6);
     }
   };
 
-  const setShowRedDays = (show) => {
+  const setShowRedDays = show => {
     showRedDays.value = show;
   };
 
-  const setMaxVisibleEvents = (count) => {
+  const setMaxVisibleEvents = count => {
     // Clamp between 1 and 20 to prevent UI issues
     maxVisibleEvents.value = Math.max(1, Math.min(20, count));
   };
 
-  const setSideViewPosition = (position) => {
+  const setSideViewPosition = position => {
     sideViewPosition.value = position;
   };
 
   const toggleSideViewPosition = () => {
     if (orientation.value === "landscape") {
       // Toggle between left and right
-      sideViewPosition.value =
-        sideViewPosition.value === "right" ? "left" : "right";
+      sideViewPosition.value = sideViewPosition.value === "right" ? "left" : "right";
     } else {
       // Toggle between top and bottom
-      sideViewPosition.value =
-        sideViewPosition.value === "bottom" ? "top" : "bottom";
+      sideViewPosition.value = sideViewPosition.value === "bottom" ? "top" : "bottom";
     }
   };
 
-  const setThemeMode = (mode) => {
+  const setThemeMode = mode => {
     themeMode.value = mode;
   };
 
@@ -789,7 +786,7 @@ export const useConfigStore = defineStore("config", () => {
     darkModeEnd.value = end;
   };
 
-  const setImageDisplayMode = (mode) => {
+  const setImageDisplayMode = mode => {
     imageDisplayMode.value = mode;
   };
 

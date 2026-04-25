@@ -12,7 +12,7 @@ const api = axios.create({
 
 // Request interceptor
 api.interceptors.request.use(
-  (config) => {
+  config => {
     // Add auth token if available
     // const token = localStorage.getItem('token')
     // if (token) {
@@ -20,14 +20,14 @@ api.interceptors.request.use(
     // }
     return config;
   },
-  (error) => {
+  error => {
     return Promise.reject(error);
-  },
+  }
 );
 
 // Response interceptor
 api.interceptors.response.use(
-  (response) => {
+  response => {
     // Mark backend as online on successful response
     const connectionStore = useConnectionStore();
     if (!connectionStore.isBackendOnline) {
@@ -35,7 +35,7 @@ api.interceptors.response.use(
     }
     return response;
   },
-  async (error) => {
+  async error => {
     const connectionStore = useConnectionStore();
 
     // Check if it's a network error (offline or backend unreachable)
@@ -64,7 +64,7 @@ api.interceptors.response.use(
     }
 
     return Promise.reject(error);
-  },
+  }
 );
 
 export default api;

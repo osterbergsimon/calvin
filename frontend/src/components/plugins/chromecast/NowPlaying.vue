@@ -6,9 +6,7 @@
 
     <div v-else-if="state === 'idle' || state === 'no_devices'" class="np-idle">
       <div class="np-idle-icon">📺</div>
-      <span class="np-idle-text"
-        >{{ deviceName || "Chromecast" }} — nothing casting</span
-      >
+      <span class="np-idle-text">{{ deviceName || "Chromecast" }} — nothing casting</span>
     </div>
 
     <div v-else-if="state === 'error'" class="np-idle">
@@ -16,12 +14,7 @@
     </div>
 
     <div v-else class="np-active">
-      <img
-        v-if="data.album_art_url"
-        class="np-art"
-        :src="data.album_art_url"
-        alt=""
-      />
+      <img v-if="data.album_art_url" class="np-art" :src="data.album_art_url" alt="" />
       <div v-else class="np-art-placeholder">{{ appIcon }}</div>
 
       <div class="np-overlay">
@@ -33,8 +26,7 @@
             <div class="np-bar-fill" :style="{ width: progressPct + '%' }" />
           </div>
           <span class="np-time"
-            >{{ formatTime(data.current_time) }} /
-            {{ formatTime(data.duration) }}</span
+            >{{ formatTime(data.current_time) }} / {{ formatTime(data.duration) }}</span
           >
         </div>
       </div>
@@ -54,7 +46,7 @@ const props = defineProps({
 
 const query = useQuery({
   queryKey: ["chromecast", props.serviceId],
-  queryFn: () => axios.get(props.apiEndpoint).then((r) => r.data),
+  queryFn: () => axios.get(props.apiEndpoint).then(r => r.data),
   refetchInterval: 10000,
   staleTime: 8000,
 });

@@ -12,7 +12,7 @@ export function useEventHelpers() {
   /**
    * Get event color from event or calendar source
    */
-  const getEventColor = (event) => {
+  const getEventColor = event => {
     // First try event's own color
     if (event.color) {
       return event.color;
@@ -20,7 +20,7 @@ export function useEventHelpers() {
     // Then try calendar source color
     // Check if source exists in calendar sources (valid source ID)
     if (event.source && calendarStore.sources.length > 0) {
-      const source = calendarStore.sources.find((s) => s.id === event.source);
+      const source = calendarStore.sources.find(s => s.id === event.source);
       if (source && source.color) {
         return source.color;
       }
@@ -32,7 +32,7 @@ export function useEventHelpers() {
   /**
    * Format event time based on time format setting
    */
-  const formatEventTime = (event) => {
+  const formatEventTime = event => {
     if (event.all_day) {
       return "All day";
     }
@@ -51,7 +51,7 @@ export function useEventHelpers() {
   /**
    * Get event title with time for tooltip
    */
-  const getEventTitle = (event) => {
+  const getEventTitle = event => {
     const time = formatEventTime(event);
     return `${event.title} (${time})`;
   };
@@ -68,7 +68,7 @@ export function useEventHelpers() {
   /**
    * Get event display text (with or without time based on source settings)
    */
-  const getEventDisplayText = (event) => {
+  const getEventDisplayText = event => {
     // Check if we should show time for this event's source
     // Only check if source is a valid source ID (not 'google' or 'mock')
     if (event.source && event.source !== "google" && event.source !== "mock") {

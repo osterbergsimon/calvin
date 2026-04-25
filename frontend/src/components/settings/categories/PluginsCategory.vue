@@ -88,11 +88,7 @@
     />
 
     <!-- Pip Security Warning Modal -->
-    <div
-      v-if="showPipWarningModal"
-      class="modal-overlay"
-      @click.self="cancelPipInstall"
-    >
+    <div v-if="showPipWarningModal" class="modal-overlay" @click.self="cancelPipInstall">
       <div class="modal-content pip-warning-modal">
         <div class="modal-header">
           <h3>⚠️ Security Warning</h3>
@@ -100,8 +96,7 @@
         </div>
         <div class="modal-body">
           <p>
-            <strong>{{ pipWarningPluginName }}</strong> requires installing the
-            following Python
+            <strong>{{ pipWarningPluginName }}</strong> requires installing the following Python
             {{ pipWarningPackages.length === 1 ? "package" : "packages" }}
             into the server environment:
           </p>
@@ -111,17 +106,13 @@
             </li>
           </ul>
           <p class="pip-warning-text">
-            Only install plugins from sources you trust. A malicious pip package
-            can execute arbitrary code on your server.
+            Only install plugins from sources you trust. A malicious pip package can execute
+            arbitrary code on your server.
           </p>
         </div>
         <div class="modal-footer">
-          <button class="btn-secondary" @click="cancelPipInstall">
-            Cancel
-          </button>
-          <button class="btn-danger" @click="confirmPipInstall">
-            Install Anyway
-          </button>
+          <button class="btn-secondary" @click="cancelPipInstall">Cancel</button>
+          <button class="btn-danger" @click="confirmPipInstall">Install Anyway</button>
         </div>
       </div>
     </div>
@@ -198,7 +189,7 @@ const imagesList = computed(() => imagesStore.images);
 
 // Computed
 const hasInstalledThemes = computed(() => {
-  return plugins.value.some((p) => p.type === "theme" && p._installed);
+  return plugins.value.some(p => p.type === "theme" && p._installed);
 });
 
 // Pip security warning modal state
@@ -230,7 +221,7 @@ const cancelPipInstall = () => {
 const rebuildStatus = ref("idle"); // idle | building | done | error
 const rebuildMessage = ref("");
 
-watch(pluginFrontendRebuildResult, (result) => {
+watch(pluginFrontendRebuildResult, result => {
   if (!result) return;
   if (result.building) {
     rebuildStatus.value = "building";
@@ -246,14 +237,12 @@ watch(pluginFrontendRebuildResult, (result) => {
 });
 
 // Handlers
-const handleZipSelect = async (file) => {
+const handleZipSelect = async file => {
   try {
     const result = await pluginsApi.inspectPluginZip(file);
     const deps = result.manifest?.python_dependencies ?? [];
     if (deps.length > 0) {
-      triggerPipWarning(deps, result.manifest?.name ?? file.name, () =>
-        installPluginFromZip(file),
-      );
+      triggerPipWarning(deps, result.manifest?.name ?? file.name, () => installPluginFromZip(file));
       return;
     }
   } catch {
@@ -271,7 +260,7 @@ const handleListPlugins = async ({ repoUrl, branch, source, localPath }) => {
 };
 
 const handleInstall = async ({ path, repoUrl, branch, force }) => {
-  const plugin = availablePlugins.value.find((p) => p.path === path);
+  const plugin = availablePlugins.value.find(p => p.path === path);
   const deps = plugin?.manifest?.python_dependencies ?? [];
   const doInstall = () => installPluginFromGitHub(repoUrl, path, branch, force);
   if (deps.length > 0) {
@@ -282,7 +271,7 @@ const handleInstall = async ({ path, repoUrl, branch, force }) => {
 };
 
 const handleForceUpdate = async ({ path, repoUrl, branch }) => {
-  const plugin = availablePlugins.value.find((p) => p.path === path);
+  const plugin = availablePlugins.value.find(p => p.path === path);
   const deps = plugin?.manifest?.python_dependencies ?? [];
   const doInstall = () => installPluginFromGitHub(repoUrl, path, branch, true);
   if (deps.length > 0) {
@@ -292,25 +281,18 @@ const handleForceUpdate = async ({ path, repoUrl, branch }) => {
   await doInstall();
 };
 
-const handleInstallSelected = async ({
-  plugins: pluginsToInstall,
-  repoUrl,
-  branch,
-}) => {
+const handleInstallSelected = async ({ plugins: pluginsToInstall, repoUrl, branch }) => {
   const allDeps = [];
   const names = [];
   for (const { path, id } of pluginsToInstall) {
-    const p = availablePlugins.value.find(
-      (ap) => ap.id === id || ap.path === path,
-    );
+    const p = availablePlugins.value.find(ap => ap.id === id || ap.path === path);
     const deps = p?.manifest?.python_dependencies ?? [];
     if (deps.length > 0) {
       allDeps.push(...deps);
       names.push(p?.name ?? id);
     }
   }
-  const doInstall = () =>
-    installPluginsFromGitHub(pluginsToInstall, repoUrl, branch);
+  const doInstall = () => installPluginsFromGitHub(pluginsToInstall, repoUrl, branch);
   if (allDeps.length > 0) {
     triggerPipWarning(allDeps, names.join(", "), doInstall);
     return;
@@ -319,7 +301,7 @@ const handleInstallSelected = async ({
 };
 
 const handleInstallLocal = async ({ path, localPath, force }) => {
-  const plugin = availablePlugins.value.find((p) => p.path === path);
+  const plugin = availablePlugins.value.find(p => p.path === path);
   const deps = plugin?.manifest?.python_dependencies ?? [];
   const doInstall = () => installPluginFromLocal(localPath, path, force);
   if (deps.length > 0) {
@@ -329,16 +311,11 @@ const handleInstallLocal = async ({ path, localPath, force }) => {
   await doInstall();
 };
 
-const handleInstallSelectedLocal = async ({
-  plugins: pluginsToInstall,
-  localPath,
-}) => {
+const handleInstallSelectedLocal = async ({ plugins: pluginsToInstall, localPath }) => {
   const allDeps = [];
   const names = [];
   for (const { path, id } of pluginsToInstall) {
-    const p = availablePlugins.value.find(
-      (ap) => ap.id === id || ap.path === path,
-    );
+    const p = availablePlugins.value.find(ap => ap.id === id || ap.path === path);
     const deps = p?.manifest?.python_dependencies ?? [];
     if (deps.length > 0) allDeps.push(...deps);
     names.push(p?.name ?? id);
@@ -355,11 +332,11 @@ const handleRestart = async () => {
   await restartBackend();
 };
 
-const handleToggleExpand = (pluginId) => {
+const handleToggleExpand = pluginId => {
   expandedPlugins.value[pluginId] = !expandedPlugins.value[pluginId];
   if (expandedPlugins.value[pluginId]) {
     // Load plugin config when expanding
-    void loadPluginConfig(pluginId).catch((error) => {
+    void loadPluginConfig(pluginId).catch(error => {
       console.error(`Failed to load config for plugin ${pluginId}:`, error);
     });
   }
@@ -370,7 +347,7 @@ const handleToggleEnabled = async (pluginId, enabled) => {
 };
 
 const handleUninstall = (pluginId, pluginType) => {
-  const plugin = plugins.value.find((p) => p.id === pluginId);
+  const plugin = plugins.value.find(p => p.id === pluginId);
   const pluginName = plugin?.name || pluginId;
   uninstallMessage.value = `Are you sure you want to uninstall "${pluginName}"? This action cannot be undone.`;
   pendingUninstall.value = { pluginId, pluginType };
@@ -399,15 +376,15 @@ const handleUpdateFormValue = (pluginId, key, value) => {
   updatePluginFormValue(pluginId, key, value);
 };
 
-const handleSaveConfig = async (pluginId) => {
+const handleSaveConfig = async pluginId => {
   await savePluginConfig(pluginId);
 };
 
-const handleTestConnection = async (pluginId) => {
+const handleTestConnection = async pluginId => {
   await testPluginConnection(pluginId);
 };
 
-const handleFetchNow = async (pluginId) => {
+const handleFetchNow = async pluginId => {
   await fetchPluginNow(pluginId);
 };
 
@@ -425,8 +402,8 @@ const showUninstallModal = ref(false);
 const pendingUninstall = ref({ pluginId: null, pluginType: null });
 const uninstallMessage = ref("");
 
-const handleAddInstance = (pluginId) => {
-  const plugin = plugins.value.find((p) => p.id === pluginId);
+const handleAddInstance = pluginId => {
+  const plugin = plugins.value.find(p => p.id === pluginId);
   if (!plugin) return;
 
   currentPlugin.value = plugin;
@@ -435,7 +412,7 @@ const handleAddInstance = (pluginId) => {
 };
 
 const handleEditInstance = (pluginId, instance) => {
-  const plugin = plugins.value.find((p) => p.id === pluginId);
+  const plugin = plugins.value.find(p => p.id === pluginId);
   if (!plugin) return;
 
   currentPlugin.value = plugin;
@@ -449,7 +426,7 @@ const handleCloseInstanceModal = () => {
   editingInstance.value = null;
 };
 
-const handleInstanceModalSave = async (calendarData) => {
+const handleInstanceModalSave = async calendarData => {
   await loadPlugins();
 
   // If a new calendar instance was created, create the calendar source
@@ -458,13 +435,11 @@ const handleInstanceModalSave = async (calendarData) => {
       const pluginTypeId = currentPlugin.value.id;
 
       // Wait a bit for plugins to fully reload
-      await new Promise((resolve) => setTimeout(resolve, 500));
+      await new Promise(resolve => setTimeout(resolve, 500));
 
       // Find the instance that was just created by name
       const instances = pluginInstances.value[pluginTypeId] || [];
-      const newInstance = instances.find(
-        (inst) => inst.name === calendarData.instanceName,
-      );
+      const newInstance = instances.find(inst => inst.name === calendarData.instanceName);
 
       if (newInstance) {
         // Create calendar source with the instance ID
@@ -485,7 +460,7 @@ const handleInstanceModalSave = async (calendarData) => {
   }
 };
 
-const handleDeleteInstance = async (instanceId) => {
+const handleDeleteInstance = async instanceId => {
   try {
     await pluginsApi.deletePluginInstance(instanceId);
     await loadPlugins();
@@ -517,7 +492,7 @@ const handleInstanceOrderChange = async (pluginId, newOrder) => {
   }
 };
 
-const handleUpload = async (event) => {
+const handleUpload = async event => {
   uploading.value = true;
   uploadError.value = "";
   uploadSuccess.value = "";
@@ -548,7 +523,7 @@ const handleUpload = async (event) => {
     }
 
     // Verify all items are File objects
-    if (!filesArray.every((f) => f instanceof File)) {
+    if (!filesArray.every(f => f instanceof File)) {
       throw new Error("Invalid file objects in selection");
     }
 
@@ -563,8 +538,7 @@ const handleUpload = async (event) => {
     }, 5000);
   } catch (error) {
     console.error("Upload error:", error);
-    uploadError.value =
-      error.response?.data?.detail || error.message || "Failed to upload image";
+    uploadError.value = error.response?.data?.detail || error.message || "Failed to upload image";
     setTimeout(() => {
       uploadError.value = "";
     }, 10000);
@@ -573,7 +547,7 @@ const handleUpload = async (event) => {
   }
 };
 
-const handleDeleteImage = async (imageId) => {
+const handleDeleteImage = async imageId => {
   try {
     await imagesStore.deleteImage(imageId);
   } catch (error) {
@@ -590,9 +564,7 @@ onMounted(async () => {
   // Set initial active tab
   if (plugins.value.length > 0) {
     const types = ["calendar", "image", "service", "backend", "theme"];
-    const firstType = types.find((type) =>
-      plugins.value.some((p) => p.type === type),
-    );
+    const firstType = types.find(type => plugins.value.some(p => p.type === type));
     if (firstType) {
       activePluginTab.value = firstType;
     }

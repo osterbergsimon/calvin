@@ -31,7 +31,7 @@ export const useCalendarStore = defineStore("calendar", () => {
       if (cachedSources) {
         logInfo(
           "[Calendar]",
-          `Using cached sources (${cachedSources.sources?.length || 0} sources)`,
+          `Using cached sources (${cachedSources.sources?.length || 0} sources)`
         );
         sources.value = cachedSources.sources || [];
         loading.value = false;
@@ -55,7 +55,7 @@ export const useCalendarStore = defineStore("calendar", () => {
         if (cachedSources) {
           logInfo(
             "[Calendar]",
-            `Request failed, using cached sources (${cachedSources.sources?.length || 0} sources)`,
+            `Request failed, using cached sources (${cachedSources.sources?.length || 0} sources)`
           );
           sources.value = cachedSources.sources || [];
           loading.value = false;
@@ -73,12 +73,9 @@ export const useCalendarStore = defineStore("calendar", () => {
 
   const updateSource = async (sourceId, updates) => {
     try {
-      const response = await axios.put(
-        `/api/calendar/sources/${sourceId}`,
-        updates,
-      );
+      const response = await axios.put(`/api/calendar/sources/${sourceId}`, updates);
       // Update local sources
-      const index = sources.value.findIndex((s) => s.id === sourceId);
+      const index = sources.value.findIndex(s => s.id === sourceId);
       if (index !== -1) {
         sources.value[index] = response.data;
       }
@@ -90,22 +87,17 @@ export const useCalendarStore = defineStore("calendar", () => {
     }
   };
 
-  const getSourceColor = (sourceId) => {
-    const source = sources.value.find((s) => s.id === sourceId);
+  const getSourceColor = sourceId => {
+    const source = sources.value.find(s => s.id === sourceId);
     return source?.color || "#2196f3"; // Default color
   };
 
-  const shouldShowTime = (sourceId) => {
-    const source = sources.value.find((s) => s.id === sourceId);
+  const shouldShowTime = sourceId => {
+    const source = sources.value.find(s => s.id === sourceId);
     return source?.show_time !== false; // Default to true
   };
 
-  const fetchEvents = async (
-    startDate,
-    endDate,
-    refreshParam = "",
-    background = false,
-  ) => {
+  const fetchEvents = async (startDate, endDate, refreshParam = "", background = false) => {
     if (background) {
       backgroundRefreshing.value = true;
     } else {
@@ -121,10 +113,7 @@ export const useCalendarStore = defineStore("calendar", () => {
     if (!connectionStore.isFullyOnline()) {
       const cachedEvents = getCachedData(cacheKey, cacheTTL);
       if (cachedEvents) {
-        logInfo(
-          "[Calendar]",
-          `Using cached events (${cachedEvents.events?.length || 0} events)`,
-        );
+        logInfo("[Calendar]", `Using cached events (${cachedEvents.events?.length || 0} events)`);
         events.value = cachedEvents.events || [];
         loading.value = false;
         return cachedEvents;
@@ -140,10 +129,7 @@ export const useCalendarStore = defineStore("calendar", () => {
       // Add refresh parameter if provided (for cache busting)
       if (refreshParam) {
         // Parse refresh param - could be a query string or boolean
-        if (
-          typeof refreshParam === "string" &&
-          refreshParam.includes("refresh=")
-        ) {
+        if (typeof refreshParam === "string" && refreshParam.includes("refresh=")) {
           // Extract refresh value from query string
           const refreshMatch = refreshParam.match(/refresh=([^&]*)/);
           if (refreshMatch) {
@@ -173,7 +159,7 @@ export const useCalendarStore = defineStore("calendar", () => {
         if (cachedEvents) {
           logInfo(
             "[Calendar]",
-            `Request failed, using cached events (${cachedEvents.events?.length || 0} events)`,
+            `Request failed, using cached events (${cachedEvents.events?.length || 0} events)`
           );
           events.value = cachedEvents.events || [];
           loading.value = false;
@@ -190,7 +176,7 @@ export const useCalendarStore = defineStore("calendar", () => {
     }
   };
 
-  const setCurrentDate = (date) => {
+  const setCurrentDate = date => {
     currentDate.value = date;
   };
 
@@ -200,9 +186,7 @@ export const useCalendarStore = defineStore("calendar", () => {
     const d = new Date(date);
     if (useUTC) {
       // Use UTC methods for all-day events (backend sends UTC dates)
-      return new Date(
-        Date.UTC(d.getUTCFullYear(), d.getUTCMonth(), d.getUTCDate()),
-      );
+      return new Date(Date.UTC(d.getUTCFullYear(), d.getUTCMonth(), d.getUTCDate()));
     } else {
       // Use local time methods for timed events (to match calendar grid)
       return new Date(d.getFullYear(), d.getMonth(), d.getDate());
@@ -233,7 +217,7 @@ export const useCalendarStore = defineStore("calendar", () => {
   const selectEvent = (event, selectedDayDate = null) => {
     // Find the event in the main events array to ensure we're using the same object reference
     // This helps with reactivity and ensures consistent comparisons
-    const eventFromMainArray = events.value.find((e) => {
+    const eventFromMainArray = events.value.find(e => {
       // Compare IDs as strings to ensure consistent comparison
       return String(e.id) === String(event.id);
     });
@@ -279,7 +263,7 @@ export const useCalendarStore = defineStore("calendar", () => {
 
       // Filter events using the exact same logic as CalendarView.getEventsForDate
       dayEvents.value = events.value
-        .filter((e) => {
+        .filter(e => {
           const eStart = new Date(e.start);
           const eEnd = new Date(e.end);
 
@@ -295,14 +279,8 @@ export const useCalendarStore = defineStore("calendar", () => {
             const eEndComponentsCalc = getDateComponents(eEndDate, false);
 
             // Check if event date is between start and end (inclusive)
-            const startCompare = compareDateComponents(
-              eStartComponents,
-              gridDateComponents,
-            );
-            const endCompare = compareDateComponents(
-              gridDateComponents,
-              eEndComponentsCalc,
-            );
+            const startCompare = compareDateComponents(eStartComponents, gridDateComponents);
+            const endCompare = compareDateComponents(gridDateComponents, eEndComponentsCalc);
             return startCompare <= 0 && endCompare <= 0;
           } else {
             // Timed events: check if the date falls within the event's time range
@@ -324,9 +302,7 @@ export const useCalendarStore = defineStore("calendar", () => {
             const aEnd = new Date(a.end);
             if (a.all_day) {
               const durationMs = aEnd.getTime() - aStart.getTime();
-              const durationDays = Math.floor(
-                durationMs / (1000 * 60 * 60 * 24),
-              );
+              const durationDays = Math.floor(durationMs / (1000 * 60 * 60 * 24));
               return durationDays > 0;
             } else {
               const aStartComp = getDateComponents(aStart, false);
@@ -340,9 +316,7 @@ export const useCalendarStore = defineStore("calendar", () => {
             const bEnd = new Date(b.end);
             if (b.all_day) {
               const durationMs = bEnd.getTime() - bStart.getTime();
-              const durationDays = Math.floor(
-                durationMs / (1000 * 60 * 60 * 24),
-              );
+              const durationDays = Math.floor(durationMs / (1000 * 60 * 60 * 24));
               return durationDays > 0;
             } else {
               const bStartComp = getDateComponents(bStart, false);
@@ -367,11 +341,11 @@ export const useCalendarStore = defineStore("calendar", () => {
     }
   };
 
-  const setDayEvents = (events) => {
+  const setDayEvents = events => {
     dayEvents.value = events;
   };
 
-  const setShowAllDayEvents = (show) => {
+  const setShowAllDayEvents = show => {
     showAllDayEvents.value = show;
   };
 

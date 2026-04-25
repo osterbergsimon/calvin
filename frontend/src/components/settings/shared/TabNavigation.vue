@@ -19,16 +19,16 @@ const props = defineProps({
   tabs: {
     type: Array,
     required: true,
-    validator: (tabs) =>
+    validator: tabs =>
       tabs.every(
-        (tab) =>
+        tab =>
           typeof tab === "object" &&
           tab.id &&
           tab.label &&
           (tab.icon === undefined || typeof tab.icon === "string") &&
           (tab.badge === undefined ||
             typeof tab.badge === "string" ||
-            typeof tab.badge === "number"),
+            typeof tab.badge === "number")
       ),
   },
   activeTab: {
@@ -39,7 +39,7 @@ const props = defineProps({
 
 const emit = defineEmits(["tab-change"]);
 
-const selectTab = (tabId) => {
+const selectTab = tabId => {
   if (tabId !== props.activeTab) {
     emit("tab-change", tabId);
   }

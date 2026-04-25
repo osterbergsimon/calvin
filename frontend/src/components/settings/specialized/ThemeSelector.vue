@@ -19,37 +19,21 @@
             v-if="theme.preview_image"
             class="theme-preview-image"
             :style="{
-              backgroundImage: theme.preview
-                ? `url(/api/plugins/${theme.id}/preview)`
-                : undefined,
+              backgroundImage: theme.preview ? `url(/api/plugins/${theme.id}/preview)` : undefined,
             }"
           />
-          <div
-            v-else
-            class="theme-preview-placeholder"
-            :style="getThemePreviewStyle(theme)"
-          >
+          <div v-else class="theme-preview-placeholder" :style="getThemePreviewStyle(theme)">
             {{ theme.name.charAt(0) }}
           </div>
-          <span
-            v-if="selectedThemeId === theme.id"
-            class="theme-selected-badge"
-          >
-            ✓
-          </span>
+          <span v-if="selectedThemeId === theme.id" class="theme-selected-badge"> ✓ </span>
         </div>
         <div class="theme-selection-info">
           <strong>{{ theme.name }}</strong>
-          <span v-if="theme.is_builtin" class="theme-badge-small"
-            >Built-in</span
-          >
+          <span v-if="theme.is_builtin" class="theme-badge-small">Built-in</span>
         </div>
       </div>
     </div>
-    <span
-      v-if="showHelp"
-      class="help-text"
-      style="display: block; margin-top: 0.5rem"
+    <span v-if="showHelp" class="help-text" style="display: block; margin-top: 0.5rem"
       >Select a theme to customize the appearance</span
     >
   </div>
@@ -80,11 +64,11 @@ defineProps({
 
 const emit = defineEmits(["select"]);
 
-const handleThemeSelect = (themeId) => {
+const handleThemeSelect = themeId => {
   emit("select", themeId);
 };
 
-const getThemePreviewStyle = (theme) => {
+const getThemePreviewStyle = theme => {
   // Extract CSS variables from theme if available
   const vars = theme.variables || {};
   const bgPrimary = vars["bg-primary"] || "#ffffff";
@@ -167,11 +151,7 @@ const getThemePreviewStyle = (theme) => {
   font-size: 2rem;
   font-weight: bold;
   color: var(--text-secondary);
-  background: linear-gradient(
-    135deg,
-    var(--accent-primary),
-    var(--accent-secondary)
-  );
+  background: linear-gradient(135deg, var(--accent-primary), var(--accent-secondary));
 }
 
 .theme-selected-badge {

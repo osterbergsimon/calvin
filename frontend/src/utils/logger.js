@@ -75,10 +75,7 @@ function shouldLog(level) {
 function formatMessage(level, prefix, ...args) {
   const timestamp = new Date().toISOString();
   const levelUpper = level.toUpperCase();
-  return [
-    `[${timestamp}] [${levelUpper}]${prefix ? ` ${prefix}` : ""}`,
-    ...args,
-  ];
+  return [`[${timestamp}] [${levelUpper}]${prefix ? ` ${prefix}` : ""}`, ...args];
 }
 
 /**

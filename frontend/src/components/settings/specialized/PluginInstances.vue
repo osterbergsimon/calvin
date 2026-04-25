@@ -3,9 +3,7 @@
     <div class="instances-header">
       <h4 class="config-section-title">
         {{ instanceLabelPlural }}
-        <span v-if="instances.length > 0" class="instance-count">
-          ({{ instances.length }})
-        </span>
+        <span v-if="instances.length > 0" class="instance-count"> ({{ instances.length }}) </span>
       </h4>
       <button
         class="btn-add-instance"
@@ -18,8 +16,8 @@
 
     <div v-if="instances.length === 0" class="empty-instances">
       <p class="help-text">
-        No {{ instanceLabelPlural.toLowerCase() }} configured. Click "Add
-        {{ instanceLabel }}" to create one.
+        No {{ instanceLabelPlural.toLowerCase() }} configured. Click "Add {{ instanceLabel }}" to
+        create one.
       </p>
     </div>
 
@@ -35,9 +33,7 @@
           <div class="instance-item" :class="{ disabled: !instance.enabled }">
             <div class="instance-info">
               <div class="instance-header">
-                <span class="instance-drag-handle" title="Drag to reorder">
-                  ⋮⋮
-                </span>
+                <span class="instance-drag-handle" title="Drag to reorder"> ⋮⋮ </span>
                 <span
                   v-if="instance.running !== undefined"
                   class="running-indicator"
@@ -46,9 +42,7 @@
                     stopped: !instance.running,
                   }"
                   :title="
-                    instance.running
-                      ? '● Green: Instance is running'
-                      : '○ Red: Instance is stopped'
+                    instance.running ? '● Green: Instance is running' : '○ Red: Instance is stopped'
                   "
                 >
                   {{ instance.running ? "●" : "○" }}
@@ -60,9 +54,7 @@
                 class="instance-details"
               >
                 <div class="instance-detail-item">
-                  <span class="instance-detail-value">{{
-                    getInstanceSummary(instance)
-                  }}</span>
+                  <span class="instance-detail-value">{{ getInstanceSummary(instance) }}</span>
                 </div>
               </div>
             </div>
@@ -70,9 +62,7 @@
               <label
                 class="toggle-switch-small"
                 :title="
-                  instance.enabled
-                    ? 'Disable and stop instance'
-                    : 'Enable and start instance'
+                  instance.enabled ? 'Disable and stop instance' : 'Enable and start instance'
                 "
               >
                 <input
@@ -140,10 +130,7 @@ const instanceLabelMap = {
 };
 
 const instanceLabel = computed(
-  () =>
-    props.plugin.instance_label ||
-    instanceLabelMap[props.plugin.type] ||
-    "Instance",
+  () => props.plugin.instance_label || instanceLabelMap[props.plugin.type] || "Instance"
 );
 
 const instanceLabelPlural = computed(() => {
@@ -160,7 +147,7 @@ const handleDelete = (instanceId, instanceName) => {
   emit("delete-instance", instanceId);
 };
 
-const handleOrderChange = (newOrder) => {
+const handleOrderChange = newOrder => {
   emit("order-change", newOrder);
 };
 </script>

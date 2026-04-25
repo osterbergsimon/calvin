@@ -48,10 +48,7 @@ export async function getPluginConfig(pluginId) {
  * Update plugin instance order.
  */
 export async function updatePluginInstanceOrder(pluginId, orders) {
-  const response = await api.put(
-    `/plugins/${pluginId}/instances/order`,
-    orders,
-  );
+  const response = await api.put(`/plugins/${pluginId}/instances/order`, orders);
   return response.data;
 }
 
@@ -130,12 +127,7 @@ export async function enumeratePluginsFromGitHub(repoUrl, branch = "main") {
 /**
  * Install plugin from GitHub.
  */
-export async function installPluginFromGitHub(
-  repoUrl,
-  pluginPath,
-  branch = "main",
-  force = false,
-) {
+export async function installPluginFromGitHub(repoUrl, pluginPath, branch = "main", force = false) {
   const response = await api.post("/plugins/github/install", {
     repo_url: repoUrl,
     plugin_path: pluginPath,
@@ -174,11 +166,7 @@ export async function enumeratePluginsFromLocal(localPath) {
 /**
  * Install plugin from a local directory (dev mode only).
  */
-export async function installPluginFromLocal(
-  localPath,
-  pluginPath,
-  force = false,
-) {
+export async function installPluginFromLocal(localPath, pluginPath, force = false) {
   const response = await api.post("/plugins/local/install", {
     local_path: localPath,
     plugin_path: pluginPath,
@@ -242,8 +230,7 @@ export async function createPluginInstance(pluginId, instanceData) {
   const configUpdate = {
     ...instanceData.config,
     _instance_name: instanceData.name, // Pass instance name as a special field
-    _instance_enabled:
-      instanceData.enabled !== undefined ? instanceData.enabled : true,
+    _instance_enabled: instanceData.enabled !== undefined ? instanceData.enabled : true,
   };
   const response = await api.put(`/plugins/${pluginId}`, configUpdate);
   return response.data;
@@ -254,10 +241,7 @@ export async function createPluginInstance(pluginId, instanceData) {
  * Uses the dedicated instance update endpoint.
  */
 export async function updatePluginInstance(instanceId, instanceData) {
-  const response = await api.put(
-    `/plugins/instances/${instanceId}`,
-    instanceData,
-  );
+  const response = await api.put(`/plugins/instances/${instanceId}`, instanceData);
   return response.data;
 }
 
