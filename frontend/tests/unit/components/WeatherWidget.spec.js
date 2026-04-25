@@ -131,7 +131,7 @@ describe("WeatherWidget", () => {
 
       const feelsLikeItem = wrapper
         .findAll(".weather-detail-item")
-        .find((item) => item.text().includes("Feels like"));
+        .find(item => item.text().includes("Feels like"));
       expect(feelsLikeItem.exists()).toBe(true);
       expect(feelsLikeItem.text()).toContain("19°C"); // Rounded
     });
@@ -144,7 +144,7 @@ describe("WeatherWidget", () => {
 
       const humidityItem = wrapper
         .findAll(".weather-detail-item")
-        .find((item) => item.text().includes("Humidity"));
+        .find(item => item.text().includes("Humidity"));
       expect(humidityItem.exists()).toBe(true);
       expect(humidityItem.text()).toContain("75%");
     });
@@ -157,7 +157,7 @@ describe("WeatherWidget", () => {
 
       const windItem = wrapper
         .findAll(".weather-detail-item")
-        .find((item) => item.text().includes("Wind"));
+        .find(item => item.text().includes("Wind"));
       expect(windItem.exists()).toBe(true);
       expect(windItem.text()).toContain("10 m/s"); // Rounded
     });
@@ -170,7 +170,7 @@ describe("WeatherWidget", () => {
 
       const pressureItem = wrapper
         .findAll(".weather-detail-item")
-        .find((item) => item.text().includes("Pressure"));
+        .find(item => item.text().includes("Pressure"));
       expect(pressureItem.exists()).toBe(true);
       expect(pressureItem.text()).toContain("1025 hPa");
     });
@@ -213,7 +213,7 @@ describe("WeatherWidget", () => {
 
       const windItem = wrapper
         .findAll(".weather-detail-item")
-        .find((item) => item.text().includes("Wind"));
+        .find(item => item.text().includes("Wind"));
       expect(windItem.text()).toContain("m/s");
     });
 
@@ -223,7 +223,7 @@ describe("WeatherWidget", () => {
 
       const windItem = wrapper
         .findAll(".weather-detail-item")
-        .find((item) => item.text().includes("Wind"));
+        .find(item => item.text().includes("Wind"));
       expect(windItem.text()).toContain("mph");
     });
   });

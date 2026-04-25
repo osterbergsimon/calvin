@@ -38,10 +38,10 @@ if ("serviceWorker" in navigator && import.meta.env.PROD) {
   window.addEventListener("load", () => {
     navigator.serviceWorker
       .register("/sw.js")
-      .then((registration) => {
+      .then(registration => {
         logInfo("[main]", "Service Worker registered:", registration);
       })
-      .catch((error) => {
+      .catch(error => {
         logError("[main]", "Service Worker registration failed:", error);
       });
   });

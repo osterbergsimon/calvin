@@ -26,7 +26,7 @@ if (import.meta.env.DEV || Object.keys(pluginComponents).length === 0) {
   logDebug(
     "[PluginComponent]",
     `Loaded ${Object.keys(pluginComponents).length} plugin components:`,
-    Object.keys(pluginComponents),
+    Object.keys(pluginComponents)
   );
 }
 
@@ -74,7 +74,7 @@ function findComponentInGlob(componentPath) {
   logWarn(
     "[PluginComponent]",
     `Available glob keys (${availableKeys.length}):`,
-    availableKeys.slice(0, 10),
+    availableKeys.slice(0, 10)
   );
   if (availableKeys.length > 10) {
     logWarn("[PluginComponent]", `... and ${availableKeys.length - 10} more`);
@@ -100,10 +100,7 @@ export async function loadPluginComponent(componentPath) {
     const moduleLoader = findComponentInGlob(componentPath);
 
     if (!moduleLoader) {
-      logError(
-        "[PluginComponent]",
-        `Component not found in glob: ${componentPath}`,
-      );
+      logError("[PluginComponent]", `Component not found in glob: ${componentPath}`);
       // In production, we should never reach here if the component was built
       // But provide a helpful error message
       if (import.meta.env.PROD) {
@@ -111,7 +108,7 @@ export async function loadPluginComponent(componentPath) {
           "[PluginComponent]",
           `Component ${componentPath} was not included in the build. ` +
             `Make sure the component exists at frontend/src/components/plugins/${componentPath} ` +
-            `and rebuild the frontend.`,
+            `and rebuild the frontend.`
         );
       }
       return null;
@@ -122,16 +119,12 @@ export async function loadPluginComponent(componentPath) {
     const component = componentModule.default || componentModule;
 
     // Validate that we got a Vue component, not a string or other type
-    if (
-      typeof component === "string" ||
-      !component ||
-      typeof component !== "object"
-    ) {
+    if (typeof component === "string" || !component || typeof component !== "object") {
       logError(
         "[PluginComponent]",
         `Component ${componentPath} did not export a valid Vue component. Got:`,
         typeof component,
-        component,
+        component
       );
       return null;
     }
@@ -143,11 +136,7 @@ export async function loadPluginComponent(componentPath) {
     componentCache.set(componentPath, rawComponent);
     return rawComponent;
   } catch (error) {
-    logError(
-      "[PluginComponent]",
-      `Failed to load component: ${componentPath}`,
-      error,
-    );
+    logError("[PluginComponent]", `Failed to load component: ${componentPath}`, error);
     return null;
   }
 }
@@ -182,7 +171,7 @@ export function getPluginComponentPath(service) {
     const componentName =
       renderTemplate
         .split("_")
-        .map((word) => word.charAt(0).toUpperCase() + word.slice(1))
+        .map(word => word.charAt(0).toUpperCase() + word.slice(1))
         .join("") + "Viewer.vue";
     return `${typeId}/${componentName}`;
   }
@@ -210,9 +199,7 @@ export function usePluginComponent(service) {
     return service;
   });
 
-  const componentPath = computed(() =>
-    getPluginComponentPath(serviceRef.value),
-  );
+  const componentPath = computed(() => getPluginComponentPath(serviceRef.value));
 
   const loadComponent = async () => {
     const path = componentPath.value;
@@ -235,11 +222,7 @@ export function usePluginComponent(service) {
       }
     } catch (err) {
       error.value = err.message || String(err);
-      logError(
-        "[PluginComponent]",
-        `Error loading component for ${serviceRef.value?.id}:`,
-        err,
-      );
+      logError("[PluginComponent]", `Error loading component for ${serviceRef.value?.id}:`, err);
     } finally {
       loading.value = false;
     }
@@ -251,7 +234,7 @@ export function usePluginComponent(service) {
     () => {
       loadComponent();
     },
-    { immediate: true },
+    { immediate: true }
   );
 
   return {

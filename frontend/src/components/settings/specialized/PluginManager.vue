@@ -1,11 +1,7 @@
 <template>
   <div class="plugin-manager">
     <!-- Plugin Type Tabs -->
-    <TabNavigation
-      :tabs="pluginTabs"
-      :active-tab="activeTab"
-      @tab-change="handleTabChange"
-    />
+    <TabNavigation :tabs="pluginTabs" :active-tab="activeTab" @tab-change="handleTabChange" />
 
     <!-- Loading State -->
     <div v-if="loading" class="loading-state">
@@ -20,14 +16,10 @@
     <!-- Plugin Cards -->
     <div v-else class="plugins-list">
       <!-- Info message for Themes tab -->
-      <div
-        v-if="activeTab === 'theme' && showThemeInfo"
-        class="theme-info-message"
-      >
+      <div v-if="activeTab === 'theme' && showThemeInfo" class="theme-info-message">
         <div class="help-text">
           <p style="margin: 0 0 0.5rem 0">
-            <strong>💡 Installing Themes:</strong> Themes are installed the same
-            way as plugins!
+            <strong>💡 Installing Themes:</strong> Themes are installed the same way as plugins!
           </p>
           <ol style="margin: 0.5rem 0 0 1.5rem; text-align: left">
             <li>Use the installation section above (Zip File or GitHub tab)</li>
@@ -36,8 +28,8 @@
             <li>Click "Install" next to any theme you want</li>
           </ol>
           <p style="margin: 0.5rem 0 0 0">
-            Built-in themes (Light, Dark, Ocean, Forest, Sunset) are always
-            available and can be selected in
+            Built-in themes (Light, Dark, Ocean, Forest, Sunset) are always available and can be
+            selected in
             <strong>UI Settings → Select Theme</strong>.
           </p>
         </div>
@@ -193,18 +185,18 @@ const pluginTabs = computed(() => {
 
   // Show tabs that have plugins OR show backend/theme tabs always (for installation)
   // This allows users to see backend/theme tabs even when listing from repo
-  return categories.filter((cat) => {
+  return categories.filter(cat => {
     // Always show backend and theme tabs (they can be installed from repos)
     if (cat.id === "backend" || cat.id === "theme") {
       return true;
     }
     // For other types, only show if there are plugins
-    return props.plugins.some((p) => p.type === cat.id);
+    return props.plugins.some(p => p.type === cat.id);
   });
 });
 
 const activePlugins = computed(() => {
-  return props.plugins.filter((p) => p.type === props.activeTab);
+  return props.plugins.filter(p => p.type === props.activeTab);
 });
 
 const emptyMessage = computed(() => {
@@ -214,11 +206,11 @@ const emptyMessage = computed(() => {
   return `No ${props.activeTab} plugins found.`;
 });
 
-const handleTabChange = (tabId) => {
+const handleTabChange = tabId => {
   emit("tab-change", tabId);
 };
 
-const handleToggleExpand = (pluginId) => {
+const handleToggleExpand = pluginId => {
   emit("toggle-expand", pluginId);
 };
 
@@ -234,15 +226,15 @@ const handleUpdateFormValue = (pluginId, key, value) => {
   emit("update-form-value", pluginId, key, value);
 };
 
-const handleSaveConfig = (pluginId) => {
+const handleSaveConfig = pluginId => {
   emit("save-config", pluginId);
 };
 
-const handleTestConnection = (pluginId) => {
+const handleTestConnection = pluginId => {
   emit("test-connection", pluginId);
 };
 
-const handleFetchNow = (pluginId) => {
+const handleFetchNow = pluginId => {
   emit("fetch-now", pluginId);
 };
 
@@ -250,7 +242,7 @@ const handleCustomAction = (pluginId, action) => {
   emit("custom-action", pluginId, action);
 };
 
-const handleAddInstance = (pluginId) => {
+const handleAddInstance = pluginId => {
   emit("add-instance", pluginId);
 };
 
@@ -258,7 +250,7 @@ const handleEditInstance = (pluginId, instance) => {
   emit("edit-instance", pluginId, instance);
 };
 
-const handleDeleteInstance = (instanceId) => {
+const handleDeleteInstance = instanceId => {
   emit("delete-instance", instanceId);
 };
 
@@ -270,11 +262,11 @@ const handleInstanceOrderChange = (pluginId, newOrder) => {
   emit("instance-order-change", pluginId, newOrder);
 };
 
-const handleUpload = (file) => {
+const handleUpload = file => {
   emit("upload", file);
 };
 
-const handleDeleteImage = (imageId) => {
+const handleDeleteImage = imageId => {
   emit("delete-image", imageId);
 };
 </script>

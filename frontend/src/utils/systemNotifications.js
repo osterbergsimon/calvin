@@ -5,10 +5,5 @@
  * @param {{ value?: { show?: (...args: unknown[]) => void } | null }} notificationRef - Vue ref to NotificationSystem
  */
 export function showSystemRebootScheduled(notificationRef) {
-  notificationRef.value?.show?.(
-    "success",
-    "✓",
-    "System rebooting in a few seconds…",
-    3500,
-  );
+  notificationRef.value?.show?.("success", "✓", "System rebooting in a few seconds…", 3500);
 }

@@ -44,8 +44,7 @@ export function useTheme() {
       shouldBeDark = true;
     } else if (themeMode.value === "auto") {
       // Use system preference
-      const matchMedia =
-        window.matchMedia && window.matchMedia("(prefers-color-scheme: dark)");
+      const matchMedia = window.matchMedia && window.matchMedia("(prefers-color-scheme: dark)");
       shouldBeDark = matchMedia ? matchMedia.matches : false;
     } else if (themeMode.value === "time") {
       // Use time-based switching
@@ -57,7 +56,7 @@ export function useTheme() {
   };
 
   // Apply custom theme variables
-  const applyCustomTheme = async (themeId) => {
+  const applyCustomTheme = async themeId => {
     if (!themeId || typeof window === "undefined") return;
 
     try {
@@ -84,7 +83,7 @@ export function useTheme() {
   };
 
   // Apply theme to document
-  const applyTheme = async (dark) => {
+  const applyTheme = async dark => {
     const html = document.documentElement;
     if (dark) {
       html.classList.add("dark");
@@ -107,7 +106,7 @@ export function useTheme() {
   };
 
   // Set theme mode
-  const setThemeMode = async (mode) => {
+  const setThemeMode = async mode => {
     themeMode.value = mode;
     await updateTheme();
   };
@@ -132,8 +131,7 @@ export function useTheme() {
       }
     };
     mediaQuery.addEventListener("change", handleChange);
-    systemThemeWatcher = () =>
-      mediaQuery.removeEventListener("change", handleChange);
+    systemThemeWatcher = () => mediaQuery.removeEventListener("change", handleChange);
     return systemThemeWatcher;
   };
 
@@ -160,7 +158,7 @@ export function useTheme() {
   };
 
   // Set selected theme
-  const setSelectedTheme = async (themeId) => {
+  const setSelectedTheme = async themeId => {
     selectedThemeId.value = themeId;
     themesStore.setSelectedTheme(themeId);
     await updateTheme();
@@ -201,7 +199,7 @@ export function useTheme() {
   };
 
   // Watch theme mode changes
-  watch(themeMode, async (newMode) => {
+  watch(themeMode, async newMode => {
     await updateTheme();
     if (newMode === "time") {
       startTimeCheck();
@@ -212,7 +210,7 @@ export function useTheme() {
   });
 
   // Watch selected theme changes
-  watch(selectedThemeId, async (newThemeId) => {
+  watch(selectedThemeId, async newThemeId => {
     if (newThemeId) {
       await applyCustomTheme(newThemeId);
     }
@@ -230,47 +228,47 @@ export function useTheme() {
   // Watch config store for theme changes (so changes from Settings page apply immediately)
   watch(
     () => configStore.themeMode,
-    async (newMode) => {
+    async newMode => {
       if (newMode !== undefined && newMode !== themeMode.value) {
         themeMode.value = newMode;
         await updateTheme();
       }
-    },
+    }
   );
 
   watch(
     () => configStore.selectedTheme,
-    async (newTheme) => {
+    async newTheme => {
       if (newTheme !== undefined && newTheme !== selectedThemeId.value) {
         selectedThemeId.value = newTheme;
         themesStore.setSelectedTheme(newTheme);
         await applyCustomTheme(newTheme);
       }
-    },
+    }
   );
 
   watch(
     () => configStore.darkModeStart,
-    async (newStart) => {
+    async newStart => {
       if (newStart !== undefined && newStart !== darkModeStart.value) {
         darkModeStart.value = newStart;
         if (themeMode.value === "time") {
           await updateTheme();
         }
       }
-    },
+    }
   );
 
   watch(
     () => configStore.darkModeEnd,
-    async (newEnd) => {
+    async newEnd => {
       if (newEnd !== undefined && newEnd !== darkModeEnd.value) {
         darkModeEnd.value = newEnd;
         if (themeMode.value === "time") {
           await updateTheme();
         }
       }
-    },
+    }
   );
 
   // Initialize theme immediately and on mount

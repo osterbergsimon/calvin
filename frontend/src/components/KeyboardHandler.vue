@@ -54,7 +54,7 @@ const keyCodeMap = {
 
 const checkRebootCombo = () => {
   // Check if both reboot combo keys are pressed
-  const comboKeysPressed = rebootComboKeys.every((key) => pressedKeys.has(key));
+  const comboKeysPressed = rebootComboKeys.every(key => pressedKeys.has(key));
 
   if (comboKeysPressed) {
     // Start tracking combo duration
@@ -67,7 +67,7 @@ const checkRebootCombo = () => {
       if (elapsed >= rebootComboDuration) {
         // Trigger reboot
         console.log(
-          `Reboot combo held for ${rebootComboDuration / 1000} seconds - rebooting system`,
+          `Reboot combo held for ${rebootComboDuration / 1000} seconds - rebooting system`
         );
         triggerReboot();
         // Reset combo tracking
@@ -98,7 +98,7 @@ const triggerReboot = async () => {
   }
 };
 
-const onKeyDown = async (event) => {
+const onKeyDown = async event => {
   // Don't handle if user is typing in an input/textarea
   if (
     event.target.tagName === "INPUT" ||
@@ -140,7 +140,7 @@ const onKeyDown = async (event) => {
   }
 };
 
-const onKeyUp = (event) => {
+const onKeyUp = event => {
   // Map browser key to our key code
   const keyCode = keyCodeMap[event.code] || event.code;
 
@@ -161,23 +161,16 @@ const loadKeyboardConfig = async () => {
     if (response.ok) {
       const config = await response.json();
       if (config.keyboardType || config.keyboard_type) {
-        keyboardStore.setKeyboardType(
-          config.keyboardType || config.keyboard_type,
-        );
+        keyboardStore.setKeyboardType(config.keyboardType || config.keyboard_type);
       }
       // Load reboot combo settings
       if (config.rebootComboKey1 || config.reboot_combo_key1) {
         const key1 = config.rebootComboKey1 || config.reboot_combo_key1;
-        const key2 =
-          config.rebootComboKey2 || config.reboot_combo_key2 || "KEY_7";
+        const key2 = config.rebootComboKey2 || config.reboot_combo_key2 || "KEY_7";
         rebootComboKeys = [key1, key2];
       }
-      if (
-        config.rebootComboDuration !== undefined ||
-        config.reboot_combo_duration !== undefined
-      ) {
-        rebootComboDuration =
-          config.rebootComboDuration || config.reboot_combo_duration || 10000;
+      if (config.rebootComboDuration !== undefined || config.reboot_combo_duration !== undefined) {
+        rebootComboDuration = config.rebootComboDuration || config.reboot_combo_duration || 10000;
       }
     }
   } catch (error) {
@@ -209,15 +202,25 @@ watch(
   () => configStore.configPollInterval,
   () => {
     startKeyboardConfigPolling();
-  },
+  }
 );
 
 // Surface restart/update status as a toast so it's visible outside Settings
 const { updateMessage, updateMessageClass } = useSystem();
-const _msgClassToNotifType = { info: "info", success: "success", error: "error", warning: "warning" };
-const _msgClassToDuration = { info: 5000, success: 4000, error: 8000, warning: 8000 };
+const _msgClassToNotifType = {
+  info: "info",
+  success: "success",
+  error: "error",
+  warning: "warning",
+};
+const _msgClassToDuration = {
+  info: 5000,
+  success: 4000,
+  error: 8000,
+  warning: 8000,
+};
 const _msgClassToIcon = { info: "🔄", success: "✓", error: "✗", warning: "⚠" };
-watch(updateMessage, (msg) => {
+watch(updateMessage, msg => {
   if (!msg) return;
   const cls = updateMessageClass.value || "info";
   const type = _msgClassToNotifType[cls] ?? "info";
@@ -225,7 +228,7 @@ watch(updateMessage, (msg) => {
     type,
     _msgClassToIcon[cls] ?? "🔄",
     msg,
-    _msgClassToDuration[cls] ?? 5000,
+    _msgClassToDuration[cls] ?? 5000
   );
 });
 

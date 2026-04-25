@@ -43,9 +43,7 @@ test.describe("Mode Switching", () => {
       await page.waitForTimeout(500);
 
       // Verify web services mode is active
-      const webServicesView = page
-        .locator('.web-services, [class*="web-service"]')
-        .first();
+      const webServicesView = page.locator('.web-services, [class*="web-service"]').first();
       if ((await webServicesView.count()) > 0) {
         await expect(webServicesView).toBeVisible();
       }
@@ -80,9 +78,7 @@ test.describe("Mode Switching", () => {
 
   test("should display mode indicator", async ({ page }) => {
     // Mode indicator should exist (even if hidden)
-    const modeIndicator = page.locator(
-      '.mode-indicator, [class*="mode-indicator"]',
-    );
+    const modeIndicator = page.locator('.mode-indicator, [class*="mode-indicator"]');
     const count = await modeIndicator.count();
     expect(count).toBeGreaterThanOrEqual(0);
   });

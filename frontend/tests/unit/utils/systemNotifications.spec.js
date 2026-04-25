@@ -10,18 +10,11 @@ describe("showSystemRebootScheduled", () => {
     showSystemRebootScheduled(notificationRef);
 
     expect(show).toHaveBeenCalledTimes(1);
-    expect(show).toHaveBeenCalledWith(
-      "success",
-      "✓",
-      "System rebooting in a few seconds…",
-      3500,
-    );
+    expect(show).toHaveBeenCalledWith("success", "✓", "System rebooting in a few seconds…", 3500);
   });
 
   it("does nothing when ref is null", () => {
-    expect(() =>
-      showSystemRebootScheduled(ref(null)),
-    ).not.toThrow();
+    expect(() => showSystemRebootScheduled(ref(null))).not.toThrow();
   });
 
   it("does nothing when show is missing", () => {

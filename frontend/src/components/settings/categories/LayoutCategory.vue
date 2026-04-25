@@ -1,10 +1,6 @@
 <template>
   <div class="layout-category">
-    <TabNavigation
-      :tabs="tabs"
-      :active-tab="activeTab"
-      @tab-change="handleTabChange"
-    />
+    <TabNavigation :tabs="tabs" :active-tab="activeTab" @tab-change="handleTabChange" />
 
     <SettingsTab>
       <DisplayTab
@@ -59,7 +55,7 @@ const tabs = [
 
 const activeTab = ref("display");
 
-const handleTabChange = (tabId) => {
+const handleTabChange = tabId => {
   activeTab.value = tabId;
 };
 </script>

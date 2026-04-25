@@ -9,9 +9,7 @@
         <p>{{ message }}</p>
       </div>
       <div class="modal-footer">
-        <button type="button" class="btn-secondary" @click="handleCancel">
-          Cancel
-        </button>
+        <button type="button" class="btn-secondary" @click="handleCancel">Cancel</button>
         <button type="button" class="btn-danger" @click="handleConfirm">
           {{ confirmText }}
         </button>

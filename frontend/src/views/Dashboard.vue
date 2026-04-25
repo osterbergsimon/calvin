@@ -14,10 +14,7 @@
         <h1>Calvin Dashboard</h1>
         <!-- Legacy clock widget in header (for backwards compatibility) -->
         <Clock
-          v-if="
-            configStore.clockEnabled &&
-            configStore.clockDisplayMode === 'header'
-          "
+          v-if="configStore.clockEnabled && configStore.clockDisplayMode === 'header'"
           :display-mode="configStore.clockDisplayMode"
           :show-date="configStore.clockShowDate"
         />
@@ -44,9 +41,7 @@
             @click="toggleOrientation"
           >
             {{ configStore.orientation === "landscape" ? "📱" : "🖥️" }}
-            {{
-              configStore.orientation === "landscape" ? "Portrait" : "Landscape"
-            }}
+            {{ configStore.orientation === "landscape" ? "Portrait" : "Landscape" }}
           </button>
           <button
             v-if="modeStore.currentMode !== modeStore.MODES.WEB_SERVICES"
@@ -56,12 +51,7 @@
           >
             Web Services
           </button>
-          <button
-            v-else
-            class="btn-web-services"
-            title="Show Photos"
-            @click="showPhotos"
-          >
+          <button v-else class="btn-web-services" title="Show Photos" @click="showPhotos">
             Photos
           </button>
           <button
@@ -71,16 +61,8 @@
           >
             {{ sideViewPositionIcon }}
           </button>
-          <button class="btn-settings" title="Settings" @click="goToSettings">
-            ⚙️ Settings
-          </button>
-          <button
-            class="btn-minimal"
-            title="Hide UI"
-            @click="configStore.toggleUI"
-          >
-            ⊖
-          </button>
+          <button class="btn-settings" title="Settings" @click="goToSettings">⚙️ Settings</button>
+          <button class="btn-minimal" title="Hide UI" @click="configStore.toggleUI">⊖</button>
         </div>
       </div>
 
@@ -96,8 +78,7 @@
       <!-- Clock Widget in Kiosk Mode -->
       <Clock
         v-if="
-          (configStore.clockWidgetEnabled &&
-            configStore.clockWidgetShowInKiosk) ||
+          (configStore.clockWidgetEnabled && configStore.clockWidgetShowInKiosk) ||
           (configStore.clockEnabled &&
             configStore.clockDisplayMode === 'always' &&
             !configStore.shouldShowUI)
@@ -119,9 +100,7 @@
           />
           <!-- Fullscreen Web Services -->
           <WebServiceViewer
-            v-else-if="
-              modeStore.fullscreenMode === modeStore.MODES.WEB_SERVICES
-            "
+            v-else-if="modeStore.fullscreenMode === modeStore.MODES.WEB_SERVICES"
             :is-fullscreen="true"
           />
         </div>
@@ -129,12 +108,7 @@
         <!-- Dashboard View (Home) - Always shows calendar + side view -->
         <div
           v-else
-          :class="[
-            'mode-content',
-            'dashboard-view',
-            mainLayoutClass,
-            sideViewPositionClass,
-          ]"
+          :class="['mode-content', 'dashboard-view', mainLayoutClass, sideViewPositionClass]"
         >
           <!-- Render elements in computed order - no CSS order needed! -->
           <template v-for="elementType in layoutOrder" :key="elementType">
@@ -233,14 +207,7 @@
 </template>
 
 <script setup>
-import {
-  ref,
-  onMounted,
-  onUnmounted,
-  computed,
-  watch,
-  defineAsyncComponent,
-} from "vue";
+import { ref, onMounted, onUnmounted, computed, watch, defineAsyncComponent } from "vue";
 import axios from "axios";
 import LayoutManager from "../components/LayoutManager.vue";
 import MinimalUIOverlay from "../components/MinimalUIOverlay.vue";
@@ -250,15 +217,9 @@ import ClockBarVertical from "../components/ClockBarVertical.vue";
 import ConnectionIndicator from "../components/ConnectionIndicator.vue";
 
 // Lazy load mode-specific components for better code splitting
-const CalendarView = defineAsyncComponent(
-  () => import("../components/CalendarView.vue"),
-);
-const PhotoSlideshow = defineAsyncComponent(
-  () => import("../components/PhotoSlideshow.vue"),
-);
-const WebServiceViewer = defineAsyncComponent(
-  () => import("../components/WebServiceViewer.vue"),
-);
+const CalendarView = defineAsyncComponent(() => import("../components/CalendarView.vue"));
+const PhotoSlideshow = defineAsyncComponent(() => import("../components/PhotoSlideshow.vue"));
+const WebServiceViewer = defineAsyncComponent(() => import("../components/WebServiceViewer.vue"));
 import { useConfigStore } from "../stores/config";
 import { useModeStore } from "../stores/mode";
 import { useRouter, useRoute } from "vue-router";
@@ -341,9 +302,7 @@ const clockClass = computed(() => {
 
 // Computed properties for clock bar rendering
 const shouldShowHorizontalBar = computed(() => {
-  return (
-    configStore.clockBarEnabled && configStore.clockBarMode === "horizontal"
-  );
+  return configStore.clockBarEnabled && configStore.clockBarMode === "horizontal";
 });
 
 const shouldShowVerticalBar = computed(() => {
@@ -413,8 +372,7 @@ const layoutOrder = computed(() => {
 });
 
 const toggleOrientation = () => {
-  const newOrientation =
-    configStore.orientation === "landscape" ? "portrait" : "landscape";
+  const newOrientation = configStore.orientation === "landscape" ? "portrait" : "landscape";
   configStore.setOrientation(newOrientation);
   // Reset side view position to default when switching orientation
   if (newOrientation === "landscape") {
@@ -498,20 +456,20 @@ watch(
   () => configStore.configPollInterval,
   () => {
     startConfigPolling();
-  },
+  }
 );
 
 // Watch for route changes to reload config when returning from settings
 watch(
   () => route.path,
-  async (newPath) => {
+  async newPath => {
     if (newPath === "/") {
       // Reload config when returning to dashboard
       await configStore.fetchConfig();
       // Restore previous mode if returning from settings
       modeStore.returnFromSettings();
     }
-  },
+  }
 );
 
 onMounted(async () => {

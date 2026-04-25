@@ -59,11 +59,7 @@
         help="Hide headers to maximize content space (kiosk mode)"
       >
         <label>
-          <input
-            :checked="config.showUI"
-            type="checkbox"
-            @change="handleShowUIChange"
-          />
+          <input :checked="config.showUI" type="checkbox" @change="handleShowUIChange" />
           Show Headers and UI Controls
         </label>
       </SettingItem>
@@ -102,10 +98,7 @@
       </SettingItem>
 
       <!-- Clock Widget Settings -->
-      <SettingItem
-        label="Enable Clock Widget"
-        help="Show floating clock widget on dashboard"
-      >
+      <SettingItem label="Enable Clock Widget" help="Show floating clock widget on dashboard">
         <label>
           <input
             name="clockWidgetEnabled"
@@ -118,10 +111,7 @@
       </SettingItem>
 
       <template v-if="config.clockWidgetEnabled">
-        <SettingItem
-          label="Show Widget in Kiosk Mode"
-          help="Display widget when UI is hidden"
-        >
+        <SettingItem label="Show Widget in Kiosk Mode" help="Display widget when UI is hidden">
           <label>
             <input
               name="clockWidgetShowInKiosk"
@@ -133,10 +123,7 @@
           </label>
         </SettingItem>
 
-        <SettingItem
-          label="Widget Position"
-          help="Position of the clock widget"
-        >
+        <SettingItem label="Widget Position" help="Position of the clock widget">
           <select
             name="clockWidgetPosition"
             :value="config.clockWidgetPosition"
@@ -151,10 +138,7 @@
           </select>
         </SettingItem>
 
-        <SettingItem
-          label="Widget Font Size"
-          help="Font size for the clock widget (in pixels)"
-        >
+        <SettingItem label="Widget Font Size" help="Font size for the clock widget (in pixels)">
           <FontSizePicker
             :model-value="getWidgetFontSize()"
             :show-date="config.clockShowDate"
@@ -191,10 +175,7 @@
           </select>
         </SettingItem>
 
-        <SettingItem
-          label="Show Bar in Non-Kiosk Mode"
-          help="Display bar when UI is visible"
-        >
+        <SettingItem label="Show Bar in Non-Kiosk Mode" help="Display bar when UI is visible">
           <label>
             <input
               name="clockBarShowInNonKiosk"
@@ -206,10 +187,7 @@
           </label>
         </SettingItem>
 
-        <SettingItem
-          label="Show Bar in Kiosk Mode"
-          help="Display bar when UI is hidden"
-        >
+        <SettingItem label="Show Bar in Kiosk Mode" help="Display bar when UI is hidden">
           <label>
             <input
               name="clockBarShowInKiosk"
@@ -231,30 +209,21 @@
             <template v-if="config.clockBarMode === 'horizontal'">
               <option value="top">Top Header</option>
               <option value="bottom">Bottom Bar</option>
-              <option
-                value="between"
-                :disabled="config.orientation !== 'portrait'"
-              >
+              <option value="between" :disabled="config.orientation !== 'portrait'">
                 Between Calendar/Side View (Portrait Only)
               </option>
             </template>
             <template v-else>
               <option value="left">Far Left</option>
               <option value="right">Far Right</option>
-              <option
-                value="between"
-                :disabled="config.orientation !== 'landscape'"
-              >
+              <option value="between" :disabled="config.orientation !== 'landscape'">
                 Between Calendar/Side View (Landscape Only)
               </option>
             </template>
           </select>
         </SettingItem>
 
-        <SettingItem
-          label="Bar Layout"
-          help="Display clock and date on one line or two lines"
-        >
+        <SettingItem label="Bar Layout" help="Display clock and date on one line or two lines">
           <select
             name="clockBarLayout"
             :value="config.clockBarLayout || 'single-line'"
@@ -378,7 +347,7 @@ const loadThemes = async () => {
     // This includes both built-in and installed themes
     const response = await pluginsApi.getPlugins({ plugin_type: "theme" });
     const allItems = response.plugins || [];
-    const themePlugins = allItems.filter((p) => p.type === "theme");
+    const themePlugins = allItems.filter(p => p.type === "theme");
 
     // Also get theme details from individual plugin endpoint for variables/preview
     const themesWithDetails = [];
@@ -406,7 +375,7 @@ const loadThemes = async () => {
 
 loadThemes();
 
-const handleThemeSelect = async (themeId) => {
+const handleThemeSelect = async themeId => {
   try {
     // Update config (saves to backend)
     emit("update:config", { selectedTheme: themeId });
@@ -417,14 +386,12 @@ const handleThemeSelect = async (themeId) => {
   }
 };
 
-const handleThemeModeChange = (event) => {
+const handleThemeModeChange = event => {
   emit("update:config", { themeMode: event.target.value });
 };
 
-const handleDarkModeTimeChange = (event) => {
-  const field = event.target.previousElementSibling?.textContent.includes(
-    "Start",
-  )
+const handleDarkModeTimeChange = event => {
+  const field = event.target.previousElementSibling?.textContent.includes("Start")
     ? "darkModeStart"
     : "darkModeEnd";
   const value = parseInt(event.target.value, 10);
@@ -433,11 +400,11 @@ const handleDarkModeTimeChange = (event) => {
   }
 };
 
-const handleShowUIChange = (event) => {
+const handleShowUIChange = event => {
   emit("update:config", { showUI: event.target.checked });
 };
 
-const handleClockSettingsChange = (event) => {
+const handleClockSettingsChange = event => {
   const field = event.target.name || event.target.id;
   if (!field) {
     console.warn("Clock setting change event missing field name/id");
@@ -453,15 +420,15 @@ const handleClockSettingsChange = (event) => {
   emit("update:config", updates);
 };
 
-const handleKeyboardFeedbackEnabledChange = (event) => {
+const handleKeyboardFeedbackEnabledChange = event => {
   emit("update:config", { keyboardFeedbackEnabled: event.target.checked });
 };
 
-const handleKeyboardFeedbackModeChange = (event) => {
+const handleKeyboardFeedbackModeChange = event => {
   emit("update:config", { keyboardFeedbackMode: event.target.value });
 };
 
-const handleModeIndicatorTimeoutChange = (event) => {
+const handleModeIndicatorTimeoutChange = event => {
   const value = parseInt(event.target.value, 10);
   if (!isNaN(value)) {
     emit("update:config", { modeIndicatorTimeout: value });
@@ -490,7 +457,7 @@ const sizeToPixels = {
   large: 20,
 };
 
-const pixelsToSize = (px) => {
+const pixelsToSize = px => {
   // Find closest size
   const sizes = Object.entries(sizeToPixels);
   const closest = sizes.reduce((prev, curr) => {
@@ -503,20 +470,20 @@ const getWidgetFontSize = () => {
   return sizeToPixels[props.config.clockSize] || 16;
 };
 
-const handleWidgetFontSizeChange = (px) => {
+const handleWidgetFontSizeChange = px => {
   const size = pixelsToSize(px);
   emit("update:config", { clockSize: size });
 };
 
-const handleBarFontSizeChange = (px) => {
+const handleBarFontSizeChange = px => {
   emit("update:config", { clockBarFontSize: px });
 };
 
-const handleBarDateFontSizeChange = (px) => {
+const handleBarDateFontSizeChange = px => {
   emit("update:config", { clockBarDateFontSize: px });
 };
 
-const handleBarPaddingChange = (px) => {
+const handleBarPaddingChange = px => {
   emit("update:config", { clockBarPadding: px });
 };
 </script>

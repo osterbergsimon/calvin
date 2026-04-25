@@ -344,9 +344,7 @@ describe("Web Services Store", () => {
       const store = useWebServicesStore();
 
       // When no plugins available, it throws "No service plugin available"
-      await expect(store.addService({})).rejects.toThrow(
-        "No service plugin available",
-      );
+      await expect(store.addService({})).rejects.toThrow("No service plugin available");
       expect(store.error).toBe("No service plugin available");
     });
 
@@ -361,9 +359,9 @@ describe("Web Services Store", () => {
 
       const store = useWebServicesStore();
 
-      await expect(
-        store.addService({ name: "Test", url: "https://test.com" }),
-      ).rejects.toThrow("Add failed");
+      await expect(store.addService({ name: "Test", url: "https://test.com" })).rejects.toThrow(
+        "Add failed"
+      );
       expect(store.error).toBe("Add failed");
     });
   });
@@ -405,18 +403,15 @@ describe("Web Services Store", () => {
         url: "https://updated.com",
       });
 
-      expect(axios.put).toHaveBeenCalledWith(
-        "/api/plugins/instances/instance1",
-        {
-          name: "Updated Service",
-          config: {
-            url: "https://updated.com",
-            fullscreen: false,
-            display_order: 0,
-          },
-          enabled: true,
+      expect(axios.put).toHaveBeenCalledWith("/api/plugins/instances/instance1", {
+        name: "Updated Service",
+        config: {
+          url: "https://updated.com",
+          fullscreen: false,
+          display_order: 0,
         },
-      );
+        enabled: true,
+      });
     });
 
     it("should handle errors when updating service", async () => {
@@ -425,9 +420,7 @@ describe("Web Services Store", () => {
 
       const store = useWebServicesStore();
 
-      await expect(store.updateService("instance1", {})).rejects.toThrow(
-        "Update failed",
-      );
+      await expect(store.updateService("instance1", {})).rejects.toThrow("Update failed");
       expect(store.error).toBe("Update failed");
     });
   });
@@ -452,9 +445,7 @@ describe("Web Services Store", () => {
       const store = useWebServicesStore();
       await store.removeService("instance1");
 
-      expect(axios.delete).toHaveBeenCalledWith(
-        "/api/plugins/instances/instance1",
-      );
+      expect(axios.delete).toHaveBeenCalledWith("/api/plugins/instances/instance1");
       expect(axios.get).toHaveBeenCalledWith("/api/plugins", {
         params: { plugin_type: "service" },
       });
@@ -466,9 +457,7 @@ describe("Web Services Store", () => {
 
       const store = useWebServicesStore();
 
-      await expect(store.removeService("instance1")).rejects.toThrow(
-        "Remove failed",
-      );
+      await expect(store.removeService("instance1")).rejects.toThrow("Remove failed");
       expect(store.error).toBe("Remove failed");
     });
   });

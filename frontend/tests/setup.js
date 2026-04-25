@@ -59,7 +59,7 @@ if (typeof window !== "undefined") {
   Object.defineProperty(window, "matchMedia", {
     writable: true,
     configurable: true,
-    value: vi.fn().mockImplementation((query) => {
+    value: vi.fn().mockImplementation(query => {
       return {
         matches: false,
         media: query,
@@ -82,9 +82,9 @@ beforeEach(() => {
   vi.clearAllMocks();
 
   // Helper function to apply default implementations to an axios instance
-  const applyDefaults = (instance) => {
+  const applyDefaults = instance => {
     // Default config response - prevents errors when useTheme calls fetchConfig
-    instance.get.mockImplementation((url) => {
+    instance.get.mockImplementation(url => {
       if (url === "/api/config" || url?.includes("/api/config")) {
         return Promise.resolve({
           data: {

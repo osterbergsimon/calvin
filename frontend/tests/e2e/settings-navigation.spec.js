@@ -11,9 +11,7 @@ test.describe("Settings Navigation", () => {
     await page.waitForLoadState("networkidle");
 
     // Navigate to settings
-    const settingsButton = page
-      .locator('button:has-text("Settings"), a[href*="settings"]')
-      .first();
+    const settingsButton = page.locator('button:has-text("Settings"), a[href*="settings"]').first();
     if ((await settingsButton.count()) > 0) {
       await settingsButton.click();
       await page.waitForLoadState("networkidle");
@@ -22,9 +20,7 @@ test.describe("Settings Navigation", () => {
 
   test("should navigate to settings page", async ({ page }) => {
     // Check if we're on settings page
-    const settingsHeading = page
-      .locator("h1, h2")
-      .filter({ hasText: /settings/i });
+    const settingsHeading = page.locator("h1, h2").filter({ hasText: /settings/i });
     if ((await settingsHeading.count()) > 0) {
       await expect(settingsHeading.first()).toBeVisible();
     }

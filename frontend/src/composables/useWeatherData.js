@@ -54,7 +54,7 @@ export function useWeatherData(serviceId, enabled = true) {
     enabled: computed(() => !!unref(enabled) && !!getId()),
     staleTime: 5 * 60 * 1000,
     gcTime: 10 * 60 * 1000,
-    refetchInterval: (_query) => {
+    refetchInterval: _query => {
       return connectionStore.isFullyOnline() ? 10 * 60 * 1000 : false;
     },
     retry: 1,

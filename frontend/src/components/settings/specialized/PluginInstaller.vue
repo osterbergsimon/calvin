@@ -53,8 +53,7 @@
     <!-- GitHub Repository -->
     <div v-show="installMethod === 'github'" class="plugin-install-content">
       <p class="help-text-compact">
-        Enter a GitHub repository URL and click "List Plugins" to see available
-        plugins and themes.
+        Enter a GitHub repository URL and click "List Plugins" to see available plugins and themes.
       </p>
       <div class="install-compact-row">
         <input
@@ -153,15 +152,10 @@
           </div>
           <div class="plugin-info-inline">
             <strong>{{ plugin.name || plugin.id }}</strong>
-            <span
-              class="plugin-type-badge-small"
-              :class="`type-${plugin.type}`"
-            >
+            <span class="plugin-type-badge-small" :class="`type-${plugin.type}`">
               {{ plugin.type }}
             </span>
-            <span v-if="plugin.version" class="plugin-version-small">
-              v{{ plugin.version }}
-            </span>
+            <span v-if="plugin.version" class="plugin-version-small"> v{{ plugin.version }} </span>
             <span
               v-if="plugin._installed"
               class="plugin-installed-badge"
@@ -221,14 +215,9 @@
     </div>
 
     <!-- Local Path (dev mode only) -->
-    <div
-      v-if="devMode"
-      v-show="installMethod === 'local'"
-      class="plugin-install-content"
-    >
+    <div v-if="devMode" v-show="installMethod === 'local'" class="plugin-install-content">
       <p class="help-text-compact">
-        Install directly from a local cloned repository. Enter an absolute path
-        to the repo root.
+        Install directly from a local cloned repository. Enter an absolute path to the repo root.
       </p>
       <div class="install-compact-row">
         <input
@@ -315,14 +304,10 @@
           </div>
           <div class="plugin-info-inline">
             <strong>{{ plugin.name || plugin.id }}</strong>
-            <span
-              class="plugin-type-badge-small"
-              :class="`type-${plugin.type}`"
-              >{{ plugin.type }}</span
-            >
-            <span v-if="plugin.version" class="plugin-version-small"
-              >v{{ plugin.version }}</span
-            >
+            <span class="plugin-type-badge-small" :class="`type-${plugin.type}`">{{
+              plugin.type
+            }}</span>
+            <span v-if="plugin.version" class="plugin-version-small">v{{ plugin.version }}</span>
             <span v-if="plugin._installed" class="plugin-installed-badge">
               Installed: v{{ plugin._installedVersion || "?" }}
             </span>
@@ -368,17 +353,9 @@
       v-if="rebuildStatus !== 'idle'"
       :class="['rebuild-status', `rebuild-status--${rebuildStatus}`]"
     >
-      <span
-        v-if="rebuildStatus === 'building'"
-        class="rebuild-spinner"
-        aria-hidden="true"
-      ></span>
+      <span v-if="rebuildStatus === 'building'" class="rebuild-spinner" aria-hidden="true"></span>
       <span class="rebuild-status-text">{{ rebuildMessage }}</span>
-      <button
-        v-if="rebuildStatus === 'done'"
-        class="btn-refresh-inline"
-        @click="handleRefresh"
-      >
+      <button v-if="rebuildStatus === 'done'" class="btn-refresh-inline" @click="handleRefresh">
         Refresh Now
       </button>
     </div>
@@ -388,9 +365,9 @@
       <div class="restart-notice-content">
         <strong>⚠️ Server Restart Required</strong>
         <p>
-          The plugin has been installed but won't appear in the UI until the
-          backend server is restarted. This is because plugin types are
-          registered in the database during server startup.
+          The plugin has been installed but won't appear in the UI until the backend server is
+          restarted. This is because plugin types are registered in the database during server
+          startup.
         </p>
         <div class="restart-actions">
           <button type="button" class="btn-primary" @click="handleRestart">
@@ -498,10 +475,10 @@ const filteredPlugins = computed(() => {
   }
   const query = searchQuery.value.toLowerCase();
   return props.availablePlugins.filter(
-    (p) =>
+    p =>
       (p.name || "").toLowerCase().includes(query) ||
       (p.id || "").toLowerCase().includes(query) ||
-      (p.description || "").toLowerCase().includes(query),
+      (p.description || "").toLowerCase().includes(query)
   );
 });
 
@@ -514,7 +491,7 @@ const filteredPluginsByType = computed(() => {
     backend: [],
     theme: [],
   };
-  filteredPlugins.value.forEach((plugin) => {
+  filteredPlugins.value.forEach(plugin => {
     if (grouped[plugin.type]) {
       grouped[plugin.type].push(plugin);
     }
@@ -557,29 +534,29 @@ const activeTypePlugins = computed(() => {
 
 // Computed properties
 const selectedPlugins = computed(() => {
-  return filteredPlugins.value.filter((p) => selectedPluginIds.value.has(p.id));
+  return filteredPlugins.value.filter(p => selectedPluginIds.value.has(p.id));
 });
 
 const allSelected = computed(() => {
   return (
     activeTypePlugins.value.length > 0 &&
-    activeTypePlugins.value.every((p) => selectedPluginIds.value.has(p.id))
+    activeTypePlugins.value.every(p => selectedPluginIds.value.has(p.id))
   );
 });
 
 const someSelected = computed(() => {
-  const selectedCount = activeTypePlugins.value.filter((p) =>
-    selectedPluginIds.value.has(p.id),
+  const selectedCount = activeTypePlugins.value.filter(p =>
+    selectedPluginIds.value.has(p.id)
   ).length;
   return selectedCount > 0 && selectedCount < activeTypePlugins.value.length;
 });
 
 // Methods
-const isSelected = (pluginId) => {
+const isSelected = pluginId => {
   return selectedPluginIds.value.has(pluginId);
 };
 
-const handleToggleSelect = (pluginId) => {
+const handleToggleSelect = pluginId => {
   if (selectedPluginIds.value.has(pluginId)) {
     selectedPluginIds.value.delete(pluginId);
   } else {
@@ -587,18 +564,16 @@ const handleToggleSelect = (pluginId) => {
   }
 };
 
-const handleSelectAll = (event) => {
+const handleSelectAll = event => {
   if (event.target.checked) {
-    activeTypePlugins.value.forEach((p) => selectedPluginIds.value.add(p.id));
+    activeTypePlugins.value.forEach(p => selectedPluginIds.value.add(p.id));
   } else {
-    activeTypePlugins.value.forEach((p) =>
-      selectedPluginIds.value.delete(p.id),
-    );
+    activeTypePlugins.value.forEach(p => selectedPluginIds.value.delete(p.id));
   }
 };
 
 const handleInstallSelected = () => {
-  const pluginsToInstall = selectedPlugins.value.map((p) => ({
+  const pluginsToInstall = selectedPlugins.value.map(p => ({
     path: p.path,
     id: p.id,
   }));
@@ -610,7 +585,7 @@ const handleInstallSelected = () => {
   selectedPluginIds.value.clear();
 };
 
-const handleZipSelect = (event) => {
+const handleZipSelect = event => {
   const file = event.target.files?.[0];
   if (file) {
     emit("zip-select", file);
@@ -632,7 +607,7 @@ const handleAutoDetect = async () => {
     if (result.suggestions && result.suggestions.length > 0) {
       localPath.value = result.suggestions[0];
     }
-  } catch (e) {
+  } catch {
     // silently ignore — user can type path manually
   } finally {
     detecting.value = false;
@@ -647,7 +622,7 @@ const handleListLocalPlugins = () => {
   });
 };
 
-const handleInstall = (pluginPath) => {
+const handleInstall = pluginPath => {
   emit("install", {
     path: pluginPath,
     repoUrl: props.repoUrl,
@@ -665,7 +640,7 @@ const handleInstallLocal = (pluginPath, force) => {
 };
 
 const handleInstallSelectedLocal = () => {
-  const pluginsToInstall = selectedPlugins.value.map((p) => ({
+  const pluginsToInstall = selectedPlugins.value.map(p => ({
     path: p.path,
     id: p.id,
   }));
@@ -676,7 +651,7 @@ const handleInstallSelectedLocal = () => {
   selectedPluginIds.value.clear();
 };
 
-const handleForceUpdate = (pluginPath) => {
+const handleForceUpdate = pluginPath => {
   emit("force-update", {
     path: pluginPath,
     repoUrl: props.repoUrl,
@@ -693,11 +668,11 @@ const handleRefresh = () => {
   window.location.reload();
 };
 
-const handleRepoUrlInput = (event) => {
+const handleRepoUrlInput = event => {
   emit("update:repoUrl", event.target.value);
 };
 
-const handleBranchInput = (event) => {
+const handleBranchInput = event => {
   emit("update:branch", event.target.value);
 };
 
@@ -708,7 +683,7 @@ watch(
     selectedPluginIds.value.clear();
     // Reset to "all" tab when plugins change
     activeTypeTab.value = "all";
-  },
+  }
 );
 
 // Watch for search query changes to reset to "all" tab

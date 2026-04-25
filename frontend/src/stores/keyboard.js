@@ -30,7 +30,7 @@ export const useKeyboardStore = defineStore("keyboard", () => {
     }
   };
 
-  const updateMappings = async (newMappings) => {
+  const updateMappings = async newMappings => {
     loading.value = true;
     error.value = null;
     try {
@@ -48,7 +48,7 @@ export const useKeyboardStore = defineStore("keyboard", () => {
     }
   };
 
-  const setKeyboardType = (type) => {
+  const setKeyboardType = type => {
     keyboardType.value = type;
   };
 

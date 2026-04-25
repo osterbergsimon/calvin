@@ -30,9 +30,7 @@
       </div>
       <div v-else-if="!currentImageUrl" class="photo-placeholder">
         <p>No images available</p>
-        <p class="photo-info">
-          Add images to <code>data/images</code> directory
-        </p>
+        <p class="photo-info">Add images to <code>data/images</code> directory</p>
       </div>
       <div v-else class="photo-container">
         <img
@@ -179,13 +177,13 @@ onUnmounted(() => {
 
 watch(
   () => props.autoRotate,
-  (newVal) => {
+  newVal => {
     if (newVal) {
       startAutoRotation();
     } else {
       stopAutoRotation();
     }
-  },
+  }
 );
 </script>
 

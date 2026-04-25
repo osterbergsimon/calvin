@@ -273,9 +273,7 @@ describe("useKeyboardActions - Calendar Event Navigation", () => {
       keyboardActions.handleAction("generic_next");
 
       // Should navigate to next month
-      expect(calendarStore.currentDate.getMonth()).toBe(
-        (initialDate.getMonth() + 1) % 12,
-      );
+      expect(calendarStore.currentDate.getMonth()).toBe((initialDate.getMonth() + 1) % 12);
     });
   });
 

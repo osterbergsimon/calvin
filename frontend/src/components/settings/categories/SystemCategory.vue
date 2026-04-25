@@ -1,10 +1,6 @@
 <template>
   <div class="system-category">
-    <TabNavigation
-      :tabs="tabs"
-      :active-tab="activeTab"
-      @tab-change="handleTabChange"
-    />
+    <TabNavigation :tabs="tabs" :active-tab="activeTab" @tab-change="handleTabChange" />
 
     <SettingsTab>
       <PowerTab
@@ -76,7 +72,7 @@ const tabs = [
 
 const activeTab = ref("power");
 
-const handleTabChange = (tabId) => {
+const handleTabChange = tabId => {
   activeTab.value = tabId;
 };
 </script>

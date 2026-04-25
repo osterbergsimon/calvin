@@ -44,9 +44,7 @@ function getGitVersion() {
   } catch (error) {
     // Git not available or error occurred - log for debugging but don't fail build
     if (process.env.NODE_ENV !== "production") {
-      console.warn(
-        `[vite] Warning: Could not get git version: ${error.message}`,
-      );
+      console.warn(`[vite] Warning: Could not get git version: ${error.message}`);
     }
     return null;
   }
@@ -67,7 +65,7 @@ export default defineConfig({
           : "";
         return html.replace(
           "<head>",
-          `<head>\n    <meta name="build-timestamp" content="${timestamp}">${versionMeta}`,
+          `<head>\n    <meta name="build-timestamp" content="${timestamp}">${versionMeta}`
         );
       },
     },
@@ -84,15 +82,11 @@ export default defineConfig({
     rollupOptions: {
       // Optimize chunk splitting for better caching
       output: {
-        manualChunks: (id) => {
+        manualChunks: id => {
           // Split vendor chunks
           if (id.includes("node_modules")) {
             // Vue ecosystem
-            if (
-              id.includes("vue") ||
-              id.includes("vue-router") ||
-              id.includes("pinia")
-            ) {
+            if (id.includes("vue") || id.includes("vue-router") || id.includes("pinia")) {
               return "vendor-vue";
             }
             // Vue Query

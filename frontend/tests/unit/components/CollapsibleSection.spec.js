@@ -56,9 +56,7 @@ describe("CollapsibleSection", () => {
         },
       });
 
-      expect(wrapper.find(".settings-section").classes()).not.toContain(
-        "expanded",
-      );
+      expect(wrapper.find(".settings-section").classes()).not.toContain("expanded");
       expect(wrapper.find(".toggle-icon").text()).toBe("▶");
       expect(wrapper.find(".section-content").isVisible()).toBe(false);
     });
@@ -84,9 +82,7 @@ describe("CollapsibleSection", () => {
         },
       });
 
-      expect(wrapper.find(".settings-section").classes()).not.toContain(
-        "expanded",
-      );
+      expect(wrapper.find(".settings-section").classes()).not.toContain("expanded");
 
       await wrapper.setProps({ expanded: true });
       await wrapper.vm.$nextTick();
@@ -105,9 +101,7 @@ describe("CollapsibleSection", () => {
         },
       });
 
-      expect(wrapper.find(".settings-section").classes()).not.toContain(
-        "expanded",
-      );
+      expect(wrapper.find(".settings-section").classes()).not.toContain("expanded");
 
       await wrapper.find(".section-header").trigger("click");
       await wrapper.vm.$nextTick();
@@ -144,9 +138,7 @@ describe("CollapsibleSection", () => {
       await wrapper.find(".section-header").trigger("click");
       await wrapper.vm.$nextTick();
 
-      expect(wrapper.find(".settings-section").classes()).not.toContain(
-        "expanded",
-      );
+      expect(wrapper.find(".settings-section").classes()).not.toContain("expanded");
       expect(wrapper.find(".toggle-icon").text()).toBe("▶");
     });
   });

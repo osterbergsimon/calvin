@@ -37,7 +37,7 @@ const pluginFetchStatus = ref({});
 
 // Computed properties (using shared refs)
 const imagePlugins = computed(() => {
-  return plugins.value.filter((p) => p.type === "image" && p.enabled);
+  return plugins.value.filter(p => p.type === "image" && p.enabled);
 });
 
 const sortedPluginCategories = computed(() => {
@@ -49,14 +49,14 @@ const sortedPluginCategories = computed(() => {
     { type: "theme", label: "Theme", plugins: [] },
   ];
 
-  plugins.value.forEach((plugin) => {
-    const category = categories.find((c) => c.type === plugin.type);
+  plugins.value.forEach(plugin => {
+    const category = categories.find(c => c.type === plugin.type);
     if (category) {
       category.plugins.push(plugin);
     }
   });
 
-  return categories.filter((c) => c.plugins.length > 0);
+  return categories.filter(c => c.plugins.length > 0);
 });
 
 // Poll the backend rebuild-status endpoint until building is complete,
@@ -102,7 +102,7 @@ export function usePlugins() {
     try {
       const [pluginsResponse, installedResponse] = await Promise.all([
         pluginsApi.getPlugins(),
-        pluginsApi.getInstalledPlugins().catch((error) => {
+        pluginsApi.getInstalledPlugins().catch(error => {
           // Silently handle 404 for installed plugins endpoint
           if (error.response?.status === 404) {
             return { plugins: [] };
@@ -113,12 +113,10 @@ export function usePlugins() {
       ]);
 
       const allPlugins = pluginsResponse.plugins || [];
-      const installedIds = new Set(
-        (installedResponse.plugins || []).map((p) => p.id),
-      );
+      const installedIds = new Set((installedResponse.plugins || []).map(p => p.id));
 
       // Mark installed plugins
-      plugins.value = allPlugins.map((plugin) => ({
+      plugins.value = allPlugins.map(plugin => ({
         ...plugin,
         _installed: installedIds.has(plugin.id),
       }));
@@ -139,9 +137,7 @@ export function usePlugins() {
           let displayOrder = pluginSchema.display_order;
 
           const [instancesResponse, configResponse] = await Promise.all([
-            pluginsApi
-              .getPluginInstances(plugin.id)
-              .catch(() => ({ instances: [] })),
+            pluginsApi.getPluginInstances(plugin.id).catch(() => ({ instances: [] })),
             pluginsApi.getPluginConfig(plugin.id).catch(() => ({})),
           ]);
 
@@ -166,7 +162,7 @@ export function usePlugins() {
           if (isNaN(parsedOrder)) {
             logWarn(
               "[usePlugins]",
-              `Invalid display_order for ${plugin.id}: ${displayOrder}, defaulting to 0`,
+              `Invalid display_order for ${plugin.id}: ${displayOrder}, defaulting to 0`
             );
             parsedOrder = 0;
           }
@@ -177,11 +173,7 @@ export function usePlugins() {
             imagePluginDisplayOrders.value[plugin.id] = parsedOrder;
           }
         } catch (error) {
-          logError(
-            "[usePlugins]",
-            `Failed to load data for plugin ${plugin.id}:`,
-            error,
-          );
+          logError("[usePlugins]", `Failed to load data for plugin ${plugin.id}:`, error);
           pluginInstances.value[plugin.id] = [];
           pluginConfigs.value[plugin.id] = {};
         }
@@ -195,7 +187,7 @@ export function usePlugins() {
   };
 
   // Install plugin from zip
-  const installPluginFromZip = async (file) => {
+  const installPluginFromZip = async file => {
     installingPlugin.value = true;
     pluginInstallError.value = "";
     pluginInstallSuccess.value = "";
@@ -218,9 +210,7 @@ export function usePlugins() {
       await loadPlugins();
     } catch (error) {
       pluginInstallError.value =
-        error.response?.data?.detail ||
-        error.message ||
-        "Failed to install plugin";
+        error.response?.data?.detail || error.message || "Failed to install plugin";
       setTimeout(() => {
         pluginInstallError.value = "";
       }, 10000);
@@ -245,17 +235,14 @@ export function usePlugins() {
     pluginActualBranch.value = "";
 
     try {
-      const response = await pluginsApi.enumeratePluginsFromGitHub(
-        repoUrl,
-        branch,
-      );
+      const response = await pluginsApi.enumeratePluginsFromGitHub(repoUrl, branch);
       const enumeratedPlugins = response.plugins || [];
       const enumeratedThemes = response.themes || [];
 
       // Merge themes into plugins array (themes are also plugins for installation purposes)
       const allItems = [
         ...enumeratedPlugins,
-        ...enumeratedThemes.map((theme) => ({
+        ...enumeratedThemes.map(theme => ({
           ...theme,
           type: "theme", // Ensure type is set to theme
         })),
@@ -266,22 +253,16 @@ export function usePlugins() {
       try {
         const installedResponse = await pluginsApi.getInstalledPlugins();
         const installed = installedResponse.plugins || [];
-        installedPluginsMap = Object.fromEntries(
-          installed.map((p) => [p.id, p]),
-        );
+        installedPluginsMap = Object.fromEntries(installed.map(p => [p.id, p]));
       } catch (error) {
         // Silently handle 404 for installed plugins endpoint
         if (error.response?.status !== 404) {
-          logWarn(
-            "[usePlugins]",
-            "Failed to load installed plugins for comparison:",
-            error,
-          );
+          logWarn("[usePlugins]", "Failed to load installed plugins for comparison:", error);
         }
       }
 
       // Mark installed plugins and add version info
-      availablePlugins.value = allItems.map((plugin) => {
+      availablePlugins.value = allItems.map(plugin => {
         const installed = installedPluginsMap[plugin.id];
         if (installed) {
           return {
@@ -300,15 +281,9 @@ export function usePlugins() {
       pluginBranchSwitched.value = response.branch_switched || false;
       pluginActualBranch.value = response.branch || branch;
     } catch (error) {
-      logError(
-        "[usePlugins]",
-        "Failed to enumerate plugins from GitHub:",
-        error,
-      );
+      logError("[usePlugins]", "Failed to enumerate plugins from GitHub:", error);
       pluginInstallError.value =
-        error.response?.data?.detail ||
-        error.message ||
-        "Failed to enumerate plugins from GitHub";
+        error.response?.data?.detail || error.message || "Failed to enumerate plugins from GitHub";
       setTimeout(() => {
         pluginInstallError.value = "";
       }, 10000);
@@ -318,12 +293,7 @@ export function usePlugins() {
   };
 
   // Install plugin from GitHub
-  const installPluginFromGitHub = async (
-    repoUrl,
-    pluginPath,
-    branch = "main",
-    force = false,
-  ) => {
+  const installPluginFromGitHub = async (repoUrl, pluginPath, branch = "main", force = false) => {
     installingPlugin.value = true;
     pluginInstallError.value = "";
     pluginInstallSuccess.value = "";
@@ -332,12 +302,7 @@ export function usePlugins() {
     pluginActualBranch.value = "";
 
     try {
-      const response = await pluginsApi.installPluginFromGitHub(
-        repoUrl,
-        pluginPath,
-        branch,
-        force,
-      );
+      const response = await pluginsApi.installPluginFromGitHub(repoUrl, pluginPath, branch, force);
       pluginInstallSuccess.value = "Plugin installed successfully!";
       pluginRequiresRestart.value = response.requires_restart || false;
       pluginBranchSwitched.value = response.branch_switched || false;
@@ -349,14 +314,13 @@ export function usePlugins() {
       // Mark the installed plugin in-place so the list stays visible
       const installedId = response.manifest?.id || pluginPath;
       const idx = availablePlugins.value.findIndex(
-        (p) => p.id === installedId || p.path === pluginPath,
+        p => p.id === installedId || p.path === pluginPath
       );
       if (idx !== -1) {
         availablePlugins.value[idx] = {
           ...availablePlugins.value[idx],
           _installed: true,
-          _installedVersion:
-            response.manifest?.version || availablePlugins.value[idx].version,
+          _installedVersion: response.manifest?.version || availablePlugins.value[idx].version,
         };
       }
 
@@ -369,14 +333,10 @@ export function usePlugins() {
       }
     } catch (error) {
       const errorDetail = error.response?.data?.detail || error.message || "";
-      if (
-        errorDetail.includes("older than") ||
-        errorDetail.includes("version")
-      ) {
+      if (errorDetail.includes("older than") || errorDetail.includes("version")) {
         pluginInstallError.value = errorDetail;
       } else {
-        pluginInstallError.value =
-          errorDetail || "Failed to install plugin from GitHub";
+        pluginInstallError.value = errorDetail || "Failed to install plugin from GitHub";
       }
       setTimeout(() => {
         pluginInstallError.value = "";
@@ -387,11 +347,7 @@ export function usePlugins() {
   };
 
   // Install multiple plugins from GitHub
-  const installPluginsFromGitHub = async (
-    plugins,
-    repoUrl,
-    branch = "main",
-  ) => {
+  const installPluginsFromGitHub = async (plugins, repoUrl, branch = "main") => {
     installingPlugin.value = true;
     pluginInstallError.value = "";
     pluginInstallSuccess.value = "";
@@ -412,7 +368,7 @@ export function usePlugins() {
             repoUrl,
             plugin.path,
             branch,
-            false, // Don't force for bulk installs
+            false // Don't force for bulk installs
           );
           results.success.push({
             id: plugin.id,
@@ -433,8 +389,7 @@ export function usePlugins() {
           results.failed.push({
             id: plugin.id,
             name: plugin.name || plugin.id,
-            error:
-              error.response?.data?.detail || error.message || "Unknown error",
+            error: error.response?.data?.detail || error.message || "Unknown error",
           });
         }
       }
@@ -442,37 +397,33 @@ export function usePlugins() {
       // Build combined message
       if (results.success.length > 0 && results.failed.length === 0) {
         // All succeeded
-        const successNames = results.success.map((s) => s.name).join(", ");
+        const successNames = results.success.map(s => s.name).join(", ");
         pluginInstallSuccess.value = `Successfully installed ${results.success.length} plugin(s): ${successNames}`;
         pluginRequiresRestart.value = results.requiresRestart;
       } else if (results.success.length > 0 && results.failed.length > 0) {
         // Partial success
-        const successNames = results.success.map((s) => s.name).join(", ");
-        const failedNames = results.failed.map((f) => f.name).join(", ");
+        const successNames = results.success.map(s => s.name).join(", ");
+        const failedNames = results.failed.map(f => f.name).join(", ");
         pluginInstallSuccess.value = `Successfully installed ${results.success.length} plugin(s): ${successNames}`;
         pluginInstallError.value = `Failed to install ${results.failed.length} plugin(s): ${failedNames}`;
         pluginRequiresRestart.value = results.requiresRestart;
       } else if (results.failed.length > 0) {
         // All failed
-        const failedNames = results.failed.map((f) => f.name).join(", ");
-        const failedDetails = results.failed
-          .map((f) => `${f.name}: ${f.error}`)
-          .join("; ");
+        const failedNames = results.failed.map(f => f.name).join(", ");
+        const failedDetails = results.failed.map(f => `${f.name}: ${f.error}`).join("; ");
         pluginInstallError.value = `Failed to install ${results.failed.length} plugin(s): ${failedNames}. Details: ${failedDetails}`;
       }
 
       // Mark installed plugins in-place so the list stays visible
       for (const s of results.success) {
         const idx = availablePlugins.value.findIndex(
-          (p) => p.id === s.id || p.path === s.response?.manifest?.id,
+          p => p.id === s.id || p.path === s.response?.manifest?.id
         );
         if (idx !== -1) {
           availablePlugins.value[idx] = {
             ...availablePlugins.value[idx],
             _installed: true,
-            _installedVersion:
-              s.response?.manifest?.version ||
-              availablePlugins.value[idx].version,
+            _installedVersion: s.response?.manifest?.version || availablePlugins.value[idx].version,
           };
         }
       }
@@ -489,9 +440,7 @@ export function usePlugins() {
       }
     } catch (error) {
       pluginInstallError.value =
-        error.response?.data?.detail ||
-        error.message ||
-        "Failed to install plugins from GitHub";
+        error.response?.data?.detail || error.message || "Failed to install plugins from GitHub";
       setTimeout(() => {
         pluginInstallError.value = "";
       }, 10000);
@@ -501,7 +450,7 @@ export function usePlugins() {
   };
 
   // Enumerate plugins from a local path (dev mode only)
-  const enumeratePluginsFromLocal = async (localPath) => {
+  const enumeratePluginsFromLocal = async localPath => {
     if (!localPath || !localPath.trim()) {
       pluginInstallError.value = "Local path is required";
       setTimeout(() => {
@@ -520,26 +469,22 @@ export function usePlugins() {
 
       const allItems = [
         ...enumeratedPlugins,
-        ...enumeratedThemes.map((theme) => ({ ...theme, type: "theme" })),
+        ...enumeratedThemes.map(theme => ({ ...theme, type: "theme" })),
       ];
 
       let installedPluginsMap = {};
       try {
         const installedResponse = await pluginsApi.getInstalledPlugins();
         installedPluginsMap = Object.fromEntries(
-          (installedResponse.plugins || []).map((p) => [p.id, p]),
+          (installedResponse.plugins || []).map(p => [p.id, p])
         );
       } catch (error) {
         if (error.response?.status !== 404) {
-          logWarn(
-            "[usePlugins]",
-            "Failed to load installed plugins for comparison:",
-            error,
-          );
+          logWarn("[usePlugins]", "Failed to load installed plugins for comparison:", error);
         }
       }
 
-      availablePlugins.value = allItems.map((plugin) => {
+      availablePlugins.value = allItems.map(plugin => {
         const installed = installedPluginsMap[plugin.id];
         return installed
           ? {
@@ -550,11 +495,7 @@ export function usePlugins() {
           : { ...plugin, _installed: false, _installedVersion: null };
       });
     } catch (error) {
-      logError(
-        "[usePlugins]",
-        "Failed to enumerate plugins from local path:",
-        error,
-      );
+      logError("[usePlugins]", "Failed to enumerate plugins from local path:", error);
       pluginInstallError.value =
         error.response?.data?.detail ||
         error.message ||
@@ -568,22 +509,14 @@ export function usePlugins() {
   };
 
   // Install a single plugin from a local path (dev mode only)
-  const installPluginFromLocal = async (
-    localPath,
-    pluginPath,
-    force = false,
-  ) => {
+  const installPluginFromLocal = async (localPath, pluginPath, force = false) => {
     installingPlugin.value = true;
     pluginInstallError.value = "";
     pluginInstallSuccess.value = "";
     pluginRequiresRestart.value = false;
 
     try {
-      const response = await pluginsApi.installPluginFromLocal(
-        localPath,
-        pluginPath,
-        force,
-      );
+      const response = await pluginsApi.installPluginFromLocal(localPath, pluginPath, force);
       pluginInstallSuccess.value = "Plugin installed successfully!";
       pluginRequiresRestart.value = response.requires_restart || false;
       if (response.frontend_rebuild_in_progress) {
@@ -593,14 +526,13 @@ export function usePlugins() {
       // Mark the installed plugin in-place so the list stays visible
       const installedId = response.manifest?.id || pluginPath;
       const idx = availablePlugins.value.findIndex(
-        (p) => p.id === installedId || p.path === pluginPath,
+        p => p.id === installedId || p.path === pluginPath
       );
       if (idx !== -1) {
         availablePlugins.value[idx] = {
           ...availablePlugins.value[idx],
           _installed: true,
-          _installedVersion:
-            response.manifest?.version || availablePlugins.value[idx].version,
+          _installedVersion: response.manifest?.version || availablePlugins.value[idx].version,
         };
       }
 
@@ -613,9 +545,7 @@ export function usePlugins() {
       }
     } catch (error) {
       pluginInstallError.value =
-        error.response?.data?.detail ||
-        error.message ||
-        "Failed to install plugin from local path";
+        error.response?.data?.detail || error.message || "Failed to install plugin from local path";
       setTimeout(() => {
         pluginInstallError.value = "";
       }, 10000);
@@ -636,11 +566,7 @@ export function usePlugins() {
     try {
       for (const plugin of plugins) {
         try {
-          const response = await pluginsApi.installPluginFromLocal(
-            localPath,
-            plugin.path,
-            false,
-          );
+          const response = await pluginsApi.installPluginFromLocal(localPath, plugin.path, false);
           results.success.push({
             id: plugin.id,
             name: plugin.name || plugin.id,
@@ -654,35 +580,32 @@ export function usePlugins() {
           results.failed.push({
             id: plugin.id,
             name: plugin.name || plugin.id,
-            error:
-              error.response?.data?.detail || error.message || "Unknown error",
+            error: error.response?.data?.detail || error.message || "Unknown error",
           });
         }
       }
 
       if (results.success.length > 0 && results.failed.length === 0) {
-        pluginInstallSuccess.value = `Successfully installed ${results.success.length} plugin(s): ${results.success.map((s) => s.name).join(", ")}`;
+        pluginInstallSuccess.value = `Successfully installed ${results.success.length} plugin(s): ${results.success.map(s => s.name).join(", ")}`;
         pluginRequiresRestart.value = results.requiresRestart;
       } else if (results.success.length > 0) {
-        pluginInstallSuccess.value = `Successfully installed ${results.success.length} plugin(s): ${results.success.map((s) => s.name).join(", ")}`;
-        pluginInstallError.value = `Failed to install ${results.failed.length} plugin(s): ${results.failed.map((f) => f.name).join(", ")}`;
+        pluginInstallSuccess.value = `Successfully installed ${results.success.length} plugin(s): ${results.success.map(s => s.name).join(", ")}`;
+        pluginInstallError.value = `Failed to install ${results.failed.length} plugin(s): ${results.failed.map(f => f.name).join(", ")}`;
         pluginRequiresRestart.value = results.requiresRestart;
       } else {
-        pluginInstallError.value = `Failed to install ${results.failed.length} plugin(s): ${results.failed.map((f) => `${f.name}: ${f.error}`).join("; ")}`;
+        pluginInstallError.value = `Failed to install ${results.failed.length} plugin(s): ${results.failed.map(f => `${f.name}: ${f.error}`).join("; ")}`;
       }
 
       // Mark installed plugins in-place so the list stays visible
       for (const s of results.success) {
         const idx = availablePlugins.value.findIndex(
-          (p) => p.id === s.id || p.path === s.response?.manifest?.id,
+          p => p.id === s.id || p.path === s.response?.manifest?.id
         );
         if (idx !== -1) {
           availablePlugins.value[idx] = {
             ...availablePlugins.value[idx],
             _installed: true,
-            _installedVersion:
-              s.response?.manifest?.version ||
-              availablePlugins.value[idx].version,
+            _installedVersion: s.response?.manifest?.version || availablePlugins.value[idx].version,
           };
         }
       }
@@ -722,18 +645,14 @@ export function usePlugins() {
     }
   };
 
-  const loadPluginConfig = async (pluginId) => {
+  const loadPluginConfig = async pluginId => {
     try {
       const config = await pluginsApi.getPluginConfig(pluginId);
       pluginConfigs.value[pluginId] = config;
       pluginFormData.value[pluginId] = { ...config };
       return config;
     } catch (error) {
-      logError(
-        "[usePlugins]",
-        `Failed to load config for plugin ${pluginId}:`,
-        error,
-      );
+      logError("[usePlugins]", `Failed to load config for plugin ${pluginId}:`, error);
       throw error;
     }
   };
@@ -745,7 +664,7 @@ export function usePlugins() {
     pluginFormData.value[pluginId][key] = value;
   };
 
-  const savePluginConfig = async (pluginId) => {
+  const savePluginConfig = async pluginId => {
     savingPlugin.value = pluginId;
     pluginSaveStatus.value[pluginId] = null;
 
@@ -763,17 +682,10 @@ export function usePlugins() {
         pluginSaveStatus.value[pluginId] = null;
       }, 5000);
     } catch (error) {
-      logError(
-        "[usePlugins]",
-        `Failed to save config for plugin ${pluginId}:`,
-        error,
-      );
+      logError("[usePlugins]", `Failed to save config for plugin ${pluginId}:`, error);
       pluginSaveStatus.value[pluginId] = {
         success: false,
-        message:
-          error.response?.data?.detail ||
-          error.message ||
-          "Failed to save configuration",
+        message: error.response?.data?.detail || error.message || "Failed to save configuration",
       };
       throw error;
     } finally {
@@ -781,7 +693,7 @@ export function usePlugins() {
     }
   };
 
-  const testPluginConnection = async (pluginId) => {
+  const testPluginConnection = async pluginId => {
     testingPlugin.value[pluginId] = true;
     pluginTestStatus.value[pluginId] = null;
 
@@ -805,7 +717,7 @@ export function usePlugins() {
     }
   };
 
-  const fetchPluginNow = async (pluginId) => {
+  const fetchPluginNow = async pluginId => {
     fetchingPlugin.value[pluginId] = true;
     pluginFetchStatus.value[pluginId] = null;
 
@@ -820,10 +732,7 @@ export function usePlugins() {
       logError("[usePlugins]", `Failed to fetch plugin ${pluginId}:`, error);
       pluginFetchStatus.value[pluginId] = {
         success: false,
-        message:
-          error.response?.data?.detail ||
-          error.message ||
-          "Failed to initiate fetch",
+        message: error.response?.data?.detail || error.message || "Failed to initiate fetch",
       };
       throw error;
     } finally {
@@ -837,7 +746,7 @@ export function usePlugins() {
       await pluginsApi.updatePluginConfig(pluginId, { enabled });
 
       // Update local state immediately (optimistic update)
-      const plugin = plugins.value.find((p) => p.id === pluginId);
+      const plugin = plugins.value.find(p => p.id === pluginId);
       if (plugin) {
         plugin.enabled = enabled;
       }
@@ -849,9 +758,7 @@ export function usePlugins() {
         pluginInstances.value[pluginId].length > 0
       ) {
         const instances = pluginInstances.value[pluginId];
-        const promises = instances.map((instance) =>
-          pluginsApi.startPluginInstance(instance.id),
-        );
+        const promises = instances.map(instance => pluginsApi.startPluginInstance(instance.id));
         await Promise.all(promises);
       }
       // If disabling and there are instances, stop them all
@@ -861,9 +768,7 @@ export function usePlugins() {
         pluginInstances.value[pluginId].length > 0
       ) {
         const instances = pluginInstances.value[pluginId];
-        const promises = instances.map((instance) =>
-          pluginsApi.stopPluginInstance(instance.id),
-        );
+        const promises = instances.map(instance => pluginsApi.stopPluginInstance(instance.id));
         await Promise.all(promises);
       }
 
@@ -873,16 +778,12 @@ export function usePlugins() {
         const instancesResponse = await pluginsApi.getPluginInstances(pluginId);
         pluginInstances.value[pluginId] = instancesResponse.instances || [];
       } catch (error) {
-        logError(
-          "[usePlugins]",
-          `Failed to reload instances for plugin ${pluginId}:`,
-          error,
-        );
+        logError("[usePlugins]", `Failed to reload instances for plugin ${pluginId}:`, error);
       }
     } catch (error) {
       logError("[usePlugins]", "Failed to toggle plugin:", error);
       // Revert optimistic update on error
-      const plugin = plugins.value.find((p) => p.id === pluginId);
+      const plugin = plugins.value.find(p => p.id === pluginId);
       if (plugin) {
         plugin.enabled = !enabled;
       }
@@ -914,11 +815,7 @@ export function usePlugins() {
       pluginConfigs.value[pluginId] = cleanedConfig;
       pluginDisplayOrders.value[pluginId] = order;
     } catch (error) {
-      logError(
-        "[usePlugins]",
-        `Failed to update order for plugin ${pluginId}:`,
-        error,
-      );
+      logError("[usePlugins]", `Failed to update order for plugin ${pluginId}:`, error);
       throw error;
     }
   };
@@ -947,11 +844,7 @@ export function usePlugins() {
       pluginConfigs.value[pluginId] = cleanedConfig;
       imagePluginDisplayOrders.value[pluginId] = order;
     } catch (error) {
-      logError(
-        "[usePlugins]",
-        `Failed to update order for image plugin ${pluginId}:`,
-        error,
-      );
+      logError("[usePlugins]", `Failed to update order for image plugin ${pluginId}:`, error);
       throw error;
     }
   };
@@ -968,11 +861,7 @@ export function usePlugins() {
       const instancesResponse = await pluginsApi.getPluginInstances(pluginId);
       pluginInstances.value[pluginId] = instancesResponse.instances || [];
     } catch (error) {
-      logError(
-        "[usePlugins]",
-        `Failed to update instance order for ${pluginId}:`,
-        error,
-      );
+      logError("[usePlugins]", `Failed to update instance order for ${pluginId}:`, error);
       throw error;
     }
   };
@@ -989,11 +878,7 @@ export function usePlugins() {
       const instancesResponse = await pluginsApi.getPluginInstances(pluginId);
       pluginInstances.value[pluginId] = instancesResponse.instances || [];
     } catch (error) {
-      logError(
-        "[usePlugins]",
-        `Failed to update image instance order for ${pluginId}:`,
-        error,
-      );
+      logError("[usePlugins]", `Failed to update image instance order for ${pluginId}:`, error);
       throw error;
     }
   };

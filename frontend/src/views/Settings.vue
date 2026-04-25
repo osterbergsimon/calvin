@@ -4,10 +4,7 @@
       <h1>Settings & Configuration</h1>
       <div class="header-actions">
         <div ref="systemMenuRef" class="system-menu">
-          <button
-            class="btn-system-menu"
-            @click="showSystemMenu = !showSystemMenu"
-          >
+          <button class="btn-system-menu" @click="showSystemMenu = !showSystemMenu">
             ⚙️ System
             <span class="menu-arrow">{{ showSystemMenu ? "▲" : "▼" }}</span>
           </button>
@@ -34,11 +31,7 @@
             >
               🔄 Restart Frontend
             </button>
-            <button
-              class="menu-item"
-              title="Reload the frontend page"
-              @click="reloadUI"
-            >
+            <button class="menu-item" title="Reload the frontend page" @click="reloadUI">
               🔄 Reload Page
             </button>
           </div>
@@ -47,11 +40,7 @@
       </div>
     </div>
 
-    <div
-      v-if="updateMessage"
-      class="system-status-banner"
-      :class="updateMessageClass"
-    >
+    <div v-if="updateMessage" class="system-status-banner" :class="updateMessageClass">
       {{ updateMessage }}
     </div>
 
@@ -77,12 +66,7 @@
         <div v-if="error" class="settings-banner settings-banner-error">
           {{ error }}
         </div>
-        <div
-          v-else-if="saveSuccess"
-          class="settings-banner settings-banner-success"
-        >
-          ✓ Saved
-        </div>
+        <div v-else-if="saveSuccess" class="settings-banner settings-banner-success">✓ Saved</div>
         <LayoutCategory
           v-if="activeCategory === 'layout' && localConfig"
           :config="localConfig"
@@ -116,16 +100,16 @@ import { defineAsyncComponent } from "vue";
 
 // Lazy load category components for better code splitting
 const LayoutCategory = defineAsyncComponent(
-  () => import("@/components/settings/categories/LayoutCategory.vue"),
+  () => import("@/components/settings/categories/LayoutCategory.vue")
 );
 const ContentCategory = defineAsyncComponent(
-  () => import("@/components/settings/categories/ContentCategory.vue"),
+  () => import("@/components/settings/categories/ContentCategory.vue")
 );
 const PluginsCategory = defineAsyncComponent(
-  () => import("@/components/settings/categories/PluginsCategory.vue"),
+  () => import("@/components/settings/categories/PluginsCategory.vue")
 );
 const SystemCategory = defineAsyncComponent(
-  () => import("@/components/settings/categories/SystemCategory.vue"),
+  () => import("@/components/settings/categories/SystemCategory.vue")
 );
 
 const router = useRouter();
@@ -141,16 +125,14 @@ const categories = [
 
 const _CATEGORY_KEY = "settings_active_category";
 const activeCategory = ref(sessionStorage.getItem(_CATEGORY_KEY) || "layout");
-watch(activeCategory, (val) => sessionStorage.setItem(_CATEGORY_KEY, val));
+watch(activeCategory, val => sessionStorage.setItem(_CATEGORY_KEY, val));
 const showSystemMenu = ref(false);
 
 // Config management
-const { localConfig, loadConfig, updateConfig, error, saveSuccess } =
-  useConfigForm();
+const { localConfig, loadConfig, updateConfig, error, saveSuccess } = useConfigForm();
 
 // System operations
-const { restartBackend, restartFrontend, updateMessage, updateMessageClass } =
-  useSystem();
+const { restartBackend, restartFrontend, updateMessage, updateMessageClass } = useSystem();
 
 // Version info
 const version = ref(null);
@@ -170,17 +152,17 @@ const getFrontendVersionFromMeta = () => {
 };
 
 // Handle config updates
-const handleConfigUpdate = async (updates) => {
+const handleConfigUpdate = async updates => {
   await updateConfig(updates);
 };
 
 // Handle git repo URL update
-const handleGitRepoUrlUpdate = async (url) => {
+const handleGitRepoUrlUpdate = async url => {
   await updateConfig({ gitRepoUrl: url });
 };
 
 // Handle git branch update
-const handleGitBranchUpdate = async (branch) => {
+const handleGitBranchUpdate = async branch => {
   await updateConfig({ gitBranch: branch });
 };
 
@@ -199,7 +181,7 @@ const reloadUI = () => {
 
 // Click-outside closes the system menu
 const systemMenuRef = ref(null);
-const onDocumentClick = (e) => {
+const onDocumentClick = e => {
   if (showSystemMenu.value && !systemMenuRef.value?.contains(e.target)) {
     showSystemMenu.value = false;
   }

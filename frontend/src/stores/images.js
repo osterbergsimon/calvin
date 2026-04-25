@@ -67,10 +67,7 @@ export const useImagesStore = defineStore("images", () => {
     // For remote images (like Picsum, Unsplash), use the URL directly
     // This avoids unnecessary backend redirects and improves performance
     const imageUrl = currentImage.value.url || currentImage.value.raw_url;
-    if (
-      imageUrl &&
-      (imageUrl.startsWith("http://") || imageUrl.startsWith("https://"))
-    ) {
+    if (imageUrl && (imageUrl.startsWith("http://") || imageUrl.startsWith("https://"))) {
       return imageUrl;
     }
 
@@ -78,7 +75,7 @@ export const useImagesStore = defineStore("images", () => {
     return `/api/images/${currentImage.value.id}`;
   });
 
-  const uploadImage = async (file) => {
+  const uploadImage = async file => {
     loading.value = true;
     error.value = null;
     try {
@@ -98,7 +95,7 @@ export const useImagesStore = defineStore("images", () => {
     }
   };
 
-  const deleteImage = async (imageId) => {
+  const deleteImage = async imageId => {
     loading.value = true;
     error.value = null;
     try {
