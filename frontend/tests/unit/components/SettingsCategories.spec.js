@@ -18,7 +18,9 @@ const childStubs = {
   DashboardLayoutTab: true,
   CalendarDisplayTab: true,
   PluginDisplayTab: true,
-  UITab: true,
+  AppearanceTab: true,
+  ClockSettingsTab: true,
+  NotificationsTab: true,
   PhotosTab: true,
   ImagesTab: true,
   ServicesTab: true,
@@ -49,7 +51,9 @@ describe("settings category IA", () => {
       "Layout",
       "Calendar Display",
       "Plugin Display",
-      "UI, Theme & Clock",
+      "Appearance",
+      "Clock",
+      "Notifications",
     ]);
   });
 

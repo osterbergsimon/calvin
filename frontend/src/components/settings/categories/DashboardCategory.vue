@@ -22,8 +22,18 @@
         :config="config"
         @update:config="$emit('update:config', $event)"
       />
-      <UITab
-        v-if="activeTab === 'ui'"
+      <AppearanceTab
+        v-if="activeTab === 'appearance'"
+        :config="config"
+        @update:config="$emit('update:config', $event)"
+      />
+      <ClockSettingsTab
+        v-if="activeTab === 'clock'"
+        :config="config"
+        @update:config="$emit('update:config', $event)"
+      />
+      <NotificationsTab
+        v-if="activeTab === 'notifications'"
         :config="config"
         @update:config="$emit('update:config', $event)"
       />
@@ -38,7 +48,9 @@ import SettingsTab from "../shared/SettingsTab.vue";
 import DashboardLayoutTab from "../tabs/dashboard/DashboardLayoutTab.vue";
 import CalendarDisplayTab from "../tabs/dashboard/CalendarDisplayTab.vue";
 import PluginDisplayTab from "../tabs/dashboard/PluginDisplayTab.vue";
-import UITab from "../tabs/layout/UITab.vue";
+import AppearanceTab from "../tabs/dashboard/AppearanceTab.vue";
+import ClockSettingsTab from "../tabs/dashboard/ClockSettingsTab.vue";
+import NotificationsTab from "../tabs/dashboard/NotificationsTab.vue";
 
 defineProps({
   config: {
@@ -54,7 +66,9 @@ const tabs = [
   { id: "layout", label: "Layout", icon: "📐" },
   { id: "calendar", label: "Calendar Display", icon: "📅" },
   { id: "plugin-display", label: "Plugin Display", icon: "📦" },
-  { id: "ui", label: "UI, Theme & Clock", icon: "🎨" },
+  { id: "appearance", label: "Appearance", icon: "🎨" },
+  { id: "clock", label: "Clock", icon: "🕐" },
+  { id: "notifications", label: "Notifications", icon: "🔔" },
 ];
 
 const { activeTab, setActiveTab } = usePersistedSettingTab(
