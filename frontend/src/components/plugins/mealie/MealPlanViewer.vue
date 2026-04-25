@@ -80,13 +80,7 @@ import { computed } from "vue";
 import { useQuery } from "@tanstack/vue-query";
 import axios from "axios";
 import { useConfigStore } from "../../../stores/config";
-import {
-  logDebug,
-  logWarn,
-  logInfo,
-  logError,
-  isDebugEnabled,
-} from "../../../utils/logger";
+import { logDebug, logWarn, isDebugEnabled } from "../../../utils/logger";
 
 const props = defineProps({
   serviceId: {

@@ -3,7 +3,9 @@
     <div
       v-if="banner"
       class="tab-banner"
-      :class="banner.type === 'error' ? 'tab-banner-error' : 'tab-banner-success'"
+      :class="
+        banner.type === 'error' ? 'tab-banner-error' : 'tab-banner-success'
+      "
     >
       {{ banner.text }}
     </div>
@@ -259,7 +261,11 @@ const loadCalendarPluginTypes = async () => {
       newCalendarSource.value.type = calendarPluginTypes.value[0].id;
     }
   } catch (error) {
-    logError("[CalendarSources]", "Failed to load calendar plugin types:", error);
+    logError(
+      "[CalendarSources]",
+      "Failed to load calendar plugin types:",
+      error,
+    );
     // Fallback to hardcoded types
     calendarPluginTypes.value = [
       { id: "google", name: "Google Calendar" },
@@ -389,7 +395,11 @@ const handleUpdateSourceColor = async (sourceId, color) => {
       await loadCalendarSources();
     }
   } catch (error) {
-    logError("[CalendarSources]", "Failed to update calendar source color:", error);
+    logError(
+      "[CalendarSources]",
+      "Failed to update calendar source color:",
+      error,
+    );
     setBanner(
       "error",
       error?.response?.data?.detail ||

@@ -86,9 +86,7 @@ const emit = defineEmits(["update:config"]);
 const consoleLogEnabled = ref(props.config.consoleLogEnabled ?? true);
 const consoleLogLevel = ref(props.config.consoleLogLevel || "info");
 const configPollInterval = ref(props.config.configPollInterval || 30);
-const calendarRefreshInterval = ref(
-  props.config.calendarRefreshInterval || 15,
-);
+const calendarRefreshInterval = ref(props.config.calendarRefreshInterval || 15);
 
 watch(
   () => props.config,
@@ -96,8 +94,7 @@ watch(
     consoleLogEnabled.value = newConfig.consoleLogEnabled ?? true;
     consoleLogLevel.value = newConfig.consoleLogLevel || "info";
     configPollInterval.value = newConfig.configPollInterval || 30;
-    calendarRefreshInterval.value =
-      newConfig.calendarRefreshInterval || 15;
+    calendarRefreshInterval.value = newConfig.calendarRefreshInterval || 15;
   },
   { deep: true },
 );

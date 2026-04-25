@@ -166,10 +166,7 @@
         />
       </SettingItem>
 
-      <SettingItem
-        label="Weekend Days"
-        help="Days to highlight as weekend"
-      >
+      <SettingItem label="Weekend Days" help="Days to highlight as weekend">
         <div class="weekend-days">
           <label
             v-for="day in dayOptions"

@@ -214,8 +214,18 @@ watch(
 
 // Surface restart/update status as a toast so it's visible outside Settings
 const { updateMessage, updateMessageClass } = useSystem();
-const _msgClassToNotifType = { info: "info", success: "success", error: "error", warning: "warning" };
-const _msgClassToDuration = { info: 5000, success: 4000, error: 8000, warning: 8000 };
+const _msgClassToNotifType = {
+  info: "info",
+  success: "success",
+  error: "error",
+  warning: "warning",
+};
+const _msgClassToDuration = {
+  info: 5000,
+  success: 4000,
+  error: 8000,
+  warning: 8000,
+};
 const _msgClassToIcon = { info: "🔄", success: "✓", error: "✗", warning: "⚠" };
 watch(updateMessage, (msg) => {
   if (!msg) return;

@@ -173,7 +173,6 @@ const instanceLabelMap = {
 };
 import PluginFieldRenderer from "@/components/PluginFieldRenderer.vue";
 import * as pluginsApi from "@/services/pluginsApi";
-import * as calendarApi from "@/services/calendarApi";
 import { useCalendarStore } from "@/stores/calendar";
 
 const props = defineProps({

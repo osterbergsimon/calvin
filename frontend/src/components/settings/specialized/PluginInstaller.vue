@@ -632,7 +632,7 @@ const handleAutoDetect = async () => {
     if (result.suggestions && result.suggestions.length > 0) {
       localPath.value = result.suggestions[0];
     }
-  } catch (e) {
+  } catch {
     // silently ignore — user can type path manually
   } finally {
     detecting.value = false;

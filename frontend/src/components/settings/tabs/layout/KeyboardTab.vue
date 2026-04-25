@@ -38,52 +38,52 @@
         <div v-else>
           <div v-if="error" class="error-message" role="alert">{{ error }}</div>
           <div class="mappings-list">
-          <!-- Add new key button for standard keyboards -->
-          <div
-            v-if="config.keyboardType === 'standard'"
-            class="add-key-section"
-          >
-            <select v-model="newKeyToAdd" class="key-selector">
-              <option value="">-- Add a key to map --</option>
-              <option
-                v-for="key in STANDARD_KEYS.filter(
-                  (k) => !availableKeys.includes(k),
-                )"
-                :key="key"
-                :value="key"
-              >
-                {{ formatKeyName(key) }}
-              </option>
-            </select>
-            <button v-if="newKeyToAdd" class="btn-add-key" @click="addNewKey">
-              Add Key
-            </button>
-          </div>
-          <div v-for="key in availableKeys" :key="key" class="mapping-item">
-            <div class="mapping-key">
-              <strong>{{ formatKeyName(key) }}</strong>
+            <!-- Add new key button for standard keyboards -->
+            <div
+              v-if="config.keyboardType === 'standard'"
+              class="add-key-section"
+            >
+              <select v-model="newKeyToAdd" class="key-selector">
+                <option value="">-- Add a key to map --</option>
+                <option
+                  v-for="key in STANDARD_KEYS.filter(
+                    (k) => !availableKeys.includes(k),
+                  )"
+                  :key="key"
+                  :value="key"
+                >
+                  {{ formatKeyName(key) }}
+                </option>
+              </select>
+              <button v-if="newKeyToAdd" class="btn-add-key" @click="addNewKey">
+                Add Key
+              </button>
             </div>
-            <select
-              :value="currentMappings[key] || 'none'"
-              class="mapping-action"
-              @change="updateMapping(key, $event.target.value)"
-            >
-              <option
-                v-for="action in availableActions"
-                :key="action.value"
-                :value="action.value"
+            <div v-for="key in availableKeys" :key="key" class="mapping-item">
+              <div class="mapping-key">
+                <strong>{{ formatKeyName(key) }}</strong>
+              </div>
+              <select
+                :value="currentMappings[key] || 'none'"
+                class="mapping-action"
+                @change="updateMapping(key, $event.target.value)"
               >
-                {{ action.label }}
-              </option>
-            </select>
-            <button
-              class="btn-clear"
-              title="Clear mapping"
-              @click="clearMapping(key)"
-            >
-              ×
-            </button>
-          </div>
+                <option
+                  v-for="action in availableActions"
+                  :key="action.value"
+                  :value="action.value"
+                >
+                  {{ action.label }}
+                </option>
+              </select>
+              <button
+                class="btn-clear"
+                title="Clear mapping"
+                @click="clearMapping(key)"
+              >
+                ×
+              </button>
+            </div>
           </div>
         </div>
       </SettingItem>
