@@ -12,10 +12,10 @@ export interface paths {
             cookie?: never;
         };
         /**
-         * Serve Frontend Root
-         * @description Serve frontend index.html for root path.
+         * Root
+         * @description Root endpoint.
          */
-        get: operations["serve_frontend_root__get"];
+        get: operations["root__get"];
         put?: never;
         post?: never;
         delete?: never;
@@ -1472,46 +1472,6 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
-    "/assets/{file_path}": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        /**
-         * Serve Asset
-         * @description Serve static assets with cache control headers for development.
-         */
-        get: operations["serve_asset_assets__file_path__get"];
-        put?: never;
-        post?: never;
-        delete?: never;
-        options?: never;
-        head?: never;
-        patch?: never;
-        trace?: never;
-    };
-    "/{full_path}": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        /**
-         * Serve Frontend Get
-         * @description Serve frontend index.html for SPA routing (GET only).
-         */
-        get: operations["serve_frontend_get__full_path__get"];
-        put?: never;
-        post?: never;
-        delete?: never;
-        options?: never;
-        head?: never;
-        patch?: never;
-        trace?: never;
-    };
 }
 export type webhooks = Record<string, never>;
 export interface components {
@@ -1924,7 +1884,7 @@ export interface components {
 }
 export type $defs = Record<string, never>;
 export interface operations {
-    serve_frontend_root__get: {
+    root__get: {
         parameters: {
             query?: never;
             header?: never;
@@ -3850,68 +3810,6 @@ export interface operations {
             };
             header?: never;
             path?: never;
-            cookie?: never;
-        };
-        requestBody?: never;
-        responses: {
-            /** @description Successful Response */
-            200: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": unknown;
-                };
-            };
-            /** @description Validation Error */
-            422: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["HTTPValidationError"];
-                };
-            };
-        };
-    };
-    serve_asset_assets__file_path__get: {
-        parameters: {
-            query?: never;
-            header?: never;
-            path: {
-                file_path: string;
-            };
-            cookie?: never;
-        };
-        requestBody?: never;
-        responses: {
-            /** @description Successful Response */
-            200: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": unknown;
-                };
-            };
-            /** @description Validation Error */
-            422: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["HTTPValidationError"];
-                };
-            };
-        };
-    };
-    serve_frontend_get__full_path__get: {
-        parameters: {
-            query?: never;
-            header?: never;
-            path: {
-                full_path: string;
-            };
             cookie?: never;
         };
         requestBody?: never;
