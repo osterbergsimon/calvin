@@ -20,6 +20,7 @@ import CardGrid from "./renderers/CardGrid.vue";
 import ItemList from "./renderers/ItemList.vue";
 import ImageWithCaption from "./renderers/ImageWithCaption.vue";
 import MetricDashboard from "./renderers/MetricDashboard.vue";
+import WeatherForecast from "./renderers/WeatherForecast.vue";
 import WebComponentHost from "./WebComponentHost.vue";
 
 const renderers = {
@@ -30,6 +31,7 @@ const renderers = {
   "item-list": ItemList,
   "image-with-caption": ImageWithCaption,
   "metric-dashboard": MetricDashboard,
+  "weather-forecast": WeatherForecast,
   "web-component": WebComponentHost,
 };
 

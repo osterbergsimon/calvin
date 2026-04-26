@@ -1127,8 +1127,8 @@
   "paths": {
     "/": {
       "get": {
-        "description": "Root endpoint.",
-        "operationId": "root__get",
+        "description": "Serve frontend index.html for root path.",
+        "operationId": "serve_frontend_root__get",
         "responses": {
           "200": {
             "content": {
@@ -1139,7 +1139,7 @@
             "description": "Successful Response"
           }
         },
-        "summary": "Root"
+        "summary": "Serve Frontend Root"
       }
     },
     "/api/calendar/events": {
@@ -3368,6 +3368,55 @@
         ]
       }
     },
+    "/api/plugins/{plugin_id}/static/{asset_path}": {
+      "get": {
+        "operationId": "get_plugin_static_asset_api_plugins__plugin_id__static__asset_path__get",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "plugin_id",
+            "required": true,
+            "schema": {
+              "title": "Plugin Id",
+              "type": "string"
+            }
+          },
+          {
+            "in": "path",
+            "name": "asset_path",
+            "required": true,
+            "schema": {
+              "title": "Asset Path",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Get Plugin Static Asset",
+        "tags": [
+          "plugins"
+        ]
+      }
+    },
     "/api/plugins/{plugin_id}/test": {
       "post": {
         "description": "Test plugin connection/configuration.\n\nUses plugin hooks to allow plugins to implement their own connection testing logic.\n\nArgs:\n    plugin_id: Plugin type ID (e.g., 'imap', 'mealie')\n    test_config: Optional config to use for testing (if not provided, uses saved config)\n\nReturns:\n    Test result with success status and message",
@@ -3667,6 +3716,82 @@
         "tags": [
           "system"
         ]
+      }
+    },
+    "/assets/{file_path}": {
+      "get": {
+        "description": "Serve static assets with cache control headers for development.",
+        "operationId": "serve_asset_assets__file_path__get",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "file_path",
+            "required": true,
+            "schema": {
+              "title": "File Path",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Serve Asset"
+      }
+    },
+    "/{full_path}": {
+      "get": {
+        "description": "Serve frontend index.html for SPA routing (GET only).",
+        "operationId": "serve_frontend_get__full_path__get",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "full_path",
+            "required": true,
+            "schema": {
+              "title": "Full Path",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Serve Frontend Get"
       }
     }
   }
