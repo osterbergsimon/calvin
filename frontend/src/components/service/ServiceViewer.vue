@@ -1,14 +1,22 @@
 <template>
   <div :key="service.id" class="service-viewer">
+    <!-- Schema-driven renderer (v2 plugin contract) -->
+    <SchemaRenderer
+      v-if="schemaKind"
+      :schema="service.display_schema"
+      :data="schemaData"
+      :plugin-id="service.id"
+    />
+
     <!-- Loading plugin component -->
-    <div v-if="pluginComponentLoading" class="loading-state">
+    <div v-else-if="pluginComponentLoading" class="loading-state">
       <div class="spinner" />
       <p>Loading component...</p>
     </div>
 
-    <!-- Plugin-provided component (highest priority) -->
+    <!-- Plugin-provided component (legacy custom SFC) -->
     <component
-      v-if="pluginComponent && !pluginComponentLoading && !pluginComponentError"
+      v-else-if="pluginComponent && !pluginComponentError"
       :is="pluginComponent"
       :service-id="service.id"
       :api-endpoint="apiEndpoint"
@@ -39,7 +47,9 @@
 import { computed, watch } from "vue";
 import WeatherViewer from "./WeatherViewer.vue";
 import GenericApiViewer from "./GenericApiViewer.vue";
+import SchemaRenderer from "../plugins/SchemaRenderer.vue";
 import { usePluginComponent } from "../../composables/usePluginComponent";
+import { useSchemaData } from "../../composables/useSchemaData";
 import { logDebug, logError } from "../../utils/logger";
 
 const props = defineProps({
@@ -68,6 +78,14 @@ const displayType = computed(() => {
 const renderTemplate = computed(() => {
   return props.service.display_schema?.render_template;
 });
+
+const schemaKind = computed(() => props.service.display_schema?.kind || null);
+const schemaQuery = useSchemaData(
+  computed(() => props.service.id),
+  computed(() => props.service.display_schema || {}),
+  computed(() => Boolean(schemaKind.value))
+);
+const schemaData = computed(() => schemaQuery.data.value);
 
 const apiEndpoint = computed(() => {
   if (props.service.display_schema?.api_endpoint) {

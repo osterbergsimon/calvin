@@ -3368,6 +3368,55 @@
         ]
       }
     },
+    "/api/plugins/{plugin_id}/static/{asset_path}": {
+      "get": {
+        "operationId": "get_plugin_static_asset_api_plugins__plugin_id__static__asset_path__get",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "plugin_id",
+            "required": true,
+            "schema": {
+              "title": "Plugin Id",
+              "type": "string"
+            }
+          },
+          {
+            "in": "path",
+            "name": "asset_path",
+            "required": true,
+            "schema": {
+              "title": "Asset Path",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Get Plugin Static Asset",
+        "tags": [
+          "plugins"
+        ]
+      }
+    },
     "/api/plugins/{plugin_id}/test": {
       "post": {
         "description": "Test plugin connection/configuration.\n\nUses plugin hooks to allow plugins to implement their own connection testing logic.\n\nArgs:\n    plugin_id: Plugin type ID (e.g., 'imap', 'mealie')\n    test_config: Optional config to use for testing (if not provided, uses saved config)\n\nReturns:\n    Test result with success status and message",

@@ -72,10 +72,10 @@
 
         <!-- Plugin Actions -->
         <PluginActions
-          v-if="plugin.ui_actions && plugin.ui_actions.length > 0"
+          v-if="pluginActions.length > 0"
           :plugin-id="plugin.id"
-          :actions="plugin.ui_actions"
-          :saving="saving === plugin.id ? plugin.id : null"
+          :actions="pluginActions"
+          :saving="saving === plugin.id || saving === true"
           :testing="typeof testing === 'object' && testing ? testing[plugin.id] || {} : {}"
           :fetching="typeof fetching === 'object' && fetching ? fetching[plugin.id] || {} : {}"
           :save-status="saveStatus"
@@ -227,6 +227,20 @@ const hasGlobalSettings = computed(() => {
   return Object.keys(globalConfigSchema.value).length > 0;
 });
 
+const pluginActions = computed(() => {
+  const actions = props.plugin.ui_actions || [];
+  if (actions.length > 0) return actions;
+  if (!hasGlobalSettings.value) return [];
+  return [
+    {
+      id: "save",
+      type: "save",
+      label: "Save Settings",
+      style: "primary",
+    },
+  ];
+});
+
 const showInstances = computed(() => {
   return (
     props.plugin.enabled &&
@@ -258,8 +272,17 @@ const getInstanceSummary = (plugin, instance) => {
   return null;
 };
 
+const unwrapConfigValue = (value, schema = {}) => {
+  if (value && typeof value === "object") {
+    if ("value" in value) return value.value ?? "";
+    if ("default" in value) return value.default ?? "";
+  }
+  if (value !== undefined && value !== null) return value;
+  return schema.default ?? (schema.type === "boolean" ? false : "");
+};
+
 const getFormValue = (key, schema) => {
-  return props.formData[key] ?? schema.default ?? (schema.type === "boolean" ? false : "");
+  return unwrapConfigValue(props.formData[key], schema);
 };
 
 const getAggregatedRunningClass = instances => {

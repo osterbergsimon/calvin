@@ -195,6 +195,16 @@ const instanceLabel = computed(
     currentPlugin.value?.instance_label || instanceLabelMap[currentPlugin.value?.type] || "Instance"
 );
 
+const unwrapConfigValue = (value, schema = {}) => {
+  if (value && typeof value === "object") {
+    if ("value" in value) return value.value ?? "";
+    if ("default" in value) return value.default ?? "";
+  }
+  if (value !== undefined) return value;
+  if (schema.default !== undefined) return schema.default;
+  return schema.type === "boolean" ? false : "";
+};
+
 // Computed property for test action check
 const hasTestAction = computed(() => {
   return (
@@ -279,14 +289,7 @@ const initializeForm = async () => {
 
     if (currentPlugin.value.instance_config_schema) {
       for (const [key, schema] of Object.entries(currentPlugin.value.instance_config_schema)) {
-        form[key] =
-          editingInstance.value.config?.[key] !== undefined
-            ? editingInstance.value.config[key]
-            : schema.default !== undefined
-              ? schema.default
-              : schema.type === "boolean"
-                ? false
-                : "";
+        form[key] = unwrapConfigValue(editingInstance.value.config?.[key], schema);
       }
     }
 
@@ -347,13 +350,7 @@ const initializeForm = async () => {
 };
 
 const getFormValue = (key, schema) => {
-  return formData.value[key] !== undefined
-    ? formData.value[key]
-    : schema.default !== undefined
-      ? schema.default
-      : schema.type === "boolean"
-        ? false
-        : "";
+  return unwrapConfigValue(formData.value[key], schema);
 };
 
 const updateFormValue = (key, value) => {
@@ -442,7 +439,7 @@ const handleTest = async () => {
         if (key === "display_order") {
           continue;
         }
-        const value = formData.value[key];
+        const value = unwrapConfigValue(formData.value[key], schema);
         if (value !== undefined && value !== null) {
           // Handle different types
           if (schema.type === "string" && typeof value === "string") {
@@ -503,7 +500,7 @@ const handleSave = async () => {
         if (key === "display_order") {
           continue;
         }
-        const value = formData.value[key];
+        const value = unwrapConfigValue(formData.value[key], schema);
         if (value !== undefined && value !== null) {
           // Handle different types
           if (schema.type === "string" && typeof value === "string") {
