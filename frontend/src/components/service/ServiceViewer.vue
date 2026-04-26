@@ -4,7 +4,7 @@
     <SchemaRenderer
       v-if="schemaKind"
       :schema="service.display_schema"
-      :data="schemaQuery.data"
+      :data="schemaData"
       :plugin-id="service.id"
     />
 
@@ -84,6 +84,7 @@ const schemaQuery = useSchemaData(
   computed(() => props.service.id),
   computed(() => props.service.display_schema || {})
 );
+const schemaData = computed(() => schemaQuery.data.value);
 
 const apiEndpoint = computed(() => {
   if (props.service.display_schema?.api_endpoint) {
