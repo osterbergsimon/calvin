@@ -14,7 +14,7 @@ from fastapi import APIRouter, Body, HTTPException
 from app.api.routes.plugins.themes import _register_theme_in_db
 from app.config import settings
 from app.plugins.loader import plugin_loader
-from app.services.plugin_installer import frontend_build_manager, plugin_installer
+from app.services.plugin_installer import plugin_installer
 from app.services.theme_installer import theme_installer
 
 logger = logging.getLogger(__name__)
@@ -296,10 +296,6 @@ async def install_plugin_from_github(request: dict[str, Any] = Body(...)):
                     # It just needs a restart to be loaded
 
                 actual_branch = "master" if branch_switched else branch
-                if manifest.get("_has_frontend"):
-                    frontend_build_manager.start_background_build(
-                        plugin_installer.get_frontend_dir()
-                    )
                 return {
                     "success": True,
                     "message": f"Plugin {manifest['id']} installed successfully from {repo_url}",
@@ -307,7 +303,7 @@ async def install_plugin_from_github(request: dict[str, Any] = Body(...)):
                     "branch": actual_branch,
                     "branch_switched": branch_switched,
                     "requires_restart": True,
-                    "frontend_rebuild_in_progress": manifest.get("_has_frontend", False),
+                    "frontend_rebuild_in_progress": False,
                 }
             else:
                 raise HTTPException(
@@ -477,14 +473,12 @@ async def install_plugin_from_local(request: dict[str, Any] = Body(...)):
                     "It will be available after server restart."
                 )
 
-            if manifest.get("_has_frontend"):
-                frontend_build_manager.start_background_build(plugin_installer.get_frontend_dir())
             return {
                 "success": True,
                 "message": f"Plugin {manifest['id']} installed successfully",
                 "manifest": manifest,
                 "requires_restart": True,
-                "frontend_rebuild_in_progress": manifest.get("_has_frontend", False),
+                "frontend_rebuild_in_progress": False,
             }
         else:
             raise HTTPException(

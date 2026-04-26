@@ -740,19 +740,16 @@ class TestPluginUninstallAPI:
 
         plugin_installer.install_plugin(plugin_dir)
 
-        # Verify frontend exists
-        frontend_path = plugin_installer.get_frontend_plugin_path("test_uninstall_frontend")
-        assert frontend_path.exists()
+        plugin_path = plugin_installer.get_plugin_path("test_uninstall_frontend")
+        assert (plugin_path / "frontend").exists()
 
         # Uninstall via API
         response = test_client.delete("/api/plugins/installed/test_uninstall_frontend")
 
         assert response.status_code == 200
 
-        # Verify both plugin and frontend are removed
-        plugin_path = plugin_installer.get_plugin_path("test_uninstall_frontend")
+        # Plugin dir (and its frontend assets) gone
         assert not plugin_path.exists()
-        assert not frontend_path.exists()
 
     def test_uninstall_plugin_not_found(self, test_client):
         """Test uninstalling a non-existent plugin."""

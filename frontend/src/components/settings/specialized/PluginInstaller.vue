@@ -348,18 +348,6 @@
       </div>
     </div>
 
-    <!-- Frontend Rebuild Progress -->
-    <div
-      v-if="rebuildStatus !== 'idle'"
-      :class="['rebuild-status', `rebuild-status--${rebuildStatus}`]"
-    >
-      <span v-if="rebuildStatus === 'building'" class="rebuild-spinner" aria-hidden="true"></span>
-      <span class="rebuild-status-text">{{ rebuildMessage }}</span>
-      <button v-if="rebuildStatus === 'done'" class="btn-refresh-inline" @click="handleRefresh">
-        Refresh Now
-      </button>
-    </div>
-
     <!-- Restart Required Notice -->
     <div v-if="requiresRestart" class="restart-notice">
       <div class="restart-notice-content">
@@ -436,14 +424,6 @@ const props = defineProps({
   devMode: {
     type: Boolean,
     default: false,
-  },
-  rebuildStatus: {
-    type: String,
-    default: "idle", // idle | building | done | error
-  },
-  rebuildMessage: {
-    type: String,
-    default: "",
   },
 });
 
@@ -662,10 +642,6 @@ const handleForceUpdate = pluginPath => {
 
 const handleRestart = () => {
   emit("restart");
-};
-
-const handleRefresh = () => {
-  window.location.reload();
 };
 
 const handleRepoUrlInput = event => {
@@ -1106,72 +1082,6 @@ watch(searchQuery, () => {
   opacity: 0.6;
   cursor: not-allowed;
   transform: none;
-}
-
-.rebuild-status {
-  display: flex;
-  align-items: center;
-  gap: 0.75rem;
-  margin-top: 1rem;
-  padding: 0.75rem 1rem;
-  border-radius: 6px;
-  font-size: 0.875rem;
-}
-
-.rebuild-status--building {
-  background: rgba(59, 130, 246, 0.12);
-  border: 1px solid rgba(59, 130, 246, 0.35);
-  color: #3b82f6;
-}
-
-.rebuild-status--done {
-  background: rgba(34, 197, 94, 0.12);
-  border: 1px solid rgba(34, 197, 94, 0.35);
-  color: #22c55e;
-}
-
-.rebuild-status--error {
-  background: rgba(239, 68, 68, 0.12);
-  border: 1px solid rgba(239, 68, 68, 0.35);
-  color: #ef4444;
-}
-
-.rebuild-spinner {
-  width: 14px;
-  height: 14px;
-  border: 2px solid currentColor;
-  border-top-color: transparent;
-  border-radius: 50%;
-  animation: rebuild-spin 0.8s linear infinite;
-  flex-shrink: 0;
-  opacity: 0.7;
-}
-
-@keyframes rebuild-spin {
-  to {
-    transform: rotate(360deg);
-  }
-}
-
-.rebuild-status-text {
-  flex: 1;
-}
-
-.btn-refresh-inline {
-  padding: 0.25rem 0.625rem;
-  background: rgba(34, 197, 94, 0.15);
-  color: inherit;
-  border: 1px solid currentColor;
-  border-radius: 4px;
-  cursor: pointer;
-  font-size: 0.8rem;
-  font-weight: 600;
-  white-space: nowrap;
-  transition: background 0.2s;
-}
-
-.btn-refresh-inline:hover {
-  background: rgba(34, 197, 94, 0.3);
 }
 
 .error-message {
