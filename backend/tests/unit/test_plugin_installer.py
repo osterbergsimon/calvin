@@ -17,20 +17,10 @@ def temp_plugins_dir(tmp_path):
 
 
 @pytest.fixture
-def temp_frontend_dir(tmp_path):
-    """Create a temporary frontend directory."""
-    frontend_dir = tmp_path / "frontend" / "src" / "components" / "plugins"
-    frontend_dir.mkdir(parents=True)
-    return frontend_dir
-
-
-@pytest.fixture
-def plugin_installer(temp_plugins_dir, temp_frontend_dir, monkeypatch):
+def plugin_installer(temp_plugins_dir, monkeypatch):
     """Create a PluginInstaller instance with temporary directories."""
     installer = PluginInstaller()
-    # Override directories with temp paths
     installer.plugins_dir = temp_plugins_dir
-    installer.frontend_plugins_dir = temp_frontend_dir
     return installer
 
 
@@ -109,11 +99,6 @@ class TestPluginInstaller:
         """Test getting plugin path."""
         path = plugin_installer.get_plugin_path("test_plugin")
         assert path == plugin_installer.plugins_dir / "test_plugin"
-
-    def test_get_frontend_plugin_path(self, plugin_installer):
-        """Test getting frontend plugin path."""
-        path = plugin_installer.get_frontend_plugin_path("test_plugin")
-        assert path == plugin_installer.frontend_plugins_dir / "test_plugin"
 
     def test_validate_plugin_directory_valid(self, plugin_installer, valid_plugin_package):
         """Test validating a valid plugin directory."""
@@ -257,13 +242,13 @@ class TestPluginInstaller:
     def test_install_plugin_with_frontend_components(
         self, plugin_installer, plugin_package_with_frontend
     ):
-        """Test installing a plugin with frontend components."""
+        """Frontend assets stay inside the plugin's data dir; the host serves
+        them through /api/plugins/{id}/static/*. Nothing gets copied into the
+        host source tree."""
         plugin_installer.install_plugin(plugin_package_with_frontend)
 
-        # Check frontend components were installed
-        frontend_path = plugin_installer.get_frontend_plugin_path("test_plugin")
-        assert frontend_path.exists()
-        assert (frontend_path / "TestComponent.vue").exists()
+        plugin_path = plugin_installer.get_plugin_path("test_plugin")
+        assert (plugin_path / "frontend" / "TestComponent.vue").exists()
 
     def test_install_plugin_cleanup_on_error(self, plugin_installer, tmp_path):
         """Test that plugin installation is cleaned up on error."""
@@ -293,15 +278,15 @@ class TestPluginInstaller:
         assert not plugin_path.exists()
 
     def test_uninstall_plugin_with_frontend(self, plugin_installer, plugin_package_with_frontend):
-        """Test uninstalling a plugin with frontend components."""
+        """Uninstalling removes the plugin dir, which contains its frontend assets."""
         plugin_installer.install_plugin(plugin_package_with_frontend)
 
-        frontend_path = plugin_installer.get_frontend_plugin_path("test_plugin")
-        assert frontend_path.exists()
+        plugin_path = plugin_installer.get_plugin_path("test_plugin")
+        assert (plugin_path / "frontend").exists()
 
         plugin_installer.uninstall_plugin("test_plugin")
 
-        assert not frontend_path.exists()
+        assert not plugin_path.exists()
 
     def test_uninstall_plugin_not_installed(self, plugin_installer):
         """Test uninstalling a plugin that's not installed."""

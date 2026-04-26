@@ -21,7 +21,7 @@ from app.plugins.loader import plugin_loader
 from app.plugins.manager import plugin_manager
 from app.services.config_service import config_service
 from app.services.event_system import event_system
-from app.services.plugin_installer import frontend_build_manager, plugin_installer
+from app.services.plugin_installer import plugin_installer
 from app.services.theme_installer import theme_installer
 
 from .config import normalize_plugin_config
@@ -32,11 +32,6 @@ router = APIRouter()
 # Cross-cutting type-level keys that all plugins support, regardless of
 # whether they declare them in their own common_config_schema.
 UNIVERSAL_TYPE_CONFIG_KEYS = frozenset({"display_order"})
-
-
-class RebuildStatusResponse(BaseModel):
-    state: str
-    message: str
 
 
 class PluginManifestEnvelope(BaseModel):
@@ -241,15 +236,6 @@ async def get_plugins(
 
 
 # Specific routes must come before parameterized routes to avoid path conflicts
-@router.get("/plugins/rebuild-status", response_model=RebuildStatusResponse)
-async def get_rebuild_status():
-    """Return the current state of a background frontend rebuild."""
-    return {
-        "state": frontend_build_manager.state,
-        "message": frontend_build_manager.message,
-    }
-
-
 @router.get("/plugins/installed", response_model=PluginListResponse)
 async def get_installed_plugins():
     """
@@ -359,15 +345,12 @@ async def install_plugin(
                     f"Failed to emit plugin_installed event for plugin {manifest['id']}: {e}"
                 )
 
-            if manifest.get("_has_frontend"):
-                frontend_build_manager.start_background_build(plugin_installer.get_frontend_dir())
-
             return {
                 "success": True,
                 "message": f"Plugin {manifest['id']} installed successfully",
                 "manifest": manifest,
                 "requires_restart": True,
-                "frontend_rebuild_in_progress": manifest.get("_has_frontend", False),
+                "frontend_rebuild_in_progress": False,
             }
         except ValueError as e:
             raise HTTPException(status_code=400, detail=str(e))
@@ -449,7 +432,6 @@ async def uninstall_plugin(plugin_id: str):
             }
         else:
             # Uninstall regular plugin
-            had_frontend = plugin_installer.get_frontend_plugin_path(plugin_id).exists()
             plugin_installer.uninstall_plugin(plugin_id)
 
             # Stop and delete all instances of this plugin type
@@ -499,9 +481,6 @@ async def uninstall_plugin(plugin_id: str):
                 if not m.startswith(f"installed_plugin_{plugin_id}")
             }
 
-            if had_frontend:
-                frontend_build_manager.start_background_build(plugin_installer.get_frontend_dir())
-
             # Emit plugin_uninstalled event
             try:
                 await event_system.emit_event(
@@ -523,7 +502,7 @@ async def uninstall_plugin(plugin_id: str):
             return {
                 "success": True,
                 "message": f"Plugin {plugin_id} uninstalled successfully",
-                "frontend_rebuild_in_progress": had_frontend,
+                "frontend_rebuild_in_progress": False,
             }
     except ValueError as e:
         raise HTTPException(status_code=404, detail=str(e))

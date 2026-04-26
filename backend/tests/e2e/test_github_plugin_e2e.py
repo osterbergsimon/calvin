@@ -227,10 +227,8 @@ class TestGitHubPluginE2E:
         install_data = install_response.json()
         assert install_data["success"] is True
 
-        # Check if frontend components were installed (if the plugin has them)
-        # Frontend might or might not exist - just verify the path structure is correct
-        # In a real test, you'd know which plugins have frontend components
-        plugin_installer.get_frontend_plugin_path(plugin_id)  # Verify path exists
+        # Frontend assets (if any) live inside the plugin's data dir under
+        # frontend/. The host serves them via /api/plugins/{id}/static/*.
 
         # Cleanup
         try:

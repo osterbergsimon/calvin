@@ -5,7 +5,6 @@ import logging
 import shutil
 import subprocess
 import sys
-import threading
 import zipfile
 from pathlib import Path
 from typing import Any
@@ -25,88 +24,6 @@ from app.services.validation import (
 logger = logging.getLogger(__name__)
 
 
-class FrontendBuildManager:
-    """Manages `npm run build` for plugin frontend components.
-
-    Runs builds in a background thread so install endpoints can return immediately.
-    Poll `state` / `message` for progress.
-    """
-
-    def __init__(self):
-        self._lock = threading.Lock()
-        self._state = "idle"  # idle | building | done | failed
-        self._message = ""
-
-    @property
-    def state(self) -> str:
-        with self._lock:
-            return self._state
-
-    @property
-    def message(self) -> str:
-        with self._lock:
-            return self._message
-
-    def start_background_build(self, frontend_dir: Path) -> None:
-        """Kick off a build in a daemon thread. Returns immediately."""
-        with self._lock:
-            if self._state == "building":
-                return  # already in progress
-            self._state = "building"
-            self._message = "Building frontend, this may take a minute…"
-        thread = threading.Thread(target=self._run_build, args=(frontend_dir,), daemon=True)
-        thread.start()
-
-    def _run_build(self, frontend_dir: Path) -> None:
-        success, message = self._build(frontend_dir)
-        with self._lock:
-            self._state = "done" if success else "failed"
-            self._message = message
-
-    def _build(self, frontend_dir: Path) -> tuple[bool, str]:
-        npm = shutil.which("npm")
-        if not npm:
-            return False, "npm not found — rebuild the frontend manually with: npm run build"
-
-        # On Windows, .cmd files can't be executed by CreateProcess directly —
-        # they need cmd.exe as the interpreter.
-        if sys.platform == "win32":
-            cmd = ["cmd", "/c", npm, "run", "build"]
-        else:
-            cmd = [npm, "run", "build"]
-
-        try:
-            result = subprocess.run(
-                cmd,
-                cwd=str(frontend_dir),
-                capture_output=True,
-                text=True,
-                timeout=300,
-            )
-            if result.returncode == 0:
-                return True, "Frontend rebuilt successfully."
-            tail = (result.stderr or result.stdout or "unknown error")[-500:]
-            return False, f"Frontend rebuild failed: {tail}"
-        except subprocess.TimeoutExpired:
-            return False, "Frontend rebuild timed out (5 min limit)"
-        except Exception as exc:
-            return False, f"Frontend rebuild failed: {exc}"
-
-    # Keep synchronous variant for callers that need to wait (e.g. startup resume)
-    def build(self, frontend_dir: Path) -> tuple[bool, str]:
-        with self._lock:
-            self._state = "building"
-            self._message = "Building frontend…"
-        success, message = self._build(frontend_dir)
-        with self._lock:
-            self._state = "done" if success else "failed"
-            self._message = message
-        return success, message
-
-
-frontend_build_manager = FrontendBuildManager()
-
-
 class PluginInstaller:
     """Service for installing, updating, and uninstalling plugins."""
 
@@ -115,13 +32,6 @@ class PluginInstaller:
         # Plugin installation directory (from config)
         self.plugins_dir = settings.plugins_dir.resolve()
         self.plugins_dir.mkdir(parents=True, exist_ok=True)
-
-        # Frontend plugins directory (relative to backend directory)
-        # Backend is typically in backend/, frontend is in frontend/
-        backend_dir = Path(__file__).parent.parent.parent
-        frontend_dir = backend_dir.parent / "frontend"
-        self.frontend_plugins_dir = frontend_dir / "src" / "components" / "plugins"
-        self.frontend_plugins_dir.mkdir(parents=True, exist_ok=True)
 
     def get_plugin_path(self, plugin_id: str) -> Path:
         """
@@ -134,22 +44,6 @@ class PluginInstaller:
             Path to plugin directory
         """
         return self.plugins_dir / plugin_id
-
-    def get_frontend_plugin_path(self, plugin_id: str) -> Path:
-        """
-        Get the frontend path for a plugin's components.
-
-        Args:
-            plugin_id: Plugin identifier
-
-        Returns:
-            Path to frontend plugin directory
-        """
-        return self.frontend_plugins_dir / plugin_id
-
-    def get_frontend_dir(self) -> Path:
-        """Return the root of the frontend source tree (frontend/)."""
-        return self.frontend_plugins_dir.parents[2]
 
     def validate_plugin_package(self, plugin_path: Path) -> dict[str, Any]:
         """
@@ -356,14 +250,11 @@ class PluginInstaller:
                 else:
                     raise ValueError(f"Invalid source path: {source_path}")
 
-            # Install frontend components if they exist
-            frontend_source = plugin_path / "frontend"
-            if frontend_source.exists():
-                frontend_dest = self.get_frontend_plugin_path(install_id)
-                if frontend_dest.exists():
-                    shutil.rmtree(frontend_dest)
-                shutil.copytree(frontend_source, frontend_dest)
-                manifest["_has_frontend"] = True
+            # Frontend assets stay inside the plugin's data directory; the
+            # host serves them through /api/plugins/{id}/static/* and either
+            # picks them up via display_schema (kind=...) or imports a
+            # built ESM module (kind=web-component). No copy into the host
+            # source tree, no rebuild required.
 
             # Install plugin-specific Python packages
             installed_packages = self._install_pip_requirements(manifest)
@@ -382,9 +273,6 @@ class PluginInstaller:
             # doesn't mask the real install error.
             if plugin_path.exists():
                 shutil.rmtree(plugin_path, ignore_errors=True)
-            frontend_path = self.get_frontend_plugin_path(install_id)
-            if frontend_path.exists():
-                shutil.rmtree(frontend_path, ignore_errors=True)
             raise ValueError(f"Failed to install plugin: {e}") from e
 
     def _install_pip_requirements(self, manifest: dict[str, Any]) -> list[str]:
@@ -476,13 +364,8 @@ class PluginInstaller:
         if not plugin_path.exists():
             raise ValueError(f"Plugin {plugin_id} is not installed")
 
-        # Remove plugin directory
+        # Remove plugin directory (frontend assets live inside it, so they go too)
         shutil.rmtree(plugin_path)
-
-        # Remove frontend components
-        frontend_path = self.get_frontend_plugin_path(plugin_id)
-        if frontend_path.exists():
-            shutil.rmtree(frontend_path)
 
     def get_installed_plugins(self) -> list[dict[str, Any]]:
         """
@@ -705,10 +588,6 @@ class PluginInstaller:
                     "removing and allowing reinstallation"
                 )
                 shutil.rmtree(plugin_path)
-                # Also clean up frontend directory if it exists
-                frontend_path = self.get_frontend_plugin_path(install_id)
-                if frontend_path.exists():
-                    shutil.rmtree(frontend_path)
 
         # Install from directory
         return self.install_plugin(plugin_dir, install_id, check_version=True, force=False)

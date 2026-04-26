@@ -290,10 +290,10 @@ def register_plugin_types() -> list[dict[str, Any]]:
         # Install plugin
         plugin_installer.install_plugin(plugin_dir)
 
-        # Verify frontend component was installed
-        frontend_path = plugin_installer.get_frontend_plugin_path("test_frontend_plugin")
-        assert frontend_path.exists()
-        assert (frontend_path / "TestComponent.vue").exists()
+        # Verify frontend asset is stored inside the plugin's data dir
+        # (the host serves these via /api/plugins/{id}/static/*).
+        plugin_path = plugin_installer.get_plugin_path("test_frontend_plugin")
+        assert (plugin_path / "frontend" / "TestComponent.vue").exists()
 
 
 @pytest.mark.integration
