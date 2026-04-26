@@ -1,0 +1,27 @@
+# Calvin production compose — single canonical service.
+#
+# Pulls the runtime image CI publishes to GHCR. Frontend dist is baked
+# into the image; FastAPI serves it on the same port as the API. No
+# separate frontend container, no nginx, no rebuild-on-install.
+#
+# Reads /etc/calvin/calvin.env (deploy/calvin.env.example).
+
+services:
+  calvin:
+    image: ghcr.io/osterbergsimon/calvin:${CALVIN_IMAGE_TAG:-latest}
+    container_name: calvin
+    restart: unless-stopped
+    env_file:
+      - ../deploy/calvin.env
+    ports:
+      - "${CALVIN_PORT:-8000}:8000"
+    volumes:
+      # Persistent state — DB, images, installed plugins. The runtime
+      # image already declares CALVIN_DATA_DIR=/var/lib/calvin.
+      - "${CALVIN_DATA_DIR:-/var/lib/calvin}:/var/lib/calvin"
+    healthcheck:
+      test: ["CMD", "curl", "-fsS", "http://localhost:8000/api/health"]
+      interval: 30s
+      timeout: 5s
+      start_period: 15s
+      retries: 3
