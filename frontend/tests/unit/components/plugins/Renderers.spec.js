@@ -4,6 +4,7 @@ import { describe, it, expect } from "vitest";
 import { mount } from "@vue/test-utils";
 import SchemaRenderer from "@/components/plugins/SchemaRenderer.vue";
 import StatusList from "@/components/plugins/renderers/StatusList.vue";
+import StatusRow from "@/components/plugins/renderers/StatusRow.vue";
 import CardGrid from "@/components/plugins/renderers/CardGrid.vue";
 import ItemList from "@/components/plugins/renderers/ItemList.vue";
 import ImageWithCaption from "@/components/plugins/renderers/ImageWithCaption.vue";
@@ -50,6 +51,48 @@ describe("StatusList", () => {
     expect(rows).toHaveLength(2);
     expect(rows[0].text()).toContain("CPU");
     expect(rows[1].text()).toContain("1.2 GB");
+  });
+});
+
+describe("StatusRow", () => {
+  const schema = {
+    kind: "status-row",
+    data_path: "$.tiles",
+    item: {
+      label_path: "$.label",
+      value_path: "$.value",
+      unit_path: "$.unit",
+      status_path: "$.status",
+    },
+    separator: "·",
+  };
+
+  it("renders one item per tile with separators between", () => {
+    const wrapper = mount(StatusRow, {
+      props: {
+        schema,
+        data: {
+          tiles: [
+            { label: "CPU", value: 42, unit: "%", status: "ok" },
+            { label: "RAM", value: 58, unit: "%", status: "warn" },
+          ],
+        },
+      },
+    });
+    const items = wrapper.findAll(".status-row__item");
+    expect(items).toHaveLength(2);
+    expect(items[0].text()).toContain("CPU");
+    expect(items[0].text()).toContain("42");
+    expect(items[0].classes()).toContain("status-row__item--ok");
+    expect(items[1].classes()).toContain("status-row__item--warn");
+    expect(wrapper.findAll(".status-row__sep")).toHaveLength(1);
+  });
+
+  it("renders nothing when data array is empty", () => {
+    const wrapper = mount(StatusRow, {
+      props: { schema, data: { tiles: [] } },
+    });
+    expect(wrapper.findAll(".status-row__item")).toHaveLength(0);
   });
 });
 
