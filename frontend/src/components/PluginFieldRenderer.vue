@@ -6,7 +6,7 @@
     <div v-if="ui && ui.component === 'directory'" class="directory-input">
       <input
         type="text"
-        :value="value"
+        :value="fieldValue"
         :placeholder="ui.placeholder || 'Enter directory path...'"
         class="form-input"
         @input="$emit('update', $event.target.value)"
@@ -17,7 +17,7 @@
     <input
       v-else-if="ui && ui.component === 'input'"
       type="text"
-      :value="value"
+      :value="fieldValue"
       :placeholder="ui.placeholder"
       class="form-input"
       @input="$emit('update', $event.target.value)"
@@ -27,7 +27,7 @@
     <input
       v-else-if="ui && ui.component === 'password'"
       type="password"
-      :value="value"
+      :value="fieldValue"
       :placeholder="ui.placeholder"
       class="form-input"
       @input="$emit('update', $event.target.value)"
@@ -37,7 +37,7 @@
     <input
       v-else-if="ui && ui.component === 'number'"
       type="number"
-      :value="value"
+      :value="fieldValue"
       :min="ui.min"
       :max="ui.max"
       :placeholder="ui.placeholder"
@@ -48,7 +48,7 @@
     <!-- Select dropdown -->
     <select
       v-else-if="ui && ui.component === 'select'"
-      :value="value"
+      :value="fieldValue"
       class="form-input"
       @change="$emit('update', $event.target.value)"
     >
@@ -60,7 +60,11 @@
     <!-- Select with scan button — fetches options from the backend -->
     <div v-else-if="ui && ui.component === 'select-scan'" class="scan-select">
       <div class="scan-select-row">
-        <select :value="value" class="form-input" @change="$emit('update', $event.target.value)">
+        <select
+          :value="fieldValue"
+          class="form-input"
+          @change="$emit('update', $event.target.value)"
+        >
           <option value="" disabled>
             {{
               scanning
@@ -70,8 +74,11 @@
                   : "— Click Scan to discover —"
             }}
           </option>
-          <option v-if="value && !scannedOptions.find(o => o.value === value)" :value="value">
-            {{ value }}
+          <option
+            v-if="fieldValue && !scannedOptions.find(o => o.value === fieldValue)"
+            :value="fieldValue"
+          >
+            {{ fieldValue }}
           </option>
           <option v-for="opt in scannedOptions" :key="opt.value" :value="opt.value">
             {{ opt.label || opt.value }}
@@ -87,7 +94,7 @@
     <!-- Textarea -->
     <textarea
       v-else-if="ui && ui.component === 'textarea'"
-      :value="value"
+      :value="fieldValue"
       :placeholder="ui.placeholder"
       class="form-input"
       rows="3"
@@ -104,7 +111,7 @@
     >
       <input
         type="checkbox"
-        :checked="value === true || value === 'true' || value === 1 || value === '1'"
+        :checked="isChecked"
         class="checkbox-input"
         @change="$emit('update', $event.target.checked)"
       />
@@ -117,14 +124,14 @@
     <input
       v-else-if="schema && typeof schema === 'object' && schema.type === 'string'"
       type="text"
-      :value="value"
+      :value="fieldValue"
       class="form-input"
       @input="$emit('update', $event.target.value)"
     />
     <input
       v-else-if="schema && typeof schema === 'object' && schema.type === 'password'"
       type="password"
-      :value="value"
+      :value="fieldValue"
       class="form-input"
       @input="$emit('update', $event.target.value)"
     />
@@ -167,7 +174,7 @@ const props = defineProps({
     default: () => ({}),
   },
   value: {
-    type: [String, Boolean, Number],
+    type: [String, Boolean, Number, Object],
     default: "",
   },
 });
@@ -176,6 +183,22 @@ defineEmits(["update"]);
 
 const ui = computed(() => {
   return props.schema && typeof props.schema === "object" ? props.schema.ui : null;
+});
+
+const fieldValue = computed(() => {
+  if (props.value && typeof props.value === "object") {
+    if ("value" in props.value) return props.value.value ?? "";
+    if ("default" in props.value) return props.value.default ?? "";
+  }
+  return props.value;
+});
+
+const isChecked = computed(() => {
+  const value = fieldValue.value;
+  if (typeof value === "string") {
+    return ["true", "1", "yes", "on"].includes(value.trim().toLowerCase());
+  }
+  return value === true || value === 1;
 });
 
 const scannedOptions = ref([]);

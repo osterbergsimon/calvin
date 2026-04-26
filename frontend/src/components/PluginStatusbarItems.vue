@@ -32,9 +32,16 @@ defineProps({
 
 const webServicesStore = useWebServicesStore();
 
+function asBoolean(value) {
+  if (typeof value === "string") {
+    return ["true", "1", "yes", "on"].includes(value.trim().toLowerCase());
+  }
+  return value === true || value === 1;
+}
+
 function isStatusbarVisible(service) {
   const cfg = service.config || {};
-  if ("show_in_statusbar" in cfg) return !!cfg.show_in_statusbar;
+  if ("show_in_statusbar" in cfg) return asBoolean(cfg.show_in_statusbar);
   return true;
 }
 
