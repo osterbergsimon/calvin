@@ -1,46 +1,52 @@
-version: '3.8'
+# Calvin development compose — hot-reload backend, hot-reload frontend.
+#
+# Uses local source via bind mounts; the runtime image is rebuilt only
+# when dependencies change. Backend runs uvicorn --reload, frontend
+# runs Vite dev server with /api/* proxied to the backend.
+#
+# Usage:
+#   docker compose -f docker-compose.dev.yml up
 
-# Development compose with hot-reload (no auto-pull, uses local code)
 services:
-  calvin-backend-dev:
-    build:
-      context: ..
-      dockerfile: docker/Dockerfile.backend-dev
+  calvin-backend:
+    image: python:3.12-slim
     container_name: calvin-backend-dev
-    ports:
-      - "8000:8000"
-    volumes:
-      - ../backend:/app
-      - calvin-data:/app/data
-      - calvin-logs:/app/logs
+    working_dir: /app/backend
     restart: unless-stopped
+    env_file:
+      - ../deploy/calvin.env
     environment:
-      - DATABASE_URL=sqlite:///app/data/db/calvin.db
-      - IMAGE_DIR=/app/data/images
-    command: uv run uvicorn app.main:app --reload --host 0.0.0.0 --port 8000
-    networks:
-      - calvin-network
+      - DATABASE_URL=sqlite:////var/lib/calvin/db/calvin.db
+      - IMAGE_DIR=/var/lib/calvin/images
+      - PLUGIN_DIR=/var/lib/calvin/plugins
+    ports:
+      - "${CALVIN_PORT:-8000}:8000"
+    volumes:
+      - ..:/app
+      - "${CALVIN_DATA_DIR:-./.calvin-dev-data}:/var/lib/calvin"
+      - calvin-dev-venv:/app/backend/.venv
+    command: >
+      sh -c "
+        apt-get update && apt-get install -y --no-install-recommends curl git build-essential gcc g++ python3-dev libjpeg-dev zlib1g-dev libpng-dev libfreetype6-dev liblcms2-dev libtiff-dev libwebp-dev &&
+        pip install --no-cache-dir uv &&
+        uv sync --extra dev &&
+        uv run uvicorn app.main:app --reload --host 0.0.0.0 --port 8000
+      "
 
-  calvin-frontend-dev:
-    build:
-      context: ..
-      dockerfile: docker/Dockerfile.frontend-dev
+  calvin-frontend:
+    image: node:22-alpine
     container_name: calvin-frontend-dev
+    working_dir: /app/frontend
+    restart: unless-stopped
     ports:
       - "5173:5173"
     volumes:
-      - ../frontend:/app
-      - /app/node_modules
-    restart: unless-stopped
-    command: npm run dev
-    networks:
-      - calvin-network
+      - ..:/app
+      - calvin-dev-node_modules:/app/frontend/node_modules
+    command: sh -c "npm install --prefer-offline --no-audit --no-fund && npm run dev -- --host 0.0.0.0"
+    depends_on:
+      - calvin-backend
 
 volumes:
-  calvin-data:
-  calvin-logs:
-
-networks:
-  calvin-network:
-    driver: bridge
-
+  calvin-dev-venv:
+  calvin-dev-node_modules:
