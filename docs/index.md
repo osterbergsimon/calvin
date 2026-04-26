@@ -20,8 +20,8 @@ Calvin is a DAKBoard alternative designed to run on Raspberry Pi hardware. It pr
 New to Calvin? Get started quickly:
 
 1. **[Getting Started](setup/GETTING_STARTED.md)** - Complete guide covering all setup methods (native, Docker, dev containers)
-2. **[Getting Started with Docker](setup/GETTING_STARTED_DOCKER.md)** - Docker-specific setup guide
-3. **[Development Setup](setup/QUICKSTART_DEVELOP.md)** - Quick development setup on Windows
+2. **[Development Setup](setup/QUICKSTART_DEVELOP.md)** - Quick development setup on Windows
+3. **Docker Setup** - Containerized development and production setup; see `docker/README.md`
 4. **[Setup Scripts](setup/SETUP_SCRIPTS.md)** - Automated setup scripts for production and development
 5. **[Production Setup](setup/SETUP_LINUX.md)** - Install Calvin on Raspberry Pi or Linux
 6. **[Plugin Development](plugins/PLUGIN_DEVELOPMENT_GUIDE.md)** - Create your first plugin
