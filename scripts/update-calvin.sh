@@ -1,198 +1,42 @@
-#!/bin/bash
-# Auto-update script for Calvin Dashboard
-# Pulls latest code from GitHub and restarts services
+#!/usr/bin/env bash
+# Update Calvin to the latest published runtime image.
 #
-# Usage: update-calvin.sh [--force]
-#   --force: Run full update even if no git changes are detected
+# Pulls the new image, restarts the compose stack. That's it — no
+# native frontend rebuild, no plugin re-extraction, no separate DB
+# migration stage. The image bakes the frontend dist; alembic
+# migrations run on container start as part of the FastAPI lifespan.
+#
+# Usage:
+#   sudo /opt/calvin/scripts/update-calvin.sh
+#
+# Override the compose file location with COMPOSE_FILE if you've put
+# it somewhere other than /etc/calvin/docker-compose.yml.
 
-# Don't use set -e - we want to continue even if some steps fail
-set +e
+set -euo pipefail
 
-# Parse command line arguments
-FORCE_UPDATE=false
-if [[ "$1" == "--force" ]]; then
-    FORCE_UPDATE=true
+COMPOSE_FILE="${COMPOSE_FILE:-/etc/calvin/docker-compose.yml}"
+
+if [[ ! -f "$COMPOSE_FILE" ]]; then
+  echo "Compose file not found at $COMPOSE_FILE" >&2
+  echo "Set COMPOSE_FILE=/path/to/docker-compose.yml or run setup.sh first." >&2
+  exit 1
 fi
 
-# Source environment file if it exists
-if [ -f /etc/default/calvin-update ]; then
-    . /etc/default/calvin-update
-fi
+echo "==> Pulling latest Calvin runtime image"
+docker compose -f "$COMPOSE_FILE" pull
 
-REPO_DIR="${REPO_DIR:-/home/calvin/calvin}"
-GIT_REPO="${GIT_REPO:-https://github.com/osterbergsimon/calvin.git}"
-GIT_BRANCH="${GIT_BRANCH:-main}"
+echo "==> Restarting Calvin"
+docker compose -f "$COMPOSE_FILE" up -d
 
-# Use user-writable log location
-LOG_FILE="${REPO_DIR}/backend/logs/calvin-update.log"
-mkdir -p "$(dirname "$LOG_FILE")"
+echo "==> Waiting for /api/health to come back"
+for _ in $(seq 1 30); do
+  if curl -fsS http://localhost:8000/api/health >/dev/null 2>&1; then
+    echo "Calvin is healthy."
+    exit 0
+  fi
+  sleep 2
+done
 
-# Ensure PATH includes UV
-export PATH="/home/calvin/.local/bin:$PATH"
-
-# Ensure we can write to the log file
-touch "$LOG_FILE" 2>/dev/null || {
-    # Fallback to home directory if logs directory not writable
-    LOG_FILE="${HOME}/calvin-update.log"
-    touch "$LOG_FILE" 2>/dev/null || {
-        # Last resort: use /tmp
-        LOG_FILE="/tmp/calvin-update.log"
-    }
-}
-
-cd "$REPO_DIR" || {
-    echo "[$(date)] ERROR: Cannot cd to $REPO_DIR" | tee -a "$LOG_FILE"
-    exit 1
-}
-
-echo "[$(date)] Starting Calvin update..." | tee -a "$LOG_FILE"
-
-# Check if git repo exists
-if [ ! -d ".git" ]; then
-    echo "Not a git repository. Cloning..." | tee -a "$LOG_FILE"
-    git clone "$GIT_REPO" "$REPO_DIR"
-    cd "$REPO_DIR"
-    git checkout "$GIT_BRANCH"
-    HAS_CHANGES=true
-else
-    # Check current commit before fetching
-    CURRENT_COMMIT=$(git rev-parse HEAD 2>/dev/null || echo "")
-    
-    # Pull latest code
-    echo "Pulling latest code from $GIT_BRANCH..." | tee -a "$LOG_FILE"
-    if ! git fetch origin; then
-        echo "Warning: Failed to fetch from origin" | tee -a "$LOG_FILE"
-        exit 0  # Don't fail the service, just skip this update
-    fi
-    
-    # Check if there are any changes
-    NEW_COMMIT=$(git rev-parse "origin/$GIT_BRANCH" 2>/dev/null || echo "")
-    if [ "$CURRENT_COMMIT" = "$NEW_COMMIT" ]; then
-        if [ "$FORCE_UPDATE" = true ]; then
-            echo "No git changes detected, but --force specified. Running full update anyway." | tee -a "$LOG_FILE"
-            HAS_CHANGES=true
-        else
-            echo "No changes detected. Already up to date at commit $CURRENT_COMMIT" | tee -a "$LOG_FILE"
-            HAS_CHANGES=false
-        fi
-    else
-        echo "Changes detected. Updating from $CURRENT_COMMIT to $NEW_COMMIT..." | tee -a "$LOG_FILE"
-        if ! git reset --hard "origin/$GIT_BRANCH"; then
-            echo "Warning: Failed to reset to $GIT_BRANCH" | tee -a "$LOG_FILE"
-            exit 0  # Don't fail the service, just skip this update
-        fi
-        HAS_CHANGES=true
-    fi
-fi
-
-# Update the update script itself if it exists in the repo
-if [ -f "$REPO_DIR/scripts/update-calvin.sh" ] && [ -f "/usr/local/bin/update-calvin.sh" ]; then
-    echo "Updating update script..." | tee -a "$LOG_FILE"
-    cp "$REPO_DIR/scripts/update-calvin.sh" /usr/local/bin/update-calvin.sh
-    chmod +x /usr/local/bin/update-calvin.sh
-    chown calvin:calvin /usr/local/bin/update-calvin.sh 2>/dev/null || true
-fi
-
-# Only update dependencies and rebuild if there are changes
-if [ "$HAS_CHANGES" = true ]; then
-    # Update backend dependencies
-    echo "Updating backend dependencies..." | tee -a "$LOG_FILE"
-    cd "$REPO_DIR/backend" || {
-        echo "ERROR: Cannot cd to backend directory" | tee -a "$LOG_FILE"
-        exit 1
-    }
-
-    # Ensure PATH includes UV locations
-    export PATH="/home/calvin/.local/bin:/home/calvin/.cargo/bin:$PATH"
-    
-    # Check if UV is available (preferred method)
-    if command -v uv &> /dev/null; then
-        # Production setup uses only 'linux' extra (matches setup.sh)
-        echo "Using UV to update backend dependencies..." | tee -a "$LOG_FILE"
-        if ! uv sync --extra linux 2>&1 | tee -a "$LOG_FILE"; then
-            echo "ERROR: Failed to update backend dependencies with UV" | tee -a "$LOG_FILE"
-            exit 1
-        fi
-    elif [ -f .venv/bin/activate ]; then
-        # Fallback to venv if it already exists (legacy setup)
-        echo "UV not found. Using existing venv..." | tee -a "$LOG_FILE"
-        source .venv/bin/activate
-        pip install --upgrade pip
-        # Install from pyproject.toml with linux and dev extras (dev setup)
-        pip install .[linux,dev] 2>&1 | tee -a "$LOG_FILE"
-    else
-        echo "ERROR: UV not found and no venv exists. Please install UV or set up a venv." | tee -a "$LOG_FILE"
-        echo "Install UV with: curl -LsSf https://astral.sh/uv/install.sh | sh" | tee -a "$LOG_FILE"
-        exit 1
-    fi
-
-    # Check if frontend files changed
-    FRONTEND_CHANGED=false
-    if [ -n "$CURRENT_COMMIT" ] && [ -n "$NEW_COMMIT" ]; then
-        # Check if any frontend files changed
-        if git diff --name-only "$CURRENT_COMMIT" "$NEW_COMMIT" | grep -q "^frontend/"; then
-            FRONTEND_CHANGED=true
-        fi
-    else
-        # If we don't have commit info, assume frontend changed
-        FRONTEND_CHANGED=true
-    fi
-
-    if [ "$FRONTEND_CHANGED" = true ]; then
-        # Update frontend dependencies
-        echo "Frontend files changed. Updating frontend dependencies..." | tee -a "$LOG_FILE"
-        cd "$REPO_DIR/frontend"
-        if ! npm ci; then
-            echo "Warning: Failed to update frontend dependencies" | tee -a "$LOG_FILE"
-            exit 0  # Don't fail the service
-        fi
-
-        # Rebuild frontend
-        echo "Rebuilding frontend..." | tee -a "$LOG_FILE"
-        if ! npm run build 2>&1 | tee -a "$LOG_FILE"; then
-            echo "Warning: Failed to build frontend" | tee -a "$LOG_FILE"
-            exit 0  # Don't fail the service
-        fi
-        echo "Frontend build completed successfully" | tee -a "$LOG_FILE"
-    else
-        echo "No frontend changes detected. Skipping frontend rebuild." | tee -a "$LOG_FILE"
-    fi
-else
-    echo "No changes detected. Skipping dependency updates and rebuilds." | tee -a "$LOG_FILE"
-fi
-
-# Restart services via systemd (non-blocking)
-# Try helper script first (most reliable), then fall back to direct systemctl
-if systemctl is-active --quiet calvin-backend.service 2>/dev/null || sudo systemctl is-active --quiet calvin-backend.service 2>/dev/null; then
-    echo "Restarting services via systemd..." | tee -a "$LOG_FILE"
-    
-    # Try helper script first
-    if [ -f "/usr/local/bin/restart-calvin-services.sh" ]; then
-        if sudo /usr/local/bin/restart-calvin-services.sh backend 2>&1 | tee -a "$LOG_FILE"; then
-            echo "Backend service restarted successfully via helper script" | tee -a "$LOG_FILE"
-        elif sudo systemctl restart calvin-backend 2>/dev/null; then
-            echo "Backend service restarted successfully via systemctl" | tee -a "$LOG_FILE"
-        elif systemctl --user restart calvin-backend 2>/dev/null; then
-            echo "Backend service restarted successfully (user service)" | tee -a "$LOG_FILE"
-        else
-            echo "Warning: Failed to restart backend (may need sudo permissions)" | tee -a "$LOG_FILE"
-            echo "Please restart manually: sudo systemctl restart calvin-backend" | tee -a "$LOG_FILE"
-        fi
-    elif sudo systemctl restart calvin-backend 2>/dev/null; then
-        echo "Backend service restarted successfully via systemctl" | tee -a "$LOG_FILE"
-    elif systemctl --user restart calvin-backend 2>/dev/null; then
-        echo "Backend service restarted successfully (user service)" | tee -a "$LOG_FILE"
-    else
-        echo "Warning: Failed to restart backend (may need sudo permissions)" | tee -a "$LOG_FILE"
-        echo "Please restart manually: sudo systemctl restart calvin-backend" | tee -a "$LOG_FILE"
-    fi
-    # Frontend doesn't need restart (Chromium will reload)
-    # But we can restart it if needed
-    # systemctl restart calvin-frontend || true
-else
-    echo "Services not running. Please start them manually." | tee -a "$LOG_FILE"
-fi
-
-echo "[$(date)] Update complete!" | tee -a "$LOG_FILE"
-
-
+echo "Calvin did not become healthy within 60s. Check logs:" >&2
+echo "  docker compose -f $COMPOSE_FILE logs --tail=200" >&2
+exit 1
