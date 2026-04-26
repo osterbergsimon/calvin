@@ -138,14 +138,6 @@ export async function installPluginFromGitHub(repoUrl, pluginPath, branch = "mai
 }
 
 /**
- * Get the current state of a background frontend rebuild.
- */
-export async function getRebuildStatus() {
-  const response = await api.get("/plugins/rebuild-status");
-  return response.data;
-}
-
-/**
  * Suggest local plugin repo paths by scanning sibling directories (dev mode only).
  */
 export async function suggestLocalPath() {

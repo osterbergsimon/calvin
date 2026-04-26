@@ -26,7 +26,6 @@ const pluginInstallSuccess = ref("");
 const pluginRequiresRestart = ref(false);
 const pluginBranchSwitched = ref(false);
 const pluginActualBranch = ref("");
-const pluginFrontendRebuildResult = ref(null); // null | { success: bool, message: str }
 const expandedPlugins = ref({});
 const pluginFormData = ref({});
 const savingPlugin = ref(null);
@@ -59,42 +58,6 @@ const sortedPluginCategories = computed(() => {
 
   return categories.filter(c => c.plugins.length > 0);
 });
-
-// Poll the backend rebuild-status endpoint until building is complete,
-// updating pluginFrontendRebuildResult along the way.
-let _rebuildPollTimer = null;
-function _startRebuildPolling() {
-  if (_rebuildPollTimer !== null) return; // already polling
-  pluginFrontendRebuildResult.value = {
-    building: true,
-    success: null,
-    message: "Building frontend, this may take a minute…",
-  };
-
-  const poll = async () => {
-    try {
-      const status = await pluginsApi.getRebuildStatus();
-      if (status.state === "building") {
-        pluginFrontendRebuildResult.value = {
-          building: true,
-          success: null,
-          message: status.message,
-        };
-        _rebuildPollTimer = setTimeout(poll, 2000);
-      } else {
-        _rebuildPollTimer = null;
-        pluginFrontendRebuildResult.value = {
-          building: false,
-          success: status.state === "done",
-          message: status.message,
-        };
-      }
-    } catch {
-      _rebuildPollTimer = null;
-    }
-  };
-  _rebuildPollTimer = setTimeout(poll, 1000);
-}
 
 export function usePlugins() {
   // Load plugins
@@ -198,10 +161,6 @@ export function usePlugins() {
       const response = await pluginsApi.installPluginFromZip(file);
       pluginInstallSuccess.value = "Plugin installed successfully!";
       pluginRequiresRestart.value = response.requires_restart || false;
-      if (response.frontend_rebuild_in_progress) {
-        _startRebuildPolling();
-      }
-
       if (!pluginRequiresRestart.value) {
         setTimeout(() => {
           pluginInstallSuccess.value = "";
@@ -308,10 +267,6 @@ export function usePlugins() {
       pluginRequiresRestart.value = response.requires_restart || false;
       pluginBranchSwitched.value = response.branch_switched || false;
       pluginActualBranch.value = response.branch || branch;
-      if (response.frontend_rebuild_in_progress) {
-        _startRebuildPolling();
-      }
-
       // Mark the installed plugin in-place so the list stays visible
       const installedId = response.manifest?.id || pluginPath;
       const idx = availablePlugins.value.findIndex(
@@ -382,9 +337,6 @@ export function usePlugins() {
           if (response.branch_switched) {
             pluginBranchSwitched.value = true;
             pluginActualBranch.value = response.branch || branch;
-          }
-          if (response.frontend_rebuild_in_progress) {
-            _startRebuildPolling();
           }
         } catch (error) {
           results.failed.push({
@@ -520,10 +472,6 @@ export function usePlugins() {
       const response = await pluginsApi.installPluginFromLocal(localPath, pluginPath, force);
       pluginInstallSuccess.value = "Plugin installed successfully!";
       pluginRequiresRestart.value = response.requires_restart || false;
-      if (response.frontend_rebuild_in_progress) {
-        _startRebuildPolling();
-      }
-
       // Mark the installed plugin in-place so the list stays visible
       const installedId = response.manifest?.id || pluginPath;
       const idx = availablePlugins.value.findIndex(
@@ -574,9 +522,6 @@ export function usePlugins() {
             response,
           });
           if (response.requires_restart) results.requiresRestart = true;
-          if (response.frontend_rebuild_in_progress) {
-            _startRebuildPolling();
-          }
         } catch (error) {
           results.failed.push({
             id: plugin.id,
@@ -635,10 +580,7 @@ export function usePlugins() {
   // Uninstall plugin
   const uninstallPlugin = async (pluginId, pluginType = null) => {
     try {
-      const response = await pluginsApi.uninstallPlugin(pluginId, pluginType);
-      if (response.frontend_rebuild_in_progress) {
-        _startRebuildPolling();
-      }
+      await pluginsApi.uninstallPlugin(pluginId, pluginType);
       await loadPlugins();
     } catch (error) {
       logError("[usePlugins]", "Failed to uninstall plugin:", error);
@@ -905,7 +847,6 @@ export function usePlugins() {
     pluginRequiresRestart,
     pluginBranchSwitched,
     pluginActualBranch,
-    pluginFrontendRebuildResult,
     expandedPlugins,
     pluginFormData,
     savingPlugin,

@@ -14,8 +14,6 @@
         :branch-switched="pluginBranchSwitched"
         :actual-branch="pluginActualBranch"
         :dev-mode="configStore.devMode"
-        :rebuild-status="rebuildStatus"
-        :rebuild-message="rebuildMessage"
         @update:repoUrl="githubRepoUrl = $event"
         @update:branch="githubBranch = $event"
         @zip-select="handleZipSelect"
@@ -120,7 +118,7 @@
 </template>
 
 <script setup>
-import { ref, computed, onMounted, watch } from "vue";
+import { ref, computed, onMounted } from "vue";
 import { usePlugins } from "@/composables";
 import { useSystem } from "@/composables";
 import { useConfigStore } from "@/stores/config";
@@ -148,7 +146,6 @@ const {
   pluginRequiresRestart,
   pluginBranchSwitched,
   pluginActualBranch,
-  pluginFrontendRebuildResult,
   expandedPlugins,
   pluginFormData,
   savingPlugin,
@@ -216,25 +213,6 @@ const cancelPipInstall = () => {
   showPipWarningModal.value = false;
   pendingInstallAction.value = null;
 };
-
-// Frontend rebuild banner
-const rebuildStatus = ref("idle"); // idle | building | done | error
-const rebuildMessage = ref("");
-
-watch(pluginFrontendRebuildResult, result => {
-  if (!result) return;
-  if (result.building) {
-    rebuildStatus.value = "building";
-    rebuildMessage.value = result.message || "Building frontend…";
-  } else {
-    rebuildStatus.value = result.success ? "done" : "error";
-    rebuildMessage.value =
-      result.message ||
-      (result.success
-        ? "Frontend rebuilt — refresh the page to load new plugin components."
-        : "Frontend rebuild failed — rebuild manually with: npm run build");
-  }
-});
 
 // Handlers
 const handleZipSelect = async file => {

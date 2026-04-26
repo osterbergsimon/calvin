@@ -8,11 +8,10 @@ from app.services.plugin_installer import PluginInstaller
 
 
 @pytest.fixture
-def plugin_installer(temp_plugins_dir, temp_frontend_dir, monkeypatch):
+def plugin_installer(temp_plugins_dir, monkeypatch):
     """Create a PluginInstaller instance with temporary directories."""
     installer = PluginInstaller()
     installer.plugins_dir = temp_plugins_dir
-    installer.frontend_plugins_dir = temp_frontend_dir
     return installer
 
 
@@ -351,10 +350,10 @@ class TestPluginInstallFromRepo:
 
         assert manifest["id"] == "plugin2"
 
-        # Check frontend components were installed
-        frontend_path = plugin_installer.get_frontend_plugin_path("plugin2")
-        assert frontend_path.exists()
-        assert (frontend_path / "Component.vue").exists()
+        # Frontend assets stay inside the plugin's data dir (host serves them
+        # via /api/plugins/{id}/static/*).
+        plugin_path = plugin_installer.get_plugin_path("plugin2")
+        assert (plugin_path / "frontend" / "Component.vue").exists()
 
     def test_install_plugin_from_repo_path_traversal_protection(
         self, plugin_installer, mock_repo_structure
