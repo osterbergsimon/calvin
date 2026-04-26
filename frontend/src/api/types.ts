@@ -12,10 +12,10 @@ export interface paths {
             cookie?: never;
         };
         /**
-         * Root
-         * @description Root endpoint.
+         * Serve Frontend Root
+         * @description Serve frontend index.html for root path.
          */
-        get: operations["root__get"];
+        get: operations["serve_frontend_root__get"];
         put?: never;
         post?: never;
         delete?: never;
@@ -1196,6 +1196,23 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/plugins/{plugin_id}/static/{asset_path}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Get Plugin Static Asset */
+        get: operations["get_plugin_static_asset_api_plugins__plugin_id__static__asset_path__get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/plugins/{plugin_id}/test": {
         parameters: {
             query?: never;
@@ -1447,6 +1464,46 @@ export interface paths {
          * @description Stream update log output as Server-Sent Events starting from log_offset bytes.
          */
         get: operations["stream_update_log_api_system_update_stream_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/assets/{file_path}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Serve Asset
+         * @description Serve static assets with cache control headers for development.
+         */
+        get: operations["serve_asset_assets__file_path__get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/{full_path}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Serve Frontend Get
+         * @description Serve frontend index.html for SPA routing (GET only).
+         */
+        get: operations["serve_frontend_get__full_path__get"];
         put?: never;
         post?: never;
         delete?: never;
@@ -1867,7 +1924,7 @@ export interface components {
 }
 export type $defs = Record<string, never>;
 export interface operations {
-    root__get: {
+    serve_frontend_root__get: {
         parameters: {
             query?: never;
             header?: never;
@@ -3517,6 +3574,38 @@ export interface operations {
             };
         };
     };
+    get_plugin_static_asset_api_plugins__plugin_id__static__asset_path__get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                plugin_id: string;
+                asset_path: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": unknown;
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
     test_plugin_api_plugins__plugin_id__test_post: {
         parameters: {
             query?: never;
@@ -3761,6 +3850,68 @@ export interface operations {
             };
             header?: never;
             path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": unknown;
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    serve_asset_assets__file_path__get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                file_path: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": unknown;
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    serve_frontend_get__full_path__get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                full_path: string;
+            };
             cookie?: never;
         };
         requestBody?: never;

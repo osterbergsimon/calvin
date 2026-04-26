@@ -10,8 +10,9 @@ import { useQuery } from "@tanstack/vue-query";
 import axios from "axios";
 import { computed, unref } from "vue";
 
-export function useSchemaData(serviceId, schema) {
+export function useSchemaData(serviceId, schema, enabled = true) {
   const id = computed(() => unref(serviceId));
+  const isEnabled = computed(() => Boolean(unref(enabled)));
   const refetchInterval = computed(() => {
     const ms = unref(schema)?.poll_interval_ms;
     return typeof ms === "number" && ms > 0 ? ms : false;
@@ -28,7 +29,7 @@ export function useSchemaData(serviceId, schema) {
       const response = await axios.get(endpoint.value);
       return response.data;
     },
-    enabled: computed(() => Boolean(endpoint.value)),
+    enabled: computed(() => isEnabled.value && Boolean(endpoint.value)),
     staleTime: 5 * 60 * 1000,
     refetchInterval,
     retry: 1,

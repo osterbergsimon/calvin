@@ -9,6 +9,7 @@ import CardGrid from "@/components/plugins/renderers/CardGrid.vue";
 import ItemList from "@/components/plugins/renderers/ItemList.vue";
 import ImageWithCaption from "@/components/plugins/renderers/ImageWithCaption.vue";
 import MetricDashboard from "@/components/plugins/renderers/MetricDashboard.vue";
+import WeatherForecast from "@/components/plugins/renderers/WeatherForecast.vue";
 
 describe("SchemaRenderer dispatcher", () => {
   it("renders the registered renderer for a known kind", () => {
@@ -242,5 +243,68 @@ describe("MetricDashboard", () => {
     expect(tiles[0].text()).toContain("21.5");
     expect(tiles[0].classes()).toContain("metric-dashboard__tile--ok");
     expect(tiles[1].classes()).toContain("metric-dashboard__tile--warn");
+  });
+});
+
+describe("WeatherForecast", () => {
+  const schema = {
+    kind: "weather-forecast",
+    title_path: "$.location",
+    current_path: "$.current",
+    current: {
+      icon_path: "$.display.icon",
+      temperature_path: "$.temperature",
+      feels_like_path: "$.feels_like",
+      humidity_path: "$.humidity",
+      pressure_path: "$.pressure",
+      wind_speed_path: "$.wind_speed",
+      description_path: "$.description",
+    },
+    forecast_path: "$.forecast",
+    forecast: {
+      date_path: "$.date",
+      icon_path: "$.display.icon",
+      temp_min_path: "$.temp_min",
+      temp_max_path: "$.temp_max",
+      description_path: "$.description",
+    },
+    units: { temperature: "°C", wind: "m/s" },
+  };
+
+  it("renders current weather and forecast from schema paths", () => {
+    const wrapper = mount(WeatherForecast, {
+      props: {
+        schema,
+        data: {
+          location: "Oslo",
+          current: {
+            temperature: 8.4,
+            feels_like: 7.1,
+            humidity: 82,
+            pressure: 1012,
+            wind_speed: 4.6,
+            description: "light rain",
+            display: { icon: "mdi:weather-rainy" },
+          },
+          forecast: [
+            {
+              date: "2099-01-01",
+              temp_min: 2.2,
+              temp_max: 9.8,
+              description: "cloudy",
+              display: { icon: "mdi:weather-cloudy" },
+            },
+          ],
+        },
+      },
+    });
+
+    expect(wrapper.find("h3").text()).toBe("Oslo");
+    expect(wrapper.find(".weather-forecast-renderer__temp-value").text()).toBe("8");
+    expect(wrapper.text()).toContain("Light rain");
+    expect(wrapper.text()).toContain("Humidity");
+    expect(wrapper.findAll(".weather-forecast-renderer__item")).toHaveLength(1);
+    expect(wrapper.text()).toContain("10°C");
+    expect(wrapper.findAll("svg path")[0].attributes("d")).toBeTruthy();
   });
 });

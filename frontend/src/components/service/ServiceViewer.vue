@@ -82,7 +82,8 @@ const renderTemplate = computed(() => {
 const schemaKind = computed(() => props.service.display_schema?.kind || null);
 const schemaQuery = useSchemaData(
   computed(() => props.service.id),
-  computed(() => props.service.display_schema || {})
+  computed(() => props.service.display_schema || {}),
+  computed(() => Boolean(schemaKind.value))
 );
 const schemaData = computed(() => schemaQuery.data.value);
 

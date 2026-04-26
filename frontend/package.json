@@ -19,6 +19,7 @@
     "gen:api": "openapi-typescript ../backend/tests/contract/openapi.json -o src/api/types.ts"
   },
   "dependencies": {
+    "@mdi/js": "^7.4.47",
     "@tanstack/vue-query": "^5.91.0",
     "@vueuse/core": "^10.7.0",
     "axios": "^1.6.0",
