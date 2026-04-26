@@ -6,19 +6,12 @@
       :service-id="service.id"
       :schema="service.statusbar_schema"
     />
-    <component
-      v-for="item in loadedItems"
-      :is="item.component"
-      :key="item.serviceId"
-      :service-id="item.serviceId"
-    />
   </div>
 </template>
 
 <script setup>
-import { computed, onMounted, ref, watch } from "vue";
+import { computed, onMounted } from "vue";
 import { useWebServicesStore } from "../stores/webServices";
-import { loadPluginComponent } from "../composables/usePluginComponent";
 import SchemaStatusbarItem from "./plugins/SchemaStatusbarItem.vue";
 
 defineOptions({ name: "PluginStatusbarItems" });
@@ -47,28 +40,6 @@ function isStatusbarVisible(service) {
 
 const schemaServices = computed(() =>
   webServicesStore.services.filter(s => s.statusbar_schema?.kind && isStatusbarVisible(s))
-);
-
-const legacyServices = computed(() =>
-  webServicesStore.services.filter(
-    s => !s.statusbar_schema?.kind && s.statusbar_schema?.component && isStatusbarVisible(s)
-  )
-);
-
-const loadedItems = ref([]);
-
-watch(
-  legacyServices,
-  async services => {
-    const items = await Promise.all(
-      services.map(async service => {
-        const component = await loadPluginComponent(service.statusbar_schema.component);
-        return component ? { serviceId: service.id, component } : null;
-      })
-    );
-    loadedItems.value = items.filter(Boolean);
-  },
-  { immediate: true }
 );
 
 onMounted(() => {

@@ -18,6 +18,7 @@ import StatusList from "./renderers/StatusList.vue";
 import StatusRow from "./renderers/StatusRow.vue";
 import CardGrid from "./renderers/CardGrid.vue";
 import ItemList from "./renderers/ItemList.vue";
+import IframeRenderer from "./renderers/IframeRenderer.vue";
 import ImageWithCaption from "./renderers/ImageWithCaption.vue";
 import MetricDashboard from "./renderers/MetricDashboard.vue";
 import WeatherForecast from "./renderers/WeatherForecast.vue";
@@ -28,6 +29,7 @@ const renderers = {
   "status-list": StatusList,
   "status-row": StatusRow,
   "card-grid": CardGrid,
+  iframe: IframeRenderer,
   "item-list": ItemList,
   "image-with-caption": ImageWithCaption,
   "metric-dashboard": MetricDashboard,
