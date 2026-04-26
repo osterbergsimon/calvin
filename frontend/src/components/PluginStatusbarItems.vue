@@ -1,5 +1,11 @@
 <template>
   <div class="plugin-statusbar-items" :class="{ ghost }">
+    <SchemaStatusbarItem
+      v-for="service in schemaServices"
+      :key="service.id"
+      :service-id="service.id"
+      :schema="service.statusbar_schema"
+    />
     <component
       v-for="item in loadedItems"
       :is="item.component"
@@ -13,6 +19,7 @@
 import { computed, onMounted, ref, watch } from "vue";
 import { useWebServicesStore } from "../stores/webServices";
 import { loadPluginComponent } from "../composables/usePluginComponent";
+import SchemaStatusbarItem from "./plugins/SchemaStatusbarItem.vue";
 
 defineOptions({ name: "PluginStatusbarItems" });
 
@@ -25,21 +32,26 @@ defineProps({
 
 const webServicesStore = useWebServicesStore();
 
-const statusbarServices = computed(() =>
-  webServicesStore.services.filter(s => {
-    if (!s.statusbar_schema?.component) return false;
-    // If the plugin uses the show_in_statusbar convention, respect it.
-    // Absence of the key means the plugin controls visibility itself (e.g. yr_weather).
-    const cfg = s.config || {};
-    if ("show_in_statusbar" in cfg) return !!cfg.show_in_statusbar;
-    return true;
-  })
+function isStatusbarVisible(service) {
+  const cfg = service.config || {};
+  if ("show_in_statusbar" in cfg) return !!cfg.show_in_statusbar;
+  return true;
+}
+
+const schemaServices = computed(() =>
+  webServicesStore.services.filter(s => s.statusbar_schema?.kind && isStatusbarVisible(s))
+);
+
+const legacyServices = computed(() =>
+  webServicesStore.services.filter(
+    s => !s.statusbar_schema?.kind && s.statusbar_schema?.component && isStatusbarVisible(s)
+  )
 );
 
 const loadedItems = ref([]);
 
 watch(
-  statusbarServices,
+  legacyServices,
   async services => {
     const items = await Promise.all(
       services.map(async service => {
