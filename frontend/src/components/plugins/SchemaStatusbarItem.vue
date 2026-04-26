@@ -1,9 +1,9 @@
 <template>
-  <SchemaRenderer :schema="schema" :data="query.data" :plugin-id="serviceId" />
+  <SchemaRenderer :schema="schema" :data="data" :plugin-id="serviceId" />
 </template>
 
 <script setup>
-import { toRef } from "vue";
+import { computed, toRef } from "vue";
 import SchemaRenderer from "./SchemaRenderer.vue";
 import { useSchemaData } from "../../composables/useSchemaData";
 
@@ -13,4 +13,5 @@ const props = defineProps({
 });
 
 const query = useSchemaData(toRef(props, "serviceId"), toRef(props, "schema"));
+const data = computed(() => query.data.value);
 </script>
