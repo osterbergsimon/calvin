@@ -398,14 +398,6 @@ def temp_plugins_dir(tmp_path):
 
 
 @pytest.fixture
-def temp_frontend_dir(tmp_path):
-    """Create a temporary frontend directory."""
-    frontend_dir = tmp_path / "frontend" / "src" / "components" / "plugins"
-    frontend_dir.mkdir(parents=True)
-    return frontend_dir
-
-
-@pytest.fixture
 def temp_themes_dir(tmp_path):
     """Create a temporary themes directory."""
     themes_dir = tmp_path / "themes"
@@ -414,23 +406,18 @@ def temp_themes_dir(tmp_path):
 
 
 @pytest.fixture(autouse=True)
-def patch_data_directories(
-    monkeypatch, tmp_path, temp_plugins_dir, temp_frontend_dir, temp_themes_dir
-):
+def patch_data_directories(monkeypatch, tmp_path, temp_plugins_dir, temp_themes_dir):
     """Patch plugin/theme installers to write under tmp_path so tests don't touch real data."""
     from app.services.plugin_installer import plugin_installer
     from app.services.theme_installer import theme_installer
 
     original_plugins_dir = plugin_installer.plugins_dir
-    original_frontend_dir = plugin_installer.frontend_plugins_dir
     original_themes_dir = theme_installer.themes_dir
 
     plugin_installer.plugins_dir = temp_plugins_dir
-    plugin_installer.frontend_plugins_dir = temp_frontend_dir
     theme_installer.themes_dir = temp_themes_dir
 
     yield
 
     plugin_installer.plugins_dir = original_plugins_dir
-    plugin_installer.frontend_plugins_dir = original_frontend_dir
     theme_installer.themes_dir = original_themes_dir

@@ -1065,24 +1065,6 @@
         "title": "PluginTypeConfigUpdateResponse",
         "type": "object"
       },
-      "RebuildStatusResponse": {
-        "properties": {
-          "message": {
-            "title": "Message",
-            "type": "string"
-          },
-          "state": {
-            "title": "State",
-            "type": "string"
-          }
-        },
-        "required": [
-          "state",
-          "message"
-        ],
-        "title": "RebuildStatusResponse",
-        "type": "object"
-      },
       "ValidationError": {
         "properties": {
           "loc": {
@@ -2701,28 +2683,6 @@
           }
         },
         "summary": "Suggest Local Plugin Paths",
-        "tags": [
-          "plugins"
-        ]
-      }
-    },
-    "/api/plugins/rebuild-status": {
-      "get": {
-        "description": "Return the current state of a background frontend rebuild.",
-        "operationId": "get_rebuild_status_api_plugins_rebuild_status_get",
-        "responses": {
-          "200": {
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/RebuildStatusResponse"
-                }
-              }
-            },
-            "description": "Successful Response"
-          }
-        },
-        "summary": "Get Rebuild Status",
         "tags": [
           "plugins"
         ]
