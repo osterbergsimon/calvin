@@ -1,13 +1,13 @@
 /**
  * Composable for dynamically loading plugin-provided frontend components.
  *
- * Plugins can specify their frontend component in display_schema.component.
- * The component path should be relative to frontend/src/components/plugins/
- *
- * Example:
- *   display_schema: {
- *     component: "mealie/MealPlanViewer.vue"
- *   }
+ * Legacy path kept for plugins that still ship Vue source via
+ * display_schema.component referencing a file under
+ * frontend/src/components/plugins/. Prefer the schema-driven
+ * SchemaRenderer (display_schema.kind = "<primitive>") or, for cases
+ * that don't fit a primitive, the WebComponentHost escape hatch
+ * (display_schema.kind = "web-component"). This composable will be
+ * removed once the iframe service viewer is migrated.
  */
 
 import { shallowRef, ref, computed, watch, unref, markRaw } from "vue";
@@ -165,9 +165,9 @@ export function getPluginComponentPath(service) {
     return null;
   }
 
-  // Try to infer component path from type_id
+  // Try to infer component path from type_id (legacy fallback for plugins
+  // that still ship a Vue file in their frontend/ dir)
   if (typeId && renderTemplate) {
-    // e.g., "mealie" + "meal_plan" -> "mealie/MealPlanViewer.vue"
     const componentName =
       renderTemplate
         .split("_")

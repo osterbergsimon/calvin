@@ -145,18 +145,14 @@ async def get_plugins(
             enabled = db_type.enabled if db_type else True  # Default to enabled
             error_message = db_type.error_message if db_type else None
 
-            # Merge plugin metadata common_config_schema with database common_config_schema
-            # This ensures user-set values (like display_order) are preserved
+            # Keep field schema separate from saved values. Older versions stored
+            # common config values in common_config_schema, but the frontend needs
+            # schema entries here; values are loaded from /plugins/{id}/config.
             metadata_schema = type_info.get("common_config_schema", {}) or {}
             db_schema = (
                 db_type.common_config_schema if db_type and db_type.common_config_schema else {}
             )
-            # Only override keys that are defined in the plugin's own metadata schema —
-            # prevents instance config fields that leaked into db_schema from showing here.
             merged_schema = {**metadata_schema}
-            for key in metadata_schema:
-                if key in db_schema:
-                    merged_schema[key] = db_schema[key]
             for key in UNIVERSAL_TYPE_CONFIG_KEYS:
                 if key in db_schema:
                     merged_schema[key] = db_schema[key]
@@ -589,14 +585,12 @@ async def get_plugin(plugin_id: str):
     enabled = db_type.enabled if db_type else True
     error_message = db_type.error_message if db_type else None
 
-    # Merge plugin metadata common_config_schema with database common_config_schema
-    # This ensures user-set values (like display_order) are preserved
+    # Keep field schema separate from saved values. Values are served by
+    # /plugins/{id}/config, while this endpoint provides plugin metadata.
     metadata_schema = type_info.get("common_config_schema", {}) or {}
     db_schema = db_type.common_config_schema if db_type and db_type.common_config_schema else {}
-    # Only override keys that are defined in the plugin's own metadata schema —
-    # prevents instance config fields that leaked into db_schema from showing here.
     merged_schema = {**metadata_schema}
-    for key in metadata_schema:
+    for key in UNIVERSAL_TYPE_CONFIG_KEYS:
         if key in db_schema:
             merged_schema[key] = db_schema[key]
 
@@ -716,10 +710,12 @@ async def _update_plugin_type(
     if not db_type:
         # Create new plugin type in database
         plugin_type = type_info.get("plugin_type")
-        # Only store keys that are defined in the plugin's own common_config_schema
+        # Store schema in common_config_schema, not ordinary config values.
+        # Ordinary values are stored in config_service below.
         metadata_schema = type_info.get("common_config_schema", {}) or {}
-        allowed_keys = set(metadata_schema.keys()) | UNIVERSAL_TYPE_CONFIG_KEYS
-        filtered_config = {k: v for k, v in config.items() if k in allowed_keys} if config else {}
+        filtered_config = (
+            {k: v for k, v in config.items() if k in UNIVERSAL_TYPE_CONFIG_KEYS} if config else {}
+        )
         initial_schema = {**metadata_schema, **filtered_config}
         logger.debug(
             f"Creating new plugin type {plugin_id} with schema: {initial_schema}, "
@@ -740,11 +736,9 @@ async def _update_plugin_type(
             db_type.enabled = enabled
         if config:
             current_schema = db_type.common_config_schema or {}
-            # Only allow keys defined in the plugin's own common_config_schema —
-            # prevents instance config fields from leaking into the type-level schema.
-            metadata_schema = type_info.get("common_config_schema", {}) or {}
-            allowed_keys = set(metadata_schema.keys()) | UNIVERSAL_TYPE_CONFIG_KEYS
-            filtered_config = {k: v for k, v in config.items() if k in allowed_keys}
+            # Only universal schema-backed values are stored here. Regular
+            # plugin settings are persisted in config_service below.
+            filtered_config = {k: v for k, v in config.items() if k in UNIVERSAL_TYPE_CONFIG_KEYS}
             updated_schema = {**current_schema, **filtered_config}
             db_type.common_config_schema = updated_schema
             logger.debug(
