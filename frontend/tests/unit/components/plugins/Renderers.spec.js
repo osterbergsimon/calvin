@@ -7,6 +7,7 @@ import StatusList from "@/components/plugins/renderers/StatusList.vue";
 import StatusRow from "@/components/plugins/renderers/StatusRow.vue";
 import CardGrid from "@/components/plugins/renderers/CardGrid.vue";
 import ItemList from "@/components/plugins/renderers/ItemList.vue";
+import IframeRenderer from "@/components/plugins/renderers/IframeRenderer.vue";
 import ImageWithCaption from "@/components/plugins/renderers/ImageWithCaption.vue";
 import MetricDashboard from "@/components/plugins/renderers/MetricDashboard.vue";
 import WeatherForecast from "@/components/plugins/renderers/WeatherForecast.vue";
@@ -306,5 +307,31 @@ describe("WeatherForecast", () => {
     expect(wrapper.findAll(".weather-forecast-renderer__item")).toHaveLength(1);
     expect(wrapper.text()).toContain("10°C");
     expect(wrapper.findAll("svg path")[0].attributes("d")).toBeTruthy();
+  });
+});
+
+describe("IframeRenderer", () => {
+  it("renders an iframe with src resolved from url_path", () => {
+    const wrapper = mount(IframeRenderer, {
+      props: {
+        schema: { kind: "iframe", url_path: "$.url" },
+        data: { url: "https://example.test/dashboard" },
+      },
+    });
+    expect(wrapper.find("iframe").attributes("src")).toBe("https://example.test/dashboard");
+  });
+
+  it("renders no iframe when the url cannot be resolved", () => {
+    const wrapper = mount(IframeRenderer, {
+      props: { schema: { kind: "iframe", url_path: "$.url" }, data: {} },
+    });
+    expect(wrapper.find("iframe").exists()).toBe(false);
+  });
+
+  it("falls back to a literal url when no path is given", () => {
+    const wrapper = mount(IframeRenderer, {
+      props: { schema: { kind: "iframe", url: "https://example.test/literal" }, data: null },
+    });
+    expect(wrapper.find("iframe").attributes("src")).toBe("https://example.test/literal");
   });
 });
