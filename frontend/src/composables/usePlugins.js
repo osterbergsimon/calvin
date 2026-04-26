@@ -5,6 +5,7 @@
 
 import { ref, computed } from "vue";
 import * as pluginsApi from "../services/pluginsApi";
+import { useWebServicesStore } from "../stores/webServices";
 import { logError, logWarn } from "../utils/logger";
 
 // Shared state (singleton pattern)
@@ -674,6 +675,8 @@ export function usePlugins() {
       const normalizedConfig = await loadPluginConfig(pluginId);
       pluginConfigs.value[pluginId] = { ...normalizedConfig };
       pluginFormData.value[pluginId] = { ...normalizedConfig };
+      await loadPlugins();
+      await useWebServicesStore().fetchServices();
       pluginSaveStatus.value[pluginId] = {
         success: true,
         message: "Configuration saved successfully",

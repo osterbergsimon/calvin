@@ -33,13 +33,30 @@ def normalize_plugin_config(config: dict[str, Any] | None) -> dict[str, Any]:
 
     for key, value in (config or {}).items():
         if isinstance(value, dict):
-            normalized[key] = value.get("value") or value.get("default") or ""
+            normalized[key] = value.get("value", value.get("default", ""))
         elif isinstance(value, Path):
             normalized[key] = str(value)
         elif value is None:
             normalized[key] = ""
         else:
             normalized[key] = str(value)
+
+    return normalized
+
+
+def normalize_plugin_config_for_frontend(config: dict[str, Any] | None) -> dict[str, Any]:
+    """Normalize plugin config values while preserving JSON primitive types."""
+    normalized: dict[str, Any] = {}
+
+    for key, value in (config or {}).items():
+        if isinstance(value, dict):
+            normalized[key] = value.get("value", value.get("default", ""))
+        elif isinstance(value, Path):
+            normalized[key] = str(value)
+        elif value is None:
+            normalized[key] = ""
+        else:
+            normalized[key] = value
 
     return normalized
 
@@ -120,7 +137,7 @@ async def get_plugin_config(plugin_id: str):
 
     if config_json:
         try:
-            config = json.loads(config_json)
+            config = normalize_plugin_config_for_frontend(json.loads(config_json))
             masked_parsed = mask_sensitive_config(config)
             logger.debug(f"Parsed config: {masked_parsed}")
         except json.JSONDecodeError as e:
