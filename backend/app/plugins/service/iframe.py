@@ -73,12 +73,8 @@ class IframeServicePlugin(ServicePlugin):
                 },
             },
             display_schema={
-                "type": "iframe",
-                "api_endpoint": None,  # Iframe services don't use API endpoints
-                "method": None,
-                "data_schema": None,
-                "render_template": "iframe",
-                "component": "iframe/IframeViewer.vue",  # Plugin-provided frontend component
+                "kind": "iframe",
+                "url_path": "$.url",
             },
             supports_multiple_instances=True,
         )
@@ -127,6 +123,19 @@ class IframeServicePlugin(ServicePlugin):
                 "sandbox": "allow-same-origin allow-scripts allow-forms allow-popups",
             },
         }
+
+    async def fetch_service_data(
+        self,
+        start_date: str | None = None,
+        end_date: str | None = None,
+    ) -> dict[str, Any]:
+        """Return the data the IframeRenderer schema binds to.
+
+        The host's SchemaRenderer dispatches `kind: "iframe"` to a
+        renderer that reads `$.url` — so we just need to surface the
+        configured URL through the standard data endpoint.
+        """
+        return {"url": self.url}
 
     async def validate_config(self, config: dict[str, Any]) -> bool:
         """
