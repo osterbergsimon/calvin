@@ -136,16 +136,28 @@ async def get_plugin_config(plugin_id: str):
 
         db_type = await PluginTypeDB.objects.get_or_none(type_id=plugin_id)
         if db_type and db_type.common_config_schema:
-            # Merge common_config_schema values into config (schema values override service values)
-            # This ensures display_order and other schema-level settings are included
+            # Fall back to per-field defaults declared in common_config_schema for keys
+            # that have not been explicitly saved via config_service. The DB stores the
+            # *schema entry* (a dict with type/default/ui) rather than the value, so we
+            # must extract `default` — passing the schema dict through breaks any
+            # frontend renderer that expects a primitive value.
             db_schema = db_type.common_config_schema
-            for key, value in db_schema.items():
-                # Only add if not already in config (config_service values take precedence)
-                if key not in config:
-                    config[key] = value
-                # For display_order, always use schema value if it exists (it's the source of truth)
-                elif key == "display_order":
-                    config[key] = value
+            for key, schema_entry in db_schema.items():
+                if key in config:
+                    continue
+                if isinstance(schema_entry, dict):
+                    default_value = schema_entry.get("default")
+                    declared_type = schema_entry.get("type")
+                else:
+                    default_value = schema_entry
+                    declared_type = None
+                if default_value is None:
+                    continue
+                # Coerce string-valued defaults that should be booleans
+                # (legacy plugin metadata sometimes declared "default": "true").
+                if declared_type == "boolean" and isinstance(default_value, str):
+                    default_value = default_value.strip().lower() == "true"
+                config[key] = default_value
     except Exception as e:
         logger.debug(f"Could not load schema from database for {plugin_id}: {e}")
         # Continue with config_service values only
