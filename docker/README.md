@@ -15,14 +15,14 @@ image (amd64 / arm64 / arm/v7) to `ghcr.io/osterbergsimon/calvin`.
 ## Production
 
 ```bash
-cp deploy/calvin.env.example /etc/calvin/calvin.env
-# edit /etc/calvin/calvin.env
+cp deploy/calvin.env.example deploy/calvin.env
+# edit deploy/calvin.env
 docker compose -f docker/docker-compose.yml up -d
 ```
 
-The compose file expects `/etc/calvin/calvin.env` next to a directory
-matching `${CALVIN_DATA_DIR}` (defaults to `/var/lib/calvin`). Calvin
-keeps its database, images, and installed plugins under that path.
+The compose file reads `deploy/calvin.env`. Calvin keeps its database,
+images, and installed plugins under `${CALVIN_DATA_DIR}` (defaults to
+`/var/lib/calvin`).
 
 Updating:
 

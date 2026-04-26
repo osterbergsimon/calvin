@@ -4,7 +4,7 @@
 # into the image; FastAPI serves it on the same port as the API. No
 # separate frontend container, no nginx, no rebuild-on-install.
 #
-# Reads /etc/calvin/calvin.env (deploy/calvin.env.example).
+# Reads ../deploy/calvin.env (copy from deploy/calvin.env.example).
 
 services:
   calvin:
