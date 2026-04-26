@@ -219,15 +219,14 @@ For more details, see [Linux Setup Guide](SETUP_LINUX.md) or [Setup Scripts Docu
 
 ## Docker Setup
 
-Docker provides a consistent, isolated environment for both development and production. Calvin supports multiple Docker deployment scenarios.
+Docker provides a consistent, isolated environment for both development and production. Calvin now uses one runtime image for production and a separate hot-reload compose file for development.
 
-### Quick Start with Docker
-
-#### Development Mode (Hot-Reload)
+### Development Mode (Hot-Reload)
 
 ```bash
 # From project root
-docker-compose -f docker/docker-compose.dev.yml up
+cp deploy/calvin.env.example deploy/calvin.env
+docker compose -f docker/docker-compose.dev.yml up
 ```
 
 **Access Points:**
@@ -240,96 +239,20 @@ docker-compose -f docker/docker-compose.dev.yml up
 - Source code mounted as volumes
 - Fast iteration cycle
 
-#### Production Mode (Local - Separate Containers)
+### Production Mode
 
 ```bash
 # From project root
-docker-compose -f docker/docker-compose.prod-separate.yml up -d
-```
-
-**Access Points:**
-- Backend API: http://localhost:8000
-- Frontend: http://localhost:80
-- API Documentation: http://localhost:8000/docs
-
-**Features:**
-- Optimized multi-stage builds
-- Nginx for frontend static file serving
-- Separate containers for scalability
-
-#### Production Mode (Monolithic - Legacy)
-
-```bash
-# From project root
-docker-compose -f docker/docker-compose.prod.yml up -d calvin-prod
+cp deploy/calvin.env.example deploy/calvin.env
+# edit deploy/calvin.env
+docker compose -f docker/docker-compose.yml up -d
 ```
 
 **Access Points:**
 - Application: http://localhost:8000
 - API Documentation: http://localhost:8000/docs
 
-### Distributed Deployment
-
-Run backend and frontend on separate machines:
-
-#### Step 1: Backend Server
-
-On the machine hosting the backend (e.g., home server):
-
-```bash
-# Set CORS origins (comma-separated list of frontend URLs)
-export CORS_ORIGINS=http://192.168.1.50:80,http://rpi.local:80
-
-# Start backend
-docker-compose -f docker/docker-compose.backend-only.yml up -d
-```
-
-Backend will be available at `http://backend-server-ip:8000`.
-
-#### Step 2: Frontend (Raspberry Pi)
-
-On the machine hosting the frontend (e.g., Raspberry Pi):
-
-```bash
-# Set the backend URL (embedded at build time)
-export BACKEND_URL=http://192.168.1.100:8000/api
-
-# Start frontend
-docker-compose -f docker/docker-compose.frontend-only.yml up -d
-```
-
-Frontend will be available at `http://localhost:80`.
-
-**Important Notes:**
-- Backend URL is embedded at build time - rebuild frontend image if backend URL changes
-- Ensure CORS is properly configured on the backend
-- Verify network connectivity between machines
-- Consider firewall rules
-
-### Multi-Architecture Builds
-
-Calvin Docker images support multiple architectures (amd64, arm64, arm/v7) for deployment on various platforms including Raspberry Pi.
-
-```bash
-cd docker
-
-# Build for all architectures and push to registry
-./build-multiarch.sh --both --push --repo your-registry/calvin --tag latest
-
-# Build only backend
-./build-multiarch.sh --backend --push --repo your-registry/calvin
-
-# Build only frontend
-./build-multiarch.sh --frontend --push --repo your-registry/calvin
-
-# Build for local use (single platform, current architecture)
-./build-multiarch.sh --both
-```
-
-For detailed Docker documentation, see:
-- [Getting Started with Docker](GETTING_STARTED_DOCKER.md) - Complete getting started guide
-- [Docker Overview](DOCKER_OVERVIEW.md) - Deployment scenarios and configuration
-- [Docker Building and Running](DOCKER_BUILDING_AND_RUNNING.md) - Detailed build and run instructions
+For current Docker details, see `docker/README.md`.
 
 ## VS Code Dev Containers
 
@@ -363,7 +286,7 @@ Edit `.devcontainer/devcontainer.json` to customize:
 - Port forwarding
 - Features
 
-**Note:** If you don't have a `.devcontainer` directory yet, you can create one based on the Docker development setup. See the [Getting Started with Docker](GETTING_STARTED_DOCKER.md) guide for details.
+**Note:** If you don't have a `.devcontainer` directory yet, you can create one based on the Docker development setup in `docker/README.md`.
 
 ## Verification
 
@@ -432,7 +355,7 @@ sudo journalctl -u calvin-frontend -n 50
 
 - Check the [documentation index](../index.md) for detailed guides
 - Review [Setup Scripts Documentation](SETUP_SCRIPTS.md) for script-specific issues
-- See [Getting Started with Docker](GETTING_STARTED_DOCKER.md) for Docker-specific issues
+- See `docker/README.md` for Docker-specific issues
 - Open an issue on [GitHub](https://github.com/osterbergsimon/calvin/issues)
 
 ## Related Documentation
@@ -442,4 +365,4 @@ sudo journalctl -u calvin-frontend -n 50
 - [Setup Scripts Documentation](SETUP_SCRIPTS.md) - Automated setup scripts
 - [Quick Start - Development](QUICKSTART_DEVELOP.md) - Fast development setup
 - [Quick Start - Windows](QUICKSTART_WINDOWS.md) - Fast Windows setup
-- [Getting Started with Docker](GETTING_STARTED_DOCKER.md) - Complete Docker guide
+- `docker/README.md` - Current Docker guide
