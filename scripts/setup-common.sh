@@ -180,6 +180,14 @@ ensure_git_repo() {
     local branch="${2:-$DEFAULT_GIT_BRANCH}"
     local target_dir="${3:-$DEFAULT_CALVIN_DIR}"
     local user="${4:-$DEFAULT_CALVIN_USER}"
+
+    if [ "${CALVIN_SKIP_GIT_UPDATE:-}" = "1" ] || [ "${CALVIN_SKIP_GIT_UPDATE:-}" = "true" ]; then
+        log "Skipping Git repository update because CALVIN_SKIP_GIT_UPDATE is set"
+        if [ -d "${target_dir}" ]; then
+            chown -R "${user}:${user}" "${target_dir}"
+        fi
+        return 0
+    fi
     
     log "Setting up Git repository: ${repo_url} (branch: ${branch})"
     

@@ -45,6 +45,7 @@ jobs:
 
       - name: Check systemd unit syntax
         run: |
+          sudo install -m 0755 scripts/update-calvin.sh /usr/local/bin/update-calvin.sh
           systemd-analyze verify rpi-image/systemd/calvin-app.service
           systemd-analyze verify rpi-image/systemd/calvin-kiosk.service
           systemd-analyze verify rpi-image/systemd/calvin-x.service
@@ -86,6 +87,7 @@ jobs:
           export CALVIN_DIR="/home/calvin/calvin"
           export CALVIN_USER="calvin"
           export CALVIN_DATA_DIR="/var/lib/calvin"
+          export CALVIN_SKIP_GIT_UPDATE="1"
           export LOG_FILE="/tmp/calvin-setup.log"
           export GIT_REPO="https://github.com/osterbergsimon/calvin.git"
           export GIT_BRANCH="${GITHUB_HEAD_REF:-develop}"
@@ -93,28 +95,45 @@ jobs:
           if ! id calvin >/dev/null 2>&1; then
             useradd -m -s /bin/bash calvin
           fi
+
           mkdir -p /home/calvin
           cp -r /tmp/calvin-test /home/calvin/calvin
           chown -R calvin:calvin /home/calvin/calvin
 
-          python3 - <<'PY'
-          from pathlib import Path
-          path = Path("scripts/setup-common.sh")
-          text = path.read_text()
-          needle = '    log "Setting up Git repository: ${repo_url} (branch: ${branch})"'
-          patch = '''    if [ -d "${target_dir}/.git" ]; then
-                  log "[CI] Target directory exists, skipping git operations"
-                  chown -R "${user}:${user}" "${target_dir}"
-                  return 0
-              fi
-          '''
-          path.write_text(text.replace(needle, patch + "\\n" + needle))
+          mkdir -p /tmp/calvin-ci-image
+          cat > /tmp/calvin-ci-image/server.py <<'PY'
+          from http.server import BaseHTTPRequestHandler, HTTPServer
+
+
+          class Handler(BaseHTTPRequestHandler):
+              def do_GET(self):
+                  if self.path == "/api/health":
+                      body = b'{"status":"healthy"}'
+                      self.send_response(200)
+                      self.send_header("Content-Type", "application/json")
+                      self.send_header("Content-Length", str(len(body)))
+                      self.end_headers()
+                      self.wfile.write(body)
+                  else:
+                      self.send_response(404)
+                      self.end_headers()
+
+
+          HTTPServer(("0.0.0.0", 8000), Handler).serve_forever()
           PY
+          cat > /tmp/calvin-ci-image/Dockerfile <<'DOCKERFILE'
+          FROM debian:sid-slim
+          RUN apt-get update -qq && apt-get install -y -qq python3 curl ca-certificates && rm -rf /var/lib/apt/lists/*
+          COPY server.py /server.py
+          EXPOSE 8000
+          CMD ["python3", "/server.py"]
+          DOCKERFILE
+          docker build -q -t ghcr.io/osterbergsimon/calvin:latest /tmp/calvin-ci-image
 
           bash scripts/setup.sh --mode prod
 
           test -f /etc/calvin/docker-compose.yml
-          test -f /etc/deploy/calvin.env
+          test -f /etc/calvin/.env
           test -d /var/lib/calvin/db
           test -d /var/lib/calvin/images
           test -d /var/lib/calvin/plugins
@@ -141,6 +160,9 @@ jobs:
               set -euo pipefail
               export DEBIAN_FRONTEND=noninteractive
               apt-get update -qq
-              apt-get install -y -qq curl git sudo bash python3 ca-certificates sed systemd systemd-sysv dbus docker.io docker-compose-plugin
+              apt-get install -y -qq curl git sudo bash python3 ca-certificates sed systemd systemd-sysv dbus docker.io
+              docker compose version >/dev/null 2>&1 || apt-get install -y -qq docker-compose-plugin || true
+              docker compose version >/dev/null 2>&1 || apt-get install -y -qq docker-compose-v2 || true
+              docker compose version >/dev/null 2>&1 || command -v docker-compose >/dev/null 2>&1 || apt-get install -y -qq docker-compose
               bash /tmp/ci-test-setup-prod.sh
             "

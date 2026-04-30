@@ -27,7 +27,11 @@ if [ -f "./setup-common.sh" ]; then
 fi
 
 if [ -z "${COMMON_SCRIPT}" ] && [ -n "${BASH_VERSION:-}" ]; then
-    _script_dir=$(bash -c 'if [ -n "${BASH_SOURCE[0]:-}" ] && [ "${BASH_SOURCE[0]}" != "-" ]; then cd "$(dirname "${BASH_SOURCE[0]}")" && pwd; fi' 2>/dev/null || echo "")
+    _script_source="${BASH_SOURCE[0]:-}"
+    _script_dir=""
+    if [ -n "${_script_source}" ] && [ "${_script_source}" != "-" ]; then
+        _script_dir=$(cd "$(dirname "${_script_source}")" && pwd 2>/dev/null || echo "")
+    fi
     if [ -n "${_script_dir}" ] && [ -f "${_script_dir}/setup-common.sh" ]; then
         COMMON_SCRIPT="${_script_dir}/setup-common.sh"
     fi
@@ -117,14 +121,36 @@ parse_args() {
 
 install_docker_runtime() {
     log "Installing Docker runtime..."
-    install_system_packages docker.io docker-compose-plugin
+    install_system_packages docker.io
+
+    if ! docker compose version >/dev/null 2>&1; then
+        install_system_packages docker-compose-plugin
+    fi
+
+    if ! docker compose version >/dev/null 2>&1; then
+        install_system_packages docker-compose-v2
+    fi
+
+    if ! docker compose version >/dev/null 2>&1 && ! command -v docker-compose >/dev/null 2>&1; then
+        install_system_packages docker-compose
+    fi
 
     systemctl enable docker || log_warn "Failed to enable docker.service"
     systemctl start docker || log_warn "Failed to start docker.service"
     usermod -aG docker "${CALVIN_USER}" || log_warn "Failed to add ${CALVIN_USER} to docker group"
 
-    if ! docker compose version >/dev/null 2>&1; then
-        error_exit "Docker Compose plugin is not available after installation" 1
+    if ! compose version >/dev/null 2>&1; then
+        error_exit "Docker Compose is not available after installation" 1
+    fi
+}
+
+compose() {
+    if docker compose version >/dev/null 2>&1; then
+        docker compose "$@"
+    elif command -v docker-compose >/dev/null 2>&1; then
+        docker-compose "$@"
+    else
+        return 127
     fi
 }
 
@@ -167,7 +193,7 @@ install_compose_config() {
         upsert_env_value /etc/calvin/.env CALVIN_REPO_DIR "${CALVIN_DIR}"
     fi
 
-    if ! docker compose -f /etc/calvin/docker-compose.yml config >/dev/null; then
+    if ! compose -f /etc/calvin/docker-compose.yml config >/dev/null; then
         error_exit "Installed Docker Compose configuration is invalid" 1
     fi
 }
@@ -215,7 +241,7 @@ start_runtime_services() {
         start_systemd_service "calvin-kiosk.service"
     else
         log_warn "systemd is not running; starting Docker Compose stack directly"
-        docker compose -f /etc/calvin/docker-compose.yml up -d
+        compose -f /etc/calvin/docker-compose.yml up -d
     fi
 }
 
@@ -226,7 +252,7 @@ verify_compose_runtime() {
     verify_file "/etc/calvin/docker-compose.yml"
     verify_file "/etc/calvin/.env"
 
-    if ! docker compose -f /etc/calvin/docker-compose.yml ps >/dev/null; then
+    if ! compose -f /etc/calvin/docker-compose.yml ps >/dev/null; then
         log_warn "Docker Compose stack is not queryable yet"
     fi
 
