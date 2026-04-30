@@ -64,7 +64,7 @@ jobs:
         run: |
           echo "Validating setup-common.sh..."
           source scripts/setup-common.sh || true
-          REQUIRED_FUNCTIONS=("ensure_uv_installed" "install_backend_deps" "install_frontend_deps" "ensure_user_exists" "create_data_directories")
+          REQUIRED_FUNCTIONS=("ensure_user_exists" "ensure_git_repo" "install_system_packages" "install_systemd_service")
           MISSING_FUNCTIONS=()
           for func in "${REQUIRED_FUNCTIONS[@]}"; do
             if ! declare -f "$func" > /dev/null; then
@@ -148,9 +148,7 @@ jobs:
           echo "Frontend dependencies installed successfully ✓"
           echo "::endgroup::"
 
-  # Note: Full setup script testing is now in separate workflows:
-  # - setup-validation-prod.yml (for setup.sh - production setup)
-  # - setup-validation-dev.yml (for setup-dev.sh - development setup)
+  # Note: Full setup script testing is in setup-validation-prod.yml.
 
   validate-windows-setup:
     name: Validate Windows Setup Script

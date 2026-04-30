@@ -1,10 +1,8 @@
 [Unit]
-Description=Calvin Dashboard Frontend (Kiosk Mode)
-After=network.target calvin-backend.service
-Requires=calvin-backend.service
-Wants=graphical.target
-# Start after X server is available (via .bash_profile on tty1)
-# The service will wait for X server in ExecStartPre
+Description=Calvin Dashboard Kiosk
+After=network.target calvin-app.service calvin-x.service
+Requires=calvin-app.service
+Wants=graphical.target calvin-x.service
 
 [Service]
 Type=simple
@@ -13,16 +11,13 @@ Group=calvin
 Environment="DISPLAY=:0"
 Environment="HOME=/home/calvin"
 Environment="XAUTHORITY=/home/calvin/.Xauthority"
-# Wait for backend to be ready (with timeout)
-ExecStartPre=/bin/bash -c 'timeout=60; elapsed=0; until curl -s http://localhost:8000/api/health > /dev/null 2>&1; do if [ $elapsed -ge $timeout ]; then echo "Backend not ready after $timeout seconds"; exit 1; fi; sleep 1; elapsed=$((elapsed+1)); done'
-# Wait for X server to be available (with timeout to prevent infinite wait)
+# 240s health wait — generous enough for first boot on a Pi 3B+ when
+# the runtime image still has to be pulled from GHCR.
+ExecStartPre=/bin/bash -c 'timeout=240; elapsed=0; until curl -s http://localhost:8000/api/health > /dev/null 2>&1; do if [ $elapsed -ge $timeout ]; then echo "Calvin app not ready after $timeout seconds"; exit 1; fi; sleep 1; elapsed=$((elapsed+1)); done'
 ExecStartPre=/bin/bash -c 'timeout=60; elapsed=0; until [ -S /tmp/.X11-unix/X0 ] || pgrep -x Xorg > /dev/null 2>&1; do if [ $elapsed -ge $timeout ]; then echo "X server not available after $timeout seconds"; exit 1; fi; sleep 1; elapsed=$((elapsed+1)); done'
-# Small delay to ensure X is fully ready
 ExecStartPre=/bin/sleep 2
-# Kill any existing Chromium processes to prevent "Opening in existing browser session" error
 ExecStartPre=/bin/bash -c 'pkill -u calvin chromium || pkill -u calvin chromium-browser || true'
 ExecStartPre=/bin/sleep 1
-# Clear Chromium cache before starting to ensure fresh files are loaded
 ExecStartPre=/bin/bash -c 'rm -rf /home/calvin/.cache/chromium/Default/Cache/* "/home/calvin/.cache/chromium/Default/Code Cache"/* 2>/dev/null || true'
 ExecStart=/usr/bin/chromium \
     --kiosk \
@@ -63,8 +58,7 @@ Restart=always
 RestartSec=10
 StandardOutput=journal
 StandardError=journal
-SyslogIdentifier=calvin-frontend
+SyslogIdentifier=calvin-kiosk
 
 [Install]
 WantedBy=multi-user.target
-

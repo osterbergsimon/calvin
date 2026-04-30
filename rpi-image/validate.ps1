@@ -46,7 +46,7 @@ function Test-BashScript {
     }
     
     # Check for shebang
-    if ($content -notmatch '^#!/bin/bash') {
+    if ($content -notmatch '^#!/(bin/bash|usr/bin/env bash)') {
         $issues += "Missing or incorrect shebang"
     }
     
@@ -151,8 +151,11 @@ function Test-SystemdService {
         $issues += "Missing ExecStart directive"
     }
     
-    # Check for User directive
-    if ($content -notmatch 'User=') {
+    $serviceName = Split-Path -Leaf $Path
+    $rootAllowedServices = @("calvin-app.service", "calvin-update.service")
+
+    # Check for User directive unless the service intentionally needs root
+    if ($content -notmatch 'User=' -and $rootAllowedServices -notcontains $serviceName) {
         $issues += "Missing User directive (security concern)"
     }
     
@@ -232,10 +235,9 @@ $ProjectRoot = Split-Path -Parent $ScriptDir
 Write-Host "Testing file structure..." -ForegroundColor Yellow
 Test-PathExists "$ScriptDir\first-boot\setup.sh" "Production setup script"
 Test-PathExists "$ScriptDir\first-boot\setup-dev.sh" "Development setup script"
-Test-PathExists "$ScriptDir\cloud-init\user-data.yml" "Production cloud-init config"
-Test-PathExists "$ScriptDir\cloud-init\user-data-dev.yml" "Development cloud-init config"
-Test-PathExists "$ScriptDir\systemd\calvin-backend.service" "Backend service file"
-Test-PathExists "$ScriptDir\systemd\calvin-frontend.service" "Frontend service file"
+Test-PathExists "$ScriptDir\systemd\calvin-app.service" "Compose app service file"
+Test-PathExists "$ScriptDir\systemd\calvin-kiosk.service" "Kiosk service file"
+Test-PathExists "$ScriptDir\systemd\calvin-x.service" "X service file"
 Test-PathExists "$ScriptDir\systemd\calvin-update.service" "Update service file"
 Test-PathExists "$ScriptDir\systemd\calvin-update.timer" "Update timer file"
 Test-PathExists "$ProjectRoot\scripts\update-calvin.sh" "Update script"
@@ -248,16 +250,11 @@ Test-BashScript "$ScriptDir\first-boot\setup-dev.sh"
 Test-BashScript "$ProjectRoot\scripts\update-calvin.sh"
 Write-Host ""
 
-# Test YAML files
-Write-Host "Testing YAML files..." -ForegroundColor Yellow
-Test-YamlFile "$ScriptDir\cloud-init\user-data.yml"
-Test-YamlFile "$ScriptDir\cloud-init\user-data-dev.yml"
-Write-Host ""
-
 # Test systemd files
 Write-Host "Testing systemd service files..." -ForegroundColor Yellow
-Test-SystemdService "$ScriptDir\systemd\calvin-backend.service"
-Test-SystemdService "$ScriptDir\systemd\calvin-frontend.service"
+Test-SystemdService "$ScriptDir\systemd\calvin-app.service"
+Test-SystemdService "$ScriptDir\systemd\calvin-kiosk.service"
+Test-SystemdService "$ScriptDir\systemd\calvin-x.service"
 Test-SystemdService "$ScriptDir\systemd\calvin-update.service"
 Test-SystemdTimer "$ScriptDir\systemd\calvin-update.timer"
 Write-Host ""

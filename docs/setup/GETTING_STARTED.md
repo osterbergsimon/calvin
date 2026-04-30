@@ -131,19 +131,17 @@ For development with hot-reload on Raspberry Pi:
 
 ```bash
 # Development installation with hot-reload
-wget -O- https://raw.githubusercontent.com/osterbergsimon/calvin/main/scripts/setup-dev.sh | sudo bash
+wget -O- https://raw.githubusercontent.com/osterbergsimon/calvin/main/scripts/setup.sh | sudo bash -s -- --mode dev
 
 # Or using curl
-curl -fsSL https://raw.githubusercontent.com/osterbergsimon/calvin/main/scripts/setup-dev.sh | sudo bash
+curl -fsSL https://raw.githubusercontent.com/osterbergsimon/calvin/main/scripts/setup.sh | sudo bash -s -- --mode dev
 ```
 
 **What it does:**
-- Everything from production setup, plus:
-- Creates 4GB swap file (for Pi 3B+ with limited RAM)
-- Uses venv for backend (more stable on Pi 3B+)
-- Installs dev dependencies
-- Configures hot-reload for both backend and frontend
-- Frontend dev server runs on port 5173
+- Installs the Docker Compose dev configuration
+- Bind-mounts the checkout into the app container
+- Runs backend and frontend with hot reload
+- Keeps the kiosk pointed at `http://localhost:8000`
 
 **After setup:**
 ```bash
@@ -151,9 +149,8 @@ sudo reboot
 ```
 
 After reboot:
-- Backend runs with hot-reload (code changes auto-reload)
-- Frontend runs with hot-reload (Vite dev server on port 5173)
-- Dashboard available at `http://localhost:5173`
+- Docker Compose runs the hot-reload dev stack
+- Dashboard available at `http://localhost:8000`
 
 #### Using Different Branches
 
@@ -164,7 +161,7 @@ wget -O- https://raw.githubusercontent.com/osterbergsimon/calvin/main/scripts/se
 
 # Development setup with develop branch
 export GIT_BRANCH=develop
-curl -fsSL https://raw.githubusercontent.com/osterbergsimon/calvin/main/scripts/setup-dev.sh | sudo -E bash
+curl -fsSL https://raw.githubusercontent.com/osterbergsimon/calvin/main/scripts/setup.sh | sudo -E bash -s -- --mode dev
 ```
 
 > **Note:** Use `sudo -E` to preserve environment variables. Without `-E`, `sudo` will not pass `GIT_BRANCH` or `GIT_REPO` to the script, and it will default to the `main` branch.
@@ -213,7 +210,7 @@ cd frontend
 npm run dev
 ```
 
-**Note:** The `scripts/setup.sh` and `scripts/setup-dev.sh` scripts are for **Raspberry Pi deployment** (require root, set up systemd services). For Linux development, use the Makefile or manual commands above.
+**Note:** The `scripts/setup.sh` script is for **Raspberry Pi deployment** (requires root, Docker, and systemd services). For Linux development, use the Makefile, Docker Compose dev file, or manual commands above.
 
 For more details, see [Linux Setup Guide](SETUP_LINUX.md) or [Setup Scripts Documentation](SETUP_SCRIPTS.md).
 
@@ -224,8 +221,8 @@ Docker provides a consistent, isolated environment for both development and prod
 ### Development Mode (Hot-Reload)
 
 ```bash
-# From project root
-cp deploy/calvin.env.example deploy/calvin.env
+# From project root, one-time setup:
+cp deploy/calvin.env.example docker/.env
 docker compose -f docker/docker-compose.dev.yml up
 ```
 
@@ -242,9 +239,9 @@ docker compose -f docker/docker-compose.dev.yml up
 ### Production Mode
 
 ```bash
-# From project root
-cp deploy/calvin.env.example deploy/calvin.env
-# edit deploy/calvin.env
+# From project root, one-time setup:
+cp deploy/calvin.env.example docker/.env
+# edit docker/.env
 docker compose -f docker/docker-compose.yml up -d
 ```
 
@@ -343,12 +340,12 @@ newgrp docker
 
 ```bash
 # Check service status
-sudo systemctl status calvin-backend
-sudo systemctl status calvin-frontend
+sudo systemctl status calvin-app
+sudo systemctl status calvin-kiosk
 
 # Check logs
-sudo journalctl -u calvin-backend -n 50
-sudo journalctl -u calvin-frontend -n 50
+sudo journalctl -u calvin-app -n 50
+sudo journalctl -u calvin-kiosk -n 50
 ```
 
 ### Getting Help

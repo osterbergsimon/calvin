@@ -1,38 +1,16 @@
 #!/bin/bash
-# Calvin Dashboard - Production Setup Script
-# This script can be run via: wget -O- https://raw.githubusercontent.com/osterbergsimon/calvin/main/scripts/setup.sh | sudo bash
-# Or: curl -fsSL https://raw.githubusercontent.com/osterbergsimon/calvin/main/scripts/setup.sh | sudo bash
+# Calvin Dashboard - Raspberry Pi setup.
 #
-# To use a different branch, set GIT_BRANCH environment variable:
-#   export GIT_BRANCH=develop
-#   wget -O- https://raw.githubusercontent.com/osterbergsimon/calvin/main/scripts/setup.sh | sudo -E bash
-#   # Or with curl:
-#   curl -fsSL https://raw.githubusercontent.com/osterbergsimon/calvin/main/scripts/setup.sh | sudo -E bash
-#
-# Note: Use 'sudo -E' to preserve environment variables. Without -E, sudo will not
-# pass GIT_BRANCH or GIT_REPO to the script.
-# IMPORTANT: Export the variable first (export GIT_BRANCH=develop) rather than
-# setting it inline (GIT_BRANCH=develop wget ...), as inline assignments don't
-# propagate through pipes to sudo.
-#
-# To use a different repository:
-#   export GIT_REPO=https://github.com/yourusername/calvin.git
-#   export GIT_BRANCH=develop
-#   wget -O- ... | sudo -E bash
+# Installs the kiosk dependencies plus Docker, then runs Calvin through
+# docker compose. Use --mode prod for the published runtime image or
+# --mode dev for the hot-reload compose stack.
 
 set -euo pipefail
 
-# Read GIT_BRANCH and GIT_REPO from environment early (before any defaults)
-# This ensures they're preserved when the script is piped through sudo
-# Also check /etc/default/calvin-update as fallback (for reinstall scenarios)
-# Environment variables take precedence over config file
 _ENV_GIT_BRANCH="${GIT_BRANCH:-}"
 _ENV_GIT_REPO="${GIT_REPO:-}"
 
-# If environment variables are not set, check /etc/default/calvin-update
 if [ -z "${_ENV_GIT_BRANCH}" ] && [ -f /etc/default/calvin-update ]; then
-    # Source the config file in a subshell to avoid polluting environment
-    # Extract just the values we need
     _CONFIG_BRANCH=$(grep "^GIT_BRANCH=" /etc/default/calvin-update 2>/dev/null | cut -d'=' -f2- | tr -d '"' | tr -d "'" || echo "")
     _CONFIG_REPO=$(grep "^GIT_REPO=" /etc/default/calvin-update 2>/dev/null | cut -d'=' -f2- | tr -d '"' | tr -d "'" || echo "")
     if [ -n "${_CONFIG_BRANCH}" ]; then
@@ -43,108 +21,240 @@ if [ -z "${_ENV_GIT_BRANCH}" ] && [ -f /etc/default/calvin-update ]; then
     fi
 fi
 
-# Try to find setup-common.sh locally first
-# If not found, download it from GitHub (works when running from pipe or when file is missing)
 COMMON_SCRIPT=""
-
-# Check current directory first (most common case when running locally)
 if [ -f "./setup-common.sh" ]; then
     COMMON_SCRIPT="./setup-common.sh"
 fi
 
-# If running with bash, also check script's directory (avoid BASH_SOURCE syntax in sh)
 if [ -z "${COMMON_SCRIPT}" ] && [ -n "${BASH_VERSION:-}" ]; then
-    # Use bash to safely get script directory without causing errors in sh
     _script_dir=$(bash -c 'if [ -n "${BASH_SOURCE[0]:-}" ] && [ "${BASH_SOURCE[0]}" != "-" ]; then cd "$(dirname "${BASH_SOURCE[0]}")" && pwd; fi' 2>/dev/null || echo "")
     if [ -n "${_script_dir}" ] && [ -f "${_script_dir}/setup-common.sh" ]; then
         COMMON_SCRIPT="${_script_dir}/setup-common.sh"
     fi
 fi
 
-# If we found setup-common.sh locally, source it (use . for POSIX compatibility)
 if [ -n "${COMMON_SCRIPT}" ] && [ -f "${COMMON_SCRIPT}" ]; then
     . "${COMMON_SCRIPT}"
 else
-    # Not found locally - download from GitHub
     echo "Downloading setup-common.sh from GitHub..." >&2
-    
-    # Create temp directory for download
     TEMP_DIR="$(mktemp -d)"
     trap "rm -rf '${TEMP_DIR}'" EXIT 2>/dev/null || true
-    
-    # Determine GitHub URL from environment or defaults
-    # Use the environment variable if it was set, otherwise use defaults
+
     GIT_REPO="${_ENV_GIT_REPO:-${GIT_REPO:-https://github.com/osterbergsimon/calvin.git}}"
     GIT_BRANCH="${_ENV_GIT_BRANCH:-${GIT_BRANCH:-main}}"
-    
-    # Extract repo owner and name from git URL
     repo_owner=$(echo "${GIT_REPO}" | sed -E 's|.*github\.com[:/]([^/]+)/([^/]+)(\.git)?$|\1|')
     repo_name=$(echo "${GIT_REPO}" | sed -E 's|.*github\.com[:/]([^/]+)/([^/]+)(\.git)?$|\2|' | sed 's|\.git$||')
-    
+
     if [ -z "${repo_owner}" ] || [ -z "${repo_name}" ]; then
         echo "Error: Could not extract repo owner/name from ${GIT_REPO}" >&2
         exit 1
     fi
-    
-    # Download setup-common.sh from raw.githubusercontent.com
+
     common_url="https://raw.githubusercontent.com/${repo_owner}/${repo_name}/${GIT_BRANCH}/scripts/setup-common.sh"
     if command -v curl &> /dev/null; then
-        if ! curl -fsSL -o "${TEMP_DIR}/setup-common.sh" "${common_url}"; then
+        curl -fsSL -o "${TEMP_DIR}/setup-common.sh" "${common_url}" || {
             echo "Error: Failed to download setup-common.sh from ${common_url}" >&2
             exit 1
-        fi
+        }
     elif command -v wget &> /dev/null; then
-        if ! wget -q -O "${TEMP_DIR}/setup-common.sh" "${common_url}"; then
+        wget -q -O "${TEMP_DIR}/setup-common.sh" "${common_url}" || {
             echo "Error: Failed to download setup-common.sh from ${common_url}" >&2
             exit 1
-        fi
+        }
     else
         echo "Error: Neither curl nor wget is available. Please install one of them." >&2
         exit 1
     fi
-    
+
     . "${TEMP_DIR}/setup-common.sh"
 fi
 
-# Configuration (can be overridden by environment variables)
-# Use the environment variable if it was set at the start, otherwise use defaults
 GIT_REPO="${_ENV_GIT_REPO:-${GIT_REPO:-$DEFAULT_GIT_REPO}}"
 GIT_BRANCH="${_ENV_GIT_BRANCH:-${GIT_BRANCH:-$DEFAULT_GIT_BRANCH}}"
 CALVIN_DIR="${CALVIN_DIR:-$DEFAULT_CALVIN_DIR}"
 CALVIN_USER="${CALVIN_USER:-$DEFAULT_CALVIN_USER}"
 LOG_FILE="${LOG_FILE:-$DEFAULT_LOG_FILE}"
+CALVIN_DATA_DIR="${CALVIN_DATA_DIR:-/var/lib/calvin}"
+SETUP_MODE="prod"
 
-# Main setup function
+usage() {
+    cat <<EOF
+Usage: setup.sh [--mode prod|dev]
+
+Environment overrides:
+  GIT_REPO, GIT_BRANCH, CALVIN_DIR, CALVIN_USER, CALVIN_DATA_DIR
+EOF
+}
+
+parse_args() {
+    while [ "$#" -gt 0 ]; do
+        case "$1" in
+            --mode)
+                SETUP_MODE="${2:-}"
+                shift 2
+                ;;
+            --mode=*)
+                SETUP_MODE="${1#*=}"
+                shift
+                ;;
+            -h|--help)
+                usage
+                exit 0
+                ;;
+            *)
+                echo "Unknown argument: $1" >&2
+                usage >&2
+                exit 1
+                ;;
+        esac
+    done
+
+    if [ "${SETUP_MODE}" != "prod" ] && [ "${SETUP_MODE}" != "dev" ]; then
+        echo "Invalid mode: ${SETUP_MODE}. Expected prod or dev." >&2
+        exit 1
+    fi
+}
+
+install_docker_runtime() {
+    log "Installing Docker runtime..."
+    install_system_packages docker.io docker-compose-plugin
+
+    systemctl enable docker || log_warn "Failed to enable docker.service"
+    systemctl start docker || log_warn "Failed to start docker.service"
+    usermod -aG docker "${CALVIN_USER}" || log_warn "Failed to add ${CALVIN_USER} to docker group"
+
+    if ! docker compose version >/dev/null 2>&1; then
+        error_exit "Docker Compose plugin is not available after installation" 1
+    fi
+}
+
+create_runtime_data_dirs() {
+    log "Creating Calvin runtime data directories under ${CALVIN_DATA_DIR}..."
+    mkdir -p \
+        "${CALVIN_DATA_DIR}/db" \
+        "${CALVIN_DATA_DIR}/images" \
+        "${CALVIN_DATA_DIR}/plugins" \
+        "${CALVIN_DATA_DIR}/logs"
+    chown -R "${CALVIN_USER}:${CALVIN_USER}" "${CALVIN_DATA_DIR}"
+    chmod -R 755 "${CALVIN_DATA_DIR}"
+}
+
+install_compose_config() {
+    local mode="$1"
+    local source_compose="${CALVIN_DIR}/docker/docker-compose.yml"
+
+    if [ "${mode}" = "dev" ]; then
+        source_compose="${CALVIN_DIR}/docker/docker-compose.dev.yml"
+    fi
+
+    # Production layout: both files live in /etc/calvin/. Compose
+    # auto-loads /etc/calvin/.env when invoked with
+    # `-f /etc/calvin/docker-compose.yml` — no env_file directive,
+    # no path rewriting needed.
+    log "Installing ${mode} compose configuration..."
+    mkdir -p /etc/calvin
+    install -m 0644 "${source_compose}" /etc/calvin/docker-compose.yml
+
+    if [ ! -f /etc/calvin/.env ]; then
+        install -m 0640 "${CALVIN_DIR}/deploy/calvin.env.example" /etc/calvin/.env
+    fi
+
+    upsert_env_value /etc/calvin/.env CALVIN_DATA_DIR "${CALVIN_DATA_DIR}"
+    if [ "${mode}" = "dev" ]; then
+        # Dev compose bind-mounts the source tree at /app. Point it at
+        # the actual checkout so the compose file can run from
+        # /etc/calvin/ instead of the repo's docker/ dir.
+        upsert_env_value /etc/calvin/.env CALVIN_REPO_DIR "${CALVIN_DIR}"
+    fi
+
+    if ! docker compose -f /etc/calvin/docker-compose.yml config >/dev/null; then
+        error_exit "Installed Docker Compose configuration is invalid" 1
+    fi
+}
+
+disable_legacy_services() {
+    log "Disabling legacy native runtime services if present..."
+    for service in \
+        calvin-backend.service \
+        calvin-frontend.service \
+        calvin-frontend-dev.service; do
+        if systemctl list-unit-files | grep -q "^${service}"; then
+            systemctl stop "${service}" 2>/dev/null || true
+            systemctl disable "${service}" 2>/dev/null || true
+        fi
+        rm -f "/etc/systemd/system/${service}"
+    done
+    systemctl daemon-reload 2>/dev/null || true
+}
+
+systemd_available() {
+    [ -d /run/systemd/system ] && systemctl list-unit-files >/dev/null 2>&1
+}
+
+install_runtime_services() {
+    log "Installing systemd services..."
+    install_systemd_service "${CALVIN_DIR}/rpi-image/systemd/calvin-app.service" "${CALVIN_DIR}"
+    install_systemd_service "${CALVIN_DIR}/rpi-image/systemd/calvin-x.service" "${CALVIN_DIR}"
+    install_systemd_service "${CALVIN_DIR}/rpi-image/systemd/calvin-kiosk.service" "${CALVIN_DIR}"
+
+    if systemd_available; then
+        enable_systemd_service "calvin-app.service"
+        enable_systemd_service "calvin-x.service"
+        enable_systemd_service "calvin-kiosk.service"
+    else
+        log_warn "systemd is not running; installed service files but skipped enable"
+    fi
+}
+
+start_runtime_services() {
+    log "Starting Calvin runtime services..."
+    if systemd_available; then
+        start_systemd_service "calvin-app.service"
+        start_systemd_service "calvin-x.service"
+        sleep 3
+        start_systemd_service "calvin-kiosk.service"
+    else
+        log_warn "systemd is not running; starting Docker Compose stack directly"
+        docker compose -f /etc/calvin/docker-compose.yml up -d
+    fi
+}
+
+verify_compose_runtime() {
+    log "Verifying Docker Compose runtime..."
+    verify_directory "${CALVIN_DIR}"
+    verify_directory "${CALVIN_DATA_DIR}"
+    verify_file "/etc/calvin/docker-compose.yml"
+    verify_file "/etc/calvin/.env"
+
+    if ! docker compose -f /etc/calvin/docker-compose.yml ps >/dev/null; then
+        log_warn "Docker Compose stack is not queryable yet"
+    fi
+
+    log "Setup verification complete"
+}
+
 main() {
+    parse_args "$@"
+
     log "=========================================="
-    log "Calvin Production Setup"
+    log "Calvin Raspberry Pi Setup"
     log "=========================================="
+    log "Mode: ${SETUP_MODE}"
     log "Repository: ${GIT_REPO}"
     log "Branch: ${GIT_BRANCH}"
     log "Target Directory: ${CALVIN_DIR}"
+    log "Data Directory: ${CALVIN_DATA_DIR}"
     log "User: ${CALVIN_USER}"
     log ""
-    
-    # Check prerequisites
+
     check_root
-    
-    # Create log directory
     mkdir -p "$(dirname "${LOG_FILE}")"
-    
-    # Step 1: Ensure user exists
+
     ensure_user_exists "${CALVIN_USER}"
-    
-    # Step 2: Update system packages
     update_system_packages
-    
-    # Step 3: Install system dependencies
-    log "Installing system dependencies..."
+
+    log "Installing kiosk and system dependencies..."
     install_system_packages \
-        python3 \
-        python3-dev \
-        python3-venv \
-        python3-pip \
-        build-essential \
         curl \
         git \
         xserver-xorg \
@@ -155,110 +265,58 @@ main() {
         xdotool \
         x11-xserver-utils \
         cron
-    
-    # Step 4: Install UV
-    ensure_uv_installed "${CALVIN_USER}"
-    
-    # Step 5: Setup Git repository (needed before we can check for pre-built frontend)
+
+    install_docker_runtime
     ensure_git_repo "${GIT_REPO}" "${GIT_BRANCH}" "${CALVIN_DIR}" "${CALVIN_USER}"
-    
-    # Step 6: Install backend dependencies (production with linux extra for evdev)
-    install_backend_deps "${CALVIN_DIR}" "${CALVIN_USER}" "linux" false
-    
-    # Step 7: Try to download pre-built frontend, fallback to building
-    local frontend_prebuilt=false
-    if download_prebuilt_frontend "${CALVIN_DIR}" "${CALVIN_USER}" "${GIT_REPO}" "${GIT_BRANCH}"; then
-        frontend_prebuilt=true
-        log "Using pre-built frontend - skipping Node.js installation and build"
-    else
-        log_warn "Pre-built frontend not available (CI/CD may not have completed or build failed)"
-        log_warn "Falling back to building on target machine (requires Node.js)"
-        
-        # Step 7a: Install Node.js (only needed if building)
-        ensure_nodejs_installed 20
-        
-        # Step 7b: Install frontend dependencies (need all dependencies including dev for build)
-        install_frontend_deps "${CALVIN_DIR}" "${CALVIN_USER}" false
-        
-        # Step 7c: Build frontend
-        build_frontend "${CALVIN_DIR}" "${CALVIN_USER}"
-    fi
-    
-    # Step 8: Create data directories
-    create_data_directories "${CALVIN_DIR}" "${CALVIN_USER}"
-    
-    # Step 9: Install utility scripts
+    create_runtime_data_dirs
+    install_compose_config "${SETUP_MODE}"
+
     install_script "${CALVIN_DIR}/scripts/update-calvin.sh" "/usr/local/bin/update-calvin.sh" "${CALVIN_USER}"
-    
+
     if [ -f "${CALVIN_DIR}/scripts/reboot-calvin.sh" ]; then
         install_privileged_sudo_helper_script "${CALVIN_DIR}/scripts/reboot-calvin.sh" "/usr/local/bin/reboot-calvin.sh"
-        # Configure sudoers for reboot script
         log "Configuring sudoers for reboot script..."
         echo "${CALVIN_USER} ALL=(root) NOPASSWD: /usr/local/bin/reboot-calvin.sh" > /etc/sudoers.d/calvin-reboot
         chmod 0440 /etc/sudoers.d/calvin-reboot
     fi
-    
+
     if [ -f "${CALVIN_DIR}/scripts/restart-calvin-services.sh" ]; then
         install_privileged_sudo_helper_script "${CALVIN_DIR}/scripts/restart-calvin-services.sh" "/usr/local/bin/restart-calvin-services.sh"
-        # Configure sudoers for restart script
         log "Configuring sudoers for restart script..."
         echo "${CALVIN_USER} ALL=(root) NOPASSWD: /usr/local/bin/restart-calvin-services.sh" > /etc/sudoers.d/calvin-restart
         chmod 0440 /etc/sudoers.d/calvin-restart
     fi
-    
-    # Step 10: Configure polkit
+
     configure_polkit_reboot "${CALVIN_USER}"
-    
-    # Step 11: Create update configuration
-    create_update_config "${GIT_REPO}" "${GIT_BRANCH}" "${CALVIN_DIR}"
-    
-    # Step 12: Install systemd services
-    log "Installing systemd services..."
-    install_systemd_service "${CALVIN_DIR}/rpi-image/systemd/calvin-backend.service" "${CALVIN_DIR}"
-    install_systemd_service "${CALVIN_DIR}/rpi-image/systemd/calvin-frontend.service" "${CALVIN_DIR}"
-    
-    # Step 13: Enable and start services
-    enable_systemd_service "calvin-backend.service"
-    enable_systemd_service "calvin-frontend.service"
-    
-    log "Starting services..."
-    start_systemd_service "calvin-backend.service"
-    sleep 5  # Wait for backend to start
-    start_systemd_service "calvin-frontend.service"
-    
-    # Step 14: Configure display
+    create_update_config "${GIT_REPO}" "${GIT_BRANCH}" "${CALVIN_DIR}" "${SETUP_MODE}"
     configure_display "${CALVIN_USER}"
-    
-    # Step 15: Configure Openbox autostart (production mode - port 8000)
-    # Don't start Chromium in autostart since systemd service handles it
     configure_openbox_autostart "${CALVIN_USER}" "http://localhost:8000" "false"
-    
-    # Step 16: Verify setup
-    verify_setup "${CALVIN_DIR}" "${CALVIN_USER}"
-    
-    # Final summary
+
+    disable_legacy_services
+    install_runtime_services
+    start_runtime_services
+    verify_compose_runtime
+
     log ""
     log "=========================================="
-    log "Calvin Production Setup Complete!"
+    log "Calvin Raspberry Pi Setup Complete!"
     log "=========================================="
-    log "Repository: ${GIT_REPO}"
-    log "Branch: ${GIT_BRANCH} (saved to /etc/default/calvin-update)"
-    log "Installation Directory: ${CALVIN_DIR}"
-    log "User: ${CALVIN_USER}"
+    log "Mode: ${SETUP_MODE}"
+    log "Compose file: /etc/calvin/docker-compose.yml"
+    log "Environment file: /etc/calvin/.env"
+    log "Data directory: ${CALVIN_DATA_DIR}"
     log ""
     log "IMPORTANT: Reboot to start X and the dashboard:"
     log "  sudo reboot"
     log ""
     log "After reboot:"
-    log "  - X will start automatically on tty1"
-    log "  - Backend service will start automatically"
-    log "  - Frontend (kiosk mode) will start automatically"
-    log "  - Dashboard will be available at http://localhost:8000"
+    log "  - Docker Compose starts Calvin via calvin-app.service"
+    log "  - Kiosk mode starts via calvin-kiosk.service"
+    log "  - Dashboard is available at http://localhost:8000"
     log ""
     log "To update Calvin in the future:"
     log "  update-calvin.sh"
     log ""
 }
 
-# Run main function
 main "$@"
