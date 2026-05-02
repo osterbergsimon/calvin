@@ -18,13 +18,12 @@ fi
 CALVIN_MODE="${CALVIN_MODE:-prod}"
 REPO_DIR="${REPO_DIR:-/home/calvin/calvin}"
 GIT_BRANCH="${GIT_BRANCH:-main}"
+WAIT_TIMEOUT="${WAIT_TIMEOUT:-180}"
 
 echo "Starting Calvin update..."
 
 compose_is_dev() {
-  [[ "$CALVIN_MODE" == "dev" ]] || {
-    [[ -f "$COMPOSE_FILE" ]] && grep -q "calvin-backend-dev\|calvin-frontend-dev" "$COMPOSE_FILE"
-  }
+  [[ "$CALVIN_MODE" == "dev" ]]
 }
 
 compose() {
@@ -39,16 +38,18 @@ compose() {
 }
 
 wait_for_health() {
-  echo "==> Waiting for /api/health to come back"
-  for _ in $(seq 1 30); do
+  echo "==> Waiting up to ${WAIT_TIMEOUT}s for /api/health to come back"
+  local elapsed=0
+  while [[ $elapsed -lt $WAIT_TIMEOUT ]]; do
     if curl -fsS http://localhost:8000/api/health >/dev/null 2>&1; then
       echo "Calvin is healthy."
       return 0
     fi
     sleep 2
+    elapsed=$((elapsed + 2))
   done
 
-  echo "Calvin did not become healthy within 60s. Check logs:" >&2
+  echo "Calvin did not become healthy within ${WAIT_TIMEOUT}s. Check logs:" >&2
   echo "  docker compose -f $COMPOSE_FILE logs --tail=200" >&2
   return 1
 }
