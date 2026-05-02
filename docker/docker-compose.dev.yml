@@ -1,11 +1,17 @@
-# Calvin development compose — hot-reload backend, hot-reload frontend.
+# Calvin development compose — hot-reload backend + hot-reload frontend.
 #
-# Uses local source via bind mounts; the runtime image is rebuilt only
-# when dependencies change. Backend runs uvicorn --reload, frontend
-# runs Vite dev server with /api/* proxied to the backend.
+# Uses local source via bind mounts. Backend runs uvicorn --reload;
+# frontend runs Vite dev server with /api/* proxied to the backend.
 #
-# Usage:
-#   docker compose -f docker-compose.dev.yml up
+# CALVIN_REPO_DIR controls the bind-mounted source tree. It defaults
+# to `..` (the repo root, when run with `docker compose -f
+# docker/docker-compose.dev.yml up`). The Pi setup writes the absolute
+# repo path into the .env file so the same compose can run from
+# /etc/calvin/.
+#
+# Usage from the repo:
+#   cp deploy/calvin.env.example docker/.env       # one-time
+#   docker compose -f docker/docker-compose.dev.yml up
 
 services:
   calvin-backend:
@@ -13,16 +19,18 @@ services:
     container_name: calvin-backend-dev
     working_dir: /app/backend
     restart: unless-stopped
-    env_file:
-      - ../deploy/calvin.env
     environment:
-      - DATABASE_URL=sqlite:////var/lib/calvin/db/calvin.db
-      - IMAGE_DIR=/var/lib/calvin/images
-      - PLUGIN_DIR=/var/lib/calvin/plugins
+      DATABASE_URL: ${DATABASE_URL:-sqlite:////var/lib/calvin/db/calvin.db}
+      IMAGE_DIR: ${IMAGE_DIR:-/var/lib/calvin/images}
+      PLUGIN_DIR: ${PLUGIN_DIR:-/var/lib/calvin/plugins}
+      CORS_ORIGINS: ${CORS_ORIGINS:-http://localhost:5173,http://localhost:8000}
+      CALVIN_MODE: dev
+      REPO_DIR: /app
+      UPDATE_SCRIPT_PATH: /app/scripts/update-calvin.sh
     ports:
       - "${CALVIN_PORT:-8000}:8000"
     volumes:
-      - ..:/app
+      - "${CALVIN_REPO_DIR:-..}:/app"
       - "${CALVIN_DATA_DIR:-./.calvin-dev-data}:/var/lib/calvin"
       - calvin-dev-venv:/app/backend/.venv
     command: >
@@ -41,7 +49,7 @@ services:
     ports:
       - "5173:5173"
     volumes:
-      - ..:/app
+      - "${CALVIN_REPO_DIR:-..}:/app"
       - calvin-dev-node_modules:/app/frontend/node_modules
     command: sh -c "npm install --prefer-offline --no-audit --no-fund && npm run dev -- --host 0.0.0.0"
     depends_on:

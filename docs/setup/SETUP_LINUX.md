@@ -163,7 +163,7 @@ On Linux, full keyboard support is available via `evdev`:
 - Full keyboard support available
 
 ### Production (Raspberry Pi)
-- Use automated setup scripts: `scripts/setup.sh` (production) or `scripts/setup-dev.sh` (development)
+- Use automated setup script: `scripts/setup.sh` (`--mode prod` or `--mode dev`)
 - See [Setup Scripts Documentation](SETUP_SCRIPTS.md) for details
 - Full keyboard support available
 
@@ -176,5 +176,7 @@ wget -O- https://raw.githubusercontent.com/osterbergsimon/calvin/main/scripts/se
 
 Development (with hot reload):
 ```bash
-wget -O- https://raw.githubusercontent.com/osterbergsimon/calvin/main/scripts/setup-dev.sh | sudo bash
-```Both scripts handle the complete setup automatically. See [Setup Scripts Documentation](SETUP_SCRIPTS.md) for more information.
+wget -O- https://raw.githubusercontent.com/osterbergsimon/calvin/main/scripts/setup.sh | sudo bash -s -- --mode dev
+```
+
+The setup script handles the complete setup automatically. See [Setup Scripts Documentation](SETUP_SCRIPTS.md) for more information.

@@ -4,15 +4,28 @@
 # into the image; FastAPI serves it on the same port as the API. No
 # separate frontend container, no nginx, no rebuild-on-install.
 #
-# Reads ../deploy/calvin.env (copy from deploy/calvin.env.example).
+# Configuration comes from a `.env` file *next to this compose file*.
+# Compose auto-loads it for both YAML substitution and as the
+# container's environment. In production, copy this file plus your
+# edited .env to /etc/calvin/ and run:
+#
+#   docker compose -f /etc/calvin/docker-compose.yml up -d
+#
+# Locally during development you can run from the repo:
+#
+#   cp deploy/calvin.env.example docker/.env
+#   docker compose -f docker/docker-compose.yml up -d
 
 services:
   calvin:
     image: ghcr.io/osterbergsimon/calvin:${CALVIN_IMAGE_TAG:-latest}
     container_name: calvin
     restart: unless-stopped
-    env_file:
-      - ../deploy/calvin.env
+    environment:
+      DATABASE_URL: ${DATABASE_URL:-sqlite:////var/lib/calvin/db/calvin.db}
+      IMAGE_DIR: ${IMAGE_DIR:-/var/lib/calvin/images}
+      PLUGIN_DIR: ${PLUGIN_DIR:-/var/lib/calvin/plugins}
+      CORS_ORIGINS: ${CORS_ORIGINS:-http://localhost:8000}
     ports:
       - "${CALVIN_PORT:-8000}:8000"
     volumes:

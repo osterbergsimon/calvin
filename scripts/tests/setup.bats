@@ -1,5 +1,5 @@
 #!/usr/bin/env bats
-# Tests for setup.sh production setup script
+# Tests for setup.sh Raspberry Pi compose setup script
 
 load 'helpers/test-helpers.bash'
 
@@ -79,10 +79,39 @@ teardown() {
     run grep -q "ensure_user_exists" "${setup_script}"
     [ "$status" -eq 0 ]
     
-    run grep -q "install_backend_deps" "${setup_script}"
+    run grep -q "install_docker_runtime" "${setup_script}"
     [ "$status" -eq 0 ]
-    
-    run grep -q "install_frontend_deps" "${setup_script}"
+
+    run grep -q "install_compose_config" "${setup_script}"
+    [ "$status" -eq 0 ]
+}
+
+@test "setup.sh supports prod and dev modes" {
+    local script_dir="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
+    local setup_script="${script_dir}/setup.sh"
+
+    run grep -q -- "--mode prod|dev" "${setup_script}"
+    [ "$status" -eq 0 ]
+}
+
+@test "setup-dev.sh delegates to setup.sh dev mode" {
+    local script_dir="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
+    local setup_dev_script="${script_dir}/setup-dev.sh"
+
+    assert_file_exists "${setup_dev_script}"
+
+    run grep -q -- "--mode dev" "${setup_dev_script}"
+    [ "$status" -eq 0 ]
+}
+
+@test "setup.sh installs compose runtime services" {
+    local script_dir="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
+    local setup_script="${script_dir}/setup.sh"
+
+    run grep -q "calvin-app.service" "${setup_script}"
+    [ "$status" -eq 0 ]
+
+    run grep -q "calvin-kiosk.service" "${setup_script}"
     [ "$status" -eq 0 ]
 }
 
@@ -91,6 +120,6 @@ teardown() {
     local setup_script="${script_dir}/setup.sh"
     
     # Check for verification
-    run grep -q "verify_setup" "${setup_script}"
+    run grep -q "verify_compose_runtime" "${setup_script}"
     [ "$status" -eq 0 ]
 }

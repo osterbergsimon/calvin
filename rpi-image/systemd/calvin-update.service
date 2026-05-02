@@ -1,16 +1,15 @@
 [Unit]
 Description=Calvin Dashboard Auto-Update Service
-After=network.target calvin-backend.service
+After=network-online.target calvin-app.service
+Wants=network-online.target
 # Don't block boot if update fails
 OnFailure=calvin-update-failure.service
 # Don't require the service to succeed
 
 [Service]
 Type=oneshot
-User=calvin
-Group=calvin
-EnvironmentFile=/etc/default/calvin-update
-WorkingDirectory=/home/calvin/calvin
+EnvironmentFile=-/etc/default/calvin-update
+WorkingDirectory=/etc/calvin
 ExecStart=/usr/local/bin/update-calvin.sh
 StandardOutput=journal
 StandardError=journal
