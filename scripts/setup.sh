@@ -119,6 +119,16 @@ parse_args() {
     fi
 }
 
+compose() {
+    if docker compose version >/dev/null 2>&1; then
+        docker compose "$@"
+    elif command -v docker-compose >/dev/null 2>&1; then
+        docker-compose "$@"
+    else
+        return 127
+    fi
+}
+
 install_docker_runtime() {
     log "Installing Docker runtime..."
     install_system_packages docker.io
@@ -131,26 +141,12 @@ install_docker_runtime() {
         install_system_packages docker-compose-v2
     fi
 
-    if ! docker compose version >/dev/null 2>&1 && ! command -v docker-compose >/dev/null 2>&1; then
-        install_system_packages docker-compose
-    fi
-
     systemctl enable docker || log_warn "Failed to enable docker.service"
     systemctl start docker || log_warn "Failed to start docker.service"
     usermod -aG docker "${CALVIN_USER}" || log_warn "Failed to add ${CALVIN_USER} to docker group"
 
     if ! compose version >/dev/null 2>&1; then
         error_exit "Docker Compose is not available after installation" 1
-    fi
-}
-
-compose() {
-    if docker compose version >/dev/null 2>&1; then
-        docker compose "$@"
-    elif command -v docker-compose >/dev/null 2>&1; then
-        docker-compose "$@"
-    else
-        return 127
     fi
 }
 
@@ -182,7 +178,7 @@ install_compose_config() {
     install -m 0644 "${source_compose}" /etc/calvin/docker-compose.yml
 
     if [ ! -f /etc/calvin/.env ]; then
-        install -m 0640 "${CALVIN_DIR}/deploy/calvin.env.example" /etc/calvin/.env
+        install -g "${CALVIN_USER}" -m 0640 "${CALVIN_DIR}/deploy/calvin.env.example" /etc/calvin/.env
     fi
 
     upsert_env_value /etc/calvin/.env CALVIN_DATA_DIR "${CALVIN_DATA_DIR}"
