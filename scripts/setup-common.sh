@@ -1,6 +1,6 @@
 #!/bin/bash
 # Shared utilities for Calvin setup scripts
-# This script provides common functions used by setup.sh and setup-dev.sh
+# This script provides common functions used by setup.sh
 # Requires Python 3.12+ (see backend/pyproject.toml for exact requirements)
 
 set -euo pipefail
@@ -180,6 +180,14 @@ ensure_git_repo() {
     local branch="${2:-$DEFAULT_GIT_BRANCH}"
     local target_dir="${3:-$DEFAULT_CALVIN_DIR}"
     local user="${4:-$DEFAULT_CALVIN_USER}"
+
+    if [ "${CALVIN_SKIP_GIT_UPDATE:-}" = "1" ] || [ "${CALVIN_SKIP_GIT_UPDATE:-}" = "true" ]; then
+        log "Skipping Git repository update because CALVIN_SKIP_GIT_UPDATE is set"
+        if [ -d "${target_dir}" ]; then
+            chown -R "${user}:${user}" "${target_dir}"
+        fi
+        return 0
+    fi
     
     log "Setting up Git repository: ${repo_url} (branch: ${branch})"
     
@@ -491,17 +499,42 @@ install_privileged_sudo_helper_script() {
     log "Script installed: ${target_path} (root:root 0755)"
 }
 
+# Idempotent KEY=VALUE upsert in a `.env`-style file. Adds the line if
+# missing, replaces it if present. Skips quoting — values must already
+# be in shell-friendly form.
+upsert_env_value() {
+    local file="$1"
+    local key="$2"
+    local value="$3"
+
+    if [ ! -f "${file}" ]; then
+        printf '%s=%s\n' "${key}" "${value}" > "${file}"
+        return
+    fi
+
+    if grep -q "^${key}=" "${file}"; then
+        # Use a sed delimiter unlikely to collide with paths.
+        sed -i "s|^${key}=.*|${key}=${value}|" "${file}"
+    else
+        # Ensure file ends with a newline before appending.
+        [ -z "$(tail -c 1 "${file}" 2>/dev/null)" ] || printf '\n' >> "${file}"
+        printf '%s=%s\n' "${key}" "${value}" >> "${file}"
+    fi
+}
+
 # Configuration file creation
 create_update_config() {
     local git_repo="${1:-$DEFAULT_GIT_REPO}"
     local git_branch="${2:-$DEFAULT_GIT_BRANCH}"
     local repo_dir="${3:-$DEFAULT_CALVIN_DIR}"
+    local calvin_mode="${4:-prod}"
     
     log "Creating update configuration..."
     cat > /etc/default/calvin-update << EOF
 GIT_REPO=${git_repo}
 GIT_BRANCH=${git_branch}
 REPO_DIR=${repo_dir}
+CALVIN_MODE=${calvin_mode}
 EOF
     log "Update configuration saved to /etc/default/calvin-update"
 }
@@ -652,7 +685,7 @@ configure_openbox_autostart() {
             echo "    ${frontend_url} &"
             echo ""
         else
-            echo "# Chromium is managed by systemd service (calvin-frontend.service)"
+            echo "# Chromium is managed by systemd service (calvin-kiosk.service)"
             echo "# No need to start it here"
             echo ""
         fi
@@ -702,4 +735,3 @@ verify_setup() {
     log "Setup verification complete"
 }
 # Workflow trigger
-

@@ -5,8 +5,7 @@ This directory contains tests for the Calvin setup scripts.
 ## Test Structure
 
 - `setup-common.bats` - Tests for utility functions in `setup-common.sh`
-- `setup.bats` - Tests for production setup script
-- `setup-dev.bats` - Tests for development setup script
+- `setup.bats` - Tests for the mode-aware Raspberry Pi setup script and the `setup-dev.sh` compatibility wrapper
 - `helpers/` - Test helper functions and mocks
 
 ## Running Tests

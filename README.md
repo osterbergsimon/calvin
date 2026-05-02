@@ -86,14 +86,14 @@ wget -O- https://raw.githubusercontent.com/osterbergsimon/calvin/main/scripts/se
 **Development Setup (with hot reload):**
 
 ```bash
-wget -O- https://raw.githubusercontent.com/osterbergsimon/calvin/main/scripts/setup-dev.sh | sudo bash
+wget -O- https://raw.githubusercontent.com/osterbergsimon/calvin/main/scripts/setup.sh | sudo bash -s -- --mode dev
 ```
 
 **Using curl:**
 
 ```bash
 curl -fsSL https://raw.githubusercontent.com/osterbergsimon/calvin/main/scripts/setup.sh | sudo bash
-curl -fsSL https://raw.githubusercontent.com/osterbergsimon/calvin/main/scripts/setup-dev.sh | sudo bash
+curl -fsSL https://raw.githubusercontent.com/osterbergsimon/calvin/main/scripts/setup.sh | sudo bash -s -- --mode dev
 ```
 
 **Using a Different Branch:**
@@ -105,7 +105,7 @@ wget -O- https://raw.githubusercontent.com/osterbergsimon/calvin/main/scripts/se
 
 # Development setup with develop branch
 export GIT_BRANCH=develop
-curl -fsSL https://raw.githubusercontent.com/osterbergsimon/calvin/main/scripts/setup-dev.sh | sudo -E bash
+curl -fsSL https://raw.githubusercontent.com/osterbergsimon/calvin/main/scripts/setup.sh | sudo -E bash -s -- --mode dev
 ```
 
 > **Note:** Use `sudo -E` to preserve environment variables. Without `-E`, `sudo` will not pass `GIT_BRANCH` or `GIT_REPO` to the script, and it will default to the `main` branch.
@@ -121,14 +121,13 @@ wget -O- ... | sudo -E bash
 ```
 
 **What the Setup Scripts Do:**
-- Install all system dependencies (Python, Node.js, etc.)
+- Install kiosk dependencies, Docker, and the Docker Compose plugin
 - Create `calvin` user if needed
 - Clone the Calvin repository (from the specified branch)
-- Install backend and frontend dependencies
-- Build frontend (production) or configure dev server (development)
-- Set up systemd services for auto-start
+- Install a compose configuration under `/etc/calvin`
+- Store runtime data under `/var/lib/calvin`
+- Set up `calvin-app.service`, `calvin-x.service`, and `calvin-kiosk.service`
 - Configure display and kiosk mode
-- Enable hot reload for both backend and frontend (dev mode only)
 - Verify installation and provide next steps
 
 **For detailed information about the setup scripts, see [Setup Scripts Documentation](docs/setup/SETUP_SCRIPTS.md)**
@@ -173,7 +172,7 @@ npm run dev
 - The Makefile automatically detects Linux and includes the `linux` extra for evdev support
 - For detailed setup instructions, see [docs/setup/SETUP_LINUX.md](docs/setup/SETUP_LINUX.md)
 
-**Important:** The `scripts/setup.sh` and `scripts/setup-dev.sh` scripts are for **Raspberry Pi deployment** (require root, set up systemd services). For Linux development, use the Makefile or manual commands above.
+**Important:** The `scripts/setup.sh` script is for **Raspberry Pi deployment** (requires root, Docker, and systemd services). For Linux development, use the Makefile, Docker Compose dev file, or manual commands above.
 
 ## 📁 Project Structure
 

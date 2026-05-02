@@ -21,15 +21,11 @@ This shared approach reduces code duplication and makes the scripts more maintai
 
 **Features:**
 - Creates `calvin` user if it doesn't exist
-- Installs all system dependencies
-- Installs UV (Python package manager)
-- Installs Node.js 20+
+- Installs kiosk dependencies, Docker, and the Docker Compose plugin
 - Clones/configures Git repository
-- Installs backend dependencies (production + linux extras)
-- Installs frontend dependencies (production)
-- Builds frontend for production
-- Creates data directories
-- Configures systemd services
+- Creates runtime data directories under `/var/lib/calvin`
+- Installs `/etc/calvin/docker-compose.yml` and `/etc/calvin/.env` (compose auto-loads the latter)
+- Configures `calvin-app.service`, `calvin-x.service`, and `calvin-kiosk.service`
 - Sets up display and kiosk mode
 - Configures auto-start on boot
 
@@ -63,12 +59,13 @@ GIT_REPO=https://github.com/yourusername/calvin.git GIT_BRANCH=your-branch \
 
 **What Happens:**
 1. System packages are updated
-2. All dependencies are installed
+2. Kiosk packages, Docker, and Docker Compose are installed
 3. Repository is cloned/updated to `/home/calvin/calvin`
-4. Backend and frontend are built and configured
-5. Systemd services are installed and enabled
-6. Display is configured for kiosk mode
-7. System is ready - **reboot required** to start services
+4. Compose configuration is installed under `/etc/calvin`
+5. Runtime data directories are created under `/var/lib/calvin`
+6. Systemd services are installed and enabled
+7. Display is configured for kiosk mode
+8. System is ready - **reboot required** to start services
 
 **After Setup:**
 ```bash
@@ -77,35 +74,32 @@ sudo reboot
 
 After reboot, the dashboard will automatically start and be available at `http://localhost:8000`.
 
-### Development Setup (`scripts/setup-dev.sh`)
+### Development Setup (`scripts/setup.sh --mode dev`)
 
 **Purpose:** Development setup with hot reload for Raspberry Pi.
 
 **Features:**
-- Everything from production setup, plus:
-- Creates 4GB swap file (for Pi 3B+ with limited RAM)
-- Uses venv for backend (more stable on Pi 3B+)
-- Installs dev dependencies
-- Creates `.dev` marker file for hot reload
-- Configures dev-specific frontend service (Vite dev server)
-- Sets up hot reload for both backend and frontend
-- Connects to dev server on port 5173
+- Installs the same kiosk and Docker runtime
+- Uses `docker/docker-compose.dev.yml`
+- Bind-mounts `/home/calvin/calvin` into the app container
+- Sets up hot reload for backend and frontend
+- Keeps the kiosk pointed at `http://localhost:8000`
 
 **Usage:**
 
 ```bash
 # Standard development installation
-wget -O- https://raw.githubusercontent.com/osterbergsimon/calvin/main/scripts/setup-dev.sh | sudo bash
+wget -O- https://raw.githubusercontent.com/osterbergsimon/calvin/main/scripts/setup.sh | sudo bash -s -- --mode dev
 
 # Or using curl
-curl -fsSL https://raw.githubusercontent.com/osterbergsimon/calvin/main/scripts/setup-dev.sh | sudo bash
+curl -fsSL https://raw.githubusercontent.com/osterbergsimon/calvin/main/scripts/setup.sh | sudo bash -s -- --mode dev
 ```
 
 **Using a Different Branch:**
 
 ```bash
 export GIT_BRANCH=develop
-curl -fsSL https://raw.githubusercontent.com/osterbergsimon/calvin/main/scripts/setup-dev.sh | sudo -E bash
+curl -fsSL https://raw.githubusercontent.com/osterbergsimon/calvin/main/scripts/setup.sh | sudo -E bash -s -- --mode dev
 ```
 
 > **Note:** Use `sudo -E` to preserve environment variables. Without `-E`, `sudo` will not pass `GIT_BRANCH` or `GIT_REPO` to the script, and it will default to the `main` branch.
@@ -113,12 +107,10 @@ curl -fsSL https://raw.githubusercontent.com/osterbergsimon/calvin/main/scripts/
 > **Important:** Export the variable first (`export GIT_BRANCH=develop`) rather than setting it inline (`GIT_BRANCH=develop curl ...`), as inline assignments don't propagate through pipes to `sudo`.
 
 **What Happens:**
-1. Same as production setup, but with development features
-2. Swap file is created for better performance
-3. Backend uses venv (more stable than UV on Pi 3B+)
-4. Dev dependencies are installed
-5. Hot reload is enabled for both backend and frontend
-6. Frontend dev server runs on port 5173
+1. Same base setup as production
+2. The dev compose file is installed to `/etc/calvin/docker-compose.yml`
+3. The checkout is bind-mounted into the app container
+4. Hot reload is enabled for backend and frontend
 
 **After Setup:**
 ```bash
@@ -126,15 +118,12 @@ sudo reboot
 ```
 
 After reboot:
-- Backend runs with hot reload (code changes auto-reload)
-- Frontend runs with hot reload (Vite dev server on port 5173)
-- Dashboard available at `http://localhost:5173`
+- Docker Compose runs the hot-reload dev stack
+- Dashboard available at `http://localhost:8000`
 
 **Development Workflow:**
 - Make code changes in `/home/calvin/calvin`
-- Backend automatically reloads on file changes
-- Frontend automatically reloads via Vite HMR
-- No manual restart needed
+- Backend and frontend reload through the dev compose stack
 
 ### Windows Development Setup (`setup-windows.ps1`)
 
@@ -300,16 +289,14 @@ For repository-based usage (most common), the scripts work correctly as they're 
 
 1. **Check service status:**
    ```bash
-   sudo systemctl status calvin-backend
-   sudo systemctl status calvin-frontend
-   # Or for dev mode:
-   sudo systemctl status calvin-frontend-dev
+   sudo systemctl status calvin-app
+   sudo systemctl status calvin-kiosk
    ```
 
 2. **Check logs:**
    ```bash
-   sudo journalctl -u calvin-backend -n 50
-   sudo journalctl -u calvin-frontend -n 50
+   sudo journalctl -u calvin-app -n 50
+   sudo journalctl -u calvin-kiosk -n 50
    ```
 
 3. **Verify permissions:**
@@ -321,14 +308,9 @@ For repository-based usage (most common), the scripts work correctly as they're 
 ### Development Mode Issues
 
 1. **Hot reload not working:**
-   - Verify `.dev` file exists: `ls -la /home/calvin/calvin/backend/.dev`
-   - Check backend service logs for `--reload` flag
-   - Verify frontend dev service is running
-
-2. **Swap file issues:**
-   - Check swap: `free -h`
-   - Verify swap file: `ls -lh /swapfile`
-   - If needed, recreate: `sudo swapoff /swapfile && sudo rm /swapfile`
+   - Verify `/etc/calvin/docker-compose.yml` came from `docker-compose.dev.yml`
+   - Check compose logs: `sudo docker compose -f /etc/calvin/docker-compose.yml logs`
+   - Restart the stack: `sudo systemctl restart calvin-app`
 
 ## Updating After Setup
 
@@ -338,10 +320,10 @@ After initial setup, use the update script:
 update-calvin.sh
 ```
 
-Or with force flag to rebuild dependencies:
-```bash
-update-calvin.sh --force
-```
+Production installs pull the configured runtime image tag and restart Compose.
+Development installs pull the configured git branch into `/home/calvin/calvin`
+with `--autostash`, then recreate the dev Compose containers so dependency
+changes are picked up.
 
 ## Contributing
 
