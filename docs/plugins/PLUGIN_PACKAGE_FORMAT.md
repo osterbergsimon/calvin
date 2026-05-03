@@ -40,8 +40,8 @@ my-plugin.zip
 └── my-plugin/              # Root directory (optional, can be flat)
     ├── plugin.json         # REQUIRED: Plugin manifest
     ├── plugin.py           # REQUIRED: Plugin implementation
-    ├── frontend/           # OPTIONAL: Frontend components
-    │   └── MyComponent.vue
+    ├── frontend/           # OPTIONAL: pre-built web component/static assets
+    │   └── dist.js
     └── assets/             # OPTIONAL: Static assets
         └── icon.png
 ```
@@ -171,8 +171,9 @@ Each plugin directory must follow this structure:
 plugin-name/
 ├── plugin.json         # REQUIRED: Plugin manifest
 ├── plugin.py          # REQUIRED: Plugin implementation
-├── frontend/           # OPTIONAL: Frontend components
-│   └── *.vue
+├── frontend/           # OPTIONAL: pre-built web component/static assets
+│   ├── dist.js
+│   └── dist.css
 └── assets/             # OPTIONAL: Static assets
     └── *
 ```
@@ -182,8 +183,10 @@ plugin-name/
 - `plugin.py`: Plugin implementation
 
 **Optional Directories:**
-- `frontend/`: Vue components for the plugin
-- `assets/`: Static assets (images, icons, etc.)
+- `frontend/`: Pre-built browser-native assets for `display_schema.kind = "web-component"`.
+  These files are served at `/api/plugins/{plugin_id}/static/{asset_path}` and do not require a
+  frontend rebuild.
+- `assets/`: Static assets used by the plugin backend.
 
 ## Validation Rules
 
@@ -215,7 +218,7 @@ plugin-name/
 1. Extract zip to temporary directory
 2. Validate package structure (exactly one plugin)
 3. Extract plugin to `backend/data/plugins/{plugin_id}/`
-4. Copy frontend components if present
+4. Store frontend static assets if present
 5. Reload plugin loader
 
 ### Repository Installation (Single Plugin)
@@ -253,7 +256,7 @@ my-service-plugin.zip
       ├── plugin.json
       ├── plugin.py
       └── frontend/
-          └── ServiceViewer.vue
+          └── dist.js
 
 # Installation
 curl -X POST /api/plugins/install -F "file=@my-service-plugin.zip"
