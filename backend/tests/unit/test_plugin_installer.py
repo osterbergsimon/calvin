@@ -69,12 +69,14 @@ def register_plugin_types() -> list[dict[str, Any]]:
 
 @pytest.fixture
 def plugin_package_with_frontend(tmp_path, valid_plugin_package):
-    """Create a plugin package with frontend components."""
+    """Create a plugin package with frontend static assets."""
     frontend_dir = valid_plugin_package / "frontend"
     frontend_dir.mkdir()
 
-    component_file = frontend_dir / "TestComponent.vue"
-    component_file.write_text("<template><div>Test Component</div></template>")
+    component_file = frontend_dir / "dist.js"
+    component_file.write_text(
+        "customElements.define('calvin-test-plugin', class extends HTMLElement {})"
+    )
 
     return valid_plugin_package
 
@@ -239,7 +241,7 @@ class TestPluginInstaller:
         with pytest.raises(ValueError, match="already installed"):
             plugin_installer.install_plugin(valid_plugin_package)
 
-    def test_install_plugin_with_frontend_components(
+    def test_install_plugin_with_frontend_static_assets(
         self, plugin_installer, plugin_package_with_frontend
     ):
         """Frontend assets stay inside the plugin's data dir; the host serves
@@ -248,7 +250,7 @@ class TestPluginInstaller:
         plugin_installer.install_plugin(plugin_package_with_frontend)
 
         plugin_path = plugin_installer.get_plugin_path("test_plugin")
-        assert (plugin_path / "frontend" / "TestComponent.vue").exists()
+        assert (plugin_path / "frontend" / "dist.js").exists()
 
     def test_install_plugin_cleanup_on_error(self, plugin_installer, tmp_path):
         """Test that plugin installation is cleaned up on error."""

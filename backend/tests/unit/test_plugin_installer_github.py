@@ -33,7 +33,7 @@ def mock_repo_structure(tmp_path):
     (plugin1_dir / "plugin.json").write_text(json.dumps(manifest1))
     (plugin1_dir / "plugin.py").write_text("# Plugin 1 code")
 
-    # Plugin 2: Plugin with frontend
+    # Plugin 2: Plugin with frontend static assets
     plugin2_dir = repo_root / "plugin2"
     plugin2_dir.mkdir()
     manifest2 = {
@@ -46,7 +46,9 @@ def mock_repo_structure(tmp_path):
     (plugin2_dir / "plugin.py").write_text("# Plugin 2 code")
     frontend_dir = plugin2_dir / "frontend"
     frontend_dir.mkdir()
-    (frontend_dir / "Component.vue").write_text("<template><div>Component</div></template>")
+    (frontend_dir / "dist.js").write_text(
+        "customElements.define('calvin-plugin2', class extends HTMLElement {})"
+    )
 
     # Plugin 3: In subdirectory
     plugin3_dir = repo_root / "plugins" / "plugin3"
@@ -342,8 +344,10 @@ class TestPluginInstallFromRepo:
         assert (plugin_path / "plugin.json").exists()
         assert (plugin_path / "plugin.py").exists()
 
-    def test_install_plugin_from_repo_with_frontend(self, plugin_installer, mock_repo_structure):
-        """Test installing a plugin with frontend components from repo."""
+    def test_install_plugin_from_repo_with_frontend_static_assets(
+        self, plugin_installer, mock_repo_structure
+    ):
+        """Test installing a plugin with frontend static assets from repo."""
         manifest = plugin_installer.install_plugin_from_repo(
             mock_repo_structure, "plugin2", plugin_id=None
         )
@@ -353,7 +357,7 @@ class TestPluginInstallFromRepo:
         # Frontend assets stay inside the plugin's data dir (host serves them
         # via /api/plugins/{id}/static/*).
         plugin_path = plugin_installer.get_plugin_path("plugin2")
-        assert (plugin_path / "frontend" / "Component.vue").exists()
+        assert (plugin_path / "frontend" / "dist.js").exists()
 
     def test_install_plugin_from_repo_path_traversal_protection(
         self, plugin_installer, mock_repo_structure

@@ -32,7 +32,7 @@ export TEST_GITHUB_BRANCH="main"  # Optional, defaults to "main"
    │   ├── plugin.json
    │   ├── plugin.py
    │   └── frontend/
-   │       └── Component.vue
+   │       └── dist.js
    └── README.md
    ```
 
@@ -177,4 +177,3 @@ jobs:
   - Scheduled nightly builds
   - Local development validation
   - Debugging integration issues
-

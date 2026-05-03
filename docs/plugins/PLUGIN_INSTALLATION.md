@@ -10,8 +10,9 @@ A plugin package is a directory or zip file containing:
 my-plugin/
 ├── plugin.json          # Plugin manifest (required)
 ├── plugin.py            # Plugin implementation (required)
-├── frontend/            # Frontend components (optional)
-│   └── MyComponent.vue
+├── frontend/            # Pre-built web component/static assets (optional)
+│   ├── dist.js
+│   └── dist.css
 └── assets/              # Static assets (optional)
     └── icon.png
 ```
@@ -135,10 +136,10 @@ class MyServicePlugin(ServicePlugin):
                 },
             },
             "display_schema": {
-                "type": "api",
-                "api_endpoint": "/api/plugins/{service_id}/data",
-                "method": "GET",
-                "component": "my_plugin/MyComponent.vue",  # Optional: custom frontend component
+                "kind": "status-tile",
+                "label": "Latest Value",
+                "value_path": "$.value",
+                "status_path": "$.status",
             },
             "plugin_class": cls,
         }
@@ -193,56 +194,80 @@ def create_plugin_instance(
     )
 ```
 
-## Frontend Components
+## Plugin Display UI
 
-If your plugin provides frontend components, place them in the `frontend/` directory:
+Service plugins render through `display_schema`. Prefer built-in schema renderers for normal
+dashboard content, and use a web component only when the built-in renderers are not expressive
+enough.
+
+### Built-In Schema Renderers
+
+The frontend dispatches `display_schema.kind` to a built-in renderer. Supported kinds include:
+
+- `status-tile`
+- `status-list`
+- `status-row`
+- `card-grid`
+- `item-list`
+- `iframe`
+- `image-with-caption`
+- `metric-dashboard`
+- `weather-forecast`
+- `web-component`
+
+Example:
+
+```python
+"display_schema": {
+    "kind": "status-tile",
+    "label": "Latest Value",
+    "value_path": "$.value",
+    "status_path": "$.status",
+}
+```
+
+### Web Components
+
+If your plugin needs custom UI, ship a pre-built browser-native web component in the
+`frontend/` directory:
 
 ```
 my-plugin/
 ├── plugin.json
 ├── plugin.py
 └── frontend/
-    └── MyComponent.vue
+    ├── dist.js
+    └── dist.css
 ```
 
-**Important**: The `frontend/` directory contents will be copied to `frontend/src/components/plugins/{plugin_id}/` during installation.
-
-### Component Path in display_schema
-
-The component path in `display_schema.component` should be relative to `frontend/src/components/plugins/`:
+The JavaScript module must register the custom element named by `display_schema.element`:
 
 ```python
 "display_schema": {
-    "type": "api",
-    "api_endpoint": "/api/plugins/{service_id}/data",
-    "method": "GET",
-    "component": "my_plugin/MyComponent.vue",  # {plugin_id}/ComponentName.vue
+    "kind": "web-component",
+    "element": "calvin-my-plugin",
+    "module": "dist.js",
+    "stylesheet": "dist.css",
 }
 ```
 
-**Example**: If your plugin ID is `my_plugin` and you have `frontend/MyComponent.vue`, the component path should be `my_plugin/MyComponent.vue`.
+At runtime, Calvin loads these assets through:
 
-### Subdirectories
-
-You can organize components in subdirectories:
-
-```
-my-plugin/
-└── frontend/
-    └── components/
-        └── MyComponent.vue
+```text
+/api/plugins/{plugin_id}/static/dist.js
+/api/plugins/{plugin_id}/static/dist.css
 ```
 
-Then use: `"component": "my_plugin/components/MyComponent.vue"`
+Calvin assigns the latest service data to the custom element's `data` property.
 
-### Frontend Component Installation
+### Frontend Asset Installation
 
 During installation:
 1. The installer checks for a `frontend/` directory in your plugin package
-2. If found, it copies the entire `frontend/` directory to `frontend/src/components/plugins/{plugin_id}/`
-3. The component is then available via the path `{plugin_id}/...` in `display_schema.component`
+2. If found, it stores the directory under `backend/data/plugins/{plugin_id}/frontend/`
+3. The static asset endpoint serves files from that directory
 
-**Note**: The frontend components are automatically loaded by the `ServiceViewer` component using the `usePluginComponent` composable. No additional frontend code changes are needed.
+Schema and web-component plugins do not require a frontend rebuild after installation.
 
 ## Installing Plugins
 
@@ -296,7 +321,7 @@ curl -X POST "http://localhost:8000/api/plugins/install-from-github" \
 
 1. Plugin package is validated (checks for `plugin.json` and `plugin.py`)
 2. Plugin is extracted to `backend/data/plugins/{plugin_id}/`
-3. Frontend components are copied to `frontend/src/components/plugins/{plugin_id}/`
+3. Frontend static assets are stored with the installed plugin, if present
 4. Plugin is loaded and registered with pluggy
 5. Plugin type is added to the database (disabled by default)
 
