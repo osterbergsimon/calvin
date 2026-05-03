@@ -271,9 +271,6 @@ class TestSystemUpdateEndpoints:
         with patch.object(system_routes.settings, "repo_dir", tmp_path):
             response = test_client.get("/api/system/update/stream")
 
-        if response.status_code == 404:
-            pytest.skip("Update stream route not available in test client")
-
         assert response.status_code == 200
         assert '"type": "status"' in response.text
         assert '"status": "complete"' in response.text

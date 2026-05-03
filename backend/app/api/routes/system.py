@@ -551,6 +551,7 @@ async def stream_update_log(log_offset: int = 0):
                     state_mtime = state_file.stat().st_mtime
                     if state_mtime != last_state_mtime:
                         last_state_mtime = state_mtime
+                        last_activity = time.time()
                         state = _read_update_state(state_file)
                         if state:
                             status_data = _state_to_update_status(state, state_file)
