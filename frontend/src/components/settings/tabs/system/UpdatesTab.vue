@@ -21,6 +21,13 @@
 
       <SettingItem label="Update Actions" help="Trigger system update">
         <div class="button-group">
+          <button
+            class="btn-secondary"
+            :disabled="statusRefreshLoading"
+            @click="refreshSystemStatus"
+          >
+            {{ statusRefreshLoading ? "Checking..." : "Check status" }}
+          </button>
           <button class="btn-primary" :disabled="updating" @click="handleTriggerUpdate">
             {{ updating ? "Updating..." : "🔄 Trigger Update" }}
           </button>
@@ -31,17 +38,56 @@
         {{ updateMessage }}
       </div>
 
+      <div class="health-summary" aria-label="System health summary">
+        <div class="status-tile">
+          <span class="status-label">Backend API</span>
+          <span class="status-pill" :class="backendHealthClass">
+            {{ backendHealthLabel }}
+          </span>
+          <span v-if="backendHealthCheckedAt" class="status-meta">
+            {{ formatDateTime(backendHealthCheckedAt) }}
+          </span>
+        </div>
+        <div class="status-tile">
+          <span class="status-label">Update state</span>
+          <span class="status-pill" :class="updateStatusClass">
+            {{ updateStatusLabel }}
+          </span>
+          <span v-if="updateStatus?.phase" class="status-meta">
+            {{ formatPhase(updateStatus.phase) }}
+          </span>
+        </div>
+        <div v-if="updateStatusCheckedAt" class="status-tile">
+          <span class="status-label">Last checked</span>
+          <span class="status-value">{{ formatDateTime(updateStatusCheckedAt) }}</span>
+        </div>
+      </div>
+
+      <div v-if="backendHealth?.error" class="update-message warning">
+        {{ backendHealth.error }}
+      </div>
+
       <div v-if="updateStatus" class="update-status">
         <SettingItem label="Update Status">
           <div class="status-details">
             <p><strong>Status:</strong> {{ updateStatus.status }}</p>
+            <p v-if="updateStatus.phase">
+              <strong>Phase:</strong> {{ formatPhase(updateStatus.phase) }}
+            </p>
             <p v-if="updateStatus.message"><strong>Message:</strong> {{ updateStatus.message }}</p>
             <p v-if="updateStatus.progress !== undefined">
               <strong>Progress:</strong> {{ updateStatus.progress }}%
             </p>
+            <p v-if="updateStatus.started_at">
+              <strong>Started:</strong> {{ formatDateTime(updateStatus.started_at) }}
+            </p>
+            <p v-if="updateStatus.finished_at">
+              <strong>Finished:</strong> {{ formatDateTime(updateStatus.finished_at) }}
+            </p>
             <p v-if="updateStatus.log_file">
               <strong>Log file:</strong> {{ updateStatus.log_file }}
             </p>
+            <p v-if="updateStatus.error"><strong>Error:</strong> {{ updateStatus.error }}</p>
           </div>
         </SettingItem>
 
@@ -74,7 +120,7 @@
 </template>
 
 <script setup>
-import { ref, watch, onMounted } from "vue";
+import { computed, ref, watch, onMounted } from "vue";
 import { useSystem } from "@/composables";
 import { getGitBranches } from "@/services/configApi";
 import CollapsibleSection from "../../shared/CollapsibleSection.vue";
@@ -93,11 +139,69 @@ const props = defineProps({
 
 const emit = defineEmits(["update:gitRepoUrl", "update:gitBranch"]);
 
-const { updating, updateStatus, updateMessage, updateMessageClass, triggerUpdate } = useSystem();
+const {
+  updating,
+  updateStatus,
+  updateStatusLoading,
+  updateStatusCheckedAt,
+  updateMessage,
+  updateMessageClass,
+  backendHealth,
+  backendHealthLoading,
+  backendHealthCheckedAt,
+  triggerUpdate,
+  getUpdateStatus,
+  getBackendHealth,
+} = useSystem();
 
 const availableBranches = ref([props.gitBranch || "main"]);
 const localGitRepoUrl = ref(props.gitRepoUrl || "");
 const lastEmittedGitRepoUrl = ref(props.gitRepoUrl || "");
+const statusRefreshLoading = computed(
+  () => updateStatusLoading.value || backendHealthLoading.value
+);
+
+const backendHealthLabel = computed(() => {
+  if (backendHealthLoading.value) return "Checking";
+  return backendHealth.value?.status || "Unknown";
+});
+
+const backendHealthClass = computed(() => ({
+  success: backendHealth.value?.status === "healthy",
+  error: backendHealth.value?.status === "unhealthy",
+  neutral: !backendHealth.value,
+}));
+
+const updateStatusLabel = computed(() => {
+  if (updateStatusLoading.value) return "Checking";
+  return updateStatus.value?.status || "Unknown";
+});
+
+const updateStatusClass = computed(() => ({
+  success: updateStatus.value?.status === "idle",
+  info: updateStatus.value?.status === "running",
+  error: updateStatus.value?.status === "error",
+  neutral: !updateStatus.value || updateStatus.value?.status === "unknown",
+}));
+
+const formatPhase = phase => {
+  if (!phase) return "";
+  return String(phase)
+    .replace(/_/g, " ")
+    .replace(/\b\w/g, char => char.toUpperCase());
+};
+
+const formatDateTime = value => {
+  if (!value) return "";
+  const date = new Date(value);
+  if (Number.isNaN(date.getTime())) return value;
+  return date.toLocaleString(undefined, {
+    month: "short",
+    day: "numeric",
+    hour: "2-digit",
+    minute: "2-digit",
+  });
+};
 
 const handleGitRepoChange = () => {
   if (
@@ -117,6 +221,10 @@ const handleTriggerUpdate = async () => {
   await triggerUpdate();
 };
 
+const refreshSystemStatus = async () => {
+  await Promise.allSettled([getBackendHealth(), getUpdateStatus()]);
+};
+
 const loadBranches = async () => {
   try {
     const branches = await getGitBranches();
@@ -128,6 +236,7 @@ const loadBranches = async () => {
 
 onMounted(() => {
   loadBranches();
+  refreshSystemStatus();
 });
 
 watch(
@@ -150,18 +259,29 @@ watch(
 .button-group {
   display: flex;
   gap: 0.75rem;
+  flex-wrap: wrap;
 }
 
-.btn-primary {
+.btn-primary,
+.btn-secondary {
   padding: 0.5rem 1rem;
-  background: var(--accent-primary);
-  color: white;
-  border: none;
   border-radius: 4px;
   font-size: 0.9rem;
   font-weight: 600;
   cursor: pointer;
   transition: all 0.2s;
+}
+
+.btn-primary {
+  background: var(--accent-primary);
+  color: white;
+  border: none;
+}
+
+.btn-secondary {
+  background: var(--bg-secondary);
+  color: var(--text-primary);
+  border: 1px solid var(--border-color);
 }
 
 .btn-primary:hover:not(:disabled) {
@@ -170,7 +290,12 @@ watch(
   box-shadow: 0 2px 4px var(--shadow);
 }
 
-.btn-primary:disabled {
+.btn-secondary:hover:not(:disabled) {
+  border-color: var(--accent-primary);
+}
+
+.btn-primary:disabled,
+.btn-secondary:disabled {
   opacity: 0.6;
   cursor: not-allowed;
 }
@@ -208,6 +333,65 @@ watch(
 
 .update-status {
   margin-top: 1rem;
+}
+
+.health-summary {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(160px, 1fr));
+  gap: 0.75rem;
+  margin-top: 1rem;
+}
+
+.status-tile {
+  display: flex;
+  flex-direction: column;
+  gap: 0.35rem;
+  min-width: 0;
+  padding: 0.75rem;
+  background: var(--bg-secondary);
+  border: 1px solid var(--border-color);
+  border-radius: 6px;
+}
+
+.status-label,
+.status-meta {
+  color: var(--text-secondary);
+  font-size: 0.78rem;
+}
+
+.status-value {
+  color: var(--text-primary);
+  font-size: 0.875rem;
+  overflow-wrap: anywhere;
+}
+
+.status-pill {
+  align-self: flex-start;
+  padding: 0.2rem 0.5rem;
+  border-radius: 999px;
+  font-size: 0.78rem;
+  font-weight: 700;
+  text-transform: capitalize;
+}
+
+.status-pill.success {
+  background: color-mix(in srgb, var(--accent-secondary) 18%, transparent);
+  color: var(--accent-secondary);
+}
+
+.status-pill.info {
+  background: color-mix(in srgb, var(--accent-primary) 18%, transparent);
+  color: var(--accent-primary);
+}
+
+.status-pill.error {
+  background: color-mix(in srgb, var(--accent-error) 18%, transparent);
+  color: var(--accent-error);
+}
+
+.status-pill.neutral {
+  background: var(--bg-tertiary);
+  color: var(--text-secondary);
 }
 
 .status-details {
