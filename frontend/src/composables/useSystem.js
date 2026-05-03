@@ -8,8 +8,13 @@ import * as systemApi from "../services/systemApi";
 // Singleton refs so any component using useSystem() shares the same status
 const updating = ref(false);
 const updateStatus = ref(null);
+const updateStatusLoading = ref(false);
+const updateStatusCheckedAt = ref(null);
 const updateMessage = ref("");
 const updateMessageClass = ref("");
+const backendHealth = ref(null);
+const backendHealthLoading = ref(false);
+const backendHealthCheckedAt = ref(null);
 
 let _clearMsgTimer = null;
 
@@ -52,6 +57,30 @@ export function useSystem() {
       await sleep(intervalMs);
     }
     return false;
+  };
+
+  const getBackendHealth = async () => {
+    backendHealthLoading.value = true;
+    try {
+      const health = await systemApi.getHealth();
+      backendHealth.value = {
+        status: health?.status || "healthy",
+        data: health,
+        error: null,
+      };
+      backendHealthCheckedAt.value = new Date().toISOString();
+      return backendHealth.value;
+    } catch (error) {
+      backendHealth.value = {
+        status: "unhealthy",
+        data: null,
+        error: error.response?.data?.detail || error.message || "Backend health check failed",
+      };
+      backendHealthCheckedAt.value = new Date().toISOString();
+      return backendHealth.value;
+    } finally {
+      backendHealthLoading.value = false;
+    }
   };
 
   // Display power control
@@ -311,13 +340,17 @@ export function useSystem() {
   };
 
   const getUpdateStatus = async () => {
+    updateStatusLoading.value = true;
     try {
       const status = await systemApi.getUpdateStatus();
       updateStatus.value = status;
+      updateStatusCheckedAt.value = new Date().toISOString();
       return status;
     } catch (error) {
       console.error("Failed to get update status:", error);
       throw error;
+    } finally {
+      updateStatusLoading.value = false;
     }
   };
 
@@ -328,12 +361,18 @@ export function useSystem() {
     displayTimeoutEnabled,
     updating,
     updateStatus,
+    updateStatusLoading,
+    updateStatusCheckedAt,
     updateMessage,
     updateMessageClass,
+    backendHealth,
+    backendHealthLoading,
+    backendHealthCheckedAt,
     // Methods
     turnDisplayOn,
     turnDisplayOff,
     configureDisplayTimeout,
+    getBackendHealth,
     restartBackend,
     restartFrontend,
     triggerUpdate,
