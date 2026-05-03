@@ -375,22 +375,22 @@ watch(
 }
 
 .status-pill.success {
-  background: rgba(40, 167, 69, 0.14);
-  color: #1f7a39;
+  background: color-mix(in srgb, var(--accent-secondary) 18%, transparent);
+  color: var(--accent-secondary);
 }
 
 .status-pill.info {
-  background: rgba(23, 162, 184, 0.14);
-  color: #0c5460;
+  background: color-mix(in srgb, var(--accent-primary) 18%, transparent);
+  color: var(--accent-primary);
 }
 
 .status-pill.error {
-  background: rgba(220, 53, 69, 0.14);
-  color: #b02a37;
+  background: color-mix(in srgb, var(--accent-error) 18%, transparent);
+  color: var(--accent-error);
 }
 
 .status-pill.neutral {
-  background: rgba(108, 117, 125, 0.14);
+  background: var(--bg-tertiary);
   color: var(--text-secondary);
 }
 
