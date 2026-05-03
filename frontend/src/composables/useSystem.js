@@ -183,6 +183,18 @@ export function useSystem() {
             }
             updateMessageClass.value = "info";
           } else if (data.type === "status") {
+            if (data.state) {
+              updateStatus.value = {
+                ...(updateStatus.value || {}),
+                ...data.state,
+                last_log: updateStatus.value?.last_log || "",
+              };
+            }
+            if (data.status === "running") {
+              updateMessage.value = data.message || "Update in progress…";
+              updateMessageClass.value = "info";
+              return;
+            }
             es.close();
             resolve(data);
           } else if (data.type === "timeout") {

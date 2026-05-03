@@ -538,11 +538,44 @@ async def stream_update_log(log_offset: int = 0):
         timeout_sec = 10 * 60
         inactivity_timeout_sec = 90
         has_started = False
+        last_state_mtime = None
 
         while time.time() - start_time < timeout_sec:
             if time.time() - last_keepalive > 15:
                 yield ": keepalive\n\n"
                 last_keepalive = time.time()
+
+            state_file = _find_update_state()
+            if state_file:
+                try:
+                    state_mtime = state_file.stat().st_mtime
+                    if state_mtime != last_state_mtime:
+                        last_state_mtime = state_mtime
+                        state = _read_update_state(state_file)
+                        if state:
+                            status_data = _state_to_update_status(state, state_file)
+                            stream_status = status_data["status"]
+                            if stream_status == "idle":
+                                stream_status = "complete"
+
+                            yield (
+                                "data: "
+                                + json.dumps(
+                                    {
+                                        "type": "status",
+                                        "status": stream_status,
+                                        "state": status_data,
+                                        "message": status_data.get("message"),
+                                        "phase": status_data.get("phase"),
+                                    }
+                                )
+                                + "\n\n"
+                            )
+
+                            if stream_status in {"complete", "error"}:
+                                return
+                except Exception as e:
+                    yield f"data: {json.dumps({'type': 'log', 'line': f'[state stream error: {e}]'})}\n\n"
 
             log_file = _find_update_log()
             if log_file:

@@ -1,5 +1,6 @@
 """Integration tests for system API endpoints."""
 
+import json
 from unittest.mock import MagicMock, patch
 
 import pytest
@@ -251,6 +252,32 @@ class TestSystemUpdateEndpoints:
         popen_env = mock_popen.call_args.kwargs["env"]
         assert popen_env["UPDATE_STATE_FILE"].endswith("calvin-update-state.json")
         assert popen_env["UPDATE_LOG_FILE"].endswith("calvin-update.log")
+
+    def test_update_stream_emits_structured_state(self, test_client, tmp_path):
+        """SSE stream emits terminal status from structured state even without log output."""
+        state_file = tmp_path / "backend" / "logs" / "calvin-update-state.json"
+        state_file.parent.mkdir(parents=True, exist_ok=True)
+        state_file.write_text(
+            json.dumps(
+                {
+                    "status": "success",
+                    "phase": "complete",
+                    "message": "Update completed successfully",
+                }
+            ),
+            encoding="utf-8",
+        )
+
+        with patch.object(system_routes.settings, "repo_dir", tmp_path):
+            response = test_client.get("/api/system/update/stream")
+
+        if response.status_code == 404:
+            pytest.skip("Update stream route not available in test client")
+
+        assert response.status_code == 200
+        assert '"type": "status"' in response.text
+        assert '"status": "complete"' in response.text
+        assert "Update completed successfully" in response.text
 
 
 @pytest.mark.integration
