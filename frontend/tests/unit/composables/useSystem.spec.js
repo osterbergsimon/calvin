@@ -67,8 +67,36 @@ describe("useSystem", () => {
       expect(system.displayTimeoutEnabled.value).toBe(false);
       expect(system.updating.value).toBe(false);
       expect(system.updateStatus.value).toBe(null);
+      expect(system.updateStatusLoading.value).toBe(false);
       expect(system.updateMessage.value).toBe("");
       expect(system.updateMessageClass.value).toBe("");
+      expect(system.backendHealth.value).toBe(null);
+      expect(system.backendHealthLoading.value).toBe(false);
+    });
+  });
+
+  describe("getBackendHealth", () => {
+    it("stores healthy backend status", async () => {
+      systemApi.getHealth.mockResolvedValue({ status: "healthy" });
+
+      const system = useSystem();
+      const health = await system.getBackendHealth();
+
+      expect(systemApi.getHealth).toHaveBeenCalled();
+      expect(health.status).toBe("healthy");
+      expect(system.backendHealth.value.status).toBe("healthy");
+      expect(system.backendHealthCheckedAt.value).toBeTruthy();
+    });
+
+    it("stores unhealthy backend status on health check failure", async () => {
+      systemApi.getHealth.mockRejectedValue(new Error("down"));
+
+      const system = useSystem();
+      const health = await system.getBackendHealth();
+
+      expect(health.status).toBe("unhealthy");
+      expect(system.backendHealth.value.error).toBe("down");
+      expect(system.backendHealthLoading.value).toBe(false);
     });
   });
 
