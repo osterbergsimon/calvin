@@ -9,7 +9,7 @@ on:
       - 'scripts/setup-common.sh'
       - 'scripts/update-calvin.sh'
       - 'scripts/restart-calvin-services.sh'
-      - 'rpi-image/systemd/**'
+      - 'deploy/systemd/**'
       - 'docker/docker-compose.yml'
       - 'deploy/calvin.env.example'
   pull_request:
@@ -20,7 +20,7 @@ on:
       - 'scripts/setup-common.sh'
       - 'scripts/update-calvin.sh'
       - 'scripts/restart-calvin-services.sh'
-      - 'rpi-image/systemd/**'
+      - 'deploy/systemd/**'
       - 'docker/docker-compose.yml'
       - 'deploy/calvin.env.example'
   workflow_dispatch:
@@ -46,10 +46,9 @@ jobs:
       - name: Check systemd unit syntax
         run: |
           sudo install -m 0755 scripts/update-calvin.sh /usr/local/bin/update-calvin.sh
-          systemd-analyze verify rpi-image/systemd/calvin-app.service
-          systemd-analyze verify rpi-image/systemd/calvin-kiosk.service
-          systemd-analyze verify rpi-image/systemd/calvin-x.service
-          systemd-analyze verify rpi-image/systemd/calvin-update.service
+          systemd-analyze verify deploy/systemd/calvin-app.service
+          systemd-analyze verify deploy/systemd/calvin-kiosk.service
+          systemd-analyze verify deploy/systemd/calvin-x.service
 
       - name: Check compose YAML is parseable
         run: |

@@ -110,13 +110,13 @@ curl -fsSL https://raw.githubusercontent.com/osterbergsimon/calvin/main/scripts/
 
 **What it does:**
 - Creates `calvin` user if needed
-- Installs all system dependencies (Python, Node.js, UV, etc.)
-- Clones the repository to `/home/calvin/calvin`
-- Installs backend dependencies (with `linux` extra for keyboard support)
-- Installs and builds frontend for production
-- Configures systemd services for auto-start
-- Sets up display and kiosk mode
-- Configures auto-login and X server
+- Installs Docker, the Compose plugin, and kiosk dependencies (X server, Chromium, openbox)
+- Clones the repository to `/home/calvin/calvin` (used for systemd unit files and update scripts only — the app itself runs from the published container image)
+- Drops `docker/docker-compose.yml` and a populated `.env` into `/etc/calvin/`
+- Installs and enables three systemd units from `deploy/systemd/`: `calvin-app.service` (runs `docker compose up -d` against `ghcr.io/osterbergsimon/calvin`), `calvin-x.service`, and `calvin-kiosk.service`
+- Configures auto-login and X server so the kiosk launches on boot
+
+The backend, frontend `dist/`, and Python/Node toolchains all live inside the container image — nothing is installed natively on the host.
 
 **After setup:**
 ```bash
@@ -138,9 +138,9 @@ curl -fsSL https://raw.githubusercontent.com/osterbergsimon/calvin/main/scripts/
 ```
 
 **What it does:**
-- Installs the Docker Compose dev configuration
-- Bind-mounts the checkout into the app container
-- Runs backend and frontend with hot reload
+- Same base setup as production (kiosk + Docker)
+- Installs `docker/docker-compose.dev.yml` to `/etc/calvin/docker-compose.yml`
+- Bind-mounts the checkout into the app container; backend runs `uvicorn --reload` and the frontend runs the Vite dev server, both inside containers
 - Keeps the kiosk pointed at `http://localhost:8000`
 
 **After setup:**

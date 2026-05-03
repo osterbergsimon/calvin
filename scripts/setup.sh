@@ -215,9 +215,9 @@ systemd_available() {
 
 install_runtime_services() {
     log "Installing systemd services..."
-    install_systemd_service "${CALVIN_DIR}/rpi-image/systemd/calvin-app.service" "${CALVIN_DIR}"
-    install_systemd_service "${CALVIN_DIR}/rpi-image/systemd/calvin-x.service" "${CALVIN_DIR}"
-    install_systemd_service "${CALVIN_DIR}/rpi-image/systemd/calvin-kiosk.service" "${CALVIN_DIR}"
+    install_systemd_service "${CALVIN_DIR}/deploy/systemd/calvin-app.service" "${CALVIN_DIR}"
+    install_systemd_service "${CALVIN_DIR}/deploy/systemd/calvin-x.service" "${CALVIN_DIR}"
+    install_systemd_service "${CALVIN_DIR}/deploy/systemd/calvin-kiosk.service" "${CALVIN_DIR}"
 
     if systemd_available; then
         enable_systemd_service "calvin-app.service"

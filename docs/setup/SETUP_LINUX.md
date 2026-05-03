@@ -164,6 +164,8 @@ On Linux, full keyboard support is available via `evdev`:
 
 ### Production (Raspberry Pi)
 - Use automated setup script: `scripts/setup.sh` (`--mode prod` or `--mode dev`)
+- The script installs Docker + the kiosk; the app itself runs from the published `ghcr.io/osterbergsimon/calvin` container image (no native Python/Node/UV install on the Pi)
+- The manual install steps in the section above do **not** apply to Pi production — they're for non-Pi Linux dev machines
 - See [Setup Scripts Documentation](SETUP_SCRIPTS.md) for details
 - Full keyboard support available
 
