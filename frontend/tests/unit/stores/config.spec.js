@@ -73,6 +73,41 @@ describe("Config Store", () => {
     expect(store.showUI).toBe(false);
   });
 
+  it("should hydrate snake_case aliases and parse JSON schedule values", async () => {
+    const schedule = [{ day: 0, enabled: false, onTime: "07:30", offTime: "21:00" }];
+    axios.get.mockResolvedValue({
+      data: {
+        apply_display_rotation: false,
+        calendar_refresh_interval: 5,
+        display_schedule: JSON.stringify(schedule),
+        clock_bar_show_in_kiosk: true,
+        console_log_level: "debug",
+      },
+    });
+
+    const store = useConfigStore();
+    await store.fetchConfig();
+
+    expect(store.applyDisplayRotation).toBe(false);
+    expect(store.calendarRefreshInterval).toBe(5);
+    expect(store.displaySchedule).toEqual(schedule);
+    expect(store.clockBarShowInKiosk).toBe(true);
+    expect(store.consoleLogLevel).toBe("debug");
+  });
+
+  it("should apply defaults for missing values after fetch", async () => {
+    axios.get.mockResolvedValue({ data: { orientation: "portrait" } });
+
+    const store = useConfigStore();
+    store.setLastSideViewMode("web_services");
+    await store.fetchConfig();
+
+    expect(store.orientation).toBe("portrait");
+    expect(store.lastSideViewMode).toBe("photos");
+    expect(store.timezone).toBeNull();
+    expect(store.clockDisplayMode).toBe("header");
+  });
+
   it("should update config via API", async () => {
     const updateData = {
       orientation: "landscape",
@@ -93,6 +128,23 @@ describe("Config Store", () => {
     expect(axios.post).toHaveBeenCalledWith("/api/config", updateData);
     expect(store.orientation).toBe("landscape");
     expect(store.calendarSplit).toBe(72);
+  });
+
+  it("should update all registered config fields from camelCase or snake_case payloads", async () => {
+    axios.post.mockResolvedValue({ data: { show_ui: true, clock_bar_padding: 12 } });
+
+    const store = useConfigStore();
+    await store.updateConfig({
+      apply_display_rotation: false,
+      displaySchedule: [{ day: 1, enabled: true, onTime: "08:00", offTime: "20:00" }],
+      clockBarShowWeather: true,
+    });
+
+    expect(store.applyDisplayRotation).toBe(false);
+    expect(store.displaySchedule[0].day).toBe(1);
+    expect(store.clockBarShowWeather).toBe(true);
+    expect(store.showUI).toBe(true);
+    expect(store.clockBarPadding).toBe(12);
   });
 
   it("should handle API errors gracefully", async () => {
