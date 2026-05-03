@@ -193,7 +193,8 @@ calvin/
 │       └── services/    # API services
 ├── config/           # Configuration files
 ├── data/             # Data storage (images, database)
-├── rpi-image/        # Raspberry Pi image creation
+├── docker/           # Dockerfile + compose files for deployment
+├── deploy/           # systemd units + env example for Pi prod
 ├── scripts/          # Utility scripts
 └── docs/             # Documentation
 ```
