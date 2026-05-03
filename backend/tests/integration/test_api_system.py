@@ -246,6 +246,11 @@ class TestSystemUpdateEndpoints:
         data = response.json()
         assert data["status"] == "started"
         assert "pid" in data
+        assert data["state_file"].endswith("calvin-update-state.json")
+
+        popen_env = mock_popen.call_args.kwargs["env"]
+        assert popen_env["UPDATE_STATE_FILE"].endswith("calvin-update-state.json")
+        assert popen_env["UPDATE_LOG_FILE"].endswith("calvin-update.log")
 
 
 @pytest.mark.integration
