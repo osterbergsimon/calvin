@@ -34,7 +34,7 @@ class TestGitHubPluginEnumeration:
             )
             zipf.writestr("repo-main/plugin1/plugin.py", "# Plugin 1")
 
-            # Plugin 2 with frontend
+            # Plugin 2 with frontend static assets
             zipf.writestr(
                 "repo-main/plugin2/plugin.json",
                 json.dumps(
@@ -47,7 +47,10 @@ class TestGitHubPluginEnumeration:
                 ),
             )
             zipf.writestr("repo-main/plugin2/plugin.py", "# Plugin 2")
-            zipf.writestr("repo-main/plugin2/frontend/Component.vue", "<template></template>")
+            zipf.writestr(
+                "repo-main/plugin2/frontend/dist.js",
+                "customElements.define('calvin-github-plugin2', class extends HTMLElement {})",
+            )
 
             # plugins.json manifest
             zipf.writestr(
@@ -713,8 +716,8 @@ class TestPluginUninstallAPI:
         plugin_path = plugin_installer.get_plugin_path("test_uninstall_api")
         assert not plugin_path.exists()
 
-    def test_uninstall_plugin_with_frontend(self, test_client, tmp_path):
-        """Test uninstalling a plugin with frontend components."""
+    def test_uninstall_plugin_with_frontend_static_assets(self, test_client, tmp_path):
+        """Test uninstalling a plugin with frontend static assets."""
         # Clean up first
         try:
             plugin_installer.uninstall_plugin("test_uninstall_frontend")
@@ -736,7 +739,9 @@ class TestPluginUninstallAPI:
 
         frontend_dir = plugin_dir / "frontend"
         frontend_dir.mkdir()
-        (frontend_dir / "Component.vue").write_text("<template></template>")
+        (frontend_dir / "dist.js").write_text(
+            "customElements.define('calvin-uninstall-test', class extends HTMLElement {})"
+        )
 
         plugin_installer.install_plugin(plugin_dir)
 

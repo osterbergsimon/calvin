@@ -183,8 +183,10 @@ class TestGitHubPluginE2E:
         branch_switched = data.get("branch_switched", False)
         print(f"\nUsed branch: {actual_branch} (switched: {branch_switched})")
 
-    def test_install_plugin_with_frontend_from_real_repo(self, test_client, network_available):
-        """Test installing a plugin with frontend components from a real repository."""
+    def test_install_plugin_with_frontend_static_assets_from_real_repo(
+        self, test_client, network_available
+    ):
+        """Test installing a plugin with frontend static assets from a real repository."""
         # First, enumerate to find plugins with frontend
         enum_response = test_client.post(
             "/api/plugins/github/enumerate",

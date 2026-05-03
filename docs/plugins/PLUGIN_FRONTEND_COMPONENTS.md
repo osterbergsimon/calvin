@@ -1,117 +1,103 @@
-# Plugin Frontend Components
+# Plugin Display UI
 
-## Overview
+Calvin no longer installs plugin-provided Vue single-file components into the main frontend
+bundle. Service plugins should render dashboard content through one of two supported contracts:
 
-Yes, the plugin installation process **does handle frontend components** provided by plugins. When a plugin includes a `frontend/` directory, it is automatically copied to the frontend during installation.
+1. **Schema renderers**: recommended for most plugins. The plugin returns a `display_schema`
+   with a built-in `kind`, and Calvin renders it with the matching built-in Vue renderer.
+2. **Web components**: an escape hatch for custom UI. The plugin ships pre-built browser-native
+   JavaScript and optional CSS under its `frontend/` directory, and Calvin loads those files at
+   runtime through the plugin static asset endpoint.
 
-## How It Works
+This means installing a schema or web-component plugin does not require a frontend rebuild.
 
-### Installation Process
+## Schema Renderers
 
-When installing a plugin (from zip or GitHub), the installer:
+Use schema renderers when the plugin can describe its UI declaratively. The frontend dispatches
+`display_schema.kind` through `frontend/src/components/plugins/SchemaRenderer.vue`.
 
-1. **Checks for `frontend/` directory** in the plugin package
-2. **Copies the entire `frontend/` directory** to `frontend/src/components/plugins/{plugin_id}/`
-3. **Makes components available** via the path `{plugin_id}/ComponentName.vue`
+Supported renderer kinds include:
 
-### Code Location
+- `status-tile`
+- `status-list`
+- `status-row`
+- `card-grid`
+- `item-list`
+- `iframe`
+- `image-with-caption`
+- `metric-dashboard`
+- `weather-forecast`
+- `web-component`
 
-The frontend component installation logic is in `backend/app/services/plugin_installer.py`:
+Example plugin metadata:
 
 ```python
-# Install frontend components if they exist
-frontend_source = plugin_path / "frontend"
-if frontend_source.exists():
-    frontend_dest = self.get_frontend_plugin_path(install_id)
-    if frontend_dest.exists():
-        shutil.rmtree(frontend_dest)
-    shutil.copytree(frontend_source, frontend_dest)
-```
-
-This works for:
-- ✅ **Zip file installations** - extracts plugin, then copies frontend/
-- ✅ **GitHub installations** - downloads repo, extracts plugin, then copies frontend/
-- ✅ **Directory installations** - copies plugin directory, then copies frontend/
-
-### Example: Mealie Plugin
-
-The Mealie plugin (available in the calvin-plugins repository) demonstrates this:
-
-**Backend** (in the plugin's `plugin.py`):
-```python
-"display_schema": {
-    "type": "api",
-    "api_endpoint": "/api/plugins/{service_id}/data",
-    "method": "GET",
-    "component": "mealie/MealPlanViewer.vue",  # Plugin-provided frontend component
+display_schema={
+    "kind": "status-tile",
+    "label": "Temperature",
+    "value_path": "$.temperature",
+    "unit": "C",
+    "status_path": "$.status",
 }
 ```
 
-**Frontend Component** (in the plugin's `frontend/MealPlanViewer.vue`):
-- This component is loaded dynamically by the `ServiceViewer` component
-- Uses the `usePluginComponent` composable to load plugin-provided components
+The plugin's service data endpoint returns the data object that schema paths bind to.
 
-## Plugin Package Structure
+## Web Components
 
-For a plugin to include frontend components, it should have this structure:
+Use `kind: "web-component"` only when the built-in schema renderers are not expressive enough.
+The plugin must ship already-built browser JavaScript in `frontend/`.
 
-```
+Example package structure:
+
+```text
 my-plugin/
 ├── plugin.json
 ├── plugin.py
 └── frontend/
-    └── MyComponent.vue
-    └── (or subdirectories)
-        └── components/
-            └── MyComponent.vue
+    ├── dist.js
+    └── dist.css
 ```
 
-## Installation Result
-
-After installation, the frontend component will be at:
-```
-frontend/src/components/plugins/{plugin_id}/MyComponent.vue
-```
-
-And referenced in `display_schema.component` as:
-```python
-"component": "{plugin_id}/MyComponent.vue"
-```
-
-## Component Loading
-
-Frontend components are automatically loaded by:
-- `frontend/src/composables/usePluginComponent.js` - Dynamically imports plugin components
-- `frontend/src/components/service/ServiceViewer.vue` - Uses the composable to render plugin components
-
-The system uses Vite's `import.meta.glob()` to discover all plugin components at build time.
-
-## Uninstallation
-
-When uninstalling a plugin, frontend components are also removed:
+Example display schema:
 
 ```python
-# Remove frontend components
-frontend_path = self.get_frontend_plugin_path(plugin_id)
-if frontend_path.exists():
-    shutil.rmtree(frontend_path)
+display_schema={
+    "kind": "web-component",
+    "element": "calvin-my-plugin",
+    "module": "dist.js",
+    "stylesheet": "dist.css",
+}
 ```
 
-## Important Notes
+At runtime, Calvin loads:
 
-1. **Frontend rebuild required**: After installing a plugin with frontend components, the frontend needs to be rebuilt for the components to be available (Vite's glob needs to pick them up)
+```text
+/api/plugins/{plugin_id}/static/dist.js
+/api/plugins/{plugin_id}/static/dist.css
+```
 
-2. **Component path**: The component path in `display_schema.component` should be relative to `frontend/src/components/plugins/`, e.g., `mealie/MealPlanViewer.vue`
+The JavaScript module must register the custom element named by `display_schema.element`.
+Calvin assigns the latest service data to the element's `data` property.
 
-3. **Subdirectories**: You can organize components in subdirectories within the `frontend/` directory, and the full path will be preserved
+## Installation Behavior
 
-4. **No manual registration**: Plugin components don't need to be manually registered - they're discovered automatically via the glob pattern
+When a plugin includes a `frontend/` directory, Calvin stores it with the installed plugin under:
 
-## Testing
+```text
+backend/data/plugins/{plugin_id}/frontend/
+```
 
-To verify frontend components are installed correctly:
+Those files are served by:
 
-1. Check that `frontend/src/components/plugins/{plugin_id}/` exists after installation
-2. Verify the component files are present
-3. Check that the plugin's `display_schema.component` path matches the installed location
-4. Rebuild the frontend and test the plugin
+```text
+GET /api/plugins/{plugin_id}/static/{asset_path}
+```
+
+The static endpoint prevents path traversal outside the plugin's `frontend/` directory.
+
+## Choosing a Contract
+
+Prefer schema renderers for stable dashboard UI because they inherit Calvin's layout, theme,
+accessibility, and test coverage. Use web components for custom visualizations or interactions
+that cannot reasonably be represented with the built-in renderer set.

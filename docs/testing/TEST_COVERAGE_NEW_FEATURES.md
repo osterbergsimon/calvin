@@ -36,7 +36,7 @@ We use a **hybrid approach** for testing GitHub plugin installation:
 
 - `TestPluginInstallFromRepo`: Tests installing plugins from repositories
   - Basic installation from repo
-  - Installation with frontend components
+  - Installation with frontend static assets for web components
   - Path traversal protection
   - Error handling for non-existent plugins
   - Error handling for already installed plugins
@@ -49,7 +49,7 @@ We use a **hybrid approach** for testing GitHub plugin installation:
 **Coverage**:
 - ✅ Plugin enumeration (auto-discovery and manifest-based)
 - ✅ Repository installation
-- ✅ Frontend component installation from repos
+- ✅ Frontend static asset installation from repos
 - ✅ Version checking
 - ✅ Security (path traversal protection)
 
@@ -71,7 +71,7 @@ We use a **hybrid approach** for testing GitHub plugin installation:
 
 - `TestPluginUninstallAPI`: Tests `/api/plugins/installed/{id}` DELETE endpoint
   - Successful uninstall
-  - Uninstall with frontend components
+  - Uninstall with frontend static assets
   - Error handling for non-existent plugins
 
 **Coverage**:
@@ -79,7 +79,7 @@ We use a **hybrid approach** for testing GitHub plugin installation:
 - ✅ GitHub installation API
 - ✅ Branch fallback logic
 - ✅ Uninstall API
-- ✅ Frontend component cleanup on uninstall
+- ✅ Frontend static asset cleanup on uninstall
 
 ### 3. `backend/tests/integration/test_api_system.py`
 
@@ -176,7 +176,10 @@ uv run pytest  # Also skips E2E (they're marked slow)
 ### ✅ Fully Covered
 - Plugin enumeration from repositories
 - Plugin installation from repositories
-- Frontend component installation
+- Frontend static asset installation
+- Plugin static asset serving
+- Schema renderer dispatch
+- Web component host loading contract
 - Version checking
 - Path traversal protection
 - GitHub API integration (mocked)
@@ -187,18 +190,19 @@ uv run pytest  # Also skips E2E (they're marked slow)
 ### ⚠️ Partially Covered
 - Real GitHub API calls (mocked in integration tests, real in E2E tests)
 - Polkit rules (tested via mocked subprocess calls)
-- Frontend rebuild after component installation (not tested - requires build step)
+- Full browser execution of third-party web component modules
 
 ### ✅ E2E Coverage (Optional)
 - Real GitHub repository integration
 - Actual network calls and error handling
 - Real branch fallback behavior
 - Actual plugin structure validation
+- Schema and web-component plugin contracts, where covered by the test repository
 
 ### ❌ Not Covered (Future Work)
 - End-to-end plugin installation flow
 - Real GitHub repository access
-- Frontend component loading after installation
+- Browser-level verification that an installed web component renders correctly after installation
 - Polkit rule file creation (tested in integration, not unit)
 
 ## Testing Strategy
@@ -230,4 +234,3 @@ uv run pytest  # Also skips E2E (they're marked slow)
 - Integration tests use mocked external services
 - Unit tests focus on business logic
 - Integration tests focus on API contracts
-
