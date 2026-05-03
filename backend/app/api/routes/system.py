@@ -10,6 +10,7 @@ import subprocess
 import threading
 import time
 from pathlib import Path
+from typing import Any
 
 from fastapi import APIRouter, HTTPException
 from fastapi.responses import StreamingResponse
@@ -93,6 +94,22 @@ _UPDATE_LOG_LOCATIONS = [
     lambda: Path("/tmp/calvin-update.log"),  # nosec B108 - read-only fallback for log discovery
     lambda: Path("/var/log/calvin-update.log"),
 ]
+_UPDATE_STATE_STALE_AFTER_SEC = 15 * 60
+_COMMIT_KEYS = {
+    "current_commit",
+    "current_commit_short",
+    "current_commit_msg",
+    "new_commit",
+    "new_commit_short",
+    "new_commit_msg",
+}
+
+_UPDATE_STATE_LOCATIONS = [
+    lambda: settings.repo_dir / "backend" / "logs" / "calvin-update-state.json",
+    lambda: settings.repo_dir.parent / "calvin-update-state.json",
+    lambda: Path("/tmp/calvin-update-state.json"),  # nosec B108 - read-only fallback
+    lambda: Path("/var/log/calvin-update-state.json"),
+]
 
 
 def _find_update_log() -> Path | None:
@@ -101,6 +118,86 @@ def _find_update_log() -> Path | None:
         if p.exists():
             return p
     return None
+
+
+def _find_update_state() -> Path | None:
+    for loc_fn in _UPDATE_STATE_LOCATIONS:
+        p = loc_fn()
+        if p.exists():
+            return p
+    return None
+
+
+def _empty_update_status(status: str, message: str) -> dict[str, Any]:
+    return {
+        "status": status,
+        "message": message,
+        "current_commit": None,
+        "current_commit_short": None,
+        "current_commit_msg": None,
+        "new_commit": None,
+        "new_commit_short": None,
+        "new_commit_msg": None,
+        "backend_restarted": False,
+    }
+
+
+def _read_update_state(state_file: Path) -> dict[str, Any] | None:
+    try:
+        with open(state_file, encoding="utf-8") as f:
+            state = json.load(f)
+        return state if isinstance(state, dict) else None
+    except (OSError, json.JSONDecodeError):
+        logger.warning("Failed to read update state file: %s", state_file, exc_info=True)
+        return None
+
+
+def _state_to_update_status(state: dict[str, Any], state_file: Path) -> dict[str, Any]:
+    raw_status = str(state.get("status") or "unknown").lower()
+    status = {
+        "success": "idle",
+        "complete": "idle",
+        "completed": "idle",
+        "running": "running",
+        "error": "error",
+        "failed": "error",
+    }.get(raw_status, "unknown")
+    message = str(state.get("message") or "Update status unknown. Check logs for details.")
+
+    if status == "running":
+        state_mtime = state_file.stat().st_mtime
+        stale_after = state.get("stale_after_seconds", _UPDATE_STATE_STALE_AFTER_SEC)
+        try:
+            stale_after = int(stale_after)
+        except (TypeError, ValueError):
+            stale_after = _UPDATE_STATE_STALE_AFTER_SEC
+
+        if (time.time() - state_mtime) > stale_after:
+            status = "error"
+            message = "Update appears to have stalled or failed"
+
+    data = _empty_update_status(status, message)
+    data.update(
+        {
+            "state_status": raw_status,
+            "phase": state.get("phase"),
+            "started_at": state.get("started_at"),
+            "updated_at": state.get("updated_at"),
+            "finished_at": state.get("finished_at"),
+            "error": state.get("error"),
+            "mode": state.get("mode"),
+            "branch": state.get("branch"),
+            "log_file": state.get("log_file"),
+            "state_file": str(state_file),
+            "backend_restarted": bool(state.get("backend_restarted", False)),
+        }
+    )
+
+    for key in _COMMIT_KEYS:
+        if key in state:
+            data[key] = state.get(key)
+
+    return data
 
 
 @router.post("/update")
@@ -127,10 +224,28 @@ async def trigger_update():
         log_dir = settings.repo_dir / "backend" / "logs"
         log_dir.mkdir(parents=True, exist_ok=True)
         log_file = log_dir / "calvin-update.log"
+        state_file = log_dir / "calvin-update-state.json"
 
         # Capture current end-of-file position so the stream endpoint knows
         # where this run's output begins (the log is appended, not truncated).
         log_offset = int(log_file.stat().st_size) if log_file.exists() else 0
+
+        state_file.write_text(
+            json.dumps(
+                {
+                    "status": "running",
+                    "phase": "starting",
+                    "message": "Starting Calvin update",
+                    "mode": os.environ.get("CALVIN_MODE"),
+                    "branch": git_branch,
+                    "log_file": str(log_file),
+                    "started_at": time.strftime("%Y-%m-%dT%H:%M:%SZ", time.gmtime()),
+                    "updated_at": time.strftime("%Y-%m-%dT%H:%M:%SZ", time.gmtime()),
+                },
+                indent=2,
+            ),
+            encoding="utf-8",
+        )
 
         # Run update script in background (non-blocking)
         # Redirect both stdout and stderr to log file AND keep them for error checking
@@ -145,12 +260,12 @@ async def trigger_update():
                     **os.environ,
                     "PATH": settings.system_path,
                     "GIT_BRANCH": git_branch,  # Pass git branch to update script
+                    "UPDATE_LOG_FILE": str(log_file),
+                    "UPDATE_STATE_FILE": str(state_file),
                 },
             )
 
         # Wait a moment to see if process starts successfully
-        import time
-
         time.sleep(0.5)
 
         # Check if process is still running (didn't immediately fail)
@@ -169,6 +284,23 @@ async def trigger_update():
                     "Log file not created. Script may not be executable or may have failed."
                 )
 
+            state_file.write_text(
+                json.dumps(
+                    {
+                        "status": "error",
+                        "phase": "starting",
+                        "message": "Update script exited immediately.",
+                        "error": error_msg,
+                        "branch": git_branch,
+                        "log_file": str(log_file),
+                        "started_at": time.strftime("%Y-%m-%dT%H:%M:%SZ", time.gmtime()),
+                        "updated_at": time.strftime("%Y-%m-%dT%H:%M:%SZ", time.gmtime()),
+                        "finished_at": time.strftime("%Y-%m-%dT%H:%M:%SZ", time.gmtime()),
+                    },
+                    indent=2,
+                ),
+                encoding="utf-8",
+            )
             raise HTTPException(status_code=500, detail=error_msg)
 
         return {
@@ -176,6 +308,7 @@ async def trigger_update():
             "message": f"Update process started (PID: {process.pid})",
             "pid": process.pid,
             "log_file": str(log_file),
+            "state_file": str(state_file),
             "log_offset": log_offset,
         }
     except HTTPException:
@@ -190,20 +323,18 @@ async def get_update_status():
     Get the status of the last update.
     Reads the last few lines from the update log.
     """
+    state_file = _find_update_state()
+    if state_file:
+        state = _read_update_state(state_file)
+        if state:
+            return _state_to_update_status(state, state_file)
+
     log_file = _find_update_log()
 
     if not log_file or not log_file.exists():
-        return {
-            "status": "unknown",
-            "message": "Update log not found. No updates have been run yet.",
-            "current_commit": None,
-            "current_commit_short": None,
-            "current_commit_msg": None,
-            "new_commit": None,
-            "new_commit_short": None,
-            "new_commit_msg": None,
-            "backend_restarted": False,
-        }
+        return _empty_update_status(
+            "unknown", "Update log not found. No updates have been run yet."
+        )
 
     try:
         # Read last 50 lines of log for better context (increased to capture commit info)
@@ -390,18 +521,9 @@ async def get_update_status():
             "backend_restarted": has_backend_restarted,
         }
     except Exception as e:
-        return {
-            "status": "error",
-            "message": f"Failed to read update log: {str(e)}",
-            "last_log": "",
-            "current_commit": None,
-            "current_commit_short": None,
-            "current_commit_msg": None,
-            "new_commit": None,
-            "new_commit_short": None,
-            "new_commit_msg": None,
-            "backend_restarted": False,
-        }
+        data = _empty_update_status("error", f"Failed to read update log: {str(e)}")
+        data["last_log"] = ""
+        return data
 
 
 @router.get("/update/stream")
