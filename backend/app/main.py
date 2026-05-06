@@ -211,10 +211,10 @@ async def _initialize_keyboard_mappings():
         "KEY_1": "generic_prev",
         "KEY_2": "generic_expand_close",
         "KEY_3": "generic_next",
-        "KEY_4": "mode_calendar",
-        "KEY_5": "mode_photos",
-        "KEY_6": "mode_web_services",
-        "KEY_7": "generic_refresh",
+        "KEY_4": "region_next",
+        "KEY_5": "screen_prev",
+        "KEY_6": "screen_next",
+        "KEY_7": "mode_settings",
     }
 
     # Set default standard keyboard mappings (same pattern, different keys)
@@ -222,10 +222,10 @@ async def _initialize_keyboard_mappings():
         "KEY_LEFT": "generic_prev",
         "KEY_UP": "generic_expand_close",
         "KEY_RIGHT": "generic_next",
-        "KEY_DOWN": "mode_calendar",
-        "KEY_SPACE": "mode_photos",
-        "KEY_1": "mode_web_services",
-        "KEY_2": "generic_refresh",
+        "KEY_DOWN": "region_next",
+        "KEY_SPACE": "screen_next",
+        "KEY_1": "screen_prev",
+        "KEY_2": "mode_settings",
     }
 
     # Initialize mappings if none exist
@@ -271,6 +271,33 @@ async def _initialize_default_config():
         "orientation": "landscape",
         "apply_display_rotation": True,
         "calendar_split": 70.0,
+        "dashboard_layout": {
+            "version": 1,
+            "preset": "split_two",
+            "regions": [
+                {"id": "region-1", "kind": "calendar", "size": 70},
+                {"id": "region-2", "kind": "photos", "serviceId": None, "size": 30},
+            ],
+        },
+        "dashboard_screens": {
+            "version": 2,
+            "activeScreenId": "screen-home",
+            "screens": [
+                {
+                    "id": "screen-home",
+                    "name": "Home",
+                    "layout": {
+                        "version": 1,
+                        "preset": "split_two",
+                        "regions": [
+                            {"id": "region-1", "kind": "calendar", "serviceId": None, "size": 70},
+                            {"id": "region-2", "kind": "photos", "serviceId": None, "size": 30},
+                        ],
+                    },
+                    "activeRegionId": "region-1",
+                }
+            ],
+        },
         "keyboard_type": "7-button",
         "photo_frame_enabled": False,
         "photo_frame_timeout": 300,  # 5 minutes

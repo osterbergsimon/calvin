@@ -7,6 +7,7 @@ import { useConfigStore } from "../stores/config";
 import { useKeyboardStore } from "../stores/keyboard";
 import * as configApi from "../services/configApi";
 import { logError } from "../utils/logger";
+import { normalizeDashboardLayout, normalizeDashboardScreens } from "../utils/layout";
 
 export function useConfigForm(initialConfig = {}) {
   const configStore = useConfigStore();
@@ -62,6 +63,16 @@ export function useConfigForm(initialConfig = {}) {
           response.applyDisplayRotation ?? response.apply_display_rotation ?? true,
         // Layout
         calendarSplit: response.calendarSplit ?? response.calendar_split ?? 70,
+        dashboardLayout: normalizeDashboardLayout(
+          response.dashboardLayout ?? response.dashboard_layout ?? null,
+          {
+            calendarSplit: response.calendarSplit ?? response.calendar_split ?? 70,
+            lastSideViewMode: response.lastSideViewMode ?? response.last_side_view_mode ?? "photos",
+          }
+        ),
+        dashboardScreens: normalizeDashboardScreens(
+          response.dashboardScreens ?? response.dashboard_screens ?? null
+        ),
         sideViewPosition: response.sideViewPosition ?? response.side_view_position ?? "right",
         lastSideViewMode: response.lastSideViewMode ?? response.last_side_view_mode ?? "photos",
         showWebServices: response.showWebServices ?? response.show_web_services ?? false,

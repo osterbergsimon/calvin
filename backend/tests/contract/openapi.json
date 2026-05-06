@@ -322,6 +322,30 @@
             ],
             "title": "Darkmodestart"
           },
+          "dashboardLayout": {
+            "anyOf": [
+              {
+                "additionalProperties": true,
+                "type": "object"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Dashboardlayout"
+          },
+          "dashboardScreens": {
+            "anyOf": [
+              {
+                "additionalProperties": true,
+                "type": "object"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Dashboardscreens"
+          },
           "displaySchedule": {
             "anyOf": [
               {
@@ -1109,8 +1133,8 @@
   "paths": {
     "/": {
       "get": {
-        "description": "Root endpoint.",
-        "operationId": "root__get",
+        "description": "Serve frontend index.html for root path.",
+        "operationId": "serve_frontend_root__get",
         "responses": {
           "200": {
             "content": {
@@ -1121,7 +1145,7 @@
             "description": "Successful Response"
           }
         },
-        "summary": "Root"
+        "summary": "Serve Frontend Root"
       }
     },
     "/api/calendar/events": {
@@ -3676,6 +3700,82 @@
         "tags": [
           "system"
         ]
+      }
+    },
+    "/assets/{file_path}": {
+      "get": {
+        "description": "Serve static assets with cache control headers for development.",
+        "operationId": "serve_asset_assets__file_path__get",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "file_path",
+            "required": true,
+            "schema": {
+              "title": "File Path",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Serve Asset"
+      }
+    },
+    "/{full_path}": {
+      "get": {
+        "description": "Serve frontend index.html for SPA routing (GET only).",
+        "operationId": "serve_frontend_get__full_path__get",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "full_path",
+            "required": true,
+            "schema": {
+              "title": "Full Path",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Serve Frontend Get"
       }
     }
   }

@@ -39,6 +39,76 @@ def test_update_config(test_client: TestClient):
 
 
 @pytest.mark.integration
+def test_update_dashboard_layout_config(test_client: TestClient):
+    """Test updating dashboard region layout via API."""
+    dashboard_layout = {
+        "version": 1,
+        "preset": "service_service",
+        "regions": [
+            {"id": "primary", "kind": "service", "serviceId": "weather", "size": 55},
+            {"id": "secondary", "kind": "service", "serviceId": "meals", "size": 45},
+        ],
+    }
+
+    response = test_client.post("/api/config", json={"dashboardLayout": dashboard_layout})
+    assert response.status_code == 200
+
+    config = response.json()
+    assert config["dashboardLayout"] == dashboard_layout
+
+    get_response = test_client.get("/api/config")
+    assert get_response.status_code == 200
+    assert get_response.json()["dashboardLayout"] == dashboard_layout
+
+
+@pytest.mark.integration
+def test_update_dashboard_screens_config(test_client: TestClient):
+    """Test updating dashboard screens via API."""
+    dashboard_screens = {
+        "version": 2,
+        "activeScreenId": "services",
+        "screens": [
+            {
+                "id": "home",
+                "name": "Home",
+                "layout": {
+                    "version": 1,
+                    "preset": "calendar_photos",
+                    "regions": [
+                        {"id": "primary", "kind": "calendar", "serviceId": None, "size": 70},
+                        {"id": "secondary", "kind": "photos", "serviceId": None, "size": 30},
+                    ],
+                },
+                "activeRegionId": "primary",
+            },
+            {
+                "id": "services",
+                "name": "Services",
+                "layout": {
+                    "version": 1,
+                    "preset": "service_service",
+                    "regions": [
+                        {"id": "primary", "kind": "service", "serviceId": "weather", "size": 50},
+                        {"id": "secondary", "kind": "service", "serviceId": "meals", "size": 50},
+                    ],
+                },
+                "activeRegionId": "secondary",
+            },
+        ],
+    }
+
+    response = test_client.post("/api/config", json={"dashboardScreens": dashboard_screens})
+    assert response.status_code == 200
+
+    config = response.json()
+    assert config["dashboardScreens"] == dashboard_screens
+
+    get_response = test_client.get("/api/config")
+    assert get_response.status_code == 200
+    assert get_response.json()["dashboardScreens"] == dashboard_screens
+
+
+@pytest.mark.integration
 def test_update_config_partial(test_client: TestClient):
     """Test partial config update."""
     # Update only one field

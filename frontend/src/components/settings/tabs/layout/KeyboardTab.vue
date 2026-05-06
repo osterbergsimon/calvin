@@ -105,6 +105,19 @@ const availableActions = [
   { value: "mode_web_services", label: "Mode: Web Services" },
   { value: "mode_spare", label: "Mode: Spare (Future Use)" },
 
+  // Screen and region navigation
+  { value: "screen_next", label: "Screen: Next" },
+  { value: "screen_prev", label: "Screen: Previous" },
+  { value: "screen_1", label: "Screen: 1" },
+  { value: "screen_2", label: "Screen: 2" },
+  { value: "screen_3", label: "Screen: 3" },
+  { value: "screen_4", label: "Screen: 4" },
+  { value: "screen_5", label: "Screen: 5" },
+  { value: "screen_6", label: "Screen: 6" },
+  { value: "screen_7", label: "Screen: 7" },
+  { value: "region_next", label: "Region: Next Active Region" },
+  { value: "region_prev", label: "Region: Previous Active Region" },
+
   // Generic context-aware buttons (3 buttons)
   { value: "generic_next", label: "Generic: Next (context-aware)" },
   { value: "generic_prev", label: "Generic: Previous (context-aware)" },

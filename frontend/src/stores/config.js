@@ -2,12 +2,21 @@ import { defineStore } from "pinia";
 import { ref, computed } from "vue";
 import axios from "axios";
 import { logError } from "../utils/logger";
+import {
+  cycleActiveDashboardRegion,
+  cycleDashboardScreen,
+  normalizeDashboardLayout,
+  normalizeDashboardScreens,
+  setActiveDashboardScreen,
+} from "../utils/layout";
 
 export const useConfigStore = defineStore("config", () => {
   const orientation = ref("landscape"); // 'landscape' | 'portrait'
   const orientationFlipped = ref(false); // Whether orientation is flipped (180° rotation)
   const applyDisplayRotation = ref(true); // Whether to physically rotate display on RPi (default: true)
   const calendarSplit = ref(70); // Percentage for calendar (10-90%, default 70%)
+  const dashboardLayout = ref(null); // Dashboard region layout configuration
+  const dashboardScreens = ref(null); // Dashboard screen configuration
   const sideViewPosition = ref("right"); // 'left' | 'right' for landscape, 'top' | 'bottom' for portrait
   const lastSideViewMode = ref("photos"); // Track last side view mode ('photos' | 'web_services')
   const showWebServices = ref(false); // Toggle for web services view
@@ -133,6 +142,29 @@ export const useConfigStore = defineStore("config", () => {
       }
       if (response.data.calendar_split !== undefined) {
         calendarSplit.value = response.data.calendar_split;
+      }
+      if (response.data.dashboardLayout !== undefined) {
+        dashboardLayout.value = normalizeDashboardLayout(response.data.dashboardLayout, {
+          calendarSplit: calendarSplit.value,
+          lastSideViewMode: lastSideViewMode.value,
+        });
+      } else if (response.data.dashboard_layout !== undefined) {
+        dashboardLayout.value = normalizeDashboardLayout(response.data.dashboard_layout, {
+          calendarSplit: calendarSplit.value,
+          lastSideViewMode: lastSideViewMode.value,
+        });
+      } else {
+        dashboardLayout.value = normalizeDashboardLayout(null, {
+          calendarSplit: calendarSplit.value,
+          lastSideViewMode: lastSideViewMode.value,
+        });
+      }
+      if (response.data.dashboardScreens !== undefined) {
+        dashboardScreens.value = normalizeDashboardScreens(response.data.dashboardScreens);
+      } else if (response.data.dashboard_screens !== undefined) {
+        dashboardScreens.value = normalizeDashboardScreens(response.data.dashboard_screens);
+      } else {
+        dashboardScreens.value = normalizeDashboardScreens(null);
       }
       if (response.data.photoFrameEnabled !== undefined) {
         photoFrameEnabled.value = response.data.photoFrameEnabled;
@@ -496,6 +528,22 @@ export const useConfigStore = defineStore("config", () => {
       if (config.calendarSplit !== undefined) {
         calendarSplit.value = config.calendarSplit;
       }
+      if (config.dashboardLayout !== undefined) {
+        dashboardLayout.value = normalizeDashboardLayout(config.dashboardLayout, {
+          calendarSplit: calendarSplit.value,
+          lastSideViewMode: lastSideViewMode.value,
+        });
+      } else if (config.dashboard_layout !== undefined) {
+        dashboardLayout.value = normalizeDashboardLayout(config.dashboard_layout, {
+          calendarSplit: calendarSplit.value,
+          lastSideViewMode: lastSideViewMode.value,
+        });
+      }
+      if (config.dashboardScreens !== undefined) {
+        dashboardScreens.value = normalizeDashboardScreens(config.dashboardScreens);
+      } else if (config.dashboard_screens !== undefined) {
+        dashboardScreens.value = normalizeDashboardScreens(config.dashboard_screens);
+      }
       if (config.showWeekNumbers !== undefined) {
         showWeekNumbers.value = config.showWeekNumbers;
       } else if (config.show_week_numbers !== undefined) {
@@ -777,6 +825,28 @@ export const useConfigStore = defineStore("config", () => {
     }
   };
 
+  const setDashboardScreens = screens => {
+    dashboardScreens.value = normalizeDashboardScreens(screens);
+  };
+
+  const activateDashboardScreen = async screenId => {
+    const nextScreens = setActiveDashboardScreen(dashboardScreens.value, screenId);
+    dashboardScreens.value = nextScreens;
+    await updateConfig({ dashboardScreens: nextScreens });
+  };
+
+  const cycleDashboardScreenBy = async direction => {
+    const nextScreens = cycleDashboardScreen(dashboardScreens.value, direction);
+    dashboardScreens.value = nextScreens;
+    await updateConfig({ dashboardScreens: nextScreens });
+  };
+
+  const cycleActiveDashboardRegionBy = async direction => {
+    const nextScreens = cycleActiveDashboardRegion(dashboardScreens.value, direction);
+    dashboardScreens.value = nextScreens;
+    await updateConfig({ dashboardScreens: nextScreens });
+  };
+
   const setThemeMode = mode => {
     themeMode.value = mode;
   };
@@ -795,6 +865,8 @@ export const useConfigStore = defineStore("config", () => {
     orientationFlipped,
     applyDisplayRotation,
     calendarSplit,
+    dashboardLayout,
+    dashboardScreens,
     showWebServices,
     lastSideViewMode,
     photoFrameEnabled,
@@ -878,6 +950,10 @@ export const useConfigStore = defineStore("config", () => {
     setMaxVisibleEvents,
     setSideViewPosition,
     toggleSideViewPosition,
+    setDashboardScreens,
+    activateDashboardScreen,
+    cycleDashboardScreenBy,
+    cycleActiveDashboardRegionBy,
     setThemeMode,
     setDarkModeTime,
     setImageDisplayMode,
