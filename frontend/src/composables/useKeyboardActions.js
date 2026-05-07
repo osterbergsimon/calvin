@@ -11,6 +11,7 @@ import {
   cycleDashboardScreen,
   getActiveDashboardRegion,
   getActiveDashboardScreen,
+  getLeafRegions,
   normalizeDashboardScreens,
   setActiveDashboardScreen,
 } from "../utils/layout";
@@ -57,17 +58,25 @@ export function useKeyboardActions() {
 
   const activateFirstScreenContainingKind = kind => {
     const screensConfig = getDashboardScreens();
-    const screenIndex = screensConfig.screens.findIndex(candidate =>
-      candidate.layout.regions.some(region => region.kind === kind)
-    );
-    if (screenIndex < 0) return false;
-    const screen = screensConfig.screens[screenIndex];
-    const region = screen.layout.regions.find(candidate => candidate.kind === kind);
+    let matchScreenIndex = -1;
+    let matchLeafId = null;
+    for (let index = 0; index < screensConfig.screens.length; index += 1) {
+      const leaf = getLeafRegions(screensConfig.screens[index].layout).find(
+        candidate => candidate.kind === kind
+      );
+      if (leaf) {
+        matchScreenIndex = index;
+        matchLeafId = leaf.id;
+        break;
+      }
+    }
+    if (matchScreenIndex < 0) return false;
+    const screen = screensConfig.screens[matchScreenIndex];
     const nextScreens = setActiveDashboardScreen(
       {
         ...screensConfig,
         screens: screensConfig.screens.map((candidate, index) =>
-          index === screenIndex ? { ...candidate, activeRegionId: region.id } : candidate
+          index === matchScreenIndex ? { ...candidate, activeRegionId: matchLeafId } : candidate
         ),
       },
       screen.id
