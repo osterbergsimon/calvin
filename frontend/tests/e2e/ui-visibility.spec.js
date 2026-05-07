@@ -11,21 +11,17 @@ test.describe("UI Visibility", () => {
     await page.waitForLoadState("networkidle");
   });
 
-  test("should show UI controls when UI is visible", async ({ page }) => {
-    // Look for header controls
-    const header = page.locator(".dashboard-header");
-    if ((await header.count()) > 0) {
-      await expect(header).toBeVisible();
+  test("should show bar action controls when UI is visible", async ({ page }) => {
+    const cluster = page.locator(".bar-action-cluster");
+    if ((await cluster.count()) > 0) {
+      await expect(cluster.first()).toBeVisible();
     }
   });
 
-  test("should display clock when enabled and UI visible", async ({ page }) => {
-    // Look for clock component
-    const clock = page.locator(".clock, [class*='clock']");
-    const clockCount = await clock.count();
-
-    // Clock should exist if enabled (might be hidden)
-    expect(clockCount).toBeGreaterThanOrEqual(0);
+  test("should display the clock bar when shown", async ({ page }) => {
+    const bar = page.locator(".clock-bar-horizontal, .clock-bar-vertical");
+    const count = await bar.count();
+    expect(count).toBeGreaterThanOrEqual(0);
   });
 
   test("should display connection indicator when offline", async ({ page }) => {

@@ -5,94 +5,13 @@
       <ClockBarHorizontal
         v-if="showHorizontalBarTop"
         position="top"
-        :show-in-non-kiosk="configStore.clockBarShowInNonKiosk"
+        :show-in-non-kiosk="true"
         :show-in-kiosk="configStore.clockBarShowInKiosk"
         :enabled="true"
       />
 
-      <div v-if="configStore.shouldShowUI" class="dashboard-header">
-        <h1>Calvin Dashboard</h1>
-        <!-- Legacy clock widget in header (for backwards compatibility) -->
-        <Clock
-          v-if="configStore.clockEnabled && configStore.clockDisplayMode === 'header'"
-          :display-mode="configStore.clockDisplayMode"
-          :show-date="configStore.clockShowDate"
-        />
-        <!-- New clock widget in header -->
-        <Clock
-          v-if="
-            configStore.clockWidgetEnabled &&
-            !configStore.clockWidgetShowInKiosk &&
-            (configStore.clockWidgetPosition === 'top-left' ||
-              configStore.clockWidgetPosition === 'top-right' ||
-              configStore.clockWidgetPosition === 'top-center')
-          "
-          :display-mode="'header'"
-          :show-date="configStore.clockShowDate"
-        />
-        <div class="header-controls">
-          <div class="status-indicator">
-            <span :class="['status-dot', statusClass]" />
-            <span>{{ statusText }}</span>
-          </div>
-          <button
-            class="btn-orientation"
-            :title="`Switch to ${configStore.orientation === 'landscape' ? 'portrait' : 'landscape'} view`"
-            @click="toggleOrientation"
-          >
-            {{ configStore.orientation === "landscape" ? "📱" : "🖥️" }}
-            {{ configStore.orientation === "landscape" ? "Portrait" : "Landscape" }}
-          </button>
-          <button
-            v-if="dashboardScreens.screens.length > 1"
-            class="btn-web-services"
-            title="Previous Screen"
-            @click="previousScreen"
-          >
-            Previous Screen
-          </button>
-          <button
-            v-if="dashboardScreens.screens.length > 1"
-            class="btn-web-services"
-            title="Next Screen"
-            @click="nextScreen"
-          >
-            Next Screen
-          </button>
-          <button
-            v-if="activeScreenLeafCount > 1"
-            class="btn-web-services"
-            title="Switch Active Region"
-            @click="nextRegion"
-          >
-            Region
-          </button>
-          <button class="btn-settings" title="Settings" @click="goToSettings">⚙️ Settings</button>
-          <button class="btn-minimal" title="Hide UI" @click="configStore.toggleUI">⊖</button>
-        </div>
-      </div>
-
       <!-- Minimal UI overlay (shown when UI is hidden) -->
       <MinimalUIOverlay v-if="!configStore.shouldShowUI" />
-
-      <!-- Connection indicator (shown when offline) -->
-      <ConnectionIndicator
-        class="connection-indicator-overlay"
-        :show-label="configStore.shouldShowUI"
-      />
-
-      <!-- Clock Widget in Kiosk Mode -->
-      <Clock
-        v-if="
-          (configStore.clockWidgetEnabled && configStore.clockWidgetShowInKiosk) ||
-          (configStore.clockEnabled &&
-            configStore.clockDisplayMode === 'always' &&
-            !configStore.shouldShowUI)
-        "
-        :display-mode="'always'"
-        :show-date="configStore.clockShowDate"
-        :class="clockClass"
-      />
 
       <div :class="['dashboard-main', mainLayoutClass]">
         <!-- Fullscreen Mode (Photos or Web Services) -->
@@ -119,7 +38,7 @@
             <ClockBarVertical
               v-if="elementType === 'verticalBarLeft'"
               position="left"
-              :show-in-non-kiosk="configStore.clockBarShowInNonKiosk"
+              :show-in-non-kiosk="true"
               :show-in-kiosk="configStore.clockBarShowInKiosk"
               :enabled="true"
             />
@@ -150,7 +69,7 @@
             <ClockBarHorizontal
               v-else-if="elementType === 'horizontalBarBetween'"
               position="between"
-              :show-in-non-kiosk="configStore.clockBarShowInNonKiosk"
+              :show-in-non-kiosk="true"
               :show-in-kiosk="configStore.clockBarShowInKiosk"
               :enabled="true"
             />
@@ -159,7 +78,7 @@
             <ClockBarVertical
               v-else-if="elementType === 'verticalBarBetween'"
               position="between"
-              :show-in-non-kiosk="configStore.clockBarShowInNonKiosk"
+              :show-in-non-kiosk="true"
               :show-in-kiosk="configStore.clockBarShowInKiosk"
               :enabled="true"
             />
@@ -168,7 +87,7 @@
             <ClockBarVertical
               v-else-if="elementType === 'verticalBarRight'"
               position="right"
-              :show-in-non-kiosk="configStore.clockBarShowInNonKiosk"
+              :show-in-non-kiosk="true"
               :show-in-kiosk="configStore.clockBarShowInKiosk"
               :enabled="true"
             />
@@ -179,7 +98,7 @@
         <ClockBarHorizontal
           v-if="showHorizontalBarBottom"
           position="bottom"
-          :show-in-non-kiosk="configStore.clockBarShowInNonKiosk"
+          :show-in-non-kiosk="true"
           :show-in-kiosk="configStore.clockBarShowInKiosk"
           :enabled="true"
         />
@@ -190,46 +109,28 @@
 
 <script setup>
 import { ref, onMounted, onUnmounted, computed, watch, defineAsyncComponent } from "vue";
-import axios from "axios";
 import LayoutManager from "../components/LayoutManager.vue";
 import DashboardRegion from "../components/DashboardRegion.vue";
 import MinimalUIOverlay from "../components/MinimalUIOverlay.vue";
-import Clock from "../components/Clock.vue"; // Legacy - keeping for backwards compatibility
 import ClockBarHorizontal from "../components/ClockBarHorizontal.vue";
 import ClockBarVertical from "../components/ClockBarVertical.vue";
-import ConnectionIndicator from "../components/ConnectionIndicator.vue";
 
-// Lazy load mode-specific components for better code splitting
 const PhotoSlideshow = defineAsyncComponent(() => import("../components/PhotoSlideshow.vue"));
 const WebServiceViewer = defineAsyncComponent(() => import("../components/WebServiceViewer.vue"));
 import { useConfigStore } from "../stores/config";
 import { useModeStore } from "../stores/mode";
-import { useRouter, useRoute } from "vue-router";
+import { useRoute } from "vue-router";
 import {
   getActiveDashboardScreen,
   getLayoutDirection,
-  getLeafRegions,
   getRegionAxisStyle,
   normalizeDashboardScreens,
 } from "../utils/layout";
 
 const configStore = useConfigStore();
 const modeStore = useModeStore();
-const router = useRouter();
 const route = useRoute();
 
-const status = ref("checking...");
-const statusClass = computed(() => {
-  if (status.value === "healthy") return "healthy";
-  if (status.value === "checking...") return "checking";
-  return "error";
-});
-
-const statusText = computed(() => {
-  return status.value.charAt(0).toUpperCase() + status.value.slice(1);
-});
-
-// Polling interval for config updates (configurable, default 30 seconds)
 let configPollInterval = null;
 
 const layoutDirection = computed(() =>
@@ -240,73 +141,43 @@ const mainLayoutClass = computed(() => {
   return `layout-${configStore.orientation} layout-direction-${layoutDirection.value}`;
 });
 
-const clockClass = computed(() => {
-  // Use new widget position if widget is enabled, otherwise fall back to legacy position
-  const position =
-    configStore.clockWidgetEnabled && configStore.clockWidgetPosition
-      ? configStore.clockWidgetPosition
-      : configStore.clockPosition || "top-right";
-  return ["clock-overlay", "position-" + position];
-});
+const barVisible = computed(() => configStore.shouldShowUI || configStore.clockBarShowInKiosk);
 
-// Computed properties for clock bar rendering
-const shouldShowHorizontalBar = computed(() => {
-  return configStore.clockBarEnabled && configStore.clockBarMode === "horizontal";
-});
+const shouldShowHorizontalBar = computed(() => configStore.clockBarMode === "horizontal");
+const shouldShowVerticalBar = computed(() => configStore.clockBarMode === "vertical");
 
-const shouldShowVerticalBar = computed(() => {
-  return configStore.clockBarEnabled && configStore.clockBarMode === "vertical";
-});
+const showHorizontalBarTop = computed(
+  () => shouldShowHorizontalBar.value && configStore.clockBarPosition === "top" && barVisible.value
+);
 
-const showHorizontalBarTop = computed(() => {
-  return (
-    shouldShowHorizontalBar.value &&
-    configStore.clockBarPosition === "top" &&
-    (configStore.clockBarShowInNonKiosk || configStore.clockBarShowInKiosk)
-  );
-});
+const showHorizontalBarBottom = computed(
+  () =>
+    shouldShowHorizontalBar.value && configStore.clockBarPosition === "bottom" && barVisible.value
+);
 
-const showHorizontalBarBottom = computed(() => {
-  return (
-    shouldShowHorizontalBar.value &&
-    configStore.clockBarPosition === "bottom" &&
-    (configStore.clockBarShowInNonKiosk || configStore.clockBarShowInKiosk)
-  );
-});
-
-const showHorizontalBarBetween = computed(() => {
-  return (
+const showHorizontalBarBetween = computed(
+  () =>
     shouldShowHorizontalBar.value &&
     configStore.clockBarPosition === "between" &&
     layoutDirection.value === "column" &&
-    (configStore.clockBarShowInNonKiosk || configStore.clockBarShowInKiosk)
-  );
-});
+    barVisible.value
+);
 
-const showVerticalBarLeft = computed(() => {
-  return (
-    shouldShowVerticalBar.value &&
-    configStore.clockBarPosition === "left" &&
-    (configStore.clockBarShowInNonKiosk || configStore.clockBarShowInKiosk)
-  );
-});
+const showVerticalBarLeft = computed(
+  () => shouldShowVerticalBar.value && configStore.clockBarPosition === "left" && barVisible.value
+);
 
-const showVerticalBarRight = computed(() => {
-  return (
-    shouldShowVerticalBar.value &&
-    configStore.clockBarPosition === "right" &&
-    (configStore.clockBarShowInNonKiosk || configStore.clockBarShowInKiosk)
-  );
-});
+const showVerticalBarRight = computed(
+  () => shouldShowVerticalBar.value && configStore.clockBarPosition === "right" && barVisible.value
+);
 
-const showVerticalBarBetween = computed(() => {
-  return (
+const showVerticalBarBetween = computed(
+  () =>
     shouldShowVerticalBar.value &&
     configStore.clockBarPosition === "between" &&
     layoutDirection.value === "row" &&
-    (configStore.clockBarShowInNonKiosk || configStore.clockBarShowInKiosk)
-  );
-});
+    barVisible.value
+);
 
 // Computed layout order - determines the order elements should be rendered
 const layoutOrder = computed(() => {
@@ -349,8 +220,6 @@ const getRegionStyle = elementType => {
   return getRegionAxisStyle(region, layoutDirection.value);
 };
 
-const activeScreenLeafCount = computed(() => getLeafRegions(activeScreen.value?.layout).length);
-
 const ACTIVE_HIGHLIGHT_MS = 2500;
 const activeRegionHighlightVisible = ref(false);
 let activeRegionHighlightTimer = null;
@@ -371,47 +240,6 @@ const isActiveRegionElement = elementType => {
   if (!region || region.split) return false;
   return region.id === activeScreen.value.activeRegionId;
 };
-
-const toggleOrientation = () => {
-  const newOrientation = configStore.orientation === "landscape" ? "portrait" : "landscape";
-  configStore.setOrientation(newOrientation);
-  // Reset side view position to default when switching orientation
-  if (newOrientation === "landscape") {
-    configStore.setSideViewPosition("right");
-  } else {
-    configStore.setSideViewPosition("bottom");
-  }
-};
-
-const nextScreen = () => configStore.cycleDashboardScreenBy(1);
-const previousScreen = () => configStore.cycleDashboardScreenBy(-1);
-const nextRegion = () => configStore.cycleActiveDashboardRegionBy(1);
-
-const goToSettings = () => {
-  modeStore.setMode(modeStore.MODES.SETTINGS);
-  router.push("/settings");
-};
-
-const checkHealth = async () => {
-  try {
-    const response = await axios.get("/api/health", { timeout: 5000 });
-    if (response.data && response.data.status === "healthy") {
-      status.value = "healthy";
-    } else {
-      status.value = "unhealthy";
-    }
-  } catch (error) {
-    // Only set error if it's not a timeout or network error (might be temporary)
-    if (error.code === "ECONNABORTED" || error.message?.includes("timeout")) {
-      status.value = "checking...";
-    } else {
-      status.value = "error";
-    }
-    console.error("Health check failed:", error);
-  }
-};
-
-let healthInterval = null;
 
 const startConfigPolling = () => {
   // Clear existing interval if any
@@ -456,13 +284,7 @@ watch(
 );
 
 onMounted(async () => {
-  // Check health immediately and then periodically
-  checkHealth();
-  healthInterval = setInterval(checkHealth, 30000); // Check every 30 seconds
-
-  // Fetch config on mount
   await configStore.fetchConfig();
-  // Start config polling with configured interval
   startConfigPolling();
 });
 
@@ -471,14 +293,9 @@ onUnmounted(() => {
     clearTimeout(activeRegionHighlightTimer);
     activeRegionHighlightTimer = null;
   }
-  // Clean up polling intervals
   if (configPollInterval) {
     clearInterval(configPollInterval);
     configPollInterval = null;
-  }
-  if (healthInterval) {
-    clearInterval(healthInterval);
-    healthInterval = null;
   }
 });
 </script>
@@ -492,163 +309,6 @@ onUnmounted(() => {
   padding: 0;
   gap: 0;
   background: var(--bg-secondary);
-}
-
-.dashboard:has(.dashboard-header) {
-  padding: 1rem;
-  gap: 1rem;
-}
-
-.dashboard-header {
-  display: flex;
-  justify-content: space-between;
-  align-items: center;
-  padding: 1rem;
-  background: var(--bg-primary);
-  border-radius: 8px;
-  box-shadow: 0 2px 4px var(--shadow);
-  gap: 1rem;
-  flex-wrap: wrap;
-}
-
-.dashboard-header h1 {
-  margin: 0;
-  font-size: 1.5rem;
-  color: var(--text-primary);
-}
-
-.header-controls {
-  display: flex;
-  align-items: center;
-  gap: 1rem;
-}
-
-.status-indicator {
-  display: flex;
-  align-items: center;
-  gap: 0.5rem;
-  font-size: 0.9rem;
-  color: var(--text-secondary);
-}
-
-.status-dot {
-  width: 10px;
-  height: 10px;
-  border-radius: 50%;
-  display: inline-block;
-}
-
-.status-dot.checking {
-  background-color: #ff9800;
-  animation: pulse 1.5s ease-in-out infinite;
-}
-
-.status-dot.healthy {
-  background-color: #4caf50;
-}
-
-.status-dot.error {
-  background-color: #f44336;
-}
-
-@keyframes pulse {
-  0%,
-  100% {
-    opacity: 1;
-  }
-  50% {
-    opacity: 0.5;
-  }
-}
-
-.btn-orientation {
-  background: var(--accent-secondary);
-  color: #fff;
-  border: none;
-  border-radius: 4px;
-  padding: 0.5rem 1rem;
-  font-size: 0.9rem;
-  cursor: pointer;
-  transition: background 0.2s;
-  display: flex;
-  align-items: center;
-  gap: 0.5rem;
-}
-
-.btn-orientation:hover {
-  background: var(--accent-secondary);
-  opacity: 0.9;
-}
-
-.btn-web-services {
-  background: var(--accent-primary);
-  color: #fff;
-  border: none;
-  border-radius: 4px;
-  padding: 0.5rem 1rem;
-  font-size: 0.9rem;
-  cursor: pointer;
-  transition: background 0.2s;
-}
-
-.btn-web-services:hover {
-  background: var(--accent-primary);
-  opacity: 0.9;
-}
-
-.btn-side-position {
-  background: var(--bg-tertiary);
-  color: var(--text-primary);
-  border: 1px solid var(--border-color);
-  border-radius: 4px;
-  padding: 0.5rem 1rem;
-  font-size: 1.2rem;
-  cursor: pointer;
-  transition: all 0.2s;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  min-width: 40px;
-}
-
-.btn-side-position:hover {
-  background: var(--bg-secondary);
-  border-color: var(--text-secondary);
-}
-
-.btn-settings {
-  background: var(--bg-tertiary);
-  color: var(--text-primary);
-  border: 1px solid var(--border-color);
-  border-radius: 4px;
-  padding: 0.5rem 1rem;
-  font-size: 0.9rem;
-  cursor: pointer;
-  transition: all 0.2s;
-  display: flex;
-  align-items: center;
-  gap: 0.5rem;
-}
-
-.btn-settings:hover {
-  background: var(--bg-secondary);
-  border-color: var(--text-secondary);
-}
-
-.btn-minimal {
-  background: var(--bg-tertiary);
-  color: var(--text-primary);
-  border: 1px solid var(--border-color);
-  border-radius: 4px;
-  padding: 0.5rem 1rem;
-  font-size: 0.9rem;
-  cursor: pointer;
-  transition: all 0.2s;
-}
-
-.btn-minimal:hover {
-  background: var(--bg-secondary);
-  border-color: var(--text-secondary);
 }
 
 .dashboard-main {
@@ -707,20 +367,17 @@ onUnmounted(() => {
 }
 
 .dashboard-region-section {
-  min-width: 0; /* Important for flex children */
+  min-width: 0;
   min-height: 0;
-  width: 100%; /* Explicitly set width to 100% */
-  max-width: 100%; /* Ensure it doesn't exceed container */
-  flex-shrink: 0; /* Prevent flexbox from shrinking the calendar */
-  border-radius: 8px;
+  width: 100%;
+  max-width: 100%;
+  flex-shrink: 0;
+  border-radius: 0;
   overflow: hidden;
-  overflow-x: clip; /* Better clipping for grid overflow on RPI */
+  overflow-x: clip;
   display: flex;
   flex-direction: column;
   box-sizing: border-box;
-}
-
-.dashboard-region-section {
   transition: outline-color 0.6s ease;
   outline: 2px solid transparent;
   outline-offset: -2px;
@@ -728,66 +385,5 @@ onUnmounted(() => {
 
 .dashboard-region-section-active {
   outline-color: var(--accent-primary);
-}
-
-.dashboard:not(:has(.dashboard-header)) .dashboard-region-section {
-  border-radius: 0;
-}
-
-.clock-overlay {
-  position: fixed;
-  z-index: 1000;
-  background: var(--bg-primary);
-  padding: 0.75rem 1rem;
-  border-radius: 8px;
-  box-shadow: 0 2px 8px var(--shadow);
-  /* Offset from edges to avoid covering calendar elements */
-}
-
-.clock-overlay.position-top-left {
-  top: 0.5rem;
-  left: 0.5rem;
-}
-
-.clock-overlay.position-top-center {
-  top: 0.5rem;
-  left: 50%;
-  transform: translateX(-50%);
-}
-
-.clock-overlay.position-top-right {
-  top: 0.5rem;
-  right: 1rem;
-  /* Additional offset for top-right to avoid calendar day markers */
-}
-
-.clock-overlay.position-bottom-left {
-  bottom: 0.5rem;
-  left: 0.5rem;
-}
-
-.clock-overlay.position-bottom-center {
-  bottom: 0.5rem;
-  left: 50%;
-  transform: translateX(-50%);
-}
-
-.clock-overlay.position-bottom-right {
-  bottom: 0.5rem;
-  right: 0.5rem;
-}
-
-.connection-indicator-overlay {
-  position: fixed;
-  top: 1rem;
-  left: 1rem;
-  z-index: 10000;
-  pointer-events: none;
-}
-
-/* Adjust position when UI is hidden to avoid clock overlap */
-.dashboard:not(:has(.dashboard-header)) .connection-indicator-overlay {
-  top: 1rem;
-  left: 1rem;
 }
 </style>

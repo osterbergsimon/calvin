@@ -15,10 +15,7 @@ describe("MinimalUIOverlay", () => {
   beforeEach(() => {
     setActivePinia(createPinia());
     configStore = useConfigStore();
-
-    // Reset to default state
     configStore.showUI = false;
-    configStore.clockPosition = "top-right";
   });
 
   describe("Visibility", () => {
@@ -38,47 +35,8 @@ describe("MinimalUIOverlay", () => {
 
       expect(wrapper.find(".minimal-ui-overlay").exists()).toBe(false);
     });
-  });
 
-  describe("Button Positioning", () => {
-    it("should position button in bottom-left when clock is in top-right", () => {
-      configStore.clockPosition = "top-right";
-      configStore.showUI = false;
-
-      const wrapper = mount(MinimalUIOverlay);
-
-      expect(wrapper.find(".minimal-ui-overlay").classes()).toContain("position-bottom-left");
-    });
-
-    it("should position button in bottom-right when clock is in top-left", () => {
-      configStore.clockPosition = "top-left";
-      configStore.showUI = false;
-
-      const wrapper = mount(MinimalUIOverlay);
-
-      expect(wrapper.find(".minimal-ui-overlay").classes()).toContain("position-bottom-right");
-    });
-
-    it("should position button in top-left when clock is in bottom-right", () => {
-      configStore.clockPosition = "bottom-right";
-      configStore.showUI = false;
-
-      const wrapper = mount(MinimalUIOverlay);
-
-      expect(wrapper.find(".minimal-ui-overlay").classes()).toContain("position-top-left");
-    });
-
-    it("should position button in top-right when clock is in bottom-left", () => {
-      configStore.clockPosition = "bottom-left";
-      configStore.showUI = false;
-
-      const wrapper = mount(MinimalUIOverlay);
-
-      expect(wrapper.find(".minimal-ui-overlay").classes()).toContain("position-top-right");
-    });
-
-    it("should default to bottom-left when clock position is invalid", () => {
-      configStore.clockPosition = "invalid";
+    it("should be positioned in bottom-left", () => {
       configStore.showUI = false;
 
       const wrapper = mount(MinimalUIOverlay);

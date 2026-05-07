@@ -4,15 +4,16 @@
     class="clock-bar-horizontal"
     :class="[`position-${position}`, { 'show-date': showDate }]"
     :style="{ padding: `${barPadding}px` }"
+    role="status"
+    aria-label="Status bar"
+    aria-live="polite"
   >
     <div class="clock-bar-outer">
-      <!-- Left spacer: invisible mirror of right side to keep clock centered -->
-      <div class="clock-bar-side clock-bar-left" aria-hidden="true">
-        <PluginStatusbarItems ghost />
-        <span v-if="isBackgroundRefreshing" class="clock-refresh-icon clock-refresh-ghost" />
+      <div class="clock-bar-side clock-bar-left">
+        <PluginStatusbarItems />
+        <span v-if="isBackgroundRefreshing" class="clock-refresh-icon" aria-hidden="true" />
       </div>
 
-      <!-- Center: time + date -->
       <div
         class="clock-bar-content"
         :class="{
@@ -26,20 +27,19 @@
         }}</span>
       </div>
 
-      <!-- Right: plugin statusbar items -->
       <div class="clock-bar-side clock-bar-right">
-        <PluginStatusbarItems />
-        <span v-if="isBackgroundRefreshing" class="clock-refresh-icon" aria-hidden="true" />
+        <BarActionCluster v-if="!previewMode" :compact="false" />
       </div>
     </div>
   </div>
 </template>
 
 <script setup>
-import { ref, computed, onMounted, onUnmounted, watch } from "vue";
-import { useConfigStore } from "../stores/config";
+import { computed } from "vue";
 import { useCalendarStore } from "../stores/calendar";
+import { useClockBar } from "../composables/useClockBar";
 import PluginStatusbarItems from "./PluginStatusbarItems.vue";
+import BarActionCluster from "./BarActionCluster.vue";
 
 defineOptions({
   name: "ClockBarHorizontal",
@@ -85,206 +85,28 @@ const props = defineProps({
   },
 });
 
-const configStore = useConfigStore();
-
-const currentTime = ref(new Date());
-let timeInterval = null;
-
-// Check if clock bar should be displayed
-const shouldShow = computed(() => {
-  // Always show in preview mode
-  if (props.previewMode) return true;
-
-  if (!props.enabled) return false;
-
-  // Show in non-kiosk mode (UI visible)
-  if (props.showInNonKiosk && configStore.shouldShowUI) {
-    return true;
-  }
-  // Show in kiosk mode (UI hidden)
-  if (props.showInKiosk && !configStore.shouldShowUI) {
-    return true;
-  }
-  return false;
-});
-
-// Get timezone from config
-const timezone = computed(() => {
-  return configStore.timezone || null;
-});
-
-// Get time format from config
-const timeFormat = computed(() => {
-  return configStore.timeFormat || "24h";
-});
-
-// Get date format from config (if available)
-// Note: dateFormat is currently not used but kept for future enhancement
-// const dateFormat = computed(() => {
-//   // Use locale-based formatting for now
-//   // Can be enhanced with custom date format settings
-//   return "locale";
-// });
-
-// Get show date setting
-const showDate = computed(() => {
-  return configStore.clockShowDate || false;
-});
-
-// Get show seconds setting
-const showSeconds = computed(() => {
-  return configStore.clockShowSeconds || false;
-});
-
-// Get font sizes and layout (use preview props if in preview mode)
-const fontSize = computed(() => {
-  if (props.previewMode && props.previewTimeSize !== null) {
-    return props.previewTimeSize;
-  }
-  return configStore.clockBarFontSize || 16;
-});
-
-const dateFontSize = computed(() => {
-  if (props.previewMode && props.previewDateSize !== null) {
-    return props.previewDateSize;
-  }
-  return configStore.clockBarDateFontSize || 14;
-});
-
-const layout = computed(() => {
-  if (props.previewMode && props.previewLayout !== null) {
-    return props.previewLayout;
-  }
-  return configStore.clockBarLayout || "single-line";
-});
-
-const barPadding = computed(() => {
-  if (props.previewMode && props.previewPadding !== null) {
-    return props.previewPadding;
-  }
-  return configStore.clockBarPadding || 8;
+const {
+  shouldShow,
+  showDate,
+  formattedTime,
+  formattedDate,
+  fontSize,
+  dateFontSize,
+  layout,
+  barPadding,
+} = useClockBar({
+  enabled: () => props.enabled,
+  showInKiosk: () => props.showInKiosk,
+  showInNonKiosk: () => props.showInNonKiosk,
+  previewMode: () => props.previewMode,
+  previewTimeSize: () => props.previewTimeSize,
+  previewDateSize: () => props.previewDateSize,
+  previewLayout: () => props.previewLayout,
+  previewPadding: () => props.previewPadding,
 });
 
 const calendarStore = useCalendarStore();
-
 const isBackgroundRefreshing = computed(() => calendarStore.backgroundRefreshing);
-
-// Format time
-const formattedTime = computed(() => {
-  const now = currentTime.value;
-
-  const options = {
-    hour: "2-digit",
-    minute: "2-digit",
-    hour12: timeFormat.value === "12h",
-  };
-
-  if (showSeconds.value) {
-    options.second = "2-digit";
-  }
-
-  if (timezone.value) {
-    options.timeZone = timezone.value;
-  }
-
-  try {
-    return now.toLocaleTimeString(undefined, options);
-  } catch {
-    // Fallback if timezone is invalid
-    const fallbackOptions = {
-      hour: "2-digit",
-      minute: "2-digit",
-      hour12: timeFormat.value === "12h",
-    };
-    if (showSeconds.value) {
-      fallbackOptions.second = "2-digit";
-    }
-    return now.toLocaleTimeString(undefined, fallbackOptions);
-  }
-});
-
-// Format date - respects locale and date format preferences
-const formattedDate = computed(() => {
-  if (!showDate.value) return "";
-
-  const now = currentTime.value;
-  const options = {
-    weekday: "short",
-    year: "numeric",
-    month: "short",
-    day: "numeric",
-  };
-
-  if (timezone.value) {
-    options.timeZone = timezone.value;
-  }
-
-  try {
-    return now.toLocaleDateString(undefined, options);
-  } catch {
-    // Fallback if timezone is invalid
-    return now.toLocaleDateString(undefined, {
-      weekday: "short",
-      year: "numeric",
-      month: "short",
-      day: "numeric",
-    });
-  }
-});
-
-// Update time
-const updateTime = () => {
-  if (!shouldShow.value) {
-    timeInterval = setTimeout(updateTime, 1000);
-    return;
-  }
-
-  currentTime.value = new Date();
-
-  const interval = showSeconds.value ? 1000 : 60000;
-  timeInterval = setTimeout(updateTime, interval);
-};
-
-// Watch for changes in clockShowSeconds to adjust update interval
-watch(
-  () => configStore.clockShowSeconds,
-  () => {
-    if (timeInterval) {
-      clearTimeout(timeInterval);
-      timeInterval = null;
-    }
-    if (shouldShow.value) {
-      updateTime();
-    }
-  }
-);
-
-// Watch for shouldShow changes to start/stop updates
-watch(shouldShow, newValue => {
-  if (newValue) {
-    if (!timeInterval) {
-      updateTime();
-    }
-  } else {
-    if (timeInterval) {
-      clearTimeout(timeInterval);
-      timeInterval = null;
-    }
-  }
-});
-
-onMounted(() => {
-  if (shouldShow.value) {
-    updateTime();
-  }
-});
-
-onUnmounted(() => {
-  if (timeInterval) {
-    clearTimeout(timeInterval);
-    timeInterval = null;
-  }
-});
 </script>
 
 <style scoped>
@@ -297,7 +119,6 @@ onUnmounted(() => {
   justify-content: center;
   z-index: 100;
   user-select: none;
-  /* Padding is set via inline style from barPadding computed property */
 }
 
 .clock-bar-horizontal.position-bottom {
@@ -307,8 +128,8 @@ onUnmounted(() => {
 
 .clock-bar-horizontal.position-between {
   border: none;
-  background: transparent;
-  /* Padding is set via inline style from barPadding computed property */
+  background: rgba(0, 0, 0, 0.05);
+  border-radius: 4px;
 }
 
 .clock-bar-content {
@@ -335,12 +156,6 @@ onUnmounted(() => {
   white-space: nowrap;
 }
 
-/* Minimal styling for between position */
-.clock-bar-horizontal.position-between {
-  background: rgba(0, 0, 0, 0.05);
-  border-radius: 4px;
-}
-
 .clock-bar-horizontal.position-between .clock-time {
   font-size: 0.875rem;
 }
@@ -349,11 +164,11 @@ onUnmounted(() => {
   font-size: 0.75rem;
 }
 
-/* Three-column layout: left mirror | center time | right plugin items */
 .clock-bar-outer {
   display: flex;
   align-items: center;
   width: 100%;
+  gap: 1rem;
 }
 
 .clock-bar-side {
@@ -385,11 +200,6 @@ onUnmounted(() => {
   margin: 0 0.5rem;
   animation: clock-spin 1s linear infinite;
   flex-shrink: 0;
-}
-
-.clock-refresh-ghost {
-  visibility: hidden;
-  animation: none;
 }
 
 @keyframes clock-spin {
