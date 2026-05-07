@@ -47,12 +47,17 @@ describe("WebServiceViewer", () => {
     });
   };
 
-  it("renders the global current service when no service id is provided", () => {
+  it("renders the cycling current service in fullscreen when no service id is provided", () => {
+    const wrapper = mountViewer({ isFullscreen: true });
+
+    expect(wrapper.find(".service-viewer-stub").text()).toBe("Weather");
+  });
+
+  it("shows an unavailable state for an embedded region without a service id", () => {
     const wrapper = mountViewer({ isFullscreen: false });
 
-    expect(wrapper.find(".viewer-header h2").text()).toBe("Weather");
-    expect(wrapper.find(".service-viewer-stub").text()).toBe("Weather");
-    expect(wrapper.find(".service-selector").exists()).toBe(true);
+    expect(wrapper.text()).toContain("Selected service is unavailable");
+    expect(wrapper.find(".service-viewer-stub").exists()).toBe(false);
   });
 
   it("renders a specific service and disables local navigation when service id is provided", () => {

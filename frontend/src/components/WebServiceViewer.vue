@@ -97,7 +97,6 @@ import { useConfigStore } from "../stores/config";
 import { useWebServicesStore } from "../stores/webServices";
 import { useModeStore } from "../stores/mode";
 import ServiceViewer from "./service/ServiceViewer.vue";
-import { logDebug } from "../utils/logger";
 
 const props = defineProps({
   isFullscreen: {
@@ -119,25 +118,18 @@ const services = computed(() => webServicesStore.services);
 const currentServiceIndex = computed(() => webServicesStore.currentServiceIndex);
 const canNavigateServices = computed(() => !props.serviceId);
 const currentService = computed(() => {
-  const service = props.serviceId
-    ? webServicesStore.getServiceById(props.serviceId)
-    : webServicesStore.getCurrentService();
-  if (service) {
-    logDebug("[WebServiceViewer]", "Current service:", {
-      id: service.id,
-      name: service.name,
-      url: service.url,
-      config: service.config,
-      display_schema: service.display_schema,
-      plugin_id: service.plugin_id,
-    });
-  }
-  return service;
+  if (props.serviceId) return webServicesStore.getServiceById(props.serviceId);
+  // No serviceId is only valid in fullscreen mode (cycling through services).
+  if (props.isFullscreen) return webServicesStore.getCurrentService();
+  return null;
 });
 const loading = computed(() => webServicesStore.loading);
 const serviceUnavailable = computed(
   () =>
-    Boolean(props.serviceId) && !loading.value && services.value.length > 0 && !currentService.value
+    !loading.value &&
+    services.value.length > 0 &&
+    (Boolean(props.serviceId) || !props.isFullscreen) &&
+    !currentService.value
 );
 
 // ServiceViewer now handles all service rendering logic

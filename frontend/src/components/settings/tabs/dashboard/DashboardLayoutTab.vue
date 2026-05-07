@@ -493,7 +493,6 @@ const services = computed(() => webServicesStore.services);
 const componentOptions = computed(() => [
   { value: "calendar", label: "Calendar", kind: "calendar", serviceId: null },
   { value: "photos", label: "Photos", kind: "photos", serviceId: null },
-  { value: "service", label: "Current service", kind: "service", serviceId: null },
   ...services.value.map(service => ({
     value: `service:${service.id}`,
     label: service.name,
