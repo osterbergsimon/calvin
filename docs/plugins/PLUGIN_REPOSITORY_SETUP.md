@@ -40,7 +40,7 @@ calvin-plugins/
 │   ├── plugin.json
 │   ├── plugin.py
 │   └── frontend/
-│       └── Component.vue
+│       └── dist.js
 ├── plugin2/               # Another plugin
 │   ├── plugin.json
 │   └── plugin.py
@@ -360,4 +360,3 @@ Extensions work across all workspace folders. Configure once, applies to both.
 - ✅ **Version control separately** but coordinate releases
 
 This setup gives you the flexibility to develop plugins independently while maintaining a clean separation between core and plugins.
-

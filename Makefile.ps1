@@ -5,302 +5,58 @@ param(
     [string]$Target = "help"
 )
 
+$ComposeDev = @("compose", "-f", "docker/docker-compose.dev.yml")
+$ComposeProd = @("compose", "-f", "docker/docker-compose.yml")
+
 function Show-Help {
     Write-Host "Available commands:" -ForegroundColor Cyan
-    Write-Host "  .\Makefile.ps1 install        - Install all dependencies" -ForegroundColor White
-    Write-Host "  .\Makefile.ps1 dev           - Start development servers (separate windows)" -ForegroundColor White
-    Write-Host "  .\Makefile.ps1 dev-logs      - Start development servers with visible logs" -ForegroundColor White
-    Write-Host "  .\Makefile.ps1 dev-logs-read - Read recent dev logs (useful for AI assistant)" -ForegroundColor White
-    Write-Host "  .\Makefile.ps1 test          - Run all tests" -ForegroundColor White
-    Write-Host "  .\Makefile.ps1 test-backend  - Run backend tests only" -ForegroundColor White
-    Write-Host "  .\Makefile.ps1 test-frontend - Run frontend tests only" -ForegroundColor White
-    Write-Host "  .\Makefile.ps1 test-coverage - Run tests with coverage" -ForegroundColor White
-    Write-Host "  .\Makefile.ps1 test-scripts  - Test setup scripts" -ForegroundColor White
-    Write-Host "  .\Makefile.ps1 lint          - Run linters" -ForegroundColor White
-    Write-Host "  .\Makefile.ps1 format        - Format code" -ForegroundColor White
-    Write-Host "  .\Makefile.ps1 type-check    - Run type checkers" -ForegroundColor White
-    Write-Host "  .\Makefile.ps1 build         - Build for production" -ForegroundColor White
-    Write-Host "  .\Makefile.ps1 clean         - Clean build artifacts" -ForegroundColor White
+    Write-Host "  .\Makefile.ps1 install        - One-time setup (creates docker/.env from example)" -ForegroundColor White
+    Write-Host "  .\Makefile.ps1 dev            - Start dev stack (docker compose, streams logs)" -ForegroundColor White
+    Write-Host "  .\Makefile.ps1 dev-logs       - Tail logs from running dev stack" -ForegroundColor White
+    Write-Host "  .\Makefile.ps1 dev-logs-read  - Show last 50 lines of dev logs" -ForegroundColor White
+    Write-Host "  .\Makefile.ps1 dev-down       - Stop dev stack" -ForegroundColor White
+    Write-Host "  .\Makefile.ps1 doctor         - Check docker + dev env" -ForegroundColor White
+    Write-Host "  .\Makefile.ps1 test           - Run all tests (native)" -ForegroundColor White
+    Write-Host "  .\Makefile.ps1 test-backend   - Run backend tests only (native)" -ForegroundColor White
+    Write-Host "  .\Makefile.ps1 test-frontend  - Run frontend tests only (native)" -ForegroundColor White
+    Write-Host "  .\Makefile.ps1 test-coverage  - Run tests with coverage (native)" -ForegroundColor White
+    Write-Host "  .\Makefile.ps1 test-scripts   - Test setup scripts" -ForegroundColor White
+    Write-Host "  .\Makefile.ps1 lint           - Run linters (native)" -ForegroundColor White
+    Write-Host "  .\Makefile.ps1 format         - Format code (native)" -ForegroundColor White
+    Write-Host "  .\Makefile.ps1 type-check     - Run type checkers (native)" -ForegroundColor White
+    Write-Host "  .\Makefile.ps1 build          - Build the production docker image" -ForegroundColor White
+    Write-Host "  .\Makefile.ps1 clean          - Tear down dev stack and remove dev data" -ForegroundColor White
 }
 
 function Install-Dependencies {
-    Write-Host "Installing dependencies..." -ForegroundColor Yellow
-    Set-Location backend
-    uv sync --extra dev
-    if ($LASTEXITCODE -ne 0) {
-        Write-Host "Backend dependencies installation failed" -ForegroundColor Red
-        Set-Location ..
-        exit 1
+    $envFile = Join-Path $PSScriptRoot "docker\.env"
+    $exampleFile = Join-Path $PSScriptRoot "deploy\calvin.env.example"
+    if (-not (Test-Path $envFile)) {
+        Write-Host "Creating docker/.env from deploy/calvin.env.example..." -ForegroundColor Yellow
+        Copy-Item $exampleFile $envFile
+    } else {
+        Write-Host "docker/.env already exists - leaving it alone" -ForegroundColor Gray
     }
-    Set-Location ..
-    
-    Set-Location frontend
-    npm install
-    if ($LASTEXITCODE -ne 0) {
-        Write-Host "Frontend dependencies installation failed" -ForegroundColor Red
-        Set-Location ..
-        exit 1
-    }
-    Set-Location ..
-    Write-Host "Dependencies installed successfully!" -ForegroundColor Green
+    Write-Host "Done. Run '.\Makefile.ps1 dev' to start." -ForegroundColor Green
 }
 
 function Start-Dev {
-    Write-Host "Starting development servers..." -ForegroundColor Yellow
-    Write-Host ""
-    Write-Host "Starting backend, docs, and frontend in separate windows..." -ForegroundColor Cyan
-    Write-Host ""
-    
-    # Get the current directory
-    $projectRoot = $PSScriptRoot
-    
-    # Start backend in new PowerShell window
-    Write-Host "Starting backend..." -ForegroundColor Yellow
-    Start-Process powershell -ArgumentList "-NoExit", "-Command", "cd '$projectRoot\backend'; uv run uvicorn app.main:app --reload --reload-dir app --host 0.0.0.0 --port 8000"
-    
-    # Wait a moment for backend to start
-    Start-Sleep -Seconds 2
-    
-    # Start docs in new PowerShell window
-    Write-Host "Starting docs..." -ForegroundColor Yellow
-    Start-Process powershell -ArgumentList "-NoExit", "-Command", "cd '$projectRoot'; uv run --project backend mkdocs serve --dev-addr 127.0.0.1:8001"
-    
-    # Wait a moment for docs to start
-    Start-Sleep -Seconds 1
-    
-    # Start frontend in new PowerShell window
-    Write-Host "Starting frontend..." -ForegroundColor Yellow
-    Start-Process powershell -ArgumentList "-NoExit", "-Command", "cd '$projectRoot\frontend'; npm run dev"
-    
-    Write-Host ""
-    Write-Host "✓ Servers starting in separate windows" -ForegroundColor Green
-    Write-Host ""
-    Write-Host "Backend: http://localhost:8000" -ForegroundColor Cyan
+    Write-Host "Starting dev stack via docker compose..." -ForegroundColor Yellow
+    Write-Host "Backend:  http://localhost:8000" -ForegroundColor Cyan
     Write-Host "Frontend: http://localhost:5173" -ForegroundColor Cyan
-    Write-Host "Docs: http://localhost:8001" -ForegroundColor Cyan
-    Write-Host "API Docs: http://localhost:8000/docs" -ForegroundColor Cyan
-    Write-Host ""
-    Write-Host "Press Ctrl+C in each window to stop the servers" -ForegroundColor Yellow
+    & docker @ComposeDev up
 }
 
-function Start-Dev-Logs {
-    Write-Host "Starting development servers with visible logs..." -ForegroundColor Yellow
-    Write-Host ""
-    
-    # Get the current directory and create log directory
-    $projectRoot = $PSScriptRoot
-    $logDir = Join-Path $projectRoot "logs"
-    if (-not (Test-Path $logDir)) {
-        New-Item -ItemType Directory -Path $logDir -Force | Out-Null
-    }
-    
-    $backendLogFile = Join-Path $logDir "dev-backend.log"
-    $frontendLogFile = Join-Path $logDir "dev-frontend.log"
-    $docsLogFile = Join-Path $logDir "dev-docs.log"
-    $combinedLogFile = Join-Path $logDir "dev-combined.log"
-    
-    # Clear previous log files
-    "" | Out-File $backendLogFile -Force
-    "" | Out-File $frontendLogFile -Force
-    "" | Out-File $docsLogFile -Force
-    "" | Out-File $combinedLogFile -Force
-    
-    Write-Host "Logs are also being written to:" -ForegroundColor Gray
-    Write-Host "  Backend:  $backendLogFile" -ForegroundColor Gray
-    Write-Host "  Frontend: $frontendLogFile" -ForegroundColor Gray
-    Write-Host "  Docs:     $docsLogFile" -ForegroundColor Gray
-    Write-Host "  Combined: $combinedLogFile" -ForegroundColor Gray
-    Write-Host ""
-    
-    # Start backend as a job with proper output handling and file logging
-    Write-Host "Starting backend..." -ForegroundColor Yellow
-    $backendJob = Start-Job -ScriptBlock {
-        param($Root, $BackendLog, $CombinedLog)
-        Set-Location "$Root\backend"
-        $env:PYTHONUNBUFFERED = "1"
-        & uv run uvicorn app.main:app --reload --reload-dir app --host 0.0.0.0 --port 8000 *>&1 | ForEach-Object {
-            $timestamp = Get-Date -Format "yyyy-MM-dd HH:mm:ss"
-            $logLine = "[$timestamp] [BACKEND] $_"
-            $logLine | Out-File -FilePath $BackendLog -Append -Encoding utf8
-            $logLine | Out-File -FilePath $CombinedLog -Append -Encoding utf8
-            "[BACKEND] $_"
-        }
-    } -ArgumentList $projectRoot, $backendLogFile, $combinedLogFile
-    
-    # Wait a moment for backend to start
-    Start-Sleep -Seconds 2
-    
-    # Start docs as a job with proper output handling and file logging
-    Write-Host "Starting docs..." -ForegroundColor Yellow
-    $docsJob = Start-Job -ScriptBlock {
-        param($Root, $DocsLog, $CombinedLog)
-        Set-Location $Root
-        & uv run --project backend mkdocs serve --dev-addr 127.0.0.1:8001 *>&1 | ForEach-Object {
-            $timestamp = Get-Date -Format "yyyy-MM-dd HH:mm:ss"
-            $logLine = "[$timestamp] [DOCS] $_"
-            $logLine | Out-File -FilePath $DocsLog -Append -Encoding utf8
-            $logLine | Out-File -FilePath $CombinedLog -Append -Encoding utf8
-            "[DOCS] $_"
-        }
-    } -ArgumentList $projectRoot, $docsLogFile, $combinedLogFile
-    
-    # Wait a moment for docs to start
-    Start-Sleep -Seconds 1
-    
-    # Start frontend as a job with proper output handling and file logging
-    Write-Host "Starting frontend..." -ForegroundColor Yellow
-    $frontendJob = Start-Job -ScriptBlock {
-        param($Root, $FrontendLog, $CombinedLog)
-        Set-Location "$Root\frontend"
-        & npm run dev *>&1 | ForEach-Object {
-            $timestamp = Get-Date -Format "yyyy-MM-dd HH:mm:ss"
-            $logLine = "[$timestamp] [FRONTEND] $_"
-            $logLine | Out-File -FilePath $FrontendLog -Append -Encoding utf8
-            $logLine | Out-File -FilePath $CombinedLog -Append -Encoding utf8
-            "[FRONTEND] $_"
-        }
-    } -ArgumentList $projectRoot, $frontendLogFile, $combinedLogFile
-    
-    Write-Host ""
-    Write-Host "✓ Servers starting (logs visible below and in log files)" -ForegroundColor Green
-    Write-Host ""
-    Write-Host "Backend: http://localhost:8000" -ForegroundColor Cyan
-    Write-Host "Frontend: http://localhost:5173" -ForegroundColor Cyan
-    Write-Host "Docs: http://localhost:8001" -ForegroundColor Cyan
-    Write-Host "API Docs: http://localhost:8000/docs" -ForegroundColor Cyan
-    Write-Host ""
-    Write-Host "Press Ctrl+C to stop all servers" -ForegroundColor Yellow
-    Write-Host ("─" * 80) -ForegroundColor DarkGray
-    Write-Host ""
-    
-    # Monitor all jobs and display output
-    try {
-        while ($backendJob.State -eq "Running" -or $docsJob.State -eq "Running" -or $frontendJob.State -eq "Running") {
-            # Receive and display backend output
-            $backendOutput = Receive-Job -Job $backendJob -ErrorAction SilentlyContinue
-            if ($backendOutput) {
-                foreach ($line in $backendOutput) {
-                    Write-Host $line -ForegroundColor Cyan
-                }
-            }
-            
-            # Receive and display docs output
-            $docsOutput = Receive-Job -Job $docsJob -ErrorAction SilentlyContinue
-            if ($docsOutput) {
-                foreach ($line in $docsOutput) {
-                    Write-Host $line -ForegroundColor Yellow
-                }
-            }
-            
-            # Receive and display frontend output
-            $frontendOutput = Receive-Job -Job $frontendJob -ErrorAction SilentlyContinue
-            if ($frontendOutput) {
-                foreach ($line in $frontendOutput) {
-                    Write-Host $line -ForegroundColor Magenta
-                }
-            }
-            
-            # Check if jobs have failed or completed
-            if ($backendJob.State -eq "Failed" -or $backendJob.State -eq "Completed") {
-                $allOutput = Receive-Job -Job $backendJob -ErrorAction SilentlyContinue
-                if ($allOutput) {
-                    foreach ($line in $allOutput) {
-                        Write-Host $line -ForegroundColor Cyan
-                    }
-                }
-                if ($backendJob.State -eq "Failed") {
-                    Write-Host "[ERROR] Backend job failed" -ForegroundColor Red
-                    break
-                }
-            }
-            
-            if ($docsJob.State -eq "Failed" -or $docsJob.State -eq "Completed") {
-                $allOutput = Receive-Job -Job $docsJob -ErrorAction SilentlyContinue
-                if ($allOutput) {
-                    foreach ($line in $allOutput) {
-                        Write-Host $line -ForegroundColor Yellow
-                    }
-                }
-                if ($docsJob.State -eq "Failed") {
-                    Write-Host "[ERROR] Docs job failed" -ForegroundColor Red
-                    break
-                }
-            }
-            
-            if ($frontendJob.State -eq "Failed" -or $frontendJob.State -eq "Completed") {
-                $allOutput = Receive-Job -Job $frontendJob -ErrorAction SilentlyContinue
-                if ($allOutput) {
-                    foreach ($line in $allOutput) {
-                        Write-Host $line -ForegroundColor Magenta
-                    }
-                }
-                if ($frontendJob.State -eq "Failed") {
-                    Write-Host "[ERROR] Frontend job failed" -ForegroundColor Red
-                    break
-                }
-            }
-            
-            Start-Sleep -Milliseconds 200
-        }
-    }
-    catch {
-        Write-Host "`n[ERROR] $($_.Exception.Message)" -ForegroundColor Red
-    }
-    finally {
-        # Clean up jobs
-        Write-Host ""
-        Write-Host "Stopping servers..." -ForegroundColor Yellow
-        Stop-Job -Job $backendJob, $docsJob, $frontendJob -ErrorAction SilentlyContinue | Out-Null
-        Remove-Job -Job $backendJob, $docsJob, $frontendJob -ErrorAction SilentlyContinue | Out-Null
-        Write-Host "Servers stopped. Logs saved to: $logDir" -ForegroundColor Green
-    }
+function Tail-Dev-Logs {
+    & docker @ComposeDev logs -f
 }
 
 function Read-Dev-Logs {
-    param(
-        [int]$Lines = 50,
-        [string]$Type = "combined"
-    )
-    
-    $projectRoot = $PSScriptRoot
-    $logDir = Join-Path $projectRoot "logs"
-    $combinedLogFile = Join-Path $logDir "dev-combined.log"
-    $backendLogFile = Join-Path $logDir "dev-backend.log"
-    $frontendLogFile = Join-Path $logDir "dev-frontend.log"
-    $docsLogFile = Join-Path $logDir "dev-docs.log"
-    
-    if (-not (Test-Path $combinedLogFile)) {
-        Write-Host "No dev logs found. Have you started 'dev-logs' yet?" -ForegroundColor Yellow
-        Write-Host "Expected log files in: $logDir" -ForegroundColor Gray
-        return
-    }
-    
-    $logFile = switch ($Type.ToLower()) {
-        "backend" { $backendLogFile }
-        "frontend" { $frontendLogFile }
-        "docs" { $docsLogFile }
-        default { $combinedLogFile }
-    }
-    
-    if (Test-Path $logFile) {
-        Write-Host "Last $Lines lines from $Type log:" -ForegroundColor Cyan
-        Write-Host ("─" * 80) -ForegroundColor DarkGray
-        Get-Content $logFile -Tail $Lines -ErrorAction SilentlyContinue | ForEach-Object {
-            if ($_ -match "\[BACKEND\]") {
-                Write-Host $_ -ForegroundColor Cyan
-            } elseif ($_ -match "\[FRONTEND\]") {
-                Write-Host $_ -ForegroundColor Magenta
-            } elseif ($_ -match "\[DOCS\]") {
-                Write-Host $_ -ForegroundColor Yellow
-            } else {
-                Write-Host $_
-            }
-        }
-        Write-Host ("─" * 80) -ForegroundColor DarkGray
-        Write-Host "Full log: $logFile" -ForegroundColor Gray
-    } else {
-        Write-Host "Log file not found: $logFile" -ForegroundColor Red
-    }
+    & docker @ComposeDev logs --tail=50
+}
+
+function Stop-Dev {
+    & docker @ComposeDev down
 }
 
 function Run-Tests {
@@ -319,7 +75,7 @@ function Run-Tests {
         exit 1
     }
     Set-Location ..
-    
+
     Set-Location frontend
     npm run test
     if ($LASTEXITCODE -ne 0) {
@@ -379,7 +135,7 @@ function Run-Tests-Coverage {
         exit 1
     }
     Set-Location ..
-    
+
     Set-Location frontend
     npm run test:coverage
     if ($LASTEXITCODE -ne 0) {
@@ -393,8 +149,6 @@ function Run-Tests-Coverage {
 
 function Run-Tests-Scripts {
     Write-Host "Testing setup scripts..." -ForegroundColor Yellow
-    
-    # Test PowerShell script with Pester
     $pesterPath = Join-Path $PSScriptRoot "scripts" "tests" "setup-windows.Tests.ps1"
     if (Test-Path $pesterPath) {
         Write-Host "Running Pester tests for setup-windows.ps1..." -ForegroundColor Cyan
@@ -404,7 +158,6 @@ function Run-Tests-Scripts {
             Write-Host "Warning: Pester not installed. Install with: Install-Module -Name Pester -Force" -ForegroundColor Yellow
         }
     }
-    
     Write-Host "Note: Bash script tests require bats. Run 'make test-scripts' on Linux/macOS." -ForegroundColor Gray
 }
 
@@ -413,7 +166,7 @@ function Run-Lint {
     Set-Location backend
     uv run ruff check .
     Set-Location ..
-    
+
     Set-Location frontend
     npm run lint
     Set-Location ..
@@ -424,7 +177,7 @@ function Format-Code {
     Set-Location backend
     uv run ruff format .
     Set-Location ..
-    
+
     Set-Location frontend
     npm run format
     Set-Location ..
@@ -435,21 +188,23 @@ function Type-Check {
     Set-Location backend
     uv run mypy app/
     Set-Location ..
-    
+
     Set-Location frontend
     npm run type-check
     Set-Location ..
 }
 
 function Build-Production {
-    Write-Host "Building for production..." -ForegroundColor Yellow
-    Set-Location frontend
-    npm run build
-    Set-Location ..
+    Write-Host "Building production docker image..." -ForegroundColor Yellow
+    & docker @ComposeProd build
 }
 
 function Clean-Artifacts {
-    Write-Host "Cleaning build artifacts..." -ForegroundColor Yellow
+    Write-Host "Tearing down dev stack and removing artifacts..." -ForegroundColor Yellow
+    & docker @ComposeDev down -v 2>$null
+    if (Test-Path "docker\.calvin-dev-data") {
+        Remove-Item -Recurse -Force "docker\.calvin-dev-data"
+    }
     if (Test-Path "backend\.venv") {
         Remove-Item -Recurse -Force "backend\.venv"
     }
@@ -459,9 +214,37 @@ function Clean-Artifacts {
     if (Test-Path "frontend\dist") {
         Remove-Item -Recurse -Force "frontend\dist"
     }
-    Get-ChildItem -Recurse -Filter "__pycache__" | Remove-Item -Recurse -Force
-    Get-ChildItem -Recurse -Filter "*.pyc" | Remove-Item -Force
+    Get-ChildItem -Recurse -Filter "__pycache__" -ErrorAction SilentlyContinue | Remove-Item -Recurse -Force -ErrorAction SilentlyContinue
+    Get-ChildItem -Recurse -Filter "*.pyc" -ErrorAction SilentlyContinue | Remove-Item -Force -ErrorAction SilentlyContinue
     Write-Host "Clean complete!" -ForegroundColor Green
+}
+
+function Show-Doctor {
+    Write-Host "Calvin dev-environment doctor" -ForegroundColor Cyan
+    Write-Host "-----------------------------"
+    Write-Host -NoNewline "docker:         "
+    if (Get-Command docker -ErrorAction SilentlyContinue) { docker --version } else { Write-Host "MISSING - install Docker Desktop" -ForegroundColor Red }
+    Write-Host -NoNewline "docker compose: "
+    $composeOk = $false
+    try { docker compose version | Out-Null; $composeOk = ($LASTEXITCODE -eq 0) } catch {}
+    if ($composeOk) { docker compose version } else { Write-Host "MISSING - needs Docker Compose v2" -ForegroundColor Red }
+    Write-Host ""
+    Write-Host -NoNewline "docker/.env:    "
+    if (Test-Path (Join-Path $PSScriptRoot "docker\.env")) { Write-Host "present" -ForegroundColor Green } else { Write-Host "MISSING - run: .\Makefile.ps1 install" -ForegroundColor Yellow }
+    Write-Host ""
+    Write-Host "Native toolchain (only needed for test/lint/format/type-check):" -ForegroundColor Gray
+    Write-Host -NoNewline "  uv:   "
+    if (Get-Command uv -ErrorAction SilentlyContinue) { uv --version } else { Write-Host "missing" -ForegroundColor Gray }
+    Write-Host -NoNewline "  node: "
+    if (Get-Command node -ErrorAction SilentlyContinue) { node --version } else { Write-Host "missing" -ForegroundColor Gray }
+    Write-Host -NoNewline "  npm:  "
+    if (Get-Command npm -ErrorAction SilentlyContinue) { npm --version } else { Write-Host "missing" -ForegroundColor Gray }
+    Write-Host ""
+    Write-Host "Ports (8000 backend, 5173 frontend):"
+    foreach ($p in 8000, 5173) {
+        $inUse = Get-NetTCPConnection -LocalPort $p -State Listen -ErrorAction SilentlyContinue
+        if ($inUse) { Write-Host "  $p: IN USE" -ForegroundColor Yellow } else { Write-Host "  $p: free" -ForegroundColor Green }
+    }
 }
 
 # Main switch
@@ -469,8 +252,10 @@ switch ($Target.ToLower()) {
     "help" { Show-Help }
     "install" { Install-Dependencies }
     "dev" { Start-Dev }
-    "dev-logs" { Start-Dev-Logs }
+    "dev-logs" { Tail-Dev-Logs }
     "dev-logs-read" { Read-Dev-Logs }
+    "dev-down" { Stop-Dev }
+    "doctor" { Show-Doctor }
     "test" { Run-Tests }
     "test-backend" { Run-Tests-Backend }
     "test-frontend" { Run-Tests-Frontend }
@@ -487,4 +272,3 @@ switch ($Target.ToLower()) {
         exit 1
     }
 }
-

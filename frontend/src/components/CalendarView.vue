@@ -181,15 +181,41 @@ const startCalendarAutoRefresh = () => {
   calendarAutoRefreshInterval = setInterval(() => loadEvents(true), ms);
 };
 
+// Refresh "today" and, on date rollover, advance currentDate if the user is
+// viewing the month that just ended. setInterval can fire late after the
+// browser/device has been asleep, so this is also called on visibilitychange.
+const refreshToday = () => {
+  const previousToday = today.value;
+  const newToday = new Date();
+  const dayChanged =
+    previousToday.getFullYear() !== newToday.getFullYear() ||
+    previousToday.getMonth() !== newToday.getMonth() ||
+    previousToday.getDate() !== newToday.getDate();
+  if (!dayChanged) return;
+  today.value = newToday;
+  const cd = currentDate.value;
+  const wasTrackingToday =
+    cd.getFullYear() === previousToday.getFullYear() && cd.getMonth() === previousToday.getMonth();
+  if (wasTrackingToday) {
+    calendarStore.setCurrentDate(newToday);
+  }
+};
+
+const handleVisibilityChange = () => {
+  if (document.visibilityState === "visible") {
+    refreshToday();
+  }
+};
+
 // Load calendar sources on mount
 onMounted(async () => {
   await calendarStore.fetchSources();
 
   // Update today's date every minute to refresh the calendar
   // This ensures the "today" highlight updates automatically
-  todayRefreshInterval = setInterval(() => {
-    today.value = new Date();
-  }, 60000); // Update every minute
+  todayRefreshInterval = setInterval(refreshToday, 60000);
+
+  document.addEventListener("visibilitychange", handleVisibilityChange);
 
   startCalendarAutoRefresh();
 });
@@ -201,6 +227,7 @@ onUnmounted(() => {
   if (calendarAutoRefreshInterval) {
     clearInterval(calendarAutoRefreshInterval);
   }
+  document.removeEventListener("visibilitychange", handleVisibilityChange);
 });
 
 watch(calendarRefreshIntervalMinutes, () => {

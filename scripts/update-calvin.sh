@@ -29,12 +29,23 @@ CURRENT_COMMIT_MSG=""
 NEW_COMMIT=""
 NEW_COMMIT_SHORT=""
 NEW_COMMIT_MSG=""
+BACKEND_RESTARTED="false"
 
 json_escape() {
-  printf '%s' "$1" | sed \
-    -e 's/\\/\\\\/g' \
-    -e 's/"/\\"/g' \
-    -e 's/	/\\t/g'
+  local s="$1"
+  local bs='\\' dq='\"' bb='\b' bf='\f' bn='\n' br='\r' bt='\t'
+  s="${s//\\/$bs}"
+  s="${s//\"/$dq}"
+  s="${s//$'\b'/$bb}"
+  s="${s//$'\f'/$bf}"
+  s="${s//$'\n'/$bn}"
+  s="${s//$'\r'/$br}"
+  s="${s//$'\t'/$bt}"
+  printf '%s' "$s"
+}
+
+_json_field() {
+  printf '  "%s": "%s"' "$1" "$(json_escape "$2")"
 }
 
 write_update_state() {
@@ -42,36 +53,43 @@ write_update_state() {
   local phase="$2"
   local message="$3"
   local error="${4:-}"
-  local now
-  local finished_at=""
+  local now finished_at=""
 
   now="$(date -u +"%Y-%m-%dT%H:%M:%SZ")"
   if [[ "$status" == "success" || "$status" == "error" ]]; then
     finished_at="$now"
   fi
 
+  local lines=()
+  lines+=("$(_json_field status "$status")")
+  lines+=("$(_json_field phase "$phase")")
+  lines+=("$(_json_field message "$message")")
+  lines+=("$(_json_field mode "$CALVIN_MODE")")
+  lines+=("$(_json_field branch "$GIT_BRANCH")")
+  lines+=("$(_json_field log_file "$UPDATE_LOG_FILE")")
+  lines+=("$(_json_field started_at "$UPDATE_STARTED_AT")")
+  lines+=("$(_json_field updated_at "$now")")
+  [[ -n "$finished_at" ]] && lines+=("$(_json_field finished_at "$finished_at")")
+  [[ -n "$CURRENT_COMMIT" ]] && lines+=("$(_json_field current_commit "$CURRENT_COMMIT")")
+  [[ -n "$CURRENT_COMMIT_SHORT" ]] && lines+=("$(_json_field current_commit_short "$CURRENT_COMMIT_SHORT")")
+  [[ -n "$CURRENT_COMMIT_MSG" ]] && lines+=("$(_json_field current_commit_msg "$CURRENT_COMMIT_MSG")")
+  [[ -n "$NEW_COMMIT" ]] && lines+=("$(_json_field new_commit "$NEW_COMMIT")")
+  [[ -n "$NEW_COMMIT_SHORT" ]] && lines+=("$(_json_field new_commit_short "$NEW_COMMIT_SHORT")")
+  [[ -n "$NEW_COMMIT_MSG" ]] && lines+=("$(_json_field new_commit_msg "$NEW_COMMIT_MSG")")
+  lines+=("  \"backend_restarted\": $BACKEND_RESTARTED")
+  [[ -n "$error" ]] && lines+=("$(_json_field error "$error")")
+
   mkdir -p "$(dirname "$UPDATE_STATE_FILE")"
   {
     printf '{\n'
-    printf '  "status": "%s",\n' "$(json_escape "$status")"
-    printf '  "phase": "%s",\n' "$(json_escape "$phase")"
-    printf '  "message": "%s",\n' "$(json_escape "$message")"
-    printf '  "mode": "%s",\n' "$(json_escape "$CALVIN_MODE")"
-    printf '  "branch": "%s",\n' "$(json_escape "$GIT_BRANCH")"
-    printf '  "log_file": "%s",\n' "$(json_escape "$UPDATE_LOG_FILE")"
-    printf '  "started_at": "%s",\n' "$(json_escape "$UPDATE_STARTED_AT")"
-    printf '  "updated_at": "%s",\n' "$(json_escape "$now")"
-    if [[ -n "$finished_at" ]]; then
-      printf '  "finished_at": "%s",\n' "$(json_escape "$finished_at")"
-    fi
-    printf '  "current_commit": "%s",\n' "$(json_escape "$CURRENT_COMMIT")"
-    printf '  "current_commit_short": "%s",\n' "$(json_escape "$CURRENT_COMMIT_SHORT")"
-    printf '  "current_commit_msg": "%s",\n' "$(json_escape "$CURRENT_COMMIT_MSG")"
-    printf '  "new_commit": "%s",\n' "$(json_escape "$NEW_COMMIT")"
-    printf '  "new_commit_short": "%s",\n' "$(json_escape "$NEW_COMMIT_SHORT")"
-    printf '  "new_commit_msg": "%s",\n' "$(json_escape "$NEW_COMMIT_MSG")"
-    printf '  "backend_restarted": %s,\n' "false"
-    printf '  "error": "%s"\n' "$(json_escape "$error")"
+    local i last=$((${#lines[@]} - 1))
+    for ((i = 0; i <= last; i++)); do
+      if (( i < last )); then
+        printf '%s,\n' "${lines[i]}"
+      else
+        printf '%s\n' "${lines[i]}"
+      fi
+    done
     printf '}\n'
   } >"${UPDATE_STATE_FILE}.tmp"
   mv "${UPDATE_STATE_FILE}.tmp" "$UPDATE_STATE_FILE"
@@ -95,12 +113,14 @@ capture_new_commit() {
 
 on_error() {
   local exit_code=$?
+  trap - ERR
   write_update_state "error" "$UPDATE_PHASE" "Update failed. Check logs for details." \
     "line ${BASH_LINENO[0]}: ${BASH_COMMAND} exited with ${exit_code}"
   exit "$exit_code"
 }
 
 fail_update() {
+  trap - ERR
   local message="$1"
   echo "$message" >&2
   write_update_state "error" "$UPDATE_PHASE" "$message" "$message"
@@ -165,6 +185,7 @@ if compose_is_dev; then
     write_update_state "running" "$UPDATE_PHASE" "Recreating dev compose stack"
     echo "==> Recreating dev compose stack"
     compose -f "$COMPOSE_FILE" up -d --force-recreate
+    BACKEND_RESTARTED="true"
   else
     echo "==> Dev source updated; hot reload will pick up code changes"
     echo "==> Skipping compose recreate because host compose control is unavailable"
@@ -184,6 +205,7 @@ else
   write_update_state "running" "$UPDATE_PHASE" "Restarting Calvin"
   echo "==> Restarting Calvin"
   compose -f "$COMPOSE_FILE" up -d
+  BACKEND_RESTARTED="true"
 fi
 
 wait_for_health

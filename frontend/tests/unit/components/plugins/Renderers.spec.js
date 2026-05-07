@@ -30,6 +30,31 @@ describe("SchemaRenderer dispatcher", () => {
     });
     expect(wrapper.text()).toContain("Unknown schema kind");
   });
+
+  it("dispatches web-component schemas to the web component host", () => {
+    const wrapper = mount(SchemaRenderer, {
+      props: {
+        schema: { kind: "web-component", element: "calvin-test-card", module: "dist.js" },
+        data: { value: 42 },
+        pluginId: "test-plugin",
+      },
+      global: {
+        stubs: {
+          WebComponentHost: {
+            props: ["schema", "data", "pluginId"],
+            template:
+              '<div class="web-component-host-stub" :data-plugin-id="pluginId">{{ schema.element }} {{ data.value }}</div>',
+          },
+        },
+      },
+    });
+
+    expect(wrapper.find(".web-component-host-stub").exists()).toBe(true);
+    expect(wrapper.find(".web-component-host-stub").attributes("data-plugin-id")).toBe(
+      "test-plugin"
+    );
+    expect(wrapper.text()).toContain("calvin-test-card 42");
+  });
 });
 
 describe("StatusList", () => {

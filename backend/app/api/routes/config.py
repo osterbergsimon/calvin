@@ -167,6 +167,10 @@ async def get_config():
         config["orientationFlipped"] = False  # Default to not flipped
     elif "orientation_flipped" in config and "orientationFlipped" not in config:
         config["orientationFlipped"] = config["orientation_flipped"]
+    if "applyDisplayRotation" not in config and "apply_display_rotation" not in config:
+        config["applyDisplayRotation"] = True  # Apply physical rotation by default
+    elif "apply_display_rotation" in config and "applyDisplayRotation" not in config:
+        config["applyDisplayRotation"] = config["apply_display_rotation"]
     if "lastSideViewMode" not in config and "last_side_view_mode" not in config:
         config["lastSideViewMode"] = "photos"  # Default to photos
     elif "last_side_view_mode" in config and "lastSideViewMode" not in config:
@@ -266,6 +270,18 @@ async def get_config():
         config["showWeekNumbers"] = False  # Hide week numbers by default
     elif "show_week_numbers" in config and "showWeekNumbers" not in config:
         config["showWeekNumbers"] = config["show_week_numbers"]
+    if "weekendDays" not in config and "weekend_days" not in config:
+        config["weekendDays"] = [0, 6]  # Sunday + Saturday by default
+    elif "weekend_days" in config and "weekendDays" not in config:
+        config["weekendDays"] = config["weekend_days"]
+    if "showRedDays" not in config and "show_red_days" not in config:
+        config["showRedDays"] = False  # Don't highlight red days by default
+    elif "show_red_days" in config and "showRedDays" not in config:
+        config["showRedDays"] = config["show_red_days"]
+    if "maxVisibleEvents" not in config and "max_visible_events" not in config:
+        config["maxVisibleEvents"] = 4  # Max 4 events per day cell by default
+    elif "max_visible_events" in config and "maxVisibleEvents" not in config:
+        config["maxVisibleEvents"] = config["max_visible_events"]
     if "sideViewPosition" not in config and "side_view_position" not in config:
         config["sideViewPosition"] = "right"  # Right/bottom default
     elif "side_view_position" in config and "sideViewPosition" not in config:
@@ -423,6 +439,58 @@ async def get_config():
         config["clockSize"] = "medium"  # Default size
     elif "clock_size" in config and "clockSize" not in config:
         config["clockSize"] = config["clock_size"]
+    if "clockWidgetEnabled" not in config and "clock_widget_enabled" not in config:
+        config["clockWidgetEnabled"] = False  # Widget disabled by default
+    elif "clock_widget_enabled" in config and "clockWidgetEnabled" not in config:
+        config["clockWidgetEnabled"] = config["clock_widget_enabled"]
+    if "clockWidgetShowInKiosk" not in config and "clock_widget_show_in_kiosk" not in config:
+        config["clockWidgetShowInKiosk"] = False  # Don't show in kiosk by default
+    elif "clock_widget_show_in_kiosk" in config and "clockWidgetShowInKiosk" not in config:
+        config["clockWidgetShowInKiosk"] = config["clock_widget_show_in_kiosk"]
+    if "clockWidgetPosition" not in config and "clock_widget_position" not in config:
+        config["clockWidgetPosition"] = "top-right"  # Default widget position
+    elif "clock_widget_position" in config and "clockWidgetPosition" not in config:
+        config["clockWidgetPosition"] = config["clock_widget_position"]
+    if "clockBarEnabled" not in config and "clock_bar_enabled" not in config:
+        config["clockBarEnabled"] = False  # Bar disabled by default
+    elif "clock_bar_enabled" in config and "clockBarEnabled" not in config:
+        config["clockBarEnabled"] = config["clock_bar_enabled"]
+    if "clockBarMode" not in config and "clock_bar_mode" not in config:
+        config["clockBarMode"] = "horizontal"  # Horizontal layout by default
+    elif "clock_bar_mode" in config and "clockBarMode" not in config:
+        config["clockBarMode"] = config["clock_bar_mode"]
+    if "clockBarShowInNonKiosk" not in config and "clock_bar_show_in_non_kiosk" not in config:
+        config["clockBarShowInNonKiosk"] = False  # Don't show in non-kiosk by default
+    elif "clock_bar_show_in_non_kiosk" in config and "clockBarShowInNonKiosk" not in config:
+        config["clockBarShowInNonKiosk"] = config["clock_bar_show_in_non_kiosk"]
+    if "clockBarShowInKiosk" not in config and "clock_bar_show_in_kiosk" not in config:
+        config["clockBarShowInKiosk"] = False  # Don't show in kiosk by default
+    elif "clock_bar_show_in_kiosk" in config and "clockBarShowInKiosk" not in config:
+        config["clockBarShowInKiosk"] = config["clock_bar_show_in_kiosk"]
+    if "clockBarPosition" not in config and "clock_bar_position" not in config:
+        config["clockBarPosition"] = "top"  # Top position by default
+    elif "clock_bar_position" in config and "clockBarPosition" not in config:
+        config["clockBarPosition"] = config["clock_bar_position"]
+    if "clockBarFontSize" not in config and "clock_bar_font_size" not in config:
+        config["clockBarFontSize"] = 16  # 16px default
+    elif "clock_bar_font_size" in config and "clockBarFontSize" not in config:
+        config["clockBarFontSize"] = config["clock_bar_font_size"]
+    if "clockBarDateFontSize" not in config and "clock_bar_date_font_size" not in config:
+        config["clockBarDateFontSize"] = 14  # 14px default
+    elif "clock_bar_date_font_size" in config and "clockBarDateFontSize" not in config:
+        config["clockBarDateFontSize"] = config["clock_bar_date_font_size"]
+    if "clockBarLayout" not in config and "clock_bar_layout" not in config:
+        config["clockBarLayout"] = "single-line"  # Single-line layout by default
+    elif "clock_bar_layout" in config and "clockBarLayout" not in config:
+        config["clockBarLayout"] = config["clock_bar_layout"]
+    if "clockBarPadding" not in config and "clock_bar_padding" not in config:
+        config["clockBarPadding"] = 8  # 8px default padding
+    elif "clock_bar_padding" in config and "clockBarPadding" not in config:
+        config["clockBarPadding"] = config["clock_bar_padding"]
+    if "clockBarShowWeather" not in config and "clock_bar_show_weather" not in config:
+        config["clockBarShowWeather"] = False  # Don't show weather by default
+    elif "clock_bar_show_weather" in config and "clockBarShowWeather" not in config:
+        config["clockBarShowWeather"] = config["clock_bar_show_weather"]
     if "mealPlanCardSize" not in config and "meal_plan_card_size" not in config:
         config["mealPlanCardSize"] = "medium"  # Default size
     elif "meal_plan_card_size" in config and "mealPlanCardSize" not in config:

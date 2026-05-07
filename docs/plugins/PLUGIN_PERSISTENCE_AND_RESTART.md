@@ -29,7 +29,9 @@ Stores individual plugin instances:
 When you install a plugin:
 
 1. ✅ **Files are installed** to `backend/data/plugins/{plugin_id}/`
-2. ✅ **Frontend components** are copied to `frontend/src/components/plugins/{plugin_id}/`
+2. ✅ **Frontend static assets**, if present, stay under
+   `backend/data/plugins/{plugin_id}/frontend/` and are served at
+   `/api/plugins/{plugin_id}/static/{asset_path}`
 3. ✅ **Plugin module is loaded** into memory via `plugin_loader.load_installed_plugins()`
 4. ✅ **Plugin is registered** with pluggy (the plugin system)
 5. ❌ **Plugin type is NOT automatically added to database**
@@ -57,4 +59,3 @@ To make newly installed plugins appear immediately:
 ## Future Improvement
 
 A future version may add automatic database registration after installation, eliminating the need for a restart.
-

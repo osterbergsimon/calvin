@@ -18,6 +18,82 @@ def test_get_config(test_client: TestClient):
 
 
 @pytest.mark.integration
+def test_get_config_returns_all_frontend_tracked_fields(test_client: TestClient):
+    """Every field the frontend config registry tracks must be present in the response.
+
+    The frontend Pinia store's `applyConfigPayload` resets missing fields to defaults on
+    every fetch. If the backend ever omits one of these keys, polling will quietly clobber
+    locally-mutated values back to defaults. Keep this list in sync with
+    frontend/src/stores/configRegistry.js (CONFIG_FIELD_DEFINITIONS).
+    """
+    expected_keys = {
+        "orientation",
+        "orientationFlipped",
+        "applyDisplayRotation",
+        "calendarSplit",
+        "sideViewPosition",
+        "lastSideViewMode",
+        "photoFrameEnabled",
+        "photoFrameTimeout",
+        "showUI",
+        "modeIndicatorTimeout",
+        "photoRotationInterval",
+        "calendarViewMode",
+        "calendarRefreshInterval",
+        "timeFormat",
+        "weekStartDay",
+        "showWeekNumbers",
+        "weekendDays",
+        "showRedDays",
+        "maxVisibleEvents",
+        "themeMode",
+        "selectedTheme",
+        "darkModeStart",
+        "darkModeEnd",
+        "displayScheduleEnabled",
+        "displaySchedule",
+        "displayTimeoutEnabled",
+        "displayTimeout",
+        "rebootComboKey1",
+        "rebootComboKey2",
+        "rebootComboDuration",
+        "keyboardFeedbackEnabled",
+        "keyboardFeedbackMode",
+        "imageDisplayMode",
+        "timezone",
+        "clockEnabled",
+        "clockDisplayMode",
+        "clockShowDate",
+        "clockShowSeconds",
+        "clockPosition",
+        "clockSize",
+        "clockWidgetEnabled",
+        "clockWidgetShowInKiosk",
+        "clockWidgetPosition",
+        "clockBarEnabled",
+        "clockBarMode",
+        "clockBarShowInNonKiosk",
+        "clockBarShowInKiosk",
+        "clockBarPosition",
+        "clockBarFontSize",
+        "clockBarDateFontSize",
+        "clockBarLayout",
+        "clockBarPadding",
+        "clockBarShowWeather",
+        "mealPlanCardSize",
+        "consoleLogEnabled",
+        "consoleLogLevel",
+        "configPollInterval",
+        "devMode",
+    }
+    response = test_client.get("/api/config")
+    assert response.status_code == 200
+    data = response.json()
+    missing = expected_keys - data.keys()
+    assert not missing, f"backend response missing registry-tracked keys: {sorted(missing)}"
+
+
+@pytest.mark.integration
 def test_update_config(test_client: TestClient):
     """Test updating configuration via API."""
     # Get current config

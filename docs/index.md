@@ -24,7 +24,8 @@ New to Calvin? Get started quickly:
 3. **Docker Setup** - Containerized development and production setup; see `docker/README.md`
 4. **[Setup Scripts](setup/SETUP_SCRIPTS.md)** - Automated setup scripts for production and development
 5. **[Production Setup](setup/SETUP_LINUX.md)** - Install Calvin on Raspberry Pi or Linux
-6. **[Plugin Development](plugins/PLUGIN_DEVELOPMENT_GUIDE.md)** - Create your first plugin
+6. **[Deployment Topologies](setup/DEPLOYMENT_TOPOLOGIES.md)** - All-in-one Pi vs. remote backend + kiosk Pi
+7. **[Plugin Development](plugins/PLUGIN_DEVELOPMENT_GUIDE.md)** - Create your first plugin
 
 ## Documentation Structure
 

@@ -1,0 +1,61 @@
+[Unit]
+Description=Calvin Dashboard Kiosk (remote backend)
+After=network-online.target calvin-x.service
+Wants=network-online.target graphical.target calvin-x.service
+
+[Service]
+Type=simple
+User=calvin
+Group=calvin
+EnvironmentFile=/etc/default/calvin-kiosk
+Environment="DISPLAY=:0"
+Environment="HOME=/home/calvin"
+Environment="XAUTHORITY=/home/calvin/.Xauthority"
+ExecStartPre=/bin/bash -c 'timeout=240; elapsed=0; until curl -sf "${CALVIN_BACKEND_URL%/}/api/health" > /dev/null 2>&1; do if [ $elapsed -ge $timeout ]; then echo "Calvin backend at ${CALVIN_BACKEND_URL} not ready after $timeout seconds"; exit 1; fi; sleep 1; elapsed=$((elapsed+1)); done'
+ExecStartPre=/bin/bash -c 'timeout=60; elapsed=0; until [ -S /tmp/.X11-unix/X0 ] || pgrep -x Xorg > /dev/null 2>&1; do if [ $elapsed -ge $timeout ]; then echo "X server not available after $timeout seconds"; exit 1; fi; sleep 1; elapsed=$((elapsed+1)); done'
+ExecStartPre=/bin/sleep 2
+ExecStartPre=/bin/bash -c 'pkill -u calvin chromium || pkill -u calvin chromium-browser || true'
+ExecStartPre=/bin/sleep 1
+ExecStartPre=/bin/bash -c 'rm -rf /home/calvin/.cache/chromium/Default/Cache/* "/home/calvin/.cache/chromium/Default/Code Cache"/* 2>/dev/null || true'
+ExecStart=/bin/bash -c '/usr/bin/chromium \
+    --kiosk \
+    --noerrdialogs \
+    --disable-infobars \
+    --autoplay-policy=no-user-gesture-required \
+    --disable-features=TranslateUI,AudioServiceOutOfProcess \
+    --disable-ipc-flooding-protection \
+    --disable-background-networking \
+    --disable-background-timer-throttling \
+    --disable-renderer-backgrounding \
+    --disable-backgrounding-occluded-windows \
+    --disable-breakpad \
+    --disable-component-update \
+    --disable-domain-reliability \
+    --disable-hang-monitor \
+    --disable-prompt-on-repost \
+    --disable-sync \
+    --disable-web-resources \
+    --metrics-recording-only \
+    --mute-audio \
+    --no-first-run \
+    --no-default-browser-check \
+    --no-pings \
+    --no-sandbox \
+    --no-zygote \
+    --use-mock-keychain \
+    --force-device-scale-factor=1 \
+    --disable-lcd-text \
+    --disable-application-cache \
+    --aggressive-cache-discard \
+    --disable-background-downloads \
+    --disk-cache-size=0 \
+    --media-cache-size=0 \
+    "${CALVIN_BACKEND_URL}"'
+Restart=always
+RestartSec=10
+StandardOutput=journal
+StandardError=journal
+SyslogIdentifier=calvin-kiosk
+
+[Install]
+WantedBy=multi-user.target

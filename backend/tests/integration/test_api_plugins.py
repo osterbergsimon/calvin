@@ -262,8 +262,8 @@ def register_plugin_types() -> list[dict[str, Any]]:
         response = test_client.delete("/api/plugins/installed/nonexistent")
         assert response.status_code == 404
 
-    def test_install_plugin_with_frontend_components(self, test_client, tmp_path):
-        """Test installing a plugin with frontend components."""
+    def test_install_plugin_with_frontend_static_assets(self, test_client, tmp_path):
+        """Test installing a plugin with frontend static assets."""
         # Clean up first in case it exists
         try:
             plugin_installer.uninstall_plugin("test_frontend_plugin")
@@ -285,15 +285,58 @@ def register_plugin_types() -> list[dict[str, Any]]:
 
         frontend_dir = plugin_dir / "frontend"
         frontend_dir.mkdir()
-        (frontend_dir / "TestComponent.vue").write_text("<template><div>Test</div></template>")
+        (frontend_dir / "dist.js").write_text(
+            "customElements.define('calvin-test-frontend-plugin', class extends HTMLElement {})"
+        )
+        (frontend_dir / "dist.css").write_text(":host { display: block; }")
 
         # Install plugin
         plugin_installer.install_plugin(plugin_dir)
 
-        # Verify frontend asset is stored inside the plugin's data dir
-        # (the host serves these via /api/plugins/{id}/static/*).
+        # Verify frontend assets are stored inside the plugin's data dir.
         plugin_path = plugin_installer.get_plugin_path("test_frontend_plugin")
-        assert (plugin_path / "frontend" / "TestComponent.vue").exists()
+        assert (plugin_path / "frontend" / "dist.js").exists()
+        assert (plugin_path / "frontend" / "dist.css").exists()
+
+    def test_plugin_static_asset_endpoint_serves_installed_frontend_asset(
+        self, test_client, temp_plugins_dir, monkeypatch
+    ):
+        """Test serving installed plugin frontend assets without a frontend rebuild."""
+        from app.config import settings
+
+        monkeypatch.setattr(settings, "plugins_dir", temp_plugins_dir)
+
+        frontend_dir = temp_plugins_dir / "test_static_plugin" / "frontend"
+        frontend_dir.mkdir(parents=True)
+        (frontend_dir / "dist.js").write_text(
+            "customElements.define('calvin-static-test', class extends HTMLElement {})"
+        )
+
+        response = test_client.get("/api/plugins/test_static_plugin/static/dist.js")
+
+        assert response.status_code == 200
+        assert "calvin-static-test" in response.text
+
+    @pytest.mark.asyncio
+    async def test_plugin_static_asset_endpoint_rejects_path_traversal(
+        self, temp_plugins_dir, monkeypatch
+    ):
+        """Test plugin static asset paths cannot escape the plugin frontend directory."""
+        from fastapi import HTTPException
+
+        from app.api.routes.plugins.static_assets import get_plugin_static_asset
+        from app.config import settings
+
+        monkeypatch.setattr(settings, "plugins_dir", temp_plugins_dir)
+
+        frontend_dir = temp_plugins_dir / "test_static_plugin" / "frontend"
+        frontend_dir.mkdir(parents=True)
+        (temp_plugins_dir / "test_static_plugin" / "secret.txt").write_text("secret")
+
+        with pytest.raises(HTTPException) as exc_info:
+            await get_plugin_static_asset("test_static_plugin", "../secret.txt")
+
+        assert exc_info.value.status_code == 400
 
 
 @pytest.mark.integration
