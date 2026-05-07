@@ -576,7 +576,7 @@ if frontend_dist.exists():
     assets_dir = frontend_dist / "assets"
     if assets_dir.exists():
         # Use custom static file handler to add cache control headers
-        @app.get("/assets/{file_path:path}")
+        @app.get("/assets/{file_path:path}", include_in_schema=False)
         async def serve_asset(file_path: str):
             """Serve static assets with cache control headers for development."""
             asset_path = assets_dir / file_path
@@ -600,9 +600,9 @@ if frontend_dist.exists():
         logger.warning(f"Assets directory not found: {assets_dir}")
 
     # Serve index.html for root path
-    @app.get("/")
+    @app.get("/", operation_id="root__get", summary="Root")
     async def serve_frontend_root():
-        """Serve frontend index.html for root path."""
+        """Root endpoint."""
         index_path = frontend_dist / "index.html"
         if index_path.exists():
             return FileResponse(
@@ -618,7 +618,7 @@ if frontend_dist.exists():
     # Serve index.html for all other non-API routes (SPA routing)
     # This must come after API routes and asset mounts to avoid intercepting them
     # Only handle GET requests for SPA routing - POST requests should only go to API routes
-    @app.get("/{full_path:path}")
+    @app.get("/{full_path:path}", include_in_schema=False)
     async def serve_frontend_get(full_path: str):
         """Serve frontend index.html for SPA routing (GET only)."""
         # Don't handle API routes, docs, or assets (already handled by mounts/routers)
