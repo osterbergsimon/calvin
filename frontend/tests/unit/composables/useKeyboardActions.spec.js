@@ -9,6 +9,10 @@ import { useKeyboardActions } from "@/composables/useKeyboardActions";
 import { useModeStore } from "@/stores/mode";
 import { useCalendarStore } from "@/stores/calendar";
 
+const mocks = vi.hoisted(() => ({
+  configStore: null,
+}));
+
 // Mock vue-router
 vi.mock("vue-router", () => ({
   useRouter: () => ({
@@ -35,14 +39,7 @@ vi.mock("@/stores/webServices", () => ({
 }));
 
 vi.mock("@/stores/config", () => ({
-  useConfigStore: () => ({
-    cycleCalendarViewMode: vi.fn(),
-    calendarViewMode: "month",
-    setCalendarViewMode: vi.fn(),
-    updateConfig: vi.fn(),
-    setLastSideViewMode: vi.fn(),
-    shouldShowUI: true,
-  }),
+  useConfigStore: () => mocks.configStore,
 }));
 
 vi.mock("@/utils/logger", () => ({
@@ -59,6 +56,18 @@ describe("useKeyboardActions - Calendar Event Navigation", () => {
 
   beforeEach(() => {
     setActivePinia(createPinia());
+    mocks.configStore = {
+      cycleCalendarViewMode: vi.fn(),
+      calendarViewMode: "month",
+      setCalendarViewMode: vi.fn(),
+      updateConfig: vi.fn().mockResolvedValue(undefined),
+      setDashboardScreens: vi.fn(screens => {
+        mocks.configStore.dashboardScreens = screens;
+      }),
+      setLastSideViewMode: vi.fn(),
+      shouldShowUI: true,
+      dashboardScreens: null,
+    };
     modeStore = useModeStore();
     calendarStore = useCalendarStore();
     keyboardActions = useKeyboardActions();
@@ -274,6 +283,55 @@ describe("useKeyboardActions - Calendar Event Navigation", () => {
 
       // Should navigate to next month
       expect(calendarStore.currentDate.getMonth()).toBe((initialDate.getMonth() + 1) % 12);
+    });
+  });
+
+  describe("Dashboard screen activation", () => {
+    it("activates a matching split leaf for mode actions", () => {
+      mocks.configStore.dashboardScreens = {
+        version: 2,
+        activeScreenId: "home",
+        screens: [
+          {
+            id: "home",
+            name: "Home",
+            layout: {
+              version: 1,
+              preset: "single",
+              regions: [{ id: "region-1", kind: "calendar", size: 100 }],
+            },
+            activeRegionId: "region-1",
+          },
+          {
+            id: "media",
+            name: "Media",
+            layout: {
+              version: 1,
+              preset: "single",
+              regions: [
+                {
+                  id: "region-1",
+                  kind: "service",
+                  size: 100,
+                  split: {
+                    regions: [
+                      { id: "region-1-a", kind: "service", size: 50 },
+                      { id: "region-1-b", kind: "photos", size: 50 },
+                    ],
+                  },
+                },
+              ],
+            },
+            activeRegionId: "region-1-a",
+          },
+        ],
+      };
+
+      keyboardActions.handleAction("mode_photos");
+
+      const nextScreens = mocks.configStore.setDashboardScreens.mock.calls.at(-1)[0];
+      expect(nextScreens.activeScreenId).toBe("media");
+      expect(nextScreens.screens[1].activeRegionId).toBe("region-1-b");
     });
   });
 

@@ -16,7 +16,7 @@
     "test:e2e:debug": "playwright test --debug",
     "lint": "eslint .",
     "format": "prettier --write \"src/**/*.{js,jsx,vue,json,css}\"",
-    "gen:api": "openapi-typescript ../backend/tests/contract/openapi.json -o src/api/types.ts"
+    "gen:api": "openapi-typescript ../backend/tests/contract/openapi.json -o src/api/types.ts && prettier --write src/api/types.ts"
   },
   "dependencies": {
     "@mdi/js": "^7.4.47",

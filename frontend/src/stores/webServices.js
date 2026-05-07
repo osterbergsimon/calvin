@@ -227,6 +227,11 @@ export const useWebServicesStore = defineStore("webServices", () => {
     return services.value[currentServiceIndex.value] || null;
   };
 
+  const getServiceById = serviceId => {
+    if (!serviceId) return getCurrentService();
+    return services.value.find(service => service.id === serviceId) || null;
+  };
+
   const nextService = () => {
     if (services.value.length === 0) return;
     currentServiceIndex.value = (currentServiceIndex.value + 1) % services.value.length;
@@ -270,6 +275,7 @@ export const useWebServicesStore = defineStore("webServices", () => {
     updateService,
     removeService,
     getCurrentService,
+    getServiceById,
     nextService,
     previousService,
     setServiceIndex,

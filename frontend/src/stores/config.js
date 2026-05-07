@@ -2,6 +2,12 @@ import { defineStore } from "pinia";
 import { ref, computed } from "vue";
 import axios from "axios";
 import { logError } from "../utils/logger";
+import {
+  cycleActiveDashboardRegion,
+  cycleDashboardScreen,
+  normalizeDashboardScreens,
+  setActiveDashboardScreen,
+} from "../utils/layout";
 import { applyConfigPayload, createDefaultDisplaySchedule } from "./configRegistry";
 
 export const useConfigStore = defineStore("config", () => {
@@ -9,6 +15,8 @@ export const useConfigStore = defineStore("config", () => {
   const orientationFlipped = ref(false); // Whether orientation is flipped (180° rotation)
   const applyDisplayRotation = ref(true); // Whether to physically rotate display on RPi (default: true)
   const calendarSplit = ref(70); // Percentage for calendar (10-90%, default 70%)
+  const dashboardLayout = ref(null); // Dashboard region layout configuration
+  const dashboardScreens = ref(null); // Dashboard screen configuration
   const sideViewPosition = ref("right"); // 'left' | 'right' for landscape, 'top' | 'bottom' for portrait
   const lastSideViewMode = ref("photos"); // Track last side view mode ('photos' | 'web_services')
   const showWebServices = ref(false); // Toggle for web services view
@@ -77,6 +85,8 @@ export const useConfigStore = defineStore("config", () => {
     orientationFlipped,
     applyDisplayRotation,
     calendarSplit,
+    dashboardLayout,
+    dashboardScreens,
     sideViewPosition,
     lastSideViewMode,
     photoFrameEnabled,
@@ -327,6 +337,28 @@ export const useConfigStore = defineStore("config", () => {
     }
   };
 
+  const setDashboardScreens = screens => {
+    dashboardScreens.value = normalizeDashboardScreens(screens);
+  };
+
+  const activateDashboardScreen = async screenId => {
+    const nextScreens = setActiveDashboardScreen(dashboardScreens.value, screenId);
+    dashboardScreens.value = nextScreens;
+    await updateConfig({ dashboardScreens: nextScreens });
+  };
+
+  const cycleDashboardScreenBy = async direction => {
+    const nextScreens = cycleDashboardScreen(dashboardScreens.value, direction);
+    dashboardScreens.value = nextScreens;
+    await updateConfig({ dashboardScreens: nextScreens });
+  };
+
+  const cycleActiveDashboardRegionBy = async direction => {
+    const nextScreens = cycleActiveDashboardRegion(dashboardScreens.value, direction);
+    dashboardScreens.value = nextScreens;
+    await updateConfig({ dashboardScreens: nextScreens });
+  };
+
   const setThemeMode = mode => {
     themeMode.value = mode;
   };
@@ -345,6 +377,8 @@ export const useConfigStore = defineStore("config", () => {
     orientationFlipped,
     applyDisplayRotation,
     calendarSplit,
+    dashboardLayout,
+    dashboardScreens,
     showWebServices,
     lastSideViewMode,
     photoFrameEnabled,
@@ -428,6 +462,10 @@ export const useConfigStore = defineStore("config", () => {
     setMaxVisibleEvents,
     setSideViewPosition,
     toggleSideViewPosition,
+    setDashboardScreens,
+    activateDashboardScreen,
+    cycleDashboardScreenBy,
+    cycleActiveDashboardRegionBy,
     setThemeMode,
     setDarkModeTime,
     setImageDisplayMode,

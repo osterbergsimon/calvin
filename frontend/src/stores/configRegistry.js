@@ -1,3 +1,5 @@
+import { normalizeDashboardLayout, normalizeDashboardScreens } from "../utils/layout";
+
 export const createDefaultDisplaySchedule = () => [
   { day: 0, enabled: true, onTime: "06:00", offTime: "22:00" },
   { day: 1, enabled: true, onTime: "06:00", offTime: "22:00" },
@@ -47,6 +49,22 @@ export const CONFIG_FIELD_DEFINITIONS = [
     name: "lastSideViewMode",
     keys: ["lastSideViewMode", "last_side_view_mode"],
     defaultValue: "photos",
+  },
+  {
+    name: "dashboardLayout",
+    keys: ["dashboardLayout", "dashboard_layout"],
+    defaultValue: null,
+    parse: (value, refsByName) =>
+      normalizeDashboardLayout(value, {
+        calendarSplit: refsByName.calendarSplit?.value ?? 70,
+        lastSideViewMode: refsByName.lastSideViewMode?.value ?? "photos",
+      }),
+  },
+  {
+    name: "dashboardScreens",
+    keys: ["dashboardScreens", "dashboard_screens"],
+    defaultValue: null,
+    parse: value => normalizeDashboardScreens(value),
   },
   {
     name: "photoFrameEnabled",
@@ -253,6 +271,6 @@ export const applyConfigPayload = (payload, refsByName, { useDefaults = false } 
     if (!found && !useDefaults) continue;
 
     const rawValue = found ? value : cloneDefault(field.defaultValue);
-    targetRef.value = field.parse ? field.parse(rawValue) : rawValue;
+    targetRef.value = field.parse ? field.parse(rawValue, refsByName) : rawValue;
   }
 };

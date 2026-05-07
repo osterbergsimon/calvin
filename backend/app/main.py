@@ -211,10 +211,10 @@ async def _initialize_keyboard_mappings():
         "KEY_1": "generic_prev",
         "KEY_2": "generic_expand_close",
         "KEY_3": "generic_next",
-        "KEY_4": "mode_calendar",
-        "KEY_5": "mode_photos",
-        "KEY_6": "mode_web_services",
-        "KEY_7": "generic_refresh",
+        "KEY_4": "region_next",
+        "KEY_5": "screen_prev",
+        "KEY_6": "screen_next",
+        "KEY_7": "mode_settings",
     }
 
     # Set default standard keyboard mappings (same pattern, different keys)
@@ -222,10 +222,10 @@ async def _initialize_keyboard_mappings():
         "KEY_LEFT": "generic_prev",
         "KEY_UP": "generic_expand_close",
         "KEY_RIGHT": "generic_next",
-        "KEY_DOWN": "mode_calendar",
-        "KEY_SPACE": "mode_photos",
-        "KEY_1": "mode_web_services",
-        "KEY_2": "generic_refresh",
+        "KEY_DOWN": "region_next",
+        "KEY_SPACE": "screen_next",
+        "KEY_1": "screen_prev",
+        "KEY_2": "mode_settings",
     }
 
     # Initialize mappings if none exist
@@ -271,6 +271,33 @@ async def _initialize_default_config():
         "orientation": "landscape",
         "apply_display_rotation": True,
         "calendar_split": 70.0,
+        "dashboard_layout": {
+            "version": 1,
+            "preset": "split_two",
+            "regions": [
+                {"id": "region-1", "kind": "calendar", "size": 70},
+                {"id": "region-2", "kind": "photos", "serviceId": None, "size": 30},
+            ],
+        },
+        "dashboard_screens": {
+            "version": 2,
+            "activeScreenId": "screen-home",
+            "screens": [
+                {
+                    "id": "screen-home",
+                    "name": "Home",
+                    "layout": {
+                        "version": 1,
+                        "preset": "split_two",
+                        "regions": [
+                            {"id": "region-1", "kind": "calendar", "serviceId": None, "size": 70},
+                            {"id": "region-2", "kind": "photos", "serviceId": None, "size": 30},
+                        ],
+                    },
+                    "activeRegionId": "region-1",
+                }
+            ],
+        },
         "keyboard_type": "7-button",
         "photo_frame_enabled": False,
         "photo_frame_timeout": 300,  # 5 minutes
@@ -549,7 +576,7 @@ if frontend_dist.exists():
     assets_dir = frontend_dist / "assets"
     if assets_dir.exists():
         # Use custom static file handler to add cache control headers
-        @app.get("/assets/{file_path:path}")
+        @app.get("/assets/{file_path:path}", include_in_schema=False)
         async def serve_asset(file_path: str):
             """Serve static assets with cache control headers for development."""
             asset_path = assets_dir / file_path
@@ -573,9 +600,9 @@ if frontend_dist.exists():
         logger.warning(f"Assets directory not found: {assets_dir}")
 
     # Serve index.html for root path
-    @app.get("/")
+    @app.get("/", operation_id="root__get", summary="Root")
     async def serve_frontend_root():
-        """Serve frontend index.html for root path."""
+        """Root endpoint."""
         index_path = frontend_dist / "index.html"
         if index_path.exists():
             return FileResponse(
@@ -591,7 +618,7 @@ if frontend_dist.exists():
     # Serve index.html for all other non-API routes (SPA routing)
     # This must come after API routes and asset mounts to avoid intercepting them
     # Only handle GET requests for SPA routing - POST requests should only go to API routes
-    @app.get("/{full_path:path}")
+    @app.get("/{full_path:path}", include_in_schema=False)
     async def serve_frontend_get(full_path: str):
         """Serve frontend index.html for SPA routing (GET only)."""
         # Don't handle API routes, docs, or assets (already handled by mounts/routers)

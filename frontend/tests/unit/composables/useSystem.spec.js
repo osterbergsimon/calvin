@@ -334,6 +334,35 @@ describe("useSystem", () => {
       expect(system.updateMessage.value).toBe("Update failed: Build failed");
       expect(system.updateMessageClass.value).toBe("error");
     });
+
+    it("keeps streaming when the server sends a running state snapshot", async () => {
+      systemApi.triggerUpdate.mockResolvedValue({ log_offset: 0 });
+      systemApi.getHealth.mockResolvedValue({ status: "healthy" });
+      vi.useRealTimers();
+
+      const system = useSystem();
+      const promise = system.triggerUpdate();
+
+      await fireStreamEvent({
+        type: "status",
+        status: "running",
+        message: "Pulling latest code",
+        state: {
+          status: "running",
+          phase: "pulling_code",
+          message: "Pulling latest code",
+        },
+      });
+
+      expect(FakeEventSource.last.closed).toBe(false);
+      expect(system.updateStatus.value.phase).toBe("pulling_code");
+      expect(system.updateMessage.value).toBe("Pulling latest code");
+
+      await fireStreamEvent({ type: "status", status: "complete" });
+      await promise;
+
+      expect(system.updateMessageClass.value).toBe("success");
+    });
   });
 
   describe("getUpdateStatus", () => {

@@ -322,6 +322,30 @@
             ],
             "title": "Darkmodestart"
           },
+          "dashboardLayout": {
+            "anyOf": [
+              {
+                "additionalProperties": true,
+                "type": "object"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Dashboardlayout"
+          },
+          "dashboardScreens": {
+            "anyOf": [
+              {
+                "additionalProperties": true,
+                "type": "object"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Dashboardscreens"
+          },
           "displaySchedule": {
             "anyOf": [
               {

@@ -98,6 +98,8 @@ class ConfigUpdate(BaseModel):
         None  # Whether to physically rotate display on RPi (default: True)
     )
     calendarSplit: float | None = None
+    dashboardLayout: dict[str, Any] | None = None
+    dashboardScreens: dict[str, Any] | None = None
     lastSideViewMode: str | None = None  # Last side view mode ('photos' | 'web_services')
     keyboardType: str | None = None
     photoFrameEnabled: bool | None = None
@@ -177,6 +179,49 @@ async def get_config():
         config["calendarSplit"] = 70.0
     elif "calendar_split" in config and "calendarSplit" not in config:
         config["calendarSplit"] = config["calendar_split"]
+    if "dashboardLayout" not in config and "dashboard_layout" not in config:
+        calendar_split = config.get("calendarSplit", config.get("calendar_split", 70.0))
+        last_side_view_mode = config.get(
+            "lastSideViewMode", config.get("last_side_view_mode", "photos")
+        )
+        secondary_kind = "service" if last_side_view_mode == "web_services" else "photos"
+        config["dashboardLayout"] = {
+            "version": 1,
+            "preset": "calendar_service" if secondary_kind == "service" else "calendar_photos",
+            "regions": [
+                {"id": "primary", "kind": "calendar", "size": calendar_split},
+                {
+                    "id": "secondary",
+                    "kind": secondary_kind,
+                    "serviceId": None,
+                    "size": 100 - float(calendar_split),
+                },
+            ],
+        }
+    elif "dashboard_layout" in config and "dashboardLayout" not in config:
+        config["dashboardLayout"] = config["dashboard_layout"]
+    if "dashboardScreens" not in config and "dashboard_screens" not in config:
+        config["dashboardScreens"] = {
+            "version": 2,
+            "activeScreenId": "screen-home",
+            "screens": [
+                {
+                    "id": "screen-home",
+                    "name": "Home",
+                    "layout": {
+                        "version": 1,
+                        "preset": "split_two",
+                        "regions": [
+                            {"id": "region-1", "kind": "calendar", "serviceId": None, "size": 70},
+                            {"id": "region-2", "kind": "photos", "serviceId": None, "size": 30},
+                        ],
+                    },
+                    "activeRegionId": "region-1",
+                }
+            ],
+        }
+    elif "dashboard_screens" in config and "dashboardScreens" not in config:
+        config["dashboardScreens"] = config["dashboard_screens"]
     if "keyboardType" not in config and "keyboard_type" not in config:
         config["keyboardType"] = "7-button"
     elif "keyboard_type" in config and "keyboardType" not in config:
@@ -500,6 +545,10 @@ async def update_config(config_update: ConfigUpdate):
         update_dict["last_side_view_mode"] = update_dict.pop("lastSideViewMode")
     if "calendarSplit" in update_dict:
         update_dict["calendar_split"] = update_dict.pop("calendarSplit")
+    if "dashboardLayout" in update_dict:
+        update_dict["dashboard_layout"] = update_dict.pop("dashboardLayout")
+    if "dashboardScreens" in update_dict:
+        update_dict["dashboard_screens"] = update_dict.pop("dashboardScreens")
     if "keyboardType" in update_dict:
         update_dict["keyboard_type"] = update_dict.pop("keyboardType")
     if "photoFrameEnabled" in update_dict:
