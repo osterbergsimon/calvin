@@ -6,6 +6,15 @@ import { useWebServicesStore } from "../stores/webServices";
 import { useConfigStore } from "../stores/config";
 import { useRouter } from "vue-router";
 import { logInfo, logError, logWarn, logDebug } from "../utils/logger";
+import {
+  cycleActiveDashboardRegion,
+  cycleDashboardScreen,
+  getActiveDashboardRegion,
+  getActiveDashboardScreen,
+  getLeafRegions,
+  normalizeDashboardScreens,
+  setActiveDashboardScreen,
+} from "../utils/layout";
 
 /**
  * Composable for handling keyboard actions.
@@ -18,6 +27,64 @@ export function useKeyboardActions() {
   const webServicesStore = useWebServicesStore();
   const configStore = useConfigStore();
   const router = useRouter();
+
+  const getDashboardScreens = () => normalizeDashboardScreens(configStore.dashboardScreens);
+
+  const getActiveRegion = () => {
+    const screen = getActiveDashboardScreen(getDashboardScreens());
+    return getActiveDashboardRegion(screen);
+  };
+
+  const activeRegionKindIs = kind => getActiveRegion()?.kind === kind;
+
+  const saveDashboardScreens = screens => {
+    if (typeof configStore.setDashboardScreens === "function") {
+      configStore.setDashboardScreens(screens);
+    }
+    if (typeof configStore.updateConfig === "function") {
+      configStore.updateConfig({ dashboardScreens: screens }).catch(err => {
+        logError("[Keyboard]", "Failed to save dashboard screens:", err);
+      });
+    }
+  };
+
+  const activateScreenByIndex = index => {
+    const screensConfig = getDashboardScreens();
+    const screen = screensConfig.screens[index];
+    if (!screen) return;
+    saveDashboardScreens(setActiveDashboardScreen(screensConfig, screen.id));
+    router.push("/");
+  };
+
+  const activateFirstScreenContainingKind = kind => {
+    const screensConfig = getDashboardScreens();
+    let matchScreenIndex = -1;
+    let matchLeafId = null;
+    for (let index = 0; index < screensConfig.screens.length; index += 1) {
+      const leaf = getLeafRegions(screensConfig.screens[index].layout).find(
+        candidate => candidate.kind === kind
+      );
+      if (leaf) {
+        matchScreenIndex = index;
+        matchLeafId = leaf.id;
+        break;
+      }
+    }
+    if (matchScreenIndex < 0) return false;
+    const screen = screensConfig.screens[matchScreenIndex];
+    const nextScreens = setActiveDashboardScreen(
+      {
+        ...screensConfig,
+        screens: screensConfig.screens.map((candidate, index) =>
+          index === matchScreenIndex ? { ...candidate, activeRegionId: matchLeafId } : candidate
+        ),
+      },
+      screen.id
+    );
+    saveDashboardScreens(nextScreens);
+    router.push("/");
+    return true;
+  };
 
   // Handle calendar mode key press - cycle view mode if already in calendar mode
   const handleCalendarModePress = () => {
@@ -331,13 +398,19 @@ export function useKeyboardActions() {
     switch (action) {
       // Mode switching
       case "mode_calendar":
-        handleCalendarModePress();
+        if (!activateFirstScreenContainingKind("calendar")) {
+          handleCalendarModePress();
+        } else {
+          modeStore.setMode(modeStore.MODES.CALENDAR);
+        }
         break;
       case "mode_photos":
+        activateFirstScreenContainingKind("photos");
         modeStore.setMode(modeStore.MODES.PHOTOS);
         router.push("/");
         break;
       case "mode_web_services":
+        activateFirstScreenContainingKind("service");
         modeStore.setMode(modeStore.MODES.WEB_SERVICES);
         router.push("/");
         break;
@@ -357,13 +430,36 @@ export function useKeyboardActions() {
           router.push("/");
         }
         break;
+      case "screen_next":
+        saveDashboardScreens(cycleDashboardScreen(getDashboardScreens(), 1));
+        router.push("/");
+        break;
+      case "screen_prev":
+        saveDashboardScreens(cycleDashboardScreen(getDashboardScreens(), -1));
+        router.push("/");
+        break;
+      case "screen_1":
+      case "screen_2":
+      case "screen_3":
+      case "screen_4":
+      case "screen_5":
+      case "screen_6":
+      case "screen_7":
+        activateScreenByIndex(Number(action.replace("screen_", "")) - 1);
+        break;
+      case "region_next":
+        saveDashboardScreens(cycleActiveDashboardRegion(getDashboardScreens(), 1));
+        break;
+      case "region_prev":
+        saveDashboardScreens(cycleActiveDashboardRegion(getDashboardScreens(), -1));
+        break;
 
       // Calendar actions - context-aware based on view mode
       // Day view: moves by 1 day, Week view: moves by 1 week, Month view: moves by 1 month
       // Note: Navigation preserves the selected event and keeps the modal open
       case "calendar_next":
       case "calendar_next_month": // Legacy name for backward compatibility
-        if (modeStore.currentMode === modeStore.MODES.CALENDAR) {
+        if (modeStore.currentMode === modeStore.MODES.CALENDAR || activeRegionKindIs("calendar")) {
           // Preserve selected event before navigation (modal stays open)
           const preservedEvent = calendarStore.selectedEvent;
           const preservedDate = calendarStore.selectedDate;
@@ -404,7 +500,7 @@ export function useKeyboardActions() {
         break;
       case "calendar_prev":
       case "calendar_prev_month": // Legacy name for backward compatibility
-        if (modeStore.currentMode === modeStore.MODES.CALENDAR) {
+        if (modeStore.currentMode === modeStore.MODES.CALENDAR || activeRegionKindIs("calendar")) {
           // Preserve selected event before navigation (modal stays open)
           const preservedEvent = calendarStore.selectedEvent;
           const preservedDate = calendarStore.selectedDate;
@@ -446,7 +542,7 @@ export function useKeyboardActions() {
       case "calendar_expand":
       case "calendar_expand_today": // Legacy name for backward compatibility
         // Context-aware expand: expands events for current day/week based on view mode
-        if (modeStore.currentMode === modeStore.MODES.CALENDAR) {
+        if (modeStore.currentMode === modeStore.MODES.CALENDAR || activeRegionKindIs("calendar")) {
           const viewMode = configStore.calendarViewMode;
           let targetDate = new Date();
 
@@ -555,31 +651,43 @@ export function useKeyboardActions() {
         }
         break;
       case "calendar_collapse":
-        if (modeStore.currentMode === modeStore.MODES.CALENDAR) {
+        if (modeStore.currentMode === modeStore.MODES.CALENDAR || activeRegionKindIs("calendar")) {
           calendarStore.clearSelectedEvent();
         }
         break;
       case "calendar_next_day":
         // Navigate to next day when event detail panel is open
-        if (modeStore.currentMode === modeStore.MODES.CALENDAR && calendarStore.selectedEvent) {
+        if (
+          (modeStore.currentMode === modeStore.MODES.CALENDAR || activeRegionKindIs("calendar")) &&
+          calendarStore.selectedEvent
+        ) {
           navigateToNextDayWithEvents();
         }
         break;
       case "calendar_prev_day":
         // Navigate to previous day when event detail panel is open
-        if (modeStore.currentMode === modeStore.MODES.CALENDAR && calendarStore.selectedEvent) {
+        if (
+          (modeStore.currentMode === modeStore.MODES.CALENDAR || activeRegionKindIs("calendar")) &&
+          calendarStore.selectedEvent
+        ) {
           navigateToPreviousDayWithEvents();
         }
         break;
       case "calendar_next_event":
         // Navigate to next event within day, or next day if on last event
-        if (modeStore.currentMode === modeStore.MODES.CALENDAR && calendarStore.selectedEvent) {
+        if (
+          (modeStore.currentMode === modeStore.MODES.CALENDAR || activeRegionKindIs("calendar")) &&
+          calendarStore.selectedEvent
+        ) {
           navigateToNextEvent();
         }
         break;
       case "calendar_prev_event":
         // Navigate to previous event within day, or previous day if on first event
-        if (modeStore.currentMode === modeStore.MODES.CALENDAR && calendarStore.selectedEvent) {
+        if (
+          (modeStore.currentMode === modeStore.MODES.CALENDAR || activeRegionKindIs("calendar")) &&
+          calendarStore.selectedEvent
+        ) {
           navigateToPreviousEvent();
         }
         break;
@@ -590,7 +698,8 @@ export function useKeyboardActions() {
         if (
           modeStore.currentMode === modeStore.MODES.PHOTOS ||
           (modeStore.isFullscreen && modeStore.fullscreenMode === modeStore.MODES.PHOTOS) ||
-          modeStore.currentMode === modeStore.MODES.CALENDAR
+          modeStore.currentMode === modeStore.MODES.CALENDAR ||
+          activeRegionKindIs("photos")
         ) {
           imagesStore.nextImage();
         }
@@ -600,7 +709,8 @@ export function useKeyboardActions() {
         if (
           modeStore.currentMode === modeStore.MODES.PHOTOS ||
           (modeStore.isFullscreen && modeStore.fullscreenMode === modeStore.MODES.PHOTOS) ||
-          modeStore.currentMode === modeStore.MODES.CALENDAR
+          modeStore.currentMode === modeStore.MODES.CALENDAR ||
+          activeRegionKindIs("photos")
         ) {
           imagesStore.previousImage();
         }
@@ -609,7 +719,8 @@ export function useKeyboardActions() {
         // Enter fullscreen photos mode
         if (
           modeStore.currentMode === modeStore.MODES.PHOTOS ||
-          modeStore.currentMode === modeStore.MODES.CALENDAR
+          modeStore.currentMode === modeStore.MODES.CALENDAR ||
+          activeRegionKindIs("photos")
         ) {
           modeStore.enterFullscreen(modeStore.MODES.PHOTOS);
           router.push("/");
@@ -646,7 +757,8 @@ export function useKeyboardActions() {
         // Works in web services mode or fullscreen web services
         if (
           modeStore.currentMode === modeStore.MODES.WEB_SERVICES ||
-          (modeStore.isFullscreen && modeStore.fullscreenMode === modeStore.MODES.WEB_SERVICES)
+          (modeStore.isFullscreen && modeStore.fullscreenMode === modeStore.MODES.WEB_SERVICES) ||
+          activeRegionKindIs("service")
         ) {
           logDebug(
             "[Keyboard]",
@@ -671,7 +783,8 @@ export function useKeyboardActions() {
         // Works in web services mode or fullscreen web services
         if (
           modeStore.currentMode === modeStore.MODES.WEB_SERVICES ||
-          (modeStore.isFullscreen && modeStore.fullscreenMode === modeStore.MODES.WEB_SERVICES)
+          (modeStore.isFullscreen && modeStore.fullscreenMode === modeStore.MODES.WEB_SERVICES) ||
+          activeRegionKindIs("service")
         ) {
           logDebug(
             "[Keyboard]",
@@ -701,7 +814,10 @@ export function useKeyboardActions() {
         break;
       case "web_service_enter_fullscreen":
         // Enter fullscreen web services mode
-        if (modeStore.currentMode === modeStore.MODES.WEB_SERVICES) {
+        if (
+          modeStore.currentMode === modeStore.MODES.WEB_SERVICES ||
+          activeRegionKindIs("service")
+        ) {
           modeStore.enterFullscreen(modeStore.MODES.WEB_SERVICES);
           router.push("/");
         }
@@ -714,7 +830,7 @@ export function useKeyboardActions() {
       // Fall through to handle the resolved action
       // eslint-disable-next-line no-fallthrough
       case "calendar_refresh":
-        if (modeStore.currentMode === modeStore.MODES.CALENDAR) {
+        if (modeStore.currentMode === modeStore.MODES.CALENDAR || activeRegionKindIs("calendar")) {
           // Refresh calendar events
           calendarStore.refreshEvents().catch(err => {
             logError("[Keyboard]", "Failed to refresh calendar:", err);
@@ -724,7 +840,10 @@ export function useKeyboardActions() {
         break;
       case "service_refresh":
         // Refresh service plugin data (for web services)
-        if (modeStore.currentMode === modeStore.MODES.WEB_SERVICES) {
+        if (
+          modeStore.currentMode === modeStore.MODES.WEB_SERVICES ||
+          activeRegionKindIs("service")
+        ) {
           webServicesStore.refreshCurrentService().catch(err => {
             logError("[Keyboard]", "Failed to refresh service:", err);
           });
@@ -744,7 +863,9 @@ export function useKeyboardActions() {
   // Get the appropriate action for generic_next based on current mode
   const getGenericNextAction = () => {
     // If in fullscreen, use fullscreen mode; otherwise use current mode
-    const activeMode = modeStore.isFullscreen ? modeStore.fullscreenMode : modeStore.currentMode;
+    const activeMode = modeStore.isFullscreen
+      ? modeStore.fullscreenMode
+      : getModeForActiveRegion() || modeStore.currentMode;
 
     if (activeMode === modeStore.MODES.CALENDAR) {
       // If event detail panel is open, navigate to next event (within day or next day)
@@ -756,6 +877,7 @@ export function useKeyboardActions() {
     } else if (activeMode === modeStore.MODES.PHOTOS) {
       return "images_next";
     } else if (activeMode === modeStore.MODES.WEB_SERVICES) {
+      if (getActiveRegion()?.serviceId) return "none";
       return "web_service_next";
     } else {
       return "none"; // No action for other modes
@@ -765,7 +887,9 @@ export function useKeyboardActions() {
   // Get the appropriate action for generic_prev based on current mode
   const getGenericPrevAction = () => {
     // If in fullscreen, use fullscreen mode; otherwise use current mode
-    const activeMode = modeStore.isFullscreen ? modeStore.fullscreenMode : modeStore.currentMode;
+    const activeMode = modeStore.isFullscreen
+      ? modeStore.fullscreenMode
+      : getModeForActiveRegion() || modeStore.currentMode;
 
     if (activeMode === modeStore.MODES.CALENDAR) {
       // If event detail panel is open, navigate to previous event (within day or previous day)
@@ -777,6 +901,7 @@ export function useKeyboardActions() {
     } else if (activeMode === modeStore.MODES.PHOTOS) {
       return "images_prev";
     } else if (activeMode === modeStore.MODES.WEB_SERVICES) {
+      if (getActiveRegion()?.serviceId) return "none";
       return "web_service_prev";
     } else {
       return "none"; // No action for other modes
@@ -794,7 +919,7 @@ export function useKeyboardActions() {
       }
     }
 
-    const currentMode = modeStore.currentMode;
+    const currentMode = getModeForActiveRegion() || modeStore.currentMode;
     if (currentMode === modeStore.MODES.CALENDAR) {
       // Check if event is expanded - if so, close it; otherwise expand (context-aware)
       if (calendarStore.selectedEvent) {
@@ -816,7 +941,9 @@ export function useKeyboardActions() {
   // Get the appropriate action for generic_refresh based on current mode
   const getGenericRefreshAction = () => {
     // If in fullscreen, use fullscreen mode; otherwise use current mode
-    const activeMode = modeStore.isFullscreen ? modeStore.fullscreenMode : modeStore.currentMode;
+    const activeMode = modeStore.isFullscreen
+      ? modeStore.fullscreenMode
+      : getModeForActiveRegion() || modeStore.currentMode;
 
     if (activeMode === modeStore.MODES.CALENDAR) {
       return "calendar_refresh";
@@ -825,6 +952,14 @@ export function useKeyboardActions() {
     } else {
       return "none"; // No refresh action for other modes
     }
+  };
+
+  const getModeForActiveRegion = () => {
+    const kind = getActiveRegion()?.kind;
+    if (kind === "calendar") return modeStore.MODES.CALENDAR;
+    if (kind === "photos") return modeStore.MODES.PHOTOS;
+    if (kind === "service") return modeStore.MODES.WEB_SERVICES;
+    return null;
   };
 
   return {

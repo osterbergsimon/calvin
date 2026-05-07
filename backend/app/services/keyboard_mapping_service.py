@@ -121,6 +121,18 @@ class KeyboardMappingService:
             "mode_photos",
             "mode_web_services",
             "mode_spare",
+            # Screen and region navigation
+            "screen_next",
+            "screen_prev",
+            "screen_1",
+            "screen_2",
+            "screen_3",
+            "screen_4",
+            "screen_5",
+            "screen_6",
+            "screen_7",
+            "region_next",
+            "region_prev",
             # Generic context-aware buttons (4 buttons)
             "generic_next",
             "generic_prev",

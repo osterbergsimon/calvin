@@ -59,6 +59,19 @@ const actionLabels = {
   mode_settings: "Settings",
   mode_cycle: "Cycle Mode",
 
+  // Screens and regions
+  screen_next: "Next Screen",
+  screen_prev: "Previous Screen",
+  screen_1: "Screen 1",
+  screen_2: "Screen 2",
+  screen_3: "Screen 3",
+  screen_4: "Screen 4",
+  screen_5: "Screen 5",
+  screen_6: "Screen 6",
+  screen_7: "Screen 7",
+  region_next: "Next Region",
+  region_prev: "Previous Region",
+
   // Generic actions
   generic_next: "Next",
   generic_prev: "Previous",

@@ -15,9 +15,10 @@ repos:
       - id: eslint
         name: eslint
         language: system
-        entry: bash -c 'cd frontend && exec npx --no-install eslint --fix --config eslint.config.js "${@#frontend/}"' --
+        entry: bash -c 'cd frontend && exec npx --no-install eslint --fix --config eslint.config.js .'
         files: ^frontend/.*\.(js|vue)$
         types_or: [file]
+        pass_filenames: false
 
   - repo: https://github.com/pre-commit/mirrors-prettier
     rev: v3.1.0
@@ -28,4 +29,3 @@ repos:
         exclude: ^\.github/workflows/.*\.yml$
         additional_dependencies:
           - prettier@3.6.2
-

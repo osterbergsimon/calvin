@@ -44,22 +44,28 @@
             {{ configStore.orientation === "landscape" ? "Portrait" : "Landscape" }}
           </button>
           <button
-            v-if="modeStore.currentMode !== modeStore.MODES.WEB_SERVICES"
+            v-if="dashboardScreens.screens.length > 1"
             class="btn-web-services"
-            title="Show Web Services"
-            @click="showWebServices"
+            title="Previous Screen"
+            @click="previousScreen"
           >
-            Web Services
-          </button>
-          <button v-else class="btn-web-services" title="Show Photos" @click="showPhotos">
-            Photos
+            Previous Screen
           </button>
           <button
-            class="btn-side-position"
-            :title="sideViewPositionTitle"
-            @click="toggleSideViewPosition"
+            v-if="dashboardScreens.screens.length > 1"
+            class="btn-web-services"
+            title="Next Screen"
+            @click="nextScreen"
           >
-            {{ sideViewPositionIcon }}
+            Next Screen
+          </button>
+          <button
+            v-if="activeScreenLeafCount > 1"
+            class="btn-web-services"
+            title="Switch Active Region"
+            @click="nextRegion"
+          >
+            Region
           </button>
           <button class="btn-settings" title="Settings" @click="goToSettings">⚙️ Settings</button>
           <button class="btn-minimal" title="Hide UI" @click="configStore.toggleUI">⊖</button>
@@ -105,11 +111,8 @@
           />
         </div>
 
-        <!-- Dashboard View (Home) - Always shows calendar + side view -->
-        <div
-          v-else
-          :class="['mode-content', 'dashboard-view', mainLayoutClass, sideViewPositionClass]"
-        >
+        <!-- Dashboard View (Home) - Renders configured dashboard regions -->
+        <div v-else :class="['mode-content', 'dashboard-view', mainLayoutClass]">
           <!-- Render elements in computed order - no CSS order needed! -->
           <template v-for="elementType in layoutOrder" :key="elementType">
             <!-- Vertical Clock Bar at Left -->
@@ -121,16 +124,26 @@
               :enabled="true"
             />
 
-            <!-- Calendar Section -->
+            <!-- Dashboard Region -->
             <div
-              v-else-if="elementType === 'calendar'"
-              class="calendar-section"
-              :style="{
-                width: calendarWidth,
-                height: calendarHeight,
-              }"
+              v-else-if="isRegionElement(elementType)"
+              :class="[
+                'dashboard-region-section',
+                {
+                  'dashboard-region-section-active':
+                    activeRegionHighlightVisible && isActiveRegionElement(elementType),
+                },
+              ]"
+              :style="getRegionStyle(elementType)"
             >
-              <CalendarView />
+              <DashboardRegion
+                :region="getRegionForElement(elementType)"
+                :photo-rotation-interval="configStore.photoRotationInterval"
+                :parent-direction="layoutDirection"
+                :active-region-id="
+                  activeRegionHighlightVisible ? activeScreen.activeRegionId : null
+                "
+              />
             </div>
 
             <!-- Horizontal Clock Bar Between (Portrait) -->
@@ -150,37 +163,6 @@
               :show-in-kiosk="configStore.clockBarShowInKiosk"
               :enabled="true"
             />
-
-            <!-- Secondary Section -->
-            <div
-              v-else-if="elementType === 'secondary'"
-              class="secondary-section"
-              :style="{
-                width: secondaryWidth,
-                height: secondaryHeight,
-              }"
-            >
-              <!-- Show content based on current mode -->
-              <!-- When in calendar mode, show last side view mode (preserve state) -->
-              <WebServiceViewer
-                v-if="
-                  modeStore.currentMode === modeStore.MODES.WEB_SERVICES ||
-                  (modeStore.currentMode === modeStore.MODES.CALENDAR &&
-                    configStore.lastSideViewMode === 'web_services')
-                "
-                :is-fullscreen="false"
-              />
-              <PhotoSlideshow
-                v-else-if="
-                  modeStore.currentMode === modeStore.MODES.PHOTOS ||
-                  (modeStore.currentMode === modeStore.MODES.CALENDAR &&
-                    configStore.lastSideViewMode !== 'web_services')
-                "
-                :is-fullscreen="false"
-                :auto-rotate="true"
-                :rotation-interval="configStore.photoRotationInterval * 1000"
-              />
-            </div>
 
             <!-- Vertical Clock Bar at Right -->
             <ClockBarVertical
@@ -210,6 +192,7 @@
 import { ref, onMounted, onUnmounted, computed, watch, defineAsyncComponent } from "vue";
 import axios from "axios";
 import LayoutManager from "../components/LayoutManager.vue";
+import DashboardRegion from "../components/DashboardRegion.vue";
 import MinimalUIOverlay from "../components/MinimalUIOverlay.vue";
 import Clock from "../components/Clock.vue"; // Legacy - keeping for backwards compatibility
 import ClockBarHorizontal from "../components/ClockBarHorizontal.vue";
@@ -217,13 +200,18 @@ import ClockBarVertical from "../components/ClockBarVertical.vue";
 import ConnectionIndicator from "../components/ConnectionIndicator.vue";
 
 // Lazy load mode-specific components for better code splitting
-const CalendarView = defineAsyncComponent(() => import("../components/CalendarView.vue"));
 const PhotoSlideshow = defineAsyncComponent(() => import("../components/PhotoSlideshow.vue"));
 const WebServiceViewer = defineAsyncComponent(() => import("../components/WebServiceViewer.vue"));
 import { useConfigStore } from "../stores/config";
 import { useModeStore } from "../stores/mode";
 import { useRouter, useRoute } from "vue-router";
-import { getLayoutOrder } from "../utils/layout";
+import {
+  getActiveDashboardScreen,
+  getLayoutDirection,
+  getLeafRegions,
+  getRegionAxisStyle,
+  normalizeDashboardScreens,
+} from "../utils/layout";
 
 const configStore = useConfigStore();
 const modeStore = useModeStore();
@@ -244,51 +232,12 @@ const statusText = computed(() => {
 // Polling interval for config updates (configurable, default 30 seconds)
 let configPollInterval = null;
 
-const isLandscape = computed(() => configStore.orientation === "landscape");
-const isPortrait = computed(() => configStore.orientation === "portrait");
-
-const calendarWidth = computed(() => {
-  return isLandscape.value ? configStore.calendarWidth : "100%";
-});
-
-const calendarHeight = computed(() => {
-  return isPortrait.value ? configStore.calendarWidth : "100%";
-});
-
-const secondaryWidth = computed(() => {
-  return isLandscape.value ? configStore.photosWidth : "100%";
-});
-
-const secondaryHeight = computed(() => {
-  return isPortrait.value ? configStore.photosWidth : "100%";
-});
+const layoutDirection = computed(() =>
+  getLayoutDirection(activeScreen.value?.layout, configStore.orientation)
+);
 
 const mainLayoutClass = computed(() => {
-  return `layout-${configStore.orientation}`;
-});
-
-const sideViewPositionClass = computed(() => {
-  return `side-${configStore.sideViewPosition}`;
-});
-
-const sideViewPositionTitle = computed(() => {
-  if (configStore.orientation === "landscape") {
-    return configStore.sideViewPosition === "right"
-      ? "Move Side View to Left"
-      : "Move Side View to Right";
-  } else {
-    return configStore.sideViewPosition === "bottom"
-      ? "Move Side View to Top"
-      : "Move Side View to Bottom";
-  }
-});
-
-const sideViewPositionIcon = computed(() => {
-  if (configStore.orientation === "landscape") {
-    return configStore.sideViewPosition === "right" ? "←" : "→";
-  } else {
-    return configStore.sideViewPosition === "bottom" ? "↑" : "↓";
-  }
+  return `layout-${configStore.orientation} layout-direction-${layoutDirection.value}`;
 });
 
 const clockClass = computed(() => {
@@ -329,7 +278,7 @@ const showHorizontalBarBetween = computed(() => {
   return (
     shouldShowHorizontalBar.value &&
     configStore.clockBarPosition === "between" &&
-    configStore.orientation === "portrait" &&
+    layoutDirection.value === "column" &&
     (configStore.clockBarShowInNonKiosk || configStore.clockBarShowInKiosk)
   );
 });
@@ -354,22 +303,74 @@ const showVerticalBarBetween = computed(() => {
   return (
     shouldShowVerticalBar.value &&
     configStore.clockBarPosition === "between" &&
-    configStore.orientation === "landscape" &&
+    layoutDirection.value === "row" &&
     (configStore.clockBarShowInNonKiosk || configStore.clockBarShowInKiosk)
   );
 });
 
 // Computed layout order - determines the order elements should be rendered
 const layoutOrder = computed(() => {
-  return getLayoutOrder({
-    orientation: configStore.orientation,
-    sideViewPosition: configStore.sideViewPosition,
-    showVerticalBarLeft: showVerticalBarLeft.value,
-    showVerticalBarRight: showVerticalBarRight.value,
-    showVerticalBarBetween: showVerticalBarBetween.value,
-    showHorizontalBarBetween: showHorizontalBarBetween.value,
+  const regionElements = activeScreen.value.layout.regions.map(region => `region:${region.id}`);
+  if (regionElements.length <= 1) {
+    return withOuterClockBars(regionElements);
+  }
+
+  const elements = [];
+  if (showVerticalBarLeft.value) elements.push("verticalBarLeft");
+  regionElements.forEach((regionElement, index) => {
+    if (index > 0 && showVerticalBarBetween.value) elements.push("verticalBarBetween");
+    if (index > 0 && showHorizontalBarBetween.value) elements.push("horizontalBarBetween");
+    elements.push(regionElement);
   });
+  if (showVerticalBarRight.value) elements.push("verticalBarRight");
+  return elements;
 });
+
+const dashboardScreens = computed(() => normalizeDashboardScreens(configStore.dashboardScreens));
+const activeScreen = computed(() => getActiveDashboardScreen(dashboardScreens.value));
+
+const withOuterClockBars = regionElements => {
+  const elements = [];
+  if (showVerticalBarLeft.value) elements.push("verticalBarLeft");
+  elements.push(...regionElements);
+  if (showVerticalBarRight.value) elements.push("verticalBarRight");
+  return elements;
+};
+
+const isRegionElement = elementType => elementType.startsWith("region:");
+
+const getRegionForElement = elementType => {
+  const regionId = elementType.replace("region:", "");
+  return activeScreen.value.layout.regions.find(region => region.id === regionId);
+};
+
+const getRegionStyle = elementType => {
+  const region = getRegionForElement(elementType);
+  return getRegionAxisStyle(region, layoutDirection.value);
+};
+
+const activeScreenLeafCount = computed(() => getLeafRegions(activeScreen.value?.layout).length);
+
+const ACTIVE_HIGHLIGHT_MS = 2500;
+const activeRegionHighlightVisible = ref(false);
+let activeRegionHighlightTimer = null;
+
+watch(
+  () => activeScreen.value?.activeRegionId,
+  () => {
+    activeRegionHighlightVisible.value = true;
+    if (activeRegionHighlightTimer) clearTimeout(activeRegionHighlightTimer);
+    activeRegionHighlightTimer = setTimeout(() => {
+      activeRegionHighlightVisible.value = false;
+    }, ACTIVE_HIGHLIGHT_MS);
+  }
+);
+
+const isActiveRegionElement = elementType => {
+  const region = getRegionForElement(elementType);
+  if (!region || region.split) return false;
+  return region.id === activeScreen.value.activeRegionId;
+};
 
 const toggleOrientation = () => {
   const newOrientation = configStore.orientation === "landscape" ? "portrait" : "landscape";
@@ -382,27 +383,9 @@ const toggleOrientation = () => {
   }
 };
 
-const toggleSideViewPosition = async () => {
-  configStore.toggleSideViewPosition();
-  // Save the config change
-  try {
-    await configStore.updateConfig({
-      sideViewPosition: configStore.sideViewPosition,
-    });
-  } catch (error) {
-    console.error("Failed to save side view position:", error);
-  }
-};
-
-const showWebServices = () => {
-  configStore.setLastSideViewMode("web_services");
-  modeStore.setMode(modeStore.MODES.WEB_SERVICES);
-};
-
-const showPhotos = () => {
-  configStore.setLastSideViewMode("photos");
-  modeStore.setMode(modeStore.MODES.PHOTOS);
-};
+const nextScreen = () => configStore.cycleDashboardScreenBy(1);
+const previousScreen = () => configStore.cycleDashboardScreenBy(-1);
+const nextRegion = () => configStore.cycleActiveDashboardRegionBy(1);
 
 const goToSettings = () => {
   modeStore.setMode(modeStore.MODES.SETTINGS);
@@ -484,6 +467,10 @@ onMounted(async () => {
 });
 
 onUnmounted(() => {
+  if (activeRegionHighlightTimer) {
+    clearTimeout(activeRegionHighlightTimer);
+    activeRegionHighlightTimer = null;
+  }
   // Clean up polling intervals
   if (configPollInterval) {
     clearInterval(configPollInterval);
@@ -695,6 +682,16 @@ onUnmounted(() => {
   flex-direction: row; /* Landscape: side by side */
 }
 
+/* Direction overrides — when the user explicitly picks a direction,
+ * it takes precedence over the orientation default. */
+.mode-content.dashboard-view.layout-direction-row {
+  flex-direction: row;
+}
+
+.mode-content.dashboard-view.layout-direction-column {
+  flex-direction: column;
+}
+
 /* Clock bar positioning is now handled via inline styles using computed order values */
 /* This makes the layout more maintainable and less dependent on CSS specificity */
 
@@ -709,7 +706,7 @@ onUnmounted(() => {
   height: 100%;
 }
 
-.calendar-section {
+.dashboard-region-section {
   min-width: 0; /* Important for flex children */
   min-height: 0;
   width: 100%; /* Explicitly set width to 100% */
@@ -723,22 +720,17 @@ onUnmounted(() => {
   box-sizing: border-box;
 }
 
-.dashboard:not(:has(.dashboard-header)) .calendar-section {
-  border-radius: 0;
+.dashboard-region-section {
+  transition: outline-color 0.6s ease;
+  outline: 2px solid transparent;
+  outline-offset: -2px;
 }
 
-.secondary-section {
-  min-width: 0; /* Important for flex children */
-  min-height: 0;
-  width: 100%; /* Explicitly set width to 100% */
-  max-width: 100%; /* Ensure it doesn't exceed container */
-  border-radius: 8px;
-  overflow: hidden;
-  display: flex;
-  flex-direction: column;
+.dashboard-region-section-active {
+  outline-color: var(--accent-primary);
 }
 
-.dashboard:not(:has(.dashboard-header)) .secondary-section {
+.dashboard:not(:has(.dashboard-header)) .dashboard-region-section {
   border-radius: 0;
 }
 

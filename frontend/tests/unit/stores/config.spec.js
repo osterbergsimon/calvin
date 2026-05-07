@@ -95,6 +95,45 @@ describe("Config Store", () => {
     expect(store.consoleLogLevel).toBe("debug");
   });
 
+  it("should normalize dashboard layout and screens through the config registry", async () => {
+    axios.get.mockResolvedValue({
+      data: {
+        calendar_split: 60,
+        last_side_view_mode: "web_services",
+        dashboard_layout: null,
+        dashboard_screens: {
+          version: 2,
+          activeScreenId: "services",
+          screens: [
+            {
+              id: "services",
+              name: "Services",
+              layout: {
+                version: 1,
+                preset: "split_two",
+                regions: [
+                  { id: "region-1", kind: "calendar", size: 50 },
+                  { id: "region-2", kind: "service", size: 50 },
+                ],
+              },
+              activeRegionId: "region-2",
+            },
+          ],
+        },
+      },
+    });
+
+    const store = useConfigStore();
+    await store.fetchConfig();
+
+    expect(store.dashboardLayout.regions).toEqual([
+      { id: "region-1", kind: "calendar", serviceId: null, size: 60, split: null },
+      { id: "region-2", kind: "service", serviceId: null, size: 40, split: null },
+    ]);
+    expect(store.dashboardScreens.activeScreenId).toBe("services");
+    expect(store.dashboardScreens.screens[0].activeRegionId).toBe("region-2");
+  });
+
   it("should apply defaults for missing values after fetch", async () => {
     axios.get.mockResolvedValue({ data: { orientation: "portrait" } });
 

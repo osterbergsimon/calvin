@@ -92,15 +92,26 @@
       {{ updateMessage }}
     </div>
 
-    <div class="settings-layout">
+    <div class="settings-layout" :class="{ 'sidebar-collapsed': sidebarCollapsed }">
       <!-- Sidebar Navigation -->
       <aside class="settings-sidebar">
+        <button
+          type="button"
+          class="sidebar-collapse-toggle"
+          :aria-expanded="!sidebarCollapsed"
+          :aria-label="sidebarCollapsed ? 'Expand sidebar' : 'Collapse sidebar'"
+          :title="sidebarCollapsed ? 'Expand sidebar' : 'Collapse sidebar'"
+          @click="toggleSidebar"
+        >
+          {{ sidebarCollapsed ? "›" : "‹" }}
+        </button>
         <nav class="category-nav">
           <button
             v-for="category in categories"
             :key="category.id"
             class="category-btn"
             :class="{ active: activeCategory === category.id }"
+            :title="sidebarCollapsed ? category.label : null"
             @click="selectCategory(category.id)"
           >
             <span class="category-icon">{{ category.icon }}</span>
@@ -114,7 +125,6 @@
         <div v-if="error" class="settings-banner settings-banner-error">
           {{ error }}
         </div>
-        <div v-else-if="saveSuccess" class="settings-banner settings-banner-success">✓ Saved</div>
         <DashboardCategory
           v-if="activeCategory === 'dashboard' && localConfig"
           :key="categoryRenderKey"
@@ -199,6 +209,13 @@ const route = useRoute();
 const modeStore = useModeStore();
 
 const categories = settingsCategories;
+
+const SIDEBAR_COLLAPSED_KEY = "settings-sidebar-collapsed";
+const sidebarCollapsed = ref(localStorage.getItem(SIDEBAR_COLLAPSED_KEY) === "1");
+const toggleSidebar = () => {
+  sidebarCollapsed.value = !sidebarCollapsed.value;
+  localStorage.setItem(SIDEBAR_COLLAPSED_KEY, sidebarCollapsed.value ? "1" : "0");
+};
 
 const getRouteSettingDestination = () => {
   const settingId = route.query.setting;
@@ -295,7 +312,7 @@ watch(
 );
 
 // Config management
-const { localConfig, loadConfig, updateConfig, error, saveSuccess, saveStatus } = useConfigForm();
+const { localConfig, loadConfig, updateConfig, error, saveStatus } = useConfigForm();
 
 // System operations
 const { restartBackend, restartFrontend, updateMessage, updateMessageClass } = useSystem();
@@ -418,6 +435,7 @@ onUnmounted(() => {
 }
 
 .save-status {
+  width: 190px;
   padding: 0.45rem 0.75rem;
   border: 1px solid var(--border-color);
   border-radius: 999px;
@@ -426,6 +444,7 @@ onUnmounted(() => {
   font-size: 0.82rem;
   font-weight: 600;
   white-space: nowrap;
+  text-align: center;
 }
 
 .save-status-saving {
@@ -613,12 +632,53 @@ onUnmounted(() => {
   display: grid;
   grid-template-columns: 250px 1fr;
   gap: 2rem;
+  transition: grid-template-columns 0.2s;
+}
+
+.settings-layout.sidebar-collapsed {
+  grid-template-columns: 56px 1fr;
 }
 
 .settings-sidebar {
   position: sticky;
   top: 2rem;
   height: fit-content;
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+}
+
+.sidebar-collapse-toggle {
+  align-self: flex-end;
+  width: 28px;
+  height: 28px;
+  border: 1px solid var(--border-color);
+  border-radius: 4px;
+  background: var(--bg-secondary);
+  color: var(--text-secondary);
+  cursor: pointer;
+  font-size: 1.1rem;
+  line-height: 1;
+}
+
+.sidebar-collapse-toggle:hover,
+.sidebar-collapse-toggle:focus {
+  border-color: var(--accent-primary);
+  color: var(--text-primary);
+}
+
+.sidebar-collapsed .sidebar-collapse-toggle {
+  align-self: center;
+}
+
+.sidebar-collapsed .category-btn {
+  padding: 0.65rem;
+  justify-content: center;
+  gap: 0;
+}
+
+.sidebar-collapsed .category-label {
+  display: none;
 }
 
 .category-nav {

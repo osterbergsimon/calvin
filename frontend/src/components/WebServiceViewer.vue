@@ -15,13 +15,13 @@
     <div v-if="showHeader && !isFullscreen" class="viewer-header">
       <div class="header-left">
         <h2>{{ currentService?.name || "Web Services" }}</h2>
-        <div v-if="services.length > 1" class="service-indicator">
+        <div v-if="canNavigateServices && services.length > 1" class="service-indicator">
           Service {{ currentServiceIndex + 1 }} of {{ services.length }}
         </div>
       </div>
       <div class="header-right">
         <button
-          v-if="services.length > 1"
+          v-if="canNavigateServices && services.length > 1"
           class="btn-nav"
           title="Previous Service"
           @click="previousService"
@@ -29,7 +29,7 @@
           ‹
         </button>
         <button
-          v-if="services.length > 1"
+          v-if="canNavigateServices && services.length > 1"
           class="btn-nav"
           title="Next Service"
           @click="nextService"
@@ -48,7 +48,10 @@
     </div>
 
     <!-- Service Selection (if multiple services) -->
-    <div v-if="showHeader && !isFullscreen && services.length > 1" class="service-selector">
+    <div
+      v-if="showHeader && !isFullscreen && canNavigateServices && services.length > 1"
+      class="service-selector"
+    >
       <button
         v-for="(service, index) in services"
         :key="service.id"
@@ -74,6 +77,12 @@
         <p class="help-text">Add web services in Settings</p>
       </div>
 
+      <!-- Explicit service missing or disabled -->
+      <div v-else-if="serviceUnavailable" class="no-services">
+        <p>Selected service is unavailable</p>
+        <p class="help-text">Choose another service in Settings</p>
+      </div>
+
       <!-- Service Content (uses ServiceViewer for routing) -->
       <div v-else-if="currentService" class="service-container">
         <ServiceViewer :key="currentService.id" :service="currentService" />
@@ -88,12 +97,15 @@ import { useConfigStore } from "../stores/config";
 import { useWebServicesStore } from "../stores/webServices";
 import { useModeStore } from "../stores/mode";
 import ServiceViewer from "./service/ServiceViewer.vue";
-import { logDebug } from "../utils/logger";
 
 const props = defineProps({
   isFullscreen: {
     type: Boolean,
     default: false,
+  },
+  serviceId: {
+    type: String,
+    default: null,
   },
 });
 
@@ -104,21 +116,21 @@ const modeStore = useModeStore();
 const showHeader = computed(() => configStore.shouldShowUI);
 const services = computed(() => webServicesStore.services);
 const currentServiceIndex = computed(() => webServicesStore.currentServiceIndex);
+const canNavigateServices = computed(() => !props.serviceId);
 const currentService = computed(() => {
-  const service = webServicesStore.getCurrentService();
-  if (service) {
-    logDebug("[WebServiceViewer]", "Current service:", {
-      id: service.id,
-      name: service.name,
-      url: service.url,
-      config: service.config,
-      display_schema: service.display_schema,
-      plugin_id: service.plugin_id,
-    });
-  }
-  return service;
+  if (props.serviceId) return webServicesStore.getServiceById(props.serviceId);
+  // No serviceId is only valid in fullscreen mode (cycling through services).
+  if (props.isFullscreen) return webServicesStore.getCurrentService();
+  return null;
 });
 const loading = computed(() => webServicesStore.loading);
+const serviceUnavailable = computed(
+  () =>
+    !loading.value &&
+    services.value.length > 0 &&
+    (Boolean(props.serviceId) || !props.isFullscreen) &&
+    !currentService.value
+);
 
 // ServiceViewer now handles all service rendering logic
 
@@ -183,14 +195,17 @@ const handleToggleFullscreen = event => {
 };
 
 const nextService = () => {
+  if (props.serviceId) return;
   webServicesStore.nextService();
 };
 
 const previousService = () => {
+  if (props.serviceId) return;
   webServicesStore.previousService();
 };
 
 const setServiceIndex = index => {
+  if (props.serviceId) return;
   webServicesStore.setServiceIndex(index);
 };
 
