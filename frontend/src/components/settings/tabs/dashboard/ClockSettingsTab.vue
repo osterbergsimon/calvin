@@ -100,7 +100,6 @@
       </SettingItem>
 
       <SettingItem
-        v-if="config.clockBarMode === 'horizontal'"
         label="Show Weather in Bar"
         help="Display current temperature and weather icon (requires a weather service to be configured)"
       >
