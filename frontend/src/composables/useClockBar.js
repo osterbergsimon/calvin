@@ -30,6 +30,7 @@ export function useClockBar(opts) {
   });
 
   const showDate = computed(() => !!configStore.clockShowDate);
+  const showStatusbar = computed(() => !!configStore.clockBarShowWeather);
   const showSeconds = computed(() => !!configStore.clockShowSeconds);
   const timezone = computed(() => configStore.timezone || null);
   const timeFormat = computed(() => configStore.timeFormat || "24h");
@@ -161,6 +162,7 @@ export function useClockBar(opts) {
   return {
     shouldShow,
     showDate,
+    showStatusbar,
     formattedTime,
     formattedDate,
     fontSize,

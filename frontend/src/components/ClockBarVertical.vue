@@ -8,17 +8,21 @@
     aria-label="Status bar"
     aria-live="polite"
   >
-    <div
-      class="clock-bar-content"
-      :class="{
-        'layout-single-line': layout === 'single-line',
-        'layout-two-lines': layout === 'two-lines',
-      }"
-    >
-      <span class="clock-time" :style="{ fontSize: `${fontSize}px` }">{{ formattedTime }}</span>
-      <span v-if="showDate" class="clock-date" :style="{ fontSize: `${dateFontSize}px` }">{{
-        formattedDate
-      }}</span>
+    <div class="clock-bar-top">
+      <div
+        class="clock-bar-content"
+        :class="{
+          'layout-single-line': layout === 'single-line',
+          'layout-two-lines': layout === 'two-lines',
+        }"
+      >
+        <span class="clock-time" :style="{ fontSize: `${fontSize}px` }">{{ formattedTime }}</span>
+        <span v-if="showDate" class="clock-date" :style="{ fontSize: `${dateFontSize}px` }">{{
+          formattedDate
+        }}</span>
+      </div>
+
+      <PluginStatusbarItems v-if="showStatusbar" orientation="vertical" />
     </div>
 
     <BarActionCluster v-if="!previewMode" class="clock-bar-actions" :compact="true" />
@@ -28,6 +32,7 @@
 <script setup>
 import { useClockBar } from "../composables/useClockBar";
 import BarActionCluster from "./BarActionCluster.vue";
+import PluginStatusbarItems from "./PluginStatusbarItems.vue";
 
 defineOptions({
   name: "ClockBarVertical",
@@ -76,6 +81,7 @@ const props = defineProps({
 const {
   shouldShow,
   showDate,
+  showStatusbar,
   formattedTime,
   formattedDate,
   fontSize,
@@ -155,6 +161,13 @@ const {
 
 .clock-bar-vertical.position-between .clock-date {
   font-size: 0.75rem;
+}
+
+.clock-bar-top {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 0.75rem;
 }
 
 .clock-bar-actions {
