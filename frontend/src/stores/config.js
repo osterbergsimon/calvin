@@ -50,28 +50,16 @@ export const useConfigStore = defineStore("config", () => {
   const keyboardFeedbackMode = ref("normal"); // Keyboard feedback mode: 'normal' | 'small' (default: 'normal')
   const imageDisplayMode = ref("smart"); // Image display mode: 'fit', 'fill', 'crop', 'center', 'smart' (default: 'smart')
   const timezone = ref(null); // Timezone (e.g., "America/New_York", "Europe/London", "UTC") - null = system timezone
-  // Legacy clock settings (kept for backwards compatibility)
-  const clockEnabled = ref(true); // Clock enabled/disabled
-  const clockDisplayMode = ref("header"); // Clock display mode: 'always' | 'header' | 'off'
-  const clockShowDate = ref(false); // Show date in clock
-  const clockShowSeconds = ref(false); // Show seconds in clock
-  const clockPosition = ref("top-right"); // Clock position: 'top-left' | 'top-right' | 'bottom-left' | 'bottom-right'
-  const clockSize = ref("medium"); // Clock size: 'small' | 'medium' | 'large'
-
-  // New clock settings
-  const clockWidgetEnabled = ref(false); // Widget clock enabled/disabled
-  const clockWidgetShowInKiosk = ref(false); // Show widget in kiosk mode
-  const clockWidgetPosition = ref("top-right"); // Widget position: 'top-left' | 'top-right' | 'top-center' | 'bottom-left' | 'bottom-right' | 'bottom-center'
-  const clockBarEnabled = ref(false); // Bar clock enabled/disabled
-  const clockBarMode = ref("horizontal"); // Bar mode: 'horizontal' | 'vertical'
-  const clockBarShowInNonKiosk = ref(false); // Show bar in non-kiosk mode (UI visible)
-  const clockBarShowInKiosk = ref(false); // Show bar in kiosk mode (UI hidden)
-  const clockBarPosition = ref("top"); // Bar position (depends on mode): horizontal: 'top' | 'bottom' | 'between', vertical: 'left' | 'right' | 'between'
-  const clockBarFontSize = ref(16); // Bar clock font size in pixels
-  const clockBarDateFontSize = ref(14); // Bar clock date font size in pixels
-  const clockBarLayout = ref("single-line"); // Bar layout: 'single-line' | 'two-lines'
-  const clockBarPadding = ref(8); // Bar padding in pixels (all sides)
-  const clockBarShowWeather = ref(false); // Show weather icon in horizontal clock bar
+  const clockShowDate = ref(false);
+  const clockShowSeconds = ref(false);
+  const clockBarMode = ref("horizontal"); // 'horizontal' | 'vertical'
+  const clockBarShowInKiosk = ref(false);
+  const clockBarPosition = ref("top"); // horizontal: 'top' | 'bottom' | 'between', vertical: 'left' | 'right' | 'between'
+  const clockBarFontSize = ref(16);
+  const clockBarDateFontSize = ref(14);
+  const clockBarLayout = ref("single-line"); // 'single-line' | 'two-lines'
+  const clockBarPadding = ref(8);
+  const clockBarShowWeather = ref(false);
   const mealPlanCardSize = ref("medium"); // Meal plan card size: 'small' | 'medium' | 'large'
   const consoleLogEnabled = ref(true); // Enable console logging (default: true for backwards compatibility)
   const consoleLogLevel = ref("info"); // Console log level: 'error' | 'warn' | 'info' | 'debug' (default: 'info')
@@ -117,18 +105,9 @@ export const useConfigStore = defineStore("config", () => {
     keyboardFeedbackMode,
     imageDisplayMode,
     timezone,
-    clockEnabled,
-    clockDisplayMode,
     clockShowDate,
     clockShowSeconds,
-    clockPosition,
-    clockSize,
-    clockWidgetEnabled,
-    clockWidgetShowInKiosk,
-    clockWidgetPosition,
-    clockBarEnabled,
     clockBarMode,
-    clockBarShowInNonKiosk,
     clockBarShowInKiosk,
     clockBarPosition,
     clockBarFontSize,
@@ -410,18 +389,9 @@ export const useConfigStore = defineStore("config", () => {
     rebootComboDuration,
     imageDisplayMode,
     timezone,
-    clockEnabled,
-    clockDisplayMode,
     clockShowDate,
     clockShowSeconds,
-    clockPosition,
-    clockSize,
-    clockWidgetEnabled,
-    clockWidgetShowInKiosk,
-    clockWidgetPosition,
-    clockBarEnabled,
     clockBarMode,
-    clockBarShowInNonKiosk,
     clockBarShowInKiosk,
     clockBarPosition,
     clockBarFontSize,

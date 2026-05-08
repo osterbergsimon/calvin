@@ -1,5 +1,5 @@
 <template>
-  <div v-if="!configStore.shouldShowUI" class="minimal-ui-overlay" :class="buttonPositionClass">
+  <div v-if="!configStore.shouldShowUI" class="minimal-ui-overlay position-bottom-left">
     <button
       class="ui-toggle-btn"
       title="Show UI"
@@ -24,30 +24,9 @@
 </template>
 
 <script setup>
-import { computed } from "vue";
 import { useConfigStore } from "../stores/config";
 
 const configStore = useConfigStore();
-
-// Position button opposite to clock position to avoid conflicts
-const buttonPositionClass = computed(() => {
-  const clockPos = configStore.clockPosition || "top-right";
-
-  // If clock is in top-right, put button in bottom-left (and vice versa)
-  // If clock is in top-left, put button in bottom-right (and vice versa)
-  switch (clockPos) {
-    case "top-right":
-      return "position-bottom-left";
-    case "top-left":
-      return "position-bottom-right";
-    case "bottom-right":
-      return "position-top-left";
-    case "bottom-left":
-      return "position-top-right";
-    default:
-      return "position-bottom-left"; // Default fallback
-  }
-});
 </script>
 
 <style scoped>

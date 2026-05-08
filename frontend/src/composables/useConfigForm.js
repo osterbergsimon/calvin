@@ -138,22 +138,9 @@ export function useConfigForm(initialConfig = {}) {
           response.rebootComboDuration ?? response.reboot_combo_duration ?? 10000,
         // Clock
         timezone: response.timezone ?? null,
-        clockEnabled: response.clockEnabled ?? response.clock_enabled ?? true,
-        clockDisplayMode: response.clockDisplayMode ?? response.clock_display_mode ?? "header",
         clockShowDate: response.clockShowDate ?? response.clock_show_date ?? false,
         clockShowSeconds: response.clockShowSeconds ?? response.clock_show_seconds ?? false,
-        clockPosition: response.clockPosition ?? response.clock_position ?? "top-right",
-        clockSize: response.clockSize ?? response.clock_size ?? "medium",
-        // New clock settings
-        clockWidgetEnabled: response.clockWidgetEnabled ?? response.clock_widget_enabled ?? false,
-        clockWidgetShowInKiosk:
-          response.clockWidgetShowInKiosk ?? response.clock_widget_show_in_kiosk ?? false,
-        clockWidgetPosition:
-          response.clockWidgetPosition ?? response.clock_widget_position ?? "top-right",
-        clockBarEnabled: response.clockBarEnabled ?? response.clock_bar_enabled ?? false,
         clockBarMode: response.clockBarMode ?? response.clock_bar_mode ?? "horizontal",
-        clockBarShowInNonKiosk:
-          response.clockBarShowInNonKiosk ?? response.clock_bar_show_in_non_kiosk ?? false,
         clockBarShowInKiosk:
           response.clockBarShowInKiosk ?? response.clock_bar_show_in_kiosk ?? false,
         clockBarPosition: response.clockBarPosition ?? response.clock_bar_position ?? "top",
@@ -162,6 +149,8 @@ export function useConfigForm(initialConfig = {}) {
           response.clockBarDateFontSize ?? response.clock_bar_date_font_size ?? 14,
         clockBarLayout: response.clockBarLayout ?? response.clock_bar_layout ?? "single-line",
         clockBarPadding: response.clockBarPadding ?? response.clock_bar_padding ?? 8,
+        clockBarShowWeather:
+          response.clockBarShowWeather ?? response.clock_bar_show_weather ?? false,
         // Other
         mealPlanCardSize: response.mealPlanCardSize ?? response.meal_plan_card_size ?? "medium",
         consoleLogEnabled: response.consoleLogEnabled ?? response.console_log_enabled ?? true,
