@@ -1,20 +1,30 @@
 <template>
-  <div class="card-grid" :style="gridStyle">
-    <article v-for="(card, idx) in cards" :key="idx" class="card-grid__card">
+  <div class="card-grid calvin-plugin-grid dashboard-renderer-grid" :style="gridStyle">
+    <article
+      v-for="(card, idx) in cards"
+      :key="idx"
+      class="card-grid__card calvin-plugin-surface dashboard-renderer-card"
+    >
       <header v-if="cardTitle(card)" class="card-grid__title">{{ cardTitle(card) }}</header>
       <ul v-if="cardItems(card).length" class="card-grid__items">
         <li
           v-for="(item, j) in cardItems(card)"
           :key="j"
           class="card-grid__item"
-          :class="{ 'card-grid__item--clickable': itemUrl(item) }"
+          :class="{
+            'card-grid__item--clickable': itemUrl(item),
+            'calvin-plugin-clickable': itemUrl(item),
+            'dashboard-renderer-clickable': itemUrl(item),
+          }"
           @click="open(itemUrl(item))"
         >
           <span v-if="itemLabel(item)" class="card-grid__item-label">{{ itemLabel(item) }}</span>
           <span v-if="itemValue(item)" class="card-grid__item-value">{{ itemValue(item) }}</span>
         </li>
       </ul>
-      <p v-else class="card-grid__empty">{{ schema.empty_text || "—" }}</p>
+      <p v-else class="card-grid__empty calvin-plugin-empty dashboard-renderer-empty">
+        {{ schema.empty_text || "—" }}
+      </p>
     </article>
   </div>
 </template>
@@ -93,23 +103,13 @@ function open(url) {
 
 <style scoped>
 .card-grid {
-  display: grid;
-  gap: 1rem;
-  width: 100%;
-  height: 100%;
   overflow: hidden;
-  align-content: start;
 }
 
 .card-grid__card {
-  background: var(--bg-secondary);
-  border: 1px solid var(--border-color);
-  border-radius: 12px;
-  padding: 1rem;
   display: flex;
   flex-direction: column;
   gap: 0.5rem;
-  min-width: 0;
   overflow: hidden;
 }
 
@@ -146,11 +146,6 @@ function open(url) {
   cursor: pointer;
 }
 
-.card-grid__item--clickable:hover {
-  background: var(--bg-tertiary);
-  border-color: var(--accent-primary);
-}
-
 .card-grid__item-label {
   font-weight: 600;
   font-size: 0.8rem;
@@ -169,7 +164,6 @@ function open(url) {
 .card-grid__empty {
   color: var(--text-secondary);
   font-style: italic;
-  font-size: 0.85rem;
   margin: 0;
 }
 </style>

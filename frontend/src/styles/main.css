@@ -17,3 +17,176 @@ body {
   width: 100%;
   height: 100vh;
 }
+
+.dashboard-panel__icon-button {
+  width: 32px;
+  height: 32px;
+  border-radius: 4px;
+  border: 1px solid var(--border-color);
+  background: var(--bg-primary);
+  color: var(--text-primary);
+  cursor: pointer;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 1.2rem;
+  line-height: 1;
+  transition:
+    background 0.2s,
+    border-color 0.2s;
+}
+
+.dashboard-panel__icon-button:hover {
+  background: var(--bg-secondary);
+  border-color: var(--text-secondary);
+}
+
+.dashboard-panel__icon-button:focus {
+  outline: 2px solid var(--accent-primary);
+  outline-offset: 2px;
+}
+
+.calvin-plugin-fill {
+  width: 100%;
+  height: 100%;
+  min-width: 0;
+  min-height: 0;
+}
+
+.calvin-plugin-grid,
+.dashboard-renderer-grid {
+  display: grid;
+  gap: 1rem;
+  width: 100%;
+  height: 100%;
+  min-width: 0;
+  min-height: 0;
+  align-content: start;
+}
+
+.calvin-plugin-grid--dense {
+  grid-template-columns: repeat(auto-fit, minmax(min(120px, 100%), 1fr));
+  gap: 0.5rem;
+}
+
+.calvin-plugin-grid--auto {
+  grid-template-columns: repeat(auto-fit, minmax(min(180px, 100%), 1fr));
+}
+
+.calvin-plugin-grid--2 {
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+}
+
+.calvin-plugin-grid--3 {
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+}
+
+.calvin-plugin-list,
+.dashboard-renderer-list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+  min-width: 0;
+  min-height: 0;
+}
+
+.calvin-plugin-list--scroll,
+.dashboard-renderer-list--scroll {
+  overflow-y: auto;
+}
+
+.calvin-plugin-surface,
+.dashboard-renderer-card,
+.dashboard-renderer-row,
+.dashboard-renderer-metric {
+  background: var(--bg-secondary);
+  border: 1px solid var(--border-color);
+  border-radius: 6px;
+  min-width: 0;
+}
+
+.calvin-plugin-surface,
+.dashboard-renderer-card {
+  padding: 1rem;
+}
+
+.calvin-plugin-row,
+.dashboard-renderer-row {
+  padding: 0.5rem 0.75rem;
+}
+
+.calvin-plugin-metric,
+.dashboard-renderer-metric {
+  padding: 1.25rem;
+}
+
+.calvin-plugin-clickable,
+.dashboard-renderer-clickable {
+  cursor: pointer;
+}
+
+.calvin-plugin-clickable:hover,
+.dashboard-renderer-clickable:hover {
+  background: var(--bg-tertiary);
+  border-color: var(--accent-primary);
+}
+
+.calvin-plugin-section {
+  display: flex;
+  flex-direction: column;
+  gap: 0.75rem;
+  min-width: 0;
+  min-height: 0;
+}
+
+.calvin-plugin-toolbar {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  flex-wrap: wrap;
+  min-width: 0;
+  flex-shrink: 0;
+}
+
+.calvin-plugin-media {
+  width: 100%;
+  height: 100%;
+  min-width: 0;
+  min-height: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  overflow: hidden;
+  background: #000;
+}
+
+.calvin-plugin-media > img,
+.calvin-plugin-media > video,
+.calvin-plugin-media > canvas {
+  max-width: 100%;
+  max-height: 100%;
+}
+
+.calvin-plugin-empty,
+.calvin-plugin-loading,
+.calvin-plugin-error,
+.dashboard-renderer-empty,
+.dashboard-renderer-loading,
+.dashboard-renderer-error {
+  color: var(--text-secondary);
+  text-align: center;
+  padding: 1rem;
+}
+
+.calvin-plugin-empty,
+.dashboard-renderer-empty {
+  font-style: italic;
+}
+
+.calvin-plugin-error,
+.dashboard-renderer-error {
+  color: var(--accent-error);
+}

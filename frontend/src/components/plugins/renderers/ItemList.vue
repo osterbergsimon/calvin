@@ -1,10 +1,18 @@
 <template>
-  <ul class="item-list">
+  <ul
+    class="item-list calvin-plugin-list calvin-plugin-list--scroll dashboard-renderer-list dashboard-renderer-list--scroll"
+  >
     <li
       v-for="(item, i) in items"
       :key="i"
       class="item-list__row"
-      :class="{ 'item-list__row--clickable': urlFor(item) }"
+      :class="{
+        'calvin-plugin-row': true,
+        'dashboard-renderer-row': true,
+        'item-list__row--clickable': urlFor(item),
+        'calvin-plugin-clickable': urlFor(item),
+        'dashboard-renderer-clickable': urlFor(item),
+      }"
       @click="open(urlFor(item))"
     >
       <span v-if="timestampFor(item)" class="item-list__timestamp">{{ timestampFor(item) }}</span>
@@ -13,7 +21,10 @@
         <span v-if="valueFor(item)" class="item-list__value">{{ valueFor(item) }}</span>
       </div>
     </li>
-    <li v-if="items.length === 0" class="item-list__empty">
+    <li
+      v-if="items.length === 0"
+      class="item-list__empty calvin-plugin-empty dashboard-renderer-empty"
+    >
       {{ schema.empty_text || "No items" }}
     </li>
   </ul>
@@ -57,31 +68,16 @@ function open(url) {
 
 <style scoped>
 .item-list {
-  list-style: none;
-  margin: 0;
-  padding: 0;
-  display: flex;
-  flex-direction: column;
   gap: 0.4rem;
-  overflow-y: auto;
 }
 
 .item-list__row {
   display: flex;
   gap: 0.75rem;
-  padding: 0.5rem 0.75rem;
-  background: var(--bg-secondary);
-  border: 1px solid var(--border-color);
-  border-radius: 6px;
 }
 
 .item-list__row--clickable {
   cursor: pointer;
-}
-
-.item-list__row--clickable:hover {
-  background: var(--bg-tertiary);
-  border-color: var(--accent-primary);
 }
 
 .item-list__timestamp {
@@ -112,9 +108,5 @@ function open(url) {
 }
 
 .item-list__empty {
-  color: var(--text-secondary);
-  font-style: italic;
-  text-align: center;
-  padding: 1rem;
 }
 </style>

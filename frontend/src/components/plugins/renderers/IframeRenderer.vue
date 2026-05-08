@@ -12,7 +12,7 @@
       @error="handleError"
     />
 
-    <div v-if="error" class="iframe-renderer__error">
+    <div v-if="error" class="iframe-renderer__error calvin-plugin-error dashboard-renderer-error">
       <div class="iframe-renderer__error-content">
         <h3>⚠️ Cannot Display Service</h3>
         <p>

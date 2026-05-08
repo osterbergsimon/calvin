@@ -1,24 +1,37 @@
 <template>
   <div :key="service.id" class="service-viewer">
-    <SchemaRenderer
-      v-if="schemaKind"
-      :schema="service.display_schema"
-      :data="schemaData"
-      :plugin-id="service.id"
-    />
-    <div v-else class="unknown-service">
-      <p>Service has no display schema.</p>
-      <p class="error-text">
-        display_schema.kind is missing — this plugin may need updating to the v2 contract.
-      </p>
-    </div>
+    <DashboardPanel
+      :title="panelTitle"
+      :subtitle="subtitle"
+      :variant="panelVariant"
+      :header-visible="headerVisible"
+    >
+      <template v-if="$slots.actions" #actions>
+        <slot name="actions" />
+      </template>
+
+      <SchemaRenderer
+        v-if="schemaKind"
+        :schema="service.display_schema"
+        :data="schemaData"
+        :plugin-id="service.id"
+      />
+      <div v-else class="unknown-service">
+        <p>Service has no display schema.</p>
+        <p class="error-text">
+          display_schema.kind is missing - this plugin may need updating to the v2 contract.
+        </p>
+      </div>
+    </DashboardPanel>
   </div>
 </template>
 
 <script setup>
 import { computed, watch } from "vue";
+import DashboardPanel from "../DashboardPanel.vue";
 import SchemaRenderer from "../plugins/SchemaRenderer.vue";
 import { useSchemaData } from "../../composables/useSchemaData";
+import { resolvePath } from "../../utils/jsonPath";
 import { logDebug } from "../../utils/logger";
 
 const props = defineProps({
@@ -26,15 +39,35 @@ const props = defineProps({
     type: Object,
     required: true,
   },
+  subtitle: {
+    type: String,
+    default: "",
+  },
+  headerVisible: {
+    type: Boolean,
+    default: true,
+  },
 });
 
 const schemaKind = computed(() => props.service.display_schema?.kind || null);
+const displaySchema = computed(() => props.service.display_schema || {});
 const schemaQuery = useSchemaData(
   computed(() => props.service.id),
-  computed(() => props.service.display_schema || {}),
+  displaySchema,
   computed(() => Boolean(schemaKind.value))
 );
 const schemaData = computed(() => schemaQuery.data.value);
+const panelTitle = computed(() => {
+  const pathTitle = displaySchema.value.title_path
+    ? resolvePath(schemaData.value, displaySchema.value.title_path)
+    : null;
+  return pathTitle || displaySchema.value.title || props.service.name || "Service";
+});
+const panelVariant = computed(() => {
+  const variant = displaySchema.value.panel_variant;
+  if (["default", "dense", "media", "iframe"].includes(variant)) return variant;
+  return schemaKind.value === "iframe" ? "iframe" : "default";
+});
 
 watch(
   () => props.service,
@@ -56,6 +89,8 @@ watch(
 .service-viewer {
   width: 100%;
   height: 100%;
+  min-width: 0;
+  min-height: 0;
 }
 
 .unknown-service {
