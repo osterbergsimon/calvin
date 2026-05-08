@@ -10,6 +10,7 @@
   >
     <div class="clock-bar-outer">
       <div class="clock-bar-side clock-bar-left">
+        <BarLogo v-if="showLogo" />
         <PluginStatusbarItems />
         <span v-if="isBackgroundRefreshing" class="clock-refresh-icon" aria-hidden="true" />
       </div>
@@ -37,9 +38,11 @@
 <script setup>
 import { computed } from "vue";
 import { useCalendarStore } from "../stores/calendar";
+import { useConfigStore } from "../stores/config";
 import { useClockBar } from "../composables/useClockBar";
 import PluginStatusbarItems from "./PluginStatusbarItems.vue";
 import BarActionCluster from "./BarActionCluster.vue";
+import BarLogo from "./BarLogo.vue";
 
 defineOptions({
   name: "ClockBarHorizontal",
@@ -107,6 +110,9 @@ const {
 
 const calendarStore = useCalendarStore();
 const isBackgroundRefreshing = computed(() => calendarStore.backgroundRefreshing);
+
+const configStore = useConfigStore();
+const showLogo = computed(() => configStore.clockBarShowLogo !== false);
 </script>
 
 <style scoped>

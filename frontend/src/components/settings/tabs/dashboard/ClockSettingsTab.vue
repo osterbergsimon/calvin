@@ -100,6 +100,21 @@
       </SettingItem>
 
       <SettingItem
+        label="Show Calvin Logo"
+        help="Display a small Calvin glyph at the leading edge of the bar."
+      >
+        <label>
+          <input
+            name="clockBarShowLogo"
+            :checked="config.clockBarShowLogo !== false"
+            type="checkbox"
+            @change="handleClockSettingsChange"
+          />
+          Show Logo
+        </label>
+      </SettingItem>
+
+      <SettingItem
         v-if="config.clockBarMode === 'horizontal'"
         label="Show Weather in Bar"
         help="Display current temperature and weather icon (requires a weather service to be configured)"

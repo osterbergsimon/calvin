@@ -8,6 +8,8 @@
     aria-label="Status bar"
     aria-live="polite"
   >
+    <BarLogo v-if="showLogo" class="clock-bar-logo" />
+
     <div
       class="clock-bar-content"
       :class="{
@@ -26,8 +28,11 @@
 </template>
 
 <script setup>
+import { computed } from "vue";
 import { useClockBar } from "../composables/useClockBar";
+import { useConfigStore } from "../stores/config";
 import BarActionCluster from "./BarActionCluster.vue";
+import BarLogo from "./BarLogo.vue";
 
 defineOptions({
   name: "ClockBarVertical",
@@ -92,6 +97,9 @@ const {
   previewLayout: () => props.previewLayout,
   previewPadding: () => props.previewPadding,
 });
+
+const configStore = useConfigStore();
+const showLogo = computed(() => configStore.clockBarShowLogo !== false);
 </script>
 
 <style scoped>
