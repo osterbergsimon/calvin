@@ -163,42 +163,13 @@ export const CONFIG_FIELD_DEFINITIONS = [
     defaultValue: "smart",
   },
   { name: "timezone", keys: ["timezone"], defaultValue: null, parse: value => value ?? null },
-  { name: "clockEnabled", keys: ["clockEnabled", "clock_enabled"], defaultValue: true },
-  {
-    name: "clockDisplayMode",
-    keys: ["clockDisplayMode", "clock_display_mode"],
-    defaultValue: "header",
-  },
   { name: "clockShowDate", keys: ["clockShowDate", "clock_show_date"], defaultValue: false },
   {
     name: "clockShowSeconds",
     keys: ["clockShowSeconds", "clock_show_seconds"],
     defaultValue: false,
   },
-  { name: "clockPosition", keys: ["clockPosition", "clock_position"], defaultValue: "top-right" },
-  { name: "clockSize", keys: ["clockSize", "clock_size"], defaultValue: "medium" },
-  {
-    name: "clockWidgetEnabled",
-    keys: ["clockWidgetEnabled", "clock_widget_enabled"],
-    defaultValue: false,
-  },
-  {
-    name: "clockWidgetShowInKiosk",
-    keys: ["clockWidgetShowInKiosk", "clock_widget_show_in_kiosk"],
-    defaultValue: false,
-  },
-  {
-    name: "clockWidgetPosition",
-    keys: ["clockWidgetPosition", "clock_widget_position"],
-    defaultValue: "top-right",
-  },
-  { name: "clockBarEnabled", keys: ["clockBarEnabled", "clock_bar_enabled"], defaultValue: false },
   { name: "clockBarMode", keys: ["clockBarMode", "clock_bar_mode"], defaultValue: "horizontal" },
-  {
-    name: "clockBarShowInNonKiosk",
-    keys: ["clockBarShowInNonKiosk", "clock_bar_show_in_non_kiosk"],
-    defaultValue: false,
-  },
   {
     name: "clockBarShowInKiosk",
     keys: ["clockBarShowInKiosk", "clock_bar_show_in_kiosk"],

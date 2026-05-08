@@ -144,7 +144,6 @@ describe("Config Store", () => {
     expect(store.orientation).toBe("portrait");
     expect(store.lastSideViewMode).toBe("photos");
     expect(store.timezone).toBeNull();
-    expect(store.clockDisplayMode).toBe("header");
   });
 
   it("should update config via API", async () => {
