@@ -35,10 +35,10 @@ A plugin directory:
 - For multi-instance plugins, use the generic helpers in `app/utils/instance_manager.py` (`extract_config_value`, `InstanceManagerConfig`, `handle_plugin_config_update_generic`). Avoid reimplementing CRUD.
 
 **Contract (frontend):**
-- Declare UI in metadata: `display_schema.component` (main view) and/or `statusbar_schema` (status bar item).
-- Component files go in the plugin's `frontend/` dir and are copied into `frontend/src/components/plugins/{plugin_id}/` at install time.
-- Components are discovered via a Vite glob and loaded dynamically by [usePluginComponent.js](frontend/src/composables/usePluginComponent.js). No manual registration.
-- Frontend auto-rebuilds when a plugin with UI is installed — `FrontendBuildManager` in [plugin_installer.py](backend/app/services/plugin_installer.py) writes a `.rebuild_needed` marker and runs `npm run build` in the background; startup resumes interrupted builds.
+- Declare UI in metadata: `display_schema.kind` (selects a built-in renderer) and/or `statusbar_schema` (status bar item).
+- Built-in renderer kinds (`status-tile`, `status-list`, `status-row`, `card-grid`, `item-list`, `iframe`, `image-with-caption`, `metric-dashboard`, `weather-forecast`, `web-component`) live in [SchemaRenderer.vue](frontend/src/components/plugins/SchemaRenderer.vue); the canonical list is enforced backend-side by `SUPPORTED_DISPLAY_KINDS` in [definitions.py](backend/app/plugins/definitions.py). Invalid `kind` values fail at plugin load.
+- For schema renderers the plugin ships **no frontend code** — it returns a `display_schema` and a data payload, and a built-in Vue renderer draws it. Use the `calvin-plugin-*` body classes ([main.css](frontend/src/styles/main.css)) for any custom markup so plugins inherit Calvin's surfaces, spacing, and theming.
+- Web-component plugins (escape hatch) ship pre-built JS/CSS in their `frontend/` dir; Calvin serves those at `/api/plugins/{plugin_id}/static/{asset}` at runtime. **No host-side rebuild happens on plugin install** — the legacy `FrontendBuildManager` / Vite-glob path was removed.
 
 **Reference plugin:** [`mealie/`](../calvin-plugins/mealie) in `calvin-plugins`. Scaffolding guide: [calvin-plugins/CREATING_PLUGINS.md](../calvin-plugins/CREATING_PLUGINS.md). Detailed specs in [docs/plugins/](docs/plugins/).
 
@@ -60,9 +60,8 @@ A plugin directory:
 
 - **Unref reactive refs before string interpolation** in axios URLs. `${serviceId}` on a `ref` becomes `[object Object]`. Always `unref(serviceId)` first. (commit 6edb2c4)
 - **`uv pip` flag order:** `uv pip install --python <path> <pkg>` — `--python` goes *after* `install`, not before. (commit 4d73ca2)
-- **Frontend rebuild marker** (`.rebuild_needed`) must be written *before* the build starts so an interrupted process resumes on next startup. (commit 08cda03)
 - **SQLite "database is locked"** under plugin install concurrency → use `retry_on_db_locked` with exponential backoff.
-- **Vite glob paths must match exactly.** Component paths are relative to `frontend/src/components/plugins/`. If `usePluginComponent` can't find a component, check the glob debug logs and the exact filename case.
+- **Schema renderer kind typos fail at load time, not silently.** If you add a renderer to [SchemaRenderer.vue](frontend/src/components/plugins/SchemaRenderer.vue), also add the kind to `SUPPORTED_DISPLAY_KINDS` in [definitions.py](backend/app/plugins/definitions.py) — otherwise plugins using it will be rejected at install.
 - **Keyboard input on Windows** uses a mock — real input paths only work on Linux/RPi. Don't assume hardware events in dev.
 
 ## Quick map
@@ -73,10 +72,11 @@ A plugin directory:
 | Plugin base / types | [backend/app/plugins/base.py](backend/app/plugins/base.py) |
 | Plugin hooks (Pluggy) | [backend/app/plugins/hooks.py](backend/app/plugins/hooks.py) |
 | Plugin loader | [backend/app/plugins/loader.py](backend/app/plugins/loader.py) |
-| Install + frontend build | [backend/app/services/plugin_installer.py](backend/app/services/plugin_installer.py) |
+| Plugin install + static assets | [backend/app/services/plugin_installer.py](backend/app/services/plugin_installer.py) |
 | Plugin mgmt API | [backend/app/api/routes/plugins/management.py](backend/app/api/routes/plugins/management.py) |
 | Instance manager helpers | [backend/app/utils/instance_manager.py](backend/app/utils/instance_manager.py) |
-| Dynamic component loader | [frontend/src/composables/usePluginComponent.js](frontend/src/composables/usePluginComponent.js) |
+| Schema renderer dispatch | [frontend/src/components/plugins/SchemaRenderer.vue](frontend/src/components/plugins/SchemaRenderer.vue) |
+| Plugin body CSS vocabulary | [frontend/src/styles/main.css](frontend/src/styles/main.css) (`.calvin-plugin-*`) |
 | Layout / mode switching | [frontend/src/components/LayoutManager.vue](frontend/src/components/LayoutManager.vue) |
 | Plugin settings UI | [frontend/src/components/settings/categories/PluginsCategory.vue](frontend/src/components/settings/categories/PluginsCategory.vue) |
 | Stores | [frontend/src/stores/](frontend/src/stores/) |

@@ -80,3 +80,39 @@ class TestPluginDefinition:
                     },
                 }
             )
+
+    def test_display_schema_rejects_unknown_kind(self):
+        with pytest.raises(ValueError, match="display_schema.kind must be one of"):
+            PluginDefinition.from_raw(
+                {
+                    "type_id": "weather",
+                    "plugin_type": PluginType.SERVICE,
+                    "name": "Weather",
+                    "display_schema": {
+                        "kind": "wether-forcast",
+                    },
+                }
+            )
+
+    def test_display_schema_requires_kind(self):
+        with pytest.raises(ValueError, match="display_schema.kind is required"):
+            PluginDefinition.from_raw(
+                {
+                    "type_id": "weather",
+                    "plugin_type": PluginType.SERVICE,
+                    "name": "Weather",
+                    "display_schema": {
+                        "title": "Weather",
+                    },
+                }
+            )
+
+    def test_display_schema_omitted_is_allowed(self):
+        definition = PluginDefinition.from_raw(
+            {
+                "type_id": "backend_only",
+                "plugin_type": PluginType.SERVICE,
+                "name": "Backend Only",
+            }
+        )
+        assert definition.display_schema is None
