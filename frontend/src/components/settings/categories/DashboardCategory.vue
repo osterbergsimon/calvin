@@ -23,11 +23,6 @@
         :config="config"
         @update:config="$emit('update:config', $event)"
       />
-      <ClockSettingsTab
-        v-if="activeTab === 'clock'"
-        :config="config"
-        @update:config="$emit('update:config', $event)"
-      />
       <NotificationsTab
         v-if="activeTab === 'notifications'"
         :config="config"
@@ -45,7 +40,6 @@ import DashboardLayoutTab from "../tabs/dashboard/DashboardLayoutTab.vue";
 import CalendarDisplayTab from "../tabs/dashboard/CalendarDisplayTab.vue";
 import PluginDisplayTab from "../tabs/dashboard/PluginDisplayTab.vue";
 import AppearanceTab from "../tabs/dashboard/AppearanceTab.vue";
-import ClockSettingsTab from "../tabs/dashboard/ClockSettingsTab.vue";
 import NotificationsTab from "../tabs/dashboard/NotificationsTab.vue";
 
 defineProps({
@@ -63,7 +57,6 @@ const tabs = [
   { id: "calendar", label: "Calendar Display", icon: "📅" },
   { id: "plugin-display", label: "Plugin Display", icon: "📦" },
   { id: "appearance", label: "Appearance", icon: "🎨" },
-  { id: "clock", label: "Clock", icon: "🕐" },
   { id: "notifications", label: "Notifications", icon: "🔔" },
 ];
 

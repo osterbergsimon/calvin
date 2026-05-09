@@ -2,6 +2,7 @@ import { describe, it, expect, beforeEach } from "vitest";
 import { mount } from "@vue/test-utils";
 import { setActivePinia, createPinia } from "pinia";
 import DashboardCategory from "@/components/settings/categories/DashboardCategory.vue";
+import ClockBarCategory from "@/components/settings/categories/ClockBarCategory.vue";
 import ContentSourcesCategory from "@/components/settings/categories/ContentSourcesCategory.vue";
 import DeviceCategory from "@/components/settings/categories/DeviceCategory.vue";
 import MaintenanceCategory from "@/components/settings/categories/MaintenanceCategory.vue";
@@ -20,6 +21,7 @@ const childStubs = {
   PluginDisplayTab: true,
   AppearanceTab: true,
   ClockSettingsTab: true,
+  ClockBarItemsTab: true,
   NotificationsTab: true,
   PhotosTab: true,
   ImagesTab: true,
@@ -52,9 +54,19 @@ describe("settings category IA", () => {
       "Calendar Display",
       "Plugin Display",
       "Appearance",
-      "Clock",
       "Notifications",
     ]);
+  });
+
+  it("groups clock bar settings around appearance and bar items", () => {
+    const wrapper = mount(ClockBarCategory, {
+      props: { config },
+      global: { stubs: childStubs },
+    });
+
+    const tabs = wrapper.findComponent(TabNavigation).props("tabs");
+
+    expect(tabs.map(tab => tab.label)).toEqual(["Appearance", "Bar Items"]);
   });
 
   it("groups content source settings around calendars, photos, images, and services", () => {
