@@ -28,6 +28,29 @@ SUPPORTED_DISPLAY_KINDS = {
 }
 
 
+def _validate_schema_kind(
+    value: dict[str, Any] | None,
+    *,
+    field_name: str,
+    check_panel_variant: bool,
+) -> dict[str, Any] | None:
+    """Validate that a schema dict has a supported kind and (optionally) panel_variant."""
+    if value is None:
+        return value
+    kind = value.get("kind")
+    if kind is None:
+        raise ValueError(f"{field_name}.kind is required when {field_name} is provided")
+    if kind not in SUPPORTED_DISPLAY_KINDS:
+        allowed = ", ".join(sorted(SUPPORTED_DISPLAY_KINDS))
+        raise ValueError(f"{field_name}.kind must be one of: {allowed} (got {kind!r})")
+    if check_panel_variant:
+        panel_variant = value.get("panel_variant")
+        if panel_variant is not None and panel_variant not in DISPLAY_PANEL_VARIANTS:
+            allowed = ", ".join(sorted(DISPLAY_PANEL_VARIANTS))
+            raise ValueError(f"{field_name}.panel_variant must be one of: {allowed}")
+    return value
+
+
 class ConfigFieldDefinition(BaseModel):
     """Typed config field metadata with permissive extra support."""
 
@@ -110,19 +133,15 @@ class PluginDefinition(BaseModel):
     @classmethod
     def validate_display_schema(cls, value: dict[str, Any] | None) -> dict[str, Any] | None:
         """Validate known display schema shell fields while allowing renderer-specific keys."""
-        if value is None:
-            return value
-        kind = value.get("kind")
-        if kind is None:
-            raise ValueError("display_schema.kind is required when display_schema is provided")
-        if kind not in SUPPORTED_DISPLAY_KINDS:
-            allowed = ", ".join(sorted(SUPPORTED_DISPLAY_KINDS))
-            raise ValueError(f"display_schema.kind must be one of: {allowed} (got {kind!r})")
-        panel_variant = value.get("panel_variant")
-        if panel_variant is not None and panel_variant not in DISPLAY_PANEL_VARIANTS:
-            allowed = ", ".join(sorted(DISPLAY_PANEL_VARIANTS))
-            raise ValueError(f"display_schema.panel_variant must be one of: {allowed}")
-        return value
+        return _validate_schema_kind(value, field_name="display_schema", check_panel_variant=True)
+
+    @field_validator("statusbar_schema")
+    @classmethod
+    def validate_statusbar_schema(cls, value: dict[str, Any] | None) -> dict[str, Any] | None:
+        """Statusbar schemas dispatch through the same SchemaRenderer; same validation applies."""
+        return _validate_schema_kind(
+            value, field_name="statusbar_schema", check_panel_variant=False
+        )
 
     @classmethod
     def from_raw(cls, raw: "PluginDefinition | dict[str, Any]") -> "PluginDefinition":
