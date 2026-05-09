@@ -330,16 +330,6 @@ class TestServicePlugin(ServicePlugin):
         """Cleanup plugin resources."""
         pass
 
-    async def get_content(self) -> dict[str, Any]:
-        """Get service content for display."""
-        return {
-            "type": "iframe",
-            "url": "about:blank",
-            "config": {
-                "message": self.message,
-            },
-        }
-
     async def validate_config(self, config: dict[str, Any]) -> bool:
         """Validate plugin configuration."""
         return True

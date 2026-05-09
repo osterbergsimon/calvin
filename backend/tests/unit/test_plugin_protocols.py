@@ -136,9 +136,6 @@ class TestProtocolAdherence:
         assert getattr(ServicePlugin.validate_config, "__isabstractmethod__", False)
 
         # Check CAN methods have default implementations (not abstract).
-        # `get_content` was demoted from MUST to CAN; new plugins use
-        # `fetch_service_data` paired with `display_schema.kind` instead.
-        assert not getattr(ServicePlugin.get_content, "__isabstractmethod__", False)
         assert not getattr(ServicePlugin.handle_webhook, "__isabstractmethod__", False)
         assert not getattr(ServicePlugin.handle_api_request, "__isabstractmethod__", False)
         assert not getattr(ServicePlugin.fetch_service_data, "__isabstractmethod__", False)
@@ -158,9 +155,6 @@ class TestProtocolAdherence:
 
             async def cleanup(self):
                 pass
-
-            async def get_content(self):
-                return {"type": "iframe", "url": "http://example.com"}
 
             async def validate_config(self, config):
                 return True
@@ -226,8 +220,8 @@ class TestProtocolUsage:
     """Test that core code uses protocols correctly."""
 
     @pytest.mark.asyncio
-    async def test_core_should_use_isinstance_not_hasattr(self):
-        """Test that core code should use isinstance checks, not hasattr."""
+    async def test_core_should_use_isinstance_for_service_data(self):
+        """Test that core code uses the service protocol for dashboard data."""
 
         # This is a documentation/test of the pattern
         class MockServicePlugin(ServicePlugin):
@@ -245,22 +239,17 @@ class TestProtocolUsage:
             async def cleanup(self):
                 pass
 
-            async def get_content(self):
-                return {"type": "iframe", "url": "http://example.com"}
-
             async def validate_config(self, config):
                 return True
 
+            async def fetch_service_data(self, start_date=None, end_date=None):
+                return {"url": "http://example.com"}
+
         plugin = MockServicePlugin("test-id", "Test")
 
-        # ✅ CORRECT: Use isinstance
         if isinstance(plugin, ServicePlugin):
-            content = await plugin.get_content()
-            assert content is not None
-
-        # ❌ WRONG: Don't use hasattr
-        # if hasattr(plugin, "get_content"):
-        #     content = await plugin.get_content()
+            content = await plugin.fetch_service_data()
+            assert content == {"url": "http://example.com"}
 
     @pytest.mark.asyncio
     async def test_optional_methods_return_none(self):
@@ -280,9 +269,6 @@ class TestProtocolUsage:
 
             async def cleanup(self):
                 pass
-
-            async def get_content(self):
-                return {"type": "iframe", "url": "http://example.com"}
 
             async def validate_config(self, config):
                 return True
@@ -312,16 +298,12 @@ class TestProtocolUsage:
             async def cleanup(self):
                 pass
 
-            async def get_content(self):
-                return {"type": "iframe", "url": "http://example.com"}
-
             async def validate_config(self, config):
                 return True
 
         plugin = MockServicePlugin("test-id", "Test")
 
         # All protocol methods should be callable
-        assert callable(plugin.get_content)
         assert callable(plugin.validate_config)
         assert callable(plugin.fetch_service_data)
         assert callable(plugin.handle_api_request)
@@ -352,11 +334,11 @@ class TestProtocolViolations:
             async def cleanup(self):
                 pass
 
-            async def get_content(self):
-                return {"type": "iframe", "url": "http://example.com"}
-
             async def validate_config(self, config):
                 return True
+
+            async def fetch_service_data(self, start_date=None, end_date=None):
+                return {"url": "http://example.com"}
 
             async def _private_method(self):
                 """This should never be called by core code."""
@@ -364,8 +346,8 @@ class TestProtocolViolations:
 
         plugin = MockServicePlugin("test-id", "Test")
 
-        # ✅ CORRECT: Use protocol method
-        content = await plugin.get_content()
+        # Use the public protocol method.
+        content = await plugin.fetch_service_data()
         assert content is not None
 
         # ❌ WRONG: Don't call private methods
@@ -394,16 +376,16 @@ class TestProtocolViolations:
             async def cleanup(self):
                 pass
 
-            async def get_content(self):
-                return {"type": "iframe", "url": self._url}
-
             async def validate_config(self, config):
                 return True
 
+            async def fetch_service_data(self, start_date=None, end_date=None):
+                return {"url": self._url}
+
         plugin = MockServicePlugin("test-id", "Test")
 
-        # ✅ CORRECT: Use protocol method
-        content = await plugin.get_content()
+        # Use the public protocol method.
+        content = await plugin.fetch_service_data()
         url = content.get("url")
         assert url == "http://example.com"
 

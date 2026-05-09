@@ -155,26 +155,10 @@ class TestIframeServicePlugin:
         assert iframe_plugin.fullscreen is True
 
     @pytest.mark.asyncio
-    async def test_get_content(self, iframe_plugin):
-        """Test getting service content."""
-        content = await iframe_plugin.get_content()
-        assert content["type"] == "iframe"
-        assert content["url"] == "https://example.com"
-        assert content["fullscreen"] is False
-        assert "config" in content
-        assert content["config"]["allowFullscreen"] is True
-
-    @pytest.mark.asyncio
-    async def test_get_content_fullscreen(self):
-        """Test getting service content with fullscreen enabled."""
-        plugin = IframeServicePlugin(
-            plugin_id="test",
-            name="Test",
-            url="https://example.com",
-            fullscreen=True,
-        )
-        content = await plugin.get_content()
-        assert content["fullscreen"] is True
+    async def test_fetch_service_data(self, iframe_plugin):
+        """Test schema-driven iframe data payload."""
+        content = await iframe_plugin.fetch_service_data()
+        assert content == {"url": "https://example.com"}
 
     @pytest.mark.asyncio
     async def test_validate_config_valid_http_url(self, iframe_plugin):
