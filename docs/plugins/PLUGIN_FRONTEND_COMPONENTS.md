@@ -87,23 +87,51 @@ display_schema={
 }
 ```
 
-Plugin frontends and built-in renderers should use Calvin's public dashboard body classes:
+### Plugin Body Class Vocabulary
 
-- `calvin-plugin-fill` for a component root that should fill the panel body.
-- `calvin-plugin-grid` for tile/card grids.
-- `calvin-plugin-grid--auto`, `calvin-plugin-grid--dense`, `calvin-plugin-grid--2`, and
-  `calvin-plugin-grid--3` for common grid layouts.
-- `calvin-plugin-list` and `calvin-plugin-list--scroll` for vertical lists.
-- `calvin-plugin-surface`, `calvin-plugin-row`, and `calvin-plugin-metric` for repeated surfaces.
-- `calvin-plugin-clickable` for clickable cards or rows.
-- `calvin-plugin-section` for lightweight body grouping without drawing a nested outer card.
-- `calvin-plugin-toolbar` for small action rows inside the plugin body.
-- `calvin-plugin-media` for image/video/canvas content inside `panel_variant: "media"`.
-- `calvin-plugin-empty`, `calvin-plugin-loading`, and `calvin-plugin-error` for fallback states.
-
-These classes use `var(--bg-secondary)`, `var(--border-color)`, radius `6px`, standard spacing, and
+Plugin frontends and built-in renderers should use Calvin's public dashboard body classes
+defined in [frontend/src/styles/main.css](../../frontend/src/styles/main.css). The classes
+use `var(--bg-secondary)`, `var(--border-color)`, radius `6px`, standard spacing, and
 region-safe `min-width`/`min-height` rules. The panel body owns the outer overflow boundary, so
 renderers should avoid adding another outer frame.
+
+**Layout containers**
+
+| Class | Use for |
+|---|---|
+| `calvin-plugin-fill` | Component root that should fill the panel body (100% width/height). |
+| `calvin-plugin-section` | Lightweight body grouping (vertical flex, gap) without a nested outer card. |
+| `calvin-plugin-toolbar` | Small horizontal action row inside the plugin body. |
+
+**Grids and lists**
+
+| Class | Use for |
+|---|---|
+| `calvin-plugin-grid` | Base tile/card grid (1rem gap, fills body). Combine with one of the variants below. |
+| `calvin-plugin-grid--auto` | Auto-fit columns, min 180px each — the default for card grids. |
+| `calvin-plugin-grid--dense` | Auto-fit columns, min 120px, tighter gap — for compact status tiles. |
+| `calvin-plugin-grid--2` | Fixed 2-column layout. |
+| `calvin-plugin-grid--3` | Fixed 3-column layout. |
+| `calvin-plugin-list` | Vertical list (flex column, no bullets). |
+| `calvin-plugin-list--scroll` | Add to a list to enable internal vertical scrolling. |
+
+**Surfaces (the repeating cards/rows inside a grid or list)**
+
+| Class | Use for |
+|---|---|
+| `calvin-plugin-surface` | Bordered card surface with 1rem padding — the default for tiles in a grid. |
+| `calvin-plugin-row` | Bordered row surface with tighter padding — for items in a list. |
+| `calvin-plugin-metric` | Bordered surface with extra padding — for prominent numeric tiles. |
+| `calvin-plugin-clickable` | Add to a surface/row to give it a pointer cursor and hover affordance. |
+| `calvin-plugin-media` | Full-bleed image/video/canvas container — for `panel_variant: "media"`. |
+
+**Fallback states**
+
+| Class | Use for |
+|---|---|
+| `calvin-plugin-empty` | "No data" / empty-state message (italic, secondary color). |
+| `calvin-plugin-loading` | Loading-state message (secondary color). |
+| `calvin-plugin-error` | Error-state message (error color). |
 
 Example web component body layout:
 

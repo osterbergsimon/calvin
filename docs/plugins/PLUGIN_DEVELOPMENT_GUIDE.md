@@ -132,13 +132,14 @@ class MyServicePlugin(ServicePlugin):
         """Cleanup plugin resources."""
         pass
     
-    async def get_content(self) -> dict[str, Any]:
-        """Get service content."""
-        return {
-            "type": "iframe",
-            "url": "https://example.com",
-        }
-    
+    async def fetch_service_data(
+        self,
+        start_date: str | None = None,
+        end_date: str | None = None,
+    ) -> dict[str, Any]:
+        """Return the data payload that this plugin's display_schema binds to."""
+        return {"url": "https://example.com"}
+
     async def validate_config(self, config: dict[str, Any]) -> bool:
         """Validate configuration."""
         return True
@@ -304,19 +305,27 @@ For file uploads or complex inputs:
 
 ## Display Schema (Service Plugins)
 
-Service plugins can define how their content is displayed:
+Service plugins describe their dashboard UI declaratively via `display_schema`. The frontend
+dispatches on `display_schema.kind` and renders the matching built-in Vue component — plugins do
+**not** ship their own Vue components for built-in renderers.
+
+`kind` is required when `display_schema` is set, and must be one of `SUPPORTED_DISPLAY_KINDS` in
+[backend/app/plugins/definitions.py](../../backend/app/plugins/definitions.py): `status-tile`,
+`status-list`, `status-row`, `card-grid`, `item-list`, `iframe`, `image-with-caption`,
+`metric-dashboard`, `weather-forecast`, or `web-component`. Unknown kinds are rejected at plugin
+load time.
 
 ```python
 "display_schema": {
-    "type": "api",  # "iframe" or "api"
-    "api_endpoint": "/api/plugins/{service_id}/data",
-    "method": "GET",
-    "render_template": "custom_template",  # Custom frontend template
-    "data_schema": {
-        # Schema for the API response
-    },
+    "kind": "status-tile",        # required, one of the supported kinds
+    "title_path": "$.location",   # optional shell title (JSONPath-lite into the data payload)
+    "panel_variant": "default",   # one of: default, dense, media, iframe
+    # ...renderer-specific keys (e.g. value_path, status_path, url_path)
 }
 ```
+
+See [PLUGIN_FRONTEND_COMPONENTS.md](PLUGIN_FRONTEND_COMPONENTS.md) for the renderer-specific
+schema fields and the `calvin-plugin-*` body class vocabulary.
 
 ## Example Plugins
 
@@ -357,8 +366,8 @@ class IframeServicePlugin(ServicePlugin):
                 },
             },
             "display_schema": {
-                "type": "iframe",
-                "render_template": "iframe",
+                "kind": "iframe",
+                "url_path": "$.url",
             },
         }
     
@@ -374,11 +383,14 @@ class IframeServicePlugin(ServicePlugin):
         """Cleanup plugin."""
         pass
     
-    async def get_content(self) -> dict[str, Any]:
-        return {
-            "type": "iframe",
-            "url": self.url,
-        }
+    async def fetch_service_data(
+        self,
+        start_date: str | None = None,
+        end_date: str | None = None,
+    ) -> dict[str, Any]:
+        # Surfaces the URL via the schema data endpoint; the host's
+        # iframe renderer reads `$.url` from this payload.
+        return {"url": self.url}
     
     async def validate_config(self, config: dict[str, Any]) -> bool:
         url = config.get("url", "")

@@ -14,6 +14,18 @@ from app.plugins.base import PluginType
 CURRENT_PLUGIN_PROTOCOL_VERSION = 1
 SUPPORTED_PLUGIN_PROTOCOL_VERSIONS = {CURRENT_PLUGIN_PROTOCOL_VERSION}
 DISPLAY_PANEL_VARIANTS = {"default", "dense", "media", "iframe"}
+SUPPORTED_DISPLAY_KINDS = {
+    "status-tile",
+    "status-list",
+    "status-row",
+    "card-grid",
+    "item-list",
+    "iframe",
+    "image-with-caption",
+    "metric-dashboard",
+    "weather-forecast",
+    "web-component",
+}
 
 
 class ConfigFieldDefinition(BaseModel):
@@ -100,6 +112,12 @@ class PluginDefinition(BaseModel):
         """Validate known display schema shell fields while allowing renderer-specific keys."""
         if value is None:
             return value
+        kind = value.get("kind")
+        if kind is None:
+            raise ValueError("display_schema.kind is required when display_schema is provided")
+        if kind not in SUPPORTED_DISPLAY_KINDS:
+            allowed = ", ".join(sorted(SUPPORTED_DISPLAY_KINDS))
+            raise ValueError(f"display_schema.kind must be one of: {allowed} (got {kind!r})")
         panel_variant = value.get("panel_variant")
         if panel_variant is not None and panel_variant not in DISPLAY_PANEL_VARIANTS:
             allowed = ", ".join(sorted(DISPLAY_PANEL_VARIANTS))
