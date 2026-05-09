@@ -133,10 +133,12 @@ class TestProtocolAdherence:
         assert inspect.isabstract(ServicePlugin)
 
         # Check MUST methods are marked as abstract
-        assert getattr(ServicePlugin.get_content, "__isabstractmethod__", False)
         assert getattr(ServicePlugin.validate_config, "__isabstractmethod__", False)
 
-        # Check CAN methods have default implementations (not abstract)
+        # Check CAN methods have default implementations (not abstract).
+        # `get_content` was demoted from MUST to CAN; new plugins use
+        # `fetch_service_data` paired with `display_schema.kind` instead.
+        assert not getattr(ServicePlugin.get_content, "__isabstractmethod__", False)
         assert not getattr(ServicePlugin.handle_webhook, "__isabstractmethod__", False)
         assert not getattr(ServicePlugin.handle_api_request, "__isabstractmethod__", False)
         assert not getattr(ServicePlugin.fetch_service_data, "__isabstractmethod__", False)

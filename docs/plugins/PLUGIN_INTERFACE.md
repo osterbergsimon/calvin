@@ -52,13 +52,19 @@ All plugins inherit from `BasePlugin` which defines the common interface:
 ## ServicePlugin Interface
 
 ### MUST Implement:
-- `get_content()`: Get service content for display
 - `validate_config(config)`: Validate plugin configuration
 
+### SHOULD Implement:
+- `fetch_service_data(start_date, end_date)`: Return the data payload that the
+  plugin's `display_schema` binds to. This is the canonical data source for
+  schema-driven dashboard rendering.
+
 ### CAN Implement:
+- `get_content()`: Legacy data shape (e.g. `{"type": "iframe", "url": ...}`).
+  Returns an empty dict by default; new plugins should leave it alone and use
+  `fetch_service_data` paired with `display_schema.kind` instead.
 - `handle_webhook(payload)`: Handle incoming webhook (optional)
 - `handle_api_request(method, path, data)`: Handle API request (optional)
-- `fetch_service_data(start_date, end_date)`: Fetch service data for display (optional)
 
 ## Hooks (Pluggy-based)
 
