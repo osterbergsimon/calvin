@@ -75,7 +75,7 @@ satisfy a small set of contracts. Full reference: [PLUGIN_INTERFACE.md](PLUGIN_I
 |---|---|
 | `calendar` | `fetch_events(start_date, end_date)`, `validate_config(config)` |
 | `image` | `get_images()`, `get_image(id)`, `get_image_data(id)`, `scan_images()`, `validate_config(config)` |
-| `service` | `get_content()`, `validate_config(config)` |
+| `service` | `validate_config(config)` (and **should** implement `fetch_service_data` if the plugin renders dashboard content) |
 | `backend` | `validate_config(config)` |
 
 ### Per-type optional methods
@@ -83,7 +83,9 @@ satisfy a small set of contracts. Full reference: [PLUGIN_INTERFACE.md](PLUGIN_I
 - **Image**: `upload_image`, `delete_image`, `get_thumbnail_path`.
 - **Service**: `fetch_service_data(start_date, end_date)` — the canonical data source for
   schema-driven dashboard rendering. `handle_webhook`, `handle_api_request` for
-  push/pull integrations.
+  push/pull integrations. `get_content()` is the legacy data shape and is no longer
+  required; new plugins should leave it as the default and use `fetch_service_data`
+  instead.
 - **All**: `configure(config)`, `test_type_config(config)` (classmethod, replaces the
   legacy `test_plugin_connection` hook), `scan_type_options(field_key)` (classmethod,
   replaces the legacy `scan_plugin_options` hook), `fetch_type_data(instance_id)`

@@ -184,16 +184,21 @@ class ImagePlugin(BasePlugin):
 
 class ServicePlugin(BasePlugin):
     """
-    Protocol for service plugins (webhooks, APIs, iframes, etc.).
+    Protocol for service plugins (dashboard cards, webhooks, APIs, iframes).
 
     MUST implement:
-    - get_content()
     - validate_config()
 
+    SHOULD implement:
+    - fetch_service_data() — the canonical data source for schema-driven dashboard
+      rendering. Returns a JSON payload that the plugin's `display_schema` binds to.
+
     CAN implement (optional):
+    - get_content() — legacy data shape (e.g. `{"type": "iframe", "url": ...}`).
+      Returns an empty dict by default; new plugins should prefer `fetch_service_data`
+      paired with `display_schema.kind`.
     - handle_webhook()
     - handle_api_request()
-    - fetch_service_data()
     """
 
     @property
@@ -201,19 +206,14 @@ class ServicePlugin(BasePlugin):
         """Return service plugin type."""
         return PluginType.SERVICE
 
-    @abstractmethod
     async def get_content(self) -> dict[str, Any]:
         """
-        Get service content for display.
+        Legacy: get service content for display.
 
-        Returns:
-            Dictionary with content information:
-            - type: Content type ('iframe', 'api', 'webhook', etc.)
-            - url: URL for iframe or API endpoint
-            - data: Additional data for rendering
-            - config: Display configuration
+        Predates the schema-driven render path. New plugins should leave this as the
+        default and implement `fetch_service_data()` instead. Returns an empty dict.
         """
-        pass
+        return {}
 
     async def handle_webhook(self, payload: dict[str, Any]) -> dict[str, Any] | None:
         """

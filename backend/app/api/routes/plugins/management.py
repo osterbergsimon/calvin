@@ -812,23 +812,6 @@ async def fetch_plugin(plugin_id: str):
         if class_result is not None:
             return class_result
 
-    # Legacy compatibility: fall back to hook-based fetch handlers
-    # Pluggy returns a list of coroutines for async hooks, we need to await them
-    fetch_coroutines = hook_manager.hook.fetch_plugin_data(
-        type_id=plugin_id,
-        instance_id=None,
-    )
-    fetch_results = await asyncio.gather(*fetch_coroutines, return_exceptions=True)
-
-    # Check if any plugin handled the fetch
-    for result in fetch_results:
-        # Skip exceptions (they're wrapped in the result)
-        if isinstance(result, Exception):
-            continue
-        if result is not None:
-            return result
-
-    # Default: plugin doesn't support fetching
     return {
         "success": False,
         "message": "This plugin type does not support manual fetch",
@@ -865,18 +848,6 @@ async def scan_plugin_options(
                 return class_result
         except Exception as e:
             logger.debug(f"Class-based scan_type_options failed for {plugin_id}: {e}")
-
-    scan_coroutines = hook_manager.hook.scan_plugin_options(
-        type_id=plugin_id,
-        field_key=field,
-    )
-    results = await asyncio.gather(*scan_coroutines, return_exceptions=True)
-
-    for result in results:
-        if isinstance(result, Exception):
-            continue
-        if result is not None:
-            return result
 
     return {"options": [], "error": "Plugin does not support option scanning for this field"}
 
@@ -1141,23 +1112,6 @@ async def test_plugin(plugin_id: str, test_config: dict[str, Any] | None = Body(
         except Exception as e:
             logger.debug(f"Class-based test_type_config failed for {plugin_id}: {e}")
 
-    # Call plugin-specific test handlers via hooks
-    # Pluggy returns a list of coroutines for async hooks, we need to await them
-    test_coroutines = hook_manager.hook.test_plugin_connection(
-        type_id=plugin_id,
-        config=config,
-    )
-    test_results = await asyncio.gather(*test_coroutines, return_exceptions=True)
-
-    # Check if any plugin handled the test
-    for result in test_results:
-        # Skip exceptions (they're wrapped in the result)
-        if isinstance(result, Exception):
-            continue
-        if result is not None:
-            return result
-
-    # Default: plugin doesn't support testing
     return {
         "success": False,
         "message": "This plugin type does not support connection testing",
