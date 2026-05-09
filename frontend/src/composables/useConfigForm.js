@@ -151,6 +151,7 @@ export function useConfigForm(initialConfig = {}) {
         clockBarPadding: response.clockBarPadding ?? response.clock_bar_padding ?? 8,
         clockBarShowWeather:
           response.clockBarShowWeather ?? response.clock_bar_show_weather ?? false,
+        clockBarShowLogo: response.clockBarShowLogo ?? response.clock_bar_show_logo ?? true,
         // Other
         mealPlanCardSize: response.mealPlanCardSize ?? response.meal_plan_card_size ?? "medium",
         consoleLogEnabled: response.consoleLogEnabled ?? response.console_log_enabled ?? true,
