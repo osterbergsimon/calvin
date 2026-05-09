@@ -8,32 +8,34 @@
         :class="{ 'dashboard-subregion-active': sub.id === activeRegionId }"
         :style="getSubStyle(sub)"
       >
-        <CalendarView v-if="sub.kind === 'calendar'" />
+        <CalendarView v-if="sub.kind === 'calendar'" :source-ids="sub.instanceIds || []" />
         <PhotoSlideshow
           v-else-if="sub.kind === 'photos'"
           :is-fullscreen="false"
           :auto-rotate="true"
           :rotation-interval="photoRotationInterval * 1000"
+          :source-ids="sub.instanceIds || []"
         />
         <WebServiceViewer
           v-else-if="sub.kind === 'service'"
           :is-fullscreen="false"
-          :service-id="sub.serviceId"
+          :service-id="sub.instanceIds?.[0] || sub.serviceId"
         />
       </div>
     </template>
     <template v-else>
-      <CalendarView v-if="region.kind === 'calendar'" />
+      <CalendarView v-if="region.kind === 'calendar'" :source-ids="region.instanceIds || []" />
       <PhotoSlideshow
         v-else-if="region.kind === 'photos'"
         :is-fullscreen="false"
         :auto-rotate="true"
         :rotation-interval="photoRotationInterval * 1000"
+        :source-ids="region.instanceIds || []"
       />
       <WebServiceViewer
         v-else-if="region.kind === 'service'"
         :is-fullscreen="false"
-        :service-id="region.serviceId"
+        :service-id="region.instanceIds?.[0] || region.serviceId"
       />
     </template>
   </div>

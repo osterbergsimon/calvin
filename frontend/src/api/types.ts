@@ -2265,7 +2265,10 @@ export interface operations {
   };
   get_current_image_api_images_current_get: {
     parameters: {
-      query?: never;
+      query?: {
+        /** @description Comma-separated source IDs */
+        source_ids?: string | null;
+      };
       header?: never;
       path?: never;
       cookie?: never;
@@ -2279,13 +2282,25 @@ export interface operations {
         };
         content: {
           "application/json": unknown;
+        };
+      };
+      /** @description Validation Error */
+      422: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["HTTPValidationError"];
         };
       };
     };
   };
   list_images_api_images_list_get: {
     parameters: {
-      query?: never;
+      query?: {
+        /** @description Comma-separated source IDs */
+        source_ids?: string | null;
+      };
       header?: never;
       path?: never;
       cookie?: never;
@@ -2299,13 +2314,25 @@ export interface operations {
         };
         content: {
           "application/json": unknown;
+        };
+      };
+      /** @description Validation Error */
+      422: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["HTTPValidationError"];
         };
       };
     };
   };
   next_image_api_images_next_post: {
     parameters: {
-      query?: never;
+      query?: {
+        /** @description Comma-separated source IDs */
+        source_ids?: string | null;
+      };
       header?: never;
       path?: never;
       cookie?: never;
@@ -2321,11 +2348,23 @@ export interface operations {
           "application/json": unknown;
         };
       };
+      /** @description Validation Error */
+      422: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["HTTPValidationError"];
+        };
+      };
     };
   };
   previous_image_api_images_previous_post: {
     parameters: {
-      query?: never;
+      query?: {
+        /** @description Comma-separated source IDs */
+        source_ids?: string | null;
+      };
       header?: never;
       path?: never;
       cookie?: never;
@@ -2339,6 +2378,15 @@ export interface operations {
         };
         content: {
           "application/json": unknown;
+        };
+      };
+      /** @description Validation Error */
+      422: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["HTTPValidationError"];
         };
       };
     };

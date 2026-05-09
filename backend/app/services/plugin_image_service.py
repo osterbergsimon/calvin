@@ -21,13 +21,18 @@ class PluginImageService:
         """Initialize image service."""
         self._current_image_id: str | None = None
         self._current_plugin_id: str | None = None
+        self._current_image_ids_by_source_key: dict[str, str] = {}
         self._all_images: list[dict[str, Any]] = []
         self._randomized_order: list[dict[str, Any]] = []
+        self._randomized_orders_by_source_key: dict[str, list[dict[str, Any]]] = {}
         self._images_cache_time: datetime | None = None
         self._images_cache_ttl = timedelta(seconds=30)  # Cache for 30 seconds
 
     async def get_images(
-        self, randomize: bool = False, randomize_per_plugin: bool = False
+        self,
+        randomize: bool = False,
+        randomize_per_plugin: bool = False,
+        source_ids: list[str] | None = None,
     ) -> list[dict[str, Any]]:
         """
         Get list of all images from all enabled image plugins, ordered by display_order.
@@ -156,25 +161,37 @@ class PluginImageService:
             else:
                 images.extend(plugin_images)
 
-        # Store original order
+        # Store original aggregate order for lookup endpoints.
         self._all_images = images.copy()
+        self._randomized_order = []
+        self._randomized_orders_by_source_key = {}
         self._images_cache_time = datetime.now()
         logger.info("Total images collected: {}", len(images))
+
+        source_key = self._source_key(source_ids)
+        if source_ids:
+            images = self._filter_images_by_source(images, source_ids)
 
         # Apply global randomization if requested (overrides per-plugin randomization)
         if randomize and images:
             randomized = images.copy()
             random.shuffle(randomized)
-            self._randomized_order = randomized
+            if source_key == "__all__":
+                self._randomized_order = randomized
+            else:
+                self._randomized_orders_by_source_key[source_key] = randomized
             logger.debug("Returning {} randomized images", len(randomized))
             return randomized
 
         # Store original order as randomized order when not randomizing
-        self._randomized_order = images.copy()
+        if source_key == "__all__":
+            self._randomized_order = images.copy()
         logger.debug("Returning {} images (not randomized)", len(images))
         return images
 
-    async def get_current_image(self, randomize: bool = False) -> dict[str, Any] | None:
+    async def get_current_image(
+        self, randomize: bool = False, source_ids: list[str] | None = None
+    ) -> dict[str, Any] | None:
         """
         Get current image metadata.
 
@@ -184,29 +201,31 @@ class PluginImageService:
         Returns:
             Current image metadata or None if no images
         """
-        # Get images (with randomization if requested), only refresh if cache is stale
+        # Refresh the aggregate image cache first. Source-specific ordering, including
+        # randomization, is resolved lazily below so independent regions keep separate order.
         if not self._all_images or self._is_cache_stale():
-            await self.get_images(randomize=randomize)
-        elif randomize and not self._randomized_order:
-            # Re-randomize if requested
-            await self.get_images(randomize=True)
+            await self.get_images(randomize=False)
 
-        # Use randomized order if randomize is True, otherwise use original order
-        images = self._randomized_order if randomize else self._all_images
+        images = self._get_ordered_images(randomize=randomize, source_ids=source_ids)
+
+        source_key = self._source_key(source_ids)
+        current_image_id = self._current_image_id_for_source_key(source_key)
 
         if not images:
             return None
 
         # Find current image by ID
-        if self._current_image_id:
+        if current_image_id:
             for img in images:
-                if img["id"] == self._current_image_id:
+                if img["id"] == current_image_id:
                     return img
 
         # Return first image if no current image set
         return images[0]
 
-    async def next_image(self, randomize: bool = False) -> dict[str, Any] | None:
+    async def next_image(
+        self, randomize: bool = False, source_ids: list[str] | None = None
+    ) -> dict[str, Any] | None:
         """
         Move to next image and return it.
 
@@ -218,22 +237,21 @@ class PluginImageService:
         """
         # Only refresh images if cache is stale (not on every navigation)
         if not self._all_images or self._is_cache_stale():
-            await self.get_images(randomize=randomize)
-        elif randomize and not self._randomized_order:
-            # Need randomized order but don't have it
-            await self.get_images(randomize=True)
+            await self.get_images(randomize=False)
 
-        # Use randomized order if randomize is True, otherwise use original order
-        images = self._randomized_order if randomize else self._all_images
+        images = self._get_ordered_images(randomize=randomize, source_ids=source_ids)
+
+        source_key = self._source_key(source_ids)
+        current_image_id = self._current_image_id_for_source_key(source_key)
 
         if not images:
             return None
 
         # Find current index
         current_index = 0
-        if self._current_image_id:
+        if current_image_id:
             for i, img in enumerate(images):
-                if img["id"] == self._current_image_id:
+                if img["id"] == current_image_id:
                     current_index = i
                     break
 
@@ -243,10 +261,13 @@ class PluginImageService:
 
         self._current_image_id = next_image["id"]
         self._current_plugin_id = next_image.get("source")
+        self._current_image_ids_by_source_key[source_key] = next_image["id"]
 
         return next_image
 
-    async def previous_image(self, randomize: bool = False) -> dict[str, Any] | None:
+    async def previous_image(
+        self, randomize: bool = False, source_ids: list[str] | None = None
+    ) -> dict[str, Any] | None:
         """
         Move to previous image and return it.
 
@@ -258,22 +279,21 @@ class PluginImageService:
         """
         # Only refresh images if cache is stale (not on every navigation)
         if not self._all_images or self._is_cache_stale():
-            await self.get_images(randomize=randomize)
-        elif randomize and not self._randomized_order:
-            # Need randomized order but don't have it
-            await self.get_images(randomize=True)
+            await self.get_images(randomize=False)
 
-        # Use randomized order if randomize is True, otherwise use original order
-        images = self._randomized_order if randomize else self._all_images
+        images = self._get_ordered_images(randomize=randomize, source_ids=source_ids)
+
+        source_key = self._source_key(source_ids)
+        current_image_id = self._current_image_id_for_source_key(source_key)
 
         if not images:
             return None
 
         # Find current index
         current_index = 0
-        if self._current_image_id:
+        if current_image_id:
             for i, img in enumerate(images):
-                if img["id"] == self._current_image_id:
+                if img["id"] == current_image_id:
                     current_index = i
                     break
 
@@ -283,6 +303,7 @@ class PluginImageService:
 
         self._current_image_id = prev_image["id"]
         self._current_plugin_id = prev_image.get("source")
+        self._current_image_ids_by_source_key[source_key] = prev_image["id"]
 
         return prev_image
 
@@ -475,3 +496,41 @@ class PluginImageService:
         self._images_cache_time = None
         self._all_images = []
         self._randomized_order = []
+        self._randomized_orders_by_source_key = {}
+
+    def _source_key(self, source_ids: list[str] | None = None) -> str:
+        if not source_ids:
+            return "__all__"
+        return ",".join(sorted({source_id for source_id in source_ids if source_id}))
+
+    def _current_image_id_for_source_key(self, source_key: str) -> str | None:
+        if source_key == "__all__":
+            return self._current_image_ids_by_source_key.get(source_key, self._current_image_id)
+        return self._current_image_ids_by_source_key.get(source_key)
+
+    def _filter_images_by_source(
+        self, images: list[dict[str, Any]], source_ids: list[str] | None = None
+    ) -> list[dict[str, Any]]:
+        if not source_ids:
+            return images
+        selected_sources = {source_id for source_id in source_ids if source_id}
+        return [img for img in images if img.get("source") in selected_sources]
+
+    def _get_ordered_images(
+        self, randomize: bool = False, source_ids: list[str] | None = None
+    ) -> list[dict[str, Any]]:
+        source_key = self._source_key(source_ids)
+        if not randomize:
+            return self._filter_images_by_source(self._all_images, source_ids)
+
+        if source_key == "__all__":
+            if not self._randomized_order:
+                self._randomized_order = self._all_images.copy()
+                random.shuffle(self._randomized_order)
+            return self._randomized_order
+
+        if source_key not in self._randomized_orders_by_source_key:
+            randomized = self._filter_images_by_source(self._all_images, source_ids).copy()
+            random.shuffle(randomized)
+            self._randomized_orders_by_source_key[source_key] = randomized
+        return self._randomized_orders_by_source_key[source_key]

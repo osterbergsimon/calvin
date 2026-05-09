@@ -256,6 +256,27 @@ describe("Calendar Store", () => {
       });
     });
 
+    it("should add source_ids parameter when source IDs are provided", async () => {
+      const startDate = new Date("2024-01-01");
+      const endDate = new Date("2024-01-31");
+      const mockEvents = { events: [] };
+
+      axios.get.mockResolvedValue({ data: mockEvents });
+      mockConnectionStore.isFullyOnline.mockReturnValue(true);
+
+      const store = useCalendarStore();
+      await store.fetchEvents(startDate, endDate, false, false, ["family", "personal"]);
+
+      expect(axios.get).toHaveBeenCalledWith("/api/calendar/events", {
+        params: {
+          start_date: startDate.toISOString(),
+          end_date: endDate.toISOString(),
+          source_ids: "family,personal",
+        },
+      });
+      expect(store.getEventsForSource(["personal", "family"])).toEqual([]);
+    });
+
     it("should use cached events when offline", async () => {
       const startDate = new Date("2024-01-01");
       const endDate = new Date("2024-01-31");

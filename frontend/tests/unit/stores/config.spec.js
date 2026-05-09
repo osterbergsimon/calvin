@@ -127,8 +127,22 @@ describe("Config Store", () => {
     await store.fetchConfig();
 
     expect(store.dashboardLayout.regions).toEqual([
-      { id: "region-1", kind: "calendar", serviceId: null, size: 60, split: null },
-      { id: "region-2", kind: "service", serviceId: null, size: 40, split: null },
+      {
+        id: "region-1",
+        kind: "calendar",
+        serviceId: null,
+        instanceIds: [],
+        size: 60,
+        split: null,
+      },
+      {
+        id: "region-2",
+        kind: "service",
+        serviceId: null,
+        instanceIds: [],
+        size: 40,
+        split: null,
+      },
     ]);
     expect(store.dashboardScreens.activeScreenId).toBe("services");
     expect(store.dashboardScreens.screens[0].activeRegionId).toBe("region-2");

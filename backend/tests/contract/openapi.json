@@ -1689,6 +1689,26 @@
       "get": {
         "description": "Get current image metadata from plugin service.\n\nReturns:\n    Current image metadata",
         "operationId": "get_current_image_api_images_current_get",
+        "parameters": [
+          {
+            "description": "Comma-separated source IDs",
+            "in": "query",
+            "name": "source_ids",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "description": "Comma-separated source IDs",
+              "title": "Source Ids"
+            }
+          }
+        ],
         "responses": {
           "200": {
             "content": {
@@ -1697,6 +1717,16 @@
               }
             },
             "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
           }
         },
         "summary": "Get Current Image",
@@ -1709,6 +1739,26 @@
       "get": {
         "description": "Get list of all images from all enabled image plugins.\n\nReturns:\n    List of image metadata",
         "operationId": "list_images_api_images_list_get",
+        "parameters": [
+          {
+            "description": "Comma-separated source IDs",
+            "in": "query",
+            "name": "source_ids",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "description": "Comma-separated source IDs",
+              "title": "Source Ids"
+            }
+          }
+        ],
         "responses": {
           "200": {
             "content": {
@@ -1717,6 +1767,16 @@
               }
             },
             "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
           }
         },
         "summary": "List Images",
@@ -1729,6 +1789,26 @@
       "post": {
         "description": "Move to next image and return it from plugin service.\n\nReturns:\n    Next image metadata",
         "operationId": "next_image_api_images_next_post",
+        "parameters": [
+          {
+            "description": "Comma-separated source IDs",
+            "in": "query",
+            "name": "source_ids",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "description": "Comma-separated source IDs",
+              "title": "Source Ids"
+            }
+          }
+        ],
         "responses": {
           "200": {
             "content": {
@@ -1737,6 +1817,16 @@
               }
             },
             "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
           }
         },
         "summary": "Next Image",
@@ -1749,6 +1839,26 @@
       "post": {
         "description": "Move to previous image and return it from plugin service.\n\nReturns:\n    Previous image metadata",
         "operationId": "previous_image_api_images_previous_post",
+        "parameters": [
+          {
+            "description": "Comma-separated source IDs",
+            "in": "query",
+            "name": "source_ids",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "description": "Comma-separated source IDs",
+              "title": "Source Ids"
+            }
+          }
+        ],
         "responses": {
           "200": {
             "content": {
@@ -1757,6 +1867,16 @@
               }
             },
             "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
           }
         },
         "summary": "Previous Image",

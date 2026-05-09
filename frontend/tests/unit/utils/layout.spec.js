@@ -129,8 +129,22 @@ describe("Layout Utilities", () => {
         preset: "split_two",
         direction: null,
         regions: [
-          { id: "region-1", kind: "calendar", serviceId: null, size: 65, split: null },
-          { id: "region-2", kind: "photos", serviceId: null, size: 35, split: null },
+          {
+            id: "region-1",
+            kind: "calendar",
+            serviceId: null,
+            instanceIds: [],
+            size: 65,
+            split: null,
+          },
+          {
+            id: "region-2",
+            kind: "photos",
+            serviceId: null,
+            instanceIds: [],
+            size: 35,
+            split: null,
+          },
         ],
       });
     });
@@ -155,8 +169,22 @@ describe("Layout Utilities", () => {
       });
 
       expect(layout.regions).toEqual([
-        { id: "region-1", kind: "service", serviceId: "weather", size: 70, split: null },
-        { id: "region-2", kind: "service", serviceId: "meals", size: 30, split: null },
+        {
+          id: "region-1",
+          kind: "service",
+          serviceId: "weather",
+          instanceIds: ["weather"],
+          size: 70,
+          split: null,
+        },
+        {
+          id: "region-2",
+          kind: "service",
+          serviceId: "meals",
+          instanceIds: ["meals"],
+          size: 30,
+          split: null,
+        },
       ]);
     });
 
@@ -200,7 +228,14 @@ describe("Layout Utilities", () => {
       const layout = createDashboardLayoutFromPreset("single");
 
       expect(layout.regions).toEqual([
-        { id: "region-1", kind: "calendar", serviceId: null, size: 100, split: null },
+        {
+          id: "region-1",
+          kind: "calendar",
+          serviceId: null,
+          instanceIds: [],
+          size: 100,
+          split: null,
+        },
       ]);
       expect(getRegionAxisStyle(layout.regions[0], "landscape")).toEqual({
         width: "100%",
