@@ -1,9 +1,5 @@
 <template>
   <section v-if="data && !data.error" class="weather-forecast-renderer">
-    <header class="weather-forecast-renderer__header">
-      <h3>{{ title }}</h3>
-    </header>
-
     <div v-if="current" class="weather-forecast-renderer__current">
       <div class="weather-forecast-renderer__main">
         <svg class="weather-forecast-renderer__icon" viewBox="0 0 24 24" aria-hidden="true">
@@ -19,23 +15,35 @@
       </div>
 
       <div class="weather-forecast-renderer__details">
-        <div v-if="hasValue(feelsLike)" class="weather-forecast-renderer__detail">
+        <div
+          v-if="hasValue(feelsLike)"
+          class="weather-forecast-renderer__detail calvin-plugin-surface"
+        >
           <span class="weather-forecast-renderer__detail-label">Feels like</span>
           <span class="weather-forecast-renderer__detail-value">
             {{ round(feelsLike) }}{{ temperatureUnit }}
           </span>
         </div>
-        <div v-if="hasValue(humidity)" class="weather-forecast-renderer__detail">
+        <div
+          v-if="hasValue(humidity)"
+          class="weather-forecast-renderer__detail calvin-plugin-surface"
+        >
           <span class="weather-forecast-renderer__detail-label">Humidity</span>
           <span class="weather-forecast-renderer__detail-value">{{ round(humidity) }}%</span>
         </div>
-        <div v-if="hasValue(windSpeed)" class="weather-forecast-renderer__detail">
+        <div
+          v-if="hasValue(windSpeed)"
+          class="weather-forecast-renderer__detail calvin-plugin-surface"
+        >
           <span class="weather-forecast-renderer__detail-label">Wind</span>
           <span class="weather-forecast-renderer__detail-value">
             {{ round(windSpeed) }} {{ windUnit }}
           </span>
         </div>
-        <div v-if="hasValue(pressure)" class="weather-forecast-renderer__detail">
+        <div
+          v-if="hasValue(pressure)"
+          class="weather-forecast-renderer__detail calvin-plugin-surface"
+        >
           <span class="weather-forecast-renderer__detail-label">Pressure</span>
           <span class="weather-forecast-renderer__detail-value">{{ round(pressure) }} hPa</span>
         </div>
@@ -48,7 +56,7 @@
         <article
           v-for="(day, index) in forecast"
           :key="dateFor(day) || index"
-          class="weather-forecast-renderer__item"
+          class="weather-forecast-renderer__item calvin-plugin-surface"
         >
           <div class="weather-forecast-renderer__date">{{ formatForecastDate(dateFor(day)) }}</div>
           <svg class="weather-forecast-renderer__small-icon" viewBox="0 0 24 24" aria-hidden="true">
@@ -89,9 +97,6 @@ const currentSpec = computed(() => props.schema.current || {});
 const forecastSpec = computed(() => props.schema.forecast || {});
 const units = computed(() => props.schema.units || {});
 
-const title = computed(
-  () => pick(props.data, props.schema.title_path, props.schema.title) || "Weather"
-);
 const current = computed(() =>
   props.schema.current_path
     ? resolvePath(props.data, props.schema.current_path)
@@ -173,24 +178,11 @@ function capitalize(value) {
 .weather-forecast-renderer {
   width: 100%;
   height: 100%;
-  padding: 1.5rem;
   display: flex;
   flex-direction: column;
   gap: 1rem;
   overflow: hidden;
   box-sizing: border-box;
-}
-
-.weather-forecast-renderer__header {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-}
-
-.weather-forecast-renderer__header h3 {
-  margin: 0;
-  font-size: 1.5rem;
-  color: var(--text-primary);
 }
 
 .weather-forecast-renderer__current {
@@ -206,7 +198,7 @@ function capitalize(value) {
   gap: 0.75rem;
   padding: 1.5rem;
   background: var(--bg-secondary);
-  border-radius: 8px;
+  border-radius: 6px;
   flex-shrink: 0;
 }
 
@@ -251,9 +243,6 @@ function capitalize(value) {
   display: flex;
   flex-direction: column;
   gap: 0.25rem;
-  padding: 1rem;
-  background: var(--bg-secondary);
-  border-radius: 6px;
 }
 
 .weather-forecast-renderer__detail-label {
@@ -299,9 +288,6 @@ function capitalize(value) {
   flex-direction: column;
   align-items: center;
   gap: 0.5rem;
-  padding: 1rem;
-  background: var(--bg-secondary);
-  border-radius: 6px;
   text-align: center;
 }
 

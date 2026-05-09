@@ -8,7 +8,7 @@
     :data="data"
     :plugin-id="pluginId"
   />
-  <component v-else :is="renderer" :schema="schema" :data="data" />
+  <component v-else :is="renderer" class="schema-renderer__body" :schema="schema" :data="data" />
 </template>
 
 <script setup>
@@ -52,5 +52,9 @@ const renderer = computed(() => renderers[props.schema?.kind] || null);
   color: var(--text-secondary);
   font-size: 0.85em;
   font-style: italic;
+}
+
+.schema-renderer__body {
+  min-height: 0;
 }
 </style>
