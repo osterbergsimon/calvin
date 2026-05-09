@@ -1,5 +1,5 @@
 <template>
-  <div class="plugin-statusbar-items" :class="{ ghost }">
+  <div class="plugin-statusbar-items" :class="[`orientation-${orientation}`, { ghost }]">
     <SchemaStatusbarItem
       v-for="service in schemaServices"
       :key="service.id"
@@ -20,6 +20,11 @@ defineProps({
   ghost: {
     type: Boolean,
     default: false,
+  },
+  orientation: {
+    type: String,
+    default: "horizontal",
+    validator: value => ["horizontal", "vertical"].includes(value),
   },
 });
 
@@ -53,6 +58,11 @@ onMounted(() => {
 .plugin-statusbar-items {
   display: flex;
   align-items: center;
+}
+
+.plugin-statusbar-items.orientation-vertical {
+  flex-direction: column;
+  gap: 0.5rem;
 }
 
 .plugin-statusbar-items.ghost {

@@ -11,7 +11,7 @@
     <div class="clock-bar-outer">
       <div class="clock-bar-side clock-bar-left">
         <BarLogo v-if="showLogo" />
-        <PluginStatusbarItems />
+        <PluginStatusbarItems v-if="showStatusbar" />
         <span v-if="isBackgroundRefreshing" class="clock-refresh-icon" aria-hidden="true" />
       </div>
 
@@ -91,6 +91,7 @@ const props = defineProps({
 const {
   shouldShow,
   showDate,
+  showStatusbar,
   formattedTime,
   formattedDate,
   fontSize,

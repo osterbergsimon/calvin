@@ -43,6 +43,82 @@ display_schema={
 
 The plugin's service data endpoint returns the data object that schema paths bind to.
 
+### Shared Dashboard Shell
+
+Dashboard service renderers are wrapped in Calvin's shared region shell. The shell provides the
+outer header, body padding, clipping, and scroll boundary for split layouts. Schema renderers should
+render only their body content and should not draw an outer dashboard header.
+
+Optional `display_schema` shell fields:
+
+- `title_path`: JSONPath-lite path resolved against the service data. This title wins when present.
+- `title`: literal fallback title.
+- `panel_variant`: one of `default`, `dense`, `media`, or `iframe`.
+
+Title resolution order is:
+
+1. `display_schema.title_path`
+2. `display_schema.title`
+3. service/plugin name
+
+Use `default` for ordinary cards and lists, `dense` for compact status-heavy renderers, `media` for
+flush image/video surfaces, and `iframe` for full-bleed embedded pages. Missing fields continue to
+work and fall back to the service name.
+
+Example title and variant metadata:
+
+```python
+display_schema={
+    "kind": "weather-forecast",
+    "title_path": "$.location.name",
+    "panel_variant": "default",
+    "current_path": "$.current",
+    "forecast_path": "$.forecast",
+    # ...
+}
+```
+
+```python
+display_schema={
+    "kind": "iframe",
+    "title": "Home Assistant",
+    "panel_variant": "iframe",
+    "url": "https://homeassistant.local/lovelace/default_view",
+}
+```
+
+Plugin frontends and built-in renderers should use Calvin's public dashboard body classes:
+
+- `calvin-plugin-fill` for a component root that should fill the panel body.
+- `calvin-plugin-grid` for tile/card grids.
+- `calvin-plugin-grid--auto`, `calvin-plugin-grid--dense`, `calvin-plugin-grid--2`, and
+  `calvin-plugin-grid--3` for common grid layouts.
+- `calvin-plugin-list` and `calvin-plugin-list--scroll` for vertical lists.
+- `calvin-plugin-surface`, `calvin-plugin-row`, and `calvin-plugin-metric` for repeated surfaces.
+- `calvin-plugin-clickable` for clickable cards or rows.
+- `calvin-plugin-section` for lightweight body grouping without drawing a nested outer card.
+- `calvin-plugin-toolbar` for small action rows inside the plugin body.
+- `calvin-plugin-media` for image/video/canvas content inside `panel_variant: "media"`.
+- `calvin-plugin-empty`, `calvin-plugin-loading`, and `calvin-plugin-error` for fallback states.
+
+These classes use `var(--bg-secondary)`, `var(--border-color)`, radius `6px`, standard spacing, and
+region-safe `min-width`/`min-height` rules. The panel body owns the outer overflow boundary, so
+renderers should avoid adding another outer frame.
+
+Example web component body layout:
+
+```html
+<div class="calvin-plugin-fill calvin-plugin-section">
+  <div class="calvin-plugin-toolbar">
+    <button>Refresh</button>
+  </div>
+  <div class="calvin-plugin-grid calvin-plugin-grid--auto">
+    <article class="calvin-plugin-surface">...</article>
+    <article class="calvin-plugin-surface">...</article>
+  </div>
+</div>
+```
+
 ## Web Components
 
 Use `kind: "web-component"` only when the built-in schema renderers are not expressive enough.
@@ -79,6 +155,21 @@ At runtime, Calvin loads:
 
 The JavaScript module must register the custom element named by `display_schema.element`.
 Calvin assigns the latest service data to the element's `data` property.
+
+Web components are also wrapped by the shared region shell. Custom elements should fill the provided
+body area (`width: 100%; height: 100%`) and avoid rendering their own Calvin-style outer header.
+
+## Porting Existing Plugin Frontends
+
+When updating plugins for the shared shell:
+
+- Move dashboard titles into `display_schema.title_path` or `display_schema.title`.
+- Remove plugin-rendered outer headers that duplicate the Calvin region header.
+- Use `panel_variant: "iframe"` for iframe-like full-bleed services.
+- Use `panel_variant: "media"` only for image/video-heavy surfaces that should sit flush against the
+  panel body.
+- Ensure web components fill their host element instead of sizing themselves against the viewport.
+- Keep internal cards, lists, and metrics inside the provided body area.
 
 ## Installation Behavior
 

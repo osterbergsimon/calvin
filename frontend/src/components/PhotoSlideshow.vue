@@ -1,50 +1,52 @@
 <template>
   <div class="photo-slideshow" :class="{ fullscreen: isFullscreen }">
-    <div v-if="!isFullscreen && showHeader" class="slideshow-header">
-      <h2>Photos</h2>
-      <div class="slideshow-controls">
-        <div v-if="imagesStore.error" class="error-message">
-          {{ imagesStore.error }}
+    <DashboardPanel title="Photos" variant="media" :header-visible="!isFullscreen">
+      <template #actions>
+        <div class="slideshow-controls">
+          <div v-if="imagesStore.error" class="error-message">
+            {{ imagesStore.error }}
+          </div>
+          <button
+            v-if="imagesStore.images.length > 1"
+            class="dashboard-panel__icon-button"
+            title="Previous image"
+            @click="imagesStore.previousImage"
+          >
+            ‹
+          </button>
+          <button
+            v-if="imagesStore.images.length > 1"
+            class="dashboard-panel__icon-button"
+            title="Next image"
+            @click="imagesStore.nextImage"
+          >
+            ›
+          </button>
         </div>
-        <button
-          v-if="imagesStore.images.length > 1"
-          class="btn-icon"
-          title="Previous image"
-          @click="imagesStore.previousImage"
-        >
-          ‹
-        </button>
-        <button
-          v-if="imagesStore.images.length > 1"
-          class="btn-icon"
-          title="Next image"
-          @click="imagesStore.nextImage"
-        >
-          ›
-        </button>
+      </template>
+
+      <div class="slideshow-content">
+        <div v-if="imagesStore.loading" class="loading">
+          <p>Loading images...</p>
+        </div>
+        <div v-else-if="!currentImageUrl" class="photo-placeholder">
+          <p>No images available</p>
+          <p class="photo-info">Add images to <code>data/images</code> directory</p>
+        </div>
+        <div v-else class="photo-container">
+          <img
+            :src="currentImageUrl"
+            :alt="imagesStore.currentImage?.filename || 'Photo'"
+            :class="['photo-image', `photo-image-${displayMode}`]"
+            :style="imageStyle"
+            decoding="async"
+            loading="eager"
+            @load="onImageLoad"
+            @error="onImageError"
+          />
+        </div>
       </div>
-    </div>
-    <div class="slideshow-content">
-      <div v-if="imagesStore.loading" class="loading">
-        <p>Loading images...</p>
-      </div>
-      <div v-else-if="!currentImageUrl" class="photo-placeholder">
-        <p>No images available</p>
-        <p class="photo-info">Add images to <code>data/images</code> directory</p>
-      </div>
-      <div v-else class="photo-container">
-        <img
-          :src="currentImageUrl"
-          :alt="imagesStore.currentImage?.filename || 'Photo'"
-          :class="['photo-image', `photo-image-${displayMode}`]"
-          :style="imageStyle"
-          decoding="async"
-          loading="eager"
-          @load="onImageLoad"
-          @error="onImageError"
-        />
-      </div>
-    </div>
+    </DashboardPanel>
   </div>
 </template>
 
@@ -52,9 +54,9 @@
 import { computed, onMounted, onUnmounted, watch } from "vue";
 import { useImagesStore } from "../stores/images";
 import { useConfigStore } from "../stores/config";
+import DashboardPanel from "./DashboardPanel.vue";
 
 const configStore = useConfigStore();
-const showHeader = computed(() => configStore.shouldShowUI);
 
 const props = defineProps({
   isFullscreen: {
@@ -212,55 +214,10 @@ watch(
   border-radius: 0;
 }
 
-.slideshow-header {
-  padding: 1.4rem;
-  background: var(--bg-secondary);
-  border-bottom: 1px solid var(--border-color);
-  display: flex;
-  justify-content: space-between;
-  align-items: center;
-  flex-shrink: 0;
-}
-
 .slideshow-controls {
   display: flex;
   align-items: center;
-  gap: 1rem;
-}
-
-.slideshow-header h2 {
-  margin: 0;
-  font-size: 1.5rem;
-  color: var(--text-primary);
-}
-
-.btn-icon {
-  background: var(--bg-primary);
-  border: 1px solid var(--border-color);
-  border-radius: 4px;
-  width: 32px;
-  height: 32px;
-  font-size: 1.5rem;
-  cursor: pointer;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  color: var(--text-primary);
-  transition: all 0.2s;
-}
-
-.btn-icon:hover {
-  background: var(--bg-secondary);
-  border-color: var(--text-secondary);
-}
-
-.btn-icon:active {
-  background: var(--bg-tertiary);
-}
-
-.btn-icon:focus {
-  outline: 2px solid var(--accent-primary);
-  outline-offset: 2px;
+  gap: 0.5rem;
 }
 
 .error-message {

@@ -11,81 +11,59 @@
       </button>
     </div>
 
-    <!-- Header (hidden in fullscreen mode) -->
-    <div v-if="showHeader && !isFullscreen" class="viewer-header">
-      <div class="header-left">
-        <h2>{{ currentService?.name || "Web Services" }}</h2>
-        <div v-if="canNavigateServices && services.length > 1" class="service-indicator">
-          Service {{ currentServiceIndex + 1 }} of {{ services.length }}
-        </div>
-      </div>
-      <div class="header-right">
-        <button
-          v-if="canNavigateServices && services.length > 1"
-          class="btn-nav"
-          title="Previous Service"
-          @click="previousService"
-        >
-          ‹
-        </button>
-        <button
-          v-if="canNavigateServices && services.length > 1"
-          class="btn-nav"
-          title="Next Service"
-          @click="nextService"
-        >
-          ›
-        </button>
-        <button
-          class="btn-fullscreen"
-          :title="isFullscreen ? 'Exit Fullscreen' : 'Enter Fullscreen'"
-          @click.stop="handleToggleFullscreen"
-        >
-          {{ isFullscreen ? "⤓" : "⤢" }}
-        </button>
-        <button class="btn-close" title="Close" @click.stop="handleClose">×</button>
-      </div>
-    </div>
-
-    <!-- Service Selection (if multiple services) -->
-    <div
-      v-if="showHeader && !isFullscreen && canNavigateServices && services.length > 1"
-      class="service-selector"
-    >
-      <button
-        v-for="(service, index) in services"
-        :key="service.id"
-        class="service-btn"
-        :class="{ active: index === currentServiceIndex }"
-        @click="setServiceIndex(index)"
-      >
-        {{ service.name }}
-      </button>
-    </div>
-
     <!-- Viewer Content -->
     <div class="viewer-content">
-      <!-- Loading State -->
-      <div v-if="loading" class="loading-state">
-        <div class="spinner" />
-        <p>Loading service...</p>
-      </div>
-
-      <!-- No Services -->
-      <div v-else-if="services.length === 0" class="no-services">
-        <p>No web services configured</p>
-        <p class="help-text">Add web services in Settings</p>
-      </div>
-
-      <!-- Explicit service missing or disabled -->
-      <div v-else-if="serviceUnavailable" class="no-services">
-        <p>Selected service is unavailable</p>
-        <p class="help-text">Choose another service in Settings</p>
-      </div>
+      <DashboardPanel v-if="emptyState" title="Web Services" :header-visible="!isFullscreen">
+        <div :class="emptyState.className">
+          <div v-if="emptyState.loading" class="spinner" />
+          <p>{{ emptyState.message }}</p>
+          <p v-if="emptyState.helpText" class="help-text">{{ emptyState.helpText }}</p>
+        </div>
+      </DashboardPanel>
 
       <!-- Service Content (uses ServiceViewer for routing) -->
       <div v-else-if="currentService" class="service-container">
-        <ServiceViewer :key="currentService.id" :service="currentService" />
+        <ServiceViewer
+          :key="currentService.id"
+          :service="currentService"
+          :subtitle="serviceSubtitle"
+          :header-visible="!isFullscreen"
+        >
+          <template #actions>
+            <button
+              v-if="canNavigateServices && services.length > 1"
+              class="dashboard-panel__icon-button"
+              title="Previous Service"
+              @click="previousService"
+            >
+              ‹
+            </button>
+            <button
+              v-if="canNavigateServices && services.length > 1"
+              class="dashboard-panel__icon-button"
+              title="Next Service"
+              @click="nextService"
+            >
+              ›
+            </button>
+            <button
+              v-if="!isFullscreen"
+              class="dashboard-panel__icon-button"
+              title="Enter Fullscreen"
+              @click.stop="handleToggleFullscreen"
+            >
+              ⤢
+            </button>
+            <button
+              v-if="!isFullscreen"
+              class="dashboard-panel__icon-button"
+              title="Close"
+              @click.stop="handleClose"
+            >
+              ×
+            </button>
+          </template>
+        </ServiceViewer>
       </div>
     </div>
   </div>
@@ -93,9 +71,9 @@
 
 <script setup>
 import { computed, onMounted, onUnmounted } from "vue";
-import { useConfigStore } from "../stores/config";
 import { useWebServicesStore } from "../stores/webServices";
 import { useModeStore } from "../stores/mode";
+import DashboardPanel from "./DashboardPanel.vue";
 import ServiceViewer from "./service/ServiceViewer.vue";
 
 const props = defineProps({
@@ -109,11 +87,9 @@ const props = defineProps({
   },
 });
 
-const configStore = useConfigStore();
 const webServicesStore = useWebServicesStore();
 const modeStore = useModeStore();
 
-const showHeader = computed(() => configStore.shouldShowUI);
 const services = computed(() => webServicesStore.services);
 const currentServiceIndex = computed(() => webServicesStore.currentServiceIndex);
 const canNavigateServices = computed(() => !props.serviceId);
@@ -131,6 +107,31 @@ const serviceUnavailable = computed(
     (Boolean(props.serviceId) || !props.isFullscreen) &&
     !currentService.value
 );
+const serviceSubtitle = computed(() =>
+  canNavigateServices.value && services.value.length > 1
+    ? `Service ${currentServiceIndex.value + 1} of ${services.value.length}`
+    : ""
+);
+const emptyState = computed(() => {
+  if (loading.value) {
+    return { className: "loading-state", loading: true, message: "Loading service..." };
+  }
+  if (services.value.length === 0) {
+    return {
+      className: "no-services",
+      message: "No web services configured",
+      helpText: "Add web services in Settings",
+    };
+  }
+  if (serviceUnavailable.value) {
+    return {
+      className: "no-services",
+      message: "Selected service is unavailable",
+      helpText: "Choose another service in Settings",
+    };
+  }
+  return null;
+});
 
 // ServiceViewer now handles all service rendering logic
 
@@ -204,11 +205,6 @@ const previousService = () => {
   webServicesStore.previousService();
 };
 
-const setServiceIndex = index => {
-  if (props.serviceId) return;
-  webServicesStore.setServiceIndex(index);
-};
-
 // ServiceViewer handles all service rendering logic
 
 // Handle Escape key to close fullscreen
@@ -251,98 +247,6 @@ onUnmounted(() => {
   right: 0;
   bottom: 0;
   z-index: 1000;
-}
-
-.viewer-header {
-  padding: 1rem;
-  background: var(--bg-secondary);
-  border-bottom: 1px solid var(--border-color);
-  display: flex;
-  justify-content: space-between;
-  align-items: center;
-  flex-shrink: 0;
-}
-
-.header-left {
-  display: flex;
-  align-items: center;
-  gap: 1rem;
-}
-
-.viewer-header h2 {
-  margin: 0;
-  font-size: 1.5rem;
-  color: var(--text-primary);
-}
-
-.service-indicator {
-  font-size: 0.9rem;
-  color: var(--text-secondary);
-  padding: 0.25rem 0.75rem;
-  background: var(--bg-tertiary);
-  border-radius: 12px;
-}
-
-.header-right {
-  display: flex;
-  align-items: center;
-  gap: 0.5rem;
-}
-
-.btn-nav,
-.btn-fullscreen,
-.btn-close {
-  background: var(--bg-primary);
-  border: 1px solid var(--border-color);
-  border-radius: 4px;
-  width: 32px;
-  height: 32px;
-  font-size: 1.2rem;
-  cursor: pointer;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  color: var(--text-primary);
-  transition: all 0.2s;
-}
-
-.btn-nav:hover,
-.btn-fullscreen:hover,
-.btn-close:hover {
-  background: var(--bg-secondary);
-  border-color: var(--text-secondary);
-}
-
-.service-selector {
-  padding: 0.75rem 1rem;
-  background: var(--bg-tertiary);
-  border-bottom: 1px solid var(--border-color);
-  display: flex;
-  gap: 0.5rem;
-  flex-wrap: wrap;
-  flex-shrink: 0;
-}
-
-.service-btn {
-  padding: 0.5rem 1rem;
-  background: var(--bg-primary);
-  border: 1px solid var(--border-color);
-  border-radius: 4px;
-  font-size: 0.9rem;
-  cursor: pointer;
-  transition: all 0.2s;
-  color: var(--text-primary);
-}
-
-.service-btn:hover {
-  background: var(--bg-secondary);
-  border-color: var(--text-secondary);
-}
-
-.service-btn.active {
-  background: var(--accent-primary);
-  color: #fff; /* Keep white for contrast on accent background */
-  border-color: var(--accent-primary);
 }
 
 .viewer-content {

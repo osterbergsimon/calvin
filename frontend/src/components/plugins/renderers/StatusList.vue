@@ -1,6 +1,6 @@
 <template>
-  <ul class="status-list">
-    <li v-for="(item, idx) in items" :key="idx" class="status-list__row">
+  <ul class="status-list calvin-plugin-list">
+    <li v-for="(item, idx) in items" :key="idx" class="status-list__row calvin-plugin-row">
       <StatusTile :schema="itemSchemaFor(item)" :data="item" />
     </li>
   </ul>
@@ -39,9 +39,5 @@ function itemSchemaFor() {
 }
 
 .status-list__row {
-  padding: 0.5rem 0.75rem;
-  background: var(--bg-secondary);
-  border: 1px solid var(--border-color);
-  border-radius: 6px;
 }
 </style>

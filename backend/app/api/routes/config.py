@@ -455,6 +455,10 @@ async def get_config():
         config["clockBarShowWeather"] = False
     elif "clock_bar_show_weather" in config and "clockBarShowWeather" not in config:
         config["clockBarShowWeather"] = config["clock_bar_show_weather"]
+    if "clockBarShowLogo" not in config and "clock_bar_show_logo" not in config:
+        config["clockBarShowLogo"] = True
+    elif "clock_bar_show_logo" in config and "clockBarShowLogo" not in config:
+        config["clockBarShowLogo"] = config["clock_bar_show_logo"]
     if "mealPlanCardSize" not in config and "meal_plan_card_size" not in config:
         config["mealPlanCardSize"] = "medium"  # Default size
     elif "meal_plan_card_size" in config and "mealPlanCardSize" not in config:

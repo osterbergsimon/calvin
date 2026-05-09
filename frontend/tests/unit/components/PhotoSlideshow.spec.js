@@ -111,7 +111,7 @@ describe("PhotoSlideshow", () => {
       configStore.showUI = true;
       const wrapper = createWrapper({ isFullscreen: false });
 
-      expect(wrapper.find(".slideshow-header").exists()).toBe(true);
+      expect(wrapper.find(".dashboard-panel__header").exists()).toBe(true);
       expect(wrapper.find("h2").text()).toBe("Photos");
     });
 
@@ -119,14 +119,14 @@ describe("PhotoSlideshow", () => {
       configStore.showUI = true;
       const wrapper = createWrapper({ isFullscreen: true });
 
-      expect(wrapper.find(".slideshow-header").exists()).toBe(false);
+      expect(wrapper.find(".dashboard-panel__header").exists()).toBe(false);
     });
 
     it("should hide header when UI is hidden", () => {
       configStore.showUI = false;
       const wrapper = createWrapper({ isFullscreen: false });
 
-      expect(wrapper.find(".slideshow-header").exists()).toBe(false);
+      expect(wrapper.find(".dashboard-panel__header").exists()).toBe(false);
     });
   });
 

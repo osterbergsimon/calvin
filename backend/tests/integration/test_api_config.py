@@ -71,6 +71,7 @@ def test_get_config_returns_all_frontend_tracked_fields(test_client: TestClient)
         "clockBarLayout",
         "clockBarPadding",
         "clockBarShowWeather",
+        "clockBarShowLogo",
         "mealPlanCardSize",
         "consoleLogEnabled",
         "consoleLogLevel",

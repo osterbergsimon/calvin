@@ -1,8 +1,8 @@
 <template>
   <svg
     class="bar-logo"
-    :width="size"
-    :height="size"
+    width="20"
+    height="20"
     viewBox="0 0 24 24"
     fill="none"
     stroke="currentColor"
@@ -11,19 +11,12 @@
     aria-hidden="true"
     focusable="false"
   >
-    <path d="M18 6.5 A8 8 0 1 0 18 17.5" />
+    <path d="M17 6 A8 8 0 1 0 17 18" />
   </svg>
 </template>
 
 <script setup>
 defineOptions({ name: "BarLogo" });
-
-defineProps({
-  size: {
-    type: Number,
-    default: 20,
-  },
-});
 </script>
 
 <style scoped>

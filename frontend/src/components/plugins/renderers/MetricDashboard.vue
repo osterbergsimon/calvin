@@ -1,9 +1,9 @@
 <template>
-  <div class="metric-dashboard" :style="gridStyle">
+  <div class="metric-dashboard calvin-plugin-grid" :style="gridStyle">
     <div
       v-for="(metric, i) in metrics"
       :key="i"
-      class="metric-dashboard__tile"
+      class="metric-dashboard__tile calvin-plugin-metric"
       :class="statusClass(metric)"
     >
       <span v-if="iconFor(metric)" class="metric-dashboard__icon">{{ iconFor(metric) }}</span>
@@ -68,21 +68,12 @@ function statusClass(metric) {
 
 <style scoped>
 .metric-dashboard {
-  display: grid;
-  gap: 1rem;
-  width: 100%;
-  height: 100%;
-  align-content: start;
 }
 
 .metric-dashboard__tile {
   display: flex;
   flex-direction: column;
   gap: 0.4rem;
-  padding: 1.25rem;
-  background: var(--bg-secondary);
-  border: 1px solid var(--border-color);
-  border-radius: 12px;
   align-items: flex-start;
   justify-content: center;
 }

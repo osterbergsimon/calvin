@@ -1,126 +1,110 @@
 <template>
   <div ref="calendarView" class="calendar-view" tabindex="0" @keydown="handleKeydown">
-    <div v-if="showHeader" class="calendar-header">
-      <h2>Calendar</h2>
-      <div class="calendar-controls">
-        <button class="btn-icon" @click="previousMonth" @keydown.enter="previousMonth">‹</button>
-        <div class="calendar-title-group">
-          <span class="current-month">{{ currentMonthYear }}</span>
-          <span class="view-mode-indicator">{{ viewModeLabel }}</span>
-        </div>
-        <button class="btn-icon" @click="nextMonth" @keydown.enter="nextMonth">›</button>
-      </div>
-    </div>
-    <div v-else class="calendar-header-minimal">
-      <button
-        class="btn-icon-minimal"
-        title="Previous Month"
-        @click="previousMonth"
-        @keydown.enter="previousMonth"
-      >
-        ‹
-      </button>
-      <div class="calendar-title-group-minimal">
-        <span class="current-month-minimal">
-          {{ currentMonthYear }}
-        </span>
-        <span class="view-mode-indicator-minimal">
-          {{ viewModeLabel }}
-        </span>
-      </div>
-      <button
-        class="btn-icon-minimal"
-        title="Next Month"
-        @click="nextMonth"
-        @keydown.enter="nextMonth"
-      >
-        ›
-      </button>
-    </div>
-    <div class="calendar-content">
-      <!-- Loading indicator -->
-      <div v-if="loading" class="loading-overlay">
-        <div class="loading-spinner">
-          <div class="spinner" />
-          <div class="loading-text">Loading events...</div>
-        </div>
-      </div>
-      <div
-        class="calendar-grid"
-        :class="{
-          'rolling-view': viewMode === 'rolling',
-          'week-view': viewMode === 'week',
-          'day-view': viewMode === 'day',
-          loading: loading,
-        }"
-      >
-        <!-- Day headers -->
-        <div class="calendar-weekdays">
-          <div
-            v-for="day in viewMode === 'day' ? [getCurrentWeekdayName()] : weekDays"
-            :key="day"
-            class="weekday"
-          >
-            {{ day }}
+    <DashboardPanel title="Calendar" :subtitle="calendarSubtitle">
+      <template #actions>
+        <button
+          class="dashboard-panel__icon-button"
+          title="Previous"
+          @click="previousMonth"
+          @keydown.enter="previousMonth"
+        >
+          ‹
+        </button>
+        <button
+          class="dashboard-panel__icon-button"
+          title="Next"
+          @click="nextMonth"
+          @keydown.enter="nextMonth"
+        >
+          ›
+        </button>
+      </template>
+
+      <div class="calendar-content">
+        <!-- Loading indicator -->
+        <div v-if="loading" class="loading-overlay">
+          <div class="loading-spinner">
+            <div class="spinner" />
+            <div class="loading-text">Loading events...</div>
           </div>
         </div>
-        <!-- Calendar days -->
         <div
-          class="calendar-days"
+          class="calendar-grid"
           :class="{
-            'rolling-days': viewMode === 'rolling',
+            'rolling-view': viewMode === 'rolling',
+            'week-view': viewMode === 'week',
+            'day-view': viewMode === 'day',
+            loading: loading,
           }"
         >
-          <div
-            v-for="(day, dayIndex) in calendarDays"
-            :key="day.date.toISOString()"
-            :class="[
-              'calendar-day',
-              {
-                'other-month': day.otherMonth,
-                today: day.isToday,
-                'week-start': isWeekStart(dayIndex),
-                weekend: isWeekend(day.date),
-                'red-day': showRedDays && isRedDay(day.date),
-              },
-            ]"
-          >
-            <div class="day-header">
-              <div class="day-number">
-                {{ day.date.getDate() }}
-              </div>
-              <div v-if="showWeekNumbers && isWeekStart(dayIndex)" class="week-number">
-                {{ getWeekNumberForDay(dayIndex) }}
-              </div>
+          <!-- Day headers -->
+          <div class="calendar-weekdays">
+            <div
+              v-for="day in viewMode === 'day' ? [getCurrentWeekdayName()] : weekDays"
+              :key="day"
+              class="weekday"
+            >
+              {{ day }}
             </div>
-            <div class="day-events">
-              <!-- Visible events for this day (limited) -->
-              <CalendarEventItem
-                v-for="(event, eventIndex) in getVisibleEvents(day.events)"
-                :key="`${event.id}-${day.date.toISOString()}-${eventIndex}`"
-                :ref="el => setEventRef(el, dayIndex, eventIndex)"
-                :event="event"
-                :day-index="dayIndex"
-                :event-index="eventIndex"
-                :day-date="day.date"
-                :is-focused="isFocused(dayIndex, eventIndex)"
-                :is-selected="isEventSelected(event, day.date)"
-                @click="selectEvent"
-                @focus="setFocusedEvent"
-              />
-              <!-- Overflow indicator -->
-              <div
-                v-if="getOverflowCount(day.events) > 0"
-                class="event-overflow-indicator"
-                :title="`${getOverflowCount(day.events)} more event${getOverflowCount(day.events) > 1 ? 's' : ''}`"
-              >
-                +{{ getOverflowCount(day.events) }} more
+          </div>
+          <!-- Calendar days -->
+          <div
+            class="calendar-days"
+            :class="{
+              'rolling-days': viewMode === 'rolling',
+            }"
+          >
+            <div
+              v-for="(day, dayIndex) in calendarDays"
+              :key="day.date.toISOString()"
+              :class="[
+                'calendar-day',
+                {
+                  'other-month': day.otherMonth,
+                  today: day.isToday,
+                  'week-start': isWeekStart(dayIndex),
+                  weekend: isWeekend(day.date),
+                  'red-day': showRedDays && isRedDay(day.date),
+                },
+              ]"
+            >
+              <div class="day-header">
+                <div class="day-number">
+                  {{ day.date.getDate() }}
+                </div>
+                <div v-if="showWeekNumbers && isWeekStart(dayIndex)" class="week-number">
+                  {{ getWeekNumberForDay(dayIndex) }}
+                </div>
+              </div>
+              <div class="day-events">
+                <!-- Visible events for this day (limited) -->
+                <CalendarEventItem
+                  v-for="(event, eventIndex) in getVisibleEvents(day.events)"
+                  :key="`${event.id}-${day.date.toISOString()}-${eventIndex}`"
+                  :ref="el => setEventRef(el, dayIndex, eventIndex)"
+                  :event="event"
+                  :day-index="dayIndex"
+                  :event-index="eventIndex"
+                  :day-date="day.date"
+                  :is-focused="isFocused(dayIndex, eventIndex)"
+                  :is-selected="isEventSelected(event, day.date)"
+                  @click="selectEvent"
+                  @focus="setFocusedEvent"
+                />
+                <!-- Overflow indicator -->
+                <div
+                  v-if="getOverflowCount(day.events) > 0"
+                  class="event-overflow-indicator"
+                  :title="`${getOverflowCount(day.events)} more event${getOverflowCount(day.events) > 1 ? 's' : ''}`"
+                >
+                  +{{ getOverflowCount(day.events) }} more
+                </div>
               </div>
             </div>
           </div>
         </div>
       </div>
-    </div>
+    </DashboardPanel>
     <!-- Event Detail Panel -->
     <EventDetailPanel
       v-if="calendarStore.selectedEvent"
@@ -143,9 +127,9 @@ import { useCalendarStore } from "../stores/calendar";
 import { useConfigStore } from "../stores/config";
 import EventDetailPanel from "./EventDetailPanel.vue";
 import CalendarEventItem from "./CalendarEventItem.vue";
+import DashboardPanel from "./DashboardPanel.vue";
 
 const configStore = useConfigStore();
-const showHeader = computed(() => configStore.shouldShowUI);
 const viewMode = computed(() => configStore.calendarViewMode);
 const showWeekNumbers = computed(() => configStore.showWeekNumbers);
 const weekStartDay = computed(() => configStore.weekStartDay ?? 1);
@@ -161,6 +145,8 @@ const viewModeLabel = computed(() => {
   };
   return labels[viewMode.value] || "Month";
 });
+
+const calendarSubtitle = computed(() => `${currentMonthYear.value} - ${viewModeLabel.value}`);
 
 const calendarStore = useCalendarStore();
 const route = useRoute();
@@ -989,145 +975,8 @@ onActivated(() => {
   outline: none;
 }
 
-.calendar-header {
-  padding: 1rem;
-  background: var(--bg-secondary);
-  border-bottom: 1px solid var(--border-color);
-  display: flex;
-  justify-content: space-between;
-  align-items: center;
-  flex-shrink: 0;
-}
-
-.calendar-header-minimal {
-  padding: 0.5rem;
-  background: rgba(0, 0, 0, 0.05);
-  border-bottom: 1px solid rgba(0, 0, 0, 0.1);
-  display: flex;
-  justify-content: center;
-  align-items: center;
-  gap: 1rem;
-  flex-shrink: 0;
-  opacity: 0.7;
-  transition: opacity 0.2s;
-}
-
-.calendar-header-minimal:hover {
-  opacity: 1;
-}
-
-.btn-icon-minimal {
-  background: transparent;
-  border: none;
-  border-radius: 4px;
-  width: 28px;
-  height: 28px;
-  font-size: 1.2rem;
-  cursor: pointer;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  color: var(--text-primary);
-  transition: all 0.2s;
-}
-
-.btn-icon-minimal:hover {
-  background: rgba(0, 0, 0, 0.1);
-}
-
-.current-month-minimal {
-  font-size: 0.9rem;
-  font-weight: 500;
-  color: var(--text-primary);
-  min-width: 120px;
-  text-align: center;
-}
-
-.calendar-header h2 {
-  margin: 0;
-  font-size: 1.5rem;
-  color: var(--text-primary);
-}
-
-.calendar-controls {
-  display: flex;
-  align-items: center;
-  gap: 1rem;
-}
-
-.calendar-title-group {
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  gap: 0.25rem;
-  min-width: 150px;
-}
-
-.current-month {
-  font-size: 1.1rem;
-  font-weight: 500;
-  color: var(--text-primary);
-  text-align: center;
-}
-
-.view-mode-indicator {
-  font-size: 0.75rem;
-  font-weight: 600;
-  color: var(--accent-primary);
-  text-transform: uppercase;
-  letter-spacing: 0.5px;
-  opacity: 0.8;
-}
-
-.calendar-title-group-minimal {
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  gap: 0.125rem;
-  min-width: 120px;
-}
-
-.view-mode-indicator-minimal {
-  font-size: 0.65rem;
-  font-weight: 600;
-  color: var(--accent-primary);
-  text-transform: uppercase;
-  letter-spacing: 0.5px;
-  opacity: 0.7;
-}
-
-.btn-icon {
-  background: var(--bg-primary);
-  border: 1px solid var(--border-color);
-  border-radius: 4px;
-  width: 32px;
-  height: 32px;
-  font-size: 1.5rem;
-  cursor: pointer;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  color: var(--text-primary);
-  transition: all 0.2s;
-}
-
-.btn-icon:hover {
-  background: var(--bg-secondary);
-  border-color: var(--text-secondary);
-}
-
-.btn-icon:active {
-  background: var(--bg-tertiary);
-}
-
-.btn-icon:focus {
-  outline: 2px solid var(--accent-primary);
-  outline-offset: 2px;
-}
-
 .calendar-content {
   flex: 1;
-  padding: 1rem;
   overflow: hidden;
   display: flex;
   flex-direction: column;
@@ -1138,10 +987,6 @@ onActivated(() => {
   box-sizing: border-box;
   /* Force hardware acceleration for consistent rendering on RPI */
   transform: translateZ(0);
-}
-
-.calendar-view:has(.calendar-header-minimal) .calendar-content {
-  padding: 0.5rem;
 }
 
 .loading-overlay {
@@ -1443,13 +1288,6 @@ onActivated(() => {
 /* Responsive styles for smaller screens and portrait mode */
 /* Use viewport units and scale everything proportionally */
 @media (max-width: 768px), (orientation: portrait) {
-  .calendar-content {
-    padding: clamp(0.25rem, 1vw, 0.75rem);
-    width: 100%;
-    max-width: 100%;
-    box-sizing: border-box;
-  }
-
   .calendar-grid {
     padding: clamp(0.25rem, 1vw, 0.75rem);
     width: 100%;
@@ -1488,22 +1326,6 @@ onActivated(() => {
     font-size: clamp(0.7rem, 2vw, 0.9rem);
   }
 
-  .calendar-header {
-    padding: clamp(0.5rem, 1.5vw, 1rem);
-  }
-
-  .calendar-header h2 {
-    font-size: clamp(1rem, 3vw, 1.5rem);
-  }
-
-  .current-month {
-    font-size: clamp(0.85rem, 2.5vw, 1.1rem);
-  }
-
-  .view-mode-indicator {
-    font-size: clamp(0.6rem, 1.5vw, 0.75rem);
-  }
-
   .day-header {
     margin-bottom: clamp(0.1rem, 0.5vw, 0.25rem);
   }
@@ -1516,13 +1338,6 @@ onActivated(() => {
 
 /* Extra small screens - more aggressive scaling */
 @media (max-width: 480px) {
-  .calendar-content {
-    padding: clamp(0.15rem, 1vw, 0.5rem);
-    width: 100%;
-    max-width: 100%;
-    box-sizing: border-box;
-  }
-
   .calendar-grid {
     padding: clamp(0.15rem, 1vw, 0.5rem);
     width: 100%;
@@ -1563,13 +1378,6 @@ onActivated(() => {
 
 /* Portrait mode with limited height - ensure everything fits */
 @media (orientation: portrait) and (max-height: 800px) {
-  .calendar-content {
-    padding: clamp(0.15rem, 1vh, 0.5rem);
-    width: 100%;
-    max-width: 100%;
-    box-sizing: border-box;
-  }
-
   .calendar-grid {
     padding: clamp(0.15rem, 1vh, 0.5rem);
     width: 100%;
@@ -1611,13 +1419,6 @@ onActivated(() => {
 
 /* Very small portrait screens - maximum compression */
 @media (orientation: portrait) and (max-height: 600px) {
-  .calendar-content {
-    padding: 0.15rem;
-    width: 100%;
-    max-width: 100%;
-    box-sizing: border-box;
-  }
-
   .calendar-grid {
     padding: 0.15rem;
     width: 100%;
