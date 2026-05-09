@@ -51,8 +51,8 @@ describe("dashboard display settings tabs", () => {
     const emitted = wrapper.emitted("update:config").at(-1)[0];
     const screen = emitted.dashboardScreens.screens[0];
     expect(screen.layout.regions).toEqual([
-      { id: "region-1", kind: "calendar", serviceId: null, size: 90, split: null },
-      { id: "region-2", kind: "photos", serviceId: null, size: 10, split: null },
+      { id: "region-1", kind: "calendar", serviceId: null, instanceIds: [], size: 90, split: null },
+      { id: "region-2", kind: "photos", serviceId: null, instanceIds: [], size: 10, split: null },
     ]);
   });
 
@@ -66,7 +66,14 @@ describe("dashboard display settings tabs", () => {
     const emitted = wrapper.emitted("update:config").at(-1)[0];
     const screen = emitted.dashboardScreens.screens[0];
     expect(screen.layout.regions).toEqual([
-      { id: "region-1", kind: "calendar", serviceId: null, size: 100, split: null },
+      {
+        id: "region-1",
+        kind: "calendar",
+        serviceId: null,
+        instanceIds: [],
+        size: 100,
+        split: null,
+      },
     ]);
   });
 

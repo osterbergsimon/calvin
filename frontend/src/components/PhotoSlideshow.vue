@@ -7,18 +7,18 @@
             {{ imagesStore.error }}
           </div>
           <button
-            v-if="imagesStore.images.length > 1"
+            v-if="sourceImages.length > 1"
             class="dashboard-panel__icon-button"
             title="Previous image"
-            @click="imagesStore.previousImage"
+            @click="imagesStore.previousImage(sourceIds)"
           >
             ‹
           </button>
           <button
-            v-if="imagesStore.images.length > 1"
+            v-if="sourceImages.length > 1"
             class="dashboard-panel__icon-button"
             title="Next image"
-            @click="imagesStore.nextImage"
+            @click="imagesStore.nextImage(sourceIds)"
           >
             ›
           </button>
@@ -36,7 +36,7 @@
         <div v-else class="photo-container">
           <img
             :src="currentImageUrl"
-            :alt="imagesStore.currentImage?.filename || 'Photo'"
+            :alt="currentImage?.filename || 'Photo'"
             :class="['photo-image', `photo-image-${displayMode}`]"
             :style="imageStyle"
             decoding="async"
@@ -71,11 +71,26 @@ const props = defineProps({
     type: Number,
     default: 30000, // 30 seconds
   },
+  sourceIds: {
+    type: Array,
+    default: () => [],
+  },
 });
 
 const imagesStore = useImagesStore();
 
-const currentImageUrl = computed(() => imagesStore.getCurrentImageUrl);
+const sourceKey = computed(() =>
+  [
+    ...new Set(
+      props.sourceIds.filter(id => typeof id === "string" && id.trim()).map(id => id.trim())
+    ),
+  ]
+    .sort()
+    .join(",")
+);
+const currentImage = computed(() => imagesStore.getCurrentImageForSource(props.sourceIds));
+const sourceImages = computed(() => imagesStore.getImagesForSource(props.sourceIds));
+const currentImageUrl = computed(() => imagesStore.getCurrentImageUrlForSource(props.sourceIds));
 
 // Get display mode from config
 const displayMode = computed(() => {
@@ -85,7 +100,7 @@ const displayMode = computed(() => {
 // Calculate smart display mode based on image and container dimensions
 const imageStyle = computed(() => {
   const mode = displayMode.value;
-  const image = imagesStore.currentImage;
+  const image = currentImage.value;
 
   if (!image || mode !== "smart") {
     return {};
@@ -142,9 +157,9 @@ const onImageError = () => {
 };
 
 const startAutoRotation = () => {
-  if (props.autoRotate && imagesStore.images.length > 1) {
+  if (props.autoRotate && sourceImages.value.length > 1) {
     rotationTimer = setInterval(() => {
-      imagesStore.nextImage();
+      imagesStore.nextImage(props.sourceIds);
     }, props.rotationInterval);
   }
 };
@@ -159,9 +174,9 @@ const stopAutoRotation = () => {
 onMounted(async () => {
   // Fetch images and current image
   try {
-    await imagesStore.fetchImages();
-    if (imagesStore.images.length > 0 && !imagesStore.currentImage) {
-      await imagesStore.fetchCurrentImage();
+    await imagesStore.fetchImages(props.sourceIds);
+    if (sourceImages.value.length > 0 && !currentImage.value) {
+      await imagesStore.fetchCurrentImage(props.sourceIds);
     }
   } catch (error) {
     console.error("Failed to load images:", error);
@@ -187,6 +202,12 @@ watch(
     }
   }
 );
+
+watch(sourceKey, async () => {
+  stopAutoRotation();
+  await imagesStore.fetchImages(props.sourceIds);
+  if (props.autoRotate) startAutoRotation();
+});
 </script>
 
 <style scoped>

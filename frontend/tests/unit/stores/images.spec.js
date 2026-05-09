@@ -50,6 +50,25 @@ describe("Images Store", () => {
       expect(store.error).toBe(null);
     });
 
+    it("should fetch images for selected source IDs", async () => {
+      const mockImages = {
+        images: [{ id: "1", filename: "image1.jpg", source: "family" }],
+      };
+
+      axios.get.mockResolvedValueOnce({ data: mockImages });
+      axios.get.mockResolvedValueOnce({
+        data: { image: mockImages.images[0] },
+      });
+
+      const store = useImagesStore();
+      await store.fetchImages(["family", "personal"]);
+
+      expect(axios.get).toHaveBeenCalledWith("/api/images/list", {
+        params: { source_ids: "family,personal" },
+      });
+      expect(store.getImagesForSource(["personal", "family"])).toEqual(mockImages.images);
+    });
+
     it("should fetch current image when images are available", async () => {
       const mockImages = {
         images: [{ id: "1", filename: "image1.jpg" }],
