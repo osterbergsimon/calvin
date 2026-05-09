@@ -157,12 +157,13 @@ class MyServicePlugin(ServicePlugin):
         """Cleanup plugin resources."""
         pass
 
-    async def get_content(self) -> dict[str, Any]:
-        """Get service content for display."""
-        return {
-            "type": "api",
-            "url": f"/api/plugins/{self.plugin_id}/data",
-        }
+    async def fetch_service_data(
+        self,
+        start_date: str | None = None,
+        end_date: str | None = None,
+    ) -> dict[str, Any]:
+        """Return the data payload that display_schema binds to."""
+        return {"value": "ok", "status": "ok"}
 
 
 # Register plugin with pluggy

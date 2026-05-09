@@ -60,9 +60,6 @@ All plugins inherit from `BasePlugin` which defines the common interface:
   schema-driven dashboard rendering.
 
 ### CAN Implement:
-- `get_content()`: Legacy data shape (e.g. `{"type": "iframe", "url": ...}`).
-  Returns an empty dict by default; new plugins should leave it alone and use
-  `fetch_service_data` paired with `display_schema.kind` instead.
 - `handle_webhook(payload)`: Handle incoming webhook (optional)
 - `handle_api_request(method, path, data)`: Handle API request (optional)
 
@@ -86,9 +83,8 @@ For operations that require plugin-specific logic beyond the standard protocol:
 ## Example: Correct Usage
 
 ```python
-# ✅ CORRECT: Use protocol methods
+# CORRECT: Use protocol methods
 if isinstance(plugin, ServicePlugin):
-    content = await plugin.get_content()
     data = await plugin.fetch_service_data()  # Returns None if not supported
     if data is not None:
         return data
@@ -97,14 +93,13 @@ if isinstance(plugin, ServicePlugin):
 ## Example: Incorrect Usage
 
 ```python
-# ❌ WRONG: Using hasattr()
+# WRONG: Using hasattr()
 if hasattr(plugin, "_fetch_meal_plan"):
     data = await plugin._fetch_meal_plan()
 
-# ❌ WRONG: Using getattr()
+# WRONG: Using getattr()
 url = getattr(plugin, "url", "")
 
 # ❌ WRONG: Calling private methods
 data = await plugin._fetch_weather()
 ```
-

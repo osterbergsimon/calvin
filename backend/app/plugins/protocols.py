@@ -194,9 +194,6 @@ class ServicePlugin(BasePlugin):
       rendering. Returns a JSON payload that the plugin's `display_schema` binds to.
 
     CAN implement (optional):
-    - get_content() — legacy data shape (e.g. `{"type": "iframe", "url": ...}`).
-      Returns an empty dict by default; new plugins should prefer `fetch_service_data`
-      paired with `display_schema.kind`.
     - handle_webhook()
     - handle_api_request()
     """
@@ -205,15 +202,6 @@ class ServicePlugin(BasePlugin):
     def plugin_type(self) -> PluginType:
         """Return service plugin type."""
         return PluginType.SERVICE
-
-    async def get_content(self) -> dict[str, Any]:
-        """
-        Legacy: get service content for display.
-
-        Predates the schema-driven render path. New plugins should leave this as the
-        default and implement `fetch_service_data()` instead. Returns an empty dict.
-        """
-        return {}
 
     async def handle_webhook(self, payload: dict[str, Any]) -> dict[str, Any] | None:
         """
