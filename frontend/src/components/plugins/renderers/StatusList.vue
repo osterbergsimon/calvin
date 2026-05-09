@@ -1,10 +1,6 @@
 <template>
-  <ul class="status-list calvin-plugin-list dashboard-renderer-list">
-    <li
-      v-for="(item, idx) in items"
-      :key="idx"
-      class="status-list__row calvin-plugin-row dashboard-renderer-row"
-    >
+  <ul class="status-list calvin-plugin-list">
+    <li v-for="(item, idx) in items" :key="idx" class="status-list__row calvin-plugin-row">
       <StatusTile :schema="itemSchemaFor(item)" :data="item" />
     </li>
   </ul>

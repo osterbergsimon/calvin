@@ -1,17 +1,13 @@
 <template>
-  <ul
-    class="item-list calvin-plugin-list calvin-plugin-list--scroll dashboard-renderer-list dashboard-renderer-list--scroll"
-  >
+  <ul class="item-list calvin-plugin-list calvin-plugin-list--scroll">
     <li
       v-for="(item, i) in items"
       :key="i"
       class="item-list__row"
       :class="{
         'calvin-plugin-row': true,
-        'dashboard-renderer-row': true,
         'item-list__row--clickable': urlFor(item),
         'calvin-plugin-clickable': urlFor(item),
-        'dashboard-renderer-clickable': urlFor(item),
       }"
       @click="open(urlFor(item))"
     >
@@ -21,10 +17,7 @@
         <span v-if="valueFor(item)" class="item-list__value">{{ valueFor(item) }}</span>
       </div>
     </li>
-    <li
-      v-if="items.length === 0"
-      class="item-list__empty calvin-plugin-empty dashboard-renderer-empty"
-    >
+    <li v-if="items.length === 0" class="item-list__empty calvin-plugin-empty">
       {{ schema.empty_text || "No items" }}
     </li>
   </ul>

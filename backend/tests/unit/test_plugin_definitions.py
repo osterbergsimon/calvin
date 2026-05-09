@@ -47,3 +47,36 @@ class TestPluginDefinition:
                     "name": "Future Plugin",
                 }
             )
+
+    def test_display_schema_allows_shell_fields_and_renderer_specific_keys(self):
+        definition = PluginDefinition.from_raw(
+            {
+                "type_id": "weather",
+                "plugin_type": PluginType.SERVICE,
+                "name": "Weather",
+                "display_schema": {
+                    "kind": "weather-forecast",
+                    "title_path": "$.location",
+                    "title": "Weather",
+                    "panel_variant": "dense",
+                    "current_path": "$.current",
+                },
+            }
+        )
+
+        assert definition.display_schema["panel_variant"] == "dense"
+        assert definition.display_schema["current_path"] == "$.current"
+
+    def test_display_schema_rejects_unknown_panel_variant(self):
+        with pytest.raises(ValueError, match="display_schema.panel_variant"):
+            PluginDefinition.from_raw(
+                {
+                    "type_id": "weather",
+                    "plugin_type": PluginType.SERVICE,
+                    "name": "Weather",
+                    "display_schema": {
+                        "kind": "weather-forecast",
+                        "panel_variant": "compact",
+                    },
+                }
+            )

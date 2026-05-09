@@ -133,34 +133,6 @@ const panelClasses = computed(() => [
   padding: 0;
 }
 
-:slotted(.dashboard-panel__icon-button) {
-  width: 32px;
-  height: 32px;
-  border-radius: 4px;
-  border: 1px solid var(--border-color);
-  background: var(--bg-primary);
-  color: var(--text-primary);
-  cursor: pointer;
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  font-size: 1.2rem;
-  line-height: 1;
-  transition:
-    background 0.2s,
-    border-color 0.2s;
-}
-
-:slotted(.dashboard-panel__icon-button:hover) {
-  background: var(--bg-secondary);
-  border-color: var(--text-secondary);
-}
-
-:slotted(.dashboard-panel__icon-button:focus) {
-  outline: 2px solid var(--accent-primary);
-  outline-offset: 2px;
-}
-
 @media (max-width: 768px), (orientation: portrait) {
   .dashboard-panel__header {
     min-height: 64px;

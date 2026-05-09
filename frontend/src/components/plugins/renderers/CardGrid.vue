@@ -1,10 +1,6 @@
 <template>
-  <div class="card-grid calvin-plugin-grid dashboard-renderer-grid" :style="gridStyle">
-    <article
-      v-for="(card, idx) in cards"
-      :key="idx"
-      class="card-grid__card calvin-plugin-surface dashboard-renderer-card"
-    >
+  <div class="card-grid calvin-plugin-grid" :style="gridStyle">
+    <article v-for="(card, idx) in cards" :key="idx" class="card-grid__card calvin-plugin-surface">
       <header v-if="cardTitle(card)" class="card-grid__title">{{ cardTitle(card) }}</header>
       <ul v-if="cardItems(card).length" class="card-grid__items">
         <li
@@ -14,7 +10,6 @@
           :class="{
             'card-grid__item--clickable': itemUrl(item),
             'calvin-plugin-clickable': itemUrl(item),
-            'dashboard-renderer-clickable': itemUrl(item),
           }"
           @click="open(itemUrl(item))"
         >
@@ -22,7 +17,7 @@
           <span v-if="itemValue(item)" class="card-grid__item-value">{{ itemValue(item) }}</span>
         </li>
       </ul>
-      <p v-else class="card-grid__empty calvin-plugin-empty dashboard-renderer-empty">
+      <p v-else class="card-grid__empty calvin-plugin-empty">
         {{ schema.empty_text || "—" }}
       </p>
     </article>

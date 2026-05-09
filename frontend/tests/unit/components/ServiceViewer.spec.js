@@ -58,6 +58,22 @@ describe("ServiceViewer", () => {
     expect(wrapper.find(".dashboard-panel__title").text()).toBe("Literal Title");
   });
 
+  it("ignores object title_path values instead of rendering them", () => {
+    schemaData.value = { location: { name: "Stockholm" } };
+
+    const wrapper = mountViewer({
+      id: "weather",
+      name: "Fallback Service",
+      display_schema: {
+        kind: "weather-forecast",
+        title_path: "$.location",
+        title: "Literal Weather",
+      },
+    });
+
+    expect(wrapper.find(".dashboard-panel__title").text()).toBe("Literal Weather");
+  });
+
   it("falls back to service name when schema title fields are missing", () => {
     const wrapper = mountViewer({
       id: "service",

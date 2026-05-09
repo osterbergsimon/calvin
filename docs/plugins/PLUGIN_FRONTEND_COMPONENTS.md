@@ -103,8 +103,7 @@ Plugin frontends and built-in renderers should use Calvin's public dashboard bod
 
 These classes use `var(--bg-secondary)`, `var(--border-color)`, radius `6px`, standard spacing, and
 region-safe `min-width`/`min-height` rules. The panel body owns the outer overflow boundary, so
-renderers should avoid adding another outer frame. Classes named `dashboard-renderer-*` are internal
-to Calvin and should not be used by external plugins.
+renderers should avoid adding another outer frame.
 
 Example web component body layout:
 

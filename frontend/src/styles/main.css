@@ -53,8 +53,7 @@ body {
   min-height: 0;
 }
 
-.calvin-plugin-grid,
-.dashboard-renderer-grid {
+.calvin-plugin-grid {
   display: grid;
   gap: 1rem;
   width: 100%;
@@ -81,8 +80,7 @@ body {
   grid-template-columns: repeat(3, minmax(0, 1fr));
 }
 
-.calvin-plugin-list,
-.dashboard-renderer-list {
+.calvin-plugin-list {
   list-style: none;
   margin: 0;
   padding: 0;
@@ -93,43 +91,34 @@ body {
   min-height: 0;
 }
 
-.calvin-plugin-list--scroll,
-.dashboard-renderer-list--scroll {
+.calvin-plugin-list--scroll {
   overflow-y: auto;
 }
 
-.calvin-plugin-surface,
-.dashboard-renderer-card,
-.dashboard-renderer-row,
-.dashboard-renderer-metric {
+.calvin-plugin-surface {
   background: var(--bg-secondary);
   border: 1px solid var(--border-color);
   border-radius: 6px;
   min-width: 0;
 }
 
-.calvin-plugin-surface,
-.dashboard-renderer-card {
+.calvin-plugin-surface {
   padding: 1rem;
 }
 
-.calvin-plugin-row,
-.dashboard-renderer-row {
+.calvin-plugin-row {
   padding: 0.5rem 0.75rem;
 }
 
-.calvin-plugin-metric,
-.dashboard-renderer-metric {
+.calvin-plugin-metric {
   padding: 1.25rem;
 }
 
-.calvin-plugin-clickable,
-.dashboard-renderer-clickable {
+.calvin-plugin-clickable {
   cursor: pointer;
 }
 
-.calvin-plugin-clickable:hover,
-.dashboard-renderer-clickable:hover {
+.calvin-plugin-clickable:hover {
   background: var(--bg-tertiary);
   border-color: var(--accent-primary);
 }
@@ -172,21 +161,16 @@ body {
 
 .calvin-plugin-empty,
 .calvin-plugin-loading,
-.calvin-plugin-error,
-.dashboard-renderer-empty,
-.dashboard-renderer-loading,
-.dashboard-renderer-error {
+.calvin-plugin-error {
   color: var(--text-secondary);
   text-align: center;
   padding: 1rem;
 }
 
-.calvin-plugin-empty,
-.dashboard-renderer-empty {
+.calvin-plugin-empty {
   font-style: italic;
 }
 
-.calvin-plugin-error,
-.dashboard-renderer-error {
+.calvin-plugin-error {
   color: var(--accent-error);
 }

@@ -17,7 +17,7 @@
       <div class="weather-forecast-renderer__details">
         <div
           v-if="hasValue(feelsLike)"
-          class="weather-forecast-renderer__detail calvin-plugin-surface dashboard-renderer-card"
+          class="weather-forecast-renderer__detail calvin-plugin-surface"
         >
           <span class="weather-forecast-renderer__detail-label">Feels like</span>
           <span class="weather-forecast-renderer__detail-value">
@@ -26,14 +26,14 @@
         </div>
         <div
           v-if="hasValue(humidity)"
-          class="weather-forecast-renderer__detail calvin-plugin-surface dashboard-renderer-card"
+          class="weather-forecast-renderer__detail calvin-plugin-surface"
         >
           <span class="weather-forecast-renderer__detail-label">Humidity</span>
           <span class="weather-forecast-renderer__detail-value">{{ round(humidity) }}%</span>
         </div>
         <div
           v-if="hasValue(windSpeed)"
-          class="weather-forecast-renderer__detail calvin-plugin-surface dashboard-renderer-card"
+          class="weather-forecast-renderer__detail calvin-plugin-surface"
         >
           <span class="weather-forecast-renderer__detail-label">Wind</span>
           <span class="weather-forecast-renderer__detail-value">
@@ -42,7 +42,7 @@
         </div>
         <div
           v-if="hasValue(pressure)"
-          class="weather-forecast-renderer__detail calvin-plugin-surface dashboard-renderer-card"
+          class="weather-forecast-renderer__detail calvin-plugin-surface"
         >
           <span class="weather-forecast-renderer__detail-label">Pressure</span>
           <span class="weather-forecast-renderer__detail-value">{{ round(pressure) }} hPa</span>
@@ -56,7 +56,7 @@
         <article
           v-for="(day, index) in forecast"
           :key="dateFor(day) || index"
-          class="weather-forecast-renderer__item calvin-plugin-surface dashboard-renderer-card"
+          class="weather-forecast-renderer__item calvin-plugin-surface"
         >
           <div class="weather-forecast-renderer__date">{{ formatForecastDate(dateFor(day)) }}</div>
           <svg class="weather-forecast-renderer__small-icon" viewBox="0 0 24 24" aria-hidden="true">

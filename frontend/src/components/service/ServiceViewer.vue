@@ -61,7 +61,9 @@ const panelTitle = computed(() => {
   const pathTitle = displaySchema.value.title_path
     ? resolvePath(schemaData.value, displaySchema.value.title_path)
     : null;
-  return pathTitle || displaySchema.value.title || props.service.name || "Service";
+  const resolvedTitle =
+    typeof pathTitle === "string" || typeof pathTitle === "number" ? String(pathTitle) : null;
+  return resolvedTitle || displaySchema.value.title || props.service.name || "Service";
 });
 const panelVariant = computed(() => {
   const variant = displaySchema.value.panel_variant;

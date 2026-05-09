@@ -13,35 +13,11 @@
 
     <!-- Viewer Content -->
     <div class="viewer-content">
-      <!-- Loading State -->
-      <DashboardPanel v-if="loading" title="Web Services" :header-visible="!isFullscreen">
-        <div class="loading-state">
-          <div class="spinner" />
-          <p>Loading service...</p>
-        </div>
-      </DashboardPanel>
-
-      <!-- No Services -->
-      <DashboardPanel
-        v-else-if="services.length === 0"
-        title="Web Services"
-        :header-visible="!isFullscreen"
-      >
-        <div class="no-services">
-          <p>No web services configured</p>
-          <p class="help-text">Add web services in Settings</p>
-        </div>
-      </DashboardPanel>
-
-      <!-- Explicit service missing or disabled -->
-      <DashboardPanel
-        v-else-if="serviceUnavailable"
-        title="Web Services"
-        :header-visible="!isFullscreen"
-      >
-        <div class="no-services">
-          <p>Selected service is unavailable</p>
-          <p class="help-text">Choose another service in Settings</p>
+      <DashboardPanel v-if="emptyState" title="Web Services" :header-visible="!isFullscreen">
+        <div :class="emptyState.className">
+          <div v-if="emptyState.loading" class="spinner" />
+          <p>{{ emptyState.message }}</p>
+          <p v-if="emptyState.helpText" class="help-text">{{ emptyState.helpText }}</p>
         </div>
       </DashboardPanel>
 
@@ -136,6 +112,26 @@ const serviceSubtitle = computed(() =>
     ? `Service ${currentServiceIndex.value + 1} of ${services.value.length}`
     : ""
 );
+const emptyState = computed(() => {
+  if (loading.value) {
+    return { className: "loading-state", loading: true, message: "Loading service..." };
+  }
+  if (services.value.length === 0) {
+    return {
+      className: "no-services",
+      message: "No web services configured",
+      helpText: "Add web services in Settings",
+    };
+  }
+  if (serviceUnavailable.value) {
+    return {
+      className: "no-services",
+      message: "Selected service is unavailable",
+      helpText: "Choose another service in Settings",
+    };
+  }
+  return null;
+});
 
 // ServiceViewer now handles all service rendering logic
 

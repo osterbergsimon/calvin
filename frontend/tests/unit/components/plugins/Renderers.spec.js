@@ -77,9 +77,7 @@ describe("StatusList", () => {
     const rows = wrapper.findAll(".status-list__row");
     expect(rows).toHaveLength(2);
     expect(wrapper.classes()).toContain("calvin-plugin-list");
-    expect(wrapper.classes()).toContain("dashboard-renderer-list");
     expect(rows[0].classes()).toContain("calvin-plugin-row");
-    expect(rows[0].classes()).toContain("dashboard-renderer-row");
     expect(rows[0].text()).toContain("CPU");
     expect(rows[1].text()).toContain("1.2 GB");
   });
@@ -150,9 +148,7 @@ describe("CardGrid", () => {
     const cards = wrapper.findAll(".card-grid__card");
     expect(cards).toHaveLength(2);
     expect(wrapper.classes()).toContain("calvin-plugin-grid");
-    expect(wrapper.classes()).toContain("dashboard-renderer-grid");
     expect(cards[0].classes()).toContain("calvin-plugin-surface");
-    expect(cards[0].classes()).toContain("dashboard-renderer-card");
     expect(cards[0].text()).toContain("dinner");
     expect(cards[0].text()).toContain("Pasta");
     expect(cards[1].text()).toContain("Salad");
@@ -178,7 +174,6 @@ describe("CardGrid", () => {
     const items = wrapper.findAll(".card-grid__item");
     expect(items[0].classes()).toContain("card-grid__item--clickable");
     expect(items[0].classes()).toContain("calvin-plugin-clickable");
-    expect(items[0].classes()).toContain("dashboard-renderer-clickable");
     expect(items[1].classes()).not.toContain("card-grid__item--clickable");
   });
 });
@@ -205,9 +200,7 @@ describe("ItemList", () => {
     expect(wrapper.text()).toContain("Hello");
     expect(wrapper.text()).toContain("world");
     expect(wrapper.classes()).toContain("calvin-plugin-list");
-    expect(wrapper.classes()).toContain("dashboard-renderer-list");
     expect(wrapper.find(".item-list__row").classes()).toContain("calvin-plugin-row");
-    expect(wrapper.find(".item-list__row").classes()).toContain("dashboard-renderer-row");
   });
 
   it("shows empty state when items is empty", () => {
@@ -281,9 +274,7 @@ describe("MetricDashboard", () => {
     const tiles = wrapper.findAll(".metric-dashboard__tile");
     expect(tiles).toHaveLength(2);
     expect(wrapper.classes()).toContain("calvin-plugin-grid");
-    expect(wrapper.classes()).toContain("dashboard-renderer-grid");
     expect(tiles[0].classes()).toContain("calvin-plugin-metric");
-    expect(tiles[0].classes()).toContain("dashboard-renderer-metric");
     expect(tiles[0].text()).toContain("21.5");
     expect(tiles[0].classes()).toContain("metric-dashboard__tile--ok");
     expect(tiles[1].classes()).toContain("metric-dashboard__tile--warn");

@@ -1,9 +1,9 @@
 <template>
-  <div class="metric-dashboard calvin-plugin-grid dashboard-renderer-grid" :style="gridStyle">
+  <div class="metric-dashboard calvin-plugin-grid" :style="gridStyle">
     <div
       v-for="(metric, i) in metrics"
       :key="i"
-      class="metric-dashboard__tile calvin-plugin-metric dashboard-renderer-metric"
+      class="metric-dashboard__tile calvin-plugin-metric"
       :class="statusClass(metric)"
     >
       <span v-if="iconFor(metric)" class="metric-dashboard__icon">{{ iconFor(metric) }}</span>
