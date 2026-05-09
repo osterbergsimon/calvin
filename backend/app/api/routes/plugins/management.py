@@ -16,6 +16,7 @@ from pydantic import BaseModel
 
 from app.models.db_models import PluginDB, PluginTypeDB
 from app.plugins.base import PluginType
+from app.plugins.definitions import PluginDefinition
 from app.plugins.hooks import plugin_manager as hook_manager
 from app.plugins.loader import plugin_loader
 from app.plugins.manager import plugin_manager
@@ -32,6 +33,40 @@ router = APIRouter()
 # Cross-cutting type-level keys that all plugins support, regardless of
 # whether they declare them in their own common_config_schema.
 UNIVERSAL_TYPE_CONFIG_KEYS = frozenset({"display_order"})
+
+
+def _validate_just_installed_plugin(plugin_id: str) -> list[str]:
+    """Run PluginDefinition.from_raw against a freshly installed plugin's metadata.
+
+    Returns a list of human-readable error strings (empty if the plugin validates
+    cleanly). This is what catches display_schema.kind typos, missing required
+    manifest fields, unsupported protocol versions, etc., at install time
+    instead of letting the plugin install "successfully" but never appear in
+    the UI because get_plugin_types silently swallows the validation error.
+    """
+    module_name = f"installed_plugin_{plugin_id}"
+    module = sys.modules.get(module_name)
+    if module is None:
+        return [
+            f"Plugin module {module_name!r} did not load. "
+            "Check the backend log for an import or syntax error in plugin.py."
+        ]
+    register = getattr(module, "register_plugin_types", None)
+    if not callable(register):
+        return ["plugin.py does not define register_plugin_types()."]
+    try:
+        raw_definitions = register()
+    except Exception as exc:  # noqa: BLE001
+        return [f"register_plugin_types() raised {type(exc).__name__}: {exc}"]
+    if not isinstance(raw_definitions, list) or not raw_definitions:
+        return ["register_plugin_types() must return a non-empty list."]
+    errors: list[str] = []
+    for index, raw in enumerate(raw_definitions):
+        try:
+            PluginDefinition.from_raw(raw)
+        except Exception as exc:  # noqa: BLE001
+            errors.append(f"plugin definition[{index}]: {exc}")
+    return errors
 
 
 class PluginManifestEnvelope(BaseModel):
@@ -326,6 +361,27 @@ async def install_plugin(
             # Reload plugins to include the newly installed one
             plugin_loader.load_installed_plugins()
 
+            # Surface metadata validation failures immediately. Without this,
+            # a plugin with (e.g.) an invalid display_schema.kind would install
+            # "successfully" but never appear in the UI because get_plugin_types
+            # silently swallows the PluginDefinition.from_raw error.
+            installed_id = manifest["id"]
+            validation_errors = _validate_just_installed_plugin(installed_id)
+            if validation_errors:
+                # Roll back: remove the broken plugin so the user can fix and retry.
+                try:
+                    plugin_installer.uninstall_plugin(installed_id)
+                except Exception as cleanup_exc:  # noqa: BLE001
+                    logger.warning(
+                        "Failed to roll back invalid plugin {} after validation errors: {}",
+                        installed_id,
+                        cleanup_exc,
+                    )
+                detail = f"Plugin {installed_id} failed validation:\n  - " + "\n  - ".join(
+                    validation_errors
+                )
+                raise HTTPException(status_code=400, detail=detail)
+
             # Emit plugin_installed event
             try:
                 await event_system.emit_event(
@@ -352,6 +408,8 @@ async def install_plugin(
                 "requires_restart": True,
                 "frontend_rebuild_in_progress": False,
             }
+        except HTTPException:
+            raise
         except ValueError as e:
             raise HTTPException(status_code=400, detail=str(e))
         except Exception as e:

@@ -98,7 +98,11 @@ from app.plugins.hooks import hookimpl
 
 @hookimpl
 def register_plugin_types() -> list[dict[str, Any]]:
-    return [{"type_id": "test_api_plugin", "plugin_type": PluginType.SERVICE}]
+    return [{
+        "type_id": "test_api_plugin",
+        "plugin_type": PluginType.SERVICE,
+        "name": "Test API Plugin",
+    }]
 '''
         )
 
@@ -144,6 +148,68 @@ def register_plugin_types() -> list[dict[str, Any]]:
             # Unexpected error
             error_msg = f"Unexpected status code: {response.status_code}, response: {response.text}"
             assert False, error_msg
+
+    def test_install_plugin_rejects_invalid_display_schema(self, test_client, tmp_path):
+        """A plugin with display_schema.kind not in SUPPORTED_DISPLAY_KINDS must
+        be rejected at install time with a 400, AND the plugin files must be
+        rolled back so the user can fix and retry."""
+        try:
+            plugin_installer.uninstall_plugin("bad_kind_plugin")
+        except Exception:
+            pass
+
+        plugin_dir = tmp_path / "bad_kind_plugin"
+        plugin_dir.mkdir()
+        (plugin_dir / "plugin.json").write_text(
+            json.dumps(
+                {
+                    "id": "bad_kind_plugin",
+                    "name": "Bad Kind Plugin",
+                    "version": "1.0.0",
+                    "type": "service",
+                }
+            )
+        )
+        (plugin_dir / "plugin.py").write_text(
+            '''"""Plugin with an invalid display_schema kind."""
+from typing import Any
+from app.plugins.base import PluginType
+from app.plugins.hooks import hookimpl
+
+@hookimpl
+def register_plugin_types() -> list[dict[str, Any]]:
+    return [{
+        "type_id": "bad_kind_plugin",
+        "plugin_type": PluginType.SERVICE,
+        "name": "Bad Kind Plugin",
+        "display_schema": {"kind": "no-such-renderer"},
+    }]
+'''
+        )
+
+        zip_path = tmp_path / "bad_kind_plugin.zip"
+        with zipfile.ZipFile(zip_path, "w") as zipf:
+            for file_path in plugin_dir.rglob("*"):
+                if file_path.is_file():
+                    zipf.write(file_path, file_path.relative_to(plugin_dir))
+
+        with open(zip_path, "rb") as zip_file:
+            response = test_client.post(
+                "/api/plugins/install",
+                files={"file": ("bad_kind_plugin.zip", zip_file, "application/zip")},
+            )
+
+        if response.status_code == 404:
+            pytest.skip("Plugin installation route not available in test client")
+
+        assert response.status_code == 400, response.text
+        detail = response.json()["detail"]
+        assert "bad_kind_plugin" in detail
+        assert "display_schema.kind" in detail
+        assert "no-such-renderer" in detail
+
+        # Roll-back: the plugin must NOT be installed.
+        assert not plugin_installer.get_plugin_path("bad_kind_plugin").exists()
 
     def test_install_plugin_invalid_zip(self, test_client, tmp_path):
         """Test installing an invalid plugin zip file."""

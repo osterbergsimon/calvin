@@ -11,6 +11,7 @@ from typing import Any
 import httpx
 from fastapi import APIRouter, Body, HTTPException
 
+from app.api.routes.plugins.management import _validate_just_installed_plugin
 from app.api.routes.plugins.themes import _register_theme_in_db
 from app.config import settings
 from app.plugins.loader import plugin_loader
@@ -295,6 +296,23 @@ async def install_plugin_from_github(request: dict[str, Any] = Body(...)):
                     # Don't fail the installation - the plugin files are installed correctly
                     # It just needs a restart to be loaded
 
+                # Surface metadata validation failures immediately. See
+                # _validate_just_installed_plugin for details.
+                installed_id = manifest["id"]
+                validation_errors = _validate_just_installed_plugin(installed_id)
+                if validation_errors:
+                    try:
+                        plugin_installer.uninstall_plugin(installed_id)
+                    except Exception as cleanup_exc:  # noqa: BLE001
+                        logger.warning(
+                            f"Failed to roll back invalid plugin {installed_id} "
+                            f"after validation errors: {cleanup_exc}"
+                        )
+                    detail = f"Plugin {installed_id} failed validation:\n  - " + "\n  - ".join(
+                        validation_errors
+                    )
+                    raise HTTPException(status_code=400, detail=detail)
+
                 actual_branch = "master" if branch_switched else branch
                 return {
                     "success": True,
@@ -310,6 +328,8 @@ async def install_plugin_from_github(request: dict[str, Any] = Body(...)):
                     status_code=400,
                     detail=f"Neither plugin.json nor theme.json found in {plugin_path}",
                 )
+        except HTTPException:
+            raise
         except ValueError as e:
             raise HTTPException(status_code=400, detail=str(e))
         except Exception as e:
@@ -472,6 +492,21 @@ async def install_plugin_from_local(request: dict[str, Any] = Body(...)):
                     f"Plugin {manifest['id']} installed but failed to load: {load_error}. "
                     "It will be available after server restart."
                 )
+
+            installed_id = manifest["id"]
+            validation_errors = _validate_just_installed_plugin(installed_id)
+            if validation_errors:
+                try:
+                    plugin_installer.uninstall_plugin(installed_id)
+                except Exception as cleanup_exc:  # noqa: BLE001
+                    logger.warning(
+                        f"Failed to roll back invalid plugin {installed_id} "
+                        f"after validation errors: {cleanup_exc}"
+                    )
+                detail = f"Plugin {installed_id} failed validation:\n  - " + "\n  - ".join(
+                    validation_errors
+                )
+                raise HTTPException(status_code=400, detail=detail)
 
             return {
                 "success": True,
