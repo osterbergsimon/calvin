@@ -60,6 +60,7 @@ export const useConfigStore = defineStore("config", () => {
   const clockBarLayout = ref("single-line"); // 'single-line' | 'two-lines'
   const clockBarPadding = ref(8);
   const clockBarShowWeather = ref(false);
+  const clockBarShowLogo = ref(true);
   const mealPlanCardSize = ref("medium"); // Meal plan card size: 'small' | 'medium' | 'large'
   const consoleLogEnabled = ref(true); // Enable console logging (default: true for backwards compatibility)
   const consoleLogLevel = ref("info"); // Console log level: 'error' | 'warn' | 'info' | 'debug' (default: 'info')
@@ -115,6 +116,7 @@ export const useConfigStore = defineStore("config", () => {
     clockBarLayout,
     clockBarPadding,
     clockBarShowWeather,
+    clockBarShowLogo,
     mealPlanCardSize,
     consoleLogEnabled,
     consoleLogLevel,
@@ -399,6 +401,7 @@ export const useConfigStore = defineStore("config", () => {
     clockBarLayout,
     clockBarPadding,
     clockBarShowWeather,
+    clockBarShowLogo,
     mealPlanCardSize,
     consoleLogEnabled,
     consoleLogLevel,

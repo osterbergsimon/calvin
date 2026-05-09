@@ -202,6 +202,11 @@ export const CONFIG_FIELD_DEFINITIONS = [
     defaultValue: false,
   },
   {
+    name: "clockBarShowLogo",
+    keys: ["clockBarShowLogo", "clock_bar_show_logo"],
+    defaultValue: true,
+  },
+  {
     name: "mealPlanCardSize",
     keys: ["mealPlanCardSize", "meal_plan_card_size"],
     defaultValue: "medium",
