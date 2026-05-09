@@ -39,8 +39,9 @@ describe("WebServiceViewer", () => {
       global: {
         stubs: {
           ServiceViewer: {
-            props: ["service"],
-            template: '<div class="service-viewer-stub">{{ service.name }}</div>',
+            props: ["service", "subtitle"],
+            template:
+              '<div class="service-viewer-stub"><h2>{{ service.name }}</h2><p>{{ subtitle }}</p><slot name="actions" /></div>',
           },
         },
       },
@@ -50,7 +51,7 @@ describe("WebServiceViewer", () => {
   it("renders the cycling current service in fullscreen when no service id is provided", () => {
     const wrapper = mountViewer({ isFullscreen: true });
 
-    expect(wrapper.find(".service-viewer-stub").text()).toBe("Weather");
+    expect(wrapper.find(".service-viewer-stub h2").text()).toBe("Weather");
   });
 
   it("shows an unavailable state for an embedded region without a service id", () => {
@@ -63,10 +64,16 @@ describe("WebServiceViewer", () => {
   it("renders a specific service and disables local navigation when service id is provided", () => {
     const wrapper = mountViewer({ isFullscreen: false, serviceId: "meals" });
 
-    expect(wrapper.find(".viewer-header h2").text()).toBe("Meals");
-    expect(wrapper.find(".service-viewer-stub").text()).toBe("Meals");
-    expect(wrapper.find(".service-selector").exists()).toBe(false);
-    expect(wrapper.findAll(".btn-nav")).toHaveLength(0);
+    expect(wrapper.find(".service-viewer-stub h2").text()).toBe("Meals");
+    expect(wrapper.find(".service-viewer-stub").text()).toContain("Meals");
+    expect(wrapper.findAll(".dashboard-panel__icon-button")).toHaveLength(2);
+  });
+
+  it("passes service count and local navigation actions in fullscreen cycling mode", () => {
+    const wrapper = mountViewer({ isFullscreen: true });
+
+    expect(wrapper.find(".service-viewer-stub").text()).toContain("Service 1 of 2");
+    expect(wrapper.findAll(".dashboard-panel__icon-button")).toHaveLength(2);
   });
 
   it("shows an unavailable state for a missing explicit service id", () => {

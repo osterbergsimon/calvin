@@ -7,12 +7,13 @@ normalizes them into these models before the rest of the app consumes them.
 
 from typing import Any
 
-from pydantic import BaseModel, ConfigDict, Field
+from pydantic import BaseModel, ConfigDict, Field, field_validator
 
 from app.plugins.base import PluginType
 
 CURRENT_PLUGIN_PROTOCOL_VERSION = 1
 SUPPORTED_PLUGIN_PROTOCOL_VERSIONS = {CURRENT_PLUGIN_PROTOCOL_VERSION}
+DISPLAY_PANEL_VARIANTS = {"default", "dense", "media", "iframe"}
 
 
 class ConfigFieldDefinition(BaseModel):
@@ -92,6 +93,18 @@ class PluginDefinition(BaseModel):
     plugin_class: type[Any] | None = None
 
     model_config = ConfigDict(arbitrary_types_allowed=True, extra="allow")
+
+    @field_validator("display_schema")
+    @classmethod
+    def validate_display_schema(cls, value: dict[str, Any] | None) -> dict[str, Any] | None:
+        """Validate known display schema shell fields while allowing renderer-specific keys."""
+        if value is None:
+            return value
+        panel_variant = value.get("panel_variant")
+        if panel_variant is not None and panel_variant not in DISPLAY_PANEL_VARIANTS:
+            allowed = ", ".join(sorted(DISPLAY_PANEL_VARIANTS))
+            raise ValueError(f"display_schema.panel_variant must be one of: {allowed}")
+        return value
 
     @classmethod
     def from_raw(cls, raw: "PluginDefinition | dict[str, Any]") -> "PluginDefinition":
