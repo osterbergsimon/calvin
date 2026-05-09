@@ -129,6 +129,13 @@ import EventDetailPanel from "./EventDetailPanel.vue";
 import CalendarEventItem from "./CalendarEventItem.vue";
 import DashboardPanel from "./DashboardPanel.vue";
 
+const props = defineProps({
+  sourceIds: {
+    type: Array,
+    default: () => [],
+  },
+});
+
 const configStore = useConfigStore();
 const viewMode = computed(() => configStore.calendarViewMode);
 const showWeekNumbers = computed(() => configStore.showWeekNumbers);
@@ -221,7 +228,7 @@ watch(calendarRefreshIntervalMinutes, () => {
 });
 
 const currentDate = computed(() => calendarStore.currentDate);
-const events = computed(() => calendarStore.events);
+const events = computed(() => calendarStore.getEventsForSource(props.sourceIds));
 const loading = computed(() => calendarStore.loading);
 const selectedEvent = computed(() => calendarStore.selectedEvent);
 
@@ -716,7 +723,7 @@ const focusEvent = (dayIndex, eventIndex) => {
 };
 
 const selectEvent = (event, dayDate) => {
-  calendarStore.selectEvent(event, dayDate);
+  calendarStore.selectEvent(event, dayDate, props.sourceIds);
 };
 
 const closeEventDetail = () => {
@@ -904,7 +911,7 @@ const loadEvents = async (background = false) => {
     // The cache TTL (5 minutes) and periodic refresh (15 minutes) will keep data fresh
     const refresh = false;
 
-    await calendarStore.fetchEvents(startDate, endDate, refresh, background);
+    await calendarStore.fetchEvents(startDate, endDate, refresh, background, props.sourceIds);
     console.log(
       `Loaded ${calendarStore.events.length} events for ${year}-${month + 1} (range: ${startDate.toISOString().split("T")[0]} to ${endDate.toISOString().split("T")[0]})`
     );
@@ -916,6 +923,14 @@ const loadEvents = async (background = false) => {
 watch(currentDate, () => {
   loadEvents();
 });
+
+watch(
+  () => props.sourceIds,
+  () => {
+    loadEvents();
+  },
+  { deep: true }
+);
 
 // Watch for route changes to reload events when navigating back to dashboard
 watch(

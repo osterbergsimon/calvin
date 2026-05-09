@@ -14,6 +14,7 @@ import { logDebug, logError, logInfo } from "../utils/logger";
 
 export const useCalendarStore = defineStore("calendar", () => {
   const events = ref([]);
+  const eventsBySourceKey = ref({});
   const sources = ref([]); // Calendar sources with colors and show_time settings
   const loading = ref(false);
   const backgroundRefreshing = ref(false);
@@ -105,7 +106,29 @@ export const useCalendarStore = defineStore("calendar", () => {
     return source?.show_time !== false; // Default to true
   };
 
-  const fetchEvents = async (startDate, endDate, refreshParam = "", background = false) => {
+  const normalizeSourceIds = sourceIds =>
+    Array.isArray(sourceIds)
+      ? [
+          ...new Set(
+            sourceIds.filter(id => typeof id === "string" && id.trim()).map(id => id.trim())
+          ),
+        ].sort()
+      : [];
+
+  const getSourceKey = sourceIds => {
+    const ids = normalizeSourceIds(sourceIds);
+    return ids.length ? ids.join(",") : "__all__";
+  };
+
+  const getEventsForSource = sourceIds => eventsBySourceKey.value[getSourceKey(sourceIds)] || [];
+
+  const fetchEvents = async (
+    startDate,
+    endDate,
+    refreshParam = "",
+    background = false,
+    sourceIds = []
+  ) => {
     if (background) {
       backgroundRefreshing.value = true;
     } else {
@@ -114,7 +137,9 @@ export const useCalendarStore = defineStore("calendar", () => {
     error.value = null;
 
     const connectionStore = useConnectionStore();
-    const cacheKey = `calendar_events_${startDate?.toISOString()}_${endDate?.toISOString()}`;
+    const normalizedSourceIds = normalizeSourceIds(sourceIds);
+    const sourceKey = getSourceKey(normalizedSourceIds);
+    const cacheKey = `calendar_events_${sourceKey}_${startDate?.toISOString()}_${endDate?.toISOString()}`;
     const cacheTTL = 30 * 60 * 1000; // 30 minutes
 
     // Try to load from cache first if offline
@@ -122,7 +147,8 @@ export const useCalendarStore = defineStore("calendar", () => {
       const cachedEvents = getCachedData(cacheKey, cacheTTL);
       if (cachedEvents) {
         logInfo("[Calendar]", `Using cached events (${cachedEvents.events?.length || 0} events)`);
-        events.value = cachedEvents.events || [];
+        eventsBySourceKey.value[sourceKey] = cachedEvents.events || [];
+        if (sourceKey === "__all__") events.value = cachedEvents.events || [];
         loading.value = false;
         return cachedEvents;
       }
@@ -133,6 +159,9 @@ export const useCalendarStore = defineStore("calendar", () => {
         start_date: startDate?.toISOString(),
         end_date: endDate?.toISOString(),
       };
+      if (normalizedSourceIds.length > 0) {
+        params.source_ids = normalizedSourceIds.join(",");
+      }
 
       // Add refresh parameter if provided (for cache busting)
       if (refreshParam) {
@@ -151,14 +180,17 @@ export const useCalendarStore = defineStore("calendar", () => {
       const response = await axios.get("/api/calendar/events", { params });
       /** @type {CalendarEventsResponse} */
       const responseData = response.data;
-      events.value = responseData.events || [];
+      eventsBySourceKey.value[sourceKey] = responseData.events || [];
+      if (sourceKey === "__all__") {
+        events.value = responseData.events || [];
+      }
 
       // Cache the response
       setCachedData(cacheKey, responseData);
 
-      logDebug("[Calendar]", `Fetched ${events.value.length} events from API`);
-      if (events.value.length > 0) {
-        logDebug("[Calendar]", "Sample event:", events.value[0]);
+      logDebug("[Calendar]", `Fetched ${responseData.events?.length || 0} events from API`);
+      if (responseData.events?.length > 0) {
+        logDebug("[Calendar]", "Sample event:", responseData.events[0]);
       }
       return responseData;
     } catch (err) {
@@ -170,7 +202,8 @@ export const useCalendarStore = defineStore("calendar", () => {
             "[Calendar]",
             `Request failed, using cached events (${cachedEvents.events?.length || 0} events)`
           );
-          events.value = cachedEvents.events || [];
+          eventsBySourceKey.value[sourceKey] = cachedEvents.events || [];
+          if (sourceKey === "__all__") events.value = cachedEvents.events || [];
           loading.value = false;
           return cachedEvents;
         }
@@ -223,10 +256,15 @@ export const useCalendarStore = defineStore("calendar", () => {
     return date1.day - date2.day;
   };
 
-  const selectEvent = (event, selectedDayDate = null) => {
+  const selectEvent = (event, selectedDayDate = null, sourceIds = []) => {
+    const sourceEvents = getEventsForSource(sourceIds);
+    const eventPool =
+      sourceEvents.length > 0 || getSourceKey(sourceIds) !== "__all__"
+        ? sourceEvents
+        : events.value;
     // Find the event in the main events array to ensure we're using the same object reference
     // This helps with reactivity and ensures consistent comparisons
-    const eventFromMainArray = events.value.find(e => {
+    const eventFromMainArray = eventPool.find(e => {
       // Compare IDs as strings to ensure consistent comparison
       return String(e.id) === String(event.id);
     });
@@ -271,7 +309,7 @@ export const useCalendarStore = defineStore("calendar", () => {
       const gridDateComponents = getDateComponents(dateToUse, false);
 
       // Filter events using the exact same logic as CalendarView.getEventsForDate
-      dayEvents.value = events.value
+      dayEvents.value = eventPool
         .filter(e => {
           const eStart = new Date(e.start);
           const eEnd = new Date(e.end);
@@ -399,6 +437,7 @@ export const useCalendarStore = defineStore("calendar", () => {
 
   return {
     events,
+    eventsBySourceKey,
     sources,
     loading,
     backgroundRefreshing,
@@ -409,6 +448,7 @@ export const useCalendarStore = defineStore("calendar", () => {
     dayEvents,
     showAllDayEvents,
     fetchEvents,
+    getEventsForSource,
     fetchSources,
     updateSource,
     getSourceColor,

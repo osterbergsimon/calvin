@@ -3,7 +3,7 @@
 import logging
 from pathlib import Path
 
-from fastapi import APIRouter, File, UploadFile
+from fastapi import APIRouter, File, Query, UploadFile
 from fastapi.responses import FileResponse
 
 from app.services import plugin_image_service
@@ -14,8 +14,17 @@ logger = logging.getLogger(__name__)
 router = APIRouter()
 
 
+def _parse_source_ids(source_ids: str | None) -> list[str] | None:
+    if not source_ids:
+        return None
+    parsed = [source_id.strip() for source_id in source_ids.split(",") if source_id.strip()]
+    return parsed or None
+
+
 @router.get("/images/list")
-async def list_images():
+async def list_images(
+    source_ids: str | None = Query(None, description="Comma-separated source IDs"),
+):
     """
     Get list of all images from all enabled image plugins.
 
@@ -33,14 +42,18 @@ async def list_images():
 
     # Use plugin service to aggregate images from all plugins
     logger.debug("Calling plugin_image_service.get_images()...")
-    images = await plugin_image_service.get_images(randomize=randomize)
+    images = await plugin_image_service.get_images(
+        randomize=randomize, source_ids=_parse_source_ids(source_ids)
+    )
     logger.debug(f"plugin_image_service.get_images() returned {len(images)} images")
 
     return {"images": images, "total": len(images)}
 
 
 @router.get("/images/current")
-async def get_current_image():
+async def get_current_image(
+    source_ids: str | None = Query(None, description="Comma-separated source IDs"),
+):
     """
     Get current image metadata from plugin service.
 
@@ -53,7 +66,9 @@ async def get_current_image():
     randomize_value = await config_service.get_value("randomize_images")
     randomize = randomize_value == "true" if randomize_value else False
 
-    image = await plugin_image_service.get_current_image(randomize=randomize)
+    image = await plugin_image_service.get_current_image(
+        randomize=randomize, source_ids=_parse_source_ids(source_ids)
+    )
     if not image:
         return {"image": None, "message": "No images available"}
 
@@ -212,7 +227,9 @@ async def get_image_thumbnail(image_id: str):
 
 
 @router.post("/images/next")
-async def next_image():
+async def next_image(
+    source_ids: str | None = Query(None, description="Comma-separated source IDs"),
+):
     """
     Move to next image and return it from plugin service.
 
@@ -225,7 +242,9 @@ async def next_image():
     randomize_value = await config_service.get_value("randomize_images")
     randomize = randomize_value == "true" if randomize_value else False
 
-    image = await plugin_image_service.next_image(randomize=randomize)
+    image = await plugin_image_service.next_image(
+        randomize=randomize, source_ids=_parse_source_ids(source_ids)
+    )
     if not image:
         return {"image": None, "message": "No images available"}
 
@@ -233,7 +252,9 @@ async def next_image():
 
 
 @router.post("/images/previous")
-async def previous_image():
+async def previous_image(
+    source_ids: str | None = Query(None, description="Comma-separated source IDs"),
+):
     """
     Move to previous image and return it from plugin service.
 
@@ -246,7 +267,9 @@ async def previous_image():
     randomize_value = await config_service.get_value("randomize_images")
     randomize = randomize_value == "true" if randomize_value else False
 
-    image = await plugin_image_service.previous_image(randomize=randomize)
+    image = await plugin_image_service.previous_image(
+        randomize=randomize, source_ids=_parse_source_ids(source_ids)
+    )
     if not image:
         return {"image": None, "message": "No images available"}
 

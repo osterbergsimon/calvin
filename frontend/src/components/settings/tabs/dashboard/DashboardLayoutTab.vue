@@ -252,6 +252,38 @@
                               {{ option.label }}
                             </button>
                             <div
+                              v-if="sourceOptionsFor(sub.kind).length > 0"
+                              class="source-options"
+                            >
+                              <button
+                                type="button"
+                                class="component-option"
+                                @click="clearSubRegionSources(screenIndex, previewIndex, subIndex)"
+                              >
+                                {{ sourceSelectionLabel({ ...sub, instanceIds: [] }) }}
+                              </button>
+                              <label
+                                v-for="source in sourceOptionsFor(sub.kind)"
+                                :key="source.id"
+                                class="source-option"
+                              >
+                                <input
+                                  type="checkbox"
+                                  :checked="(sub.instanceIds || []).includes(source.id)"
+                                  @change="
+                                    toggleSubRegionSource(
+                                      screenIndex,
+                                      previewIndex,
+                                      subIndex,
+                                      source.id,
+                                      $event.target.checked
+                                    )
+                                  "
+                                />
+                                {{ source.name }}
+                              </label>
+                            </div>
+                            <div
                               v-if="filteredComponentOptions.length === 0"
                               class="component-empty"
                             >
@@ -328,6 +360,34 @@
                       >
                         {{ option.label }}
                       </button>
+                      <div v-if="sourceOptionsFor(region.kind).length > 0" class="source-options">
+                        <button
+                          type="button"
+                          class="component-option"
+                          @click="clearRegionSources(screenIndex, previewIndex)"
+                        >
+                          {{ sourceSelectionLabel({ ...region, instanceIds: [] }) }}
+                        </button>
+                        <label
+                          v-for="source in sourceOptionsFor(region.kind)"
+                          :key="source.id"
+                          class="source-option"
+                        >
+                          <input
+                            type="checkbox"
+                            :checked="(region.instanceIds || []).includes(source.id)"
+                            @change="
+                              toggleRegionSource(
+                                screenIndex,
+                                previewIndex,
+                                source.id,
+                                $event.target.checked
+                              )
+                            "
+                          />
+                          {{ source.name }}
+                        </label>
+                      </div>
                       <div v-if="filteredComponentOptions.length === 0" class="component-empty">
                         No matches
                       </div>
@@ -378,6 +438,8 @@
 <script setup>
 import { computed, onMounted, onUnmounted, reactive, ref } from "vue";
 import { useWebServicesStore } from "@/stores/webServices";
+import { useCalendarStore } from "@/stores/calendar";
+import { usePlugins } from "@/composables";
 import {
   MAX_TOP_REGIONS,
   addSubRegion,
@@ -410,6 +472,8 @@ const props = defineProps({
 
 const emit = defineEmits(["update:config"]);
 const webServicesStore = useWebServicesStore();
+const calendarStore = useCalendarStore();
+const { plugins, pluginInstances, loadingPlugins, loadPlugins } = usePlugins();
 const previewRefs = new Map();
 const subPreviewRefs = new Map();
 const dragState = ref(null);
@@ -490,14 +554,21 @@ const previewStyleFor = layout => {
 };
 
 const services = computed(() => webServicesStore.services);
+const calendarSources = computed(() => calendarStore.sources || []);
+const imageInstances = computed(() =>
+  plugins.value
+    .filter(plugin => plugin.type === "image" && plugin.enabled)
+    .flatMap(plugin => pluginInstances.value[plugin.id] || [])
+    .sort((a, b) => (a.display_order ?? 0) - (b.display_order ?? 0))
+);
 const componentOptions = computed(() => [
-  { value: "calendar", label: "Calendar", kind: "calendar", serviceId: null },
-  { value: "photos", label: "Photos", kind: "photos", serviceId: null },
+  { value: "calendar", label: "Calendar", kind: "calendar", instanceIds: [] },
+  { value: "photos", label: "Photos", kind: "photos", instanceIds: [] },
   ...services.value.map(service => ({
     value: `service:${service.id}`,
     label: service.name,
     kind: "service",
-    serviceId: service.id,
+    instanceIds: [service.id],
   })),
 ]);
 const filteredComponentOptions = computed(() => {
@@ -578,7 +649,8 @@ const selectRegionComponent = (screenIndex, regionIndex, option) => {
   layout.regions[regionIndex] = {
     ...layout.regions[regionIndex],
     kind: option.kind,
-    serviceId: option.kind === "service" ? option.serviceId : null,
+    serviceId: option.kind === "service" ? option.instanceIds?.[0] || null : null,
+    instanceIds: option.instanceIds || [],
   };
   openComponentPickerKey.value = null;
   componentSearch.value = "";
@@ -588,7 +660,8 @@ const selectRegionComponent = (screenIndex, regionIndex, option) => {
 const selectSubRegionComponent = (screenIndex, regionIndex, subIndex, option) => {
   const layout = setSubRegionContent(cloneLayout(screenIndex), regionIndex, subIndex, {
     kind: option.kind,
-    serviceId: option.serviceId,
+    serviceId: option.instanceIds?.[0] || null,
+    instanceIds: option.instanceIds || [],
   });
   openComponentPickerKey.value = null;
   componentSearch.value = "";
@@ -628,16 +701,83 @@ const toggleComponentPicker = (screenId, regionId) => {
   componentSearch.value = "";
 };
 
+const sourceOptionsFor = kind => {
+  if (kind === "calendar") {
+    return calendarSources.value.map(source => ({ id: source.id, name: source.name }));
+  }
+  if (kind === "photos") {
+    return imageInstances.value.map(instance => ({ id: instance.id, name: instance.name }));
+  }
+  return [];
+};
+
+const sourceSelectionLabel = region => {
+  const ids = region.instanceIds || [];
+  if (region.kind !== "calendar" && region.kind !== "photos") return "";
+  if (ids.length === 0) return "All sources";
+  if (ids.length === 1) {
+    const source = sourceOptionsFor(region.kind).find(option => option.id === ids[0]);
+    return source?.name || "1 source";
+  }
+  return `${ids.length} sources`;
+};
+
+const toggleRegionSource = (screenIndex, regionIndex, sourceId, checked) => {
+  const layout = cloneLayout(screenIndex);
+  const region = layout.regions[regionIndex];
+  if (!region) return;
+  const current = new Set(region.instanceIds || []);
+  if (checked) current.add(sourceId);
+  else current.delete(sourceId);
+  region.instanceIds = [...current];
+  region.serviceId = null;
+  updateScreen(screenIndex, { layout });
+};
+
+const toggleSubRegionSource = (screenIndex, regionIndex, subIndex, sourceId, checked) => {
+  const layout = cloneLayout(screenIndex);
+  const sub = layout.regions[regionIndex]?.split?.regions?.[subIndex];
+  if (!sub) return;
+  const current = new Set(sub.instanceIds || []);
+  if (checked) current.add(sourceId);
+  else current.delete(sourceId);
+  sub.instanceIds = [...current];
+  sub.serviceId = null;
+  updateScreen(screenIndex, { layout });
+};
+
+const clearRegionSources = (screenIndex, regionIndex) => {
+  const layout = cloneLayout(screenIndex);
+  const region = layout.regions[regionIndex];
+  if (!region) return;
+  region.instanceIds = [];
+  region.serviceId = null;
+  updateScreen(screenIndex, { layout });
+};
+
+const clearSubRegionSources = (screenIndex, regionIndex, subIndex) => {
+  const layout = cloneLayout(screenIndex);
+  const sub = layout.regions[regionIndex]?.split?.regions?.[subIndex];
+  if (!sub) return;
+  sub.instanceIds = [];
+  sub.serviceId = null;
+  updateScreen(screenIndex, { layout });
+};
+
 const cloneLayout = screenIndex => {
   const screen = dashboardScreens.value.screens[screenIndex];
   return {
     ...screen.layout,
     regions: screen.layout.regions.map(region => ({
       ...region,
+      instanceIds: [...(region.instanceIds || [])],
       split: region.split
         ? {
             ...region.split,
-            regions: region.split.regions.map(sub => ({ ...sub })),
+            regions: region.split.regions.map(sub => ({
+              ...sub,
+              instanceIds: [...(sub.instanceIds || [])],
+            })),
           }
         : null,
     })),
@@ -777,10 +917,12 @@ const deleteScreen = screenIndex => {
 const regionLabel = previewIndex => `Region ${previewIndex + 1}`;
 
 const regionKindLabel = region => {
-  if (region.kind === "calendar") return "Calendar";
-  if (region.kind === "photos") return "Photos";
+  if (region.kind === "calendar") return `Calendar - ${sourceSelectionLabel(region)}`;
+  if (region.kind === "photos") return `Photos - ${sourceSelectionLabel(region)}`;
   if (region.kind === "service") {
-    const service = services.value.find(item => item.id === region.serviceId);
+    const service = services.value.find(
+      item => item.id === (region.instanceIds?.[0] || region.serviceId)
+    );
     return service?.name || "Service";
   }
   return "Region";
@@ -807,6 +949,12 @@ const resizeRegionAtIndex = (regions, index, size) => {
 onMounted(async () => {
   if (webServicesStore.services.length === 0 && !webServicesStore.loading) {
     await webServicesStore.fetchServices();
+  }
+  if (calendarStore.sources.length === 0 && !calendarStore.loading) {
+    await calendarStore.fetchSources();
+  }
+  if (plugins.value.length === 0 && !loadingPlugins.value) {
+    await loadPlugins();
   }
 });
 
@@ -1106,6 +1254,25 @@ onUnmounted(() => {
 .component-option:focus {
   background: var(--bg-secondary);
   outline: none;
+}
+
+.source-options {
+  border-top: 1px solid var(--border-color);
+  padding: 0.35rem 0;
+}
+
+.source-option {
+  display: flex;
+  align-items: center;
+  gap: 0.45rem;
+  padding: 0.45rem 0.65rem;
+  color: var(--text-primary);
+  cursor: pointer;
+  font-size: 0.9rem;
+}
+
+.source-option:hover {
+  background: var(--bg-secondary);
 }
 
 .component-empty {

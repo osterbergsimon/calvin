@@ -169,6 +169,33 @@ class TestPluginImageService:
                 assert result is not None
                 assert result["id"] == "img1"
 
+    async def test_get_images_filters_by_source_ids(self):
+        """Test get_images can filter to selected image plugin instances."""
+        service = PluginImageService()
+
+        mock_plugin_type = MagicMock(
+            type_id="local", enabled=True, common_config_schema={"display_order": "0"}
+        )
+        mock_db_plugins = [
+            MagicMock(id="family-images", type_id="local", display_order=0),
+            MagicMock(id="personal-images", type_id="local", display_order=1),
+        ]
+
+        family_images = [{"id": "family-img", "source": "family-images"}]
+        personal_images = [{"id": "personal-img", "source": "personal-images"}]
+
+        type_patch, db_patch = create_mock_ormar_models([mock_plugin_type], mock_db_plugins)
+        with type_patch, db_patch:
+            with patch("app.services.plugin_image_service.plugin_manager") as mock_manager:
+                mock_manager.get_plugins.return_value = [
+                    MockImagePlugin("family-images", family_images),
+                    MockImagePlugin("personal-images", personal_images),
+                ]
+
+                result = await service.get_images(source_ids=["personal-images"])
+
+                assert result == personal_images
+
     async def test_get_current_image_returns_current(self):
         """Test get_current_image returns current image when set."""
         service = PluginImageService()

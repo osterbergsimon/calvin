@@ -86,30 +86,30 @@ export const MAX_TOP_REGIONS = 8;
 export const DASHBOARD_LAYOUT_PRESETS = {
   single: {
     label: "Single Region",
-    regions: [{ id: "region-1", kind: "calendar", size: 100 }],
+    regions: [{ id: "region-1", kind: "calendar", instanceIds: [], size: 100 }],
   },
   split_two: {
     label: "Two Regions",
     regions: [
-      { id: "region-1", kind: "calendar", size: 70 },
-      { id: "region-2", kind: "photos", size: 30 },
+      { id: "region-1", kind: "calendar", instanceIds: [], size: 70 },
+      { id: "region-2", kind: "photos", instanceIds: [], size: 30 },
     ],
   },
   split_three: {
     label: "Three Regions",
     regions: [
-      { id: "region-1", kind: "calendar", size: 50 },
-      { id: "region-2", kind: "photos", size: 25 },
-      { id: "region-3", kind: "service", size: 25 },
+      { id: "region-1", kind: "calendar", instanceIds: [], size: 50 },
+      { id: "region-2", kind: "photos", instanceIds: [], size: 25 },
+      { id: "region-3", kind: "service", instanceIds: [], size: 25 },
     ],
   },
   split_four: {
     label: "Four Regions",
     regions: [
-      { id: "region-1", kind: "calendar", size: 25 },
-      { id: "region-2", kind: "photos", size: 25 },
-      { id: "region-3", kind: "service", size: 25 },
-      { id: "region-4", kind: "service", size: 25 },
+      { id: "region-1", kind: "calendar", instanceIds: [], size: 25 },
+      { id: "region-2", kind: "photos", instanceIds: [], size: 25 },
+      { id: "region-3", kind: "service", instanceIds: [], size: 25 },
+      { id: "region-4", kind: "service", instanceIds: [], size: 25 },
     ],
   },
 };
@@ -275,6 +275,7 @@ export function createLegacyDashboardLayout(config = {}) {
         id: "region-2",
         kind: secondaryKind,
         serviceId: null,
+        instanceIds: [],
         size: 100 - calendarSize,
       },
     ],
@@ -297,10 +298,12 @@ export function normalizeDashboardLayout(layout, legacyConfig = {}) {
       };
     const kind = DASHBOARD_REGION_KINDS.includes(region.kind) ? region.kind : presetRegion.kind;
     const id = region.id || presetRegion.id || `region-${index + 1}`;
+    const instanceIds = normalizeRegionInstanceIds(region, kind);
     return {
       id,
       kind,
-      serviceId: kind === "service" ? region.serviceId || null : null,
+      serviceId: kind === "service" ? instanceIds[0] || null : null,
+      instanceIds,
       size: clampRegionSize(region.size ?? presetRegion.size ?? 100 / sourceRegions.length),
       split: normalizeRegionSplit(region.split, id),
     };
@@ -342,10 +345,12 @@ export function createDashboardLayoutFromPreset(preset, existingLayout = null) {
     regions: presetConfig.regions.map((region, index) => {
       const existing = existingRegions[index] || {};
       const kind = DASHBOARD_REGION_KINDS.includes(existing.kind) ? existing.kind : region.kind;
+      const instanceIds = normalizeRegionInstanceIds(existing, kind);
       return {
         ...region,
         kind,
-        serviceId: kind === "service" ? existing.serviceId || region.serviceId || null : null,
+        serviceId: kind === "service" ? instanceIds[0] || region.serviceId || null : null,
+        instanceIds: instanceIds.length ? instanceIds : normalizeRegionInstanceIds(region, kind),
         size: existing.size ?? region.size,
       };
     }),
@@ -400,10 +405,12 @@ function normalizeRegionSplit(split, parentId) {
   if (subs.length < 2) return null;
   const normalized = subs.map((sub, index) => {
     const kind = DASHBOARD_REGION_KINDS.includes(sub.kind) ? sub.kind : "photos";
+    const instanceIds = normalizeRegionInstanceIds(sub, kind);
     return {
       id: sub.id || `${parentId}-${String.fromCharCode(97 + index)}`,
       kind,
-      serviceId: kind === "service" ? sub.serviceId || null : null,
+      serviceId: kind === "service" ? instanceIds[0] || null : null,
+      instanceIds,
       size: clampRegionSize(Number(sub.size) || 100 / subs.length),
     };
   });
@@ -450,6 +457,7 @@ export function addTopRegion(layout, opts = {}) {
     id: opts.id || nextRegionId(layout.regions),
     kind: opts.kind || "service",
     serviceId: null,
+    instanceIds: normalizeRegionInstanceIds(opts, opts.kind || "service"),
     size: newRegionSize,
     split: null,
   };
@@ -484,13 +492,16 @@ export function splitTopRegion(layout, topIndex) {
       {
         id: `${parentId}-a`,
         kind: target.kind,
-        serviceId: target.kind === "service" ? target.serviceId || null : null,
+        serviceId:
+          target.kind === "service" ? target.instanceIds?.[0] || target.serviceId || null : null,
+        instanceIds: normalizeRegionInstanceIds(target, target.kind),
         size: 50,
       },
       {
         id: `${parentId}-b`,
         kind: secondaryKind,
         serviceId: null,
+        instanceIds: [],
         size: 50,
       },
     ],
@@ -511,7 +522,9 @@ export function unsplitTopRegion(layout, topIndex) {
       ? {
           id: region.id,
           kind: subA.kind,
-          serviceId: subA.kind === "service" ? subA.serviceId || null : null,
+          serviceId:
+            subA.kind === "service" ? subA.instanceIds?.[0] || subA.serviceId || null : null,
+          instanceIds: normalizeRegionInstanceIds(subA, subA.kind),
           size: region.size,
           split: null,
         }
@@ -520,7 +533,7 @@ export function unsplitTopRegion(layout, topIndex) {
   return { ...layout, regions };
 }
 
-export function setSubRegionContent(layout, topIndex, subIndex, { kind, serviceId }) {
+export function setSubRegionContent(layout, topIndex, subIndex, { kind, serviceId, instanceIds }) {
   const region = layout?.regions?.[topIndex];
   if (!region?.split) return layout;
   const subs = region.split.regions.map((sub, index) =>
@@ -528,7 +541,8 @@ export function setSubRegionContent(layout, topIndex, subIndex, { kind, serviceI
       ? {
           ...sub,
           kind,
-          serviceId: kind === "service" ? serviceId || null : null,
+          serviceId: kind === "service" ? instanceIds?.[0] || serviceId || null : null,
+          instanceIds: normalizeRegionInstanceIds({ serviceId, instanceIds }, kind),
         }
       : sub
   );
@@ -596,7 +610,11 @@ export function removeSubRegion(layout, topIndex, subIndex) {
         ? {
             id: candidate.id,
             kind: surviving.kind,
-            serviceId: surviving.kind === "service" ? surviving.serviceId || null : null,
+            serviceId:
+              surviving.kind === "service"
+                ? surviving.instanceIds?.[0] || surviving.serviceId || null
+                : null,
+            instanceIds: normalizeRegionInstanceIds(surviving, surviving.kind),
             size: candidate.size,
             split: null,
           }
@@ -616,6 +634,21 @@ function updateLayoutSplit(layout, topIndex, subs) {
       : candidate
   );
   return { ...layout, regions };
+}
+
+function normalizeRegionInstanceIds(region, kind) {
+  if (!region || (kind !== "calendar" && kind !== "photos" && kind !== "service")) return [];
+  const rawIds = Array.isArray(region.instanceIds)
+    ? region.instanceIds
+    : region.instanceId
+      ? [region.instanceId]
+      : region.serviceId
+        ? [region.serviceId]
+        : [];
+  const ids = [
+    ...new Set(rawIds.filter(id => typeof id === "string" && id.trim()).map(id => id.trim())),
+  ];
+  return kind === "service" ? ids.slice(0, 1) : ids;
 }
 
 function nextSubId(parentId, subs) {
