@@ -554,11 +554,14 @@ const previewStyleFor = layout => {
 };
 
 const services = computed(() => webServicesStore.services);
-const calendarSources = computed(() => calendarStore.sources || []);
+const calendarSources = computed(() =>
+  (calendarStore.sources || []).filter(source => source.enabled !== false)
+);
 const imageInstances = computed(() =>
   plugins.value
     .filter(plugin => plugin.type === "image" && plugin.enabled)
     .flatMap(plugin => pluginInstances.value[plugin.id] || [])
+    .filter(instance => instance.enabled !== false)
     .sort((a, b) => (a.display_order ?? 0) - (b.display_order ?? 0))
 );
 const componentOptions = computed(() => [
