@@ -107,23 +107,6 @@ class IframeServicePlugin(ServicePlugin):
         # Nothing to cleanup for iframe
         pass
 
-    async def get_content(self) -> dict[str, Any]:
-        """
-        Get service content for display.
-
-        Returns:
-            Dictionary with content information
-        """
-        return {
-            "type": "iframe",
-            "url": self.url,
-            "fullscreen": self.fullscreen,
-            "config": {
-                "allowFullscreen": True,
-                "sandbox": "allow-same-origin allow-scripts allow-forms allow-popups",
-            },
-        }
-
     async def fetch_service_data(
         self,
         start_date: str | None = None,

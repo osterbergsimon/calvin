@@ -751,9 +751,6 @@ class TestServicePluginDataAPI:
         async def cleanup(self) -> None:
             pass
 
-        async def get_content(self) -> dict[str, Any]:
-            return {"type": "api", "url": "/api/plugins/test-service-instance/data"}
-
         async def validate_config(self, config: dict[str, Any]) -> bool:
             return True
 

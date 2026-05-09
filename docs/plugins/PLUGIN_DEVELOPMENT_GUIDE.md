@@ -83,9 +83,7 @@ satisfy a small set of contracts. Full reference: [PLUGIN_INTERFACE.md](PLUGIN_I
 - **Image**: `upload_image`, `delete_image`, `get_thumbnail_path`.
 - **Service**: `fetch_service_data(start_date, end_date)` — the canonical data source for
   schema-driven dashboard rendering. `handle_webhook`, `handle_api_request` for
-  push/pull integrations. `get_content()` is the legacy data shape and is no longer
-  required; new plugins should leave it as the default and use `fetch_service_data`
-  instead.
+  push/pull integrations.
 - **All**: `configure(config)`, `test_type_config(config)` (classmethod, replaces the
   legacy `test_plugin_connection` hook), `scan_type_options(field_key)` (classmethod,
   replaces the legacy `scan_plugin_options` hook), `fetch_type_data(instance_id)`
