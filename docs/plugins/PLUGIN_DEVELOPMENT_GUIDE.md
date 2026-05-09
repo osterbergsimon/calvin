@@ -1,159 +1,122 @@
 # Plugin Development Guide
 
-This guide explains how to create plugins for Calvin. The plugin system uses `pluggy` for automatic discovery and registration, making it easy to add new functionality without modifying core code.
+This is the host-side reference for the Calvin plugin system: the contracts a plugin must
+implement, the SDK helpers Calvin provides, and the display contract for dashboard UI.
+
+If you are creating a plugin for the first time, start with
+[`calvin-plugins/CREATING_PLUGINS.md`](../../../calvin-plugins/CREATING_PLUGINS.md) — it
+contains the scaffold script, directory layout, and step-by-step walkthrough. Use this
+guide alongside it when you need to know what the host expects on the other end of the
+contract.
+
+For the package format itself (`plugin.json`, manifest fields, install rules), see
+[PLUGIN_PACKAGE_FORMAT.md](PLUGIN_PACKAGE_FORMAT.md).
+
+## Where Plugins Live
+
+Plugins are **not** part of the Calvin host repo. They live in
+[`../calvin-plugins/`](../../../calvin-plugins/) (a sibling repo) and are installed at
+runtime into `backend/data/plugins/{plugin_id}/`. Each installed plugin is a directory with
+a `plugin.json` manifest, a `plugin.py` entry point, and optional `frontend/` and `assets/`
+folders. The host loads them via Pluggy at startup — there is no in-tree import to add.
+
+A handful of foundational plugins (e.g. the iframe service) still ship inside
+`backend/app/plugins/` because they are needed before any external plugins are installed.
+New plugins should go in `calvin-plugins`, not in-tree.
 
 ## Table of Contents
 
-1. [Plugin Architecture](#plugin-architecture)
-2. [Plugin Types](#plugin-types)
-3. [Creating a Plugin](#creating-a-plugin)
-4. [Plugin Metadata](#plugin-metadata)
-5. [UI Schema](#ui-schema)
-6. [Example Plugins](#example-plugins)
-7. [Best Practices](#best-practices)
-
-## Plugin Architecture
-
-Calvin uses a self-contained plugin architecture where each plugin:
-
-- **Registers itself** via `pluggy` hooks
-- **Provides its own metadata** including configuration schema and UI definitions
-- **Is automatically discovered** when the module is imported
-- **Requires no code changes** to core files when adding new plugins
-
-### Key Components
-
-- **`BasePlugin`**: Abstract base class all plugins inherit from
-- **`PluginType`**: Enum defining plugin categories (CALENDAR, IMAGE, SERVICE)
-- **Protocol Classes**: Specific interfaces for each plugin type (`CalendarPlugin`, `ImagePlugin`, `ServicePlugin`)
-- **Pluggy Hooks**: `register_plugin_types()` and `create_plugin_instance()` for auto-discovery
+1. [Plugin Types](#plugin-types)
+2. [Plugin Contract](#plugin-contract)
+3. [Hooks (Pluggy)](#hooks-pluggy)
+4. [Plugin SDK](#plugin-sdk)
+5. [Instance Manager](#instance-manager)
+6. [Display Schema (Service Plugins)](#display-schema-service-plugins)
+7. [Statusbar Schema](#statusbar-schema)
+8. [Configuration UI Schema](#configuration-ui-schema)
+9. [Cross-Plugin Events](#cross-plugin-events)
+10. [Best Practices](#best-practices)
+11. [Troubleshooting](#troubleshooting)
 
 ## Plugin Types
 
-### Calendar Plugins
+The `PluginType` enum in [base.py](../../backend/app/plugins/base.py) defines the
+supported categories:
 
-Provide calendar events from external sources (Google Calendar, iCal, etc.).
+| Type | Purpose | SDK module |
+|---|---|---|
+| `calendar` | Calendar events from external sources (Google, iCal, CalDAV). | `app.plugins.sdk.calendar` |
+| `image` | Image sources for the photo mode (filesystem, APIs, IMAP attachments). | `app.plugins.sdk.image` |
+| `service` | Dashboard cards: web embeds, API-driven widgets, status displays. | `app.plugins.sdk.service` |
+| `backend` | Headless background work, event handlers, processing jobs. | `app.plugins.sdk.backend` |
+| `theme` | Visual theme bundles. **Not a Pluggy plugin** — themes are CSS bundles installed via `app.services.theme_installer`, not Python modules. The enum value exists only so the management routes can tag theme records uniformly. Skip if you're writing a Python plugin. | (no SDK) |
 
-**Required Methods:**
-- `fetch_events(start_date, end_date)` - Fetch events for a date range
-- `validate_config(config)` - Validate configuration
+Each non-theme type has a matching protocol class in
+[protocols.py](../../backend/app/plugins/protocols.py) (`CalendarPlugin`, `ImagePlugin`,
+`ServicePlugin`, `BackendPlugin`) that the plugin class subclasses.
 
-**Example Use Cases:**
-- Google Calendar integration
-- iCal/ICS feed parsing
-- CalDAV servers
+## Plugin Contract
 
-### Image Plugins
+All plugins inherit from `BasePlugin` ([base.py](../../backend/app/plugins/base.py)) and
+satisfy a small set of contracts. Full reference: [PLUGIN_INTERFACE.md](PLUGIN_INTERFACE.md).
 
-Provide images from various sources (local filesystem, APIs, etc.).
+### Required on every plugin (`BasePlugin`)
 
-**Required Methods:**
-- `get_images()` - Get all available images
-- `get_image(image_id)` - Get image metadata by ID
-- `get_image_data(image_id)` - Get image file data
-- `scan_images()` - Scan for new/updated images
-- `upload_image(file_data, filename)` - Optional: upload support
-- `delete_image(image_id)` - Optional: deletion support
+- `plugin_type` (property): returns one of the `PluginType` values.
+- `get_plugin_metadata()` (classmethod): returns a `PluginDefinition` (or compatible dict).
+  Prefer the SDK `build_*_plugin_metadata` helpers — they fill in defaults and produce a
+  validated definition.
+- `initialize()` (async): set up resources. Call `self.start()` on success.
+- `cleanup()` (async): tear down resources. Call `self.stop()` first.
 
-**Example Use Cases:**
-- Local filesystem image directory
-- Unsplash API
-- IMAP email attachments
-- Cloud storage (S3, etc.)
+### Per-type required methods
 
-### Service Plugins
+| Type | Required protocol methods |
+|---|---|
+| `calendar` | `fetch_events(start_date, end_date)`, `validate_config(config)` |
+| `image` | `get_images()`, `get_image(id)`, `get_image_data(id)`, `scan_images()`, `validate_config(config)` |
+| `service` | `get_content()`, `validate_config(config)` |
+| `backend` | `validate_config(config)` |
 
-Display web services, APIs, or custom content (iframes, meal plans, etc.).
+### Per-type optional methods
 
-**Required Methods:**
-- `get_content()` - Get service content for display
-- `validate_config(config)` - Validate configuration
+- **Image**: `upload_image`, `delete_image`, `get_thumbnail_path`.
+- **Service**: `fetch_service_data(start_date, end_date)` — the canonical data source for
+  schema-driven dashboard rendering. `handle_webhook`, `handle_api_request` for
+  push/pull integrations.
+- **All**: `configure(config)`, `test_type_config(config)` (classmethod, replaces the
+  legacy `test_plugin_connection` hook), `scan_type_options(field_key)` (classmethod,
+  replaces the legacy `scan_plugin_options` hook), `fetch_type_data(instance_id)`
+  (classmethod, replaces the legacy `fetch_plugin_data` hook).
 
-**Optional Methods:**
-- `handle_webhook(payload)` - Handle incoming webhooks
-- `handle_api_request(method, path, data)` - Handle API requests
+> Newer host code prefers class-based methods (`test_type_config`, `scan_type_options`,
+> `fetch_type_data`) on the plugin class over the corresponding Pluggy hooks. The hooks
+> still work but are marked deprecated in [hooks.py](../../backend/app/plugins/hooks.py).
 
-**Example Use Cases:**
-- Iframe embeds
-- API-driven displays (Mealie meal plans, etc.)
-- Webhook receivers
+### Core code rules (host-side)
 
-## Creating a Plugin
+The host follows strict rules when calling plugins (see PLUGIN_INTERFACE.md):
 
-### Step 1: Choose Plugin Type and Location
+- **No `hasattr()`** to probe for plugin methods — go through protocol methods only.
+- **No `getattr()`** for plugin attributes — same reason.
+- **`isinstance()` checks** before invoking type-specific methods.
+- **No private methods** (anything prefixed with `_`).
 
-Create your plugin file in the appropriate directory:
+Plugins should similarly avoid reaching into host internals beyond the documented surface
+(`app.plugins.*`, `app.plugins.sdk.*`, `app.plugins.utils.instance_manager.*`, the event
+system, and any explicitly public utilities under `app.utils`).
 
-```
-backend/app/plugins/
-├── calendar/     # Calendar plugins
-│   └── my_calendar.py
-├── image/        # Image plugins
-│   └── my_image.py
-└── service/      # Service plugins
-    └── my_service.py
-```
+## Hooks (Pluggy)
 
-### Step 2: Create Plugin Class
-
-Inherit from the appropriate protocol class:
+Plugins register themselves via two required Pluggy hooks at the module level of
+`plugin.py`:
 
 ```python
-from app.plugins.base import PluginType
-from app.plugins.protocols import ServicePlugin
 from app.plugins.hooks import hookimpl
 
-class MyServicePlugin(ServicePlugin):
-    """My custom service plugin."""
-    
-    @classmethod
-    def get_plugin_metadata(cls) -> dict[str, Any]:
-        """Return plugin metadata for registration."""
-        return {
-            "type_id": "my_service",
-            "plugin_type": PluginType.SERVICE,
-            "name": "My Service",
-            "description": "Description of my service",
-            "version": "1.0.0",
-            "common_config_schema": {
-                # Configuration schema (see below)
-            },
-        }
-    
-    def __init__(self, plugin_id: str, name: str, ...):
-        super().__init__(plugin_id, name)
-        # Initialize your plugin
-    
-    async def initialize(self) -> None:
-        """Initialize the plugin."""
-        pass
-    
-    async def cleanup(self) -> None:
-        """Cleanup plugin resources."""
-        pass
-    
-    async def fetch_service_data(
-        self,
-        start_date: str | None = None,
-        end_date: str | None = None,
-    ) -> dict[str, Any]:
-        """Return the data payload that this plugin's display_schema binds to."""
-        return {"url": "https://example.com"}
-
-    async def validate_config(self, config: dict[str, Any]) -> bool:
-        """Validate configuration."""
-        return True
-```
-
-### Step 3: Register Plugin Hooks
-
-Add hook implementations at the module level:
-
-```python
 @hookimpl
 def register_plugin_types() -> list[dict[str, Any]]:
-    """Register this plugin type."""
-    return [MyServicePlugin.get_plugin_metadata()]
+    return [MyPlugin.get_plugin_metadata()]
 
 @hookimpl
 def create_plugin_instance(
@@ -161,456 +124,313 @@ def create_plugin_instance(
     type_id: str,
     name: str,
     config: dict[str, Any],
-) -> MyServicePlugin | None:
-    """Create a plugin instance."""
-    if type_id != "my_service":
+) -> MyPlugin | None:
+    if type_id != "my_plugin":
         return None
-    
-    return MyServicePlugin(
-        plugin_id=plugin_id,
-        name=name,
-        # ... extract config values
+    # Use the SDK helper instead of hand-rolling instance construction:
+    return create_service_plugin_instance(MyPlugin, ..., fields=SERVICE_FIELDS)
+```
+
+Optional hooks are documented in [hooks.py](../../backend/app/plugins/hooks.py):
+
+- `handle_plugin_config_update` — runs when a plugin type's config changes; should
+  delegate to `handle_plugin_config_update_generic` (see
+  [Instance Manager](#instance-manager)).
+- `test_plugin_connection`, `fetch_plugin_data`, `scan_plugin_options`,
+  `fetch_service_data` — **deprecated** in favor of class-based equivalents on
+  `BasePlugin`. Implement these on the plugin class instead.
+
+## Plugin SDK
+
+The SDK (`app.plugins.sdk.*`) provides per-type helpers that remove boilerplate from
+plugin code. New plugins **should use the SDK** — the scaffold script in `calvin-plugins`
+generates SDK-first templates for every plugin type.
+
+For each type there is a parallel set of helpers:
+
+| Helper | Purpose |
+|---|---|
+| `<Type>ConfigField` | Declarative field spec: name, default, converter (`str`, `int`, `bool`, `path_or_none`, etc.). |
+| `build_<type>_plugin_metadata(...)` | Builds a `PluginDefinition` dict with type-correct defaults. |
+| `extract_<type>_config(config, fields)` | Pulls instance config values out using the field tuple. |
+| `create_<type>_plugin_instance(cls, ..., fields)` | Instantiates the plugin class from a config dict; for use inside `create_plugin_instance`. |
+| `build_<type>_manager_config(...)` | Builds an `InstanceManagerConfig` for use with the generic instance manager. |
+
+Example service plugin entry point — see
+[`calvin-plugins/CREATING_PLUGINS.md`](../../../calvin-plugins/CREATING_PLUGINS.md) for a
+full walkthrough.
+
+```python
+from app.plugins.sdk.service import (
+    ServiceConfigField,
+    build_service_plugin_metadata,
+    create_service_plugin_instance,
+    build_service_manager_config,
+)
+
+SERVICE_FIELDS = (
+    ServiceConfigField("api_key", default="", converter=str),
+)
+
+class MyServicePlugin(ServicePlugin):
+    @classmethod
+    def get_plugin_metadata(cls):
+        return build_service_plugin_metadata(
+            type_id="my_plugin",
+            name="My Plugin",
+            plugin_class=cls,
+            supports_multiple_instances=True,
+            instance_config_schema={ "api_key": { "type": "password", ... } },
+            display_schema={ "kind": "status-tile", "value_path": "$.value" },
+        )
+```
+
+## Instance Manager
+
+Use `handle_plugin_config_update_generic` from
+[`app.plugins.utils.instance_manager`](../../backend/app/plugins/utils/instance_manager.py)
+instead of writing CRUD for plugin instances. It handles single-instance and multi-instance
+plugins, reconciles the database state with incoming config, and fires lifecycle hooks.
+
+```python
+from app.plugins.utils.instance_manager import handle_plugin_config_update_generic
+
+@hookimpl
+async def handle_plugin_config_update(type_id, config, enabled, db_type, session):
+    if type_id != "my_plugin":
+        return None
+    manager_config = build_service_manager_config(
+        type_id="my_plugin",
+        fields=SERVICE_FIELDS,
+        validate_config=lambda c: bool(c.get("api_key")),
+        generate_instance_id=lambda c, _: f"my-plugin-{abs(hash(c['api_key'])) % 100000}",
+    )
+    return await handle_plugin_config_update_generic(
+        type_id=type_id, config=config, enabled=enabled,
+        db_type=db_type, session=session, manager_config=manager_config,
     )
 ```
 
-### Step 4: Import Plugin Module
-
-Add an import in `backend/app/plugins/__init__.py` to trigger auto-discovery:
-
-```python
-from app.plugins.service import my_service  # noqa: F401
-```
-
-## Plugin Metadata
-
-The `get_plugin_metadata()` method returns a dictionary with:
-
-### Required Fields
-
-- **`type_id`**: Unique identifier (e.g., `"mealie"`, `"local"`, `"google"`)
-- **`plugin_type`**: Plugin category (`PluginType.CALENDAR`, `PluginType.IMAGE`, or `PluginType.SERVICE`)
-- **`name`**: Human-readable name
-- **`description`**: Plugin description
-
-### Optional Fields
-
-- **`version`**: Plugin version (default: `"1.0.0"`)
-- **`common_config_schema`**: Configuration schema (see [UI Schema](#ui-schema))
-- **`ui_actions`**: List of action buttons (Save, Test, Fetch, etc.)
-- **`ui_sections`**: List of UI sections for file uploads, etc.
-- **`display_schema`**: Schema for displaying service content (Service plugins only)
-- **`plugin_class`**: Plugin class reference
-
-## UI Schema
-
-The `common_config_schema` defines configuration fields and their UI representation.
-
-### Basic Field Schema
-
-```python
-"common_config_schema": {
-    "field_name": {
-        "type": "string",  # string, integer, boolean, password, etc.
-        "description": "Field description",
-        "default": "default_value",
-        "ui": {
-            "component": "input",  # input, password, number, textarea, select, etc.
-            "placeholder": "Enter value...",
-            "help_text": "Additional help text",
-            "validation": {
-                "required": True,
-                "type": "url",  # url, email, etc.
-                "min": 1,
-                "max": 100,
-            },
-        },
-    },
-}
-```
-
-### Field Types
-
-- **`string`**: Text input
-- **`password`**: Password input (masked)
-- **`integer`**: Number input
-- **`boolean`**: Checkbox
-- **`textarea`**: Multi-line text
-
-### UI Components
-
-- **`input`**: Standard text input
-- **`password`**: Password input
-- **`number`**: Number input
-- **`textarea`**: Multi-line textarea
-- **`select`**: Dropdown (requires `options` in UI)
-
-### Special Features
-
-#### Browse Button
-
-For directory/file selection:
-
-```python
-"ui": {
-    "component": "input",
-    "browse_button": True,  # Shows browse button
-    "browse_type": "directory",  # or "file"
-}
-```
-
-#### Help Text
-
-```python
-"ui": {
-    "help_text": "This field does something important",
-}
-```
-
-### UI Actions
-
-Define action buttons (Save, Test, Fetch, etc.):
-
-```python
-"ui_actions": [
-    {
-        "id": "save",
-        "type": "save",
-        "label": "Save Settings",
-        "style": "primary",
-    },
-    {
-        "id": "test",
-        "type": "test",
-        "label": "Test Connection",
-        "style": "secondary",
-    },
-]
-```
-
-### UI Sections
-
-For file uploads or complex inputs:
-
-```python
-"ui_sections": [
-    {
-        "id": "file_upload",
-        "title": "Upload Files",
-        "type": "file_upload",
-        "fields": ["file_path"],
-        "accept": ".jpg,.png",
-    },
-]
-```
+For multi-instance plugins, supply a stable `generate_instance_id` so existing instances
+survive config edits.
 
 ## Display Schema (Service Plugins)
 
-Service plugins describe their dashboard UI declaratively via `display_schema`. The frontend
-dispatches on `display_schema.kind` and renders the matching built-in Vue component — plugins do
-**not** ship their own Vue components for built-in renderers.
+Service plugins describe their dashboard UI declaratively via `display_schema`. Calvin
+dispatches on `display_schema.kind` and renders the matching built-in Vue component —
+plugins do **not** ship Vue components for built-in renderers, only data.
 
-`kind` is required when `display_schema` is set, and must be one of `SUPPORTED_DISPLAY_KINDS` in
-[backend/app/plugins/definitions.py](../../backend/app/plugins/definitions.py): `status-tile`,
-`status-list`, `status-row`, `card-grid`, `item-list`, `iframe`, `image-with-caption`,
-`metric-dashboard`, `weather-forecast`, or `web-component`. Unknown kinds are rejected at plugin
-load time.
+`kind` is **required** when `display_schema` is set, and must be one of the values in
+`SUPPORTED_DISPLAY_KINDS` in [definitions.py](../../backend/app/plugins/definitions.py).
+Unknown or missing kinds are rejected at plugin load.
+
+### Supported kinds
+
+| Kind | Used for |
+|---|---|
+| `status-tile` | A single value + label tile. |
+| `status-list` | List of `{label, value, status}` rows. |
+| `status-row` | Inline row of small status pills/metrics. |
+| `card-grid` | Grid of cards from an array of items. |
+| `item-list` | Vertical list of items (titles, subtitles, optional thumbs). |
+| `iframe` | Embed an external URL. Pair with `panel_variant: "iframe"`. |
+| `image-with-caption` | Single image surface with optional caption. Pair with `panel_variant: "media"`. |
+| `metric-dashboard` | Multi-tile numeric dashboard. |
+| `weather-forecast` | Current conditions + forecast. |
+| `web-component` | Escape hatch — load a pre-built custom element from the plugin's `frontend/` dir. |
+
+Each kind has its own renderer-specific schema fields (e.g. `value_path`, `url_path`,
+`items_path`). Renderer specs and field reference live in
+[PLUGIN_FRONTEND_COMPONENTS.md](PLUGIN_FRONTEND_COMPONENTS.md).
+
+### Shell fields (apply to every kind)
+
+- `title` — literal title for the dashboard region header.
+- `title_path` — JSONPath-lite into the data payload; wins over `title` when present.
+- `panel_variant` — one of `default`, `dense`, `media`, `iframe`. Controls panel chrome
+  (padding, surface, overflow). Required only when the renderer needs a non-default
+  variant.
+
+### How the data flows
+
+1. Calvin asks the plugin for service data via `ServicePlugin.fetch_service_data()` (or
+   the data endpoint declared in the schema).
+2. The plugin returns a JSON payload.
+3. Calvin's renderer (selected by `kind`) reads the relevant paths from that payload.
 
 ```python
-"display_schema": {
-    "kind": "status-tile",        # required, one of the supported kinds
-    "title_path": "$.location",   # optional shell title (JSONPath-lite into the data payload)
-    "panel_variant": "default",   # one of: default, dense, media, iframe
-    # ...renderer-specific keys (e.g. value_path, status_path, url_path)
+# In get_plugin_metadata():
+display_schema={
+    "kind": "status-tile",
+    "title_path": "$.location.name",
+    "panel_variant": "default",
+    "value_path": "$.temperature",
+    "unit": "°C",
+    "status_path": "$.status",
+}
+
+# On the plugin instance:
+async def fetch_service_data(self, start_date=None, end_date=None):
+    return {
+        "location": {"name": "Stockholm"},
+        "temperature": 18.4,
+        "status": "ok",
+    }
+```
+
+### Web components (escape hatch)
+
+If no built-in kind fits, ship a pre-built custom element in `frontend/dist.js` (and
+optional `dist.css`) and reference it via `kind: "web-component"`:
+
+```python
+display_schema={
+    "kind": "web-component",
+    "element": "calvin-my-plugin",
+    "module": "dist.js",
+    "stylesheet": "dist.css",
 }
 ```
 
-See [PLUGIN_FRONTEND_COMPONENTS.md](PLUGIN_FRONTEND_COMPONENTS.md) for the renderer-specific
-schema fields and the `calvin-plugin-*` body class vocabulary.
+Calvin serves the assets from `/api/plugins/{plugin_id}/static/{asset_path}` and assigns
+the latest service data to the element's `data` property. Use the `calvin-plugin-*` body
+classes documented in PLUGIN_FRONTEND_COMPONENTS.md so custom components inherit Calvin's
+surfaces, spacing, and theming.
 
-## Example Plugins
+There is **no host frontend rebuild** when a plugin is installed. Plugins must ship their
+own pre-built JS/CSS in `frontend/`.
 
-### Example 1: Simple Service Plugin (Iframe)
+## Statusbar Schema
 
-```python
-"""Simple iframe service plugin."""
+Service plugins can also render compact items in the dashboard statusbar via
+`statusbar_schema`. The schema is dispatched the same way as `display_schema` and reads
+the same data payload. See [PLUGIN_FRONTEND_COMPONENTS.md](PLUGIN_FRONTEND_COMPONENTS.md)
+for renderer details.
 
-from typing import Any
-from app.plugins.base import PluginType
-from app.plugins.hooks import hookimpl
-from app.plugins.protocols import ServicePlugin
+## Configuration UI Schema
 
-class IframeServicePlugin(ServicePlugin):
-    """Iframe service plugin."""
-    
-    @classmethod
-    def get_plugin_metadata(cls) -> dict[str, Any]:
-        return {
-            "type_id": "iframe",
-            "plugin_type": PluginType.SERVICE,
-            "name": "Iframe Service",
-            "description": "Display external websites in an iframe",
-            "version": "1.0.0",
-            "common_config_schema": {
-                "url": {
-                    "type": "string",
-                    "description": "Website URL",
-                    "default": "",
-                    "ui": {
-                        "component": "input",
-                        "placeholder": "https://example.com",
-                        "validation": {
-                            "required": True,
-                            "type": "url",
-                        },
-                    },
-                },
-            },
-            "display_schema": {
-                "kind": "iframe",
-                "url_path": "$.url",
-            },
-        }
-    
-    def __init__(self, plugin_id: str, name: str, url: str, enabled: bool = True):
-        super().__init__(plugin_id, name, enabled)
-        self.url = url
-    
-    async def initialize(self) -> None:
-        """Initialize plugin."""
-        pass
-    
-    async def cleanup(self) -> None:
-        """Cleanup plugin."""
-        pass
-    
-    async def fetch_service_data(
-        self,
-        start_date: str | None = None,
-        end_date: str | None = None,
-    ) -> dict[str, Any]:
-        # Surfaces the URL via the schema data endpoint; the host's
-        # iframe renderer reads `$.url` from this payload.
-        return {"url": self.url}
-    
-    async def validate_config(self, config: dict[str, Any]) -> bool:
-        url = config.get("url", "")
-        return bool(url and (url.startswith("http://") or url.startswith("https://")))
-
-@hookimpl
-def register_plugin_types() -> list[dict[str, Any]]:
-    return [IframeServicePlugin.get_plugin_metadata()]
-
-@hookimpl
-def create_plugin_instance(
-    plugin_id: str,
-    type_id: str,
-    name: str,
-    config: dict[str, Any],
-) -> IframeServicePlugin | None:
-    if type_id != "iframe":
-        return None
-    
-    url = config.get("url", "")
-    enabled = config.get("enabled", True)
-    
-    return IframeServicePlugin(
-        plugin_id=plugin_id,
-        name=name,
-        url=url,
-        enabled=enabled,
-    )
-```
-
-### Example 2: Image Plugin with File Upload
+Plugins declare their settings UI via `instance_config_schema` (per-instance) and
+`common_config_schema` (per plugin type — rare). The settings frontend auto-generates
+forms from these schemas via `PluginFieldRenderer`, so plugins should not hand-roll
+settings UI.
 
 ```python
-"""Local image plugin with directory selection."""
-
-from pathlib import Path
-from typing import Any
-from app.plugins.base import PluginType
-from app.plugins.hooks import hookimpl
-from app.plugins.protocols import ImagePlugin
-
-class LocalImagePlugin(ImagePlugin):
-    """Local filesystem image plugin."""
-    
-    @classmethod
-    def get_plugin_metadata(cls) -> dict[str, Any]:
-        return {
-            "type_id": "local",
-            "plugin_type": PluginType.IMAGE,
-            "name": "Local Images",
-            "description": "Load images from local directory",
-            "version": "1.0.0",
-            "common_config_schema": {
-                "image_dir": {
-                    "type": "string",
-                    "description": "Image directory path",
-                    "default": "./data/images",
-                    "ui": {
-                        "component": "input",
-                        "placeholder": "./data/images",
-                        "browse_button": True,
-                        "browse_type": "directory",
-                        "help_text": "Select directory containing images",
-                    },
-                },
-            },
-            "ui_actions": [
-                {
-                    "id": "save",
-                    "type": "save",
-                    "label": "Save Settings",
-                    "style": "primary",
-                },
-            ],
-        }
-    
-    def __init__(self, plugin_id: str, name: str, image_dir: str, enabled: bool = True):
-        super().__init__(plugin_id, name, enabled)
-        self.image_dir = Path(image_dir)
-        self.thumbnail_dir = self.image_dir / "thumbnails"
-    
-    async def initialize(self) -> None:
-        """Initialize plugin - create directories if needed."""
-        self.image_dir.mkdir(parents=True, exist_ok=True)
-        self.thumbnail_dir.mkdir(parents=True, exist_ok=True)
-    
-    async def cleanup(self) -> None:
-        """Cleanup plugin."""
-        pass
-    
-    async def get_images(self) -> list[dict[str, Any]]:
-        """Get all images."""
-        images = []
-        for img_file in self.image_dir.glob("*.jpg"):
-            images.append({
-                "id": img_file.stem,
-                "filename": img_file.name,
-                "path": str(img_file),
-                "source": self.plugin_id,
-            })
-        return images
-    
-    # ... implement other required methods
-    
-    async def validate_config(self, config: dict[str, Any]) -> bool:
-        image_dir = config.get("image_dir", "")
-        return bool(image_dir and Path(image_dir).exists())
-
-@hookimpl
-def register_plugin_types() -> list[dict[str, Any]]:
-    return [LocalImagePlugin.get_plugin_metadata()]
-
-@hookimpl
-def create_plugin_instance(
-    plugin_id: str,
-    type_id: str,
-    name: str,
-    config: dict[str, Any],
-) -> LocalImagePlugin | None:
-    if type_id != "local":
-        return None
-    
-    image_dir = config.get("image_dir", "./data/images")
-    enabled = config.get("enabled", True)
-    
-    return LocalImagePlugin(
-        plugin_id=plugin_id,
-        name=name,
-        image_dir=image_dir,
-        enabled=enabled,
-    )
+"instance_config_schema": {
+    "api_key": {
+        "type": "password",
+        "description": "API key",
+        "default": "",
+        "ui": {
+            "component": "password",
+            "placeholder": "Paste your key",
+            "help_text": "Available in your account dashboard.",
+            "validation": { "required": True },
+        },
+    },
+    "interval_minutes": {
+        "type": "integer",
+        "default": 15,
+        "ui": { "component": "number", "validation": { "min": 1, "max": 1440 } },
+    },
+}
 ```
 
-### Example 3: API-Driven Service Plugin
+**Field types**: `string`, `password`, `integer`, `boolean`, `textarea`.
 
-See the Mealie plugin in the calvin-plugins repository for a complete example of:
-- API authentication
-- Backend proxy endpoints
-- Custom frontend rendering
-- Date range configuration
-- Clickable recipe links
+**UI components**: `input`, `password`, `number`, `textarea`, `select` (with `options`),
+`checkbox`. Add `browse_button: true` (with `browse_type: "directory"` or `"file"`) for
+filesystem pickers.
+
+For action buttons (Save / Test / Fetch / Custom) and structured upload sections, declare
+them as `ui_actions` and `ui_sections` in metadata — both render via the shared
+`PluginActions` and section components.
+
+## Cross-Plugin Events
+
+Plugins can publish and subscribe to events via the host event system. See
+[EVENT_SYSTEM.md](../EVENT_SYSTEM.md) for the full surface. From inside a plugin:
+
+```python
+await self.emit_event(
+    "image_processed",
+    {"image_id": "123", "status": "completed"},
+)
+```
+
+Events are the only sanctioned way for plugins to communicate. **Plugins must not import
+each other** — keep them self-contained.
 
 ## Best Practices
 
-### 1. Self-Contained Plugins
-
-- All plugin code should be in one module
-- No dependencies on other plugins
-- Register yourself via hooks
-
-### 2. Configuration Handling
-
-- Always validate configuration in `validate_config()`
-- Handle missing/optional fields gracefully
-- Store configuration in `_config` or instance variables
-
-### 3. Error Handling
-
-- Use try/except for external API calls
-- Return `None` or empty lists on errors
-- Log errors appropriately
-
-### 4. Resource Management
-
-- Clean up resources in `cleanup()`
-- Close connections, files, etc.
-- Handle async operations properly
-
-### 5. UI Schema
-
-- Provide helpful placeholders and help text
-- Use appropriate validation rules
-- Make required fields clear
-
-### 6. Testing
-
-- Test plugin initialization
-- Test configuration validation
-- Test core functionality
-- Test error cases
-
-### 7. Documentation
-
-- Document your plugin's purpose
-- Explain configuration options
-- Provide usage examples
-
-## Plugin Lifecycle
-
-1. **Discovery**: Plugin module is imported, hooks are registered
-2. **Registration**: `register_plugin_types()` is called, metadata is stored
-3. **Instance Creation**: `create_plugin_instance()` is called when plugin is configured
-4. **Initialization**: `initialize()` is called after instance creation
-5. **Configuration**: `configure()` is called when settings change
-6. **Runtime**: Plugin methods are called as needed
-7. **Cleanup**: `cleanup()` is called when plugin is disabled/removed
+1. **Start with the scaffold.** Run the create-plugin script in
+   [`calvin-plugins/scripts/`](../../../calvin-plugins/scripts/) and edit the generated
+   files. The scaffold wires the SDK and instance manager correctly.
+2. **Use the SDK helpers** (`build_*_plugin_metadata`, `create_*_plugin_instance`,
+   `build_*_manager_config`) rather than constructing metadata by hand.
+3. **Use `handle_plugin_config_update_generic`** rather than implementing your own CRUD.
+4. **Schema-driven UI first.** Reach for `kind: "web-component"` only when no built-in
+   kind fits.
+5. **Use the `calvin-plugin-*` body classes** for any custom markup (web components or
+   future custom renderers) — they give you Calvin's surfaces, spacing, and theme tokens
+   for free.
+6. **Validate at boundaries** in `validate_config`. Trust internal callers.
+7. **`isinstance()` rather than `hasattr()`** when your plugin code dispatches on type.
+8. **Pin dependencies** in `plugin.json` and exclude tests/docs/build artifacts via
+   `files.exclude`.
+9. **Declare `format_version` and `protocol_version`** explicitly in `plugin.json` so
+   future host versions can detect compatibility.
 
 ## Troubleshooting
 
-### Plugin Not Appearing
+### Plugin not appearing after install
 
-- Check that module is imported in `__init__.py`
-- Verify `register_plugin_types()` hook is implemented
-- Check for import errors in logs
+- Check `backend/data/plugins/{plugin_id}/plugin.json` and `plugin.py` exist.
+- Look for import errors in the backend logs (`loguru` output) — a missing dependency in
+  the plugin's Python imports will silently skip the plugin.
+- Confirm `register_plugin_types` is decorated with `@hookimpl` and exported at module
+  level.
 
-### Configuration Not Saving
+### Plugin rejected at load with "display_schema.kind must be one of …"
 
-- Ensure `common_config_schema` is defined correctly
-- Check that field names match in `configure()`
-- Verify `validate_config()` returns `True`
+The plugin's `display_schema.kind` is not in `SUPPORTED_DISPLAY_KINDS`. Either fix the
+typo or, if you genuinely need a new kind, add a renderer in
+[SchemaRenderer.vue](../../frontend/src/components/plugins/SchemaRenderer.vue), register
+it in [rendererRegistry.js](../../frontend/src/components/plugins/rendererRegistry.js),
+**and** add it to `SUPPORTED_DISPLAY_KINDS` — all three must stay in sync.
 
-### UI Not Rendering
+### Plugin loads but the dashboard region is empty
 
-- Check `ui` metadata in schema
-- Verify component types are supported
-- Check browser console for errors
+- Check the data endpoint actually returns the shape the renderer expects (use the
+  network tab; the URL is `/api/plugins/{plugin_id}/data` for the default API endpoint).
+- JSONPath-lite paths in the schema (`$.foo.bar`) must match the payload keys exactly.
+- For `panel_variant: "media"` and `"iframe"`, verify the plugin's CSS doesn't draw an
+  outer header — Calvin's region shell already provides one.
 
-## Additional Resources
+### "database is locked"
 
-- See existing plugins in `backend/app/plugins/` for examples
-- Check `backend/app/plugins/base.py` for base classes
-- Review `backend/app/plugins/protocols.py` for interfaces
-- Look at `backend/app/plugins/hooks.py` for hook specifications
+SQLite contention during plugin install. The instance manager already wraps writes with
+`retry_on_db_locked`; if you see this from your own code, do the same.
+
+### Web component doesn't render
+
+- Confirm `frontend/dist.js` is committed and present in the installed plugin directory.
+- The custom element must be registered in `dist.js` under the name in
+  `display_schema.element`.
+- Check the browser console for module-load errors — bad MIME types or missing exports
+  fail silently in some browsers.
+
+## Reference
+
+- [PLUGIN_PACKAGE_FORMAT.md](PLUGIN_PACKAGE_FORMAT.md) — `plugin.json` schema and zip
+  package rules.
+- [PLUGIN_INTERFACE.md](PLUGIN_INTERFACE.md) — full protocol method reference.
+- [PLUGIN_FRONTEND_COMPONENTS.md](PLUGIN_FRONTEND_COMPONENTS.md) — schema renderer
+  fields, `calvin-plugin-*` body classes, web-component contract.
+- [PLUGIN_PERSISTENCE_AND_RESTART.md](PLUGIN_PERSISTENCE_AND_RESTART.md) — install &
+  lifecycle internals.
+- [EVENT_SYSTEM.md](../EVENT_SYSTEM.md) — cross-plugin events.
+- [PLUGIN_INSTALLATION.md](PLUGIN_INSTALLATION.md) — install flow and CLI/API.
+- [`calvin-plugins/CREATING_PLUGINS.md`](../../../calvin-plugins/CREATING_PLUGINS.md) —
+  scaffold script and step-by-step tutorial.
+- Built-in plugin examples: [`backend/app/plugins/`](../../backend/app/plugins/).
+- Reference plugin: [`mealie/`](../../../calvin-plugins/mealie) in `calvin-plugins`.

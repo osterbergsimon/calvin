@@ -9,7 +9,18 @@ if TYPE_CHECKING:
 
 
 class PluginType(str, Enum):
-    """Plugin type enumeration."""
+    """Plugin type enumeration.
+
+    `CALENDAR`, `IMAGE`, `SERVICE`, and `BACKEND` are the four plugin families
+    that subclass `BasePlugin` and follow the Pluggy hook contract.
+
+    `THEME` is intentionally different: theme "plugins" are CSS bundles installed
+    via `app.services.theme_installer`, not Python modules registered via Pluggy.
+    The enum value exists so the management routes
+    (`app.api.routes.plugins.themes`) can tag theme records uniformly with the
+    same plugin-type column. There is no `BasePlugin` subclass for themes and no
+    SDK helper.
+    """
 
     CALENDAR = "calendar"
     IMAGE = "image"

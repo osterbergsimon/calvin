@@ -107,6 +107,38 @@ class TestPluginDefinition:
                 }
             )
 
+    def test_statusbar_schema_rejects_unknown_kind(self):
+        with pytest.raises(ValueError, match="statusbar_schema.kind must be one of"):
+            PluginDefinition.from_raw(
+                {
+                    "type_id": "weather",
+                    "plugin_type": PluginType.SERVICE,
+                    "name": "Weather",
+                    "statusbar_schema": {"kind": "no-such-renderer"},
+                }
+            )
+
+    def test_statusbar_schema_requires_kind(self):
+        with pytest.raises(ValueError, match="statusbar_schema.kind is required"):
+            PluginDefinition.from_raw(
+                {
+                    "type_id": "weather",
+                    "plugin_type": PluginType.SERVICE,
+                    "name": "Weather",
+                    "statusbar_schema": {"label": "Temp"},
+                }
+            )
+
+    def test_statusbar_schema_omitted_is_allowed(self):
+        definition = PluginDefinition.from_raw(
+            {
+                "type_id": "no_status",
+                "plugin_type": PluginType.SERVICE,
+                "name": "No Status",
+            }
+        )
+        assert definition.statusbar_schema is None
+
     def test_display_schema_omitted_is_allowed(self):
         definition = PluginDefinition.from_raw(
             {
