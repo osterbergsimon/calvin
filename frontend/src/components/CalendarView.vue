@@ -137,6 +137,15 @@ const props = defineProps({
 });
 
 const configStore = useConfigStore();
+const sourceKey = computed(() =>
+  [
+    ...new Set(
+      props.sourceIds.filter(id => typeof id === "string" && id.trim()).map(id => id.trim())
+    ),
+  ]
+    .sort()
+    .join(",")
+);
 const viewMode = computed(() => configStore.calendarViewMode);
 const showWeekNumbers = computed(() => configStore.showWeekNumbers);
 const weekStartDay = computed(() => configStore.weekStartDay ?? 1);
@@ -924,13 +933,9 @@ watch(currentDate, () => {
   loadEvents();
 });
 
-watch(
-  () => props.sourceIds,
-  () => {
-    loadEvents();
-  },
-  { deep: true }
-);
+watch(sourceKey, () => {
+  loadEvents();
+});
 
 // Watch for route changes to reload events when navigating back to dashboard
 watch(

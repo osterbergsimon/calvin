@@ -79,6 +79,15 @@ const props = defineProps({
 
 const imagesStore = useImagesStore();
 
+const sourceKey = computed(() =>
+  [
+    ...new Set(
+      props.sourceIds.filter(id => typeof id === "string" && id.trim()).map(id => id.trim())
+    ),
+  ]
+    .sort()
+    .join(",")
+);
 const currentImage = computed(() => imagesStore.getCurrentImageForSource(props.sourceIds));
 const sourceImages = computed(() => imagesStore.getImagesForSource(props.sourceIds));
 const currentImageUrl = computed(() => imagesStore.getCurrentImageUrlForSource(props.sourceIds));
@@ -194,15 +203,11 @@ watch(
   }
 );
 
-watch(
-  () => props.sourceIds,
-  async () => {
-    stopAutoRotation();
-    await imagesStore.fetchImages(props.sourceIds);
-    if (props.autoRotate) startAutoRotation();
-  },
-  { deep: true }
-);
+watch(sourceKey, async () => {
+  stopAutoRotation();
+  await imagesStore.fetchImages(props.sourceIds);
+  if (props.autoRotate) startAutoRotation();
+});
 </script>
 
 <style scoped>

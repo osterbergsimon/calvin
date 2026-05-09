@@ -728,7 +728,7 @@ const sourceSelectionLabel = region => {
 const toggleRegionSource = (screenIndex, regionIndex, sourceId, checked) => {
   const layout = cloneLayout(screenIndex);
   const region = layout.regions[regionIndex];
-  if (!region) return;
+  if (!region || region.kind === "service") return;
   const current = new Set(region.instanceIds || []);
   if (checked) current.add(sourceId);
   else current.delete(sourceId);
@@ -740,7 +740,7 @@ const toggleRegionSource = (screenIndex, regionIndex, sourceId, checked) => {
 const toggleSubRegionSource = (screenIndex, regionIndex, subIndex, sourceId, checked) => {
   const layout = cloneLayout(screenIndex);
   const sub = layout.regions[regionIndex]?.split?.regions?.[subIndex];
-  if (!sub) return;
+  if (!sub || sub.kind === "service") return;
   const current = new Set(sub.instanceIds || []);
   if (checked) current.add(sourceId);
   else current.delete(sourceId);
@@ -752,7 +752,7 @@ const toggleSubRegionSource = (screenIndex, regionIndex, subIndex, sourceId, che
 const clearRegionSources = (screenIndex, regionIndex) => {
   const layout = cloneLayout(screenIndex);
   const region = layout.regions[regionIndex];
-  if (!region) return;
+  if (!region || region.kind === "service") return;
   region.instanceIds = [];
   region.serviceId = null;
   updateScreen(screenIndex, { layout });
@@ -761,7 +761,7 @@ const clearRegionSources = (screenIndex, regionIndex) => {
 const clearSubRegionSources = (screenIndex, regionIndex, subIndex) => {
   const layout = cloneLayout(screenIndex);
   const sub = layout.regions[regionIndex]?.split?.regions?.[subIndex];
-  if (!sub) return;
+  if (!sub || sub.kind === "service") return;
   sub.instanceIds = [];
   sub.serviceId = null;
   updateScreen(screenIndex, { layout });

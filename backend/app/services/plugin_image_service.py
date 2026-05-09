@@ -201,19 +201,15 @@ class PluginImageService:
         Returns:
             Current image metadata or None if no images
         """
-        # Get images (with randomization if requested), only refresh if cache is stale
+        # Refresh the aggregate image cache first. Source-specific ordering, including
+        # randomization, is resolved lazily below so independent regions keep separate order.
         if not self._all_images or self._is_cache_stale():
             await self.get_images(randomize=False)
-        elif randomize and not self._randomized_order and not source_ids:
-            # Re-randomize if requested
-            await self.get_images(randomize=True)
 
         images = self._get_ordered_images(randomize=randomize, source_ids=source_ids)
 
         source_key = self._source_key(source_ids)
-        current_image_id = self._current_image_ids_by_source_key.get(
-            source_key, self._current_image_id
-        )
+        current_image_id = self._current_image_id_for_source_key(source_key)
 
         if not images:
             return None
@@ -242,16 +238,11 @@ class PluginImageService:
         # Only refresh images if cache is stale (not on every navigation)
         if not self._all_images or self._is_cache_stale():
             await self.get_images(randomize=False)
-        elif randomize and not self._randomized_order and not source_ids:
-            # Need randomized order but don't have it
-            await self.get_images(randomize=True)
 
         images = self._get_ordered_images(randomize=randomize, source_ids=source_ids)
 
         source_key = self._source_key(source_ids)
-        current_image_id = self._current_image_ids_by_source_key.get(
-            source_key, self._current_image_id
-        )
+        current_image_id = self._current_image_id_for_source_key(source_key)
 
         if not images:
             return None
@@ -289,16 +280,11 @@ class PluginImageService:
         # Only refresh images if cache is stale (not on every navigation)
         if not self._all_images or self._is_cache_stale():
             await self.get_images(randomize=False)
-        elif randomize and not self._randomized_order and not source_ids:
-            # Need randomized order but don't have it
-            await self.get_images(randomize=True)
 
         images = self._get_ordered_images(randomize=randomize, source_ids=source_ids)
 
         source_key = self._source_key(source_ids)
-        current_image_id = self._current_image_ids_by_source_key.get(
-            source_key, self._current_image_id
-        )
+        current_image_id = self._current_image_id_for_source_key(source_key)
 
         if not images:
             return None
@@ -516,6 +502,11 @@ class PluginImageService:
         if not source_ids:
             return "__all__"
         return ",".join(sorted({source_id for source_id in source_ids if source_id}))
+
+    def _current_image_id_for_source_key(self, source_key: str) -> str | None:
+        if source_key == "__all__":
+            return self._current_image_ids_by_source_key.get(source_key, self._current_image_id)
+        return self._current_image_ids_by_source_key.get(source_key)
 
     def _filter_images_by_source(
         self, images: list[dict[str, Any]], source_ids: list[str] | None = None
