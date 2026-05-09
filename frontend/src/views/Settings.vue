@@ -131,6 +131,12 @@
           :config="localConfig"
           @update:config="handleConfigUpdate"
         />
+        <ClockBarCategory
+          v-if="activeCategory === 'clock-bar' && localConfig"
+          :key="categoryRenderKey"
+          :config="localConfig"
+          @update:config="handleConfigUpdate"
+        />
         <ContentSourcesCategory
           v-if="activeCategory === 'content' && localConfig"
           :key="categoryRenderKey"
@@ -190,6 +196,9 @@ import {
 // Lazy load category components for better code splitting
 const DashboardCategory = defineAsyncComponent(
   () => import("@/components/settings/categories/DashboardCategory.vue")
+);
+const ClockBarCategory = defineAsyncComponent(
+  () => import("@/components/settings/categories/ClockBarCategory.vue")
 );
 const ContentSourcesCategory = defineAsyncComponent(
   () => import("@/components/settings/categories/ContentSourcesCategory.vue")
