@@ -245,7 +245,22 @@ class TestGitHubPluginInstallation:
                     }
                 ),
             )
-            zipf.writestr("repo-main/plugin1/plugin.py", "# Plugin code")
+            zipf.writestr(
+                "repo-main/plugin1/plugin.py",
+                """\"\"\"Minimal install fixture.\"\"\"
+from typing import Any
+from app.plugins.base import PluginType
+from app.plugins.hooks import hookimpl
+
+@hookimpl
+def register_plugin_types() -> list[dict[str, Any]]:
+    return [{
+        "type_id": "github_install_plugin",
+        "plugin_type": PluginType.SERVICE,
+        "name": "GitHub Install Plugin",
+    }]
+""",
+            )
 
         return zip_path
 
@@ -290,11 +305,9 @@ class TestServicePlugin(ServicePlugin):
                 },
             },
             "display_schema": {
-                "type": "api",
-                "api_endpoint": None,
-                "method": None,
-                "data_schema": None,
-                "render_template": "iframe",
+                "kind": "status-tile",
+                "title": "Test Plugin",
+                "value_path": "$.message",
             },
             "plugin_class": cls,
         }
