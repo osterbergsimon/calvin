@@ -11,6 +11,7 @@ describe("settings registry", () => {
   it("defines the primary settings categories in display order", () => {
     expect(settingsCategories.map(category => category.id)).toEqual([
       "dashboard",
+      "clock-bar",
       "content",
       "plugins",
       "device",
@@ -21,20 +22,29 @@ describe("settings registry", () => {
 
   it("validates known category ids", () => {
     expect(isKnownSettingsCategory("dashboard")).toBe(true);
+    expect(isKnownSettingsCategory("clock-bar")).toBe(true);
     expect(isKnownSettingsCategory("missing")).toBe(false);
     expect(isKnownSettingsCategory(null)).toBe(false);
   });
 
   it("resolves destinations by stable id", () => {
-    expect(getSettingDestinationById("dashboard-clock")).toMatchObject({
-      category: "dashboard",
-      tab: "clock",
-      tabKey: "settings_tab_dashboard",
+    expect(getSettingDestinationById("clock-bar-appearance")).toMatchObject({
+      category: "clock-bar",
+      tab: "appearance",
+      tabKey: "settings_tab_clock_bar",
+    });
+    expect(getSettingDestinationById("clock-bar-items")).toMatchObject({
+      category: "clock-bar",
+      tab: "bar-items",
+      tabKey: "settings_tab_clock_bar",
     });
   });
 
   it("searches labels, paths, and keywords", () => {
-    expect(filterSettingsDestinations("seconds").map(item => item.id)).toEqual(["dashboard-clock"]);
+    expect(filterSettingsDestinations("seconds").map(item => item.id)).toEqual([
+      "clock-bar-appearance",
+    ]);
+    expect(filterSettingsDestinations("tiles").map(item => item.id)).toEqual(["clock-bar-items"]);
     expect(filterSettingsDestinations("github").map(item => item.id)).toEqual(["plugins"]);
   });
 
