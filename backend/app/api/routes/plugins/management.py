@@ -703,7 +703,13 @@ async def _update_plugin_type(
         if enabled is not None:
             previous_enabled = db_type.enabled
             db_type.enabled = enabled
-            await db_type.save_with_timestamp()
+            from app.utils.db_retry import retry_on_db_locked
+
+            @retry_on_db_locked(max_retries=5, initial_delay=0.1, max_delay=1.0)
+            async def _save_theme_db_type():
+                await db_type.save_with_timestamp()
+
+            await _save_theme_db_type()
 
             # Emit plugin_enabled or plugin_disabled events if enabled status changed
             if previous_enabled is not None and previous_enabled != enabled:
@@ -758,15 +764,23 @@ async def _update_plugin_type(
             f"Creating new plugin type {plugin_id} with schema: {initial_schema}, "
             f"config={config}, metadata_schema={metadata_schema}"
         )
-        db_type = await PluginTypeDB.objects.create(
-            type_id=plugin_id,
-            plugin_type=plugin_type.value if hasattr(plugin_type, "value") else str(plugin_type),
-            name=type_info.get("name", ""),
-            description=type_info.get("description", ""),
-            version=type_info.get("version"),
-            common_config_schema=initial_schema,
-            enabled=enabled if enabled is not None else True,
-        )
+        from app.utils.db_retry import retry_on_db_locked
+
+        @retry_on_db_locked(max_retries=5, initial_delay=0.1, max_delay=1.0)
+        async def _create_plugin_type():
+            return await PluginTypeDB.objects.create(
+                type_id=plugin_id,
+                plugin_type=plugin_type.value
+                if hasattr(plugin_type, "value")
+                else str(plugin_type),
+                name=type_info.get("name", ""),
+                description=type_info.get("description", ""),
+                version=type_info.get("version"),
+                common_config_schema=initial_schema,
+                enabled=enabled if enabled is not None else True,
+            )
+
+        db_type = await _create_plugin_type()
     else:
         # Update existing plugin type
         if enabled is not None:
@@ -782,7 +796,13 @@ async def _update_plugin_type(
                 f"Updated plugin {plugin_id} common_config_schema: "
                 f"old={current_schema}, new={updated_schema}, config={config}"
             )
-        await db_type.save_with_timestamp()
+        from app.utils.db_retry import retry_on_db_locked
+
+        @retry_on_db_locked(max_retries=5, initial_delay=0.1, max_delay=1.0)
+        async def _save_plugin_type():
+            await db_type.save_with_timestamp()
+
+        await _save_plugin_type()
 
     # Save common config to config service for backward compatibility
     if config:

@@ -159,9 +159,6 @@ class PluginInstaller:
         if plugin_path.exists():
             if force:
                 # Force reinstall: uninstall existing plugin first
-                import logging
-
-                logger = logging.getLogger(__name__)
                 logger.info(f"Force installing plugin {install_id}, removing existing installation")
                 self.uninstall_plugin(install_id)
             else:
@@ -182,11 +179,17 @@ class PluginInstaller:
                                     "Uninstall the existing plugin first."
                                 )
                         except ImportError:
-                            # packaging not available, skip version check
-                            pass
-                        except Exception:
-                            # If version parsing fails, allow install but warn
-                            pass
+                            logger.warning(
+                                f"`packaging` library not available; skipping version check "
+                                f"for plugin {install_id} (existing={existing_version}, "
+                                f"new={new_version})"
+                            )
+                        except Exception as e:
+                            logger.warning(
+                                f"Version comparison failed for plugin {install_id} "
+                                f"(existing={existing_version}, new={new_version}): {e}. "
+                                "Proceeding with install."
+                            )
 
                 raise ValueError(
                     f"Plugin {install_id} is already installed. "
@@ -391,10 +394,7 @@ class PluginInstaller:
                     manifest = json.load(f)
                 manifest["_installed_path"] = str(plugin_dir)
                 plugins.append(manifest)
-            except (json.JSONDecodeError, Exception) as e:
-                import logging
-
-                logger = logging.getLogger(__name__)
+            except (json.JSONDecodeError, OSError, ValueError) as e:
                 logger.warning(f"Error reading plugin manifest for {plugin_dir.name}: {e}")
                 continue
 
@@ -567,9 +567,6 @@ class PluginInstaller:
                 # Plugin is actually installed and valid
                 if force:
                     # Force reinstall: uninstall existing plugin first
-                    import logging
-
-                    logger = logging.getLogger(__name__)
                     logger.info(
                         f"Force installing plugin {install_id}, removing existing installation"
                     )
@@ -579,10 +576,6 @@ class PluginInstaller:
             else:
                 # Plugin directory exists but is invalid/corrupted (no manifest)
                 # Remove it and allow reinstallation
-                import logging
-                import shutil
-
-                logger = logging.getLogger(__name__)
                 logger.warning(
                     f"Found corrupted/invalid plugin directory for {install_id}, "
                     "removing and allowing reinstallation"
