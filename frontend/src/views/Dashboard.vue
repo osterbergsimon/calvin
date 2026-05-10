@@ -122,9 +122,12 @@ import { useModeStore } from "../stores/mode";
 import { useRoute } from "vue-router";
 import {
   getActiveDashboardScreen,
+  getClockBarPlacementGap,
+  getGlobalClockBarSettings,
   getLayoutDirection,
   getRegionAxisStyle,
   normalizeDashboardScreens,
+  resolveClockBarForScreen,
 } from "../utils/layout";
 
 const configStore = useConfigStore();
@@ -143,40 +146,57 @@ const mainLayoutClass = computed(() => {
 
 const barVisible = computed(() => configStore.shouldShowUI || configStore.clockBarShowInKiosk);
 
-const shouldShowHorizontalBar = computed(() => configStore.clockBarMode === "horizontal");
-const shouldShowVerticalBar = computed(() => configStore.clockBarMode === "vertical");
+const dashboardScreens = computed(() => normalizeDashboardScreens(configStore.dashboardScreens));
+const activeScreen = computed(() => getActiveDashboardScreen(dashboardScreens.value));
+
+const effectiveClockBar = computed(() =>
+  resolveClockBarForScreen(
+    activeScreen.value,
+    getGlobalClockBarSettings({
+      clockBarMode: configStore.clockBarMode,
+      clockBarPosition: configStore.clockBarPosition,
+    })
+  )
+);
+
+const clockBarActive = computed(() => effectiveClockBar.value.enabled && barVisible.value);
+const isHorizontalMode = computed(() => effectiveClockBar.value.mode === "horizontal");
+const isVerticalMode = computed(() => effectiveClockBar.value.mode === "vertical");
+const clockBarPosition = computed(() => effectiveClockBar.value.position);
+const clockBarPlacementGap = computed(() =>
+  getClockBarPlacementGap(clockBarPosition.value, activeScreen.value?.layout?.regions?.length || 0)
+);
 
 const showHorizontalBarTop = computed(
-  () => shouldShowHorizontalBar.value && configStore.clockBarPosition === "top" && barVisible.value
+  () => clockBarActive.value && isHorizontalMode.value && clockBarPosition.value === "top"
 );
 
 const showHorizontalBarBottom = computed(
-  () =>
-    shouldShowHorizontalBar.value && configStore.clockBarPosition === "bottom" && barVisible.value
+  () => clockBarActive.value && isHorizontalMode.value && clockBarPosition.value === "bottom"
 );
 
 const showHorizontalBarBetween = computed(
   () =>
-    shouldShowHorizontalBar.value &&
-    configStore.clockBarPosition === "between" &&
-    layoutDirection.value === "column" &&
-    barVisible.value
+    clockBarActive.value &&
+    isHorizontalMode.value &&
+    clockBarPlacementGap.value !== null &&
+    layoutDirection.value === "column"
 );
 
 const showVerticalBarLeft = computed(
-  () => shouldShowVerticalBar.value && configStore.clockBarPosition === "left" && barVisible.value
+  () => clockBarActive.value && isVerticalMode.value && clockBarPosition.value === "left"
 );
 
 const showVerticalBarRight = computed(
-  () => shouldShowVerticalBar.value && configStore.clockBarPosition === "right" && barVisible.value
+  () => clockBarActive.value && isVerticalMode.value && clockBarPosition.value === "right"
 );
 
 const showVerticalBarBetween = computed(
   () =>
-    shouldShowVerticalBar.value &&
-    configStore.clockBarPosition === "between" &&
-    layoutDirection.value === "row" &&
-    barVisible.value
+    clockBarActive.value &&
+    isVerticalMode.value &&
+    clockBarPlacementGap.value !== null &&
+    layoutDirection.value === "row"
 );
 
 // Computed layout order - determines the order elements should be rendered
@@ -186,19 +206,20 @@ const layoutOrder = computed(() => {
     return withOuterClockBars(regionElements);
   }
 
+  const placedBetween = clockBarPlacementGap.value;
+
   const elements = [];
   if (showVerticalBarLeft.value) elements.push("verticalBarLeft");
   regionElements.forEach((regionElement, index) => {
-    if (index > 0 && showVerticalBarBetween.value) elements.push("verticalBarBetween");
-    if (index > 0 && showHorizontalBarBetween.value) elements.push("horizontalBarBetween");
+    if (index > 0 && index - 1 === placedBetween) {
+      if (showVerticalBarBetween.value) elements.push("verticalBarBetween");
+      else if (showHorizontalBarBetween.value) elements.push("horizontalBarBetween");
+    }
     elements.push(regionElement);
   });
   if (showVerticalBarRight.value) elements.push("verticalBarRight");
   return elements;
 });
-
-const dashboardScreens = computed(() => normalizeDashboardScreens(configStore.dashboardScreens));
-const activeScreen = computed(() => getActiveDashboardScreen(dashboardScreens.value));
 
 const withOuterClockBars = regionElements => {
   const elements = [];
