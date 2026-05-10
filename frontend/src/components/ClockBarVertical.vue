@@ -10,7 +10,9 @@
   >
     <div class="clock-bar-top">
       <BarLogo v-if="showLogo" />
+    </div>
 
+    <div class="clock-bar-middle">
       <div
         class="clock-bar-content"
         :class="{
@@ -117,8 +119,7 @@ const showLogo = computed(() => configStore.clockBarShowLogo !== false);
   border-right: 1px solid var(--border-color);
   display: flex;
   flex-direction: column;
-  align-items: center;
-  justify-content: space-between;
+  align-items: stretch;
   gap: 0.75rem;
   z-index: 100;
   user-select: none;
@@ -137,30 +138,48 @@ const showLogo = computed(() => configStore.clockBarShowLogo !== false);
   border-radius: 4px;
 }
 
-.clock-bar-content {
+.clock-bar-top {
   display: flex;
-  flex-direction: row;
+  flex-direction: column;
+  align-items: center;
+  gap: 0.5rem;
+  flex: 0 0 auto;
+}
+
+.clock-bar-middle {
+  flex: 1 1 auto;
+  display: flex;
+  flex-direction: column;
   align-items: center;
   justify-content: center;
-  gap: 0.5rem;
+  gap: 0.75rem;
+  min-height: 0;
+}
+
+.clock-bar-content {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 0.35rem;
   font-family: "Courier New", monospace;
-  writing-mode: vertical-rl;
-  text-orientation: upright;
   white-space: nowrap;
+  text-align: center;
 }
 
 .clock-bar-content.layout-two-lines {
-  flex-direction: column;
-  gap: 0.25rem;
+  gap: 0.15rem;
 }
 
 .clock-time {
   font-weight: 600;
   color: var(--text-primary);
+  line-height: 1.1;
 }
 
 .clock-date {
   color: var(--text-secondary);
+  line-height: 1.1;
 }
 
 .clock-bar-vertical.position-between .clock-time {
@@ -171,14 +190,8 @@ const showLogo = computed(() => configStore.clockBarShowLogo !== false);
   font-size: 0.75rem;
 }
 
-.clock-bar-top {
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  gap: 0.75rem;
-}
-
 .clock-bar-actions {
   width: 100%;
+  flex: 0 0 auto;
 }
 </style>

@@ -13,91 +13,95 @@
       <!-- Minimal UI overlay (shown when UI is hidden) -->
       <MinimalUIOverlay v-if="!configStore.shouldShowUI" />
 
-      <div :class="['dashboard-main', mainLayoutClass]">
-        <!-- Fullscreen Mode (Photos or Web Services) -->
-        <div v-if="modeStore.isFullscreen" class="mode-content fullscreen-mode">
-          <!-- Fullscreen Photos -->
-          <PhotoSlideshow
-            v-if="modeStore.fullscreenMode === modeStore.MODES.PHOTOS"
-            :is-fullscreen="true"
-            :auto-rotate="true"
-            :rotation-interval="configStore.photoRotationInterval * 1000"
-          />
-          <!-- Fullscreen Web Services -->
-          <WebServiceViewer
-            v-else-if="modeStore.fullscreenMode === modeStore.MODES.WEB_SERVICES"
-            :is-fullscreen="true"
-          />
-        </div>
+      <!--
+        Dashboard stage wraps the side perimeter bars and the body so that
+        vertical left/right bars sit at the dashboard edge regardless of the
+        active screen's layout direction (row vs column).
+      -->
+      <div class="dashboard-stage">
+        <ClockBarVertical
+          v-if="showVerticalBarLeft"
+          position="left"
+          :show-in-non-kiosk="true"
+          :show-in-kiosk="configStore.clockBarShowInKiosk"
+          :enabled="true"
+        />
 
-        <!-- Dashboard View (Home) - Renders configured dashboard regions -->
-        <div v-else :class="['mode-content', 'dashboard-view', mainLayoutClass]">
-          <!-- Render elements in computed order - no CSS order needed! -->
-          <template v-for="elementType in layoutOrder" :key="elementType">
-            <!-- Vertical Clock Bar at Left -->
-            <ClockBarVertical
-              v-if="elementType === 'verticalBarLeft'"
-              position="left"
-              :show-in-non-kiosk="true"
-              :show-in-kiosk="configStore.clockBarShowInKiosk"
-              :enabled="true"
+        <div :class="['dashboard-main', mainLayoutClass]">
+          <!-- Fullscreen Mode (Photos or Web Services) -->
+          <div v-if="modeStore.isFullscreen" class="mode-content fullscreen-mode">
+            <!-- Fullscreen Photos -->
+            <PhotoSlideshow
+              v-if="modeStore.fullscreenMode === modeStore.MODES.PHOTOS"
+              :is-fullscreen="true"
+              :auto-rotate="true"
+              :rotation-interval="configStore.photoRotationInterval * 1000"
             />
+            <!-- Fullscreen Web Services -->
+            <WebServiceViewer
+              v-else-if="modeStore.fullscreenMode === modeStore.MODES.WEB_SERVICES"
+              :is-fullscreen="true"
+            />
+          </div>
 
-            <!-- Dashboard Region -->
-            <div
-              v-else-if="isRegionElement(elementType)"
-              :class="[
-                'dashboard-region-section',
-                {
-                  'dashboard-region-section-active':
-                    activeRegionHighlightVisible && isActiveRegionElement(elementType),
-                },
-              ]"
-              :style="getRegionStyle(elementType)"
-            >
-              <DashboardRegion
-                :region="getRegionForElement(elementType)"
-                :photo-rotation-interval="configStore.photoRotationInterval"
-                :parent-direction="layoutDirection"
-                :active-region-id="
-                  activeRegionHighlightVisible ? activeScreen.activeRegionId : null
-                "
+          <!-- Dashboard View (Home) - Renders configured dashboard regions -->
+          <div v-else :class="['mode-content', 'dashboard-view', mainLayoutClass]">
+            <template v-for="elementType in layoutOrder" :key="elementType">
+              <!-- Dashboard Region -->
+              <div
+                v-if="isRegionElement(elementType)"
+                :class="[
+                  'dashboard-region-section',
+                  {
+                    'dashboard-region-section-active':
+                      activeRegionHighlightVisible && isActiveRegionElement(elementType),
+                  },
+                ]"
+                :style="getRegionStyle(elementType)"
+              >
+                <DashboardRegion
+                  :region="getRegionForElement(elementType)"
+                  :photo-rotation-interval="configStore.photoRotationInterval"
+                  :parent-direction="layoutDirection"
+                  :active-region-id="
+                    activeRegionHighlightVisible ? activeScreen.activeRegionId : null
+                  "
+                />
+              </div>
+
+              <!-- Horizontal between bar (regions stacked vertically) -->
+              <ClockBarHorizontal
+                v-else-if="elementType === 'horizontalBarBetween'"
+                position="between"
+                :show-in-non-kiosk="true"
+                :show-in-kiosk="configStore.clockBarShowInKiosk"
+                :enabled="true"
               />
-            </div>
 
-            <!-- Horizontal Clock Bar Between (Portrait) -->
-            <ClockBarHorizontal
-              v-else-if="elementType === 'horizontalBarBetween'"
-              position="between"
-              :show-in-non-kiosk="true"
-              :show-in-kiosk="configStore.clockBarShowInKiosk"
-              :enabled="true"
-            />
+              <!-- Vertical between bar (regions side by side) -->
+              <ClockBarVertical
+                v-else-if="elementType === 'verticalBarBetween'"
+                position="between"
+                :show-in-non-kiosk="true"
+                :show-in-kiosk="configStore.clockBarShowInKiosk"
+                :enabled="true"
+              />
+            </template>
+          </div>
 
-            <!-- Vertical Clock Bar Between (Landscape) -->
-            <ClockBarVertical
-              v-else-if="elementType === 'verticalBarBetween'"
-              position="between"
-              :show-in-non-kiosk="true"
-              :show-in-kiosk="configStore.clockBarShowInKiosk"
-              :enabled="true"
-            />
-
-            <!-- Vertical Clock Bar at Right -->
-            <ClockBarVertical
-              v-else-if="elementType === 'verticalBarRight'"
-              position="right"
-              :show-in-non-kiosk="true"
-              :show-in-kiosk="configStore.clockBarShowInKiosk"
-              :enabled="true"
-            />
-          </template>
+          <!-- Horizontal Clock Bar at Bottom -->
+          <ClockBarHorizontal
+            v-if="showHorizontalBarBottom"
+            position="bottom"
+            :show-in-non-kiosk="true"
+            :show-in-kiosk="configStore.clockBarShowInKiosk"
+            :enabled="true"
+          />
         </div>
 
-        <!-- Horizontal Clock Bar at Bottom -->
-        <ClockBarHorizontal
-          v-if="showHorizontalBarBottom"
-          position="bottom"
+        <ClockBarVertical
+          v-if="showVerticalBarRight"
+          position="right"
           :show-in-non-kiosk="true"
           :show-in-kiosk="configStore.clockBarShowInKiosk"
           :enabled="true"
@@ -175,12 +179,21 @@ const showHorizontalBarBottom = computed(
   () => clockBarActive.value && isHorizontalMode.value && clockBarPosition.value === "bottom"
 );
 
+// Between-bar orientation follows the layout direction (perpendicular to the
+// region flow), not the user-selected mode. So a 'between' position renders as
+// a horizontal strip when regions stack and a vertical strip when they sit
+// side by side, regardless of whether the user picked horizontal or vertical
+// mode for the perimeter case.
 const showHorizontalBarBetween = computed(
   () =>
     clockBarActive.value &&
-    isHorizontalMode.value &&
     clockBarPlacementGap.value !== null &&
     layoutDirection.value === "column"
+);
+
+const showVerticalBarBetween = computed(
+  () =>
+    clockBarActive.value && clockBarPlacementGap.value !== null && layoutDirection.value === "row"
 );
 
 const showVerticalBarLeft = computed(
@@ -191,43 +204,22 @@ const showVerticalBarRight = computed(
   () => clockBarActive.value && isVerticalMode.value && clockBarPosition.value === "right"
 );
 
-const showVerticalBarBetween = computed(
-  () =>
-    clockBarActive.value &&
-    isVerticalMode.value &&
-    clockBarPlacementGap.value !== null &&
-    layoutDirection.value === "row"
-);
-
 // Computed layout order - determines the order elements should be rendered
 const layoutOrder = computed(() => {
   const regionElements = activeScreen.value.layout.regions.map(region => `region:${region.id}`);
-  if (regionElements.length <= 1) {
-    return withOuterClockBars(regionElements);
-  }
+  if (regionElements.length <= 1) return regionElements;
 
   const placedBetween = clockBarPlacementGap.value;
-
   const elements = [];
-  if (showVerticalBarLeft.value) elements.push("verticalBarLeft");
   regionElements.forEach((regionElement, index) => {
     if (index > 0 && index - 1 === placedBetween) {
-      if (showVerticalBarBetween.value) elements.push("verticalBarBetween");
-      else if (showHorizontalBarBetween.value) elements.push("horizontalBarBetween");
+      if (showHorizontalBarBetween.value) elements.push("horizontalBarBetween");
+      else if (showVerticalBarBetween.value) elements.push("verticalBarBetween");
     }
     elements.push(regionElement);
   });
-  if (showVerticalBarRight.value) elements.push("verticalBarRight");
   return elements;
 });
-
-const withOuterClockBars = regionElements => {
-  const elements = [];
-  if (showVerticalBarLeft.value) elements.push("verticalBarLeft");
-  elements.push(...regionElements);
-  if (showVerticalBarRight.value) elements.push("verticalBarRight");
-  return elements;
-};
 
 const isRegionElement = elementType => elementType.startsWith("region:");
 
@@ -332,20 +324,21 @@ onUnmounted(() => {
   background: var(--bg-secondary);
 }
 
+.dashboard-stage {
+  flex: 1;
+  display: flex;
+  flex-direction: row;
+  min-height: 0;
+  min-width: 0;
+}
+
 .dashboard-main {
   flex: 1;
   display: flex;
+  flex-direction: column;
   gap: 1rem;
-  min-height: 0; /* Important for flex children */
-  flex-direction: row; /* Default to row (landscape) */
-}
-
-.dashboard-main.layout-portrait {
-  flex-direction: column; /* Portrait: stack vertically */
-}
-
-.dashboard-main.layout-landscape {
-  flex-direction: row; /* Landscape: side by side */
+  min-height: 0;
+  min-width: 0;
 }
 
 .mode-content {
