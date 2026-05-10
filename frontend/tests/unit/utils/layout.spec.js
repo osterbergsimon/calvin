@@ -10,19 +10,24 @@ import {
   cycleDashboardScreen,
   getActiveDashboardRegion,
   getActiveDashboardScreen,
+  getClockBarBetweenIndex,
   getDashboardRegionOrder,
   getLayoutDirection,
   getLayoutOrder,
   getLeafRegions,
   getRegionAxisStyle,
   getSplitDirection,
+  isClockBarBetweenPosition,
+  normalizeClockBarPosition,
   normalizeDashboardLayout,
   normalizeDashboardScreens,
+  normalizeScreenClockBar,
   removeSubRegion,
   removeTopRegion,
   resizeAdjacentRegions,
   resizeSubRegion,
   resizeSubRegionPair,
+  resolveClockBarForScreen,
   setLayoutDirection,
   setSplitDirection,
   setSubRegionContent,
@@ -492,6 +497,172 @@ describe("Layout Utilities", () => {
       expect(cycled.screens[0].activeRegionId).toBe("region-2");
       cycled = cycleActiveDashboardRegion(cycled, 1);
       expect(cycled.screens[0].activeRegionId).toBe("region-1-a");
+    });
+  });
+
+  describe("clock bar per-screen settings", () => {
+    const screenWith = (regionsCount, clockBar) => ({
+      id: "screen-1",
+      name: "Test",
+      layout: {
+        version: 1,
+        preset: "split_two",
+        direction: null,
+        regions: Array.from({ length: regionsCount }, (_, i) => ({
+          id: `region-${i + 1}`,
+          kind: "calendar",
+          instanceIds: [],
+          size: Math.floor(100 / regionsCount),
+          split: null,
+        })),
+      },
+      activeRegionId: "region-1",
+      clockBar: clockBar ?? null,
+    });
+
+    describe("normalizeClockBarPosition", () => {
+      it("returns perimeter values unchanged", () => {
+        expect(normalizeClockBarPosition("top", 2)).toBe("top");
+        expect(normalizeClockBarPosition("bottom", 2)).toBe("bottom");
+        expect(normalizeClockBarPosition("left", 2)).toBe("left");
+        expect(normalizeClockBarPosition("right", 2)).toBe("right");
+      });
+
+      it("normalizes 'between' to canonical first-gap form", () => {
+        expect(normalizeClockBarPosition("between", 3)).toBe("between");
+        expect(normalizeClockBarPosition("between:0", 3)).toBe("between");
+      });
+
+      it("preserves valid between:N for higher gaps", () => {
+        expect(normalizeClockBarPosition("between:1", 3)).toBe("between:1");
+        expect(normalizeClockBarPosition("between:2", 4)).toBe("between:2");
+      });
+
+      it("clamps between:N to the last available gap", () => {
+        expect(normalizeClockBarPosition("between:5", 3)).toBe("between:1");
+        expect(normalizeClockBarPosition("between:1", 2)).toBe("between");
+      });
+
+      it("rejects unknown values", () => {
+        expect(normalizeClockBarPosition("nope", 2)).toBeNull();
+        expect(normalizeClockBarPosition(null, 2)).toBeNull();
+        expect(normalizeClockBarPosition(undefined, 2)).toBeNull();
+      });
+    });
+
+    describe("getClockBarBetweenIndex / isClockBarBetweenPosition", () => {
+      it("returns 0 for 'between' and the parsed index for 'between:N'", () => {
+        expect(getClockBarBetweenIndex("between")).toBe(0);
+        expect(getClockBarBetweenIndex("between:2")).toBe(2);
+      });
+
+      it("returns null for non-between positions", () => {
+        expect(getClockBarBetweenIndex("top")).toBeNull();
+        expect(getClockBarBetweenIndex("right")).toBeNull();
+        expect(getClockBarBetweenIndex(null)).toBeNull();
+      });
+
+      it("isClockBarBetweenPosition mirrors the index check", () => {
+        expect(isClockBarBetweenPosition("between")).toBe(true);
+        expect(isClockBarBetweenPosition("between:3")).toBe(true);
+        expect(isClockBarBetweenPosition("top")).toBe(false);
+      });
+    });
+
+    describe("normalizeScreenClockBar", () => {
+      it("returns null for empty/invalid input", () => {
+        expect(normalizeScreenClockBar(null, 2)).toBeNull();
+        expect(normalizeScreenClockBar({}, 2)).toBeNull();
+        expect(normalizeScreenClockBar({ enabled: "yes" }, 2)).toBeNull();
+      });
+
+      it("keeps recognized fields and drops unknown ones", () => {
+        expect(
+          normalizeScreenClockBar(
+            { enabled: false, mode: "vertical", position: "left", junk: 42 },
+            2
+          )
+        ).toEqual({ enabled: false, mode: "vertical", position: "left" });
+      });
+
+      it("clamps stale between indices", () => {
+        expect(normalizeScreenClockBar({ position: "between:5" }, 3)).toEqual({
+          position: "between:1",
+        });
+      });
+    });
+
+    describe("normalizeDashboardScreen with clockBar", () => {
+      it("populates clockBar=null when no override provided", () => {
+        const screens = normalizeDashboardScreens({
+          version: 2,
+          activeScreenId: "screen-1",
+          screens: [{ id: "screen-1", name: "Home" }],
+        });
+        expect(screens.screens[0].clockBar).toBeNull();
+      });
+
+      it("preserves a valid override", () => {
+        const screens = normalizeDashboardScreens({
+          version: 2,
+          activeScreenId: "screen-1",
+          screens: [
+            {
+              id: "screen-1",
+              name: "Home",
+              clockBar: { enabled: false, mode: "vertical", position: "right" },
+            },
+          ],
+        });
+        expect(screens.screens[0].clockBar).toEqual({
+          enabled: false,
+          mode: "vertical",
+          position: "right",
+        });
+      });
+    });
+
+    describe("resolveClockBarForScreen", () => {
+      const globals = { enabled: true, mode: "horizontal", position: "top" };
+
+      it("falls back to globals when no override exists", () => {
+        const screen = screenWith(2, null);
+        expect(resolveClockBarForScreen(screen, globals)).toEqual({
+          enabled: true,
+          mode: "horizontal",
+          position: "top",
+        });
+      });
+
+      it("merges per-screen overrides on top of globals", () => {
+        const screen = screenWith(2, { mode: "vertical", position: "left" });
+        expect(resolveClockBarForScreen(screen, globals)).toEqual({
+          enabled: true,
+          mode: "vertical",
+          position: "left",
+        });
+      });
+
+      it("coerces an inconsistent (mode, position) pair to a sane perimeter", () => {
+        const screen = screenWith(2, { mode: "horizontal", position: "left" });
+        expect(resolveClockBarForScreen(screen, globals).position).toBe("top");
+      });
+
+      it("falls back to a perimeter when 'between' is requested with <2 regions", () => {
+        const screen = screenWith(1, { position: "between" });
+        const resolved = resolveClockBarForScreen(screen, globals);
+        expect(resolved.position).toBe("top");
+      });
+
+      it("clamps a stale between index against the screen's region count", () => {
+        const screen = screenWith(3, { position: "between:9" });
+        expect(resolveClockBarForScreen(screen, globals).position).toBe("between:1");
+      });
+
+      it("honors per-screen enabled=false override", () => {
+        const screen = screenWith(2, { enabled: false });
+        expect(resolveClockBarForScreen(screen, globals).enabled).toBe(false);
+      });
     });
   });
 });

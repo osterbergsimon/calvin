@@ -102,327 +102,513 @@
             </button>
           </header>
 
-          <div
-            v-if="expandedScreens.has(screen.id)"
-            :ref="el => setPreviewRef(screen.id, el)"
-            class="screen-preview"
-            :class="`screen-preview-${layoutDirectionFor(screen.layout)}`"
-            :style="previewStyleFor(screen.layout)"
-          >
-            <template v-for="(region, previewIndex) in screen.layout.regions" :key="region.id">
-              <div
-                :class="[
-                  'preview-region',
-                  region.split ? 'preview-region-split' : `preview-region-${region.kind}`,
-                  { 'preview-region-active': region.id === screen.activeRegionId },
-                ]"
-                :style="getPreviewRegionStyle(region)"
+          <div v-if="expandedScreens.has(screen.id)" class="screen-clock-bar-controls">
+            <span class="clock-bar-row-label">Clock bar</span>
+            <select
+              class="clock-bar-control"
+              :value="effectiveClockBarFor(screen).mode"
+              :aria-label="`Screen ${screenIndex + 1} clock bar mode`"
+              @change="setScreenClockBarMode(screenIndex, $event.target.value)"
+            >
+              <option value="horizontal">Horizontal</option>
+              <option value="vertical">Vertical</option>
+            </select>
+            <select
+              class="clock-bar-control"
+              :value="effectiveClockBarFor(screen).position"
+              :aria-label="`Screen ${screenIndex + 1} clock bar position`"
+              @change="setScreenClockBarPosition(screenIndex, $event.target.value)"
+            >
+              <option
+                v-for="opt in clockBarPositionOptions(screen, effectiveClockBarFor(screen).mode)"
+                :key="opt.value"
+                :value="opt.value"
               >
-                <div class="preview-region-header">
-                  <label v-if="!region.split" class="preview-primary-control" @click.stop>
-                    <input
-                      :id="`region-primary-${region.id}`"
-                      type="radio"
-                      :name="`dashboard-active-region-${screen.id}`"
-                      :checked="region.id === screen.activeRegionId"
-                      :aria-label="`Make ${regionLabel(previewIndex)} primary`"
-                      @change="setActiveRegion(screenIndex, region.id)"
-                    />
-                    Primary
-                  </label>
-                  <div class="preview-region-label">{{ regionLabel(previewIndex) }}</div>
-                  <button
-                    v-if="region.split"
-                    type="button"
-                    class="split-toggle"
-                    :aria-label="`Toggle ${regionLabel(previewIndex)} split direction`"
-                    :title="`Sub direction: ${directionLabel(splitDirectionFor(screen.layout, region))}`"
-                    @click.stop="toggleSubDirection(screenIndex, previewIndex)"
-                  >
-                    {{ splitDirectionFor(screen.layout, region) === "column" ? "▭▭" : "▯|▯" }}
-                  </button>
-                  <button
-                    v-if="region.split && region.split.regions.length < MAX_TOP_REGIONS"
-                    type="button"
-                    class="add-region-button add-region-button-small"
-                    :aria-label="`Add sub-region to ${regionLabel(previewIndex)}`"
-                    @click.stop="addSub(screenIndex, previewIndex)"
-                  >
-                    + Sub
-                  </button>
-                  <button
-                    type="button"
-                    class="split-toggle"
-                    :aria-label="
-                      region.split
-                        ? `Unsplit ${regionLabel(previewIndex)}`
-                        : `Split ${regionLabel(previewIndex)}`
-                    "
-                    @click.stop="toggleSplit(screenIndex, previewIndex)"
-                  >
-                    {{ region.split ? "Unsplit" : "Split" }}
-                  </button>
-                  <button
-                    v-if="screen.layout.regions.length > 1"
-                    type="button"
-                    class="region-delete"
-                    :aria-label="`Delete ${regionLabel(previewIndex)}`"
-                    @click.stop="removeRegion(screenIndex, previewIndex)"
-                  >
-                    ×
-                  </button>
-                </div>
+                {{ opt.label }}
+              </option>
+            </select>
+            <label class="clock-bar-show-toggle">
+              <input
+                type="checkbox"
+                :checked="effectiveClockBarFor(screen).enabled"
+                :aria-label="`Show clock bar on screen ${screenIndex + 1}`"
+                @change="setScreenClockBarEnabled(screenIndex, $event.target.checked)"
+              />
+              Show
+            </label>
+            <button
+              v-if="screenHasClockBarOverride(screen)"
+              type="button"
+              class="clock-bar-inherit"
+              :aria-label="`Inherit global clock bar settings on screen ${screenIndex + 1}`"
+              @click="clearScreenClockBar(screenIndex)"
+            >
+              Inherit global
+            </button>
+            <span v-else class="clock-bar-inherit-hint">Inherits global</span>
+            <span class="clock-bar-summary">{{ clockBarSummary(screen) }}</span>
+          </div>
 
-                <template v-if="region.split">
-                  <div
-                    :ref="el => setSubPreviewRef(screen.id, region.id, el)"
-                    class="preview-split-container"
-                    :class="`preview-split-${splitDirectionFor(screen.layout, region)}`"
-                  >
-                    <template v-for="(sub, subIndex) in region.split.regions" :key="sub.id">
-                      <div
-                        :class="[
-                          'preview-subregion',
-                          `preview-region-${sub.kind}`,
-                          { 'preview-region-active': sub.id === screen.activeRegionId },
-                        ]"
-                        :style="getSubRegionStyle(sub)"
-                      >
-                        <div class="preview-region-header">
-                          <label class="preview-primary-control" @click.stop>
-                            <input
-                              :id="`region-primary-${sub.id}`"
-                              type="radio"
-                              :name="`dashboard-active-region-${screen.id}`"
-                              :checked="sub.id === screen.activeRegionId"
-                              :aria-label="`Make ${regionLabel(previewIndex)} sub ${subIndex + 1} primary`"
-                              @change="setActiveRegion(screenIndex, sub.id)"
-                            />
-                            Primary
-                          </label>
-                          <div class="preview-region-label">
-                            {{ regionLabel(previewIndex) }}.{{ subIndex + 1 }}
-                          </div>
-                          <button
-                            v-if="region.split.regions.length > 1"
-                            type="button"
-                            class="region-delete"
-                            :aria-label="`Delete ${regionLabel(previewIndex)} sub ${subIndex + 1}`"
-                            @click.stop="removeSub(screenIndex, previewIndex, subIndex)"
-                          >
-                            ×
-                          </button>
-                        </div>
-                        <div class="preview-component-picker" @click.stop>
-                          <button
-                            :id="`region-component-${sub.id}`"
-                            type="button"
-                            class="preview-component-select"
-                            :aria-expanded="openComponentPickerKey === `${screen.id}:${sub.id}`"
-                            :aria-label="`${regionLabel(previewIndex)} sub ${subIndex + 1} component`"
-                            @click="toggleComponentPicker(screen.id, sub.id)"
-                          >
-                            {{ regionKindLabel(sub) }}
-                          </button>
-                          <div
-                            v-if="openComponentPickerKey === `${screen.id}:${sub.id}`"
-                            class="component-menu"
-                          >
-                            <input
-                              v-model="componentSearch"
-                              class="component-search"
-                              type="search"
-                              placeholder="Filter components"
-                              autocomplete="off"
-                            />
+          <div v-if="expandedScreens.has(screen.id)" class="screen-preview-frame">
+            <div
+              v-if="
+                clockBarDragScreenId === screen.id &&
+                effectiveClockBarFor(screen).position !== 'top'
+              "
+              class="clock-bar-drop-zone clock-bar-drop-zone-horizontal"
+              @dragover.prevent
+              @drop="handleClockBarDrop(screenIndex, 'top', $event)"
+            >
+              Top
+            </div>
+            <div
+              v-if="
+                effectiveClockBarFor(screen).enabled &&
+                effectiveClockBarFor(screen).position === 'top'
+              "
+              class="clock-bar-token clock-bar-token-horizontal"
+              draggable="true"
+              :aria-label="`Clock bar on screen ${screenIndex + 1} — drag to reposition`"
+              @dragstart="beginClockBarDrag(screen.id, $event)"
+              @dragend="endClockBarDrag()"
+            >
+              <span class="clock-bar-token-label">⠿ Clock bar</span>
+            </div>
+
+            <div
+              :ref="el => setPreviewRef(screen.id, el)"
+              class="screen-preview"
+              :class="`screen-preview-${layoutDirectionFor(screen.layout)}`"
+              :style="previewStyleFor(screen.layout)"
+            >
+              <div
+                v-if="
+                  clockBarDragScreenId === screen.id &&
+                  effectiveClockBarFor(screen).position !== 'left'
+                "
+                class="clock-bar-drop-zone clock-bar-drop-zone-vertical"
+                @dragover.prevent
+                @drop="handleClockBarDrop(screenIndex, 'left', $event)"
+              >
+                Left
+              </div>
+              <div
+                v-if="
+                  effectiveClockBarFor(screen).enabled &&
+                  effectiveClockBarFor(screen).position === 'left'
+                "
+                class="clock-bar-token clock-bar-token-vertical"
+                draggable="true"
+                :aria-label="`Clock bar on screen ${screenIndex + 1} — drag to reposition`"
+                @dragstart="beginClockBarDrag(screen.id, $event)"
+                @dragend="endClockBarDrag()"
+              >
+                <span class="clock-bar-token-label">⠿</span>
+              </div>
+              <template v-for="(region, previewIndex) in screen.layout.regions" :key="region.id">
+                <div
+                  :class="[
+                    'preview-region',
+                    region.split ? 'preview-region-split' : `preview-region-${region.kind}`,
+                    { 'preview-region-active': region.id === screen.activeRegionId },
+                  ]"
+                  :style="getPreviewRegionStyle(region)"
+                >
+                  <div class="preview-region-header">
+                    <label v-if="!region.split" class="preview-primary-control" @click.stop>
+                      <input
+                        :id="`region-primary-${region.id}`"
+                        type="radio"
+                        :name="`dashboard-active-region-${screen.id}`"
+                        :checked="region.id === screen.activeRegionId"
+                        :aria-label="`Make ${regionLabel(previewIndex)} primary`"
+                        @change="setActiveRegion(screenIndex, region.id)"
+                      />
+                      Primary
+                    </label>
+                    <div class="preview-region-label">{{ regionLabel(previewIndex) }}</div>
+                    <button
+                      v-if="region.split"
+                      type="button"
+                      class="split-toggle"
+                      :aria-label="`Toggle ${regionLabel(previewIndex)} split direction`"
+                      :title="`Sub direction: ${directionLabel(splitDirectionFor(screen.layout, region))}`"
+                      @click.stop="toggleSubDirection(screenIndex, previewIndex)"
+                    >
+                      {{ splitDirectionFor(screen.layout, region) === "column" ? "▭▭" : "▯|▯" }}
+                    </button>
+                    <button
+                      v-if="region.split && region.split.regions.length < MAX_TOP_REGIONS"
+                      type="button"
+                      class="add-region-button add-region-button-small"
+                      :aria-label="`Add sub-region to ${regionLabel(previewIndex)}`"
+                      @click.stop="addSub(screenIndex, previewIndex)"
+                    >
+                      + Sub
+                    </button>
+                    <button
+                      type="button"
+                      class="split-toggle"
+                      :aria-label="
+                        region.split
+                          ? `Unsplit ${regionLabel(previewIndex)}`
+                          : `Split ${regionLabel(previewIndex)}`
+                      "
+                      @click.stop="toggleSplit(screenIndex, previewIndex)"
+                    >
+                      {{ region.split ? "Unsplit" : "Split" }}
+                    </button>
+                    <button
+                      v-if="screen.layout.regions.length > 1"
+                      type="button"
+                      class="region-delete"
+                      :aria-label="`Delete ${regionLabel(previewIndex)}`"
+                      @click.stop="removeRegion(screenIndex, previewIndex)"
+                    >
+                      ×
+                    </button>
+                  </div>
+
+                  <template v-if="region.split">
+                    <div
+                      :ref="el => setSubPreviewRef(screen.id, region.id, el)"
+                      class="preview-split-container"
+                      :class="`preview-split-${splitDirectionFor(screen.layout, region)}`"
+                    >
+                      <template v-for="(sub, subIndex) in region.split.regions" :key="sub.id">
+                        <div
+                          :class="[
+                            'preview-subregion',
+                            `preview-region-${sub.kind}`,
+                            { 'preview-region-active': sub.id === screen.activeRegionId },
+                          ]"
+                          :style="getSubRegionStyle(sub)"
+                        >
+                          <div class="preview-region-header">
+                            <label class="preview-primary-control" @click.stop>
+                              <input
+                                :id="`region-primary-${sub.id}`"
+                                type="radio"
+                                :name="`dashboard-active-region-${screen.id}`"
+                                :checked="sub.id === screen.activeRegionId"
+                                :aria-label="`Make ${regionLabel(previewIndex)} sub ${subIndex + 1} primary`"
+                                @change="setActiveRegion(screenIndex, sub.id)"
+                              />
+                              Primary
+                            </label>
+                            <div class="preview-region-label">
+                              {{ regionLabel(previewIndex) }}.{{ subIndex + 1 }}
+                            </div>
                             <button
-                              v-for="option in filteredComponentOptions"
-                              :key="option.value"
+                              v-if="region.split.regions.length > 1"
                               type="button"
-                              class="component-option"
-                              @click="
-                                selectSubRegionComponent(
+                              class="region-delete"
+                              :aria-label="`Delete ${regionLabel(previewIndex)} sub ${subIndex + 1}`"
+                              @click.stop="removeSub(screenIndex, previewIndex, subIndex)"
+                            >
+                              ×
+                            </button>
+                          </div>
+                          <div class="preview-component-picker" @click.stop>
+                            <button
+                              :id="`region-component-${sub.id}`"
+                              type="button"
+                              class="preview-component-select"
+                              :aria-expanded="openComponentPickerKey === `${screen.id}:${sub.id}`"
+                              :aria-label="`${regionLabel(previewIndex)} sub ${subIndex + 1} component`"
+                              @click="toggleComponentPicker(screen.id, sub.id)"
+                            >
+                              {{ regionKindLabel(sub) }}
+                            </button>
+                            <div
+                              v-if="openComponentPickerKey === `${screen.id}:${sub.id}`"
+                              class="component-menu"
+                            >
+                              <input
+                                v-model="componentSearch"
+                                class="component-search"
+                                type="search"
+                                placeholder="Filter components"
+                                autocomplete="off"
+                              />
+                              <button
+                                v-for="option in filteredComponentOptions"
+                                :key="option.value"
+                                type="button"
+                                class="component-option"
+                                @click="
+                                  selectSubRegionComponent(
+                                    screenIndex,
+                                    previewIndex,
+                                    subIndex,
+                                    option
+                                  )
+                                "
+                              >
+                                {{ option.label }}
+                              </button>
+                              <div
+                                v-if="sourceOptionsFor(sub.kind).length > 0"
+                                class="source-options"
+                              >
+                                <button
+                                  type="button"
+                                  class="component-option"
+                                  @click="
+                                    clearSubRegionSources(screenIndex, previewIndex, subIndex)
+                                  "
+                                >
+                                  {{ sourceSelectionLabel({ ...sub, instanceIds: [] }) }}
+                                </button>
+                                <label
+                                  v-for="source in sourceOptionsFor(sub.kind)"
+                                  :key="source.id"
+                                  class="source-option"
+                                >
+                                  <input
+                                    type="checkbox"
+                                    :checked="(sub.instanceIds || []).includes(source.id)"
+                                    @change="
+                                      toggleSubRegionSource(
+                                        screenIndex,
+                                        previewIndex,
+                                        subIndex,
+                                        source.id,
+                                        $event.target.checked
+                                      )
+                                    "
+                                  />
+                                  {{ source.name }}
+                                </label>
+                              </div>
+                              <div
+                                v-if="filteredComponentOptions.length === 0"
+                                class="component-empty"
+                              >
+                                No matches
+                              </div>
+                            </div>
+                          </div>
+                          <label class="preview-size-control">
+                            Size
+                            <input
+                              :id="`region-size-${sub.id}`"
+                              :value="sub.size"
+                              type="number"
+                              min="10"
+                              max="90"
+                              step="1"
+                              :aria-label="`Sub ${subIndex + 1} size percentage`"
+                              @change="
+                                handleSubRegionSizeChange(
                                   screenIndex,
                                   previewIndex,
                                   subIndex,
-                                  option
+                                  $event.target.value
                                 )
                               "
-                            >
-                              {{ option.label }}
-                            </button>
-                            <div
-                              v-if="sourceOptionsFor(sub.kind).length > 0"
-                              class="source-options"
-                            >
-                              <button
-                                type="button"
-                                class="component-option"
-                                @click="clearSubRegionSources(screenIndex, previewIndex, subIndex)"
-                              >
-                                {{ sourceSelectionLabel({ ...sub, instanceIds: [] }) }}
-                              </button>
-                              <label
-                                v-for="source in sourceOptionsFor(sub.kind)"
-                                :key="source.id"
-                                class="source-option"
-                              >
-                                <input
-                                  type="checkbox"
-                                  :checked="(sub.instanceIds || []).includes(source.id)"
-                                  @change="
-                                    toggleSubRegionSource(
-                                      screenIndex,
-                                      previewIndex,
-                                      subIndex,
-                                      source.id,
-                                      $event.target.checked
-                                    )
-                                  "
-                                />
-                                {{ source.name }}
-                              </label>
-                            </div>
-                            <div
-                              v-if="filteredComponentOptions.length === 0"
-                              class="component-empty"
-                            >
-                              No matches
-                            </div>
-                          </div>
+                            />
+                            %
+                          </label>
                         </div>
-                        <label class="preview-size-control">
-                          Size
-                          <input
-                            :id="`region-size-${sub.id}`"
-                            :value="sub.size"
-                            type="number"
-                            min="10"
-                            max="90"
-                            step="1"
-                            :aria-label="`Sub ${subIndex + 1} size percentage`"
-                            @change="
-                              handleSubRegionSizeChange(
-                                screenIndex,
-                                previewIndex,
-                                subIndex,
-                                $event.target.value
-                              )
-                            "
-                          />
-                          %
-                        </label>
-                      </div>
-                      <button
-                        v-if="subIndex < region.split.regions.length - 1"
-                        type="button"
-                        :class="[
-                          'preview-resizer',
-                          `preview-resizer-${splitDirectionFor(screen.layout, region)}`,
-                        ]"
-                        :aria-label="`Resize ${regionLabel(previewIndex)} sub-regions`"
-                        @pointerdown.stop="
-                          startSubResize(screenIndex, previewIndex, subIndex, $event)
-                        "
-                      />
-                    </template>
-                  </div>
-                </template>
-                <template v-else>
-                  <div class="preview-component-picker" @click.stop>
-                    <button
-                      :id="`region-component-${region.id}`"
-                      type="button"
-                      class="preview-component-select"
-                      :aria-expanded="openComponentPickerKey === `${screen.id}:${region.id}`"
-                      :aria-label="`${regionLabel(previewIndex)} component`"
-                      @click="toggleComponentPicker(screen.id, region.id)"
-                    >
-                      {{ regionKindLabel(region) }}
-                    </button>
-                    <div
-                      v-if="openComponentPickerKey === `${screen.id}:${region.id}`"
-                      class="component-menu"
-                    >
-                      <input
-                        v-model="componentSearch"
-                        class="component-search"
-                        type="search"
-                        placeholder="Filter components"
-                        autocomplete="off"
-                      />
-                      <button
-                        v-for="option in filteredComponentOptions"
-                        :key="option.value"
-                        type="button"
-                        class="component-option"
-                        @click="selectRegionComponent(screenIndex, previewIndex, option)"
-                      >
-                        {{ option.label }}
-                      </button>
-                      <div v-if="sourceOptionsFor(region.kind).length > 0" class="source-options">
                         <button
+                          v-if="subIndex < region.split.regions.length - 1"
+                          type="button"
+                          :class="[
+                            'preview-resizer',
+                            `preview-resizer-${splitDirectionFor(screen.layout, region)}`,
+                          ]"
+                          :aria-label="`Resize ${regionLabel(previewIndex)} sub-regions`"
+                          @pointerdown.stop="
+                            startSubResize(screenIndex, previewIndex, subIndex, $event)
+                          "
+                        />
+                      </template>
+                    </div>
+                  </template>
+                  <template v-else>
+                    <div class="preview-component-picker" @click.stop>
+                      <button
+                        :id="`region-component-${region.id}`"
+                        type="button"
+                        class="preview-component-select"
+                        :aria-expanded="openComponentPickerKey === `${screen.id}:${region.id}`"
+                        :aria-label="`${regionLabel(previewIndex)} component`"
+                        @click="toggleComponentPicker(screen.id, region.id)"
+                      >
+                        {{ regionKindLabel(region) }}
+                      </button>
+                      <div
+                        v-if="openComponentPickerKey === `${screen.id}:${region.id}`"
+                        class="component-menu"
+                      >
+                        <input
+                          v-model="componentSearch"
+                          class="component-search"
+                          type="search"
+                          placeholder="Filter components"
+                          autocomplete="off"
+                        />
+                        <button
+                          v-for="option in filteredComponentOptions"
+                          :key="option.value"
                           type="button"
                           class="component-option"
-                          @click="clearRegionSources(screenIndex, previewIndex)"
+                          @click="selectRegionComponent(screenIndex, previewIndex, option)"
                         >
-                          {{ sourceSelectionLabel({ ...region, instanceIds: [] }) }}
+                          {{ option.label }}
                         </button>
-                        <label
-                          v-for="source in sourceOptionsFor(region.kind)"
-                          :key="source.id"
-                          class="source-option"
-                        >
-                          <input
-                            type="checkbox"
-                            :checked="(region.instanceIds || []).includes(source.id)"
-                            @change="
-                              toggleRegionSource(
-                                screenIndex,
-                                previewIndex,
-                                source.id,
-                                $event.target.checked
-                              )
-                            "
-                          />
-                          {{ source.name }}
-                        </label>
-                      </div>
-                      <div v-if="filteredComponentOptions.length === 0" class="component-empty">
-                        No matches
+                        <div v-if="sourceOptionsFor(region.kind).length > 0" class="source-options">
+                          <button
+                            type="button"
+                            class="component-option"
+                            @click="clearRegionSources(screenIndex, previewIndex)"
+                          >
+                            {{ sourceSelectionLabel({ ...region, instanceIds: [] }) }}
+                          </button>
+                          <label
+                            v-for="source in sourceOptionsFor(region.kind)"
+                            :key="source.id"
+                            class="source-option"
+                          >
+                            <input
+                              type="checkbox"
+                              :checked="(region.instanceIds || []).includes(source.id)"
+                              @change="
+                                toggleRegionSource(
+                                  screenIndex,
+                                  previewIndex,
+                                  source.id,
+                                  $event.target.checked
+                                )
+                              "
+                            />
+                            {{ source.name }}
+                          </label>
+                        </div>
+                        <div v-if="filteredComponentOptions.length === 0" class="component-empty">
+                          No matches
+                        </div>
                       </div>
                     </div>
-                  </div>
-                  <label
-                    v-if="screen.layout.regions.length > 1"
-                    class="preview-size-control"
-                    @click.stop
+                    <label
+                      v-if="screen.layout.regions.length > 1"
+                      class="preview-size-control"
+                      @click.stop
+                    >
+                      Size
+                      <input
+                        :id="`region-size-${region.id}`"
+                        :value="region.size"
+                        type="number"
+                        min="10"
+                        max="90"
+                        step="1"
+                        :aria-label="`${regionLabel(previewIndex)} size percentage`"
+                        @change="
+                          handleRegionSizeChange(screenIndex, previewIndex, $event.target.value)
+                        "
+                      />
+                      %
+                    </label>
+                  </template>
+                </div>
+                <template v-if="previewIndex < screen.layout.regions.length - 1">
+                  <div
+                    v-if="
+                      clockBarDragScreenId === screen.id &&
+                      getClockBarBetweenIndex(effectiveClockBarFor(screen).position) !==
+                        previewIndex
+                    "
+                    class="clock-bar-drop-zone"
+                    :class="`clock-bar-drop-zone-between-${layoutDirectionFor(screen.layout) === 'row' ? 'vertical' : 'horizontal'}`"
+                    @dragover.prevent
+                    @drop="
+                      handleClockBarDrop(
+                        screenIndex,
+                        previewIndex === 0 ? 'between' : `between:${previewIndex}`,
+                        $event
+                      )
+                    "
                   >
-                    Size
-                    <input
-                      :id="`region-size-${region.id}`"
-                      :value="region.size"
-                      type="number"
-                      min="10"
-                      max="90"
-                      step="1"
-                      :aria-label="`${regionLabel(previewIndex)} size percentage`"
-                      @change="
-                        handleRegionSizeChange(screenIndex, previewIndex, $event.target.value)
-                      "
-                    />
-                    %
-                  </label>
+                    Gap {{ previewIndex + 1 }}
+                  </div>
+                  <div
+                    v-if="
+                      effectiveClockBarFor(screen).enabled &&
+                      getClockBarBetweenIndex(effectiveClockBarFor(screen).position) ===
+                        previewIndex
+                    "
+                    class="clock-bar-token"
+                    :class="`clock-bar-token-${layoutDirectionFor(screen.layout) === 'row' ? 'vertical' : 'horizontal'}`"
+                    draggable="true"
+                    :aria-label="`Clock bar on screen ${screenIndex + 1} — drag to reposition`"
+                    @dragstart="beginClockBarDrag(screen.id, $event)"
+                    @dragend="endClockBarDrag()"
+                  >
+                    <span class="clock-bar-token-label">⠿</span>
+                  </div>
+                  <button
+                    type="button"
+                    :class="[
+                      'preview-resizer',
+                      `preview-resizer-${layoutDirectionFor(screen.layout)}`,
+                    ]"
+                    :aria-label="`Resize ${regionLabel(previewIndex)}`"
+                    @pointerdown="startResize(screenIndex, previewIndex, $event)"
+                  />
                 </template>
+              </template>
+              <div
+                v-if="
+                  effectiveClockBarFor(screen).enabled &&
+                  effectiveClockBarFor(screen).position === 'right'
+                "
+                class="clock-bar-token clock-bar-token-vertical"
+                draggable="true"
+                :aria-label="`Clock bar on screen ${screenIndex + 1} — drag to reposition`"
+                @dragstart="beginClockBarDrag(screen.id, $event)"
+                @dragend="endClockBarDrag()"
+              >
+                <span class="clock-bar-token-label">⠿</span>
               </div>
-              <button
-                v-if="previewIndex < screen.layout.regions.length - 1"
-                type="button"
-                :class="['preview-resizer', `preview-resizer-${layoutDirectionFor(screen.layout)}`]"
-                :aria-label="`Resize ${regionLabel(previewIndex)}`"
-                @pointerdown="startResize(screenIndex, previewIndex, $event)"
-              />
-            </template>
+              <div
+                v-if="
+                  clockBarDragScreenId === screen.id &&
+                  effectiveClockBarFor(screen).position !== 'right'
+                "
+                class="clock-bar-drop-zone clock-bar-drop-zone-vertical"
+                @dragover.prevent
+                @drop="handleClockBarDrop(screenIndex, 'right', $event)"
+              >
+                Right
+              </div>
+            </div>
+
+            <div
+              v-if="
+                effectiveClockBarFor(screen).enabled &&
+                effectiveClockBarFor(screen).position === 'bottom'
+              "
+              class="clock-bar-token clock-bar-token-horizontal"
+              draggable="true"
+              :aria-label="`Clock bar on screen ${screenIndex + 1} — drag to reposition`"
+              @dragstart="beginClockBarDrag(screen.id, $event)"
+              @dragend="endClockBarDrag()"
+            >
+              <span class="clock-bar-token-label">⠿ Clock bar</span>
+            </div>
+            <div
+              v-if="
+                clockBarDragScreenId === screen.id &&
+                effectiveClockBarFor(screen).position !== 'bottom'
+              "
+              class="clock-bar-drop-zone clock-bar-drop-zone-horizontal"
+              @dragover.prevent
+              @drop="handleClockBarDrop(screenIndex, 'bottom', $event)"
+            >
+              Bottom
+            </div>
           </div>
         </section>
 
@@ -441,18 +627,23 @@ import { useWebServicesStore } from "@/stores/webServices";
 import { useCalendarStore } from "@/stores/calendar";
 import { usePlugins } from "@/composables";
 import {
+  CLOCK_BAR_PERIMETER_POSITIONS,
   MAX_TOP_REGIONS,
   addSubRegion,
   addTopRegion,
   createDashboardScreenFromPreset,
+  getClockBarBetweenIndex,
   getLayoutDirection,
   getSplitDirection,
+  isClockBarBetweenPosition,
+  normalizeClockBarPosition,
   normalizeDashboardScreens,
   removeSubRegion,
   removeTopRegion,
   resizeAdjacentRegions,
   resizeSubRegion,
   resizeSubRegionPair,
+  resolveClockBarForScreen,
   setLayoutDirection,
   setSplitDirection,
   setSubRegionContent,
@@ -477,8 +668,29 @@ const { plugins, pluginInstances, loadingPlugins, loadPlugins } = usePlugins();
 const previewRefs = new Map();
 const subPreviewRefs = new Map();
 const dragState = ref(null);
+const clockBarDragScreenId = ref(null);
 const openComponentPickerKey = ref(null);
 const componentSearch = ref("");
+
+const beginClockBarDrag = (screenId, event) => {
+  clockBarDragScreenId.value = screenId;
+  if (event?.dataTransfer) {
+    event.dataTransfer.effectAllowed = "move";
+    // Some browsers require setData for drag to start.
+    event.dataTransfer.setData("text/plain", `clock-bar:${screenId}`);
+  }
+};
+
+const endClockBarDrag = () => {
+  clockBarDragScreenId.value = null;
+};
+
+const handleClockBarDrop = (screenIndex, position, event) => {
+  event?.preventDefault?.();
+  if (clockBarDragScreenId.value === null) return;
+  setScreenClockBarPosition(screenIndex, position);
+  endClockBarDrag();
+};
 
 const setPreviewRef = (screenId, el) => {
   if (el) previewRefs.set(screenId, el);
@@ -498,9 +710,132 @@ const configValue = computed(() => {
     orientationFlipped: config.orientationFlipped ?? false,
     applyDisplayRotation: config.applyDisplayRotation ?? true,
     calendarSplit: config.calendarSplit ?? 70,
+    clockBarMode: config.clockBarMode ?? "horizontal",
+    clockBarPosition: config.clockBarPosition ?? "top",
     dashboardScreens: normalizeDashboardScreens(config.dashboardScreens),
   };
 });
+
+const globalClockBarSettings = computed(() => ({
+  enabled: true,
+  mode: configValue.value.clockBarMode,
+  position: configValue.value.clockBarPosition,
+}));
+
+const effectiveClockBarFor = screen =>
+  resolveClockBarForScreen(screen, globalClockBarSettings.value);
+
+const screenHasClockBarOverride = screen => Boolean(screen?.clockBar);
+
+const clockBarSummary = screen => {
+  const resolved = effectiveClockBarFor(screen);
+  const positionLabel = clockBarPositionLabel(resolved.position, screen);
+  const modeLabel = resolved.mode === "vertical" ? "Vertical" : "Horizontal";
+  const enabledLabel = resolved.enabled ? "" : " · Hidden";
+  return `${modeLabel} · ${positionLabel}${enabledLabel}`;
+};
+
+const clockBarPositionLabel = (position, screen) => {
+  if (position === "top") return "Top";
+  if (position === "bottom") return "Bottom";
+  if (position === "left") return "Left";
+  if (position === "right") return "Right";
+  const index = getClockBarBetweenIndex(position);
+  if (index !== null) {
+    const regions = screen?.layout?.regions || [];
+    const before = regions[index];
+    const after = regions[index + 1];
+    if (before && after) {
+      return `Between R${index + 1} & R${index + 2}`;
+    }
+    return "Between regions";
+  }
+  return "—";
+};
+
+const clockBarPositionOptions = (screen, mode) => {
+  const options =
+    mode === "vertical"
+      ? [
+          { value: "left", label: "Left edge" },
+          { value: "right", label: "Right edge" },
+        ]
+      : [
+          { value: "top", label: "Top edge" },
+          { value: "bottom", label: "Bottom edge" },
+        ];
+  const regions = screen?.layout?.regions || [];
+  for (let i = 0; i < regions.length - 1; i += 1) {
+    const value = i === 0 ? "between" : `between:${i}`;
+    options.push({ value, label: `Between region ${i + 1} & ${i + 2}` });
+  }
+  return options;
+};
+
+const updateScreenClockBar = (screenIndex, patch) => {
+  const screens = cloneScreens();
+  const target = screens.screens[screenIndex];
+  const next = { ...(target.clockBar || {}), ...patch };
+  // Drop fields explicitly set to undefined or null so override stays minimal.
+  Object.keys(next).forEach(key => {
+    if (next[key] === undefined || next[key] === null) delete next[key];
+  });
+  target.clockBar = Object.keys(next).length ? next : null;
+  emitScreensUpdate(screens);
+};
+
+const clearScreenClockBar = screenIndex => {
+  const screens = cloneScreens();
+  screens.screens[screenIndex].clockBar = null;
+  emitScreensUpdate(screens);
+};
+
+const setScreenClockBarMode = (screenIndex, mode) => {
+  const screen = dashboardScreens.value.screens[screenIndex];
+  const resolved = effectiveClockBarFor(screen);
+  // Switching mode invalidates the current perimeter side; re-coerce position.
+  const patch = { mode };
+  if (
+    (mode === "horizontal" && resolved.position !== "top" && resolved.position !== "bottom") ||
+    (mode === "vertical" && resolved.position !== "left" && resolved.position !== "right")
+  ) {
+    if (!isClockBarBetweenPosition(resolved.position)) {
+      patch.position = mode === "horizontal" ? "top" : "left";
+    }
+  }
+  updateScreenClockBar(screenIndex, patch);
+};
+
+const setScreenClockBarPosition = (screenIndex, position) => {
+  const screen = dashboardScreens.value.screens[screenIndex];
+  const regionsCount = screen.layout.regions.length;
+  const normalized = normalizeClockBarPosition(position, regionsCount);
+  if (!normalized) return;
+  // If the override has no other fields and the new position matches the
+  // global already, leave the screen inheriting.
+  const wouldMatchGlobal =
+    normalized === globalClockBarSettings.value.position &&
+    !screen.clockBar?.mode &&
+    typeof screen.clockBar?.enabled !== "boolean";
+  if (wouldMatchGlobal) {
+    clearScreenClockBar(screenIndex);
+    return;
+  }
+  // Set position; also pin the mode so the position remains valid even if the
+  // global mode flips later.
+  const patch = { position: normalized };
+  const sideMode = CLOCK_BAR_PERIMETER_POSITIONS.includes(normalized)
+    ? normalized === "top" || normalized === "bottom"
+      ? "horizontal"
+      : "vertical"
+    : null;
+  if (sideMode) patch.mode = sideMode;
+  updateScreenClockBar(screenIndex, patch);
+};
+
+const setScreenClockBarEnabled = (screenIndex, enabled) => {
+  updateScreenClockBar(screenIndex, { enabled });
+};
 
 const dashboardScreens = computed(() => configValue.value.dashboardScreens);
 
@@ -1391,6 +1726,142 @@ onUnmounted(() => {
 
 .preview-subregion .preview-region-header {
   min-height: 1.75rem;
+}
+
+.screen-clock-bar-controls {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0.5rem;
+  padding: 0.4rem 0.6rem;
+  border: 1px solid var(--border-color);
+  border-radius: 6px;
+  background: var(--bg-primary);
+  font-size: 0.85rem;
+  color: var(--text-secondary);
+}
+
+.clock-bar-row-label {
+  font-weight: 600;
+  color: var(--text-primary);
+}
+
+.clock-bar-control {
+  border: 1px solid var(--border-color);
+  border-radius: 4px;
+  padding: 0.25rem 0.4rem;
+  background: var(--bg-secondary);
+  color: var(--text-primary);
+}
+
+.clock-bar-show-toggle {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.3rem;
+  cursor: pointer;
+}
+
+.clock-bar-inherit {
+  border: 1px solid var(--border-color);
+  border-radius: 4px;
+  padding: 0.25rem 0.5rem;
+  background: var(--bg-secondary);
+  color: var(--text-primary);
+  cursor: pointer;
+}
+
+.clock-bar-inherit:hover,
+.clock-bar-inherit:focus {
+  border-color: var(--accent-primary);
+}
+
+.clock-bar-inherit-hint {
+  font-style: italic;
+  font-size: 0.8rem;
+}
+
+.clock-bar-summary {
+  margin-left: auto;
+  font-size: 0.8rem;
+  color: var(--text-secondary);
+}
+
+.screen-preview-frame {
+  display: flex;
+  flex-direction: column;
+  gap: 0.4rem;
+}
+
+.clock-bar-token {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  background: var(--accent-primary);
+  color: #fff;
+  border-radius: 4px;
+  font-size: 0.8rem;
+  font-weight: 600;
+  cursor: grab;
+  user-select: none;
+  flex-shrink: 0;
+}
+
+.clock-bar-token:active {
+  cursor: grabbing;
+}
+
+.clock-bar-token-horizontal {
+  width: 100%;
+  height: 1.6rem;
+  padding: 0 0.5rem;
+}
+
+.clock-bar-token-vertical {
+  width: 1.6rem;
+  align-self: stretch;
+  writing-mode: vertical-rl;
+  padding: 0.5rem 0;
+}
+
+.clock-bar-token-label {
+  white-space: nowrap;
+}
+
+.clock-bar-drop-zone {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border: 1px dashed var(--accent-primary);
+  border-radius: 4px;
+  background: rgba(0, 0, 0, 0.05);
+  color: var(--accent-primary);
+  font-size: 0.75rem;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  flex-shrink: 0;
+}
+
+.clock-bar-drop-zone-horizontal {
+  width: 100%;
+  height: 1.4rem;
+}
+
+.clock-bar-drop-zone-vertical {
+  width: 1.4rem;
+  align-self: stretch;
+  writing-mode: vertical-rl;
+}
+
+.clock-bar-drop-zone-between-horizontal {
+  width: 100%;
+  height: 1.4rem;
+}
+
+.clock-bar-drop-zone-between-vertical {
+  width: 1.4rem;
+  align-self: stretch;
+  writing-mode: vertical-rl;
 }
 
 .screen-add {

@@ -180,13 +180,102 @@ export function normalizeDashboardScreen(screen) {
   const activeRegionId = leafIds.includes(screen?.activeRegionId)
     ? screen.activeRegionId
     : leafIds[0] || "region-1";
+  const clockBar = normalizeScreenClockBar(screen?.clockBar, layout.regions.length);
 
   return {
     id: screen?.id || createScreenId(),
     name: screen?.name || "Screen",
     layout,
     activeRegionId,
+    clockBar,
   };
+}
+
+export const CLOCK_BAR_PERIMETER_POSITIONS = ["top", "bottom", "left", "right"];
+
+/**
+ * Normalize a per-screen clock bar override. Returns `null` if no fields are
+ * set (the screen inherits the global settings entirely). Position values:
+ *   - 'top' | 'bottom' (horizontal mode)
+ *   - 'left' | 'right' (vertical mode)
+ *   - 'between'         (== between:0; the first gap between top-level regions)
+ *   - `between:${i}`    (the i-th gap; clamped to [0, regionsCount - 2])
+ */
+export function normalizeScreenClockBar(value, regionsCount) {
+  if (!value || typeof value !== "object") return null;
+  const out = {};
+  if (typeof value.enabled === "boolean") out.enabled = value.enabled;
+  if (value.mode === "horizontal" || value.mode === "vertical") out.mode = value.mode;
+  const position = normalizeClockBarPosition(value.position, regionsCount);
+  if (position) out.position = position;
+  return Object.keys(out).length ? out : null;
+}
+
+export function normalizeClockBarPosition(value, regionsCount) {
+  if (CLOCK_BAR_PERIMETER_POSITIONS.includes(value)) return value;
+  if (value === "between") return clampBetweenPosition(0, regionsCount);
+  if (typeof value === "string") {
+    const match = value.match(/^between:(\d+)$/);
+    if (match) {
+      return clampBetweenPosition(parseInt(match[1], 10), regionsCount);
+    }
+  }
+  return null;
+}
+
+function clampBetweenPosition(index, regionsCount) {
+  const count = Number.isFinite(regionsCount) ? regionsCount : 0;
+  if (count < 2) return "between";
+  const maxIndex = count - 2;
+  const clamped = Math.max(0, Math.min(maxIndex, Number.isFinite(index) ? index : 0));
+  return clamped === 0 ? "between" : `between:${clamped}`;
+}
+
+export function getClockBarBetweenIndex(position) {
+  if (position === "between") return 0;
+  if (typeof position === "string") {
+    const match = position.match(/^between:(\d+)$/);
+    if (match) return parseInt(match[1], 10);
+  }
+  return null;
+}
+
+export function isClockBarBetweenPosition(position) {
+  return getClockBarBetweenIndex(position) !== null;
+}
+
+/**
+ * Merge per-screen clock bar overrides with global settings, returning the
+ * effective `{ enabled, mode, position }` to use when rendering. Falls back to
+ * a sane perimeter position when the resolved (mode, position) pair is
+ * inconsistent (e.g. horizontal mode with a 'left' override).
+ */
+export function resolveClockBarForScreen(screen, globalSettings = {}) {
+  const override = screen?.clockBar || {};
+  const enabled =
+    typeof override.enabled === "boolean" ? override.enabled : Boolean(globalSettings.enabled);
+  const mode =
+    override.mode === "horizontal" || override.mode === "vertical"
+      ? override.mode
+      : globalSettings.mode === "vertical"
+        ? "vertical"
+        : "horizontal";
+  const requested = override.position ?? globalSettings.position ?? null;
+  const regionsCount = screen?.layout?.regions?.length || 0;
+  const position = coerceClockBarPosition(requested, mode, regionsCount);
+  return { enabled, mode, position };
+}
+
+function coerceClockBarPosition(position, mode, regionsCount) {
+  const betweenIndex = getClockBarBetweenIndex(position);
+  if (betweenIndex !== null) {
+    if (regionsCount < 2) return mode === "vertical" ? "left" : "top";
+    return clampBetweenPosition(betweenIndex, regionsCount);
+  }
+  if (mode === "horizontal") {
+    return position === "top" || position === "bottom" ? position : "top";
+  }
+  return position === "left" || position === "right" ? position : "left";
 }
 
 export function getLeafRegions(layout) {

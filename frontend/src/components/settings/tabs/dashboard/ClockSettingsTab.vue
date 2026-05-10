@@ -1,7 +1,7 @@
 <template>
   <div class="clock-settings-tab">
-    <CollapsibleSection title="Status Bar" icon="🕐" :expanded="true">
-      <SettingItem label="Show Date" help="Display the date alongside the time">
+    <CollapsibleSection title="Clock display" icon="🕐" :expanded="true">
+      <SettingItem label="Show date" help="Display the date alongside the time">
         <label>
           <input
             name="clockShowDate"
@@ -9,11 +9,11 @@
             type="checkbox"
             @change="handleClockSettingsChange"
           />
-          Show Date
+          Show date
         </label>
       </SettingItem>
 
-      <SettingItem label="Show Seconds" help="Display seconds in the time (updates every second)">
+      <SettingItem label="Show seconds" help="Updates the time every second">
         <label>
           <input
             name="clockShowSeconds"
@@ -21,69 +21,63 @@
             type="checkbox"
             @change="handleClockSettingsChange"
           />
-          Show Seconds
+          Show seconds
         </label>
       </SettingItem>
+    </CollapsibleSection>
 
-      <SettingItem label="Show Bar in Kiosk Mode" help="Display bar when UI is hidden">
-        <label>
-          <input
-            name="clockBarShowInKiosk"
-            :checked="config.clockBarShowInKiosk"
-            type="checkbox"
-            @change="handleClockSettingsChange"
-          />
-          Show in Kiosk Mode
-        </label>
-      </SettingItem>
+    <CollapsibleSection title="Default position" icon="📍" :expanded="true">
+      <p class="section-hint">
+        These are the defaults used when a screen doesn't specify its own clock bar position. To
+        override on a specific screen — including dropping the bar into a gap between regions — open
+        <strong>Screens</strong> in the Dashboard settings.
+      </p>
 
-      <SettingItem label="Bar Mode" help="Horizontal or vertical clock bar">
+      <SettingItem label="Bar mode" help="Horizontal bar (top/bottom) or vertical bar (left/right)">
         <select
           name="clockBarMode"
           :value="config.clockBarMode"
           @change="handleClockSettingsChange"
         >
-          <option value="horizontal">Horizontal Bar</option>
-          <option value="vertical">Vertical Bar</option>
+          <option value="horizontal">Horizontal</option>
+          <option value="vertical">Vertical</option>
         </select>
       </SettingItem>
 
-      <SettingItem label="Bar Position" :help="getBarPositionHelp()">
+      <SettingItem label="Bar position" :help="getBarPositionHelp()">
         <select
           name="clockBarPosition"
           :value="config.clockBarPosition"
           @change="handleClockSettingsChange"
         >
           <template v-if="config.clockBarMode === 'horizontal'">
-            <option value="top">Top Header</option>
-            <option value="bottom">Bottom Bar</option>
-            <option value="between" :disabled="config.orientation !== 'portrait'">
-              Between Calendar/Side View (Portrait Only)
-            </option>
+            <option value="top">Top</option>
+            <option value="bottom">Bottom</option>
+            <option value="between">Between regions (first gap)</option>
           </template>
           <template v-else>
-            <option value="left">Far Left</option>
-            <option value="right">Far Right</option>
-            <option value="between" :disabled="config.orientation !== 'landscape'">
-              Between Calendar/Side View (Landscape Only)
-            </option>
+            <option value="left">Left</option>
+            <option value="right">Right</option>
+            <option value="between">Between regions (first gap)</option>
           </template>
         </select>
       </SettingItem>
+    </CollapsibleSection>
 
-      <SettingItem label="Bar Layout" help="Display clock and date on one line or two lines">
+    <CollapsibleSection title="Appearance" icon="🎨" :expanded="true">
+      <SettingItem label="Layout" help="Display clock and date on one line or two">
         <select
           name="clockBarLayout"
           :value="config.clockBarLayout || 'single-line'"
           @change="handleClockSettingsChange"
         >
-          <option value="single-line">Single Line</option>
-          <option value="two-lines">Two Lines</option>
+          <option value="single-line">Single line</option>
+          <option value="two-lines">Two lines</option>
         </select>
       </SettingItem>
 
       <SettingItem
-        label="Font Sizes"
+        label="Font sizes"
         help="Adjust font sizes for time and date. Preview shows how the bar will look."
       >
         <ClockBarFontSizePicker
@@ -100,8 +94,8 @@
       </SettingItem>
 
       <SettingItem
-        label="Show Calvin Logo"
-        help="Display a small Calvin glyph at the leading edge of the bar."
+        label="Show Calvin logo"
+        help="Display a small Calvin glyph at the leading edge of the bar"
       >
         <label>
           <input
@@ -110,13 +104,13 @@
             type="checkbox"
             @change="handleClockSettingsChange"
           />
-          Show Logo
+          Show logo
         </label>
       </SettingItem>
 
       <SettingItem
-        label="Show Weather in Bar"
-        help="Display current temperature and weather icon (requires a weather service to be configured)"
+        label="Show weather"
+        help="Display current temperature and icon (requires a weather service)"
       >
         <label>
           <input
@@ -125,7 +119,24 @@
             type="checkbox"
             @change="handleClockSettingsChange"
           />
-          Show Weather in Bar
+          Show weather in bar
+        </label>
+      </SettingItem>
+    </CollapsibleSection>
+
+    <CollapsibleSection title="Visibility" icon="👁️" :expanded="true">
+      <SettingItem
+        label="Show in kiosk mode"
+        help="Keep the bar visible when the rest of the UI is hidden"
+      >
+        <label>
+          <input
+            name="clockBarShowInKiosk"
+            :checked="config.clockBarShowInKiosk"
+            type="checkbox"
+            @change="handleClockSettingsChange"
+          />
+          Show in kiosk mode
         </label>
       </SettingItem>
     </CollapsibleSection>
@@ -164,9 +175,9 @@ const handleClockSettingsChange = event => {
 
 const getBarPositionHelp = () => {
   if (props.config.clockBarMode === "horizontal") {
-    return "Position for horizontal bar. 'Between' only works in portrait mode.";
+    return "Top/bottom always render. 'Between' shows when the screen layout stacks regions vertically.";
   }
-  return "Position for vertical bar. 'Between' only works in landscape mode.";
+  return "Left/right always render. 'Between' shows when the screen layout places regions side by side.";
 };
 
 const handleBarFontSizeChange = px => {
@@ -185,5 +196,23 @@ const handleBarPaddingChange = px => {
 <style scoped>
 .clock-settings-tab {
   width: 100%;
+  display: flex;
+  flex-direction: column;
+  gap: 1rem;
+}
+
+.section-hint {
+  margin: 0 0 0.75rem;
+  padding: 0.6rem 0.75rem;
+  border-left: 3px solid var(--accent-primary);
+  background: var(--bg-secondary);
+  border-radius: 0 4px 4px 0;
+  color: var(--text-secondary);
+  font-size: 0.88rem;
+  line-height: 1.45;
+}
+
+.section-hint strong {
+  color: var(--text-primary);
 }
 </style>

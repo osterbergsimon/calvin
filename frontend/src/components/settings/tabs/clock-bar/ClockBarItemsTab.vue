@@ -2,41 +2,61 @@
   <div class="clock-bar-items-tab">
     <CollapsibleSection title="Bar Items" icon="🧩" :expanded="true">
       <p class="section-description">
-        Pick which plugin tiles appear in the clock bar. Toggling here flips each instance's
-        <code>show_in_statusbar</code> flag, so plugins continue to control their own preview and
-        data &mdash; this menu just chooses which ones to show.
+        Choose which plugin tiles appear in the clock bar. Each tile keeps its own preview and live
+        data — toggling here just controls whether it's shown.
       </p>
 
       <div v-if="loading" class="state-message">Loading installed plugins&hellip;</div>
 
       <div v-else-if="barCapableServices.length === 0" class="state-message empty-state">
-        <p>No installed plugins expose a status bar item.</p>
+        <p>No installed plugins expose a clock bar tile.</p>
         <p>
-          Install a plugin that ships a <code>statusbar_schema</code> to add tiles here. Manage
-          installs in the <strong>Plugins</strong> category.
+          Install a plugin that ships a status bar item to add tiles here. Manage installs in the
+          <strong>Plugins</strong> category.
         </p>
       </div>
 
-      <ul v-else class="items-list">
-        <li v-for="service in barCapableServices" :key="service.id" class="item-row">
-          <div class="preview" :title="`Live preview of ${service.name}`">
-            <SchemaStatusbarItem :service-id="service.id" :schema="service.statusbar_schema" />
-          </div>
-          <div class="meta">
-            <div class="title">{{ service.name }}</div>
-            <div class="subtitle">{{ service.plugin_name || service.plugin_id }}</div>
-          </div>
-          <label class="toggle" :class="{ saving: pendingId === service.id }">
-            <input
-              type="checkbox"
-              :checked="isVisible(service)"
-              :disabled="pendingId === service.id"
-              @change="toggle(service, $event.target.checked)"
-            />
-            <span>{{ isVisible(service) ? "Shown" : "Hidden" }}</span>
-          </label>
-        </li>
-      </ul>
+      <template v-else>
+        <p class="items-summary">
+          <strong>{{ visibleCount }}</strong> of {{ barCapableServices.length }} tile{{
+            barCapableServices.length === 1 ? "" : "s"
+          }}
+          shown
+        </p>
+
+        <ul class="items-list">
+          <li
+            v-for="service in barCapableServices"
+            :key="service.id"
+            class="item-row"
+            :class="{ 'item-row-hidden': !isVisible(service) }"
+          >
+            <div class="preview" :title="`Live preview of ${service.name}`">
+              <SchemaStatusbarItem :service-id="service.id" :schema="service.statusbar_schema" />
+            </div>
+            <div class="meta">
+              <div class="title">{{ service.name }}</div>
+              <div class="subtitle">{{ service.plugin_name || service.plugin_id }}</div>
+            </div>
+            <label
+              class="switch"
+              :class="{ 'switch-on': isVisible(service), saving: pendingId === service.id }"
+              :title="isVisible(service) ? 'Click to hide' : 'Click to show'"
+            >
+              <input
+                type="checkbox"
+                :checked="isVisible(service)"
+                :disabled="pendingId === service.id"
+                @change="toggle(service, $event.target.checked)"
+              />
+              <span class="switch-track" aria-hidden="true">
+                <span class="switch-thumb" />
+              </span>
+              <span class="switch-label">{{ isVisible(service) ? "Shown" : "Hidden" }}</span>
+            </label>
+          </li>
+        </ul>
+      </template>
 
       <div v-if="errorMessage" class="error-message" role="alert">{{ errorMessage }}</div>
     </CollapsibleSection>
@@ -60,6 +80,8 @@ const errorMessage = ref("");
 const barCapableServices = computed(() =>
   webServicesStore.services.filter(s => s.statusbar_schema?.kind)
 );
+
+const visibleCount = computed(() => barCapableServices.value.filter(isVisible).length);
 
 function asBoolean(value) {
   if (typeof value === "string") {
@@ -175,23 +197,80 @@ onMounted(async () => {
   color: var(--text-secondary);
 }
 
-.toggle {
+.items-summary {
+  margin: 0 0 0.6rem;
+  font-size: 0.85rem;
+  color: var(--text-secondary);
+}
+
+.items-summary strong {
+  color: var(--text-primary);
+}
+
+.item-row-hidden {
+  opacity: 0.55;
+}
+
+.switch {
   display: inline-flex;
   align-items: center;
-  gap: 0.5rem;
+  gap: 0.55rem;
   cursor: pointer;
-  font-size: 0.9rem;
+  font-size: 0.85rem;
   color: var(--text-primary);
   user-select: none;
 }
 
-.toggle.saving {
+.switch input {
+  position: absolute;
+  opacity: 0;
+  pointer-events: none;
+  width: 0;
+  height: 0;
+}
+
+.switch-track {
+  position: relative;
+  width: 2.2rem;
+  height: 1.2rem;
+  border-radius: 999px;
+  background: var(--border-color);
+  transition: background 0.15s ease;
+  flex-shrink: 0;
+}
+
+.switch-thumb {
+  position: absolute;
+  top: 2px;
+  left: 2px;
+  width: 1rem;
+  height: 1rem;
+  border-radius: 50%;
+  background: var(--bg-primary);
+  box-shadow: 0 1px 2px rgba(0, 0, 0, 0.2);
+  transition: transform 0.15s ease;
+}
+
+.switch-on .switch-track {
+  background: var(--accent-primary);
+}
+
+.switch-on .switch-thumb {
+  transform: translateX(1rem);
+}
+
+.switch-label {
+  min-width: 3.2rem;
+}
+
+.switch.saving {
   opacity: 0.6;
   cursor: progress;
 }
 
-.toggle input {
-  cursor: inherit;
+.switch input:focus-visible + .switch-track {
+  outline: 2px solid var(--accent-primary);
+  outline-offset: 2px;
 }
 
 .error-message {
