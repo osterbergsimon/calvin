@@ -73,6 +73,26 @@
               @change="handleScreenNameChange(screenIndex, $event)"
             />
             <button
+              type="button"
+              class="screen-activate"
+              :class="{ 'screen-activate-active': isActiveScreen(screen) }"
+              :disabled="isActiveScreen(screen)"
+              :aria-pressed="isActiveScreen(screen)"
+              :aria-label="
+                isActiveScreen(screen)
+                  ? `Screen ${screenIndex + 1} is active`
+                  : `Activate screen ${screenIndex + 1}`
+              "
+              :title="
+                isActiveScreen(screen)
+                  ? 'This screen is currently shown on the dashboard'
+                  : 'Show this screen on the dashboard'
+              "
+              @click="activateScreen(screenIndex)"
+            >
+              {{ isActiveScreen(screen) ? "● Active" : "Activate" }}
+            </button>
+            <button
               :id="`add-region-${screen.id}`"
               type="button"
               class="add-region-button"
@@ -865,6 +885,16 @@ const setScreenClockBarEnabled = (screenIndex, enabled) => {
   updateScreenClockBar(screenIndex, { enabled });
 };
 
+const isActiveScreen = screen => screen?.id === dashboardScreens.value.activeScreenId;
+
+const activateScreen = screenIndex => {
+  const screens = cloneScreens();
+  const target = screens.screens[screenIndex];
+  if (!target) return;
+  screens.activeScreenId = target.id;
+  emitScreensUpdate(screens);
+};
+
 const dashboardScreens = computed(() => configValue.value.dashboardScreens);
 
 const expandedScreens = reactive(new Set([dashboardScreens.value.activeScreenId]));
@@ -1467,6 +1497,35 @@ onUnmounted(() => {
 .direction-toggle:focus {
   border-color: var(--accent-primary);
   color: var(--text-primary);
+}
+
+.screen-activate {
+  flex: 0 0 auto;
+  border: 1px solid var(--border-color);
+  border-radius: 4px;
+  padding: 0.35rem 0.6rem;
+  background: var(--bg-primary);
+  color: var(--text-primary);
+  cursor: pointer;
+  font-size: 0.8rem;
+  font-weight: 600;
+}
+
+.screen-activate:hover:not(:disabled),
+.screen-activate:focus:not(:disabled) {
+  border-color: var(--accent-primary);
+  color: var(--accent-primary);
+}
+
+.screen-activate-active {
+  border-color: var(--accent-primary);
+  background: var(--accent-primary);
+  color: #fff;
+  cursor: default;
+}
+
+.screen-activate:disabled {
+  opacity: 1;
 }
 
 .screen-delete {
