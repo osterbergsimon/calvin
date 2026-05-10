@@ -153,11 +153,10 @@ async def get_plugins(
     try:
         db_types_list = await PluginTypeDB.objects.all()
         db_types = {db_type.type_id: db_type for db_type in db_types_list}
-    except Exception as e:
-        logger.error(
-            f"[get_plugins] Failed to load plugin types from database: {e}. "
-            "This may indicate missing tables. Check database initialization.",
-            exc_info=True,
+    except Exception:
+        logger.exception(
+            "[get_plugins] Failed to load plugin types from database. "
+            "This may indicate missing tables. Check database initialization."
         )
         # Continue with empty dict - app won't crash but plugins won't load
         db_types = {}
@@ -264,8 +263,8 @@ async def get_plugins(
                     "version": theme_manifest.get("version", "1.0.0"),
                 }
                 result.append(theme_entry)
-        except Exception as e:
-            logger.error(f"[get_plugins] Error including themes: {e}", exc_info=True)
+        except Exception:
+            logger.exception("[get_plugins] Error including themes")
 
     return {"plugins": result, "total": len(result)}
 
@@ -972,7 +971,7 @@ async def get_plugin_data(
             await plugin_instance.initialize()
             plugin_instance.start()
         except Exception as e:
-            logger.error(f"Error initializing plugin {plugin_id}: {e}", exc_info=True)
+            logger.exception("Error initializing plugin {}", plugin_id)
             raise HTTPException(status_code=500, detail=f"Failed to initialize plugin: {str(e)}")
 
     try:
@@ -980,7 +979,7 @@ async def get_plugin_data(
         if data is not None:
             return data
     except Exception as e:
-        logger.error(f"Error calling fetch_service_data for {plugin_id}: {e}", exc_info=True)
+        logger.exception("Error calling fetch_service_data for {}", plugin_id)
         raise HTTPException(status_code=500, detail=f"Failed to fetch plugin data: {str(e)}")
 
     # If plugin returned None, it doesn't support data fetching
@@ -1248,7 +1247,7 @@ async def run_backend_plugin_task(plugin_id: str):
             "message": f"Plugin '{plugin_id}' does not support scheduled tasks",
         }
     except Exception as e:
-        logger.exception(f"Error running task for backend plugin {plugin_id}")
+        logger.exception("Error running task for backend plugin {}", plugin_id)
         return {
             "success": False,
             "message": f"Error running task: {str(e)}",

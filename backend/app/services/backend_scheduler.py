@@ -71,10 +71,8 @@ class BackendPluginScheduler:
                         "Expected format: 'minute hour day month day_of_week'"
                     )
                     return
-            except Exception as e:
-                logger.error(
-                    f"Error parsing cron expression for plugin {plugin_id}: {e}", exc_info=True
-                )
+            except Exception:
+                logger.exception("Error parsing cron expression for plugin {}", plugin_id)
                 return
         elif "interval" in schedule_config:
             # Interval-based scheduling (seconds)
@@ -88,8 +86,8 @@ class BackendPluginScheduler:
                         f"Invalid interval for plugin {plugin_id}: {interval}. Must be > 0"
                     )
                     return
-            except (ValueError, TypeError) as e:
-                logger.error(f"Error parsing interval for plugin {plugin_id}: {e}", exc_info=True)
+            except (ValueError, TypeError):
+                logger.exception("Error parsing interval for plugin {}", plugin_id)
                 return
         else:
             logger.warning(
@@ -126,10 +124,8 @@ class BackendPluginScheduler:
                             f"Scheduled task for plugin {plugin_id} failed: "
                             f"{result.get('message', 'Unknown error')}"
                         )
-            except Exception as e:
-                logger.error(
-                    f"Error executing scheduled task for plugin {plugin_id}: {e}", exc_info=True
-                )
+            except Exception:
+                logger.exception("Error executing scheduled task for plugin {}", plugin_id)
 
         # Register task with scheduler
         job_id = f"backend_plugin_{plugin_id}"
@@ -152,10 +148,8 @@ class BackendPluginScheduler:
                 f"Registered scheduled task for plugin {plugin_id}: {trigger_description} "
                 f"(max_concurrent: {max_concurrent})"
             )
-        except Exception as e:
-            logger.error(
-                f"Error registering scheduled task for plugin {plugin_id}: {e}", exc_info=True
-            )
+        except Exception:
+            logger.exception("Error registering scheduled task for plugin {}", plugin_id)
 
     async def unregister_plugin_tasks(self, plugin_id: str) -> None:
         """Unregister scheduled tasks for a plugin.
@@ -172,9 +166,9 @@ class BackendPluginScheduler:
                 self.scheduler.remove_job(job_id)
             del self._registered_tasks[plugin_id]
             logger.info(f"Unregistered scheduled task for plugin {plugin_id}")
-        except Exception as e:
-            logger.warning(
-                f"Error unregistering scheduled task for plugin {plugin_id}: {e}", exc_info=True
+        except Exception:
+            logger.opt(exception=True).warning(
+                "Error unregistering scheduled task for plugin {}", plugin_id
             )
             # Clean up entry even if removal failed
             self._registered_tasks.pop(plugin_id, None)

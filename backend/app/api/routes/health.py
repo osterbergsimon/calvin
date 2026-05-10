@@ -1,10 +1,7 @@
 """Health check endpoints."""
 
-import logging
-
 from fastapi import APIRouter
-
-logger = logging.getLogger(__name__)
+from loguru import logger
 
 router = APIRouter()
 
@@ -15,8 +12,8 @@ async def health_check():
     try:
         logger.info("Health check endpoint called")
         return {"status": "healthy"}
-    except Exception as e:
-        logger.exception(f"Error in health check: {e}")
+    except Exception:
+        logger.exception("Error in health check")
         raise
 
 
@@ -49,8 +46,8 @@ async def test_db_health_check():
             "database_connected": db_connected,
             "config_items_count": count,
         }
-    except Exception as e:
+    except Exception:
         import traceback
 
-        logger.exception(f"Database health check failed: {e}\n{traceback.format_exc()}")
+        logger.exception("Database health check failed\n{}", traceback.format_exc())
         raise

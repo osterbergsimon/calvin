@@ -159,11 +159,7 @@ class PluginLoader:
                     try:
                         plugin_types.append(PluginDefinition.from_raw(raw_definition))
                     except Exception as e:
-                        logger.error(
-                            "Error normalizing plugin type from hook result: {}",
-                            e,
-                            exc_info=True,
-                        )
+                        logger.exception("Error normalizing plugin type from hook result: {}", e)
         return plugin_types
 
     def create_plugin_instance(
