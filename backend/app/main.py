@@ -96,16 +96,20 @@ class InterceptHandler(logging.Handler):
 # Set up standard logging interception for compatibility
 logging.basicConfig(handlers=[InterceptHandler()], level=0, force=True)
 
-# Reduce SQLAlchemy verbosity by setting its loggers to WARNING
-# This must be done BEFORE database.py is imported (which creates the engine)
-sqlalchemy_loggers = [
+# Configure SQL-related stdlib loggers to flow through InterceptHandler.
+# CALVIN_SQL_ECHO=1 turns on SQL statement logging without editing this file.
+# Runtime queries go Ormar -> `databases` lib -> aiosqlite, so `databases` is
+# the useful logger; SQLAlchemy loggers cover metadata.create_all() in init.
+# Must be done BEFORE database.py is imported (which creates the engine).
+_sql_log_level = logging.DEBUG if os.environ.get("CALVIN_SQL_ECHO") == "1" else logging.WARNING
+for sql_logger_name in (
+    "databases",
     "sqlalchemy.engine",
     "sqlalchemy.pool",
     "sqlalchemy.dialects",
-]
-for sql_logger_name in sqlalchemy_loggers:
+):
     sql_logger = logging.getLogger(sql_logger_name)
-    sql_logger.setLevel(logging.WARNING)
+    sql_logger.setLevel(_sql_log_level)
     sql_logger.handlers = [InterceptHandler()]
     sql_logger.propagate = False
 
