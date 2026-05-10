@@ -48,6 +48,8 @@ services:
     restart: unless-stopped
     ports:
       - "5173:5173"
+    environment:
+      VITE_API_PROXY_TARGET: http://calvin-backend:8000
     volumes:
       - "${CALVIN_REPO_DIR:-..}:/app"
       - calvin-dev-node_modules:/app/frontend/node_modules

@@ -1,5 +1,6 @@
-import { describe, expect, it } from "vitest";
+import { beforeEach, describe, expect, it } from "vitest";
 import { mount } from "@vue/test-utils";
+import { createPinia, setActivePinia } from "pinia";
 import ClockSettingsTab from "@/components/settings/tabs/dashboard/ClockSettingsTab.vue";
 
 const baseConfig = {
@@ -18,6 +19,10 @@ const baseConfig = {
 };
 
 describe("ClockSettingsTab", () => {
+  beforeEach(() => {
+    setActivePinia(createPinia());
+  });
+
   function mountTab(configOverrides = {}) {
     return mount(ClockSettingsTab, {
       props: {

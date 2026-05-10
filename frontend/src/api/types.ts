@@ -1595,6 +1595,14 @@ export interface components {
       calendarSplit?: number | null;
       /** Calendarviewmode */
       calendarViewMode?: string | null;
+      /** Clockbarverticaldatefontsize */
+      clockBarVerticalDateFontSize?: number | null;
+      /** Clockbarverticalfontsize */
+      clockBarVerticalFontSize?: number | null;
+      /** Clockbarverticallayout */
+      clockBarVerticalLayout?: string | null;
+      /** Clockbarverticalpadding */
+      clockBarVerticalPadding?: number | null;
       /** Configpollinterval */
       configPollInterval?: number | null;
       /** Darkmodeend */

@@ -18,18 +18,55 @@
         :class="{
           'layout-single-line': layout === 'single-line',
           'layout-two-lines': layout === 'two-lines',
+          'layout-vertical-compact': isCompactLayout,
+          'layout-compact-date': layout === 'compact-time-date',
         }"
       >
-        <span class="clock-time" :style="{ fontSize: `${fontSize}px` }">{{ formattedTime }}</span>
-        <span v-if="showDate" class="clock-date" :style="{ fontSize: `${dateFontSize}px` }">{{
-          formattedDate
-        }}</span>
+        <template v-if="isCompactLayout">
+          <span class="clock-time compact-time" :style="{ fontSize: `${fontSize}px` }">
+            <span>{{ compactTimeParts.hour }}</span>
+            <span>{{ compactTimeParts.minute }}</span>
+            <span v-if="compactTimeParts.second">{{ compactTimeParts.second }}</span>
+            <span v-if="compactTimeParts.dayPeriod" class="compact-period">{{
+              compactTimeParts.dayPeriod
+            }}</span>
+          </span>
+          <span
+            v-if="showDate && layout === 'compact-time-date' && compactDateParts"
+            class="clock-date compact-date compact-date-stacked"
+            :style="{ fontSize: `${dateFontSize}px` }"
+          >
+            <span v-if="compactDateParts.weekday">{{ compactDateParts.weekday }}</span>
+            <span>
+              {{ compactDateParts.day }}
+              {{ compactDateParts.month }}
+            </span>
+            <span v-if="compactDateParts.year" class="compact-date-year">{{
+              compactDateParts.year
+            }}</span>
+          </span>
+          <span
+            v-else-if="showDate"
+            class="clock-date compact-date"
+            :style="{ fontSize: `${dateFontSize}px` }"
+          >
+            {{ formattedDate }}
+          </span>
+        </template>
+        <template v-else>
+          <span class="clock-time" :style="{ fontSize: `${fontSize}px` }">{{ formattedTime }}</span>
+          <span v-if="showDate" class="clock-date" :style="{ fontSize: `${dateFontSize}px` }">{{
+            formattedDate
+          }}</span>
+        </template>
       </div>
-
-      <PluginStatusbarItems v-if="showStatusbar" orientation="vertical" />
     </div>
 
-    <BarActionCluster v-if="!previewMode" class="clock-bar-actions" :compact="true" />
+    <div class="clock-bar-bottom">
+      <PluginStatusbarItems v-if="showStatusbar" orientation="vertical" />
+
+      <BarActionCluster v-if="!previewMode" class="clock-bar-actions" :compact="true" />
+    </div>
   </div>
 </template>
 
@@ -90,7 +127,9 @@ const {
   showDate,
   showStatusbar,
   formattedTime,
+  compactTimeParts,
   formattedDate,
+  compactDateParts,
   fontSize,
   dateFontSize,
   layout,
@@ -104,10 +143,14 @@ const {
   previewDateSize: () => props.previewDateSize,
   previewLayout: () => props.previewLayout,
   previewPadding: () => props.previewPadding,
+  orientation: () => "vertical",
 });
 
 const configStore = useConfigStore();
 const showLogo = computed(() => configStore.clockBarShowLogo !== false);
+const isCompactLayout = computed(
+  () => layout.value === "compact-time" || layout.value === "compact-time-date"
+);
 </script>
 
 <style scoped>
@@ -121,10 +164,12 @@ const showLogo = computed(() => configStore.clockBarShowLogo !== false);
   flex-direction: column;
   align-items: stretch;
   gap: 0.75rem;
+  position: relative;
   z-index: 100;
   user-select: none;
   flex-shrink: 0;
   box-sizing: border-box;
+  min-height: 0;
 }
 
 .clock-bar-vertical.position-right {
@@ -156,6 +201,16 @@ const showLogo = computed(() => configStore.clockBarShowLogo !== false);
   min-height: 0;
 }
 
+.clock-bar-bottom {
+  flex: 0 0 auto;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 0.75rem;
+  min-height: 0;
+}
+
 .clock-bar-content {
   display: flex;
   flex-direction: column;
@@ -169,6 +224,53 @@ const showLogo = computed(() => configStore.clockBarShowLogo !== false);
 
 .clock-bar-content.layout-two-lines {
   gap: 0.15rem;
+}
+
+.clock-bar-content.layout-vertical-compact {
+  flex-direction: column;
+  gap: 0.45rem;
+  writing-mode: horizontal-tb;
+  text-orientation: mixed;
+}
+
+.compact-time {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 0;
+  line-height: 0.92;
+  font-variant-numeric: tabular-nums;
+}
+
+.compact-period {
+  margin-top: 0.2rem;
+  font-size: 0.45em;
+  line-height: 1;
+}
+
+.compact-date {
+  max-height: 35vh;
+  writing-mode: vertical-rl;
+  text-orientation: upright;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.compact-date-stacked {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 0.05rem;
+  max-height: none;
+  writing-mode: horizontal-tb;
+  text-orientation: mixed;
+  line-height: 1;
+  font-variant-numeric: tabular-nums;
+}
+
+.compact-date-year {
+  font-size: 0.78em;
+  color: var(--text-secondary);
 }
 
 .clock-time {

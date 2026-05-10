@@ -184,16 +184,12 @@ const showHorizontalBarBottom = computed(
 // a horizontal strip when regions stack and a vertical strip when they sit
 // side by side, regardless of whether the user picked horizontal or vertical
 // mode for the perimeter case.
-const showHorizontalBarBetween = computed(
-  () =>
-    clockBarActive.value &&
-    clockBarPlacementGap.value !== null &&
-    layoutDirection.value === "column"
-);
-
-const showVerticalBarBetween = computed(
-  () =>
-    clockBarActive.value && clockBarPlacementGap.value !== null && layoutDirection.value === "row"
+const betweenClockBarElement = computed(() =>
+  clockBarActive.value && clockBarPlacementGap.value !== null
+    ? layoutDirection.value === "row"
+      ? "verticalBarBetween"
+      : "horizontalBarBetween"
+    : null
 );
 
 const showVerticalBarLeft = computed(
@@ -213,8 +209,7 @@ const layoutOrder = computed(() => {
   const elements = [];
   regionElements.forEach((regionElement, index) => {
     if (index > 0 && index - 1 === placedBetween) {
-      if (showHorizontalBarBetween.value) elements.push("horizontalBarBetween");
-      else if (showVerticalBarBetween.value) elements.push("verticalBarBetween");
+      if (betweenClockBarElement.value) elements.push(betweenClockBarElement.value);
     }
     elements.push(regionElement);
   });
@@ -343,9 +338,11 @@ onUnmounted(() => {
 
 .mode-content {
   width: 100%;
-  height: 100%;
+  flex: 1 1 auto;
   display: flex;
   gap: 1rem;
+  min-height: 0;
+  min-width: 0;
 }
 
 .mode-content.dashboard-view.layout-portrait {
