@@ -15,6 +15,7 @@ function Show-Help {
     Write-Host "  .\Makefile.ps1 dev-logs       - Tail logs from running dev stack" -ForegroundColor White
     Write-Host "  .\Makefile.ps1 dev-logs-read  - Show last 50 lines of dev logs" -ForegroundColor White
     Write-Host "  .\Makefile.ps1 dev-down       - Stop dev stack" -ForegroundColor White
+    Write-Host "  .\Makefile.ps1 dev-restart    - Restart dev stack containers" -ForegroundColor White
     Write-Host "  .\Makefile.ps1 doctor         - Check docker + dev env" -ForegroundColor White
     Write-Host "  .\Makefile.ps1 test           - Run all tests (native)" -ForegroundColor White
     Write-Host "  .\Makefile.ps1 test-backend   - Run backend tests only (native)" -ForegroundColor White
@@ -57,6 +58,10 @@ function Read-Dev-Logs {
 
 function Stop-Dev {
     & docker @ComposeDev down
+}
+
+function Restart-Dev {
+    & docker @ComposeDev restart
 }
 
 function Run-Tests {
@@ -243,7 +248,7 @@ function Show-Doctor {
     Write-Host "Ports (8000 backend, 5173 frontend):"
     foreach ($p in 8000, 5173) {
         $inUse = Get-NetTCPConnection -LocalPort $p -State Listen -ErrorAction SilentlyContinue
-        if ($inUse) { Write-Host "  $p: IN USE" -ForegroundColor Yellow } else { Write-Host "  $p: free" -ForegroundColor Green }
+        if ($inUse) { Write-Host "  ${p}: IN USE" -ForegroundColor Yellow } else { Write-Host "  ${p}: free" -ForegroundColor Green }
     }
 }
 
@@ -255,6 +260,7 @@ switch ($Target.ToLower()) {
     "dev-logs" { Tail-Dev-Logs }
     "dev-logs-read" { Read-Dev-Logs }
     "dev-down" { Stop-Dev }
+    "dev-restart" { Restart-Dev }
     "doctor" { Show-Doctor }
     "test" { Run-Tests }
     "test-backend" { Run-Tests-Backend }
