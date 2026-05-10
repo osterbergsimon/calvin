@@ -58,6 +58,10 @@ export const useConfigStore = defineStore("config", () => {
   const clockBarFontSize = ref(16);
   const clockBarDateFontSize = ref(14);
   const clockBarLayout = ref("single-line"); // 'single-line' | 'two-lines'
+  const clockBarVerticalLayout = ref("upright"); // 'upright' | 'compact-time' | 'compact-time-date'
+  const clockBarVerticalFontSize = ref(18);
+  const clockBarVerticalDateFontSize = ref(11);
+  const clockBarVerticalPadding = ref(8);
   const clockBarPadding = ref(8);
   const clockBarShowWeather = ref(false);
   const clockBarShowLogo = ref(true);
@@ -114,6 +118,10 @@ export const useConfigStore = defineStore("config", () => {
     clockBarFontSize,
     clockBarDateFontSize,
     clockBarLayout,
+    clockBarVerticalLayout,
+    clockBarVerticalFontSize,
+    clockBarVerticalDateFontSize,
+    clockBarVerticalPadding,
     clockBarPadding,
     clockBarShowWeather,
     clockBarShowLogo,
@@ -399,6 +407,10 @@ export const useConfigStore = defineStore("config", () => {
     clockBarFontSize,
     clockBarDateFontSize,
     clockBarLayout,
+    clockBarVerticalLayout,
+    clockBarVerticalFontSize,
+    clockBarVerticalDateFontSize,
+    clockBarVerticalPadding,
     clockBarPadding,
     clockBarShowWeather,
     clockBarShowLogo,

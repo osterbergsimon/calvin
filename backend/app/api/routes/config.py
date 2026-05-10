@@ -148,6 +148,10 @@ class ConfigUpdate(BaseModel):
     calendarRefreshInterval: int | None = (
         None  # Calendar cache refresh interval in minutes (default: 15)
     )
+    clockBarVerticalLayout: str | None = None  # Vertical bar layout
+    clockBarVerticalFontSize: int | None = None
+    clockBarVerticalDateFontSize: int | None = None
+    clockBarVerticalPadding: int | None = None
 
     # Allow arbitrary fields for extensibility
     model_config = ConfigDict(extra="allow")
@@ -445,6 +449,28 @@ async def get_config():
         config["clockBarLayout"] = "single-line"
     elif "clock_bar_layout" in config and "clockBarLayout" not in config:
         config["clockBarLayout"] = config["clock_bar_layout"]
+    if "clockBarVerticalLayout" not in config and "clock_bar_vertical_layout" not in config:
+        config["clockBarVerticalLayout"] = "upright"
+    elif "clock_bar_vertical_layout" in config and "clockBarVerticalLayout" not in config:
+        config["clockBarVerticalLayout"] = config["clock_bar_vertical_layout"]
+    if "clockBarVerticalFontSize" not in config and "clock_bar_vertical_font_size" not in config:
+        config["clockBarVerticalFontSize"] = 18
+    elif "clock_bar_vertical_font_size" in config and "clockBarVerticalFontSize" not in config:
+        config["clockBarVerticalFontSize"] = config["clock_bar_vertical_font_size"]
+    if (
+        "clockBarVerticalDateFontSize" not in config
+        and "clock_bar_vertical_date_font_size" not in config
+    ):
+        config["clockBarVerticalDateFontSize"] = 11
+    elif (
+        "clock_bar_vertical_date_font_size" in config
+        and "clockBarVerticalDateFontSize" not in config
+    ):
+        config["clockBarVerticalDateFontSize"] = config["clock_bar_vertical_date_font_size"]
+    if "clockBarVerticalPadding" not in config and "clock_bar_vertical_padding" not in config:
+        config["clockBarVerticalPadding"] = 8
+    elif "clock_bar_vertical_padding" in config and "clockBarVerticalPadding" not in config:
+        config["clockBarVerticalPadding"] = config["clock_bar_vertical_padding"]
     if "clockBarPadding" not in config and "clock_bar_padding" not in config:
         config["clockBarPadding"] = 8
     elif "clock_bar_padding" in config and "clockBarPadding" not in config:
@@ -596,6 +622,26 @@ async def update_config(config_update: ConfigUpdate):
     if "timezone" in update_dict:
         # Store timezone as-is (no camelCase conversion needed)
         update_dict["timezone"] = update_dict.pop("timezone")
+    clock_key_map = {
+        "clockShowDate": "clock_show_date",
+        "clockShowSeconds": "clock_show_seconds",
+        "clockBarMode": "clock_bar_mode",
+        "clockBarShowInKiosk": "clock_bar_show_in_kiosk",
+        "clockBarPosition": "clock_bar_position",
+        "clockBarFontSize": "clock_bar_font_size",
+        "clockBarDateFontSize": "clock_bar_date_font_size",
+        "clockBarLayout": "clock_bar_layout",
+        "clockBarVerticalLayout": "clock_bar_vertical_layout",
+        "clockBarVerticalFontSize": "clock_bar_vertical_font_size",
+        "clockBarVerticalDateFontSize": "clock_bar_vertical_date_font_size",
+        "clockBarVerticalPadding": "clock_bar_vertical_padding",
+        "clockBarPadding": "clock_bar_padding",
+        "clockBarShowWeather": "clock_bar_show_weather",
+        "clockBarShowLogo": "clock_bar_show_logo",
+    }
+    for camel_key, snake_key in clock_key_map.items():
+        if camel_key in update_dict:
+            update_dict[snake_key] = update_dict.pop(camel_key)
     if "gitRepoUrl" in update_dict:
         update_dict["git_repo_url"] = update_dict.pop("gitRepoUrl")
         # Also update /etc/default/calvin-update file

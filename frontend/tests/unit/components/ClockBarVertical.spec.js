@@ -130,11 +130,11 @@ describe("ClockBarVertical", () => {
     expect(wrapper.find(".clock-bar-vertical.position-right").exists()).toBe(true);
   });
 
-  it("should display time and date on same line", () => {
+  it("should display compact time and date for compact vertical layout", () => {
     const store = useConfigStore();
     store.showUI = true;
     store.clockShowDate = true;
-    store.clockBarLayout = "single-line";
+    store.clockBarVerticalLayout = "compact-time-date";
 
     const wrapper = mount(ClockBarVertical, {
       props: {
@@ -150,8 +150,8 @@ describe("ClockBarVertical", () => {
 
     const content = wrapper.find(".clock-bar-content");
     expect(content.exists()).toBe(true);
-    // Check that layout is single-line (time and date on same line)
-    expect(content.classes()).toContain("layout-single-line");
+    expect(content.classes()).toContain("layout-vertical-compact");
+    expect(content.classes()).toContain("layout-compact-date");
     expect(wrapper.find(".clock-time").exists()).toBe(true);
     expect(wrapper.find(".clock-date").exists()).toBe(true);
   });
@@ -219,7 +219,7 @@ describe("ClockBarVertical", () => {
   it("should apply font size from config", () => {
     const store = useConfigStore();
     store.showUI = true;
-    store.clockBarFontSize = 18;
+    store.clockBarVerticalFontSize = 18;
 
     const wrapper = mount(ClockBarVertical, {
       props: {

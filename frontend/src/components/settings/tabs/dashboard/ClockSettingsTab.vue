@@ -26,72 +26,92 @@
       </SettingItem>
     </CollapsibleSection>
 
-    <CollapsibleSection title="Default position" icon="📍" :expanded="true">
-      <p class="section-hint">
-        These are the defaults used when a screen doesn't specify its own clock bar position. To
-        override on a specific screen — including dropping the bar into a gap between regions — open
-        <strong>Screens</strong> in the Dashboard settings.
-      </p>
-
-      <SettingItem label="Bar mode" help="Horizontal bar (top/bottom) or vertical bar (left/right)">
-        <select
-          name="clockBarMode"
-          :value="config.clockBarMode"
-          @change="handleClockSettingsChange"
-        >
-          <option value="horizontal">Horizontal</option>
-          <option value="vertical">Vertical</option>
-        </select>
-      </SettingItem>
-
-      <SettingItem label="Bar position" :help="getBarPositionHelp()">
-        <select
-          name="clockBarPosition"
-          :value="config.clockBarPosition"
-          @change="handleClockSettingsChange"
-        >
-          <template v-if="config.clockBarMode === 'horizontal'">
-            <option value="top">Top</option>
-            <option value="bottom">Bottom</option>
-            <option value="between">Between regions (first gap)</option>
-          </template>
-          <template v-else>
-            <option value="left">Left</option>
-            <option value="right">Right</option>
-            <option value="between">Between regions (first gap)</option>
-          </template>
-        </select>
-      </SettingItem>
-    </CollapsibleSection>
-
     <CollapsibleSection title="Appearance" icon="🎨" :expanded="true">
-      <SettingItem label="Layout" help="Display clock and date on one line or two">
-        <select
-          name="clockBarLayout"
-          :value="config.clockBarLayout || 'single-line'"
-          @change="handleClockSettingsChange"
-        >
-          <option value="single-line">Single line</option>
-          <option value="two-lines">Two lines</option>
-        </select>
-      </SettingItem>
+      <div class="orientation-appearance">
+        <div class="orientation-panel">
+          <h4>Horizontal bars</h4>
+          <SettingItem
+            label="Layout"
+            help="Choose how time and date are arranged on top and bottom bars"
+          >
+            <select
+              name="clockBarLayout"
+              :value="config.clockBarLayout || 'single-line'"
+              @change="handleClockSettingsChange"
+            >
+              <option value="single-line">Single line</option>
+              <option value="two-lines">Two lines</option>
+            </select>
+          </SettingItem>
 
-      <SettingItem
-        label="Font sizes"
-        help="Adjust font sizes for time and date. Preview shows how the bar will look."
-      >
-        <ClockBarFontSizePicker
-          :time-size="config.clockBarFontSize || 16"
-          :date-size="config.clockBarDateFontSize || 14"
-          :layout="config.clockBarLayout || 'single-line'"
-          :padding="config.clockBarPadding || 8"
-          :show-date="config.clockShowDate"
-          :is-vertical="config.clockBarMode === 'vertical'"
-          @update:time-size="handleBarFontSizeChange"
-          @update:date-size="handleBarDateFontSizeChange"
-          @update:padding="handleBarPaddingChange"
-        />
-      </SettingItem>
+          <SettingItem label="Sizing" help="Adjust time, date, and padding for top and bottom bars">
+            <ClockBarFontSizePicker
+              :time-size="config.clockBarFontSize || 16"
+              :date-size="config.clockBarDateFontSize || 14"
+              :layout="config.clockBarLayout || 'single-line'"
+              :padding="config.clockBarPadding || 8"
+              :show-date="config.clockShowDate"
+              :is-vertical="false"
+              @update:time-size="handleBarFontSizeChange"
+              @update:date-size="handleBarDateFontSizeChange"
+              @update:padding="handleBarPaddingChange"
+            />
+          </SettingItem>
+        </div>
+
+        <div class="orientation-panel">
+          <h4>Vertical bars</h4>
+          <SettingItem
+            label="Layout"
+            help="Choose how time and date are arranged on left, right, and between bars"
+          >
+            <div class="vertical-layout-control">
+              <select
+                name="clockBarVerticalLayout"
+                :value="config.clockBarVerticalLayout || 'upright'"
+                @change="handleClockSettingsChange"
+              >
+                <option value="upright">Upright text</option>
+                <option value="compact-time">Compact time</option>
+                <option value="compact-time-date">Compact time and date</option>
+              </select>
+
+              <div class="vertical-layout-preview" aria-label="Vertical clock bar layout preview">
+                <ClockBarVertical
+                  position="left"
+                  :show-in-non-kiosk="true"
+                  :show-in-kiosk="false"
+                  :enabled="true"
+                  :preview-mode="true"
+                  :preview-time-size="config.clockBarVerticalFontSize || 18"
+                  :preview-date-size="config.clockBarVerticalDateFontSize || 11"
+                  :preview-layout="config.clockBarVerticalLayout || 'upright'"
+                  :preview-padding="config.clockBarVerticalPadding || 8"
+                />
+              </div>
+            </div>
+          </SettingItem>
+
+          <SettingItem
+            label="Sizing"
+            help="Adjust time, date, and padding for left, right, and between vertical bars"
+          >
+            <ClockBarFontSizePicker
+              :time-size="config.clockBarVerticalFontSize || 18"
+              :date-size="config.clockBarVerticalDateFontSize || 11"
+              :layout="config.clockBarVerticalLayout || 'upright'"
+              :padding="config.clockBarVerticalPadding || 8"
+              :show-date="config.clockShowDate"
+              :is-vertical="true"
+              :show-preview="false"
+              :max="48"
+              @update:time-size="handleVerticalBarFontSizeChange"
+              @update:date-size="handleVerticalBarDateFontSizeChange"
+              @update:padding="handleVerticalBarPaddingChange"
+            />
+          </SettingItem>
+        </div>
+      </div>
 
       <SettingItem
         label="Show Calvin logo"
@@ -147,8 +167,9 @@
 import CollapsibleSection from "../../shared/CollapsibleSection.vue";
 import SettingItem from "../../shared/SettingItem.vue";
 import ClockBarFontSizePicker from "../../shared/ClockBarFontSizePicker.vue";
+import ClockBarVertical from "@/components/ClockBarVertical.vue";
 
-const props = defineProps({
+defineProps({
   config: {
     type: Object,
     required: true,
@@ -173,13 +194,6 @@ const handleClockSettingsChange = event => {
   emit("update:config", updates);
 };
 
-const getBarPositionHelp = () => {
-  if (props.config.clockBarMode === "horizontal") {
-    return "Top/bottom always render. 'Between' shows when the screen layout stacks regions vertically.";
-  }
-  return "Left/right always render. 'Between' shows when the screen layout places regions side by side.";
-};
-
 const handleBarFontSizeChange = px => {
   emit("update:config", { clockBarFontSize: px });
 };
@@ -190,6 +204,18 @@ const handleBarDateFontSizeChange = px => {
 
 const handleBarPaddingChange = px => {
   emit("update:config", { clockBarPadding: px });
+};
+
+const handleVerticalBarFontSizeChange = px => {
+  emit("update:config", { clockBarVerticalFontSize: px });
+};
+
+const handleVerticalBarDateFontSizeChange = px => {
+  emit("update:config", { clockBarVerticalDateFontSize: px });
+};
+
+const handleVerticalBarPaddingChange = px => {
+  emit("update:config", { clockBarVerticalPadding: px });
 };
 </script>
 
@@ -214,5 +240,52 @@ const handleBarPaddingChange = px => {
 
 .section-hint strong {
   color: var(--text-primary);
+}
+
+.orientation-appearance {
+  display: flex;
+  flex-direction: column;
+  gap: 1.25rem;
+}
+
+.orientation-panel {
+  display: flex;
+  flex-direction: column;
+  gap: 0.75rem;
+  padding-block: 0.25rem;
+}
+
+.orientation-panel + .orientation-panel {
+  border-top: 1px solid var(--border-color);
+  padding-top: 1.25rem;
+}
+
+.orientation-panel h4 {
+  margin: 0;
+  color: var(--text-primary);
+  font-size: 0.95rem;
+  font-weight: 700;
+}
+
+.vertical-layout-control {
+  display: flex;
+  align-items: stretch;
+  gap: 1rem;
+  flex-wrap: wrap;
+}
+
+.vertical-layout-control select {
+  align-self: flex-start;
+}
+
+.vertical-layout-preview {
+  width: 7rem;
+  height: 16rem;
+  border: 1px solid var(--border-color);
+  border-radius: 4px;
+  background: var(--bg-primary);
+  overflow: hidden;
+  display: flex;
+  align-items: stretch;
 }
 </style>

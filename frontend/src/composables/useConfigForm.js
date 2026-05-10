@@ -147,7 +147,23 @@ export function useConfigForm(initialConfig = {}) {
         clockBarFontSize: response.clockBarFontSize ?? response.clock_bar_font_size ?? 16,
         clockBarDateFontSize:
           response.clockBarDateFontSize ?? response.clock_bar_date_font_size ?? 14,
-        clockBarLayout: response.clockBarLayout ?? response.clock_bar_layout ?? "single-line",
+        clockBarLayout:
+          response.clockBarLayout === "two-lines" || response.clock_bar_layout === "two-lines"
+            ? "two-lines"
+            : "single-line",
+        clockBarVerticalLayout:
+          response.clockBarVerticalLayout ??
+          response.clock_bar_vertical_layout ??
+          (response.clockBarLayout === "vertical-compact" ||
+          response.clock_bar_layout === "vertical-compact"
+            ? "compact-time"
+            : "upright"),
+        clockBarVerticalFontSize:
+          response.clockBarVerticalFontSize ?? response.clock_bar_vertical_font_size ?? 18,
+        clockBarVerticalDateFontSize:
+          response.clockBarVerticalDateFontSize ?? response.clock_bar_vertical_date_font_size ?? 11,
+        clockBarVerticalPadding:
+          response.clockBarVerticalPadding ?? response.clock_bar_vertical_padding ?? 8,
         clockBarPadding: response.clockBarPadding ?? response.clock_bar_padding ?? 8,
         clockBarShowWeather:
           response.clockBarShowWeather ?? response.clock_bar_show_weather ?? false,
