@@ -107,6 +107,7 @@ const {
   previewDateSize: () => props.previewDateSize,
   previewLayout: () => props.previewLayout,
   previewPadding: () => props.previewPadding,
+  orientation: () => "horizontal",
 });
 
 const calendarStore = useCalendarStore();
@@ -126,6 +127,9 @@ const showLogo = computed(() => configStore.clockBarShowLogo !== false);
   justify-content: center;
   z-index: 100;
   user-select: none;
+  flex: 0 0 auto;
+  box-sizing: border-box;
+  min-width: 0;
 }
 
 .clock-bar-horizontal.position-bottom {
@@ -176,6 +180,7 @@ const showLogo = computed(() => configStore.clockBarShowLogo !== false);
   align-items: center;
   width: 100%;
   gap: 1rem;
+  min-width: 0;
 }
 
 .clock-bar-side {
@@ -195,6 +200,7 @@ const showLogo = computed(() => configStore.clockBarShowLogo !== false);
 
 .clock-bar-content {
   flex: 0 1 auto;
+  min-width: 0;
 }
 
 .clock-refresh-icon {

@@ -13,6 +13,7 @@ import { useConfigStore } from "../stores/config";
  * @param {() => number|null} [opts.previewDateSize]
  * @param {() => string|null} [opts.previewLayout]
  * @param {() => number|null} [opts.previewPadding]
+ * @param {() => 'horizontal'|'vertical'} [opts.orientation]
  */
 export function useClockBar(opts) {
   const configStore = useConfigStore();
@@ -20,6 +21,7 @@ export function useClockBar(opts) {
   const get = (fn, fallback = null) => (typeof fn === "function" ? fn() : fallback);
 
   const isPreview = computed(() => !!get(opts.previewMode, false));
+  const orientation = computed(() => get(opts.orientation, "horizontal"));
 
   const shouldShow = computed(() => {
     if (isPreview.value) return true;
@@ -38,24 +40,31 @@ export function useClockBar(opts) {
   const fontSize = computed(() => {
     const preview = get(opts.previewTimeSize, null);
     if (isPreview.value && preview !== null) return preview;
+    if (orientation.value === "vertical") return configStore.clockBarVerticalFontSize || 18;
     return configStore.clockBarFontSize || 16;
   });
 
   const dateFontSize = computed(() => {
     const preview = get(opts.previewDateSize, null);
     if (isPreview.value && preview !== null) return preview;
+    if (orientation.value === "vertical") return configStore.clockBarVerticalDateFontSize || 11;
     return configStore.clockBarDateFontSize || 14;
   });
 
   const layout = computed(() => {
     const preview = get(opts.previewLayout, null);
     if (isPreview.value && preview !== null) return preview;
+    if (orientation.value === "vertical") {
+      if (configStore.clockBarVerticalLayout) return configStore.clockBarVerticalLayout;
+      return configStore.clockBarLayout === "vertical-compact" ? "compact-time" : "upright";
+    }
     return configStore.clockBarLayout || "single-line";
   });
 
   const barPadding = computed(() => {
     const preview = get(opts.previewPadding, null);
     if (isPreview.value && preview !== null) return preview;
+    if (orientation.value === "vertical") return configStore.clockBarVerticalPadding || 8;
     return configStore.clockBarPadding || 8;
   });
 
@@ -89,6 +98,37 @@ export function useClockBar(opts) {
     }
   });
 
+  const compactTimeParts = computed(() => {
+    const now = currentTime.value;
+    const fallback = {
+      hour: "2-digit",
+      minute: "2-digit",
+      hour12: timeFormat.value === "12h",
+    };
+    if (showSeconds.value) fallback.second = "2-digit";
+    if (timezone.value) fallback.timeZone = timezone.value;
+
+    try {
+      const formatter = new Intl.DateTimeFormat(undefined, fallback);
+      const parts = formatter.formatToParts(now);
+      return {
+        hour: parts.find(part => part.type === "hour")?.value || "00",
+        minute: parts.find(part => part.type === "minute")?.value || "00",
+        second: showSeconds.value ? parts.find(part => part.type === "second")?.value || "" : "",
+        dayPeriod: parts.find(part => part.type === "dayPeriod")?.value || "",
+      };
+    } catch {
+      const [time, dayPeriod = ""] = now.toLocaleTimeString(undefined, fallback).split(" ");
+      const [hour = "00", minute = "00", second = ""] = time.split(":");
+      return {
+        hour,
+        minute,
+        second: showSeconds.value ? second : "",
+        dayPeriod,
+      };
+    }
+  });
+
   const formattedDate = computed(() => {
     if (!showDate.value) return "";
     const now = currentTime.value;
@@ -108,6 +148,31 @@ export function useClockBar(opts) {
         month: "short",
         day: "numeric",
       });
+    }
+  });
+
+  const compactDateParts = computed(() => {
+    if (!showDate.value) return null;
+    const now = currentTime.value;
+    const options = {
+      weekday: "short",
+      year: "numeric",
+      month: "short",
+      day: "numeric",
+    };
+    if (timezone.value) options.timeZone = timezone.value;
+
+    try {
+      const formatter = new Intl.DateTimeFormat(undefined, options);
+      const parts = formatter.formatToParts(now);
+      return {
+        weekday: parts.find(part => part.type === "weekday")?.value || "",
+        month: parts.find(part => part.type === "month")?.value || "",
+        day: parts.find(part => part.type === "day")?.value || "",
+        year: parts.find(part => part.type === "year")?.value || "",
+      };
+    } catch {
+      return null;
     }
   });
 
@@ -164,7 +229,9 @@ export function useClockBar(opts) {
     showDate,
     showStatusbar,
     formattedTime,
+    compactTimeParts,
     formattedDate,
+    compactDateParts,
     fontSize,
     dateFontSize,
     layout,

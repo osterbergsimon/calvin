@@ -194,6 +194,33 @@ export const CONFIG_FIELD_DEFINITIONS = [
     name: "clockBarLayout",
     keys: ["clockBarLayout", "clock_bar_layout"],
     defaultValue: "single-line",
+    parse: value => (value === "two-lines" ? "two-lines" : "single-line"),
+  },
+  {
+    name: "clockBarVerticalLayout",
+    keys: ["clockBarVerticalLayout", "clock_bar_vertical_layout"],
+    defaultValue: "upright",
+    parse: value =>
+      ["upright", "compact-time", "compact-time-date"].includes(value)
+        ? value
+        : value === "vertical-compact"
+          ? "compact-time"
+          : "upright",
+  },
+  {
+    name: "clockBarVerticalFontSize",
+    keys: ["clockBarVerticalFontSize", "clock_bar_vertical_font_size"],
+    defaultValue: 18,
+  },
+  {
+    name: "clockBarVerticalDateFontSize",
+    keys: ["clockBarVerticalDateFontSize", "clock_bar_vertical_date_font_size"],
+    defaultValue: 11,
+  },
+  {
+    name: "clockBarVerticalPadding",
+    keys: ["clockBarVerticalPadding", "clock_bar_vertical_padding"],
+    defaultValue: 8,
   },
   { name: "clockBarPadding", keys: ["clockBarPadding", "clock_bar_padding"], defaultValue: 8 },
   {
