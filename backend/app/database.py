@@ -1,31 +1,13 @@
 """Database configuration and session management."""
 
-import logging
-import os
-
 import databases
 from loguru import logger
 from sqlalchemy import MetaData
 
 from app.config import settings
 
-# CALVIN_SQL_ECHO=1 turns on SQL statement logging without editing this file.
-#
-# Runtime queries go Ormar -> `databases` lib -> aiosqlite (NOT through a SQLAlchemy
-# engine), so the useful logger is `databases`. We also flip the SQLAlchemy loggers
-# because metadata.create_all() in init/tests does run through a sync SA engine.
-# All emitted records flow through loguru via InterceptHandler in app.main.
-_SQL_ECHO = os.environ.get("CALVIN_SQL_ECHO") == "1"
-_sql_log_level = logging.DEBUG if _SQL_ECHO else logging.WARNING
-
-# Runtime queries — Ormar/databases lib
-logging.getLogger("databases").setLevel(_sql_log_level)
-
-# Schema/init — SQLAlchemy core (metadata.create_all, sync engine in init_db)
-for _name in ("sqlalchemy.engine", "sqlalchemy.pool", "sqlalchemy.dialects"):
-    _lg = logging.getLogger(_name)
-    _lg.setLevel(_sql_log_level)
-    _lg.propagate = True
+# SQL logger configuration (CALVIN_SQL_ECHO) lives in app.main alongside the
+# rest of the loguru/InterceptHandler bridge.
 
 # Create database connection for Ormar
 # Use absolute path to avoid path resolution issues
