@@ -5,6 +5,7 @@ from typing import Any
 
 from app.plugins.hooks import hookimpl
 from app.plugins.protocols import ServicePlugin
+from app.plugins.sdk.schema import number_field, toggle_field, url_field
 from app.plugins.sdk.service import (
     ServiceConfigField,
     build_service_manager_config,
@@ -32,45 +33,26 @@ class IframeServicePlugin(ServicePlugin):
             description="Web service displayed in iframe",
             plugin_class=cls,
             common_config_schema={
-                "display_order": {
-                    "type": "integer",
-                    "description": "Display order for service instances",
-                    "default": 0,
-                    "ui": {
-                        "component": "number",
-                        "help_text": (
-                            "Order for display/switching (lower numbers appear first). "
-                            "This applies to all instances of this plugin type."
-                        ),
-                        "validation": {
-                            "min": 0,
-                        },
-                    },
-                },
+                "display_order": number_field(
+                    "Display order for service instances",
+                    default=0,
+                    min=0,
+                    help_text=(
+                        "Order for display/switching (lower numbers appear first). "
+                        "This applies to all instances of this plugin type."
+                    ),
+                ),
             },
             instance_config_schema={
-                "url": {
-                    "type": "string",
-                    "description": "Website URL",
-                    "default": "",
-                    "ui": {
-                        "component": "input",
-                        "placeholder": "https://example.com",
-                        "validation": {
-                            "required": True,
-                            "type": "url",
-                        },
-                    },
-                },
-                "fullscreen": {
-                    "type": "boolean",
-                    "description": "Prefer fullscreen mode",
-                    "default": False,
-                    "ui": {
-                        "component": "checkbox",
-                        "help_text": "Open this service in fullscreen by default",
-                    },
-                },
+                "url": url_field(
+                    "Website URL",
+                    placeholder="https://example.com",
+                    required=True,
+                ),
+                "fullscreen": toggle_field(
+                    "Prefer fullscreen mode",
+                    help_text="Open this service in fullscreen by default",
+                ),
             },
             display_schema={
                 "kind": "iframe",

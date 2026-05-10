@@ -341,6 +341,35 @@ settings UI.
 `checkbox`. Add `browse_button: true` (with `browse_type: "directory"` or `"file"`) for
 filesystem pickers.
 
+### Schema authoring helpers
+
+Hand-rolling these dicts gets noisy. `app.plugins.sdk.schema` ships small helpers that
+emit the same shape, so plugin metadata stays declarative:
+
+```python
+from app.plugins.sdk.schema import (
+    number_field,
+    password_field,
+    select_field,
+    text_field,
+    toggle_field,
+    url_field,
+)
+
+instance_config_schema = {
+    "api_key": password_field("API key", required=True, help_text="From your account dashboard."),
+    "host": text_field("Host", placeholder="api.example.com", required=True),
+    "url": url_field("Webhook URL", required=True),
+    "port": number_field("Port", default=443, min=1, max=65535),
+    "mode": select_field("Mode", [("auto", "Auto"), ("manual", "Manual")], default="auto"),
+    "verbose": toggle_field("Verbose logging"),
+}
+```
+
+Helpers are additive — raw dicts continue to work, and you can mix the two freely.
+For one-off shapes the renderer accepts but no helper covers, drop back to a literal
+dict.
+
 For action buttons (Save / Test / Fetch / Custom) and structured upload sections, declare
 them as `ui_actions` and `ui_sections` in metadata — both render via the shared
 `PluginActions` and section components.
