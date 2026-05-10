@@ -289,6 +289,50 @@
             ],
             "title": "Calendarviewmode"
           },
+          "clockBarVerticalDateFontSize": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Clockbarverticaldatefontsize"
+          },
+          "clockBarVerticalFontSize": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Clockbarverticalfontsize"
+          },
+          "clockBarVerticalLayout": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Clockbarverticallayout"
+          },
+          "clockBarVerticalPadding": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Clockbarverticalpadding"
+          },
           "configPollInterval": {
             "anyOf": [
               {

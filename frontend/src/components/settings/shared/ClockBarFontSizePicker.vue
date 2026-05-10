@@ -83,7 +83,7 @@
       </div>
     </div>
 
-    <div class="preview-container">
+    <div v-if="showPreview" class="preview-container">
       <div class="preview-label">Preview:</div>
       <!-- Use actual clock bar component for preview -->
       <div v-if="isVertical" class="preview-wrapper preview-vertical">
@@ -141,6 +141,10 @@ const props = defineProps({
   isVertical: {
     type: Boolean,
     default: false,
+  },
+  showPreview: {
+    type: Boolean,
+    default: true,
   },
   padding: {
     type: Number,

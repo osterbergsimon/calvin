@@ -286,7 +286,7 @@ export function getGlobalClockBarSettings(config = {}) {
   return {
     enabled: true,
     mode: config.clockBarMode === "vertical" ? "vertical" : "horizontal",
-    position: config.clockBarPosition ?? "top",
+    position: normalizeClockBarPosition(config.clockBarPosition, 2) || "top",
   };
 }
 
