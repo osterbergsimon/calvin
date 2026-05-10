@@ -1,11 +1,9 @@
 """Configuration management."""
 
-import logging
 from pathlib import Path
 
+from loguru import logger
 from pydantic_settings import BaseSettings, SettingsConfigDict
-
-logger = logging.getLogger(__name__)
 
 
 class Settings(BaseSettings):
@@ -140,8 +138,8 @@ class Settings(BaseSettings):
                         shutil.copy2(wrong_path, db_path)
                         logger.info(f"Database migrated successfully to {db_path}")
                         # Old file is kept for safety - user can remove manually if needed
-                    except Exception as e:
-                        logger.warning(f"Failed to migrate database: {e}", exc_info=True)
+                    except Exception:
+                        logger.opt(exception=True).warning("Failed to migrate database")
                     break
 
 

@@ -133,11 +133,8 @@ class ICalCalendarPlugin(CalendarPlugin):
                 e,
             )
             raise
-        except Exception as e:
-            logger.error(
-                f"[ICAL PLUGIN] Error fetching events from {self.plugin_id}: {e}",
-                exc_info=True,
-            )
+        except Exception:
+            logger.exception("[ICAL PLUGIN] Error fetching events from {}", self.plugin_id)
             raise
 
     async def validate_config(self, config: dict) -> bool:

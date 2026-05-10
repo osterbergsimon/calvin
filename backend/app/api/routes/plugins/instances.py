@@ -1,12 +1,12 @@
 """Plugin instance management endpoints."""
 
 import asyncio
-import logging
 from datetime import UTC, datetime
 from pathlib import Path
 from typing import Any
 
 from fastapi import APIRouter, Body, HTTPException
+from loguru import logger
 from pydantic import BaseModel
 
 from app.api.routes.plugins.config import mask_sensitive_config
@@ -15,8 +15,6 @@ from app.plugins.hooks import plugin_manager as hook_manager
 from app.plugins.loader import plugin_loader
 from app.plugins.manager import plugin_manager
 from app.services.event_system import event_system
-
-logger = logging.getLogger(__name__)
 
 router = APIRouter()
 
@@ -483,10 +481,8 @@ async def update_plugin_instance(instance_id: str, instance_data: dict[str, Any]
                         f"Failed to emit plugin_instance_created event "
                         f"for instance {instance_id}: {e}"
                     )
-            except Exception as e:
-                logger.error(
-                    f"Error creating and starting plugin {instance_id}: {e}", exc_info=True
-                )
+            except Exception:
+                logger.exception("Error creating and starting plugin {}", instance_id)
                 plugin = None
 
     if plugin:
@@ -506,8 +502,8 @@ async def update_plugin_instance(instance_id: str, instance_data: dict[str, Any]
 
                         if isinstance(plugin, BackendPlugin):
                             await backend_plugin_scheduler.register_plugin_tasks(plugin)
-                    except Exception as e:
-                        logger.error(f"Error starting plugin {instance_id}: {e}", exc_info=True)
+                    except Exception:
+                        logger.exception("Error starting plugin {}", instance_id)
             else:
                 plugin.disable()
                 # Stop the plugin if it's running
@@ -521,15 +517,15 @@ async def update_plugin_instance(instance_id: str, instance_data: dict[str, Any]
                         if isinstance(plugin, BackendPlugin):
                             await backend_plugin_scheduler.unregister_plugin_tasks(instance_id)
                         await plugin.cleanup()
-                    except Exception as e:
-                        logger.warning(f"Error stopping plugin {instance_id}: {e}", exc_info=True)
+                    except Exception:
+                        logger.opt(exception=True).warning("Error stopping plugin {}", instance_id)
 
         # Update config if provided
         if updated_config is not None:
             try:
                 await plugin.configure(updated_config)
-            except Exception as e:
-                logger.warning(f"Error updating plugin {instance_id} config: {e}", exc_info=True)
+            except Exception:
+                logger.opt(exception=True).warning("Error updating plugin {} config", instance_id)
 
     # Emit plugin_instance_updated event if instance was updated (but not newly created)
     if (

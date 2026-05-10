@@ -1,15 +1,13 @@
 """Image endpoints."""
 
-import logging
 from pathlib import Path
 
 from fastapi import APIRouter, File, Query, UploadFile
 from fastapi.responses import FileResponse
+from loguru import logger
 
 from app.services import plugin_image_service
 from app.utils.errors import ErrorResponse
-
-logger = logging.getLogger(__name__)
 
 router = APIRouter()
 

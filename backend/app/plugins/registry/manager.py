@@ -1,13 +1,12 @@
 """Plugin registration and unregistration logic."""
 
-import logging
 from typing import Any
+
+from loguru import logger
 
 from app.models.db_models import PluginDB, PluginTypeDB
 from app.plugins.loader import plugin_loader
 from app.plugins.manager import plugin_manager as instance_manager
-
-logger = logging.getLogger(__name__)
 
 
 async def register_plugin(
@@ -105,10 +104,9 @@ async def unregister_plugin(plugin_id: str) -> bool:
     if plugin:
         try:
             await plugin.cleanup()
-        except Exception as e:
-            logger.warning(
-                f"Error cleaning up plugin {plugin_id} during unregister: {e}",
-                exc_info=True,
+        except Exception:
+            logger.opt(exception=True).warning(
+                "Error cleaning up plugin {} during unregister", plugin_id
             )
             # Continue with deletion even if cleanup fails
 
@@ -137,20 +135,14 @@ async def unregister_plugin(plugin_id: str) -> bool:
                     deleted_from_db = False
                 else:
                     logger.info(f"Verified: Plugin {plugin_id} successfully removed from database")
-            except Exception as e:
-                logger.error(
-                    f"Error deleting plugin {plugin_id} from database: {e}",
-                    exc_info=True,
-                )
+            except Exception:
+                logger.exception("Error deleting plugin {} from database", plugin_id)
                 deleted_from_db = False
                 raise
         else:
             logger.warning(f"Plugin {plugin_id} not found in database during unregister")
-    except Exception as e:
-        logger.error(
-            f"Unexpected error during database deletion of {plugin_id}: {e}",
-            exc_info=True,
-        )
+    except Exception:
+        logger.exception("Unexpected error during database deletion of {}", plugin_id)
         # Don't re-raise here - we want to continue and unregister from manager
         # But mark as not deleted
         deleted_from_db = False

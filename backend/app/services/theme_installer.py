@@ -1,11 +1,12 @@
 """Theme installation service for managing installed themes (file operations only)."""
 
 import json
-import logging
 import shutil
 import zipfile
 from pathlib import Path
 from typing import Any
+
+from loguru import logger
 
 from app.services.validation import (
     validate_directory_structure,
@@ -14,8 +15,6 @@ from app.services.validation import (
     validate_theme_variables,
     validate_zip_structure,
 )
-
-logger = logging.getLogger(__name__)
 
 # Constants
 REQUIRED_THEME_FIELDS = ["id", "name", "version", "variables"]

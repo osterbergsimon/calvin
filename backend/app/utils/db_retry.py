@@ -1,14 +1,12 @@
 """Database retry utilities for handling SQLite concurrency issues."""
 
 import asyncio
-import logging
 from collections.abc import Callable
 from functools import wraps
 from typing import Any, TypeVar
 
+from loguru import logger
 from sqlalchemy.exc import OperationalError
-
-logger = logging.getLogger(__name__)
 
 T = TypeVar("T")
 

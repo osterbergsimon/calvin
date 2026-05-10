@@ -6,6 +6,7 @@ from pathlib import Path
 from typing import Any
 
 from fastapi import APIRouter, HTTPException
+from loguru import logger
 from pydantic import BaseModel, ConfigDict
 
 from app.config import settings
@@ -82,9 +83,6 @@ def get_frontend_version() -> str | None:
         return None
     except Exception as e:
         # File not found or error reading - log in debug mode
-        import logging
-
-        logger = logging.getLogger(__name__)
         logger.debug(f"Could not read frontend version: {e}")
         return None
 

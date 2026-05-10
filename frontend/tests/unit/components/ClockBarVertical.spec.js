@@ -2,6 +2,7 @@
 
 import { describe, it, expect, beforeEach, vi } from "vitest";
 import { mount } from "@vue/test-utils";
+import { nextTick } from "vue";
 import { setActivePinia, createPinia } from "pinia";
 import ClockBarVertical from "@/components/ClockBarVertical.vue";
 import { useConfigStore } from "@/stores/config";
@@ -26,6 +27,17 @@ describe("ClockBarVertical", () => {
     setActivePinia(createPinia());
   });
 
+  const globalMountOptions = {
+    stubs: {
+      BarActionCluster: true,
+      PluginStatusbarItems: {
+        props: ["orientation"],
+        template:
+          '<div class="plugin-statusbar-stub" :data-orientation="orientation || \'horizontal\'" />',
+      },
+    },
+  };
+
   it("should render when enabled and showInNonKiosk is true and UI is visible", () => {
     const store = useConfigStore();
     store.showUI = true;
@@ -38,7 +50,7 @@ describe("ClockBarVertical", () => {
         enabled: true,
       },
       global: {
-        plugins: [],
+        ...globalMountOptions,
       },
     });
 
@@ -57,7 +69,7 @@ describe("ClockBarVertical", () => {
         enabled: true,
       },
       global: {
-        plugins: [],
+        ...globalMountOptions,
       },
     });
 
@@ -76,7 +88,7 @@ describe("ClockBarVertical", () => {
         enabled: true,
       },
       global: {
-        plugins: [],
+        ...globalMountOptions,
       },
     });
 
@@ -92,7 +104,7 @@ describe("ClockBarVertical", () => {
         enabled: false,
       },
       global: {
-        plugins: [],
+        ...globalMountOptions,
       },
     });
 
@@ -111,7 +123,7 @@ describe("ClockBarVertical", () => {
         enabled: true,
       },
       global: {
-        plugins: [],
+        ...globalMountOptions,
       },
     });
 
@@ -132,7 +144,7 @@ describe("ClockBarVertical", () => {
         enabled: true,
       },
       global: {
-        plugins: [],
+        ...globalMountOptions,
       },
     });
 
@@ -156,7 +168,7 @@ describe("ClockBarVertical", () => {
         enabled: true,
       },
       global: {
-        plugins: [],
+        ...globalMountOptions,
       },
     });
 
@@ -177,7 +189,7 @@ describe("ClockBarVertical", () => {
         enabled: true,
       },
       global: {
-        plugins: [],
+        ...globalMountOptions,
       },
     });
 
@@ -197,7 +209,7 @@ describe("ClockBarVertical", () => {
         enabled: true,
       },
       global: {
-        plugins: [],
+        ...globalMountOptions,
       },
     });
 
@@ -217,12 +229,39 @@ describe("ClockBarVertical", () => {
         enabled: true,
       },
       global: {
-        plugins: [],
+        ...globalMountOptions,
       },
     });
 
     const timeElement = wrapper.find(".clock-time");
     expect(timeElement.exists()).toBe(true);
     expect(timeElement.attributes("style")).toContain("font-size: 18px");
+  });
+
+  it("should render statusbar items vertically when weather is enabled", async () => {
+    const store = useConfigStore();
+    store.showUI = true;
+    store.clockBarShowWeather = false;
+
+    const wrapper = mount(ClockBarVertical, {
+      props: {
+        position: "left",
+        showInNonKiosk: true,
+        showInKiosk: false,
+        enabled: true,
+      },
+      global: {
+        ...globalMountOptions,
+      },
+    });
+
+    expect(wrapper.find(".plugin-statusbar-stub").exists()).toBe(false);
+
+    store.clockBarShowWeather = true;
+    await nextTick();
+
+    const statusbar = wrapper.find(".plugin-statusbar-stub");
+    expect(statusbar.exists()).toBe(true);
+    expect(statusbar.attributes("data-orientation")).toBe("vertical");
   });
 });

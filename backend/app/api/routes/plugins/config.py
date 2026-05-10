@@ -1,16 +1,14 @@
 """Plugin configuration endpoints and utilities."""
 
 import json
-import logging
 from pathlib import Path
 from typing import Any
 
 from fastapi import APIRouter, HTTPException
+from loguru import logger
 
 from app.plugins.loader import plugin_loader
 from app.services.config_service import config_service
-
-logger = logging.getLogger(__name__)
 
 router = APIRouter()
 
