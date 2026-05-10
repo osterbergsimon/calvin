@@ -278,6 +278,92 @@ function coerceClockBarPosition(position, mode, regionsCount) {
   return position === "left" || position === "right" ? position : "left";
 }
 
+/**
+ * Build the global clock bar settings object that screen overrides resolve
+ * against. Centralises the contract so callers don't hard-code `enabled: true`.
+ */
+export function getGlobalClockBarSettings(config = {}) {
+  return {
+    enabled: true,
+    mode: config.clockBarMode === "vertical" ? "vertical" : "horizontal",
+    position: config.clockBarPosition ?? "top",
+  };
+}
+
+/**
+ * Given a between-style position and a region count, return the gap index at
+ * which a between-bar should render, or `null` if the bar should not appear
+ * (non-between position, or fewer than 2 regions). The index is clamped to the
+ * last available gap so stale `between:N` values fall back gracefully.
+ */
+export function getClockBarPlacementGap(position, regionsCount) {
+  const idx = getClockBarBetweenIndex(position);
+  if (idx === null) return null;
+  if (!Number.isFinite(regionsCount) || regionsCount < 2) return null;
+  return Math.max(0, Math.min(idx, regionsCount - 2));
+}
+
+function inferModeForPerimeter(position) {
+  if (position === "top" || position === "bottom") return "horizontal";
+  if (position === "left" || position === "right") return "vertical";
+  return null;
+}
+
+/**
+ * Decide how a per-screen position change should be applied. Returns:
+ *   - `null` if the position is invalid
+ *   - `{ clear: true }` if the override should be removed (resolved value
+ *     would already match the globals exactly)
+ *   - `{ patch: {...} }` with the minimal patch to merge into `screen.clockBar`
+ *
+ * When the new position is a perimeter, the patch also pins `mode` so the
+ * screen owns its orientation and stays valid if global mode flips later.
+ */
+export function computeClockBarPositionUpdate(screen, position, globalSettings = {}) {
+  const regionsCount = screen?.layout?.regions?.length || 0;
+  const normalized = normalizeClockBarPosition(position, regionsCount);
+  if (!normalized) return null;
+
+  const sideMode = inferModeForPerimeter(normalized);
+  const override = screen?.clockBar || {};
+  const overrideHasMode = override.mode === "horizontal" || override.mode === "vertical";
+  const overrideHasEnabled = typeof override.enabled === "boolean";
+
+  // Clear the override only when the resolved value would already match the
+  // globals on every dimension — otherwise we'd silently change orientation
+  // (e.g. dropping on 'top' while global mode is 'vertical').
+  const positionMatchesGlobal = normalized === globalSettings.position;
+  const modeMatchesGlobal = sideMode === null || sideMode === globalSettings.mode;
+  if (positionMatchesGlobal && modeMatchesGlobal && !overrideHasMode && !overrideHasEnabled) {
+    return { clear: true };
+  }
+
+  const patch = { position: normalized };
+  if (sideMode) patch.mode = sideMode;
+  return { patch };
+}
+
+/**
+ * Decide how a per-screen mode change should be applied. Returns the minimal
+ * patch to merge into `screen.clockBar`. If the resolved position no longer
+ * matches the new mode (and isn't a between gap, which is mode-agnostic), the
+ * patch flips the position to a default perimeter for the new mode.
+ */
+export function computeClockBarModeUpdate(screen, mode, globalSettings = {}) {
+  if (mode !== "horizontal" && mode !== "vertical") return null;
+  const resolved = resolveClockBarForScreen(screen, globalSettings);
+  const patch = { mode };
+  const isPerimeter = CLOCK_BAR_PERIMETER_POSITIONS.includes(resolved.position);
+  const wrongSide =
+    isPerimeter &&
+    ((mode === "horizontal" && resolved.position !== "top" && resolved.position !== "bottom") ||
+      (mode === "vertical" && resolved.position !== "left" && resolved.position !== "right"));
+  if (wrongSide) {
+    patch.position = mode === "horizontal" ? "top" : "left";
+  }
+  return { patch };
+}
+
 export function getLeafRegions(layout) {
   if (!layout?.regions) return [];
   return layout.regions.flatMap(region =>

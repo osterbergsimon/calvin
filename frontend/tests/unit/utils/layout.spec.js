@@ -5,13 +5,17 @@ import {
   MAX_TOP_REGIONS,
   addSubRegion,
   addTopRegion,
+  computeClockBarModeUpdate,
+  computeClockBarPositionUpdate,
   createDashboardLayoutFromPreset,
   cycleActiveDashboardRegion,
   cycleDashboardScreen,
   getActiveDashboardRegion,
   getActiveDashboardScreen,
   getClockBarBetweenIndex,
+  getClockBarPlacementGap,
   getDashboardRegionOrder,
+  getGlobalClockBarSettings,
   getLayoutDirection,
   getLayoutOrder,
   getLeafRegions,
@@ -662,6 +666,148 @@ describe("Layout Utilities", () => {
       it("honors per-screen enabled=false override", () => {
         const screen = screenWith(2, { enabled: false });
         expect(resolveClockBarForScreen(screen, globals).enabled).toBe(false);
+      });
+    });
+
+    describe("getGlobalClockBarSettings", () => {
+      it("defaults to enabled horizontal/top when config is empty", () => {
+        expect(getGlobalClockBarSettings({})).toEqual({
+          enabled: true,
+          mode: "horizontal",
+          position: "top",
+        });
+      });
+
+      it("reads mode and position from config", () => {
+        expect(
+          getGlobalClockBarSettings({ clockBarMode: "vertical", clockBarPosition: "right" })
+        ).toEqual({ enabled: true, mode: "vertical", position: "right" });
+      });
+
+      it("coerces unknown mode to horizontal", () => {
+        expect(getGlobalClockBarSettings({ clockBarMode: "diagonal" }).mode).toBe("horizontal");
+      });
+    });
+
+    describe("getClockBarPlacementGap", () => {
+      it("returns null for non-between positions", () => {
+        expect(getClockBarPlacementGap("top", 3)).toBeNull();
+        expect(getClockBarPlacementGap("right", 3)).toBeNull();
+        expect(getClockBarPlacementGap(null, 3)).toBeNull();
+      });
+
+      it("returns null when there are fewer than 2 regions", () => {
+        expect(getClockBarPlacementGap("between", 0)).toBeNull();
+        expect(getClockBarPlacementGap("between", 1)).toBeNull();
+        expect(getClockBarPlacementGap("between:2", 1)).toBeNull();
+      });
+
+      it("returns the parsed gap index for valid between:N", () => {
+        expect(getClockBarPlacementGap("between", 3)).toBe(0);
+        expect(getClockBarPlacementGap("between:1", 3)).toBe(1);
+        expect(getClockBarPlacementGap("between:2", 4)).toBe(2);
+      });
+
+      it("clamps stale between:N to the last available gap (regression for #34)", () => {
+        // 3 regions => gaps 0..1; between:9 should fall to gap 1.
+        expect(getClockBarPlacementGap("between:9", 3)).toBe(1);
+        // 2 regions => only gap 0.
+        expect(getClockBarPlacementGap("between:5", 2)).toBe(0);
+      });
+
+      it("clamps negative-ish indices to 0", () => {
+        expect(getClockBarPlacementGap("between:0", 5)).toBe(0);
+      });
+    });
+
+    describe("computeClockBarPositionUpdate", () => {
+      const globals = { enabled: true, mode: "horizontal", position: "top" };
+
+      it("returns null for an invalid position", () => {
+        const screen = screenWith(2, null);
+        expect(computeClockBarPositionUpdate(screen, "nope", globals)).toBeNull();
+      });
+
+      it("clears the override when the new position matches global on every dimension", () => {
+        const screen = screenWith(2, null);
+        expect(computeClockBarPositionUpdate(screen, "top", globals)).toEqual({ clear: true });
+      });
+
+      it("does NOT clear when the inferred mode differs from global mode", () => {
+        // Global is vertical/right; user drops onto 'top'. Position 'top' implies
+        // horizontal mode, so we must keep an override that pins mode=horizontal —
+        // otherwise resolution would coerce back to a vertical perimeter.
+        const verticalGlobals = { enabled: true, mode: "vertical", position: "top" };
+        const screen = screenWith(2, null);
+        const result = computeClockBarPositionUpdate(screen, "top", verticalGlobals);
+        expect(result).toEqual({ patch: { position: "top", mode: "horizontal" } });
+      });
+
+      it("does NOT clear when the screen has an enabled override", () => {
+        const screen = screenWith(2, { enabled: false });
+        const result = computeClockBarPositionUpdate(screen, "top", globals);
+        expect(result).toEqual({ patch: { position: "top", mode: "horizontal" } });
+      });
+
+      it("does NOT clear when the screen has a mode override", () => {
+        const screen = screenWith(2, { mode: "vertical" });
+        const result = computeClockBarPositionUpdate(screen, "top", globals);
+        expect(result).toEqual({ patch: { position: "top", mode: "horizontal" } });
+      });
+
+      it("pins mode for perimeter positions so screen owns its orientation", () => {
+        const screen = screenWith(2, null);
+        expect(computeClockBarPositionUpdate(screen, "left", globals)).toEqual({
+          patch: { position: "left", mode: "vertical" },
+        });
+        expect(computeClockBarPositionUpdate(screen, "bottom", globals)).toEqual({
+          patch: { position: "bottom", mode: "horizontal" },
+        });
+      });
+
+      it("does not pin mode for between positions (mode-agnostic)", () => {
+        const screen = screenWith(3, null);
+        expect(computeClockBarPositionUpdate(screen, "between:1", globals)).toEqual({
+          patch: { position: "between:1" },
+        });
+      });
+
+      it("clamps stale between:N before patching", () => {
+        const screen = screenWith(3, null);
+        expect(computeClockBarPositionUpdate(screen, "between:9", globals)).toEqual({
+          patch: { position: "between:1" },
+        });
+      });
+    });
+
+    describe("computeClockBarModeUpdate", () => {
+      const globals = { enabled: true, mode: "horizontal", position: "top" };
+
+      it("returns null for an invalid mode", () => {
+        const screen = screenWith(2, null);
+        expect(computeClockBarModeUpdate(screen, "diagonal", globals)).toBeNull();
+      });
+
+      it("flips position to a default perimeter when the new mode invalidates it", () => {
+        // Resolved is vertical/left, switching to horizontal -> default 'top'.
+        const screen = screenWith(2, { mode: "vertical", position: "left" });
+        expect(computeClockBarModeUpdate(screen, "horizontal", globals)).toEqual({
+          patch: { mode: "horizontal", position: "top" },
+        });
+      });
+
+      it("keeps a between position untouched (mode-agnostic)", () => {
+        const screen = screenWith(3, { position: "between:1" });
+        expect(computeClockBarModeUpdate(screen, "vertical", globals)).toEqual({
+          patch: { mode: "vertical" },
+        });
+      });
+
+      it("only patches mode when the resolved perimeter already matches", () => {
+        const screen = screenWith(2, { position: "bottom" });
+        expect(computeClockBarModeUpdate(screen, "horizontal", globals)).toEqual({
+          patch: { mode: "horizontal" },
+        });
       });
     });
   });

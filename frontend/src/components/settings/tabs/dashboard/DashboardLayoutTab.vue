@@ -127,14 +127,27 @@
                 {{ opt.label }}
               </option>
             </select>
-            <label class="clock-bar-show-toggle">
+            <label
+              class="clock-bar-switch"
+              :class="{ 'clock-bar-switch-on': effectiveClockBarFor(screen).enabled }"
+              :title="
+                effectiveClockBarFor(screen).enabled
+                  ? 'Hide bar on this screen'
+                  : 'Show bar on this screen'
+              "
+            >
               <input
                 type="checkbox"
                 :checked="effectiveClockBarFor(screen).enabled"
                 :aria-label="`Show clock bar on screen ${screenIndex + 1}`"
                 @change="setScreenClockBarEnabled(screenIndex, $event.target.checked)"
               />
-              Show
+              <span class="clock-bar-switch-track" aria-hidden="true">
+                <span class="clock-bar-switch-thumb" />
+              </span>
+              <span class="clock-bar-switch-label">{{
+                effectiveClockBarFor(screen).enabled ? "Shown" : "Hidden"
+              }}</span>
             </label>
             <button
               v-if="screenHasClockBarOverride(screen)"
@@ -156,6 +169,11 @@
                 effectiveClockBarFor(screen).position !== 'top'
               "
               class="clock-bar-drop-zone clock-bar-drop-zone-horizontal"
+              :class="{
+                'clock-bar-drop-zone-mode-switch':
+                  effectiveClockBarFor(screen).mode !== 'horizontal',
+              }"
+              :title="dropZoneTooltip(screen, 'top')"
               @dragover.prevent
               @drop="handleClockBarDrop(screenIndex, 'top', $event)"
             >
@@ -187,6 +205,11 @@
                   effectiveClockBarFor(screen).position !== 'left'
                 "
                 class="clock-bar-drop-zone clock-bar-drop-zone-vertical"
+                :class="{
+                  'clock-bar-drop-zone-mode-switch':
+                    effectiveClockBarFor(screen).mode !== 'vertical',
+                }"
+                :title="dropZoneTooltip(screen, 'left')"
                 @dragover.prevent
                 @drop="handleClockBarDrop(screenIndex, 'left', $event)"
               >
@@ -522,6 +545,7 @@
                     "
                     class="clock-bar-drop-zone"
                     :class="`clock-bar-drop-zone-between-${layoutDirectionFor(screen.layout) === 'row' ? 'vertical' : 'horizontal'}`"
+                    title="Drop here to place the bar between these regions"
                     @dragover.prevent
                     @drop="
                       handleClockBarDrop(
@@ -531,7 +555,7 @@
                       )
                     "
                   >
-                    Gap {{ previewIndex + 1 }}
+                    Between region {{ previewIndex + 1 }} & {{ previewIndex + 2 }}
                   </div>
                   <div
                     v-if="
@@ -578,6 +602,11 @@
                   effectiveClockBarFor(screen).position !== 'right'
                 "
                 class="clock-bar-drop-zone clock-bar-drop-zone-vertical"
+                :class="{
+                  'clock-bar-drop-zone-mode-switch':
+                    effectiveClockBarFor(screen).mode !== 'vertical',
+                }"
+                :title="dropZoneTooltip(screen, 'right')"
                 @dragover.prevent
                 @drop="handleClockBarDrop(screenIndex, 'right', $event)"
               >
@@ -604,6 +633,11 @@
                 effectiveClockBarFor(screen).position !== 'bottom'
               "
               class="clock-bar-drop-zone clock-bar-drop-zone-horizontal"
+              :class="{
+                'clock-bar-drop-zone-mode-switch':
+                  effectiveClockBarFor(screen).mode !== 'horizontal',
+              }"
+              :title="dropZoneTooltip(screen, 'bottom')"
               @dragover.prevent
               @drop="handleClockBarDrop(screenIndex, 'bottom', $event)"
             >
@@ -627,16 +661,16 @@ import { useWebServicesStore } from "@/stores/webServices";
 import { useCalendarStore } from "@/stores/calendar";
 import { usePlugins } from "@/composables";
 import {
-  CLOCK_BAR_PERIMETER_POSITIONS,
   MAX_TOP_REGIONS,
   addSubRegion,
   addTopRegion,
+  computeClockBarModeUpdate,
+  computeClockBarPositionUpdate,
   createDashboardScreenFromPreset,
   getClockBarBetweenIndex,
+  getGlobalClockBarSettings,
   getLayoutDirection,
   getSplitDirection,
-  isClockBarBetweenPosition,
-  normalizeClockBarPosition,
   normalizeDashboardScreens,
   removeSubRegion,
   removeTopRegion,
@@ -716,13 +750,18 @@ const configValue = computed(() => {
   };
 });
 
-const globalClockBarSettings = computed(() => ({
-  enabled: true,
-  mode: configValue.value.clockBarMode,
-  position: configValue.value.clockBarPosition,
-}));
+const globalClockBarSettings = computed(() => getGlobalClockBarSettings(configValue.value));
+
+const effectiveClockBars = computed(() => {
+  const map = new Map();
+  for (const screen of configValue.value.dashboardScreens.screens) {
+    map.set(screen.id, resolveClockBarForScreen(screen, globalClockBarSettings.value));
+  }
+  return map;
+});
 
 const effectiveClockBarFor = screen =>
+  effectiveClockBars.value.get(screen.id) ||
   resolveClockBarForScreen(screen, globalClockBarSettings.value);
 
 const screenHasClockBarOverride = screen => Boolean(screen?.clockBar);
@@ -746,7 +785,7 @@ const clockBarPositionLabel = (position, screen) => {
     const before = regions[index];
     const after = regions[index + 1];
     if (before && after) {
-      return `Between R${index + 1} & R${index + 2}`;
+      return `Between region ${index + 1} & ${index + 2}`;
     }
     return "Between regions";
   }
@@ -772,6 +811,20 @@ const clockBarPositionOptions = (screen, mode) => {
   return options;
 };
 
+const dropZoneTooltip = (screen, position) => {
+  const resolved = effectiveClockBarFor(screen);
+  const targetMode =
+    position === "top" || position === "bottom"
+      ? "horizontal"
+      : position === "left" || position === "right"
+        ? "vertical"
+        : resolved.mode;
+  if (targetMode !== resolved.mode) {
+    return `Drop here to move the bar — switches to ${targetMode} orientation`;
+  }
+  return "Drop here to move the bar";
+};
+
 const updateScreenClockBar = (screenIndex, patch) => {
   const screens = cloneScreens();
   const target = screens.screens[screenIndex];
@@ -792,45 +845,20 @@ const clearScreenClockBar = screenIndex => {
 
 const setScreenClockBarMode = (screenIndex, mode) => {
   const screen = dashboardScreens.value.screens[screenIndex];
-  const resolved = effectiveClockBarFor(screen);
-  // Switching mode invalidates the current perimeter side; re-coerce position.
-  const patch = { mode };
-  if (
-    (mode === "horizontal" && resolved.position !== "top" && resolved.position !== "bottom") ||
-    (mode === "vertical" && resolved.position !== "left" && resolved.position !== "right")
-  ) {
-    if (!isClockBarBetweenPosition(resolved.position)) {
-      patch.position = mode === "horizontal" ? "top" : "left";
-    }
-  }
-  updateScreenClockBar(screenIndex, patch);
+  const update = computeClockBarModeUpdate(screen, mode, globalClockBarSettings.value);
+  if (!update) return;
+  updateScreenClockBar(screenIndex, update.patch);
 };
 
 const setScreenClockBarPosition = (screenIndex, position) => {
   const screen = dashboardScreens.value.screens[screenIndex];
-  const regionsCount = screen.layout.regions.length;
-  const normalized = normalizeClockBarPosition(position, regionsCount);
-  if (!normalized) return;
-  // If the override has no other fields and the new position matches the
-  // global already, leave the screen inheriting.
-  const wouldMatchGlobal =
-    normalized === globalClockBarSettings.value.position &&
-    !screen.clockBar?.mode &&
-    typeof screen.clockBar?.enabled !== "boolean";
-  if (wouldMatchGlobal) {
+  const update = computeClockBarPositionUpdate(screen, position, globalClockBarSettings.value);
+  if (!update) return;
+  if (update.clear) {
     clearScreenClockBar(screenIndex);
     return;
   }
-  // Set position; also pin the mode so the position remains valid even if the
-  // global mode flips later.
-  const patch = { position: normalized };
-  const sideMode = CLOCK_BAR_PERIMETER_POSITIONS.includes(normalized)
-    ? normalized === "top" || normalized === "bottom"
-      ? "horizontal"
-      : "vertical"
-    : null;
-  if (sideMode) patch.mode = sideMode;
-  updateScreenClockBar(screenIndex, patch);
+  updateScreenClockBar(screenIndex, update.patch);
 };
 
 const setScreenClockBarEnabled = (screenIndex, enabled) => {
@@ -1754,11 +1782,61 @@ onUnmounted(() => {
   color: var(--text-primary);
 }
 
-.clock-bar-show-toggle {
+.clock-bar-switch {
   display: inline-flex;
   align-items: center;
-  gap: 0.3rem;
+  gap: 0.4rem;
   cursor: pointer;
+  user-select: none;
+  font-size: 0.8rem;
+  color: var(--text-primary);
+}
+
+.clock-bar-switch input {
+  position: absolute;
+  opacity: 0;
+  pointer-events: none;
+  width: 0;
+  height: 0;
+}
+
+.clock-bar-switch-track {
+  position: relative;
+  width: 1.9rem;
+  height: 1rem;
+  border-radius: 999px;
+  background: var(--border-color);
+  transition: background 0.15s ease;
+  flex-shrink: 0;
+}
+
+.clock-bar-switch-thumb {
+  position: absolute;
+  top: 2px;
+  left: 2px;
+  width: 0.75rem;
+  height: 0.75rem;
+  border-radius: 50%;
+  background: var(--bg-primary);
+  box-shadow: 0 1px 2px rgba(0, 0, 0, 0.2);
+  transition: transform 0.15s ease;
+}
+
+.clock-bar-switch-on .clock-bar-switch-track {
+  background: var(--accent-primary);
+}
+
+.clock-bar-switch-on .clock-bar-switch-thumb {
+  transform: translateX(0.9rem);
+}
+
+.clock-bar-switch input:focus-visible + .clock-bar-switch-track {
+  outline: 2px solid var(--accent-primary);
+  outline-offset: 2px;
+}
+
+.clock-bar-switch-label {
+  min-width: 3rem;
 }
 
 .clock-bar-inherit {
@@ -1862,6 +1940,12 @@ onUnmounted(() => {
   width: 1.4rem;
   align-self: stretch;
   writing-mode: vertical-rl;
+}
+
+.clock-bar-drop-zone-mode-switch {
+  border-style: dotted;
+  border-color: var(--accent-secondary, var(--accent-primary));
+  background: rgba(255, 165, 0, 0.08);
 }
 
 .screen-add {

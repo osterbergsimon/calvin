@@ -122,7 +122,8 @@ import { useModeStore } from "../stores/mode";
 import { useRoute } from "vue-router";
 import {
   getActiveDashboardScreen,
-  getClockBarBetweenIndex,
+  getClockBarPlacementGap,
+  getGlobalClockBarSettings,
   getLayoutDirection,
   getRegionAxisStyle,
   normalizeDashboardScreens,
@@ -149,18 +150,22 @@ const dashboardScreens = computed(() => normalizeDashboardScreens(configStore.da
 const activeScreen = computed(() => getActiveDashboardScreen(dashboardScreens.value));
 
 const effectiveClockBar = computed(() =>
-  resolveClockBarForScreen(activeScreen.value, {
-    enabled: true,
-    mode: configStore.clockBarMode,
-    position: configStore.clockBarPosition,
-  })
+  resolveClockBarForScreen(
+    activeScreen.value,
+    getGlobalClockBarSettings({
+      clockBarMode: configStore.clockBarMode,
+      clockBarPosition: configStore.clockBarPosition,
+    })
+  )
 );
 
 const clockBarActive = computed(() => effectiveClockBar.value.enabled && barVisible.value);
 const isHorizontalMode = computed(() => effectiveClockBar.value.mode === "horizontal");
 const isVerticalMode = computed(() => effectiveClockBar.value.mode === "vertical");
 const clockBarPosition = computed(() => effectiveClockBar.value.position);
-const clockBarBetweenIndex = computed(() => getClockBarBetweenIndex(clockBarPosition.value));
+const clockBarPlacementGap = computed(() =>
+  getClockBarPlacementGap(clockBarPosition.value, activeScreen.value?.layout?.regions?.length || 0)
+);
 
 const showHorizontalBarTop = computed(
   () => clockBarActive.value && isHorizontalMode.value && clockBarPosition.value === "top"
@@ -174,7 +179,7 @@ const showHorizontalBarBetween = computed(
   () =>
     clockBarActive.value &&
     isHorizontalMode.value &&
-    clockBarBetweenIndex.value !== null &&
+    clockBarPlacementGap.value !== null &&
     layoutDirection.value === "column"
 );
 
@@ -190,7 +195,7 @@ const showVerticalBarBetween = computed(
   () =>
     clockBarActive.value &&
     isVerticalMode.value &&
-    clockBarBetweenIndex.value !== null &&
+    clockBarPlacementGap.value !== null &&
     layoutDirection.value === "row"
 );
 
@@ -201,9 +206,7 @@ const layoutOrder = computed(() => {
     return withOuterClockBars(regionElements);
   }
 
-  const betweenIndex = clockBarBetweenIndex.value;
-  const maxBetween = regionElements.length - 2;
-  const placedBetween = betweenIndex === null ? null : Math.min(betweenIndex, maxBetween);
+  const placedBetween = clockBarPlacementGap.value;
 
   const elements = [];
   if (showVerticalBarLeft.value) elements.push("verticalBarLeft");
