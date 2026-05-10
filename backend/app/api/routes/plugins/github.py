@@ -1,6 +1,5 @@
 """GitHub and local plugin installation endpoints."""
 
-import logging
 import re
 import shutil
 import tempfile
@@ -10,6 +9,7 @@ from typing import Any
 
 import httpx
 from fastapi import APIRouter, Body, HTTPException
+from loguru import logger
 
 from app.api.routes.plugins.management import _validate_just_installed_plugin
 from app.api.routes.plugins.themes import _register_theme_in_db
@@ -17,8 +17,6 @@ from app.config import settings
 from app.plugins.loader import plugin_loader
 from app.services.plugin_installer import plugin_installer
 from app.services.theme_installer import theme_installer
-
-logger = logging.getLogger(__name__)
 
 router = APIRouter()
 
@@ -139,7 +137,7 @@ async def enumerate_plugins_from_github(
     except HTTPException:
         raise
     except Exception as e:
-        logger.error(f"Failed to enumerate plugins from GitHub: {e}", exc_info=True)
+        logger.exception("Failed to enumerate plugins from GitHub")
         error_detail = str(e) if str(e) else "Unknown error occurred"
         raise HTTPException(status_code=500, detail=f"Failed to enumerate plugins: {error_detail}")
     finally:
@@ -287,11 +285,11 @@ async def install_plugin_from_github(request: dict[str, Any] = Body(...)):
                 # Wrap in try-except to handle loading errors gracefully
                 try:
                     plugin_loader.load_installed_plugins()
-                except Exception as load_error:
-                    logger.warning(
-                        f"Plugin {manifest['id']} installed but failed to load: {load_error}. "
+                except Exception:
+                    logger.opt(exception=True).warning(
+                        "Plugin {} installed but failed to load. "
                         "It will be available after server restart.",
-                        exc_info=True,
+                        manifest["id"],
                     )
                     # Don't fail the installation - the plugin files are installed correctly
                     # It just needs a restart to be loaded
@@ -337,7 +335,7 @@ async def install_plugin_from_github(request: dict[str, Any] = Body(...)):
     except HTTPException:
         raise
     except Exception as e:
-        logger.error(f"Failed to install plugin from GitHub: {e}", exc_info=True)
+        logger.exception("Failed to install plugin from GitHub")
         raise HTTPException(status_code=500, detail=f"Failed to install plugin: {str(e)}")
     finally:
         # Clean up temp files
@@ -525,5 +523,5 @@ async def install_plugin_from_local(request: dict[str, Any] = Body(...)):
     except HTTPException:
         raise
     except Exception as e:
-        logger.error(f"Failed to install plugin from local path: {e}", exc_info=True)
+        logger.exception("Failed to install plugin from local path")
         raise HTTPException(status_code=500, detail=f"Failed to install: {str(e)}")

@@ -191,10 +191,6 @@ class LocalImagePlugin(ImagePlugin):
         Returns:
             List of image metadata dictionaries
         """
-        import logging
-
-        logger = logging.getLogger(__name__)
-
         logger.debug(f"[Local Images] scan_images() called for plugin {self.plugin_id}")
         logger.debug(f"[Local Images] image_dir: {self.image_dir}")
         logger.debug(f"[Local Images] image_dir exists: {self.image_dir.exists()}")

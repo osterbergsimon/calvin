@@ -416,9 +416,6 @@ async def update_calendar_source(source_id: str, source: CalendarSource):
                 # Then unregister it
                 await plugin_manager.unregister(source_id)
             except Exception:
-                import logging
-
-                logger = logging.getLogger(__name__)
                 logger.exception("Error cleaning up disabled plugin {}", source_id)
 
     return source

@@ -26,6 +26,12 @@ describe("ClockBarHorizontal", () => {
     setActivePinia(createPinia());
   });
 
+  const globalMountOptions = {
+    stubs: {
+      BarActionCluster: true,
+    },
+  };
+
   it("should render when enabled and showInNonKiosk is true and UI is visible", () => {
     const store = useConfigStore();
     store.showUI = true;
@@ -38,7 +44,7 @@ describe("ClockBarHorizontal", () => {
         enabled: true,
       },
       global: {
-        plugins: [],
+        ...globalMountOptions,
       },
     });
 
@@ -57,7 +63,7 @@ describe("ClockBarHorizontal", () => {
         enabled: true,
       },
       global: {
-        plugins: [],
+        ...globalMountOptions,
       },
     });
 
@@ -76,7 +82,7 @@ describe("ClockBarHorizontal", () => {
         enabled: true,
       },
       global: {
-        plugins: [],
+        ...globalMountOptions,
       },
     });
 
@@ -92,7 +98,7 @@ describe("ClockBarHorizontal", () => {
         enabled: false,
       },
       global: {
-        plugins: [],
+        ...globalMountOptions,
       },
     });
 
@@ -111,7 +117,7 @@ describe("ClockBarHorizontal", () => {
         enabled: true,
       },
       global: {
-        plugins: [],
+        ...globalMountOptions,
       },
     });
 
@@ -130,7 +136,7 @@ describe("ClockBarHorizontal", () => {
         enabled: true,
       },
       global: {
-        plugins: [],
+        ...globalMountOptions,
       },
     });
 
@@ -151,7 +157,7 @@ describe("ClockBarHorizontal", () => {
         enabled: true,
       },
       global: {
-        plugins: [],
+        ...globalMountOptions,
       },
     });
 
@@ -171,7 +177,7 @@ describe("ClockBarHorizontal", () => {
         enabled: true,
       },
       global: {
-        plugins: [],
+        ...globalMountOptions,
       },
     });
 
@@ -191,7 +197,7 @@ describe("ClockBarHorizontal", () => {
         enabled: true,
       },
       global: {
-        plugins: [],
+        ...globalMountOptions,
       },
     });
 

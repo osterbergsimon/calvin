@@ -5,15 +5,14 @@ that eliminates the need for plugins to implement hundreds of lines of
 boilerplate instance management code.
 """
 
-import logging
 from collections.abc import Callable
 from typing import Any
+
+from loguru import logger
 
 from app.models.db_models import PluginDB
 from app.plugins.manager import plugin_manager
 from app.plugins.registry import plugin_registry
-
-logger = logging.getLogger(__name__)
 
 
 class InstanceManagerConfig:
@@ -183,8 +182,8 @@ async def handle_plugin_config_update_generic(
                 if not existing_plugin:
                     await db_instance.delete()
                     db_instance = None
-    except Exception as e:
-        logger.warning(f"[{type_id}] Error querying database: {e}", exc_info=True)
+    except Exception:
+        logger.opt(exception=True).warning("[{}] Error querying database", type_id)
         db_instance = None
 
     # Determine enabled status
@@ -266,7 +265,7 @@ async def handle_plugin_config_update_generic(
                 }
             raise
         except Exception as e:
-            logger.error(f"[{type_id}] Failed to create instance: {e}", exc_info=True)
+            logger.exception("[{}] Failed to create instance", type_id)
             return {"instance_created": False, "error": str(e)}
     else:
         # Update existing instance
@@ -301,16 +300,16 @@ async def handle_plugin_config_update_generic(
                     try:
                         await plugin.initialize()
                         plugin.start()
-                    except Exception as e:
-                        logger.error(f"[{type_id}] Error starting plugin: {e}", exc_info=True)
+                    except Exception:
+                        logger.exception("[{}] Error starting plugin", type_id)
             else:
                 plugin.disable()
                 if plugin.is_running():
                     try:
                         plugin.stop()
                         await plugin.cleanup()
-                    except Exception as e:
-                        logger.warning(f"[{type_id}] Error stopping plugin: {e}", exc_info=True)
+                    except Exception:
+                        logger.opt(exception=True).warning("[{}] Error stopping plugin", type_id)
 
             result = {
                 "instance_updated": True,
@@ -366,9 +365,7 @@ async def handle_plugin_config_update_generic(
                         "warning": "Plugin instance updated in DB but not registered in manager",
                     }
             except Exception as e:
-                logger.error(
-                    f"[{type_id}] Failed to register existing instance: {e}", exc_info=True
-                )
+                logger.exception("[{}] Failed to register existing instance", type_id)
                 # Still update the DB entry even if registration fails
                 result = {
                     "instance_updated": True,

@@ -88,10 +88,7 @@ class EventSystem:
                 result = await handler(event_type, event_data)
                 return {"plugin_id": plugin_id, "success": True, "result": result}
             except Exception as e:
-                logger.error(
-                    f"Error in event handler {plugin_id} for event {event_type}: {e}",
-                    exc_info=True,
-                )
+                logger.exception("Error in event handler {} for event {}", plugin_id, event_type)
                 return {"plugin_id": plugin_id, "success": False, "error": str(e)}
 
         return asyncio.create_task(safe_handler())
@@ -105,10 +102,7 @@ class EventSystem:
         results = await asyncio.gather(*tasks, return_exceptions=True)
         for result, (plugin_id, _) in zip(results, handlers):
             if isinstance(result, Exception):
-                logger.error(
-                    f"Exception in event handler {plugin_id}: {result}",
-                    exc_info=True,
-                )
+                logger.opt(exception=result).error("Exception in event handler {}", plugin_id)
             elif result and not result.get("success", False):
                 logger.warning(f"Event handler {plugin_id} returned error: {result.get('error')}")
 

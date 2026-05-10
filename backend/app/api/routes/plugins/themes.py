@@ -1,14 +1,13 @@
 """Theme helper functions for plugin management."""
 
 import json
-import logging
 from pathlib import Path
 from typing import Any
 
+from loguru import logger
+
 from app.models.db_models import PluginTypeDB
 from app.plugins.base import PluginType
-
-logger = logging.getLogger(__name__)
 
 
 def _load_builtin_themes() -> dict[str, Any]:

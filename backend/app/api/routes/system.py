@@ -2,7 +2,6 @@
 
 import asyncio
 import json
-import logging
 import os
 import re
 import shutil
@@ -14,11 +13,10 @@ from typing import Any
 
 from fastapi import APIRouter, HTTPException
 from fastapi.responses import StreamingResponse
+from loguru import logger
 
 from app.config import settings
 from app.services.display_power_service import display_power_service
-
-logger = logging.getLogger(__name__)
 
 router = APIRouter()
 
@@ -54,17 +52,17 @@ def _attempt_restart_calvin_service(service: str) -> bool:
                 text=True,
             )
             if result.returncode == 0:
-                logger.info("%s restart initiated via helper script", service)
+                logger.info("{} restart initiated via helper script", service)
                 return True
             error_msg = result.stderr or result.stdout or "Unknown error"
-            logger.warning("Helper script failed: %s", error_msg)
+            logger.warning("Helper script failed: {}", error_msg)
         except FileNotFoundError:
             logger.warning("sudo not found")
         except subprocess.TimeoutExpired:
             logger.info("Helper script timed out (but may have initiated)")
             return True
-        except Exception as e:
-            logger.error("Helper script error: %s", e, exc_info=True)
+        except Exception:
+            logger.exception("Helper script error")
 
     try:
         result = subprocess.run(
@@ -74,16 +72,16 @@ def _attempt_restart_calvin_service(service: str) -> bool:
             text=True,
         )
         if result.returncode == 0:
-            logger.info("%s restart initiated via systemctl restart", service)
+            logger.info("{} restart initiated via systemctl restart", service)
             return True
-        logger.warning("systemctl restart failed: %s", result.stderr or "Unknown error")
+        logger.warning("systemctl restart failed: {}", result.stderr or "Unknown error")
     except FileNotFoundError:
         logger.warning("systemctl not found")
     except subprocess.TimeoutExpired:
         logger.info("systemctl restart timed out (but may have initiated)")
         return True
-    except Exception as e:
-        logger.error("systemctl restart error: %s", e, exc_info=True)
+    except Exception:
+        logger.exception("systemctl restart error")
 
     return False
 
@@ -148,7 +146,7 @@ def _read_update_state(state_file: Path) -> dict[str, Any] | None:
             state = json.load(f)
         return state if isinstance(state, dict) else None
     except (OSError, json.JSONDecodeError):
-        logger.warning("Failed to read update state file: %s", state_file, exc_info=True)
+        logger.opt(exception=True).warning("Failed to read update state file: {}", state_file)
         return None
 
 
@@ -703,7 +701,7 @@ async def restart_frontend():
     except HTTPException:
         raise
     except Exception as e:
-        logger.error("Frontend restart error: %s", e, exc_info=True)
+        logger.exception("Frontend restart error")
         raise HTTPException(status_code=500, detail=f"Failed to restart frontend service: {str(e)}")
 
 
@@ -746,7 +744,7 @@ async def restart_backend():
     except HTTPException:
         raise
     except Exception as e:
-        logger.error("Backend restart error: %s", e, exc_info=True)
+        logger.exception("Backend restart error")
         raise HTTPException(status_code=500, detail=f"Failed to restart backend service: {str(e)}")
 
 
@@ -776,8 +774,8 @@ async def reboot_system():
         except subprocess.TimeoutExpired:
             logger.info("systemctl reboot timed out (but may have initiated)")
             reboot_attempted = True
-        except Exception as e:
-            logger.error(f"systemctl reboot error: {e}", exc_info=True)
+        except Exception:
+            logger.exception("systemctl reboot error")
 
         # Method 2: Use dbus to call systemd-logind (alternative to systemctl)
         # This might work if polkit rules are configured
@@ -807,8 +805,8 @@ async def reboot_system():
             except subprocess.TimeoutExpired:
                 logger.info("dbus reboot timed out (but may have initiated)")
                 reboot_attempted = True
-            except Exception as e:
-                logger.error(f"dbus reboot error: {e}", exc_info=True)
+            except Exception:
+                logger.exception("dbus reboot error")
 
         if reboot_attempted:
             return {"status": "success", "message": "System reboot initiated"}
@@ -825,5 +823,5 @@ async def reboot_system():
     except HTTPException:
         raise
     except Exception as e:
-        logger.error(f"Reboot error: {e}", exc_info=True)
+        logger.exception("Reboot error")
         raise HTTPException(status_code=500, detail=f"Failed to reboot system: {str(e)}")

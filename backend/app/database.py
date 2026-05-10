@@ -4,6 +4,7 @@ import logging
 import os
 
 import databases
+from loguru import logger
 from sqlalchemy import MetaData
 
 from app.config import settings
@@ -51,7 +52,6 @@ async def connect_db():
     except Exception as e:
         # If PRAGMA commands fail, log but don't fail connection
         # (might happen if database is read-only or other issues)
-        logger = logging.getLogger(__name__)
         logger.warning(f"Failed to configure SQLite PRAGMA settings: {e}")
 
 

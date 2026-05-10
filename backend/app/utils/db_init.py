@@ -5,14 +5,12 @@ It ensures all tables are created and migrations are run properly.
 """
 
 import asyncio
-import logging
 from pathlib import Path
 
 import databases
+from loguru import logger
 
 from app.database import metadata
-
-logger = logging.getLogger(__name__)
 
 
 async def initialize_database(

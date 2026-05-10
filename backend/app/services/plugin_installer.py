@@ -1,13 +1,14 @@
 """Plugin installation service for managing installed plugins."""
 
 import json
-import logging
 import shutil
 import subprocess
 import sys
 import zipfile
 from pathlib import Path
 from typing import Any
+
+from loguru import logger
 
 from app.config import settings
 from app.plugins.definitions import CURRENT_PLUGIN_PROTOCOL_VERSION
@@ -20,8 +21,6 @@ from app.services.validation import (
     validate_plugin_type,
     validate_zip_structure,
 )
-
-logger = logging.getLogger(__name__)
 
 
 class PluginInstaller:
