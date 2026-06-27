@@ -49,10 +49,9 @@
   --font-ui: "IBM Plex Sans", system-ui, sans-serif;
   --font-data: "IBM Plex Mono", ui-monospace, monospace;
 
-  /* aliases so existing components keep working */
-  --bg-primary: var(--bg-1);
-  --bg-secondary: var(--bg-0);
-  --accent-primary: var(--focus);
+  /* switch knob tokens */
+  --switch-knob: #cdd6dc;
+  --switch-knob-on: #ffffff;
 }
 
 .dark {

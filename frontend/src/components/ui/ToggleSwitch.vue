@@ -38,7 +38,7 @@ const toggle = () => emit("update:modelValue", !props.modelValue);
   width: 26px;
   height: 26px;
   border-radius: 50%;
-  background: #cdd6dc;
+  background: var(--switch-knob);
   transition: transform 0.2s;
 }
 .tog.on {
@@ -46,7 +46,7 @@ const toggle = () => emit("update:modelValue", !props.modelValue);
 }
 .tog.on::after {
   transform: translateX(24px);
-  background: #fff;
+  background: var(--switch-knob-on);
 }
 .tog:focus-visible {
   outline: 2px solid var(--focus);

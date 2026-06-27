@@ -28,4 +28,22 @@ describe("SegmentedControl", () => {
     await w.find('[role="radiogroup"]').trigger("keydown", { key: "ArrowRight" });
     expect(w.emitted("update:modelValue")[0]).toEqual(["portrait"]);
   });
+
+  it("moves selection backward with ArrowLeft", async () => {
+    const w = mount(SegmentedControl, { props: { modelValue: "portrait", options: OPTS } });
+    await w.find('[role="radiogroup"]').trigger("keydown", { key: "ArrowLeft" });
+    expect(w.emitted("update:modelValue")[0]).toEqual(["landscape"]);
+  });
+
+  it("ArrowRight from the last option wraps to the first", async () => {
+    const w = mount(SegmentedControl, { props: { modelValue: "portrait", options: OPTS } });
+    await w.find('[role="radiogroup"]').trigger("keydown", { key: "ArrowRight" });
+    expect(w.emitted("update:modelValue")[0]).toEqual(["landscape"]);
+  });
+
+  it("ArrowLeft from the first option wraps to the last", async () => {
+    const w = mount(SegmentedControl, { props: { modelValue: "landscape", options: OPTS } });
+    await w.find('[role="radiogroup"]').trigger("keydown", { key: "ArrowLeft" });
+    expect(w.emitted("update:modelValue")[0]).toEqual(["portrait"]);
+  });
 });
