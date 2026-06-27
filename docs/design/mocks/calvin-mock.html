@@ -1,0 +1,258 @@
+<!doctype html>
+<html lang="sv">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>Calvin — focus-light mock</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Sans:wght@400;500;600;700&family=IBM+Plex+Sans+Condensed:wght@500;600;700&family=IBM+Plex+Mono:wght@400;500;600&family=Space+Grotesk:wght@400;500;600;700&family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500;600&family=Schibsted+Grotesk:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+<style>
+:root{
+  /* ---- Backlit (dark instrument) color theme ---- */
+  --bg-0:#0e1316;        /* page */
+  --bg-1:#151c21;        /* panel resting */
+  --bg-2:#1d262d;        /* panel lit */
+  --line:#27313a;
+  --line-soft:#1e272e;
+  --ink:#eaf0f3;
+  --ink-2:#9aa7b0;
+  --ink-3:#62707a;
+  --focus:#f3b052;             /* the lamp */
+  --focus-ink:#1a130a;
+  --focus-glow:rgba(243,176,82,.20);
+  --focus-edge:rgba(243,176,82,.55);
+  --ok:#5bd0a0;
+
+  /* default font roles (Instrument); overridden per theme below */
+  --font-display:"IBM Plex Sans Condensed", system-ui, sans-serif;
+  --font-ui:"IBM Plex Sans", system-ui, sans-serif;
+  --font-data:"IBM Plex Mono", ui-monospace, monospace;
+  --display-tracking:.01em;
+  --display-weight:700;
+}
+
+/* ===== type themes (font roles only) ===== */
+body[data-type="instrument"]{
+  --font-display:"IBM Plex Sans Condensed", system-ui, sans-serif;
+  --font-ui:"IBM Plex Sans", system-ui, sans-serif;
+  --font-data:"IBM Plex Mono", ui-monospace, monospace;
+  --display-tracking:.01em; --display-weight:700;
+}
+body[data-type="marquee"]{
+  --font-display:"Space Grotesk", system-ui, sans-serif;
+  --font-ui:"Inter", system-ui, sans-serif;
+  --font-data:"JetBrains Mono", ui-monospace, monospace;
+  --display-tracking:.005em; --display-weight:600;
+}
+body[data-type="station"]{
+  --font-display:"Schibsted Grotesk", system-ui, sans-serif;
+  --font-ui:"Schibsted Grotesk", system-ui, sans-serif;
+  --font-data:"JetBrains Mono", ui-monospace, monospace;
+  --display-tracking:-.005em; --display-weight:800;
+}
+
+/* ===== light "Paper" color theme ===== */
+body[data-color="paper"]{
+  --bg-0:#eef1f4; --bg-1:#ffffff; --bg-2:#ffffff; --line:#dde3e8; --line-soft:#e8edf1;
+  --ink:#1b242b; --ink-2:#5d6b75; --ink-3:#93a0a9;
+  --focus:#e08a1e; --focus-ink:#fff; --focus-glow:rgba(224,138,30,.16); --focus-edge:rgba(224,138,30,.5);
+}
+
+*{box-sizing:border-box;margin:0;padding:0}
+html,body{height:100%}
+body{
+  background:var(--bg-0); color:var(--ink);
+  font-family:var(--font-ui);
+  -webkit-font-smoothing:antialiased; text-rendering:optimizeLegibility;
+  display:flex; flex-direction:column; height:100vh; overflow:hidden;
+  padding:18px; gap:14px;
+}
+.tnum{font-variant-numeric:tabular-nums lining-nums}
+
+/* ===== clock / status bar ===== */
+.bar{
+  display:grid; grid-template-columns:1fr auto 1fr; align-items:center;
+  background:var(--bg-1); border:1px solid var(--line); border-radius:16px;
+  padding:14px 22px;
+}
+.brand{display:flex; align-items:center; gap:12px}
+.brand .mark{
+  font-family:var(--font-display); font-weight:var(--display-weight);
+  font-size:26px; letter-spacing:.16em; text-transform:uppercase; color:var(--ink);
+}
+.brand .mark b{color:var(--focus)}
+.brand .tag{font-size:12px; color:var(--ink-3); letter-spacing:.04em}
+.clock{display:flex; flex-direction:column; align-items:center; line-height:1}
+.clock .time{
+  font-family:var(--font-display); font-weight:var(--display-weight);
+  font-size:54px; letter-spacing:var(--display-tracking); color:var(--ink);
+}
+.clock .date{
+  font-family:var(--font-data); font-size:13px; color:var(--ink-2);
+  letter-spacing:.06em; text-transform:lowercase; margin-top:6px;
+}
+.meta{display:flex; align-items:center; justify-content:flex-end; gap:22px}
+.meta .wx{display:flex; align-items:baseline; gap:8px}
+.meta .wx .t{font-family:var(--font-display); font-size:30px; font-weight:var(--display-weight)}
+.meta .wx .d{font-size:13px; color:var(--ink-2)}
+.status{display:flex; align-items:center; gap:8px; font-size:13px; color:var(--ink-2)}
+.status .dot{width:9px;height:9px;border-radius:50%;background:var(--ok);box-shadow:0 0 10px var(--ok)}
+
+/* ===== stage ===== */
+.stage{flex:1; display:flex; gap:14px; min-height:0}
+.region{
+  background:var(--bg-1); border:1px solid var(--line); border-radius:18px;
+  display:flex; flex-direction:column; min-height:0; overflow:hidden;
+  transition:transform .35s cubic-bezier(.2,.7,.2,1), box-shadow .35s, opacity .35s, filter .35s;
+}
+.region__head{
+  display:flex; align-items:center; gap:12px;
+  padding:16px 20px; border-bottom:1px solid var(--line-soft);
+}
+.region__title{
+  font-family:var(--font-display); font-weight:var(--display-weight);
+  font-size:19px; letter-spacing:.02em;
+}
+.region__focuslabel{
+  margin-left:auto; display:none; align-items:center; gap:7px;
+  font-size:11px; letter-spacing:.14em; text-transform:uppercase; color:var(--focus);
+}
+.region__focuslabel .lamp{width:8px;height:8px;border-radius:50%;background:var(--focus);box-shadow:0 0 12px var(--focus)}
+.region__body{flex:1; padding:18px 20px; min-height:0; overflow:hidden}
+
+/* focused = lit */
+.region--focused{
+  background:
+    linear-gradient(180deg, color-mix(in srgb, var(--focus) 7%, transparent), transparent 38%),
+    var(--bg-2);
+  border-color:var(--focus-edge);
+  box-shadow:0 0 0 1px var(--focus-edge), 0 18px 60px -12px var(--focus-glow), 0 0 90px -30px var(--focus-glow);
+  transform:translateY(-2px);
+}
+.region--focused .region__focuslabel{display:flex}
+/* unfocused = quietly dimmed */
+.region--dim{opacity:.62; filter:saturate(.65) brightness(.86)}
+.region--cal{flex:1.35}
+.region--photo{flex:1}
+
+/* calendar content */
+.daycols{display:grid; grid-template-columns:repeat(7,1fr); gap:8px; height:100%}
+.daycol{display:flex;flex-direction:column;gap:6px;min-height:0}
+.daycol .dh{display:flex;flex-direction:column;align-items:center;gap:2px;padding-bottom:6px;border-bottom:1px solid var(--line-soft)}
+.daycol .dh .dn{font-family:var(--font-data);font-size:11px;color:var(--ink-3);text-transform:uppercase;letter-spacing:.08em}
+.daycol .dh .dd{font-family:var(--font-display);font-weight:var(--display-weight);font-size:20px}
+.daycol.today .dh .dd{color:var(--focus)}
+.ev{
+  border-radius:9px; padding:8px 9px; font-size:12px; line-height:1.25;
+  background:var(--bg-1); border:1px solid var(--line);
+}
+.region--focused .ev{background:color-mix(in srgb, var(--bg-1) 70%, transparent)}
+.ev .et{font-family:var(--font-data); font-size:10.5px; color:var(--ink-2); letter-spacing:.02em}
+.ev .en{color:var(--ink); margin-top:2px; font-weight:500;
+  overflow:hidden; text-overflow:ellipsis; white-space:nowrap}
+.ev--accent{border-left:3px solid var(--focus)}
+.ev--blue{border-left:3px solid #5aa2e6}
+.ev--green{border-left:3px solid var(--ok)}
+
+/* photos content */
+.photo{
+  height:100%; border-radius:12px; position:relative; overflow:hidden;
+  background:
+    radial-gradient(120% 90% at 70% 20%, #2a3b46, transparent 60%),
+    linear-gradient(160deg,#22303a,#16202730);
+  display:flex; align-items:flex-end;
+}
+.photo::before{content:"";position:absolute;inset:0;
+  background:repeating-linear-gradient(135deg, rgba(255,255,255,.018) 0 12px, transparent 12px 24px)}
+.photo .cap{position:relative; padding:16px 18px}
+.photo .cap .c1{font-family:var(--font-display); font-weight:var(--display-weight); font-size:22px}
+.photo .cap .c2{font-family:var(--font-data); font-size:12px; color:var(--ink-2); margin-top:4px; letter-spacing:.04em}
+
+/* ===== soft control rail (touch twin of the 7 buttons) ===== */
+.rail{
+  display:flex; align-items:stretch; gap:10px;
+  background:var(--bg-1); border:1px solid var(--line); border-radius:16px; padding:10px;
+}
+.key{
+  flex:1; min-height:60px; border-radius:12px;
+  background:var(--bg-2); border:1px solid var(--line);
+  display:flex; flex-direction:column; align-items:center; justify-content:center; gap:5px;
+  color:var(--ink); cursor:pointer;
+  box-shadow:0 2px 0 var(--line), inset 0 1px 0 rgba(255,255,255,.03);
+}
+.key .ic{font-size:22px; line-height:1}
+.key .lb{font-size:11px; letter-spacing:.04em; color:var(--ink-2)}
+.key--primary{background:var(--focus); border-color:var(--focus); box-shadow:0 2px 0 #00000033, 0 0 26px -6px var(--focus-glow)}
+.key--primary .ic,.key--primary .lb{color:var(--focus-ink)}
+.key--sep{flex:0 0 1px; background:var(--line); margin:6px 2px; min-height:auto; box-shadow:none; border:0}
+.key--narrow{flex:0 0 78px}
+</style>
+</head>
+<body data-type="instrument" data-color="backlit">
+  <header class="bar">
+    <div class="brand">
+      <span class="mark">CAL<b>·</b>VIN</span>
+      <span class="tag">vardagsrummet</span>
+    </div>
+    <div class="clock">
+      <span class="time tnum">14:32</span>
+      <span class="date">lördag 27 juni</span>
+    </div>
+    <div class="meta">
+      <div class="wx"><span class="t tnum">21°</span><span class="d">klart · Öland</span></div>
+      <div class="status"><span class="dot"></span><span>uppkopplad</span></div>
+    </div>
+  </header>
+
+  <main class="stage">
+    <section class="region region--cal region--focused">
+      <div class="region__head">
+        <span class="region__title">Kalender</span>
+        <span class="region__focuslabel"><span class="lamp"></span>i fokus</span>
+      </div>
+      <div class="region__body">
+        <div class="daycols">
+          <div class="daycol"><div class="dh"><span class="dn">mån</span><span class="dd tnum">22</span></div>
+            <div class="ev ev--blue"><div class="et tnum">08:30</div><div class="en">Förskola</div></div></div>
+          <div class="daycol"><div class="dh"><span class="dn">tis</span><span class="dd tnum">23</span></div>
+            <div class="ev ev--green"><div class="et tnum">10:00</div><div class="en">Tandläkare</div></div></div>
+          <div class="daycol"><div class="dh"><span class="dn">ons</span><span class="dd tnum">24</span></div></div>
+          <div class="daycol"><div class="dh"><span class="dn">tor</span><span class="dd tnum">25</span></div>
+            <div class="ev ev--blue"><div class="et tnum">17:15</div><div class="en">Möte med Åsa</div></div></div>
+          <div class="daycol"><div class="dh"><span class="dn">fre</span><span class="dd tnum">26</span></div></div>
+          <div class="daycol today"><div class="dh"><span class="dn">lör</span><span class="dd tnum">27</span></div>
+            <div class="ev ev--accent"><div class="et tnum">13:00</div><div class="en">Lunch på Æblegård</div></div>
+            <div class="ev ev--accent"><div class="et tnum">19:30</div><div class="en">Middag hos Søren</div></div></div>
+          <div class="daycol"><div class="dh"><span class="dn">sön</span><span class="dd tnum">28</span></div>
+            <div class="ev ev--green"><div class="et tnum">11:00</div><div class="en">Bad i sjön</div></div></div>
+        </div>
+      </div>
+    </section>
+
+    <section class="region region--photo region--dim">
+      <div class="region__head">
+        <span class="region__title">Foton</span>
+      </div>
+      <div class="region__body">
+        <div class="photo">
+          <div class="cap">
+            <div class="c1">Sommar på Öland</div>
+            <div class="c2">augusti 2023 · 4 av 312</div>
+          </div>
+        </div>
+      </div>
+    </section>
+  </main>
+
+  <nav class="rail">
+    <div class="key"><span class="ic">◀</span><span class="lb">Föregående</span></div>
+    <div class="key"><span class="ic">▶</span><span class="lb">Nästa</span></div>
+    <div class="key key--primary"><span class="ic">⤢</span><span class="lb">Öppna</span></div>
+    <div class="key"><span class="ic">↻</span><span class="lb">Uppdatera</span></div>
+    <div class="key--sep"></div>
+    <div class="key"><span class="ic">⊞</span><span class="lb">Skärmar</span></div>
+    <div class="key key--narrow"><span class="ic">⚙</span><span class="lb">Inställn.</span></div>
+  </nav>
+</body>
+</html>

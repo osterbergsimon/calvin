@@ -1,0 +1,146 @@
+<!doctype html><html lang="en"><head><meta charset="utf-8">
+<link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Sans:wght@400;500;600;700&family=IBM+Plex+Sans+Condensed:wght@600;700&family=IBM+Plex+Mono:wght@400;500;600&display=swap" rel="stylesheet">
+<style>
+:root{
+  --bg-0:#0e1316;--bg-1:#151c21;--bg-2:#1d262d;--line:#27313a;--line-soft:#1e272e;
+  --ink:#eaf0f3;--ink-2:#9aa7b0;--ink-3:#62707a;
+  --focus:#f3b052;--focus-ink:#1a130a;--focus-glow:rgba(243,176,82,.20);--focus-edge:rgba(243,176,82,.55);
+  --ok:#5bd0a0;
+  --font-display:"IBM Plex Sans Condensed",sans-serif;--font-ui:"IBM Plex Sans",sans-serif;--font-data:"IBM Plex Mono",monospace;
+}
+*{margin:0;box-sizing:border-box}
+body{background:var(--bg-0);color:var(--ink);font-family:var(--font-ui);-webkit-font-smoothing:antialiased;
+  height:100vh;display:flex;flex-direction:column;gap:14px;padding:18px;overflow:hidden}
+.tnum{font-variant-numeric:tabular-nums lining-nums}
+
+/* top bar */
+.bar{display:flex;align-items:center;justify-content:space-between;
+  background:var(--bg-1);border:1px solid var(--line);border-radius:16px;padding:14px 22px}
+.brand{display:flex;align-items:center;gap:14px}
+.mark{font-family:var(--font-display);font-weight:700;font-size:24px;letter-spacing:.16em;text-transform:uppercase}
+.mark b{color:var(--focus)}
+.crumb{font-size:14px;color:var(--ink-3);letter-spacing:.02em;border-left:1px solid var(--line);padding-left:14px}
+.actions{display:flex;align-items:center;gap:14px}
+.save{display:flex;align-items:center;gap:8px;font-size:13px;color:var(--ink-2);
+  border:1px solid var(--line);border-radius:999px;padding:8px 14px}
+.save .dot{width:8px;height:8px;border-radius:50%;background:var(--ok);box-shadow:0 0 9px var(--ok)}
+.done{font-family:var(--font-ui);font-weight:600;font-size:14px;color:var(--focus-ink);background:var(--focus);
+  border:0;border-radius:11px;padding:11px 20px;cursor:pointer}
+
+/* search */
+.search{display:flex;align-items:center;gap:12px;background:var(--bg-1);border:1px solid var(--line);
+  border-radius:14px;padding:0 18px;height:58px}
+.search .mg{font-size:19px;color:var(--ink-3)}
+.search input{flex:1;background:transparent;border:0;outline:0;color:var(--ink);font-family:var(--font-ui);font-size:16px}
+.search input::placeholder{color:var(--ink-3)}
+.search .kbd{font-family:var(--font-data);font-size:12px;color:var(--ink-3);border:1px solid var(--line);border-radius:6px;padding:3px 8px}
+
+/* layout */
+.layout{flex:1;display:grid;grid-template-columns:252px 1fr;gap:14px;min-height:0}
+.rail{display:flex;flex-direction:column;gap:8px;overflow:auto}
+.cat{position:relative;display:flex;flex-direction:column;gap:3px;text-align:left;
+  background:transparent;border:1px solid transparent;border-radius:13px;padding:13px 16px;cursor:pointer;color:var(--ink-2)}
+.cat .ct{font-size:16px;font-weight:500;color:var(--ink)}
+.cat .cs{font-size:12.5px;color:var(--ink-3)}
+.cat:hover{background:var(--bg-1)}
+.cat.active{background:linear-gradient(100deg,color-mix(in srgb,var(--focus) 8%,transparent),transparent 60%),var(--bg-2);
+  border-color:var(--focus-edge);box-shadow:0 0 0 1px var(--focus-edge),0 14px 40px -16px var(--focus-glow)}
+.cat.active::before{content:"";position:absolute;left:0;top:14px;bottom:14px;width:3px;border-radius:3px;
+  background:var(--focus);box-shadow:0 0 12px var(--focus)}
+.cat.active .cs{color:var(--focus)}
+
+/* content */
+.content{overflow:auto;padding-right:4px;display:flex;flex-direction:column;gap:10px}
+.eyebrow{font-family:var(--font-data);font-size:12px;letter-spacing:.18em;text-transform:uppercase;color:var(--ink-3);
+  margin:14px 4px 4px}
+.eyebrow:first-child{margin-top:2px}
+.panel{background:var(--bg-1);border:1px solid var(--line);border-radius:16px;overflow:hidden}
+.row{display:flex;align-items:center;justify-content:space-between;gap:24px;padding:16px 22px;min-height:72px;cursor:pointer}
+.row+.row{border-top:1px solid var(--line-soft)}
+.row:hover{background:color-mix(in srgb,var(--bg-2) 50%,transparent)}
+.row .info{min-width:0}
+.row .lb{font-size:16px;font-weight:500}
+.row .ds{font-size:13px;color:var(--ink-2);margin-top:3px;line-height:1.4}
+
+/* segmented control */
+.seg{display:inline-flex;background:var(--bg-0);border:1px solid var(--line);border-radius:11px;padding:4px;flex-shrink:0}
+.seg button{font-family:var(--font-ui);font-size:14px;font-weight:500;color:var(--ink-2);background:transparent;border:0;
+  border-radius:8px;padding:10px 18px;cursor:pointer;display:flex;align-items:center;gap:7px}
+.seg button.on{background:var(--focus);color:var(--focus-ink)}
+
+/* toggle */
+.tog{width:56px;height:32px;border-radius:999px;background:var(--line);position:relative;flex-shrink:0;cursor:pointer;transition:background .2s}
+.tog::after{content:"";position:absolute;top:3px;left:3px;width:26px;height:26px;border-radius:50%;background:#cdd6dc;transition:transform .2s}
+.tog.on{background:var(--focus)}
+.tog.on::after{transform:translateX(24px);background:#fff}
+
+/* select pill */
+.pill{display:inline-flex;align-items:center;gap:12px;height:48px;padding:0 16px;background:var(--bg-2);
+  border:1px solid var(--line);border-radius:11px;font-size:15px;color:var(--ink);cursor:pointer;flex-shrink:0}
+.pill .cv{color:var(--ink-3);font-size:12px}
+.pill .swatch{width:16px;height:16px;border-radius:5px;background:var(--focus);box-shadow:0 0 10px -2px var(--focus)}
+</style></head>
+<body>
+  <header class="bar">
+    <div class="brand"><span class="mark">CAL<b>·</b>VIN</span><span class="crumb">Settings</span></div>
+    <div class="actions">
+      <span class="save"><span class="dot"></span>All changes saved</span>
+      <button class="done">Done</button>
+    </div>
+  </header>
+
+  <div class="search">
+    <span class="mg">⌕</span>
+    <input placeholder="Find a setting — orientation, theme, calendar, reboot…">
+    <span class="kbd">/</span>
+  </div>
+
+  <div class="layout">
+    <nav class="rail">
+      <button class="cat active"><span class="ct">Display</span><span class="cs">Layout · appearance · regions</span></button>
+      <button class="cat"><span class="ct">Clock bar</span><span class="cs">Time · weather · status tiles</span></button>
+      <button class="cat"><span class="ct">Content</span><span class="cs">Calendars · photos · services</span></button>
+      <button class="cat"><span class="ct">Plugins</span><span class="cs">Install · manage · themes</span></button>
+      <button class="cat"><span class="ct">Device</span><span class="cs">Power · keyboard · hardware</span></button>
+      <button class="cat"><span class="ct">Upkeep</span><span class="cs">Updates · diagnostics</span></button>
+    </nav>
+
+    <div class="content">
+      <div class="eyebrow">Layout</div>
+      <div class="panel">
+        <div class="row">
+          <div class="info"><div class="lb">Orientation</div><div class="ds">How panels arrange on the screen.</div></div>
+          <div class="seg"><button class="on">Landscape</button><button>Portrait</button></div>
+        </div>
+        <div class="row">
+          <div class="info"><div class="lb">Split the main area</div><div class="ds">Show a second region beside the calendar.</div></div>
+          <div class="tog on"></div>
+        </div>
+        <div class="row">
+          <div class="info"><div class="lb">Week starts on</div><div class="ds">First column of the calendar grid.</div></div>
+          <div class="seg"><button class="on">Mon</button><button>Sun</button></div>
+        </div>
+      </div>
+
+      <div class="eyebrow">Appearance</div>
+      <div class="panel">
+        <div class="row">
+          <div class="info"><div class="lb">Theme</div><div class="ds">Colors and surfaces across the whole display.</div></div>
+          <div class="pill"><span class="swatch"></span>Backlit<span class="cv">▾</span></div>
+        </div>
+        <div class="row">
+          <div class="info"><div class="lb">Typeface</div><div class="ds">The font set used for the clock, headings, and data.</div></div>
+          <div class="pill">Instrument<span class="cv">▾</span></div>
+        </div>
+        <div class="row">
+          <div class="info"><div class="lb">Hide controls in kiosk mode</div><div class="ds">Panel controls fade when no one is interacting.</div></div>
+          <div class="tog on"></div>
+        </div>
+        <div class="row">
+          <div class="info"><div class="lb">Show seconds on the clock</div><div class="ds">Adds a seconds readout to the time.</div></div>
+          <div class="tog"></div>
+        </div>
+      </div>
+    </div>
+  </div>
+</body></html>
