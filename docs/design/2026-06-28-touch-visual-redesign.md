@@ -181,7 +181,7 @@ Three spec → plan → build cycles. **A** builds the vocabulary **B** and **C*
 
 **Risks / open questions**
 - **Theme contrast guardrail.** Themeable color means a theme could make `--focus` illegible. Consider a minimum-contrast check or curated built-in themes only.
-- **Font licensing/self-host.** All chosen faces are OFL — confirm and vendor the specific weights as woff2; keep total payload modest for the Pi.
+- **Font licensing/self-host.** *Resolved:* all chosen faces are SIL OFL-1.1, which is GPLv3-compatible (OFL covers only the font files). Vendored via `@fontsource/*` (npm, covered by the existing `license-checker` workflow); OFL texts ship in `frontend/src/assets/fonts/LICENSES/`; recorded in `LICENSE_COMPATIBILITY.md`. Keep the woff2 payload modest for the Pi (latin + latin-ext subsets only).
 - **Token migration.** Existing components use `--bg-primary` etc. Alias old→new tokens so rollout is incremental, not a big-bang rename.
 - **Type-theme persistence.** Decide where the selected type theme is stored (config key vs. theme-plugin selection) and how it composes with color themes in `useTheme.js`.
 - **Touch detection.** Confirm a reliable signal to show/hide touch affordances (pointer media query + kiosk config) so the 24" stays clean.
