@@ -6,6 +6,7 @@ import router from "./router";
 import "./styles/main.css";
 import "./styles/theme.css";
 import "./styles/fonts.js";
+import "./styles/base.css";
 import { initLogger, logError, logInfo } from "./utils/logger";
 import { useConfigStore } from "./stores/config";
 
