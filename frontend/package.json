@@ -15,10 +15,18 @@
     "test:e2e:ui": "playwright test --ui",
     "test:e2e:debug": "playwright test --debug",
     "lint": "eslint .",
+    "type-check": "npm run lint",
     "format": "prettier --write \"src/**/*.{js,jsx,vue,json,css}\"",
     "gen:api": "openapi-typescript ../backend/tests/contract/openapi.json -o src/api/types.ts && prettier --write src/api/types.ts"
   },
   "dependencies": {
+    "@fontsource/ibm-plex-mono": "^5.2.7",
+    "@fontsource/ibm-plex-sans": "^5.2.8",
+    "@fontsource/ibm-plex-sans-condensed": "^5.2.8",
+    "@fontsource/inter": "^5.2.8",
+    "@fontsource/jetbrains-mono": "^5.2.8",
+    "@fontsource/schibsted-grotesk": "^5.2.8",
+    "@fontsource/space-grotesk": "^5.2.10",
     "@mdi/js": "^7.4.47",
     "@tanstack/vue-query": "^5.91.0",
     "@vueuse/core": "^10.7.0",
