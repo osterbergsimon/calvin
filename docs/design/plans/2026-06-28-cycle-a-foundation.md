@@ -27,9 +27,9 @@
 
 - `frontend/src/styles/theme.css` — **modify**: add semantic color + focus + font-role tokens; alias to existing tokens.
 - `frontend/src/styles/base.css` — **create**: global `:focus-visible` + `prefers-reduced-motion` baseline.
-- `frontend/src/assets/fonts/fonts.css` — **create**: `@font-face` for the three type themes (self-hosted woff2).
-- `frontend/src/assets/fonts/<family>/*.woff2` — **create**: vendored font files.
-- `frontend/scripts/fetch-fonts.mjs` — **create**: reproducible font-vendoring script.
+- `frontend/src/styles/fonts.js` — **create**: imports the needed `@fontsource` weight CSS (self-hosted woff2).
+- `frontend/src/assets/fonts/LICENSES/*.LICENSE` — **create**: vendored OFL-1.1 license texts.
+- `frontend/package.json` — **modify**: add `@fontsource/*` font dependencies.
 - `frontend/src/styles/typeThemes.js` — **create**: type-theme registry (id → font-role stacks).
 - `frontend/src/composables/useTypeTheme.js` — **create**: apply/persist the selected type theme.
 - `frontend/src/components/ui/FocusPanel.vue` — **create**: the focus-light primitive.
@@ -127,101 +127,101 @@ Co-Authored-By: Claude Opus 4.8 (1M context) <noreply@anthropic.com>"
 
 ---
 
-## Task 2: Self-host type-theme fonts
+## Task 2: Self-host type-theme fonts (via `@fontsource`, OFL-1.1)
 
 **Files:**
-- Create: `frontend/scripts/fetch-fonts.mjs`
-- Create: `frontend/src/assets/fonts/fonts.css`
-- Create: `frontend/src/assets/fonts/**/*.woff2`
+- Modify: `frontend/package.json` (+ `package-lock.json`) — add `@fontsource/*` deps
+- Create: `frontend/src/styles/fonts.js` — imports the needed weight CSS
+- Create: `frontend/src/assets/fonts/LICENSES/*.LICENSE` — vendored OFL texts
 - Modify: `frontend/src/main.js`
 
 **Interfaces:**
-- Produces: the font families `IBM Plex Sans`, `IBM Plex Sans Condensed`, `IBM Plex Mono`, `Space Grotesk`, `Inter`, `JetBrains Mono`, `Schibsted Grotesk` available offline, so the `--font-*` tokens resolve to real faces.
+- Produces: the font families `IBM Plex Sans`, `IBM Plex Sans Condensed`, `IBM Plex Mono`, `Space Grotesk`, `Inter`, `JetBrains Mono`, `Schibsted Grotesk` available **offline** (self-hosted, no CDN), so the `--font-*` tokens resolve to real faces.
 
-Font binaries aren't unit-testable; verification is "files exist + build succeeds + a smoke check that `@font-face` rules parse".
+**License note:** all seven packages are **SIL OFL-1.1**, which is GPLv3-compatible (OFL governs only the font files). `@fontsource` ships unmodified upstream builds *with* their `LICENSE`, and as npm deps they're covered by the existing frontend `license-checker` workflow. Compliance is recorded in `LICENSE_COMPATIBILITY.md` (already updated). Fonts aren't unit-testable; verification is "build succeeds + license files vendored".
 
-- [ ] **Step 1: Write the vendoring script**
+- [ ] **Step 1: Install the `@fontsource` packages**
 
-Create `frontend/scripts/fetch-fonts.mjs`. It downloads the `latin` + `latin-ext` (Nordic) woff2 subsets via the google-webfonts-helper API into `src/assets/fonts/<family>/`.
-
-```js
-// Usage: node scripts/fetch-fonts.mjs
-// Vendors woff2 (latin + latin-ext) for the three type themes, offline-first.
-import { mkdir, writeFile } from "node:fs/promises";
-import { dirname } from "node:path";
-
-const API = "https://gwfh.mranftl.com/api/fonts"; // google-webfonts-helper
-const SUBSETS = "latin,latin-ext";
-const JOBS = [
-  { id: "ibm-plex-sans", variants: ["400", "500", "600", "700"] },
-  { id: "ibm-plex-sans-condensed", variants: ["600", "700"] },
-  { id: "ibm-plex-mono", variants: ["400", "500", "600"] },
-  { id: "space-grotesk", variants: ["400", "500", "700"] },
-  { id: "inter", variants: ["400", "500", "600", "700"] },
-  { id: "jetbrains-mono", variants: ["400", "500"] },
-  { id: "schibsted-grotesk", variants: ["400", "600", "800"] },
-];
-
-for (const job of JOBS) {
-  const meta = await (await fetch(`${API}/${job.id}?subsets=${SUBSETS}`)).json();
-  for (const v of meta.variants.filter(x => job.variants.includes(x.fontWeight) && x.fontStyle === "normal")) {
-    const buf = Buffer.from(await (await fetch(v.woff2)).arrayBuffer());
-    const path = `src/assets/fonts/${job.id}/${job.id}-${v.fontWeight}.woff2`;
-    await mkdir(dirname(path), { recursive: true });
-    await writeFile(path, buf);
-    console.log("vendored", path);
-  }
-}
-```
-
-- [ ] **Step 2: Run the script to vendor the files**
-
-Run: `cd frontend && node scripts/fetch-fonts.mjs`
-Expected: `vendored src/assets/fonts/.../*.woff2` lines; files present under `src/assets/fonts/`.
-(If the host is offline, vendor on a networked machine and copy the `src/assets/fonts/` tree in — the files are the deliverable, the script is just reproducibility.)
-
-- [ ] **Step 3: Write `@font-face` declarations**
-
-Create `frontend/src/assets/fonts/fonts.css`. One block per weight; `font-display: swap`; `unicode-range` covering Latin + Latin-ext. Example for two faces (repeat the pattern for every vendored weight):
-
-```css
-@font-face {
-  font-family: "IBM Plex Sans";
-  font-style: normal;
-  font-weight: 400;
-  font-display: swap;
-  src: url("./ibm-plex-sans/ibm-plex-sans-400.woff2") format("woff2");
-  unicode-range: U+0000-00FF, U+0100-017F, U+0180-024F, U+2000-206F, U+2070-209F, U+20A0-20BF;
-}
-@font-face {
-  font-family: "IBM Plex Sans Condensed";
-  font-style: normal;
-  font-weight: 700;
-  font-display: swap;
-  src: url("./ibm-plex-sans-condensed/ibm-plex-sans-condensed-700.woff2") format("woff2");
-  unicode-range: U+0000-00FF, U+0100-017F, U+0180-024F, U+2000-206F, U+2070-209F, U+20A0-20BF;
-}
-/* …repeat for every vendored family/weight from Step 2… */
-```
-
-- [ ] **Step 4: Import fonts in `main.js`**
-
-Add near the top of `frontend/src/main.js`, beside the existing style imports:
-
-```js
-import "./assets/fonts/fonts.css";
-```
-
-- [ ] **Step 5: Verify build**
-
-Run: `cd frontend && npm run build`
-Expected: build succeeds; `dist/assets/` contains the hashed `.woff2` files (Vite copies referenced font assets).
-
-- [ ] **Step 6: Commit**
+Run:
 
 ```bash
-git add frontend/scripts/fetch-fonts.mjs frontend/src/assets/fonts frontend/src/main.js
-git commit -m "feat(design): self-host type-theme fonts (latin + latin-ext, offline)
+cd frontend && npm install \
+  @fontsource/ibm-plex-sans @fontsource/ibm-plex-sans-condensed @fontsource/ibm-plex-mono \
+  @fontsource/space-grotesk @fontsource/inter \
+  @fontsource/jetbrains-mono @fontsource/schibsted-grotesk
+```
+
+Expected: packages added to `dependencies`; each present under `node_modules/@fontsource/` with a `LICENSE` file (`grep -il "Open Font License" node_modules/@fontsource/*/LICENSE` lists all seven).
+
+- [ ] **Step 2: Confirm licenses are OFL (compliance gate)**
+
+Run: `cd frontend && for p in ibm-plex-sans ibm-plex-sans-condensed ibm-plex-mono space-grotesk inter jetbrains-mono schibsted-grotesk; do echo -n "$p: "; node -e "console.log(require('@fontsource/'+process.argv[1]+'/package.json').license)" "$p"; done`
+Expected: every line prints `OFL-1.1`. If any prints something else, **stop** and reconsider that face before proceeding.
+
+- [ ] **Step 3: Create the font-import module**
+
+Create `frontend/src/styles/fonts.js`. Each `@fontsource/<pkg>/<weight>.css` import pulls that weight's `@font-face` rules for **all subsets including `latin-ext`** (Nordic), with the woff2 referenced so Vite bundles them:
+
+```js
+// Self-hosted type-theme fonts (all OFL-1.1). Weights match docs/design spec §4.3.
+// Instrument (default)
+import "@fontsource/ibm-plex-sans/400.css";
+import "@fontsource/ibm-plex-sans/500.css";
+import "@fontsource/ibm-plex-sans/600.css";
+import "@fontsource/ibm-plex-sans/700.css";
+import "@fontsource/ibm-plex-sans-condensed/600.css";
+import "@fontsource/ibm-plex-sans-condensed/700.css";
+import "@fontsource/ibm-plex-mono/400.css";
+import "@fontsource/ibm-plex-mono/500.css";
+import "@fontsource/ibm-plex-mono/600.css";
+// Marquee
+import "@fontsource/space-grotesk/400.css";
+import "@fontsource/space-grotesk/500.css";
+import "@fontsource/space-grotesk/700.css";
+import "@fontsource/inter/400.css";
+import "@fontsource/inter/500.css";
+import "@fontsource/inter/600.css";
+import "@fontsource/inter/700.css";
+import "@fontsource/jetbrains-mono/400.css";
+import "@fontsource/jetbrains-mono/500.css";
+// Station
+import "@fontsource/schibsted-grotesk/400.css";
+import "@fontsource/schibsted-grotesk/600.css";
+import "@fontsource/schibsted-grotesk/700.css";
+import "@fontsource/schibsted-grotesk/800.css";
+```
+
+- [ ] **Step 4: Vendor the OFL license texts into the distribution**
+
+Run:
+
+```bash
+cd frontend && mkdir -p src/assets/fonts/LICENSES && \
+for p in ibm-plex-sans ibm-plex-sans-condensed ibm-plex-mono space-grotesk inter jetbrains-mono schibsted-grotesk; do \
+  cp "node_modules/@fontsource/$p/LICENSE" "src/assets/fonts/LICENSES/$p.LICENSE"; done && \
+ls src/assets/fonts/LICENSES/
+```
+
+Expected: seven `*.LICENSE` files. (These ship with the source tree so the OFL notices travel with the fonts, satisfying OFL §; the built woff2 in `dist/` are the embedded copies.)
+
+- [ ] **Step 5: Import the font module in `main.js`**
+
+Add to `frontend/src/main.js`, after the existing global CSS imports:
+
+```js
+import "./styles/fonts.js";
+```
+
+- [ ] **Step 6: Verify build**
+
+Run: `cd frontend && npm run build`
+Expected: build succeeds; `dist/assets/` contains hashed `.woff2` files (Vite bundles the referenced font assets).
+
+- [ ] **Step 7: Commit**
+
+```bash
+git add frontend/package.json frontend/package-lock.json frontend/src/styles/fonts.js frontend/src/assets/fonts/LICENSES frontend/src/main.js LICENSE_COMPATIBILITY.md
+git commit -m "feat(design): self-host type-theme fonts via @fontsource (OFL-1.1)
 
 Co-Authored-By: Claude Opus 4.8 (1M context) <noreply@anthropic.com>"
 ```
