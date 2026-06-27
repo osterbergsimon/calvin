@@ -26,6 +26,33 @@
   /* Mode indicator */
   --indicator-bg: rgba(0, 0, 0, 0.7);
   --indicator-border: rgba(255, 255, 255, 0.3);
+
+  /* --- Redesign semantic tokens (light / "Paper") --- */
+  --bg-0: #eef1f4;
+  --bg-1: #ffffff;
+  --bg-2: #ffffff;
+  --line: #dde3e8;
+  --line-soft: #e8edf1;
+  --ink: #1b242b;
+  --ink-2: #5d6b75;
+  --ink-3: #93a0a9;
+  --focus: #e08a1e;
+  --focus-ink: #ffffff;
+  --focus-glow: rgba(224, 138, 30, 0.16);
+  --focus-edge: rgba(224, 138, 30, 0.5);
+  --ok: #2e9e6b;
+  --warn: #c8860a;
+  --err: #c0392b;
+
+  /* font roles — default = Instrument; overridden by useTypeTheme */
+  --font-display: "IBM Plex Sans Condensed", system-ui, sans-serif;
+  --font-ui: "IBM Plex Sans", system-ui, sans-serif;
+  --font-data: "IBM Plex Mono", ui-monospace, monospace;
+
+  /* aliases so existing components keep working */
+  --bg-primary: var(--bg-1);
+  --bg-secondary: var(--bg-0);
+  --accent-primary: var(--focus);
 }
 
 .dark {
@@ -55,6 +82,23 @@
   /* Mode indicator */
   --indicator-bg: rgba(255, 255, 255, 0.2);
   --indicator-border: rgba(255, 255, 255, 0.4);
+
+  /* --- Redesign semantic tokens (dark / "Backlit") --- */
+  --bg-0: #0e1316;
+  --bg-1: #151c21;
+  --bg-2: #1d262d;
+  --line: #27313a;
+  --line-soft: #1e272e;
+  --ink: #eaf0f3;
+  --ink-2: #9aa7b0;
+  --ink-3: #62707a;
+  --focus: #f3b052;
+  --focus-ink: #1a130a;
+  --focus-glow: rgba(243, 176, 82, 0.2);
+  --focus-edge: rgba(243, 176, 82, 0.55);
+  --ok: #5bd0a0;
+  --warn: #f3b052;
+  --err: #ef6b5e;
 }
 
 /* Apply theme variables globally */
