@@ -15,9 +15,9 @@ defineEmits(["dismiss"]);
 
 <style scoped>
 .dialog-scrim {
-  position: absolute;
+  position: fixed;
   inset: 0;
-  z-index: 5;
+  z-index: 999;
   background: color-mix(in srgb, var(--bg-0) 72%, transparent);
   animation: scrim-in 0.25s ease;
 }

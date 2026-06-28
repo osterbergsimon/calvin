@@ -1,4 +1,4 @@
-import { ref, readonly } from "vue";
+import { ref, readonly, onScopeDispose } from "vue";
 
 /**
  * Reactive touch-capability detection.
@@ -17,8 +17,10 @@ export function useTouchCapability() {
     };
     if (typeof mql.addEventListener === "function") {
       mql.addEventListener("change", update);
+      onScopeDispose(() => mql.removeEventListener("change", update));
     } else if (typeof mql.addListener === "function") {
       mql.addListener(update); // older Safari
+      onScopeDispose(() => mql.removeListener(update));
     }
   }
 
