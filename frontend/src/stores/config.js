@@ -65,6 +65,9 @@ export const useConfigStore = defineStore("config", () => {
   const clockBarPadding = ref(8);
   const clockBarShowWeather = ref(false);
   const clockBarShowLogo = ref(true);
+  const displayName = ref("");
+  const focusLightMode = ref("interaction");
+  const focusLightDimOthers = ref(true);
   const mealPlanCardSize = ref("medium"); // Meal plan card size: 'small' | 'medium' | 'large'
   const consoleLogEnabled = ref(true); // Enable console logging (default: true for backwards compatibility)
   const consoleLogLevel = ref("info"); // Console log level: 'error' | 'warn' | 'info' | 'debug' (default: 'info')
@@ -125,6 +128,9 @@ export const useConfigStore = defineStore("config", () => {
     clockBarPadding,
     clockBarShowWeather,
     clockBarShowLogo,
+    displayName,
+    focusLightMode,
+    focusLightDimOthers,
     mealPlanCardSize,
     consoleLogEnabled,
     consoleLogLevel,
@@ -361,6 +367,16 @@ export const useConfigStore = defineStore("config", () => {
     imageDisplayMode.value = mode;
   };
 
+  const setDisplayName = name => {
+    displayName.value = name;
+  };
+  const setFocusLightMode = mode => {
+    focusLightMode.value = mode;
+  };
+  const setFocusLightDimOthers = dim => {
+    focusLightDimOthers.value = dim;
+  };
+
   return {
     orientation,
     orientationFlipped,
@@ -419,6 +435,9 @@ export const useConfigStore = defineStore("config", () => {
     consoleLogLevel,
     configPollInterval,
     devMode,
+    displayName,
+    focusLightMode,
+    focusLightDimOthers,
     loading,
     error,
     calendarWidth,
@@ -454,6 +473,9 @@ export const useConfigStore = defineStore("config", () => {
     setThemeMode,
     setDarkModeTime,
     setImageDisplayMode,
+    setDisplayName,
+    setFocusLightMode,
+    setFocusLightDimOthers,
     fetchConfig,
     updateConfig,
   };
