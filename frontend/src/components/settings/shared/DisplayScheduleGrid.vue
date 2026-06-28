@@ -50,7 +50,7 @@ const emitChange = () => {
 </script>
 
 <style scoped>
-/* Styling lifted as-is from PowerTab (legacy tokens) — restyle in calvin-hbp. */
+/* Restyled in calvin-hbp (R2 — Device embeds) — shell token pass. */
 .schedule-days {
   display: flex;
   flex-direction: column;
@@ -58,8 +58,8 @@ const emitChange = () => {
 }
 .schedule-day {
   padding: 0.75rem;
-  background: var(--bg-secondary);
-  border: 1px solid var(--border-color);
+  background: var(--bg-2);
+  border: 1px solid var(--line);
   border-radius: 6px;
 }
 .schedule-day-header {
@@ -69,6 +69,7 @@ const emitChange = () => {
   display: flex;
   align-items: center;
   gap: 0.5rem;
+  font-family: var(--font-ui);
   font-weight: 600;
   cursor: pointer;
 }
@@ -84,13 +85,20 @@ const emitChange = () => {
 }
 .schedule-time label {
   font-size: 0.875rem;
-  color: var(--text-secondary);
+  font-family: var(--font-ui);
+  color: var(--ink-2);
 }
 .schedule-time input {
   padding: 0.5rem;
-  border: 1px solid var(--border-color);
+  border: 1px solid var(--line);
   border-radius: 4px;
-  background: var(--bg-primary);
-  color: var(--text-primary);
+  background: var(--bg-1);
+  color: var(--ink);
+  font-family: var(--font-data);
+  min-height: 44px;
+}
+.schedule-time input:focus-visible {
+  outline: 2px solid var(--focus);
+  outline-offset: 2px;
 }
 </style>
