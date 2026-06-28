@@ -497,15 +497,15 @@ onMounted(async () => {
 }
 
 .tab-banner-error {
-  background: rgba(244, 67, 54, 0.15);
-  color: var(--text-primary);
-  border: 1px solid rgba(244, 67, 54, 0.4);
+  background: color-mix(in srgb, var(--err) 15%, transparent);
+  color: var(--ink);
+  border: 1px solid color-mix(in srgb, var(--err) 40%, transparent);
 }
 
 .tab-banner-success {
-  background: rgba(76, 175, 80, 0.15);
-  color: var(--text-primary);
-  border: 1px solid rgba(76, 175, 80, 0.4);
+  background: color-mix(in srgb, var(--ok) 15%, transparent);
+  color: var(--ink);
+  border: 1px solid color-mix(in srgb, var(--ok) 40%, transparent);
 }
 
 .calendar-source-form {
@@ -513,9 +513,9 @@ onMounted(async () => {
   flex-direction: column;
   gap: 1rem;
   padding: 1rem;
-  background: var(--bg-secondary);
+  background: var(--bg-2);
   border-radius: 6px;
-  border: 1px solid var(--border-color);
+  border: 1px solid var(--line);
 }
 
 .form-group {
@@ -526,16 +526,17 @@ onMounted(async () => {
 
 .form-group label {
   font-weight: 600;
-  color: var(--text-primary);
+  color: var(--ink);
   font-size: 0.9rem;
+  font-family: var(--font-ui);
 }
 
 .form-input,
 .form-select {
   padding: 0.5rem 0.75rem;
-  background: var(--bg-primary);
-  color: var(--text-primary);
-  border: 1px solid var(--border-color);
+  background: var(--bg-1);
+  color: var(--ink);
+  border: 1px solid var(--line);
   border-radius: 4px;
   font-size: 0.9rem;
   font-family: inherit;
@@ -544,13 +545,19 @@ onMounted(async () => {
 .form-input:focus,
 .form-select:focus {
   outline: none;
-  border-color: var(--accent-primary);
-  box-shadow: 0 0 0 2px rgba(33, 150, 243, 0.2);
+  border-color: var(--focus);
+  box-shadow: 0 0 0 2px color-mix(in srgb, var(--focus) 20%, transparent);
+}
+
+.form-input:focus-visible,
+.form-select:focus-visible {
+  outline: 2px solid var(--focus);
+  outline-offset: 2px;
 }
 
 .btn-add {
   padding: 0.75rem 1.5rem;
-  background: var(--accent-primary);
+  background: var(--focus);
   color: white;
   border: none;
   border-radius: 4px;
@@ -562,7 +569,7 @@ onMounted(async () => {
 }
 
 .btn-add:hover:not(:disabled) {
-  background: #1976d2;
+  background: color-mix(in srgb, var(--focus) 80%, black);
   transform: translateY(-1px);
   box-shadow: 0 2px 4px var(--shadow);
 }
@@ -584,8 +591,8 @@ onMounted(async () => {
   flex-direction: column;
   gap: 1rem;
   padding: 1rem;
-  background: var(--bg-secondary);
-  border: 1px solid var(--border-color);
+  background: var(--bg-2);
+  border: 1px solid var(--line);
   border-radius: 6px;
 }
 
@@ -597,13 +604,13 @@ onMounted(async () => {
 
 .source-info strong {
   font-size: 1rem;
-  color: var(--text-primary);
+  color: var(--ink);
 }
 
 .source-type {
   padding: 0.25rem 0.5rem;
-  background: var(--bg-tertiary);
-  color: var(--text-secondary);
+  background: var(--bg-2);
+  color: var(--ink-2);
   border-radius: 4px;
   font-size: 0.75rem;
   text-transform: uppercase;
@@ -615,11 +622,11 @@ onMounted(async () => {
 }
 
 .running-indicator.running {
-  color: #4caf50;
+  color: var(--ok);
 }
 
 .running-indicator.stopped {
-  color: #f44336;
+  color: var(--err);
 }
 
 .source-settings {
@@ -636,13 +643,14 @@ onMounted(async () => {
 
 .source-setting label {
   font-size: 0.9rem;
-  color: var(--text-primary);
+  color: var(--ink);
+  font-family: var(--font-ui);
 }
 
 .color-input {
   width: 3rem;
   height: 2rem;
-  border: 1px solid var(--border-color);
+  border: 1px solid var(--line);
   border-radius: 4px;
   cursor: pointer;
 }
@@ -673,7 +681,7 @@ onMounted(async () => {
   left: 0;
   right: 0;
   bottom: 0;
-  background-color: var(--bg-tertiary);
+  background-color: var(--bg-2);
   transition: 0.4s;
   border-radius: 24px;
 }
@@ -691,7 +699,7 @@ onMounted(async () => {
 }
 
 .toggle-switch input:checked + .slider {
-  background-color: var(--accent-primary);
+  background-color: var(--focus);
 }
 
 .toggle-switch input:checked + .slider:before {
@@ -701,8 +709,8 @@ onMounted(async () => {
 .btn-remove {
   padding: 0.5rem 1rem;
   background: transparent;
-  color: #f44336;
-  border: 1px solid #f44336;
+  color: var(--err);
+  border: 1px solid var(--err);
   border-radius: 4px;
   font-size: 0.9rem;
   cursor: pointer;
@@ -710,7 +718,7 @@ onMounted(async () => {
 }
 
 .btn-remove:hover {
-  background: #f44336;
+  background: var(--err);
   color: white;
 }
 </style>
