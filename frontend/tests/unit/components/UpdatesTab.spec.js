@@ -129,46 +129,11 @@ describe("UpdatesTab", () => {
     expect(wrapper.text()).toContain("Pulling latest code");
   });
 
-  describe("System section", () => {
-    const mountTab = () =>
-      mount(UpdatesTab, {
-        props: { gitRepoUrl: "https://github.com/example/calvin.git", gitBranch: "main" },
-      });
-
-    it("renders Restart Backend, Restart Frontend, and Reload UI buttons", () => {
-      const wrapper = mountTab();
-      const buttons = wrapper.findAll("button");
-      const labels = buttons.map(b => b.text());
-      expect(labels).toContain("Restart Backend");
-      expect(labels).toContain("Restart Frontend");
-      expect(labels).toContain("Reload UI");
+  it("no longer renders the System restart/reload section", () => {
+    const wrapper = mount(UpdatesTab, {
+      props: { gitRepoUrl: "", gitBranch: "main" },
     });
-
-    it("opens confirm modal when Restart Backend is clicked", async () => {
-      const wrapper = mountTab();
-      const restartBtn = wrapper.findAll("button").find(b => b.text() === "Restart Backend");
-      await restartBtn.trigger("click");
-      expect(wrapper.text()).toContain("Restart the backend server");
-    });
-
-    it("calls restartBackend after confirming in the modal", async () => {
-      const wrapper = mountTab();
-      const restartBtn = wrapper.findAll("button").find(b => b.text() === "Restart Backend");
-      await restartBtn.trigger("click");
-      // The confirm button inside ConfirmModal has class btn-danger
-      const confirmBtn = wrapper.find(".btn-danger");
-      await confirmBtn.trigger("click");
-      await flushPromises();
-      expect(systemMock.restartBackend).toHaveBeenCalledOnce();
-    });
-
-    it("does not call restartBackend when cancel is clicked", async () => {
-      const wrapper = mountTab();
-      const restartBtn = wrapper.findAll("button").find(b => b.text() === "Restart Backend");
-      await restartBtn.trigger("click");
-      const cancelBtn = wrapper.find(".modal-footer .btn-secondary");
-      await cancelBtn.trigger("click");
-      expect(systemMock.restartBackend).not.toHaveBeenCalled();
-    });
+    expect(wrapper.text()).not.toContain("Restart Backend");
+    expect(wrapper.text()).not.toContain("Reload UI");
   });
 });

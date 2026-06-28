@@ -116,29 +116,6 @@
         </SettingItem>
       </div>
     </CollapsibleSection>
-
-    <CollapsibleSection title="System" icon="🛠️" :expanded="false">
-      <SettingItem label="Restart Backend" help="Restart the backend API server">
-        <button class="btn-secondary" @click="openConfirm('backend')">Restart Backend</button>
-      </SettingItem>
-
-      <SettingItem label="Restart Frontend" help="Restart the frontend service">
-        <button class="btn-secondary" @click="openConfirm('frontend')">Restart Frontend</button>
-      </SettingItem>
-
-      <SettingItem label="Reload UI" help="Reload the browser page">
-        <button class="btn-secondary" @click="reloadUI">Reload UI</button>
-      </SettingItem>
-    </CollapsibleSection>
-
-    <ConfirmModal
-      :show="showConfirm"
-      :title="confirmTitle"
-      :message="confirmMessage"
-      :confirm-text="confirmButtonText"
-      @confirm="handleConfirm"
-      @cancel="showConfirm = false"
-    />
   </div>
 </template>
 
@@ -148,7 +125,6 @@ import { useSystem } from "@/composables";
 import { getGitBranches } from "@/services/configApi";
 import CollapsibleSection from "../../shared/CollapsibleSection.vue";
 import SettingItem from "../../shared/SettingItem.vue";
-import ConfirmModal from "../../shared/ConfirmModal.vue";
 
 const props = defineProps({
   gitRepoUrl: {
@@ -176,8 +152,6 @@ const {
   triggerUpdate,
   getUpdateStatus,
   getBackendHealth,
-  restartBackend,
-  restartFrontend,
 } = useSystem();
 
 const availableBranches = ref([props.gitBranch || "main"]);
@@ -245,42 +219,6 @@ const handleGitBranchChange = event => {
 
 const handleTriggerUpdate = async () => {
   await triggerUpdate();
-};
-
-// System section — confirm modal state
-const showConfirm = ref(false);
-const pendingAction = ref(null);
-const confirmTitle = ref("");
-const confirmMessage = ref("");
-const confirmButtonText = ref("Confirm");
-
-const openConfirm = target => {
-  if (target === "backend") {
-    confirmTitle.value = "Restart Backend";
-    confirmMessage.value =
-      "Restart the backend server? The display will briefly disconnect.";
-    confirmButtonText.value = "Restart";
-    pendingAction.value = restartBackend;
-  } else if (target === "frontend") {
-    confirmTitle.value = "Restart Frontend";
-    confirmMessage.value =
-      "Restart the frontend service? The page will reload once it comes back.";
-    confirmButtonText.value = "Restart";
-    pendingAction.value = restartFrontend;
-  }
-  showConfirm.value = true;
-};
-
-const handleConfirm = async () => {
-  showConfirm.value = false;
-  if (pendingAction.value) {
-    await pendingAction.value();
-    pendingAction.value = null;
-  }
-};
-
-const reloadUI = () => {
-  window.location.reload();
 };
 
 const refreshSystemStatus = async () => {
