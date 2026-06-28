@@ -4,6 +4,7 @@
     <div v-if="isFullscreen" class="fullscreen-close-overlay">
       <button
         class="btn-close-fullscreen"
+        data-action="exit-fullscreen"
         title="Close Fullscreen (ESC)"
         @click.stop="handleCloseFullscreen"
       >
@@ -421,9 +422,9 @@ onUnmounted(() => {
 }
 
 .btn-close-fullscreen {
-  background: rgba(0, 0, 0, 0.7);
-  color: #fff;
-  border: 2px solid rgba(255, 255, 255, 0.5);
+  background: var(--bg-2);
+  color: var(--ink);
+  border: 2px solid var(--line);
   border-radius: 50%;
   width: 48px;
   height: 48px;
@@ -434,13 +435,18 @@ onUnmounted(() => {
   justify-content: center;
   transition: all 0.2s;
   pointer-events: auto;
-  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.3);
+  box-shadow: 0 4px 12px var(--shadow);
 }
 
 .btn-close-fullscreen:hover {
-  background: rgba(0, 0, 0, 0.9);
-  border-color: rgba(255, 255, 255, 0.8);
+  background: var(--bg-1);
+  border-color: var(--ink-2);
   transform: scale(1.1);
+}
+
+.btn-close-fullscreen:focus-visible {
+  outline: 2px solid var(--focus);
+  outline-offset: 2px;
 }
 
 /* API-based Service Styles */
