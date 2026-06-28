@@ -15,46 +15,6 @@
 
     <template v-if="configStore.shouldShowUI">
       <button
-        v-if="modeStore.currentMode !== modeStore.MODES.WEB_SERVICES"
-        class="bar-btn"
-        :title="compact ? 'Web Services' : undefined"
-        aria-label="Show Web Services"
-        @click="showWebServices"
-      >
-        <span class="bar-btn-icon">🌐</span>
-        <span v-if="!compact" class="bar-btn-label">Web Services</span>
-      </button>
-      <button
-        v-else
-        class="bar-btn"
-        :title="compact ? 'Photos' : undefined"
-        aria-label="Show Photos"
-        @click="showPhotos"
-      >
-        <span class="bar-btn-icon">🖼️</span>
-        <span v-if="!compact" class="bar-btn-label">Photos</span>
-      </button>
-
-      <button
-        class="bar-btn"
-        :title="compact ? sideViewPositionTitle : undefined"
-        :aria-label="sideViewPositionTitle"
-        @click="toggleSideViewPosition"
-      >
-        <span class="bar-btn-icon">{{ sideViewPositionIcon }}</span>
-      </button>
-
-      <button
-        class="bar-btn"
-        :title="compact ? orientationTitle : undefined"
-        :aria-label="orientationTitle"
-        @click="toggleOrientation"
-      >
-        <span class="bar-btn-icon">{{ orientationIcon }}</span>
-        <span v-if="!compact" class="bar-btn-label">{{ orientationLabel }}</span>
-      </button>
-
-      <button
         class="bar-btn"
         :title="compact ? 'Settings' : undefined"
         aria-label="Open settings"
@@ -64,14 +24,7 @@
         <span v-if="!compact" class="bar-btn-label">Settings</span>
       </button>
 
-      <button
-        class="bar-btn"
-        :title="compact ? 'Hide UI' : undefined"
-        aria-label="Hide UI"
-        @click="configStore.toggleUI"
-      >
-        <span class="bar-btn-icon">⊖</span>
-      </button>
+      <AdminOverflow />
     </template>
   </div>
 </template>
@@ -82,8 +35,8 @@ import axios from "axios";
 import { useRouter } from "vue-router";
 import { useConfigStore } from "../stores/config";
 import { useModeStore } from "../stores/mode";
-import { logError } from "../utils/logger";
 import ConnectionIndicator from "./ConnectionIndicator.vue";
+import AdminOverflow from "./dashboard/AdminOverflow.vue";
 
 defineProps({
   compact: {
@@ -122,57 +75,6 @@ const checkHealth = async () => {
   }
 };
 
-const orientationIcon = computed(() => (configStore.orientation === "landscape" ? "📱" : "🖥️"));
-const orientationLabel = computed(() =>
-  configStore.orientation === "landscape" ? "Portrait" : "Landscape"
-);
-const orientationTitle = computed(
-  () => `Switch to ${configStore.orientation === "landscape" ? "portrait" : "landscape"} view`
-);
-
-const sideViewPositionIcon = computed(() => {
-  if (configStore.orientation === "landscape") {
-    return configStore.sideViewPosition === "right" ? "←" : "→";
-  }
-  return configStore.sideViewPosition === "bottom" ? "↑" : "↓";
-});
-
-const sideViewPositionTitle = computed(() => {
-  if (configStore.orientation === "landscape") {
-    return configStore.sideViewPosition === "right"
-      ? "Move Side View to Left"
-      : "Move Side View to Right";
-  }
-  return configStore.sideViewPosition === "bottom"
-    ? "Move Side View to Top"
-    : "Move Side View to Bottom";
-});
-
-const toggleOrientation = () => {
-  const next = configStore.orientation === "landscape" ? "portrait" : "landscape";
-  configStore.setOrientation(next);
-  configStore.setSideViewPosition(next === "landscape" ? "right" : "bottom");
-};
-
-const toggleSideViewPosition = async () => {
-  configStore.toggleSideViewPosition();
-  try {
-    await configStore.updateConfig({ sideViewPosition: configStore.sideViewPosition });
-  } catch (err) {
-    logError("[BarActionCluster]", "Failed to save side view position:", err);
-  }
-};
-
-const showWebServices = () => {
-  configStore.setLastSideViewMode("web_services");
-  modeStore.setMode(modeStore.MODES.WEB_SERVICES);
-};
-
-const showPhotos = () => {
-  configStore.setLastSideViewMode("photos");
-  modeStore.setMode(modeStore.MODES.PHOTOS);
-};
-
 const goToSettings = () => {
   modeStore.setMode(modeStore.MODES.SETTINGS);
   router.push("/settings");
@@ -209,7 +111,7 @@ onUnmounted(() => {
   align-items: center;
   gap: 0.4rem;
   font-size: 0.85rem;
-  color: var(--text-secondary);
+  color: var(--ink-2);
 }
 
 .status-indicator.compact {
@@ -225,16 +127,16 @@ onUnmounted(() => {
 }
 
 .status-dot.checking {
-  background-color: #ff9800;
+  background-color: var(--warn);
   animation: bar-pulse 1.5s ease-in-out infinite;
 }
 
 .status-dot.healthy {
-  background-color: #4caf50;
+  background-color: var(--ok);
 }
 
 .status-dot.error {
-  background-color: #f44336;
+  background-color: var(--err);
 }
 
 @keyframes bar-pulse {
@@ -251,9 +153,9 @@ onUnmounted(() => {
   display: inline-flex;
   align-items: center;
   gap: 0.4rem;
-  background: var(--bg-tertiary);
-  color: var(--text-primary);
-  border: 1px solid var(--border-color);
+  background: var(--bg-2);
+  color: var(--ink);
+  border: 1px solid var(--line);
   border-radius: 4px;
   padding: 0.35rem 0.6rem;
   font-size: 0.85rem;
@@ -271,8 +173,8 @@ onUnmounted(() => {
 }
 
 .bar-btn:hover {
-  background: var(--bg-secondary);
-  border-color: var(--text-secondary);
+  background: var(--bg-2);
+  border-color: var(--ink-2);
 }
 
 .bar-btn-icon {
