@@ -51,6 +51,7 @@
               <div
                 v-if="isRegionElement(elementType)"
                 class="dashboard-region-section"
+                :class="{ 'dashboard-region-section--lit': isLitSection(elementType) }"
                 :style="getRegionStyle(elementType)"
               >
                 <DashboardRegion
@@ -238,6 +239,19 @@ const onFocusRegion = regionId => {
   focusRegion(regionId);
 };
 
+// A region (section) is "lit" when the focus-light is active and it contains
+// the active leaf. The lit section is raised above its siblings so its glow
+// isn't clipped by a later-painted neighbour.
+const regionContainsLeaf = (region, leafId) => {
+  if (!region || !leafId) return false;
+  if (!region.split) return region.id === leafId;
+  return region.split.regions.some(sub => regionContainsLeaf(sub, leafId));
+};
+const isLitSection = elementType => {
+  if (!lightActive.value) return false;
+  return regionContainsLeaf(getRegionForElement(elementType), activeScreen.value?.activeRegionId);
+};
+
 const startConfigPolling = () => {
   // Clear existing interval if any
   if (configPollInterval) {
@@ -375,5 +389,12 @@ onUnmounted(() => {
   display: flex;
   flex-direction: column;
   box-sizing: border-box;
+  position: relative;
+  z-index: 0;
+}
+/* Raise the focused region so its glow paints over the neighbouring panels
+   instead of being clipped by a later-painted sibling. */
+.dashboard-region-section--lit {
+  z-index: 3;
 }
 </style>

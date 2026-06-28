@@ -36,14 +36,14 @@ const stateClass = computed(() => {
     linear-gradient(180deg, color-mix(in srgb, var(--focus) 16%, transparent), transparent 44%),
     var(--bg-2);
   border-color: var(--focus);
-  /* Soft neon: a crisp saturated edge, a tight bright halo, then layered
-     colored blooms that diffuse outward. */
+  /* Soft neon, even on all sides: a crisp saturated edge, a tight bright halo,
+     then centered colored blooms (no directional drop), so the light is equal
+     all the way around the region. */
   box-shadow:
     0 0 0 2px var(--focus),
-    0 0 10px -1px var(--focus),
-    0 0 30px -2px var(--focus-edge),
-    0 0 90px -6px var(--focus-glow),
-    0 22px 84px -12px var(--focus-glow);
+    0 0 12px 0 var(--focus),
+    0 0 38px 2px var(--focus-edge),
+    0 0 104px 4px var(--focus-glow);
   transform: translateY(-2px);
 }
 .focus-panel.is-dim {
