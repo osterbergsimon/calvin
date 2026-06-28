@@ -13,7 +13,10 @@
 
     <!-- Viewer Content -->
     <div class="viewer-content">
-      <DashboardPanel v-if="emptyState" title="Web Services" :header-visible="!isFullscreen">
+      <DashboardPanel v-if="emptyState" title="Web Services" :header-visible="!isFullscreen" :focused="focused" :dim="dim">
+        <template #actions>
+          <RegionControls v-if="focused" region-kind="service" />
+        </template>
         <div :class="emptyState.className">
           <div v-if="emptyState.loading" class="spinner" />
           <p>{{ emptyState.message }}</p>
@@ -30,6 +33,7 @@
           :header-visible="!isFullscreen"
         >
           <template #actions>
+            <RegionControls v-if="focused" region-kind="service" />
             <button
               v-if="canNavigateServices && services.length > 1"
               class="dashboard-panel__icon-button"
@@ -75,8 +79,17 @@ import { useWebServicesStore } from "../stores/webServices";
 import { useModeStore } from "../stores/mode";
 import DashboardPanel from "./DashboardPanel.vue";
 import ServiceViewer from "./service/ServiceViewer.vue";
+import RegionControls from "./dashboard/RegionControls.vue";
 
 const props = defineProps({
+  focused: {
+    type: Boolean,
+    default: false,
+  },
+  dim: {
+    type: Boolean,
+    default: false,
+  },
   isFullscreen: {
     type: Boolean,
     default: false,

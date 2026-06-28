@@ -1,6 +1,6 @@
 <template>
   <div ref="calendarView" class="calendar-view" tabindex="0" @keydown="handleKeydown">
-    <DashboardPanel title="Calendar" :subtitle="calendarSubtitle">
+    <DashboardPanel title="Calendar" :subtitle="calendarSubtitle" :focused="focused" :dim="dim">
       <template #actions>
         <button
           class="dashboard-panel__icon-button"
@@ -18,6 +18,7 @@
         >
           ›
         </button>
+        <RegionControls v-if="focused" region-kind="calendar" />
       </template>
 
       <div class="calendar-content">
@@ -124,8 +125,17 @@ import EventDetailPanel from "./EventDetailPanel.vue";
 import DialogScrim from "./ui/DialogScrim.vue";
 import CalendarEventItem from "./CalendarEventItem.vue";
 import DashboardPanel from "./DashboardPanel.vue";
+import RegionControls from "./dashboard/RegionControls.vue";
 
 const props = defineProps({
+  focused: {
+    type: Boolean,
+    default: false,
+  },
+  dim: {
+    type: Boolean,
+    default: false,
+  },
   sourceIds: {
     type: Array,
     default: () => [],
