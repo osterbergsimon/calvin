@@ -11,7 +11,7 @@
     >
       ⋯
     </button>
-    <div v-if="open" class="admin-overflow__menu" role="menu">
+    <div v-if="open" class="admin-overflow__menu" role="menu" @keydown.escape="close">
       <button type="button" role="menuitem" class="admin-overflow__item" data-admin="mode" @click="onMode">
         {{ modeLabel }}
       </button>
