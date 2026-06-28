@@ -59,8 +59,8 @@ const toggle = () => {
 
 <style scoped>
 .settings-section {
-  background: var(--bg-primary);
-  border: 1px solid var(--border-color);
+  background: var(--bg-1);
+  border: 1px solid var(--line);
   border-radius: 8px;
   margin-bottom: 1.5rem;
   overflow: hidden;
@@ -68,7 +68,7 @@ const toggle = () => {
 }
 
 .settings-section:hover {
-  border-color: var(--accent-primary);
+  border-color: var(--focus);
   box-shadow: 0 2px 4px var(--shadow);
 }
 
@@ -80,17 +80,17 @@ const toggle = () => {
   padding: 1rem 1.5rem;
   cursor: pointer;
   user-select: none;
-  background: var(--bg-secondary);
+  background: var(--bg-1);
   border: 0;
   transition: background 0.2s ease;
 }
 
 .section-header:hover {
-  background: var(--bg-tertiary);
+  background: var(--bg-2);
 }
 
 .section-header:focus-visible {
-  outline: 2px solid var(--accent-primary);
+  outline: 2px solid var(--focus);
   outline-offset: -2px;
 }
 
@@ -98,7 +98,8 @@ const toggle = () => {
   margin: 0;
   font-size: 1.1rem;
   font-weight: 600;
-  color: var(--text-primary);
+  font-family: var(--font-ui);
+  color: var(--ink);
   display: flex;
   align-items: center;
   gap: 0.5rem;
@@ -110,16 +111,16 @@ const toggle = () => {
 
 .toggle-icon {
   font-size: 0.875rem;
-  color: var(--text-secondary);
+  color: var(--ink-2);
   transition: transform 0.2s ease;
 }
 
 .section-content {
   padding: 1.5rem;
-  border-top: 1px solid var(--border-color);
+  border-top: 1px solid var(--line);
 }
 
 .settings-section.expanded .section-header {
-  border-bottom: 1px solid var(--border-color);
+  border-bottom: 1px solid var(--line);
 }
 </style>
