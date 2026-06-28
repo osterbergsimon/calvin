@@ -1,28 +1,11 @@
 <template>
   <div class="photo-slideshow" :class="{ fullscreen: isFullscreen }">
-    <DashboardPanel title="Photos" variant="media" :header-visible="!isFullscreen">
+    <DashboardPanel title="Photos" variant="media" :header-visible="!isFullscreen" :focused="focused" :dim="dim">
       <template #actions>
-        <div class="slideshow-controls">
-          <div v-if="imagesStore.error" class="error-message">
-            {{ imagesStore.error }}
-          </div>
-          <button
-            v-if="sourceImages.length > 1"
-            class="dashboard-panel__icon-button"
-            title="Previous image"
-            @click="imagesStore.previousImage(sourceIds)"
-          >
-            ‹
-          </button>
-          <button
-            v-if="sourceImages.length > 1"
-            class="dashboard-panel__icon-button"
-            title="Next image"
-            @click="imagesStore.nextImage(sourceIds)"
-          >
-            ›
-          </button>
+        <div v-if="imagesStore.error" class="error-message">
+          {{ imagesStore.error }}
         </div>
+        <RegionControls v-if="focused" region-kind="photos" />
       </template>
 
       <div class="slideshow-content">
@@ -55,10 +38,19 @@ import { computed, onMounted, onUnmounted, watch } from "vue";
 import { useImagesStore } from "../stores/images";
 import { useConfigStore } from "../stores/config";
 import DashboardPanel from "./DashboardPanel.vue";
+import RegionControls from "./dashboard/RegionControls.vue";
 
 const configStore = useConfigStore();
 
 const props = defineProps({
+  focused: {
+    type: Boolean,
+    default: false,
+  },
+  dim: {
+    type: Boolean,
+    default: false,
+  },
   isFullscreen: {
     type: Boolean,
     default: false,
