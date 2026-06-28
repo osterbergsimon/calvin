@@ -38,8 +38,8 @@
   --ink-3: #93a0a9;
   --focus: #e08a1e;
   --focus-ink: #ffffff;
-  --focus-glow: rgba(224, 138, 30, 0.26);
-  --focus-edge: rgba(224, 138, 30, 0.62);
+  --focus-glow: rgba(224, 138, 30, 0.36);
+  --focus-edge: rgba(224, 138, 30, 0.75);
   --ok: #2e9e6b;
   --warn: #c8860a;
   --err: #c0392b;

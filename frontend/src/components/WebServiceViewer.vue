@@ -260,7 +260,7 @@ onUnmounted(() => {
   flex-direction: column;
   background: var(--bg-primary);
   border-radius: 8px;
-  overflow: hidden;
+  overflow: visible; /* let the focused panel glow bloom out */
 }
 
 .web-service-viewer.fullscreen {

@@ -1001,7 +1001,7 @@ onActivated(() => {
   flex-direction: column;
   background: var(--calendar-bg);
   border-radius: 8px;
-  overflow: hidden;
+  overflow: visible; /* let the focused panel glow bloom out */
   outline: none;
   min-height: 0;
   min-width: 0;
