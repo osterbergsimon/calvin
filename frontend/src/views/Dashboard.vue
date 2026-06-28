@@ -369,8 +369,9 @@ onUnmounted(() => {
   max-width: 100%;
   flex-shrink: 0;
   border-radius: 0;
-  overflow: hidden;
-  overflow-x: clip;
+  /* visible so the focused panel's neon box-shadow can bloom into the gap.
+     Panel content is still clipped by the panel's own overflow:hidden. */
+  overflow: visible;
   display: flex;
   flex-direction: column;
   box-sizing: border-box;
