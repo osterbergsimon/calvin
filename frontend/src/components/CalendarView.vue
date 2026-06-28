@@ -3,6 +3,7 @@
     <DashboardPanel title="Calendar" :subtitle="calendarSubtitle" :focused="focused" :dim="dim">
       <template #actions>
         <button
+          v-if="!isTouch"
           class="dashboard-panel__icon-button"
           title="Previous"
           @click="previousMonth"
@@ -11,6 +12,7 @@
           ‹
         </button>
         <button
+          v-if="!isTouch"
           class="dashboard-panel__icon-button"
           title="Next"
           @click="nextMonth"
@@ -126,6 +128,7 @@ import DialogScrim from "./ui/DialogScrim.vue";
 import CalendarEventItem from "./CalendarEventItem.vue";
 import DashboardPanel from "./DashboardPanel.vue";
 import RegionControls from "./dashboard/RegionControls.vue";
+import { useTouchCapability } from "@/composables/useTouchCapability";
 
 const props = defineProps({
   focused: {
@@ -141,6 +144,8 @@ const props = defineProps({
     default: () => [],
   },
 });
+
+const { isTouch } = useTouchCapability();
 
 const configStore = useConfigStore();
 const sourceKey = computed(() =>

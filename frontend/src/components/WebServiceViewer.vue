@@ -35,7 +35,7 @@
           <template #actions>
             <RegionControls v-if="focused" region-kind="service" />
             <button
-              v-if="canNavigateServices && services.length > 1"
+              v-if="!isTouch && canNavigateServices && services.length > 1"
               class="dashboard-panel__icon-button"
               title="Previous Service"
               @click="previousService"
@@ -43,7 +43,7 @@
               ‹
             </button>
             <button
-              v-if="canNavigateServices && services.length > 1"
+              v-if="!isTouch && canNavigateServices && services.length > 1"
               class="dashboard-panel__icon-button"
               title="Next Service"
               @click="nextService"
@@ -51,7 +51,7 @@
               ›
             </button>
             <button
-              v-if="!isFullscreen"
+              v-if="!isTouch && !isFullscreen"
               class="dashboard-panel__icon-button"
               title="Enter Fullscreen"
               @click.stop="handleToggleFullscreen"
@@ -80,6 +80,7 @@ import { useModeStore } from "../stores/mode";
 import DashboardPanel from "./DashboardPanel.vue";
 import ServiceViewer from "./service/ServiceViewer.vue";
 import RegionControls from "./dashboard/RegionControls.vue";
+import { useTouchCapability } from "@/composables/useTouchCapability";
 
 const props = defineProps({
   focused: {
@@ -99,6 +100,8 @@ const props = defineProps({
     default: null,
   },
 });
+
+const { isTouch } = useTouchCapability();
 
 const webServicesStore = useWebServicesStore();
 const modeStore = useModeStore();
