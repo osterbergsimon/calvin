@@ -345,7 +345,10 @@ const handlePaddingInput = event => {
 
 .preview-horizontal {
   width: 100%;
-  min-height: 60px;
+  height: 96px;
+  display: flex;
+  align-items: center;
+  overflow: hidden;
 }
 
 .preview-vertical {
