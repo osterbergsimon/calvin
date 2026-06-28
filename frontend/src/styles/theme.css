@@ -38,8 +38,8 @@
   --ink-3: #93a0a9;
   --focus: #e08a1e;
   --focus-ink: #ffffff;
-  --focus-glow: rgba(224, 138, 30, 0.16);
-  --focus-edge: rgba(224, 138, 30, 0.5);
+  --focus-glow: rgba(224, 138, 30, 0.26);
+  --focus-edge: rgba(224, 138, 30, 0.62);
   --ok: #2e9e6b;
   --warn: #c8860a;
   --err: #c0392b;
@@ -93,8 +93,8 @@
   --ink-3: #62707a;
   --focus: #f3b052;
   --focus-ink: #1a130a;
-  --focus-glow: rgba(243, 176, 82, 0.2);
-  --focus-edge: rgba(243, 176, 82, 0.55);
+  --focus-glow: rgba(243, 176, 82, 0.32);
+  --focus-edge: rgba(243, 176, 82, 0.68);
   --ok: #5bd0a0;
   --warn: #f3b052;
   --err: #ef6b5e;

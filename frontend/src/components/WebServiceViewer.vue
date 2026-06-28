@@ -14,7 +14,14 @@
 
     <!-- Viewer Content -->
     <div class="viewer-content">
-      <DashboardPanel v-if="emptyState" title="Web Services" :header-visible="!isFullscreen" :focused="focused" :dim="dim">
+      <DashboardPanel
+        v-if="emptyState"
+        title="Web Services"
+        :show-title="false"
+        :header-visible="!isFullscreen"
+        :focused="focused"
+        :dim="dim"
+      >
         <template #actions>
           <RegionControls v-if="focused" region-kind="service" />
         </template>

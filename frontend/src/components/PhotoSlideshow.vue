@@ -10,7 +10,14 @@
     >
       ✕
     </button>
-    <DashboardPanel title="Photos" variant="media" :header-visible="!isFullscreen" :focused="focused" :dim="dim">
+    <DashboardPanel
+      title="Photos"
+      variant="media"
+      :show-title="false"
+      :header-visible="!isFullscreen"
+      :focused="focused"
+      :dim="dim"
+    >
       <template #actions>
         <div v-if="imagesStore.error" class="error-message">
           {{ imagesStore.error }}

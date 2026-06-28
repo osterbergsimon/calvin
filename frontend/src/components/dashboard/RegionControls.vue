@@ -29,10 +29,11 @@
       ↻
     </button>
     <button
+      v-if="actions.expand"
       type="button"
       class="cbtn cbtn--primary"
       data-action="expand"
-      :aria-label="`Expand ${regionKind}`"
+      :aria-label="`Fullscreen ${regionKind}`"
       @click="run('expand')"
     >
       ⤢
@@ -61,7 +62,10 @@ const MAP = {
     prev: "calendar_prev",
     next: "calendar_next",
     refresh: "calendar_refresh",
-    expand: "calendar_expand",
+    // No expand on touch: tapping an event opens it directly, and there is no
+    // calendar fullscreen yet (tracked separately). Keyboard calendar_expand
+    // is unaffected — this only governs the touch control cluster.
+    expand: null,
   },
   photos: {
     prev: "images_prev",

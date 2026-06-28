@@ -6,7 +6,7 @@
     :class="panelClasses"
   >
     <header v-if="showPanelHeader" class="dashboard-panel__header">
-      <div class="dashboard-panel__title-group">
+      <div v-if="titleShown" class="dashboard-panel__title-group">
         <h2 class="dashboard-panel__title">{{ title }}</h2>
         <p v-if="subtitle" class="dashboard-panel__subtitle">{{ subtitle }}</p>
       </div>
@@ -43,6 +43,10 @@ const props = defineProps({
     type: Boolean,
     default: true,
   },
+  showTitle: {
+    type: Boolean,
+    default: true,
+  },
   focused: {
     type: Boolean,
     default: false,
@@ -55,6 +59,7 @@ const props = defineProps({
 
 const configStore = useConfigStore();
 
+const titleShown = computed(() => props.showTitle && !!props.title);
 const showPanelHeader = computed(() => props.headerVisible && configStore.shouldShowUI);
 const panelClasses = computed(() => [
   "dashboard-panel",
@@ -79,15 +84,21 @@ const panelClasses = computed(() => [
 }
 
 .dashboard-panel__header {
-  min-height: 72px;
-  padding: 1rem;
+  min-height: 0;
+  /* Slim: no large title bar. Collapses to nothing when it holds no title
+     and no controls (the actions slot is empty); grows to fit the ~46px
+     touch controls when they appear on the focused region. */
+  padding: 0.5rem 0.75rem;
   flex-shrink: 0;
   display: flex;
   align-items: center;
-  justify-content: space-between;
-  gap: 1rem;
+  justify-content: flex-end;
+  gap: 0.75rem;
   background: transparent;
-  border-bottom: 1px solid var(--line-soft);
+}
+/* When a title IS shown, space it opposite the controls. */
+.dashboard-panel__header:has(.dashboard-panel__title-group) {
+  justify-content: space-between;
 }
 
 .dashboard-panel__title-group {
