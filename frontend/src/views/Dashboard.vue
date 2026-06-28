@@ -344,6 +344,13 @@ onUnmounted(() => {
   min-width: 0;
 }
 
+/* Inset the region grid from the screen edges so each panel "floats" with
+   equal clearance on all sides (edge padding ≈ half the inter-panel gap),
+   giving the focus-light room to glow uniformly around the whole region. */
+.mode-content.dashboard-view {
+  padding: 0.5rem;
+}
+
 .mode-content.dashboard-view.layout-portrait {
   flex-direction: column; /* Portrait: stack calendar and secondary vertically */
 }

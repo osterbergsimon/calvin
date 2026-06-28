@@ -41,9 +41,9 @@ const stateClass = computed(() => {
      all the way around the region. */
   box-shadow:
     0 0 0 2px var(--focus),
-    0 0 12px 0 var(--focus),
-    0 0 38px 2px var(--focus-edge),
-    0 0 104px 4px var(--focus-glow);
+    0 0 10px 0 var(--focus),
+    0 0 30px 1px var(--focus-edge),
+    0 0 68px 3px var(--focus-glow);
   transform: translateY(-2px);
 }
 .focus-panel.is-dim {
