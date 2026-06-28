@@ -7,10 +7,15 @@
 </template>
 
 <script setup>
+import { onMounted } from "vue";
 import SelectPill from "@/components/ui/SelectPill.vue";
 import { useTypeTheme } from "@/composables/useTypeTheme";
 
-const { current, applyTypeTheme } = useTypeTheme();
+const { current, applyTypeTheme, loadTypeTheme } = useTypeTheme();
+
+onMounted(() => {
+  loadTypeTheme();
+});
 
 const options = [
   { value: "instrument", label: "Instrument" },

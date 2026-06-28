@@ -3,7 +3,7 @@ export const SETTINGS_CATEGORY_STORAGE_KEY = "settings_active_category";
 export const defaultSettingsCategoryId = "dashboard";
 
 export const settingsCategories = [
-  { id: "dashboard", label: "Dashboard", icon: "📐", subtitle: "Layout · appearance · regions" },
+  { id: "dashboard", label: "Display", icon: "📐", subtitle: "Layout · appearance · regions" },
   { id: "clock-bar", label: "Clock Bar", icon: "🕐", subtitle: "Time · weather · status tiles" },
   { id: "content", label: "Content Sources", icon: "📦", subtitle: "Calendars · photos · services" },
   { id: "plugins", label: "Plugins", icon: "🔌", subtitle: "Install · manage · themes" },
@@ -15,7 +15,7 @@ export const settingsDestinations = [
   {
     id: "dashboard-layout",
     label: "Layout and calendar display",
-    path: "Dashboard / Layout",
+    path: "Display / Layout",
     category: "dashboard",
     tabKey: "settings_tab_dashboard",
     tab: "layout",
@@ -24,7 +24,7 @@ export const settingsDestinations = [
   {
     id: "dashboard-calendar",
     label: "Calendar display",
-    path: "Dashboard / Calendar Display",
+    path: "Display / Calendar Display",
     category: "dashboard",
     tabKey: "settings_tab_dashboard",
     tab: "calendar",
@@ -33,7 +33,7 @@ export const settingsDestinations = [
   {
     id: "dashboard-plugin-display",
     label: "Plugin display",
-    path: "Dashboard / Plugin Display",
+    path: "Display / Plugin Display",
     category: "dashboard",
     tabKey: "settings_tab_dashboard",
     tab: "plugin-display",
@@ -42,7 +42,7 @@ export const settingsDestinations = [
   {
     id: "dashboard-ui",
     label: "Appearance and kiosk UI",
-    path: "Dashboard / Appearance",
+    path: "Display / Appearance",
     category: "dashboard",
     tabKey: "settings_tab_dashboard",
     tab: "appearance",
@@ -79,7 +79,7 @@ export const settingsDestinations = [
   {
     id: "dashboard-notifications",
     label: "Notifications",
-    path: "Dashboard / Notifications",
+    path: "Display / Notifications",
     category: "dashboard",
     tabKey: "settings_tab_dashboard",
     tab: "notifications",

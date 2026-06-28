@@ -554,7 +554,7 @@ const calendarDays = computed(() => {
       },
     ];
   } else if (viewMode.value === "rolling") {
-    // Rolling weeks view: show 4 weeks starting from today
+    // Rolling view: show `rollingWeeks` weeks starting from the current week
     const days = [];
     const startDate = getWeekStart(todayDate);
 
