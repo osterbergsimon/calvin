@@ -50,22 +50,17 @@
               <!-- Dashboard Region -->
               <div
                 v-if="isRegionElement(elementType)"
-                :class="[
-                  'dashboard-region-section',
-                  {
-                    'dashboard-region-section-active':
-                      activeRegionHighlightVisible && isActiveRegionElement(elementType),
-                  },
-                ]"
+                class="dashboard-region-section"
                 :style="getRegionStyle(elementType)"
               >
                 <DashboardRegion
                   :region="getRegionForElement(elementType)"
                   :photo-rotation-interval="configStore.photoRotationInterval"
                   :parent-direction="layoutDirection"
-                  :active-region-id="
-                    activeRegionHighlightVisible ? activeScreen.activeRegionId : null
-                  "
+                  :active-region-id="activeScreen.activeRegionId"
+                  :light-active="lightActive"
+                  :dim-others="configStore.focusLightDimOthers"
+                  @focus-region="onFocusRegion"
                 />
               </div>
 
@@ -112,7 +107,7 @@
 </template>
 
 <script setup>
-import { ref, onMounted, onUnmounted, computed, watch, defineAsyncComponent } from "vue";
+import { onMounted, onUnmounted, computed, watch, defineAsyncComponent } from "vue";
 import LayoutManager from "../components/LayoutManager.vue";
 import DashboardRegion from "../components/DashboardRegion.vue";
 import MinimalUIOverlay from "../components/MinimalUIOverlay.vue";
@@ -124,6 +119,7 @@ const WebServiceViewer = defineAsyncComponent(() => import("../components/WebSer
 import { useConfigStore } from "../stores/config";
 import { useModeStore } from "../stores/mode";
 import { useRoute } from "vue-router";
+import { useKeyboardActions } from "../composables/useKeyboardActions";
 import {
   getActiveDashboardScreen,
   getClockBarPlacementGap,
@@ -137,6 +133,7 @@ import {
 const configStore = useConfigStore();
 const modeStore = useModeStore();
 const route = useRoute();
+const { focusRegion } = useKeyboardActions();
 
 let configPollInterval = null;
 
@@ -228,25 +225,17 @@ const getRegionStyle = elementType => {
   return getRegionAxisStyle(region, layoutDirection.value);
 };
 
-const ACTIVE_HIGHLIGHT_MS = 2500;
-const activeRegionHighlightVisible = ref(false);
-let activeRegionHighlightTimer = null;
+const lightActive = computed(() => {
+  if (configStore.focusLightMode === "off") return false;
+  if (configStore.focusLightMode === "always") return true;
+  return configStore.shouldShowUI; // 'interaction'
+});
 
-watch(
-  () => activeScreen.value?.activeRegionId,
-  () => {
-    activeRegionHighlightVisible.value = true;
-    if (activeRegionHighlightTimer) clearTimeout(activeRegionHighlightTimer);
-    activeRegionHighlightTimer = setTimeout(() => {
-      activeRegionHighlightVisible.value = false;
-    }, ACTIVE_HIGHLIGHT_MS);
+const onFocusRegion = regionId => {
+  if (typeof configStore.showUITemporarily === "function") {
+    configStore.showUITemporarily(60);
   }
-);
-
-const isActiveRegionElement = elementType => {
-  const region = getRegionForElement(elementType);
-  if (!region || region.split) return false;
-  return region.id === activeScreen.value.activeRegionId;
+  focusRegion(regionId);
 };
 
 const startConfigPolling = () => {
@@ -297,10 +286,6 @@ onMounted(async () => {
 });
 
 onUnmounted(() => {
-  if (activeRegionHighlightTimer) {
-    clearTimeout(activeRegionHighlightTimer);
-    activeRegionHighlightTimer = null;
-  }
   if (configPollInterval) {
     clearInterval(configPollInterval);
     configPollInterval = null;
@@ -389,12 +374,5 @@ onUnmounted(() => {
   display: flex;
   flex-direction: column;
   box-sizing: border-box;
-  transition: outline-color 0.6s ease;
-  outline: 2px solid transparent;
-  outline-offset: -2px;
-}
-
-.dashboard-region-section-active {
-  outline-color: var(--accent-primary);
 }
 </style>
