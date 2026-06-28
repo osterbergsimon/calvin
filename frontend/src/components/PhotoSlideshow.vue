@@ -232,7 +232,7 @@ watch(sourceKey, async () => {
   flex-direction: column;
   background: #000;
   border-radius: 8px;
-  overflow: hidden;
+  overflow: visible; /* let the focused panel glow bloom out */
   min-height: 0;
   min-width: 0;
   box-sizing: border-box;
