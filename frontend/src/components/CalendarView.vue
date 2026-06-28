@@ -111,12 +111,7 @@
       :event="calendarStore.selectedEvent"
       @close="closeEventDetail"
     />
-    <!-- Backdrop for modal -->
-    <div
-      v-if="calendarStore.selectedEvent"
-      class="event-detail-backdrop"
-      @click="closeEventDetail"
-    />
+    <DialogScrim v-if="calendarStore.selectedEvent" @dismiss="closeEventDetail" />
   </div>
 </template>
 
@@ -126,6 +121,7 @@ import { useRoute } from "vue-router";
 import { useCalendarStore } from "../stores/calendar";
 import { useConfigStore } from "../stores/config";
 import EventDetailPanel from "./EventDetailPanel.vue";
+import DialogScrim from "./ui/DialogScrim.vue";
 import CalendarEventItem from "./CalendarEventItem.vue";
 import DashboardPanel from "./DashboardPanel.vue";
 
@@ -1293,16 +1289,6 @@ onActivated(() => {
   opacity: 0.8;
   font-weight: 500;
   flex-shrink: 0;
-}
-
-.event-detail-backdrop {
-  position: fixed;
-  top: 0;
-  left: 0;
-  right: 0;
-  bottom: 0;
-  background: rgba(0, 0, 0, 0.5);
-  z-index: 999;
 }
 
 /* Responsive styles for smaller screens and portrait mode */
