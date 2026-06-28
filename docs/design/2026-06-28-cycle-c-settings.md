@@ -136,3 +136,13 @@ Existing specs stay green: `SettingItem`, `settingsRegistry`, `useConfigForm`, `
 - Tokens only (no hardcoded hex/font); tabular figures where data is shown.
 - ≥44px touch targets; `:focus-visible` preserved; `prefers-reduced-motion` respected by the focus-light + popovers.
 - Responsive: the rail + content must not break narrow widths.
+
+## 10. C1 outcomes & C2 follow-ups (post-implementation)
+
+C1 shipped the shell + Display category. Resolved/deferred during build + final review:
+
+- **Restart/Reload admin actions** — the old header system menu was removed (mock is clean); by decision the actions (Restart Backend / Restart Frontend / Reload UI) were relocated into the **Maintenance** category (`UpdatesTab` "System" section, with confirm). **Done in C1.**
+- **Multi-screen / regions editor (`dashboardScreens`)** — spec §4 wanted it embedded in LAYOUT; deferred to **C2** (extract the screen/region picker out of `DashboardLayoutTab` into its own component and place it in the Display LAYOUT section; update search anchors). Region editing is temporarily unreachable from the new shell.
+- **`weekendDays`** — multi-select row deferred to **C2**.
+- **SelectPill `aria-label`** — `SelectPill` has no `ariaLabel` prop, so DisplaySettings' enum pills rely on the adjacent `SettingRow` label + the selected option text. **C2:** add an `ariaLabel` prop to `SelectPill` and pass row labels.
+- **Typeface applied at app boot** — `TypefacePicker` now calls `loadTypeTheme()` on mount, but the app root never applies the saved type theme at startup (pre-existing gap). **C2/follow-up:** call `loadTypeTheme()` once at app init (e.g. `main.js`/root) so the persisted typeface is active on the dashboard, not only after opening Settings.
