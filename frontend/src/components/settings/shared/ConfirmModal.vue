@@ -56,7 +56,7 @@ const handleCancel = () => {
   left: 0;
   right: 0;
   bottom: 0;
-  background: rgba(0, 0, 0, 0.5);
+  background: color-mix(in srgb, var(--ink) 55%, transparent);
   display: flex;
   align-items: center;
   justify-content: center;
@@ -64,9 +64,9 @@ const handleCancel = () => {
 }
 
 .modal-content {
-  background: var(--bg-primary);
+  background: var(--bg-1);
   border-radius: 8px;
-  box-shadow: 0 4px 20px rgba(0, 0, 0, 0.3);
+  box-shadow: 0 4px 20px color-mix(in srgb, var(--ink) 30%, transparent);
   max-width: 500px;
   width: 90%;
   max-height: 90vh;
@@ -83,25 +83,26 @@ const handleCancel = () => {
   justify-content: space-between;
   align-items: center;
   padding: 1.25rem;
-  border-bottom: 1px solid var(--border-color);
+  border-bottom: 1px solid var(--line);
 }
 
 .modal-header h3 {
   margin: 0;
   font-size: 1.25rem;
   font-weight: 600;
-  color: var(--text-primary);
+  color: var(--ink);
 }
 
 .btn-close-modal {
   background: none;
   border: none;
   font-size: 1.5rem;
-  color: var(--text-secondary);
+  color: var(--ink-2);
   cursor: pointer;
   padding: 0;
   width: 2rem;
   height: 2rem;
+  min-height: 44px;
   display: flex;
   align-items: center;
   justify-content: center;
@@ -110,8 +111,13 @@ const handleCancel = () => {
 }
 
 .btn-close-modal:hover {
-  background: var(--bg-secondary);
-  color: var(--text-primary);
+  background: var(--bg-2);
+  color: var(--ink);
+}
+
+.btn-close-modal:focus-visible {
+  outline: 2px solid var(--focus);
+  outline-offset: 2px;
 }
 
 .modal-body {
@@ -120,7 +126,7 @@ const handleCancel = () => {
 
 .modal-body p {
   margin: 0;
-  color: var(--text-primary);
+  color: var(--ink);
   line-height: 1.5;
 }
 
@@ -129,14 +135,15 @@ const handleCancel = () => {
   justify-content: flex-end;
   gap: 0.75rem;
   padding: 1.25rem;
-  border-top: 1px solid var(--border-color);
+  border-top: 1px solid var(--line);
 }
 
 .btn-secondary {
   padding: 0.5rem 1rem;
-  background: var(--bg-secondary);
-  color: var(--text-primary);
-  border: 1px solid var(--border-color);
+  min-height: 44px;
+  background: var(--bg-2);
+  color: var(--ink);
+  border: 1px solid var(--line);
   border-radius: 4px;
   font-size: 0.9rem;
   font-weight: 500;
@@ -145,13 +152,19 @@ const handleCancel = () => {
 }
 
 .btn-secondary:hover {
-  background: var(--bg-tertiary);
-  border-color: var(--accent-primary);
+  background: var(--bg-2);
+  border-color: var(--focus);
+}
+
+.btn-secondary:focus-visible {
+  outline: 2px solid var(--focus);
+  outline-offset: 2px;
 }
 
 .btn-danger {
   padding: 0.5rem 1rem;
-  background: #dc3545;
+  min-height: 44px;
+  background: var(--err);
   color: white;
   border: none;
   border-radius: 4px;
@@ -162,8 +175,13 @@ const handleCancel = () => {
 }
 
 .btn-danger:hover {
-  background: #c82333;
+  background: color-mix(in srgb, var(--err) 85%, black);
   transform: translateY(-1px);
-  box-shadow: 0 2px 4px rgba(220, 53, 69, 0.3);
+  box-shadow: 0 2px 4px color-mix(in srgb, var(--err) 30%, transparent);
+}
+
+.btn-danger:focus-visible {
+  outline: 2px solid var(--focus);
+  outline-offset: 2px;
 }
 </style>
