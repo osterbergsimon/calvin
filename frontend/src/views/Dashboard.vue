@@ -339,7 +339,7 @@ onUnmounted(() => {
   width: 100%;
   flex: 1 1 auto;
   display: flex;
-  gap: 1rem;
+  gap: 0.5rem;
   min-height: 0;
   min-width: 0;
 }
@@ -388,7 +388,9 @@ onUnmounted(() => {
   min-height: 0;
   width: 100%;
   max-width: 100%;
-  flex-shrink: 0;
+  /* shrink to fit the padded container so both panels keep their margin
+     (flex-shrink:0 caused the trailing panel to overflow past the edge) */
+  flex-shrink: 1;
   border-radius: 0;
   /* visible so the focused panel's neon box-shadow can bloom into the gap.
      Panel content is still clipped by the panel's own overflow:hidden. */
