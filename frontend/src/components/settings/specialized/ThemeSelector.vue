@@ -90,7 +90,7 @@ const getThemePreviewStyle = theme => {
 .loading-state {
   padding: 2rem;
   text-align: center;
-  color: var(--text-secondary);
+  color: var(--ink-2);
 }
 
 .theme-selection-grid {
@@ -105,22 +105,28 @@ const getThemePreviewStyle = theme => {
   flex-direction: column;
   align-items: center;
   padding: 1rem;
-  background: var(--bg-secondary);
-  border: 2px solid var(--border-color);
+  min-height: 44px;
+  background: var(--bg-2);
+  border: 2px solid var(--line);
   border-radius: 8px;
   cursor: pointer;
   transition: all 0.2s ease;
 }
 
 .theme-selection-item:hover {
-  border-color: var(--accent-primary);
+  border-color: var(--focus);
   box-shadow: 0 2px 8px var(--shadow);
   transform: translateY(-2px);
 }
 
+.theme-selection-item:focus-visible {
+  outline: 2px solid var(--focus);
+  outline-offset: 2px;
+}
+
 .theme-selection-item.active {
-  border-color: var(--accent-primary);
-  background: var(--bg-tertiary);
+  border-color: var(--focus);
+  background: var(--bg-2);
   box-shadow: 0 4px 12px var(--shadow-hover);
 }
 
@@ -131,8 +137,8 @@ const getThemePreviewStyle = theme => {
   border-radius: 6px;
   overflow: hidden;
   margin-bottom: 0.5rem;
-  background: var(--bg-primary);
-  border: 1px solid var(--border-color);
+  background: var(--bg-1);
+  border: 1px solid var(--line);
 }
 
 .theme-preview-image {
@@ -150,8 +156,8 @@ const getThemePreviewStyle = theme => {
   justify-content: center;
   font-size: 2rem;
   font-weight: bold;
-  color: var(--text-secondary);
-  background: linear-gradient(135deg, var(--accent-primary), var(--accent-secondary));
+  color: var(--ink-2);
+  background: linear-gradient(135deg, var(--focus), color-mix(in srgb, var(--focus) 60%, var(--bg-1)));
 }
 
 .theme-selected-badge {
@@ -160,7 +166,7 @@ const getThemePreviewStyle = theme => {
   right: 0.25rem;
   width: 1.5rem;
   height: 1.5rem;
-  background: var(--accent-primary);
+  background: var(--focus);
   color: white;
   border-radius: 50%;
   display: flex;
@@ -179,15 +185,15 @@ const getThemePreviewStyle = theme => {
 .theme-selection-info strong {
   display: block;
   font-size: 0.875rem;
-  color: var(--text-primary);
+  color: var(--ink);
   margin-bottom: 0.25rem;
 }
 
 .theme-badge-small {
   display: inline-block;
   padding: 0.125rem 0.375rem;
-  background: var(--bg-tertiary);
-  color: var(--text-secondary);
+  background: var(--bg-2);
+  color: var(--ink-2);
   border-radius: 4px;
   font-size: 0.7rem;
   margin-left: 0.25rem;
@@ -195,7 +201,7 @@ const getThemePreviewStyle = theme => {
 
 .help-text {
   font-size: 0.875rem;
-  color: var(--text-secondary);
+  color: var(--ink-2);
   line-height: 1.4;
 }
 </style>
