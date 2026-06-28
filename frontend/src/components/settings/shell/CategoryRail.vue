@@ -1,5 +1,5 @@
 <template>
-  <nav class="category-rail" role="list">
+  <nav ref="railEl" class="category-rail" role="list">
     <FocusPanel
       v-for="(cat, index) in categories"
       :key="cat.id"
@@ -9,7 +9,7 @@
       class="category-rail__item"
       :class="{ 'is-active': cat.id === activeId }"
       type="button"
-      :aria-current="cat.id === activeId ? 'true' : null"
+      :aria-current="cat.id === activeId ? 'page' : null"
       :tabindex="cat.id === activeId ? 0 : -1"
       role="listitem"
       @click="$emit('select', cat.id)"
@@ -32,6 +32,8 @@ const props = defineProps({
 
 const emit = defineEmits(["select"]);
 
+const railEl = useTemplateRef("railEl");
+
 function onKeydown(event, index) {
   if (event.key === "ArrowDown") {
     event.preventDefault();
@@ -45,10 +47,14 @@ function onKeydown(event, index) {
 }
 
 function focusItem(index) {
-  const rail = document.querySelectorAll(".category-rail__item");
-  if (rail[index]) {
-    rail[index].tabIndex = 0;
-    rail[index].focus();
+  const items = railEl.value?.querySelectorAll(".category-rail__item");
+  if (!items) return;
+  items.forEach((item) => {
+    item.tabIndex = -1;
+  });
+  if (items[index]) {
+    items[index].tabIndex = 0;
+    items[index].focus();
   }
 }
 </script>
