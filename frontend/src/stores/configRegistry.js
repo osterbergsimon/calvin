@@ -254,6 +254,11 @@ export const CONFIG_FIELD_DEFINITIONS = [
     defaultValue: "auto",
   },
   {
+    name: "touchControlSize",
+    keys: ["touchControlSize", "touch_control_size"],
+    defaultValue: "medium",
+  },
+  {
     name: "mealPlanCardSize",
     keys: ["mealPlanCardSize", "meal_plan_card_size"],
     defaultValue: "medium",

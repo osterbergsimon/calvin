@@ -33,13 +33,17 @@ const stateClass = computed(() => {
 }
 .focus-panel.is-focused {
   background:
-    linear-gradient(180deg, color-mix(in srgb, var(--focus) 12%, transparent), transparent 42%),
+    linear-gradient(180deg, color-mix(in srgb, var(--focus) 16%, transparent), transparent 44%),
     var(--bg-2);
   border-color: var(--focus);
+  /* Soft neon: a crisp saturated edge, a tight bright halo, then layered
+     colored blooms that diffuse outward. */
   box-shadow:
-    0 0 0 2px var(--focus-edge),
-    0 18px 64px -10px var(--focus-glow),
-    0 0 140px -16px var(--focus-glow);
+    0 0 0 2px var(--focus),
+    0 0 10px -1px var(--focus),
+    0 0 30px -2px var(--focus-edge),
+    0 0 90px -6px var(--focus-glow),
+    0 22px 84px -12px var(--focus-glow);
   transform: translateY(-2px);
 }
 .focus-panel.is-dim {

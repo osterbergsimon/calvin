@@ -1,5 +1,7 @@
 import { describe, it, expect, vi, beforeEach } from "vitest";
 import { mount } from "@vue/test-utils";
+import { setActivePinia, createPinia } from "pinia";
+import { useConfigStore } from "@/stores/config";
 
 const handleAction = vi.fn();
 
@@ -26,6 +28,7 @@ import RegionControls from "@/components/dashboard/RegionControls.vue";
 
 describe("RegionControls", () => {
   beforeEach(() => {
+    setActivePinia(createPinia());
     handleAction.mockClear();
     isTouchRef.value = true; // reset to touch mode before each test
   });
@@ -66,5 +69,18 @@ describe("RegionControls", () => {
     isTouchRef.value = false;
     const w = mount(RegionControls, { props: { regionKind: "calendar" } });
     expect(w.find(".region-controls").exists()).toBe(false);
+  });
+
+  it("applies the configured size class (default medium)", () => {
+    const def = mount(RegionControls, { props: { regionKind: "calendar" } });
+    expect(def.find(".region-controls").classes()).toContain("region-controls--medium");
+
+    useConfigStore().touchControlSize = "small";
+    const small = mount(RegionControls, { props: { regionKind: "calendar" } });
+    expect(small.find(".region-controls").classes()).toContain("region-controls--small");
+
+    useConfigStore().touchControlSize = "large";
+    const large = mount(RegionControls, { props: { regionKind: "calendar" } });
+    expect(large.find(".region-controls").classes()).toContain("region-controls--large");
   });
 });

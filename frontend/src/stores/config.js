@@ -69,6 +69,7 @@ export const useConfigStore = defineStore("config", () => {
   const focusLightMode = ref("interaction");
   const focusLightDimOthers = ref(true);
   const touchControls = ref("auto"); // 'auto' (detect) | 'on' (force) | 'off' (hide) touch chrome
+  const touchControlSize = ref("medium"); // 'small' | 'medium' | 'large' — region touch control size
   const mealPlanCardSize = ref("medium"); // Meal plan card size: 'small' | 'medium' | 'large'
   const consoleLogEnabled = ref(true); // Enable console logging (default: true for backwards compatibility)
   const consoleLogLevel = ref("info"); // Console log level: 'error' | 'warn' | 'info' | 'debug' (default: 'info')
@@ -133,6 +134,7 @@ export const useConfigStore = defineStore("config", () => {
     focusLightMode,
     focusLightDimOthers,
     touchControls,
+    touchControlSize,
     mealPlanCardSize,
     consoleLogEnabled,
     consoleLogLevel,
@@ -381,6 +383,9 @@ export const useConfigStore = defineStore("config", () => {
   const setTouchControls = mode => {
     touchControls.value = mode;
   };
+  const setTouchControlSize = size => {
+    touchControlSize.value = size;
+  };
 
   return {
     orientation,
@@ -444,6 +449,7 @@ export const useConfigStore = defineStore("config", () => {
     focusLightMode,
     focusLightDimOthers,
     touchControls,
+    touchControlSize,
     loading,
     error,
     calendarWidth,
@@ -483,6 +489,7 @@ export const useConfigStore = defineStore("config", () => {
     setFocusLightMode,
     setFocusLightDimOthers,
     setTouchControls,
+    setTouchControlSize,
     fetchConfig,
     updateConfig,
   };
