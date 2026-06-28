@@ -51,7 +51,7 @@ export const settingsDestinations = [
   {
     id: "clock-bar-appearance",
     label: "Clock and status bar",
-    path: "Clock Bar / Appearance",
+    path: "Clock Bar / Clock",
     category: "clock-bar",
     tabKey: "settings_tab_clock_bar",
     tab: "appearance",
@@ -131,7 +131,7 @@ export const settingsDestinations = [
   {
     id: "device-power",
     label: "Power, display schedule, and timeout",
-    path: "Device / Power & Display",
+    path: "Device / Display Power",
     category: "device",
     tabKey: "settings_tab_device",
     tab: "power",
