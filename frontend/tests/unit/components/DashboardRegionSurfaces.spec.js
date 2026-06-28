@@ -13,6 +13,7 @@ const schemaData = ref(null);
 
 vi.mock("vue-router", () => ({
   useRoute: () => ({ path: "/" }),
+  useRouter: () => ({ push: vi.fn() }),
 }));
 
 vi.mock("@/composables/useSchemaData", () => ({
