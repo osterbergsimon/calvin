@@ -147,18 +147,43 @@ const categoryRenderKey = ref(0);
 // ── Scroll-spy breadcrumb (dashboard only) ────────────────────────────────────
 const sectionLabel = ref("");
 let sectionObserver = null;
+let observerRetryId = null;
 
-function setupSectionObserver() {
+function cancelObserverRetry() {
+  if (observerRetryId !== null) {
+    cancelAnimationFrame(observerRetryId);
+    observerRetryId = null;
+  }
+}
+
+function teardownSectionObserver() {
+  cancelObserverRetry();
   if (sectionObserver) {
     sectionObserver.disconnect();
     sectionObserver = null;
+  }
+}
+
+function setupSectionObserver(attempt = 0) {
+  // On a fresh call, tear down any existing observer and pending retries
+  if (attempt === 0) {
+    teardownSectionObserver();
   }
   if (activeCategory.value !== "dashboard") {
     sectionLabel.value = "";
     return;
   }
   const sections = document.querySelectorAll(".settings-section");
-  if (!sections.length) return;
+  if (!sections.length) {
+    // Async component may not have rendered yet — retry via rAF, capped at 10 attempts
+    if (attempt < 10) {
+      observerRetryId = requestAnimationFrame(() => {
+        observerRetryId = null;
+        setupSectionObserver(attempt + 1);
+      });
+    }
+    return;
+  }
 
   sectionObserver = new IntersectionObserver(
     entries => {
@@ -181,12 +206,9 @@ watch(activeCategory, async () => {
   sectionLabel.value = "";
   if (activeCategory.value === "dashboard") {
     await nextTick();
-    setupSectionObserver();
+    setupSectionObserver(); // handles teardown internally at attempt=0
   } else {
-    if (sectionObserver) {
-      sectionObserver.disconnect();
-      sectionObserver = null;
-    }
+    teardownSectionObserver();
   }
 });
 
@@ -240,10 +262,12 @@ const onDone = () => {
 
 const onCrumb = which => {
   if (which === "section") {
-    // Scroll to the currently active section (no-op if nothing is active)
+    // Scroll to the currently active section — find the eyebrow whose text
+    // matches sectionLabel so we don't always land on the first section.
     const label = sectionLabel.value;
     if (label) {
-      const el = document.querySelector(".settings-section__eyebrow");
+      const el = [...document.querySelectorAll(".settings-section__eyebrow")]
+        .find(e => e.textContent.trim() === label);
       el?.closest(".settings-section")?.scrollIntoView({ behavior: "smooth" });
     }
   } else {
@@ -305,10 +329,7 @@ onMounted(async () => {
 });
 
 onUnmounted(() => {
-  if (sectionObserver) {
-    sectionObserver.disconnect();
-    sectionObserver = null;
-  }
+  teardownSectionObserver();
 });
 </script>
 
