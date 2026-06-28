@@ -122,7 +122,7 @@ const handleImageInstanceOrderChange = async (pluginId, newOrder) => {
   left: 0;
   right: 0;
   bottom: 0;
-  background: var(--bg-primary);
+  background: var(--bg-1);
   opacity: 0.9;
   display: flex;
   align-items: center;
@@ -141,8 +141,8 @@ const handleImageInstanceOrderChange = async (pluginId, newOrder) => {
 .spinner {
   width: 40px;
   height: 40px;
-  border: 4px solid var(--border-color);
-  border-top-color: var(--accent-primary);
+  border: 4px solid var(--line);
+  border-top-color: var(--focus);
   border-radius: 50%;
   animation: spin 0.8s linear infinite;
 }
@@ -154,7 +154,7 @@ const handleImageInstanceOrderChange = async (pluginId, newOrder) => {
 }
 
 .loading-text {
-  color: var(--text-primary);
+  color: var(--ink);
   font-size: 0.9rem;
 }
 </style>
