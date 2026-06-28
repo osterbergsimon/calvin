@@ -1,21 +1,30 @@
-import { ref, readonly, onScopeDispose } from "vue";
+import { ref, computed, readonly, onScopeDispose } from "vue";
+import { useConfigStore } from "../stores/config";
 
 /**
- * Reactive touch-capability detection.
- * `isTouch` is true when ANY attached pointer is coarse (a touchscreen) —
- * `any-pointer` rather than `pointer` so a touch unit that also has a mouse
- * (e.g. a touchscreen wired to a workstation) is still detected, while the
- * 24" keyboard-only unit with no pointing device stays false. Single source
- * of truth for whether to render touch chrome.
+ * Reactive touch-capability detection with a manual override.
+ *
+ * `isTouch` decides whether touch chrome (region controls, screen dots,
+ * admin overflow, fullscreen close) renders. It combines a config override
+ * with auto-detection:
+ *   - config `touchControls: 'on'`   → always true  (force touch chrome)
+ *   - config `touchControls: 'off'`  → always false (hide touch chrome)
+ *   - config `touchControls: 'auto'` → `(any-pointer: coarse)` matches
+ *
+ * `any-pointer` (not `pointer`) is used so a touchscreen wired to a machine
+ * that also has a mouse is still detected, while a keyboard-only unit with no
+ * pointing device stays false. Auto-detection is unreliable on some hybrid
+ * setups, hence the explicit 'on'/'off' override.
  */
 export function useTouchCapability() {
-  const isTouch = ref(false);
+  const configStore = useConfigStore();
+  const coarse = ref(false);
 
   if (typeof window !== "undefined" && typeof window.matchMedia === "function") {
     const mql = window.matchMedia("(any-pointer: coarse)");
-    isTouch.value = mql.matches;
+    coarse.value = mql.matches;
     const update = event => {
-      isTouch.value = event.matches;
+      coarse.value = event.matches;
     };
     if (typeof mql.addEventListener === "function") {
       mql.addEventListener("change", update);
@@ -25,6 +34,13 @@ export function useTouchCapability() {
       onScopeDispose(() => mql.removeListener(update));
     }
   }
+
+  const isTouch = computed(() => {
+    const mode = configStore.touchControls;
+    if (mode === "on") return true;
+    if (mode === "off") return false;
+    return coarse.value; // 'auto'
+  });
 
   return { isTouch: readonly(isTouch) };
 }
