@@ -3,12 +3,12 @@ export const SETTINGS_CATEGORY_STORAGE_KEY = "settings_active_category";
 export const defaultSettingsCategoryId = "dashboard";
 
 export const settingsCategories = [
-  { id: "dashboard", label: "Dashboard", icon: "📐" },
-  { id: "clock-bar", label: "Clock Bar", icon: "🕐" },
-  { id: "content", label: "Content Sources", icon: "📦" },
-  { id: "plugins", label: "Plugins", icon: "🔌" },
-  { id: "device", label: "Device", icon: "🖥️" },
-  { id: "maintenance", label: "Maintenance", icon: "⚙️" },
+  { id: "dashboard", label: "Dashboard", icon: "📐", subtitle: "Layout · appearance · regions" },
+  { id: "clock-bar", label: "Clock Bar", icon: "🕐", subtitle: "Time · weather · status tiles" },
+  { id: "content", label: "Content Sources", icon: "📦", subtitle: "Calendars · photos · services" },
+  { id: "plugins", label: "Plugins", icon: "🔌", subtitle: "Install · manage · themes" },
+  { id: "device", label: "Device", icon: "🖥️", subtitle: "Power · keyboard · hardware" },
+  { id: "maintenance", label: "Maintenance", icon: "⚙️", subtitle: "Updates · diagnostics" },
 ];
 
 export const settingsDestinations = [
