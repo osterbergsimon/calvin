@@ -30,7 +30,7 @@ const props = defineProps({
   activeId: { type: String, default: null },
 });
 
-const emit = defineEmits(["select"]);
+defineEmits(["select"]);
 
 const railEl = useTemplateRef("railEl");
 
