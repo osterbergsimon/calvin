@@ -28,6 +28,20 @@ describe("DashboardPanel", () => {
     expect(wrapper.find(".panel-body-stub").text()).toBe("Body");
   });
 
+  it("hides the title when show-title is false but still renders actions", () => {
+    const configStore = useConfigStore();
+    configStore.showUI = true;
+
+    const wrapper = mount(DashboardPanel, {
+      props: { title: "Calendar", showTitle: false },
+      slots: { actions: '<button class="ctl">x</button>' },
+    });
+
+    expect(wrapper.find(".dashboard-panel__title-group").exists()).toBe(false);
+    expect(wrapper.find(".dashboard-panel__title").exists()).toBe(false);
+    expect(wrapper.find(".dashboard-panel__actions .ctl").exists()).toBe(true);
+  });
+
   it("hides the shared header when dashboard UI is hidden", () => {
     const configStore = useConfigStore();
     configStore.showUI = false;

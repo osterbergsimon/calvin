@@ -107,12 +107,14 @@ describe("PhotoSlideshow", () => {
   });
 
   describe("Header Display", () => {
-    it("should show header when UI is visible and not fullscreen", () => {
+    it("does not render a region title (content speaks for itself)", () => {
       configStore.showUI = true;
       const wrapper = createWrapper({ isFullscreen: false });
 
-      expect(wrapper.find(".dashboard-panel__header").exists()).toBe(true);
-      expect(wrapper.find("h2").text()).toBe("Photos");
+      // Cycle B removed the large region title; the header is a slim controls
+      // strip only (no "Photos" heading).
+      expect(wrapper.find(".dashboard-panel__title").exists()).toBe(false);
+      expect(wrapper.find("h2").exists()).toBe(false);
     });
 
     it("should hide header when fullscreen", () => {

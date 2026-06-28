@@ -1,6 +1,12 @@
 <template>
   <div ref="calendarView" class="calendar-view" tabindex="0" @keydown="handleKeydown">
-    <DashboardPanel title="Calendar" :subtitle="calendarSubtitle" :focused="focused" :dim="dim">
+    <DashboardPanel
+      title="Calendar"
+      :subtitle="calendarSubtitle"
+      :show-title="false"
+      :focused="focused"
+      :dim="dim"
+    >
       <template #actions>
         <button
           v-if="!isTouch"

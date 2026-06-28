@@ -24,7 +24,7 @@ const stateClass = computed(() => {
 .focus-panel {
   background: var(--bg-1);
   border: 1px solid var(--line);
-  border-radius: 18px;
+  border-radius: 4px;
   transition:
     transform 0.35s cubic-bezier(0.2, 0.7, 0.2, 1),
     box-shadow 0.35s,
@@ -33,13 +33,13 @@ const stateClass = computed(() => {
 }
 .focus-panel.is-focused {
   background:
-    linear-gradient(180deg, color-mix(in srgb, var(--focus) 7%, transparent), transparent 38%),
+    linear-gradient(180deg, color-mix(in srgb, var(--focus) 12%, transparent), transparent 42%),
     var(--bg-2);
-  border-color: var(--focus-edge);
+  border-color: var(--focus);
   box-shadow:
-    0 0 0 1px var(--focus-edge),
-    0 18px 60px -12px var(--focus-glow),
-    0 0 90px -30px var(--focus-glow);
+    0 0 0 2px var(--focus-edge),
+    0 18px 64px -10px var(--focus-glow),
+    0 0 140px -16px var(--focus-glow);
   transform: translateY(-2px);
 }
 .focus-panel.is-dim {

@@ -301,7 +301,7 @@ onUnmounted(() => {
   flex-direction: column;
   padding: 0;
   gap: 0;
-  background: var(--bg-secondary);
+  background: var(--bg-0);
 }
 
 .dashboard-stage {
