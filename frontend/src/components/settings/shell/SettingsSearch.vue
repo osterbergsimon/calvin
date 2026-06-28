@@ -154,7 +154,7 @@ onUnmounted(() => {
   list-style: none;
   margin: 0;
   padding: var(--space-1, 4px);
-  box-shadow: 0 4px 16px rgb(0 0 0 / 0.15);
+  box-shadow: 0 4px 16px var(--shadow);
   overflow: hidden;
 }
 
