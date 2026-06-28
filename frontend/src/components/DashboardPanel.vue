@@ -1,5 +1,10 @@
 <template>
-  <section :class="panelClasses">
+  <FocusPanel
+    as="section"
+    :focused="focused"
+    :dim="dim"
+    :class="panelClasses"
+  >
     <header v-if="showPanelHeader" class="dashboard-panel__header">
       <div class="dashboard-panel__title-group">
         <h2 class="dashboard-panel__title">{{ title }}</h2>
@@ -12,12 +17,13 @@
     <div class="dashboard-panel__body">
       <slot />
     </div>
-  </section>
+  </FocusPanel>
 </template>
 
 <script setup>
 import { computed } from "vue";
 import { useConfigStore } from "../stores/config";
+import FocusPanel from "./ui/FocusPanel.vue";
 
 const props = defineProps({
   title: {
@@ -36,6 +42,14 @@ const props = defineProps({
   headerVisible: {
     type: Boolean,
     default: true,
+  },
+  focused: {
+    type: Boolean,
+    default: false,
+  },
+  dim: {
+    type: Boolean,
+    default: false,
   },
 });
 
@@ -58,12 +72,10 @@ const panelClasses = computed(() => [
   display: flex;
   flex-direction: column;
   overflow: hidden;
-  background: var(--bg-primary);
-  border-radius: 8px;
 }
 
-.dashboard-panel--media {
-  background: #000;
+.dashboard-panel--media .dashboard-panel__body {
+  background: var(--bg-0);
 }
 
 .dashboard-panel__header {
@@ -74,8 +86,8 @@ const panelClasses = computed(() => [
   align-items: center;
   justify-content: space-between;
   gap: 1rem;
-  background: var(--bg-secondary);
-  border-bottom: 1px solid var(--border-color);
+  background: transparent;
+  border-bottom: 1px solid var(--line-soft);
 }
 
 .dashboard-panel__title-group {
@@ -87,7 +99,8 @@ const panelClasses = computed(() => [
 
 .dashboard-panel__title {
   margin: 0;
-  color: var(--text-primary);
+  color: var(--ink);
+  font-family: var(--font-display);
   font-size: 1.5rem;
   font-weight: 700;
   line-height: 1.2;
@@ -98,7 +111,7 @@ const panelClasses = computed(() => [
 
 .dashboard-panel__subtitle {
   margin: 0;
-  color: var(--text-secondary);
+  color: var(--ink-2);
   font-size: 0.85rem;
   font-weight: 500;
   line-height: 1.25;
