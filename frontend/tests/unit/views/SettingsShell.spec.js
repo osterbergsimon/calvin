@@ -30,9 +30,9 @@ const stubs = {
   },
   DisplaySettings: { template: '<div class="display-stub" />' },
   ClockBarSettings: { template: '<div class="clockbar-settings-stub" />' },
+  ContentSettings: { template: '<div class="content-settings-stub" />' },
   DeviceSettings: { template: '<div class="device-settings-stub" />' },
   MaintenanceSettings: { template: '<div class="maintenance-settings-stub" />' },
-  ContentSourcesCategory: true,
   PluginsCategory: true,
 };
 
@@ -67,6 +67,13 @@ describe("Settings shell", () => {
     sessionStorage.setItem("settings_active_category", "maintenance");
     const w = mount(Settings, { global: { stubs } });
     expect(w.find(".maintenance-settings-stub").exists()).toBe(true);
+    expect(w.find(".display-stub").exists()).toBe(false);
+  });
+
+  it("renders ContentSettings for the content category", () => {
+    sessionStorage.setItem("settings_active_category", "content");
+    const w = mount(Settings, { global: { stubs } });
+    expect(w.find(".content-settings-stub").exists()).toBe(true);
     expect(w.find(".display-stub").exists()).toBe(false);
   });
 });

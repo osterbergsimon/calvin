@@ -37,7 +37,7 @@
             :config="localConfig"
             @update:config="handleConfigUpdate"
           />
-          <ContentSourcesCategory
+          <ContentSettings
             v-if="activeCategory === 'content' && localConfig"
             :key="categoryRenderKey"
             :config="localConfig"
@@ -86,6 +86,7 @@ import {
   isKnownSettingsCategory,
   settingsCategories,
 } from "@/components/settings/settingsRegistry";
+import ContentSettings from "@/components/settings/categories/ContentSettings.vue";
 
 // Lazy-load category components for better code splitting
 const DisplaySettings = defineAsyncComponent(
@@ -93,9 +94,6 @@ const DisplaySettings = defineAsyncComponent(
 );
 const ClockBarSettings = defineAsyncComponent(
   () => import("@/components/settings/categories/ClockBarSettings.vue")
-);
-const ContentSourcesCategory = defineAsyncComponent(
-  () => import("@/components/settings/categories/ContentSourcesCategory.vue")
 );
 const PluginsCategory = defineAsyncComponent(
   () => import("@/components/settings/categories/PluginsCategory.vue")
@@ -224,6 +222,12 @@ const SECTION_BY_CATEGORY_TAB = {
   "clock-bar": {
     appearance: "clock-bar-clock",
     "bar-items": "clock-bar-items",
+  },
+  content: {
+    calendars: "content-calendars",
+    photos: "content-photos",
+    images: "content-images",
+    services: "content-services",
   },
   device: {
     power: "device-power",
