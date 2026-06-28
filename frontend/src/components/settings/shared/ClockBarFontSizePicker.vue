@@ -245,8 +245,9 @@ const handlePaddingInput = event => {
 
 .control-label {
   font-size: 0.875rem;
+  font-family: var(--font-ui);
   font-weight: 500;
-  color: var(--text-primary);
+  color: var(--ink);
 }
 
 .slider-group {
@@ -259,7 +260,7 @@ const handlePaddingInput = event => {
   flex: 1;
   height: 6px;
   border-radius: 3px;
-  background: var(--bg-secondary);
+  background: var(--bg-2);
   outline: none;
   -webkit-appearance: none;
   appearance: none;
@@ -271,20 +272,25 @@ const handlePaddingInput = event => {
   width: 18px;
   height: 18px;
   border-radius: 50%;
-  background: var(--accent-primary);
+  background: var(--focus);
   cursor: pointer;
-  border: 2px solid var(--bg-primary);
-  box-shadow: 0 2px 4px rgba(0, 0, 0, 0.2);
+  border: 2px solid var(--bg-1);
+  box-shadow: 0 2px 4px var(--shadow);
 }
 
 .font-size-slider::-moz-range-thumb {
   width: 18px;
   height: 18px;
   border-radius: 50%;
-  background: var(--accent-primary);
+  background: var(--focus);
   cursor: pointer;
-  border: 2px solid var(--bg-primary);
-  box-shadow: 0 2px 4px rgba(0, 0, 0, 0.2);
+  border: 2px solid var(--bg-1);
+  box-shadow: 0 2px 4px var(--shadow);
+}
+
+.font-size-slider:focus-visible {
+  outline: 2px solid var(--focus);
+  outline-offset: 2px;
 }
 
 .font-size-display {
@@ -297,23 +303,24 @@ const handlePaddingInput = event => {
 .font-size-input {
   width: 60px;
   padding: 0.375rem 0.5rem;
-  background: var(--bg-secondary);
-  color: var(--text-primary);
-  border: 1px solid var(--border-color);
+  background: var(--bg-2);
+  color: var(--ink);
+  border: 1px solid var(--line);
   border-radius: 4px;
   font-size: 0.9rem;
+  font-family: var(--font-data);
   text-align: center;
 }
 
-.font-size-input:focus {
-  outline: none;
-  border-color: var(--accent-primary);
-  box-shadow: 0 0 0 2px rgba(33, 150, 243, 0.2);
+.font-size-input:focus-visible {
+  outline: 2px solid var(--focus);
+  outline-offset: 2px;
+  border-color: var(--focus);
 }
 
 .font-size-unit {
   font-size: 0.875rem;
-  color: var(--text-secondary);
+  color: var(--ink-2);
 }
 
 .preview-container {
@@ -324,14 +331,15 @@ const handlePaddingInput = event => {
 
 .preview-label {
   font-size: 0.875rem;
+  font-family: var(--font-ui);
   font-weight: 500;
-  color: var(--text-secondary);
+  color: var(--ink-2);
 }
 
 .preview-wrapper {
-  border: 1px solid var(--border-color);
+  border: 1px solid var(--line);
   border-radius: 4px;
-  background: var(--bg-primary);
+  background: var(--bg-1);
   overflow: hidden;
 }
 
