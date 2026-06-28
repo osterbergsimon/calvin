@@ -29,17 +29,18 @@ const stubs = {
     template: '<div class="rail-stub" @click="$emit(\'select\', \'clock-bar\')" />',
   },
   DisplaySettings: { template: '<div class="display-stub" />' },
-  ClockBarCategory: { template: '<div class="clockbar-stub" />' },
+  ClockBarSettings: { template: '<div class="clockbar-settings-stub" />' },
+  DeviceSettings: { template: '<div class="device-settings-stub" />' },
+  MaintenanceSettings: { template: '<div class="maintenance-settings-stub" />' },
   ContentSourcesCategory: true,
   PluginsCategory: true,
-  DeviceCategory: true,
-  MaintenanceCategory: true,
 };
 
 describe("Settings shell", () => {
   beforeEach(() => {
     setActivePinia(createPinia());
     push.mockClear();
+    sessionStorage.clear();
   });
 
   it("renders DisplaySettings for the default (dashboard) category", () => {
@@ -47,11 +48,25 @@ describe("Settings shell", () => {
     expect(w.find(".display-stub").exists()).toBe(true);
   });
 
-  it("switches to an existing category component on rail select", async () => {
+  it("renders ClockBarSettings for the clock-bar category", async () => {
     const w = mount(Settings, { global: { stubs } });
     await w.find(".rail-stub").trigger("click");
     await flushPromises();
-    expect(w.find(".clockbar-stub").exists()).toBe(true);
+    expect(w.find(".clockbar-settings-stub").exists()).toBe(true);
+    expect(w.find(".display-stub").exists()).toBe(false);
+  });
+
+  it("renders DeviceSettings for the device category", () => {
+    sessionStorage.setItem("settings_active_category", "device");
+    const w = mount(Settings, { global: { stubs } });
+    expect(w.find(".device-settings-stub").exists()).toBe(true);
+    expect(w.find(".display-stub").exists()).toBe(false);
+  });
+
+  it("renders MaintenanceSettings for the maintenance category", () => {
+    sessionStorage.setItem("settings_active_category", "maintenance");
+    const w = mount(Settings, { global: { stubs } });
+    expect(w.find(".maintenance-settings-stub").exists()).toBe(true);
     expect(w.find(".display-stub").exists()).toBe(false);
   });
 });
