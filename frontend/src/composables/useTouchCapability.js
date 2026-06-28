@@ -2,15 +2,17 @@ import { ref, readonly, onScopeDispose } from "vue";
 
 /**
  * Reactive touch-capability detection.
- * `isTouch` is true on coarse-pointer devices (the 15" wall touchscreen)
- * and false on the 24" keyboard-driven unit. Single source of truth for
- * whether to render touch chrome.
+ * `isTouch` is true when ANY attached pointer is coarse (a touchscreen) —
+ * `any-pointer` rather than `pointer` so a touch unit that also has a mouse
+ * (e.g. a touchscreen wired to a workstation) is still detected, while the
+ * 24" keyboard-only unit with no pointing device stays false. Single source
+ * of truth for whether to render touch chrome.
  */
 export function useTouchCapability() {
   const isTouch = ref(false);
 
   if (typeof window !== "undefined" && typeof window.matchMedia === "function") {
-    const mql = window.matchMedia("(pointer: coarse)");
+    const mql = window.matchMedia("(any-pointer: coarse)");
     isTouch.value = mql.matches;
     const update = event => {
       isTouch.value = event.matches;
