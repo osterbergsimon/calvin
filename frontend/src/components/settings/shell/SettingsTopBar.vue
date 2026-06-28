@@ -9,20 +9,26 @@
           class="topbar__crumb"
           type="button"
           @click="$emit('crumb', 'settings')"
-        >Settings</button>
+        >
+Settings
+</button>
         <span class="settings-topbar__sep" aria-hidden="true">›</span>
         <button
           class="topbar__crumb"
           type="button"
           @click="$emit('crumb', 'category')"
-        >{{ categoryLabel }}</button>
+        >
+{{ categoryLabel }}
+</button>
         <template v-if="sectionLabel">
           <span class="settings-topbar__sep" aria-hidden="true">›</span>
           <button
             class="topbar__crumb"
             type="button"
             @click="$emit('crumb', 'section')"
-          >{{ sectionLabel }}</button>
+          >
+{{ sectionLabel }}
+</button>
         </template>
       </nav>
     </div>
@@ -41,7 +47,9 @@
         type="button"
         data-action="done"
         @click="$emit('done')"
-      >Done</button>
+      >
+Done
+</button>
     </div>
   </header>
 </template>
