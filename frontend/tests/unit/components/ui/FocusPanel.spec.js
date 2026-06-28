@@ -21,4 +21,16 @@ describe("FocusPanel", () => {
     expect(w.element.tagName.toLowerCase()).toBe("article");
     expect(w.html()).toContain("<p>hi</p>");
   });
+
+  it("is neutral (neither focused nor dim) when dim=false and not focused", () => {
+    const wrapper = mount(FocusPanel, { props: { focused: false, dim: false } });
+    const root = wrapper.find(".focus-panel");
+    expect(root.classes()).not.toContain("is-focused");
+    expect(root.classes()).not.toContain("is-dim");
+  });
+
+  it("dims by default when not focused (back-compat)", () => {
+    const wrapper = mount(FocusPanel, { props: { focused: false } });
+    expect(wrapper.find(".focus-panel").classes()).toContain("is-dim");
+  });
 });

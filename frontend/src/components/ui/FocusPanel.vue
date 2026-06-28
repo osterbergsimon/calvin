@@ -1,18 +1,22 @@
 <template>
-  <component
-    :is="as"
-    class="focus-panel"
-    :class="focused ? 'is-focused' : 'is-dim'"
-    :aria-current="focused ? 'true' : null"
-  >
+  <component :is="as" class="focus-panel" :class="stateClass" :aria-current="focused ? 'true' : null">
     <slot />
   </component>
 </template>
 
 <script setup>
-defineProps({
+import { computed } from "vue";
+
+const props = defineProps({
   focused: { type: Boolean, default: false },
+  dim: { type: Boolean, default: true },
   as: { type: String, default: "section" },
+});
+
+const stateClass = computed(() => {
+  if (props.focused) return "is-focused";
+  if (props.dim) return "is-dim";
+  return null;
 });
 </script>
 
