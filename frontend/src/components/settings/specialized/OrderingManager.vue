@@ -173,15 +173,15 @@ const handleInstanceDragEnd = pluginId => {
 }
 
 .plugin-tree-item {
-  background: var(--bg-primary);
-  border: 1px solid var(--border-color);
+  background: var(--bg-1);
+  border: 1px solid var(--line);
   border-radius: 6px;
   transition: all 0.2s ease;
   overflow: hidden;
 }
 
 .plugin-tree-item:hover {
-  border-color: var(--accent-primary);
+  border-color: var(--focus);
   box-shadow: 0 2px 4px var(--shadow);
 }
 
@@ -196,21 +196,22 @@ const handleInstanceDragEnd = pluginId => {
   display: flex;
   align-items: center;
   gap: 0.5rem;
-  color: var(--text-secondary);
+  color: var(--ink-2);
 }
 
 .order-number {
   font-weight: 600;
-  color: var(--accent-primary);
+  color: var(--focus);
   min-width: 1.5rem;
   text-align: center;
+  font-family: var(--font-data);
 }
 
 .plugin-drag-handle {
   cursor: grab;
   font-size: 1.2rem;
   line-height: 1;
-  color: var(--text-tertiary);
+  color: var(--ink-3);
   user-select: none;
 }
 
@@ -227,10 +228,11 @@ const handleInstanceDragEnd = pluginId => {
 
 .instance-count-badge {
   padding: 0.25rem 0.5rem;
-  background: var(--bg-secondary);
+  background: var(--bg-2);
   border-radius: 12px;
   font-size: 0.75rem;
-  color: var(--text-secondary);
+  color: var(--ink-2);
+  font-family: var(--font-data);
 }
 
 .plugin-instances-tree {
@@ -238,7 +240,7 @@ const handleInstanceDragEnd = pluginId => {
   margin-right: 1rem;
   margin-bottom: 0.75rem;
   padding-left: 1rem;
-  border-left: 2px solid var(--border-color);
+  border-left: 2px solid var(--line);
   display: flex;
   flex-direction: column;
   gap: 0.5rem;
@@ -246,15 +248,15 @@ const handleInstanceDragEnd = pluginId => {
 
 .instance-tree-item {
   padding: 0.5rem 0.75rem;
-  background: var(--bg-tertiary);
-  border: 1px solid var(--border-color);
+  background: var(--bg-2);
+  border: 1px solid var(--line);
   border-radius: 4px;
   transition: all 0.2s ease;
 }
 
 .instance-tree-item:hover {
-  border-color: var(--accent-primary);
-  background: var(--bg-secondary);
+  border-color: var(--focus);
+  background: var(--bg-2);
 }
 
 .instance-tree-header {
@@ -268,7 +270,7 @@ const handleInstanceDragEnd = pluginId => {
   cursor: grab;
   font-size: 1rem;
   line-height: 1;
-  color: var(--text-tertiary);
+  color: var(--ink-3);
   user-select: none;
   flex-shrink: 0;
 }
@@ -283,21 +285,22 @@ const handleInstanceDragEnd = pluginId => {
 }
 
 .running-indicator.running {
-  color: #4caf50;
+  color: var(--ok);
 }
 
 .running-indicator.stopped {
-  color: #f44336;
+  color: var(--err);
 }
 
 .instance-name {
   font-weight: 500;
-  color: var(--text-primary);
+  color: var(--ink);
   flex: 0 0 auto;
+  font-family: var(--font-ui);
 }
 
 .instance-summary {
-  color: var(--text-secondary);
+  color: var(--ink-2);
   font-size: 0.85rem;
   flex: 1;
   overflow: hidden;
@@ -316,7 +319,7 @@ const handleInstanceDragEnd = pluginId => {
 
 .help-text {
   font-size: 0.875rem;
-  color: var(--text-secondary);
+  color: var(--ink-2);
   margin: 0;
   line-height: 1.4;
 }
@@ -324,8 +327,8 @@ const handleInstanceDragEnd = pluginId => {
 .no-plugins-message {
   padding: 2rem;
   text-align: center;
-  background: var(--bg-secondary);
-  border: 1px solid var(--border-color);
+  background: var(--bg-2);
+  border: 1px solid var(--line);
   border-radius: 6px;
 }
 </style>
