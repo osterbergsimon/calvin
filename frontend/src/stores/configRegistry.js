@@ -92,6 +92,7 @@ export const CONFIG_FIELD_DEFINITIONS = [
     keys: ["calendarViewMode", "calendar_view_mode"],
     defaultValue: "month",
   },
+  { name: "calendarWeeks", keys: ["calendarWeeks", "calendar_weeks"], defaultValue: 4 },
   {
     name: "calendarRefreshInterval",
     keys: ["calendarRefreshInterval", "calendar_refresh_interval"],

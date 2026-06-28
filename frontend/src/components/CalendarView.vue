@@ -168,6 +168,7 @@ const showWeekNumbers = computed(() => configStore.showWeekNumbers);
 const weekStartDay = computed(() => configStore.weekStartDay ?? 1);
 const weekendDays = computed(() => configStore.weekendDays || [0, 6]);
 const showRedDays = computed(() => configStore.showRedDays || false);
+const rollingWeeks = computed(() => Math.min(12, Math.max(1, configStore.calendarWeeks ?? 4)));
 
 const viewModeLabel = computed(() => {
   const labels = {
@@ -557,8 +558,8 @@ const calendarDays = computed(() => {
     const days = [];
     const startDate = getWeekStart(todayDate);
 
-    // Generate 4 weeks (28 days)
-    for (let i = 0; i < 28; i++) {
+    // Generate rollingWeeks weeks
+    for (let i = 0; i < rollingWeeks.value * 7; i++) {
       const date = new Date(startDate);
       date.setDate(startDate.getDate() + i);
       const dateOnly = new Date(date);
