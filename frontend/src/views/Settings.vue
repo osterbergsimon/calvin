@@ -31,7 +31,7 @@
             :config="localConfig"
             @update:config="handleConfigUpdate"
           />
-          <ClockBarCategory
+          <ClockBarSettings
             v-if="activeCategory === 'clock-bar' && localConfig"
             :key="categoryRenderKey"
             :config="localConfig"
@@ -47,23 +47,23 @@
             v-if="activeCategory === 'plugins'"
             :key="categoryRenderKey"
           />
-          <DeviceCategory
-            v-if="activeCategory === 'device'"
+          <DeviceSettings
+            v-if="activeCategory === 'device' && localConfig"
             :key="categoryRenderKey"
             :config="localConfig"
             :version="version"
             :frontend-version="frontendVersion"
             @update:config="handleConfigUpdate"
           />
-          <MaintenanceCategory
-            v-if="activeCategory === 'maintenance'"
+          <MaintenanceSettings
+            v-if="activeCategory === 'maintenance' && localConfig"
             :key="categoryRenderKey"
             :config="localConfig"
             :git-repo-url="localConfig && localConfig.gitRepoUrl"
-            :git-branch="localConfig && localConfig.gitBranch"
+            :git-branch="(localConfig && localConfig.gitBranch) || 'main'"
             @update:config="handleConfigUpdate"
-            @update:gitRepoUrl="handleGitRepoUrlUpdate"
-            @update:gitBranch="handleGitBranchUpdate"
+            @update:git-repo-url="handleGitRepoUrlUpdate"
+            @update:git-branch="handleGitBranchUpdate"
           />
         </div>
       </div>
@@ -91,8 +91,8 @@ import {
 const DisplaySettings = defineAsyncComponent(
   () => import("@/components/settings/categories/DisplaySettings.vue")
 );
-const ClockBarCategory = defineAsyncComponent(
-  () => import("@/components/settings/categories/ClockBarCategory.vue")
+const ClockBarSettings = defineAsyncComponent(
+  () => import("@/components/settings/categories/ClockBarSettings.vue")
 );
 const ContentSourcesCategory = defineAsyncComponent(
   () => import("@/components/settings/categories/ContentSourcesCategory.vue")
@@ -100,11 +100,11 @@ const ContentSourcesCategory = defineAsyncComponent(
 const PluginsCategory = defineAsyncComponent(
   () => import("@/components/settings/categories/PluginsCategory.vue")
 );
-const DeviceCategory = defineAsyncComponent(
-  () => import("@/components/settings/categories/DeviceCategory.vue")
+const DeviceSettings = defineAsyncComponent(
+  () => import("@/components/settings/categories/DeviceSettings.vue")
 );
-const MaintenanceCategory = defineAsyncComponent(
-  () => import("@/components/settings/categories/MaintenanceCategory.vue")
+const MaintenanceSettings = defineAsyncComponent(
+  () => import("@/components/settings/categories/MaintenanceSettings.vue")
 );
 
 const router = useRouter();
@@ -212,17 +212,34 @@ watch(activeCategory, async () => {
   }
 });
 
-// ── Tab → section-id mapping (Display/dashboard) ─────────────────────────────
-const TAB_TO_SECTION = {
-  layout: "layout",
-  calendar: "calendar",
-  appearance: "appearance",
-  notifications: "notifications",
-  "plugin-display": "plugin-display",
+// ── (category, tab) → section-id for migrated categories ────────────────────
+const SECTION_BY_CATEGORY_TAB = {
+  dashboard: {
+    layout: "layout",
+    calendar: "calendar",
+    appearance: "appearance",
+    notifications: "notifications",
+    "plugin-display": "plugin-display",
+  },
+  "clock-bar": {
+    appearance: "clock-bar-clock",
+    "bar-items": "clock-bar-items",
+  },
+  device: {
+    power: "device-power",
+    keyboard: "device-keyboard",
+    reboot: "device-reboot",
+    hardware: "device-hardware",
+  },
+  maintenance: {
+    updates: "maintenance-updates",
+    diagnostics: "maintenance-diagnostics",
+  },
 };
+const MIGRATED_CATEGORIES = new Set(Object.keys(SECTION_BY_CATEGORY_TAB));
 
-function sectionForTab(tab) {
-  return TAB_TO_SECTION[tab] ?? null;
+function sectionFor(category, tab) {
+  return SECTION_BY_CATEGORY_TAB[category]?.[tab] ?? null;
 }
 
 // ── Navigation helpers ────────────────────────────────────────────────────────
@@ -235,19 +252,22 @@ const selectCategory = categoryId => {
 };
 
 const onJump = async destination => {
-  // For non-dashboard categories, honour the tab sessionStorage hint
-  if (destination.tabKey && destination.tab && destination.category !== "dashboard") {
+  // Unmigrated categories still use the tab sessionStorage hint.
+  if (
+    destination.tabKey &&
+    destination.tab &&
+    !MIGRATED_CATEGORIES.has(destination.category)
+  ) {
     sessionStorage.setItem(destination.tabKey, destination.tab);
   }
 
   activeCategory.value = destination.category;
   categoryRenderKey.value += 1;
-
   router.replace({ query: { ...route.query, setting: destination.id } });
 
-  if (destination.category === "dashboard" && destination.tab) {
+  if (MIGRATED_CATEGORIES.has(destination.category) && destination.tab) {
     await nextTick();
-    const sectionId = sectionForTab(destination.tab);
+    const sectionId = sectionFor(destination.category, destination.tab);
     if (sectionId) {
       const el = document.getElementById("section-" + sectionId);
       if (el) el.scrollIntoView({ behavior: "smooth" });
@@ -281,7 +301,7 @@ watch(
   () => {
     const destination = getRouteSettingDestination();
     if (!destination) return;
-    if (destination.tabKey && destination.tab && destination.category !== "dashboard") {
+    if (destination.tabKey && destination.tab && !MIGRATED_CATEGORIES.has(destination.category)) {
       sessionStorage.setItem(destination.tabKey, destination.tab);
     }
     activeCategory.value = destination.category;
