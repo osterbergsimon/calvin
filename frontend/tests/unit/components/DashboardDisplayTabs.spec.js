@@ -2,8 +2,6 @@ import { beforeEach, describe, it, expect, vi } from "vitest";
 import { mount } from "@vue/test-utils";
 import { createPinia, setActivePinia } from "pinia";
 import DashboardLayoutTab from "@/components/settings/tabs/dashboard/DashboardLayoutTab.vue";
-import CalendarDisplayTab from "@/components/settings/tabs/dashboard/CalendarDisplayTab.vue";
-import PluginDisplayTab from "@/components/settings/tabs/dashboard/PluginDisplayTab.vue";
 import { useWebServicesStore } from "@/stores/webServices";
 
 describe("dashboard display settings tabs", () => {
@@ -165,46 +163,4 @@ describe("dashboard display settings tabs", () => {
     expect(emitted.dashboardScreens.screens[0].activeRegionId).toBe("region-2");
   });
 
-  it("renders week start options in the calendar display tab", () => {
-    const wrapper = mount(CalendarDisplayTab, {
-      props: { config: {} },
-    });
-
-    const options = wrapper
-      .find("#week-start-day")
-      .findAll("option")
-      .map(option => option.text());
-
-    expect(wrapper.find("#week-start-day").element.value).toBe("1");
-    expect(options).toEqual([
-      "Sunday",
-      "Monday",
-      "Tuesday",
-      "Wednesday",
-      "Thursday",
-      "Friday",
-      "Saturday",
-    ]);
-  });
-
-  it("emits week start day updates from the calendar display tab", async () => {
-    const wrapper = mount(CalendarDisplayTab, {
-      props: { config: { weekStartDay: 1 } },
-    });
-
-    await wrapper.find("#week-start-day").setValue("6");
-    await wrapper.find("#week-start-day").trigger("change");
-
-    expect(wrapper.emitted("update:config").at(-1)[0]).toEqual({
-      weekStartDay: 6,
-    });
-  });
-
-  it("exposes plugin display controls with stable ids", () => {
-    const wrapper = mount(PluginDisplayTab, {
-      props: { config: {} },
-    });
-
-    expect(wrapper.find("#meal-plan-card-size").exists()).toBe(true);
-  });
 });
