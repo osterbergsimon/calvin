@@ -78,9 +78,9 @@ const stubs = {
   SettingsSection: { template: "<div><slot /></div>" },
   SettingRow: { template: "<div><slot /></div>" },
   PluginInstaller: { name: "PluginInstaller", template: "<div />", props: ["repoUrl"] },
-  PluginManager: true,
-  InstanceModal: true,
-  ConfirmModal: true,
+  PluginManager: { template: "<div/>" },
+  InstanceModal: { template: "<div/>" },
+  ConfirmModal: { template: "<div/>" },
 };
 
 describe("PluginsCategory repo prefill", () => {

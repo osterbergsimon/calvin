@@ -1,6 +1,6 @@
 """Tests for load_plugin_types_for_single (no-restart install registration)."""
 
-from unittest.mock import MagicMock, patch
+from unittest.mock import patch
 
 import pytest
 
