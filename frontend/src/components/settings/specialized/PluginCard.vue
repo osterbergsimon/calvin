@@ -333,11 +333,12 @@ const handleInstanceOrderChange = newOrder => {
 <style scoped>
 .plugin-card {
   width: 100%;
+  background: var(--bg-2);
 }
 
 .plugin-header {
   padding: 1rem 1.5rem;
-  border-bottom: 1px solid var(--border-color);
+  border-bottom: 1px solid var(--line);
 }
 
 .plugin-header-top {
@@ -364,15 +365,15 @@ const handleInstanceOrderChange = newOrder => {
 }
 
 .running-indicator-aggregate.all-running {
-  color: #4caf50;
+  color: var(--ok);
 }
 
 .running-indicator-aggregate.all-stopped {
-  color: #f44336;
+  color: var(--err);
 }
 
 .running-indicator-aggregate.partial-running {
-  color: #ff9800;
+  color: var(--warn);
 }
 
 .plugin-type-badge {
@@ -409,7 +410,7 @@ const handleInstanceOrderChange = newOrder => {
 
 .plugin-description {
   margin: 0;
-  color: var(--text-secondary);
+  color: var(--ink-2);
   font-size: 0.9rem;
 }
 
@@ -421,31 +422,37 @@ const handleInstanceOrderChange = newOrder => {
 
 .btn-icon-only {
   background: transparent;
-  border: 1px solid var(--border-color);
+  border: 1px solid var(--line);
   border-radius: 4px;
   padding: 0.5rem;
   cursor: pointer;
   transition: all 0.2s;
+  min-height: 44px;
 }
 
 .btn-icon-only:hover {
-  background: var(--bg-secondary);
-  border-color: var(--accent-primary);
+  background: var(--bg-2);
+  border-color: var(--focus);
+}
+
+.btn-icon-only:focus-visible {
+  outline: 2px solid var(--focus);
+  outline-offset: 2px;
 }
 
 .btn-icon-only.active {
-  background: var(--accent-primary);
+  background: var(--focus);
   color: white;
-  border-color: var(--accent-primary);
+  border-color: var(--focus);
 }
 
 .btn-remove {
-  color: #f44336;
+  color: var(--err);
 }
 
 .btn-remove:hover {
-  background: rgba(244, 67, 54, 0.1);
-  border-color: #f44336;
+  background: color-mix(in srgb, var(--err) 10%, transparent);
+  border-color: var(--err);
 }
 
 .toggle-switch {
@@ -468,7 +475,7 @@ const handleInstanceOrderChange = newOrder => {
   left: 0;
   right: 0;
   bottom: 0;
-  background-color: #ccc;
+  background-color: var(--ink-3);
   transition: 0.4s;
   border-radius: 24px;
 }
@@ -486,7 +493,7 @@ const handleInstanceOrderChange = newOrder => {
 }
 
 input:checked + .slider {
-  background-color: var(--accent-primary);
+  background-color: var(--focus);
 }
 
 input:checked + .slider:before {
@@ -495,14 +502,14 @@ input:checked + .slider:before {
 
 .plugin-config {
   padding: 1.5rem;
-  border-top: 1px solid var(--border-color);
+  border-top: 1px solid var(--line);
 }
 
 .config-section-title {
   margin: 0 0 1rem 0;
   font-size: 1rem;
   font-weight: 600;
-  color: var(--text-primary);
+  color: var(--ink);
 }
 
 .plugin-setting {
@@ -511,13 +518,13 @@ input:checked + .slider:before {
 
 .plugin-disabled-message {
   padding: 1rem 1.5rem;
-  border-top: 1px solid var(--border-color);
+  border-top: 1px solid var(--line);
 }
 
 .help-text {
   margin: 0;
   font-size: 0.875rem;
-  color: var(--text-secondary);
+  color: var(--ink-2);
   line-height: 1.4;
 }
 </style>
