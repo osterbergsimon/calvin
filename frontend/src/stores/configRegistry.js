@@ -280,6 +280,11 @@ export const CONFIG_FIELD_DEFINITIONS = [
     defaultValue: 30,
   },
   { name: "devMode", keys: ["devMode", "dev_mode"], defaultValue: false },
+  {
+    name: "pluginRepositoryUrl",
+    keys: ["pluginRepositoryUrl", "plugin_repository_url"],
+    defaultValue: "https://github.com/osterbergsimon/calvin-plugins",
+  },
 ];
 
 export const getConfigPayloadValue = (payload, field) => {
