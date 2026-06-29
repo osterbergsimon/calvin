@@ -683,15 +683,16 @@ watch(searchQuery, () => {
   display: flex;
   gap: 0.5rem;
   margin-bottom: 1rem;
-  border-bottom: 2px solid var(--border-color);
+  border-bottom: 2px solid var(--line);
 }
 
 .install-tab {
   padding: 0.75rem 1.25rem;
+  min-height: 44px;
   background: transparent;
   border: none;
   border-bottom: 3px solid transparent;
-  color: var(--text-secondary);
+  color: var(--ink-2);
   font-size: 0.95rem;
   font-weight: 500;
   cursor: pointer;
@@ -700,30 +701,36 @@ watch(searchQuery, () => {
 }
 
 .install-tab:hover {
-  color: var(--text-primary);
-  background: var(--bg-secondary);
+  color: var(--ink);
+  background: var(--bg-2);
+}
+
+.install-tab:focus-visible {
+  outline: 2px solid var(--focus);
+  outline-offset: 2px;
 }
 
 .install-tab.active {
-  color: var(--accent-primary);
-  border-bottom-color: var(--accent-primary);
+  color: var(--focus);
+  border-bottom-color: var(--focus);
   font-weight: 600;
 }
 
 .install-tab--dev {
-  color: #e67e22;
+  color: var(--warn);
 }
 
 .install-tab--dev.active {
-  color: #e67e22;
-  border-bottom-color: #e67e22;
+  color: var(--warn);
+  border-bottom-color: var(--warn);
 }
 
 .btn-autodetect {
   padding: 0.5rem 1rem;
-  background: #6c757d;
-  color: white;
-  border: none;
+  min-height: 44px;
+  background: var(--bg-2);
+  color: var(--ink);
+  border: 1px solid var(--line);
   border-radius: 4px;
   font-size: 0.9rem;
   font-weight: 600;
@@ -733,9 +740,14 @@ watch(searchQuery, () => {
 }
 
 .btn-autodetect:hover:not(:disabled) {
-  background: #5a6268;
+  border-color: var(--focus);
   transform: translateY(-1px);
   box-shadow: 0 2px 4px var(--shadow);
+}
+
+.btn-autodetect:focus-visible {
+  outline: 2px solid var(--focus);
+  outline-offset: 2px;
 }
 
 .btn-autodetect:disabled {
@@ -757,8 +769,9 @@ watch(searchQuery, () => {
 
 .btn-upload {
   padding: 0.5rem 1rem;
-  background: #2196f3;
-  color: #fff;
+  min-height: 44px;
+  background: var(--focus);
+  color: white;
   border: none;
   border-radius: 4px;
   font-size: 0.9rem;
@@ -769,9 +782,14 @@ watch(searchQuery, () => {
 }
 
 .btn-upload:hover:not(:disabled) {
-  background: #1976d2;
+  background: color-mix(in srgb, var(--focus), black 12%);
   transform: translateY(-1px);
-  box-shadow: 0 2px 4px rgba(0, 0, 0, 0.2);
+  box-shadow: 0 2px 4px var(--shadow);
+}
+
+.btn-upload:focus-visible {
+  outline: 2px solid var(--focus);
+  outline-offset: 2px;
 }
 
 .btn-upload:disabled {
@@ -781,7 +799,7 @@ watch(searchQuery, () => {
 }
 
 .selected-file-compact {
-  color: var(--text-secondary);
+  color: var(--ink-2);
   font-size: 0.875rem;
 }
 
@@ -789,26 +807,49 @@ watch(searchQuery, () => {
   flex: 1;
   min-width: 200px;
   padding: 0.5rem;
-  border: 1px solid var(--border-color);
+  border: 1px solid var(--line);
   border-radius: 4px;
-  background: var(--bg-secondary);
-  color: var(--text-primary);
+  background: var(--bg-2);
+  color: var(--ink);
   font-size: 0.9rem;
+}
+
+.github-input-compact:focus {
+  outline: none;
+  border-color: var(--focus);
+  box-shadow: 0 0 0 2px color-mix(in srgb, var(--focus) 20%, transparent);
+}
+
+.github-input-compact:focus-visible {
+  outline: 2px solid var(--focus);
+  outline-offset: 2px;
 }
 
 .github-branch-compact {
   width: 100px;
   padding: 0.5rem;
-  border: 1px solid var(--border-color);
+  border: 1px solid var(--line);
   border-radius: 4px;
-  background: var(--bg-secondary);
-  color: var(--text-primary);
+  background: var(--bg-2);
+  color: var(--ink);
   font-size: 0.9rem;
+}
+
+.github-branch-compact:focus {
+  outline: none;
+  border-color: var(--focus);
+  box-shadow: 0 0 0 2px color-mix(in srgb, var(--focus) 20%, transparent);
+}
+
+.github-branch-compact:focus-visible {
+  outline: 2px solid var(--focus);
+  outline-offset: 2px;
 }
 
 .btn-browse {
   padding: 0.5rem 1rem;
-  background: var(--accent-primary);
+  min-height: 44px;
+  background: var(--focus);
   color: white;
   border: none;
   border-radius: 4px;
@@ -820,9 +861,14 @@ watch(searchQuery, () => {
 }
 
 .btn-browse:hover:not(:disabled) {
-  background: var(--accent-secondary);
+  background: color-mix(in srgb, var(--focus), black 12%);
   transform: translateY(-1px);
   box-shadow: 0 2px 4px var(--shadow);
+}
+
+.btn-browse:focus-visible {
+  outline: 2px solid var(--focus);
+  outline-offset: 2px;
 }
 
 .btn-browse:disabled {
@@ -833,7 +879,7 @@ watch(searchQuery, () => {
 
 .help-text-compact {
   font-size: 0.875rem;
-  color: var(--text-secondary);
+  color: var(--ink-2);
   margin: 0 0 0.75rem 0;
   line-height: 1.4;
 }
@@ -841,11 +887,11 @@ watch(searchQuery, () => {
 .branch-switch-notice-compact {
   margin-top: 1rem;
   padding: 0.75rem;
-  background: rgba(23, 162, 184, 0.1);
-  border: 1px solid rgba(23, 162, 184, 0.3);
+  background: color-mix(in srgb, var(--ink-2) 10%, transparent);
+  border: 1px solid color-mix(in srgb, var(--ink-2) 30%, transparent);
   border-radius: 4px;
   font-size: 0.875rem;
-  color: #0c5460;
+  color: var(--ink-2);
 }
 
 .available-plugins-compact {
@@ -862,17 +908,22 @@ watch(searchQuery, () => {
 .plugin-search-input {
   width: 100%;
   padding: 0.75rem;
-  border: 1px solid var(--border-color);
+  border: 1px solid var(--line);
   border-radius: 4px;
-  background: var(--bg-secondary);
-  color: var(--text-primary);
+  background: var(--bg-2);
+  color: var(--ink);
   font-size: 0.9rem;
 }
 
 .plugin-search-input:focus {
   outline: none;
-  border-color: var(--accent-primary);
-  box-shadow: 0 0 0 2px rgba(var(--accent-primary-rgb, 33, 150, 243), 0.2);
+  border-color: var(--focus);
+  box-shadow: 0 0 0 2px color-mix(in srgb, var(--focus) 20%, transparent);
+}
+
+.plugin-search-input:focus-visible {
+  outline: 2px solid var(--focus);
+  outline-offset: 2px;
 }
 
 .plugin-search-input:disabled {
@@ -885,8 +936,8 @@ watch(searchQuery, () => {
   justify-content: space-between;
   align-items: center;
   padding: 0.75rem;
-  background: var(--bg-tertiary);
-  border: 1px solid var(--border-color);
+  background: var(--bg-2);
+  border: 1px solid var(--line);
   border-radius: 6px;
   margin-bottom: 0.5rem;
 }
@@ -898,7 +949,8 @@ watch(searchQuery, () => {
   cursor: pointer;
   font-size: 0.9rem;
   font-weight: 500;
-  color: var(--text-primary);
+  color: var(--ink);
+  font-family: var(--font-ui);
 }
 
 .select-all-checkbox input[type="checkbox"] {
@@ -909,7 +961,8 @@ watch(searchQuery, () => {
 
 .btn-install-selected {
   padding: 0.5rem 1rem;
-  background: var(--accent-primary);
+  min-height: 44px;
+  background: var(--focus);
   color: white;
   border: none;
   border-radius: 4px;
@@ -921,9 +974,14 @@ watch(searchQuery, () => {
 }
 
 .btn-install-selected:hover:not(:disabled) {
-  background: var(--accent-secondary);
+  background: color-mix(in srgb, var(--focus), black 12%);
   transform: translateY(-1px);
   box-shadow: 0 2px 4px var(--shadow);
+}
+
+.btn-install-selected:focus-visible {
+  outline: 2px solid var(--focus);
+  outline-offset: 2px;
 }
 
 .btn-install-selected:disabled {
@@ -937,8 +995,8 @@ watch(searchQuery, () => {
   justify-content: space-between;
   align-items: center;
   padding: 0.75rem;
-  background: var(--bg-secondary);
-  border: 1px solid var(--border-color);
+  background: var(--bg-2);
+  border: 1px solid var(--line);
   border-radius: 6px;
   gap: 0.75rem;
 }
@@ -950,8 +1008,8 @@ watch(searchQuery, () => {
 }
 
 .plugin-item-inline.plugin-installed {
-  background: rgba(40, 167, 69, 0.05);
-  border-color: rgba(40, 167, 69, 0.3);
+  background: color-mix(in srgb, var(--ok) 5%, transparent);
+  border-color: color-mix(in srgb, var(--ok) 30%, transparent);
 }
 
 .plugin-checkbox-wrapper {
@@ -979,6 +1037,7 @@ watch(searchQuery, () => {
   font-weight: 600;
 }
 
+/* Plugin-type identity palette — categorical data colors, preserved per design spec */
 .plugin-type-badge-small.type-calendar {
   background: #e3f2fd;
   color: #1976d2;
@@ -1005,8 +1064,9 @@ watch(searchQuery, () => {
 }
 
 .plugin-version-small {
-  color: var(--text-secondary);
+  color: var(--ink-2);
   font-size: 0.75rem;
+  font-family: var(--font-data);
 }
 
 .plugin-installed-badge {
@@ -1014,32 +1074,32 @@ watch(searchQuery, () => {
   border-radius: 12px;
   font-size: 0.7rem;
   font-weight: 500;
-  background: rgba(40, 167, 69, 0.1);
-  color: #28a745;
-  border: 1px solid rgba(40, 167, 69, 0.3);
+  background: color-mix(in srgb, var(--ok) 10%, transparent);
+  color: var(--ok);
+  border: 1px solid color-mix(in srgb, var(--ok) 30%, transparent);
 }
 
 .plugin-installed-badge.plugin-update-available {
-  background: rgba(255, 193, 7, 0.1);
-  color: #856404;
-  border-color: rgba(255, 193, 7, 0.3);
+  background: color-mix(in srgb, var(--warn) 10%, transparent);
+  color: var(--warn);
+  border-color: color-mix(in srgb, var(--warn) 30%, transparent);
 }
 
 .btn-update {
-  background: #ffc107 !important;
-  color: #000 !important;
+  background: var(--warn) !important;
+  color: var(--ink) !important;
 }
 
 .btn-update:hover:not(:disabled) {
-  background: #ffb300 !important;
+  background: color-mix(in srgb, var(--warn), black 12%) !important;
 }
 
 .btn-reinstall {
   padding: 0.5rem 1rem;
-  background: var(--bg-secondary);
-  color: var(--text-primary);
-  border: 1px solid var(--border-color);
-  border: none;
+  min-height: 44px;
+  background: var(--bg-2);
+  color: var(--ink);
+  border: 1px solid var(--line);
   border-radius: 4px;
   font-size: 0.875rem;
   font-weight: 600;
@@ -1049,8 +1109,13 @@ watch(searchQuery, () => {
 }
 
 .btn-reinstall:hover:not(:disabled) {
-  background: var(--bg-tertiary);
-  border-color: var(--accent-primary);
+  background: var(--bg-2);
+  border-color: var(--focus);
+}
+
+.btn-reinstall:focus-visible {
+  outline: 2px solid var(--focus);
+  outline-offset: 2px;
 }
 
 .btn-reinstall:disabled {
@@ -1061,7 +1126,8 @@ watch(searchQuery, () => {
 
 .btn-install {
   padding: 0.5rem 1rem;
-  background: var(--accent-primary);
+  min-height: 44px;
+  background: var(--focus);
   color: white;
   border: none;
   border-radius: 4px;
@@ -1073,9 +1139,14 @@ watch(searchQuery, () => {
 }
 
 .btn-install:hover:not(:disabled) {
-  background: var(--accent-secondary);
+  background: color-mix(in srgb, var(--focus), black 12%);
   transform: translateY(-1px);
   box-shadow: 0 2px 4px var(--shadow);
+}
+
+.btn-install:focus-visible {
+  outline: 2px solid var(--focus);
+  outline-offset: 2px;
 }
 
 .btn-install:disabled {
@@ -1087,36 +1158,37 @@ watch(searchQuery, () => {
 .error-message {
   margin-top: 1rem;
   padding: 0.75rem;
-  background: rgba(220, 53, 69, 0.1);
-  border: 1px solid rgba(220, 53, 69, 0.3);
+  background: color-mix(in srgb, var(--err) 10%, transparent);
+  border: 1px solid color-mix(in srgb, var(--err) 30%, transparent);
   border-radius: 4px;
-  color: #dc3545;
+  color: var(--err);
   font-size: 0.875rem;
 }
 
 .success-message {
   margin-top: 1rem;
   padding: 0.75rem;
-  background: rgba(40, 167, 69, 0.1);
-  border: 1px solid rgba(40, 167, 69, 0.3);
+  background: color-mix(in srgb, var(--ok) 10%, transparent);
+  border: 1px solid color-mix(in srgb, var(--ok) 30%, transparent);
   border-radius: 4px;
-  color: #28a745;
+  color: var(--ok);
   font-size: 0.875rem;
 }
 
 .branch-switch-notice {
   margin-top: 0.5rem;
   padding: 0.5rem;
-  background: rgba(23, 162, 184, 0.1);
+  background: color-mix(in srgb, var(--ink-2) 10%, transparent);
   border-radius: 4px;
   font-size: 0.875rem;
+  color: var(--ink-2);
 }
 
 .restart-notice {
   margin-top: 1rem;
   padding: 1rem;
-  background: rgba(255, 193, 7, 0.1);
-  border: 1px solid rgba(255, 193, 7, 0.3);
+  background: color-mix(in srgb, var(--warn) 10%, transparent);
+  border: 1px solid color-mix(in srgb, var(--warn) 30%, transparent);
   border-radius: 4px;
 }
 
@@ -1127,13 +1199,13 @@ watch(searchQuery, () => {
 }
 
 .restart-notice-content strong {
-  color: #856404;
+  color: var(--warn);
   font-size: 1rem;
 }
 
 .restart-notice-content p {
   margin: 0;
-  color: #856404;
+  color: var(--warn);
   font-size: 0.875rem;
 }
 
@@ -1145,7 +1217,8 @@ watch(searchQuery, () => {
 
 .btn-primary {
   padding: 0.5rem 1rem;
-  background: var(--accent-primary);
+  min-height: 44px;
+  background: var(--focus);
   color: white;
   border: none;
   border-radius: 4px;
@@ -1157,18 +1230,23 @@ watch(searchQuery, () => {
 }
 
 .btn-primary:hover {
-  background: var(--accent-secondary);
+  background: color-mix(in srgb, var(--focus), black 12%);
   transform: translateY(-1px);
   box-shadow: 0 2px 4px var(--shadow);
 }
 
+.btn-primary:focus-visible {
+  outline: 2px solid var(--focus);
+  outline-offset: 2px;
+}
+
 .restart-alternative {
   font-size: 0.875rem;
-  color: var(--text-secondary);
+  color: var(--ink-2);
 }
 
 .restart-alternative code {
-  background: var(--bg-tertiary);
+  background: var(--bg-2);
   padding: 0.25rem 0.5rem;
   border-radius: 4px;
   font-family: monospace;
