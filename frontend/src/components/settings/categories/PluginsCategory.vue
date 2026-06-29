@@ -1,7 +1,7 @@
 <template>
   <div class="plugins-category">
     <!-- Plugin Installation Section -->
-    <CollapsibleSection title="Install New Plugin" icon="📦" :expanded="true">
+    <SettingsSection id="plugins-install" title="Install">
       <PluginInstaller
         :repo-url="githubRepoUrl"
         :branch="githubBranch"
@@ -25,10 +25,10 @@
         @force-update="handleForceUpdate"
         @restart="handleRestart"
       />
-    </CollapsibleSection>
+    </SettingsSection>
 
     <!-- Plugin Management -->
-    <CollapsibleSection title="Installed Plugins" icon="🔌" :expanded="true">
+    <SettingsSection id="plugins-installed" title="Installed Plugins">
       <PluginManager
         :plugins="plugins"
         :instances="pluginInstances"
@@ -64,7 +64,7 @@
         @upload="handleUpload"
         @delete-image="handleDeleteImage"
       />
-    </CollapsibleSection>
+    </SettingsSection>
 
     <!-- Instance Modal -->
     <InstanceModal
@@ -125,7 +125,7 @@ import { useConfigStore } from "@/stores/config";
 import { useImagesStore } from "@/stores/images";
 import * as pluginsApi from "@/services/pluginsApi";
 import * as calendarApi from "@/services/calendarApi";
-import CollapsibleSection from "../shared/CollapsibleSection.vue";
+import SettingsSection from "@/components/settings/shell/SettingsSection.vue";
 import PluginInstaller from "../specialized/PluginInstaller.vue";
 import PluginManager from "../specialized/PluginManager.vue";
 import InstanceModal from "../specialized/InstanceModal.vue";
@@ -559,7 +559,7 @@ onMounted(async () => {
 .modal-overlay {
   position: fixed;
   inset: 0;
-  background: rgba(0, 0, 0, 0.5);
+  background: color-mix(in srgb, var(--ink) 55%, transparent);
   display: flex;
   align-items: center;
   justify-content: center;
@@ -567,9 +567,9 @@ onMounted(async () => {
 }
 
 .modal-content {
-  background: var(--bg-primary);
+  background: var(--bg-1);
   border-radius: 8px;
-  box-shadow: 0 4px 20px rgba(0, 0, 0, 0.3);
+  box-shadow: 0 4px 20px var(--shadow);
   max-width: 480px;
   width: 90%;
   max-height: 90vh;
@@ -583,21 +583,21 @@ onMounted(async () => {
   justify-content: space-between;
   align-items: center;
   padding: 1.25rem;
-  border-bottom: 1px solid var(--border-color);
+  border-bottom: 1px solid var(--line);
 }
 
 .modal-header h3 {
   margin: 0;
   font-size: 1.1rem;
   font-weight: 600;
-  color: var(--text-primary);
+  color: var(--ink);
 }
 
 .btn-close-modal {
   background: none;
   border: none;
   font-size: 1.5rem;
-  color: var(--text-secondary);
+  color: var(--ink-2);
   cursor: pointer;
   padding: 0;
   width: 2rem;
@@ -609,8 +609,8 @@ onMounted(async () => {
 }
 
 .btn-close-modal:hover {
-  background: var(--bg-secondary);
-  color: var(--text-primary);
+  background: var(--bg-2);
+  color: var(--ink);
 }
 
 .modal-body {
@@ -622,7 +622,7 @@ onMounted(async () => {
 
 .modal-body p {
   margin: 0;
-  color: var(--text-primary);
+  color: var(--ink);
   line-height: 1.5;
   font-size: 0.9rem;
 }
@@ -640,19 +640,19 @@ onMounted(async () => {
 }
 
 .pip-package-list code {
-  background: var(--bg-tertiary);
-  border: 1px solid var(--border-color);
+  background: var(--bg-2);
+  border: 1px solid var(--line);
   border-radius: 4px;
   padding: 0.1rem 0.4rem;
   font-family: monospace;
   font-size: 0.85rem;
-  color: var(--text-primary);
+  color: var(--ink);
 }
 
 .pip-warning-text {
-  color: #856404 !important;
-  background: rgba(255, 193, 7, 0.1);
-  border: 1px solid rgba(255, 193, 7, 0.3);
+  color: var(--warn) !important;
+  background: color-mix(in srgb, var(--warn) 10%, transparent);
+  border: 1px solid color-mix(in srgb, var(--warn) 30%, transparent);
   border-radius: 4px;
   padding: 0.6rem 0.75rem;
 }
@@ -662,28 +662,29 @@ onMounted(async () => {
   justify-content: flex-end;
   gap: 0.75rem;
   padding: 1.25rem;
-  border-top: 1px solid var(--border-color);
+  border-top: 1px solid var(--line);
 }
 
 .btn-secondary {
   padding: 0.5rem 1rem;
-  background: var(--bg-secondary);
-  color: var(--text-primary);
-  border: 1px solid var(--border-color);
+  background: var(--bg-2);
+  color: var(--ink);
+  border: 1px solid var(--line);
   border-radius: 4px;
   font-size: 0.9rem;
   font-weight: 500;
   cursor: pointer;
   transition: all 0.2s;
+  min-height: 44px;
 }
 
 .btn-secondary:hover {
-  background: var(--bg-tertiary);
+  border-color: var(--focus);
 }
 
 .btn-danger {
   padding: 0.5rem 1rem;
-  background: #dc3545;
+  background: var(--err);
   color: white;
   border: none;
   border-radius: 4px;
@@ -691,9 +692,17 @@ onMounted(async () => {
   font-weight: 600;
   cursor: pointer;
   transition: all 0.2s;
+  min-height: 44px;
 }
 
 .btn-danger:hover {
-  background: #c82333;
+  background: color-mix(in srgb, var(--err), black 12%);
+}
+
+.btn-secondary:focus-visible,
+.btn-danger:focus-visible,
+.btn-close-modal:focus-visible {
+  outline: 2px solid var(--focus);
+  outline-offset: 2px;
 }
 </style>
