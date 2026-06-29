@@ -143,7 +143,9 @@ const categoryRenderKey = ref(0);
 
 // ── Scroll-spy section indicator ─────────────────────────────────────────────
 const sectionLabel = ref("");
-let sectionObserver = null;
+let scrollListener = null;
+let scrollListenerTarget = null;
+let computeRafId = null;
 let observerRetryId = null;
 
 function cancelObserverRetry() {
@@ -153,16 +155,49 @@ function cancelObserverRetry() {
   }
 }
 
+function computeActiveSection() {
+  const container = document.querySelector(".settings-content");
+  const refY = (container ? container.getBoundingClientRect().top : 0) + 80;
+  const sections = [...document.querySelectorAll(".settings-section")];
+  if (!sections.length) return;
+
+  // Active = last section whose top is at or above the reference line.
+  // Falling back to the first section covers the case where all headings
+  // are still below the line (scrolled to the very top).
+  let active = sections[0];
+  for (const section of sections) {
+    if (section.getBoundingClientRect().top <= refY) {
+      active = section;
+    }
+  }
+
+  const eyebrow = active.querySelector(".settings-section__eyebrow");
+  if (eyebrow) sectionLabel.value = eyebrow.textContent.trim();
+}
+
+function scheduleCompute() {
+  if (computeRafId !== null) return; // already queued — coalesce
+  computeRafId = requestAnimationFrame(() => {
+    computeRafId = null;
+    computeActiveSection();
+  });
+}
+
 function teardownSectionObserver() {
   cancelObserverRetry();
-  if (sectionObserver) {
-    sectionObserver.disconnect();
-    sectionObserver = null;
+  if (computeRafId !== null) {
+    cancelAnimationFrame(computeRafId);
+    computeRafId = null;
+  }
+  if (scrollListener && scrollListenerTarget) {
+    scrollListenerTarget.removeEventListener("scroll", scrollListener);
+    scrollListener = null;
+    scrollListenerTarget = null;
   }
 }
 
 function setupSectionObserver(attempt = 0) {
-  // On a fresh call, tear down any existing observer and pending retries
+  // On a fresh call, tear down any existing listener and pending rAFs
   if (attempt === 0) {
     teardownSectionObserver();
   }
@@ -182,27 +217,15 @@ function setupSectionObserver(attempt = 0) {
     return;
   }
 
-  // Use .settings-content as the scroll root so the detection band is
-  // relative to the pane, not the viewport (which includes fixed chrome).
-  // rootMargin "0px 0px -55% 0px" gives a 45%-tall hot zone at the top of
-  // the container: a section heading triggers "active" as it scrolls into
-  // the upper portion of the pane, before it reaches the midpoint.
-  const scrollRoot = document.querySelector(".settings-content") ?? null;
-  sectionObserver = new IntersectionObserver(
-    entries => {
-      // Pick the topmost visible section
-      const visible = entries
-        .filter(e => e.isIntersecting)
-        .sort((a, b) => a.boundingClientRect.top - b.boundingClientRect.top);
-      if (visible.length) {
-        const eyebrow = visible[0].target.querySelector(".settings-section__eyebrow");
-        if (eyebrow) sectionLabel.value = eyebrow.textContent.trim();
-      }
-    },
-    { root: scrollRoot, threshold: 0.1, rootMargin: "0px 0px -55% 0px" }
-  );
+  // Attach a passive scroll listener to the pane's scroll container.
+  // Throttle updates via rAF so layout reads are coalesced to one per frame.
+  const container = document.querySelector(".settings-content");
+  scrollListenerTarget = container ?? window;
+  scrollListener = scheduleCompute;
+  scrollListenerTarget.addEventListener("scroll", scrollListener, { passive: true });
 
-  sections.forEach(section => sectionObserver.observe(section));
+  // Compute immediately so the indicator is correct before any scroll occurs
+  computeActiveSection();
 }
 
 watch(activeCategory, async () => {
