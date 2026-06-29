@@ -161,7 +161,7 @@ class TestGitHubPluginE2E:
             install_data = install_response.json()
             assert install_data["success"] is True
             assert install_data["manifest"]["id"] == plugin_id
-            assert install_data["requires_restart"] is True
+            assert install_data["requires_restart"] is False
 
             plugin_path_installed = plugin_installer.get_plugin_path(plugin_id)
             assert plugin_path_installed.exists()
