@@ -384,13 +384,6 @@ onUnmounted(() => {
   overflow-y: auto;
 }
 
-/* Rail scrolls independently only if it ever overflows; chrome stays put. */
-.settings-layout :deep(.category-rail) {
-  min-height: 0;
-  max-height: 100%;
-  overflow-y: auto;
-}
-
 .settings-banner {
   padding: 0.75rem 1rem;
   border-radius: 6px;
@@ -419,7 +412,6 @@ onUnmounted(() => {
 
   .settings-page { height: auto; min-height: 100dvh; overflow: visible; }
   .settings-content { overflow-y: visible; min-height: auto; }
-  .settings-layout :deep(.category-rail) { max-height: none; overflow-y: visible; }
 }
 
 @media (max-height: 600px) {
