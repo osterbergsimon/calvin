@@ -76,6 +76,7 @@ export const useConfigStore = defineStore("config", () => {
   const consoleLogLevel = ref("info"); // Console log level: 'error' | 'warn' | 'info' | 'debug' (default: 'info')
   const configPollInterval = ref(30); // Config polling interval in seconds (default: 30)
   const devMode = ref(false); // Whether the backend is running in dev mode (backend/.dev marker file)
+  const pluginRepositoryUrl = ref("https://github.com/osterbergsimon/calvin-plugins"); // Default plugin repo for the GitHub install flow
   const loading = ref(false);
   const error = ref(null);
 
@@ -142,6 +143,7 @@ export const useConfigStore = defineStore("config", () => {
     consoleLogLevel,
     configPollInterval,
     devMode,
+    pluginRepositoryUrl,
   };
 
   const setOrientation = newOrientation => {
@@ -448,6 +450,7 @@ export const useConfigStore = defineStore("config", () => {
     consoleLogLevel,
     configPollInterval,
     devMode,
+    pluginRepositoryUrl,
     displayName,
     focusLightMode,
     focusLightDimOthers,
