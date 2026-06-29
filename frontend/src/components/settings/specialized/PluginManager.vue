@@ -280,13 +280,13 @@ const handleDeleteImage = imageId => {
 .empty-state {
   padding: 2rem;
   text-align: center;
-  color: var(--text-secondary);
+  color: var(--ink-2);
 }
 
 .theme-info-message {
   margin-bottom: 1.5rem;
   padding: 1rem;
-  background: var(--bg-secondary);
+  background: var(--bg-2);
   border-radius: 6px;
 }
 
@@ -297,14 +297,14 @@ const handleDeleteImage = imageId => {
 }
 
 .plugin-item {
-  background: var(--bg-primary);
-  border: 1px solid var(--border-color);
+  background: var(--bg-1);
+  border: 1px solid var(--line);
   border-radius: 8px;
   transition: all 0.2s ease;
 }
 
 .plugin-item:hover {
-  border-color: var(--accent-primary);
+  border-color: var(--focus);
   box-shadow: 0 2px 4px var(--shadow);
 }
 
