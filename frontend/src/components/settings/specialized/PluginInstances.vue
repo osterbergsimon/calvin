@@ -156,7 +156,7 @@ const handleOrderChange = newOrder => {
 .plugin-instances {
   margin-top: 1.5rem;
   padding-top: 1.5rem;
-  border-top: 1px solid var(--border-color);
+  border-top: 1px solid var(--line);
 }
 
 .instances-header {
@@ -170,31 +170,39 @@ const handleOrderChange = newOrder => {
   margin: 0;
   font-size: 1rem;
   font-weight: 600;
-  color: var(--text-primary);
+  color: var(--ink);
+  font-family: var(--font-ui);
 }
 
 .instance-count {
   font-weight: normal;
-  color: var(--text-secondary);
+  color: var(--ink-2);
   font-size: 0.9rem;
 }
 
 .btn-add-instance {
   padding: 0.5rem 1rem;
-  background: var(--accent-primary);
-  color: white;
-  border: none;
+  min-height: 44px;
+  background: var(--bg-2);
+  color: var(--ink);
+  border: 1px solid var(--line);
   border-radius: 4px;
   font-size: 0.875rem;
+  font-family: var(--font-ui);
   font-weight: 600;
   cursor: pointer;
   transition: all 0.2s;
 }
 
 .btn-add-instance:hover {
-  background: var(--accent-secondary);
+  border-color: var(--focus);
   transform: translateY(-1px);
   box-shadow: 0 2px 4px var(--shadow);
+}
+
+.btn-add-instance:focus-visible {
+  outline: 2px solid var(--focus);
+  outline-offset: 2px;
 }
 
 .empty-instances {
@@ -213,15 +221,15 @@ const handleOrderChange = newOrder => {
   justify-content: space-between;
   align-items: center;
   padding: 0.75rem;
-  background: var(--bg-secondary);
-  border: 1px solid var(--border-color);
+  background: var(--bg-2);
+  border: 1px solid var(--line);
   border-radius: 6px;
   transition: all 0.2s ease;
 }
 
 .instance-item:hover {
-  border-color: var(--accent-primary);
-  background: var(--bg-tertiary);
+  border-color: var(--focus);
+  background: var(--bg-2);
 }
 
 .instance-item.disabled {
@@ -241,7 +249,7 @@ const handleOrderChange = newOrder => {
 
 .instance-drag-handle {
   cursor: grab;
-  color: var(--text-tertiary);
+  color: var(--ink-3);
   font-size: 1rem;
   user-select: none;
 }
@@ -256,18 +264,18 @@ const handleOrderChange = newOrder => {
 }
 
 .running-indicator.running {
-  color: #4caf50;
+  color: var(--ok);
 }
 
 .running-indicator.stopped {
-  color: #f44336;
+  color: var(--err);
 }
 
 .instance-header h5 {
   margin: 0;
   font-size: 0.95rem;
   font-weight: 600;
-  color: var(--text-primary);
+  color: var(--ink);
 }
 
 .instance-details {
@@ -276,7 +284,7 @@ const handleOrderChange = newOrder => {
 
 .instance-detail-item {
   font-size: 0.85rem;
-  color: var(--text-secondary);
+  color: var(--ink-2);
 }
 
 .instance-actions {
@@ -305,7 +313,7 @@ const handleOrderChange = newOrder => {
   left: 0;
   right: 0;
   bottom: 0;
-  background-color: #ccc;
+  background-color: var(--ink-3);
   transition: 0.4s;
   border-radius: 20px;
 }
@@ -323,7 +331,7 @@ const handleOrderChange = newOrder => {
 }
 
 input:checked + .slider-small {
-  background-color: var(--accent-primary);
+  background-color: var(--focus);
 }
 
 input:checked + .slider-small:before {
@@ -331,32 +339,38 @@ input:checked + .slider-small:before {
 }
 
 .btn-action {
-  background: transparent;
-  border: 1px solid var(--border-color);
+  background: var(--bg-2);
+  border: 1px solid var(--line);
   border-radius: 4px;
   padding: 0.375rem;
+  min-height: 44px;
   cursor: pointer;
   transition: all 0.2s;
 }
 
 .btn-action:hover {
-  background: var(--bg-tertiary);
-  border-color: var(--accent-primary);
+  background: var(--bg-2);
+  border-color: var(--focus);
+}
+
+.btn-action:focus-visible {
+  outline: 2px solid var(--focus);
+  outline-offset: 2px;
 }
 
 .btn-action-danger {
-  color: #f44336;
+  color: var(--err);
 }
 
 .btn-action-danger:hover {
-  background: rgba(244, 67, 54, 0.1);
-  border-color: #f44336;
+  background: color-mix(in srgb, var(--err) 10%, transparent);
+  border-color: var(--err);
 }
 
 .help-text {
   margin: 0;
   font-size: 0.875rem;
-  color: var(--text-secondary);
+  color: var(--ink-2);
   line-height: 1.4;
 }
 </style>
