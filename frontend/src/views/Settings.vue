@@ -182,6 +182,12 @@ function setupSectionObserver(attempt = 0) {
     return;
   }
 
+  // Use .settings-content as the scroll root so the detection band is
+  // relative to the pane, not the viewport (which includes fixed chrome).
+  // rootMargin "0px 0px -55% 0px" gives a 45%-tall hot zone at the top of
+  // the container: a section heading triggers "active" as it scrolls into
+  // the upper portion of the pane, before it reaches the midpoint.
+  const scrollRoot = document.querySelector(".settings-content") ?? null;
   sectionObserver = new IntersectionObserver(
     entries => {
       // Pick the topmost visible section
@@ -193,7 +199,7 @@ function setupSectionObserver(attempt = 0) {
         if (eyebrow) sectionLabel.value = eyebrow.textContent.trim();
       }
     },
-    { threshold: 0.1, rootMargin: "0px 0px -70% 0px" }
+    { root: scrollRoot, threshold: 0.1, rootMargin: "0px 0px -55% 0px" }
   );
 
   sections.forEach(section => sectionObserver.observe(section));
