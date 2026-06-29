@@ -5,7 +5,6 @@
       :section-label="sectionLabel"
       :save-state="saveStatus.state"
       @done="onDone"
-      @crumb="onCrumb"
     />
 
     <div class="settings-body">
@@ -142,7 +141,7 @@ const activeCategoryLabel = computed(
 
 const categoryRenderKey = ref(0);
 
-// ── Scroll-spy breadcrumb (dashboard only) ────────────────────────────────────
+// ── Scroll-spy section indicator ─────────────────────────────────────────────
 const sectionLabel = ref("");
 let sectionObserver = null;
 let observerRetryId = null;
@@ -167,7 +166,7 @@ function setupSectionObserver(attempt = 0) {
   if (attempt === 0) {
     teardownSectionObserver();
   }
-  if (activeCategory.value !== "dashboard") {
+  if (!MIGRATED_CATEGORIES.has(activeCategory.value)) {
     sectionLabel.value = "";
     return;
   }
@@ -202,7 +201,7 @@ function setupSectionObserver(attempt = 0) {
 
 watch(activeCategory, async () => {
   sectionLabel.value = "";
-  if (activeCategory.value === "dashboard") {
+  if (MIGRATED_CATEGORIES.has(activeCategory.value)) {
     await nextTick();
     setupSectionObserver(); // handles teardown internally at attempt=0
   } else {
@@ -288,21 +287,6 @@ const onDone = () => {
   router.push("/");
 };
 
-const onCrumb = which => {
-  if (which === "section") {
-    // Scroll to the currently active section — find the eyebrow whose text
-    // matches sectionLabel so we don't always land on the first section.
-    const label = sectionLabel.value;
-    if (label) {
-      const el = [...document.querySelectorAll(".settings-section__eyebrow")]
-        .find(e => e.textContent.trim() === label);
-      el?.closest(".settings-section")?.scrollIntoView({ behavior: "smooth" });
-    }
-  } else {
-    window.scrollTo({ top: 0, behavior: "smooth" });
-  }
-};
-
 // Reload from route ?setting= when the query changes externally
 watch(
   () => route.query.setting,
@@ -350,7 +334,7 @@ onMounted(async () => {
   frontendVersion.value = getFrontendVersionFromMeta();
   version.value = localConfig.value?.version ?? null;
 
-  if (activeCategory.value === "dashboard") {
+  if (MIGRATED_CATEGORIES.has(activeCategory.value)) {
     await nextTick();
     setupSectionObserver();
   }
