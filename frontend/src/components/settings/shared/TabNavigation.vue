@@ -93,7 +93,7 @@ const handleKeydown = event => {
 .tab-navigation {
   display: flex;
   gap: 0.5rem;
-  border-bottom: 2px solid var(--border-color);
+  border-bottom: 2px solid var(--line);
   margin-bottom: 1.5rem;
   overflow-x: auto;
   overflow-y: hidden;
@@ -105,11 +105,13 @@ const handleKeydown = event => {
   align-items: center;
   gap: 0.5rem;
   padding: 0.75rem 1.25rem;
+  min-height: 44px;
   background: transparent;
   border: none;
   border-bottom: 3px solid transparent;
-  color: var(--text-secondary);
+  color: var(--ink-2);
   font-size: 0.95rem;
+  font-family: var(--font-ui);
   font-weight: 500;
   cursor: pointer;
   transition: all 0.2s ease;
@@ -119,13 +121,18 @@ const handleKeydown = event => {
 }
 
 .tab-button:hover {
-  color: var(--text-primary);
-  background: var(--bg-secondary);
+  color: var(--ink);
+  background: var(--bg-2);
+}
+
+.tab-button:focus-visible {
+  outline: 2px solid var(--focus);
+  outline-offset: 2px;
 }
 
 .tab-button.active {
-  color: var(--accent-primary);
-  border-bottom-color: var(--accent-primary);
+  color: var(--focus);
+  border-bottom-color: var(--focus);
   font-weight: 600;
 }
 
@@ -139,15 +146,15 @@ const handleKeydown = event => {
 
 .tab-badge {
   padding: 0.125rem 0.5rem;
-  background: var(--bg-tertiary);
-  color: var(--text-secondary);
+  background: var(--bg-2);
+  color: var(--ink-2);
   border-radius: 12px;
   font-size: 0.75rem;
   font-weight: 600;
 }
 
 .tab-button.active .tab-badge {
-  background: var(--accent-primary);
+  background: var(--focus);
   color: white;
 }
 
@@ -157,15 +164,15 @@ const handleKeydown = event => {
 }
 
 .tab-navigation::-webkit-scrollbar-track {
-  background: var(--bg-secondary);
+  background: var(--bg-2);
 }
 
 .tab-navigation::-webkit-scrollbar-thumb {
-  background: var(--border-color);
+  background: var(--line);
   border-radius: 2px;
 }
 
 .tab-navigation::-webkit-scrollbar-thumb:hover {
-  background: var(--text-tertiary);
+  background: var(--ink-3);
 }
 </style>
