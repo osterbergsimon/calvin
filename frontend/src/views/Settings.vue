@@ -363,15 +363,18 @@ onUnmounted(() => {
 
 <style scoped>
 .settings-page {
-  min-height: 100vh;
-  background: var(--bg-primary);
-  color: var(--text-primary);
+  height: 100dvh;
+  overflow: hidden;
+  background: var(--bg-1);
+  color: var(--ink);
   display: flex;
   flex-direction: column;
 }
 
 .settings-body {
   flex: 1;
+  min-height: 0;
+  overflow: hidden;
   padding: var(--space-5, 2rem);
   display: flex;
   flex-direction: column;
@@ -383,14 +386,25 @@ onUnmounted(() => {
 }
 
 .settings-layout {
+  flex: 1;
+  min-height: 0;
   display: grid;
   grid-template-columns: 220px 1fr;
   gap: var(--space-5, 2rem);
-  align-items: start;
+  align-items: stretch;
 }
 
 .settings-content {
   min-width: 0;
+  min-height: 0;
+  overflow-y: auto;
+}
+
+/* Rail scrolls independently only if it ever overflows; chrome stays put. */
+.settings-layout :deep(.category-rail) {
+  min-height: 0;
+  max-height: 100%;
+  overflow-y: auto;
 }
 
 .settings-banner {
@@ -401,20 +415,32 @@ onUnmounted(() => {
 }
 
 .settings-banner-error {
-  background: rgba(244, 67, 54, 0.15);
-  color: var(--text-primary);
-  border: 1px solid rgba(244, 67, 54, 0.4);
+  background: color-mix(in srgb, var(--err) 15%, transparent);
+  color: var(--ink);
+  border: 1px solid color-mix(in srgb, var(--err) 40%, transparent);
 }
 
 /* Responsive */
 @media (max-width: 768px) {
   .settings-body {
     padding: var(--space-3, 1rem);
+    overflow: visible;
   }
 
   .settings-layout {
     grid-template-columns: 1fr;
     gap: var(--space-3, 1rem);
+    min-height: auto;
   }
+
+  .settings-page { height: auto; min-height: 100dvh; overflow: visible; }
+  .settings-content { overflow-y: visible; min-height: auto; }
+  .settings-layout :deep(.category-rail) { max-height: none; overflow-y: visible; }
+}
+
+@media (max-height: 600px) {
+  .settings-page { height: auto; min-height: 100dvh; overflow: visible; }
+  .settings-body { overflow: visible; }
+  .settings-content { overflow-y: visible; }
 }
 </style>
