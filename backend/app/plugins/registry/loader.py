@@ -121,6 +121,69 @@ async def load_plugin_types() -> None:
                     logger.exception("Error updating database for broken plugin {}", type_id)
 
 
+async def load_plugin_types_for_single(plugin_id: str) -> None:
+    """Register a single plugin type in the database after install.
+
+    Mirrors the per-type save logic from ``load_plugin_types()`` for one
+    ``plugin_id`` so a freshly installed plugin appears in
+    ``get_plugin_types()`` output without a server restart. Handles both
+    create (no existing row) and update (row already exists). No-ops with a
+    warning if the type is not found after install.
+    """
+    plugin_types = plugin_loader.get_plugin_types()
+    type_info = next((t for t in plugin_types if t.get("type_id") == plugin_id), None)
+    if type_info is None:
+        logger.warning(
+            "Plugin type {} not found after install — skipping DB registration", plugin_id
+        )
+        return
+
+    try:
+        type_info = PluginDefinition.from_raw(type_info)
+        type_id: str = type_info.type_id  # type: ignore[assignment]
+    except Exception:
+        logger.exception(
+            "Plugin {} failed PluginDefinition validation — skipping DB registration", plugin_id
+        )
+        return
+
+    db_type = await PluginTypeDB.objects.get_or_none(type_id=type_id)
+
+    from app.utils.db_retry import retry_on_db_locked
+
+    @retry_on_db_locked(max_retries=5, initial_delay=0.1, max_delay=1.0)
+    async def _save_plugin_type() -> None:
+        nonlocal db_type
+        plugin_type_value = (
+            type_info.plugin_type.value
+            if hasattr(type_info.plugin_type, "value")
+            else str(type_info.plugin_type)
+        )
+        if not db_type:
+            await PluginTypeDB.objects.create(
+                type_id=type_id,
+                plugin_type=plugin_type_value,
+                name=type_info.name or type_id or "Unknown Plugin",
+                description=type_info.description,
+                version=type_info.version,
+                common_config_schema=type_info.common_config_schema,
+                enabled=False,
+                error_message=None,
+            )
+        else:
+            db_type.name = type_info.name or type_id or "Unknown Plugin"
+            db_type.description = type_info.description
+            db_type.version = type_info.version
+            metadata_schema = type_info.common_config_schema or {}
+            existing_schema = db_type.common_config_schema or {}
+            db_type.common_config_schema = {**metadata_schema, **existing_schema}
+            db_type.plugin_type = plugin_type_value
+            db_type.error_message = None
+            await db_type.save_with_timestamp()
+
+    await _save_plugin_type()
+
+
 async def load_plugin_instances() -> None:
     """Load plugin instances from database."""
     db_plugins = await PluginDB.objects.all()

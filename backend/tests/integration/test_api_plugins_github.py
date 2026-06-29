@@ -453,7 +453,7 @@ def create_plugin_instance(
         data = response.json()
         assert data["success"] is True
         assert data["manifest"]["id"] == "github_install_plugin"
-        assert data["requires_restart"] is True
+        assert data["requires_restart"] is False
 
         # Verify plugin is installed
         plugin_path = plugin_installer.get_plugin_path("github_install_plugin")
@@ -613,7 +613,7 @@ def create_plugin_instance(
         assert data["success"] is True
         assert data["manifest"]["id"] == "test_plugin"
         assert data["manifest"]["name"] == "Test Plugin"
-        assert data["requires_restart"] is True
+        assert data["requires_restart"] is False
 
         # Verify plugin is installed
         plugin_path = plugin_installer.get_plugin_path("test_plugin")
