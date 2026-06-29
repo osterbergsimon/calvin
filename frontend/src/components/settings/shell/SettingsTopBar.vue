@@ -97,6 +97,7 @@ const dotClass = computed(() => {
   color: var(--ink);
   padding-left: 16px;
   border-left: 1px solid var(--line);
+  min-width: 0;
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
