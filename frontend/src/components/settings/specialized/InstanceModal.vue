@@ -632,8 +632,8 @@ const handleSave = async () => {
   color: var(--ink-2);
   cursor: pointer;
   padding: 0;
-  width: 2rem;
-  height: 2rem;
+  width: 44px;
+  height: 44px;
   min-height: 44px;
   min-width: 44px;
   display: flex;
