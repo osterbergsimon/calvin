@@ -153,7 +153,6 @@ async def load_plugin_types_for_single(plugin_id: str) -> None:
 
     @retry_on_db_locked(max_retries=5, initial_delay=0.1, max_delay=1.0)
     async def _save_plugin_type() -> None:
-        nonlocal db_type
         plugin_type_value = (
             type_info.plugin_type.value
             if hasattr(type_info.plugin_type, "value")
