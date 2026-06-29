@@ -157,22 +157,41 @@ function cancelObserverRetry() {
 
 function computeActiveSection() {
   const container = document.querySelector(".settings-content");
-  const refY = (container ? container.getBoundingClientRect().top : 0) + 80;
-  const sections = [...document.querySelectorAll(".settings-section")];
-  if (!sections.length) return;
+  // Key off eyebrows, not ".settings-section": CollapsibleSection (used inside
+  // embedded editors) also carries the .settings-section class but has no
+  // eyebrow, so matching on .settings-section would land on those nested,
+  // label-less elements. Each eyebrow belongs to exactly one shell section,
+  // in DOM (= visual) order.
+  const eyebrows = [...document.querySelectorAll(".settings-section__eyebrow")];
+  if (!eyebrows.length) return;
 
-  // Active = last section whose top is at or above the reference line.
-  // Falling back to the first section covers the case where all headings
-  // are still below the line (scrolled to the very top).
-  let active = sections[0];
-  for (const section of sections) {
-    if (section.getBoundingClientRect().top <= refY) {
-      active = section;
+  // When scrolled to (near) the bottom, the trailing sections are all on
+  // screen and short ones can't be scrolled any higher — treat the last as
+  // active so the final section is always reachable.
+  if (
+    container &&
+    container.scrollTop + container.clientHeight >= container.scrollHeight - 4
+  ) {
+    sectionLabel.value = eyebrows[eyebrows.length - 1].textContent.trim();
+    return;
+  }
+
+  // Otherwise the active section is the last one whose heading has scrolled
+  // above the pane's vertical midpoint. The midpoint (rather than the top) is
+  // forgiving enough that short sections, which can't reach the very top of a
+  // tall pane, still get their turn. Fall back to the first section when no
+  // heading has crossed the line yet (scrolled to the very top).
+  const top = container ? container.getBoundingClientRect().top : 0;
+  const height = container ? container.clientHeight : window.innerHeight;
+  const refY = top + height * 0.5;
+  let active = eyebrows[0];
+  for (const eyebrow of eyebrows) {
+    if (eyebrow.getBoundingClientRect().top <= refY) {
+      active = eyebrow;
     }
   }
 
-  const eyebrow = active.querySelector(".settings-section__eyebrow");
-  if (eyebrow) sectionLabel.value = eyebrow.textContent.trim();
+  sectionLabel.value = active.textContent.trim();
 }
 
 function scheduleCompute() {
@@ -205,7 +224,7 @@ function setupSectionObserver(attempt = 0) {
     sectionLabel.value = "";
     return;
   }
-  const sections = document.querySelectorAll(".settings-section");
+  const sections = document.querySelectorAll(".settings-section__eyebrow");
   if (!sections.length) {
     // Async component may not have rendered yet — retry via rAF, capped at 10 attempts
     if (attempt < 10) {
