@@ -4,33 +4,7 @@
       <span class="settings-topbar__wordmark" aria-label="Calvin">
         CAL<span class="settings-topbar__wordmark-dot">·</span>VIN
       </span>
-      <nav class="settings-topbar__breadcrumb" aria-label="Settings navigation">
-        <button
-          class="topbar__crumb"
-          type="button"
-          @click="$emit('crumb', 'settings')"
-        >
-Settings
-</button>
-        <span class="settings-topbar__sep" aria-hidden="true">›</span>
-        <button
-          class="topbar__crumb"
-          type="button"
-          @click="$emit('crumb', 'category')"
-        >
-{{ categoryLabel }}
-</button>
-        <template v-if="sectionLabel">
-          <span class="settings-topbar__sep" aria-hidden="true">›</span>
-          <button
-            class="topbar__crumb"
-            type="button"
-            @click="$emit('crumb', 'section')"
-          >
-{{ sectionLabel }}
-</button>
-        </template>
-      </nav>
+      <span class="settings-topbar__location" aria-live="polite">{{ locationLabel }}</span>
     </div>
 
     <div class="settings-topbar__right">
@@ -63,7 +37,9 @@ const props = defineProps({
   saveState: { type: String, required: true },
 });
 
-defineEmits(["done", "crumb"]);
+defineEmits(["done"]);
+
+const locationLabel = computed(() => props.sectionLabel || props.categoryLabel);
 
 const pillLabel = computed(() => {
   switch (props.saveState) {
@@ -114,42 +90,16 @@ const dotClass = computed(() => {
   color: var(--focus);
 }
 
-.settings-topbar__breadcrumb {
-  display: flex;
-  align-items: center;
-  gap: 4px;
-}
-
-.topbar__crumb {
-  background: none;
-  border: none;
-  padding: 2px 4px;
-  font-family: inherit;
-  font-size: 0.875rem;
-  color: var(--ink-2);
-  cursor: pointer;
-  border-radius: 4px;
-  transition: color 0.15s;
-}
-
-.topbar__crumb:hover {
-  color: var(--ink);
-}
-
-.topbar__crumb:last-of-type {
-  color: var(--ink);
+.settings-topbar__location {
+  font-family: var(--font-ui);
+  font-size: 1rem;
   font-weight: 500;
-}
-
-.topbar__crumb:focus-visible {
-  outline: 2px solid var(--focus);
-  outline-offset: 2px;
-}
-
-.settings-topbar__sep {
-  color: var(--ink-3);
-  font-size: 0.875rem;
-  user-select: none;
+  color: var(--ink);
+  padding-left: 16px;
+  border-left: 1px solid var(--line);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
 }
 
 /* Right side */
