@@ -59,6 +59,7 @@
         <span class="cst-source-name">{{ source.name }}</span>
         <span class="cst-type-badge">{{ source.type }}</span>
         <span
+          v-if="source.running !== undefined"
           class="cst-running-dot"
           :class="source.running ? 'cst-running-dot--on' : 'cst-running-dot--off'"
           :title="source.running ? 'Running' : 'Stopped'"
@@ -127,10 +128,16 @@
       <button
         type="button"
         class="cst-btn-refresh"
+        :disabled="refreshStatus === 'refreshing'"
         @click="handleRefreshNow"
       >
         Refresh now
       </button>
+      <span
+        v-if="refreshStatus"
+        class="cst-refresh-status"
+        aria-live="polite"
+      >{{ refreshStatus === 'refreshing' ? 'Refreshing…' : 'Refreshed' }}</span>
     </div>
   </SettingRow>
 
@@ -702,5 +709,10 @@ onMounted(async () => {
 .cst-btn-refresh:focus-visible {
   outline: 2px solid var(--focus);
   outline-offset: 2px;
+}
+.cst-refresh-status {
+  font-size: 0.8rem;
+  color: var(--ink-2);
+  font-family: var(--font-ui);
 }
 </style>

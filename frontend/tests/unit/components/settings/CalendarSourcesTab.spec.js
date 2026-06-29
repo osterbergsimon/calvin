@@ -1,7 +1,7 @@
 // frontend/tests/unit/components/settings/CalendarSourcesTab.spec.js
 import { describe, it, expect, vi, beforeEach } from "vitest";
 import { mount, flushPromises } from "@vue/test-utils";
-import { ref } from "vue";
+import { ref, nextTick } from "vue";
 import CalendarSourcesTab from "@/components/settings/tabs/content/CalendarSourcesTab.vue";
 
 // ---------------------------------------------------------------------------
@@ -13,6 +13,7 @@ let mockUpdateSource;
 let mockRefreshEvents;
 let mockAddCalendarSource;
 let mockDeleteCalendarSource;
+let mockPluginInstances;
 
 vi.mock("@/stores/calendar", () => ({
   // Pinia auto-unwraps refs; mirror that by returning .value from a getter so
@@ -48,7 +49,7 @@ vi.mock("@/services/pluginsApi", () => ({
 }));
 
 vi.mock("@/composables", () => ({
-  usePlugins: () => ({ pluginInstances: ref({}) }),
+  usePlugins: () => ({ pluginInstances: mockPluginInstances }),
 }));
 
 // ---------------------------------------------------------------------------
@@ -81,6 +82,7 @@ describe("CalendarSourcesTab", () => {
     mockRefreshEvents = vi.fn().mockResolvedValue(undefined);
     mockAddCalendarSource = vi.fn().mockResolvedValue({});
     mockDeleteCalendarSource = vi.fn().mockResolvedValue({});
+    mockPluginInstances = ref({});
   });
 
   // -------------------------------------------------------------------------
@@ -254,5 +256,56 @@ describe("CalendarSourcesTab", () => {
 
     const colorInput = w.find('input[type="color"]');
     expect(colorInput.element.value).toBe("#4caf50");
+  });
+
+  // -------------------------------------------------------------------------
+  // 10. Refresh status text shows "Refreshing…" and button is disabled during call
+  // -------------------------------------------------------------------------
+  it('"Refresh now" shows "Refreshing…" and disables button while refreshEvents is pending', async () => {
+    let resolveRefresh;
+    mockRefreshEvents = vi.fn().mockImplementation(
+      () => new Promise(resolve => { resolveRefresh = resolve; })
+    );
+
+    const w = mountComp();
+    await flushPromises();
+
+    const refreshBtn = w.findAll("button").find(b => /refresh now/i.test(b.text()));
+    expect(refreshBtn).toBeTruthy();
+
+    // Trigger click but do NOT flush — leave the promise pending
+    refreshBtn.trigger("click");
+    await nextTick();
+
+    expect(refreshBtn.element.disabled).toBe(true);
+    expect(w.text()).toContain("Refreshing…");
+
+    // Resolve to allow teardown
+    resolveRefresh();
+    await flushPromises();
+  });
+
+  // -------------------------------------------------------------------------
+  // 11. Running dot renders only when source.running is defined
+  // -------------------------------------------------------------------------
+  it("running dot is absent when no matching plugin instance exists (running undefined)", async () => {
+    mockSources.value = [{ ...sampleSource }];
+    // mockPluginInstances is {} by default → running stays undefined
+    const w = mountComp();
+    await flushPromises();
+
+    expect(w.find(".cst-running-dot").exists()).toBe(false);
+  });
+
+  it("running dot renders when a matching plugin instance provides a running value", async () => {
+    mockSources.value = [{ ...sampleSource }];
+    mockPluginInstances = ref({
+      google: [{ id: sampleSource.id, running: true }],
+    });
+
+    const w = mountComp();
+    await flushPromises();
+
+    expect(w.find(".cst-running-dot").exists()).toBe(true);
   });
 });
