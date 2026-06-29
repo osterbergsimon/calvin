@@ -239,6 +239,10 @@ const SECTION_BY_CATEGORY_TAB = {
     updates: "maintenance-updates",
     diagnostics: "maintenance-diagnostics",
   },
+  plugins: {
+    install: "plugins-install",
+    installed: "plugins-installed",
+  },
 };
 const MIGRATED_CATEGORIES = new Set(Object.keys(SECTION_BY_CATEGORY_TAB));
 
