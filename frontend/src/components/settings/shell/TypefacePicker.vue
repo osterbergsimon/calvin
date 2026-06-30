@@ -2,6 +2,7 @@
   <SelectPill
     :model-value="current"
     :options="options"
+    aria-label="Typeface"
     @update:model-value="applyTypeTheme"
   />
 </template>

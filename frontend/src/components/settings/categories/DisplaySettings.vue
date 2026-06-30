@@ -32,6 +32,7 @@
         <SelectPill
           :model-value="config.calendarViewMode"
           :options="[{value:'month',label:'Month'},{value:'week',label:'Week'},{value:'day',label:'Day'},{value:'rolling',label:'Rolling'}]"
+          aria-label="Calendar view"
           @update:model-value="v => emit('update:config', { calendarViewMode: v })"
         />
       </SettingRow>
@@ -56,7 +57,24 @@
             {value:6,label:'Saturday'},
             {value:0,label:'Sunday'}
           ]"
+          aria-label="Week starts on"
           @update:model-value="v => emit('update:config', { weekStartDay: v })"
+        />
+      </SettingRow>
+      <SettingRow label="Weekend days" description="Days highlighted as the weekend on the calendar.">
+        <ChipMultiSelect
+          :model-value="config.weekendDays"
+          :options="[
+            {value:1,label:'Mon'},
+            {value:2,label:'Tue'},
+            {value:3,label:'Wed'},
+            {value:4,label:'Thu'},
+            {value:5,label:'Fri'},
+            {value:6,label:'Sat'},
+            {value:0,label:'Sun'}
+          ]"
+          aria-label="Weekend days"
+          @update:model-value="v => emit('update:config', { weekendDays: v })"
         />
       </SettingRow>
       <SettingRow label="Show week numbers" description="Display ISO week numbers alongside each calendar row.">
@@ -104,6 +122,7 @@
         <SelectPill
           :model-value="config.themeMode"
           :options="[{value:'light',label:'Light'},{value:'dark',label:'Dark'},{value:'auto',label:'Auto'},{value:'time',label:'Time'}]"
+          aria-label="Theme mode"
           @update:model-value="v => emit('update:config', { themeMode: v })"
         />
       </SettingRow>
@@ -134,6 +153,7 @@
         <SelectPill
           :model-value="config.focusLightMode"
           :options="[{value:'interaction',label:'When navigating'},{value:'always',label:'Always on'},{value:'off',label:'Off'}]"
+          aria-label="Focus light"
           @update:model-value="v => emit('update:config', { focusLightMode: v })"
         />
       </SettingRow>
@@ -155,6 +175,7 @@
         <SelectPill
           :model-value="config.touchControls"
           :options="[{value:'auto',label:'Auto'},{value:'on',label:'Always on'},{value:'off',label:'Off'}]"
+          aria-label="Touch controls"
           @update:model-value="v => emit('update:config', { touchControls: v })"
         />
       </SettingRow>
@@ -225,6 +246,7 @@ import SettingRow from "@/components/settings/shell/SettingRow.vue";
 import SegmentedControl from "@/components/ui/SegmentedControl.vue";
 import ToggleSwitch from "@/components/ui/ToggleSwitch.vue";
 import SelectPill from "@/components/ui/SelectPill.vue";
+import ChipMultiSelect from "@/components/ui/ChipMultiSelect.vue";
 import NumberStepper from "@/components/ui/NumberStepper.vue";
 import ThemePicker from "@/components/settings/shell/ThemePicker.vue";
 import TypefacePicker from "@/components/settings/shell/TypefacePicker.vue";
