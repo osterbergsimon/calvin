@@ -197,9 +197,9 @@ describe("CalendarSourcesTab", () => {
     await flushPromises();
     mockFetchSources.mockClear();
 
-    // Click the Remove button on the source card
-    const removeBtn = w.findAll("button").find(b => /remove/i.test(b.text()));
-    expect(removeBtn).toBeTruthy();
+    // Click the Remove (✕) button on the source row
+    const removeBtn = w.find(".cst-src-remove");
+    expect(removeBtn.exists()).toBe(true);
     await removeBtn.trigger("click");
     await flushPromises();
 
@@ -294,7 +294,7 @@ describe("CalendarSourcesTab", () => {
     const w = mountComp();
     await flushPromises();
 
-    expect(w.find(".cst-running-dot").exists()).toBe(false);
+    expect(w.find(".cst-src-dot").exists()).toBe(false);
   });
 
   it("running dot renders when a matching plugin instance provides a running value", async () => {
@@ -306,6 +306,6 @@ describe("CalendarSourcesTab", () => {
     const w = mountComp();
     await flushPromises();
 
-    expect(w.find(".cst-running-dot").exists()).toBe(true);
+    expect(w.find(".cst-src-dot").exists()).toBe(true);
   });
 });

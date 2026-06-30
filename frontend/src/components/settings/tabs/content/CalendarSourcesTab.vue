@@ -51,58 +51,56 @@
     </button>
   </div>
 
-  <!-- Source cards -->
+  <!-- Source rows (one compact line each) -->
   <div v-if="sourcesWithStatus.length > 0" class="cst-source-list">
-    <div v-for="source in sourcesWithStatus" :key="source.id" class="cst-source-card">
-      <!-- Card header -->
-      <div class="cst-card-header">
-        <span class="cst-source-name">{{ source.name }}</span>
-        <span class="cst-type-badge">{{ source.type }}</span>
-        <span
-          v-if="source.running !== undefined"
-          class="cst-running-dot"
-          :class="source.running ? 'cst-running-dot--on' : 'cst-running-dot--off'"
-          :title="source.running ? 'Running' : 'Stopped'"
-        >{{ source.running ? "●" : "○" }}</span>
-      </div>
+    <div
+      v-for="source in sourcesWithStatus"
+      :key="source.id"
+      class="cst-src"
+      :class="{ 'cst-src--off': !source.enabled }"
+    >
+      <span
+        v-if="source.running !== undefined"
+        class="cst-src-dot"
+        :class="source.running ? 'cst-src-dot--on' : 'cst-src-dot--off'"
+        :title="source.running ? 'Running' : 'Stopped'"
+      />
+      <span class="cst-src-name">{{ source.name }}</span>
+      <span class="cst-src-type">{{ source.type }}</span>
 
-      <!-- Color -->
-      <div class="cst-card-row">
-        <span class="cst-card-label">Color</span>
+      <div class="cst-src-controls">
         <input
           type="color"
-          class="cst-color-input"
+          class="cst-src-color"
           :value="getColorValue(source.color)"
+          :aria-label="`Colour for ${source.name}`"
+          :title="`Colour for ${source.name}`"
           @change="handleColorChange(source.id, $event.target.value)"
         />
-      </div>
-
-      <!-- Show times -->
-      <SettingRow label="Show times" description="Display event start/end times.">
-        <ToggleSwitch
-          :model-value="source.show_time !== false"
-          aria-label="Show event times"
-          @update:model-value="v => handleShowTimeChange(source.id, v)"
-        />
-      </SettingRow>
-
-      <!-- Enabled -->
-      <SettingRow label="Enabled" description="Include this calendar in the display.">
-        <ToggleSwitch
-          :model-value="!!source.enabled"
-          aria-label="Enable calendar source"
-          @update:model-value="v => handleEnabledChange(source.id, v)"
-        />
-      </SettingRow>
-
-      <!-- Remove -->
-      <div class="cst-card-row cst-card-row--remove">
+        <span class="cst-src-toggle">
+          <span class="cst-src-cap">Times</span>
+          <ToggleSwitch
+            :model-value="source.show_time !== false"
+            :aria-label="`Show event times for ${source.name}`"
+            @update:model-value="v => handleShowTimeChange(source.id, v)"
+          />
+        </span>
+        <span class="cst-src-toggle">
+          <span class="cst-src-cap">Shown</span>
+          <ToggleSwitch
+            :model-value="!!source.enabled"
+            :aria-label="`Show ${source.name} on the dashboard`"
+            @update:model-value="v => handleEnabledChange(source.id, v)"
+          />
+        </span>
         <button
           type="button"
-          class="cst-btn-remove"
+          class="cst-src-remove"
+          :aria-label="`Remove ${source.name}`"
+          title="Remove"
           @click="handleRemove(source.id)"
         >
-          Remove
+          ✕
         </button>
       </div>
     </div>
@@ -565,109 +563,116 @@ onMounted(async () => {
   outline-offset: 2px;
 }
 
-/* Source list */
+/* Source rows — one compact line per calendar */
 .cst-source-list {
   display: flex;
   flex-direction: column;
-  gap: 0.75rem;
+  gap: 0.4rem;
   margin-bottom: 1.25rem;
 }
-.cst-source-card {
+.cst-src {
+  display: flex;
+  align-items: center;
+  gap: 0.6rem;
+  padding: 0.4rem 0.75rem;
   background: var(--bg-2);
   border: 1px solid var(--line);
   border-radius: 8px;
-  overflow: hidden;
+  flex-wrap: wrap;
 }
-.cst-card-header {
-  display: flex;
-  align-items: center;
-  gap: 0.5rem;
-  padding: 0.75rem 1.25rem;
-  border-bottom: 1px solid var(--line);
+.cst-src--off {
+  opacity: 0.6;
 }
-.cst-source-name {
+.cst-src-dot {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  flex-shrink: 0;
+}
+.cst-src-dot--on {
+  background: var(--ok);
+}
+.cst-src-dot--off {
+  background: var(--ink-3);
+}
+.cst-src-name {
   font-family: var(--font-ui);
-  font-size: 1rem;
+  font-size: 0.95rem;
   font-weight: 500;
   color: var(--ink);
   flex: 1;
-  min-width: 0;
+  min-width: 6rem;
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
 }
-.cst-type-badge {
-  padding: 0.2rem 0.5rem;
+.cst-src-type {
+  padding: 0.15rem 0.5rem;
   border-radius: 4px;
-  font-size: 0.75rem;
+  font-size: 0.7rem;
   font-family: var(--font-ui);
+  letter-spacing: 0.03em;
   text-transform: uppercase;
   background: var(--bg-1);
   color: var(--ink-2);
   border: 1px solid var(--line);
+  flex-shrink: 0;
 }
-.cst-running-dot {
-  font-size: 1rem;
-  font-weight: bold;
-}
-.cst-running-dot--on {
-  color: var(--ok);
-}
-.cst-running-dot--off {
-  color: var(--ink-3);
-}
-
-/* Card rows */
-.cst-card-row {
+.cst-src-controls {
   display: flex;
   align-items: center;
-  justify-content: space-between;
-  gap: 1rem;
-  padding: 0.5rem 1.25rem;
-  min-height: 44px;
+  gap: 0.75rem;
+  margin-left: auto;
+  flex-shrink: 0;
 }
-.cst-card-row + .cst-card-row {
-  border-top: 1px solid var(--line-soft, var(--line));
-}
-.cst-card-label {
-  font-family: var(--font-ui);
-  font-size: 0.9rem;
-  font-weight: 500;
-  color: var(--ink);
-}
-.cst-color-input {
-  width: 3rem;
-  height: 2.25rem;
-  min-height: 44px;
-  border: 1px solid var(--line);
-  border-radius: 4px;
-  cursor: pointer;
-  background: none;
+.cst-src-color {
+  width: 30px;
+  height: 30px;
+  min-height: 0;
   padding: 2px;
-}
-.cst-card-row--remove {
-  justify-content: flex-end;
-  padding-top: 0.75rem;
-  padding-bottom: 0.75rem;
-}
-.cst-btn-remove {
-  padding: 0.4rem 0.9rem;
-  min-height: 44px;
-  background: transparent;
-  color: var(--err);
-  border: 1px solid var(--err);
+  border: 1px solid var(--line);
   border-radius: 6px;
-  font-size: 0.875rem;
-  font-family: var(--font-ui);
-  font-weight: 500;
+  background: none;
   cursor: pointer;
-  transition: background 0.15s, color 0.15s;
+  flex-shrink: 0;
 }
-.cst-btn-remove:hover {
-  background: var(--err);
-  color: white;
+.cst-src-color:focus-visible {
+  outline: 2px solid var(--focus);
+  outline-offset: 2px;
 }
-.cst-btn-remove:focus-visible {
+.cst-src-toggle {
+  display: flex;
+  align-items: center;
+  gap: 0.35rem;
+}
+.cst-src-cap {
+  font-family: var(--font-ui);
+  font-size: 0.7rem;
+  font-weight: 600;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  color: var(--ink-3);
+}
+.cst-src-remove {
+  width: 34px;
+  height: 34px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: transparent;
+  color: var(--ink-3);
+  border: 1px solid var(--line);
+  border-radius: 6px;
+  font-size: 0.9rem;
+  cursor: pointer;
+  transition: color 0.15s, border-color 0.15s, background 0.15s;
+}
+.cst-src-remove:hover {
+  color: var(--err);
+  border-color: var(--err);
+  background: color-mix(in srgb, var(--err) 8%, transparent);
+}
+.cst-src-remove:focus-visible {
   outline: 2px solid var(--err);
   outline-offset: 2px;
 }
