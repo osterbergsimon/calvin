@@ -52,4 +52,44 @@ describe("DashboardRegion focus", () => {
     });
     expect(w.find(".leaf").attributes("data-focused")).toBe("false");
   });
+
+  it("raises only the focused sub-region so its glow isn't clipped by siblings (calvin-ltx)", () => {
+    const split = {
+      id: "r1",
+      kind: null,
+      size: 100,
+      split: {
+        direction: "row",
+        regions: [
+          { id: "s1", kind: "calendar", instanceIds: [], size: 34 },
+          { id: "s2", kind: "photos", instanceIds: [], size: 33 },
+          { id: "s3", kind: "photos", instanceIds: [], size: 33 },
+        ],
+      },
+    };
+    const w = mount(DashboardRegion, {
+      props: { region: split, photoRotationInterval: 30, activeRegionId: "s2", lightActive: true },
+      global: { stubs },
+    });
+    const subs = w.findAll(".dashboard-subregion");
+    expect(subs).toHaveLength(3);
+    expect(subs[0].classes()).not.toContain("dashboard-subregion--lit");
+    expect(subs[1].classes()).toContain("dashboard-subregion--lit"); // the active one
+    expect(subs[2].classes()).not.toContain("dashboard-subregion--lit");
+  });
+
+  it("raises no sub-region when the focus light is off", () => {
+    const split = {
+      id: "r1", kind: null, size: 100,
+      split: { direction: "row", regions: [
+        { id: "s1", kind: "calendar", instanceIds: [], size: 50 },
+        { id: "s2", kind: "photos", instanceIds: [], size: 50 },
+      ] },
+    };
+    const w = mount(DashboardRegion, {
+      props: { region: split, photoRotationInterval: 30, activeRegionId: "s2", lightActive: false },
+      global: { stubs },
+    });
+    expect(w.findAll(".dashboard-subregion--lit")).toHaveLength(0);
+  });
 });

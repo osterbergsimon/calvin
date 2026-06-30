@@ -5,6 +5,7 @@
         v-for="sub in region.split.regions"
         :key="sub.id"
         class="dashboard-subregion"
+        :class="{ 'dashboard-subregion--lit': isFocused(sub.id) }"
         :style="getSubStyle(sub)"
         @click.stop="emit('focus-region', sub.id)"
       >
@@ -139,5 +140,15 @@ const getSubStyle = sub => {
   min-height: 0;
   display: flex;
   flex-direction: column;
+  /* Default stacking context so the focused sibling can be raised above its
+     neighbours — otherwise a later sub-region paints over its glow. */
+  position: relative;
+  z-index: 0;
+}
+/* Raise the focused sub-region so its neon glow blooms over adjacent sub-regions
+   instead of being clipped by a later-painted sibling (mirrors the section --lit
+   treatment for top-level regions). */
+.dashboard-subregion--lit {
+  z-index: 3;
 }
 </style>
