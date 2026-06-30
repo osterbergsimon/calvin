@@ -250,6 +250,11 @@ export const CONFIG_FIELD_DEFINITIONS = [
     defaultValue: true,
   },
   {
+    name: "regionsLocked",
+    keys: ["regionsLocked", "regions_locked"],
+    defaultValue: true,
+  },
+  {
     name: "touchControls",
     keys: ["touchControls", "touch_controls"],
     defaultValue: "auto",

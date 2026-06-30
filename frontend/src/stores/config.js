@@ -69,6 +69,7 @@ export const useConfigStore = defineStore("config", () => {
   const displayName = ref("");
   const focusLightMode = ref("interaction");
   const focusLightDimOthers = ref(true);
+  const regionsLocked = ref(true); // Dashboard region drag-resize is locked by default (touch-wall safety)
   const touchControls = ref("auto"); // 'auto' (detect) | 'on' (force) | 'off' (hide) touch chrome
   const touchControlSize = ref("medium"); // 'small' | 'medium' | 'large' — region touch control size
   const mealPlanCardSize = ref("medium"); // Meal plan card size: 'small' | 'medium' | 'large'
@@ -136,6 +137,7 @@ export const useConfigStore = defineStore("config", () => {
     displayName,
     focusLightMode,
     focusLightDimOthers,
+    regionsLocked,
     touchControls,
     touchControlSize,
     mealPlanCardSize,
@@ -216,6 +218,12 @@ export const useConfigStore = defineStore("config", () => {
 
   const setShowUI = show => {
     showUI.value = show;
+  };
+
+  // Lock/unlock direct drag-resize of dashboard regions. Locked by default so a
+  // touch wall never reshapes its layout by accident.
+  const toggleRegionsLock = async () => {
+    await updateConfig({ regionsLocked: !regionsLocked.value });
   };
 
   const toggleUI = async () => {
@@ -454,6 +462,8 @@ export const useConfigStore = defineStore("config", () => {
     displayName,
     focusLightMode,
     focusLightDimOthers,
+    regionsLocked,
+    toggleRegionsLock,
     touchControls,
     touchControlSize,
     loading,

@@ -45,6 +45,55 @@ describe("AdminOverflow", () => {
     w.unmount();
   });
 
+  it("offers Unlock layout only with >1 region, and toggles the lock (calvin-fou)", async () => {
+    const store = useConfigStore();
+    store.regionsLocked = true;
+    store.dashboardScreens = {
+      activeScreenId: "s1",
+      screens: [
+        {
+          id: "s1",
+          name: "Home",
+          layout: {
+            direction: "row",
+            regions: [
+              { id: "r1", kind: "calendar", instanceIds: [], size: 60 },
+              { id: "r2", kind: "photos", instanceIds: [], size: 40 },
+            ],
+          },
+        },
+      ],
+    };
+    const spy = vi.spyOn(store, "toggleRegionsLock").mockResolvedValue();
+    const w = mount(AdminOverflow, { attachTo: document.body });
+    await w.get(".admin-overflow__trigger").trigger("click");
+    const item = w.find('[data-admin="lock-layout"]');
+    expect(item.exists()).toBe(true);
+    expect(item.text()).toBe("Unlock layout");
+    await item.trigger("click");
+    expect(spy).toHaveBeenCalled();
+    expect(w.find(".admin-overflow__menu").exists()).toBe(false);
+    w.unmount();
+  });
+
+  it("hides Unlock layout when the screen has a single region", async () => {
+    const store = useConfigStore();
+    store.dashboardScreens = {
+      activeScreenId: "s1",
+      screens: [
+        {
+          id: "s1",
+          name: "Home",
+          layout: { direction: "row", regions: [{ id: "r1", kind: "calendar", instanceIds: [], size: 100 }] },
+        },
+      ],
+    };
+    const w = mount(AdminOverflow, { attachTo: document.body });
+    await w.get(".admin-overflow__trigger").trigger("click");
+    expect(w.find('[data-admin="lock-layout"]').exists()).toBe(false);
+    w.unmount();
+  });
+
   it("Escape closes the popover", async () => {
     const w = mount(AdminOverflow, { attachTo: document.body });
     await w.get(".admin-overflow__trigger").trigger("click");

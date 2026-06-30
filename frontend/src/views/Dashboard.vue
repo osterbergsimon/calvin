@@ -45,7 +45,16 @@
           </div>
 
           <!-- Dashboard View (Home) - Renders configured dashboard regions -->
-          <div v-else :class="['mode-content', 'dashboard-view', mainLayoutClass]">
+          <div
+            v-else
+            ref="dashboardViewEl"
+            :class="[
+              'mode-content',
+              'dashboard-view',
+              mainLayoutClass,
+              { 'dashboard-view--unlocked': !configStore.regionsLocked },
+            ]"
+          >
             <template v-for="elementType in layoutOrder" :key="elementType">
               <!-- Dashboard Region -->
               <div
@@ -60,7 +69,7 @@
                   :parent-direction="layoutDirection"
                   :active-region-id="activeScreen.activeRegionId"
                   :light-active="lightActive"
-                  :dim-others="configStore.focusLightDimOthers"
+                  :dim-others="configStore.focusLightDimOthers && configStore.regionsLocked"
                   @focus-region="onFocusRegion"
                 />
               </div>
@@ -83,6 +92,29 @@
                 :enabled="true"
               />
             </template>
+
+            <!-- Drag-to-resize handles (only when the layout is unlocked) -->
+            <div
+              v-for="handle in resizeHandles"
+              :key="`resizer-${handle.firstIndex}`"
+              class="region-resizer"
+              :class="`region-resizer--${layoutDirection}`"
+              :style="resizerStyle(handle)"
+              role="separator"
+              aria-orientation="vertical"
+              :aria-label="`Drag to resize regions ${handle.firstIndex + 1} and ${handle.firstIndex + 2}`"
+              @pointerdown="startRegionResize(handle.firstIndex, $event)"
+            >
+              <span class="region-resizer__grip" aria-hidden="true" />
+            </div>
+          </div>
+
+          <!-- Unlocked-layout banner: clear status + one-tap re-lock -->
+          <div v-if="!configStore.regionsLocked" class="layout-unlock-banner" role="status">
+            <span class="layout-unlock-banner__text">Layout unlocked — drag the dividers to resize</span>
+            <button type="button" class="layout-unlock-banner__lock" @click="lockLayout">
+              Lock
+            </button>
           </div>
 
           <!-- Horizontal Clock Bar at Bottom -->
@@ -108,7 +140,7 @@
 </template>
 
 <script setup>
-import { onMounted, onUnmounted, computed, watch, defineAsyncComponent } from "vue";
+import { onMounted, onUnmounted, computed, ref, watch, defineAsyncComponent } from "vue";
 import LayoutManager from "../components/LayoutManager.vue";
 import DashboardRegion from "../components/DashboardRegion.vue";
 import MinimalUIOverlay from "../components/MinimalUIOverlay.vue";
@@ -128,6 +160,7 @@ import {
   getLayoutDirection,
   getRegionAxisStyle,
   normalizeDashboardScreens,
+  resizeAdjacentRegions,
   resolveClockBarForScreen,
 } from "../utils/layout";
 
@@ -223,7 +256,104 @@ const getRegionForElement = elementType => {
 
 const getRegionStyle = elementType => {
   const region = getRegionForElement(elementType);
-  return getRegionAxisStyle(region, layoutDirection.value);
+  // During a live drag, override sizes from dragSizes for instant feedback
+  // without persisting on every pointer move.
+  const override = region && dragSizes.value ? dragSizes.value[region.id] : undefined;
+  const sized = override != null ? { ...region, size: override } : region;
+  return getRegionAxisStyle(sized, layoutDirection.value);
+};
+
+// ── Drag-to-resize top-level regions (calvin-fou) ───────────────────────────
+const dashboardViewEl = ref(null);
+const dragSizes = ref(null); // { [regionId]: size } live override while dragging
+let resizeState = null;
+
+// One handle per divider between adjacent top-level regions, skipping the
+// divider occupied by a between-clock-bar. Positioned by cumulative size %.
+const resizeHandles = computed(() => {
+  if (configStore.regionsLocked) return [];
+  const regions = activeScreen.value?.layout?.regions || [];
+  if (regions.length < 2) return [];
+  const betweenGap = clockBarPlacementGap.value;
+  const sizeOf = region => (dragSizes.value?.[region.id] ?? region.size) || 0;
+  const handles = [];
+  let cumulative = 0;
+  for (let i = 0; i < regions.length - 1; i++) {
+    cumulative += sizeOf(regions[i]);
+    if (betweenGap !== null && i === betweenGap) continue; // a bar sits here
+    handles.push({ firstIndex: i, position: cumulative });
+  }
+  return handles;
+});
+
+const resizerStyle = handle =>
+  layoutDirection.value === "column"
+    ? { top: `${handle.position}%` }
+    : { left: `${handle.position}%` };
+
+const startRegionResize = (firstIndex, event) => {
+  if (configStore.regionsLocked) return;
+  event.preventDefault();
+  event.stopPropagation();
+  const el = dashboardViewEl.value;
+  if (!el) return;
+  resizeState = { firstIndex, rect: el.getBoundingClientRect(), direction: layoutDirection.value };
+  window.addEventListener("pointermove", onRegionResizeMove);
+  window.addEventListener("pointerup", stopRegionResize, { once: true });
+};
+
+const onRegionResizeMove = event => {
+  if (!resizeState) return;
+  const isColumn = resizeState.direction === "column";
+  const offset = isColumn ? event.clientY - resizeState.rect.top : event.clientX - resizeState.rect.left;
+  const axis = isColumn ? resizeState.rect.height : resizeState.rect.width;
+  if (axis <= 0) return;
+  const regions = activeScreen.value.layout.regions;
+  const before = regions
+    .slice(0, resizeState.firstIndex)
+    .reduce((sum, region) => sum + (Number(region.size) || 0), 0);
+  const nextFirstSize = (offset / axis) * 100 - before;
+  const resized = resizeAdjacentRegions(regions, resizeState.firstIndex, nextFirstSize);
+  const map = {};
+  resized.forEach(region => {
+    map[region.id] = region.size;
+  });
+  dragSizes.value = map;
+};
+
+const stopRegionResize = () => {
+  window.removeEventListener("pointermove", onRegionResizeMove);
+  const sizes = dragSizes.value;
+  resizeState = null;
+  dragSizes.value = null;
+  if (sizes) commitRegionSizes(sizes);
+};
+
+const commitRegionSizes = sizes => {
+  const screens = dashboardScreens.value;
+  const activeId = activeScreen.value.id;
+  const next = {
+    ...screens,
+    screens: screens.screens.map(screen =>
+      screen.id !== activeId
+        ? screen
+        : {
+            ...screen,
+            layout: {
+              ...screen.layout,
+              regions: screen.layout.regions.map(region => ({
+                ...region,
+                size: sizes[region.id] ?? region.size,
+              })),
+            },
+          }
+    ),
+  };
+  configStore.updateConfig({ dashboardScreens: normalizeDashboardScreens(next) });
+};
+
+const lockLayout = () => {
+  configStore.updateConfig({ regionsLocked: true });
 };
 
 const lightActive = computed(() => {
@@ -304,6 +434,12 @@ onUnmounted(() => {
     clearInterval(configPollInterval);
     configPollInterval = null;
   }
+  // Drop any in-flight drag listeners and re-lock the layout on the way out so
+  // it never stays editable behind the user's back.
+  window.removeEventListener("pointermove", onRegionResizeMove);
+  if (!configStore.regionsLocked) {
+    configStore.updateConfig({ regionsLocked: true });
+  }
 });
 </script>
 
@@ -349,6 +485,7 @@ onUnmounted(() => {
    giving the focus-light room to glow uniformly around the whole region. */
 .mode-content.dashboard-view {
   padding: 0.5rem;
+  position: relative; /* anchor the absolute drag-resize handles */
 }
 
 .mode-content.dashboard-view.layout-portrait {
@@ -375,6 +512,90 @@ onUnmounted(() => {
 .mode-content.photos-mode,
 .mode-content.web-services-mode {
   gap: 0;
+}
+
+/* ── Drag-to-resize handles (calvin-fou) ─────────────────────────────────── */
+.region-resizer {
+  position: absolute;
+  z-index: 6; /* above lit regions (z-index:3) so the grip is always grabbable */
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  touch-action: none; /* let pointer events drive the drag on touch screens */
+}
+.region-resizer--row {
+  top: 0;
+  bottom: 0;
+  width: 28px;
+  transform: translateX(-50%);
+  cursor: col-resize;
+}
+.region-resizer--column {
+  left: 0;
+  right: 0;
+  height: 28px;
+  transform: translateY(-50%);
+  cursor: row-resize;
+}
+.region-resizer__grip {
+  background: var(--focus);
+  border: 1px solid var(--focus-edge);
+  border-radius: 999px;
+  box-shadow: 0 0 0 3px color-mix(in srgb, var(--focus) 22%, transparent);
+}
+.region-resizer--row .region-resizer__grip {
+  width: 6px;
+  height: 54px;
+  max-height: 60%;
+}
+.region-resizer--column .region-resizer__grip {
+  height: 6px;
+  width: 54px;
+  max-width: 60%;
+}
+.region-resizer:hover .region-resizer__grip,
+.region-resizer:active .region-resizer__grip {
+  background: var(--focus);
+  box-shadow: 0 0 0 5px color-mix(in srgb, var(--focus) 28%, transparent);
+}
+
+/* Unlocked-layout banner */
+.layout-unlock-banner {
+  position: fixed;
+  left: 50%;
+  bottom: 1rem;
+  transform: translateX(-50%);
+  z-index: 1002;
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+  padding: 0.5rem 0.5rem 0.5rem 1rem;
+  background: var(--bg-1);
+  border: 1px solid var(--focus-edge);
+  border-radius: 999px;
+  box-shadow: 0 10px 30px -10px var(--focus-glow);
+  font-family: var(--font-ui);
+}
+.layout-unlock-banner__text {
+  font-size: 0.85rem;
+  color: var(--ink);
+  white-space: nowrap;
+}
+.layout-unlock-banner__lock {
+  min-height: 36px;
+  padding: 0 0.9rem;
+  font-family: var(--font-ui);
+  font-size: 0.85rem;
+  font-weight: 600;
+  color: var(--focus-ink);
+  background: var(--focus);
+  border: 0;
+  border-radius: 999px;
+  cursor: pointer;
+}
+.layout-unlock-banner__lock:focus-visible {
+  outline: 2px solid var(--focus);
+  outline-offset: 2px;
 }
 
 .photos-mode,
