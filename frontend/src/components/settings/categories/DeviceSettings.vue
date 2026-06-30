@@ -59,6 +59,33 @@
       <KeyboardTab :config="config" @update:config="patch => emit('update:config', patch)" />
     </SettingsSection>
 
+    <SettingsSection id="device-notifications" title="Notifications">
+      <SettingRow label="Enable feedback" description="Show a visual indicator when keyboard shortcuts are activated.">
+        <ToggleSwitch
+          :model-value="config.keyboardFeedbackEnabled"
+          aria-label="Enable feedback"
+          @update:model-value="v => emit('update:config', { keyboardFeedbackEnabled: v })"
+        />
+      </SettingRow>
+      <SettingRow label="Feedback style" description="Size of the keyboard feedback overlay.">
+        <SegmentedControl
+          :model-value="config.keyboardFeedbackMode"
+          :options="[{value:'normal',label:'Normal'},{value:'small',label:'Small'}]"
+          aria-label="Feedback style"
+          @update:model-value="v => emit('update:config', { keyboardFeedbackMode: v })"
+        />
+      </SettingRow>
+      <SettingRow label="Auto-hide delay (s)" description="Seconds before the mode indicator fades out automatically.">
+        <NumberStepper
+          :model-value="config.modeIndicatorTimeout"
+          :min="0"
+          :max="60"
+          aria-label="Auto-hide delay in seconds"
+          @update:model-value="v => emit('update:config', { modeIndicatorTimeout: v })"
+        />
+      </SettingRow>
+    </SettingsSection>
+
     <SettingsSection id="device-reboot" title="Reboot combo">
       <SettingRow label="First key" description="First key in the reboot key combination.">
         <SelectPill
@@ -105,6 +132,7 @@ import SettingsSection from "@/components/settings/shell/SettingsSection.vue";
 import SettingRow from "@/components/settings/shell/SettingRow.vue";
 import ToggleSwitch from "@/components/ui/ToggleSwitch.vue";
 import SelectPill from "@/components/ui/SelectPill.vue";
+import SegmentedControl from "@/components/ui/SegmentedControl.vue";
 import NumberStepper from "@/components/ui/NumberStepper.vue";
 import DisplayScheduleGrid from "@/components/settings/shared/DisplayScheduleGrid.vue";
 import KeyboardTab from "@/components/settings/tabs/layout/KeyboardTab.vue";

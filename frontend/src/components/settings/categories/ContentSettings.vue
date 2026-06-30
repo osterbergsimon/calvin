@@ -4,6 +4,89 @@
       <CalendarSourcesTab :config="config" @update:config="patch => emit('update:config', patch)" />
     </SettingsSection>
 
+    <SettingsSection id="content-calendar-display" title="Calendar display">
+      <SettingRow label="Calendar view" description="The default layout used to display calendar events.">
+        <SelectPill
+          :model-value="config.calendarViewMode"
+          :options="[{value:'month',label:'Month'},{value:'week',label:'Week'},{value:'day',label:'Day'},{value:'rolling',label:'Rolling'}]"
+          aria-label="Calendar view"
+          @update:model-value="v => emit('update:config', { calendarViewMode: v })"
+        />
+      </SettingRow>
+      <SettingRow label="Weeks to show" description="Number of weeks visible in the rolling calendar view.">
+        <NumberStepper
+          :model-value="config.calendarWeeks"
+          :min="1"
+          :max="12"
+          aria-label="Weeks to show"
+          @update:model-value="v => emit('update:config', { calendarWeeks: v })"
+        />
+      </SettingRow>
+      <SettingRow label="Week starts on" description="The first day shown in each calendar week.">
+        <SelectPill
+          :model-value="config.weekStartDay"
+          :options="[
+            {value:1,label:'Monday'},
+            {value:2,label:'Tuesday'},
+            {value:3,label:'Wednesday'},
+            {value:4,label:'Thursday'},
+            {value:5,label:'Friday'},
+            {value:6,label:'Saturday'},
+            {value:0,label:'Sunday'}
+          ]"
+          aria-label="Week starts on"
+          @update:model-value="v => emit('update:config', { weekStartDay: v })"
+        />
+      </SettingRow>
+      <SettingRow label="Weekend days" description="Days highlighted as the weekend on the calendar.">
+        <ChipMultiSelect
+          :model-value="config.weekendDays"
+          :options="[
+            {value:1,label:'Mon'},
+            {value:2,label:'Tue'},
+            {value:3,label:'Wed'},
+            {value:4,label:'Thu'},
+            {value:5,label:'Fri'},
+            {value:6,label:'Sat'},
+            {value:0,label:'Sun'}
+          ]"
+          aria-label="Weekend days"
+          @update:model-value="v => emit('update:config', { weekendDays: v })"
+        />
+      </SettingRow>
+      <SettingRow label="Show week numbers" description="Display ISO week numbers alongside each calendar row.">
+        <ToggleSwitch
+          :model-value="config.showWeekNumbers"
+          aria-label="Show week numbers"
+          @update:model-value="v => emit('update:config', { showWeekNumbers: v })"
+        />
+      </SettingRow>
+      <SettingRow label="Time format" description="Whether event times are shown in 24-hour or 12-hour format.">
+        <SegmentedControl
+          :model-value="config.timeFormat"
+          :options="[{value:'24h',label:'24h'},{value:'12h',label:'12h'}]"
+          aria-label="Time format"
+          @update:model-value="v => emit('update:config', { timeFormat: v })"
+        />
+      </SettingRow>
+      <SettingRow label="Max visible events" description="How many events can appear in a single calendar cell.">
+        <NumberStepper
+          :model-value="config.maxVisibleEvents"
+          :min="1"
+          :max="20"
+          aria-label="Max visible events"
+          @update:model-value="v => emit('update:config', { maxVisibleEvents: v })"
+        />
+      </SettingRow>
+      <SettingRow label="Highlight holidays" description="Mark public holidays and red days on the calendar.">
+        <ToggleSwitch
+          :model-value="config.showRedDays"
+          aria-label="Highlight holidays"
+          @update:model-value="v => emit('update:config', { showRedDays: v })"
+        />
+      </SettingRow>
+    </SettingsSection>
+
     <SettingsSection id="content-photos" title="Photos">
       <SettingRow label="Rotation interval" description="Seconds each photo is shown before advancing.">
         <NumberStepper
@@ -73,6 +156,8 @@ import SettingsSection from "@/components/settings/shell/SettingsSection.vue";
 import SettingRow from "@/components/settings/shell/SettingRow.vue";
 import ToggleSwitch from "@/components/ui/ToggleSwitch.vue";
 import SelectPill from "@/components/ui/SelectPill.vue";
+import SegmentedControl from "@/components/ui/SegmentedControl.vue";
+import ChipMultiSelect from "@/components/ui/ChipMultiSelect.vue";
 import NumberStepper from "@/components/ui/NumberStepper.vue";
 import CalendarSourcesTab from "@/components/settings/tabs/content/CalendarSourcesTab.vue";
 import ImagesTab from "@/components/settings/tabs/content/ImagesTab.vue";

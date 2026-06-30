@@ -250,10 +250,8 @@ const SECTION_BY_CATEGORY_TAB = {
   dashboard: {
     layout: "layout",
     regions: "regions",
-    calendar: "calendar",
     appearance: "appearance",
-    notifications: "notifications",
-    "plugin-display": "plugin-display",
+    "kiosk-touch": "kiosk-touch",
   },
   "clock-bar": {
     appearance: "clock-bar-clock",
@@ -261,6 +259,7 @@ const SECTION_BY_CATEGORY_TAB = {
   },
   content: {
     calendars: "content-calendars",
+    "calendar-display": "content-calendar-display",
     photos: "content-photos",
     images: "content-images",
     services: "content-services",
@@ -268,6 +267,7 @@ const SECTION_BY_CATEGORY_TAB = {
   device: {
     power: "device-power",
     keyboard: "device-keyboard",
+    notifications: "device-notifications",
     reboot: "device-reboot",
     hardware: "device-hardware",
   },

@@ -5,12 +5,8 @@ import DisplaySettings from "@/components/settings/categories/DisplaySettings.vu
 
 const baseConfig = () => ({
   orientation: "landscape", orientationFlipped: false, applyDisplayRotation: true,
-  calendarViewMode: "month", calendarWeeks: 4, weekStartDay: 1, weekendDays: [0, 6], showWeekNumbers: false,
-  timeFormat: "24h", maxVisibleEvents: 4, showRedDays: false,
   selectedTheme: null, themeMode: "auto", focusLightMode: "interaction", focusLightDimOthers: true,
   showUI: true, touchControls: "auto", touchControlSize: "medium", displayName: "",
-  keyboardFeedbackEnabled: true, keyboardFeedbackMode: "normal", modeIndicatorTimeout: 5,
-  mealPlanCardSize: "medium",
 });
 
 const stubs = { ThemePicker: true, TypefacePicker: true };
@@ -18,10 +14,14 @@ const stubs = { ThemePicker: true, TypefacePicker: true };
 describe("DisplaySettings", () => {
   beforeEach(() => setActivePinia(createPinia()));
 
-  it("renders the eyebrow sections incl. the embedded screens & regions editor", () => {
+  it("renders the focused section set (calendar/notifications/plugin-display moved out — calvin-svo)", () => {
     const w = mount(DisplaySettings, { props: { config: baseConfig() }, global: { stubs } });
-    ["layout", "regions", "calendar", "appearance", "notifications", "plugin-display"].forEach(id =>
+    ["layout", "regions", "appearance", "kiosk-touch"].forEach(id =>
       expect(w.find(`#section-${id}`).exists()).toBe(true)
+    );
+    // moved to Content Sources / Device respectively, or removed (meal-plan)
+    ["calendar", "notifications", "plugin-display"].forEach(id =>
+      expect(w.find(`#section-${id}`).exists()).toBe(false)
     );
     // the regions editor is embedded and reachable (calvin-4k8 regression fix)
     expect(w.findComponent({ name: "DashboardRegionsEditor" }).exists()).toBe(true);
@@ -35,15 +35,6 @@ describe("DisplaySettings", () => {
     const focusPill = pills.find(p => (p.props("options") || []).some(o => o.value === "always"));
     focusPill.vm.$emit("update:modelValue", "always");
     expect(w.emitted("update:config").some(c => c[0].focusLightMode === "always")).toBe(true);
-  });
-
-  it("emits update:config when a weekend-day chip is toggled", async () => {
-    const w = mount(DisplaySettings, { props: { config: baseConfig() }, global: { stubs } });
-    const chips = w.findComponent({ name: "ChipMultiSelect" });
-    expect(chips.exists()).toBe(true);
-    // baseConfig weekend = [0,6]; toggling Saturday(6) off should emit [0]
-    chips.vm.$emit("update:modelValue", [0]);
-    expect(w.emitted("update:config").some(c => Array.isArray(c[0].weekendDays) && c[0].weekendDays.join() === "0")).toBe(true);
   });
 
   it("inverts the kiosk toggle (Hide controls → showUI:false)", async () => {
