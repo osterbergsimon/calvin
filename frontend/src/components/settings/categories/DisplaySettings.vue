@@ -2,7 +2,7 @@
   <div class="display-settings">
     <!-- LAYOUT -->
     <SettingsSection id="layout" title="Layout">
-      <SettingRow label="Orientation" description="How panels arrange on the screen.">
+      <SettingRow label="Orientation" description="Physical screen orientation. Per-screen region direction is set under Screens & regions.">
         <SegmentedControl
           :model-value="config.orientation"
           :options="[{value:'landscape',label:'Landscape'},{value:'portrait',label:'Portrait'}]"

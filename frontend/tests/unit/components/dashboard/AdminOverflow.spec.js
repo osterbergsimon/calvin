@@ -22,24 +22,24 @@ describe("AdminOverflow", () => {
     w.unmount();
   });
 
-  it("offers Settings / orientation / Hide UI and not the dead side-view + mode items (calvin-ayr)", async () => {
+  it("offers only Settings + Hide UI; legacy mode/side-view/orientation items are gone (calvin-ayr, calvin-7nm)", async () => {
     const w = mount(AdminOverflow, { attachTo: document.body });
     await w.get(".admin-overflow__trigger").trigger("click");
     expect(w.find('[data-admin="settings"]').exists()).toBe(true);
-    expect(w.find('[data-admin="orientation"]').exists()).toBe(true);
     expect(w.find('[data-admin="hide-ui"]').exists()).toBe(true);
-    // legacy side-view-model actions are no-ops in the region layout — removed
+    // these are no-ops / belong in Display settings now — removed from the ⋯ menu
     expect(w.find('[data-admin="mode"]').exists()).toBe(false);
     expect(w.find('[data-admin="side-view"]').exists()).toBe(false);
+    expect(w.find('[data-admin="orientation"]').exists()).toBe(false);
     w.unmount();
   });
 
-  it("toggles orientation and closes after the action", async () => {
+  it("Hide UI toggles the UI and closes the menu", async () => {
     const store = useConfigStore();
-    const spy = vi.spyOn(store, "setOrientation");
+    const spy = vi.spyOn(store, "toggleUI");
     const w = mount(AdminOverflow, { attachTo: document.body });
     await w.get(".admin-overflow__trigger").trigger("click");
-    await w.get('[data-admin="orientation"]').trigger("click");
+    await w.get('[data-admin="hide-ui"]').trigger("click");
     expect(spy).toHaveBeenCalled();
     expect(w.find(".admin-overflow__menu").exists()).toBe(false);
     w.unmount();

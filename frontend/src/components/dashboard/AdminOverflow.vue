@@ -22,9 +22,6 @@
       <button type="button" role="menuitem" class="admin-overflow__item" data-admin="settings" @click="onSettings">
         Settings
       </button>
-      <button type="button" role="menuitem" class="admin-overflow__item" data-admin="orientation" @click="onOrientation">
-        {{ orientationLabel }}
-      </button>
       <button type="button" role="menuitem" class="admin-overflow__item" data-admin="hide-ui" @click="onHideUi">
         Hide UI
       </button>
@@ -33,7 +30,7 @@
 </template>
 
 <script setup>
-import { ref, computed, onUnmounted } from "vue";
+import { ref, onUnmounted } from "vue";
 import { useRouter } from "vue-router";
 import { useConfigStore } from "../../stores/config";
 import { useModeStore } from "../../stores/mode";
@@ -75,19 +72,9 @@ const close = () => {
 };
 onUnmounted(() => document.removeEventListener("click", onDocClick, true));
 
-const orientationLabel = computed(() =>
-  configStore.orientation === "landscape" ? "Switch to Portrait" : "Switch to Landscape"
-);
-
 const onSettings = () => {
   modeStore.setMode(modeStore.MODES.SETTINGS);
   router.push("/settings");
-  close();
-};
-const onOrientation = () => {
-  const next = configStore.orientation === "landscape" ? "portrait" : "landscape";
-  configStore.setOrientation(next);
-  configStore.setSideViewPosition(next === "landscape" ? "right" : "bottom");
   close();
 };
 const onHideUi = () => {
