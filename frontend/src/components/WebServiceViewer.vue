@@ -39,6 +39,7 @@
           :service="currentService"
           :subtitle="serviceSubtitle"
           :header-visible="!isFullscreen"
+          :focused="focused"
         >
           <template #actions>
             <RegionControls v-if="focused" region-kind="service" />

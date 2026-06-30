@@ -84,6 +84,17 @@ describe("ServiceViewer", () => {
     expect(wrapper.find(".dashboard-panel__title").text()).toBe("Service Name");
   });
 
+  it("threads the focus state to the panel so a focused service region glows (calvin-ltx)", () => {
+    const svc = { id: "s", name: "S", display_schema: { kind: "status-tile" } };
+    expect(mountViewer(svc).find(".focus-panel.is-focused").exists()).toBe(false);
+
+    const focused = mount(ServiceViewer, {
+      props: { focused: true, service: svc },
+      global: { stubs: { SchemaRenderer: { template: '<div class="schema-renderer-stub" />' } } },
+    });
+    expect(focused.find(".focus-panel.is-focused").exists()).toBe(true);
+  });
+
   it("can hide the shared panel header for fullscreen service rendering", () => {
     const wrapper = mount(ServiceViewer, {
       props: {
