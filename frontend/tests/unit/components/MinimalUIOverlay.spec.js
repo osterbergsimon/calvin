@@ -1,6 +1,6 @@
 /**
- * Unit tests for MinimalUIOverlay component
- * Tests functionality: shows/hides UI toggle button based on UI visibility
+ * Unit tests for MinimalUIOverlay — the configurable hot-corner reveal shown
+ * when the UI is hidden (calvin-hgy).
  */
 
 import { describe, it, expect, beforeEach, vi } from "vitest";
@@ -9,7 +9,7 @@ import { setActivePinia, createPinia } from "pinia";
 import MinimalUIOverlay from "@/components/MinimalUIOverlay.vue";
 import { useConfigStore } from "@/stores/config";
 
-describe("MinimalUIOverlay", () => {
+describe("MinimalUIOverlay (hot corner)", () => {
   let configStore;
 
   beforeEach(() => {
@@ -18,66 +18,43 @@ describe("MinimalUIOverlay", () => {
     configStore.showUI = false;
   });
 
-  describe("Visibility", () => {
-    it("should render when UI is hidden", () => {
-      configStore.showUI = false;
-
-      const wrapper = mount(MinimalUIOverlay);
-
-      expect(wrapper.find(".minimal-ui-overlay").exists()).toBe(true);
-      expect(wrapper.find(".ui-toggle-btn").exists()).toBe(true);
-    });
-
-    it("should not render when UI is shown", () => {
-      configStore.showUI = true;
-
-      const wrapper = mount(MinimalUIOverlay);
-
-      expect(wrapper.find(".minimal-ui-overlay").exists()).toBe(false);
-    });
-
-    it("should be positioned in bottom-left", () => {
-      configStore.showUI = false;
-
-      const wrapper = mount(MinimalUIOverlay);
-
-      expect(wrapper.find(".minimal-ui-overlay").classes()).toContain("position-bottom-left");
-    });
+  it("renders the hot corner in the configured position when the UI is hidden", () => {
+    configStore.hotCornerPosition = "top-right";
+    const wrapper = mount(MinimalUIOverlay);
+    const btn = wrapper.find(".hot-corner");
+    expect(btn.exists()).toBe(true);
+    expect(btn.classes()).toContain("hot-corner--top-right");
+    expect(btn.attributes("title")).toBe("Show controls");
+    expect(wrapper.find("svg").exists()).toBe(true);
   });
 
-  describe("Button Functionality", () => {
-    it("should have correct button attributes", () => {
-      configStore.showUI = false;
+  it("defaults to bottom-left", () => {
+    const wrapper = mount(MinimalUIOverlay);
+    expect(wrapper.find(".hot-corner").classes()).toContain("hot-corner--bottom-left");
+  });
 
-      const wrapper = mount(MinimalUIOverlay);
+  it("does not render when the UI is shown", () => {
+    configStore.showUI = true;
+    const wrapper = mount(MinimalUIOverlay);
+    expect(wrapper.find(".hot-corner").exists()).toBe(false);
+  });
 
-      const button = wrapper.find(".ui-toggle-btn");
-      expect(button.exists()).toBe(true);
-      expect(button.attributes("title")).toBe("Show UI");
-      expect(button.attributes("aria-label")).toBe("Show UI");
-    });
+  it("does not render when the corner is switched off", () => {
+    configStore.hotCornerPosition = "off";
+    const wrapper = mount(MinimalUIOverlay);
+    expect(wrapper.find(".hot-corner").exists()).toBe(false);
+  });
 
-    it("should call showUITemporarily when button is clicked", async () => {
-      configStore.showUI = false;
-      const showUITemporarilySpy = vi.spyOn(configStore, "showUITemporarily");
+  it("applies the configured rest opacity (0–100 → 0–1)", () => {
+    configStore.hotCornerOpacity = 20;
+    const wrapper = mount(MinimalUIOverlay);
+    expect(wrapper.find(".hot-corner").attributes("style")).toContain("--rest-opacity: 0.2");
+  });
 
-      const wrapper = mount(MinimalUIOverlay);
-
-      const button = wrapper.find(".ui-toggle-btn");
-      await button.trigger("click");
-
-      expect(showUITemporarilySpy).toHaveBeenCalledWith(60);
-    });
-
-    it("should render SVG icon", () => {
-      configStore.showUI = false;
-
-      const wrapper = mount(MinimalUIOverlay);
-
-      const svg = wrapper.find("svg");
-      expect(svg.exists()).toBe(true);
-      expect(svg.attributes("width")).toBe("16");
-      expect(svg.attributes("height")).toBe("16");
-    });
+  it("reveals the UI temporarily on tap", async () => {
+    const spy = vi.spyOn(configStore, "showUITemporarily");
+    const wrapper = mount(MinimalUIOverlay);
+    await wrapper.find(".hot-corner").trigger("click");
+    expect(spy).toHaveBeenCalledWith(60);
   });
 });

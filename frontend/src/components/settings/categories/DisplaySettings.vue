@@ -145,6 +145,47 @@
         />
       </SettingRow>
       <SettingRow
+        label="Tap anywhere to show controls"
+        description="When controls are hidden, tapping the calendar or photos brings them back. Off by default — use the reveal corner instead."
+      >
+        <ToggleSwitch
+          :model-value="config.tapAnywhereReveal"
+          aria-label="Tap anywhere to show controls"
+          @update:model-value="v => emit('update:config', { tapAnywhereReveal: v })"
+        />
+      </SettingRow>
+      <SettingRow
+        label="Reveal corner"
+        description="Which screen corner shows the tap-to-reveal control while the UI is hidden."
+      >
+        <SelectPill
+          :model-value="config.hotCornerPosition || 'bottom-left'"
+          :options="[
+            { value: 'bottom-left', label: 'Bottom left' },
+            { value: 'bottom-right', label: 'Bottom right' },
+            { value: 'top-left', label: 'Top left' },
+            { value: 'top-right', label: 'Top right' },
+            { value: 'off', label: 'Off' },
+          ]"
+          aria-label="Reveal corner"
+          @update:model-value="v => emit('update:config', { hotCornerPosition: v })"
+        />
+      </SettingRow>
+      <SettingRow
+        v-if="(config.hotCornerPosition || 'bottom-left') !== 'off'"
+        label="Reveal corner opacity"
+        description="How visible the reveal corner is at rest (0 = invisible but still tappable). It always brightens when you touch it."
+      >
+        <NumberStepper
+          :model-value="config.hotCornerOpacity ?? 55"
+          :min="0"
+          :max="100"
+          :step="5"
+          aria-label="Reveal corner opacity percentage"
+          @update:model-value="v => emit('update:config', { hotCornerOpacity: v })"
+        />
+      </SettingRow>
+      <SettingRow
         label="Touch controls"
         description="Whether on-screen touch navigation controls are shown."
       >

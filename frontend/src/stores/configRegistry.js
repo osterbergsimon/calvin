@@ -255,6 +255,21 @@ export const CONFIG_FIELD_DEFINITIONS = [
     defaultValue: true,
   },
   {
+    name: "tapAnywhereReveal",
+    keys: ["tapAnywhereReveal", "tap_anywhere_reveal"],
+    defaultValue: false,
+  },
+  {
+    name: "hotCornerPosition",
+    keys: ["hotCornerPosition", "hot_corner_position"],
+    defaultValue: "bottom-left",
+  },
+  {
+    name: "hotCornerOpacity",
+    keys: ["hotCornerOpacity", "hot_corner_opacity"],
+    defaultValue: 55,
+  },
+  {
     name: "touchControls",
     keys: ["touchControls", "touch_controls"],
     defaultValue: "auto",
