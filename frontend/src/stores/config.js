@@ -71,6 +71,8 @@ export const useConfigStore = defineStore("config", () => {
   const focusLightDimOthers = ref(true);
   const regionsLocked = ref(true); // Dashboard region drag-resize is locked by default (touch-wall safety)
   const tapAnywhereReveal = ref(false); // When UI is hidden, whether tapping content re-shows it (default: hot corner only)
+  const hotCornerPosition = ref("bottom-left"); // Reveal hot corner: 'bottom-left'|'bottom-right'|'top-left'|'top-right'|'off'
+  const hotCornerOpacity = ref(55); // Rest opacity of the reveal hot corner, 0–100 (0 = invisible but still tappable)
   const touchControls = ref("auto"); // 'auto' (detect) | 'on' (force) | 'off' (hide) touch chrome
   const touchControlSize = ref("medium"); // 'small' | 'medium' | 'large' — region touch control size
   const mealPlanCardSize = ref("medium"); // Meal plan card size: 'small' | 'medium' | 'large'
@@ -140,6 +142,8 @@ export const useConfigStore = defineStore("config", () => {
     focusLightDimOthers,
     regionsLocked,
     tapAnywhereReveal,
+    hotCornerPosition,
+    hotCornerOpacity,
     touchControls,
     touchControlSize,
     mealPlanCardSize,
@@ -466,6 +470,8 @@ export const useConfigStore = defineStore("config", () => {
     focusLightDimOthers,
     regionsLocked,
     tapAnywhereReveal,
+    hotCornerPosition,
+    hotCornerOpacity,
     toggleRegionsLock,
     touchControls,
     touchControlSize,
