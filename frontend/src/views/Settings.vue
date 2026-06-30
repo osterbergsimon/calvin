@@ -75,6 +75,7 @@ import { computed, ref, watch, onMounted, onUnmounted, nextTick, defineAsyncComp
 import { useRoute, useRouter } from "vue-router";
 import { useConfigForm } from "@/composables/useConfigForm";
 import { useModeStore } from "@/stores/mode";
+import { resolveScrollView, pickActiveEyebrow } from "@/utils/settingsSectionSpy";
 import SettingsTopBar from "@/components/settings/shell/SettingsTopBar.vue";
 import SettingsSearch from "@/components/settings/shell/SettingsSearch.vue";
 import CategoryRail from "@/components/settings/shell/CategoryRail.vue";
@@ -143,8 +144,7 @@ const categoryRenderKey = ref(0);
 
 // ── Scroll-spy section indicator ─────────────────────────────────────────────
 const sectionLabel = ref("");
-let scrollListener = null;
-let scrollListenerTarget = null;
+let scrollTargets = [];
 let computeRafId = null;
 let observerRetryId = null;
 
@@ -156,7 +156,6 @@ function cancelObserverRetry() {
 }
 
 function computeActiveSection() {
-  const container = document.querySelector(".settings-content");
   // Key off eyebrows, not ".settings-section": CollapsibleSection (used inside
   // embedded editors) also carries the .settings-section class but has no
   // eyebrow, so matching on .settings-section would land on those nested,
@@ -165,33 +164,17 @@ function computeActiveSection() {
   const eyebrows = [...document.querySelectorAll(".settings-section__eyebrow")];
   if (!eyebrows.length) return;
 
-  // When scrolled to (near) the bottom, the trailing sections are all on
-  // screen and short ones can't be scrolled any higher — treat the last as
-  // active so the final section is always reachable.
-  if (
-    container &&
-    container.scrollTop + container.clientHeight >= container.scrollHeight - 4
-  ) {
-    sectionLabel.value = eyebrows[eyebrows.length - 1].textContent.trim();
-    return;
-  }
+  const view = resolveScrollView({
+    container: document.querySelector(".settings-content"),
+    win: window,
+    doc: document.documentElement,
+  });
+  const idx = pickActiveEyebrow(
+    eyebrows.map(e => e.getBoundingClientRect().top),
+    view
+  );
 
-  // Otherwise the active section is the last one whose heading has scrolled
-  // above the pane's vertical midpoint. The midpoint (rather than the top) is
-  // forgiving enough that short sections, which can't reach the very top of a
-  // tall pane, still get their turn. Fall back to the first section when no
-  // heading has crossed the line yet (scrolled to the very top).
-  const top = container ? container.getBoundingClientRect().top : 0;
-  const height = container ? container.clientHeight : window.innerHeight;
-  const refY = top + height * 0.5;
-  let active = eyebrows[0];
-  for (const eyebrow of eyebrows) {
-    if (eyebrow.getBoundingClientRect().top <= refY) {
-      active = eyebrow;
-    }
-  }
-
-  sectionLabel.value = active.textContent.trim();
+  sectionLabel.value = eyebrows[idx].textContent.trim();
 }
 
 function scheduleCompute() {
@@ -208,11 +191,11 @@ function teardownSectionObserver() {
     cancelAnimationFrame(computeRafId);
     computeRafId = null;
   }
-  if (scrollListener && scrollListenerTarget) {
-    scrollListenerTarget.removeEventListener("scroll", scrollListener);
-    scrollListener = null;
-    scrollListenerTarget = null;
+  for (const target of scrollTargets) {
+    target.removeEventListener("scroll", scheduleCompute);
   }
+  scrollTargets = [];
+  window.removeEventListener("resize", scheduleCompute);
 }
 
 function setupSectionObserver(attempt = 0) {
@@ -236,12 +219,17 @@ function setupSectionObserver(attempt = 0) {
     return;
   }
 
-  // Attach a passive scroll listener to the pane's scroll container.
-  // Throttle updates via rAF so layout reads are coalesced to one per frame.
+  // Listen on BOTH the pane and the window: the pane scrolls on desktop, the
+  // window scrolls at the responsive breakpoints, and which one is live can
+  // flip on resize. computeActiveSection() reads geometry from whichever is
+  // actually scrolling. Resize also recomputes (the scroll owner / midpoint
+  // can change). Throttled via rAF so layout reads coalesce to one per frame.
   const container = document.querySelector(".settings-content");
-  scrollListenerTarget = container ?? window;
-  scrollListener = scheduleCompute;
-  scrollListenerTarget.addEventListener("scroll", scrollListener, { passive: true });
+  scrollTargets = container ? [container, window] : [window];
+  for (const target of scrollTargets) {
+    target.addEventListener("scroll", scheduleCompute, { passive: true });
+  }
+  window.addEventListener("resize", scheduleCompute, { passive: true });
 
   // Compute immediately so the indicator is correct before any scroll occurs
   computeActiveSection();
