@@ -1,6 +1,7 @@
 <template>
   <div class="admin-overflow">
     <button
+      ref="triggerEl"
       type="button"
       class="admin-overflow__trigger"
       aria-label="More controls"
@@ -11,7 +12,13 @@
     >
       ⋯
     </button>
-    <div v-if="open" class="admin-overflow__menu" role="menu" @keydown.escape="close">
+    <div
+      v-if="open"
+      class="admin-overflow__menu"
+      :class="{ 'admin-overflow__menu--up': openUp, 'admin-overflow__menu--left': alignLeft }"
+      role="menu"
+      @keydown.escape="close"
+    >
       <button type="button" role="menuitem" class="admin-overflow__item" data-admin="settings" @click="onSettings">
         Settings
       </button>
@@ -43,6 +50,12 @@ const modeStore = useModeStore();
 const router = useRouter();
 
 const open = ref(false);
+const triggerEl = ref(null);
+// Placement is decided from the trigger's position so the menu never opens
+// off-screen — e.g. on a vertical/side clock bar the ⋯ sits at a bottom corner,
+// so the menu must open upward and toward the content rather than down/right.
+const openUp = ref(false);
+const alignLeft = ref(false);
 
 const onDocClick = event => {
   if (!event.target.closest(".admin-overflow")) close();
@@ -52,6 +65,13 @@ const toggle = () => {
   open.value ? close() : openMenu();
 };
 const openMenu = () => {
+  const rect = triggerEl.value?.getBoundingClientRect();
+  if (rect && typeof window !== "undefined") {
+    // Lower half of the viewport → open upward; left half → anchor left edge
+    // (menu grows rightward into the content) instead of the default right anchor.
+    openUp.value = rect.top + rect.height / 2 > window.innerHeight / 2;
+    alignLeft.value = rect.left + rect.width / 2 < window.innerWidth / 2;
+  }
   open.value = true;
   document.addEventListener("click", onDocClick, true);
 };
@@ -139,6 +159,8 @@ const onHideUi = () => {
   right: 0;
   z-index: 20;
   min-width: 200px;
+  max-height: calc(100vh - 16px);
+  overflow-y: auto;
   display: flex;
   flex-direction: column;
   gap: 0.25rem;
@@ -147,6 +169,14 @@ const onHideUi = () => {
   border: 1px solid var(--line);
   border-radius: 12px;
   box-shadow: 0 18px 50px -16px var(--focus-glow);
+}
+.admin-overflow__menu--up {
+  top: auto;
+  bottom: calc(100% + 8px);
+}
+.admin-overflow__menu--left {
+  right: auto;
+  left: 0;
 }
 .admin-overflow__item {
   min-height: 46px;

@@ -40,4 +40,32 @@ describe("AdminOverflow", () => {
     expect(w.find(".admin-overflow__menu").exists()).toBe(false);
     w.unmount();
   });
+
+  it("opens upward + left-anchored for a bottom-left trigger (vertical bar) so it stays on-screen (calvin-37g)", async () => {
+    const w = mount(AdminOverflow, { attachTo: document.body });
+    const trigger = w.get(".admin-overflow__trigger");
+    trigger.element.getBoundingClientRect = () => ({
+      top: window.innerHeight - 50, left: 8, width: 46, height: 46,
+      bottom: window.innerHeight - 4, right: 54,
+    });
+    await trigger.trigger("click");
+    const menu = w.get(".admin-overflow__menu");
+    expect(menu.classes()).toContain("admin-overflow__menu--up");
+    expect(menu.classes()).toContain("admin-overflow__menu--left");
+    w.unmount();
+  });
+
+  it("opens down/right (default) for a top-right trigger (horizontal bar)", async () => {
+    const w = mount(AdminOverflow, { attachTo: document.body });
+    const trigger = w.get(".admin-overflow__trigger");
+    trigger.element.getBoundingClientRect = () => ({
+      top: 8, left: window.innerWidth - 60, width: 46, height: 46,
+      bottom: 54, right: window.innerWidth - 14,
+    });
+    await trigger.trigger("click");
+    const menu = w.get(".admin-overflow__menu");
+    expect(menu.classes()).not.toContain("admin-overflow__menu--up");
+    expect(menu.classes()).not.toContain("admin-overflow__menu--left");
+    w.unmount();
+  });
 });
