@@ -1,7 +1,6 @@
 <template>
   <div class="dashboard-layout-tab">
-    <CollapsibleSection title="Screens" icon="📐">
-      <div class="screen-stack" :class="`screen-stack-${configValue.orientation}`">
+    <div class="screen-stack" :class="`screen-stack-${configValue.orientation}`">
         <section
           v-for="(screen, screenIndex) in dashboardScreens.screens"
           :key="screen.id"
@@ -628,8 +627,7 @@
           <span class="screen-add-icon">+</span>
           <span>Add Screen</span>
         </button>
-      </div>
-    </CollapsibleSection>
+    </div>
   </div>
 </template>
 
@@ -662,7 +660,6 @@ import {
   splitTopRegion,
   unsplitTopRegion,
 } from "@/utils/layout";
-import CollapsibleSection from "./CollapsibleSection.vue";
 
 const props = defineProps({
   config: {
@@ -1308,6 +1305,8 @@ onUnmounted(() => {
 <style scoped>
 .dashboard-layout-tab {
   width: 100%;
+  /* Sits directly inside a SettingsSection panel (no SettingRow padding). */
+  padding: 1rem 1.25rem 1.25rem;
 }
 
 .screen-stack {
@@ -1330,10 +1329,10 @@ onUnmounted(() => {
   display: flex;
   flex-direction: column;
   gap: 0.75rem;
-  border: 1px solid var(--border-color);
+  border: 1px solid var(--line);
   border-radius: 8px;
   padding: 0.85rem;
-  background: var(--bg-secondary);
+  background: var(--bg-2);
   overflow-x: auto;
 }
 
@@ -1354,7 +1353,7 @@ onUnmounted(() => {
   border: 0;
   border-radius: 4px;
   background: transparent;
-  color: var(--text-secondary);
+  color: var(--ink-2);
   cursor: pointer;
   font-size: 0.95rem;
   line-height: 1;
@@ -1362,8 +1361,8 @@ onUnmounted(() => {
 
 .screen-collapse-toggle:hover,
 .screen-collapse-toggle:focus {
-  color: var(--text-primary);
-  background: var(--bg-primary);
+  color: var(--ink);
+  background: var(--bg-1);
 }
 
 .screen-index {
@@ -1374,7 +1373,7 @@ onUnmounted(() => {
   width: 1.75rem;
   height: 1.75rem;
   border-radius: 999px;
-  background: var(--accent-primary);
+  background: var(--focus);
   color: #fff;
   font-weight: 700;
 }
@@ -1382,28 +1381,28 @@ onUnmounted(() => {
 .screen-name-input {
   flex: 1 1 auto;
   min-width: 0;
-  border: 1px solid var(--border-color);
+  border: 1px solid var(--line);
   border-radius: 4px;
   padding: 0.4rem 0.55rem;
-  background: var(--bg-primary);
-  color: var(--text-primary);
+  background: var(--bg-1);
+  color: var(--ink);
   font-weight: 600;
 }
 
 .add-region-button {
   flex: 0 0 auto;
-  border: 1px solid var(--border-color);
+  border: 1px solid var(--line);
   border-radius: 4px;
   padding: 0.4rem 0.65rem;
-  background: var(--bg-primary);
-  color: var(--accent-primary);
+  background: var(--bg-1);
+  color: var(--focus);
   cursor: pointer;
   font-weight: 600;
 }
 
 .add-region-button:hover:not(:disabled),
 .add-region-button:focus:not(:disabled) {
-  border-color: var(--accent-primary);
+  border-color: var(--focus);
 }
 
 .add-region-button:disabled {
@@ -1412,11 +1411,11 @@ onUnmounted(() => {
 }
 
 .region-delete {
-  border: 1px solid var(--border-color);
+  border: 1px solid var(--line);
   border-radius: 4px;
   padding: 0 0.4rem;
-  background: var(--bg-primary);
-  color: var(--color-red);
+  background: var(--bg-1);
+  color: var(--err);
   cursor: pointer;
   font-size: 0.95rem;
   line-height: 1.4;
@@ -1424,16 +1423,16 @@ onUnmounted(() => {
 
 .region-delete:hover,
 .region-delete:focus {
-  border-color: var(--color-red);
+  border-color: var(--err);
 }
 
 .direction-toggle {
   flex: 0 0 auto;
-  border: 1px solid var(--border-color);
+  border: 1px solid var(--line);
   border-radius: 4px;
   padding: 0.4rem 0.6rem;
-  background: var(--bg-primary);
-  color: var(--text-secondary);
+  background: var(--bg-1);
+  color: var(--ink-2);
   cursor: pointer;
   font-size: 0.85rem;
   letter-spacing: 0.05em;
@@ -1441,17 +1440,17 @@ onUnmounted(() => {
 
 .direction-toggle:hover,
 .direction-toggle:focus {
-  border-color: var(--accent-primary);
-  color: var(--text-primary);
+  border-color: var(--focus);
+  color: var(--ink);
 }
 
 .screen-activate {
   flex: 0 0 auto;
-  border: 1px solid var(--border-color);
+  border: 1px solid var(--line);
   border-radius: 4px;
   padding: 0.35rem 0.6rem;
-  background: var(--bg-primary);
-  color: var(--text-primary);
+  background: var(--bg-1);
+  color: var(--ink);
   cursor: pointer;
   font-size: 0.8rem;
   font-weight: 600;
@@ -1459,13 +1458,13 @@ onUnmounted(() => {
 
 .screen-activate:hover:not(:disabled),
 .screen-activate:focus:not(:disabled) {
-  border-color: var(--accent-primary);
-  color: var(--accent-primary);
+  border-color: var(--focus);
+  color: var(--focus);
 }
 
 .screen-activate-active {
-  border-color: var(--accent-primary);
-  background: var(--accent-primary);
+  border-color: var(--focus);
+  background: var(--focus);
   color: #fff;
   cursor: default;
 }
@@ -1478,10 +1477,10 @@ onUnmounted(() => {
   flex: 0 0 auto;
   width: 1.9rem;
   height: 1.9rem;
-  border: 1px solid var(--border-color);
+  border: 1px solid var(--line);
   border-radius: 4px;
-  background: var(--bg-primary);
-  color: var(--color-red);
+  background: var(--bg-1);
+  color: var(--err);
   cursor: pointer;
   font-size: 1.2rem;
   line-height: 1;
@@ -1489,16 +1488,16 @@ onUnmounted(() => {
 
 .screen-delete:hover,
 .screen-delete:focus {
-  background: var(--bg-secondary);
+  background: var(--bg-2);
 }
 
 .screen-preview {
   display: flex;
   margin: 0;
   padding: 0.75rem;
-  border: 1px solid var(--border-color);
+  border: 1px solid var(--line);
   border-radius: 6px;
-  background: var(--bg-primary);
+  background: var(--bg-1);
   box-sizing: border-box;
   width: 100%;
 }
@@ -1514,14 +1513,14 @@ onUnmounted(() => {
 .preview-region {
   min-width: 0;
   min-height: 0;
-  border: 1px solid var(--border-color);
+  border: 1px solid var(--line);
   border-radius: 4px;
   padding: 0.6rem;
   display: flex;
   flex-direction: column;
   cursor: pointer;
-  background: var(--bg-secondary);
-  color: var(--text-primary);
+  background: var(--bg-2);
+  color: var(--ink);
   box-sizing: border-box;
   gap: 0.5rem;
 }
@@ -1540,34 +1539,34 @@ onUnmounted(() => {
   align-items: center;
   gap: 0.35rem;
   font-size: 0.85rem;
-  color: var(--text-secondary);
+  color: var(--ink-2);
   cursor: pointer;
 }
 
 .split-toggle {
-  border: 1px solid var(--border-color);
+  border: 1px solid var(--line);
   border-radius: 4px;
   padding: 0.2rem 0.5rem;
-  background: var(--bg-primary);
-  color: var(--text-secondary);
+  background: var(--bg-1);
+  color: var(--ink-2);
   cursor: pointer;
   font-size: 0.8rem;
 }
 
 .split-toggle:hover,
 .split-toggle:focus {
-  border-color: var(--accent-primary);
-  color: var(--text-primary);
+  border-color: var(--focus);
+  color: var(--ink);
 }
 
 .preview-component-select {
   width: 100%;
   min-width: 0;
-  border: 1px solid var(--border-color);
+  border: 1px solid var(--line);
   border-radius: 4px;
   padding: 0.45rem 0.55rem;
-  background: var(--bg-primary);
-  color: var(--text-primary);
+  background: var(--bg-1);
+  color: var(--ink);
   font-size: 1rem;
   font-weight: 600;
   box-sizing: border-box;
@@ -1576,7 +1575,7 @@ onUnmounted(() => {
 }
 
 .preview-component-select:focus {
-  outline: 2px solid var(--accent-primary);
+  outline: 2px solid var(--focus);
   outline-offset: 1px;
 }
 
@@ -1592,9 +1591,9 @@ onUnmounted(() => {
   right: 0;
   max-height: 220px;
   overflow: auto;
-  border: 1px solid var(--border-color);
+  border: 1px solid var(--line);
   border-radius: 6px;
-  background: var(--bg-primary);
+  background: var(--bg-1);
   box-shadow: 0 8px 24px var(--shadow);
 }
 
@@ -1602,10 +1601,10 @@ onUnmounted(() => {
   width: calc(100% - 0.75rem);
   margin: 0.375rem;
   padding: 0.45rem 0.55rem;
-  border: 1px solid var(--border-color);
+  border: 1px solid var(--line);
   border-radius: 4px;
-  background: var(--bg-secondary);
-  color: var(--text-primary);
+  background: var(--bg-2);
+  color: var(--ink);
   box-sizing: border-box;
 }
 
@@ -1614,21 +1613,21 @@ onUnmounted(() => {
   width: 100%;
   padding: 0.55rem 0.65rem;
   border: 0;
-  border-top: 1px solid var(--border-color);
+  border-top: 1px solid var(--line);
   background: transparent;
-  color: var(--text-primary);
+  color: var(--ink);
   cursor: pointer;
   text-align: left;
 }
 
 .component-option:hover,
 .component-option:focus {
-  background: var(--bg-secondary);
+  background: var(--bg-2);
   outline: none;
 }
 
 .source-options {
-  border-top: 1px solid var(--border-color);
+  border-top: 1px solid var(--line);
   padding: 0.35rem 0;
 }
 
@@ -1637,18 +1636,18 @@ onUnmounted(() => {
   align-items: center;
   gap: 0.45rem;
   padding: 0.45rem 0.65rem;
-  color: var(--text-primary);
+  color: var(--ink);
   cursor: pointer;
   font-size: 0.9rem;
 }
 
 .source-option:hover {
-  background: var(--bg-secondary);
+  background: var(--bg-2);
 }
 
 .component-empty {
   padding: 0.65rem;
-  color: var(--text-secondary);
+  color: var(--ink-2);
   font-size: 0.85rem;
 }
 
@@ -1656,32 +1655,32 @@ onUnmounted(() => {
   display: flex;
   align-items: center;
   gap: 0.35rem;
-  color: var(--text-secondary);
+  color: var(--ink-2);
   font-size: 0.85rem;
 }
 
 .preview-size-control input {
   width: 4rem;
   min-width: 0;
-  border: 1px solid var(--border-color);
+  border: 1px solid var(--line);
   border-radius: 4px;
   padding: 0.35rem;
-  background: var(--bg-primary);
-  color: var(--text-primary);
+  background: var(--bg-1);
+  color: var(--ink);
 }
 
 .preview-resizer {
   flex: 0 0 14px;
   border: 0;
   border-radius: 4px;
-  background: var(--border-color);
+  background: var(--line);
   cursor: col-resize;
   padding: 0;
 }
 
 .preview-resizer:hover,
 .preview-resizer:focus {
-  background: var(--accent-primary);
+  background: var(--focus);
 }
 
 .preview-resizer-column {
@@ -1693,7 +1692,7 @@ onUnmounted(() => {
 }
 
 .preview-region-active {
-  outline: 2px solid var(--accent-primary);
+  outline: 2px solid var(--focus);
   outline-offset: -2px;
 }
 
@@ -1710,11 +1709,11 @@ onUnmounted(() => {
 }
 
 .preview-region-split {
-  border-left: 6px solid var(--accent-primary);
+  border-left: 6px solid var(--focus);
 }
 
 .preview-region-label {
-  color: var(--text-secondary);
+  color: var(--ink-2);
   font-size: 0.85rem;
 }
 
@@ -1724,7 +1723,7 @@ onUnmounted(() => {
   gap: 0;
   min-height: 0;
   min-width: 0;
-  border: 1px dashed var(--border-color);
+  border: 1px dashed var(--line);
   border-radius: 4px;
   padding: 0.35rem;
 }
@@ -1749,10 +1748,10 @@ onUnmounted(() => {
   gap: 0.5rem;
   min-width: 0;
   min-height: 0;
-  border: 1px solid var(--border-color);
+  border: 1px solid var(--line);
   border-radius: 4px;
   padding: 0.6rem;
-  background: var(--bg-primary);
+  background: var(--bg-1);
   box-sizing: border-box;
   cursor: pointer;
 }
@@ -1767,24 +1766,24 @@ onUnmounted(() => {
   align-items: center;
   gap: 0.5rem;
   padding: 0.4rem 0.6rem;
-  border: 1px solid var(--border-color);
+  border: 1px solid var(--line);
   border-radius: 6px;
-  background: var(--bg-primary);
+  background: var(--bg-1);
   font-size: 0.85rem;
-  color: var(--text-secondary);
+  color: var(--ink-2);
 }
 
 .clock-bar-row-label {
   font-weight: 600;
-  color: var(--text-primary);
+  color: var(--ink);
 }
 
 .clock-bar-control {
-  border: 1px solid var(--border-color);
+  border: 1px solid var(--line);
   border-radius: 4px;
   padding: 0.25rem 0.4rem;
-  background: var(--bg-secondary);
-  color: var(--text-primary);
+  background: var(--bg-2);
+  color: var(--ink);
 }
 
 .clock-bar-switch {
@@ -1794,7 +1793,7 @@ onUnmounted(() => {
   cursor: pointer;
   user-select: none;
   font-size: 0.8rem;
-  color: var(--text-primary);
+  color: var(--ink);
 }
 
 .clock-bar-switch input {
@@ -1810,7 +1809,7 @@ onUnmounted(() => {
   width: 1.9rem;
   height: 1rem;
   border-radius: 999px;
-  background: var(--border-color);
+  background: var(--line);
   transition: background 0.15s ease;
   flex-shrink: 0;
 }
@@ -1822,13 +1821,13 @@ onUnmounted(() => {
   width: 0.75rem;
   height: 0.75rem;
   border-radius: 50%;
-  background: var(--bg-primary);
+  background: var(--bg-1);
   box-shadow: 0 1px 2px rgba(0, 0, 0, 0.2);
   transition: transform 0.15s ease;
 }
 
 .clock-bar-switch-on .clock-bar-switch-track {
-  background: var(--accent-primary);
+  background: var(--focus);
 }
 
 .clock-bar-switch-on .clock-bar-switch-thumb {
@@ -1836,7 +1835,7 @@ onUnmounted(() => {
 }
 
 .clock-bar-switch input:focus-visible + .clock-bar-switch-track {
-  outline: 2px solid var(--accent-primary);
+  outline: 2px solid var(--focus);
   outline-offset: 2px;
 }
 
@@ -1845,17 +1844,17 @@ onUnmounted(() => {
 }
 
 .clock-bar-inherit {
-  border: 1px solid var(--border-color);
+  border: 1px solid var(--line);
   border-radius: 4px;
   padding: 0.25rem 0.5rem;
-  background: var(--bg-secondary);
-  color: var(--text-primary);
+  background: var(--bg-2);
+  color: var(--ink);
   cursor: pointer;
 }
 
 .clock-bar-inherit:hover,
 .clock-bar-inherit:focus {
-  border-color: var(--accent-primary);
+  border-color: var(--focus);
 }
 
 .clock-bar-inherit-hint {
@@ -1866,7 +1865,7 @@ onUnmounted(() => {
 .clock-bar-summary {
   margin-left: auto;
   font-size: 0.8rem;
-  color: var(--text-secondary);
+  color: var(--ink-2);
 }
 
 .screen-preview-frame {
@@ -1879,7 +1878,7 @@ onUnmounted(() => {
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  background: var(--accent-primary);
+  background: var(--focus);
   color: #fff;
   border-radius: 4px;
   font-size: 0.8rem;
@@ -1914,10 +1913,10 @@ onUnmounted(() => {
   display: flex;
   align-items: center;
   justify-content: center;
-  border: 1px dashed var(--accent-primary);
+  border: 1px dashed var(--focus);
   border-radius: 4px;
   background: rgba(0, 0, 0, 0.05);
-  color: var(--accent-primary);
+  color: var(--focus);
   font-size: 0.75rem;
   font-weight: 600;
   text-transform: uppercase;
@@ -1949,7 +1948,7 @@ onUnmounted(() => {
 
 .clock-bar-drop-zone-mode-switch {
   border-style: dotted;
-  border-color: var(--accent-secondary, var(--accent-primary));
+  border-color: var(--accent-secondary, var(--focus));
   background: rgba(255, 165, 0, 0.08);
 }
 
@@ -1960,11 +1959,11 @@ onUnmounted(() => {
   justify-content: center;
   gap: 0.5rem;
   min-height: 96px;
-  border: 1px dashed var(--accent-primary);
+  border: 1px dashed var(--focus);
   border-radius: 8px;
   padding: 1rem;
   background: transparent;
-  color: var(--accent-primary);
+  color: var(--focus);
   font-weight: 600;
   cursor: pointer;
 }
@@ -1976,7 +1975,7 @@ onUnmounted(() => {
 
 .screen-add:hover,
 .screen-add:focus {
-  background: var(--bg-secondary);
+  background: var(--bg-2);
 }
 
 .screen-add-icon {
@@ -1985,7 +1984,7 @@ onUnmounted(() => {
   justify-content: center;
   width: 2.25rem;
   height: 2.25rem;
-  border: 1px dashed var(--accent-primary);
+  border: 1px dashed var(--focus);
   border-radius: 999px;
   font-size: 1.6rem;
   line-height: 1;
