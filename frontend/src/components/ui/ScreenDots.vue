@@ -1,5 +1,10 @@
 <template>
-  <div v-if="screens.length > 1" class="screen-dots" role="tablist">
+  <div
+    v-if="screens.length > 1"
+    class="screen-dots"
+    :class="{ 'screen-dots--vertical': vertical }"
+    role="tablist"
+  >
     <button
       v-for="screen in screens"
       :key="screen.id"
@@ -19,6 +24,8 @@
 defineProps({
   screens: { type: Array, required: true },
   activeScreenId: { type: String, default: null },
+  // Stack the dots vertically for the left/right (vertical) clock bar.
+  vertical: { type: Boolean, default: false },
 });
 defineEmits(["select-screen"]);
 </script>
@@ -28,6 +35,9 @@ defineEmits(["select-screen"]);
   display: inline-flex;
   align-items: center;
   gap: 0.25rem;
+}
+.screen-dots--vertical {
+  flex-direction: column;
 }
 .screen-dot {
   min-width: 44px;

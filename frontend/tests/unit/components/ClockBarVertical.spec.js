@@ -264,4 +264,52 @@ describe("ClockBarVertical", () => {
     expect(statusbar.exists()).toBe(true);
     expect(statusbar.attributes("data-orientation")).toBe("vertical");
   });
+
+  it("renders stacked screen dots for page navigation when there is more than one screen (calvin-rvd)", () => {
+    const store = useConfigStore();
+    store.showUI = true;
+    store.dashboardScreens = {
+      version: 2,
+      activeScreenId: "home",
+      screens: [
+        { id: "home", name: "Home", activeRegionId: "region-1",
+          layout: { version: 1, preset: "single", regions: [{ id: "region-1", kind: "calendar", size: 100 }] } },
+        { id: "media", name: "Media", activeRegionId: "region-1",
+          layout: { version: 1, preset: "single", regions: [{ id: "region-1", kind: "photos", size: 100 }] } },
+      ],
+    };
+
+    const wrapper = mount(ClockBarVertical, {
+      props: { position: "left", showInNonKiosk: true, showInKiosk: false, enabled: true },
+      global: { ...globalMountOptions },
+    });
+
+    const dots = wrapper.findAll(".screen-dot");
+    expect(dots).toHaveLength(2);
+    expect(wrapper.find(".screen-dots--vertical").exists()).toBe(true);
+    // the active screen's dot is marked current
+    expect(wrapper.find('.screen-dot[aria-current="true"]').attributes("aria-label")).toBe(
+      "Show screen: Home"
+    );
+  });
+
+  it("does not render screen dots with a single screen", () => {
+    const store = useConfigStore();
+    store.showUI = true;
+    store.dashboardScreens = {
+      version: 2,
+      activeScreenId: "home",
+      screens: [
+        { id: "home", name: "Home", activeRegionId: "region-1",
+          layout: { version: 1, preset: "single", regions: [{ id: "region-1", kind: "calendar", size: 100 }] } },
+      ],
+    };
+
+    const wrapper = mount(ClockBarVertical, {
+      props: { position: "left", showInNonKiosk: true, showInKiosk: false, enabled: true },
+      global: { ...globalMountOptions },
+    });
+
+    expect(wrapper.find(".screen-dot").exists()).toBe(false);
+  });
 });
