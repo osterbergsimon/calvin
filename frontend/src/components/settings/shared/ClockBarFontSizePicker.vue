@@ -229,6 +229,11 @@ const handlePaddingInput = event => {
   display: flex;
   flex-direction: column;
   gap: 1.5rem;
+  /* Never let the live preview's intrinsic width size this editor — otherwise
+     dragging a slider grows the preview, which grows the container, which
+     changes the slider length under the user's finger (calvin-hbp regression). */
+  width: 100%;
+  min-width: 0;
 }
 
 .font-size-controls {
@@ -345,6 +350,7 @@ const handlePaddingInput = event => {
 
 .preview-horizontal {
   width: 100%;
+  min-width: 0;
   height: 96px;
   display: flex;
   align-items: center;
@@ -352,11 +358,12 @@ const handlePaddingInput = event => {
 }
 
 .preview-vertical {
-  width: auto;
-  min-width: fit-content;
+  width: 100%;
+  min-width: 0;
   height: 200px;
   display: flex;
   align-items: stretch;
+  justify-content: center;
   overflow: hidden;
 }
 </style>
