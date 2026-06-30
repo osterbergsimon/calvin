@@ -46,7 +46,7 @@
           @update:model-value="v => emit('update:config', { clockBarLayout: v })"
         />
       </SettingRow>
-      <SettingRow label="Horizontal sizing" description="Time, date, and padding for the top and bottom bars.">
+      <SettingRow stacked label="Horizontal sizing" description="Time, date, and padding for the top and bottom bars.">
         <ClockBarFontSizePicker
           :time-size="config.clockBarFontSize || 16"
           :date-size="config.clockBarDateFontSize || 14"
@@ -70,7 +70,7 @@
           @update:model-value="v => emit('update:config', { clockBarVerticalLayout: v })"
         />
       </SettingRow>
-      <SettingRow label="Vertical sizing" description="Time, date, and padding for the left and right vertical bars.">
+      <SettingRow stacked label="Vertical sizing" description="Time, date, and padding for the left and right vertical bars.">
         <ClockBarFontSizePicker
           :time-size="config.clockBarVerticalFontSize || 18"
           :date-size="config.clockBarVerticalDateFontSize || 11"
