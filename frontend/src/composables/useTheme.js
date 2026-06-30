@@ -77,6 +77,16 @@ export function useTheme() {
           root.style.setProperty(`--${key}`, value);
         }
       }
+
+      // Tie the focus-light glow + shell highlights to the theme's accent, unless
+      // the theme sets --focus itself. --focus-edge/--focus-glow derive from it.
+      const themeSetsFocus = "focus" in variables || (theme.dark_mode && "focus" in theme.dark_mode);
+      if (!themeSetsFocus) {
+        const accent =
+          (theme.dark_mode && isDark.value && theme.dark_mode["accent-primary"]) ||
+          variables["accent-primary"];
+        if (accent) root.style.setProperty("--focus", accent);
+      }
     } catch (err) {
       console.error(`Failed to apply custom theme ${themeId}:`, err);
     }
@@ -97,11 +107,9 @@ export function useTheme() {
     if (selectedThemeId.value) {
       await applyCustomTheme(selectedThemeId.value);
     } else {
-      // Reset to default theme variables (from theme.css)
-      // This is handled by the CSS file, but we can explicitly reset if needed
-      const _root = document.documentElement;
-      // Remove any custom theme variables that might have been set
-      // The default theme.css will take over
+      // No custom theme: clear the theme-applied accent override so the default
+      // (amber, from theme.css) focus accent applies again.
+      document.documentElement.style.removeProperty("--focus");
     }
   };
 
