@@ -1268,19 +1268,17 @@ onActivated(() => {
 }
 
 .week-number {
-  font-size: 0.7rem;
+  font-family: var(--font-data);
+  font-size: 0.62rem;
   font-weight: 600;
-  color: var(--text-secondary);
-  background: var(--bg-tertiary);
-  padding: 0.125rem 0.375rem;
-  border-radius: 3px;
-  line-height: 1.2;
+  letter-spacing: 0.04em;
+  color: var(--focus);
+  background: color-mix(in srgb, var(--focus) 12%, transparent);
+  padding: 0.05rem 0.35rem;
+  border-radius: 999px;
+  line-height: 1.35;
   white-space: nowrap;
-}
-
-.calendar-day.week-start .week-number {
-  color: var(--accent-primary);
-  background: var(--calendar-today-bg);
+  align-self: flex-start;
 }
 
 .day-events {

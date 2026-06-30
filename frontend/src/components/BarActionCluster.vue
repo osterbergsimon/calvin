@@ -4,7 +4,7 @@
 
     <div
       class="status-indicator"
-      :class="{ compact }"
+      :class="{ compact, 'status-indicator--settled': statusSettled }"
       :title="`Backend: ${statusText}`"
       role="status"
       :aria-label="`Backend status: ${statusText}`"
@@ -20,7 +20,7 @@
 </template>
 
 <script setup>
-import { ref, computed, onMounted, onUnmounted } from "vue";
+import { ref, computed, watch, onMounted, onUnmounted } from "vue";
 import axios from "axios";
 import { useConfigStore } from "../stores/config";
 import ConnectionIndicator from "./ConnectionIndicator.vue";
@@ -48,6 +48,26 @@ const statusClass = computed(() => {
 
 const statusText = computed(() => status.value.charAt(0).toUpperCase() + status.value.slice(1));
 
+// On a wall display a permanent "Healthy" indicator is just noise. Fade it out
+// once things settle; anything that isn't healthy (checking / error / unhealthy)
+// stays visible and prominent so problems are noticed.
+const statusSettled = ref(false);
+let settleTimer = null;
+watch(
+  status,
+  s => {
+    clearTimeout(settleTimer);
+    if (s === "healthy") {
+      settleTimer = setTimeout(() => {
+        statusSettled.value = true;
+      }, 4000);
+    } else {
+      statusSettled.value = false;
+    }
+  },
+  { immediate: true }
+);
+
 const checkHealth = async () => {
   try {
     const response = await axios.get("/api/health", { timeout: 5000 });
@@ -71,6 +91,7 @@ onUnmounted(() => {
     clearInterval(healthInterval);
     healthInterval = null;
   }
+  clearTimeout(settleTimer);
 });
 </script>
 
@@ -93,6 +114,26 @@ onUnmounted(() => {
   gap: 0.4rem;
   font-size: 0.85rem;
   color: var(--ink-2);
+  transition:
+    opacity 0.8s ease,
+    max-width 0.8s ease,
+    margin 0.8s ease;
+  opacity: 1;
+  max-width: 12rem;
+  overflow: hidden;
+}
+
+/* Healthy + settled: fade away and collapse so it leaves no gap. Hover/focus
+   within the bar brings it back for a quick glance. */
+.status-indicator--settled {
+  opacity: 0;
+  max-width: 0;
+  margin-right: -0.5rem;
+}
+.bar-action-cluster:hover .status-indicator--settled {
+  opacity: 0.6;
+  max-width: 12rem;
+  margin-right: 0;
 }
 
 .status-indicator.compact {
