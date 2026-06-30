@@ -12,6 +12,9 @@
       ⋯
     </button>
     <div v-if="open" class="admin-overflow__menu" role="menu" @keydown.escape="close">
+      <button type="button" role="menuitem" class="admin-overflow__item" data-admin="settings" @click="onSettings">
+        Settings
+      </button>
       <button type="button" role="menuitem" class="admin-overflow__item" data-admin="mode" @click="onMode">
         {{ modeLabel }}
       </button>
@@ -30,12 +33,14 @@
 
 <script setup>
 import { ref, computed, onUnmounted } from "vue";
+import { useRouter } from "vue-router";
 import { useConfigStore } from "../../stores/config";
 import { useModeStore } from "../../stores/mode";
 import { logError } from "../../utils/logger";
 
 const configStore = useConfigStore();
 const modeStore = useModeStore();
+const router = useRouter();
 
 const open = ref(false);
 
@@ -70,6 +75,11 @@ const sideViewPositionTitle = computed(() => {
   return configStore.sideViewPosition === "bottom" ? "Side view: top" : "Side view: bottom";
 });
 
+const onSettings = () => {
+  modeStore.setMode(modeStore.MODES.SETTINGS);
+  router.push("/settings");
+  close();
+};
 const onMode = () => {
   if (modeStore.currentMode === modeStore.MODES.WEB_SERVICES) {
     configStore.setLastSideViewMode("photos");
