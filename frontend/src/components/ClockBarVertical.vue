@@ -9,7 +9,7 @@
     aria-live="polite"
   >
     <div class="clock-bar-top">
-      <BarLogo v-if="showLogo" />
+      <BarLogo v-if="showLogo" vertical />
     </div>
 
     <div class="clock-bar-middle">
