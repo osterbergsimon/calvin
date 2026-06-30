@@ -36,10 +36,13 @@
   --ink: #1b242b;
   --ink-2: #5d6b75;
   --ink-3: #93a0a9;
+  /* Accent that drives the focus-light + all shell highlights. Themeable:
+     useTheme sets --focus from the selected theme's accent; the edge/glow are
+     derived from it so a theme only needs to change --focus. */
   --focus: #e08a1e;
   --focus-ink: #ffffff;
-  --focus-glow: rgba(224, 138, 30, 0.36);
-  --focus-edge: rgba(224, 138, 30, 0.75);
+  --focus-glow: color-mix(in srgb, var(--focus) 36%, transparent);
+  --focus-edge: color-mix(in srgb, var(--focus) 75%, transparent);
   --ok: #2e9e6b;
   --warn: #c8860a;
   --err: #c0392b;
@@ -93,8 +96,8 @@
   --ink-3: #62707a;
   --focus: #f3b052;
   --focus-ink: #1a130a;
-  --focus-glow: rgba(243, 176, 82, 0.32);
-  --focus-edge: rgba(243, 176, 82, 0.68);
+  --focus-glow: color-mix(in srgb, var(--focus) 32%, transparent);
+  --focus-edge: color-mix(in srgb, var(--focus) 68%, transparent);
   --ok: #5bd0a0;
   --warn: #f3b052;
   --err: #ef6b5e;
