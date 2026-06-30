@@ -10,6 +10,13 @@
   >
     <div class="clock-bar-top">
       <BarLogo v-if="showLogo" vertical />
+      <ScreenDots
+        v-if="!previewMode"
+        vertical
+        :screens="screens"
+        :active-screen-id="activeScreenId"
+        @select-screen="activateScreen"
+      />
     </div>
 
     <div class="clock-bar-middle">
@@ -74,8 +81,11 @@
 import { computed } from "vue";
 import { useClockBar } from "../composables/useClockBar";
 import { useConfigStore } from "../stores/config";
+import { useKeyboardActions } from "../composables/useKeyboardActions";
+import { normalizeDashboardScreens, getActiveDashboardScreen } from "../utils/layout";
 import BarActionCluster from "./BarActionCluster.vue";
 import BarLogo from "./BarLogo.vue";
+import ScreenDots from "./ui/ScreenDots.vue";
 import PluginStatusbarItems from "./PluginStatusbarItems.vue";
 
 defineOptions({
@@ -151,6 +161,11 @@ const showLogo = computed(() => configStore.clockBarShowLogo !== false);
 const isCompactLayout = computed(
   () => layout.value === "compact-time" || layout.value === "compact-time-date"
 );
+
+const { activateScreen } = useKeyboardActions();
+const screensConfig = computed(() => normalizeDashboardScreens(configStore.dashboardScreens));
+const screens = computed(() => screensConfig.value.screens);
+const activeScreenId = computed(() => getActiveDashboardScreen(screensConfig.value)?.id ?? null);
 </script>
 
 <style scoped>
