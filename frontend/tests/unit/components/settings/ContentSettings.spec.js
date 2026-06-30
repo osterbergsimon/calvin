@@ -10,14 +10,41 @@ const baseConfig = {
   photoFrameEnabled: false,
   photoFrameMode: false,
   photoFrameTimeout: 60,
+  // calendar display (moved here from Display — calvin-svo IA pass)
+  calendarViewMode: "month",
+  calendarWeeks: 4,
+  weekStartDay: 1,
+  weekendDays: [0, 6],
+  showWeekNumbers: false,
+  timeFormat: "24h",
+  maxVisibleEvents: 4,
+  showRedDays: false,
 };
 
 describe("ContentSettings", () => {
-  it("renders the four sections", () => {
+  it("renders the five sections incl. the moved calendar-display", () => {
     const wrapper = mount(ContentSettings, { props: { config: baseConfig }, global: { stubs } });
-    for (const id of ["content-calendars", "content-photos", "content-images", "content-services"]) {
+    for (const id of [
+      "content-calendars",
+      "content-calendar-display",
+      "content-photos",
+      "content-images",
+      "content-services",
+    ]) {
       expect(wrapper.find(`#section-${id}`).exists()).toBe(true);
     }
+  });
+
+  it("emits update:config when a weekend-day chip is toggled (calendar display)", () => {
+    const wrapper = mount(ContentSettings, { props: { config: baseConfig }, global: { stubs } });
+    const chips = wrapper.findComponent({ name: "ChipMultiSelect" });
+    expect(chips.exists()).toBe(true);
+    chips.vm.$emit("update:modelValue", [0]);
+    expect(
+      wrapper
+        .emitted("update:config")
+        .some(c => Array.isArray(c[0].weekendDays) && c[0].weekendDays.join() === "0")
+    ).toBe(true);
   });
 
   it("emits update:config when Randomize image order toggles", async () => {
