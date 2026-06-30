@@ -1528,10 +1528,16 @@ onUnmounted(() => {
 .preview-region-header {
   display: flex;
   align-items: center;
-  justify-content: space-between;
-  gap: 0.5rem;
+  justify-content: flex-start;
+  /* Wrap the control cluster so split/remove/etc. stay reachable in a thin
+     (small-size) region instead of overflowing and being clipped. */
+  flex-wrap: wrap;
+  gap: 0.35rem;
   min-height: 1.75rem;
   flex: 0 0 auto;
+}
+.preview-region-label {
+  margin-right: auto;
 }
 
 .preview-primary-control {
