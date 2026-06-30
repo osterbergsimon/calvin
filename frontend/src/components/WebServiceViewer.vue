@@ -259,7 +259,7 @@ onUnmounted(() => {
   height: 100%;
   display: flex;
   flex-direction: column;
-  background: var(--bg-primary);
+  background: var(--bg-1);
   border-radius: 8px;
   overflow: visible; /* let the focused panel glow bloom out */
 }
@@ -277,7 +277,9 @@ onUnmounted(() => {
 .viewer-content {
   flex: 1;
   position: relative;
-  overflow: hidden;
+  /* visible so the focused panel's neon glow can bloom out — the iframe/content
+     is still clipped by the panel body's own overflow:hidden. */
+  overflow: visible;
   min-height: 0;
 }
 
