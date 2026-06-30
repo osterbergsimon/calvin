@@ -3,6 +3,7 @@
     <button
       type="button"
       class="pill"
+      :aria-label="ariaLabel || undefined"
       :aria-expanded="open ? 'true' : 'false'"
       aria-haspopup="listbox"
       :aria-controls="listboxId"
@@ -50,6 +51,7 @@ const props = defineProps({
   modelValue: { type: [String, Number], default: null },
   options: { type: Array, required: true },
   swatch: { type: String, default: null },
+  ariaLabel: { type: String, default: "" },
 });
 const emit = defineEmits(["update:modelValue"]);
 

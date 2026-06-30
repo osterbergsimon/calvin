@@ -71,4 +71,14 @@ describe("SelectPill", () => {
     expect(w.find('[role="listbox"]').exists()).toBe(false);
     w.unmount();
   });
+
+  it("labels the trigger with ariaLabel so the control's purpose is announced", () => {
+    const w = mount(SelectPill, { props: { modelValue: "backlit", options: OPTS, ariaLabel: "Theme mode" } });
+    expect(w.find(".pill").attributes("aria-label")).toBe("Theme mode");
+  });
+
+  it("omits aria-label when none is provided (falls back to the value text)", () => {
+    const w = mount(SelectPill, { props: { modelValue: "backlit", options: OPTS } });
+    expect(w.find(".pill").attributes("aria-label")).toBeUndefined();
+  });
 });

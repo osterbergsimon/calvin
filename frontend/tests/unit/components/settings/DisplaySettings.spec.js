@@ -5,7 +5,7 @@ import DisplaySettings from "@/components/settings/categories/DisplaySettings.vu
 
 const baseConfig = () => ({
   orientation: "landscape", orientationFlipped: false, applyDisplayRotation: true,
-  calendarViewMode: "month", calendarWeeks: 4, weekStartDay: 1, showWeekNumbers: false,
+  calendarViewMode: "month", calendarWeeks: 4, weekStartDay: 1, weekendDays: [0, 6], showWeekNumbers: false,
   timeFormat: "24h", maxVisibleEvents: 4, showRedDays: false,
   selectedTheme: null, themeMode: "auto", focusLightMode: "interaction", focusLightDimOthers: true,
   showUI: true, touchControls: "auto", touchControlSize: "medium", displayName: "",
@@ -33,6 +33,15 @@ describe("DisplaySettings", () => {
     const focusPill = pills.find(p => (p.props("options") || []).some(o => o.value === "always"));
     focusPill.vm.$emit("update:modelValue", "always");
     expect(w.emitted("update:config").some(c => c[0].focusLightMode === "always")).toBe(true);
+  });
+
+  it("emits update:config when a weekend-day chip is toggled", async () => {
+    const w = mount(DisplaySettings, { props: { config: baseConfig() }, global: { stubs } });
+    const chips = w.findComponent({ name: "ChipMultiSelect" });
+    expect(chips.exists()).toBe(true);
+    // baseConfig weekend = [0,6]; toggling Saturday(6) off should emit [0]
+    chips.vm.$emit("update:modelValue", [0]);
+    expect(w.emitted("update:config").some(c => Array.isArray(c[0].weekendDays) && c[0].weekendDays.join() === "0")).toBe(true);
   });
 
   it("inverts the kiosk toggle (Hide controls → showUI:false)", async () => {
