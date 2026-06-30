@@ -367,6 +367,10 @@ const lockLayout = () => {
 };
 
 const lightActive = computed(() => {
+  // While arranging the layout (unlocked), drop the focus spotlight: its large
+  // blur glow + raised z-index repaint on every resize frame, which flashes the
+  // neighbouring panel through. Plain opaque panels tile cleanly as you drag.
+  if (!configStore.regionsLocked) return false;
   if (configStore.focusLightMode === "off") return false;
   if (configStore.focusLightMode === "always") return true;
   return configStore.shouldShowUI; // 'interaction'
