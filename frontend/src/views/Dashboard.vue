@@ -325,8 +325,18 @@ const stopRegionResize = () => {
   window.removeEventListener("pointermove", onRegionResizeMove);
   const sizes = dragSizes.value;
   resizeState = null;
-  dragSizes.value = null;
-  if (sizes) commitRegionSizes(sizes);
+  if (!sizes) {
+    dragSizes.value = null;
+    return;
+  }
+  // Keep the live override applied until the persisted config reflects the new
+  // sizes, then clear it. Clearing first would render one frame at the old
+  // committed size before the update lands — a visible snap-back on drop.
+  commitRegionSizes(sizes)
+    .catch(() => {}) // updateConfig already logs; keep the override-clear unconditional
+    .finally(() => {
+      dragSizes.value = null;
+    });
 };
 
 const commitRegionSizes = sizes => {
@@ -349,7 +359,7 @@ const commitRegionSizes = sizes => {
           }
     ),
   };
-  configStore.updateConfig({ dashboardScreens: normalizeDashboardScreens(next) });
+  return configStore.updateConfig({ dashboardScreens: normalizeDashboardScreens(next) });
 };
 
 const lockLayout = () => {
