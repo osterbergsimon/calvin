@@ -22,6 +22,16 @@
       <button type="button" role="menuitem" class="admin-overflow__item" data-admin="settings" @click="onSettings">
         Settings
       </button>
+      <button
+        v-if="canResizeRegions"
+        type="button"
+        role="menuitem"
+        class="admin-overflow__item"
+        data-admin="lock-layout"
+        @click="onToggleLock"
+      >
+        {{ configStore.regionsLocked ? "Unlock layout" : "Lock layout" }}
+      </button>
       <button type="button" role="menuitem" class="admin-overflow__item" data-admin="hide-ui" @click="onHideUi">
         Hide UI
       </button>
@@ -30,14 +40,21 @@
 </template>
 
 <script setup>
-import { ref, onUnmounted } from "vue";
+import { ref, computed, onUnmounted } from "vue";
 import { useRouter } from "vue-router";
 import { useConfigStore } from "../../stores/config";
 import { useModeStore } from "../../stores/mode";
+import { getActiveDashboardScreen } from "../../utils/layout";
 
 const configStore = useConfigStore();
 const modeStore = useModeStore();
 const router = useRouter();
+
+// Drag-resize only makes sense with at least two top-level regions to share.
+const canResizeRegions = computed(() => {
+  const screen = getActiveDashboardScreen(configStore.dashboardScreens);
+  return (screen?.layout?.regions?.length || 0) > 1;
+});
 
 const open = ref(false);
 const triggerEl = ref(null);
@@ -79,6 +96,10 @@ const onSettings = () => {
 };
 const onHideUi = () => {
   configStore.toggleUI();
+  close();
+};
+const onToggleLock = () => {
+  configStore.toggleRegionsLock();
   close();
 };
 </script>
