@@ -11,7 +11,13 @@
     <div class="clock-bar-outer">
       <div class="clock-bar-side clock-bar-left">
         <BarLogo v-if="showLogo" />
-        <PluginStatusbarItems v-if="showStatusbar" />
+        <span v-if="!previewMode && roomLabel" class="clock-bar-room">{{ roomLabel }}</span>
+        <ScreenDots
+          v-if="!previewMode"
+          :screens="screens"
+          :active-screen-id="activeScreenId"
+          @select-screen="activateScreen"
+        />
         <span v-if="isBackgroundRefreshing" class="clock-refresh-icon" aria-hidden="true" />
       </div>
 
@@ -29,6 +35,7 @@
       </div>
 
       <div class="clock-bar-side clock-bar-right">
+        <PluginStatusbarItems v-if="showStatusbar" />
         <BarActionCluster v-if="!previewMode" :compact="false" />
       </div>
     </div>
@@ -40,9 +47,12 @@ import { computed } from "vue";
 import { useCalendarStore } from "../stores/calendar";
 import { useConfigStore } from "../stores/config";
 import { useClockBar } from "../composables/useClockBar";
+import { useKeyboardActions } from "../composables/useKeyboardActions";
+import { normalizeDashboardScreens, getActiveDashboardScreen } from "../utils/layout";
 import PluginStatusbarItems from "./PluginStatusbarItems.vue";
 import BarActionCluster from "./BarActionCluster.vue";
 import BarLogo from "./BarLogo.vue";
+import ScreenDots from "./ui/ScreenDots.vue";
 
 defineOptions({
   name: "ClockBarHorizontal",
@@ -115,13 +125,19 @@ const isBackgroundRefreshing = computed(() => calendarStore.backgroundRefreshing
 
 const configStore = useConfigStore();
 const showLogo = computed(() => configStore.clockBarShowLogo !== false);
+
+const { activateScreen } = useKeyboardActions();
+const screensConfig = computed(() => normalizeDashboardScreens(configStore.dashboardScreens));
+const screens = computed(() => screensConfig.value.screens);
+const activeScreenId = computed(() => getActiveDashboardScreen(screensConfig.value)?.id ?? null);
+const roomLabel = computed(() => configStore.displayName);
 </script>
 
 <style scoped>
 .clock-bar-horizontal {
   width: 100%;
-  background: var(--bg-secondary);
-  border-bottom: 1px solid var(--border-color);
+  background: var(--bg-1);
+  border-bottom: 1px solid var(--line);
   display: flex;
   align-items: center;
   justify-content: center;
@@ -133,7 +149,7 @@ const showLogo = computed(() => configStore.clockBarShowLogo !== false);
 }
 
 .clock-bar-horizontal.position-bottom {
-  border-top: 1px solid var(--border-color);
+  border-top: 1px solid var(--line);
   border-bottom: none;
 }
 
@@ -147,7 +163,6 @@ const showLogo = computed(() => configStore.clockBarShowLogo !== false);
   display: flex;
   align-items: center;
   gap: 1rem;
-  font-family: "Courier New", monospace;
 }
 
 .clock-bar-content.layout-two-lines {
@@ -157,14 +172,24 @@ const showLogo = computed(() => configStore.clockBarShowLogo !== false);
 }
 
 .clock-time {
+  font-family: var(--font-display);
+  font-variant-numeric: tabular-nums lining-nums;
   font-weight: 600;
-  color: var(--text-primary);
+  color: var(--ink);
   white-space: nowrap;
 }
 
 .clock-date {
-  color: var(--text-secondary);
+  font-family: var(--font-data);
+  font-variant-numeric: tabular-nums lining-nums;
+  color: var(--ink-2);
   white-space: nowrap;
+}
+
+.clock-bar-room {
+  font-family: var(--font-ui);
+  color: var(--ink-3);
+  font-size: 0.95rem;
 }
 
 .clock-bar-horizontal.position-between .clock-time {
@@ -207,7 +232,7 @@ const showLogo = computed(() => configStore.clockBarShowLogo !== false);
   display: inline-block;
   width: 0.5rem;
   height: 0.5rem;
-  border: 1.5px solid var(--text-secondary);
+  border: 1.5px solid var(--ink-2);
   border-top-color: transparent;
   border-radius: 50%;
   margin: 0 0.5rem;

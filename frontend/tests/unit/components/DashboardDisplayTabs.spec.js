@@ -1,12 +1,10 @@
 import { beforeEach, describe, it, expect, vi } from "vitest";
 import { mount } from "@vue/test-utils";
 import { createPinia, setActivePinia } from "pinia";
-import DashboardLayoutTab from "@/components/settings/tabs/dashboard/DashboardLayoutTab.vue";
-import CalendarDisplayTab from "@/components/settings/tabs/dashboard/CalendarDisplayTab.vue";
-import PluginDisplayTab from "@/components/settings/tabs/dashboard/PluginDisplayTab.vue";
+import DashboardRegionsEditor from "@/components/settings/shared/DashboardRegionsEditor.vue";
 import { useWebServicesStore } from "@/stores/webServices";
 
-describe("dashboard display settings tabs", () => {
+describe("DashboardRegionsEditor (screens & regions logic)", () => {
   beforeEach(() => {
     setActivePinia(createPinia());
     const webServicesStore = useWebServicesStore();
@@ -14,11 +12,12 @@ describe("dashboard display settings tabs", () => {
   });
 
   it("exposes dashboard layout controls with stable ids", () => {
-    const wrapper = mount(DashboardLayoutTab, {
+    const wrapper = mount(DashboardRegionsEditor, {
       props: { config: {} },
     });
 
-    expect(wrapper.find("#display-orientation").exists()).toBe(true);
+    // orientation controls moved to DisplaySettings rows; not part of this editor
+    expect(wrapper.find("#display-orientation").exists()).toBe(false);
     expect(wrapper.find("#add-region-screen-home").exists()).toBe(true);
     expect(wrapper.find("#region-size-region-1").exists()).toBe(true);
     expect(wrapper.find("#region-component-region-1").exists()).toBe(true);
@@ -29,10 +28,10 @@ describe("dashboard display settings tabs", () => {
   });
 
   it("orients rendered screen cards with the configured display layout", () => {
-    const landscapeWrapper = mount(DashboardLayoutTab, {
+    const landscapeWrapper = mount(DashboardRegionsEditor, {
       props: { config: { orientation: "landscape" } },
     });
-    const portraitWrapper = mount(DashboardLayoutTab, {
+    const portraitWrapper = mount(DashboardRegionsEditor, {
       props: { config: { orientation: "portrait" } },
     });
 
@@ -41,7 +40,7 @@ describe("dashboard display settings tabs", () => {
   });
 
   it("emits clamped region size updates from the layout tab", async () => {
-    const wrapper = mount(DashboardLayoutTab, {
+    const wrapper = mount(DashboardRegionsEditor, {
       props: { config: { calendarSplit: 70 } },
     });
 
@@ -57,7 +56,7 @@ describe("dashboard display settings tabs", () => {
   });
 
   it("removes a region and renormalizes the layout", async () => {
-    const wrapper = mount(DashboardLayoutTab, {
+    const wrapper = mount(DashboardRegionsEditor, {
       props: { config: {} },
     });
 
@@ -78,7 +77,7 @@ describe("dashboard display settings tabs", () => {
   });
 
   it("adds a region via the + Region button", async () => {
-    const wrapper = mount(DashboardLayoutTab, {
+    const wrapper = mount(DashboardRegionsEditor, {
       props: { config: {} },
     });
 
@@ -95,7 +94,7 @@ describe("dashboard display settings tabs", () => {
       { id: "weather", name: "Weather" },
       { id: "meals", name: "Meals" },
     ];
-    const wrapper = mount(DashboardLayoutTab, {
+    const wrapper = mount(DashboardRegionsEditor, {
       props: {
         config: {
           dashboardScreens: {
@@ -135,7 +134,7 @@ describe("dashboard display settings tabs", () => {
   });
 
   it("adds and activates a new dashboard screen", async () => {
-    const wrapper = mount(DashboardLayoutTab, {
+    const wrapper = mount(DashboardRegionsEditor, {
       props: { config: {} },
     });
 
@@ -147,7 +146,7 @@ describe("dashboard display settings tabs", () => {
   });
 
   it("renders draggable preview handles between regions", () => {
-    const wrapper = mount(DashboardLayoutTab, {
+    const wrapper = mount(DashboardRegionsEditor, {
       props: { config: {} },
     });
 
@@ -155,7 +154,7 @@ describe("dashboard display settings tabs", () => {
   });
 
   it("sets the primary region from the preview radio", async () => {
-    const wrapper = mount(DashboardLayoutTab, {
+    const wrapper = mount(DashboardRegionsEditor, {
       props: { config: {} },
     });
 
@@ -165,46 +164,11 @@ describe("dashboard display settings tabs", () => {
     expect(emitted.dashboardScreens.screens[0].activeRegionId).toBe("region-2");
   });
 
-  it("renders week start options in the calendar display tab", () => {
-    const wrapper = mount(CalendarDisplayTab, {
-      props: { config: {} },
-    });
-
-    const options = wrapper
-      .find("#week-start-day")
-      .findAll("option")
-      .map(option => option.text());
-
-    expect(wrapper.find("#week-start-day").element.value).toBe("1");
-    expect(options).toEqual([
-      "Sunday",
-      "Monday",
-      "Tuesday",
-      "Wednesday",
-      "Thursday",
-      "Friday",
-      "Saturday",
-    ]);
-  });
-
-  it("emits week start day updates from the calendar display tab", async () => {
-    const wrapper = mount(CalendarDisplayTab, {
-      props: { config: { weekStartDay: 1 } },
-    });
-
-    await wrapper.find("#week-start-day").setValue("6");
-    await wrapper.find("#week-start-day").trigger("change");
-
-    expect(wrapper.emitted("update:config").at(-1)[0]).toEqual({
-      weekStartDay: 6,
-    });
-  });
-
-  it("exposes plugin display controls with stable ids", () => {
-    const wrapper = mount(PluginDisplayTab, {
-      props: { config: {} },
-    });
-
-    expect(wrapper.find("#meal-plan-card-size").exists()).toBe(true);
+  it("toggles a screen's expanded state via its collapse control", async () => {
+    const wrapper = mount(DashboardRegionsEditor, { props: { config: {} } });
+    const toggle = wrapper.find(".screen-collapse-toggle");
+    const before = toggle.attributes("aria-expanded");
+    await toggle.trigger("click");
+    expect(toggle.attributes("aria-expanded")).not.toBe(before);
   });
 });

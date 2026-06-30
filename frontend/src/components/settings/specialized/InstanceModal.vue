@@ -593,7 +593,7 @@ const handleSave = async () => {
   left: 0;
   right: 0;
   bottom: 0;
-  background: rgba(0, 0, 0, 0.5);
+  background: color-mix(in srgb, var(--ink) 55%, transparent);
   display: flex;
   align-items: center;
   justify-content: center;
@@ -601,7 +601,7 @@ const handleSave = async () => {
 }
 
 .instance-modal {
-  background: var(--bg-primary);
+  background: var(--bg-1);
   border-radius: 8px;
   box-shadow: 0 4px 12px var(--shadow);
   max-width: 600px;
@@ -615,25 +615,27 @@ const handleSave = async () => {
   justify-content: space-between;
   align-items: center;
   padding: 1.5rem;
-  border-bottom: 1px solid var(--border-color);
+  border-bottom: 1px solid var(--line);
 }
 
 .modal-header h3 {
   margin: 0;
   font-size: 1.25rem;
   font-weight: 600;
-  color: var(--text-primary);
+  color: var(--ink);
 }
 
 .btn-close-modal {
   background: none;
   border: none;
   font-size: 1.5rem;
-  color: var(--text-secondary);
+  color: var(--ink-2);
   cursor: pointer;
   padding: 0;
-  width: 2rem;
-  height: 2rem;
+  width: 44px;
+  height: 44px;
+  min-height: 44px;
+  min-width: 44px;
   display: flex;
   align-items: center;
   justify-content: center;
@@ -642,8 +644,13 @@ const handleSave = async () => {
 }
 
 .btn-close-modal:hover {
-  background: var(--bg-secondary);
-  color: var(--text-primary);
+  background: var(--bg-2);
+  color: var(--ink);
+}
+
+.btn-close-modal:focus-visible {
+  outline: 2px solid var(--focus);
+  outline-offset: 2px;
 }
 
 .modal-body {
@@ -657,17 +664,18 @@ const handleSave = async () => {
 .form-group label {
   display: block;
   font-weight: 600;
-  color: var(--text-primary);
+  color: var(--ink);
   margin-bottom: 0.5rem;
   font-size: 0.95rem;
+  font-family: var(--font-ui);
 }
 
 .form-input {
   width: 100%;
   padding: 0.5rem 0.75rem;
-  background: var(--bg-secondary);
-  color: var(--text-primary);
-  border: 1px solid var(--border-color);
+  background: var(--bg-2);
+  color: var(--ink);
+  border: 1px solid var(--line);
   border-radius: 4px;
   font-size: 0.9rem;
   font-family: inherit;
@@ -676,31 +684,36 @@ const handleSave = async () => {
 
 .form-input:focus {
   outline: none;
-  border-color: var(--accent-primary);
-  box-shadow: 0 0 0 2px rgba(33, 150, 243, 0.2);
+  border-color: var(--focus);
+  box-shadow: 0 0 0 2px color-mix(in srgb, var(--focus) 20%, transparent);
+}
+
+.form-input:focus-visible {
+  outline: 2px solid var(--focus);
+  outline-offset: 2px;
 }
 
 .help-text {
   font-size: 0.875rem;
-  color: var(--text-secondary);
+  color: var(--ink-2);
   margin-top: 0.25rem;
   line-height: 1.4;
 }
 
 .error-message {
   padding: 0.75rem 1rem;
-  background: #fee;
-  color: #c33;
-  border: 1px solid #fcc;
+  background: color-mix(in srgb, var(--err) 10%, transparent);
+  color: var(--err);
+  border: 1px solid color-mix(in srgb, var(--err) 30%, transparent);
   border-radius: 4px;
   margin-bottom: 1rem;
 }
 
 .success-message {
   padding: 0.75rem 1rem;
-  background: #efe;
-  color: #3c3;
-  border: 1px solid #cfc;
+  background: color-mix(in srgb, var(--ok) 10%, transparent);
+  color: var(--ok);
+  border: 1px solid color-mix(in srgb, var(--ok) 30%, transparent);
   border-radius: 4px;
 }
 
@@ -710,12 +723,13 @@ const handleSave = async () => {
   justify-content: flex-end;
   margin-top: 2rem;
   padding-top: 1.5rem;
-  border-top: 1px solid var(--border-color);
+  border-top: 1px solid var(--line);
 }
 
 .btn-primary,
 .btn-secondary {
   padding: 0.75rem 1.5rem;
+  min-height: 44px;
   border: none;
   border-radius: 4px;
   font-size: 0.9rem;
@@ -725,12 +739,13 @@ const handleSave = async () => {
 }
 
 .btn-primary {
-  background: var(--accent-primary);
+  background: var(--focus);
   color: white;
+  border: 1px solid var(--focus);
 }
 
 .btn-primary:hover:not(:disabled) {
-  background: #1976d2;
+  background: color-mix(in srgb, var(--focus), black 12%);
   transform: translateY(-1px);
   box-shadow: 0 2px 4px var(--shadow);
 }
@@ -740,15 +755,20 @@ const handleSave = async () => {
   cursor: not-allowed;
 }
 
+.btn-primary:focus-visible {
+  outline: 2px solid var(--focus);
+  outline-offset: 2px;
+}
+
 .btn-secondary {
-  background: var(--bg-secondary);
-  color: var(--text-primary);
-  border: 1px solid var(--border-color);
+  background: var(--bg-2);
+  color: var(--ink);
+  border: 1px solid var(--line);
 }
 
 .btn-secondary:hover:not(:disabled) {
-  background: var(--bg-tertiary);
-  border-color: var(--accent-primary);
+  background: var(--bg-2);
+  border-color: var(--focus);
 }
 
 .btn-secondary:disabled {
@@ -756,10 +776,16 @@ const handleSave = async () => {
   cursor: not-allowed;
 }
 
+.btn-secondary:focus-visible {
+  outline: 2px solid var(--focus);
+  outline-offset: 2px;
+}
+
 .btn-geocode {
   margin-top: 0.5rem;
   padding: 0.5rem 1rem;
-  background: var(--accent-primary);
+  min-height: 44px;
+  background: var(--focus);
   color: white;
   border: none;
   border-radius: 4px;
@@ -770,7 +796,7 @@ const handleSave = async () => {
 }
 
 .btn-geocode:hover:not(:disabled) {
-  background: #1976d2;
+  background: color-mix(in srgb, var(--focus), black 12%);
   transform: translateY(-1px);
   box-shadow: 0 2px 4px var(--shadow);
 }
@@ -778,5 +804,10 @@ const handleSave = async () => {
 .btn-geocode:disabled {
   opacity: 0.6;
   cursor: not-allowed;
+}
+
+.btn-geocode:focus-visible {
+  outline: 2px solid var(--focus);
+  outline-offset: 2px;
 }
 </style>

@@ -13,6 +13,7 @@ import {
   getActiveDashboardScreen,
   getLeafRegions,
   normalizeDashboardScreens,
+  setActiveDashboardRegion,
   setActiveDashboardScreen,
 } from "../utils/layout";
 
@@ -962,7 +963,18 @@ export function useKeyboardActions() {
     return null;
   };
 
+  const focusRegion = regionId => {
+    saveDashboardScreens(setActiveDashboardRegion(getDashboardScreens(), regionId));
+  };
+
+  const activateScreen = screenId => {
+    saveDashboardScreens(setActiveDashboardScreen(getDashboardScreens(), screenId));
+    router.push("/");
+  };
+
   return {
     handleAction,
+    focusRegion,
+    activateScreen,
   };
 }

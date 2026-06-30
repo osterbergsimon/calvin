@@ -5,8 +5,15 @@ import App from "./App.vue";
 import router from "./router";
 import "./styles/main.css";
 import "./styles/theme.css";
+import "./styles/fonts.js";
+import "./styles/base.css";
 import { initLogger, logError, logInfo } from "./utils/logger";
 import { useConfigStore } from "./stores/config";
+import { useTypeTheme } from "./composables/useTypeTheme";
+
+// Apply the persisted typeface before mount so the dashboard boots with the
+// saved font instead of the default (previously only applied on opening Settings).
+useTypeTheme().loadTypeTheme();
 
 const app = createApp(App);
 const pinia = createPinia();

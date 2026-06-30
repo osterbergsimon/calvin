@@ -137,22 +137,22 @@ onMounted(async () => {
 
 .section-description {
   margin: 0 0 1rem;
-  color: var(--text-secondary);
+  color: var(--ink-3);
   font-size: 0.9rem;
   line-height: 1.5;
 }
 
 .section-description code {
   padding: 0.05rem 0.35rem;
-  background: var(--bg-secondary);
-  border: 1px solid var(--border-color);
+  background: var(--bg-2);
+  border: 1px solid var(--line);
   border-radius: 4px;
   font-size: 0.85em;
 }
 
 .state-message {
   padding: 1rem;
-  color: var(--text-secondary);
+  color: var(--ink-3);
   font-size: 0.9rem;
 }
 
@@ -175,8 +175,9 @@ onMounted(async () => {
   gap: 1rem;
   align-items: center;
   padding: 0.75rem 1rem;
-  background: var(--bg-secondary);
-  border: 1px solid var(--border-color);
+  min-height: 44px;
+  background: var(--bg-2);
+  border: 1px solid var(--line);
   border-radius: 8px;
 }
 
@@ -187,24 +188,26 @@ onMounted(async () => {
 }
 
 .meta .title {
+  font-family: var(--font-ui);
   font-weight: 600;
-  color: var(--text-primary);
+  color: var(--ink);
 }
 
 .meta .subtitle {
   margin-top: 0.15rem;
   font-size: 0.8rem;
-  color: var(--text-secondary);
+  font-family: var(--font-ui);
+  color: var(--ink-2);
 }
 
 .items-summary {
   margin: 0 0 0.6rem;
   font-size: 0.85rem;
-  color: var(--text-secondary);
+  color: var(--ink-2);
 }
 
 .items-summary strong {
-  color: var(--text-primary);
+  color: var(--ink);
 }
 
 .item-row-hidden {
@@ -217,8 +220,10 @@ onMounted(async () => {
   gap: 0.55rem;
   cursor: pointer;
   font-size: 0.85rem;
-  color: var(--text-primary);
+  font-family: var(--font-ui);
+  color: var(--ink);
   user-select: none;
+  min-height: 44px;
 }
 
 .switch input {
@@ -234,7 +239,7 @@ onMounted(async () => {
   width: 2.2rem;
   height: 1.2rem;
   border-radius: 999px;
-  background: var(--border-color);
+  background: var(--line);
   transition: background 0.15s ease;
   flex-shrink: 0;
 }
@@ -246,13 +251,13 @@ onMounted(async () => {
   width: 1rem;
   height: 1rem;
   border-radius: 50%;
-  background: var(--bg-primary);
-  box-shadow: 0 1px 2px rgba(0, 0, 0, 0.2);
+  background: var(--bg-1);
+  box-shadow: 0 1px 2px var(--shadow);
   transition: transform 0.15s ease;
 }
 
 .switch-on .switch-track {
-  background: var(--accent-primary);
+  background: var(--focus);
 }
 
 .switch-on .switch-thumb {
@@ -269,17 +274,17 @@ onMounted(async () => {
 }
 
 .switch input:focus-visible + .switch-track {
-  outline: 2px solid var(--accent-primary);
+  outline: 2px solid var(--focus);
   outline-offset: 2px;
 }
 
 .error-message {
   margin-top: 0.75rem;
   padding: 0.6rem 0.85rem;
-  background: rgba(244, 67, 54, 0.12);
-  border: 1px solid rgba(244, 67, 54, 0.4);
+  background: color-mix(in srgb, var(--err) 12%, transparent);
+  border: 1px solid color-mix(in srgb, var(--err) 40%, transparent);
   border-radius: 6px;
-  color: var(--text-primary);
+  color: var(--ink);
   font-size: 0.88rem;
 }
 </style>

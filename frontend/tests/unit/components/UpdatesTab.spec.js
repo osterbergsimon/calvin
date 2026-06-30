@@ -15,6 +15,8 @@ const systemMock = vi.hoisted(() => ({
   triggerUpdate: vi.fn(),
   getUpdateStatus: vi.fn(() => Promise.resolve({ status: "unknown" })),
   getBackendHealth: vi.fn(() => Promise.resolve({ status: "healthy" })),
+  restartBackend: vi.fn(() => Promise.resolve()),
+  restartFrontend: vi.fn(() => Promise.resolve()),
 }));
 
 vi.mock("@/composables", () => ({
@@ -39,6 +41,8 @@ describe("UpdatesTab", () => {
     systemMock.backendHealthCheckedAt.value = null;
     systemMock.getUpdateStatus.mockResolvedValue({ status: "unknown" });
     systemMock.getBackendHealth.mockResolvedValue({ status: "healthy" });
+    systemMock.restartBackend.mockResolvedValue();
+    systemMock.restartFrontend.mockResolvedValue();
   });
 
   it("does not save repo URL on every keystroke", async () => {
@@ -123,5 +127,13 @@ describe("UpdatesTab", () => {
     expect(wrapper.text()).toContain("healthy");
     expect(wrapper.text()).toContain("Pulling Code");
     expect(wrapper.text()).toContain("Pulling latest code");
+  });
+
+  it("no longer renders the System restart/reload section", () => {
+    const wrapper = mount(UpdatesTab, {
+      props: { gitRepoUrl: "", gitBranch: "main" },
+    });
+    expect(wrapper.text()).not.toContain("Restart Backend");
+    expect(wrapper.text()).not.toContain("Reload UI");
   });
 });

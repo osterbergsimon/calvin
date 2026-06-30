@@ -64,8 +64,10 @@ export function useClockBar(opts) {
   const barPadding = computed(() => {
     const preview = get(opts.previewPadding, null);
     if (isPreview.value && preview !== null) return preview;
-    if (orientation.value === "vertical") return configStore.clockBarVerticalPadding || 8;
-    return configStore.clockBarPadding || 8;
+    // Nullish coalescing, not ||: padding 0 is valid ("all the way down") and
+    // must not fall back to the 8px default.
+    if (orientation.value === "vertical") return configStore.clockBarVerticalPadding ?? 8;
+    return configStore.clockBarPadding ?? 8;
   });
 
   const currentTime = ref(new Date());

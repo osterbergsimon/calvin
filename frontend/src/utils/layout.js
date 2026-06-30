@@ -396,6 +396,20 @@ export function setActiveDashboardScreen(screensConfig, screenId) {
   };
 }
 
+export function setActiveDashboardRegion(screensConfig, regionId) {
+  const config = normalizeDashboardScreens(screensConfig);
+  const activeScreen = getActiveDashboardScreen(config);
+  if (!activeScreen) return config;
+  const isLeaf = getLeafRegions(activeScreen.layout).some(region => region.id === regionId);
+  if (!isLeaf) return config;
+  return {
+    ...config,
+    screens: config.screens.map(screen =>
+      screen.id === activeScreen.id ? { ...screen, activeRegionId: regionId } : screen
+    ),
+  };
+}
+
 export function cycleDashboardScreen(screensConfig, direction = 1) {
   const normalized = normalizeDashboardScreens(screensConfig);
   if (normalized.screens.length <= 1) return normalized;

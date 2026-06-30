@@ -28,6 +28,7 @@ export const useConfigStore = defineStore("config", () => {
   const modeIndicatorTimeout = ref(5); // Mode change notification auto-hide timeout in seconds (0 = never hide, default 5)
   const photoRotationInterval = ref(30); // Photo rotation interval in seconds (default 30)
   const calendarViewMode = ref("month"); // Calendar view mode: 'month' | 'week' | 'day' | 'rolling'
+  const calendarWeeks = ref(4); // Number of weeks to show in rolling view (default 4)
   const calendarRefreshInterval = ref(15); // Calendar refresh interval in minutes (default 15)
   const timeFormat = ref("24h"); // Time format: '12h' or '24h' (default: '24h')
   const weekStartDay = ref(1); // Week starting day (0=Sunday, 1=Monday, ..., 6=Saturday, default Monday)
@@ -65,11 +66,18 @@ export const useConfigStore = defineStore("config", () => {
   const clockBarPadding = ref(8);
   const clockBarShowWeather = ref(false);
   const clockBarShowLogo = ref(true);
+  const displayName = ref("");
+  const focusLightMode = ref("interaction");
+  const focusLightDimOthers = ref(true);
+  const regionsLocked = ref(true); // Dashboard region drag-resize is locked by default (touch-wall safety)
+  const touchControls = ref("auto"); // 'auto' (detect) | 'on' (force) | 'off' (hide) touch chrome
+  const touchControlSize = ref("medium"); // 'small' | 'medium' | 'large' — region touch control size
   const mealPlanCardSize = ref("medium"); // Meal plan card size: 'small' | 'medium' | 'large'
   const consoleLogEnabled = ref(true); // Enable console logging (default: true for backwards compatibility)
   const consoleLogLevel = ref("info"); // Console log level: 'error' | 'warn' | 'info' | 'debug' (default: 'info')
   const configPollInterval = ref(30); // Config polling interval in seconds (default: 30)
   const devMode = ref(false); // Whether the backend is running in dev mode (backend/.dev marker file)
+  const pluginRepositoryUrl = ref("https://github.com/osterbergsimon/calvin-plugins"); // Default plugin repo for the GitHub install flow
   const loading = ref(false);
   const error = ref(null);
 
@@ -88,6 +96,7 @@ export const useConfigStore = defineStore("config", () => {
     modeIndicatorTimeout,
     photoRotationInterval,
     calendarViewMode,
+    calendarWeeks,
     calendarRefreshInterval,
     timeFormat,
     weekStartDay,
@@ -125,11 +134,18 @@ export const useConfigStore = defineStore("config", () => {
     clockBarPadding,
     clockBarShowWeather,
     clockBarShowLogo,
+    displayName,
+    focusLightMode,
+    focusLightDimOthers,
+    regionsLocked,
+    touchControls,
+    touchControlSize,
     mealPlanCardSize,
     consoleLogEnabled,
     consoleLogLevel,
     configPollInterval,
     devMode,
+    pluginRepositoryUrl,
   };
 
   const setOrientation = newOrientation => {
@@ -202,6 +218,12 @@ export const useConfigStore = defineStore("config", () => {
 
   const setShowUI = show => {
     showUI.value = show;
+  };
+
+  // Lock/unlock direct drag-resize of dashboard regions. Locked by default so a
+  // touch wall never reshapes its layout by accident.
+  const toggleRegionsLock = async () => {
+    await updateConfig({ regionsLocked: !regionsLocked.value });
   };
 
   const toggleUI = async () => {
@@ -361,6 +383,22 @@ export const useConfigStore = defineStore("config", () => {
     imageDisplayMode.value = mode;
   };
 
+  const setDisplayName = name => {
+    displayName.value = name;
+  };
+  const setFocusLightMode = mode => {
+    focusLightMode.value = mode;
+  };
+  const setFocusLightDimOthers = dim => {
+    focusLightDimOthers.value = dim;
+  };
+  const setTouchControls = mode => {
+    touchControls.value = mode;
+  };
+  const setTouchControlSize = size => {
+    touchControlSize.value = size;
+  };
+
   return {
     orientation,
     orientationFlipped,
@@ -378,6 +416,7 @@ export const useConfigStore = defineStore("config", () => {
     keyboardFeedbackMode,
     photoRotationInterval,
     calendarViewMode,
+    calendarWeeks,
     calendarRefreshInterval,
     timeFormat,
     weekStartDay,
@@ -419,6 +458,14 @@ export const useConfigStore = defineStore("config", () => {
     consoleLogLevel,
     configPollInterval,
     devMode,
+    pluginRepositoryUrl,
+    displayName,
+    focusLightMode,
+    focusLightDimOthers,
+    regionsLocked,
+    toggleRegionsLock,
+    touchControls,
+    touchControlSize,
     loading,
     error,
     calendarWidth,
@@ -454,6 +501,11 @@ export const useConfigStore = defineStore("config", () => {
     setThemeMode,
     setDarkModeTime,
     setImageDisplayMode,
+    setDisplayName,
+    setFocusLightMode,
+    setFocusLightDimOthers,
+    setTouchControls,
+    setTouchControlSize,
     fetchConfig,
     updateConfig,
   };

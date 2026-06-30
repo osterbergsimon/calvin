@@ -44,9 +44,10 @@ defineProps({
 .setting-item label {
   display: block;
   font-weight: 600;
-  color: var(--text-primary);
+  color: var(--ink);
   margin-bottom: 0.5rem;
   font-size: 0.95rem;
+  font-family: var(--font-ui);
 }
 
 .setting-control {
@@ -63,9 +64,10 @@ defineProps({
 .setting-item textarea {
   width: 100%;
   padding: 0.5rem 0.75rem;
-  background: var(--bg-secondary);
-  color: var(--text-primary);
-  border: 1px solid var(--border-color);
+  min-height: 44px;
+  background: var(--bg-2);
+  color: var(--ink);
+  border: 1px solid var(--line);
   border-radius: 4px;
   font-size: 0.9rem;
   font-family: inherit;
@@ -80,8 +82,8 @@ defineProps({
 .setting-item select:focus,
 .setting-item textarea:focus {
   outline: none;
-  border-color: var(--accent-primary);
-  box-shadow: 0 0 0 2px rgba(33, 150, 243, 0.2);
+  border-color: var(--focus);
+  box-shadow: 0 0 0 2px color-mix(in srgb, var(--focus) 20%, transparent);
 }
 
 .setting-item input[type="text"]:hover,
@@ -91,14 +93,14 @@ defineProps({
 .setting-item input[type="url"]:hover,
 .setting-item select:hover,
 .setting-item textarea:hover {
-  border-color: var(--accent-primary);
+  border-color: var(--focus);
 }
 
 .setting-item input[type="checkbox"] {
   width: 1.25rem;
   height: 1.25rem;
   cursor: pointer;
-  accent-color: var(--accent-primary);
+  accent-color: var(--focus);
 }
 
 .setting-item select {
@@ -113,13 +115,13 @@ defineProps({
 .help-text {
   display: block;
   font-size: 0.875rem;
-  color: var(--text-secondary);
+  color: var(--ink-2);
   margin-top: 0.25rem;
   line-height: 1.4;
 }
 
 .required-indicator {
-  color: var(--accent-primary);
+  color: var(--focus);
   margin-left: 0.25rem;
 }
 </style>

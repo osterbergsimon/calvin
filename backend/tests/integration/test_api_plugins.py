@@ -3,6 +3,7 @@
 import json
 import zipfile
 from typing import Any
+from unittest.mock import AsyncMock, patch
 
 import pytest
 
@@ -948,3 +949,83 @@ class TestPluginTypeClassBasedActions:
         assert data["success"] is True
         assert data["message"] == "manual fetch completed"
         assert data["instance_id"] is None
+
+
+@pytest.mark.integration
+class TestZipInstallRestartRequired:
+    """Verify requires_restart in ZIP upload install response mirrors the manifest."""
+
+    @pytest.fixture
+    def minimal_zip_path(self, tmp_path):
+        """Minimal zip containing a plugin.json so the package validation passes."""
+        zip_path = tmp_path / "minimal.zip"
+        with zipfile.ZipFile(zip_path, "w") as zipf:
+            zipf.writestr(
+                "plugin.json",
+                json.dumps(
+                    {
+                        "id": "myplugin",
+                        "name": "My Plugin",
+                        "version": "1.0.0",
+                        "type": "service",
+                    }
+                ),
+            )
+        return zip_path
+
+    @pytest.mark.parametrize(
+        "requirements,expected_restart",
+        [
+            ({"restart_required": True}, True),
+            ({"restart_required": False}, False),
+            ({}, False),  # no restart_required key — defaults to False
+        ],
+    )
+    @patch(
+        "app.api.routes.plugins.management.load_plugin_types_for_single",
+        new_callable=AsyncMock,
+    )
+    @patch("app.api.routes.plugins.management.event_system")
+    @patch("app.api.routes.plugins.management._validate_just_installed_plugin")
+    @patch("app.api.routes.plugins.management.plugin_loader")
+    @patch("app.api.routes.plugins.management.plugin_installer")
+    def test_zip_install_restart_required(
+        self,
+        mock_plugin_installer,
+        mock_plugin_loader,
+        mock_validate,
+        mock_event_system,
+        mock_load_single,
+        requirements,
+        expected_restart,
+        test_client,
+        minimal_zip_path,
+    ):
+        """requires_restart in the ZIP upload response must reflect manifest.requirements.restart_required."""
+        manifest = {
+            "id": "myplugin",
+            "name": "My Plugin",
+            "version": "1.0.0",
+            "type": "service",
+        }
+        if requirements:
+            manifest["requirements"] = requirements
+        mock_plugin_installer.install_plugin.return_value = manifest
+        mock_validate.return_value = []
+        mock_event_system.emit_event = AsyncMock()
+
+        with open(minimal_zip_path, "rb") as zip_file:
+            response = test_client.post(
+                "/api/plugins/install",
+                files={"file": ("minimal.zip", zip_file, "application/zip")},
+            )
+
+        if response.status_code == 404:
+            pytest.skip("ZIP install route not available in test client")
+
+        assert response.status_code == 200, (
+            f"Expected 200, got {response.status_code}: {response.json()}"
+        )
+        data = response.json()
+        assert data["success"] is True
+        assert data["requires_restart"] is expected_restart

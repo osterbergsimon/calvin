@@ -1,8 +1,15 @@
 <template>
   <div ref="calendarView" class="calendar-view" tabindex="0" @keydown="handleKeydown">
-    <DashboardPanel title="Calendar" :subtitle="calendarSubtitle">
+    <DashboardPanel
+      title="Calendar"
+      :subtitle="calendarSubtitle"
+      :show-title="false"
+      :focused="focused"
+      :dim="dim"
+    >
       <template #actions>
         <button
+          v-if="!isTouch"
           class="dashboard-panel__icon-button"
           title="Previous"
           @click="previousMonth"
@@ -11,6 +18,7 @@
           ‹
         </button>
         <button
+          v-if="!isTouch"
           class="dashboard-panel__icon-button"
           title="Next"
           @click="nextMonth"
@@ -18,6 +26,7 @@
         >
           ›
         </button>
+        <RegionControls v-if="focused" region-kind="calendar" />
       </template>
 
       <div class="calendar-content">
@@ -111,12 +120,7 @@
       :event="calendarStore.selectedEvent"
       @close="closeEventDetail"
     />
-    <!-- Backdrop for modal -->
-    <div
-      v-if="calendarStore.selectedEvent"
-      class="event-detail-backdrop"
-      @click="closeEventDetail"
-    />
+    <DialogScrim v-if="calendarStore.selectedEvent" @dismiss="closeEventDetail" />
   </div>
 </template>
 
@@ -126,15 +130,28 @@ import { useRoute } from "vue-router";
 import { useCalendarStore } from "../stores/calendar";
 import { useConfigStore } from "../stores/config";
 import EventDetailPanel from "./EventDetailPanel.vue";
+import DialogScrim from "./ui/DialogScrim.vue";
 import CalendarEventItem from "./CalendarEventItem.vue";
 import DashboardPanel from "./DashboardPanel.vue";
+import RegionControls from "./dashboard/RegionControls.vue";
+import { useTouchCapability } from "@/composables/useTouchCapability";
 
 const props = defineProps({
+  focused: {
+    type: Boolean,
+    default: false,
+  },
+  dim: {
+    type: Boolean,
+    default: false,
+  },
   sourceIds: {
     type: Array,
     default: () => [],
   },
 });
+
+const { isTouch } = useTouchCapability();
 
 const configStore = useConfigStore();
 const sourceKey = computed(() =>
@@ -151,6 +168,7 @@ const showWeekNumbers = computed(() => configStore.showWeekNumbers);
 const weekStartDay = computed(() => configStore.weekStartDay ?? 1);
 const weekendDays = computed(() => configStore.weekendDays || [0, 6]);
 const showRedDays = computed(() => configStore.showRedDays || false);
+const rollingWeeks = computed(() => Math.min(12, Math.max(1, configStore.calendarWeeks ?? 4)));
 
 const viewModeLabel = computed(() => {
   const labels = {
@@ -536,12 +554,12 @@ const calendarDays = computed(() => {
       },
     ];
   } else if (viewMode.value === "rolling") {
-    // Rolling weeks view: show 4 weeks starting from today
+    // Rolling view: show `rollingWeeks` weeks starting from the current week
     const days = [];
     const startDate = getWeekStart(todayDate);
 
-    // Generate 4 weeks (28 days)
-    for (let i = 0; i < 28; i++) {
+    // Generate rollingWeeks weeks
+    for (let i = 0; i < rollingWeeks.value * 7; i++) {
       const date = new Date(startDate);
       date.setDate(startDate.getDate() + i);
       const dateOnly = new Date(date);
@@ -984,7 +1002,7 @@ onActivated(() => {
   flex-direction: column;
   background: var(--calendar-bg);
   border-radius: 8px;
-  overflow: hidden;
+  overflow: visible; /* let the focused panel glow bloom out */
   outline: none;
   min-height: 0;
   min-width: 0;
@@ -1250,19 +1268,17 @@ onActivated(() => {
 }
 
 .week-number {
-  font-size: 0.7rem;
+  font-family: var(--font-data);
+  font-size: 0.62rem;
   font-weight: 600;
-  color: var(--text-secondary);
-  background: var(--bg-tertiary);
-  padding: 0.125rem 0.375rem;
-  border-radius: 3px;
-  line-height: 1.2;
+  letter-spacing: 0.04em;
+  color: var(--focus);
+  background: color-mix(in srgb, var(--focus) 12%, transparent);
+  padding: 0.05rem 0.35rem;
+  border-radius: 999px;
+  line-height: 1.35;
   white-space: nowrap;
-}
-
-.calendar-day.week-start .week-number {
-  color: var(--accent-primary);
-  background: var(--calendar-today-bg);
+  align-self: flex-start;
 }
 
 .day-events {
@@ -1293,16 +1309,6 @@ onActivated(() => {
   opacity: 0.8;
   font-weight: 500;
   flex-shrink: 0;
-}
-
-.event-detail-backdrop {
-  position: fixed;
-  top: 0;
-  left: 0;
-  right: 0;
-  bottom: 0;
-  background: rgba(0, 0, 0, 0.5);
-  z-index: 999;
 }
 
 /* Responsive styles for smaller screens and portrait mode */

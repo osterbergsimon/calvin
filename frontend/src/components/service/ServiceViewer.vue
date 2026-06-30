@@ -5,6 +5,7 @@
       :subtitle="subtitle"
       :variant="panelVariant"
       :header-visible="headerVisible"
+      :focused="focused"
     >
       <template v-if="$slots.actions" #actions>
         <slot name="actions" />
@@ -46,6 +47,10 @@ const props = defineProps({
   headerVisible: {
     type: Boolean,
     default: true,
+  },
+  focused: {
+    type: Boolean,
+    default: false,
   },
 });
 

@@ -270,28 +270,37 @@ watch(
   font-weight: 600;
   cursor: pointer;
   transition: all 0.2s;
+  min-height: 44px;
+  font-family: var(--font-ui);
 }
 
 .btn-primary {
-  background: var(--accent-primary);
+  background: var(--focus);
   color: white;
   border: none;
 }
 
 .btn-secondary {
-  background: var(--bg-secondary);
-  color: var(--text-primary);
-  border: 1px solid var(--border-color);
+  background: var(--bg-2);
+  color: var(--ink);
+  border: 1px solid var(--line);
 }
 
 .btn-primary:hover:not(:disabled) {
-  background: var(--accent-secondary);
+  background: var(--focus);
+  filter: brightness(1.1);
   transform: translateY(-1px);
   box-shadow: 0 2px 4px var(--shadow);
 }
 
 .btn-secondary:hover:not(:disabled) {
-  border-color: var(--accent-primary);
+  border-color: var(--focus);
+}
+
+.btn-primary:focus-visible,
+.btn-secondary:focus-visible {
+  outline: 2px solid var(--focus);
+  outline-offset: 2px;
 }
 
 .btn-primary:disabled,
@@ -308,27 +317,27 @@ watch(
 }
 
 .update-message.success {
-  background: rgba(40, 167, 69, 0.1);
-  border: 1px solid rgba(40, 167, 69, 0.3);
-  color: #28a745;
+  background: color-mix(in srgb, var(--ok) 10%, transparent);
+  border: 1px solid color-mix(in srgb, var(--ok) 30%, transparent);
+  color: var(--ok);
 }
 
 .update-message.error {
-  background: rgba(220, 53, 69, 0.1);
-  border: 1px solid rgba(220, 53, 69, 0.3);
-  color: #dc3545;
+  background: color-mix(in srgb, var(--err) 10%, transparent);
+  border: 1px solid color-mix(in srgb, var(--err) 30%, transparent);
+  color: var(--err);
 }
 
 .update-message.info {
-  background: rgba(23, 162, 184, 0.1);
-  border: 1px solid rgba(23, 162, 184, 0.3);
-  color: #0c5460;
+  background: color-mix(in srgb, var(--focus) 10%, transparent);
+  border: 1px solid color-mix(in srgb, var(--focus) 30%, transparent);
+  color: var(--focus);
 }
 
 .update-message.warning {
-  background: rgba(255, 193, 7, 0.1);
-  border: 1px solid rgba(255, 193, 7, 0.3);
-  color: #856404;
+  background: color-mix(in srgb, var(--warn) 10%, transparent);
+  border: 1px solid color-mix(in srgb, var(--warn) 30%, transparent);
+  color: var(--warn);
 }
 
 .update-status {
@@ -348,19 +357,20 @@ watch(
   gap: 0.35rem;
   min-width: 0;
   padding: 0.75rem;
-  background: var(--bg-secondary);
-  border: 1px solid var(--border-color);
+  background: var(--bg-2);
+  border: 1px solid var(--line);
   border-radius: 6px;
 }
 
 .status-label,
 .status-meta {
-  color: var(--text-secondary);
+  color: var(--ink-2);
   font-size: 0.78rem;
+  font-family: var(--font-ui);
 }
 
 .status-value {
-  color: var(--text-primary);
+  color: var(--ink);
   font-size: 0.875rem;
   overflow-wrap: anywhere;
 }
@@ -375,23 +385,23 @@ watch(
 }
 
 .status-pill.success {
-  background: color-mix(in srgb, var(--accent-secondary) 18%, transparent);
-  color: var(--accent-secondary);
+  background: color-mix(in srgb, var(--ok) 18%, transparent);
+  color: var(--ok);
 }
 
 .status-pill.info {
-  background: color-mix(in srgb, var(--accent-primary) 18%, transparent);
-  color: var(--accent-primary);
+  background: color-mix(in srgb, var(--warn) 18%, transparent);
+  color: var(--warn);
 }
 
 .status-pill.error {
-  background: color-mix(in srgb, var(--accent-error) 18%, transparent);
-  color: var(--accent-error);
+  background: color-mix(in srgb, var(--err) 18%, transparent);
+  color: var(--err);
 }
 
 .status-pill.neutral {
-  background: var(--bg-tertiary);
-  color: var(--text-secondary);
+  background: var(--bg-2);
+  color: var(--ink-2);
 }
 
 .status-details {
@@ -403,22 +413,22 @@ watch(
 .status-details p {
   margin: 0;
   font-size: 0.875rem;
-  color: var(--text-primary);
+  color: var(--ink);
 }
 
 .status-details strong {
-  color: var(--text-primary);
+  color: var(--ink);
 }
 
 .update-log {
   max-height: 260px;
   overflow: auto;
-  background: rgba(0, 0, 0, 0.05);
-  border: 1px solid var(--border-color, rgba(0, 0, 0, 0.1));
+  background: var(--bg-2);
+  border: 1px solid var(--line);
   border-radius: 4px;
   padding: 0.75rem;
   white-space: pre-wrap;
-  font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
+  font-family: var(--font-data);
   font-size: 0.8rem;
   line-height: 1.25rem;
 }
