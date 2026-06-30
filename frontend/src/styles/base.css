@@ -1,6 +1,15 @@
 /* Global accessibility baseline for the redesign. */
 
-:where(button, a, input, select, textarea, [role="radio"], [role="switch"], [role="option"]):focus-visible {
+:where(
+  button,
+  a,
+  input,
+  select,
+  textarea,
+  [role="radio"],
+  [role="switch"],
+  [role="option"]
+):focus-visible {
   outline: 2px solid var(--focus);
   outline-offset: 2px;
   border-radius: 4px;

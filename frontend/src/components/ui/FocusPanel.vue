@@ -1,5 +1,10 @@
 <template>
-  <component :is="as" class="focus-panel" :class="stateClass" :aria-current="focused ? 'true' : null">
+  <component
+    :is="as"
+    class="focus-panel"
+    :class="stateClass"
+    :aria-current="focused ? 'true' : null"
+  >
     <slot />
   </component>
 </template>

@@ -157,7 +157,11 @@ const getThemePreviewStyle = theme => {
   font-size: 2rem;
   font-weight: bold;
   color: var(--ink-2);
-  background: linear-gradient(135deg, var(--focus), color-mix(in srgb, var(--focus) 60%, var(--bg-1)));
+  background: linear-gradient(
+    135deg,
+    var(--focus),
+    color-mix(in srgb, var(--focus) 60%, var(--bg-1))
+  );
 }
 
 .theme-selected-badge {

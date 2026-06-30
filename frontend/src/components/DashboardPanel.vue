@@ -1,10 +1,5 @@
 <template>
-  <FocusPanel
-    as="section"
-    :focused="focused"
-    :dim="dim"
-    :class="panelClasses"
-  >
+  <FocusPanel as="section" :focused="focused" :dim="dim" :class="panelClasses">
     <header v-if="showPanelHeader" class="dashboard-panel__header">
       <div v-if="titleShown" class="dashboard-panel__title-group">
         <h2 class="dashboard-panel__title">{{ title }}</h2>

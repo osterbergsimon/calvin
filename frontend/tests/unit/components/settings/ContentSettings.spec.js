@@ -67,8 +67,8 @@ describe("ContentSettings", () => {
     const wrapper = mount(ContentSettings, { props: { config: baseConfig }, global: { stubs } });
     const toggles = wrapper.findAll('[role="switch"]');
     for (const t of toggles) await t.trigger("click");
-    const frameEmit = (wrapper.emitted("update:config") || []).find(
-      e => Object.prototype.hasOwnProperty.call(e[0], "photoFrameEnabled")
+    const frameEmit = (wrapper.emitted("update:config") || []).find(e =>
+      Object.prototype.hasOwnProperty.call(e[0], "photoFrameEnabled")
     );
     expect(frameEmit).toBeTruthy();
     expect(frameEmit[0]).toHaveProperty("photoFrameMode");

@@ -2,9 +2,23 @@
   <div class="settings-search">
     <div class="settings-search__bar">
       <span class="settings-search__icon" aria-hidden="true">
-        <svg width="16" height="16" viewBox="0 0 16 16" fill="none" xmlns="http://www.w3.org/2000/svg">
+        <svg
+          width="16"
+          height="16"
+          viewBox="0 0 16 16"
+          fill="none"
+          xmlns="http://www.w3.org/2000/svg"
+        >
           <circle cx="6.5" cy="6.5" r="4.5" stroke="currentColor" stroke-width="1.5" />
-          <line x1="10.5" y1="10.5" x2="14" y2="14" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" />
+          <line
+            x1="10.5"
+            y1="10.5"
+            x2="14"
+            y2="14"
+            stroke="currentColor"
+            stroke-width="1.5"
+            stroke-linecap="round"
+          />
         </svg>
       </span>
       <input
@@ -19,14 +33,14 @@
       />
       <kbd class="settings-search__hint" aria-label="Press slash to focus search">/</kbd>
     </div>
-    <ul v-if="results.length" class="settings-search__results" role="listbox" aria-label="Search results">
+    <ul
+      v-if="results.length"
+      class="settings-search__results"
+      role="listbox"
+      aria-label="Search results"
+    >
       <li v-for="result in results" :key="result.id" role="none">
-        <button
-          class="settings-search__result"
-          type="button"
-          role="option"
-          @click="select(result)"
-        >
+        <button class="settings-search__result" type="button" role="option" @click="select(result)">
           <span class="settings-search__result-label">{{ result.label }}</span>
           <span class="settings-search__result-path">{{ result.path }}</span>
         </button>

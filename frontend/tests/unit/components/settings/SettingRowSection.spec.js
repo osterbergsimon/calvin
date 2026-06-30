@@ -17,11 +17,17 @@ describe("SettingRow + SettingsSection", () => {
     const beside = mount(SettingRow, { props: { label: "A" }, slots: { default: "<i>c</i>" } });
     expect(beside.find(".setting-row").classes()).not.toContain("setting-row--stacked");
 
-    const stacked = mount(SettingRow, { props: { label: "A", stacked: true }, slots: { default: "<i>c</i>" } });
+    const stacked = mount(SettingRow, {
+      props: { label: "A", stacked: true },
+      slots: { default: "<i>c</i>" },
+    });
     expect(stacked.find(".setting-row").classes()).toContain("setting-row--stacked");
   });
   it("SettingsSection renders an eyebrow title and exposes its id", () => {
-    const w = mount(SettingsSection, { props: { id: "layout", title: "Layout" }, slots: { default: "<p>rows</p>" } });
+    const w = mount(SettingsSection, {
+      props: { id: "layout", title: "Layout" },
+      slots: { default: "<p>rows</p>" },
+    });
     expect(w.find(".settings-section").attributes("id")).toBe("section-layout");
     expect(w.find(".settings-section__eyebrow").text()).toBe("Layout");
   });

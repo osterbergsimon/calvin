@@ -272,10 +272,26 @@ describe("ClockBarVertical", () => {
       version: 2,
       activeScreenId: "home",
       screens: [
-        { id: "home", name: "Home", activeRegionId: "region-1",
-          layout: { version: 1, preset: "single", regions: [{ id: "region-1", kind: "calendar", size: 100 }] } },
-        { id: "media", name: "Media", activeRegionId: "region-1",
-          layout: { version: 1, preset: "single", regions: [{ id: "region-1", kind: "photos", size: 100 }] } },
+        {
+          id: "home",
+          name: "Home",
+          activeRegionId: "region-1",
+          layout: {
+            version: 1,
+            preset: "single",
+            regions: [{ id: "region-1", kind: "calendar", size: 100 }],
+          },
+        },
+        {
+          id: "media",
+          name: "Media",
+          activeRegionId: "region-1",
+          layout: {
+            version: 1,
+            preset: "single",
+            regions: [{ id: "region-1", kind: "photos", size: 100 }],
+          },
+        },
       ],
     };
 
@@ -300,8 +316,16 @@ describe("ClockBarVertical", () => {
       version: 2,
       activeScreenId: "home",
       screens: [
-        { id: "home", name: "Home", activeRegionId: "region-1",
-          layout: { version: 1, preset: "single", regions: [{ id: "region-1", kind: "calendar", size: 100 }] } },
+        {
+          id: "home",
+          name: "Home",
+          activeRegionId: "region-1",
+          layout: {
+            version: 1,
+            preset: "single",
+            regions: [{ id: "region-1", kind: "calendar", size: 100 }],
+          },
+        },
       ],
     };
 

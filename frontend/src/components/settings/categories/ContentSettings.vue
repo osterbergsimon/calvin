@@ -5,15 +5,26 @@
     </SettingsSection>
 
     <SettingsSection id="content-calendar-display" title="Calendar display">
-      <SettingRow label="Calendar view" description="The default layout used to display calendar events.">
+      <SettingRow
+        label="Calendar view"
+        description="The default layout used to display calendar events."
+      >
         <SelectPill
           :model-value="config.calendarViewMode"
-          :options="[{value:'month',label:'Month'},{value:'week',label:'Week'},{value:'day',label:'Day'},{value:'rolling',label:'Rolling'}]"
+          :options="[
+            { value: 'month', label: 'Month' },
+            { value: 'week', label: 'Week' },
+            { value: 'day', label: 'Day' },
+            { value: 'rolling', label: 'Rolling' },
+          ]"
           aria-label="Calendar view"
           @update:model-value="v => emit('update:config', { calendarViewMode: v })"
         />
       </SettingRow>
-      <SettingRow label="Weeks to show" description="Number of weeks visible in the rolling calendar view.">
+      <SettingRow
+        label="Weeks to show"
+        description="Number of weeks visible in the rolling calendar view."
+      >
         <NumberStepper
           :model-value="config.calendarWeeks"
           :min="1"
@@ -26,50 +37,65 @@
         <SelectPill
           :model-value="config.weekStartDay"
           :options="[
-            {value:1,label:'Monday'},
-            {value:2,label:'Tuesday'},
-            {value:3,label:'Wednesday'},
-            {value:4,label:'Thursday'},
-            {value:5,label:'Friday'},
-            {value:6,label:'Saturday'},
-            {value:0,label:'Sunday'}
+            { value: 1, label: 'Monday' },
+            { value: 2, label: 'Tuesday' },
+            { value: 3, label: 'Wednesday' },
+            { value: 4, label: 'Thursday' },
+            { value: 5, label: 'Friday' },
+            { value: 6, label: 'Saturday' },
+            { value: 0, label: 'Sunday' },
           ]"
           aria-label="Week starts on"
           @update:model-value="v => emit('update:config', { weekStartDay: v })"
         />
       </SettingRow>
-      <SettingRow label="Weekend days" description="Days highlighted as the weekend on the calendar.">
+      <SettingRow
+        label="Weekend days"
+        description="Days highlighted as the weekend on the calendar."
+      >
         <ChipMultiSelect
           :model-value="config.weekendDays"
           :options="[
-            {value:1,label:'Mon'},
-            {value:2,label:'Tue'},
-            {value:3,label:'Wed'},
-            {value:4,label:'Thu'},
-            {value:5,label:'Fri'},
-            {value:6,label:'Sat'},
-            {value:0,label:'Sun'}
+            { value: 1, label: 'Mon' },
+            { value: 2, label: 'Tue' },
+            { value: 3, label: 'Wed' },
+            { value: 4, label: 'Thu' },
+            { value: 5, label: 'Fri' },
+            { value: 6, label: 'Sat' },
+            { value: 0, label: 'Sun' },
           ]"
           aria-label="Weekend days"
           @update:model-value="v => emit('update:config', { weekendDays: v })"
         />
       </SettingRow>
-      <SettingRow label="Show week numbers" description="Display ISO week numbers alongside each calendar row.">
+      <SettingRow
+        label="Show week numbers"
+        description="Display ISO week numbers alongside each calendar row."
+      >
         <ToggleSwitch
           :model-value="config.showWeekNumbers"
           aria-label="Show week numbers"
           @update:model-value="v => emit('update:config', { showWeekNumbers: v })"
         />
       </SettingRow>
-      <SettingRow label="Time format" description="Whether event times are shown in 24-hour or 12-hour format.">
+      <SettingRow
+        label="Time format"
+        description="Whether event times are shown in 24-hour or 12-hour format."
+      >
         <SegmentedControl
           :model-value="config.timeFormat"
-          :options="[{value:'24h',label:'24h'},{value:'12h',label:'12h'}]"
+          :options="[
+            { value: '24h', label: '24h' },
+            { value: '12h', label: '12h' },
+          ]"
           aria-label="Time format"
           @update:model-value="v => emit('update:config', { timeFormat: v })"
         />
       </SettingRow>
-      <SettingRow label="Max visible events" description="How many events can appear in a single calendar cell.">
+      <SettingRow
+        label="Max visible events"
+        description="How many events can appear in a single calendar cell."
+      >
         <NumberStepper
           :model-value="config.maxVisibleEvents"
           :min="1"
@@ -78,7 +104,10 @@
           @update:model-value="v => emit('update:config', { maxVisibleEvents: v })"
         />
       </SettingRow>
-      <SettingRow label="Highlight holidays" description="Mark public holidays and red days on the calendar.">
+      <SettingRow
+        label="Highlight holidays"
+        description="Mark public holidays and red days on the calendar."
+      >
         <ToggleSwitch
           :model-value="config.showRedDays"
           aria-label="Highlight holidays"
@@ -88,7 +117,10 @@
     </SettingsSection>
 
     <SettingsSection id="content-photos" title="Photos">
-      <SettingRow label="Rotation interval" description="Seconds each photo is shown before advancing.">
+      <SettingRow
+        label="Rotation interval"
+        description="Seconds each photo is shown before advancing."
+      >
         <NumberStepper
           :model-value="config.photoRotationInterval || 30"
           :min="5"
@@ -111,18 +143,26 @@
           @update:model-value="v => emit('update:config', { imageDisplayMode: v })"
         />
       </SettingRow>
-      <SettingRow label="Randomize image order" description="Shuffle the order photos are displayed in.">
+      <SettingRow
+        label="Randomize image order"
+        description="Shuffle the order photos are displayed in."
+      >
         <ToggleSwitch
           :model-value="config.randomizeImages ?? false"
           aria-label="Randomize image order"
           @update:model-value="v => emit('update:config', { randomizeImages: v })"
         />
       </SettingRow>
-      <SettingRow label="Photo-frame mode" description="Show a single photo full-screen as a digital frame.">
+      <SettingRow
+        label="Photo-frame mode"
+        description="Show a single photo full-screen as a digital frame."
+      >
         <ToggleSwitch
           :model-value="config.photoFrameEnabled || config.photoFrameMode"
           aria-label="Photo-frame mode"
-          @update:model-value="v => emit('update:config', { photoFrameEnabled: v, photoFrameMode: v })"
+          @update:model-value="
+            v => emit('update:config', { photoFrameEnabled: v, photoFrameMode: v })
+          "
         />
       </SettingRow>
       <SettingRow

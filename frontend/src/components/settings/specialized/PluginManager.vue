@@ -170,9 +170,7 @@ const TAB_LABELS = {
 
 const tabOptions = computed(() =>
   Object.entries(TAB_LABELS)
-    .filter(
-      ([id]) => id === "backend" || id === "theme" || props.plugins.some(p => p.type === id)
-    )
+    .filter(([id]) => id === "backend" || id === "theme" || props.plugins.some(p => p.type === id))
     .map(([value, label]) => ({ value, label }))
 );
 

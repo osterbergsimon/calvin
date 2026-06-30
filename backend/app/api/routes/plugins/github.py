@@ -321,7 +321,9 @@ async def install_plugin_from_github(request: dict[str, Any] = Body(...)):
                     "manifest": manifest,
                     "branch": actual_branch,
                     "branch_switched": branch_switched,
-                    "requires_restart": manifest.get("requirements", {}).get("restart_required", False),
+                    "requires_restart": manifest.get("requirements", {}).get(
+                        "restart_required", False
+                    ),
                     "frontend_rebuild_in_progress": False,
                 }
             else:

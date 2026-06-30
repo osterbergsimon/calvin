@@ -29,7 +29,10 @@ describe("PluginManager", () => {
         ],
         activeTab: "image",
       });
-      const values = wrapper.findComponent(SegmentedControl).props("options").map(o => o.value);
+      const values = wrapper
+        .findComponent(SegmentedControl)
+        .props("options")
+        .map(o => o.value);
       expect(values).toContain("backend");
       expect(values).toContain("theme");
     });
@@ -42,7 +45,10 @@ describe("PluginManager", () => {
         ],
         activeTab: "calendar",
       });
-      const values = wrapper.findComponent(SegmentedControl).props("options").map(o => o.value);
+      const values = wrapper
+        .findComponent(SegmentedControl)
+        .props("options")
+        .map(o => o.value);
       expect(values).toEqual(expect.arrayContaining(["calendar", "image", "backend", "theme"]));
       // service has no plugins and is not always-on → absent
       expect(values).not.toContain("service");

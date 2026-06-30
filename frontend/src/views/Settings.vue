@@ -42,10 +42,7 @@
             :config="localConfig"
             @update:config="handleConfigUpdate"
           />
-          <PluginsCategory
-            v-if="activeCategory === 'plugins'"
-            :key="categoryRenderKey"
-          />
+          <PluginsCategory v-if="activeCategory === 'plugins'" :key="categoryRenderKey" />
           <DeviceSettings
             v-if="activeCategory === 'device' && localConfig"
             :key="categoryRenderKey"
@@ -122,8 +119,11 @@ const getRouteSettingDestination = () => {
 
 const initialRouteDestination = getRouteSettingDestination();
 // Honour tab hints for non-dashboard categories on initial load
-if (initialRouteDestination?.tabKey && initialRouteDestination.tab
-    && initialRouteDestination.category !== "dashboard") {
+if (
+  initialRouteDestination?.tabKey &&
+  initialRouteDestination.tab &&
+  initialRouteDestination.category !== "dashboard"
+) {
   sessionStorage.setItem(initialRouteDestination.tabKey, initialRouteDestination.tab);
 }
 
@@ -297,11 +297,7 @@ const selectCategory = categoryId => {
 
 const onJump = async destination => {
   // Unmigrated categories still use the tab sessionStorage hint.
-  if (
-    destination.tabKey &&
-    destination.tab &&
-    !MIGRATED_CATEGORIES.has(destination.category)
-  ) {
+  if (destination.tabKey && destination.tab && !MIGRATED_CATEGORIES.has(destination.category)) {
     sessionStorage.setItem(destination.tabKey, destination.tab);
   }
 
@@ -447,13 +443,28 @@ onUnmounted(() => {
     min-height: auto;
   }
 
-  .settings-page { height: auto; min-height: 100dvh; overflow: visible; }
-  .settings-content { overflow-y: visible; min-height: auto; }
+  .settings-page {
+    height: auto;
+    min-height: 100dvh;
+    overflow: visible;
+  }
+  .settings-content {
+    overflow-y: visible;
+    min-height: auto;
+  }
 }
 
 @media (max-height: 600px) {
-  .settings-page { height: auto; min-height: 100dvh; overflow: visible; }
-  .settings-body { overflow: visible; }
-  .settings-content { overflow-y: visible; }
+  .settings-page {
+    height: auto;
+    min-height: 100dvh;
+    overflow: visible;
+  }
+  .settings-body {
+    overflow: visible;
+  }
+  .settings-content {
+    overflow-y: visible;
+  }
 }
 </style>

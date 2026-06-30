@@ -34,18 +34,21 @@
           />
           <div class="pi-info">
             <span class="pi-name">{{ instance.name }}</span>
-            <span
-              v-if="getInstanceSummary && getInstanceSummary(instance)"
-              class="pi-summary"
-              >{{ getInstanceSummary(instance) }}</span
-            >
+            <span v-if="getInstanceSummary && getInstanceSummary(instance)" class="pi-summary">{{
+              getInstanceSummary(instance)
+            }}</span>
           </div>
           <ToggleSwitch
             :model-value="!!instance.enabled"
             :aria-label="`Enable ${instance.name}`"
             @update:model-value="v => handleToggle(instance.id, v)"
           />
-          <button type="button" class="pi-action" title="Edit" @click="$emit('edit-instance', instance)">
+          <button
+            type="button"
+            class="pi-action"
+            title="Edit"
+            @click="$emit('edit-instance', instance)"
+          >
             Edit
           </button>
           <button

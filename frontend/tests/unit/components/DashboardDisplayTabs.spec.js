@@ -171,5 +171,4 @@ describe("DashboardRegionsEditor (screens & regions logic)", () => {
     await toggle.trigger("click");
     expect(toggle.attributes("aria-expanded")).not.toBe(before);
   });
-
 });

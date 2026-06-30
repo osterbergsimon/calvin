@@ -5,11 +5,19 @@ import ClockBarSettings from "@/components/settings/categories/ClockBarSettings.
 const stubs = { ClockBarFontSizePicker: true, ClockBarItemsTab: true };
 
 const baseConfig = {
-  clockShowDate: true, clockShowSeconds: false, clockBarShowLogo: true,
-  clockBarShowWeather: false, clockBarShowInKiosk: false,
-  clockBarLayout: "single-line", clockBarVerticalLayout: "upright",
-  clockBarFontSize: 16, clockBarDateFontSize: 14, clockBarPadding: 8,
-  clockBarVerticalFontSize: 18, clockBarVerticalDateFontSize: 11, clockBarVerticalPadding: 8,
+  clockShowDate: true,
+  clockShowSeconds: false,
+  clockBarShowLogo: true,
+  clockBarShowWeather: false,
+  clockBarShowInKiosk: false,
+  clockBarLayout: "single-line",
+  clockBarVerticalLayout: "upright",
+  clockBarFontSize: 16,
+  clockBarDateFontSize: 14,
+  clockBarPadding: 8,
+  clockBarVerticalFontSize: 18,
+  clockBarVerticalDateFontSize: 11,
+  clockBarVerticalPadding: 8,
 };
 
 describe("ClockBarSettings", () => {

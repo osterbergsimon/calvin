@@ -264,7 +264,10 @@ describe("CalendarSourcesTab", () => {
   it('"Refresh now" shows "Refreshing…" and disables button while refreshEvents is pending', async () => {
     let resolveRefresh;
     mockRefreshEvents = vi.fn().mockImplementation(
-      () => new Promise(resolve => { resolveRefresh = resolve; })
+      () =>
+        new Promise(resolve => {
+          resolveRefresh = resolve;
+        })
     );
 
     const w = mountComp();

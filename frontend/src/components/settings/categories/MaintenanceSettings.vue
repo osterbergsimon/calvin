@@ -14,7 +14,9 @@
         <button type="button" class="maint-btn" @click="askRestartBackend">Restart backend</button>
       </SettingRow>
       <SettingRow label="Restart frontend" description="Restart the frontend service.">
-        <button type="button" class="maint-btn" @click="askRestartFrontend">Restart frontend</button>
+        <button type="button" class="maint-btn" @click="askRestartFrontend">
+          Restart frontend
+        </button>
       </SettingRow>
       <SettingRow label="Reload UI" description="Reload the browser page.">
         <button type="button" class="maint-btn" @click="reloadUi">Reload UI</button>
@@ -22,7 +24,10 @@
     </SettingsSection>
 
     <SettingsSection id="maintenance-diagnostics" title="Diagnostics">
-      <SettingRow label="Console logging" description="Log to the browser console. When off, only errors are shown.">
+      <SettingRow
+        label="Console logging"
+        description="Log to the browser console. When off, only errors are shown."
+      >
         <ToggleSwitch
           :model-value="config.consoleLogEnabled ?? true"
           aria-label="Console logging"
@@ -37,15 +42,18 @@
         <SelectPill
           :model-value="config.consoleLogLevel || 'info'"
           :options="[
-            {value:'error',label:'Errors only'},
-            {value:'warn',label:'Warnings & errors'},
-            {value:'info',label:'Info, warnings & errors'},
-            {value:'debug',label:'All logs'},
+            { value: 'error', label: 'Errors only' },
+            { value: 'warn', label: 'Warnings & errors' },
+            { value: 'info', label: 'Info, warnings & errors' },
+            { value: 'debug', label: 'All logs' },
           ]"
           @update:model-value="v => emit('update:config', { consoleLogLevel: v })"
         />
       </SettingRow>
-      <SettingRow label="Config polling interval" description="How often to check for config changes (seconds).">
+      <SettingRow
+        label="Config polling interval"
+        description="How often to check for config changes (seconds)."
+      >
         <NumberStepper
           :model-value="config.configPollInterval || 30"
           :min="5"

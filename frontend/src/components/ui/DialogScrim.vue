@@ -1,9 +1,5 @@
 <template>
-  <div
-    class="dialog-scrim"
-    :class="{ 'is-blurred': blur }"
-    @click="$emit('dismiss')"
-  />
+  <div class="dialog-scrim" :class="{ 'is-blurred': blur }" @click="$emit('dismiss')" />
 </template>
 
 <script setup>

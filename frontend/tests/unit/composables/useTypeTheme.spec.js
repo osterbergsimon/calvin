@@ -22,7 +22,9 @@ describe("useTypeTheme", () => {
     const { applyTypeTheme, current } = useTypeTheme();
     applyTypeTheme("nonsense");
     expect(current.value).toBe("instrument");
-    expect(document.documentElement.style.getPropertyValue("--font-display")).toContain("Plex Sans Condensed");
+    expect(document.documentElement.style.getPropertyValue("--font-display")).toContain(
+      "Plex Sans Condensed"
+    );
   });
 
   it("loadTypeTheme restores the persisted choice", () => {

@@ -24,7 +24,9 @@ describe("ScreenDots", () => {
   });
 
   it("renders nothing for a single screen", () => {
-    const w = mount(ScreenDots, { props: { screens: [{ id: "s1", name: "Home" }], activeScreenId: "s1" } });
+    const w = mount(ScreenDots, {
+      props: { screens: [{ id: "s1", name: "Home" }], activeScreenId: "s1" },
+    });
     expect(w.find("button").exists()).toBe(false);
   });
 });

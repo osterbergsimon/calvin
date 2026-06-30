@@ -2,7 +2,10 @@
 <template>
   <div class="device-settings">
     <SettingsSection id="device-power" title="Display power">
-      <SettingRow label="Power schedule" description="Automatically turn the display off and on at set times.">
+      <SettingRow
+        label="Power schedule"
+        description="Automatically turn the display off and on at set times."
+      >
         <ToggleSwitch
           :model-value="config.displayScheduleEnabled"
           aria-label="Power schedule"
@@ -16,16 +19,24 @@
             @update:model-value="v => emit('update:config', { displaySchedule: v })"
           />
         </SettingRow>
-        <SettingRow label="Timezone" description="Timezone for the schedule. Leave as system default to use the Pi's timezone.">
+        <SettingRow
+          label="Timezone"
+          description="Timezone for the schedule. Leave as system default to use the Pi's timezone."
+        >
           <SelectPill
             :model-value="config.timezone || 'system'"
             :options="timezoneOptions"
-            @update:model-value="v => emit('update:config', { timezone: v === 'system' ? null : v })"
+            @update:model-value="
+              v => emit('update:config', { timezone: v === 'system' ? null : v })
+            "
           />
         </SettingRow>
       </template>
 
-      <SettingRow label="Screen timeout" description="Turn the display off after a period of inactivity.">
+      <SettingRow
+        label="Screen timeout"
+        description="Turn the display off after a period of inactivity."
+      >
         <ToggleSwitch
           :model-value="config.displayTimeoutEnabled"
           aria-label="Screen timeout"
@@ -60,7 +71,10 @@
     </SettingsSection>
 
     <SettingsSection id="device-notifications" title="Notifications">
-      <SettingRow label="Enable feedback" description="Show a visual indicator when keyboard shortcuts are activated.">
+      <SettingRow
+        label="Enable feedback"
+        description="Show a visual indicator when keyboard shortcuts are activated."
+      >
         <ToggleSwitch
           :model-value="config.keyboardFeedbackEnabled"
           aria-label="Enable feedback"
@@ -70,12 +84,18 @@
       <SettingRow label="Feedback style" description="Size of the keyboard feedback overlay.">
         <SegmentedControl
           :model-value="config.keyboardFeedbackMode"
-          :options="[{value:'normal',label:'Normal'},{value:'small',label:'Small'}]"
+          :options="[
+            { value: 'normal', label: 'Normal' },
+            { value: 'small', label: 'Small' },
+          ]"
           aria-label="Feedback style"
           @update:model-value="v => emit('update:config', { keyboardFeedbackMode: v })"
         />
       </SettingRow>
-      <SettingRow label="Auto-hide delay (s)" description="Seconds before the mode indicator fades out automatically.">
+      <SettingRow
+        label="Auto-hide delay (s)"
+        description="Seconds before the mode indicator fades out automatically."
+      >
         <NumberStepper
           :model-value="config.modeIndicatorTimeout"
           :min="0"
@@ -101,7 +121,10 @@
           @update:model-value="v => emit('update:config', { rebootComboKey2: v })"
         />
       </SettingRow>
-      <SettingRow label="Hold duration" description="How long to hold both keys to trigger a reboot (milliseconds).">
+      <SettingRow
+        label="Hold duration"
+        description="How long to hold both keys to trigger a reboot (milliseconds)."
+      >
         <NumberStepper
           :model-value="config.rebootComboDuration || 10000"
           :min="1000"

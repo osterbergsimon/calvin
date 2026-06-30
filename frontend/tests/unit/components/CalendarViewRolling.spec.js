@@ -12,9 +12,12 @@ describe("CalendarView rolling weeks", () => {
     const cal = useCalendarStore();
     cal.fetchSources = vi.fn().mockResolvedValue({ sources: [] });
     cal.fetchEvents = vi.fn().mockResolvedValue({ events: [] });
-    cal.events = []; cal.sources = []; cal.loading = false;
+    cal.events = [];
+    cal.sources = [];
+    cal.loading = false;
     const cfg = useConfigStore();
-    cfg.showUI = true; cfg.calendarViewMode = "rolling";
+    cfg.showUI = true;
+    cfg.calendarViewMode = "rolling";
   });
   it("renders calendarWeeks*7 day cells in rolling view", async () => {
     useConfigStore().calendarWeeks = 3;

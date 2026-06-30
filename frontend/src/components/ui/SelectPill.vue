@@ -11,7 +11,12 @@
       @click="toggleOpen"
       @keydown="onTriggerKey"
     >
-      <span v-if="swatch" class="pill__swatch" :style="{ background: `var(${swatch})` }" aria-hidden="true" />
+      <span
+        v-if="swatch"
+        class="pill__swatch"
+        :style="{ background: `var(${swatch})` }"
+        aria-hidden="true"
+      />
       <span class="pill__label">{{ currentLabel }}</span>
       <span class="pill__cv" aria-hidden="true">▾</span>
     </button>

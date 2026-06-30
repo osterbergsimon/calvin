@@ -2,10 +2,16 @@
   <div class="display-settings">
     <!-- LAYOUT -->
     <SettingsSection id="layout" title="Layout">
-      <SettingRow label="Orientation" description="Physical screen orientation. Per-screen region direction is set under Screens & regions.">
+      <SettingRow
+        label="Orientation"
+        description="Physical screen orientation. Per-screen region direction is set under Screens & regions."
+      >
         <SegmentedControl
           :model-value="config.orientation"
-          :options="[{value:'landscape',label:'Landscape'},{value:'portrait',label:'Portrait'}]"
+          :options="[
+            { value: 'landscape', label: 'Landscape' },
+            { value: 'portrait', label: 'Portrait' },
+          ]"
           aria-label="Orientation"
           @update:model-value="v => emit('update:config', { orientation: v })"
         />
@@ -17,7 +23,10 @@
           @update:model-value="v => emit('update:config', { orientationFlipped: v })"
         />
       </SettingRow>
-      <SettingRow label="Apply display rotation" description="Apply the orientation setting to the OS display output.">
+      <SettingRow
+        label="Apply display rotation"
+        description="Apply the orientation setting to the OS display output."
+      >
         <ToggleSwitch
           :model-value="config.applyDisplayRotation"
           aria-label="Apply display rotation"
@@ -45,13 +54,21 @@
       <SettingRow label="Theme mode" description="Control whether light or dark mode is active.">
         <SelectPill
           :model-value="config.themeMode"
-          :options="[{value:'light',label:'Light'},{value:'dark',label:'Dark'},{value:'auto',label:'Auto'},{value:'time',label:'Time'}]"
+          :options="[
+            { value: 'light', label: 'Light' },
+            { value: 'dark', label: 'Dark' },
+            { value: 'auto', label: 'Auto' },
+            { value: 'time', label: 'Time' },
+          ]"
           aria-label="Theme mode"
           @update:model-value="v => emit('update:config', { themeMode: v })"
         />
       </SettingRow>
       <template v-if="config.themeMode === 'time'">
-        <SettingRow label="Dark mode start (hour)" description="The hour of day when dark mode turns on (0–23).">
+        <SettingRow
+          label="Dark mode start (hour)"
+          description="The hour of day when dark mode turns on (0–23)."
+        >
           <NumberStepper
             :model-value="config.darkModeStart"
             :min="0"
@@ -60,7 +77,10 @@
             @update:model-value="v => emit('update:config', { darkModeStart: v })"
           />
         </SettingRow>
-        <SettingRow label="Dark mode end (hour)" description="The hour of day when dark mode turns off (0–23).">
+        <SettingRow
+          label="Dark mode end (hour)"
+          description="The hour of day when dark mode turns off (0–23)."
+        >
           <NumberStepper
             :model-value="config.darkModeEnd"
             :min="0"
@@ -73,22 +93,35 @@
       <SettingRow label="Typeface" description="The font family used throughout the dashboard.">
         <TypefacePicker />
       </SettingRow>
-      <SettingRow label="Focus light" description="When the focus spotlight highlights the active region.">
+      <SettingRow
+        label="Focus light"
+        description="When the focus spotlight highlights the active region."
+      >
         <SelectPill
           :model-value="config.focusLightMode"
-          :options="[{value:'interaction',label:'When navigating'},{value:'always',label:'Always on'},{value:'off',label:'Off'}]"
+          :options="[
+            { value: 'interaction', label: 'When navigating' },
+            { value: 'always', label: 'Always on' },
+            { value: 'off', label: 'Off' },
+          ]"
           aria-label="Focus light"
           @update:model-value="v => emit('update:config', { focusLightMode: v })"
         />
       </SettingRow>
-      <SettingRow label="Dim other regions" description="Reduce brightness of non-focused regions while the spotlight is active.">
+      <SettingRow
+        label="Dim other regions"
+        description="Reduce brightness of non-focused regions while the spotlight is active."
+      >
         <ToggleSwitch
           :model-value="config.focusLightDimOthers"
           aria-label="Dim other regions"
           @update:model-value="v => emit('update:config', { focusLightDimOthers: v })"
         />
       </SettingRow>
-      <SettingRow label="Display name" description="A friendly name for this dashboard shown in the title bar.">
+      <SettingRow
+        label="Display name"
+        description="A friendly name for this dashboard shown in the title bar."
+      >
         <input
           class="display-name-input"
           type="text"
@@ -101,25 +134,42 @@
 
     <!-- KIOSK & TOUCH -->
     <SettingsSection id="kiosk-touch" title="Kiosk & touch">
-      <SettingRow label="Hide controls in kiosk mode" description="Suppress on-screen controls when running in kiosk mode.">
+      <SettingRow
+        label="Hide controls in kiosk mode"
+        description="Suppress on-screen controls when running in kiosk mode."
+      >
         <ToggleSwitch
           :model-value="!config.showUI"
           aria-label="Hide controls in kiosk mode"
           @update:model-value="v => emit('update:config', { showUI: !v })"
         />
       </SettingRow>
-      <SettingRow label="Touch controls" description="Whether on-screen touch navigation controls are shown.">
+      <SettingRow
+        label="Touch controls"
+        description="Whether on-screen touch navigation controls are shown."
+      >
         <SelectPill
           :model-value="config.touchControls"
-          :options="[{value:'auto',label:'Auto'},{value:'on',label:'Always on'},{value:'off',label:'Off'}]"
+          :options="[
+            { value: 'auto', label: 'Auto' },
+            { value: 'on', label: 'Always on' },
+            { value: 'off', label: 'Off' },
+          ]"
           aria-label="Touch controls"
           @update:model-value="v => emit('update:config', { touchControls: v })"
         />
       </SettingRow>
-      <SettingRow label="Touch control size" description="Size of the on-screen touch navigation buttons.">
+      <SettingRow
+        label="Touch control size"
+        description="Size of the on-screen touch navigation buttons."
+      >
         <SegmentedControl
           :model-value="config.touchControlSize"
-          :options="[{value:'small',label:'Small'},{value:'medium',label:'Medium'},{value:'large',label:'Large'}]"
+          :options="[
+            { value: 'small', label: 'Small' },
+            { value: 'medium', label: 'Medium' },
+            { value: 'large', label: 'Large' },
+          ]"
           aria-label="Touch control size"
           @update:model-value="v => emit('update:config', { touchControlSize: v })"
         />

@@ -13,15 +13,13 @@
  * @returns {{top:number, height:number, atBottom:boolean}}
  */
 export function resolveScrollView({ container, win, doc }) {
-  const paneScrolls =
-    !!container && container.scrollHeight - container.clientHeight > 1;
+  const paneScrolls = !!container && container.scrollHeight - container.clientHeight > 1;
 
   if (paneScrolls) {
     return {
       top: container.getBoundingClientRect().top,
       height: container.clientHeight,
-      atBottom:
-        container.scrollTop + container.clientHeight >= container.scrollHeight - 4,
+      atBottom: container.scrollTop + container.clientHeight >= container.scrollHeight - 4,
     };
   }
 
@@ -30,8 +28,7 @@ export function resolveScrollView({ container, win, doc }) {
   return {
     top: 0,
     height: win.innerHeight,
-    atBottom:
-      windowScrolls && win.scrollY + win.innerHeight >= doc.scrollHeight - 4,
+    atBottom: windowScrolls && win.scrollY + win.innerHeight >= doc.scrollHeight - 4,
   };
 }
 
