@@ -145,6 +145,16 @@
         />
       </SettingRow>
       <SettingRow
+        label="Tap anywhere to show controls"
+        description="When controls are hidden, tapping the calendar or photos brings them back. Off by default — use the bottom-left corner instead."
+      >
+        <ToggleSwitch
+          :model-value="config.tapAnywhereReveal"
+          aria-label="Tap anywhere to show controls"
+          @update:model-value="v => emit('update:config', { tapAnywhereReveal: v })"
+        />
+      </SettingRow>
+      <SettingRow
         label="Touch controls"
         description="Whether on-screen touch navigation controls are shown."
       >

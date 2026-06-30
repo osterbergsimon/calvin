@@ -255,6 +255,11 @@ export const CONFIG_FIELD_DEFINITIONS = [
     defaultValue: true,
   },
   {
+    name: "tapAnywhereReveal",
+    keys: ["tapAnywhereReveal", "tap_anywhere_reveal"],
+    defaultValue: false,
+  },
+  {
     name: "touchControls",
     keys: ["touchControls", "touch_controls"],
     defaultValue: "auto",
