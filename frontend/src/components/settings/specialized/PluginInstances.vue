@@ -1,102 +1,71 @@
 <template>
-  <div class="plugin-instances">
-    <div class="instances-header">
-      <h4 class="config-section-title">
+  <div class="pi-wrap">
+    <div class="pi-header">
+      <h4 class="pi-title">
         {{ instanceLabelPlural }}
-        <span v-if="instances.length > 0" class="instance-count"> ({{ instances.length }}) </span>
+        <span v-if="instances.length > 0" class="pi-count">{{ instances.length }}</span>
       </h4>
-      <button
-        class="btn-add-instance"
-        :title="`Add new ${instanceLabel}`"
-        @click="$emit('add-instance')"
-      >
-        + Add {{ instanceLabel }}
+      <button type="button" class="pi-btn-add" @click="$emit('add-instance')">
+        + Add {{ instanceLabel.toLowerCase() }}
       </button>
     </div>
 
-    <div v-if="instances.length === 0" class="empty-instances">
-      <p class="help-text">
-        No {{ instanceLabelPlural.toLowerCase() }} configured. Click "Add {{ instanceLabel }}" to
-        create one.
-      </p>
-    </div>
+    <p v-if="instances.length === 0" class="pi-empty">
+      No {{ instanceLabelPlural.toLowerCase() }} yet. Add one to get started.
+    </p>
 
-    <div v-else class="instances-list">
-      <draggable
-        :model-value="instances"
-        :animation="200"
-        handle=".instance-drag-handle"
-        item-key="id"
-        @update:model-value="handleOrderChange"
-      >
-        <template #item="{ element: instance }">
-          <div class="instance-item" :class="{ disabled: !instance.enabled }">
-            <div class="instance-info">
-              <div class="instance-header">
-                <span class="instance-drag-handle" title="Drag to reorder"> ⋮⋮ </span>
-                <span
-                  v-if="instance.running !== undefined"
-                  class="running-indicator"
-                  :class="{
-                    running: instance.running,
-                    stopped: !instance.running,
-                  }"
-                  :title="
-                    instance.running ? '● Green: Instance is running' : '○ Red: Instance is stopped'
-                  "
-                >
-                  {{ instance.running ? "●" : "○" }}
-                </span>
-                <h5>{{ instance.name }}</h5>
-              </div>
-              <div
-                v-if="getInstanceSummary && getInstanceSummary(instance)"
-                class="instance-details"
-              >
-                <div class="instance-detail-item">
-                  <span class="instance-detail-value">{{ getInstanceSummary(instance) }}</span>
-                </div>
-              </div>
-            </div>
-            <div class="instance-actions">
-              <label
-                class="toggle-switch-small"
-                :title="
-                  instance.enabled ? 'Disable and stop instance' : 'Enable and start instance'
-                "
-              >
-                <input
-                  type="checkbox"
-                  :checked="instance.enabled"
-                  @change="handleToggle(instance.id, $event.target.checked)"
-                />
-                <span class="slider-small" />
-              </label>
-              <button
-                class="btn-icon-only btn-action"
-                title="Edit instance"
-                @click="$emit('edit-instance', instance)"
-              >
-                ✏️
-              </button>
-              <button
-                class="btn-icon-only btn-action btn-action-danger"
-                title="Delete instance"
-                @click="handleDelete(instance.id, instance.name)"
-              >
-                🗑️
-              </button>
-            </div>
+    <draggable
+      v-else
+      class="pi-list"
+      :model-value="instances"
+      :animation="200"
+      handle=".pi-drag"
+      item-key="id"
+      @update:model-value="handleOrderChange"
+    >
+      <template #item="{ element: instance }">
+        <div class="pi-item" :class="{ 'pi-item--off': !instance.enabled }">
+          <span class="pi-drag" title="Drag to reorder" aria-hidden="true">⠿</span>
+          <span
+            v-if="instance.running !== undefined"
+            class="pi-dot"
+            :class="instance.running ? 'pi-dot--on' : 'pi-dot--off'"
+            :title="instance.running ? 'Running' : 'Stopped'"
+          />
+          <div class="pi-info">
+            <span class="pi-name">{{ instance.name }}</span>
+            <span
+              v-if="getInstanceSummary && getInstanceSummary(instance)"
+              class="pi-summary"
+              >{{ getInstanceSummary(instance) }}</span
+            >
           </div>
-        </template>
-      </draggable>
-    </div>
+          <ToggleSwitch
+            :model-value="!!instance.enabled"
+            :aria-label="`Enable ${instance.name}`"
+            @update:model-value="v => handleToggle(instance.id, v)"
+          />
+          <button type="button" class="pi-action" title="Edit" @click="$emit('edit-instance', instance)">
+            Edit
+          </button>
+          <button
+            type="button"
+            class="pi-action pi-action--danger"
+            title="Delete"
+            @click="handleDelete(instance.id, instance.name)"
+          >
+            Delete
+          </button>
+        </div>
+      </template>
+    </draggable>
   </div>
 </template>
 
 <script setup>
 import { computed } from "vue";
 import draggable from "vuedraggable";
+import ToggleSwitch from "@/components/ui/ToggleSwitch.vue";
 
 const props = defineProps({
   plugin: {
@@ -123,8 +92,8 @@ const emit = defineEmits([
 ]);
 
 const instanceLabelMap = {
-  calendar: "Calendar Source",
-  image: "Image Source",
+  calendar: "Source",
+  image: "Source",
   backend: "Instance",
   service: "Instance",
 };
@@ -138,239 +107,172 @@ const instanceLabelPlural = computed(() => {
   return label.endsWith("s") ? label : label + "s";
 });
 
-const handleToggle = (instanceId, enabled) => {
-  emit("toggle-instance", instanceId, enabled);
-};
+const handleToggle = (instanceId, enabled) => emit("toggle-instance", instanceId, enabled);
 
 const handleDelete = (instanceId, instanceName) => {
   if (!confirm(`Delete "${instanceName}"? This cannot be undone.`)) return;
   emit("delete-instance", instanceId);
 };
 
-const handleOrderChange = newOrder => {
-  emit("order-change", newOrder);
-};
+const handleOrderChange = newOrder => emit("order-change", newOrder);
 </script>
 
 <style scoped>
-.plugin-instances {
-  margin-top: 1.5rem;
-  padding-top: 1.5rem;
-  border-top: 1px solid var(--line);
+/* Spacing/divider is owned by the parent (.pc-body) so a plugin with no global
+   settings doesn't get a floating divider above its instance list. */
+.pi-wrap {
+  margin-top: 0;
 }
 
-.instances-header {
+.pi-header {
   display: flex;
   justify-content: space-between;
   align-items: center;
+  gap: 1rem;
   margin-bottom: 1rem;
 }
-
-.config-section-title {
+.pi-title {
   margin: 0;
-  font-size: 1rem;
-  font-weight: 600;
-  color: var(--ink);
-  font-family: var(--font-ui);
-}
-
-.instance-count {
-  font-weight: normal;
-  color: var(--ink-2);
-  font-size: 0.9rem;
-}
-
-.btn-add-instance {
-  padding: 0.5rem 1rem;
-  min-height: 44px;
-  background: var(--bg-2);
-  color: var(--ink);
-  border: 1px solid var(--line);
-  border-radius: 4px;
-  font-size: 0.875rem;
-  font-family: var(--font-ui);
-  font-weight: 600;
-  cursor: pointer;
-  transition: all 0.2s;
-}
-
-.btn-add-instance:hover {
-  border-color: var(--focus);
-  transform: translateY(-1px);
-  box-shadow: 0 2px 4px var(--shadow);
-}
-
-.btn-add-instance:focus-visible {
-  outline: 2px solid var(--focus);
-  outline-offset: 2px;
-}
-
-.empty-instances {
-  padding: 1rem;
-  text-align: center;
-}
-
-.instances-list {
-  display: flex;
-  flex-direction: column;
-  gap: 0.5rem;
-}
-
-.instance-item {
-  display: flex;
-  justify-content: space-between;
-  align-items: center;
-  padding: 0.75rem;
-  background: var(--bg-2);
-  border: 1px solid var(--line);
-  border-radius: 6px;
-  transition: all 0.2s ease;
-}
-
-.instance-item:hover {
-  border-color: var(--focus);
-  background: var(--bg-2);
-}
-
-.instance-item.disabled {
-  opacity: 0.6;
-}
-
-.instance-info {
-  flex: 1;
-}
-
-.instance-header {
   display: flex;
   align-items: center;
   gap: 0.5rem;
-  margin-bottom: 0.25rem;
-}
-
-.instance-drag-handle {
-  cursor: grab;
-  color: var(--ink-3);
-  font-size: 1rem;
-  user-select: none;
-}
-
-.instance-drag-handle:active {
-  cursor: grabbing;
-}
-
-.running-indicator {
-  font-size: 1rem;
-  line-height: 1;
-}
-
-.running-indicator.running {
-  color: var(--ok);
-}
-
-.running-indicator.stopped {
-  color: var(--err);
-}
-
-.instance-header h5 {
-  margin: 0;
+  font-family: var(--font-ui);
   font-size: 0.95rem;
   font-weight: 600;
   color: var(--ink);
 }
-
-.instance-details {
-  margin-top: 0.25rem;
-}
-
-.instance-detail-item {
-  font-size: 0.85rem;
+.pi-count {
+  font-weight: 500;
+  font-size: 0.8rem;
   color: var(--ink-2);
-}
-
-.instance-actions {
-  display: flex;
-  align-items: center;
-  gap: 0.5rem;
-}
-
-.toggle-switch-small {
-  position: relative;
-  display: inline-block;
-  width: 36px;
-  height: 20px;
-}
-
-.toggle-switch-small input {
-  opacity: 0;
-  width: 0;
-  height: 0;
-}
-
-.slider-small {
-  position: absolute;
-  cursor: pointer;
-  top: 0;
-  left: 0;
-  right: 0;
-  bottom: 0;
-  background-color: var(--ink-3);
-  transition: 0.4s;
-  border-radius: 20px;
-}
-
-.slider-small:before {
-  position: absolute;
-  content: "";
-  height: 14px;
-  width: 14px;
-  left: 3px;
-  bottom: 3px;
-  background-color: white;
-  transition: 0.4s;
-  border-radius: 50%;
-}
-
-input:checked + .slider-small {
-  background-color: var(--focus);
-}
-
-input:checked + .slider-small:before {
-  transform: translateX(16px);
-}
-
-.btn-action {
-  background: var(--bg-2);
+  background: var(--bg-1);
   border: 1px solid var(--line);
-  border-radius: 4px;
-  padding: 0.375rem;
-  min-height: 44px;
-  cursor: pointer;
-  transition: all 0.2s;
+  border-radius: 999px;
+  padding: 0.05rem 0.5rem;
 }
-
-.btn-action:hover {
-  background: var(--bg-2);
+.pi-btn-add {
+  padding: 0.4rem 0.85rem;
+  min-height: 44px;
+  background: var(--bg-1);
+  color: var(--ink);
+  border: 1px solid var(--line);
+  border-radius: 6px;
+  font-family: var(--font-ui);
+  font-size: 0.85rem;
+  font-weight: 500;
+  cursor: pointer;
+  transition: border-color 0.15s;
+}
+.pi-btn-add:hover {
   border-color: var(--focus);
 }
-
-.btn-action:focus-visible {
+.pi-btn-add:focus-visible {
   outline: 2px solid var(--focus);
   outline-offset: 2px;
 }
 
-.btn-action-danger {
-  color: var(--err);
-}
-
-.btn-action-danger:hover {
-  background: color-mix(in srgb, var(--err) 10%, transparent);
-  border-color: var(--err);
-}
-
-.help-text {
+.pi-empty {
   margin: 0;
-  font-size: 0.875rem;
+  padding: 1rem;
+  text-align: center;
+  font-family: var(--font-ui);
+  font-size: 0.85rem;
+  color: var(--ink-3);
+}
+
+.pi-list {
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+}
+.pi-item {
+  display: flex;
+  align-items: center;
+  gap: 0.6rem;
+  padding: 0.6rem 0.85rem;
+  background: var(--bg-1);
+  border: 1px solid var(--line);
+  border-radius: 6px;
+  transition: border-color 0.15s;
+}
+.pi-item:hover {
+  border-color: color-mix(in srgb, var(--focus) 45%, var(--line));
+}
+.pi-item--off {
+  opacity: 0.6;
+}
+.pi-drag {
+  cursor: grab;
+  color: var(--ink-3);
+  font-size: 1rem;
+  line-height: 1;
+  user-select: none;
+}
+.pi-drag:active {
+  cursor: grabbing;
+}
+.pi-dot {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  flex-shrink: 0;
+}
+.pi-dot--on {
+  background: var(--ok);
+}
+.pi-dot--off {
+  background: var(--ink-3);
+}
+.pi-info {
+  display: flex;
+  flex-direction: column;
+  gap: 0.1rem;
+  min-width: 0;
+  flex: 1;
+}
+.pi-name {
+  font-family: var(--font-ui);
+  font-size: 0.9rem;
+  font-weight: 500;
+  color: var(--ink);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.pi-summary {
+  font-family: var(--font-ui);
+  font-size: 0.8rem;
+  color: var(--ink-3);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.pi-action {
+  padding: 0.35rem 0.7rem;
+  min-height: 44px;
+  background: transparent;
   color: var(--ink-2);
-  line-height: 1.4;
+  border: 1px solid var(--line);
+  border-radius: 6px;
+  font-family: var(--font-ui);
+  font-size: 0.8rem;
+  font-weight: 500;
+  cursor: pointer;
+  transition:
+    border-color 0.15s,
+    color 0.15s;
+}
+.pi-action:hover {
+  border-color: var(--focus);
+  color: var(--ink);
+}
+.pi-action:focus-visible {
+  outline: 2px solid var(--focus);
+  outline-offset: 2px;
+}
+.pi-action--danger:hover {
+  border-color: var(--err);
+  color: var(--err);
+  background: color-mix(in srgb, var(--err) 8%, transparent);
 }
 </style>
