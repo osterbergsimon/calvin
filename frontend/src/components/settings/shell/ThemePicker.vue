@@ -1,6 +1,7 @@
 <template>
   <div class="theme-picker" ref="rootEl">
     <button
+      ref="triggerEl"
       type="button"
       class="theme-picker__trigger"
       :aria-expanded="open ? 'true' : 'false'"
@@ -11,7 +12,14 @@
       <span class="theme-picker__label">{{ selectedThemeName }}</span>
       <span class="theme-picker__chevron" aria-hidden="true">▾</span>
     </button>
-    <div v-if="open" class="theme-picker__popover" role="dialog" aria-label="Choose theme">
+    <div
+      v-if="open"
+      class="theme-picker__popover"
+      :class="{ 'theme-picker__popover--up': openUp }"
+      :style="popoverStyle"
+      role="dialog"
+      aria-label="Choose theme"
+    >
       <ThemeSelector
         :themes="themes"
         :selected-theme-id="selectedThemeId"
@@ -35,9 +43,27 @@ const props = defineProps({
 const emit = defineEmits(["select"]);
 
 const rootEl = ref(null);
+const triggerEl = ref(null);
 const open = ref(false);
+const openUp = ref(false);
+const popoverStyle = ref({});
 const themes = ref([]);
 const loading = ref(false);
+
+// Size + place the popover against the available viewport space so the theme
+// list never runs off the bottom of a short screen: cap its height to the room
+// below the trigger, or flip it upward when there's clearly more room above.
+const placePopover = () => {
+  const el = triggerEl.value;
+  if (!el) return;
+  const r = el.getBoundingClientRect();
+  const margin = 16;
+  const spaceBelow = window.innerHeight - r.bottom - margin;
+  const spaceAbove = r.top - margin;
+  const up = spaceBelow < 240 && spaceAbove > spaceBelow;
+  openUp.value = up;
+  popoverStyle.value = { maxHeight: `${Math.max(160, Math.round(up ? spaceAbove : spaceBelow))}px` };
+};
 
 const selectedThemeName = computed(() => {
   if (!props.selectedThemeId || themes.value.length === 0) return "Theme";
@@ -81,6 +107,7 @@ const onDocKeydown = event => {
 };
 
 const openPopover = () => {
+  placePopover();
   open.value = true;
   document.addEventListener("click", onDocClick, true);
   document.addEventListener("keydown", onDocKeydown);
@@ -165,6 +192,18 @@ onUnmounted(() => {
   border: 1px solid var(--line);
   border-radius: 12px;
   box-shadow: 0 12px 32px var(--shadow);
+  /* max-height is set inline from the available viewport space (placePopover);
+     this is the fallback cap. The list scrolls inside the popover so it never
+     runs off the bottom of a short screen. */
+  max-height: min(60vh, 26rem);
+  overflow-y: auto;
+  overscroll-behavior: contain;
+}
+
+/* Flip above the trigger when there's more room there. */
+.theme-picker__popover--up {
+  top: auto;
+  bottom: calc(100% + 8px);
 }
 
 @media (prefers-reduced-motion: no-preference) {
