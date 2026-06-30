@@ -80,7 +80,8 @@
       "calendar-event-bg": "#0066cc",
       "calendar-event-text": "#ffffff",
       "indicator-bg": "rgba(0, 102, 204, 0.7)",
-      "indicator-border": "rgba(255, 255, 255, 0.3)"
+      "indicator-border": "rgba(255, 255, 255, 0.3)",
+      "focus": "#0066cc"
     },
     "dark_mode": {
       "bg-primary": "#0a1a24",
@@ -101,7 +102,8 @@
       "calendar-event-bg": "#4da6ff",
       "calendar-event-text": "#ffffff",
       "indicator-bg": "rgba(77, 166, 255, 0.2)",
-      "indicator-border": "rgba(255, 255, 255, 0.4)"
+      "indicator-border": "rgba(255, 255, 255, 0.4)",
+      "focus": "#4da6ff"
     }
   },
   "forest": {
@@ -129,7 +131,8 @@
       "calendar-event-bg": "#228b22",
       "calendar-event-text": "#ffffff",
       "indicator-bg": "rgba(34, 139, 34, 0.7)",
-      "indicator-border": "rgba(255, 255, 255, 0.3)"
+      "indicator-border": "rgba(255, 255, 255, 0.3)",
+      "focus": "#228b22"
     },
     "dark_mode": {
       "bg-primary": "#0a1a0a",
@@ -150,7 +153,8 @@
       "calendar-event-bg": "#4ade4a",
       "calendar-event-text": "#ffffff",
       "indicator-bg": "rgba(74, 222, 74, 0.2)",
-      "indicator-border": "rgba(255, 255, 255, 0.4)"
+      "indicator-border": "rgba(255, 255, 255, 0.4)",
+      "focus": "#4ade4a"
     }
   },
   "sunset": {
@@ -178,7 +182,8 @@
       "calendar-event-bg": "#ff8c00",
       "calendar-event-text": "#ffffff",
       "indicator-bg": "rgba(255, 140, 0, 0.7)",
-      "indicator-border": "rgba(255, 255, 255, 0.3)"
+      "indicator-border": "rgba(255, 255, 255, 0.3)",
+      "focus": "#ff8c00"
     },
     "dark_mode": {
       "bg-primary": "#1a0a0a",
@@ -199,8 +204,8 @@
       "calendar-event-bg": "#ffb366",
       "calendar-event-text": "#ffffff",
       "indicator-bg": "rgba(255, 179, 102, 0.2)",
-      "indicator-border": "rgba(255, 255, 255, 0.4)"
+      "indicator-border": "rgba(255, 255, 255, 0.4)",
+      "focus": "#ffb366"
     }
   }
 }
-
