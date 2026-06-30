@@ -381,7 +381,10 @@ const lightActive = computed(() => {
 });
 
 const onFocusRegion = regionId => {
-  if (typeof configStore.showUITemporarily === "function") {
+  // Focusing a region (for the focus-light / touch nav) must not bring the
+  // chrome back while the UI is hidden — the hot corner is the deliberate
+  // reveal. Only tap-anywhere opt-in re-shows the UI on a content tap.
+  if (configStore.tapAnywhereReveal && typeof configStore.showUITemporarily === "function") {
     configStore.showUITemporarily(60);
   }
   focusRegion(regionId);

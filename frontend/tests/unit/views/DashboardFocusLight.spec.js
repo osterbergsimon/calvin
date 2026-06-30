@@ -76,12 +76,27 @@ describe("Dashboard focus-light", () => {
     expect(w.find(".region-stub").attributes("data-light")).toBe("false");
   });
 
-  it("tap calls showUITemporarily + focusRegion", async () => {
+  it("a content tap focuses the region but does NOT reveal the UI by default (calvin-hgy)", async () => {
+    const reveal = vi.fn();
     const w = setup(s => {
       s.focusLightMode = "interaction";
-      s.showUITemporarily = vi.fn();
+      s.showUITemporarily = reveal;
+      // default: tapAnywhereReveal is false
     });
     await w.find(".region-stub").trigger("click");
     expect(focusRegion).toHaveBeenCalledWith("cal");
+    expect(reveal).not.toHaveBeenCalled();
+  });
+
+  it("a content tap reveals the UI when tap-anywhere is opted in", async () => {
+    const reveal = vi.fn();
+    const w = setup(s => {
+      s.focusLightMode = "interaction";
+      s.showUITemporarily = reveal;
+      s.tapAnywhereReveal = true;
+    });
+    await w.find(".region-stub").trigger("click");
+    expect(focusRegion).toHaveBeenCalledWith("cal");
+    expect(reveal).toHaveBeenCalledWith(60);
   });
 });
