@@ -1,7 +1,7 @@
 <template>
-  <section :class="panelClasses">
+  <FocusPanel as="section" :focused="focused" :dim="dim" :class="panelClasses">
     <header v-if="showPanelHeader" class="dashboard-panel__header">
-      <div class="dashboard-panel__title-group">
+      <div v-if="titleShown" class="dashboard-panel__title-group">
         <h2 class="dashboard-panel__title">{{ title }}</h2>
         <p v-if="subtitle" class="dashboard-panel__subtitle">{{ subtitle }}</p>
       </div>
@@ -12,12 +12,13 @@
     <div class="dashboard-panel__body">
       <slot />
     </div>
-  </section>
+  </FocusPanel>
 </template>
 
 <script setup>
 import { computed } from "vue";
 import { useConfigStore } from "../stores/config";
+import FocusPanel from "./ui/FocusPanel.vue";
 
 const props = defineProps({
   title: {
@@ -37,10 +38,23 @@ const props = defineProps({
     type: Boolean,
     default: true,
   },
+  showTitle: {
+    type: Boolean,
+    default: true,
+  },
+  focused: {
+    type: Boolean,
+    default: false,
+  },
+  dim: {
+    type: Boolean,
+    default: false,
+  },
 });
 
 const configStore = useConfigStore();
 
+const titleShown = computed(() => props.showTitle && !!props.title);
 const showPanelHeader = computed(() => props.headerVisible && configStore.shouldShowUI);
 const panelClasses = computed(() => [
   "dashboard-panel",
@@ -58,24 +72,28 @@ const panelClasses = computed(() => [
   display: flex;
   flex-direction: column;
   overflow: hidden;
-  background: var(--bg-primary);
-  border-radius: 8px;
 }
 
-.dashboard-panel--media {
-  background: #000;
+.dashboard-panel--media .dashboard-panel__body {
+  background: var(--bg-0);
 }
 
 .dashboard-panel__header {
-  min-height: 72px;
-  padding: 1rem;
+  min-height: 0;
+  /* Slim: no large title bar. Collapses to nothing when it holds no title
+     and no controls (the actions slot is empty); grows to fit the ~46px
+     touch controls when they appear on the focused region. */
+  padding: 0.5rem 0.75rem;
   flex-shrink: 0;
   display: flex;
   align-items: center;
+  justify-content: flex-end;
+  gap: 0.75rem;
+  background: transparent;
+}
+/* When a title IS shown, space it opposite the controls. */
+.dashboard-panel__header:has(.dashboard-panel__title-group) {
   justify-content: space-between;
-  gap: 1rem;
-  background: var(--bg-secondary);
-  border-bottom: 1px solid var(--border-color);
 }
 
 .dashboard-panel__title-group {
@@ -87,7 +105,8 @@ const panelClasses = computed(() => [
 
 .dashboard-panel__title {
   margin: 0;
-  color: var(--text-primary);
+  color: var(--ink);
+  font-family: var(--font-display);
   font-size: 1.5rem;
   font-weight: 700;
   line-height: 1.2;
@@ -98,7 +117,7 @@ const panelClasses = computed(() => [
 
 .dashboard-panel__subtitle {
   margin: 0;
-  color: var(--text-secondary);
+  color: var(--ink-2);
   font-size: 0.85rem;
   font-weight: 500;
   line-height: 1.25;

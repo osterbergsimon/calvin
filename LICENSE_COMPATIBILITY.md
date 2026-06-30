@@ -22,6 +22,27 @@ Checked with `license-checker` tool:
 - CC0-1.0: Compatible (public domain equivalent)
 - BlueOak-1.0.0: Compatible (permissive license)
 
+## Bundled Fonts (Web Fonts)
+
+The redesign ships self-hosted web fonts (offline-first; no runtime CDN). All are
+**SIL Open Font License 1.1 (OFL-1.1)**, delivered via `@fontsource/*` npm packages
+(unmodified upstream Google Fonts builds, `latin` + `latin-ext` subsets):
+
+| Font | Role | License |
+|---|---|---|
+| IBM Plex Sans / Sans Condensed / Mono | Instrument theme (default) | OFL-1.1 |
+| Space Grotesk | Marquee theme (display) | OFL-1.1 |
+| Inter | Marquee theme (UI) | OFL-1.1 |
+| JetBrains Mono | Marquee/Station theme (data) | OFL-1.1 |
+| Schibsted Grotesk | Station theme | OFL-1.1 |
+
+- ✅ **OFL-1.1 is compatible with GPLv3** (listed as GPL-compatible by the FSF).
+  OFL applies only to the font files and does not affect the GPLv3 status of the
+  application code.
+- **Obligation met:** each `@fontsource` package bundles its OFL `LICENSE`; these
+  notices are vendored into the distribution (see `frontend/src/assets/fonts/LICENSES/`).
+- Fonts are not sold or distributed standalone (OFL's only prohibition).
+
 ## License Breakdown
 
 ### Backend

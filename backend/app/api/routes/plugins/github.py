@@ -15,6 +15,7 @@ from app.api.routes.plugins.management import _validate_just_installed_plugin
 from app.api.routes.plugins.themes import _register_theme_in_db
 from app.config import settings
 from app.plugins.loader import plugin_loader
+from app.plugins.registry.loader import load_plugin_types_for_single
 from app.services.plugin_installer import plugin_installer
 from app.services.theme_installer import theme_installer
 
@@ -312,13 +313,17 @@ async def install_plugin_from_github(request: dict[str, Any] = Body(...)):
                     raise HTTPException(status_code=400, detail=detail)
 
                 actual_branch = "master" if branch_switched else branch
+                # Register the plugin type now so it appears without a restart.
+                await load_plugin_types_for_single(manifest["id"])
                 return {
                     "success": True,
                     "message": f"Plugin {manifest['id']} installed successfully from {repo_url}",
                     "manifest": manifest,
                     "branch": actual_branch,
                     "branch_switched": branch_switched,
-                    "requires_restart": True,
+                    "requires_restart": manifest.get("requirements", {}).get(
+                        "restart_required", False
+                    ),
                     "frontend_rebuild_in_progress": False,
                 }
             else:
@@ -506,11 +511,12 @@ async def install_plugin_from_local(request: dict[str, Any] = Body(...)):
                 )
                 raise HTTPException(status_code=400, detail=detail)
 
+            await load_plugin_types_for_single(manifest["id"])
             return {
                 "success": True,
                 "message": f"Plugin {manifest['id']} installed successfully",
                 "manifest": manifest,
-                "requires_restart": True,
+                "requires_restart": manifest.get("requirements", {}).get("restart_required", False),
                 "frontend_rebuild_in_progress": False,
             }
         else:

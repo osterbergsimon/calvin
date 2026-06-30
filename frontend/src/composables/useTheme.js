@@ -77,6 +77,19 @@ export function useTheme() {
           root.style.setProperty(`--${key}`, value);
         }
       }
+
+      // The focus-light glow stays Calvin's signature amber unless a theme opts
+      // in by setting `focus` explicitly. Neutral themes (Light/Dark) keep amber;
+      // expressive themes (Ocean, Forest, Sunset) ship their own focus hue.
+      // --focus-edge/--focus-glow derive from --focus in theme.css.
+      const explicitFocus =
+        (theme.dark_mode && isDark.value && theme.dark_mode.focus) || variables.focus;
+      if (explicitFocus) {
+        root.style.setProperty("--focus", explicitFocus);
+      } else {
+        // Clear any focus left by a previously-selected theme → back to amber.
+        root.style.removeProperty("--focus");
+      }
     } catch (err) {
       console.error(`Failed to apply custom theme ${themeId}:`, err);
     }
@@ -97,11 +110,9 @@ export function useTheme() {
     if (selectedThemeId.value) {
       await applyCustomTheme(selectedThemeId.value);
     } else {
-      // Reset to default theme variables (from theme.css)
-      // This is handled by the CSS file, but we can explicitly reset if needed
-      const _root = document.documentElement;
-      // Remove any custom theme variables that might have been set
-      // The default theme.css will take over
+      // No custom theme: clear the theme-applied accent override so the default
+      // (amber, from theme.css) focus accent applies again.
+      document.documentElement.style.removeProperty("--focus");
     }
   };
 

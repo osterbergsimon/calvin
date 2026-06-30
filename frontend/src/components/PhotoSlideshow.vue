@@ -1,28 +1,28 @@
 <template>
   <div class="photo-slideshow" :class="{ fullscreen: isFullscreen }">
-    <DashboardPanel title="Photos" variant="media" :header-visible="!isFullscreen">
+    <button
+      v-if="isFullscreen && isTouch"
+      type="button"
+      class="fs-close"
+      data-action="exit-fullscreen"
+      aria-label="Exit fullscreen"
+      @click="handleAction('photos_exit_fullscreen')"
+    >
+      ✕
+    </button>
+    <DashboardPanel
+      title="Photos"
+      variant="media"
+      :show-title="false"
+      :header-visible="!isFullscreen"
+      :focused="focused"
+      :dim="dim"
+    >
       <template #actions>
-        <div class="slideshow-controls">
-          <div v-if="imagesStore.error" class="error-message">
-            {{ imagesStore.error }}
-          </div>
-          <button
-            v-if="sourceImages.length > 1"
-            class="dashboard-panel__icon-button"
-            title="Previous image"
-            @click="imagesStore.previousImage(sourceIds)"
-          >
-            ‹
-          </button>
-          <button
-            v-if="sourceImages.length > 1"
-            class="dashboard-panel__icon-button"
-            title="Next image"
-            @click="imagesStore.nextImage(sourceIds)"
-          >
-            ›
-          </button>
+        <div v-if="imagesStore.error" class="error-message">
+          {{ imagesStore.error }}
         </div>
+        <RegionControls v-if="focused" region-kind="photos" />
       </template>
 
       <div class="slideshow-content">
@@ -55,10 +55,23 @@ import { computed, onMounted, onUnmounted, watch } from "vue";
 import { useImagesStore } from "../stores/images";
 import { useConfigStore } from "../stores/config";
 import DashboardPanel from "./DashboardPanel.vue";
+import RegionControls from "./dashboard/RegionControls.vue";
+import { useKeyboardActions } from "@/composables/useKeyboardActions";
+import { useTouchCapability } from "@/composables/useTouchCapability";
 
 const configStore = useConfigStore();
+const { handleAction } = useKeyboardActions();
+const { isTouch } = useTouchCapability();
 
 const props = defineProps({
+  focused: {
+    type: Boolean,
+    default: false,
+  },
+  dim: {
+    type: Boolean,
+    default: false,
+  },
   isFullscreen: {
     type: Boolean,
     default: false,
@@ -219,10 +232,35 @@ watch(sourceKey, async () => {
   flex-direction: column;
   background: #000;
   border-radius: 8px;
-  overflow: hidden;
+  overflow: visible; /* let the focused panel glow bloom out */
   min-height: 0;
   min-width: 0;
   box-sizing: border-box;
+  position: relative;
+}
+
+.fs-close {
+  position: absolute;
+  top: 1rem;
+  right: 1rem;
+  z-index: 6;
+  width: 46px;
+  height: 46px;
+  background: var(--bg-2);
+  color: var(--ink);
+  border: 1px solid var(--line);
+  border-radius: 50%;
+  font-size: 1.25rem;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transition: opacity 0.2s;
+}
+
+.fs-close:focus-visible {
+  outline: 2px solid var(--focus);
+  outline-offset: 2px;
 }
 
 .photo-slideshow.fullscreen {

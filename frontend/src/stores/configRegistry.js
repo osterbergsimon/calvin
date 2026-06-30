@@ -92,6 +92,7 @@ export const CONFIG_FIELD_DEFINITIONS = [
     keys: ["calendarViewMode", "calendar_view_mode"],
     defaultValue: "month",
   },
+  { name: "calendarWeeks", keys: ["calendarWeeks", "calendar_weeks"], defaultValue: 4 },
   {
     name: "calendarRefreshInterval",
     keys: ["calendarRefreshInterval", "calendar_refresh_interval"],
@@ -234,6 +235,36 @@ export const CONFIG_FIELD_DEFINITIONS = [
     defaultValue: true,
   },
   {
+    name: "displayName",
+    keys: ["displayName", "display_name"],
+    defaultValue: "",
+  },
+  {
+    name: "focusLightMode",
+    keys: ["focusLightMode", "focus_light_mode"],
+    defaultValue: "interaction",
+  },
+  {
+    name: "focusLightDimOthers",
+    keys: ["focusLightDimOthers", "focus_light_dim_others"],
+    defaultValue: true,
+  },
+  {
+    name: "regionsLocked",
+    keys: ["regionsLocked", "regions_locked"],
+    defaultValue: true,
+  },
+  {
+    name: "touchControls",
+    keys: ["touchControls", "touch_controls"],
+    defaultValue: "auto",
+  },
+  {
+    name: "touchControlSize",
+    keys: ["touchControlSize", "touch_control_size"],
+    defaultValue: "medium",
+  },
+  {
     name: "mealPlanCardSize",
     keys: ["mealPlanCardSize", "meal_plan_card_size"],
     defaultValue: "medium",
@@ -254,6 +285,11 @@ export const CONFIG_FIELD_DEFINITIONS = [
     defaultValue: 30,
   },
   { name: "devMode", keys: ["devMode", "dev_mode"], defaultValue: false },
+  {
+    name: "pluginRepositoryUrl",
+    keys: ["pluginRepositoryUrl", "plugin_repository_url"],
+    defaultValue: "https://github.com/osterbergsimon/calvin-plugins",
+  },
 ];
 
 export const getConfigPayloadValue = (payload, field) => {

@@ -205,4 +205,26 @@ describe("ClockBarHorizontal", () => {
     expect(timeElement.exists()).toBe(true);
     expect(timeElement.attributes("style")).toContain("font-size: 24px");
   });
+
+  it("shows the room label when displayName is set", () => {
+    const store = useConfigStore();
+    store.showUI = true;
+    store.displayName = "Vardagsrummet";
+    const wrapper = mount(ClockBarHorizontal, {
+      props: { position: "top", showInNonKiosk: true, showInKiosk: false, enabled: true },
+      global: { stubs: { BarActionCluster: true } },
+    });
+    expect(wrapper.text()).toContain("Vardagsrummet");
+  });
+
+  it("hides the room label when displayName is empty", () => {
+    const store = useConfigStore();
+    store.showUI = true;
+    store.displayName = "";
+    const wrapper = mount(ClockBarHorizontal, {
+      props: { position: "top", showInNonKiosk: true, showInKiosk: false, enabled: true },
+      global: { stubs: { BarActionCluster: true } },
+    });
+    expect(wrapper.find(".clock-bar-room").exists()).toBe(false);
+  });
 });

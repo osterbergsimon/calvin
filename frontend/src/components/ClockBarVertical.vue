@@ -9,7 +9,14 @@
     aria-live="polite"
   >
     <div class="clock-bar-top">
-      <BarLogo v-if="showLogo" />
+      <BarLogo v-if="showLogo" vertical />
+      <ScreenDots
+        v-if="!previewMode"
+        vertical
+        :screens="screens"
+        :active-screen-id="activeScreenId"
+        @select-screen="activateScreen"
+      />
     </div>
 
     <div class="clock-bar-middle">
@@ -74,8 +81,11 @@
 import { computed } from "vue";
 import { useClockBar } from "../composables/useClockBar";
 import { useConfigStore } from "../stores/config";
+import { useKeyboardActions } from "../composables/useKeyboardActions";
+import { normalizeDashboardScreens, getActiveDashboardScreen } from "../utils/layout";
 import BarActionCluster from "./BarActionCluster.vue";
 import BarLogo from "./BarLogo.vue";
+import ScreenDots from "./ui/ScreenDots.vue";
 import PluginStatusbarItems from "./PluginStatusbarItems.vue";
 
 defineOptions({
@@ -151,6 +161,11 @@ const showLogo = computed(() => configStore.clockBarShowLogo !== false);
 const isCompactLayout = computed(
   () => layout.value === "compact-time" || layout.value === "compact-time-date"
 );
+
+const { activateScreen } = useKeyboardActions();
+const screensConfig = computed(() => normalizeDashboardScreens(configStore.dashboardScreens));
+const screens = computed(() => screensConfig.value.screens);
+const activeScreenId = computed(() => getActiveDashboardScreen(screensConfig.value)?.id ?? null);
 </script>
 
 <style scoped>
@@ -158,8 +173,8 @@ const isCompactLayout = computed(
   height: 100%;
   width: auto;
   min-width: fit-content;
-  background: var(--bg-secondary);
-  border-right: 1px solid var(--border-color);
+  background: var(--bg-1);
+  border-right: 1px solid var(--line);
   display: flex;
   flex-direction: column;
   align-items: stretch;
@@ -173,7 +188,7 @@ const isCompactLayout = computed(
 }
 
 .clock-bar-vertical.position-right {
-  border-left: 1px solid var(--border-color);
+  border-left: 1px solid var(--line);
   border-right: none;
 }
 
@@ -217,7 +232,6 @@ const isCompactLayout = computed(
   align-items: center;
   justify-content: center;
   gap: 0.35rem;
-  font-family: "Courier New", monospace;
   white-space: nowrap;
   text-align: center;
 }
@@ -270,17 +284,21 @@ const isCompactLayout = computed(
 
 .compact-date-year {
   font-size: 0.78em;
-  color: var(--text-secondary);
+  color: var(--ink-2);
 }
 
 .clock-time {
+  font-family: var(--font-display);
+  font-variant-numeric: tabular-nums lining-nums;
   font-weight: 600;
-  color: var(--text-primary);
+  color: var(--ink);
   line-height: 1.1;
 }
 
 .clock-date {
-  color: var(--text-secondary);
+  font-family: var(--font-data);
+  font-variant-numeric: tabular-nums lining-nums;
+  color: var(--ink-2);
   line-height: 1.1;
 }
 

@@ -4,6 +4,7 @@
     <div v-if="isFullscreen" class="fullscreen-close-overlay">
       <button
         class="btn-close-fullscreen"
+        data-action="exit-fullscreen"
         title="Close Fullscreen (ESC)"
         @click.stop="handleCloseFullscreen"
       >
@@ -13,7 +14,17 @@
 
     <!-- Viewer Content -->
     <div class="viewer-content">
-      <DashboardPanel v-if="emptyState" title="Web Services" :header-visible="!isFullscreen">
+      <DashboardPanel
+        v-if="emptyState"
+        title="Web Services"
+        :show-title="false"
+        :header-visible="!isFullscreen"
+        :focused="focused"
+        :dim="dim"
+      >
+        <template #actions>
+          <RegionControls v-if="focused" region-kind="service" />
+        </template>
         <div :class="emptyState.className">
           <div v-if="emptyState.loading" class="spinner" />
           <p>{{ emptyState.message }}</p>
@@ -28,10 +39,12 @@
           :service="currentService"
           :subtitle="serviceSubtitle"
           :header-visible="!isFullscreen"
+          :focused="focused"
         >
           <template #actions>
+            <RegionControls v-if="focused" region-kind="service" />
             <button
-              v-if="canNavigateServices && services.length > 1"
+              v-if="!isTouch && canNavigateServices && services.length > 1"
               class="dashboard-panel__icon-button"
               title="Previous Service"
               @click="previousService"
@@ -39,7 +52,7 @@
               ‹
             </button>
             <button
-              v-if="canNavigateServices && services.length > 1"
+              v-if="!isTouch && canNavigateServices && services.length > 1"
               class="dashboard-panel__icon-button"
               title="Next Service"
               @click="nextService"
@@ -47,7 +60,7 @@
               ›
             </button>
             <button
-              v-if="!isFullscreen"
+              v-if="!isTouch && !isFullscreen"
               class="dashboard-panel__icon-button"
               title="Enter Fullscreen"
               @click.stop="handleToggleFullscreen"
@@ -75,8 +88,18 @@ import { useWebServicesStore } from "../stores/webServices";
 import { useModeStore } from "../stores/mode";
 import DashboardPanel from "./DashboardPanel.vue";
 import ServiceViewer from "./service/ServiceViewer.vue";
+import RegionControls from "./dashboard/RegionControls.vue";
+import { useTouchCapability } from "@/composables/useTouchCapability";
 
 const props = defineProps({
+  focused: {
+    type: Boolean,
+    default: false,
+  },
+  dim: {
+    type: Boolean,
+    default: false,
+  },
   isFullscreen: {
     type: Boolean,
     default: false,
@@ -86,6 +109,8 @@ const props = defineProps({
     default: null,
   },
 });
+
+const { isTouch } = useTouchCapability();
 
 const webServicesStore = useWebServicesStore();
 const modeStore = useModeStore();
@@ -234,9 +259,9 @@ onUnmounted(() => {
   height: 100%;
   display: flex;
   flex-direction: column;
-  background: var(--bg-primary);
+  background: var(--bg-1);
   border-radius: 8px;
-  overflow: hidden;
+  overflow: visible; /* let the focused panel glow bloom out */
 }
 
 .web-service-viewer.fullscreen {
@@ -252,7 +277,9 @@ onUnmounted(() => {
 .viewer-content {
   flex: 1;
   position: relative;
-  overflow: hidden;
+  /* visible so the focused panel's neon glow can bloom out — the iframe/content
+     is still clipped by the panel body's own overflow:hidden. */
+  overflow: visible;
   min-height: 0;
 }
 
@@ -405,9 +432,9 @@ onUnmounted(() => {
 }
 
 .btn-close-fullscreen {
-  background: rgba(0, 0, 0, 0.7);
-  color: #fff;
-  border: 2px solid rgba(255, 255, 255, 0.5);
+  background: var(--bg-2);
+  color: var(--ink);
+  border: 2px solid var(--line);
   border-radius: 50%;
   width: 48px;
   height: 48px;
@@ -418,13 +445,18 @@ onUnmounted(() => {
   justify-content: center;
   transition: all 0.2s;
   pointer-events: auto;
-  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.3);
+  box-shadow: 0 4px 12px var(--shadow);
 }
 
 .btn-close-fullscreen:hover {
-  background: rgba(0, 0, 0, 0.9);
-  border-color: rgba(255, 255, 255, 0.8);
+  background: var(--bg-1);
+  border-color: var(--ink-2);
   transform: scale(1.1);
+}
+
+.btn-close-fullscreen:focus-visible {
+  outline: 2px solid var(--focus);
+  outline-offset: 2px;
 }
 
 /* API-based Service Styles */

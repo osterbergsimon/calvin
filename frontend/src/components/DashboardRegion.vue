@@ -1,41 +1,60 @@
 <template>
-  <div class="dashboard-region" :class="containerClass">
+  <div class="dashboard-region" :class="containerClass" @click="emit('focus-region', region.id)">
     <template v-if="region.split">
       <div
         v-for="sub in region.split.regions"
         :key="sub.id"
         class="dashboard-subregion"
-        :class="{ 'dashboard-subregion-active': sub.id === activeRegionId }"
+        :class="{ 'dashboard-subregion--lit': isFocused(sub.id) }"
         :style="getSubStyle(sub)"
+        @click.stop="emit('focus-region', sub.id)"
       >
-        <CalendarView v-if="sub.kind === 'calendar'" :source-ids="sub.instanceIds || []" />
+        <CalendarView
+          v-if="sub.kind === 'calendar'"
+          :source-ids="sub.instanceIds || []"
+          :focused="isFocused(sub.id)"
+          :dim="isDim(sub.id)"
+        />
         <PhotoSlideshow
           v-else-if="sub.kind === 'photos'"
           :is-fullscreen="false"
           :auto-rotate="true"
           :rotation-interval="photoRotationInterval * 1000"
           :source-ids="sub.instanceIds || []"
+          :focused="isFocused(sub.id)"
+          :dim="isDim(sub.id)"
         />
         <WebServiceViewer
           v-else-if="sub.kind === 'service'"
           :is-fullscreen="false"
           :service-id="sub.instanceIds?.[0] || sub.serviceId"
+          :focused="isFocused(sub.id)"
+          :dim="isDim(sub.id)"
         />
       </div>
     </template>
     <template v-else>
-      <CalendarView v-if="region.kind === 'calendar'" :source-ids="region.instanceIds || []" />
+      <CalendarView
+        v-if="region.kind === 'calendar'"
+        :source-ids="region.instanceIds || []"
+        :focused="isFocused(region.id)"
+        :dim="isDim(region.id)"
+      />
       <PhotoSlideshow
         v-else-if="region.kind === 'photos'"
         :is-fullscreen="false"
         :auto-rotate="true"
         :rotation-interval="photoRotationInterval * 1000"
         :source-ids="region.instanceIds || []"
+        :focused="isFocused(region.id)"
+        :dim="isDim(region.id)"
       />
       <WebServiceViewer
         v-else-if="region.kind === 'service'"
         :is-fullscreen="false"
         :service-id="region.instanceIds?.[0] || region.serviceId"
+        :focused="isFocused(region.id)"
+        :dim="isDim(region.id)"
       />
     </template>
   </div>
@@ -62,7 +81,20 @@ const props = defineProps({
     type: String,
     default: null,
   },
+  lightActive: {
+    type: Boolean,
+    default: false,
+  },
+  dimOthers: {
+    type: Boolean,
+    default: true,
+  },
 });
+
+const emit = defineEmits(["focus-region"]);
+
+const isFocused = leafId => props.lightActive && leafId === props.activeRegionId;
+const isDim = leafId => props.lightActive && props.dimOthers && leafId !== props.activeRegionId;
 
 const CalendarView = defineAsyncComponent(() => import("./CalendarView.vue"));
 const PhotoSlideshow = defineAsyncComponent(() => import("./PhotoSlideshow.vue"));
@@ -107,12 +139,15 @@ const getSubStyle = sub => {
   min-height: 0;
   display: flex;
   flex-direction: column;
-  outline: 2px solid transparent;
-  outline-offset: -2px;
-  transition: outline-color 0.6s ease;
+  /* Default stacking context so the focused sibling can be raised above its
+     neighbours — otherwise a later sub-region paints over its glow. */
+  position: relative;
+  z-index: 0;
 }
-
-.dashboard-subregion-active {
-  outline-color: var(--accent-primary);
+/* Raise the focused sub-region so its neon glow blooms over adjacent sub-regions
+   instead of being clipped by a later-painted sibling (mirrors the section --lit
+   treatment for top-level regions). */
+.dashboard-subregion--lit {
+  z-index: 3;
 }
 </style>

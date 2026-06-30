@@ -20,6 +20,7 @@ from app.plugins.definitions import PluginDefinition
 from app.plugins.hooks import plugin_manager as hook_manager
 from app.plugins.loader import plugin_loader
 from app.plugins.manager import plugin_manager
+from app.plugins.registry.loader import load_plugin_types_for_single
 from app.services.config_service import config_service
 from app.services.event_system import event_system
 from app.services.plugin_installer import plugin_installer
@@ -400,11 +401,13 @@ async def install_plugin(
                     f"Failed to emit plugin_installed event for plugin {manifest['id']}: {e}"
                 )
 
+            # Register the plugin type now so it appears without a restart.
+            await load_plugin_types_for_single(installed_id)
             return {
                 "success": True,
                 "message": f"Plugin {manifest['id']} installed successfully",
                 "manifest": manifest,
-                "requires_restart": True,
+                "requires_restart": manifest.get("requirements", {}).get("restart_required", False),
                 "frontend_rebuild_in_progress": False,
             }
         except HTTPException:

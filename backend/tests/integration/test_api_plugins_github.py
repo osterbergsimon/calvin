@@ -453,7 +453,7 @@ def create_plugin_instance(
         data = response.json()
         assert data["success"] is True
         assert data["manifest"]["id"] == "github_install_plugin"
-        assert data["requires_restart"] is True
+        assert data["requires_restart"] is False
 
         # Verify plugin is installed
         plugin_path = plugin_installer.get_plugin_path("github_install_plugin")
@@ -613,7 +613,7 @@ def create_plugin_instance(
         assert data["success"] is True
         assert data["manifest"]["id"] == "test_plugin"
         assert data["manifest"]["name"] == "Test Plugin"
-        assert data["requires_restart"] is True
+        assert data["requires_restart"] is False
 
         # Verify plugin is installed
         plugin_path = plugin_installer.get_plugin_path("test_plugin")
@@ -678,6 +678,92 @@ def create_plugin_instance(
         assert test_plugin["path"] == "test-plugin"
         assert test_plugin["version"] == "1.0.0"
         assert test_plugin["type"] == "service"
+
+
+@pytest.mark.integration
+class TestInstallRestartRequired:
+    """Verify that requires_restart in the install response mirrors the manifest."""
+
+    @pytest.fixture
+    def minimal_zip_path(self, tmp_path):
+        """Minimal zip containing a plugin.json so the path-existence check passes."""
+        zip_path = tmp_path / "minimal.zip"
+        with zipfile.ZipFile(zip_path, "w") as zipf:
+            zipf.writestr(
+                "repo-main/myplugin/plugin.json",
+                json.dumps(
+                    {"id": "myplugin", "name": "My Plugin", "version": "1.0.0", "type": "service"}
+                ),
+            )
+        return zip_path
+
+    @pytest.mark.parametrize(
+        "requirements,expected_restart",
+        [
+            ({"restart_required": True}, True),
+            ({"restart_required": False}, False),
+            ({}, False),  # no restart_required key — defaults to False
+        ],
+    )
+    @patch("app.api.routes.plugins.github.load_plugin_types_for_single", new_callable=AsyncMock)
+    @patch("app.api.routes.plugins.github._validate_just_installed_plugin")
+    @patch("app.api.routes.plugins.github.plugin_loader")
+    @patch("app.api.routes.plugins.github.plugin_installer")
+    @patch("httpx.AsyncClient")
+    def test_install_github_plugin_restart_required(
+        self,
+        mock_client_class,
+        mock_plugin_installer,
+        mock_plugin_loader,
+        mock_validate,
+        mock_load_single,
+        requirements,
+        expected_restart,
+        test_client,
+        minimal_zip_path,
+    ):
+        """requires_restart in the response must reflect manifest.requirements.restart_required."""
+        with open(minimal_zip_path, "rb") as f:
+            zip_content = f.read()
+
+        async def mock_get_async(*args, **kwargs):
+            mock_response = MagicMock()
+            mock_response.status_code = 200
+            mock_response.content = zip_content
+            mock_response.raise_for_status = MagicMock()
+            return mock_response
+
+        mock_client = AsyncMock()
+        mock_client.__aenter__ = AsyncMock(return_value=mock_client)
+        mock_client.__aexit__ = AsyncMock(return_value=None)
+        mock_client.get = AsyncMock(side_effect=mock_get_async)
+        mock_client_class.return_value = mock_client
+
+        # Installer returns a manifest whose requirements match the parametrized case.
+        manifest = {"id": "myplugin", "name": "My Plugin", "version": "1.0.0", "type": "service"}
+        if requirements:
+            manifest["requirements"] = requirements
+        mock_plugin_installer.install_plugin_from_repo.return_value = manifest
+        mock_validate.return_value = []
+
+        response = test_client.post(
+            "/api/plugins/github/install",
+            json={
+                "repo_url": "https://github.com/user/repo",
+                "plugin_path": "myplugin",
+                "branch": "main",
+            },
+        )
+
+        if response.status_code == 404:
+            pytest.skip("GitHub install route not available in test client")
+
+        assert response.status_code == 200, (
+            f"Expected 200, got {response.status_code}: {response.json()}"
+        )
+        data = response.json()
+        assert data["success"] is True
+        assert data["requires_restart"] is expected_restart
 
 
 @pytest.mark.integration

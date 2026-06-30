@@ -379,48 +379,50 @@ onMounted(async () => {
   align-items: center;
   gap: 1rem;
   padding: 1rem;
-  background: var(--bg-secondary);
+  background: var(--bg-2);
   border-radius: 6px;
-  border: 1px solid var(--border-color);
+  border: 1px solid var(--line);
   transition: all 0.2s ease;
 }
 
 .mapping-item:hover {
-  border-color: var(--accent-primary);
+  border-color: var(--focus);
   box-shadow: 0 2px 4px var(--shadow);
 }
 
 .mapping-key {
   min-width: 150px;
   font-size: 1rem;
-  color: var(--text-primary);
+  color: var(--ink);
   font-weight: 600;
+  font-family: var(--font-data);
 }
 
 .mapping-action {
   flex: 1;
   padding: 0.5rem 0.75rem;
-  border: 1px solid var(--border-color);
+  border: 1px solid var(--line);
   border-radius: 4px;
   font-size: 0.95rem;
-  background: var(--bg-primary);
-  color: var(--text-primary);
+  font-family: var(--font-ui);
+  background: var(--bg-1);
+  color: var(--ink);
   cursor: pointer;
   transition: all 0.2s ease;
+  min-height: 44px;
 }
 
 .mapping-action:hover {
-  border-color: var(--accent-primary);
+  border-color: var(--focus);
 }
 
-.mapping-action:focus {
-  outline: none;
-  border-color: var(--accent-primary);
-  box-shadow: 0 0 0 2px rgba(33, 150, 243, 0.2);
+.mapping-action:focus-visible {
+  outline: 2px solid var(--focus);
+  outline-offset: 2px;
 }
 
 .btn-clear {
-  background: var(--color-red);
+  background: var(--err);
   color: white;
   border: none;
   border-radius: 4px;
@@ -437,7 +439,7 @@ onMounted(async () => {
 }
 
 .btn-clear:hover {
-  background: var(--color-red-dark);
+  background: color-mix(in srgb, var(--err) 80%, black);
   transform: scale(1.05);
 }
 
@@ -450,42 +452,43 @@ onMounted(async () => {
 }
 
 .loading-message {
-  background: var(--bg-secondary);
-  color: var(--text-secondary);
+  background: var(--bg-2);
+  color: var(--ink-2);
 }
 
 .error-message {
-  background: var(--bg-error);
-  color: var(--color-red);
-  border: 1px solid var(--color-red);
+  background: color-mix(in srgb, var(--err) 12%, var(--bg-1));
+  color: var(--err);
+  border: 1px solid var(--err);
 }
 
 .no-keys-message {
-  background: var(--bg-secondary);
-  color: var(--text-secondary);
+  background: var(--bg-2);
+  color: var(--ink-2);
 }
 
 .keyboard-type-select {
   width: 100%;
   max-width: 400px;
   padding: 0.5rem 0.75rem;
-  border: 1px solid var(--border-color);
+  border: 1px solid var(--line);
   border-radius: 4px;
   font-size: 0.95rem;
-  background: var(--bg-secondary);
-  color: var(--text-primary);
+  font-family: var(--font-ui);
+  background: var(--bg-2);
+  color: var(--ink);
   cursor: pointer;
   transition: all 0.2s ease;
+  min-height: 44px;
 }
 
 .keyboard-type-select:hover {
-  border-color: var(--accent-primary);
+  border-color: var(--focus);
 }
 
-.keyboard-type-select:focus {
-  outline: none;
-  border-color: var(--accent-primary);
-  box-shadow: 0 0 0 2px rgba(33, 150, 243, 0.2);
+.keyboard-type-select:focus-visible {
+  outline: 2px solid var(--focus);
+  outline-offset: 2px;
 }
 
 .add-key-section {
@@ -493,8 +496,8 @@ onMounted(async () => {
   gap: 0.75rem;
   align-items: center;
   padding: 1rem;
-  background: var(--bg-tertiary);
-  border: 1px dashed var(--border-color);
+  background: var(--bg-2);
+  border: 1px dashed var(--line);
   border-radius: 6px;
   margin-bottom: 1rem;
 }
@@ -502,35 +505,38 @@ onMounted(async () => {
 .key-selector {
   flex: 1;
   padding: 0.5rem 0.75rem;
-  border: 1px solid var(--border-color);
+  border: 1px solid var(--line);
   border-radius: 4px;
   font-size: 0.95rem;
-  background: var(--bg-primary);
-  color: var(--text-primary);
+  font-family: var(--font-ui);
+  background: var(--bg-1);
+  color: var(--ink);
   cursor: pointer;
   transition: all 0.2s ease;
+  min-height: 44px;
 }
 
-.key-selector:focus {
-  outline: none;
-  border-color: var(--accent-primary);
-  box-shadow: 0 0 0 2px rgba(33, 150, 243, 0.2);
+.key-selector:focus-visible {
+  outline: 2px solid var(--focus);
+  outline-offset: 2px;
 }
 
 .btn-add-key {
   padding: 0.5rem 1rem;
-  background: var(--accent-primary);
+  background: var(--focus);
   color: white;
-  border: 1px solid var(--accent-primary);
+  border: 1px solid var(--focus);
   border-radius: 4px;
   font-size: 0.95rem;
+  font-family: var(--font-ui);
   font-weight: 500;
   cursor: pointer;
   transition: all 0.2s ease;
+  min-height: 44px;
 }
 
 .btn-add-key:hover {
-  background: var(--accent-dark);
-  border-color: var(--accent-dark);
+  background: color-mix(in srgb, var(--focus) 80%, black);
+  border-color: color-mix(in srgb, var(--focus) 80%, black);
 }
 </style>
