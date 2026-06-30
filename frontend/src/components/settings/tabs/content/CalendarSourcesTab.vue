@@ -78,7 +78,7 @@
           @change="handleColorChange(source.id, $event.target.value)"
         />
         <span class="cst-src-toggle">
-          <span class="cst-src-cap">Times</span>
+          <span class="cst-src-cap">Show times</span>
           <ToggleSwitch
             :model-value="source.show_time !== false"
             :aria-label="`Show event times for ${source.name}`"
@@ -86,7 +86,7 @@
           />
         </span>
         <span class="cst-src-toggle">
-          <span class="cst-src-cap">Shown</span>
+          <span class="cst-src-cap">Enabled</span>
           <ToggleSwitch
             :model-value="!!source.enabled"
             :aria-label="`Show ${source.name} on the dashboard`"
@@ -652,6 +652,7 @@ onMounted(async () => {
   letter-spacing: 0.04em;
   text-transform: uppercase;
   color: var(--ink-3);
+  white-space: nowrap;
 }
 .cst-src-remove {
   width: 34px;
