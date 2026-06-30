@@ -155,7 +155,12 @@ onUnmounted(() => {
   margin: 0;
   padding: var(--space-1, 4px);
   box-shadow: 0 4px 16px var(--shadow);
-  overflow: hidden;
+  /* Cap the results list so a long match set scrolls instead of running off a
+     short screen. The search sits at the top of the pane, so it only opens
+     downward — no upward flip needed. */
+  max-height: min(50vh, 22rem);
+  overflow-y: auto;
+  overscroll-behavior: contain;
 }
 
 .settings-search__result {

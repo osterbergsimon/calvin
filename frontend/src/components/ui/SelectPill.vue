@@ -18,6 +18,8 @@
     <ul
       v-if="open"
       class="pill__menu"
+      :class="{ 'pill__menu--up': openUp }"
+      :style="popoverStyle"
       role="listbox"
       :id="listboxId"
       :aria-activedescendant="activeOptionId"
@@ -43,6 +45,7 @@
 
 <script setup>
 import { ref, computed, onUnmounted, nextTick } from "vue";
+import { usePopoverPlacement } from "@/composables/usePopoverPlacement";
 
 let _counter = 0;
 const listboxId = `selectpill-lb-${++_counter}-${Math.random().toString(36).slice(2, 7)}`;
@@ -60,6 +63,7 @@ const activeIndex = ref(0);
 const rootEl = ref(null);
 const triggerEl = ref(null);
 const optRefs = ref([]);
+const { openUp, popoverStyle, place } = usePopoverPlacement();
 
 const currentLabel = computed(
   () => props.options.find(o => o.value === props.modelValue)?.label ?? ""
@@ -89,6 +93,7 @@ const close = () => {
 const openList = () => {
   const idx = props.options.findIndex(o => o.value === props.modelValue);
   activeIndex.value = idx >= 0 ? idx : 0;
+  place(triggerEl);
   open.value = true;
   nextTick(() => {
     optRefs.value[activeIndex.value]?.focus();
@@ -188,6 +193,14 @@ onUnmounted(() => {
   border: 1px solid var(--line);
   border-radius: 12px;
   box-shadow: 0 12px 32px var(--focus-glow);
+  /* Long option lists scroll inside the menu (max-height set inline from the
+     viewport space) instead of running off a short screen. */
+  overflow-y: auto;
+  overscroll-behavior: contain;
+}
+.pill__menu--up {
+  top: auto;
+  bottom: calc(100% + 6px);
 }
 .pill__opt {
   padding: 12px 14px;
