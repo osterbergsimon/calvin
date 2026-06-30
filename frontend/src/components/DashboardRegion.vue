@@ -94,8 +94,7 @@ const props = defineProps({
 const emit = defineEmits(["focus-region"]);
 
 const isFocused = leafId => props.lightActive && leafId === props.activeRegionId;
-const isDim = leafId =>
-  props.lightActive && props.dimOthers && leafId !== props.activeRegionId;
+const isDim = leafId => props.lightActive && props.dimOthers && leafId !== props.activeRegionId;
 
 const CalendarView = defineAsyncComponent(() => import("./CalendarView.vue"));
 const PhotoSlideshow = defineAsyncComponent(() => import("./PhotoSlideshow.vue"));

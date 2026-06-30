@@ -1,8 +1,24 @@
 <template>
   <div class="stepper" role="group" :aria-label="ariaLabel">
-    <button type="button" class="stepper__btn" data-step="dec" aria-label="Decrease" @click="bump(-step)">−</button>
+    <button
+      type="button"
+      class="stepper__btn"
+      data-step="dec"
+      aria-label="Decrease"
+      @click="bump(-step)"
+    >
+      −
+    </button>
     <span class="stepper__value" aria-live="polite">{{ modelValue }}</span>
-    <button type="button" class="stepper__btn" data-step="inc" aria-label="Increase" @click="bump(step)">+</button>
+    <button
+      type="button"
+      class="stepper__btn"
+      data-step="inc"
+      aria-label="Increase"
+      @click="bump(step)"
+    >
+      +
+    </button>
   </div>
 </template>
 

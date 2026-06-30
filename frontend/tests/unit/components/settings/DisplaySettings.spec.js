@@ -4,9 +4,17 @@ import { setActivePinia, createPinia } from "pinia";
 import DisplaySettings from "@/components/settings/categories/DisplaySettings.vue";
 
 const baseConfig = () => ({
-  orientation: "landscape", orientationFlipped: false, applyDisplayRotation: true,
-  selectedTheme: null, themeMode: "auto", focusLightMode: "interaction", focusLightDimOthers: true,
-  showUI: true, touchControls: "auto", touchControlSize: "medium", displayName: "",
+  orientation: "landscape",
+  orientationFlipped: false,
+  applyDisplayRotation: true,
+  selectedTheme: null,
+  themeMode: "auto",
+  focusLightMode: "interaction",
+  focusLightDimOthers: true,
+  showUI: true,
+  touchControls: "auto",
+  touchControlSize: "medium",
+  displayName: "",
 });
 
 const stubs = { ThemePicker: true, TypefacePicker: true };

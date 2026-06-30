@@ -15,21 +15,30 @@
           @update:model-value="v => emit('update:config', { clockShowSeconds: v })"
         />
       </SettingRow>
-      <SettingRow label="Show Calvin logo" description="Show a small Calvin glyph at the leading edge of the bar.">
+      <SettingRow
+        label="Show Calvin logo"
+        description="Show a small Calvin glyph at the leading edge of the bar."
+      >
         <ToggleSwitch
           :model-value="config.clockBarShowLogo !== false"
           aria-label="Show Calvin logo"
           @update:model-value="v => emit('update:config', { clockBarShowLogo: v })"
         />
       </SettingRow>
-      <SettingRow label="Show weather" description="Show current temperature and icon (requires a weather service).">
+      <SettingRow
+        label="Show weather"
+        description="Show current temperature and icon (requires a weather service)."
+      >
         <ToggleSwitch
           :model-value="config.clockBarShowWeather"
           aria-label="Show weather"
           @update:model-value="v => emit('update:config', { clockBarShowWeather: v })"
         />
       </SettingRow>
-      <SettingRow label="Show in kiosk mode" description="Keep the bar visible when the rest of the UI is hidden.">
+      <SettingRow
+        label="Show in kiosk mode"
+        description="Keep the bar visible when the rest of the UI is hidden."
+      >
         <ToggleSwitch
           :model-value="config.clockBarShowInKiosk"
           aria-label="Show in kiosk mode"
@@ -39,14 +48,24 @@
     </SettingsSection>
 
     <SettingsSection id="clock-bar-layout" title="Bar layout">
-      <SettingRow label="Horizontal layout" description="How time and date are arranged on the top and bottom bars.">
+      <SettingRow
+        label="Horizontal layout"
+        description="How time and date are arranged on the top and bottom bars."
+      >
         <SelectPill
           :model-value="config.clockBarLayout || 'single-line'"
-          :options="[{value:'single-line',label:'Single line'},{value:'two-lines',label:'Two lines'}]"
+          :options="[
+            { value: 'single-line', label: 'Single line' },
+            { value: 'two-lines', label: 'Two lines' },
+          ]"
           @update:model-value="v => emit('update:config', { clockBarLayout: v })"
         />
       </SettingRow>
-      <SettingRow stacked label="Horizontal sizing" description="Time, date, and padding for the top and bottom bars.">
+      <SettingRow
+        stacked
+        label="Horizontal sizing"
+        description="Time, date, and padding for the top and bottom bars."
+      >
         <ClockBarFontSizePicker
           :time-size="config.clockBarFontSize || 16"
           :date-size="config.clockBarDateFontSize || 14"
@@ -59,18 +78,25 @@
           @update:padding="v => emit('update:config', { clockBarPadding: v })"
         />
       </SettingRow>
-      <SettingRow label="Vertical layout" description="How time and date are arranged on the left and right bars.">
+      <SettingRow
+        label="Vertical layout"
+        description="How time and date are arranged on the left and right bars."
+      >
         <SelectPill
           :model-value="config.clockBarVerticalLayout || 'upright'"
           :options="[
-            {value:'upright',label:'Upright'},
-            {value:'compact-time',label:'Compact time'},
-            {value:'compact-time-date',label:'Compact time & date'},
+            { value: 'upright', label: 'Upright' },
+            { value: 'compact-time', label: 'Compact time' },
+            { value: 'compact-time-date', label: 'Compact time & date' },
           ]"
           @update:model-value="v => emit('update:config', { clockBarVerticalLayout: v })"
         />
       </SettingRow>
-      <SettingRow stacked label="Vertical sizing" description="Time, date, and padding for the left and right vertical bars.">
+      <SettingRow
+        stacked
+        label="Vertical sizing"
+        description="Time, date, and padding for the left and right vertical bars."
+      >
         <ClockBarFontSizePicker
           :time-size="config.clockBarVerticalFontSize || 18"
           :date-size="config.clockBarVerticalDateFontSize || 11"

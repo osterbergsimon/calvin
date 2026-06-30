@@ -41,12 +41,7 @@
         {{ getCalendarTypeHelpText(newSource.type) }}
       </span>
     </div>
-    <button
-      type="button"
-      class="cst-btn-add"
-      :disabled="!canAdd"
-      @click="handleAdd"
-    >
+    <button type="button" class="cst-btn-add" :disabled="!canAdd" @click="handleAdd">
       Add calendar
     </button>
   </div>
@@ -131,11 +126,9 @@
       >
         Refresh now
       </button>
-      <span
-        v-if="refreshStatus"
-        class="cst-refresh-status"
-        aria-live="polite"
-      >{{ refreshStatus === 'refreshing' ? 'Refreshing…' : 'Refreshed' }}</span>
+      <span v-if="refreshStatus" class="cst-refresh-status" aria-live="polite">{{
+        refreshStatus === "refreshing" ? "Refreshing…" : "Refreshed"
+      }}</span>
     </div>
   </SettingRow>
 
@@ -666,7 +659,10 @@ onMounted(async () => {
   border-radius: 6px;
   font-size: 0.9rem;
   cursor: pointer;
-  transition: color 0.15s, border-color 0.15s, background 0.15s;
+  transition:
+    color 0.15s,
+    border-color 0.15s,
+    background 0.15s;
 }
 .cst-src-remove:hover {
   color: var(--err);

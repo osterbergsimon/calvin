@@ -9,21 +9,12 @@
 
     <div class="settings-topbar__right">
       <div class="settings-topbar__pill" :data-state="saveState">
-        <span
-          class="settings-topbar__dot"
-          :class="dotClass"
-          aria-hidden="true"
-        ></span>
+        <span class="settings-topbar__dot" :class="dotClass" aria-hidden="true"></span>
         <span class="settings-topbar__pill-label">{{ pillLabel }}</span>
       </div>
-      <button
-        class="settings-topbar__done"
-        type="button"
-        data-action="done"
-        @click="$emit('done')"
-      >
-Done
-</button>
+      <button class="settings-topbar__done" type="button" data-action="done" @click="$emit('done')">
+        Done
+      </button>
     </div>
   </header>
 </template>
@@ -43,18 +34,25 @@ const locationLabel = computed(() => props.sectionLabel || props.categoryLabel);
 
 const pillLabel = computed(() => {
   switch (props.saveState) {
-    case "saving": return "Saving…";
-    case "saved": return "Saved";
-    case "error": return "Error";
-    default: return "All changes saved";
+    case "saving":
+      return "Saving…";
+    case "saved":
+      return "Saved";
+    case "error":
+      return "Error";
+    default:
+      return "All changes saved";
   }
 });
 
 const dotClass = computed(() => {
   switch (props.saveState) {
-    case "saving": return "settings-topbar__dot--warn";
-    case "error": return "settings-topbar__dot--err";
-    default: return "settings-topbar__dot--ok";
+    case "saving":
+      return "settings-topbar__dot--warn";
+    case "error":
+      return "settings-topbar__dot--err";
+    default:
+      return "settings-topbar__dot--ok";
   }
 });
 </script>

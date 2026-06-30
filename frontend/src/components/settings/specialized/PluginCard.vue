@@ -205,7 +205,8 @@ const instanceLabelMap = {
 };
 
 const instanceNoun = computed(
-  () => props.plugin.instance_label?.toLowerCase() || instanceLabelMap[props.plugin.type] || "instance"
+  () =>
+    props.plugin.instance_label?.toLowerCase() || instanceLabelMap[props.plugin.type] || "instance"
 );
 
 const hasSettings = computed(
@@ -298,12 +299,13 @@ const unwrapConfigValue = (value, schema = {}) => {
 
 const getFormValue = (key, schema) => unwrapConfigValue(props.formData[key], schema);
 
-const handleUpdateFormValue = (key, value) => emit("update-form-value", props.plugin.id, key, value);
+const handleUpdateFormValue = (key, value) =>
+  emit("update-form-value", props.plugin.id, key, value);
 const handleCustomAction = action => emit("custom-action", props.plugin.id, action);
 const handleEditInstance = instance => emit("edit-instance", props.plugin.id, instance);
-const handleToggleInstance = (instanceId, enabled) =>
-  emit("toggle-instance", instanceId, enabled);
-const handleInstanceOrderChange = newOrder => emit("instance-order-change", props.plugin.id, newOrder);
+const handleToggleInstance = (instanceId, enabled) => emit("toggle-instance", instanceId, enabled);
+const handleInstanceOrderChange = newOrder =>
+  emit("instance-order-change", props.plugin.id, newOrder);
 </script>
 
 <style scoped>

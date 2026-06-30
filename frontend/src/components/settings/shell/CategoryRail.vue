@@ -49,7 +49,7 @@ function onKeydown(event, index) {
 function focusItem(index) {
   const items = railEl.value?.querySelectorAll(".category-rail__item");
   if (!items) return;
-  items.forEach((item) => {
+  items.forEach(item => {
     item.tabIndex = -1;
   });
   if (items[index]) {

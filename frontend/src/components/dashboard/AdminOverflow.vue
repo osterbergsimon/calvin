@@ -19,7 +19,13 @@
       role="menu"
       @keydown.escape="close"
     >
-      <button type="button" role="menuitem" class="admin-overflow__item" data-admin="settings" @click="onSettings">
+      <button
+        type="button"
+        role="menuitem"
+        class="admin-overflow__item"
+        data-admin="settings"
+        @click="onSettings"
+      >
         Settings
       </button>
       <button
@@ -32,7 +38,13 @@
       >
         {{ configStore.regionsLocked ? "Unlock layout" : "Lock layout" }}
       </button>
-      <button type="button" role="menuitem" class="admin-overflow__item" data-admin="hide-ui" @click="onHideUi">
+      <button
+        type="button"
+        role="menuitem"
+        class="admin-overflow__item"
+        data-admin="hide-ui"
+        @click="onHideUi"
+      >
         Hide UI
       </button>
     </div>

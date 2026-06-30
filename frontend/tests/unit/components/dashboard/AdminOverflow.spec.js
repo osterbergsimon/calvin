@@ -84,7 +84,10 @@ describe("AdminOverflow", () => {
         {
           id: "s1",
           name: "Home",
-          layout: { direction: "row", regions: [{ id: "r1", kind: "calendar", instanceIds: [], size: 100 }] },
+          layout: {
+            direction: "row",
+            regions: [{ id: "r1", kind: "calendar", instanceIds: [], size: 100 }],
+          },
         },
       ],
     };
@@ -106,8 +109,12 @@ describe("AdminOverflow", () => {
     const w = mount(AdminOverflow, { attachTo: document.body });
     const trigger = w.get(".admin-overflow__trigger");
     trigger.element.getBoundingClientRect = () => ({
-      top: window.innerHeight - 50, left: 8, width: 46, height: 46,
-      bottom: window.innerHeight - 4, right: 54,
+      top: window.innerHeight - 50,
+      left: 8,
+      width: 46,
+      height: 46,
+      bottom: window.innerHeight - 4,
+      right: 54,
     });
     await trigger.trigger("click");
     const menu = w.get(".admin-overflow__menu");
@@ -120,8 +127,12 @@ describe("AdminOverflow", () => {
     const w = mount(AdminOverflow, { attachTo: document.body });
     const trigger = w.get(".admin-overflow__trigger");
     trigger.element.getBoundingClientRect = () => ({
-      top: 8, left: window.innerWidth - 60, width: 46, height: 46,
-      bottom: 54, right: window.innerWidth - 14,
+      top: 8,
+      left: window.innerWidth - 60,
+      width: 46,
+      height: 46,
+      bottom: 54,
+      right: window.innerWidth - 14,
     });
     await trigger.trigger("click");
     const menu = w.get(".admin-overflow__menu");

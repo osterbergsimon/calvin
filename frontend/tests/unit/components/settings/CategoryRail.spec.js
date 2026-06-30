@@ -27,7 +27,7 @@ describe("CategoryRail", () => {
     });
     await w.findAll(".category-rail__item")[0].trigger("keydown", { key: "ArrowDown" });
     const items = w.findAll(".category-rail__item");
-    const withTabindex0 = items.filter((item) => item.attributes("tabindex") === "0");
+    const withTabindex0 = items.filter(item => item.attributes("tabindex") === "0");
     expect(withTabindex0).toHaveLength(1);
     w.unmount();
   });

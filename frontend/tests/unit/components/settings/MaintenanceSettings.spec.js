@@ -36,15 +36,36 @@ describe("MaintenanceSettings", () => {
     const btn = wrapper.findAll("button").find(b => b.text() === "Restart backend");
     await btn.trigger("click");
     // ConfirmModal is real; find its confirm button and click it
-    const confirmBtn = wrapper.findAll("button").find(b => /restart/i.test(b.text()) && b.text() !== "Restart backend" && b.text() !== "Restart frontend");
+    const confirmBtn = wrapper
+      .findAll("button")
+      .find(
+        b =>
+          /restart/i.test(b.text()) &&
+          b.text() !== "Restart backend" &&
+          b.text() !== "Restart frontend"
+      );
     await confirmBtn.trigger("click");
     expect(restartBackend).toHaveBeenCalled();
   });
 
   it("shows the log level only when console logging is on", () => {
-    const on = mount(MaintenanceSettings, { props: { config: { ...baseConfig, consoleLogEnabled: true }, gitRepoUrl: "", gitBranch: "main" }, global: { stubs } });
+    const on = mount(MaintenanceSettings, {
+      props: {
+        config: { ...baseConfig, consoleLogEnabled: true },
+        gitRepoUrl: "",
+        gitBranch: "main",
+      },
+      global: { stubs },
+    });
     expect(on.text()).toContain("Log level");
-    const off = mount(MaintenanceSettings, { props: { config: { ...baseConfig, consoleLogEnabled: false }, gitRepoUrl: "", gitBranch: "main" }, global: { stubs } });
+    const off = mount(MaintenanceSettings, {
+      props: {
+        config: { ...baseConfig, consoleLogEnabled: false },
+        gitRepoUrl: "",
+        gitBranch: "main",
+      },
+      global: { stubs },
+    });
     expect(off.text()).not.toContain("Log level");
   });
 });

@@ -111,7 +111,9 @@
 
           <!-- Unlocked-layout banner: clear status + one-tap re-lock -->
           <div v-if="!configStore.regionsLocked" class="layout-unlock-banner" role="status">
-            <span class="layout-unlock-banner__text">Layout unlocked — drag the dividers to resize</span>
+            <span class="layout-unlock-banner__text"
+              >Layout unlocked — drag the dividers to resize</span
+            >
             <button type="button" class="layout-unlock-banner__lock" @click="lockLayout">
               Lock
             </button>
@@ -305,7 +307,9 @@ const startRegionResize = (firstIndex, event) => {
 const onRegionResizeMove = event => {
   if (!resizeState) return;
   const isColumn = resizeState.direction === "column";
-  const offset = isColumn ? event.clientY - resizeState.rect.top : event.clientX - resizeState.rect.left;
+  const offset = isColumn
+    ? event.clientY - resizeState.rect.top
+    : event.clientX - resizeState.rect.left;
   const axis = isColumn ? resizeState.rect.height : resizeState.rect.width;
   if (axis <= 0) return;
   const regions = activeScreen.value.layout.regions;

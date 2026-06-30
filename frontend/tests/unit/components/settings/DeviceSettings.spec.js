@@ -10,11 +10,18 @@ vi.mock("@/composables", () => ({
 
 const stubs = { DisplayScheduleGrid: true, KeyboardTab: true };
 const baseConfig = {
-  displayScheduleEnabled: false, displaySchedule: [],
-  timezone: null, displayTimeoutEnabled: false, displayTimeout: 0,
-  rebootComboKey1: "KEY_1", rebootComboKey2: "KEY_7", rebootComboDuration: 10000,
+  displayScheduleEnabled: false,
+  displaySchedule: [],
+  timezone: null,
+  displayTimeoutEnabled: false,
+  displayTimeout: 0,
+  rebootComboKey1: "KEY_1",
+  rebootComboKey2: "KEY_7",
+  rebootComboDuration: 10000,
   // keyboard-feedback notifications (moved here from Display — calvin-svo IA pass)
-  keyboardFeedbackEnabled: true, keyboardFeedbackMode: "normal", modeIndicatorTimeout: 5,
+  keyboardFeedbackEnabled: true,
+  keyboardFeedbackMode: "normal",
+  modeIndicatorTimeout: 5,
 };
 
 describe("DeviceSettings", () => {
@@ -43,14 +50,18 @@ describe("DeviceSettings", () => {
     });
     const toggles = wrapper.findAllComponents({ name: "ToggleSwitch" });
     for (const t of toggles) t.vm.$emit("update:modelValue", false);
-    expect(
-      wrapper.emitted("update:config").some(c => c[0].keyboardFeedbackEnabled === false)
-    ).toBe(true);
+    expect(wrapper.emitted("update:config").some(c => c[0].keyboardFeedbackEnabled === false)).toBe(
+      true
+    );
   });
 
   it("shows the timeout stepper only when timeout is enabled", async () => {
     const wrapper = mount(DeviceSettings, {
-      props: { config: { ...baseConfig, displayTimeoutEnabled: true }, version: null, frontendVersion: null },
+      props: {
+        config: { ...baseConfig, displayTimeoutEnabled: true },
+        version: null,
+        frontendVersion: null,
+      },
       global: { stubs },
     });
     expect(wrapper.text()).toContain("Timeout");

@@ -2,7 +2,16 @@ import { describe, it, expect, vi } from "vitest";
 import { mount } from "@vue/test-utils";
 vi.mock("@/components/settings/settingsRegistry", () => ({
   filterSettingsDestinations: q =>
-    q === "orient" ? [{ id: "dashboard-layout", label: "Layout", path: "Display / Layout", category: "dashboard" }] : [],
+    q === "orient"
+      ? [
+          {
+            id: "dashboard-layout",
+            label: "Layout",
+            path: "Display / Layout",
+            category: "dashboard",
+          },
+        ]
+      : [],
 }));
 import SettingsSearch from "@/components/settings/shell/SettingsSearch.vue";
 

@@ -26,7 +26,7 @@ const stubs = {
   CategoryRail: {
     props: ["categories", "activeId"],
     emits: ["select"],
-    template: '<div class="rail-stub" @click="$emit(\'select\', \'clock-bar\')" />',
+    template: "<div class=\"rail-stub\" @click=\"$emit('select', 'clock-bar')\" />",
   },
   DisplaySettings: { template: '<div class="display-stub" />' },
   ClockBarSettings: { template: '<div class="clockbar-settings-stub" />' },
