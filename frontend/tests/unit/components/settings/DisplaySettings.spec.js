@@ -18,11 +18,13 @@ const stubs = { ThemePicker: true, TypefacePicker: true };
 describe("DisplaySettings", () => {
   beforeEach(() => setActivePinia(createPinia()));
 
-  it("renders the five eyebrow sections", () => {
+  it("renders the eyebrow sections incl. the embedded screens & regions editor", () => {
     const w = mount(DisplaySettings, { props: { config: baseConfig() }, global: { stubs } });
-    ["layout", "calendar", "appearance", "notifications", "plugin-display"].forEach(id =>
+    ["layout", "regions", "calendar", "appearance", "notifications", "plugin-display"].forEach(id =>
       expect(w.find(`#section-${id}`).exists()).toBe(true)
     );
+    // the regions editor is embedded and reachable (calvin-4k8 regression fix)
+    expect(w.findComponent({ name: "DashboardRegionsEditor" }).exists()).toBe(true);
   });
 
   it("emits update:config for the focus-light mode select", async () => {
