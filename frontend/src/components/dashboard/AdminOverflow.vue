@@ -22,12 +22,6 @@
       <button type="button" role="menuitem" class="admin-overflow__item" data-admin="settings" @click="onSettings">
         Settings
       </button>
-      <button type="button" role="menuitem" class="admin-overflow__item" data-admin="mode" @click="onMode">
-        {{ modeLabel }}
-      </button>
-      <button type="button" role="menuitem" class="admin-overflow__item" data-admin="side-view" @click="onSideView">
-        {{ sideViewPositionTitle }}
-      </button>
       <button type="button" role="menuitem" class="admin-overflow__item" data-admin="orientation" @click="onOrientation">
         {{ orientationLabel }}
       </button>
@@ -43,7 +37,6 @@ import { ref, computed, onUnmounted } from "vue";
 import { useRouter } from "vue-router";
 import { useConfigStore } from "../../stores/config";
 import { useModeStore } from "../../stores/mode";
-import { logError } from "../../utils/logger";
 
 const configStore = useConfigStore();
 const modeStore = useModeStore();
@@ -82,41 +75,13 @@ const close = () => {
 };
 onUnmounted(() => document.removeEventListener("click", onDocClick, true));
 
-const modeLabel = computed(() =>
-  modeStore.currentMode === modeStore.MODES.WEB_SERVICES ? "Show Photos" : "Show Web Services"
-);
 const orientationLabel = computed(() =>
   configStore.orientation === "landscape" ? "Switch to Portrait" : "Switch to Landscape"
 );
-const sideViewPositionTitle = computed(() => {
-  if (configStore.orientation === "landscape") {
-    return configStore.sideViewPosition === "right" ? "Side view: left" : "Side view: right";
-  }
-  return configStore.sideViewPosition === "bottom" ? "Side view: top" : "Side view: bottom";
-});
 
 const onSettings = () => {
   modeStore.setMode(modeStore.MODES.SETTINGS);
   router.push("/settings");
-  close();
-};
-const onMode = () => {
-  if (modeStore.currentMode === modeStore.MODES.WEB_SERVICES) {
-    configStore.setLastSideViewMode("photos");
-    modeStore.setMode(modeStore.MODES.PHOTOS);
-  } else {
-    configStore.setLastSideViewMode("web_services");
-    modeStore.setMode(modeStore.MODES.WEB_SERVICES);
-  }
-  close();
-};
-const onSideView = async () => {
-  configStore.toggleSideViewPosition();
-  try {
-    await configStore.updateConfig({ sideViewPosition: configStore.sideViewPosition });
-  } catch (err) {
-    logError("[AdminOverflow]", "Failed to save side view position:", err);
-  }
   close();
 };
 const onOrientation = () => {

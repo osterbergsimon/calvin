@@ -22,6 +22,18 @@ describe("AdminOverflow", () => {
     w.unmount();
   });
 
+  it("offers Settings / orientation / Hide UI and not the dead side-view + mode items (calvin-ayr)", async () => {
+    const w = mount(AdminOverflow, { attachTo: document.body });
+    await w.get(".admin-overflow__trigger").trigger("click");
+    expect(w.find('[data-admin="settings"]').exists()).toBe(true);
+    expect(w.find('[data-admin="orientation"]').exists()).toBe(true);
+    expect(w.find('[data-admin="hide-ui"]').exists()).toBe(true);
+    // legacy side-view-model actions are no-ops in the region layout — removed
+    expect(w.find('[data-admin="mode"]').exists()).toBe(false);
+    expect(w.find('[data-admin="side-view"]').exists()).toBe(false);
+    w.unmount();
+  });
+
   it("toggles orientation and closes after the action", async () => {
     const store = useConfigStore();
     const spy = vi.spyOn(store, "setOrientation");
