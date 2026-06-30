@@ -26,6 +26,14 @@
       </SettingRow>
     </SettingsSection>
 
+    <!-- DASHBOARD SCREENS / REGIONS -->
+    <SettingsSection id="regions" title="Screens & regions">
+      <DashboardRegionsEditor
+        :config="config"
+        @update:config="patch => emit('update:config', patch)"
+      />
+    </SettingsSection>
+
     <!-- CALENDAR -->
     <SettingsSection id="calendar" title="Calendar">
       <SettingRow label="Calendar view" description="The default layout used to display calendar events.">
@@ -250,6 +258,7 @@ import ChipMultiSelect from "@/components/ui/ChipMultiSelect.vue";
 import NumberStepper from "@/components/ui/NumberStepper.vue";
 import ThemePicker from "@/components/settings/shell/ThemePicker.vue";
 import TypefacePicker from "@/components/settings/shell/TypefacePicker.vue";
+import DashboardRegionsEditor from "@/components/settings/shared/DashboardRegionsEditor.vue";
 
 defineProps({
   config: { type: Object, required: true },

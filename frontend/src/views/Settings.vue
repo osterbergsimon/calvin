@@ -249,6 +249,7 @@ watch(activeCategory, async () => {
 const SECTION_BY_CATEGORY_TAB = {
   dashboard: {
     layout: "layout",
+    regions: "regions",
     calendar: "calendar",
     appearance: "appearance",
     notifications: "notifications",

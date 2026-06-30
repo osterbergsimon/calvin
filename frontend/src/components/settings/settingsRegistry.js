@@ -22,6 +22,15 @@ export const settingsDestinations = [
     keywords: ["display", "orientation", "split", "calendar", "week", "time format", "meal plan"],
   },
   {
+    id: "dashboard-regions",
+    label: "Screens and regions",
+    path: "Display / Screens & regions",
+    category: "dashboard",
+    tabKey: "settings_tab_dashboard",
+    tab: "regions",
+    keywords: ["screens", "regions", "layout", "split", "multi-screen", "dashboard", "primary region", "activate screen"],
+  },
+  {
     id: "dashboard-calendar",
     label: "Calendar display",
     path: "Display / Calendar Display",
