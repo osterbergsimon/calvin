@@ -69,13 +69,11 @@ class PluginInstallResponse(BaseModel):
     message: str
     manifest: dict[str, Any]
     requires_restart: bool
-    frontend_rebuild_in_progress: bool
 
 
 class PluginDeleteResponse(BaseModel):
     success: bool
     message: str
-    frontend_rebuild_in_progress: bool = False
 
 
 class PluginListResponse(BaseModel):
@@ -396,7 +394,6 @@ async def install_plugin(
                 "message": f"Plugin {manifest['id']} installed successfully",
                 "manifest": manifest,
                 "requires_restart": manifest.get("requirements", {}).get("restart_required", False),
-                "frontend_rebuild_in_progress": False,
             }
         except HTTPException:
             raise
@@ -538,7 +535,6 @@ async def uninstall_plugin(plugin_id: str):
             return {
                 "success": True,
                 "message": f"Plugin {plugin_id} uninstalled successfully",
-                "frontend_rebuild_in_progress": False,
             }
     except ValueError as e:
         raise HTTPException(status_code=404, detail=str(e))
@@ -986,24 +982,21 @@ async def geocode_location(plugin_id: str, request: dict[str, Any] = Body(...)):
     if not location:
         raise HTTPException(status_code=400, detail="Location is required")
 
-    # Verify plugin type (optional - allow geocoding even if plugin instance doesn't exist yet)
-    # This allows users to geocode before saving the plugin configuration
-    # Check if plugin exists and is yr_weather type
+    # Geocoding is available to any plugin whose metadata declares a `geocode`
+    # ui_action — no plugin ids are special-cased. Unsaved instances may pass
+    # a type_id directly (geocode-before-save).
     db_plugin = await PluginDB.objects.get_or_none(id=plugin_id)
-
-    # If plugin exists, verify it's the right type
-    if db_plugin and db_plugin.type_id != "yr_weather":
-        raise HTTPException(
-            status_code=400, detail="Geocoding is only available for Yr.no weather plugins"
+    type_id = db_plugin.type_id if db_plugin else plugin_id
+    plugin_class = plugin_loader.get_plugin_class(type_id)
+    if plugin_class is not None and plugin_class.metadata is not None:
+        declares_geocode = any(
+            action.get("type") == "geocode" for action in plugin_class.metadata.ui_actions
         )
-
-    # If plugin doesn't exist, check if the plugin_id matches the expected pattern
-    # This allows geocoding for new plugin instances before they're saved
-    # We'll allow it if the plugin_id looks like it could be a yr_weather plugin
-    # (starts with 'yr_weather' or is just 'yr_weather')
-    if not db_plugin:
-        # Allow geocoding for new instances - we'll validate the location instead
-        pass
+        if not declares_geocode:
+            raise HTTPException(
+                status_code=400,
+                detail="This plugin does not support location lookup",
+            )
 
     try:
         # Use OpenStreetMap Nominatim API (free, no API key required)

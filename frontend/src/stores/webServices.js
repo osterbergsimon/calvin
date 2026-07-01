@@ -158,23 +158,13 @@ export const useWebServicesStore = defineStore("webServices", () => {
     }
   };
 
+  // "Add web service" creates an instance of the host's built-in iframe
+  // plugin — a deliberate host-owned constant, not plugin sniffing.
+  const WEB_EMBED_PLUGIN_ID = "iframe";
+
   const addService = async service => {
     try {
-      // Web services are now plugin instances
-      // Find the iframe service plugin (or use a default)
-      const pluginsResponse = await axios.get("/api/plugins", {
-        params: { plugin_type: "service" },
-      });
-      const servicePlugins = pluginsResponse.data.plugins || [];
-      // Find iframe plugin or use first service plugin
-      const iframePlugin = servicePlugins.find(p => p.id === "iframe") || servicePlugins[0];
-
-      if (!iframePlugin) {
-        throw new Error("No service plugin available");
-      }
-
-      // Create instance using plugin API
-      const response = await axios.post(`/api/plugins/${iframePlugin.id}/instances`, {
+      const response = await axios.post(`/api/plugins/${WEB_EMBED_PLUGIN_ID}/instances`, {
         name: service.name,
         config: {
           url: service.url,

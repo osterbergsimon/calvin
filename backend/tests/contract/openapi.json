@@ -826,11 +826,6 @@
       },
       "PluginDeleteResponse": {
         "properties": {
-          "frontend_rebuild_in_progress": {
-            "default": false,
-            "title": "Frontend Rebuild In Progress",
-            "type": "boolean"
-          },
           "message": {
             "title": "Message",
             "type": "string"
@@ -849,10 +844,6 @@
       },
       "PluginInstallResponse": {
         "properties": {
-          "frontend_rebuild_in_progress": {
-            "title": "Frontend Rebuild In Progress",
-            "type": "boolean"
-          },
           "manifest": {
             "additionalProperties": true,
             "title": "Manifest",
@@ -875,8 +866,7 @@
           "success",
           "message",
           "manifest",
-          "requires_restart",
-          "frontend_rebuild_in_progress"
+          "requires_restart"
         ],
         "title": "PluginInstallResponse",
         "type": "object"
@@ -3144,7 +3134,7 @@
     },
     "/api/plugins/{plugin_id}/data": {
       "get": {
-        "description": "Get data from a service plugin instance.\n\nThis is a generic endpoint that works for all service plugins that implement\nthe fetch_service_data() method (e.g., weather plugins).\n\nArgs:\n    plugin_id: Plugin instance ID\n    start_date: Optional start date (plugin-specific)\n    end_date: Optional end date (plugin-specific)\n\nReturns:\n    Plugin data (format depends on plugin type)",
+        "description": "Get data from a service plugin instance.\n\nThis is a generic endpoint that works for all service plugins that implement\nthe fetch() method (e.g., weather plugins).\n\nArgs:\n    plugin_id: Plugin instance ID\n    start_date: Optional start date (plugin-specific)\n    end_date: Optional end date (plugin-specific)\n\nReturns:\n    Plugin data (format depends on plugin type)",
         "operationId": "get_plugin_data_api_plugins__plugin_id__data_get",
         "parameters": [
           {
@@ -3221,7 +3211,7 @@
     },
     "/api/plugins/{plugin_id}/fetch": {
       "post": {
-        "description": "Manually trigger plugin fetch/check operation.\n\nUses plugin hooks to allow plugins to implement their own fetch logic.\n\nArgs:\n    plugin_id: Plugin type ID (e.g., 'imap')\n\nReturns:\n    Fetch result with success status, message, and details",
+        "description": "Manually trigger a fetch/check operation on a plugin type's instances.\n\nCalls `fetch()` on each enabled instance of the type (e.g. an imap\nplugin's \"check now\" action).\n\nArgs:\n    plugin_id: Plugin type ID (e.g., 'imap')\n\nReturns:\n    Fetch result with success status, message, and details",
         "operationId": "fetch_plugin_api_plugins__plugin_id__fetch_post",
         "parameters": [
           {
@@ -3356,7 +3346,7 @@
         ]
       },
       "post": {
-        "description": "Create a plugin instance via an explicit instance lifecycle endpoint.\n\nThis currently adapts to the existing plugin hook contract by translating\nthe typed payload into the legacy config-update metadata fields.",
+        "description": "Create a plugin instance via an explicit instance lifecycle endpoint.\n\nThe typed payload is translated into the config-update metadata fields\nunderstood by the generic instance manager.",
         "operationId": "create_plugin_instance_api_plugins__plugin_id__instances_post",
         "parameters": [
           {

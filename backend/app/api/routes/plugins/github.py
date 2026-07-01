@@ -324,8 +324,7 @@ async def install_plugin_from_github(request: dict[str, Any] = Body(...)):
                     "requires_restart": manifest.get("requirements", {}).get(
                         "restart_required", False
                     ),
-                    "frontend_rebuild_in_progress": False,
-                }
+                        }
             else:
                 raise HTTPException(
                     status_code=400,
@@ -517,8 +516,7 @@ async def install_plugin_from_local(request: dict[str, Any] = Body(...)):
                 "message": f"Plugin {manifest['id']} installed successfully",
                 "manifest": manifest,
                 "requires_restart": manifest.get("requirements", {}).get("restart_required", False),
-                "frontend_rebuild_in_progress": False,
-            }
+                }
         else:
             raise HTTPException(
                 status_code=400,

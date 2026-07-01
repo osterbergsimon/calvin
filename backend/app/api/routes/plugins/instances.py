@@ -62,7 +62,20 @@ class PluginInstanceCreateRequest(BaseModel):
 
 
 def _serialize_instance_config(config: dict[str, Any]) -> dict[str, Any]:
-    """Serialize config values to JSON-compatible primitives."""
+    """Serialize config values to JSON-compatible primitives.
+
+    Config values are bare scalars in the 1.0 contract; legacy rows may still
+    hold `{value}`/`{default}` wrapper dicts, which are unwrapped here so the
+    frontend always sees one shape.
+    """
+    from app.plugins.utils.config import normalize_config_value
+
+    config = {
+        key: normalize_config_value(val)
+        if isinstance(val, dict) and ("value" in val or "default" in val)
+        else val
+        for key, val in config.items()
+    }
 
     def serialize_value(val):
         if val is None:
