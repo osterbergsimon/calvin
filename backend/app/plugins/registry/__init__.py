@@ -1,4 +1,4 @@
-"""Plugin registry service using unified plugins table and pluggy."""
+"""Plugin registry service using the unified plugins table and the declarative loader."""
 
 from typing import Any
 
@@ -10,7 +10,7 @@ from .manager import register_plugin, unregister_plugin
 
 
 class PluginRegistry:
-    """Plugin registry using unified plugins table and pluggy."""
+    """Plugin registry using the unified plugins table and the declarative loader."""
 
     def __init__(self):
         """Initialize plugin registry."""
@@ -18,7 +18,7 @@ class PluginRegistry:
 
     async def load_plugins_from_db(self) -> None:
         """Load all plugins from database and register them."""
-        # Load plugin types from pluggy hooks first
+        # Discover plugin classes first
         plugin_loader.load_all_plugins()
 
         # Then, load plugin types from database (or register defaults)
