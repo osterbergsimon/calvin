@@ -4,6 +4,7 @@ import json
 
 import pytest
 
+from app.plugins.definitions import CURRENT_PLUGIN_API_VERSION
 from app.services.plugin_installer import PluginInstaller
 
 
@@ -29,6 +30,7 @@ def mock_repo_structure(tmp_path):
         "name": "Plugin 1",
         "version": "1.0.0",
         "type": "service",
+        "api_version": CURRENT_PLUGIN_API_VERSION,
     }
     (plugin1_dir / "plugin.json").write_text(json.dumps(manifest1))
     (plugin1_dir / "plugin.py").write_text("# Plugin 1 code")
@@ -41,6 +43,7 @@ def mock_repo_structure(tmp_path):
         "name": "Plugin 2",
         "version": "2.0.0",
         "type": "calendar",
+        "api_version": CURRENT_PLUGIN_API_VERSION,
     }
     (plugin2_dir / "plugin.json").write_text(json.dumps(manifest2))
     (plugin2_dir / "plugin.py").write_text("# Plugin 2 code")
@@ -58,6 +61,7 @@ def mock_repo_structure(tmp_path):
         "name": "Plugin 3",
         "version": "3.0.0",
         "type": "image",
+        "api_version": CURRENT_PLUGIN_API_VERSION,
     }
     (plugin3_dir / "plugin.json").write_text(json.dumps(manifest3))
     (plugin3_dir / "plugin.py").write_text("# Plugin 3 code")
@@ -107,6 +111,7 @@ def test_plugin_repo_structure(tmp_path):
         "name": "Test Plugin",
         "version": "1.0.0",
         "type": "service",
+        "api_version": CURRENT_PLUGIN_API_VERSION,
         "description": "A basic test plugin for plugin installation testing",
         "author": "Calvin Test Suite",
         "license": "MIT",
@@ -118,100 +123,52 @@ def test_plugin_repo_structure(tmp_path):
 
 from typing import Any
 
-from app.plugins.base import PluginType
-from app.plugins.hooks import hookimpl
+from app.plugins.definitions import PluginMetadata
 from app.plugins.protocols import ServicePlugin
 
 
 class TestServicePlugin(ServicePlugin):
     """Test service plugin for installation testing."""
 
-    @classmethod
-    def get_plugin_metadata(cls) -> dict[str, Any]:
-        """Get plugin metadata for registration."""
-        return {
-            "type_id": "test_plugin",
-            "plugin_type": PluginType.SERVICE,
-            "name": "Test Plugin",
-            "description": "A basic test plugin for plugin installation testing",
-            "version": "1.0.0",
-            "common_config_schema": {
-                "message": {
-                    "type": "string",
-                    "description": "Test message to display",
-                    "default": "Hello from test plugin!",
-                    "ui": {
-                        "component": "input",
-                        "placeholder": "Enter a message",
-                        "validation": {
-                            "required": False,
-                        },
+    metadata = PluginMetadata(
+        type_id="test_plugin",
+        name="Test Plugin",
+        description="A basic test plugin for plugin installation testing",
+        version="1.0.0",
+        common_config_schema={
+            "message": {
+                "type": "string",
+                "description": "Test message to display",
+                "default": "Hello from test plugin!",
+                "ui": {
+                    "component": "input",
+                    "placeholder": "Enter a message",
+                    "validation": {
+                        "required": False,
                     },
                 },
             },
-            "display_schema": {
-                "type": "api",
-                "api_endpoint": None,
-                "method": None,
-                "data_schema": None,
-                "render_template": "iframe",
+        },
+        instance_config_schema={
+            "message": {
+                "type": "string",
+                "description": "Test message to display",
+                "default": "Hello from test plugin!",
             },
-            "plugin_class": cls,
-        }
-
-    def __init__(
-        self,
-        plugin_id: str,
-        name: str,
-        message: str = "Hello from test plugin!",
-        enabled: bool = True,
-    ):
-        super().__init__(plugin_id, name, enabled)
-        self.message = message
-
-    async def initialize(self) -> None:
-        """Initialize the plugin."""
-        pass
-
-    async def cleanup(self) -> None:
-        """Cleanup plugin resources."""
-        pass
-
-    async def validate_config(self, config: dict[str, Any]) -> bool:
-        """Validate plugin configuration."""
-        return True
-
-
-@hookimpl
-def register_plugin_types() -> list[dict[str, Any]]:
-    """Register TestServicePlugin type."""
-    return [TestServicePlugin.get_plugin_metadata()]
-
-
-@hookimpl
-def create_plugin_instance(
-    plugin_id: str,
-    type_id: str,
-    name: str,
-    config: dict[str, Any],
-) -> TestServicePlugin | None:
-    """Create a TestServicePlugin instance."""
-    if type_id != "test_plugin":
-        return None
-
-    enabled = config.get("enabled", False)
-    message = config.get("message", "Hello from test plugin!")
-
-    if isinstance(message, dict):
-        message = message.get("value") or message.get("default") or "Hello from test plugin!"
-    message = str(message) if message else "Hello from test plugin!"
-
-    return TestServicePlugin(
-        plugin_id=plugin_id,
-        name=name,
-        message=message,
-        enabled=enabled,
+        },
+        display_schema={
+            "kind": "status",
+            "item": {"label": "Message", "value_path": "$.message"},
+        },
     )
+
+    async def fetch(
+        self,
+        start_date: str | None = None,
+        end_date: str | None = None,
+    ) -> dict[str, Any]:
+        """Return the payload the display schema binds to."""
+        return {"message": self.config.get("message", "Hello from test plugin!")}
 '''
     (test_plugin_dir / "plugin.py").write_text(plugin_code)
 
@@ -273,7 +230,15 @@ class TestPluginEnumeration:
         valid_plugin = repo_root / "valid"
         valid_plugin.mkdir()
         (valid_plugin / "plugin.json").write_text(
-            json.dumps({"id": "valid", "name": "Valid", "version": "1.0.0", "type": "service"})
+            json.dumps(
+                {
+                    "id": "valid",
+                    "name": "Valid",
+                    "version": "1.0.0",
+                    "type": "service",
+                    "api_version": CURRENT_PLUGIN_API_VERSION,
+                }
+            )
         )
         (valid_plugin / "plugin.py").write_text("# Valid")
 
@@ -299,7 +264,15 @@ class TestPluginEnumeration:
         valid_plugin = repo_root / "valid"
         valid_plugin.mkdir()
         (valid_plugin / "plugin.json").write_text(
-            json.dumps({"id": "valid", "name": "Valid", "version": "1.0.0", "type": "service"})
+            json.dumps(
+                {
+                    "id": "valid",
+                    "name": "Valid",
+                    "version": "1.0.0",
+                    "type": "service",
+                    "api_version": CURRENT_PLUGIN_API_VERSION,
+                }
+            )
         )
         (valid_plugin / "plugin.py").write_text("# Valid")
 
@@ -398,6 +371,7 @@ class TestPluginInstallFromRepo:
                     "name": "Corrupted Plugin",
                     "version": "1.0.0",
                     "type": "service",
+                    "api_version": CURRENT_PLUGIN_API_VERSION,
                 }
             )
         )
@@ -481,6 +455,7 @@ class TestVersionChecking:
             "name": "Test",
             "version": "1.0.0",
             "type": "service",
+            "api_version": CURRENT_PLUGIN_API_VERSION,
         }
         (plugin_dir1 / "plugin.json").write_text(json.dumps(manifest1))
         (plugin_dir1 / "plugin.py").write_text("# Plugin")
@@ -507,6 +482,7 @@ class TestVersionChecking:
             "name": "Test",
             "version": "2.0.0",
             "type": "service",
+            "api_version": CURRENT_PLUGIN_API_VERSION,
         }
         (plugin_dir1 / "plugin.json").write_text(json.dumps(manifest1))
         (plugin_dir1 / "plugin.py").write_text("# Plugin")
@@ -541,6 +517,7 @@ class TestVersionChecking:
             "name": "Test",
             "version": "2.0.0",
             "type": "service",
+            "api_version": CURRENT_PLUGIN_API_VERSION,
         }
         (plugin_dir1 / "plugin.json").write_text(json.dumps(manifest1))
         (plugin_dir1 / "plugin.py").write_text("# Plugin")
