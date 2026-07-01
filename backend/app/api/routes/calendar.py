@@ -209,13 +209,12 @@ async def get_calendar_sources():
 
         # Filter out sources from disabled plugin types
         enabled_plugin_types = set()
-        # Get plugin types from pluggy hooks
         plugin_types = plugin_loader.get_plugin_types()
-        calendar_types = [t for t in plugin_types if t.get("plugin_type") == PluginType.CALENDAR]
+        calendar_types = [t for t in plugin_types if t.plugin_type == PluginType.CALENDAR]
 
         # Check enabled status from database
         for type_info in calendar_types:
-            type_id = type_info.get("type_id")
+            type_id = type_info.type_id
             db_type = await PluginTypeDB.objects.get_or_none(type_id=type_id)
             enabled = db_type.enabled if db_type else True  # Default to enabled
             if enabled:

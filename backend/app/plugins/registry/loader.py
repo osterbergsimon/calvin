@@ -3,7 +3,6 @@
 from loguru import logger
 
 from app.models.db_models import PluginDB, PluginTypeDB
-from app.plugins.definitions import PluginDefinition
 from app.plugins.loader import plugin_loader
 from app.plugins.manager import plugin_manager as instance_manager
 
@@ -18,8 +17,6 @@ async def load_plugin_types() -> None:
         error_message = None
 
         try:
-            # Validate required fields
-            type_info = PluginDefinition.from_raw(type_info)
             if not type_info.type_id:
                 continue
 
@@ -131,21 +128,14 @@ async def load_plugin_types_for_single(plugin_id: str) -> None:
     warning if the type is not found after install.
     """
     plugin_types = plugin_loader.get_plugin_types()
-    type_info = next((t for t in plugin_types if t.get("type_id") == plugin_id), None)
+    type_info = next((t for t in plugin_types if t.type_id == plugin_id), None)
     if type_info is None:
         logger.warning(
             "Plugin type {} not found after install — skipping DB registration", plugin_id
         )
         return
 
-    try:
-        type_info = PluginDefinition.from_raw(type_info)
-        type_id: str = type_info.type_id  # type: ignore[assignment]
-    except Exception:
-        logger.exception(
-            "Plugin {} failed PluginDefinition validation — skipping DB registration", plugin_id
-        )
-        return
+    type_id: str = type_info.type_id
 
     db_type = await PluginTypeDB.objects.get_or_none(type_id=type_id)
 

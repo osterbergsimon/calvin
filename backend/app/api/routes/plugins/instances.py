@@ -1,6 +1,5 @@
 """Plugin instance management endpoints."""
 
-import asyncio
 from datetime import UTC, datetime
 from pathlib import Path
 from typing import Any
@@ -11,9 +10,9 @@ from pydantic import BaseModel
 
 from app.api.routes.plugins.config import mask_sensitive_config
 from app.models.db_models import PluginDB, PluginTypeDB
-from app.plugins.hooks import plugin_manager as hook_manager
 from app.plugins.loader import plugin_loader
 from app.plugins.manager import plugin_manager
+from app.plugins.utils.instance_manager import apply_plugin_config_update
 from app.services.event_system import event_system
 
 router = APIRouter()
@@ -333,13 +332,10 @@ async def create_plugin_instance(
     """
     Create a plugin instance via an explicit instance lifecycle endpoint.
 
-    This currently adapts to the existing plugin hook contract by translating
-    the typed payload into the legacy config-update metadata fields.
+    The typed payload is translated into the config-update metadata fields
+    understood by the generic instance manager.
     """
-    plugin_types = plugin_loader.get_plugin_types()
-    type_info = next((t for t in plugin_types if t.get("type_id") == plugin_id), None)
-
-    if not type_info:
+    if plugin_loader.get_plugin_class(plugin_id) is None:
         raise HTTPException(status_code=404, detail="Plugin type not found")
 
     instance_config = {
@@ -350,23 +346,13 @@ async def create_plugin_instance(
 
     db_plugin_type = await PluginTypeDB.objects.get_or_none(type_id=plugin_id)
 
-    update_coroutines = hook_manager.hook.handle_plugin_config_update(
-        type_id=plugin_id,
-        config=instance_config,
-        enabled=None,
-        db_type=db_plugin_type,
-        session=None,
-    )
-    results = await asyncio.gather(*update_coroutines, return_exceptions=True)
+    try:
+        result = await apply_plugin_config_update(plugin_id, instance_config, None, db_plugin_type)
+    except Exception as e:
+        logger.exception("Instance creation failed for plugin type {}", plugin_id)
+        raise HTTPException(status_code=500, detail=f"Failed to create instance: {e}")
 
-    created_instance_id = None
-    for result in results:
-        if isinstance(result, Exception) or result is None:
-            continue
-        created_instance_id = result.get("instance_id")
-        if created_instance_id:
-            break
-
+    created_instance_id = result.get("instance_id") if result else None
     if not created_instance_id:
         raise HTTPException(status_code=400, detail="Plugin did not create an instance")
 

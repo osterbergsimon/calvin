@@ -1,8 +1,7 @@
 """Validation utilities for plugins and themes."""
 
 from .manifest_validator import (
-    validate_manifest_format_version,
-    validate_manifest_protocol_version,
+    validate_manifest_api_version,
     validate_manifest_required_fields,
     validate_path_traversal,
     validate_plugin_optional_fields,
@@ -16,8 +15,7 @@ from .package_validator import (
 
 __all__ = [
     "validate_manifest_required_fields",
-    "validate_manifest_format_version",
-    "validate_manifest_protocol_version",
+    "validate_manifest_api_version",
     "validate_path_traversal",
     "validate_plugin_type",
     "validate_plugin_optional_fields",

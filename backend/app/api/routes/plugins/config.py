@@ -113,9 +113,8 @@ async def get_plugin_config(plugin_id: str):
     """Get plugin type common configuration."""
     logger.debug(f"Getting config for plugin {plugin_id}")
 
-    # Get plugin types from pluggy hooks
     plugin_types = plugin_loader.get_plugin_types()
-    type_info = next((t for t in plugin_types if t.get("type_id") == plugin_id), None)
+    type_info = next((t for t in plugin_types if t.type_id == plugin_id), None)
 
     if not type_info:
         raise HTTPException(status_code=404, detail="Plugin type not found")

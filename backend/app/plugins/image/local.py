@@ -8,33 +8,29 @@ from typing import Any
 from loguru import logger
 from PIL import Image, ImageOps
 
-from app.plugins.hooks import hookimpl
+from app.plugins.definitions import PluginMetadata
 from app.plugins.protocols import ImagePlugin
-from app.plugins.sdk.image import (
-    build_image_manager_config,
-    build_image_plugin_metadata,
-)
-from app.plugins.utils.instance_manager import handle_plugin_config_update_generic
 
-# Loguru automatically includes module/function info in logs
+
+def _default_image_dir() -> Path:
+    """Resolve the image directory: IMAGE_DIR env var or ./data/images."""
+    image_dir_str = os.getenv("IMAGE_DIR")
+    if image_dir_str:
+        return Path(image_dir_str).resolve()
+    return Path("./data/images").resolve()
 
 
 class LocalImagePlugin(ImagePlugin):
     """Local filesystem image plugin."""
 
-    @classmethod
-    def get_plugin_metadata(cls) -> dict[str, Any]:
-        """Get plugin metadata for registration."""
-        metadata = build_image_plugin_metadata(
-            type_id="local",
-            name="Local Images",
-            description="Upload and store images on the server. Images are stored in ./data/images",
-            plugin_class=cls,
-            common_config_schema={},
-            instance_config_schema={},
-            supports_multiple_instances=False,
-        )
-        metadata["ui_sections"] = [
+    metadata = PluginMetadata(
+        type_id="local",
+        name="Local Images",
+        description="Upload and store images on the server. Images are stored in ./data/images",
+        default_instance_name="Local Images",
+        supports_multiple_instances=False,
+        fixed_instance_id="local-images",
+        ui_sections=[
             {
                 "id": "upload",
                 "type": "upload",
@@ -49,45 +45,27 @@ class LocalImagePlugin(ImagePlugin):
                 "title": "Manage Images",
                 "collapsible": True,
             },
-        ]
-        return metadata
+        ],
+    )
 
-    def __init__(
-        self,
-        plugin_id: str,
-        name: str,
-        image_dir: Path | str,
-        thumbnail_dir: Path | str | None = None,
-        enabled: bool = True,
-    ):
-        """
-        Initialize local image plugin.
-
-        Args:
-            plugin_id: Unique identifier for the plugin
-            name: Human-readable name
-            image_dir: Directory containing images
-            thumbnail_dir: Directory for storing thumbnails (defaults to image_dir/thumbnails)
-            enabled: Whether the plugin is enabled
-        """
+    def __init__(self, plugin_id: str, name: str, enabled: bool = True):
         super().__init__(plugin_id, name, enabled)
-        self.image_dir = Path(image_dir)
-        self.image_dir.mkdir(parents=True, exist_ok=True)
-        self.thumbnail_dir = Path(thumbnail_dir) if thumbnail_dir else self.image_dir / "thumbnails"
-        self.thumbnail_dir.mkdir(parents=True, exist_ok=True)
         self.thumbnail_size = (200, 200)
         self.supported_formats = {".jpg", ".jpeg", ".png", ".webp", ".gif"}
         self._images: list[dict[str, Any]] = []
+        self._set_image_dir(_default_image_dir())
+
+    def _set_image_dir(self, image_dir: Path) -> None:
+        """Point the plugin at an image directory, creating it and its thumbnails dir."""
+        self.image_dir = Path(image_dir)
+        self.image_dir.mkdir(parents=True, exist_ok=True)
+        self.thumbnail_dir = self.image_dir / "thumbnails"
+        self.thumbnail_dir.mkdir(parents=True, exist_ok=True)
 
     async def initialize(self) -> None:
         """Initialize the plugin."""
         # Scan images on initialization
         await self.scan_images()
-
-    async def cleanup(self) -> None:
-        """Cleanup plugin resources."""
-        # Nothing to cleanup for local filesystem
-        pass
 
     async def configure(self, config: dict[str, Any]) -> None:
         """
@@ -98,7 +76,7 @@ class LocalImagePlugin(ImagePlugin):
         """
         await super().configure(config)
 
-        # Check if IMAGE_DIR environment variable has changed
+        # IMAGE_DIR environment variable takes precedence when set
         current_image_dir = os.getenv("IMAGE_DIR")
         if current_image_dir:
             new_image_dir = Path(current_image_dir).resolve()
@@ -107,27 +85,11 @@ class LocalImagePlugin(ImagePlugin):
                     f"[Local Images] IMAGE_DIR changed from {self.image_dir} "
                     f"to {new_image_dir}, updating plugin"
                 )
-                self.image_dir = new_image_dir
-                self.image_dir.mkdir(parents=True, exist_ok=True)
-                self.thumbnail_dir = self.image_dir / "thumbnails"
-                self.thumbnail_dir.mkdir(parents=True, exist_ok=True)
+                self._set_image_dir(new_image_dir)
 
-        if "image_dir" in config and config["image_dir"]:
-            # Extract actual value from config (handle schema objects)
-            image_dir_value = config["image_dir"]
-            # If it's a dict (schema object), extract the value or default
-            if isinstance(image_dir_value, dict):
-                image_dir_str = image_dir_value.get("value") or image_dir_value.get("default") or ""
-            else:
-                image_dir_str = str(image_dir_value)
-
-            # Only update if we have a valid string value
-            if image_dir_str and image_dir_str.strip():
-                self.image_dir = Path(image_dir_str)
-                self.image_dir.mkdir(parents=True, exist_ok=True)
-                # Always set thumbnail_dir to image_dir/thumbnails
-                self.thumbnail_dir = self.image_dir / "thumbnails"
-                self.thumbnail_dir.mkdir(parents=True, exist_ok=True)
+        image_dir_str = str(self.config.get("image_dir") or "")
+        if image_dir_str.strip():
+            self._set_image_dir(Path(image_dir_str))
 
     async def get_images(self) -> list[dict[str, Any]]:
         """
@@ -382,82 +344,3 @@ class LocalImagePlugin(ImagePlugin):
         if thumbnail_path.exists():
             return thumbnail_path
         return None
-
-
-# Register this plugin with pluggy
-@hookimpl
-def register_plugin_types() -> list[dict[str, Any]]:
-    """Register LocalImagePlugin type."""
-    return [LocalImagePlugin.get_plugin_metadata()]
-
-
-@hookimpl
-def create_plugin_instance(
-    plugin_id: str,
-    type_id: str,
-    name: str,
-    config: dict[str, Any],
-) -> LocalImagePlugin | None:
-    """Create a LocalImagePlugin instance."""
-    if type_id != "local":
-        return None
-
-    from pathlib import Path
-
-    enabled = config.get("enabled", False)  # Default to disabled
-
-    # Use IMAGE_DIR environment variable if set, otherwise use hardcoded directory
-    # Images are stored in ./data/images (relative to current working directory)
-    # Resolve to absolute path for reliability
-    import os
-
-    image_dir_str = os.getenv("IMAGE_DIR")
-    if image_dir_str:
-        image_dir = Path(image_dir_str).resolve()
-    else:
-        image_dir = Path("./data/images").resolve()
-
-    # Thumbnail directory is always image_dir/thumbnails
-    # We pass None and let the plugin set it automatically
-    return LocalImagePlugin(
-        plugin_id=plugin_id,
-        name=name,
-        image_dir=image_dir,
-        thumbnail_dir=None,  # Will be set to image_dir/thumbnails automatically
-        enabled=enabled,
-    )
-
-
-@hookimpl
-async def handle_plugin_config_update(
-    type_id: str,
-    config: dict[str, Any],
-    enabled: bool | None,
-    db_type: Any,
-    session: Any,
-) -> dict[str, Any] | None:
-    """Handle Local Images plugin configuration update and instance management."""
-    if type_id != "local":
-        return None
-
-    def on_instance_updated(plugin: Any, result: dict[str, Any]) -> None:
-        """Callback after instance update (IMAGE_DIR is handled in configure method)."""
-        # IMAGE_DIR environment variable changes are handled in the plugin's configure method
-        # which is called by the generic handler. No additional action needed here.
-        pass
-
-    manager_config = build_image_manager_config(
-        type_id="local",
-        single_instance=True,
-        instance_id="local-images",
-        default_instance_name="Local Images",
-        on_instance_updated=on_instance_updated,
-    )
-
-    return await handle_plugin_config_update_generic(
-        type_id, config, enabled, db_type, session, manager_config
-    )
-
-
-# Auto-register this module with pluggy when imported
-# The loader will discover and register this module automatically
