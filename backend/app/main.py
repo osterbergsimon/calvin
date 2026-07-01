@@ -131,7 +131,7 @@ from app.api.routes import (  # noqa: E402
 )
 from app.services.scheduler import calendar_scheduler  # noqa: E402
 
-# Plugins are auto-discovered via pluggy hooks when modules are imported
+# Plugin classes are auto-discovered by the loader when modules are imported
 
 # Use loguru logger (already imported at top of file)
 

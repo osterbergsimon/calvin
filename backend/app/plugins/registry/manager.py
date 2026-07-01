@@ -29,7 +29,7 @@ async def register_plugin(
     Returns:
         Registered plugin instance
     """
-    # Create plugin instance using pluggy hooks
+    # Create plugin instance from the loader's type registry
     plugin = plugin_loader.create_plugin_instance(
         plugin_id=plugin_id,
         type_id=type_id,

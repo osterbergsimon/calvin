@@ -9,7 +9,7 @@ from app.plugins.manager import plugin_manager as instance_manager
 
 async def load_plugin_types() -> None:
     """Load plugin types from database or register defaults."""
-    # Get plugin types from pluggy hooks
+    # Get plugin types from the loader's registry
     plugin_types = plugin_loader.get_plugin_types()
 
     for type_info in plugin_types:
@@ -212,7 +212,7 @@ async def load_plugin_instances() -> None:
                     await db_plugin.save_with_timestamp()
                 continue
 
-            # Create plugin instance using pluggy hooks (only for enabled plugins)
+            # Create plugin instance (only for enabled plugins)
             plugin = None
             try:
                 plugin_config = db_plugin.config or {}

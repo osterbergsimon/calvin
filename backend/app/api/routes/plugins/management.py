@@ -1119,7 +1119,7 @@ async def test_plugin(plugin_id: str, test_config: dict[str, Any] | None = Body(
     """
     Test plugin connection/configuration.
 
-    Uses plugin hooks to allow plugins to implement their own connection testing logic.
+    Dispatches to the plugin class's test_connection() classmethod.
 
     Args:
         plugin_id: Plugin type ID (e.g., 'imap', 'mealie')
