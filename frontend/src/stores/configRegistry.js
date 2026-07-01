@@ -270,6 +270,16 @@ export const CONFIG_FIELD_DEFINITIONS = [
     defaultValue: 55,
   },
   {
+    name: "hotCornerSize",
+    keys: ["hotCornerSize", "hot_corner_size"],
+    defaultValue: 64,
+  },
+  {
+    name: "hotCornerLongPressMs",
+    keys: ["hotCornerLongPressMs", "hot_corner_long_press_ms"],
+    defaultValue: 500,
+  },
+  {
     name: "touchControls",
     keys: ["touchControls", "touch_controls"],
     defaultValue: "auto",
