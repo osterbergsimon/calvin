@@ -31,7 +31,14 @@
             <div class="plugin-tree-header">
               <div class="plugin-order-handle">
                 <span class="order-number">{{ index + 1 }}</span>
-                <span class="plugin-drag-handle" title="Drag to reorder plugins"> ⋮⋮ </span>
+                <button
+                  type="button"
+                  class="plugin-drag-handle"
+                  :aria-label="`Drag to reorder ${plugin.name}`"
+                  :title="`Drag to reorder ${plugin.name}`"
+                >
+                  <span aria-hidden="true">⋮⋮</span>
+                </button>
               </div>
               <div class="plugin-info">
                 <strong>{{ plugin.name }}</strong>
@@ -58,9 +65,14 @@
                 <template #item="{ element: instance }">
                   <div class="instance-tree-item">
                     <div class="instance-tree-header">
-                      <span class="instance-drag-handle" title="Drag to reorder instances">
-                        ⋮⋮
-                      </span>
+                      <button
+                        type="button"
+                        class="instance-drag-handle"
+                        :aria-label="`Drag to reorder ${instance.name}`"
+                        :title="`Drag to reorder ${instance.name}`"
+                      >
+                        <span aria-hidden="true">⋮⋮</span>
+                      </button>
                       <span
                         v-if="instance.running !== undefined"
                         class="running-indicator"
@@ -68,13 +80,11 @@
                           running: instance.running,
                           stopped: !instance.running,
                         }"
-                        :title="
-                          instance.running
-                            ? '● Green: Instance is running'
-                            : '○ Red: Instance is stopped'
-                        "
+                        role="img"
+                        :aria-label="instance.running ? 'Running' : 'Stopped'"
+                        :title="instance.running ? 'Running' : 'Stopped'"
                       >
-                        {{ instance.running ? "●" : "○" }}
+                        <span aria-hidden="true">{{ instance.running ? "●" : "○" }}</span>
                       </span>
                       <span class="instance-name">{{ instance.name }}</span>
                       <span
@@ -162,27 +172,36 @@ const handleInstanceDragEnd = pluginId => {
 </script>
 
 <style scoped>
+/* Renders inside a shell SettingsSection panel (ContentSettings.vue), so it
+   supplies its own inner padding rather than panel chrome. */
 .ordering-manager {
   width: 100%;
+  padding: 0.875rem 1rem 1rem;
+}
+
+.ordering-manager > .setting-item {
+  margin-bottom: 0.875rem;
 }
 
 .ordering-tree {
   display: flex;
   flex-direction: column;
-  gap: 0.75rem;
+  gap: 0.625rem;
 }
 
 .plugin-tree-item {
-  background: var(--bg-1);
+  background: var(--bg-2);
   border: 1px solid var(--line);
-  border-radius: 6px;
-  transition: all 0.2s ease;
+  border-radius: 12px;
+  transition:
+    border-color 0.15s ease,
+    box-shadow 0.15s ease;
   overflow: hidden;
 }
 
 .plugin-tree-item:hover {
   border-color: var(--focus);
-  box-shadow: 0 2px 4px var(--shadow);
+  box-shadow: 0 2px 6px var(--shadow);
 }
 
 .plugin-tree-header {
@@ -208,11 +227,31 @@ const handleInstanceDragEnd = pluginId => {
 }
 
 .plugin-drag-handle {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 32px;
+  min-height: 32px;
+  padding: 0;
+  border: 0;
+  border-radius: 8px;
+  background: transparent;
   cursor: grab;
   font-size: 1.2rem;
   line-height: 1;
   color: var(--ink-3);
   user-select: none;
+  touch-action: none;
+}
+
+.plugin-drag-handle:hover {
+  color: var(--ink-2);
+}
+
+.plugin-drag-handle:focus-visible {
+  outline: 2px solid var(--focus);
+  outline-offset: 2px;
+  color: var(--ink-2);
 }
 
 .plugin-drag-handle:active {
@@ -227,9 +266,10 @@ const handleInstanceDragEnd = pluginId => {
 }
 
 .instance-count-badge {
-  padding: 0.25rem 0.5rem;
-  background: var(--bg-2);
-  border-radius: 12px;
+  padding: 0.15rem 0.55rem;
+  background: var(--bg-1);
+  border: 1px solid var(--line);
+  border-radius: 999px;
   font-size: 0.75rem;
   color: var(--ink-2);
   font-family: var(--font-data);
@@ -247,16 +287,15 @@ const handleInstanceDragEnd = pluginId => {
 }
 
 .instance-tree-item {
-  padding: 0.5rem 0.75rem;
-  background: var(--bg-2);
+  padding: 0.4rem 0.6rem;
+  background: var(--bg-1);
   border: 1px solid var(--line);
-  border-radius: 4px;
-  transition: all 0.2s ease;
+  border-radius: 8px;
+  transition: border-color 0.15s ease;
 }
 
 .instance-tree-item:hover {
   border-color: var(--focus);
-  background: var(--bg-2);
 }
 
 .instance-tree-header {
@@ -267,12 +306,32 @@ const handleInstanceDragEnd = pluginId => {
 }
 
 .instance-drag-handle {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 28px;
+  min-height: 28px;
+  padding: 0;
+  border: 0;
+  border-radius: 6px;
+  background: transparent;
   cursor: grab;
   font-size: 1rem;
   line-height: 1;
   color: var(--ink-3);
   user-select: none;
+  touch-action: none;
   flex-shrink: 0;
+}
+
+.instance-drag-handle:hover {
+  color: var(--ink-2);
+}
+
+.instance-drag-handle:focus-visible {
+  outline: 2px solid var(--focus);
+  outline-offset: 2px;
+  color: var(--ink-2);
 }
 
 .instance-drag-handle:active {
@@ -280,8 +339,10 @@ const handleInstanceDragEnd = pluginId => {
 }
 
 .running-indicator {
+  display: inline-flex;
   font-size: 1rem;
   line-height: 1;
+  flex-shrink: 0;
 }
 
 .running-indicator.running {
@@ -329,6 +390,13 @@ const handleInstanceDragEnd = pluginId => {
   text-align: center;
   background: var(--bg-2);
   border: 1px solid var(--line);
-  border-radius: 6px;
+  border-radius: 12px;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .plugin-tree-item,
+  .instance-tree-item {
+    transition: none;
+  }
 }
 </style>
