@@ -42,65 +42,71 @@
               </div>
               <div class="plugin-info">
                 <strong>{{ plugin.name }}</strong>
-                <span v-if="pluginInstances[plugin.id]?.length > 0" class="instance-count-badge">
+                <span
+                  v-if="isMultiInstance(plugin) && pluginInstances[plugin.id]?.length > 0"
+                  class="instance-count-badge"
+                >
                   {{ pluginInstances[plugin.id].length }}
                   {{ pluginInstances[plugin.id].length === 1 ? "instance" : "instances" }}
                 </span>
               </div>
             </div>
 
-            <!-- Nested instances list -->
-            <div v-if="pluginInstances[plugin.id]?.length > 0" class="plugin-instances-tree">
-              <draggable
-                :model-value="pluginInstances[plugin.id]"
-                :animation="200"
-                handle=".instance-drag-handle"
-                :group="`${type}-instances`"
-                :data-plugin-id="plugin.id"
-                item-key="id"
-                @update:model-value="handleInstanceOrderChange(plugin.id, $event)"
-                @start="handleInstanceDragStart(plugin.id)"
-                @end="handleInstanceDragEnd(plugin.id)"
-              >
-                <template #item="{ element: instance }">
-                  <div class="instance-tree-item">
-                    <div class="instance-tree-header">
-                      <button
-                        type="button"
-                        class="instance-drag-handle"
-                        :aria-label="`Drag to reorder ${instance.name}`"
-                        :title="`Drag to reorder ${instance.name}`"
-                      >
-                        <span aria-hidden="true">⋮⋮</span>
-                      </button>
-                      <span
-                        v-if="instance.running !== undefined"
-                        class="running-indicator"
-                        :class="{
-                          running: instance.running,
-                          stopped: !instance.running,
-                        }"
-                        role="img"
-                        :aria-label="instance.running ? 'Running' : 'Stopped'"
-                        :title="instance.running ? 'Running' : 'Stopped'"
-                      >
-                        <span aria-hidden="true">{{ instance.running ? "●" : "○" }}</span>
-                      </span>
-                      <span class="instance-name">{{ instance.name }}</span>
-                      <span
-                        v-if="instance.config && getInstanceSummary(plugin.id, instance.config)"
-                        class="instance-summary"
-                      >
-                        {{ getInstanceSummary(plugin.id, instance.config) }}
-                      </span>
+            <!-- Nested instances: only for multi-instance plugins. Single-instance
+                 plugins have nothing to reorder, so the sub-list is omitted. -->
+            <template v-if="isMultiInstance(plugin)">
+              <div v-if="pluginInstances[plugin.id]?.length > 0" class="plugin-instances-tree">
+                <draggable
+                  :model-value="pluginInstances[plugin.id]"
+                  :animation="200"
+                  handle=".instance-drag-handle"
+                  :group="`${type}-instances-${plugin.id}`"
+                  :data-plugin-id="plugin.id"
+                  item-key="id"
+                  @update:model-value="handleInstanceOrderChange(plugin.id, $event)"
+                  @start="handleInstanceDragStart(plugin.id)"
+                  @end="handleInstanceDragEnd(plugin.id)"
+                >
+                  <template #item="{ element: instance }">
+                    <div class="instance-tree-item">
+                      <div class="instance-tree-header">
+                        <button
+                          type="button"
+                          class="instance-drag-handle"
+                          :aria-label="`Drag to reorder ${instance.name}`"
+                          :title="`Drag to reorder ${instance.name}`"
+                        >
+                          <span aria-hidden="true">⋮⋮</span>
+                        </button>
+                        <span
+                          v-if="instance.running !== undefined"
+                          class="running-indicator"
+                          :class="{
+                            running: instance.running,
+                            stopped: !instance.running,
+                          }"
+                          role="img"
+                          :aria-label="instance.running ? 'Running' : 'Stopped'"
+                          :title="instance.running ? 'Running' : 'Stopped'"
+                        >
+                          <span aria-hidden="true">{{ instance.running ? "●" : "○" }}</span>
+                        </span>
+                        <span class="instance-name">{{ instance.name }}</span>
+                        <span
+                          v-if="instance.config && getInstanceSummary(plugin.id, instance.config)"
+                          class="instance-summary"
+                        >
+                          {{ getInstanceSummary(plugin.id, instance.config) }}
+                        </span>
+                      </div>
                     </div>
-                  </div>
-                </template>
-              </draggable>
-            </div>
-            <div v-else class="no-instances-message">
-              <span class="help-text">No instances configured</span>
-            </div>
+                  </template>
+                </draggable>
+              </div>
+              <div v-else class="no-instances-message">
+                <span class="help-text">No instances configured</span>
+              </div>
+            </template>
           </div>
         </template>
       </draggable>
@@ -145,6 +151,10 @@ const emit = defineEmits([
   "instance-drag-start",
   "instance-drag-end",
 ]);
+
+// Single-instance plugins (supports_multiple_instances === false) have nothing
+// to reorder, so we omit their instance sub-list entirely.
+const isMultiInstance = plugin => plugin.supports_multiple_instances !== false;
 
 const handlePluginOrderChange = newOrder => {
   emit("plugin-order-change", newOrder);
