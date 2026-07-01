@@ -1,10 +1,10 @@
 <template>
   <div class="web-component-host">
-    <div v-if="error" class="web-component-host__error">
-      Failed to load plugin component: {{ error }}
+    <div v-if="error" class="web-component-host__error calvin-plugin-error">
+      Couldn't load this plugin's display. {{ error }}
     </div>
     <component v-else-if="loaded" :is="elementName" ref="elementRef" />
-    <div v-else class="web-component-host__loading">Loading…</div>
+    <div v-else class="web-component-host__loading calvin-plugin-loading">Loading…</div>
   </div>
 </template>
 
@@ -90,16 +90,8 @@ onBeforeUnmount(() => {
   height: 100%;
 }
 
-.web-component-host__error {
-  padding: 0.75rem;
-  color: var(--accent-error, #e74c3c);
-  font-size: 0.85em;
-}
-
+.web-component-host__error,
 .web-component-host__loading {
-  padding: 0.75rem;
-  color: var(--text-secondary);
-  font-style: italic;
-  font-size: 0.85em;
+  font-size: 0.85rem;
 }
 </style>

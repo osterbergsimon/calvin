@@ -2,11 +2,11 @@
   <div class="card-grid calvin-plugin-grid" :style="gridStyle">
     <article v-for="(card, idx) in cards" :key="idx" class="card-grid__card calvin-plugin-surface">
       <header v-if="cardTitle(card)" class="card-grid__title">{{ cardTitle(card) }}</header>
-      <ul v-if="cardItems(card).length" class="card-grid__items">
+      <ul v-if="cardItems(card).length" class="card-grid__items calvin-plugin-list">
         <li
           v-for="(item, j) in cardItems(card)"
           :key="j"
-          class="card-grid__item"
+          class="card-grid__item calvin-plugin-row"
           :class="{
             'card-grid__item--clickable': itemUrl(item),
             'calvin-plugin-clickable': itemUrl(item),
@@ -18,7 +18,7 @@
         </li>
       </ul>
       <p v-else class="card-grid__empty calvin-plugin-empty">
-        {{ schema.empty_text || "—" }}
+        {{ schema.empty_text || "Nothing planned." }}
       </p>
     </article>
   </div>
@@ -108,33 +108,23 @@ function open(url) {
   overflow: hidden;
 }
 
+/* card title = the readout microlabel: one label voice everywhere */
 .card-grid__title {
-  font-weight: 700;
-  font-size: 0.85rem;
-  color: var(--text-primary);
-  padding-bottom: 0.4rem;
-  border-bottom: 1px solid var(--border-color);
+  font-family: var(--font-ui);
+  font-size: 0.7rem;
+  font-weight: 600;
+  letter-spacing: 0.09em;
   text-transform: uppercase;
-  letter-spacing: 0.05em;
-}
-
-.card-grid__items {
-  list-style: none;
-  margin: 0;
-  padding: 0;
-  display: flex;
-  flex-direction: column;
-  gap: 0.4rem;
+  color: var(--ink-3);
+  padding-bottom: 0.45rem;
+  border-bottom: 1px solid var(--line-soft);
 }
 
 .card-grid__item {
   display: flex;
-  align-items: center;
+  align-items: baseline;
   gap: 0.75rem;
-  padding: 0.5rem 0.75rem;
-  background: var(--bg-primary);
-  border-radius: 6px;
-  border: 1px solid transparent;
+  border-radius: 2px;
 }
 
 .card-grid__item--clickable {
@@ -142,23 +132,27 @@ function open(url) {
 }
 
 .card-grid__item-label {
+  font-family: var(--font-ui);
+  font-size: 0.7rem;
   font-weight: 600;
-  font-size: 0.8rem;
-  color: var(--accent-primary);
-  text-transform: capitalize;
+  letter-spacing: 0.09em;
+  text-transform: uppercase;
+  color: var(--ink-3);
   min-width: 70px;
+  flex-shrink: 0;
 }
 
 .card-grid__item-value {
   flex: 1;
-  color: var(--text-primary);
-  font-size: 0.9rem;
+  color: var(--ink);
+  font-size: 0.95rem;
+  line-height: 1.35;
   word-break: break-word;
 }
 
 .card-grid__empty {
-  color: var(--text-secondary);
-  font-style: italic;
   margin: 0;
+  text-align: left;
+  padding: 0.5rem 0;
 }
 </style>
