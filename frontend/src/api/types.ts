@@ -1012,7 +1012,7 @@ export interface paths {
      * @description Get data from a service plugin instance.
      *
      *     This is a generic endpoint that works for all service plugins that implement
-     *     the fetch_service_data() method (e.g., weather plugins).
+     *     the fetch() method (e.g., weather plugins).
      *
      *     Args:
      *         plugin_id: Plugin instance ID
@@ -1042,9 +1042,10 @@ export interface paths {
     put?: never;
     /**
      * Fetch Plugin
-     * @description Manually trigger plugin fetch/check operation.
+     * @description Manually trigger a fetch/check operation on a plugin type's instances.
      *
-     *     Uses plugin hooks to allow plugins to implement their own fetch logic.
+     *     Calls `fetch()` on each enabled instance of the type (e.g. an imap
+     *     plugin's "check now" action).
      *
      *     Args:
      *         plugin_id: Plugin type ID (e.g., 'imap')
@@ -1112,8 +1113,8 @@ export interface paths {
      * Create Plugin Instance
      * @description Create a plugin instance via an explicit instance lifecycle endpoint.
      *
-     *     This currently adapts to the existing plugin hook contract by translating
-     *     the typed payload into the legacy config-update metadata fields.
+     *     The typed payload is translated into the config-update metadata fields
+     *     understood by the generic instance manager.
      */
     post: operations["create_plugin_instance_api_plugins__plugin_id__instances_post"];
     delete?: never;
@@ -1722,11 +1723,6 @@ export interface components {
     };
     /** PluginDeleteResponse */
     PluginDeleteResponse: {
-      /**
-       * Frontend Rebuild In Progress
-       * @default false
-       */
-      frontend_rebuild_in_progress: boolean;
       /** Message */
       message: string;
       /** Success */
@@ -1734,8 +1730,6 @@ export interface components {
     };
     /** PluginInstallResponse */
     PluginInstallResponse: {
-      /** Frontend Rebuild In Progress */
-      frontend_rebuild_in_progress: boolean;
       /** Manifest */
       manifest: {
         [key: string]: unknown;
