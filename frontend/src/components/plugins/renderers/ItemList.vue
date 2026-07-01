@@ -18,7 +18,7 @@
       </div>
     </li>
     <li v-if="items.length === 0" class="item-list__empty calvin-plugin-empty">
-      {{ schema.empty_text || "No items" }}
+      {{ schema.empty_text || "Nothing to show yet." }}
     </li>
   </ul>
 </template>
@@ -60,23 +60,23 @@ function open(url) {
 </script>
 
 <style scoped>
-.item-list {
-  gap: 0.4rem;
-}
-
 .item-list__row {
   display: flex;
-  gap: 0.75rem;
+  align-items: baseline;
+  gap: 0.9rem;
 }
 
 .item-list__row--clickable {
   cursor: pointer;
 }
 
+/* timestamps are data: tabular mono column so entries align like a log */
 .item-list__timestamp {
-  color: var(--text-secondary);
+  font-family: var(--font-data);
+  font-variant-numeric: tabular-nums;
   font-size: 0.8rem;
-  font-weight: 600;
+  font-weight: 500;
+  color: var(--ink-3);
   min-width: 80px;
   flex-shrink: 0;
 }
@@ -90,16 +90,15 @@ function open(url) {
 }
 
 .item-list__label {
-  color: var(--text-primary);
+  color: var(--ink);
   font-weight: 600;
-  font-size: 0.9rem;
+  font-size: 0.95rem;
+  line-height: 1.35;
 }
 
 .item-list__value {
-  color: var(--text-secondary);
+  color: var(--ink-2);
   font-size: 0.85rem;
-}
-
-.item-list__empty {
+  line-height: 1.35;
 }
 </style>

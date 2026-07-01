@@ -12,13 +12,10 @@
       @error="handleError"
     />
 
-    <div v-if="error" class="iframe-renderer__error calvin-plugin-error">
+    <div v-if="error" class="iframe-renderer__error">
       <div class="iframe-renderer__error-content">
-        <h3>⚠️ Cannot Display Service</h3>
-        <p>
-          This service cannot be embedded in an iframe due to security restrictions
-          (CORS/X-Frame-Options).
-        </p>
+        <h3>This site won't embed</h3>
+        <p>It blocks being shown inside another page (X-Frame-Options/CSP).</p>
         <p v-if="url" class="iframe-renderer__url">{{ url }}</p>
         <div class="iframe-renderer__actions">
           <a
@@ -28,7 +25,7 @@
             rel="noopener noreferrer"
             class="iframe-renderer__btn iframe-renderer__btn--primary"
           >
-            Open in New Window
+            Open in new window
           </a>
           <button class="iframe-renderer__btn iframe-renderer__btn--secondary" @click="retry">
             Retry
@@ -120,7 +117,7 @@ onUnmounted(clearTimer);
   width: 100%;
   height: 100%;
   border: none;
-  background: var(--bg-primary);
+  background: var(--bg-1);
 }
 
 .iframe-renderer__frame--error {
@@ -133,7 +130,7 @@ onUnmounted(clearTimer);
   display: flex;
   align-items: center;
   justify-content: center;
-  background: var(--bg-primary);
+  background: var(--bg-1);
   z-index: 10;
 }
 
@@ -144,22 +141,26 @@ onUnmounted(clearTimer);
 }
 
 .iframe-renderer__error-content h3 {
-  margin: 0 0 1rem 0;
-  color: var(--accent-error);
-  font-size: 1.5rem;
+  margin: 0 0 0.75rem 0;
+  color: var(--ink);
+  font-family: var(--font-ui);
+  font-size: 1.15rem;
+  font-weight: 700;
 }
 
 .iframe-renderer__error-content p {
-  margin: 0.5rem 0;
-  color: var(--text-secondary);
+  margin: 0.4rem 0;
+  color: var(--ink-2);
+  font-size: 0.95rem;
 }
 
 .iframe-renderer__url {
-  font-family: monospace;
-  font-size: 0.9rem;
+  font-family: var(--font-data);
+  font-size: 0.8rem;
   word-break: break-all;
-  color: var(--text-primary);
-  background: var(--bg-secondary);
+  color: var(--ink-2);
+  background: var(--bg-2);
+  border: 1px solid var(--line-soft);
   padding: 0.5rem;
   border-radius: 4px;
   margin: 1rem 0;
@@ -167,37 +168,35 @@ onUnmounted(clearTimer);
 
 .iframe-renderer__actions {
   display: flex;
-  gap: 1rem;
+  gap: 0.75rem;
   justify-content: center;
-  margin-top: 1.5rem;
+  margin-top: 1.25rem;
 }
 
 .iframe-renderer__btn {
-  padding: 0.75rem 1.5rem;
+  padding: 0.6rem 1.25rem;
   border-radius: 4px;
-  font-size: 1rem;
+  font-family: var(--font-ui);
+  font-size: 0.9rem;
+  font-weight: 600;
   cursor: pointer;
-  transition: all 0.2s;
-  border: 1px solid transparent;
+  border: 1px solid var(--line);
+  background: var(--bg-2);
+  color: var(--ink);
+  text-decoration: none;
+  transition: border-color 0.2s;
 }
 
 .iframe-renderer__btn--primary {
-  background: var(--accent-primary);
-  color: white;
-  text-decoration: none;
+  border-color: var(--focus);
 }
 
-.iframe-renderer__btn--primary:hover {
-  background: var(--accent-secondary);
+.iframe-renderer__btn:hover {
+  border-color: var(--focus);
 }
 
-.iframe-renderer__btn--secondary {
-  background: var(--bg-secondary);
-  color: var(--text-primary);
-  border-color: var(--border-color);
-}
-
-.iframe-renderer__btn--secondary:hover {
-  background: var(--bg-tertiary);
+.iframe-renderer__btn:focus-visible {
+  outline: 2px solid var(--focus);
+  outline-offset: 2px;
 }
 </style>

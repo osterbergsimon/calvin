@@ -39,7 +39,7 @@ const metadata = computed(() => pick("metadata_path", "metadata", "metadata_form
   height: 100%;
   margin: 0;
   overflow: hidden;
-  background: var(--bg-primary);
+  background: var(--bg-0);
 }
 
 .image-caption__img {
@@ -62,6 +62,7 @@ const metadata = computed(() => pick("metadata_path", "metadata", "metadata_form
 
 .image-caption__title {
   margin: 0;
+  font-family: var(--font-ui);
   font-size: 1.1rem;
   font-weight: 700;
 }
@@ -77,9 +78,12 @@ const metadata = computed(() => pick("metadata_path", "metadata", "metadata_form
   overflow: hidden;
 }
 
+/* metadata (date, camera, source) is data — tabular mono microtext */
 .image-caption__meta {
-  font-size: 0.75rem;
-  opacity: 0.7;
-  letter-spacing: 0.05em;
+  font-family: var(--font-data);
+  font-variant-numeric: tabular-nums;
+  font-size: 0.72rem;
+  opacity: 0.75;
+  letter-spacing: 0.04em;
 }
 </style>
