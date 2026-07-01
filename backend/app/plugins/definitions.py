@@ -19,10 +19,10 @@ from app.plugins.base import PluginType
 CURRENT_PLUGIN_API_VERSION = 1
 
 DISPLAY_PANEL_VARIANTS = {"default", "dense", "media", "iframe"}
+# Panel kinds — must mirror `renderers` in frontend rendererRegistry.js
+# (enforced by tests/unit/test_display_kind_sync.py).
 SUPPORTED_DISPLAY_KINDS = {
-    "status-tile",
-    "status-list",
-    "status-row",
+    "status",
     "card-grid",
     "item-list",
     "iframe",
@@ -31,22 +31,38 @@ SUPPORTED_DISPLAY_KINDS = {
     "weather-forecast",
     "web-component",
 }
+# Statusbar kinds — a statusbar item is a compact strip, not a full panel, so
+# it has its own (smaller) namespace. Mirrors SUPPORTED_STATUSBAR_KINDS in
+# rendererRegistry.js.
+SUPPORTED_STATUSBAR_KINDS = {"status"}
+
+# Keys from the retired pre-1.0 display contract (type:"api", render_template,
+# shipped .vue components). Rejected loudly so straddlers fail at load, not at
+# render.
+_LEGACY_DISPLAY_KEYS = {"type", "api_endpoint", "render_template", "component", "data_schema"}
 
 
 def _validate_schema_kind(
     value: dict[str, Any] | None,
     *,
     field_name: str,
+    allowed_kinds: set[str],
     check_panel_variant: bool,
 ) -> dict[str, Any] | None:
     """Validate that a schema dict has a supported kind and (optionally) panel_variant."""
     if value is None:
         return value
+    legacy = sorted(_LEGACY_DISPLAY_KEYS & value.keys())
+    if legacy:
+        raise ValueError(
+            f"{field_name} uses retired pre-1.0 keys: {', '.join(legacy)}. "
+            "Declare a kind-based schema instead (see SUPPORTED_DISPLAY_KINDS)."
+        )
     kind = value.get("kind")
     if kind is None:
         raise ValueError(f"{field_name}.kind is required when {field_name} is provided")
-    if kind not in SUPPORTED_DISPLAY_KINDS:
-        allowed = ", ".join(sorted(SUPPORTED_DISPLAY_KINDS))
+    if kind not in allowed_kinds:
+        allowed = ", ".join(sorted(allowed_kinds))
         raise ValueError(f"{field_name}.kind must be one of: {allowed} (got {kind!r})")
     if check_panel_variant:
         panel_variant = value.get("panel_variant")
@@ -142,12 +158,20 @@ class PluginMetadata(BaseModel):
     @classmethod
     def validate_display_schema(cls, value: dict[str, Any] | None) -> dict[str, Any] | None:
         """Validate known display schema shell fields while allowing renderer-specific keys."""
-        return _validate_schema_kind(value, field_name="display_schema", check_panel_variant=True)
+        return _validate_schema_kind(
+            value,
+            field_name="display_schema",
+            allowed_kinds=SUPPORTED_DISPLAY_KINDS,
+            check_panel_variant=True,
+        )
 
     @field_validator("statusbar_schema")
     @classmethod
     def validate_statusbar_schema(cls, value: dict[str, Any] | None) -> dict[str, Any] | None:
-        """Statusbar schemas dispatch through the same SchemaRenderer; same validation applies."""
+        """Statusbar items have their own kind namespace — no full panels in the bar."""
         return _validate_schema_kind(
-            value, field_name="statusbar_schema", check_panel_variant=False
+            value,
+            field_name="statusbar_schema",
+            allowed_kinds=SUPPORTED_STATUSBAR_KINDS,
+            check_panel_variant=False,
         )

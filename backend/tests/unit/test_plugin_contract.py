@@ -37,7 +37,10 @@ class MinimalPlugin(ServicePlugin):
             },
             "count": {"type": "integer", "default": 3},
         },
-        display_schema={"kind": "status-tile", "label": "Minimal", "value_path": "$.value"},
+        display_schema={
+            "kind": "status",
+            "item": {"label": "Minimal", "value_path": "$.value"},
+        },
     )
 
     async def fetch(self, start_date=None, end_date=None):
@@ -222,9 +225,28 @@ class TestPluginMetadataModel:
 
     def test_display_schema_requires_supported_kind(self):
         with pytest.raises(ValidationError, match="kind is required"):
-            PluginMetadata(type_id="x", name="X", display_schema={"type": "api"})
+            PluginMetadata(type_id="x", name="X", display_schema={"title": "No kind"})
         with pytest.raises(ValidationError, match="must be one of"):
             PluginMetadata(type_id="x", name="X", display_schema={"kind": "nope"})
+
+    def test_legacy_display_keys_fail_loudly(self):
+        # The retired type:"api"/render_template/.vue path must be rejected at
+        # load even when a valid kind is also present (no straddling).
+        for legacy in (
+            {"type": "api", "api_endpoint": "/api/x"},
+            {"kind": "iframe", "render_template": "weather"},
+            {"kind": "iframe", "component": "x/Foo.vue"},
+        ):
+            with pytest.raises(ValidationError, match="retired pre-1.0 keys"):
+                PluginMetadata(type_id="x", name="X", display_schema=legacy)
+
+    def test_statusbar_namespace_excludes_panel_kinds(self):
+        with pytest.raises(ValidationError, match="statusbar_schema.kind must be one of"):
+            PluginMetadata(type_id="x", name="X", statusbar_schema={"kind": "iframe"})
+        metadata = PluginMetadata(
+            type_id="x", name="X", statusbar_schema={"kind": "status", "item": {"label": "X"}}
+        )
+        assert metadata.statusbar_schema["kind"] == "status"
 
     def test_dict_compat_shims_are_gone(self):
         metadata = PluginMetadata(type_id="x", name="X")
