@@ -3557,7 +3557,7 @@
     },
     "/api/plugins/{plugin_id}/test": {
       "post": {
-        "description": "Test plugin connection/configuration.\n\nUses plugin hooks to allow plugins to implement their own connection testing logic.\n\nArgs:\n    plugin_id: Plugin type ID (e.g., 'imap', 'mealie')\n    test_config: Optional config to use for testing (if not provided, uses saved config)\n\nReturns:\n    Test result with success status and message",
+        "description": "Test plugin connection/configuration.\n\nDispatches to the plugin class's test_connection() classmethod.\n\nArgs:\n    plugin_id: Plugin type ID (e.g., 'imap', 'mealie')\n    test_config: Optional config to use for testing (if not provided, uses saved config)\n\nReturns:\n    Test result with success status and message",
         "operationId": "test_plugin_api_plugins__plugin_id__test_post",
         "parameters": [
           {
