@@ -156,7 +156,7 @@
       </SettingRow>
       <SettingRow
         label="Reveal corner"
-        description="Which screen corner shows the tap-to-reveal control while the UI is hidden."
+        description="Which screen corner reveals the controls on a press-and-hold while the UI is hidden."
       >
         <SelectPill
           :model-value="config.hotCornerPosition || 'bottom-left'"
@@ -165,16 +165,14 @@
             { value: 'bottom-right', label: 'Bottom right' },
             { value: 'top-left', label: 'Top left' },
             { value: 'top-right', label: 'Top right' },
-            { value: 'off', label: 'Off' },
           ]"
           aria-label="Reveal corner"
           @update:model-value="v => emit('update:config', { hotCornerPosition: v })"
         />
       </SettingRow>
       <SettingRow
-        v-if="(config.hotCornerPosition || 'bottom-left') !== 'off'"
         label="Reveal corner opacity"
-        description="How visible the reveal corner is at rest (0 = invisible but still tappable). It always brightens when you touch it."
+        description="How visible the reveal corner is at rest (0 = invisible, but press-and-hold still reveals)."
       >
         <NumberStepper
           :model-value="config.hotCornerOpacity ?? 55"
@@ -183,6 +181,34 @@
           :step="5"
           aria-label="Reveal corner opacity percentage"
           @update:model-value="v => emit('update:config', { hotCornerOpacity: v })"
+        />
+      </SettingRow>
+      <SettingRow
+        label="Reveal corner size"
+        description="Size of the corner target and its press-and-hold hit area."
+      >
+        <RangeSlider
+          :model-value="config.hotCornerSize ?? 64"
+          :min="40"
+          :max="96"
+          :step="4"
+          unit="px"
+          aria-label="Reveal corner size in pixels"
+          @update:model-value="v => emit('update:config', { hotCornerSize: v })"
+        />
+      </SettingRow>
+      <SettingRow
+        label="Reveal hold time"
+        description="How long to press-and-hold the corner before the controls appear."
+      >
+        <RangeSlider
+          :model-value="config.hotCornerLongPressMs ?? 500"
+          :min="200"
+          :max="1200"
+          :step="50"
+          unit="ms"
+          aria-label="Reveal hold time in milliseconds"
+          @update:model-value="v => emit('update:config', { hotCornerLongPressMs: v })"
         />
       </SettingRow>
       <SettingRow
@@ -226,6 +252,7 @@ import SegmentedControl from "@/components/ui/SegmentedControl.vue";
 import ToggleSwitch from "@/components/ui/ToggleSwitch.vue";
 import SelectPill from "@/components/ui/SelectPill.vue";
 import NumberStepper from "@/components/ui/NumberStepper.vue";
+import RangeSlider from "@/components/ui/RangeSlider.vue";
 import ThemePicker from "@/components/settings/shell/ThemePicker.vue";
 import TypefacePicker from "@/components/settings/shell/TypefacePicker.vue";
 import DashboardRegionsEditor from "@/components/settings/shared/DashboardRegionsEditor.vue";

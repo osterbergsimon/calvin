@@ -1,6 +1,7 @@
 /**
- * Unit tests for MinimalUIOverlay — the configurable hot-corner reveal shown
- * when the UI is hidden (calvin-hgy).
+ * Unit tests for MinimalUIOverlay — the configurable hot-corner reveal hint
+ * shown when the UI is hidden. The reveal gesture itself (press-and-hold) lives
+ * in useHotCornerReveal; here we test the visual (calvin-hgy, calvin-arv).
  */
 
 import { describe, it, expect, beforeEach, vi } from "vitest";
@@ -24,7 +25,6 @@ describe("MinimalUIOverlay (hot corner)", () => {
     const btn = wrapper.find(".hot-corner");
     expect(btn.exists()).toBe(true);
     expect(btn.classes()).toContain("hot-corner--top-right");
-    expect(btn.attributes("title")).toBe("Show controls");
     expect(wrapper.find("svg").exists()).toBe(true);
   });
 
@@ -39,10 +39,12 @@ describe("MinimalUIOverlay (hot corner)", () => {
     expect(wrapper.find(".hot-corner").exists()).toBe(false);
   });
 
-  it("does not render when the corner is switched off", () => {
+  it("normalizes a legacy 'off' value to bottom-left (no lockout)", () => {
     configStore.hotCornerPosition = "off";
     const wrapper = mount(MinimalUIOverlay);
-    expect(wrapper.find(".hot-corner").exists()).toBe(false);
+    const btn = wrapper.find(".hot-corner");
+    expect(btn.exists()).toBe(true);
+    expect(btn.classes()).toContain("hot-corner--bottom-left");
   });
 
   it("applies the configured rest opacity (0–100 → 0–1)", () => {
@@ -51,7 +53,13 @@ describe("MinimalUIOverlay (hot corner)", () => {
     expect(wrapper.find(".hot-corner").attributes("style")).toContain("--rest-opacity: 0.2");
   });
 
-  it("reveals the UI temporarily on tap", async () => {
+  it("applies the configured size", () => {
+    configStore.hotCornerSize = 80;
+    const wrapper = mount(MinimalUIOverlay);
+    expect(wrapper.find(".hot-corner").attributes("style")).toContain("--hot-corner-size: 80px");
+  });
+
+  it("reveals the UI temporarily via keyboard activation (Enter → click)", async () => {
     const spy = vi.spyOn(configStore, "showUITemporarily");
     const wrapper = mount(MinimalUIOverlay);
     await wrapper.find(".hot-corner").trigger("click");

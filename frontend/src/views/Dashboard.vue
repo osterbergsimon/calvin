@@ -155,6 +155,7 @@ import { useConfigStore } from "../stores/config";
 import { useModeStore } from "../stores/mode";
 import { useRoute } from "vue-router";
 import { useKeyboardActions } from "../composables/useKeyboardActions";
+import { useHotCornerReveal } from "../composables/useHotCornerReveal";
 import {
   getActiveDashboardScreen,
   getClockBarPlacementGap,
@@ -167,6 +168,11 @@ import {
 } from "../utils/layout";
 
 const configStore = useConfigStore();
+
+// Press-and-hold in the reveal corner shows the UI while it's hidden. Runs at
+// the window level so the corner visual stays pointer-events:none and content
+// taps pass straight through. See calvin-arv.
+useHotCornerReveal(configStore);
 const modeStore = useModeStore();
 const route = useRoute();
 const { focusRegion } = useKeyboardActions();
