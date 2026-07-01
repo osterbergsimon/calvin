@@ -139,9 +139,9 @@ async def test_imap_download_triggers_image_processor():
         local_plugin = LocalImagePlugin(
             plugin_id="local-images",
             name="Local Images",
-            image_dir=image_dir,
             enabled=True,
         )
+        await local_plugin.configure({"image_dir": str(image_dir)})
         await local_plugin.initialize()
 
         # Create ImageProcessorPlugin
@@ -255,9 +255,9 @@ async def test_full_event_chain_imap_to_processor_to_logger():
         local_plugin = LocalImagePlugin(
             plugin_id="local-images",
             name="Local Images",
-            image_dir=image_dir,
             enabled=True,
         )
+        await local_plugin.configure({"image_dir": str(image_dir)})
         await local_plugin.initialize()
 
         # Create ImageProcessorPlugin

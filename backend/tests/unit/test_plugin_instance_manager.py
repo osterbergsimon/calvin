@@ -6,6 +6,7 @@ import pytest
 
 from app.plugins.utils.instance_manager import (
     InstanceManagerConfig,
+    apply_plugin_config_update,
     handle_plugin_config_update_generic,
 )
 
@@ -134,7 +135,6 @@ class TestHandlePluginConfigUpdateGeneric:
             config={},
             enabled=None,
             db_type=None,
-            session=None,  # Session parameter ignored with Ormar
             manager_config=manager_config,
         )
         assert result is None
@@ -146,7 +146,6 @@ class TestHandlePluginConfigUpdateGeneric:
             config={"count": -1},  # Invalid count
             enabled=None,
             db_type=mock_db_type,
-            session=None,  # Session parameter ignored with Ormar
             manager_config=manager_config,
         )
         assert result is not None
@@ -193,7 +192,6 @@ class TestHandlePluginConfigUpdateGeneric:
                     config={"count": 30, "_instance_name": "My Instance"},
                     enabled=True,
                     db_type=real_db_type,  # Use real db_type instead of mock
-                    session=None,  # Session parameter ignored with Ormar
                     manager_config=manager_config,
                 )
 
@@ -242,7 +240,6 @@ class TestHandlePluginConfigUpdateGeneric:
                     config={"count": 30},
                     enabled=True,
                     db_type=real_db_type,  # Use real db_type instead of mock
-                    session=None,  # Session parameter ignored with Ormar
                     manager_config=single_instance_config,
                 )
 
@@ -289,7 +286,6 @@ class TestHandlePluginConfigUpdateGeneric:
             config={"count": 50, "_instance_id": "test-instance"},
             enabled=True,
             db_type=mock_db_type,
-            session=None,  # Session parameter ignored with Ormar
             manager_config=manager_config,
         )
 
@@ -345,7 +341,6 @@ class TestHandlePluginConfigUpdateGeneric:
             config={"_instance_id": "test-instance", "_instance_enabled": False},
             enabled=None,
             db_type=mock_db_type,
-            session=None,  # Session parameter ignored with Ormar
             manager_config=manager_config,
         )
 
@@ -401,7 +396,6 @@ class TestHandlePluginConfigUpdateGeneric:
                     },  # String that needs normalization
                     enabled=True,
                     db_type=mock_db_type,
-                    session=None,  # Session parameter ignored with Ormar
                     manager_config=manager_config,
                 )
 
@@ -459,7 +453,6 @@ class TestHandlePluginConfigUpdateGeneric:
                         },
                         enabled=True,
                         db_type=mock_db_type,
-                        session=None,  # Session parameter ignored with Ormar
                         manager_config=manager_config,
                     )
 
@@ -535,7 +528,6 @@ class TestHandlePluginConfigUpdateGeneric:
                         },
                         enabled=True,
                         db_type=mock_db_type,
-                        session=None,  # Session parameter ignored with Ormar
                         manager_config=manager_config,
                     )
 
@@ -598,7 +590,6 @@ class TestHandlePluginConfigUpdateGeneric:
                     config={"count": 30, "_instance_name": "Test Instance"},
                     enabled=True,
                     db_type=mock_db_type,
-                    session=None,  # Session parameter ignored with Ormar
                     manager_config=manager_config,
                 )
 
@@ -653,7 +644,6 @@ class TestHandlePluginConfigUpdateGeneric:
             config={"count": 50, "_instance_id": "test-instance"},
             enabled=True,
             db_type=mock_db_type,
-            session=None,  # Session parameter ignored with Ormar
             manager_config=manager_config,
         )
 
@@ -664,3 +654,164 @@ class TestHandlePluginConfigUpdateGeneric:
 
         # Cleanup
         await plugin_manager.unregister("test-instance")
+
+
+@pytest.mark.unit
+class TestValidateConfigSyncOrAsync:
+    """validate_config callbacks may be sync or async."""
+
+    async def test_async_validate_config_failure(self, mock_db_type, test_db):
+        async def validate_config(config):
+            return False
+
+        manager_config = InstanceManagerConfig(
+            type_id="test_plugin",
+            validate_config=validate_config,
+        )
+
+        result = await handle_plugin_config_update_generic(
+            type_id="test_plugin",
+            config={"count": 1},
+            enabled=None,
+            db_type=mock_db_type,
+            manager_config=manager_config,
+        )
+        assert result == {"instance_created": False, "instance_updated": False}
+
+    async def test_async_validate_config_success(self, mock_db_type, mock_plugin, test_db):
+        async def validate_config(config):
+            return True
+
+        manager_config = InstanceManagerConfig(
+            type_id="test_plugin",
+            validate_config=validate_config,
+            generate_instance_id=lambda c, t: f"{t}-async-ok",
+        )
+
+        with patch("app.plugins.registry.manager.plugin_loader") as mock_loader:
+            mock_loader.create_plugin_instance.return_value = mock_plugin
+
+            with patch("app.plugins.registry.manager.instance_manager") as mock_instance_mgr:
+                mock_instance_mgr.register = AsyncMock()
+
+                from app.models.db_models import PluginTypeDB
+
+                db_type = await PluginTypeDB.objects.get_or_none(type_id="test_plugin")
+                if not db_type:
+                    await PluginTypeDB.objects.create(
+                        type_id="test_plugin",
+                        plugin_type="image",
+                        name="Test Plugin",
+                        enabled=True,
+                    )
+
+                result = await handle_plugin_config_update_generic(
+                    type_id="test_plugin",
+                    config={"count": 1, "_instance_name": "Async OK"},
+                    enabled=True,
+                    db_type=mock_db_type,
+                    manager_config=manager_config,
+                )
+
+                assert result is not None
+                assert result.get("instance_created") is True
+                assert result["instance_id"] == "test_plugin-async-ok"
+
+
+@pytest.mark.unit
+class TestApplyPluginConfigUpdate:
+    """apply_plugin_config_update derives the manager config from the class."""
+
+    @staticmethod
+    def _register_fixture_class(monkeypatch):
+        import types
+
+        from app.plugins.definitions import PluginMetadata
+        from app.plugins.loader import PluginLoader
+        from app.plugins.protocols import ServicePlugin
+
+        class DerivedPlugin(ServicePlugin):
+            metadata = PluginMetadata(
+                type_id="derived",
+                name="Derived",
+                instance_identity=["url"],
+                instance_config_schema={
+                    "url": {
+                        "type": "string",
+                        "default": "",
+                        "ui": {"validation": {"required": True}},
+                    },
+                },
+            )
+
+        module = types.ModuleType("fake_derived_plugin_module")
+        module.DerivedPlugin = DerivedPlugin
+
+        import app.plugins.loader as loader_module
+
+        fresh_loader = PluginLoader()
+        fresh_loader.register_module(module)
+        monkeypatch.setattr(loader_module, "plugin_loader", fresh_loader)
+        return DerivedPlugin
+
+    async def test_unknown_type_returns_none(self, monkeypatch):
+        import app.plugins.loader as loader_module
+        from app.plugins.loader import PluginLoader
+
+        monkeypatch.setattr(loader_module, "plugin_loader", PluginLoader())
+
+        result = await apply_plugin_config_update(
+            type_id="unknown",
+            config={},
+            enabled=True,
+            db_type=None,
+        )
+        assert result is None
+
+    async def test_schema_driven_validation_failure(self, monkeypatch, mock_db_type, test_db):
+        """The class's default validate_config (required fields) is wired in."""
+        self._register_fixture_class(monkeypatch)
+
+        result = await apply_plugin_config_update(
+            type_id="derived",
+            config={"url": ""},  # required field empty
+            enabled=True,
+            db_type=mock_db_type,
+        )
+        assert result == {"instance_created": False, "instance_updated": False}
+
+    async def test_creates_instance_with_identity_derived_id(
+        self, monkeypatch, mock_db_type, mock_plugin, test_db
+    ):
+        """instance_id_for (instance_identity) drives the generated instance id."""
+        plugin_cls = self._register_fixture_class(monkeypatch)
+        expected_id = plugin_cls.instance_id_for({"url": "https://example.com"})
+        assert expected_id is not None
+
+        with patch("app.plugins.registry.manager.plugin_loader") as mock_loader:
+            mock_loader.create_plugin_instance.return_value = mock_plugin
+
+            with patch("app.plugins.registry.manager.instance_manager") as mock_instance_mgr:
+                mock_instance_mgr.register = AsyncMock()
+
+                from app.models.db_models import PluginTypeDB
+
+                db_type = await PluginTypeDB.objects.get_or_none(type_id="derived")
+                if not db_type:
+                    await PluginTypeDB.objects.create(
+                        type_id="derived",
+                        plugin_type="service",
+                        name="Derived",
+                        enabled=True,
+                    )
+
+                result = await apply_plugin_config_update(
+                    type_id="derived",
+                    config={"url": "https://example.com", "_instance_name": "Derived Instance"},
+                    enabled=True,
+                    db_type=mock_db_type,
+                )
+
+                assert result is not None
+                assert result.get("instance_created") is True
+                assert result["instance_id"] == expected_id

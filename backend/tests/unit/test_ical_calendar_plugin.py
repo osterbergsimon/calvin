@@ -1,4 +1,4 @@
-"""Tests for iCal Calendar plugin.
+"""Tests for the iCal / Proton calendar plugins.
 
 Run from backend directory:
     pytest tests/unit/test_ical_calendar_plugin.py -v
@@ -10,127 +10,116 @@ from unittest.mock import AsyncMock, MagicMock, patch
 import pytest
 
 from app.plugins.base import PluginType
-from app.plugins.calendar.ical import ICalCalendarPlugin, handle_plugin_config_update
+from app.plugins.calendar.ical import ICalCalendarPlugin, ProtonCalendarPlugin
+from app.plugins.loader import PluginLoader
 
 
 @pytest.fixture
-def ical_plugin():
-    """Create an ICalCalendarPlugin instance."""
+async def ical_plugin():
+    """Create a configured ICalCalendarPlugin instance."""
     plugin = ICalCalendarPlugin(
         plugin_id="ical-instance",
         name="iCal Feed",
-        ical_url="https://example.com/calendar.ics",
         enabled=True,
     )
+    await plugin.configure({"ical_url": "https://example.com/calendar.ics"})
     return plugin
 
 
 class TestICalCalendarPlugin:
     """Tests for ICalCalendarPlugin class."""
 
-    def test_get_plugin_metadata(self):
-        """Test plugin metadata."""
-        metadata = ICalCalendarPlugin.get_plugin_metadata()
-        assert metadata["type_id"] == "ical"
-        assert metadata["plugin_type"] == PluginType.CALENDAR
-        assert metadata["name"] == "iCal Feed"
-        assert metadata["supports_multiple_instances"] is True
-        assert "common_config_schema" in metadata
-        assert "instance_config_schema" in metadata
-        assert "ical_url" in metadata["instance_config_schema"]
+    def test_metadata(self):
+        """Test declarative plugin metadata."""
+        metadata = ICalCalendarPlugin.metadata
+        assert metadata.type_id == "ical"
+        assert metadata.name == "iCal Feed"
+        assert metadata.supports_multiple_instances is True
+        assert metadata.instance_identity == ["ical_url"]
+        assert "ical_url" in metadata.instance_config_schema
 
-    def test_init(self, ical_plugin):
-        """Test plugin initialization."""
+    def test_module_registers_ical_and_proton(self):
+        """The module declares two calendar types: ical and proton."""
+        import app.plugins.calendar.ical as ical_module
+
+        loader = PluginLoader()
+        registered = loader.register_module(ical_module)
+        assert set(registered) == {"ical", "proton"}
+        definitions = {d.type_id: d for d in loader.get_plugin_types()}
+        assert definitions["ical"].plugin_type == PluginType.CALENDAR
+        assert definitions["ical"].plugin_class is ICalCalendarPlugin
+        assert definitions["proton"].plugin_type == PluginType.CALENDAR
+        assert definitions["proton"].plugin_class is ProtonCalendarPlugin
+
+    def test_proton_metadata(self):
+        """Proton is the iCal implementation under its own type id."""
+        metadata = ProtonCalendarPlugin.metadata
+        assert metadata.type_id == "proton"
+        assert metadata.name == "Proton Calendar"
+        assert metadata.instance_identity == ["ical_url"]
+        assert "ical_url" in metadata.instance_config_schema
+        assert issubclass(ProtonCalendarPlugin, ICalCalendarPlugin)
+
+    async def test_configure_populates_config(self, ical_plugin):
+        """Test configuration is normalized into self.config."""
         assert ical_plugin.plugin_id == "ical-instance"
         assert ical_plugin.name == "iCal Feed"
-        assert ical_plugin.ical_url == "https://example.com/calendar.ics"
+        assert ical_plugin.config["ical_url"] == "https://example.com/calendar.ics"
         assert ical_plugin.enabled is True
 
-    @pytest.mark.asyncio
     async def test_initialize_valid_url(self, ical_plugin):
         """Test plugin initialization with valid URL."""
         await ical_plugin.initialize()
         # Should not raise any errors
 
-    @pytest.mark.asyncio
     async def test_initialize_invalid_url(self):
         """Test plugin initialization with invalid URL."""
-        plugin = ICalCalendarPlugin(
-            plugin_id="test",
-            name="Test",
-            ical_url="invalid-url",
-            enabled=True,
-        )
+        plugin = ICalCalendarPlugin(plugin_id="test", name="Test")
+        await plugin.configure({"ical_url": "invalid-url"})
         with pytest.raises(ValueError, match="Invalid iCal URL"):
             await plugin.initialize()
 
-    @pytest.mark.asyncio
     async def test_cleanup(self, ical_plugin):
         """Test plugin cleanup."""
         await ical_plugin.cleanup()
         # Should not raise any errors
 
-    @pytest.mark.asyncio
-    async def test_configure(self, ical_plugin):
+    async def test_configure_update(self, ical_plugin):
         """Test plugin configuration update."""
         new_url = "https://example.com/new-calendar.ics"
         await ical_plugin.configure({"ical_url": new_url})
-        assert ical_plugin.ical_url == new_url
+        assert ical_plugin.config["ical_url"] == new_url
 
-    @pytest.mark.asyncio
-    async def test_validate_config_valid_http_url(self, ical_plugin):
+    async def test_validate_config_valid_http_url(self):
         """Test config validation with valid HTTP URL."""
         assert (
-            await ical_plugin.validate_config(
-                {
-                    "ical_url": "http://example.com/calendar.ics",
-                }
+            await ICalCalendarPlugin.validate_config(
+                {"ical_url": "http://example.com/calendar.ics"}
             )
             is True
         )
 
-    @pytest.mark.asyncio
-    async def test_validate_config_valid_https_url(self, ical_plugin):
+    async def test_validate_config_valid_https_url(self):
         """Test config validation with valid HTTPS URL."""
         assert (
-            await ical_plugin.validate_config(
-                {
-                    "ical_url": "https://example.com/calendar.ics",
-                }
+            await ICalCalendarPlugin.validate_config(
+                {"ical_url": "https://example.com/calendar.ics"}
             )
             is True
         )
 
-    @pytest.mark.asyncio
-    async def test_validate_config_missing_ical_url(self, ical_plugin):
+    async def test_validate_config_missing_ical_url(self):
         """Test config validation with missing ical_url."""
-        assert await ical_plugin.validate_config({}) is False
+        assert await ICalCalendarPlugin.validate_config({}) is False
 
-    @pytest.mark.asyncio
-    async def test_validate_config_empty_ical_url(self, ical_plugin):
+    async def test_validate_config_empty_ical_url(self):
         """Test config validation with empty ical_url."""
-        assert (
-            await ical_plugin.validate_config(
-                {
-                    "ical_url": "",
-                }
-            )
-            is False
-        )
+        assert await ICalCalendarPlugin.validate_config({"ical_url": ""}) is False
 
-    @pytest.mark.asyncio
-    async def test_validate_config_invalid_url(self, ical_plugin):
+    async def test_validate_config_invalid_url(self):
         """Test config validation with invalid URL."""
-        assert (
-            await ical_plugin.validate_config(
-                {
-                    "ical_url": "not-a-url",
-                }
-            )
-            is False
-        )
+        assert await ICalCalendarPlugin.validate_config({"ical_url": "not-a-url"}) is False
 
-    @pytest.mark.asyncio
     @patch("app.plugins.calendar.ical.parse_ical_from_url")
     async def test_fetch_events(self, mock_parse_ical, ical_plugin):
         """Test fetching calendar events."""
@@ -157,41 +146,51 @@ class TestICalCalendarPlugin:
         assert len(events) == 1
         assert events[0].title == "Test Event"
         assert events[0].source == "ical-instance"
-        mock_parse_ical.assert_called_once_with(ical_plugin.ical_url)
+        mock_parse_ical.assert_called_once_with(ical_plugin.config["ical_url"])
 
 
-class TestICalCalendarPluginHooks:
-    """Tests for iCal Calendar plugin hooks."""
+class TestICalConfigUpdate:
+    """Tests for the host-side config-update flow for the ical/proton types."""
 
-    @pytest.mark.asyncio
-    async def test_handle_plugin_config_update_ical(self, test_db):
-        """Test iCal plugin handle_plugin_config_update hook for 'ical' type."""
-        # Mock plugin_loader
+    @staticmethod
+    def _mock_plugin(plugin_id: str) -> MagicMock:
+        mock_plugin = MagicMock()
+        mock_plugin.plugin_id = plugin_id
+        mock_plugin.enabled = False
+        mock_plugin.configure = AsyncMock()
+        mock_plugin.enable = MagicMock()
+        mock_plugin.disable = MagicMock()
+        mock_plugin.is_running = MagicMock(return_value=False)
+        mock_plugin.initialize = AsyncMock()
+        mock_plugin.start = MagicMock()
+        mock_plugin.stop = MagicMock()
+        mock_plugin.cleanup = AsyncMock()
+        return mock_plugin
+
+    @staticmethod
+    def _fresh_loader(monkeypatch) -> PluginLoader:
+        import app.plugins.calendar.ical as ical_module
+        import app.plugins.loader as loader_module
+
+        fresh_loader = PluginLoader()
+        fresh_loader.register_module(ical_module)
+        monkeypatch.setattr(loader_module, "plugin_loader", fresh_loader)
+        return fresh_loader
+
+    async def test_apply_plugin_config_update_ical(self, test_db, monkeypatch):
+        """Test apply_plugin_config_update creates an ical instance."""
+        from app.plugins.utils.instance_manager import apply_plugin_config_update
+
+        self._fresh_loader(monkeypatch)
+
         with patch("app.plugins.registry.manager.plugin_loader") as mock_loader:
-            mock_plugin = MagicMock()
-            mock_plugin.plugin_id = "ical-1234"
-            mock_plugin.enabled = False
-            mock_plugin.configure = AsyncMock()
-            mock_plugin.enable = MagicMock()
-            mock_plugin.disable = MagicMock()
-            mock_plugin.is_running = MagicMock(return_value=False)
-            mock_plugin.initialize = AsyncMock()
-            mock_plugin.start = MagicMock()
-            mock_plugin.stop = MagicMock()
-            mock_plugin.cleanup = AsyncMock()
+            mock_loader.create_plugin_instance.return_value = self._mock_plugin("ical-1234")
 
-            mock_loader.create_plugin_instance.return_value = mock_plugin
-            mock_loader.get_plugin_types.return_value = [
-                {"type_id": "ical", "plugin_type": "calendar", "name": "iCal Feed"}
-            ]
-
-            # Mock instance_manager.register
             with patch("app.plugins.registry.manager.instance_manager") as mock_instance_mgr:
                 mock_instance_mgr.register = AsyncMock()
 
                 from app.models.db_models import PluginTypeDB
 
-                # Create plugin type in database (or get existing)
                 db_type = await PluginTypeDB.objects.get_or_none(type_id="ical")
                 if not db_type:
                     db_type = await PluginTypeDB.objects.create(
@@ -204,15 +203,11 @@ class TestICalCalendarPluginHooks:
                     db_type.enabled = True
                     await db_type.update()
 
-                # Test creating a new instance
-                result = await handle_plugin_config_update(
+                result = await apply_plugin_config_update(
                     type_id="ical",
-                    config={
-                        "ical_url": "https://example.com/calendar.ics",
-                    },
+                    config={"ical_url": "https://example.com/calendar.ics"},
                     enabled=True,
                     db_type=db_type,
-                    session=None,  # Session parameter ignored with Ormar
                 )
 
                 assert result is not None
@@ -232,33 +227,18 @@ class TestICalCalendarPluginHooks:
                 assert db_plugin.type_id == "ical"
                 assert db_plugin.config.get("ical_url") == "https://example.com/calendar.ics"
 
-    @pytest.mark.asyncio
-    async def test_handle_plugin_config_update_proton(self, test_db):
-        """Test iCal plugin handle_plugin_config_update hook for 'proton' type."""
-        # Mock plugin_loader
+    async def test_apply_plugin_config_update_proton(self, test_db, monkeypatch):
+        """Test apply_plugin_config_update creates a proton instance."""
+        from app.plugins.utils.instance_manager import apply_plugin_config_update
+
+        self._fresh_loader(monkeypatch)
+
         with patch("app.plugins.registry.manager.plugin_loader") as mock_loader:
-            mock_plugin = MagicMock()
-            mock_plugin.plugin_id = "proton-1234"
-            mock_plugin.enabled = False
-            mock_plugin.configure = AsyncMock()
-            mock_plugin.enable = MagicMock()
-            mock_plugin.disable = MagicMock()
-            mock_plugin.is_running = MagicMock(return_value=False)
-            mock_plugin.initialize = AsyncMock()
-            mock_plugin.start = MagicMock()
-            mock_plugin.stop = MagicMock()
-            mock_plugin.cleanup = AsyncMock()
+            mock_loader.create_plugin_instance.return_value = self._mock_plugin("proton-1234")
 
-            mock_loader.create_plugin_instance.return_value = mock_plugin
-            mock_loader.get_plugin_types.return_value = [
-                {"type_id": "proton", "plugin_type": "calendar", "name": "Proton Calendar"}
-            ]
-
-            # Mock instance_manager.register
             with patch("app.plugins.registry.manager.instance_manager") as mock_instance_mgr:
                 mock_instance_mgr.register = AsyncMock()
 
-                # Create plugin type in database (use get_or_create to avoid UNIQUE constraint)
                 import ormar
 
                 from app.models.db_models import PluginTypeDB
@@ -273,15 +253,11 @@ class TestICalCalendarPluginHooks:
                         enabled=True,
                     )
 
-                # Test creating a new instance
-                result = await handle_plugin_config_update(
+                result = await apply_plugin_config_update(
                     type_id="proton",
-                    config={
-                        "ical_url": "https://calendar.proton.me/api/calendar/ics",
-                    },
+                    config={"ical_url": "https://calendar.proton.me/api/calendar/ics"},
                     enabled=True,
                     db_type=db_type,
-                    session=None,  # Session parameter ignored with Ormar
                 )
 
                 assert result is not None
@@ -297,13 +273,14 @@ class TestICalCalendarPluginHooks:
 
                 db_plugins = await PluginDB.objects.filter(type_id="proton").all()
                 assert len(db_plugins) > 0
-                db_plugin = db_plugins[0]
-                assert db_plugin.type_id == "proton"
+                assert db_plugins[0].type_id == "proton"
 
-    @pytest.mark.asyncio
-    async def test_handle_plugin_config_update_invalid_url(self, test_db):
-        """Test iCal plugin handle_plugin_config_update with invalid URL."""
-        # Create plugin type in database (use get_or_create to avoid UNIQUE constraint)
+    async def test_apply_plugin_config_update_invalid_url(self, test_db, monkeypatch):
+        """Test apply_plugin_config_update rejects an invalid URL."""
+        from app.plugins.utils.instance_manager import apply_plugin_config_update
+
+        self._fresh_loader(monkeypatch)
+
         import ormar
 
         from app.models.db_models import PluginTypeDB
@@ -318,22 +295,13 @@ class TestICalCalendarPluginHooks:
                 enabled=True,
             )
 
-        # Mock plugin_loader to avoid registration issues
-        with patch("app.plugins.registry.manager.plugin_loader") as mock_loader:
-            mock_loader.get_plugin_types.return_value = [
-                {"type_id": "ical", "plugin_type": "calendar", "name": "iCal Feed"}
-            ]
+        result = await apply_plugin_config_update(
+            type_id="ical",
+            config={"ical_url": "not-a-url"},
+            enabled=True,
+            db_type=db_type,
+        )
 
-            # Test with invalid URL - should fail validation
-            result = await handle_plugin_config_update(
-                type_id="ical",
-                config={
-                    "ical_url": "not-a-url",
-                },
-                enabled=True,
-                db_type=db_type,
-                session=None,  # Session parameter ignored with Ormar
-            )
-
-            # Should return None or indicate validation failure
-            assert result is None or result.get("instance_created") is False
+        # Validation failure short-circuits instance creation
+        assert result is not None
+        assert result.get("instance_created") is False

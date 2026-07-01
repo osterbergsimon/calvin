@@ -6,18 +6,19 @@ import pytest
 
 from app.models.db_models import PluginTypeDB
 from app.plugins.base import PluginType
+from app.plugins.definitions import PluginMetadata
 from app.plugins.registry.loader import load_plugin_types_for_single
 
 
 def _type_info(type_id="acme", name="Acme", version="1.0.0", schema=None):
-    return {
-        "type_id": type_id,
-        "plugin_type": PluginType.SERVICE,
-        "name": name,
-        "description": "Acme plugin",
-        "version": version,
-        "common_config_schema": schema or {},
-    }
+    return PluginMetadata(
+        type_id=type_id,
+        plugin_type=PluginType.SERVICE,
+        name=name,
+        description="Acme plugin",
+        version=version,
+        common_config_schema=schema or {},
+    )
 
 
 @pytest.mark.unit
