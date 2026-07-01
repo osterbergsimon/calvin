@@ -2,8 +2,9 @@
 Plugin protocols/interfaces for each plugin type.
 
 This module defines the well-defined interface between core and plugins.
-Core code MUST ONLY use methods defined in these protocols.
-Plugins MUST implement all abstract methods and CAN implement optional methods.
+Core code MUST ONLY use methods defined in these protocols (plus the
+`BasePlugin` contract). Plugins MUST implement all abstract methods and CAN
+override optional methods.
 
 Protocol Design Principles:
 - MUST methods: Abstract methods that plugins MUST implement
@@ -28,7 +29,6 @@ class CalendarPlugin(BasePlugin):
 
     MUST implement:
     - fetch_events()
-    - validate_config()
     """
 
     @property
@@ -54,19 +54,6 @@ class CalendarPlugin(BasePlugin):
         """
         pass
 
-    @abstractmethod
-    async def validate_config(self, config: dict[str, Any]) -> bool:
-        """
-        Validate plugin configuration.
-
-        Args:
-            config: Configuration dictionary
-
-        Returns:
-            True if configuration is valid
-        """
-        pass
-
 
 class ImagePlugin(BasePlugin):
     """
@@ -77,7 +64,6 @@ class ImagePlugin(BasePlugin):
     - get_image()
     - get_image_data()
     - scan_images()
-    - validate_config()
 
     CAN implement (optional):
     - upload_image()
@@ -184,18 +170,12 @@ class ImagePlugin(BasePlugin):
 
 class ServicePlugin(BasePlugin):
     """
-    Protocol for service plugins (dashboard cards, webhooks, APIs, iframes).
-
-    MUST implement:
-    - validate_config()
+    Protocol for service plugins (dashboard panels, statusbar items).
 
     SHOULD implement:
-    - fetch_service_data() — the canonical data source for schema-driven dashboard
-      rendering. Returns a JSON payload that the plugin's `display_schema` binds to.
-
-    CAN implement (optional):
-    - handle_webhook()
-    - handle_api_request()
+    - fetch() — the canonical data source for schema-driven rendering. Returns
+      the JSON payload that the plugin's `display_schema` / `statusbar_schema`
+      binds to; served at /api/plugins/{plugin_id}/data.
     """
 
     @property
@@ -203,45 +183,13 @@ class ServicePlugin(BasePlugin):
         """Return service plugin type."""
         return PluginType.SERVICE
 
-    async def handle_webhook(self, payload: dict[str, Any]) -> dict[str, Any] | None:
-        """
-        Handle incoming webhook (optional - not all services support webhooks).
-
-        Args:
-            payload: Webhook payload
-
-        Returns:
-            Response dictionary or None if webhook not supported
-        """
-        return None
-
-    async def handle_api_request(
-        self, method: str, path: str, data: dict[str, Any] | None = None
-    ) -> dict[str, Any] | None:
-        """
-        Handle API request (optional - not all services support API).
-
-        Args:
-            method: HTTP method (GET, POST, etc.)
-            path: API path
-            data: Request data (for POST, PUT, etc.)
-
-        Returns:
-            Response dictionary or None if API not supported
-        """
-        return None
-
-    async def fetch_service_data(
+    async def fetch(
         self,
         start_date: str | None = None,
         end_date: str | None = None,
     ) -> dict[str, Any] | None:
         """
-        Fetch service data for display (optional - not all services support data fetching).
-
-        This method is called by the core when fetching data via
-        /api/plugins/{plugin_id}/data.
-        Plugins should implement this on the resolved instance directly.
+        Fetch the data payload the plugin's display schema binds to.
 
         Args:
             start_date: Optional start date (YYYY-MM-DD format, plugin-specific)
@@ -249,22 +197,8 @@ class ServicePlugin(BasePlugin):
 
         Returns:
             Dictionary with service data, or None if data fetching not supported.
-            The dict can contain any plugin-specific data structure.
         """
         return None
-
-    @abstractmethod
-    async def validate_config(self, config: dict[str, Any]) -> bool:
-        """
-        Validate plugin configuration.
-
-        Args:
-            config: Configuration dictionary
-
-        Returns:
-            True if configuration is valid
-        """
-        pass
 
 
 class BackendPlugin(BasePlugin):
@@ -280,21 +214,30 @@ class BackendPlugin(BasePlugin):
 
     Plugins can implement any combination of optional capabilities.
 
-    MUST implement:
-    - validate_config()
-
     CAN implement (optional):
     - get_schedule_config(), run_scheduled_task() - Scheduled tasks
     - start_worker(), stop_worker() - Background workers
     - provide_service(), get_provided_services() - Service providers
     - handle_event(), get_subscribed_events() - Event handlers (subscribe to events)
     - emit_event() - Event publisher (publish events, inherited from BasePlugin)
+    - fetch() - On-demand fetch/check triggered from the UI
     """
 
     @property
     def plugin_type(self) -> PluginType:
         """Return backend plugin type."""
         return PluginType.BACKEND
+
+    async def fetch(
+        self,
+        start_date: str | None = None,
+        end_date: str | None = None,
+    ) -> dict[str, Any] | None:
+        """Run an on-demand fetch/check (e.g. a "check now" UI action).
+
+        Returns a result payload, or None if not supported.
+        """
+        return None
 
     # Optional: Scheduled tasks
     async def get_schedule_config(self) -> dict[str, Any] | None:
@@ -377,16 +320,3 @@ class BackendPlugin(BasePlugin):
             List of event type strings (e.g., ['image_uploaded', 'config_changed'])
         """
         return []
-
-    # Required: Basic validation
-    @abstractmethod
-    async def validate_config(self, config: dict[str, Any]) -> bool:
-        """Validate plugin configuration.
-
-        Args:
-            config: Configuration dictionary
-
-        Returns:
-            True if configuration is valid
-        """
-        pass

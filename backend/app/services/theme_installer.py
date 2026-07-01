@@ -10,7 +10,6 @@ from loguru import logger
 
 from app.services.validation import (
     validate_directory_structure,
-    validate_manifest_format_version,
     validate_manifest_required_fields,
     validate_theme_variables,
     validate_zip_structure,
@@ -18,7 +17,6 @@ from app.services.validation import (
 
 # Constants
 REQUIRED_THEME_FIELDS = ["id", "name", "version", "variables"]
-SUPPORTED_FORMAT_VERSIONS = ["1.0.0"]
 
 
 class ThemeInstaller:
@@ -85,11 +83,6 @@ class ThemeInstaller:
         """
         # Validate required fields
         validate_manifest_required_fields(manifest, REQUIRED_THEME_FIELDS, "theme.json")
-
-        # Validate format version if specified
-        validate_manifest_format_version(
-            manifest, SUPPORTED_FORMAT_VERSIONS, default_version="1.0.0", manifest_type="theme.json"
-        )
 
         # Validate variables structure
         validate_theme_variables(manifest["variables"])

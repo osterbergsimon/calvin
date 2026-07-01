@@ -1,6 +1,5 @@
 """Google Calendar plugin."""
 
-import hashlib
 import re
 from datetime import datetime
 from typing import Any
@@ -10,19 +9,9 @@ import httpx
 from loguru import logger
 
 from app.models.calendar import CalendarEvent
-from app.plugins.hooks import hookimpl
+from app.plugins.definitions import PluginMetadata
 from app.plugins.protocols import CalendarPlugin
-from app.plugins.sdk.calendar import (
-    CalendarConfigField,
-    build_calendar_manager_config,
-    build_calendar_plugin_metadata,
-    create_calendar_plugin_instance,
-)
-from app.plugins.utils.config import extract_config_value, to_str
-from app.plugins.utils.instance_manager import handle_plugin_config_update_generic
 from app.utils.ical_parser import parse_ical_from_url
-
-# Loguru automatically includes module/function info in logs
 
 
 def _is_google_calendar_url(url: str) -> bool:
@@ -87,58 +76,42 @@ def _normalize_google_calendar_url(url: str) -> str:
 class GoogleCalendarPlugin(CalendarPlugin):
     """Google Calendar plugin using iCal feeds."""
 
-    CALENDAR_FIELDS = (CalendarConfigField("ical_url", default="", converter=to_str),)
-
-    @classmethod
-    def get_plugin_metadata(cls) -> dict[str, Any]:
-        """Get plugin metadata for registration."""
-        return build_calendar_plugin_metadata(
-            type_id="google",
-            name="Google Calendar",
-            description="Google Calendar via iCal feed",
-            plugin_class=cls,
-            common_config_schema={},
-            instance_config_schema={
-                "ical_url": {
-                    "type": "string",
-                    "description": "Google Calendar iCal URL or share URL",
-                    "default": "",
-                    "ui": {
-                        "component": "input",
-                        "placeholder": "https://calendar.google.com/calendar/ical/...",
-                        "validation": {
-                            "required": True,
-                            "type": "url",
-                        },
+    metadata = PluginMetadata(
+        type_id="google",
+        name="Google Calendar",
+        description="Google Calendar via iCal feed",
+        default_instance_name="Google Calendar",
+        # Same calendar URL -> same instance
+        instance_identity=["ical_url"],
+        instance_config_schema={
+            "ical_url": {
+                "type": "string",
+                "description": "Google Calendar iCal URL or share URL",
+                "default": "",
+                "ui": {
+                    "component": "input",
+                    "placeholder": "https://calendar.google.com/calendar/ical/...",
+                    "validation": {
+                        "required": True,
+                        "type": "url",
                     },
                 },
             },
-            supports_multiple_instances=True,
-        )
+        },
+    )
 
-    def __init__(self, plugin_id: str, name: str, ical_url: str, enabled: bool = True):
-        """
-        Initialize Google Calendar plugin.
-
-        Args:
-            plugin_id: Unique identifier for the plugin
-            name: Human-readable name
-            ical_url: Google Calendar iCal URL or share URL
-            enabled: Whether the plugin is enabled
-        """
+    def __init__(self, plugin_id: str, name: str, enabled: bool = True):
         super().__init__(plugin_id, name, enabled)
-        self.ical_url = ical_url
         self._normalized_url: str | None = None
 
     async def initialize(self) -> None:
-        """Initialize the plugin."""
-        # Normalize URL (convert share URL to iCal if needed)
-        self._normalized_url = _normalize_google_calendar_url(self.ical_url)
+        """Normalize URL (convert share URL to iCal if needed)."""
+        self._normalized_url = _normalize_google_calendar_url(self.config.get("ical_url", ""))
 
-    async def cleanup(self) -> None:
-        """Cleanup plugin resources."""
-        # Nothing to cleanup for Google Calendar
-        pass
+    async def configure(self, config: dict[str, Any]) -> None:
+        """Apply configuration; reset the normalized URL so it's recalculated."""
+        await super().configure(config)
+        self._normalized_url = None
 
     async def fetch_events(
         self,
@@ -202,111 +175,8 @@ class GoogleCalendarPlugin(CalendarPlugin):
             logger.exception("[GOOGLE PLUGIN] Error fetching events from {}", self.plugin_id)
             raise
 
-    async def validate_config(self, config: dict) -> bool:
-        """
-        Validate plugin configuration.
-
-        Args:
-            config: Configuration dictionary with 'ical_url' key
-
-        Returns:
-            True if configuration is valid
-        """
-        if "ical_url" not in config:
-            return False
-
-        url = extract_config_value(config, "ical_url", converter=to_str)
-        if not url or not url.strip():
-            return False
-
-        # Check if it's a Google Calendar URL
+    @classmethod
+    async def validate_config(cls, config: dict[str, Any]) -> bool:
+        """Require a Google Calendar URL."""
+        url = cls.normalize_config(config).get("ical_url") or ""
         return "calendar.google.com" in url or "google.com/calendar" in url
-
-    async def configure(self, config: dict[str, Any]) -> None:
-        """
-        Configure the plugin with new settings.
-
-        Args:
-            config: Configuration dictionary
-        """
-        await super().configure(config)
-
-        ical_url = extract_config_value(config, "ical_url", converter=to_str)
-        if ical_url:
-            self.ical_url = ical_url
-            # Reset normalized URL so it gets recalculated on next use
-            self._normalized_url = None
-
-
-# Register this plugin with pluggy
-@hookimpl
-def register_plugin_types() -> list[dict[str, Any]]:
-    """Register GoogleCalendarPlugin type."""
-    return [GoogleCalendarPlugin.get_plugin_metadata()]
-
-
-@hookimpl
-def create_plugin_instance(
-    plugin_id: str,
-    type_id: str,
-    name: str,
-    config: dict[str, Any],
-) -> GoogleCalendarPlugin | None:
-    """Create a GoogleCalendarPlugin instance."""
-    return create_calendar_plugin_instance(
-        GoogleCalendarPlugin,
-        expected_type_ids="google",
-        plugin_id=plugin_id,
-        type_id=type_id,
-        name=name,
-        config=config,
-        fields=GoogleCalendarPlugin.CALENDAR_FIELDS,
-    )
-
-
-@hookimpl
-async def handle_plugin_config_update(
-    type_id: str,
-    config: dict[str, Any],
-    enabled: bool | None,
-    db_type: Any,
-    session: Any,
-) -> dict[str, Any] | None:
-    """Handle Google Calendar plugin configuration update and instance management."""
-    if type_id != "google":
-        return None
-
-    def validate_config(c: dict[str, Any]) -> bool:
-        """Validate config has required ical_url."""
-        if "ical_url" not in c:
-            return False
-
-        url = extract_config_value(c, "ical_url", converter=to_str)
-        if not url or not url.strip():
-            return False
-
-        # Check if it's a Google Calendar URL
-        return "calendar.google.com" in url or "google.com/calendar" in url
-
-    def generate_instance_id(c: dict[str, Any], t: str) -> str:
-        """Generate instance ID from ical_url."""
-        ical_url = extract_config_value(c, "ical_url", converter=to_str)
-        if ical_url:
-            # Generate hash from URL (same instance for same URL)
-            url_hash = hashlib.md5(ical_url.encode(), usedforsecurity=False).hexdigest()[:8]
-            return f"{t}-{url_hash}"
-        # Fallback ID if URL not available
-        return f"{t}-instance"
-
-    manager_config = build_calendar_manager_config(
-        type_id="google",
-        fields=GoogleCalendarPlugin.CALENDAR_FIELDS,
-        single_instance=False,  # Multi-instance plugin
-        validate_config=validate_config,
-        generate_instance_id=generate_instance_id,
-        default_instance_name="Google Calendar",
-    )
-
-    return await handle_plugin_config_update_generic(
-        type_id, config, enabled, db_type, session, manager_config
-    )
