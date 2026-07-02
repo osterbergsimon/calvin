@@ -37,4 +37,20 @@ describe("CalendarView per-region view", () => {
     await w.vm.$nextTick();
     expect(w.findAll(".calendar-day").length).toBe(21);
   });
+
+  it("rolling-week renders `days` cells starting today", async () => {
+    const w = mountCalendar({ mode: "week", rolling: true, weeks: 4, days: 5 });
+    await w.vm.$nextTick();
+    const cells = w.findAll(".calendar-day");
+    expect(cells.length).toBe(5);
+    expect(cells[0].classes()).toContain("today");
+  });
+
+  it("rolling-week uses date-based headers starting with today", async () => {
+    const w = mountCalendar({ mode: "week", rolling: true, weeks: 4, days: 3 });
+    await w.vm.$nextTick();
+    const headers = w.findAll(".calendar-weekdays .weekday").map(n => n.text());
+    expect(headers).toHaveLength(3);
+    expect(headers[0]).toContain(String(new Date().getDate()));
+  });
 });
