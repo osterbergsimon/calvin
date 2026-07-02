@@ -736,7 +736,8 @@ export function useKeyboardActions() {
             region?.kind === "calendar" && Array.isArray(region.instanceIds)
               ? region.instanceIds
               : [];
-          modeStore.enterFullscreen(modeStore.MODES.CALENDAR, { sourceIds });
+          const view = region?.kind === "calendar" ? region.view : null;
+          modeStore.enterFullscreen(modeStore.MODES.CALENDAR, { sourceIds, view });
           router.push("/");
         }
         break;

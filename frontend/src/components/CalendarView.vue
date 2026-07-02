@@ -316,8 +316,11 @@ const handleCloseFullscreen = () => {
 };
 
 const enterFullscreen = () => {
-  // Carry the current sources so the maximized view shows the same calendars.
-  modeStore.enterFullscreen(modeStore.MODES.CALENDAR, { sourceIds: props.sourceIds });
+  // Carry the region's sources and view so the maximized calendar matches.
+  modeStore.enterFullscreen(modeStore.MODES.CALENDAR, {
+    sourceIds: props.sourceIds,
+    view: props.view,
+  });
 };
 
 // Reactive today date that updates periodically to refresh the calendar

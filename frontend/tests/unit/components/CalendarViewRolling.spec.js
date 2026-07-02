@@ -5,6 +5,7 @@ vi.mock("vue-router", () => ({ useRoute: () => ({ path: "/" }) }));
 import CalendarView from "@/components/CalendarView.vue";
 import { useConfigStore } from "@/stores/config";
 import { useCalendarStore } from "@/stores/calendar";
+import { useModeStore } from "@/stores/mode";
 
 function mountCalendar(view) {
   return mount(CalendarView, { props: { sourceIds: [], regionId: "r1", view } });
@@ -60,5 +61,12 @@ describe("CalendarView per-region view", () => {
     const w = mountCalendar({ mode: "month", rolling: false, weeks: 4, days: 7 });
     await w.find(".calendar-header__view-switch").trigger("click");
     expect(cfg.updateRegionView).toHaveBeenCalledWith("r1", { mode: "week" });
+  });
+
+  it("entering fullscreen carries the region's view", async () => {
+    const view = { mode: "week", rolling: true, weeks: 4, days: 5 };
+    const w = mountCalendar(view);
+    await w.find(".calendar-header__fullscreen").trigger("click");
+    expect(useModeStore().fullscreenContext.view).toEqual(view);
   });
 });
