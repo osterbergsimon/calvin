@@ -31,7 +31,6 @@ describe("dashboard region surfaces", () => {
 
     const configStore = useConfigStore();
     configStore.showUI = false;
-    configStore.calendarViewMode = "month";
     configStore.showWeekNumbers = false;
     configStore.showRedDays = false;
 

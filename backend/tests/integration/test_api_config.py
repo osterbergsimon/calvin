@@ -38,7 +38,6 @@ def test_get_config_returns_all_frontend_tracked_fields(test_client: TestClient)
         "showUI",
         "modeIndicatorTimeout",
         "photoRotationInterval",
-        "calendarViewMode",
         "calendarRefreshInterval",
         "timeFormat",
         "weekStartDay",

@@ -5,34 +5,6 @@
     </SettingsSection>
 
     <SettingsSection id="content-calendar-display" title="Calendar display">
-      <SettingRow
-        label="Calendar view"
-        description="The default layout used to display calendar events."
-      >
-        <SelectPill
-          :model-value="config.calendarViewMode"
-          :options="[
-            { value: 'month', label: 'Month' },
-            { value: 'week', label: 'Week' },
-            { value: 'day', label: 'Day' },
-            { value: 'rolling', label: 'Rolling' },
-          ]"
-          aria-label="Calendar view"
-          @update:model-value="v => emit('update:config', { calendarViewMode: v })"
-        />
-      </SettingRow>
-      <SettingRow
-        label="Weeks to show"
-        description="Number of weeks visible in the rolling calendar view."
-      >
-        <NumberStepper
-          :model-value="config.calendarWeeks"
-          :min="1"
-          :max="12"
-          aria-label="Weeks to show"
-          @update:model-value="v => emit('update:config', { calendarWeeks: v })"
-        />
-      </SettingRow>
       <SettingRow label="Week starts on" description="The first day shown in each calendar week.">
         <SelectPill
           :model-value="config.weekStartDay"

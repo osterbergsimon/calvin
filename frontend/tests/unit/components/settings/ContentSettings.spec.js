@@ -11,8 +11,6 @@ const baseConfig = {
   photoFrameMode: false,
   photoFrameTimeout: 60,
   // calendar display (moved here from Display — calvin-svo IA pass)
-  calendarViewMode: "month",
-  calendarWeeks: 4,
   weekStartDay: 1,
   weekendDays: [0, 6],
   showWeekNumbers: false,

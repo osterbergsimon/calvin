@@ -18,7 +18,12 @@
       "Bash(xargs -I {} bash -c \"echo '=== {} ===' && head -30 {}\")",
       "Bash(npx vitest *)",
       "Bash(uv run *)",
-      "Bash(python -m pytest tests/unit/test_image_sdk.py -v)"
+      "Bash(python -m pytest tests/unit/test_image_sdk.py -v)",
+      "Bash(bd list *)",
+      "Bash(bd ready *)",
+      "Bash(bd create *)",
+      "Bash(bd prime *)",
+      "Bash(gh pr *)"
     ]
   }
 }

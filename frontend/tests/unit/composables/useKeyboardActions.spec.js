@@ -57,9 +57,6 @@ describe("useKeyboardActions - Calendar Event Navigation", () => {
   beforeEach(() => {
     setActivePinia(createPinia());
     mocks.configStore = {
-      cycleCalendarViewMode: vi.fn(),
-      calendarViewMode: "month",
-      setCalendarViewMode: vi.fn(),
       updateConfig: vi.fn().mockResolvedValue(undefined),
       setDashboardScreens: vi.fn(screens => {
         mocks.configStore.dashboardScreens = screens;
