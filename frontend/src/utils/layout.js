@@ -142,6 +142,38 @@ export function createDashboardScreenFromPreset(preset, existingScreen = null) {
   });
 }
 
+export const DEFAULT_CALENDAR_VIEW = Object.freeze({
+  mode: "month",
+  rolling: false,
+  weeks: 4,
+  days: 7,
+});
+
+const clampViewInt = (value, lo, hi, fallback) => {
+  const n = Math.round(Number(value));
+  if (!Number.isFinite(n)) return fallback;
+  return Math.min(hi, Math.max(lo, n));
+};
+
+/**
+ * Coerce a calendar region's `view` block into the canonical shape:
+ * mode ∈ {month,week,day}, rolling boolean, weeks 1–12, days 1–14.
+ */
+export function clampCalendarView(view = {}) {
+  return {
+    mode: ["month", "week", "day"].includes(view.mode) ? view.mode : "month",
+    rolling: view.rolling === true || view.rolling === "true" || view.rolling === 1,
+    weeks: clampViewInt(view.weeks, 1, 12, DEFAULT_CALENDAR_VIEW.weeks),
+    days: clampViewInt(view.days, 1, 14, DEFAULT_CALENDAR_VIEW.days),
+  };
+}
+
+// Only calendar regions carry a `view`; others get no such key.
+const calendarViewFor = (region, kind) =>
+  kind === "calendar"
+    ? { view: clampCalendarView({ ...DEFAULT_CALENDAR_VIEW, ...(region?.view || {}) }) }
+    : {};
+
 export function normalizeDashboardScreens(screensConfig) {
   const fallback = {
     version: 2,
@@ -495,6 +527,7 @@ export function normalizeDashboardLayout(layout, legacyConfig = {}) {
       instanceIds,
       size: clampRegionSize(region.size ?? presetRegion.size ?? 100 / sourceRegions.length),
       split: normalizeRegionSplit(region.split, id),
+      ...calendarViewFor(region, kind),
     };
   });
 
@@ -601,6 +634,7 @@ function normalizeRegionSplit(split, parentId) {
       serviceId: kind === "service" ? instanceIds[0] || null : null,
       instanceIds,
       size: clampRegionSize(Number(sub.size) || 100 / subs.length),
+      ...calendarViewFor(sub, kind),
     };
   });
   return {
