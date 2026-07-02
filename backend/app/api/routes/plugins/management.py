@@ -290,7 +290,7 @@ async def inspect_plugin(file: UploadFile = File(...)):
     """
     Read plugin.json from a zip without installing it.
 
-    Returns the manifest so the caller can check python_dependencies and
+    Returns the manifest so the caller can check dependencies.packages and
     show a security warning before committing to an install.
     """
     if not file.filename:
