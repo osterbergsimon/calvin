@@ -2377,7 +2377,7 @@
     },
     "/api/plugins/inspect": {
       "post": {
-        "description": "Read plugin.json from a zip without installing it.\n\nReturns the manifest so the caller can check python_dependencies and\nshow a security warning before committing to an install.",
+        "description": "Read plugin.json from a zip without installing it.\n\nReturns the manifest so the caller can check dependencies.packages and\nshow a security warning before committing to an install.",
         "operationId": "inspect_plugin_api_plugins_inspect_post",
         "requestBody": {
           "content": {

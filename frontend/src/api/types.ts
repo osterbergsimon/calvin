@@ -655,7 +655,7 @@ export interface paths {
      * Inspect Plugin
      * @description Read plugin.json from a zip without installing it.
      *
-     *     Returns the manifest so the caller can check python_dependencies and
+     *     Returns the manifest so the caller can check dependencies.packages and
      *     show a security warning before committing to an install.
      */
     post: operations["inspect_plugin_api_plugins_inspect_post"];
