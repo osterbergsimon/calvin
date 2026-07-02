@@ -145,6 +145,8 @@ class KeyboardMappingService:
             "calendar_prev_month",
             "calendar_expand_today",
             "calendar_collapse",
+            "calendar_enter_fullscreen",
+            "calendar_exit_fullscreen",
             "images_next",
             "images_prev",
             "photos_enter_fullscreen",
