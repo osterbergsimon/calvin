@@ -8,7 +8,7 @@ const baseConfig = {
   clockShowDate: true,
   clockShowSeconds: false,
   clockBarShowLogo: true,
-  clockBarShowWeather: false,
+  clockBarShowPluginItems: true,
   clockBarShowInKiosk: false,
   clockBarLayout: "single-line",
   clockBarVerticalLayout: "upright",

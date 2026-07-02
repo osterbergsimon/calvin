@@ -26,13 +26,13 @@
         />
       </SettingRow>
       <SettingRow
-        label="Show weather"
-        description="Show current temperature and icon (requires a weather service)."
+        label="Show plugin items"
+        description="Show statusbar items from plugins (e.g. weather). Each service opts in via its own settings."
       >
         <ToggleSwitch
-          :model-value="config.clockBarShowWeather"
-          aria-label="Show weather"
-          @update:model-value="v => emit('update:config', { clockBarShowWeather: v })"
+          :model-value="config.clockBarShowPluginItems !== false"
+          aria-label="Show plugin items"
+          @update:model-value="v => emit('update:config', { clockBarShowPluginItems: v })"
         />
       </SettingRow>
       <SettingRow

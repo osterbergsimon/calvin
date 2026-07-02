@@ -189,13 +189,13 @@ describe("Config Store", () => {
     await store.updateConfig({
       apply_display_rotation: false,
       displaySchedule: [{ day: 1, enabled: true, onTime: "08:00", offTime: "20:00" }],
-      clockBarShowWeather: true,
+      clockBarShowPluginItems: true,
       clockBarShowLogo: false,
     });
 
     expect(store.applyDisplayRotation).toBe(false);
     expect(store.displaySchedule[0].day).toBe(1);
-    expect(store.clockBarShowWeather).toBe(true);
+    expect(store.clockBarShowPluginItems).toBe(true);
     expect(store.clockBarShowLogo).toBe(false);
     expect(store.showUI).toBe(true);
     expect(store.clockBarPadding).toBe(12);
