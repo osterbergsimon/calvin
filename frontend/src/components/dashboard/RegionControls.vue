@@ -70,10 +70,10 @@ const MAP = {
     prev: "calendar_prev",
     next: "calendar_next",
     refresh: "calendar_refresh",
-    // No expand on touch: tapping an event opens it directly, and there is no
-    // calendar fullscreen yet (tracked separately). Keyboard calendar_expand
-    // is unaffected — this only governs the touch control cluster.
-    expand: null,
+    // Touch ⤢ maximizes the calendar (tapping an event opens it directly, so
+    // ⤢ is free for fullscreen). Keyboard calendar_expand — which opens the
+    // marked event — is unaffected; this only governs the touch cluster.
+    expand: "calendar_enter_fullscreen",
   },
   photos: {
     prev: "images_prev",

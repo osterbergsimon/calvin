@@ -5,6 +5,7 @@ const pushMock = vi.fn();
 vi.mock("vue-router", () => ({ useRouter: () => ({ push: pushMock }) }));
 
 import { useConfigStore } from "@/stores/config";
+import { useModeStore } from "@/stores/mode";
 import { useKeyboardActions } from "@/composables/useKeyboardActions";
 
 const screens = {
@@ -61,5 +62,41 @@ describe("useKeyboardActions touch helpers", () => {
 
     expect(store.dashboardScreens.activeScreenId).toBe("s2");
     expect(pushMock).toHaveBeenCalledWith("/");
+  });
+
+  it("web_service_enter_fullscreen carries the active region's service into fullscreen", () => {
+    const store = useConfigStore();
+    store.setDashboardScreens({
+      version: 2,
+      activeScreenId: "s2",
+      screens: [
+        {
+          id: "s1",
+          name: "Home",
+          activeRegionId: "mealie",
+          layout: {
+            regions: [{ id: "mealie", kind: "service", instanceIds: ["mealie-1"], size: 100 }],
+          },
+        },
+        {
+          id: "s2",
+          name: "Weather",
+          activeRegionId: "yr",
+          layout: {
+            regions: [{ id: "yr", kind: "service", instanceIds: ["yr-weather-1"], size: 100 }],
+          },
+        },
+      ],
+    });
+    const modeStore = useModeStore();
+    const { handleAction } = useKeyboardActions();
+
+    handleAction("web_service_enter_fullscreen");
+
+    expect(modeStore.isFullscreen).toBe(true);
+    expect(modeStore.fullscreenMode).toBe(modeStore.MODES.WEB_SERVICES);
+    // The region the user pressed expand on is the yr service, not the globally
+    // "current" service — fullscreen must show that region's service.
+    expect(modeStore.fullscreenContext?.serviceId).toBe("yr-weather-1");
   });
 });

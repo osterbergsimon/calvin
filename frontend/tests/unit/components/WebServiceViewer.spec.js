@@ -4,6 +4,7 @@ import { createPinia, setActivePinia } from "pinia";
 import WebServiceViewer from "@/components/WebServiceViewer.vue";
 import { useConfigStore } from "@/stores/config";
 import { useWebServicesStore } from "@/stores/webServices";
+import { useModeStore } from "@/stores/mode";
 
 describe("WebServiceViewer", () => {
   beforeEach(() => {
@@ -74,6 +75,18 @@ describe("WebServiceViewer", () => {
 
     expect(wrapper.find(".service-viewer-stub").text()).toContain("Service 1 of 2");
     expect(wrapper.findAll(".dashboard-panel__icon-button")).toHaveLength(2);
+  });
+
+  it("enters fullscreen carrying its own pinned service, not the globally current one", async () => {
+    const modeStore = useModeStore();
+    const enterSpy = vi.spyOn(modeStore, "enterFullscreen");
+    // currentServiceIndex is 0 ("Weather") — the buggy path would fullscreen
+    // that instead of the region's own "meals" service.
+    const wrapper = mountViewer({ isFullscreen: false, serviceId: "meals" });
+
+    await wrapper.get('[title="Enter Fullscreen"]').trigger("click");
+
+    expect(enterSpy).toHaveBeenCalledWith(modeStore.MODES.WEB_SERVICES, { serviceId: "meals" });
   });
 
   it("shows an unavailable state for a missing explicit service id", () => {

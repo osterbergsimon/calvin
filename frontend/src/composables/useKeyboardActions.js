@@ -735,6 +735,27 @@ export function useKeyboardActions() {
         }
         break;
 
+      case "calendar_enter_fullscreen":
+        // Enter fullscreen calendar, carrying the active region's sources so the
+        // maximized view shows the same calendars the user was looking at.
+        if (modeStore.currentMode === modeStore.MODES.CALENDAR || activeRegionKindIs("calendar")) {
+          const region = getActiveRegion();
+          const sourceIds =
+            region?.kind === "calendar" && Array.isArray(region.instanceIds)
+              ? region.instanceIds
+              : [];
+          modeStore.enterFullscreen(modeStore.MODES.CALENDAR, { sourceIds });
+          router.push("/");
+        }
+        break;
+      case "calendar_exit_fullscreen":
+        // Exit fullscreen - return to dashboard
+        if (modeStore.isFullscreen && modeStore.fullscreenMode === modeStore.MODES.CALENDAR) {
+          modeStore.exitFullscreen();
+          router.push("/");
+        }
+        break;
+
       // Web service actions
       case "web_service_1":
         if (modeStore.currentMode === modeStore.MODES.WEB_SERVICES) {
@@ -814,12 +835,24 @@ export function useKeyboardActions() {
         }
         break;
       case "web_service_enter_fullscreen":
-        // Enter fullscreen web services mode
+        // Enter fullscreen web services mode, carrying the active region's
+        // service so the maximized view shows the service the user pressed
+        // expand on — not the globally "current" service (which may belong to a
+        // different screen/region). Null context = WEB_SERVICES mode, where
+        // fullscreen cycles through all services from the current index.
         if (
           modeStore.currentMode === modeStore.MODES.WEB_SERVICES ||
           activeRegionKindIs("service")
         ) {
-          modeStore.enterFullscreen(modeStore.MODES.WEB_SERVICES);
+          const region = getActiveRegion();
+          const serviceId =
+            region?.kind === "service"
+              ? region.instanceIds?.[0] || region.serviceId || null
+              : null;
+          modeStore.enterFullscreen(
+            modeStore.MODES.WEB_SERVICES,
+            serviceId ? { serviceId } : null
+          );
           router.push("/");
         }
         break;
@@ -917,6 +950,10 @@ export function useKeyboardActions() {
         return "photos_exit_fullscreen";
       } else if (modeStore.fullscreenMode === modeStore.MODES.WEB_SERVICES) {
         return "web_service_close";
+      } else if (modeStore.fullscreenMode === modeStore.MODES.CALENDAR) {
+        // In fullscreen calendar, an expanded event closes first; otherwise
+        // exit fullscreen.
+        return calendarStore.selectedEvent ? "calendar_collapse" : "calendar_exit_fullscreen";
       }
     }
 

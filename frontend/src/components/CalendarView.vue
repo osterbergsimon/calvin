@@ -1,35 +1,90 @@
 <template>
-  <div ref="calendarView" class="calendar-view" tabindex="0" @keydown="handleKeydown">
+  <div
+    ref="calendarView"
+    class="calendar-view"
+    :class="{ 'calendar-view--fullscreen': isFullscreen }"
+    tabindex="0"
+    @keydown="handleKeydown"
+  >
+    <!-- Fullscreen close button (only in fullscreen mode) -->
+    <div v-if="isFullscreen" class="fullscreen-close-overlay">
+      <button
+        class="btn-close-fullscreen"
+        data-action="exit-fullscreen"
+        title="Close Fullscreen (ESC)"
+        @click.stop="handleCloseFullscreen"
+      >
+        ×
+      </button>
+    </div>
+
     <DashboardPanel
       title="Calendar"
-      :subtitle="calendarSubtitle"
       :show-title="false"
+      :header-visible="!isFullscreen"
       :focused="focused"
       :dim="dim"
     >
       <template #actions>
-        <button
-          v-if="!isTouch"
-          class="dashboard-panel__icon-button"
-          title="Previous"
-          @click="previousMonth"
-          @keydown.enter="previousMonth"
-        >
-          ‹
-        </button>
-        <button
-          v-if="!isTouch"
-          class="dashboard-panel__icon-button"
-          title="Next"
-          @click="nextMonth"
-          @keydown.enter="nextMonth"
-        >
-          ›
-        </button>
         <RegionControls v-if="focused" region-kind="calendar" />
       </template>
 
       <div class="calendar-content">
+        <!-- Always-visible header: month/year label, navigation + view switch -->
+        <div class="calendar-header">
+          <div class="calendar-header__label">{{ currentMonthYear }}</div>
+          <div class="calendar-header__controls">
+            <button
+              v-if="!isCurrentPeriod"
+              type="button"
+              class="calendar-header__today"
+              title="Jump to today"
+              aria-label="Jump to today"
+              @click="goToToday"
+            >
+              Today
+            </button>
+            <button
+              type="button"
+              class="calendar-header__nav"
+              title="Previous"
+              aria-label="Previous"
+              @click="previousMonth"
+            >
+              ‹
+            </button>
+            <button
+              type="button"
+              class="calendar-header__view-switch"
+              :title="`Switch view (currently ${viewModeLabel})`"
+              :aria-label="`Switch calendar view, currently ${viewModeLabel}`"
+              @click="cycleView"
+            >
+              <span class="calendar-header__view-label">{{ viewModeLabel }}</span>
+              <span class="calendar-header__view-caret" aria-hidden="true">▸</span>
+            </button>
+            <button
+              type="button"
+              class="calendar-header__nav"
+              title="Next"
+              aria-label="Next"
+              @click="nextMonth"
+            >
+              ›
+            </button>
+            <button
+              v-if="!isFullscreen"
+              type="button"
+              class="calendar-header__nav calendar-header__fullscreen"
+              title="Fullscreen"
+              aria-label="Fullscreen calendar"
+              @click="enterFullscreen"
+            >
+              ⤢
+            </button>
+          </div>
+        </div>
+
         <!-- Loading indicator -->
         <div v-if="loading" class="loading-overlay">
           <div class="loading-spinner">
@@ -129,12 +184,12 @@ import { ref, computed, watch, onMounted, onUnmounted, onActivated, nextTick } f
 import { useRoute } from "vue-router";
 import { useCalendarStore } from "../stores/calendar";
 import { useConfigStore } from "../stores/config";
+import { useModeStore } from "../stores/mode";
 import EventDetailPanel from "./EventDetailPanel.vue";
 import DialogScrim from "./ui/DialogScrim.vue";
 import CalendarEventItem from "./CalendarEventItem.vue";
 import DashboardPanel from "./DashboardPanel.vue";
 import RegionControls from "./dashboard/RegionControls.vue";
-import { useTouchCapability } from "@/composables/useTouchCapability";
 
 const props = defineProps({
   focused: {
@@ -149,9 +204,11 @@ const props = defineProps({
     type: Array,
     default: () => [],
   },
+  isFullscreen: {
+    type: Boolean,
+    default: false,
+  },
 });
-
-const { isTouch } = useTouchCapability();
 
 const configStore = useConfigStore();
 const sourceKey = computed(() =>
@@ -180,10 +237,56 @@ const viewModeLabel = computed(() => {
   return labels[viewMode.value] || "Month";
 });
 
-const calendarSubtitle = computed(() => `${currentMonthYear.value} - ${viewModeLabel.value}`);
-
 const calendarStore = useCalendarStore();
+const modeStore = useModeStore();
 const route = useRoute();
+
+// Cycle the calendar view mode (month → week → day) via the shared config
+// action, which also persists the choice to the backend.
+const cycleView = () => {
+  configStore.cycleCalendarViewMode().catch(err => {
+    console.error("Failed to cycle calendar view mode:", err);
+  });
+};
+
+// True when the visible window already contains today — used to hide the
+// "Today" jump button when it would be a no-op.
+const isCurrentPeriod = computed(() => {
+  const t = new Date(today.value);
+  t.setHours(0, 0, 0, 0);
+  const cd = currentDate.value;
+  if (viewMode.value === "day") {
+    return (
+      cd.getFullYear() === t.getFullYear() &&
+      cd.getMonth() === t.getMonth() &&
+      cd.getDate() === t.getDate()
+    );
+  }
+  if (viewMode.value === "week" || viewMode.value === "rolling") {
+    const weeks = viewMode.value === "rolling" ? rollingWeeks.value : 1;
+    const windowStart = getWeekStart(cd);
+    const windowEnd = new Date(windowStart);
+    windowEnd.setDate(windowStart.getDate() + weeks * 7 - 1);
+    return t >= windowStart && t <= windowEnd;
+  }
+  // month
+  return cd.getFullYear() === t.getFullYear() && cd.getMonth() === t.getMonth();
+});
+
+const goToToday = () => {
+  calendarStore.setCurrentDate(new Date());
+  focusedDayIndex.value = null;
+  focusedEventIndex.value = null;
+};
+
+const handleCloseFullscreen = () => {
+  modeStore.exitFullscreen();
+};
+
+const enterFullscreen = () => {
+  // Carry the current sources so the maximized view shows the same calendars.
+  modeStore.enterFullscreen(modeStore.MODES.CALENDAR, { sourceIds: props.sourceIds });
+};
 
 // Reactive today date that updates periodically to refresh the calendar
 const today = ref(new Date());
@@ -277,31 +380,37 @@ const weekDays = computed(() => {
   return days;
 });
 
+// Format an inclusive start–end date range: "Jan 1 - 7, 2024" when the range
+// stays inside one month, otherwise "Dec 31 - Jan 6, 2025".
+const formatDateRange = (startDate, endDate) => {
+  if (
+    startDate.getMonth() === endDate.getMonth() &&
+    startDate.getFullYear() === endDate.getFullYear()
+  ) {
+    return `${startDate.toLocaleDateString("en-US", { month: "long", day: "numeric" })} - ${endDate.toLocaleDateString("en-US", { day: "numeric", year: "numeric" })}`;
+  }
+  const start = startDate.toLocaleDateString("en-US", { month: "short", day: "numeric" });
+  const end = endDate.toLocaleDateString("en-US", {
+    month: "short",
+    day: "numeric",
+    year: "numeric",
+  });
+  return `${start} - ${end}`;
+};
+
 const currentMonthYear = computed(() => {
   if (viewMode.value === "week") {
     // Show week range for week view
     const startDate = getWeekStart(currentDate.value);
     const endDate = new Date(startDate);
     endDate.setDate(startDate.getDate() + 6);
-
-    // If same month, show: "Jan 1-7, 2024", otherwise "Dec 31 - Jan 6, 2024"
-    if (
-      startDate.getMonth() === endDate.getMonth() &&
-      startDate.getFullYear() === endDate.getFullYear()
-    ) {
-      return `${startDate.toLocaleDateString("en-US", { month: "long", day: "numeric" })} - ${endDate.toLocaleDateString("en-US", { day: "numeric", year: "numeric" })}`;
-    } else {
-      const startMonth = startDate.toLocaleDateString("en-US", {
-        month: "short",
-        day: "numeric",
-      });
-      const endMonth = endDate.toLocaleDateString("en-US", {
-        month: "short",
-        day: "numeric",
-        year: "numeric",
-      });
-      return `${startMonth} - ${endMonth}`;
-    }
+    return formatDateRange(startDate, endDate);
+  } else if (viewMode.value === "rolling") {
+    // Rolling view spans several weeks from the anchored week — show the range.
+    const startDate = getWeekStart(currentDate.value);
+    const endDate = new Date(startDate);
+    endDate.setDate(startDate.getDate() + rollingWeeks.value * 7 - 1);
+    return formatDateRange(startDate, endDate);
   } else if (viewMode.value === "day") {
     // Show full date for day view
     return currentDate.value.toLocaleDateString("en-US", {
@@ -554,9 +663,13 @@ const calendarDays = computed(() => {
       },
     ];
   } else if (viewMode.value === "rolling") {
-    // Rolling view: show `rollingWeeks` weeks starting from the current week
+    // Rolling view: show `rollingWeeks` weeks starting from the anchored week.
+    // Anchored to currentDate (which defaults to today) so navigation actually
+    // moves the window; a rolling window spans months, so days are never greyed
+    // as "other month".
     const days = [];
-    const startDate = getWeekStart(todayDate);
+    const startDate = getWeekStart(currentDate.value);
+    startDate.setHours(0, 0, 0, 0);
 
     // Generate rollingWeeks weeks
     for (let i = 0; i < rollingWeeks.value * 7; i++) {
@@ -567,7 +680,7 @@ const calendarDays = computed(() => {
 
       days.push({
         date,
-        otherMonth: date.getMonth() !== todayDate.getMonth(),
+        otherMonth: false,
         isToday: dateOnly.getTime() === todayDate.getTime(),
         events: getEventsForDate(date),
       });
@@ -623,8 +736,10 @@ const calendarDays = computed(() => {
       });
     }
 
-    // Next month days (fill to 6 weeks = 42 days)
-    const remainingDays = 42 - days.length;
+    // Next month days: fill only enough to complete the final week rather than
+    // always padding to 6 rows, which drew a spurious trailing week and shrank
+    // every day cell.
+    const remainingDays = (7 - (days.length % 7)) % 7;
     for (let day = 1; day <= remainingDays; day++) {
       const date = new Date(year, month + 1, day);
       days.push({
@@ -801,6 +916,13 @@ const handleKeydown = event => {
     return;
   }
 
+  // In fullscreen, Escape returns to the dashboard
+  if (event.key === "Escape" && props.isFullscreen) {
+    handleCloseFullscreen();
+    event.preventDefault();
+    return;
+  }
+
   switch (event.key) {
     case "ArrowRight":
       navigateEvents("next");
@@ -848,13 +970,13 @@ const navigatePrevious = () => {
   if (viewMode.value === "day") {
     // Day view: move to previous day
     newDate.setDate(newDate.getDate() - 1);
-  } else if (viewMode.value === "week") {
-    // Week view: move to the start of the previous week
+  } else if (viewMode.value === "week" || viewMode.value === "rolling") {
+    // Week/Rolling view: roll the window back by one week
     const weekStart = getWeekStart(currentDate.value);
     weekStart.setDate(weekStart.getDate() - 7);
     newDate.setTime(weekStart.getTime());
   } else {
-    // Month/Rolling view: move to previous month
+    // Month view: move to previous month
     newDate.setMonth(newDate.getMonth() - 1);
   }
   calendarStore.setCurrentDate(newDate);
@@ -869,13 +991,13 @@ const navigateNext = () => {
   if (viewMode.value === "day") {
     // Day view: move to next day
     newDate.setDate(newDate.getDate() + 1);
-  } else if (viewMode.value === "week") {
-    // Week view: move to the start of the next week
+  } else if (viewMode.value === "week" || viewMode.value === "rolling") {
+    // Week/Rolling view: roll the window forward by one week
     const weekStart = getWeekStart(currentDate.value);
     weekStart.setDate(weekStart.getDate() + 7);
     newDate.setTime(weekStart.getTime());
   } else {
-    // Month/Rolling view: move to next month
+    // Month view: move to next month
     newDate.setMonth(newDate.getMonth() + 1);
   }
   calendarStore.setCurrentDate(newDate);
@@ -916,8 +1038,20 @@ const loadEvents = async (background = false) => {
     endDate = new Date(day);
     endDate.setDate(endDate.getDate() + 7); // 7 days after
     endDate.setHours(23, 59, 59, 999);
+  } else if (viewMode.value === "rolling") {
+    // Rolling view: load the full N-week window plus a buffer week on each side
+    // for multi-day events. The month-based range below is too narrow once the
+    // window exceeds a few weeks, which dropped events off the tail.
+    const weekStart = getWeekStart(currentDate.value);
+    startDate = new Date(weekStart);
+    startDate.setDate(startDate.getDate() - 7);
+    startDate.setHours(0, 0, 0, 0);
+
+    endDate = new Date(weekStart);
+    endDate.setDate(endDate.getDate() + rollingWeeks.value * 7 + 6);
+    endDate.setHours(23, 59, 59, 999);
   } else {
-    // Month/rolling view: use month-based range
+    // Month view: use month-based range
     // Expand date range to include events that span across month boundaries
     // Load previous month, current month, and next month for better caching
     // This ensures we have data cached for adjacent months
@@ -953,6 +1087,20 @@ watch(currentDate, () => {
 
 watch(sourceKey, () => {
   loadEvents();
+});
+
+// The visible date range differs per view mode (a month spans wider than the
+// ±7-day week/day window), so refetch when the mode changes and drop any stale
+// event focus.
+watch(viewMode, () => {
+  focusedDayIndex.value = null;
+  focusedEventIndex.value = null;
+  loadEvents();
+});
+
+// A larger rolling window needs a wider fetch range than what's already loaded.
+watch(rollingWeeks, () => {
+  if (viewMode.value === "rolling") loadEvents();
 });
 
 // Watch for route changes to reload events when navigating back to dashboard
@@ -1013,6 +1161,16 @@ onActivated(() => {
   outline: none;
 }
 
+.calendar-view--fullscreen {
+  border-radius: 0;
+}
+
+/* Keep the header controls clear of the fixed fullscreen close (×) button,
+   which floats at top/right: 1rem and is 48px wide. */
+.calendar-view--fullscreen .calendar-header {
+  padding-right: 4rem;
+}
+
 .calendar-content {
   flex: 1;
   overflow: hidden;
@@ -1025,6 +1183,151 @@ onActivated(() => {
   box-sizing: border-box;
   /* Force hardware acceleration for consistent rendering on RPI */
   transform: translateZ(0);
+}
+
+/* Always-visible calendar header: month/year label + nav + view switch.
+   Lives inside the content (not the panel chrome) so it stays visible even
+   when the dashboard UI chrome is hidden. */
+.calendar-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.75rem;
+  flex-shrink: 0;
+  padding: 0 0.25rem 0.4rem;
+  min-width: 0;
+}
+
+.calendar-header__label {
+  font-family: var(--font-display);
+  font-size: 1rem;
+  font-weight: 700;
+  color: var(--ink);
+  line-height: 1.2;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  min-width: 0;
+}
+
+.calendar-header__controls {
+  display: flex;
+  align-items: center;
+  gap: 0.35rem;
+  flex-shrink: 0;
+}
+
+.calendar-header__nav {
+  min-width: 1.75rem;
+  height: 1.75rem;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 1.05rem;
+  font-family: var(--font-ui);
+  color: var(--ink);
+  background: var(--bg-2);
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  cursor: pointer;
+  transition:
+    background 0.2s,
+    border-color 0.2s;
+}
+
+.calendar-header__view-switch {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.35rem;
+  height: 1.75rem;
+  padding: 0 0.7rem;
+  font-family: var(--font-ui);
+  font-size: 0.85rem;
+  font-weight: 600;
+  color: var(--ink);
+  background: var(--bg-2);
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  cursor: pointer;
+  transition:
+    background 0.2s,
+    border-color 0.2s;
+}
+
+.calendar-header__today {
+  height: 1.75rem;
+  padding: 0 0.75rem;
+  font-family: var(--font-ui);
+  font-size: 0.8rem;
+  font-weight: 600;
+  color: var(--focus-ink);
+  background: var(--focus);
+  border: 1px solid var(--focus);
+  border-radius: 8px;
+  cursor: pointer;
+  transition: filter 0.2s;
+}
+
+.calendar-header__today:hover {
+  filter: brightness(1.08);
+}
+
+.calendar-header__today:focus-visible {
+  outline: 2px solid var(--focus);
+  outline-offset: 2px;
+}
+
+.calendar-header__view-caret {
+  font-size: 0.7rem;
+  color: var(--ink-2);
+}
+
+.calendar-header__nav:hover,
+.calendar-header__view-switch:hover {
+  border-color: var(--focus-edge);
+}
+
+.calendar-header__nav:focus-visible,
+.calendar-header__view-switch:focus-visible {
+  outline: 2px solid var(--focus);
+  outline-offset: 2px;
+}
+
+/* Fullscreen close button — mirrors the photos/web-service overlay. */
+.fullscreen-close-overlay {
+  position: absolute;
+  top: 1rem;
+  right: 1rem;
+  z-index: 100;
+  pointer-events: none;
+}
+
+.btn-close-fullscreen {
+  background: var(--bg-2);
+  color: var(--ink);
+  border: 2px solid var(--line);
+  border-radius: 50%;
+  width: 48px;
+  height: 48px;
+  font-size: 2rem;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transition: all 0.2s;
+  pointer-events: auto;
+  box-shadow: 0 4px 12px var(--shadow);
+}
+
+.btn-close-fullscreen:hover {
+  background: var(--bg-1);
+  border-color: var(--ink-2);
+  transform: scale(1.1);
+}
+
+.btn-close-fullscreen:focus-visible {
+  outline: 2px solid var(--focus);
+  outline-offset: 2px;
 }
 
 .loading-overlay {

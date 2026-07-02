@@ -33,18 +33,19 @@ describe("RegionControls", () => {
     isTouchRef.value = true; // reset to touch mode before each test
   });
 
-  it("calendar renders prev/next/refresh (no expand — tap an event to open)", async () => {
+  it("calendar renders prev/next/refresh/expand (⤢ maximizes the calendar)", async () => {
     const w = mount(RegionControls, { props: { regionKind: "calendar" } });
     const buttons = w.findAll("button");
-    expect(buttons).toHaveLength(3);
-    expect(w.find('[data-action="expand"]').exists()).toBe(false);
+    expect(buttons).toHaveLength(4);
     await w.get('[data-action="prev"]').trigger("click");
     await w.get('[data-action="next"]').trigger("click");
     await w.get('[data-action="refresh"]').trigger("click");
+    await w.get('[data-action="expand"]').trigger("click");
     expect(handleAction.mock.calls.map(c => c[0])).toEqual([
       "calendar_prev",
       "calendar_next",
       "calendar_refresh",
+      "calendar_enter_fullscreen",
     ]);
   });
 
