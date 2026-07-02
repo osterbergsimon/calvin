@@ -6,11 +6,20 @@
       <!-- statusbar strip -->
       <div class="gallery__bar">
         <span class="gallery__clock">21:47</span>
-        <SchemaRenderer :schema="fixtures.statusRow.schema" :data="fixtures.statusRow.data" context="statusbar" />
+        <SchemaRenderer
+          :schema="fixtures.statusRow.schema"
+          :data="fixtures.statusRow.data"
+          context="statusbar"
+        />
       </div>
 
       <div class="gallery__grid">
-        <section v-for="f in panels" :key="f.title" class="gallery__panel focus-panel-mock" :style="{ gridColumn: f.wide ? 'span 2' : 'span 1' }">
+        <section
+          v-for="f in panels"
+          :key="f.title"
+          class="gallery__panel focus-panel-mock"
+          :style="{ gridColumn: f.wide ? 'span 2' : 'span 1' }"
+        >
           <header class="gallery__panel-header">{{ f.title }}</header>
           <div class="gallery__panel-body">
             <SchemaRenderer :schema="f.schema" :data="f.data" :context="f.context || 'panel'" />

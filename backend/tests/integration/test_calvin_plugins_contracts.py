@@ -120,8 +120,7 @@ def test_plugin_conforms_to_contract(plugin_id: str, plugin_py: Path) -> None:
         "(a BasePlugin subclass with a `metadata = PluginMetadata(...)` attribute)"
     )
     assert manifest["id"] in registered, (
-        f"{plugin_id}: manifest id {manifest['id']!r} not among registered "
-        f"type_ids {registered}"
+        f"{plugin_id}: manifest id {manifest['id']!r} not among registered type_ids {registered}"
     )
 
     # Runtime fields resolve for every registered type.
