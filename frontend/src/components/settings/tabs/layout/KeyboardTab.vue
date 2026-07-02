@@ -137,6 +137,8 @@ const availableActions = [
   { value: "calendar_expand", label: "Calendar: Expand (context-aware)" },
   { value: "calendar_expand_today", label: "Calendar: Expand Today (legacy)" },
   { value: "calendar_collapse", label: "Calendar: Collapse (direct)" },
+  { value: "calendar_enter_fullscreen", label: "Calendar: Enter Fullscreen" },
+  { value: "calendar_exit_fullscreen", label: "Calendar: Exit Fullscreen" },
   { value: "calendar_refresh", label: "Calendar: Refresh" },
 
   // Image-specific actions
