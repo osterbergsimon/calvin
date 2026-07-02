@@ -1,61 +1,105 @@
-# Plugin Persistence and Restart Requirements
+# Plugin Persistence and Lifecycle
+
+How plugins are persisted, what happens at install/uninstall, and how load
+errors surface. Under plugin contract 1.0 **installation is live — no server
+restart is required** at any point.
 
 ## How Plugins Are Persisted
 
-Plugins are persisted in two database tables:
+Two database tables:
 
-### 1. Plugin Types (`plugin_types` table)
-Stores plugin type definitions:
-- `type_id`: Unique identifier (e.g., 'google', 'local', 'iframe')
-- `plugin_type`: Category ('calendar', 'image', 'service')
-- `name`: Human-readable name
-- `version`: Plugin version
-- `common_config_schema`: Configuration schema (JSON)
-- `enabled`: Whether the plugin type is enabled
-- `error_message`: Error message if plugin failed to load
+### 1. Plugin types (`plugin_types` table)
 
-### 2. Plugin Instances (`plugins` table)
-Stores individual plugin instances:
-- `id`: Unique instance identifier
-- `type_id`: References the plugin type
-- `plugin_type`: Category ('calendar', 'image', 'service')
-- `name`: Instance name
-- `version`: Plugin version
-- `enabled`: Whether the instance is enabled
-- `config`: Instance-specific configuration (JSON)
+One row per plugin type, mirrored from the loader's registry by
+[registry/loader.py](../../backend/app/plugins/registry/loader.py):
 
-## Installation Process
+- `type_id` — unique identifier (e.g. `google`, `local`, `mealie`)
+- `plugin_type` — family (`calendar`, `image`, `service`, `backend`, `theme`)
+- `name`, `description`, `version` — from `PluginMetadata`
+- `common_config_schema` — merged with any user-set values (user values win)
+- `enabled` — new types default to **disabled**; the user enables them
+- `error_message` — set when the type failed to load, cleared on success
 
-When you install a plugin:
+### 2. Plugin instances (`plugins` table)
 
-1. ✅ **Files are installed** to `backend/data/plugins/{plugin_id}/`
-2. ✅ **Frontend static assets**, if present, stay under
-   `backend/data/plugins/{plugin_id}/frontend/` and are served at
-   `/api/plugins/{plugin_id}/static/{asset_path}`
-3. ✅ **Plugin module is loaded** into memory via `plugin_loader.load_installed_plugins()`
-4. ✅ **Plugin is registered** with pluggy (the plugin system)
-5. ❌ **Plugin type is NOT automatically added to database**
+One row per configured instance:
 
-## Why Restart Is Required
+- `id` — instance id (fixed for single-instance plugins, identity-hash or
+  config-hash otherwise — see `instance_id_for` in
+  [PLUGIN_INTERFACE.md](PLUGIN_INTERFACE.md))
+- `type_id`, `plugin_type`, `name`, `version`, `enabled`
+- `config` — instance config as **bare scalar** values (JSON)
 
-Plugin types are registered in the database during **server startup** via `PluginRegistry.load_plugins_from_db()`. This process:
+Instance rows are written by the host-side config-update flow
+(`apply_plugin_config_update`); plugins never touch these tables directly.
 
-1. Loads all plugin modules from disk
-2. Discovers plugin types via pluggy hooks
-3. Creates/updates `PluginTypeDB` entries in the database
-4. Defaults new plugins to `enabled=False` (user must enable manually)
+## Install Lifecycle
 
-**After installing a plugin, it won't appear in the UI until you restart the server** because the database registration only happens at startup.
+`POST /api/plugins/install` (or install-from-GitHub) runs the whole chain
+synchronously — when the call returns success, the plugin is usable:
 
-## Workaround: Server Restart
+1. **Validate + copy.** The package is validated
+   ([PLUGIN_PACKAGE_FORMAT.md](PLUGIN_PACKAGE_FORMAT.md)) — including the
+   required `api_version` — and extracted to
+   `backend/data/plugins/{plugin_id}/`. Frontend assets stay inside that
+   directory and are served at `/api/plugins/{plugin_id}/static/{asset}`.
+2. **Pip dependencies.** `dependencies.packages` are installed into the
+   host's venv. Any failure rolls the plugin directory back and fails the
+   install.
+3. **Import + discover.** The loader imports `plugin.py` and registers every
+   `BasePlugin` subclass that declares a `metadata = PluginMetadata(...)`
+   attribute. `PluginMetadata` is validated at class-definition time, so a
+   bad `display_schema.kind` or a retired display key raises **here**.
+4. **Validate the result.** If the module failed to import, recorded a load
+   error, or declared no plugin class, the install **rolls back**
+   (directory removed) and the API returns HTTP 400 with the reason.
+5. **DB registration.** The new type is registered in `plugin_types`
+   (disabled by default) via `load_plugin_types_for_single`, and a
+   `plugin_installed` event is emitted.
+6. **Visible immediately.** The type appears in `GET /api/plugins` and the
+   settings UI right away. Enable it, configure an instance, done.
 
-To make newly installed plugins appear immediately:
+## Uninstall Lifecycle
 
-1. **Restart the backend server**
-2. The plugin will be discovered and registered in the database
-3. It will appear in the Settings → Plugins section (disabled by default)
-4. You can then enable and configure it
+`DELETE /api/plugins/installed/{plugin_id}` reverses the chain:
 
-## Future Improvement
+1. Running instances are stopped and cleaned up (backend-plugin scheduled
+   tasks unregistered).
+2. Instance rows and the type row are deleted from the database.
+3. The loader unloads the plugin's module and drops its type registrations
+   (`unload_installed_plugin`) — the type disappears from
+   `get_plugin_types()` without a restart.
+4. The plugin directory (including frontend assets) is removed.
+5. A `plugin_uninstalled` event is emitted.
 
-A future version may add automatic database registration after installation, eliminating the need for a restart.
+## Startup
+
+On server startup ([main.py](../../backend/app/main.py) lifespan):
+
+1. `initialize_database()` runs first.
+2. The loader imports built-in plugin packages and all installed plugins from
+   `backend/data/plugins/`. Installed plugins whose manifest `api_version`
+   doesn't match the host are **skipped loudly** with a recorded load error.
+3. Types are mirrored to `plugin_types`; enabled instances are constructed
+   (`cls(plugin_id, name, enabled)`), configured, and initialized.
+
+## Load Errors
+
+Failures surface instead of silently hiding the plugin:
+
+- The loader records per-plugin errors (`plugin_loader.get_load_error(id)`) —
+  import/syntax errors, metadata validation errors, unsupported
+  `api_version`.
+- At **install time** these become an HTTP 400 with the message, and the
+  broken plugin is rolled back so you can fix and retry.
+- At **startup/registration time** they land in `plugin_types.error_message`
+  and are included in the plugin listing (`error_message` field) so the
+  settings UI can show why a type is broken.
+
+## Notes
+
+- `requirements.restart_required` in `plugin.json` is a legacy flag: it is
+  still echoed in the install response but nothing in the lifecycle needs it.
+  Don't set it.
+- Config values are stored as bare scalars; legacy `{value}` wrappers are
+  normalized once at the API write boundary.

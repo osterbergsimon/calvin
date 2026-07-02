@@ -6,7 +6,7 @@ Calvin is a self-hosted Raspberry Pi dashboard (calendars, photos, web services)
 
 ## Stack
 
-- **Backend:** FastAPI + uvicorn, Python 3.12+, `uv` package manager, Ormar ORM + Alembic (SQLite), APScheduler, Loguru (unified via `InterceptHandler`), Pluggy for plugin hooks.
+- **Backend:** FastAPI + uvicorn, Python 3.12+, `uv` package manager, Ormar ORM + Alembic (SQLite), APScheduler, Loguru (unified via `InterceptHandler`), declarative class-discovery plugin loader.
 - **Frontend:** Vue 3 Composition API, Vite, Pinia stores, Vue Router. Built to `frontend/dist/` and served by FastAPI at `/`. API lives at `/api/*`.
 - **Platforms:** develop on Windows/Linux, deploy on Raspberry Pi. Keyboard input uses `evdev` on Linux, a mock on Windows.
 
@@ -20,27 +20,28 @@ A plugin directory:
 
 ```
 {plugin_id}/
-  plugin.json       # manifest: id, name, type, version, format_version, deps, requirements
-  plugin.py         # backend: Pluggy hook impls + BasePlugin subclass
-  frontend/         # optional Vue components, copied to frontend/src/components/plugins/{plugin_id}/ at install
+  plugin.json       # manifest: api_version (required, =1), id, name, type, version, dependencies.packages, files, requirements
+  plugin.py         # backend: one BasePlugin-family subclass with metadata = PluginMetadata(...)
+  frontend/         # optional pre-built web-component assets, served at /api/plugins/{id}/static/*
   ...assets
 ```
 
 **Plugin types:** `calendar`, `image`, `service`, `backend`, `theme` — see [app/plugins/base.py](backend/app/plugins/base.py).
 
-**Contract (backend):**
-- Implement a `BasePlugin` subclass with `initialize()`, `cleanup()`, `get_plugin_metadata()`.
-- Register via Pluggy hooks in `plugin.py`: `register_plugin_types()`, `create_plugin_instance()`, and optionally `handle_plugin_config_update`, `test_plugin_connection`, `fetch_plugin_data`, `fetch_service_data`. See [app/plugins/hooks.py](backend/app/plugins/hooks.py).
-- Use `instance_config_schema` in metadata to declare per-instance settings — the frontend auto-generates forms from this via `PluginFieldRenderer`. Don't hand-roll settings UI.
-- For multi-instance plugins, use the generic helpers in `app/utils/instance_manager.py` (`extract_config_value`, `InstanceManagerConfig`, `handle_plugin_config_update_generic`). Avoid reimplementing CRUD.
+**Contract (backend)** — plugin contract 1.0 (`api_version: 1`):
+- One class, declared once: a `CalendarPlugin`/`ImagePlugin`/`ServicePlugin`/`BackendPlugin` subclass with a `metadata = PluginMetadata(...)` attribute ([definitions.py](backend/app/plugins/definitions.py)). The loader ([loader.py](backend/app/plugins/loader.py)) discovers the class — no module-level hooks, no Pluggy, no `get_plugin_metadata()`.
+- Config is declared once in `metadata.instance_config_schema`: it drives the auto-generated settings form (`PluginFieldRenderer`), normalization into `self.config` (via `configure()`), and required-field validation. Never take config in `__init__`; the host constructs `cls(plugin_id, name, enabled)` then awaits `configure(config)`. Config values are bare scalars.
+- Data verbs: `fetch(start_date, end_date)` (service/backend, serves `/api/plugins/{id}/data`), `fetch_events()` (calendar), `get_images()` et al. (image). Optional classmethods: `validate_config`, `test_connection`, `scan_options`, `instance_id_for`.
+- Instance CRUD is host-side: `apply_plugin_config_update` in [app/plugins/utils/instance_manager.py](backend/app/plugins/utils/instance_manager.py) derives everything from `metadata` + the class hooks. Plugins implement no config-update handler.
+- `dependencies.packages` in `plugin.json` is the only dep mechanism (pip-installed at plugin install, rollback on failure). `format_version`/`protocol_version`/`python_dependencies` are retired. Install is live — no restart.
 
 **Contract (frontend):**
-- Declare UI in metadata: `display_schema.kind` (selects a built-in renderer) and/or `statusbar_schema` (status bar item).
-- Built-in renderer kinds (`status-tile`, `status-list`, `status-row`, `card-grid`, `item-list`, `iframe`, `image-with-caption`, `metric-dashboard`, `weather-forecast`, `web-component`) live in [SchemaRenderer.vue](frontend/src/components/plugins/SchemaRenderer.vue); the canonical list is enforced backend-side by `SUPPORTED_DISPLAY_KINDS` in [definitions.py](backend/app/plugins/definitions.py). Invalid `kind` values fail at plugin load.
+- Declare UI in metadata: `display_schema.kind` (selects a built-in renderer) and/or `statusbar_schema` (clock-bar item; its namespace is `status` only).
+- Built-in renderer kinds (`status`, `card-grid`, `item-list`, `iframe`, `image-with-caption`, `metric-dashboard`, `weather-forecast`, `web-component`) live in [rendererRegistry.js](frontend/src/components/plugins/rendererRegistry.js); the canonical list is enforced backend-side by `SUPPORTED_DISPLAY_KINDS` in [definitions.py](backend/app/plugins/definitions.py). Invalid kinds — and the retired `type: "api"`/`render_template`/`component` keys — fail at plugin load.
 - For schema renderers the plugin ships **no frontend code** — it returns a `display_schema` and a data payload, and a built-in Vue renderer draws it. Use the `calvin-plugin-*` body classes ([main.css](frontend/src/styles/main.css)) for any custom markup so plugins inherit Calvin's surfaces, spacing, and theming.
-- Web-component plugins (escape hatch) ship pre-built JS/CSS in their `frontend/` dir; Calvin serves those at `/api/plugins/{plugin_id}/static/{asset}` at runtime. **No host-side rebuild happens on plugin install** — the legacy `FrontendBuildManager` / Vite-glob path was removed.
+- Web-component plugins (escape hatch) ship pre-built JS/CSS in their `frontend/` dir; Calvin serves those at `/api/plugins/{plugin_id}/static/{asset}` at runtime and pushes each payload to the element's `.data` property. **No host-side rebuild happens on plugin install.**
 
-**Reference plugin:** [`mealie/`](../calvin-plugins/mealie) in `calvin-plugins`. Scaffolding guide: [calvin-plugins/CREATING_PLUGINS.md](../calvin-plugins/CREATING_PLUGINS.md). Detailed specs in [docs/plugins/](docs/plugins/).
+**Reference plugin:** [`mealie/`](../calvin-plugins/mealie) in `calvin-plugins` (contract-1.0 shape: declarative class, `instance_identity`, card-grid payload shaping, contract tests). Scaffolding guide: [calvin-plugins/CREATING_PLUGINS.md](../calvin-plugins/CREATING_PLUGINS.md). Detailed specs in [docs/plugins/](docs/plugins/).
 
 ## Conventions
 
@@ -54,14 +55,14 @@ A plugin directory:
 
 **Database writes:** wrap with `retry_on_db_locked` — SQLite locks under concurrent plugin ops. Always `await initialize_database()` before loading plugins.
 
-**Adding a feature to an existing plugin:** extend `instance_config_schema` → the form updates itself → wire the field into the plugin's hook impl. No frontend form edits needed for plain inputs.
+**Adding a feature to an existing plugin:** extend `instance_config_schema` → the form updates itself → read the new key from `self.config` in the plugin. No frontend form edits needed for plain inputs.
 
 ## Gotchas — learned the hard way
 
 - **Unref reactive refs before string interpolation** in axios URLs. `${serviceId}` on a `ref` becomes `[object Object]`. Always `unref(serviceId)` first. (commit 6edb2c4)
 - **`uv pip` flag order:** `uv pip install --python <path> <pkg>` — `--python` goes *after* `install`, not before. (commit 4d73ca2)
 - **SQLite "database is locked"** under plugin install concurrency → use `retry_on_db_locked` with exponential backoff.
-- **Schema renderer kind typos fail at load time, not silently.** If you add a renderer to [SchemaRenderer.vue](frontend/src/components/plugins/SchemaRenderer.vue), also add the kind to `SUPPORTED_DISPLAY_KINDS` in [definitions.py](backend/app/plugins/definitions.py) — otherwise plugins using it will be rejected at install.
+- **Schema renderer kind typos fail at load time, not silently.** If you add a renderer to [rendererRegistry.js](frontend/src/components/plugins/rendererRegistry.js), also add the kind to `SUPPORTED_DISPLAY_KINDS` in [definitions.py](backend/app/plugins/definitions.py) — otherwise plugins using it are rejected at install. The kind-sync test (`backend/tests/unit/test_display_kind_sync.py`) enforces this.
 - **Keyboard input on Windows** uses a mock — real input paths only work on Linux/RPi. Don't assume hardware events in dev.
 
 ## Quick map
@@ -70,12 +71,12 @@ A plugin directory:
 |---|---|
 | Backend bootstrap | [backend/app/main.py](backend/app/main.py) |
 | Plugin base / types | [backend/app/plugins/base.py](backend/app/plugins/base.py) |
-| Plugin hooks (Pluggy) | [backend/app/plugins/hooks.py](backend/app/plugins/hooks.py) |
-| Plugin loader | [backend/app/plugins/loader.py](backend/app/plugins/loader.py) |
+| Plugin metadata contract | [backend/app/plugins/definitions.py](backend/app/plugins/definitions.py) |
+| Plugin loader (class discovery) | [backend/app/plugins/loader.py](backend/app/plugins/loader.py) |
 | Plugin install + static assets | [backend/app/services/plugin_installer.py](backend/app/services/plugin_installer.py) |
 | Plugin mgmt API | [backend/app/api/routes/plugins/management.py](backend/app/api/routes/plugins/management.py) |
-| Instance manager helpers | [backend/app/utils/instance_manager.py](backend/app/utils/instance_manager.py) |
-| Schema renderer dispatch | [frontend/src/components/plugins/SchemaRenderer.vue](frontend/src/components/plugins/SchemaRenderer.vue) |
+| Instance manager (host-side CRUD) | [backend/app/plugins/utils/instance_manager.py](backend/app/plugins/utils/instance_manager.py) |
+| Schema renderer registry + dispatch | [frontend/src/components/plugins/rendererRegistry.js](frontend/src/components/plugins/rendererRegistry.js), [SchemaRenderer.vue](frontend/src/components/plugins/SchemaRenderer.vue) |
 | Plugin body CSS vocabulary | [frontend/src/styles/main.css](frontend/src/styles/main.css) (`.calvin-plugin-*`) |
 | Layout / mode switching | [frontend/src/components/LayoutManager.vue](frontend/src/components/LayoutManager.vue) |
 | Plugin settings UI | [frontend/src/components/settings/categories/PluginsCategory.vue](frontend/src/components/settings/categories/PluginsCategory.vue) |
@@ -85,7 +86,7 @@ A plugin directory:
 
 - [docs/index.md](docs/index.md) — full doc index
 - [docs/plugins/PLUGIN_DEVELOPMENT_GUIDE.md](docs/plugins/PLUGIN_DEVELOPMENT_GUIDE.md) — writing plugins end-to-end
-- [docs/plugins/PLUGIN_INTERFACE.md](docs/plugins/PLUGIN_INTERFACE.md) — hook reference
+- [docs/plugins/PLUGIN_INTERFACE.md](docs/plugins/PLUGIN_INTERFACE.md) — `PluginMetadata` + `BasePlugin` reference
 - [docs/plugins/PLUGIN_FRONTEND_COMPONENTS.md](docs/plugins/PLUGIN_FRONTEND_COMPONENTS.md) — Vue integration
 - [docs/plugins/PLUGIN_PACKAGE_FORMAT.md](docs/plugins/PLUGIN_PACKAGE_FORMAT.md) — `plugin.json` schema
 - [docs/plugins/PLUGIN_PERSISTENCE_AND_RESTART.md](docs/plugins/PLUGIN_PERSISTENCE_AND_RESTART.md) — lifecycle
