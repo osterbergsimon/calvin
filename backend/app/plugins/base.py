@@ -2,6 +2,7 @@
 
 import hashlib
 from abc import ABC, abstractmethod
+from collections.abc import Callable
 from enum import Enum
 from typing import TYPE_CHECKING, Any, ClassVar
 
@@ -96,7 +97,12 @@ class BasePlugin(ABC):
             to_str,
         )
 
-        converters = {"string": to_str, "integer": to_int, "number": to_float, "boolean": to_bool}
+        converters: dict[str, Callable[[Any], Any]] = {
+            "string": to_str,
+            "integer": to_int,
+            "number": to_float,
+            "boolean": to_bool,
+        }
         schema = cls.metadata.instance_config_schema if cls.metadata else {}
 
         normalized: dict[str, Any] = {}

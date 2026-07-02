@@ -145,7 +145,7 @@ async def load_plugin_types_for_single(plugin_id: str) -> None:
     async def _save_plugin_type() -> None:
         plugin_type_value = (
             type_info.plugin_type.value
-            if hasattr(type_info.plugin_type, "value")
+            if type_info.plugin_type is not None
             else str(type_info.plugin_type)
         )
         if not db_type:
