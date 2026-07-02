@@ -3,6 +3,7 @@
 from pathlib import Path
 
 from loguru import logger
+from pydantic import AliasChoices, Field
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
 
@@ -51,8 +52,16 @@ class Settings(BaseSettings):
     image_dir: Path = Path("./data/images")
     image_cache_dir: Path = Path("./data/cache/images")
 
-    # Plugin Storage
-    plugins_dir: Path = Path("./data/plugins")
+    # Plugin Storage.
+    # Deploy configs (docker compose, deploy/calvin.env.example) set the
+    # singular PLUGIN_DIR, so accept it alongside the convention-following
+    # PLUGINS_DIR. Without this the env is silently ignored and container
+    # installs fall back to ./data/plugins inside the bind-mounted repo,
+    # creating root-owned dirs that break a host-run backend. (calvin-0ds)
+    plugins_dir: Path = Field(
+        default=Path("./data/plugins"),
+        validation_alias=AliasChoices("plugins_dir", "plugin_dir"),
+    )
 
     # Photo Frame Mode
     photo_frame_enabled: bool = False
