@@ -1,280 +1,76 @@
 # Plugin Package Format Specification
 
-This document defines the official format for installable Calvin plugins.
+The official format for installable Calvin plugins under **plugin contract
+1.0**. Enforced by
+[plugin_installer.py](../../backend/app/services/plugin_installer.py) and
+[manifest_validator.py](../../backend/app/services/validation/manifest_validator.py).
 
-## Format Versioning
+## Versioning: `api_version`
 
-The plugin package format is versioned to allow for future changes while maintaining backward compatibility.
+The **one** contract version signal is `api_version` in `plugin.json`:
 
-**Current Format Version: `1.0.0`**
+- Integer, **required** — a manifest without it is rejected (never
+  default-filled).
+- Must equal the host's `CURRENT_PLUGIN_API_VERSION`
+  ([definitions.py](../../backend/app/plugins/definitions.py)), currently `1`.
+  Newer → "update Calvin"; older → "update the plugin".
+- Checked at install **and** at every startup load — an installed plugin whose
+  `api_version` no longer matches is skipped with a load error instead of
+  loading half-broken.
 
-### Format Version Fields
+The plugin's own `version` field remains a semver **release label**, used only
+for upgrade/downgrade checks at install; it says nothing about the contract.
 
-- **Repository Manifest (`plugins.json`)**: The `version` field specifies the manifest format version
-- **Plugin Manifest (`plugin.json`)**: The `format_version` field (optional) specifies the plugin manifest format version
-- **Plugin Protocol (`plugin.json` and runtime metadata)**: The `protocol_version` field specifies the Calvin plugin protocol the plugin targets
-
-If `format_version` is not specified in `plugin.json`, it defaults to `1.0.0` (the current format).
-If `protocol_version` is not specified, it defaults to `1` for backward compatibility.
-
-### Version Compatibility
-
-- **Format 1.0.0**: Initial format specification
-  - Supports all current features (dependencies, files, requirements, etc.)
-  - All plugins without `format_version` are treated as 1.0.0
-- **Protocol 1**: Current Calvin plugin protocol
-  - Plugins without `protocol_version` are treated as protocol 1
-  - Calvin rejects plugins that declare a newer unsupported protocol version
-
-Future format versions will be documented here with migration guides.
+**Retired version keys:** `format_version` and `protocol_version` are gone.
+They have no effect on the host, and the `calvin-plugins` repository validator
+(`scripts/validate_plugins.py`) rejects manifests that still declare them.
 
 ## Package Types
 
 ### 1. Single Plugin Package (Zip File)
 
-A zip file containing exactly **one** plugin. This is the format used for direct uploads.
+A zip containing exactly **one** plugin — the format for direct uploads.
 
-**Structure:**
 ```
 my-plugin.zip
 └── my-plugin/              # Root directory (optional, can be flat)
-    ├── plugin.json         # REQUIRED: Plugin manifest
-    ├── plugin.py           # REQUIRED: Plugin implementation
-    ├── frontend/           # OPTIONAL: pre-built web component/static assets
+    ├── plugin.json         # REQUIRED: manifest
+    ├── plugin.py           # REQUIRED: the plugin class
+    ├── frontend/           # OPTIONAL: pre-built web-component assets
     │   └── dist.js
-    └── assets/             # OPTIONAL: Static assets
-        └── icon.png
+    └── assets/             # OPTIONAL: backend static assets
 ```
 
-**Validation Rules:**
-- Must contain exactly **one** `plugin.json` file
-- Must contain exactly **one** `plugin.py` file in the same directory as `plugin.json`
-- The `plugin.json` and `plugin.py` must be in the same directory (the plugin root)
-- If zip contains a root directory, files will be extracted from it
-- If zip is flat (no root directory), files must be at the root level
+Validation rules:
 
-**Example:**
-```bash
-# Valid: Root directory structure
-my-plugin.zip
-  └── my-plugin/
-      ├── plugin.json
-      └── plugin.py
-
-# Valid: Flat structure
-my-plugin.zip
-  ├── plugin.json
-  └── plugin.py
-
-# Invalid: Multiple plugins
-my-plugin.zip
-  ├── plugin1/
-  │   ├── plugin.json
-  │   └── plugin.py
-  └── plugin2/
-      ├── plugin.json
-      └── plugin.py
-```
+- Exactly one `plugin.json` and one `plugin.py`, in the same directory (the
+  plugin root).
+- Root-directory and flat layouts both work; multiple plugins in one zip are
+  rejected.
 
 ### 2. Multi-Plugin Repository (GitHub)
 
-A GitHub repository containing **one or more** plugins. Can include a manifest file for explicit enumeration.
+A repository containing one or more plugins, enumerated either through a
+`plugins.json` manifest at the repo root or by auto-discovery (any directory
+containing both `plugin.json` and `plugin.py`).
 
-**Structure Option A: With Manifest File**
 ```
 my-plugins-repo/
-├── plugins.json            # REQUIRED: Repository manifest
-├── plugin1/                # Plugin directory
+├── plugins.json            # RECOMMENDED: repository manifest
+├── plugin1/
 │   ├── plugin.json
 │   └── plugin.py
-├── plugin2/                # Plugin directory
-│   ├── plugin.json
-│   └── plugin.py
-└── README.md
-```
-
-**Structure Option B: Without Manifest (Auto-Discovery)**
-```
-my-plugins-repo/
-├── plugin1/                # Plugin directory (auto-discovered)
-│   ├── plugin.json
-│   └── plugin.py
-├── plugin2/                # Plugin directory (auto-discovered)
-│   ├── plugin.json
-│   └── plugin.py
-└── README.md
-```
-
-## Repository Manifest Format (`plugins.json`)
-
-If a repository contains multiple plugins, it **should** include a `plugins.json` file at the root that explicitly lists available plugins.
-
-**Note**: The repository manifest (`plugins.json`) is different from the plugin manifest (`plugin.json`):
-- **`plugins.json`** (repository-level): Lists all plugins in the repository for discovery
-- **`plugin.json`** (plugin-level): Defines individual plugin metadata, dependencies, and installation rules
-
-See [Plugin Manifest Schema](#plugin-manifest-schema-pluginjson) section below for the complete plugin manifest schema.
-
-**Format:**
-```json
-{
-  "version": "1.0.0",
-  "plugins": [
-    {
-      "id": "plugin1",
-      "name": "Plugin One",
-      "path": "plugin1",
-      "description": "First plugin in the repository",
-      "version": "1.0.0",
-      "type": "service"
-    },
-    {
-      "id": "plugin2",
-      "name": "Plugin Two",
-      "path": "plugin2",
-      "description": "Second plugin in the repository",
-      "version": "2.1.0",
-      "type": "calendar"
-    }
-  ]
-}
-```
-
-**Fields:**
-- `version` (string, required): Repository manifest format version (currently `"1.0.0"`)
-- `plugins` (array, required): List of available plugins
-  - `id` (string, required): Plugin identifier (must match plugin.json id)
-  - `name` (string, required): Human-readable name
-  - `path` (string, required): Relative path to plugin directory from repo root
-  - `description` (string, optional): Plugin description
-  - `version` (string, optional): Plugin version (if different from plugin.json)
-  - `type` (string, optional): Plugin type (calendar/image/service)
-
-**Auto-Discovery Rules:**
-If `plugins.json` is not present, the installer will:
-1. Scan the repository root for directories
-2. For each directory, check if it contains `plugin.json` and `plugin.py`
-3. Validate each found plugin directory
-4. Return list of discovered plugins
-
-**Validation:**
-- Each plugin path must exist and be a directory
-- Each plugin directory must contain valid `plugin.json` and `plugin.py`
-- Plugin IDs must be unique within the repository
-- Plugin paths must be relative and not contain `..` (security)
-
-## Plugin Directory Structure
-
-Each plugin directory must follow this structure:
-
-```
-plugin-name/
-├── plugin.json         # REQUIRED: Plugin manifest
-├── plugin.py          # REQUIRED: Plugin implementation
-├── frontend/           # OPTIONAL: pre-built web component/static assets
-│   ├── dist.js
-│   └── dist.css
-└── assets/             # OPTIONAL: Static assets
-    └── *
-```
-
-**Required Files:**
-- `plugin.json`: Plugin manifest (see [Plugin Manifest Schema](#plugin-manifest-schema-pluginjson) below)
-- `plugin.py`: Plugin implementation
-
-**Optional Directories:**
-- `frontend/`: Pre-built browser-native assets for `display_schema.kind = "web-component"`.
-  These files are served at `/api/plugins/{plugin_id}/static/{asset_path}` and do not require a
-  frontend rebuild.
-- `assets/`: Static assets used by the plugin backend.
-
-## Validation Rules
-
-### Zip File Validation
-1. ✅ Contains exactly one `plugin.json` file
-2. ✅ Contains exactly one `plugin.py` file in the same directory as `plugin.json`
-3. ✅ `plugin.json` is valid JSON
-4. ✅ `plugin.json` contains required fields: `id`, `name`, `version`, `type`
-5. ✅ Plugin type is valid: `calendar`, `image`, or `service`
-6. ✅ Plugin ID matches manifest ID (if provided during install)
-
-### Repository Validation
-1. ✅ If `plugins.json` exists, it must be valid JSON
-2. ✅ Each plugin listed in `plugins.json` must exist at the specified path
-3. ✅ Each plugin directory must contain valid `plugin.json` and `plugin.py`
-4. ✅ Plugin IDs must be unique within the repository
-5. ✅ Plugin paths must be relative and not contain `..`
-
-### Plugin Directory Validation
-1. ✅ Directory contains `plugin.json`
-2. ✅ Directory contains `plugin.py`
-3. ✅ `plugin.json` is valid JSON and contains required fields (`id`, `name`, `version`, `type`)
-4. ✅ Plugin type is valid (`calendar`, `image`, or `service`)
-5. ✅ Optional fields (dependencies, files, requirements) have valid structure if present
-
-## Installation Process
-
-### Zip File Installation
-1. Extract zip to temporary directory
-2. Validate package structure (exactly one plugin)
-3. Extract plugin to `backend/data/plugins/{plugin_id}/`
-4. Store frontend static assets if present
-5. Reload plugin loader
-
-### Repository Installation (Single Plugin)
-1. Download repository zip from GitHub
-2. Extract to temporary directory
-3. Navigate to specified plugin path
-4. Validate plugin directory
-5. Install plugin (same as zip installation)
-
-### Repository Installation (Multi-Plugin)
-1. Download repository zip from GitHub
-2. Extract to temporary directory
-3. Check for `plugins.json` manifest
-4. If manifest exists, validate and enumerate plugins
-5. If no manifest, auto-discover plugins by scanning directories
-6. Return list of available plugins to user
-7. User selects plugin(s) to install
-8. Install selected plugin(s) one by one
-
-## Security Considerations
-
-1. **Path Traversal**: Plugin paths must not contain `..` or absolute paths
-2. **File Validation**: Only extract expected file types
-3. **Size Limits**: Enforce reasonable size limits on downloads
-4. **Malicious Code**: Plugins execute Python code - users must trust the source
-5. **Dependencies**: Validate plugin dependencies before installation
-
-## Examples
-
-### Example 1: Single Plugin Zip
-```bash
-# Package structure
-my-service-plugin.zip
-  └── my-service-plugin/
-      ├── plugin.json
-      ├── plugin.py
-      └── frontend/
-          └── dist.js
-
-# Installation
-curl -X POST /api/plugins/install -F "file=@my-service-plugin.zip"
-```
-
-### Example 2: Multi-Plugin Repository with Manifest
-```bash
-# Repository structure
-calvin-plugins/
-├── plugins.json
-├── weather-plugin/
-│   ├── plugin.json
-│   └── plugin.py
-└── news-plugin/
+└── plugin2/
     ├── plugin.json
     └── plugin.py
+```
 
-# plugins.json
+## Repository Manifest (`plugins.json`)
+
+The repository-level manifest lists plugins for discovery. It is distinct
+from the per-plugin `plugin.json`.
+
+```json
 {
   "version": "1.0.0",
   "plugins": [
@@ -282,281 +78,182 @@ calvin-plugins/
       "id": "weather",
       "name": "Weather Service",
       "path": "weather-plugin",
-      "type": "service"
-    },
-    {
-      "id": "news",
-      "name": "News Feed",
-      "path": "news-plugin",
+      "description": "Display weather information",
+      "version": "1.0.0",
       "type": "service"
     }
   ]
 }
-
-# Installation
-# 1. Enumerate plugins
-GET /api/plugins/enumerate-from-github?repo_url=https://github.com/user/calvin-plugins
-
-# 2. Install selected plugin
-POST /api/plugins/install-from-github
-{
-  "repo_url": "https://github.com/user/calvin-plugins",
-  "plugin_path": "weather-plugin"
-}
 ```
 
-### Example 3: Multi-Plugin Repository without Manifest
-```bash
-# Repository structure (auto-discovered)
-calvin-plugins/
-├── weather-plugin/
-│   ├── plugin.json
-│   └── plugin.py
-└── news-plugin/
-    ├── plugin.json
-    └── plugin.py
+- `version` (string): repository manifest format version.
+- `plugins[]`: `id` and `path` required; `name`, `description`, `version`,
+  `type` optional (fall back to the plugin's own manifest).
+- Paths must be relative, without `..` (path-traversal protection).
+- Entries whose directories are missing or fail plugin validation are skipped.
 
-# Installation
-# 1. Enumerate plugins (auto-discovers)
-GET /api/plugins/enumerate-from-github?repo_url=https://github.com/user/calvin-plugins
-
-# 2. Install selected plugin
-POST /api/plugins/install-from-github
-{
-  "repo_url": "https://github.com/user/calvin-plugins",
-  "plugin_path": "weather-plugin"
-}
-```
+In the official `calvin-plugins` repo, `scripts/rebuild-manifest.py`
+regenerates this file — don't edit it by hand there.
 
 ## Plugin Manifest Schema (`plugin.json`)
 
-Each plugin **must** have a `plugin.json` file in its root directory. This manifest defines plugin metadata, dependencies, file inclusion/exclusion rules, and installation requirements.
-
-### Required Fields
+### Required fields
 
 ```json
 {
+  "api_version": 1,
   "id": "my_plugin",
   "name": "My Plugin",
   "version": "1.0.0",
-  "type": "service",
-  "protocol_version": 1
+  "type": "service"
 }
 ```
 
-- **`id`** (string, required): Unique plugin identifier
-  - Must be lowercase
-  - Can contain letters, numbers, underscores, and hyphens
-  - Must be unique within the Calvin installation
-  - Example: `"my_plugin"`, `"weather-service"`
+- **`api_version`** (int, required): plugin contract version — see above.
+- **`id`** (string, required): unique plugin identifier (lowercase; letters,
+  numbers, underscores, hyphens). Must equal the class's
+  `metadata.type_id`.
+- **`name`** (string, required): human-readable name.
+- **`version`** (string, required): semantic version; used for
+  upgrade/downgrade checks at install.
+- **`type`** (string, required): one of `calendar`, `image`, `service`,
+  `backend`. Must match the family base class the plugin subclasses.
 
-- **`name`** (string, required): Human-readable plugin name
-  - Displayed in the UI
-  - Can contain any characters
-  - Example: `"My Plugin"`, `"Weather Service"`
+### Optional metadata fields
 
-- **`version`** (string, required): Plugin version
-  - Should follow semantic versioning (e.g., `"1.0.0"`, `"2.1.3"`)
-  - Used for version checking during installation
-
-- **`type`** (string, required): Plugin type
-  - Must be one of: `"calendar"`, `"image"`, or `"service"`
-
-- **`protocol_version`** (integer, optional): Calvin plugin protocol version
-  - Defaults to `1` if not specified
-  - Should match the runtime plugin protocol the plugin was authored against
-  - Calvin currently supports protocol version `1`
-
-### Format Version Field
-
-```json
-{
-  "format_version": "1.0.0"
-}
-```
-
-- **`format_version`** (string, optional): Plugin manifest format version
-  - Defaults to `"1.0.0"` if not specified
-  - Should match the format version this plugin was created for
-  - Used for format compatibility checking
-
-### Optional Metadata Fields
-
-```json
-{
-  "description": "A description of what this plugin does",
-  "author": "Plugin Author Name",
-  "license": "MIT",
-  "homepage": "https://github.com/user/my-plugin",
-  "repository": "https://github.com/user/my-plugin",
-  "bugs": "https://github.com/user/my-plugin/issues",
-  "keywords": ["weather", "api", "service"]
-}
-```
-
-- **`description`** (string, optional): Detailed plugin description
-- **`author`** (string, optional): Plugin author name or organization
-- **`license`** (string, optional): License type (e.g., `"MIT"`, `"Apache-2.0"`, `"GPL-3.0"`)
-- **`homepage`** (string, optional): Plugin homepage URL
-- **`repository`** (string, optional): Source code repository URL
-- **`bugs`** (string, optional): Bug tracker URL
-- **`keywords`** (array of strings, optional): Tags for plugin discovery
+`description`, `author`, `license`, `homepage`, `repository`, `bugs`,
+`keywords` — free-form metadata shown in the UI and used for discovery.
 
 ### Dependencies
 
 ```json
 {
   "dependencies": {
-    "python": ">=3.10",
-    "packages": {
-      "requests": ">=2.28.0",
-      "pydantic": "^2.0.0"
-    },
-    "system": {
-      "ffmpeg": ">=4.0.0"
-    },
-    "calvin": ">=1.0.0"
+    "packages": ["psutil>=5.9", "httpx"]
   }
 }
 ```
 
-- **`dependencies`** (object, optional): Plugin dependencies
-  - **`python`** (string, optional): Required Python version (e.g., `">=3.10"`, `"3.9"`)
-  - **`packages`** (object, optional): Python package dependencies
-    - Keys are package names (PyPI names)
-    - Values are version constraints (e.g., `">=2.28.0"`, `"^2.0.0"`, `"==1.5.0"`)
-  - **`system`** (object, optional): System-level dependencies
-    - Keys are system package names
-    - Values are version constraints (if applicable)
-  - **`calvin`** (string, optional): Minimum required Calvin version
+- **`dependencies.packages`** (list of strings): pip requirement strings —
+  **the only dependency mechanism**. The installer pip-installs each one into
+  the host's venv at plugin install (resolving `uv`, a venv `pip`, or
+  `python -m pip`, in that order). A failed or timed-out install (120 s per
+  package) **rolls the whole plugin back**.
+- Shape is validated at install: must be a list of non-empty strings.
 
-### File Inclusion/Exclusion
+**Retired dependency keys** (no effect on the host; rejected by the
+`calvin-plugins` repo validator): `python_dependencies`,
+`dependencies.python`, `dependencies.calvin`, and the old dict form of
+`packages` (must be a list of requirement strings).
+
+### Files
 
 ```json
 {
   "files": {
-    "include": [
-      "plugin.py",
-      "config.yaml",
-      "assets/**",
-      "data/**"
-    ],
-    "exclude": [
-      "*.pyc",
-      "__pycache__/**",
-      "*.log",
-      "tests/**",
-      ".git/**"
-    ]
+    "include": ["plugin.py", "plugin.json", "frontend/**"],
+    "exclude": ["*.md", "tests/**", "__pycache__/**"]
   }
 }
 ```
 
-- **`files`** (object, optional): File inclusion/exclusion rules
-  - **`include`** (array of strings, optional): Files/directories to include
-    - Supports glob patterns (e.g., `"assets/**"`, `"*.py"`)
-    - If not specified, all files in plugin directory are included (except excludes)
-    - Default: All files except common exclusions
-  - **`exclude`** (array of strings, optional): Files/directories to exclude
-    - Supports glob patterns
-    - Always excludes: `.git/**`, `__pycache__/**`, `*.pyc`, `*.pyo`, `.DS_Store`
-    - Default: Common build artifacts and version control files
+- `include` / `exclude` (arrays of glob patterns): which files belong in the
+  installable package. `__pycache__`, `.git`, `.gitignore` are always skipped
+  when installing from a directory.
 
-**Note**: The `files` field is primarily useful for:
-- Including additional files beyond `plugin.py` (config files, data files, etc.)
-- Excluding test files, documentation, or development files from installation
-- Optimizing plugin package size
-
-### Installation Requirements
+### Requirements
 
 ```json
 {
   "requirements": {
-    "restart_required": true,
-    "permissions": ["network", "filesystem"],
-    "config_required": true
+    "config_required": true,
+    "permissions": ["network"]
   }
 }
 ```
 
-- **`requirements`** (object, optional): Installation and runtime requirements
-  - **`restart_required`** (boolean, optional): Whether plugin requires restart after installation
-    - Default: `true` (plugins typically need restart to load)
-  - **`permissions`** (array of strings, optional): Required permissions
-    - Common values: `"network"`, `"filesystem"`, `"database"`
-  - **`config_required`** (boolean, optional): Whether plugin requires configuration before use
-    - Default: `false`
+- **`config_required`** (bool, default `false`): the plugin needs
+  configuration before it can do anything useful.
+- **`permissions`** (array): informational permission tags (e.g. `"network"`,
+  `"filesystem"`).
+- **`restart_required`** (bool, default `false`): legacy flag, echoed in the
+  install response. Installation is live under contract 1.0 (see
+  [PLUGIN_PERSISTENCE_AND_RESTART.md](PLUGIN_PERSISTENCE_AND_RESTART.md)) —
+  don't set this.
 
-### Complete Plugin Manifest Example
+### Complete example
 
 ```json
 {
+  "api_version": 1,
   "id": "weather_service",
   "name": "Weather Service",
   "version": "1.2.0",
   "type": "service",
-  "description": "Displays weather information from OpenWeatherMap API",
+  "description": "Displays weather information from OpenWeatherMap",
   "author": "John Doe",
   "license": "MIT",
   "homepage": "https://github.com/johndoe/weather-plugin",
-  "repository": "https://github.com/johndoe/weather-plugin",
-  "keywords": ["weather", "api", "service", "openweathermap"],
-  "dependencies": {
-    "python": ">=3.10",
-    "packages": {
-      "requests": ">=2.28.0",
-      "pydantic": "^2.0.0"
-    },
-    "calvin": ">=1.0.0"
-  },
+  "keywords": ["weather", "api", "service"],
+  "dependencies": {"packages": ["httpx>=0.27"]},
   "files": {
-    "include": [
-      "plugin.py",
-      "config.yaml",
-      "assets/icons/**"
-    ],
-    "exclude": [
-      "tests/**",
-      "docs/**",
-      "*.md"
-    ]
+    "include": ["plugin.py", "plugin.json"],
+    "exclude": ["tests/**", "docs/**", "*.md"]
   },
-  "requirements": {
-    "restart_required": true,
-    "permissions": ["network"],
-    "config_required": true
-  }
+  "requirements": {"config_required": true}
 }
 ```
 
-### Manifest Validation Rules
+## Plugin Directory Structure
 
-1. **Required fields**: `id`, `name`, `version`, `type` must be present
-2. **Plugin type**: Must be one of `"calendar"`, `"image"`, or `"service"`
-3. **Version format**: Should follow semantic versioning (e.g., `"1.0.0"`)
-4. **Format version**: If specified, `format_version` must be a valid format version (currently `"1.0.0"`)
-5. **ID format**: Must be valid identifier (lowercase, alphanumeric, underscores, hyphens)
-6. **Dependencies**: Version constraints should follow standard format
-7. **Files**: Glob patterns must be valid
-8. **Optional fields**: Dependencies, files, and requirements have valid structure if present
+```
+plugin-name/
+├── plugin.json         # REQUIRED: manifest
+├── plugin.py           # REQUIRED: one BasePlugin subclass with metadata
+├── frontend/           # OPTIONAL: pre-built assets for kind: "web-component"
+│   ├── dist.js
+│   └── dist.css
+└── assets/             # OPTIONAL: backend static assets
+```
 
-### Two-Level Manifest System
+- `frontend/` files are served at
+  `/api/plugins/{plugin_id}/static/{asset_path}` — pre-built ES modules only,
+  **no `.vue` sources and no host rebuild**.
+- `plugin.py` must declare a plugin class per
+  [PLUGIN_INTERFACE.md](PLUGIN_INTERFACE.md); module-level hooks are not part
+  of the format.
 
-Calvin uses a **two-level manifest system**:
+## Validation at Install
 
-1. **Repository Manifest (`plugins.json`)** - Repository root
-   - Lists all plugins in the repository
-   - Used for discovery and enumeration
-   - Minimal metadata (id, name, path, version, type, description)
+1. Exactly one `plugin.json` + `plugin.py` (zip) / both present (directory).
+2. `plugin.json` is valid JSON with `id`, `name`, `version`, `type`.
+3. `type` is one of `calendar`, `image`, `service`, `backend`.
+4. `api_version` present, integer, equal to the host's supported version.
+5. Optional fields (`dependencies`, `files`, `requirements`) have valid
+   structure if present.
+6. After extraction, the host imports `plugin.py` and validates the plugin
+   class (`PluginMetadata` validation runs at import — bad `display_schema`
+   kinds, retired display keys, or a missing plugin class **roll the install
+   back** with a descriptive error).
 
-2. **Plugin Manifest (`plugin.json`)** - Each plugin directory
-   - Complete plugin metadata
-   - Dependencies and requirements
-   - File inclusion/exclusion rules
-   - Installation requirements
+## Installation Process
 
-**Benefits**:
-- Fast repository enumeration (only reads `plugins.json`)
-- Detailed information only loaded when needed
-- Clear separation of concerns
-- Scalable for large repositories
+Full flow (including the no-restart lifecycle):
+[PLUGIN_INSTALLATION.md](PLUGIN_INSTALLATION.md) and
+[PLUGIN_PERSISTENCE_AND_RESTART.md](PLUGIN_PERSISTENCE_AND_RESTART.md).
+
+1. Validate the package (rules above).
+2. Extract/copy to `backend/data/plugins/{plugin_id}/`.
+3. Pip-install `dependencies.packages` (failure → rollback).
+4. Import `plugin.py`, register the plugin class, validate (failure →
+   rollback).
+5. Register the plugin type in the database (disabled by default) — visible
+   in the UI immediately, no restart.
+
+## Security Considerations
+
+1. **Path traversal**: plugin paths must not contain `..` or be absolute.
+2. **Trusted sources only**: plugins execute Python in the host process and
+   install pip packages — install only code you trust.
+3. **Static assets**: the `/static/` endpoint is confined to the plugin's own
+   directory.

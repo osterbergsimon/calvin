@@ -195,11 +195,9 @@ const instanceLabel = computed(
     currentPlugin.value?.instance_label || instanceLabelMap[currentPlugin.value?.type] || "Instance"
 );
 
-const unwrapConfigValue = (value, schema = {}) => {
-  if (value && typeof value === "object") {
-    if ("value" in value) return value.value ?? "";
-    if ("default" in value) return value.default ?? "";
-  }
+// Config values are bare scalars (the backend normalizes legacy wrappers);
+// this only fills schema defaults for fields the instance hasn't set yet.
+const configValueOrDefault = (value, schema = {}) => {
   if (value !== undefined) return value;
   if (schema.default !== undefined) return schema.default;
   return schema.type === "boolean" ? false : "";
@@ -213,21 +211,13 @@ const hasTestAction = computed(() => {
   );
 });
 
-// Computed property for geocode action check (check if plugin has geocode endpoint)
+// A plugin gets the location-lookup button by declaring a geocode ui_action
+// in its metadata — never by id.
 const hasGeocodeAction = computed(() => {
-  if (!currentPlugin.value) return false;
-  // Check if plugin has a geocode action in ui_actions, or if it's a weather plugin
-  const hasGeocodeInActions =
-    currentPlugin.value.ui_actions &&
-    currentPlugin.value.ui_actions.some(
-      action => action.type === "geocode" || action.endpoint?.includes("geocode")
-    );
-  // Also check plugin ID or type for common weather plugins
-  const isWeatherPlugin =
-    currentPlugin.value.id === "yr.no" ||
-    currentPlugin.value.id === "yr_weather" ||
-    currentPlugin.value.type === "weather";
-  return hasGeocodeInActions || isWeatherPlugin;
+  return Boolean(
+    currentPlugin.value?.ui_actions &&
+      currentPlugin.value.ui_actions.some(action => action.type === "geocode")
+  );
 });
 
 // Watch for plugin/instance changes
@@ -289,7 +279,7 @@ const initializeForm = async () => {
 
     if (currentPlugin.value.instance_config_schema) {
       for (const [key, schema] of Object.entries(currentPlugin.value.instance_config_schema)) {
-        form[key] = unwrapConfigValue(editingInstance.value.config?.[key], schema);
+        form[key] = configValueOrDefault(editingInstance.value.config?.[key], schema);
       }
     }
 
@@ -350,7 +340,7 @@ const initializeForm = async () => {
 };
 
 const getFormValue = (key, schema) => {
-  return unwrapConfigValue(formData.value[key], schema);
+  return configValueOrDefault(formData.value[key], schema);
 };
 
 const updateFormValue = (key, value) => {
@@ -439,7 +429,7 @@ const handleTest = async () => {
         if (key === "display_order") {
           continue;
         }
-        const value = unwrapConfigValue(formData.value[key], schema);
+        const value = configValueOrDefault(formData.value[key], schema);
         if (value !== undefined && value !== null) {
           // Handle different types
           if (schema.type === "string" && typeof value === "string") {
@@ -500,7 +490,7 @@ const handleSave = async () => {
         if (key === "display_order") {
           continue;
         }
-        const value = unwrapConfigValue(formData.value[key], schema);
+        const value = configValueOrDefault(formData.value[key], schema);
         if (value !== undefined && value !== null) {
           // Handle different types
           if (schema.type === "string" && typeof value === "string") {

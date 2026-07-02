@@ -185,13 +185,9 @@ const ui = computed(() => {
   return props.schema && typeof props.schema === "object" ? props.schema.ui : null;
 });
 
-const fieldValue = computed(() => {
-  if (props.value && typeof props.value === "object") {
-    if ("value" in props.value) return props.value.value ?? "";
-    if ("default" in props.value) return props.value.default ?? "";
-  }
-  return props.value;
-});
+// Config values are bare scalars in the 1.0 contract; callers resolve
+// schema defaults before passing a value in.
+const fieldValue = computed(() => props.value);
 
 const isChecked = computed(() => {
   const value = fieldValue.value;

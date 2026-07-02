@@ -3,14 +3,19 @@
     <div
       v-for="(metric, i) in metrics"
       :key="i"
-      class="metric-dashboard__tile calvin-plugin-metric"
+      class="metric-dashboard__tile calvin-plugin-surface calvin-plugin-metric calvin-plugin-readout"
       :class="statusClass(metric)"
     >
-      <span v-if="iconFor(metric)" class="metric-dashboard__icon">{{ iconFor(metric) }}</span>
-      <span v-if="labelFor(metric)" class="metric-dashboard__label">{{ labelFor(metric) }}</span>
-      <span class="metric-dashboard__value">
+      <span class="calvin-plugin-readout__label">
+        <span v-if="isAlert(metric)" class="calvin-plugin-lamp" />
+        <span v-if="iconFor(metric)" class="metric-dashboard__icon">{{ iconFor(metric) }}</span>
+        {{ labelFor(metric) }}
+      </span>
+      <span class="calvin-plugin-readout__value metric-dashboard__value">
         {{ valueFor(metric)
-        }}<span v-if="unitFor(metric)" class="metric-dashboard__unit">{{ unitFor(metric) }}</span>
+        }}<span v-if="unitFor(metric)" class="calvin-plugin-readout__unit">{{
+          unitFor(metric)
+        }}</span>
       </span>
     </div>
   </div>
@@ -59,61 +64,36 @@ const labelFor = m => pick(m, "label_path", "label");
 const valueFor = m => pick(m, "value_path", "value", "value_format");
 const unitFor = m => pick(m, "unit_path", "unit");
 
-function statusClass(metric) {
+function statusFor(metric) {
   const spec = tileSpec.value;
-  const status = spec.status_path ? resolvePath(metric, spec.status_path) : spec.status;
-  return status ? `metric-dashboard__tile--${status}` : null;
+  return spec.status_path ? resolvePath(metric, spec.status_path) : spec.status;
+}
+
+function isAlert(metric) {
+  const s = statusFor(metric);
+  return s === "warn" || s === "error";
+}
+
+function statusClass(metric) {
+  const s = statusFor(metric);
+  if (s === "warn") return "calvin-plugin-readout--warn";
+  if (s === "error") return "calvin-plugin-readout--error";
+  return null;
 }
 </script>
 
 <style scoped>
-.metric-dashboard {
-}
-
 .metric-dashboard__tile {
-  display: flex;
-  flex-direction: column;
-  gap: 0.4rem;
-  align-items: flex-start;
   justify-content: center;
+  gap: 0.45rem;
 }
 
 .metric-dashboard__icon {
-  font-size: 1.75rem;
+  font-size: 1.2em;
   line-height: 1;
 }
 
-.metric-dashboard__label {
-  font-size: 0.8rem;
-  color: var(--text-secondary);
-  font-weight: 500;
-  text-transform: uppercase;
-  letter-spacing: 0.05em;
-}
-
 .metric-dashboard__value {
-  font-size: 1.85rem;
-  font-weight: 700;
-  color: var(--text-primary);
-  line-height: 1.1;
-}
-
-.metric-dashboard__unit {
-  font-size: 0.95rem;
-  font-weight: 500;
-  color: var(--text-secondary);
-  margin-left: 0.25rem;
-}
-
-.metric-dashboard__tile--ok {
-  border-color: var(--accent-success, #2ecc71);
-}
-
-.metric-dashboard__tile--warn {
-  border-color: var(--accent-warning, #f39c12);
-}
-
-.metric-dashboard__tile--error {
-  border-color: var(--accent-error, #e74c3c);
+  font-size: var(--plugin-value-size-lg);
 }
 </style>

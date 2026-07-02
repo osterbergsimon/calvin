@@ -11,11 +11,10 @@ from typing import Any
 from loguru import logger
 
 from app.config import settings
-from app.plugins.definitions import CURRENT_PLUGIN_PROTOCOL_VERSION
+from app.plugins.definitions import CURRENT_PLUGIN_API_VERSION
 from app.services.validation import (
     validate_directory_structure,
-    validate_manifest_format_version,
-    validate_manifest_protocol_version,
+    validate_manifest_api_version,
     validate_manifest_required_fields,
     validate_plugin_optional_fields,
     validate_plugin_type,
@@ -75,14 +74,8 @@ class PluginInstaller:
         required_fields = ["id", "name", "version", "type"]
         validate_manifest_required_fields(manifest, required_fields, "plugin.json")
         validate_plugin_type(manifest["type"])
-        validate_manifest_format_version(
-            manifest, ["1.0.0"], default_version="1.0.0", manifest_type="plugin.json"
-        )
-        validate_manifest_protocol_version(
-            manifest,
-            [CURRENT_PLUGIN_PROTOCOL_VERSION],
-            default_version=CURRENT_PLUGIN_PROTOCOL_VERSION,
-            manifest_type="plugin.json",
+        validate_manifest_api_version(
+            manifest, CURRENT_PLUGIN_API_VERSION, manifest_type="plugin.json"
         )
         validate_plugin_optional_fields(manifest)
 
@@ -112,14 +105,8 @@ class PluginInstaller:
         required_fields = ["id", "name", "version", "type"]
         validate_manifest_required_fields(manifest, required_fields, "plugin.json")
         validate_plugin_type(manifest["type"])
-        validate_manifest_format_version(
-            manifest, ["1.0.0"], default_version="1.0.0", manifest_type="plugin.json"
-        )
-        validate_manifest_protocol_version(
-            manifest,
-            [CURRENT_PLUGIN_PROTOCOL_VERSION],
-            default_version=CURRENT_PLUGIN_PROTOCOL_VERSION,
-            manifest_type="plugin.json",
+        validate_manifest_api_version(
+            manifest, CURRENT_PLUGIN_API_VERSION, manifest_type="plugin.json"
         )
         validate_plugin_optional_fields(manifest)
 
@@ -278,12 +265,12 @@ class PluginInstaller:
             raise ValueError(f"Failed to install plugin: {e}") from e
 
     def _install_pip_requirements(self, manifest: dict[str, Any]) -> list[str]:
-        """Install Python packages declared in plugin.json under python_dependencies.
+        """Install Python packages declared in plugin.json under dependencies.packages.
 
         Uses the running interpreter so the packages land in the correct venv.
         Raises ValueError if any package fails to install so the caller can roll back.
         """
-        requirements: list[str] = manifest.get("python_dependencies", [])
+        requirements: list[str] = (manifest.get("dependencies") or {}).get("packages", [])
         if not requirements:
             return []
 

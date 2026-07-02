@@ -88,7 +88,7 @@ export async function stopPluginInstance(instanceId) {
 
 /**
  * Read plugin.json from a zip without installing it.
- * Returns the manifest so callers can inspect python_dependencies before committing.
+ * Returns the manifest so callers can inspect dependencies.packages before committing.
  */
 export async function inspectPluginZip(file) {
   const formData = new FormData();

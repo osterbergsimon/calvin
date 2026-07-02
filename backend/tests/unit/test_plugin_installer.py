@@ -5,6 +5,7 @@ import zipfile
 
 import pytest
 
+from app.plugins.definitions import CURRENT_PLUGIN_API_VERSION
 from app.services.plugin_installer import PluginInstaller
 
 
@@ -33,6 +34,7 @@ def valid_plugin_manifest():
         "description": "A test plugin",
         "version": "1.0.0",
         "type": "service",
+        "api_version": CURRENT_PLUGIN_API_VERSION,
         "author": "Test Author",
         "license": "MIT",
     }
@@ -49,18 +51,19 @@ def valid_plugin_package(tmp_path, valid_plugin_manifest):
     with open(manifest_path, "w", encoding="utf-8") as f:
         json.dump(valid_plugin_manifest, f, indent=2)
 
-    # Create plugin.py
+    # Create plugin.py (contract 1.0: one class with a metadata attribute)
     plugin_py = plugin_dir / "plugin.py"
     plugin_py.write_text(
         '''"""Test plugin."""
-from typing import Any
-from app.plugins.base import PluginType
-from app.plugins.hooks import hookimpl
+from app.plugins.definitions import PluginMetadata
+from app.plugins.protocols import ServicePlugin
 
-@hookimpl
-def register_plugin_types() -> list[dict[str, Any]]:
-    """Register plugin type."""
-    return [{"type_id": "test_plugin", "plugin_type": PluginType.SERVICE}]
+
+class TestPlugin(ServicePlugin):
+    metadata = PluginMetadata(type_id="test_plugin", name="Test Plugin")
+
+    async def fetch(self, start_date=None, end_date=None):
+        return {"ok": True}
 '''
     )
 
@@ -108,24 +111,43 @@ class TestPluginInstaller:
         assert manifest["id"] == "test_plugin"
         assert manifest["name"] == "Test Plugin"
 
-    def test_validate_plugin_directory_defaults_protocol_version(
-        self, plugin_installer, valid_plugin_package
-    ):
-        """Test plugin manifests default to protocol version 1 when omitted."""
-        manifest = plugin_installer.validate_plugin_package(valid_plugin_package)
-        assert manifest.get("protocol_version", 1) == 1
-
-    def test_validate_plugin_directory_unsupported_protocol_version(
+    def test_validate_plugin_directory_missing_api_version_rejected(
         self, plugin_installer, tmp_path, valid_plugin_manifest
     ):
-        """Test validating plugin directory with unsupported protocol version."""
+        """api_version is required — a manifest without it is rejected, not default-filled."""
         plugin_dir = tmp_path / "invalid_plugin"
         plugin_dir.mkdir()
-        manifest = {**valid_plugin_manifest, "protocol_version": 2}
+        manifest = {k: v for k, v in valid_plugin_manifest.items() if k != "api_version"}
         (plugin_dir / "plugin.json").write_text(json.dumps(manifest))
         (plugin_dir / "plugin.py").write_text("# Plugin code")
 
-        with pytest.raises(ValueError, match="Unsupported plugin.json protocol version"):
+        with pytest.raises(ValueError, match="must declare api_version"):
+            plugin_installer.validate_plugin_package(plugin_dir)
+
+    def test_validate_plugin_directory_newer_api_version_rejected(
+        self, plugin_installer, tmp_path, valid_plugin_manifest
+    ):
+        """Test validating plugin directory with an unsupported (newer) api_version."""
+        plugin_dir = tmp_path / "invalid_plugin"
+        plugin_dir.mkdir()
+        manifest = {**valid_plugin_manifest, "api_version": CURRENT_PLUGIN_API_VERSION + 1}
+        (plugin_dir / "plugin.json").write_text(json.dumps(manifest))
+        (plugin_dir / "plugin.py").write_text("# Plugin code")
+
+        with pytest.raises(ValueError, match="newer than this Calvin"):
+            plugin_installer.validate_plugin_package(plugin_dir)
+
+    def test_validate_plugin_directory_non_int_api_version_rejected(
+        self, plugin_installer, tmp_path, valid_plugin_manifest
+    ):
+        """Test validating plugin directory with a non-integer api_version."""
+        plugin_dir = tmp_path / "invalid_plugin"
+        plugin_dir.mkdir()
+        manifest = {**valid_plugin_manifest, "api_version": "1"}
+        (plugin_dir / "plugin.json").write_text(json.dumps(manifest))
+        (plugin_dir / "plugin.py").write_text("# Plugin code")
+
+        with pytest.raises(ValueError, match="api_version must be an integer"):
             plugin_installer.validate_plugin_package(plugin_dir)
 
     def test_validate_plugin_directory_missing_manifest(self, plugin_installer, tmp_path):
@@ -188,6 +210,7 @@ class TestPluginInstaller:
             "name": "Test Backend",
             "version": "1.0.0",
             "type": "backend",
+            "api_version": CURRENT_PLUGIN_API_VERSION,
         }
         (plugin_dir / "plugin.json").write_text(json.dumps(manifest))
         (plugin_dir / "plugin.py").write_text("# Plugin code")
@@ -402,3 +425,44 @@ class TestPluginInstaller:
         assert not (plugin_path / ".git").exists()
         # .gitignore should not be copied
         assert not (plugin_path / ".gitignore").exists()
+
+
+@pytest.mark.unit
+class TestPluginDependenciesValidation:
+    """dependencies.packages is the single (validated) pip-dependency mechanism."""
+
+    def _package_with_deps(self, tmp_path, valid_plugin_manifest, deps):
+        plugin_dir = tmp_path / "deps_plugin"
+        plugin_dir.mkdir()
+        manifest = {**valid_plugin_manifest, "dependencies": deps}
+        (plugin_dir / "plugin.json").write_text(json.dumps(manifest))
+        (plugin_dir / "plugin.py").write_text("# Plugin code")
+        return plugin_dir
+
+    def test_valid_packages_list_accepted(self, plugin_installer, tmp_path, valid_plugin_manifest):
+        plugin_dir = self._package_with_deps(
+            tmp_path, valid_plugin_manifest, {"packages": ["psutil>=5.9", "httpx"]}
+        )
+        manifest = plugin_installer.validate_plugin_package(plugin_dir)
+        assert manifest["dependencies"]["packages"] == ["psutil>=5.9", "httpx"]
+
+    def test_non_list_packages_rejected(self, plugin_installer, tmp_path, valid_plugin_manifest):
+        plugin_dir = self._package_with_deps(
+            tmp_path, valid_plugin_manifest, {"packages": "psutil>=5.9"}
+        )
+        with pytest.raises(ValueError, match="dependencies.packages must be a list"):
+            plugin_installer.validate_plugin_package(plugin_dir)
+
+    def test_empty_string_package_rejected(self, plugin_installer, tmp_path, valid_plugin_manifest):
+        plugin_dir = self._package_with_deps(
+            tmp_path, valid_plugin_manifest, {"packages": ["psutil", " "]}
+        )
+        with pytest.raises(ValueError, match="dependencies.packages must be a list"):
+            plugin_installer.validate_plugin_package(plugin_dir)
+
+    def test_non_dict_dependencies_rejected(
+        self, plugin_installer, tmp_path, valid_plugin_manifest
+    ):
+        plugin_dir = self._package_with_deps(tmp_path, valid_plugin_manifest, ["psutil"])
+        with pytest.raises(ValueError, match="dependencies must be an object"):
+            plugin_installer.validate_plugin_package(plugin_dir)

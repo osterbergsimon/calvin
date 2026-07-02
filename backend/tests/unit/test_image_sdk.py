@@ -1,20 +1,17 @@
+"""Tests for the image plugin SDK helpers (contract 1.0 surface).
+
+Only `fetch_image_data` and `SelfHostedGalleryImagePlugin` remain in
+`app.plugins.sdk.image`; the metadata/field builder helpers were removed.
+"""
+
 from unittest.mock import MagicMock, patch
 
 import httpx
 import pytest
 
-from app.plugins.sdk.image import (
-    ImageConfigField,
-    SelfHostedGalleryImagePlugin,
-    build_image_manager_config,
-    build_image_plugin_metadata,
-    create_image_plugin_instance,
-    extract_image_config,
-    fetch_image_data,
-)
+from app.plugins.sdk.image import SelfHostedGalleryImagePlugin, fetch_image_data
 
 
-@pytest.mark.asyncio
 async def test_fetch_image_data_returns_bytes():
     with patch("app.plugins.sdk.image.httpx.AsyncClient") as mock_client:
         mock_response = MagicMock()
@@ -30,7 +27,6 @@ async def test_fetch_image_data_returns_bytes():
         assert data == b"image-bytes"
 
 
-@pytest.mark.asyncio
 async def test_fetch_image_data_passes_headers_and_redirects():
     with patch("app.plugins.sdk.image.httpx.AsyncClient") as mock_client:
         mock_response = MagicMock()
@@ -52,12 +48,10 @@ async def test_fetch_image_data_passes_headers_and_redirects():
         )
 
 
-@pytest.mark.asyncio
 async def test_fetch_image_data_returns_none_for_missing_url():
     assert await fetch_image_data(None, plugin_name="Example") is None
 
 
-@pytest.mark.asyncio
 async def test_fetch_image_data_returns_none_on_http_error():
     with patch("app.plugins.sdk.image.httpx.AsyncClient") as mock_client:
         mock_response = MagicMock()
@@ -77,16 +71,6 @@ class DummyGalleryPlugin(SelfHostedGalleryImagePlugin):
     api_base_path = "/api/v2"
     auth_header_name = "x-api-key"
 
-    @classmethod
-    def get_plugin_metadata(cls) -> dict[str, object]:
-        return {}
-
-    async def initialize(self) -> None:
-        pass
-
-    async def cleanup(self) -> None:
-        pass
-
     async def get_images(self) -> list[dict[str, object]]:
         return []
 
@@ -99,16 +83,11 @@ class DummyGalleryPlugin(SelfHostedGalleryImagePlugin):
     async def scan_images(self) -> list[dict[str, object]]:
         return []
 
-    async def validate_config(self, config: dict[str, object]) -> bool:
-        return True
 
-
-class DummyImagePlugin:
-    def __init__(self, plugin_id: str, name: str, enabled: bool = True, **kwargs):
-        self.plugin_id = plugin_id
-        self.name = name
-        self.enabled = enabled
-        self.kwargs = kwargs
+async def _configured_gallery_plugin() -> DummyGalleryPlugin:
+    plugin = DummyGalleryPlugin(plugin_id="dummy-gallery", name="Dummy Gallery")
+    await plugin.configure({"url": "https://photos.example.com/", "api_key": "secret"})
+    return plugin
 
 
 def test_self_hosted_gallery_build_auth_headers():
@@ -118,15 +97,11 @@ def test_self_hosted_gallery_build_auth_headers():
     }
 
 
-def test_self_hosted_gallery_api_url_and_init():
-    plugin = DummyGalleryPlugin(
-        plugin_id="dummy-gallery",
-        name="Dummy Gallery",
-        url="https://photos.example.com/",
-        api_key="secret",
-    )
+async def test_self_hosted_gallery_reads_config():
+    plugin = await _configured_gallery_plugin()
 
     assert plugin.base_url == "https://photos.example.com"
+    assert plugin.api_key == "secret"
     assert plugin.auth_headers() == {
         "x-api-key": "secret",
         "Accept": "application/json",
@@ -134,14 +109,15 @@ def test_self_hosted_gallery_api_url_and_init():
     assert plugin.api_url("albums/123") == "https://photos.example.com/api/v2/albums/123"
 
 
-@pytest.mark.asyncio
+async def test_self_hosted_gallery_defaults_before_configure():
+    plugin = DummyGalleryPlugin(plugin_id="dummy-gallery", name="Dummy Gallery")
+
+    assert plugin.base_url == ""
+    assert plugin.api_key == ""
+
+
 async def test_self_hosted_gallery_fetch_protected_image_data():
-    plugin = DummyGalleryPlugin(
-        plugin_id="dummy-gallery",
-        name="Dummy Gallery",
-        url="https://photos.example.com/",
-        api_key="secret",
-    )
+    plugin = await _configured_gallery_plugin()
 
     with patch("app.plugins.sdk.image.fetch_image_data", autospec=True) as mock_fetch:
         mock_fetch.return_value = b"image-bytes"
@@ -157,104 +133,8 @@ async def test_self_hosted_gallery_fetch_protected_image_data():
         )
 
 
-def test_build_image_plugin_metadata():
-    metadata = build_image_plugin_metadata(
-        type_id="dummy_image",
-        name="Dummy Image",
-        description="Dummy",
-        plugin_class=DummyImagePlugin,
-        supports_multiple_instances=False,
-        instance_label="Source",
-    )
+def test_removed_sdk_helpers_raise_helpful_error():
+    import app.plugins.sdk.image as image_sdk
 
-    assert metadata["type_id"] == "dummy_image"
-    assert metadata["plugin_type"].value == "image"
-    assert metadata["supports_multiple_instances"] is False
-    assert metadata["instance_label"] == "Source"
-    assert metadata["plugin_class"] is DummyImagePlugin
-
-
-def test_extract_image_config_uses_defaults_and_transforms():
-    fields = (
-        ImageConfigField("token", default="", converter=str, transform=str.strip),
-        ImageConfigField("count", default=1, converter=int),
-        ImageConfigField("alias", default="", arg_name="label"),
-    )
-
-    values = extract_image_config(
-        {"token": "  abc  ", "count": "4", "alias": "Name"},
-        fields,
-    )
-
-    assert values == {
-        "token": "abc",
-        "count": 4,
-        "label": "Name",
-    }
-
-
-def test_create_image_plugin_instance_builds_kwargs():
-    fields = (
-        ImageConfigField("token", default="", converter=str),
-        ImageConfigField("count", default=1, converter=int),
-    )
-
-    plugin = create_image_plugin_instance(
-        DummyImagePlugin,
-        expected_type_id="dummy_image",
-        plugin_id="dummy-instance",
-        type_id="dummy_image",
-        name="Dummy",
-        config={"enabled": True, "token": "abc", "count": "2"},
-        fields=fields,
-        extra_kwargs=lambda config: {"source": config.get("source", "default")},
-    )
-
-    assert plugin is not None
-    assert plugin.plugin_id == "dummy-instance"
-    assert plugin.enabled is True
-    assert plugin.kwargs == {"token": "abc", "count": 2, "source": "default"}
-
-
-def test_create_image_plugin_instance_returns_none_for_other_type():
-    plugin = create_image_plugin_instance(
-        DummyImagePlugin,
-        expected_type_id="dummy_image",
-        plugin_id="dummy-instance",
-        type_id="other_image",
-        name="Dummy",
-        config={},
-    )
-
-    assert plugin is None
-
-
-def test_build_image_manager_config_normalizes_fields_and_extras():
-    fields = (
-        ImageConfigField("token", default="", converter=str, transform=str.strip),
-        ImageConfigField("count", default=1, converter=int),
-        ImageConfigField("alias", default="", arg_name="label"),
-    )
-
-    manager_config = build_image_manager_config(
-        type_id="dummy_image",
-        fields=fields,
-        single_instance=True,
-        instance_id="dummy-instance",
-        extra_normalize=lambda config: {"enabled_flag": config.get("enabled", False)},
-        default_instance_name="Dummy Image",
-    )
-
-    normalized = manager_config.normalize_config(
-        {"token": "  abc  ", "count": "3", "alias": "Shown", "enabled": True}
-    )
-
-    assert manager_config.single_instance is True
-    assert manager_config.instance_id == "dummy-instance"
-    assert manager_config.default_instance_name == "Dummy Image"
-    assert normalized == {
-        "token": "abc",
-        "count": 3,
-        "alias": "Shown",
-        "enabled_flag": True,
-    }
+    with pytest.raises(AttributeError, match="plugin contract 1.0"):
+        image_sdk.build_image_plugin_metadata  # noqa: B018

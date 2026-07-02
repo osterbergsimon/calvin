@@ -37,7 +37,7 @@ Each is `<SettingsSection>`s of `<SettingRow>`s; plain settings use the shell co
 These five keep their internal markup; only their *containing* row/section is new:
 
 1. `ClockBarFontSizePicker` — clock-bar sizing (horizontal **and** vertical instances, the vertical one with its live `ClockBarVertical` preview).
-2. `ClockBarItemsTab` — clock-bar status-tile editor (self-managed state; no `config` prop).
+2. `ClockBarItemsTab` — clock-bar status-item editor (self-managed state; no `config` prop).
 3. The per-day **display-power schedule grid** — extracted verbatim from `PowerTab` into a new `DisplayScheduleGrid.vue` (markup/styling unchanged, a lift-and-shift) so it can be embedded while the surrounding power settings become new rows. `PowerTab`'s simple settings (schedule-enable, timezone, timeout, manual control) are *not* embedded — they are rebuilt as rows (§4.2), and `PowerTab` is then retired.
 4. `KeyboardTab` — keyboard type + remapping UI (the *UI* may be restyled later; the action set stays frozen).
 5. The **update-status + health block** — embedded via `UpdatesTab` (see §4 Maintenance).
