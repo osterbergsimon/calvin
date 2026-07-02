@@ -28,11 +28,17 @@
         />
 
         <div :class="['dashboard-main', mainLayoutClass]">
-          <!-- Fullscreen Mode (Photos or Web Services) -->
+          <!-- Fullscreen Mode (Calendar, Photos or Web Services) -->
           <div v-if="modeStore.isFullscreen" class="mode-content fullscreen-mode">
+            <!-- Fullscreen Calendar -->
+            <CalendarView
+              v-if="modeStore.fullscreenMode === modeStore.MODES.CALENDAR"
+              :is-fullscreen="true"
+              :source-ids="modeStore.fullscreenContext?.sourceIds || []"
+            />
             <!-- Fullscreen Photos -->
             <PhotoSlideshow
-              v-if="modeStore.fullscreenMode === modeStore.MODES.PHOTOS"
+              v-else-if="modeStore.fullscreenMode === modeStore.MODES.PHOTOS"
               :is-fullscreen="true"
               :auto-rotate="true"
               :rotation-interval="configStore.photoRotationInterval * 1000"
@@ -41,6 +47,7 @@
             <WebServiceViewer
               v-else-if="modeStore.fullscreenMode === modeStore.MODES.WEB_SERVICES"
               :is-fullscreen="true"
+              :service-id="modeStore.fullscreenContext?.serviceId || null"
             />
           </div>
 
@@ -151,6 +158,7 @@ import ClockBarVertical from "../components/ClockBarVertical.vue";
 
 const PhotoSlideshow = defineAsyncComponent(() => import("../components/PhotoSlideshow.vue"));
 const WebServiceViewer = defineAsyncComponent(() => import("../components/WebServiceViewer.vue"));
+const CalendarView = defineAsyncComponent(() => import("../components/CalendarView.vue"));
 import { useConfigStore } from "../stores/config";
 import { useModeStore } from "../stores/mode";
 import { useRoute } from "vue-router";

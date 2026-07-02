@@ -204,8 +204,15 @@ const toggleFullscreen = () => {
     // This will preserve the web service in the side panel
     modeStore.exitFullscreen();
   } else {
-    // Enter fullscreen web services
-    modeStore.enterFullscreen(modeStore.MODES.WEB_SERVICES);
+    // Enter fullscreen web services, carrying THIS viewer's service so the
+    // maximized view shows the service whose ⤢ was pressed — not the globally
+    // "current" service (which may belong to another region/screen). When this
+    // viewer has no pinned service (the WEB_SERVICES carousel), pass null so
+    // fullscreen cycles from the current index.
+    modeStore.enterFullscreen(
+      modeStore.MODES.WEB_SERVICES,
+      props.serviceId ? { serviceId: props.serviceId } : null
+    );
   }
 
   // Reset flag after a short delay

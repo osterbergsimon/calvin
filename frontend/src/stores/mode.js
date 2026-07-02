@@ -14,7 +14,8 @@ export const useModeStore = defineStore("mode", () => {
   const currentMode = ref(MODES.CALENDAR);
   const previousMode = ref(null); // For returning from settings
   const isFullscreen = ref(false); // Track if we're in fullscreen mode
-  const fullscreenMode = ref(null); // Which mode is fullscreen (PHOTOS or WEB_SERVICES)
+  const fullscreenMode = ref(null); // Which mode is fullscreen (CALENDAR, PHOTOS or WEB_SERVICES)
+  const fullscreenContext = ref(null); // Optional payload for the fullscreen view (e.g. calendar sourceIds)
   const modeBeforeFullscreen = ref(null); // Track mode before entering fullscreen
 
   const setMode = mode => {
@@ -25,14 +26,18 @@ export const useModeStore = defineStore("mode", () => {
     // When switching modes, exit fullscreen and stay on dashboard
     isFullscreen.value = false;
     fullscreenMode.value = null;
+    fullscreenContext.value = null;
     currentMode.value = mode;
   };
 
-  const enterFullscreen = mode => {
+  const enterFullscreen = (mode, context = null) => {
     // Store current mode before entering fullscreen
     modeBeforeFullscreen.value = currentMode.value;
     isFullscreen.value = true;
     fullscreenMode.value = mode;
+    // Optional view context (e.g. the calendar sources of the region that
+    // triggered fullscreen). Null for globally-scoped views (photos/services).
+    fullscreenContext.value = context;
   };
 
   const exitFullscreen = () => {
@@ -40,6 +45,7 @@ export const useModeStore = defineStore("mode", () => {
     const wasPhotos = fullscreenMode.value === MODES.PHOTOS;
     isFullscreen.value = false;
     fullscreenMode.value = null;
+    fullscreenContext.value = null;
 
     // Restore the mode we were in before entering fullscreen
     if (modeBeforeFullscreen.value) {
@@ -91,6 +97,7 @@ export const useModeStore = defineStore("mode", () => {
     previousMode,
     isFullscreen,
     fullscreenMode,
+    fullscreenContext,
     setMode,
     enterFullscreen,
     exitFullscreen,
