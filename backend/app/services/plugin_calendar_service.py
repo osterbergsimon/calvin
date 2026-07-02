@@ -229,15 +229,9 @@ class PluginCalendarService:
                         )
                         cached_data = data
 
-                # If no exact match, look for a cached entry that FULLY covers the
-                # requested range. A merely-overlapping entry must NOT be used: we
-                # filter its events to the requested range, so any day the cache
-                # doesn't cover would silently come back empty. That surfaced as
-                # blank weeks when navigating the rolling view (the window extends
-                # past the previous fetch's buffer). Prefer the tightest covering
-                # entry to keep the filtered set small.
+                # If no exact match, check for overlapping date ranges
                 if not cached_data:
-                    best_cover_days = None
+                    best_overlap_days = 0
 
                     for key, data in list(self._cache.items()):
                         if not key.startswith(f"{plugin.plugin_id}:"):
@@ -271,25 +265,36 @@ class PluginCalendarService:
                             cached_start_date = datetime.fromisoformat(parts[1]).date()
                             cached_end_date = datetime.fromisoformat(parts[2]).date()
 
-                            # Only reuse a cache entry that fully covers the
-                            # requested range: cached_start <= requested_start
-                            # AND cached_end >= requested_end.
+                            # Check if date ranges overlap (simple date comparison on full days)
+                            # Overlap exists if: cached_start <= requested_end
+                            # AND cached_end >= requested_start
                             if (
-                                cached_start_date <= start_date_only
-                                and cached_end_date >= end_date_only
+                                cached_start_date <= end_date_only
+                                and cached_end_date >= start_date_only
                             ):
-                                cover_days = (cached_end_date - cached_start_date).days
-                                if best_cover_days is None or cover_days < best_cover_days:
-                                    best_cover_days = cover_days
+                                # Calculate overlap in days
+                                overlap_start = max(cached_start_date, start_date_only)
+                                overlap_end = min(cached_end_date, end_date_only)
+                                overlap_days = (overlap_end - overlap_start).days + 1
+                                requested_days = (end_date_only - start_date_only).days + 1
+                                overlap_ratio = (
+                                    overlap_days / requested_days if requested_days > 0 else 0
+                                )
+
+                                # Use if overlap covers at least 50% of requested range
+                                if overlap_ratio >= 0.5 and overlap_days > best_overlap_days:
+                                    best_overlap_days = overlap_days
                                     cached_data = data
                                     logger.info(
-                                        "✅ Cache COVER HIT for {}: cached={} to {} "
-                                        "covers requested {} to {}",
+                                        "✅ Cache OVERLAP HIT for {}: cached={} to {}, "
+                                        "requested={} to {}, overlap={:.1%} ({} days)",
                                         plugin.plugin_id,
                                         cached_start_date,
                                         cached_end_date,
                                         start_date_only,
                                         end_date_only,
+                                        overlap_ratio,
+                                        overlap_days,
                                     )
                         except (ValueError, IndexError) as e:
                             # Invalid key format (probably old format) - skip
