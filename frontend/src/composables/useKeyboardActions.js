@@ -38,6 +38,13 @@ export function useKeyboardActions() {
 
   const activeRegionKindIs = kind => getActiveRegion()?.kind === kind;
 
+  // The focused calendar region's base view mode (per-region; falls back to
+  // "month"). Calendar navigation + view-cycle key off this, not global config.
+  const activeCalendarViewMode = () => {
+    const region = getActiveRegion();
+    return region?.kind === "calendar" ? (region.view?.mode ?? "month") : "month";
+  };
+
   const saveDashboardScreens = screens => {
     if (typeof configStore.setDashboardScreens === "function") {
       configStore.setDashboardScreens(screens);
@@ -103,30 +110,15 @@ export function useKeyboardActions() {
       return;
     }
 
-    // We're already in calendar mode - cycle to next view mode
-    if (typeof configStore.cycleCalendarViewMode === "function") {
-      configStore
-        .cycleCalendarViewMode()
-        .then(newMode => {
-          logInfo("[Keyboard]", `Calendar view mode cycled to: ${newMode}`);
-        })
-        .catch(err => {
-          logError("[Keyboard]", "Failed to cycle calendar view mode:", err);
-        });
-    } else {
-      // Fallback: manually cycle if function doesn't exist (hot-reload issue)
+    // We're already in calendar mode - cycle the focused region's base view.
+    const region = getActiveRegion();
+    if (region?.kind === "calendar" && typeof configStore.updateRegionView === "function") {
       const modes = ["month", "week", "day"];
-      const currentIndex = modes.indexOf(configStore.calendarViewMode);
-      const nextIndex = (currentIndex + 1) % modes.length;
-      const newMode = modes[nextIndex];
-      configStore.setCalendarViewMode(newMode);
-      // Try to persist to backend
-      if (typeof configStore.updateConfig === "function") {
-        configStore.updateConfig({ calendarViewMode: newMode }).catch(err => {
-          logError("[Keyboard]", "Failed to save calendar view mode:", err);
-        });
-      }
-      logInfo("[Keyboard]", `Calendar view mode cycled to: ${newMode} (fallback)`);
+      const newMode = modes[(modes.indexOf(region.view?.mode ?? "month") + 1) % modes.length];
+      configStore
+        .updateRegionView(region.id, { mode: newMode })
+        .then(() => logInfo("[Keyboard]", `Calendar view mode cycled to: ${newMode}`))
+        .catch(err => logError("[Keyboard]", "Failed to cycle calendar view mode:", err));
     }
   };
 
@@ -465,7 +457,7 @@ export function useKeyboardActions() {
           const preservedEvent = calendarStore.selectedEvent;
           const preservedDate = calendarStore.selectedDate;
 
-          const viewMode = configStore.calendarViewMode;
+          const viewMode = activeCalendarViewMode();
           let newDate;
 
           if (viewMode === "day") {
@@ -506,7 +498,7 @@ export function useKeyboardActions() {
           const preservedEvent = calendarStore.selectedEvent;
           const preservedDate = calendarStore.selectedDate;
 
-          const viewMode = configStore.calendarViewMode;
+          const viewMode = activeCalendarViewMode();
           let newDate;
 
           if (viewMode === "day") {
@@ -544,7 +536,7 @@ export function useKeyboardActions() {
       case "calendar_expand_today": // Legacy name for backward compatibility
         // Context-aware expand: expands events for current day/week based on view mode
         if (modeStore.currentMode === modeStore.MODES.CALENDAR || activeRegionKindIs("calendar")) {
-          const viewMode = configStore.calendarViewMode;
+          const viewMode = activeCalendarViewMode();
           let targetDate = new Date();
 
           if (viewMode === "day") {
