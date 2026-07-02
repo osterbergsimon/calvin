@@ -96,19 +96,16 @@
           class="calendar-grid"
           :class="{
             'rolling-view': isMonthRolling,
-            'week-view': viewMode === 'week',
+            'rolling-week-view': isRollingWeek,
+            'week-view': viewMode === 'week' && !isRollingWeek,
             'day-view': viewMode === 'day',
             loading: loading,
           }"
         >
           <!-- Day headers -->
-          <div class="calendar-weekdays">
-            <div
-              v-for="day in viewMode === 'day' ? [getCurrentWeekdayName()] : weekDays"
-              :key="day"
-              class="weekday"
-            >
-              {{ day }}
+          <div class="calendar-weekdays" :style="rollingColumnStyle">
+            <div v-for="header in weekdayHeaders" :key="header.key" class="weekday">
+              {{ header.label }}
             </div>
           </div>
           <!-- Calendar days -->
@@ -117,6 +114,7 @@
             :class="{
               'rolling-days': isMonthRolling,
             }"
+            :style="rollingColumnStyle"
           >
             <div
               v-for="(day, dayIndex) in calendarDays"
@@ -246,6 +244,13 @@ const rollingDays = computed(() => Math.min(14, Math.max(1, props.view?.days ?? 
 //   day is never rolling.
 const isMonthRolling = computed(() => viewMode.value === "month" && rolling.value);
 const isRollingWeek = computed(() => viewMode.value === "week" && rolling.value);
+// Rolling-week lays out `days` columns in a single row; the count is dynamic,
+// so feed it to the (!important) grid rule via a custom property.
+const rollingColumnStyle = computed(() =>
+  isRollingWeek.value
+    ? { "--rolling-cols": `repeat(${rollingDays.value}, minmax(0, 1fr))` }
+    : null
+);
 
 const viewModeLabel = computed(() => {
   const labels = { month: "Month", week: "Week", day: "Day" };
@@ -277,6 +282,13 @@ const isCurrentPeriod = computed(() => {
       cd.getMonth() === t.getMonth() &&
       cd.getDate() === t.getDate()
     );
+  }
+  if (isRollingWeek.value) {
+    const windowStart = new Date(cd);
+    windowStart.setHours(0, 0, 0, 0);
+    const windowEnd = new Date(windowStart);
+    windowEnd.setDate(windowStart.getDate() + rollingDays.value - 1);
+    return t >= windowStart && t <= windowEnd;
   }
   if (viewMode.value === "week" || isMonthRolling.value) {
     const weeks = isMonthRolling.value ? rollingWeeks.value : 1;
@@ -396,6 +408,22 @@ const weekDays = computed(() => {
   return days;
 });
 
+// Column headers for the grid. Fixed weekday names for month/week; a single
+// weekday for day view; per-day date labels ("Wed 2") for the rolling-week
+// agenda strip, since rolling by days breaks fixed weekday columns.
+const weekdayHeaders = computed(() => {
+  if (viewMode.value === "day") {
+    return [{ key: "day", label: getCurrentWeekdayName() }];
+  }
+  if (isRollingWeek.value) {
+    return calendarDays.value.map(d => ({
+      key: d.date.toISOString(),
+      label: `${weekDayNames[d.date.getDay()]} ${d.date.getDate()}`,
+    }));
+  }
+  return weekDays.value.map(name => ({ key: name, label: name }));
+});
+
 // Format an inclusive start–end date range: "Jan 1 - 7, 2024" when the range
 // stays inside one month, otherwise "Dec 31 - Jan 6, 2025".
 const formatDateRange = (startDate, endDate) => {
@@ -415,7 +443,13 @@ const formatDateRange = (startDate, endDate) => {
 };
 
 const currentMonthYear = computed(() => {
-  if (viewMode.value === "week") {
+  if (isRollingWeek.value) {
+    // Rolling-week: show the N-day range starting from the anchor.
+    const startDate = new Date(currentDate.value);
+    const endDate = new Date(startDate);
+    endDate.setDate(startDate.getDate() + rollingDays.value - 1);
+    return formatDateRange(startDate, endDate);
+  } else if (viewMode.value === "week") {
     // Show week range for week view
     const startDate = getWeekStart(currentDate.value);
     const endDate = new Date(startDate);
@@ -641,7 +675,30 @@ const calendarDays = computed(() => {
   const todayDate = new Date(today.value);
   todayDate.setHours(0, 0, 0, 0);
 
-  if (viewMode.value === "week") {
+  if (isRollingWeek.value) {
+    // Rolling-week: an agenda strip of `rollingDays` days starting from the
+    // anchor (currentDate, which defaults to today). Today is column 1; per-day
+    // date headers replace fixed weekday columns.
+    const days = [];
+    const startDate = new Date(currentDate.value);
+    startDate.setHours(0, 0, 0, 0);
+
+    for (let i = 0; i < rollingDays.value; i++) {
+      const date = new Date(startDate);
+      date.setDate(startDate.getDate() + i);
+      const dateOnly = new Date(date);
+      dateOnly.setHours(0, 0, 0, 0);
+
+      days.push({
+        date,
+        otherMonth: false,
+        isToday: dateOnly.getTime() === todayDate.getTime(),
+        events: getEventsForDate(date),
+      });
+    }
+
+    return days;
+  } else if (viewMode.value === "week") {
     // Week view: show 7 days starting from week start of current date
     const days = [];
     const startDate = getWeekStart(currentDate.value);
@@ -986,6 +1043,9 @@ const navigatePrevious = () => {
   if (viewMode.value === "day") {
     // Day view: move to previous day
     newDate.setDate(newDate.getDate() - 1);
+  } else if (isRollingWeek.value) {
+    // Rolling-week: page the agenda strip back by its own length
+    newDate.setDate(newDate.getDate() - rollingDays.value);
   } else if (viewMode.value === "week" || isMonthRolling.value) {
     // Week/Rolling view: roll the window back by one week
     const weekStart = getWeekStart(currentDate.value);
@@ -1007,6 +1067,9 @@ const navigateNext = () => {
   if (viewMode.value === "day") {
     // Day view: move to next day
     newDate.setDate(newDate.getDate() + 1);
+  } else if (isRollingWeek.value) {
+    // Rolling-week: page the agenda strip forward by its own length
+    newDate.setDate(newDate.getDate() + rollingDays.value);
   } else if (viewMode.value === "week" || isMonthRolling.value) {
     // Week/Rolling view: roll the window forward by one week
     const weekStart = getWeekStart(currentDate.value);
@@ -1033,7 +1096,19 @@ const loadEvents = async (background = false) => {
   const year = currentDate.value.getFullYear();
   const month = currentDate.value.getMonth();
 
-  if (viewMode.value === "week") {
+  if (isRollingWeek.value) {
+    // Rolling-week: load the N-day window plus a buffer week on each side for
+    // multi-day events. Anchored to currentDate (defaults to today).
+    const anchor = new Date(currentDate.value);
+    anchor.setHours(0, 0, 0, 0);
+    startDate = new Date(anchor);
+    startDate.setDate(startDate.getDate() - 7);
+    startDate.setHours(0, 0, 0, 0);
+
+    endDate = new Date(anchor);
+    endDate.setDate(endDate.getDate() + rollingDays.value + 6);
+    endDate.setHours(23, 59, 59, 999);
+  } else if (viewMode.value === "week") {
     // Week view: load the week plus buffer days for multi-day events
     const weekStart = getWeekStart(currentDate.value);
     startDate = new Date(weekStart);
@@ -1118,6 +1193,14 @@ watch(viewMode, () => {
 watch(rollingWeeks, () => {
   if (isMonthRolling.value) loadEvents();
 });
+
+watch(rollingDays, () => {
+  if (isRollingWeek.value) loadEvents();
+});
+
+// Rolling on/off (and base mode) can flip the effective window; reload so the
+// fetched range matches what's rendered.
+watch(rolling, () => loadEvents());
 
 // Watch for route changes to reload events when navigating back to dashboard
 watch(
@@ -1480,6 +1563,18 @@ onActivated(() => {
 }
 
 .calendar-grid.day-view .calendar-day {
+  min-height: 0;
+}
+
+/* Rolling-week: an agenda strip of N day columns in a single row. The count is
+   dynamic, so it comes in via the --rolling-cols custom property (set inline). */
+.calendar-grid.rolling-week-view .calendar-weekdays,
+.calendar-grid.rolling-week-view .calendar-days {
+  grid-template-columns: var(--rolling-cols) !important;
+  grid-auto-rows: minmax(0, 1fr);
+}
+
+.calendar-grid.rolling-week-view .calendar-day {
   min-height: 0;
 }
 
