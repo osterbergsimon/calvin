@@ -2,9 +2,11 @@
 
 import { describe, it, expect } from "vitest";
 import {
+  DEFAULT_CALENDAR_VIEW,
   MAX_TOP_REGIONS,
   addSubRegion,
   addTopRegion,
+  clampCalendarView,
   computeClockBarModeUpdate,
   computeClockBarPositionUpdate,
   createDashboardLayoutFromPreset,
@@ -145,6 +147,7 @@ describe("Layout Utilities", () => {
             instanceIds: [],
             size: 65,
             split: null,
+            view: DEFAULT_CALENDAR_VIEW,
           },
           {
             id: "region-2",
@@ -244,6 +247,7 @@ describe("Layout Utilities", () => {
           instanceIds: [],
           size: 100,
           split: null,
+          view: DEFAULT_CALENDAR_VIEW,
         },
       ]);
       expect(getRegionAxisStyle(layout.regions[0], "landscape")).toEqual({
@@ -809,6 +813,54 @@ describe("Layout Utilities", () => {
           patch: { mode: "horizontal" },
         });
       });
+    });
+  });
+});
+
+describe("calendar region view", () => {
+  const screenWith = region => ({
+    activeScreenId: "s1",
+    screens: [{ id: "s1", layout: { regions: [region] } }],
+  });
+
+  it("backfills the default view on a calendar region with none", () => {
+    const screens = normalizeDashboardScreens(
+      screenWith({ id: "region-1", kind: "calendar", instanceIds: [], size: 100 })
+    );
+    expect(screens.screens[0].layout.regions[0].view).toEqual(DEFAULT_CALENDAR_VIEW);
+  });
+
+  it("preserves and clamps an explicit view", () => {
+    const screens = normalizeDashboardScreens(
+      screenWith({
+        id: "region-1",
+        kind: "calendar",
+        instanceIds: [],
+        size: 100,
+        view: { mode: "week", rolling: true, weeks: 99, days: 99 },
+      })
+    );
+    expect(screens.screens[0].layout.regions[0].view).toEqual({
+      mode: "week",
+      rolling: true,
+      weeks: 12,
+      days: 14,
+    });
+  });
+
+  it("does not add a view block to non-calendar regions", () => {
+    const screens = normalizeDashboardScreens(
+      screenWith({ id: "region-1", kind: "photos", instanceIds: [], size: 100 })
+    );
+    expect(screens.screens[0].layout.regions[0].view).toBeUndefined();
+  });
+
+  it("clampCalendarView coerces bad values to the valid range", () => {
+    expect(clampCalendarView({ mode: "bogus", rolling: 1, weeks: 0, days: 50 })).toEqual({
+      mode: "month",
+      rolling: true,
+      weeks: 1,
+      days: 14,
     });
   });
 });
