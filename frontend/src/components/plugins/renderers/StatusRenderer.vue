@@ -8,7 +8,8 @@
         {{ labelFor(item) }}
       </span>
       <span class="status__line-value" :class="alertClass(item)">
-        {{ valueFor(item) }}<span v-if="unitFor(item)" class="status__line-unit">{{ unitFor(item) }}</span>
+        {{ valueFor(item)
+        }}<span v-if="unitFor(item)" class="status__line-unit">{{ unitFor(item) }}</span>
       </span>
     </li>
   </ul>
@@ -20,7 +21,8 @@
       <span v-if="iconFor(item)" class="status__icon">{{ iconFor(item) }}</span>
       <span v-if="labelFor(item)" class="status__cell-label">{{ labelFor(item) }}</span>
       <span v-if="hasValue(item)" class="status__cell-value">
-        {{ valueFor(item) }}<span v-if="unitFor(item)" class="status__cell-unit">{{ unitFor(item) }}</span>
+        {{ valueFor(item)
+        }}<span v-if="unitFor(item)" class="status__cell-unit">{{ unitFor(item) }}</span>
       </span>
     </span>
   </span>
@@ -39,7 +41,8 @@
         {{ labelFor(item) }}
       </span>
       <span v-if="hasValue(item)" class="calvin-plugin-readout__value">
-        {{ valueFor(item) }}<span v-if="unitFor(item)" class="calvin-plugin-readout__unit">{{ unitFor(item) }}</span>
+        {{ valueFor(item)
+        }}<span v-if="unitFor(item)" class="calvin-plugin-readout__unit">{{ unitFor(item) }}</span>
       </span>
     </div>
   </div>
@@ -88,10 +91,10 @@ function pick(item, pathKey, literalKey, formatKey) {
   return formatKey ? applyFormat(raw, spec[formatKey]) : raw;
 }
 
-const iconFor = (item) => pick(item, "icon_path", "icon");
-const labelFor = (item) => pick(item, "label_path", "label");
-const valueFor = (item) => pick(item, "value_path", "value", "value_format");
-const unitFor = (item) => pick(item, "unit_path", "unit");
+const iconFor = item => pick(item, "icon_path", "icon");
+const labelFor = item => pick(item, "label_path", "label");
+const valueFor = item => pick(item, "value_path", "value", "value_format");
+const unitFor = item => pick(item, "unit_path", "unit");
 
 function hasValue(item) {
   const v = valueFor(item);
