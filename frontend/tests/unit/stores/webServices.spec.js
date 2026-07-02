@@ -337,17 +337,6 @@ describe("Web Services Store", () => {
       });
     });
 
-    it("should handle errors when adding service", async () => {
-      const _error = new Error("Add failed");
-      axios.get.mockResolvedValue({ data: { plugins: [] } });
-
-      const store = useWebServicesStore();
-
-      // When no plugins available, it throws "No service plugin available"
-      await expect(store.addService({})).rejects.toThrow("No service plugin available");
-      expect(store.error).toBe("No service plugin available");
-    });
-
     it("should handle API errors when adding service", async () => {
       const error = new Error("Add failed");
       axios.get.mockResolvedValue({

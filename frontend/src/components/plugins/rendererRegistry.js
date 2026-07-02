@@ -12,7 +12,7 @@
 //   2. Register it here under its kind string.
 //   3. Add the same kind string to SUPPORTED_DISPLAY_KINDS in definitions.py.
 
-import Status from "./renderers/Status.vue";
+import StatusRenderer from "./renderers/StatusRenderer.vue";
 import CardGrid from "./renderers/CardGrid.vue";
 import ItemList from "./renderers/ItemList.vue";
 import IframeRenderer from "./renderers/IframeRenderer.vue";
@@ -22,7 +22,7 @@ import WeatherForecast from "./renderers/WeatherForecast.vue";
 import WebComponentHost from "./WebComponentHost.vue";
 
 export const renderers = {
-  status: Status,
+  status: StatusRenderer,
   "card-grid": CardGrid,
   iframe: IframeRenderer,
   "item-list": ItemList,
