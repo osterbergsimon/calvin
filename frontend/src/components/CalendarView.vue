@@ -95,7 +95,7 @@
         <div
           class="calendar-grid"
           :class="{
-            'rolling-view': viewMode === 'rolling',
+            'rolling-view': isMonthRolling,
             'week-view': viewMode === 'week',
             'day-view': viewMode === 'day',
             loading: loading,
@@ -115,7 +115,7 @@
           <div
             class="calendar-days"
             :class="{
-              'rolling-days': viewMode === 'rolling',
+              'rolling-days': isMonthRolling,
             }"
           >
             <div
@@ -208,6 +208,17 @@ const props = defineProps({
     type: Boolean,
     default: false,
   },
+  // Per-region view config: { mode, rolling, weeks, days }. Owns the calendar's
+  // base granularity + rolling-window modifier (replaces the old global config).
+  view: {
+    type: Object,
+    default: null,
+  },
+  // Region id this calendar belongs to — target for view-mutating controls.
+  regionId: {
+    type: String,
+    default: null,
+  },
 });
 
 const configStore = useConfigStore();
@@ -220,21 +231,26 @@ const sourceKey = computed(() =>
     .sort()
     .join(",")
 );
-const viewMode = computed(() => configStore.calendarViewMode);
+// Base granularity + rolling modifier come from the region's `view` prop.
+const viewMode = computed(() => props.view?.mode ?? "month");
+const rolling = computed(() => props.view?.rolling === true);
 const showWeekNumbers = computed(() => configStore.showWeekNumbers);
 const weekStartDay = computed(() => configStore.weekStartDay ?? 1);
 const weekendDays = computed(() => configStore.weekendDays || [0, 6]);
 const showRedDays = computed(() => configStore.showRedDays || false);
-const rollingWeeks = computed(() => Math.min(12, Math.max(1, configStore.calendarWeeks ?? 4)));
+const rollingWeeks = computed(() => Math.min(12, Math.max(1, props.view?.weeks ?? 4)));
+const rollingDays = computed(() => Math.min(14, Math.max(1, props.view?.days ?? 7)));
+// Rolling as a windowing modifier over the base granularity:
+//   month + rolling → month-rolling (N weeks from the current week)
+//   week  + rolling → rolling-week agenda strip (N days from today)
+//   day is never rolling.
+const isMonthRolling = computed(() => viewMode.value === "month" && rolling.value);
+const isRollingWeek = computed(() => viewMode.value === "week" && rolling.value);
 
 const viewModeLabel = computed(() => {
-  const labels = {
-    month: "Month",
-    week: "Week",
-    day: "Day",
-    rolling: "Rolling",
-  };
-  return labels[viewMode.value] || "Month";
+  const labels = { month: "Month", week: "Week", day: "Day" };
+  const base = labels[viewMode.value] || "Month";
+  return rolling.value && viewMode.value !== "day" ? `${base} · Rolling` : base;
 });
 
 const calendarStore = useCalendarStore();
@@ -262,8 +278,8 @@ const isCurrentPeriod = computed(() => {
       cd.getDate() === t.getDate()
     );
   }
-  if (viewMode.value === "week" || viewMode.value === "rolling") {
-    const weeks = viewMode.value === "rolling" ? rollingWeeks.value : 1;
+  if (viewMode.value === "week" || isMonthRolling.value) {
+    const weeks = isMonthRolling.value ? rollingWeeks.value : 1;
     const windowStart = getWeekStart(cd);
     const windowEnd = new Date(windowStart);
     windowEnd.setDate(windowStart.getDate() + weeks * 7 - 1);
@@ -405,7 +421,7 @@ const currentMonthYear = computed(() => {
     const endDate = new Date(startDate);
     endDate.setDate(startDate.getDate() + 6);
     return formatDateRange(startDate, endDate);
-  } else if (viewMode.value === "rolling") {
+  } else if (isMonthRolling.value) {
     // Rolling view spans several weeks from the anchored week — show the range.
     const startDate = getWeekStart(currentDate.value);
     const endDate = new Date(startDate);
@@ -662,7 +678,7 @@ const calendarDays = computed(() => {
         events: getEventsForDate(date),
       },
     ];
-  } else if (viewMode.value === "rolling") {
+  } else if (isMonthRolling.value) {
     // Rolling view: show `rollingWeeks` weeks starting from the anchored week.
     // Anchored to currentDate (which defaults to today) so navigation actually
     // moves the window; a rolling window spans months, so days are never greyed
@@ -970,7 +986,7 @@ const navigatePrevious = () => {
   if (viewMode.value === "day") {
     // Day view: move to previous day
     newDate.setDate(newDate.getDate() - 1);
-  } else if (viewMode.value === "week" || viewMode.value === "rolling") {
+  } else if (viewMode.value === "week" || isMonthRolling.value) {
     // Week/Rolling view: roll the window back by one week
     const weekStart = getWeekStart(currentDate.value);
     weekStart.setDate(weekStart.getDate() - 7);
@@ -991,7 +1007,7 @@ const navigateNext = () => {
   if (viewMode.value === "day") {
     // Day view: move to next day
     newDate.setDate(newDate.getDate() + 1);
-  } else if (viewMode.value === "week" || viewMode.value === "rolling") {
+  } else if (viewMode.value === "week" || isMonthRolling.value) {
     // Week/Rolling view: roll the window forward by one week
     const weekStart = getWeekStart(currentDate.value);
     weekStart.setDate(weekStart.getDate() + 7);
@@ -1038,7 +1054,7 @@ const loadEvents = async (background = false) => {
     endDate = new Date(day);
     endDate.setDate(endDate.getDate() + 7); // 7 days after
     endDate.setHours(23, 59, 59, 999);
-  } else if (viewMode.value === "rolling") {
+  } else if (isMonthRolling.value) {
     // Rolling view: load the full N-week window plus a buffer week on each side
     // for multi-day events. The month-based range below is too narrow once the
     // window exceeds a few weeks, which dropped events off the tail.
@@ -1100,7 +1116,7 @@ watch(viewMode, () => {
 
 // A larger rolling window needs a wider fetch range than what's already loaded.
 watch(rollingWeeks, () => {
-  if (viewMode.value === "rolling") loadEvents();
+  if (isMonthRolling.value) loadEvents();
 });
 
 // Watch for route changes to reload events when navigating back to dashboard

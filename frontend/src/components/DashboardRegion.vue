@@ -12,6 +12,8 @@
         <CalendarView
           v-if="sub.kind === 'calendar'"
           :source-ids="sub.instanceIds || []"
+          :view="sub.view"
+          :region-id="sub.id"
           :focused="isFocused(sub.id)"
           :dim="isDim(sub.id)"
         />
@@ -37,6 +39,8 @@
       <CalendarView
         v-if="region.kind === 'calendar'"
         :source-ids="region.instanceIds || []"
+        :view="region.view"
+        :region-id="region.id"
         :focused="isFocused(region.id)"
         :dim="isDim(region.id)"
       />
