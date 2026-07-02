@@ -262,10 +262,12 @@ const calendarStore = useCalendarStore();
 const modeStore = useModeStore();
 const route = useRoute();
 
-// Cycle the calendar view mode (month → week → day) via the shared config
-// action, which also persists the choice to the backend.
+// Cycle this region's base view (month → week → day) and persist it to the
+// region. Rolling stays out of the cycle — it's a separate windowing toggle.
 const cycleView = () => {
-  configStore.cycleCalendarViewMode().catch(err => {
+  const order = ["month", "week", "day"];
+  const next = order[(order.indexOf(viewMode.value) + 1) % order.length];
+  configStore.updateRegionView(props.regionId, { mode: next }).catch(err => {
     console.error("Failed to cycle calendar view mode:", err);
   });
 };
