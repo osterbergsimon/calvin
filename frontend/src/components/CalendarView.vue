@@ -72,6 +72,7 @@
             >
               ›
             </button>
+            <CalendarViewGear v-if="view" :region-id="regionId" :view="view" />
             <button
               v-if="!isFullscreen"
               type="button"
@@ -188,6 +189,7 @@ import DialogScrim from "./ui/DialogScrim.vue";
 import CalendarEventItem from "./CalendarEventItem.vue";
 import DashboardPanel from "./DashboardPanel.vue";
 import RegionControls from "./dashboard/RegionControls.vue";
+import CalendarViewGear from "./dashboard/CalendarViewGear.vue";
 
 const props = defineProps({
   focused: {
