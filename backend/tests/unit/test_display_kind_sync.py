@@ -36,7 +36,9 @@ def _js_object_keys(source: str, declaration: str) -> set[str]:
 
 def _js_string_array(source: str, declaration: str) -> set[str]:
     """Extract string entries of `export const <declaration> = Object.freeze([...])`."""
-    match = re.search(rf"export const {declaration}\s*=\s*Object\.freeze\(\[(.*?)\]\)", source, re.DOTALL)
+    match = re.search(
+        rf"export const {declaration}\s*=\s*Object\.freeze\(\[(.*?)\]\)", source, re.DOTALL
+    )
     assert match, f"could not find `export const {declaration}` in rendererRegistry.js"
     return set(re.findall(r'"([^"]+)"', match.group(1)))
 

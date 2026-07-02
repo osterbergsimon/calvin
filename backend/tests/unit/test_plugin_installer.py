@@ -439,9 +439,7 @@ class TestPluginDependenciesValidation:
         (plugin_dir / "plugin.py").write_text("# Plugin code")
         return plugin_dir
 
-    def test_valid_packages_list_accepted(
-        self, plugin_installer, tmp_path, valid_plugin_manifest
-    ):
+    def test_valid_packages_list_accepted(self, plugin_installer, tmp_path, valid_plugin_manifest):
         plugin_dir = self._package_with_deps(
             tmp_path, valid_plugin_manifest, {"packages": ["psutil>=5.9", "httpx"]}
         )
@@ -455,9 +453,7 @@ class TestPluginDependenciesValidation:
         with pytest.raises(ValueError, match="dependencies.packages must be a list"):
             plugin_installer.validate_plugin_package(plugin_dir)
 
-    def test_empty_string_package_rejected(
-        self, plugin_installer, tmp_path, valid_plugin_manifest
-    ):
+    def test_empty_string_package_rejected(self, plugin_installer, tmp_path, valid_plugin_manifest):
         plugin_dir = self._package_with_deps(
             tmp_path, valid_plugin_manifest, {"packages": ["psutil", " "]}
         )

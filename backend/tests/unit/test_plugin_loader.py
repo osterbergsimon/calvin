@@ -46,7 +46,9 @@ def plugin_loader_instance():
 def make_installed_plugin(tmp_path):
     """Factory writing a real installed-plugin directory (plugin.py + plugin.json)."""
 
-    def _make(plugin_id: str, *, type_id: str | None = None, api_version=CURRENT_PLUGIN_API_VERSION):
+    def _make(
+        plugin_id: str, *, type_id: str | None = None, api_version=CURRENT_PLUGIN_API_VERSION
+    ):
         plugin_dir = tmp_path / plugin_id
         plugin_dir.mkdir()
         (plugin_dir / "plugin.py").write_text(
