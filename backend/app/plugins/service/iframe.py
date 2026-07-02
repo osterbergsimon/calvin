@@ -4,6 +4,7 @@ from typing import Any
 
 from app.plugins.definitions import PluginMetadata
 from app.plugins.protocols import ServicePlugin
+from app.plugins.sdk.schema import toggle_field, url_field
 
 
 class IframeServicePlugin(ServicePlugin):
@@ -34,28 +35,11 @@ class IframeServicePlugin(ServicePlugin):
             },
         },
         instance_config_schema={
-            "url": {
-                "type": "string",
-                "description": "Website URL",
-                "default": "",
-                "ui": {
-                    "component": "input",
-                    "placeholder": "https://example.com",
-                    "validation": {
-                        "required": True,
-                        "type": "url",
-                    },
-                },
-            },
-            "fullscreen": {
-                "type": "boolean",
-                "description": "Prefer fullscreen mode",
-                "default": False,
-                "ui": {
-                    "component": "checkbox",
-                    "help_text": "Open this service in fullscreen by default",
-                },
-            },
+            "url": url_field("Website URL", placeholder="https://example.com", required=True),
+            "fullscreen": toggle_field(
+                "Prefer fullscreen mode",
+                help_text="Open this service in fullscreen by default",
+            ),
         },
         display_schema={
             "kind": "iframe",

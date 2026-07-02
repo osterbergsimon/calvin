@@ -55,6 +55,57 @@ Validation at class definition (so errors surface at import, not render):
 
 Renderer schema fields per kind: [PLUGIN_FRONTEND_COMPONENTS.md](PLUGIN_FRONTEND_COMPONENTS.md).
 
+### Config field shape
+
+Each `instance_config_schema` entry is a field dict in one canonical shape:
+
+```python
+"field_key": {
+    "type": "string" | "integer" | "number" | "boolean" | "password",
+    "description": "shown in the form",
+    "default": ...,          # optional — omit to leave a field genuinely unset
+    "ui": {
+        "component": "input" | "password" | "number" | "checkbox"
+                     | "select" | "directory" | "textarea",
+        "placeholder": "...",   # optional
+        "help_text": "...",     # optional
+        "options": [...],       # select only
+        "validation": {         # all constraints live here
+            "required": bool,   # enforced by the default validate_config
+            "min": num, "max": num,   # enforced by the number renderer
+            "type": "url",      # semantic hint (e.g. URL fields)
+        },
+    },
+}
+```
+
+- **`type`** drives `normalize_config` conversion — numeric fields must be
+  `integer`/`number`, never `string`, or the value won't convert.
+- **Constraints belong under `ui.validation`** — this is the single validation
+  namespace. `min`/`max` at `ui.min`/`ui.max` are **not** read.
+- **Omit `default` when a field should start unset.** A default is injected by
+  `normalize_config`, and for numeric fields `to_float(None)` yields `0.0`; a
+  spurious default can make an empty config look valid (see calvin-8p0).
+
+**Authoring helpers** ([`app/plugins/sdk/schema.py`](../../backend/app/plugins/sdk/schema.py))
+build this shape so plugins don't hand-roll nested dicts. `text_field()`,
+`password_field()`, `url_field()`, `number_field()`, `select_field()`,
+`toggle_field()` — mix freely with raw dicts:
+
+```python
+from app.plugins.sdk.schema import number_field, password_field, select_field, toggle_field, url_field
+
+instance_config_schema={
+    "url": url_field("Website URL", placeholder="https://example.com", required=True),
+    "api_token": password_field("API token", required=True),
+    "days_ahead": number_field("Days ahead", default=7, min=1, max=30, integer=True),
+    "mark_as_read": select_field("Mark as read", [("true", "Yes"), ("false", "No")]),
+    "fullscreen": toggle_field("Prefer fullscreen mode"),
+}
+```
+
+The `iframe` plugin uses these as the reference example.
+
 ## BasePlugin surface
 
 ### Construction and config
