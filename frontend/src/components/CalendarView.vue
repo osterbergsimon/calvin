@@ -249,9 +249,7 @@ const isRollingWeek = computed(() => viewMode.value === "week" && rolling.value)
 // Rolling-week lays out `days` columns in a single row; the count is dynamic,
 // so feed it to the (!important) grid rule via a custom property.
 const rollingColumnStyle = computed(() =>
-  isRollingWeek.value
-    ? { "--rolling-cols": `repeat(${rollingDays.value}, minmax(0, 1fr))` }
-    : null
+  isRollingWeek.value ? { "--rolling-cols": `repeat(${rollingDays.value}, minmax(0, 1fr))` } : null
 );
 
 const viewModeLabel = computed(() => {
