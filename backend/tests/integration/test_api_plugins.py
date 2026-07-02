@@ -8,6 +8,7 @@ from unittest.mock import AsyncMock, patch
 import pytest
 
 from app.plugins.base import PluginType
+from app.plugins.definitions import CURRENT_PLUGIN_API_VERSION, PluginMetadata
 from app.plugins.manager import plugin_manager
 from app.plugins.protocols import BackendPlugin, ServicePlugin
 from app.services.plugin_installer import plugin_installer
@@ -89,21 +90,20 @@ class TestPluginInstallationAPI:
             "name": "Test API Plugin",
             "version": "1.0.0",
             "type": "service",
+            "api_version": CURRENT_PLUGIN_API_VERSION,
         }
         (plugin_dir / "plugin.json").write_text(json.dumps(manifest))
         (plugin_dir / "plugin.py").write_text(
             '''"""Test plugin."""
-from typing import Any
-from app.plugins.base import PluginType
-from app.plugins.hooks import hookimpl
+from app.plugins.definitions import PluginMetadata
+from app.plugins.protocols import ServicePlugin
 
-@hookimpl
-def register_plugin_types() -> list[dict[str, Any]]:
-    return [{
-        "type_id": "test_api_plugin",
-        "plugin_type": PluginType.SERVICE,
-        "name": "Test API Plugin",
-    }]
+
+class TestApiPlugin(ServicePlugin):
+    metadata = PluginMetadata(type_id="test_api_plugin", name="Test API Plugin")
+
+    async def fetch(self, start_date=None, end_date=None):
+        return {"ok": True}
 '''
         )
 
@@ -168,23 +168,22 @@ def register_plugin_types() -> list[dict[str, Any]]:
                     "name": "Bad Kind Plugin",
                     "version": "1.0.0",
                     "type": "service",
+                    "api_version": CURRENT_PLUGIN_API_VERSION,
                 }
             )
         )
         (plugin_dir / "plugin.py").write_text(
             '''"""Plugin with an invalid display_schema kind."""
-from typing import Any
-from app.plugins.base import PluginType
-from app.plugins.hooks import hookimpl
+from app.plugins.definitions import PluginMetadata
+from app.plugins.protocols import ServicePlugin
 
-@hookimpl
-def register_plugin_types() -> list[dict[str, Any]]:
-    return [{
-        "type_id": "bad_kind_plugin",
-        "plugin_type": PluginType.SERVICE,
-        "name": "Bad Kind Plugin",
-        "display_schema": {"kind": "no-such-renderer"},
-    }]
+
+class BadKindPlugin(ServicePlugin):
+    metadata = PluginMetadata(
+        type_id="bad_kind_plugin",
+        name="Bad Kind Plugin",
+        display_schema={"kind": "no-such-renderer"},
+    )
 '''
         )
 
@@ -245,6 +244,7 @@ def register_plugin_types() -> list[dict[str, Any]]:
             "name": "Test Manifest Plugin",
             "version": "1.0.0",
             "type": "service",
+            "api_version": CURRENT_PLUGIN_API_VERSION,
         }
         (plugin_dir / "plugin.json").write_text(json.dumps(manifest))
         (plugin_dir / "plugin.py").write_text("# Plugin code")
@@ -280,6 +280,7 @@ def register_plugin_types() -> list[dict[str, Any]]:
             "name": "Test Uninstall Plugin",
             "version": "1.0.0",
             "type": "service",
+            "api_version": CURRENT_PLUGIN_API_VERSION,
         }
         (plugin_dir / "plugin.json").write_text(json.dumps(manifest))
         (plugin_dir / "plugin.py").write_text("# Plugin code")
@@ -346,6 +347,7 @@ def register_plugin_types() -> list[dict[str, Any]]:
             "name": "Test Frontend Plugin",
             "version": "1.0.0",
             "type": "service",
+            "api_version": CURRENT_PLUGIN_API_VERSION,
         }
         (plugin_dir / "plugin.json").write_text(json.dumps(manifest))
         (plugin_dir / "plugin.py").write_text("# Plugin code")
@@ -734,28 +736,16 @@ class TestServicePluginDataAPI:
     """Test service plugin data endpoint."""
 
     class MockServicePluginForAPI(ServicePlugin):
+        metadata = PluginMetadata(type_id="test-service", name="Test Service")
+
         def __init__(self, plugin_id: str, name: str, enabled: bool = True):
             super().__init__(plugin_id, name, enabled)
             self.initialize_calls = 0
 
-        @classmethod
-        def get_plugin_metadata(cls):
-            return {"type_id": "test-service", "plugin_type": PluginType.SERVICE}
-
-        @property
-        def plugin_type(self) -> PluginType:
-            return PluginType.SERVICE
-
         async def initialize(self) -> None:
             self.initialize_calls += 1
 
-        async def cleanup(self) -> None:
-            pass
-
-        async def validate_config(self, config: dict[str, Any]) -> bool:
-            return True
-
-        async def fetch_service_data(
+        async def fetch(
             self,
             start_date: str | None = None,
             end_date: str | None = None,
@@ -810,41 +800,31 @@ class TestServicePluginDataAPI:
 
 @pytest.mark.integration
 class TestPluginTypeClassBasedActions:
-    """Test class-based type-level plugin actions."""
+    """Test class-based type-level plugin actions (test/scan/fetch verbs)."""
 
-    def test_test_plugin_connection_prefers_plugin_class(self, test_client, monkeypatch):
-        from app.plugins.base import BasePlugin
+    @staticmethod
+    def _loader_for(plugin_class, type_id):
+        """Minimal plugin_loader stand-in exposing get_plugin_class."""
+        from types import SimpleNamespace
 
-        class ClassBasedTestPlugin(BasePlugin):
-            @property
-            def plugin_type(self) -> PluginType:
-                return PluginType.SERVICE
+        return SimpleNamespace(
+            get_plugin_class=lambda pid: plugin_class if pid == type_id else None
+        )
 
-            @classmethod
-            def get_plugin_metadata(cls):
-                return {
-                    "type_id": "class-based-test",
-                    "plugin_type": PluginType.SERVICE,
-                    "name": "Class Based Test",
-                    "plugin_class": cls,
-                }
-
-            async def initialize(self) -> None:
-                pass
-
-            async def cleanup(self) -> None:
-                pass
+    def test_test_plugin_connection_uses_class_test_connection(self, test_client, monkeypatch):
+        class ClassBasedTestPlugin(ServicePlugin):
+            metadata = PluginMetadata(type_id="class-based-test", name="Class Based Test")
 
             @classmethod
-            async def test_type_config(cls, config: dict[str, Any]) -> dict[str, Any] | None:
+            async def test_connection(cls, config: dict[str, Any]) -> dict[str, Any] | None:
                 return {
                     "success": True,
                     "message": f"tested:{config.get('value', '')}",
                 }
 
         monkeypatch.setattr(
-            "app.api.routes.plugins.management.plugin_loader.get_plugin_types",
-            lambda: [ClassBasedTestPlugin.get_plugin_metadata()],
+            "app.api.routes.plugins.management.plugin_loader",
+            self._loader_for(ClassBasedTestPlugin, "class-based-test"),
         )
 
         response = test_client.post(
@@ -860,38 +840,38 @@ class TestPluginTypeClassBasedActions:
         assert data["success"] is True
         assert data["message"] == "tested:ok"
 
-    def test_scan_plugin_options_prefers_plugin_class(self, test_client, monkeypatch):
-        from app.plugins.base import BasePlugin
+    def test_test_plugin_connection_default_signals_unsupported(self, test_client, monkeypatch):
+        class NoTestPlugin(ServicePlugin):
+            metadata = PluginMetadata(type_id="no-test-plugin", name="No Test Plugin")
 
-        class ClassBasedScanPlugin(BasePlugin):
-            @property
-            def plugin_type(self) -> PluginType:
-                return PluginType.SERVICE
+        monkeypatch.setattr(
+            "app.api.routes.plugins.management.plugin_loader",
+            self._loader_for(NoTestPlugin, "no-test-plugin"),
+        )
+
+        response = test_client.post("/api/plugins/no-test-plugin/test", json={})
+
+        if response.status_code == 404:
+            pytest.skip("Plugin test endpoint not available in test client")
+
+        assert response.status_code == 200
+        data = response.json()
+        assert data["success"] is False
+        assert "does not support connection testing" in data["message"]
+
+    def test_scan_plugin_options_uses_class_scan_options(self, test_client, monkeypatch):
+        class ClassBasedScanPlugin(ServicePlugin):
+            metadata = PluginMetadata(type_id="class-based-scan", name="Class Based Scan")
 
             @classmethod
-            def get_plugin_metadata(cls):
-                return {
-                    "type_id": "class-based-scan",
-                    "plugin_type": PluginType.SERVICE,
-                    "name": "Class Based Scan",
-                    "plugin_class": cls,
-                }
-
-            async def initialize(self) -> None:
-                pass
-
-            async def cleanup(self) -> None:
-                pass
-
-            @classmethod
-            async def scan_type_options(cls, field_key: str) -> dict[str, Any] | None:
+            async def scan_options(cls, field_key: str) -> dict[str, Any] | None:
                 return {
                     "options": [{"value": field_key, "label": field_key.upper()}],
                 }
 
         monkeypatch.setattr(
-            "app.api.routes.plugins.management.plugin_loader.get_plugin_types",
-            lambda: [ClassBasedScanPlugin.get_plugin_metadata()],
+            "app.api.routes.plugins.management.plugin_loader",
+            self._loader_for(ClassBasedScanPlugin, "class-based-scan"),
         )
 
         response = test_client.get("/api/plugins/class-based-scan/scan", params={"field": "device"})
@@ -903,52 +883,74 @@ class TestPluginTypeClassBasedActions:
         data = response.json()
         assert data["options"] == [{"value": "device", "label": "DEVICE"}]
 
-    def test_fetch_plugin_prefers_plugin_class(self, test_client, monkeypatch):
-        from app.plugins.base import BasePlugin
+    @pytest.mark.asyncio
+    async def test_fetch_plugin_calls_enabled_instances(self, test_client, monkeypatch):
+        """POST /plugins/{type_id}/fetch calls fetch() on enabled instances."""
+        from app.models.db_models import PluginDB
 
-        class ClassBasedFetchPlugin(BasePlugin):
-            @property
-            def plugin_type(self) -> PluginType:
-                return PluginType.BACKEND
+        class ClassBasedFetchPlugin(ServicePlugin):
+            metadata = PluginMetadata(type_id="class-based-fetch", name="Class Based Fetch")
 
-            @classmethod
-            def get_plugin_metadata(cls):
-                return {
-                    "type_id": "class-based-fetch",
-                    "plugin_type": PluginType.BACKEND,
-                    "name": "Class Based Fetch",
-                    "plugin_class": cls,
-                }
-
-            async def initialize(self) -> None:
-                pass
-
-            async def cleanup(self) -> None:
-                pass
-
-            @classmethod
-            async def fetch_type_data(cls, instance_id: str | None = None) -> dict[str, Any] | None:
-                return {
-                    "success": True,
-                    "message": "manual fetch completed",
-                    "instance_id": instance_id,
-                }
+            async def fetch(
+                self,
+                start_date: str | None = None,
+                end_date: str | None = None,
+            ) -> dict[str, Any] | None:
+                return {"success": True, "message": "manual fetch completed"}
 
         monkeypatch.setattr(
-            "app.api.routes.plugins.management.plugin_loader.get_plugin_types",
-            lambda: [ClassBasedFetchPlugin.get_plugin_metadata()],
+            "app.api.routes.plugins.management.plugin_loader",
+            self._loader_for(ClassBasedFetchPlugin, "class-based-fetch"),
         )
 
-        response = test_client.post("/api/plugins/class-based-fetch/fetch")
+        instance = ClassBasedFetchPlugin(
+            plugin_id="class-based-fetch-1", name="Fetch Instance", enabled=True
+        )
+        await plugin_manager.register(instance)
+        db_plugin = await PluginDB.objects.create(
+            id="class-based-fetch-1",
+            type_id="class-based-fetch",
+            plugin_type="service",
+            name="Fetch Instance",
+            enabled=True,
+            config={},
+        )
+
+        try:
+            response = test_client.post("/api/plugins/class-based-fetch/fetch")
+
+            if response.status_code == 404:
+                pytest.skip("Plugin fetch endpoint not available in test client")
+
+            assert response.status_code == 200
+            data = response.json()
+            assert data["success"] is True
+            assert data["message"] == "manual fetch completed"
+        finally:
+            await plugin_manager.unregister("class-based-fetch-1")
+            await db_plugin.delete()
+
+    @pytest.mark.asyncio
+    async def test_fetch_plugin_without_instances_reports_unsupported(
+        self, test_client, monkeypatch
+    ):
+        class NoInstancesPlugin(ServicePlugin):
+            metadata = PluginMetadata(type_id="no-instances-fetch", name="No Instances")
+
+        monkeypatch.setattr(
+            "app.api.routes.plugins.management.plugin_loader",
+            self._loader_for(NoInstancesPlugin, "no-instances-fetch"),
+        )
+
+        response = test_client.post("/api/plugins/no-instances-fetch/fetch")
 
         if response.status_code == 404:
             pytest.skip("Plugin fetch endpoint not available in test client")
 
         assert response.status_code == 200
         data = response.json()
-        assert data["success"] is True
-        assert data["message"] == "manual fetch completed"
-        assert data["instance_id"] is None
+        assert data["success"] is False
+        assert "does not support manual fetch" in data["message"]
 
 
 @pytest.mark.integration

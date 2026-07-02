@@ -347,37 +347,6 @@ class TestThemeInstaller:
         with pytest.raises(ValueError, match="variables must be an object"):
             theme_installer.validate_theme_package(zip_path)
 
-    def test_validate_theme_directory_unsupported_format_version(self, theme_installer, tmp_path):
-        """Test validating theme directory with unsupported format version."""
-        theme_dir = tmp_path / "invalid_theme"
-        theme_dir.mkdir()
-        invalid_manifest = {
-            "id": "test",
-            "name": "Test",
-            "version": "1.0.0",
-            "format_version": "2.0.0",  # Unsupported
-            "variables": {},
-        }
-        (theme_dir / "theme.json").write_text(json.dumps(invalid_manifest))
-        with pytest.raises(ValueError, match="Unsupported.*format version"):
-            theme_installer._validate_theme_directory(theme_dir)
-
-    def test_validate_theme_package_zip_unsupported_format_version(self, theme_installer, tmp_path):
-        """Test validating zip package with unsupported format version."""
-        zip_path = tmp_path / "invalid.zip"
-        invalid_manifest = {
-            "id": "test",
-            "name": "Test",
-            "version": "1.0.0",
-            "format_version": "2.0.0",  # Unsupported
-            "variables": {},
-        }
-        with zipfile.ZipFile(zip_path, "w") as zipf:
-            zipf.writestr("theme.json", json.dumps(invalid_manifest))
-
-        with pytest.raises(ValueError, match="Unsupported.*format version"):
-            theme_installer.validate_theme_package(zip_path)
-
     def test_is_safe_path_valid(self, theme_installer, tmp_path):
         """Test _is_safe_path with valid paths."""
         base_path = tmp_path / "base"

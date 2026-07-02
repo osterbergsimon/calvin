@@ -3,8 +3,7 @@
 import { describe, it, expect } from "vitest";
 import { mount } from "@vue/test-utils";
 import SchemaRenderer from "@/components/plugins/SchemaRenderer.vue";
-import StatusList from "@/components/plugins/renderers/StatusList.vue";
-import StatusRow from "@/components/plugins/renderers/StatusRow.vue";
+import StatusRenderer from "@/components/plugins/renderers/StatusRenderer.vue";
 import CardGrid from "@/components/plugins/renderers/CardGrid.vue";
 import ItemList from "@/components/plugins/renderers/ItemList.vue";
 import IframeRenderer from "@/components/plugins/renderers/IframeRenderer.vue";
@@ -16,11 +15,11 @@ describe("SchemaRenderer dispatcher", () => {
   it("renders the registered renderer for a known kind", () => {
     const wrapper = mount(SchemaRenderer, {
       props: {
-        schema: { kind: "status-tile", value: "42", unit: "ms" },
-        data: null,
+        schema: { kind: "status", item: { label: "Ping", value: "42", unit: "ms" } },
+        data: {},
       },
     });
-    expect(wrapper.find(".status-tile").exists()).toBe(true);
+    expect(wrapper.find(".status--tile").exists()).toBe(true);
     expect(wrapper.text()).toContain("42");
   });
 
@@ -57,15 +56,18 @@ describe("SchemaRenderer dispatcher", () => {
   });
 });
 
-describe("StatusList", () => {
-  it("renders a row per item", () => {
-    const wrapper = mount(StatusList, {
+describe("StatusRenderer", () => {
+  const itemSpec = {
+    label_path: "$.label",
+    value_path: "$.value",
+    unit_path: "$.unit",
+    status_path: "$.status",
+  };
+
+  it("renders a list row per item", () => {
+    const wrapper = mount(StatusRenderer, {
       props: {
-        schema: {
-          kind: "status-list",
-          data_path: "$.items",
-          item: { label_path: "$.label", value_path: "$.value" },
-        },
+        schema: { kind: "status", layout: "list", data_path: "$.items", item: itemSpec },
         data: {
           items: [
             { label: "CPU", value: "42%" },
@@ -74,32 +76,18 @@ describe("StatusList", () => {
         },
       },
     });
-    const rows = wrapper.findAll(".status-list__row");
+    const rows = wrapper.findAll(".status__line");
     expect(rows).toHaveLength(2);
-    expect(wrapper.classes()).toContain("calvin-plugin-list");
+    expect(wrapper.find(".status--list").classes()).toContain("calvin-plugin-list");
     expect(rows[0].classes()).toContain("calvin-plugin-row");
     expect(rows[0].text()).toContain("CPU");
     expect(rows[1].text()).toContain("1.2 GB");
   });
-});
 
-describe("StatusRow", () => {
-  const schema = {
-    kind: "status-row",
-    data_path: "$.tiles",
-    item: {
-      label_path: "$.label",
-      value_path: "$.value",
-      unit_path: "$.unit",
-      status_path: "$.status",
-    },
-    separator: "·",
-  };
-
-  it("renders one item per tile with separators between", () => {
-    const wrapper = mount(StatusRow, {
+  it("renders row cells with alert tint only for warn/error", () => {
+    const wrapper = mount(StatusRenderer, {
       props: {
-        schema,
+        schema: { kind: "status", layout: "row", data_path: "$.tiles", item: itemSpec },
         data: {
           tiles: [
             { label: "CPU", value: 42, unit: "%", status: "ok" },
@@ -108,20 +96,77 @@ describe("StatusRow", () => {
         },
       },
     });
-    const items = wrapper.findAll(".status-row__item");
-    expect(items).toHaveLength(2);
-    expect(items[0].text()).toContain("CPU");
-    expect(items[0].text()).toContain("42");
-    expect(items[0].classes()).toContain("status-row__item--ok");
-    expect(items[1].classes()).toContain("status-row__item--warn");
-    expect(wrapper.findAll(".status-row__sep")).toHaveLength(1);
+    const cells = wrapper.findAll(".status__cell");
+    expect(cells).toHaveLength(2);
+    expect(cells[0].text()).toContain("CPU");
+    expect(cells[0].text()).toContain("42");
+    expect(cells[0].classes()).not.toContain("status--warn");
+    expect(cells[1].classes()).toContain("status--warn");
   });
 
-  it("renders nothing when data array is empty", () => {
-    const wrapper = mount(StatusRow, {
-      props: { schema, data: { tiles: [] } },
+  it("defaults to row layout in the statusbar and tile layout in panels", () => {
+    const props = {
+      schema: { kind: "status", item: itemSpec },
+      data: { label: "CPU", value: 42 },
+    };
+    const statusbar = mount(StatusRenderer, { props: { ...props, context: "statusbar" } });
+    expect(statusbar.find(".status--row").exists()).toBe(true);
+    const panel = mount(StatusRenderer, { props });
+    expect(panel.find(".status--tile").exists()).toBe(true);
+  });
+
+  it("renders tile readouts with formatted value and unit", () => {
+    const wrapper = mount(StatusRenderer, {
+      props: {
+        schema: {
+          kind: "status",
+          layout: "tile",
+          data_path: "$.current",
+          item: { ...itemSpec, value_path: "$.temperature", value_format: "round-1" },
+        },
+        data: {
+          current: { label: "Weather", temperature: 12.456, unit: "°C", status: "ok" },
+        },
+      },
     });
-    expect(wrapper.findAll(".status-row__item")).toHaveLength(0);
+    const readout = wrapper.find(".calvin-plugin-readout");
+    expect(readout.exists()).toBe(true);
+    expect(readout.text()).toContain("12.5");
+    expect(readout.text()).toContain("°C");
+    expect(readout.classes()).not.toContain("calvin-plugin-readout--warn");
+  });
+
+  it("supports literal icon/label/value/unit when no paths are given", () => {
+    const wrapper = mount(StatusRenderer, {
+      props: {
+        schema: { kind: "status", item: { icon: "⚡", label: "Power", value: "120", unit: "W" } },
+        data: {},
+      },
+    });
+    expect(wrapper.text()).toContain("⚡");
+    expect(wrapper.text()).toContain("Power");
+    expect(wrapper.text()).toContain("120");
+    expect(wrapper.text()).toContain("W");
+  });
+
+  it("omits the value span when the value does not resolve", () => {
+    const wrapper = mount(StatusRenderer, {
+      props: {
+        schema: { kind: "status", item: { label: "Empty", value_path: "$.missing" } },
+        data: {},
+      },
+    });
+    expect(wrapper.find(".calvin-plugin-readout__value").exists()).toBe(false);
+  });
+
+  it("renders no items when the data array is empty", () => {
+    const wrapper = mount(StatusRenderer, {
+      props: {
+        schema: { kind: "status", layout: "row", data_path: "$.tiles", item: itemSpec },
+        data: { tiles: [] },
+      },
+    });
+    expect(wrapper.findAll(".status__cell")).toHaveLength(0);
   });
 });
 
@@ -276,8 +321,8 @@ describe("MetricDashboard", () => {
     expect(wrapper.classes()).toContain("calvin-plugin-grid");
     expect(tiles[0].classes()).toContain("calvin-plugin-metric");
     expect(tiles[0].text()).toContain("21.5");
-    expect(tiles[0].classes()).toContain("metric-dashboard__tile--ok");
-    expect(tiles[1].classes()).toContain("metric-dashboard__tile--warn");
+    expect(tiles[0].classes()).not.toContain("calvin-plugin-readout--warn");
+    expect(tiles[1].classes()).toContain("calvin-plugin-readout--warn");
   });
 });
 

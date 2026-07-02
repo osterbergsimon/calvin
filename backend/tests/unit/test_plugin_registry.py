@@ -4,6 +4,8 @@ from unittest.mock import AsyncMock, MagicMock, patch
 
 import pytest
 
+from app.plugins.base import PluginType
+from app.plugins.definitions import PluginMetadata
 from app.plugins.registry import PluginRegistry
 
 
@@ -33,17 +35,14 @@ class TestPluginRegistry:
     ):
         """Test loading plugins from database."""
         # Mock plugin types
-        from app.plugins.base import PluginType
-
         mock_plugin_loader.get_plugin_types.return_value = [
-            {
-                "type_id": "test_plugin",
-                "plugin_type": PluginType.SERVICE,
-                "name": "Test Plugin",
-                "description": "A test plugin",
-                "version": "1.0.0",
-                "common_config_schema": {},
-            }
+            PluginMetadata(
+                type_id="test_plugin",
+                plugin_type=PluginType.SERVICE,
+                name="Test Plugin",
+                description="A test plugin",
+                version="1.0.0",
+            )
         ]
 
         # Mock plugin instances - return None so no instances are created
@@ -97,14 +96,12 @@ class TestPluginRegistry:
         )
 
         # Mock plugin types
-        from app.plugins.base import PluginType
-
         mock_plugin_loader.get_plugin_types.return_value = [
-            {
-                "type_id": "test_plugin",
-                "plugin_type": PluginType.SERVICE,
-                "name": "Test Plugin",
-            }
+            PluginMetadata(
+                type_id="test_plugin",
+                plugin_type=PluginType.SERVICE,
+                name="Test Plugin",
+            )
         ]
 
         await plugin_registry_instance.load_plugins_from_db()
@@ -140,14 +137,12 @@ class TestPluginRegistry:
         mock_instance_manager.register = AsyncMock(return_value=None)
 
         # Mock plugin types
-        from app.plugins.base import PluginType
-
         mock_plugin_loader.get_plugin_types.return_value = [
-            {
-                "type_id": "test_plugin",
-                "plugin_type": PluginType.SERVICE,
-                "name": "Test Plugin",
-            }
+            PluginMetadata(
+                type_id="test_plugin",
+                plugin_type=PluginType.SERVICE,
+                name="Test Plugin",
+            )
         ]
 
         # Create plugin type in database first (use get_or_create to avoid UNIQUE constraint)
@@ -221,11 +216,11 @@ class TestPluginRegistry:
         mock_instance_manager.register = AsyncMock(return_value=None)
 
         mock_plugin_loader.get_plugin_types.return_value = [
-            {
-                "type_id": "test_plugin",
-                "plugin_type": PluginType.SERVICE,
-                "name": "Test Plugin",
-            }
+            PluginMetadata(
+                type_id="test_plugin",
+                plugin_type=PluginType.SERVICE,
+                name="Test Plugin",
+            )
         ]
 
         # Create plugin type in database (use get_or_create to avoid UNIQUE constraint)
@@ -350,17 +345,14 @@ class TestPluginRegistry:
         test_db,
     ):
         """Test loading new plugin types."""
-        from app.plugins.base import PluginType
-
         mock_plugin_loader.get_plugin_types.return_value = [
-            {
-                "type_id": "new_plugin",
-                "plugin_type": PluginType.SERVICE,
-                "name": "New Plugin",
-                "description": "A new plugin",
-                "version": "1.0.0",
-                "common_config_schema": {},
-            }
+            PluginMetadata(
+                type_id="new_plugin",
+                plugin_type=PluginType.SERVICE,
+                name="New Plugin",
+                description="A new plugin",
+                version="1.0.0",
+            )
         ]
 
         from app.plugins.registry.loader import load_plugin_types
@@ -400,17 +392,15 @@ class TestPluginRegistry:
             )
 
         # Mock updated plugin type
-        from app.plugins.base import PluginType
-
         mock_plugin_loader.get_plugin_types.return_value = [
-            {
-                "type_id": "existing_plugin",
-                "plugin_type": PluginType.SERVICE,
-                "name": "New Name",
-                "description": "Updated description",
-                "version": "2.0.0",
-                "common_config_schema": {"new_field": "value"},
-            }
+            PluginMetadata(
+                type_id="existing_plugin",
+                plugin_type=PluginType.SERVICE,
+                name="New Name",
+                description="Updated description",
+                version="2.0.0",
+                common_config_schema={"new_field": "value"},
+            )
         ]
 
         from app.plugins.registry.loader import load_plugin_types

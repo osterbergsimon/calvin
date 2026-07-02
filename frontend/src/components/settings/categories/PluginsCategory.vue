@@ -237,7 +237,7 @@ const cancelPipInstall = () => {
 const handleZipSelect = async file => {
   try {
     const result = await pluginsApi.inspectPluginZip(file);
-    const deps = result.manifest?.python_dependencies ?? [];
+    const deps = result.manifest?.dependencies?.packages ?? [];
     if (deps.length > 0) {
       triggerPipWarning(deps, result.manifest?.name ?? file.name, () => installPluginFromZip(file));
       return;
@@ -258,7 +258,7 @@ const handleListPlugins = async ({ repoUrl, branch, source, localPath }) => {
 
 const handleInstall = async ({ path, repoUrl, branch, force }) => {
   const plugin = availablePlugins.value.find(p => p.path === path);
-  const deps = plugin?.manifest?.python_dependencies ?? [];
+  const deps = plugin?.manifest?.dependencies?.packages ?? [];
   const doInstall = () => installPluginFromGitHub(repoUrl, path, branch, force);
   if (deps.length > 0) {
     triggerPipWarning(deps, plugin?.name ?? path, doInstall);
@@ -269,7 +269,7 @@ const handleInstall = async ({ path, repoUrl, branch, force }) => {
 
 const handleForceUpdate = async ({ path, repoUrl, branch }) => {
   const plugin = availablePlugins.value.find(p => p.path === path);
-  const deps = plugin?.manifest?.python_dependencies ?? [];
+  const deps = plugin?.manifest?.dependencies?.packages ?? [];
   const doInstall = () => installPluginFromGitHub(repoUrl, path, branch, true);
   if (deps.length > 0) {
     triggerPipWarning(deps, plugin?.name ?? path, doInstall);
@@ -283,7 +283,7 @@ const handleInstallSelected = async ({ plugins: pluginsToInstall, repoUrl, branc
   const names = [];
   for (const { path, id } of pluginsToInstall) {
     const p = availablePlugins.value.find(ap => ap.id === id || ap.path === path);
-    const deps = p?.manifest?.python_dependencies ?? [];
+    const deps = p?.manifest?.dependencies?.packages ?? [];
     if (deps.length > 0) {
       allDeps.push(...deps);
       names.push(p?.name ?? id);
@@ -299,7 +299,7 @@ const handleInstallSelected = async ({ plugins: pluginsToInstall, repoUrl, branc
 
 const handleInstallLocal = async ({ path, localPath, force }) => {
   const plugin = availablePlugins.value.find(p => p.path === path);
-  const deps = plugin?.manifest?.python_dependencies ?? [];
+  const deps = plugin?.manifest?.dependencies?.packages ?? [];
   const doInstall = () => installPluginFromLocal(localPath, path, force);
   if (deps.length > 0) {
     triggerPipWarning(deps, plugin?.name ?? path, doInstall);
@@ -313,7 +313,7 @@ const handleInstallSelectedLocal = async ({ plugins: pluginsToInstall, localPath
   const names = [];
   for (const { path, id } of pluginsToInstall) {
     const p = availablePlugins.value.find(ap => ap.id === id || ap.path === path);
-    const deps = p?.manifest?.python_dependencies ?? [];
+    const deps = p?.manifest?.dependencies?.packages ?? [];
     if (deps.length > 0) allDeps.push(...deps);
     names.push(p?.name ?? id);
   }

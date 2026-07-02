@@ -212,24 +212,30 @@ class TestPluginErrorHandling:
     ):
         """Test that multiple broken plugins don't prevent others from loading."""
         from app.plugins.base import PluginType
+        from app.plugins.definitions import PluginMetadata
+
+        class BrokenTypeInfo:
+            """Type info whose attributes blow up during registration."""
+
+            type_id = "broken_plugin_1"
+
+            @property
+            def name(self):
+                raise ValueError("Plugin metadata is invalid")
 
         # Mock plugin loader with mix of working and broken plugins
         mock_plugin_loader.get_plugin_types.return_value = [
-            {
-                "type_id": "working_plugin",
-                "plugin_type": PluginType.SERVICE,
-                "name": "Working Plugin",
-            },
-            {
-                "type_id": "broken_plugin_1",
-                "plugin_type": PluginType.SERVICE,
-                # Missing name - will cause error
-            },
-            {
-                "type_id": "working_plugin_2",
-                "plugin_type": PluginType.SERVICE,
-                "name": "Another Working Plugin",
-            },
+            PluginMetadata(
+                type_id="working_plugin",
+                plugin_type=PluginType.SERVICE,
+                name="Working Plugin",
+            ),
+            BrokenTypeInfo(),
+            PluginMetadata(
+                type_id="working_plugin_2",
+                plugin_type=PluginType.SERVICE,
+                name="Another Working Plugin",
+            ),
         ]
 
         mock_instance_manager.initialize_all = AsyncMock(return_value=None)

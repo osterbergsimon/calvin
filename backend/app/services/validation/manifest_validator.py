@@ -23,57 +23,43 @@ def validate_manifest_required_fields(
             raise ValueError(f"Missing required field in {manifest_type}: {field}")
 
 
-def validate_manifest_format_version(
+def validate_manifest_api_version(
     manifest: dict[str, Any],
-    supported_versions: list[str],
-    default_version: str = "1.0.0",
-    manifest_type: str = "manifest",
+    current_version: int,
+    manifest_type: str = "plugin.json",
 ) -> None:
     """
-    Validate manifest format version.
+    Validate the manifest's plugin API version — the one enforced version signal.
+
+    Unlike the retired format_version/protocol_version pair, this field is
+    required and never default-filled: a plugin that doesn't declare it is
+    rejected instead of silently passing.
 
     Args:
         manifest: Manifest dictionary to validate
-        supported_versions: List of supported format versions
-        default_version: Default version if not specified
+        current_version: The host's CURRENT_PLUGIN_API_VERSION
         manifest_type: Type of manifest (for error messages)
 
     Raises:
-        ValueError: If format version is unsupported
+        ValueError: If api_version is missing, non-int, or unsupported
     """
-    format_version = manifest.get("format_version", default_version)
-    if format_version not in supported_versions:
+    api_version = manifest.get("api_version")
+    if api_version is None:
         raise ValueError(
-            f"Unsupported {manifest_type} format version: {format_version}. "
-            f"Supported versions: {', '.join(supported_versions)}"
+            f"{manifest_type} must declare api_version "
+            f"(this Calvin supports api_version {current_version})"
         )
-
-
-def validate_manifest_protocol_version(
-    manifest: dict[str, Any],
-    supported_versions: list[int],
-    default_version: int = 1,
-    manifest_type: str = "manifest",
-) -> None:
-    """
-    Validate manifest protocol version.
-
-    Args:
-        manifest: Manifest dictionary to validate
-        supported_versions: List of supported protocol versions
-        default_version: Default protocol version if not specified
-        manifest_type: Type of manifest (for error messages)
-
-    Raises:
-        ValueError: If protocol version is invalid or unsupported
-    """
-    protocol_version = manifest.get("protocol_version", default_version)
-    if not isinstance(protocol_version, int):
-        raise ValueError(f"{manifest_type} protocol_version must be an integer")
-    if protocol_version not in supported_versions:
+    if isinstance(api_version, bool) or not isinstance(api_version, int):
+        raise ValueError(f"{manifest_type} api_version must be an integer")
+    if api_version > current_version:
         raise ValueError(
-            f"Unsupported {manifest_type} protocol version: {protocol_version}. "
-            f"Supported versions: {', '.join(str(version) for version in supported_versions)}"
+            f"{manifest_type} api_version {api_version} is newer than this Calvin "
+            f"supports ({current_version}). Update Calvin to use this plugin."
+        )
+    if api_version < current_version:
+        raise ValueError(
+            f"{manifest_type} api_version {api_version} is no longer supported "
+            f"(current: {current_version}). Update the plugin."
         )
 
 
@@ -135,15 +121,22 @@ def validate_plugin_optional_fields(manifest: dict[str, Any]) -> None:
     Raises:
         ValueError: If optional fields have invalid structure
     """
-    # Validate dependencies structure
+    # Validate dependencies structure. `dependencies.packages` is the single
+    # dependency mechanism: a list of pip requirement strings the installer
+    # actually installs.
     if "dependencies" in manifest:
         deps = manifest["dependencies"]
         if not isinstance(deps, dict):
             raise ValueError("dependencies must be an object")
-        if "packages" in deps and not isinstance(deps["packages"], dict):
-            raise ValueError("dependencies.packages must be an object")
-        if "system" in deps and not isinstance(deps["system"], dict):
-            raise ValueError("dependencies.system must be an object")
+        if "packages" in deps:
+            packages = deps["packages"]
+            if not isinstance(packages, list) or not all(
+                isinstance(pkg, str) and pkg.strip() for pkg in packages
+            ):
+                raise ValueError(
+                    "dependencies.packages must be a list of pip requirement strings "
+                    '(e.g. ["psutil>=5.9"])'
+                )
 
     # Validate files structure
     if "files" in manifest:

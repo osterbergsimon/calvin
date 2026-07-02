@@ -18,10 +18,8 @@
         :plugin-id="service.id"
       />
       <div v-else class="unknown-service">
-        <p>Service has no display schema.</p>
-        <p class="error-text">
-          display_schema.kind is missing - this plugin may need updating to the v2 contract.
-        </p>
+        <p>This service can't be shown.</p>
+        <p class="error-text">Its plugin doesn't declare a display schema — update the plugin.</p>
       </div>
     </DashboardPanel>
   </div>

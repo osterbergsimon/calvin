@@ -46,12 +46,100 @@ body {
   outline-offset: 2px;
 }
 
+/* ==========================================================================
+   Plugin surface vocabulary (.calvin-plugin-*)
+
+   The shared visual identity of every plugin panel and statusbar item —
+   "instrument readouts on an appliance", derived entirely from the shell's
+   semantic tokens (--bg-*, --ink-*, --line*, --ok/--warn/--err, --font-*).
+
+   Rules of the layer:
+   - Every datum is set in var(--font-data) with tabular numerals.
+   - Labels are small tracked-uppercase ink-3; the display face never appears
+     inside a plugin surface (panel titles belong to the shell).
+   - State color appears ONLY when something needs attention: `ok` renders
+     monochrome; `warn`/`err` light the square lamp and tint the value.
+   - Separation inside a panel is hairline (--line-soft); raised surfaces
+     (--bg-2 + --line) are reserved for true grouping.
+
+   Web-component plugins inherit this vocabulary by using these classes and
+   the --plugin-* custom properties (which cross shadow-DOM boundaries).
+   ========================================================================== */
+
+:root {
+  --plugin-value-size: 2rem; /* readout value (tile) */
+  --plugin-value-size-lg: 2.6rem; /* hero metric */
+  --plugin-value-size-sm: 1.05rem; /* inline (row / statusbar) value */
+  --plugin-lamp-size: 0.45rem;
+}
+
 .calvin-plugin-fill {
   width: 100%;
   height: 100%;
   min-width: 0;
   min-height: 0;
 }
+
+/* --- The readout: microlabel over tabular value, square lamp on alert --- */
+
+.calvin-plugin-readout {
+  display: flex;
+  flex-direction: column;
+  gap: 0.3rem;
+  min-width: 0;
+}
+
+.calvin-plugin-readout__label {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.4rem;
+  font-family: var(--font-ui);
+  font-size: 0.7rem;
+  font-weight: 600;
+  letter-spacing: 0.09em;
+  text-transform: uppercase;
+  color: var(--ink-3);
+  white-space: nowrap;
+}
+
+.calvin-plugin-readout__value {
+  font-family: var(--font-data);
+  font-variant-numeric: tabular-nums;
+  font-size: var(--plugin-value-size);
+  font-weight: 600;
+  line-height: 1.05;
+  color: var(--ink);
+  white-space: nowrap;
+}
+
+.calvin-plugin-readout__unit {
+  font-size: 0.55em;
+  font-weight: 500;
+  color: var(--ink-3);
+  margin-left: 0.18em;
+  letter-spacing: 0.02em;
+}
+
+/* The lamp: a small square indicator, present only when a state demands it. */
+.calvin-plugin-lamp {
+  width: var(--plugin-lamp-size);
+  height: var(--plugin-lamp-size);
+  border-radius: 1px;
+  background: currentcolor;
+  flex-shrink: 0;
+}
+
+.calvin-plugin-readout--warn .calvin-plugin-readout__label,
+.calvin-plugin-readout--warn .calvin-plugin-readout__value {
+  color: var(--warn);
+}
+
+.calvin-plugin-readout--error .calvin-plugin-readout__label,
+.calvin-plugin-readout--error .calvin-plugin-readout__value {
+  color: var(--err);
+}
+
+/* --- Layout primitives --- */
 
 .calvin-plugin-grid {
   display: grid;
@@ -86,9 +174,14 @@ body {
   padding: 0;
   display: flex;
   flex-direction: column;
-  gap: 0.5rem;
   min-width: 0;
   min-height: 0;
+}
+
+/* Hairline-separated rows: the quiet table. */
+.calvin-plugin-list > li + li,
+.calvin-plugin-list > .calvin-plugin-row + .calvin-plugin-row {
+  border-top: 1px solid var(--line-soft);
 }
 
 .calvin-plugin-list--scroll {
@@ -96,18 +189,15 @@ body {
 }
 
 .calvin-plugin-surface {
-  background: var(--bg-secondary);
-  border: 1px solid var(--border-color);
-  border-radius: 6px;
+  background: var(--bg-2);
+  border: 1px solid var(--line);
+  border-radius: 4px;
   min-width: 0;
-}
-
-.calvin-plugin-surface {
   padding: 1rem;
 }
 
 .calvin-plugin-row {
-  padding: 0.5rem 0.75rem;
+  padding: 0.55rem 0.25rem;
 }
 
 .calvin-plugin-metric {
@@ -119,8 +209,12 @@ body {
 }
 
 .calvin-plugin-clickable:hover {
-  background: var(--bg-tertiary);
-  border-color: var(--accent-primary);
+  background: color-mix(in srgb, var(--focus) 7%, transparent);
+}
+
+.calvin-plugin-clickable:focus-visible {
+  outline: 2px solid var(--focus);
+  outline-offset: 2px;
 }
 
 .calvin-plugin-section {
@@ -149,7 +243,7 @@ body {
   align-items: center;
   justify-content: center;
   overflow: hidden;
-  background: #000;
+  background: var(--bg-0);
 }
 
 .calvin-plugin-media > img,
@@ -159,18 +253,18 @@ body {
   max-height: 100%;
 }
 
+/* --- Empty / loading / error: direction, not mood --- */
+
 .calvin-plugin-empty,
 .calvin-plugin-loading,
 .calvin-plugin-error {
-  color: var(--text-secondary);
+  font-family: var(--font-ui);
+  font-size: 0.95rem;
+  color: var(--ink-2);
   text-align: center;
-  padding: 1rem;
-}
-
-.calvin-plugin-empty {
-  font-style: italic;
+  padding: 1.25rem 1rem;
 }
 
 .calvin-plugin-error {
-  color: var(--accent-error);
+  color: var(--err);
 }

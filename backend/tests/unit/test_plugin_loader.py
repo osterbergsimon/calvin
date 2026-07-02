@@ -1,13 +1,39 @@
-"""Tests for plugin loader."""
+"""Tests for the class-discovery plugin loader.
+
+Complementary to tests/unit/test_plugin_contract.py (which pins discovery
+semantics on in-memory modules): this module covers loading installed plugins
+from disk via importlib, the api_version gate against real files, unload, and
+error bookkeeping.
+"""
 
 import json
-from unittest.mock import MagicMock, patch
+import sys
+from unittest.mock import patch
 
 import pytest
 
 from app.plugins.base import PluginType
-from app.plugins.definitions import PluginDefinition
+from app.plugins.definitions import CURRENT_PLUGIN_API_VERSION
 from app.plugins.loader import PluginLoader
+
+_FIXTURE_PLUGIN_PY = '''"""Test installed plugin (contract 1.0)."""
+from typing import Any
+
+from app.plugins.definitions import PluginMetadata
+from app.plugins.protocols import ServicePlugin
+
+
+class InstalledFixturePlugin(ServicePlugin):
+    metadata = PluginMetadata(
+        type_id="{type_id}",
+        name="Test Installed Plugin",
+        description="Test fixture",
+        instance_config_schema={{"url": {{"type": "string", "default": ""}}}},
+    )
+
+    async def fetch(self, start_date=None, end_date=None):
+        return {{"ok": True}}
+'''
 
 
 @pytest.fixture
@@ -17,59 +43,36 @@ def plugin_loader_instance():
 
 
 @pytest.fixture
-def mock_plugin_installer(tmp_path):
-    """Create a mock plugin installer."""
-    installer = MagicMock()
-    installer.get_installed_plugins.return_value = []
-    installer.get_plugin_path.return_value = tmp_path / "plugin"
-    return installer
+def make_installed_plugin(tmp_path):
+    """Factory writing a real installed-plugin directory (plugin.py + plugin.json)."""
+
+    def _make(
+        plugin_id: str, *, type_id: str | None = None, api_version=CURRENT_PLUGIN_API_VERSION
+    ):
+        plugin_dir = tmp_path / plugin_id
+        plugin_dir.mkdir()
+        (plugin_dir / "plugin.py").write_text(
+            _FIXTURE_PLUGIN_PY.format(type_id=type_id or plugin_id)
+        )
+        manifest = {
+            "id": plugin_id,
+            "name": "Test Plugin",
+            "version": "1.0.0",
+            "type": "service",
+            "api_version": api_version,
+        }
+        (plugin_dir / "plugin.json").write_text(json.dumps(manifest))
+        return manifest, plugin_dir
+
+    return _make
 
 
-@pytest.fixture
-def installed_plugin_package(tmp_path):
-    """Create a mock installed plugin package."""
-    plugin_dir = tmp_path / "test_plugin"
-    plugin_dir.mkdir()
-
-    plugin_py = plugin_dir / "plugin.py"
-    plugin_py.write_text(
-        '''"""Test installed plugin."""
-from typing import Any
-from app.plugins.base import PluginType
-from app.plugins.hooks import hookimpl
-
-@hookimpl
-def register_plugin_types() -> list[dict[str, Any]]:
-    """Register plugin type."""
-    return [{
-        "type_id": "test_installed",
-        "plugin_type": PluginType.SERVICE,
-        "name": "Test Installed Plugin",
-    }]
-
-@hookimpl
-def create_plugin_instance(
-    plugin_id: str,
-    type_id: str,
-    name: str,
-    config: dict[str, Any],
-) -> Any:
-    """Create plugin instance."""
-    if type_id != "test_installed":
-        return None
-    return MagicMock(plugin_id=plugin_id, type_id=type_id, name=name)
-'''
-    )
-
-    manifest = {
-        "id": "test_plugin",
-        "name": "Test Plugin",
-        "version": "1.0.0",
-        "type": "service",
-    }
-    (plugin_dir / "plugin.json").write_text(json.dumps(manifest))
-
-    return plugin_dir
+@pytest.fixture(autouse=True)
+def _clean_installed_plugin_modules():
+    """Drop fixture plugin modules from sys.modules after each test."""
+    yield
+    for name in [n for n in sys.modules if n.startswith("installed_plugin_test_")]:
+        sys.modules.pop(name, None)
 
 
 @pytest.mark.unit
@@ -79,293 +82,175 @@ class TestPluginLoader:
     def test_init(self, plugin_loader_instance):
         """Test PluginLoader initialization."""
         assert plugin_loader_instance._loaded_modules == set()
+        assert plugin_loader_instance.get_plugin_types() == []
 
-    @patch("app.plugins.loader.plugin_manager")
-    @patch("pkgutil.iter_modules")
-    @patch("importlib.import_module")
-    @patch("pathlib.Path")
-    def test_load_plugins_from_package(
-        self,
-        mock_path,
-        mock_import_module,
-        mock_iter_modules,
-        mock_plugin_manager,
-        plugin_loader_instance,
-    ):
-        """Test loading plugins from a package."""
-        # Mock package module
-        mock_package = MagicMock()
-        mock_package.__file__ = "/path/to/package/__init__.py"
+    def test_load_plugins_from_package_discovers_builtins(self, plugin_loader_instance):
+        """Loading a built-in package registers its declared plugin classes."""
+        plugin_loader_instance.load_plugins_from_package("app.plugins.service")
 
-        # Mock plugin module with hooks
-        mock_plugin_module = MagicMock()
-        mock_plugin_module.register_plugin_types = MagicMock()
+        assert plugin_loader_instance.get_plugin_class("iframe") is not None
+        definitions = {d.type_id: d for d in plugin_loader_instance.get_plugin_types()}
+        assert definitions["iframe"].plugin_type == PluginType.SERVICE
+        assert definitions["iframe"].plugin_class is plugin_loader_instance.get_plugin_class(
+            "iframe"
+        )
 
-        # Mock Path operations
-        mock_path_instance = MagicMock()
-        mock_path_instance.parent = MagicMock()
-        mock_path_instance.parent.__str__ = lambda x: "/path/to/package"
-        mock_path.return_value = mock_path_instance
-
-        # Setup mocks
-        def import_side_effect(name):
-            if name == "app.plugins.test":
-                return mock_package
-            elif name == "app.plugins.test.test_plugin":
-                return mock_plugin_module
-            return MagicMock()
-
-        mock_import_module.side_effect = import_side_effect
-        mock_iter_modules.return_value = [
-            ("", "test_plugin", False),
-        ]
-
-        plugin_loader_instance.load_plugins_from_package("app.plugins.test")
-
-        # Verify module was registered (if hooks were found)
-        # Note: The actual registration depends on has_hooks check
-        # We verify the method was called at least once
-        assert mock_import_module.called
-
-    def test_get_plugin_types(self, plugin_loader_instance):
-        """Test getting plugin types normalized into typed definitions."""
-        with patch("app.plugins.loader.plugin_manager") as mock_manager:
-            mock_manager.hook.register_plugin_types.return_value = [
-                [{"type_id": "test1", "plugin_type": PluginType.SERVICE, "name": "Test 1"}],
-                PluginDefinition(
-                    type_id="test2",
-                    plugin_type=PluginType.IMAGE,
-                    name="Test 2",
-                ),
-            ]
-
-            types = plugin_loader_instance.get_plugin_types()
-
-            assert len(types) == 2
-            assert isinstance(types[0], PluginDefinition)
-            assert isinstance(types[1], PluginDefinition)
-            assert types[0]["type_id"] == "test1"
-            assert types[1]["type_id"] == "test2"
-            assert types[0].plugin_type == PluginType.SERVICE
-            assert types[1].plugin_type == PluginType.IMAGE
-
-    def test_get_plugin_types_empty(self, plugin_loader_instance):
-        """Test getting plugin types when none are registered."""
-        with patch("app.plugins.loader.plugin_manager") as mock_manager:
-            mock_manager.hook.register_plugin_types.return_value = []
-
-            types = plugin_loader_instance.get_plugin_types()
-
-            assert types == []
-
-    def test_get_plugin_types_skips_invalid_hook_results(self, plugin_loader_instance):
-        """Test invalid hook results are skipped without breaking valid ones."""
-        with patch("app.plugins.loader.plugin_manager") as mock_manager:
-            mock_manager.hook.register_plugin_types.return_value = [
-                [
-                    {"type_id": "valid", "plugin_type": PluginType.SERVICE, "name": "Valid"},
-                    {"type_id": "invalid-missing-type", "name": "Invalid"},
-                ]
-            ]
-
-            types = plugin_loader_instance.get_plugin_types()
-
-            assert len(types) == 1
-            assert types[0].type_id == "valid"
-
-    def test_get_plugin_types_skips_unsupported_protocol_versions(self, plugin_loader_instance):
-        """Test future protocol versions are skipped without breaking valid plugins."""
-        with patch("app.plugins.loader.plugin_manager") as mock_manager:
-            mock_manager.hook.register_plugin_types.return_value = [
-                [
-                    {"type_id": "valid", "plugin_type": PluginType.SERVICE, "name": "Valid"},
-                    {
-                        "protocol_version": 2,
-                        "type_id": "future",
-                        "plugin_type": PluginType.SERVICE,
-                        "name": "Future Plugin",
-                    },
-                ]
-            ]
-
-            types = plugin_loader_instance.get_plugin_types()
-
-            assert len(types) == 1
-            assert types[0].type_id == "valid"
-
-    def test_create_plugin_instance(self, plugin_loader_instance):
-        """Test creating a plugin instance."""
-        mock_plugin = MagicMock()
-
-        with patch("app.plugins.loader.plugin_manager") as mock_manager:
-            mock_manager.hook.create_plugin_instance.return_value = [
-                None,
-                mock_plugin,
-                None,
-            ]
-
-            result = plugin_loader_instance.create_plugin_instance(
-                plugin_id="test-1",
-                type_id="test",
-                name="Test Plugin",
-                config={},
-            )
-
-            assert result == mock_plugin
-
-    def test_create_plugin_instance_not_found(self, plugin_loader_instance):
-        """Test creating a plugin instance when not found."""
-        with patch("app.plugins.loader.plugin_manager") as mock_manager:
-            mock_manager.hook.create_plugin_instance.return_value = [None, None]
-
-            result = plugin_loader_instance.create_plugin_instance(
-                plugin_id="test-1",
-                type_id="test",
-                name="Test Plugin",
-                config={},
-            )
-
-            assert result is None
+    def test_load_plugins_from_missing_package_is_safe(self, plugin_loader_instance):
+        """A missing package is logged, not raised."""
+        plugin_loader_instance.load_plugins_from_package("app.plugins.no_such_package")
+        assert plugin_loader_instance.get_plugin_types() == []
 
     @patch("app.plugins.loader.plugin_installer")
-    @patch("app.plugins.loader.plugin_manager")
-    @patch("app.plugins.loader.sys.path")
-    def test_load_installed_plugins(
-        self,
-        mock_sys_path,
-        mock_plugin_manager,
-        mock_installer,
-        plugin_loader_instance,
-        installed_plugin_package,
+    def test_load_installed_plugins_from_disk(
+        self, mock_installer, plugin_loader_instance, make_installed_plugin
     ):
-        """Test loading installed plugins."""
-        # Setup mock installer
-        mock_installer.get_installed_plugins.return_value = [
-            {"id": "test_plugin"},
-        ]
-        mock_installer.get_plugin_path.return_value = installed_plugin_package
+        """An installed plugin's class is imported from plugin.py and registered."""
+        manifest, plugin_dir = make_installed_plugin("test_installed")
+        mock_installer.get_installed_plugins.return_value = [manifest]
+        mock_installer.get_plugin_path.return_value = plugin_dir
 
-        # Mock sys.path to verify backend directory is added
-        # Use a real list that we can check
-        import sys
+        plugin_loader_instance.load_installed_plugins()
 
-        original_path = sys.path.copy()
-        try:
-            # Load installed plugins
-            plugin_loader_instance.load_installed_plugins()
+        assert "installed_plugin_test_installed" in plugin_loader_instance._loaded_modules
+        cls = plugin_loader_instance.get_plugin_class("test_installed")
+        assert cls is not None
+        assert cls.metadata.type_id == "test_installed"
+        assert plugin_loader_instance.get_load_error("test_installed") is None
+        assert plugin_loader_instance.installed_plugin_type_ids("test_installed") == {
+            "test_installed"
+        }
 
-            # Verify plugin was registered
-            assert mock_plugin_manager.register.called
-            assert "installed_plugin_test_plugin" in plugin_loader_instance._loaded_modules
-        finally:
-            # Restore original path
-            sys.path[:] = original_path
+        # Instances come from the standard constructor
+        instance = plugin_loader_instance.create_plugin_instance(
+            plugin_id="test_installed-1",
+            type_id="test_installed",
+            name="One",
+            config={"enabled": True},
+        )
+        assert instance is not None
+        assert instance.plugin_id == "test_installed-1"
+        assert instance.enabled is True
 
     @patch("app.plugins.loader.plugin_installer")
-    @patch("app.plugins.loader.plugin_manager")
-    def test_load_installed_plugins_backend_dir_already_in_path(
-        self,
-        mock_plugin_manager,
-        mock_installer,
-        plugin_loader_instance,
-        installed_plugin_package,
+    def test_load_installed_plugins_skips_wrong_api_version(
+        self, mock_installer, plugin_loader_instance, make_installed_plugin
     ):
-        """Test loading installed plugins when backend directory is already in sys.path."""
-        # Setup mock installer
-        mock_installer.get_installed_plugins.return_value = [
-            {"id": "test_plugin"},
-        ]
-        mock_installer.get_plugin_path.return_value = installed_plugin_package
+        """Plugins with a stale/newer api_version are skipped with a recorded error."""
+        for plugin_id, api_version in (
+            ("test_stale", CURRENT_PLUGIN_API_VERSION - 1),
+            ("test_future", CURRENT_PLUGIN_API_VERSION + 1),
+        ):
+            manifest, plugin_dir = make_installed_plugin(plugin_id, api_version=api_version)
+            mock_installer.get_installed_plugins.return_value = [manifest]
+            mock_installer.get_plugin_path.return_value = plugin_dir
 
-        # Add backend directory to sys.path before loading
-        import sys
-        from pathlib import Path
-
-        backend_dir = Path(__file__).parent.parent.parent.parent  # backend directory
-        backend_dir_str = str(backend_dir)
-        original_path = sys.path.copy()
-        try:
-            if backend_dir_str not in sys.path:
-                sys.path.insert(0, backend_dir_str)
-
-            # Load installed plugins
             plugin_loader_instance.load_installed_plugins()
 
-            # Verify plugin was still registered
-            assert mock_plugin_manager.register.called
-        finally:
-            # Restore original path
-            sys.path[:] = original_path
+            assert plugin_loader_instance.get_plugin_class(plugin_id) is None
+            assert "api_version" in (plugin_loader_instance.get_load_error(plugin_id) or "")
+
+    @patch("app.plugins.loader.plugin_installer")
+    def test_unload_installed_plugin(
+        self, mock_installer, plugin_loader_instance, make_installed_plugin
+    ):
+        """Unloading removes the registered types, module, and load errors."""
+        manifest, plugin_dir = make_installed_plugin("test_unload")
+        mock_installer.get_installed_plugins.return_value = [manifest]
+        mock_installer.get_plugin_path.return_value = plugin_dir
+
+        plugin_loader_instance.load_installed_plugins()
+        assert plugin_loader_instance.get_plugin_class("test_unload") is not None
+        assert "installed_plugin_test_unload" in sys.modules
+
+        plugin_loader_instance.unload_installed_plugin("test_unload")
+
+        assert plugin_loader_instance.get_plugin_class("test_unload") is None
+        assert "installed_plugin_test_unload" not in plugin_loader_instance._loaded_modules
+        assert plugin_loader_instance.installed_plugin_type_ids("test_unload") == set()
+        assert "installed_plugin_test_unload" not in sys.modules
+
+        # A reinstall can load it again
+        plugin_loader_instance.load_installed_plugins()
+        assert plugin_loader_instance.get_plugin_class("test_unload") is not None
+
+    @patch("app.plugins.loader.plugin_installer")
+    def test_load_installed_plugins_duplicate_type_id_keeps_first(
+        self, mock_installer, plugin_loader_instance, make_installed_plugin
+    ):
+        """Two installed plugins declaring the same type_id: the first wins."""
+        manifest_a, dir_a = make_installed_plugin("test_dup_a", type_id="test_dup")
+        manifest_b, dir_b = make_installed_plugin("test_dup_b", type_id="test_dup")
+        mock_installer.get_installed_plugins.return_value = [manifest_a, manifest_b]
+        mock_installer.get_plugin_path.side_effect = lambda pid: {
+            "test_dup_a": dir_a,
+            "test_dup_b": dir_b,
+        }[pid]
+
+        plugin_loader_instance.load_installed_plugins()
+
+        cls = plugin_loader_instance.get_plugin_class("test_dup")
+        assert cls is not None
+        assert cls.__module__ == "installed_plugin_test_dup_a"
+        assert plugin_loader_instance.installed_plugin_type_ids("test_dup_b") == set()
 
     @patch("app.plugins.loader.plugin_installer")
     def test_load_installed_plugins_missing_plugin_py(
-        self,
-        mock_installer,
-        plugin_loader_instance,
-        tmp_path,
+        self, mock_installer, plugin_loader_instance, tmp_path
     ):
         """Test loading installed plugin without plugin.py."""
-        plugin_dir = tmp_path / "test_plugin"
+        plugin_dir = tmp_path / "test_missing"
         plugin_dir.mkdir()
 
         mock_installer.get_installed_plugins.return_value = [
-            {"id": "test_plugin"},
+            {"id": "test_missing", "api_version": CURRENT_PLUGIN_API_VERSION},
         ]
         mock_installer.get_plugin_path.return_value = plugin_dir
 
         # Should not raise an error, just skip
         plugin_loader_instance.load_installed_plugins()
+        assert "installed_plugin_test_missing" not in plugin_loader_instance._loaded_modules
 
     @patch("app.plugins.loader.plugin_installer")
-    @patch("app.plugins.loader.plugin_manager")
     def test_load_installed_plugins_error_handling(
-        self,
-        mock_plugin_manager,
-        mock_installer,
-        plugin_loader_instance,
-        tmp_path,
+        self, mock_installer, plugin_loader_instance, tmp_path
     ):
-        """Test error handling when loading installed plugin fails."""
-        plugin_dir = tmp_path / "test_plugin"
+        """Import errors are recorded as load errors, not raised."""
+        plugin_dir = tmp_path / "test_broken"
         plugin_dir.mkdir()
         (plugin_dir / "plugin.py").write_text("invalid python code !!!")
 
         mock_installer.get_installed_plugins.return_value = [
-            {"id": "test_plugin"},
+            {"id": "test_broken", "api_version": CURRENT_PLUGIN_API_VERSION},
         ]
         mock_installer.get_plugin_path.return_value = plugin_dir
 
         # Should not raise an error, just log and continue
         plugin_loader_instance.load_installed_plugins()
 
+        assert plugin_loader_instance.get_plugin_class("test_broken") is None
+        assert plugin_loader_instance.get_load_error("test_broken") is not None
+
     @patch("app.plugins.loader.plugin_installer")
-    def test_load_installed_plugins_no_hooks(
-        self,
-        mock_installer,
-        plugin_loader_instance,
-        tmp_path,
+    def test_load_installed_plugins_no_plugin_class(
+        self, mock_installer, plugin_loader_instance, tmp_path
     ):
-        """Test loading installed plugin without hooks."""
-        plugin_dir = tmp_path / "test_plugin"
+        """A plugin.py without a metadata-declaring class registers nothing."""
+        plugin_dir = tmp_path / "test_empty"
         plugin_dir.mkdir()
-        (plugin_dir / "plugin.py").write_text("# No hooks here")
+        (plugin_dir / "plugin.py").write_text("# No plugin class here\n")
 
         mock_installer.get_installed_plugins.return_value = [
-            {"id": "test_plugin"},
+            {"id": "test_empty", "api_version": CURRENT_PLUGIN_API_VERSION},
         ]
         mock_installer.get_plugin_path.return_value = plugin_dir
 
-        # Should not register if no hooks
         plugin_loader_instance.load_installed_plugins()
 
-        assert "installed_plugin_test_plugin" not in plugin_loader_instance._loaded_modules
+        assert "installed_plugin_test_empty" not in plugin_loader_instance._loaded_modules
+        assert plugin_loader_instance.get_plugin_types() == []
 
     @patch("app.plugins.loader.plugin_installer")
-    def test_load_all_plugins(
-        self,
-        mock_installer,
-        plugin_loader_instance,
-    ):
+    def test_load_all_plugins(self, mock_installer, plugin_loader_instance):
         """Test loading all plugins (built-in and installed)."""
         mock_installer.get_installed_plugins.return_value = []
 

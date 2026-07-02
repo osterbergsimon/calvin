@@ -15,48 +15,36 @@
       </div>
 
       <div class="weather-forecast-renderer__details">
-        <div
-          v-if="hasValue(feelsLike)"
-          class="weather-forecast-renderer__detail calvin-plugin-surface"
-        >
-          <span class="weather-forecast-renderer__detail-label">Feels like</span>
+        <div v-if="hasValue(feelsLike)" class="calvin-plugin-readout">
+          <span class="calvin-plugin-readout__label">Feels like</span>
           <span class="weather-forecast-renderer__detail-value">
             {{ round(feelsLike) }}{{ temperatureUnit }}
           </span>
         </div>
-        <div
-          v-if="hasValue(humidity)"
-          class="weather-forecast-renderer__detail calvin-plugin-surface"
-        >
-          <span class="weather-forecast-renderer__detail-label">Humidity</span>
+        <div v-if="hasValue(humidity)" class="calvin-plugin-readout">
+          <span class="calvin-plugin-readout__label">Humidity</span>
           <span class="weather-forecast-renderer__detail-value">{{ round(humidity) }}%</span>
         </div>
-        <div
-          v-if="hasValue(windSpeed)"
-          class="weather-forecast-renderer__detail calvin-plugin-surface"
-        >
-          <span class="weather-forecast-renderer__detail-label">Wind</span>
+        <div v-if="hasValue(windSpeed)" class="calvin-plugin-readout">
+          <span class="calvin-plugin-readout__label">Wind</span>
           <span class="weather-forecast-renderer__detail-value">
             {{ round(windSpeed) }} {{ windUnit }}
           </span>
         </div>
-        <div
-          v-if="hasValue(pressure)"
-          class="weather-forecast-renderer__detail calvin-plugin-surface"
-        >
-          <span class="weather-forecast-renderer__detail-label">Pressure</span>
+        <div v-if="hasValue(pressure)" class="calvin-plugin-readout">
+          <span class="calvin-plugin-readout__label">Pressure</span>
           <span class="weather-forecast-renderer__detail-value">{{ round(pressure) }} hPa</span>
         </div>
       </div>
     </div>
 
     <div v-if="forecast.length" class="weather-forecast-renderer__forecast">
-      <h4>Forecast</h4>
+      <h4 class="calvin-plugin-readout__label">Forecast</h4>
       <div class="weather-forecast-renderer__items">
         <article
           v-for="(day, index) in forecast"
           :key="dateFor(day) || index"
-          class="weather-forecast-renderer__item calvin-plugin-surface"
+          class="weather-forecast-renderer__item"
         >
           <div class="weather-forecast-renderer__date">{{ formatForecastDate(dateFor(day)) }}</div>
           <svg class="weather-forecast-renderer__small-icon" viewBox="0 0 24 24" aria-hidden="true">
@@ -77,7 +65,7 @@
       </div>
     </div>
   </section>
-  <div v-else-if="data?.error" class="weather-forecast-renderer weather-forecast-renderer__error">
+  <div v-else-if="data?.error" class="weather-forecast-renderer calvin-plugin-error">
     <p>{{ data.error }}</p>
     <p v-if="data.message">{{ data.message }}</p>
   </div>
@@ -180,7 +168,7 @@ function capitalize(value) {
   height: 100%;
   display: flex;
   flex-direction: column;
-  gap: 1rem;
+  gap: 1.25rem;
   overflow: hidden;
   box-sizing: border-box;
 }
@@ -188,97 +176,91 @@ function capitalize(value) {
 .weather-forecast-renderer__current {
   display: flex;
   flex-direction: column;
-  gap: 1.5rem;
+  gap: 1.25rem;
 }
 
+/* The current conditions are the panel's one big display moment: open air,
+   no box — the temperature carries the hierarchy by size alone. */
 .weather-forecast-renderer__main {
   display: flex;
   flex-direction: column;
   align-items: center;
-  gap: 0.75rem;
-  padding: 1.5rem;
-  background: var(--bg-secondary);
-  border-radius: 6px;
+  gap: 0.5rem;
+  padding: 0.75rem 0 0.25rem;
   flex-shrink: 0;
 }
 
 .weather-forecast-renderer__icon {
-  width: 80px;
-  height: 80px;
-  fill: var(--accent-primary);
+  width: 72px;
+  height: 72px;
+  fill: var(--ink-2);
 }
 
 .weather-forecast-renderer__temp {
   display: flex;
   align-items: baseline;
-  gap: 0.5rem;
+  gap: 0.25rem;
 }
 
 .weather-forecast-renderer__temp-value {
-  font-size: 3rem;
-  font-weight: 700;
-  color: var(--text-primary);
+  font-family: var(--font-data);
+  font-variant-numeric: tabular-nums;
+  font-size: 4rem;
+  font-weight: 500;
+  color: var(--ink);
   line-height: 1;
 }
 
 .weather-forecast-renderer__temp-unit {
-  font-size: 2rem;
-  font-weight: 500;
-  color: var(--text-secondary);
+  font-family: var(--font-data);
+  font-size: 1.75rem;
+  font-weight: 400;
+  color: var(--ink-3);
 }
 
 .weather-forecast-renderer__desc {
-  font-size: 1.25rem;
-  color: var(--text-secondary);
-  text-transform: capitalize;
+  font-size: 1.05rem;
+  color: var(--ink-2);
 }
 
 .weather-forecast-renderer__details {
   display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
+  grid-template-columns: repeat(auto-fit, minmax(120px, 1fr));
   gap: 1rem;
-}
-
-.weather-forecast-renderer__detail {
-  display: flex;
-  flex-direction: column;
-  gap: 0.25rem;
-}
-
-.weather-forecast-renderer__detail-label {
-  font-size: 0.85rem;
-  color: var(--text-secondary);
-  text-transform: uppercase;
-  letter-spacing: 0.5px;
+  border-top: 1px solid var(--line-soft);
+  padding-top: 1rem;
 }
 
 .weather-forecast-renderer__detail-value {
-  font-size: 1.25rem;
+  font-family: var(--font-data);
+  font-variant-numeric: tabular-nums;
+  font-size: 1.2rem;
   font-weight: 600;
-  color: var(--text-primary);
+  color: var(--ink);
 }
 
 .weather-forecast-renderer__forecast {
-  margin-top: 0.5rem;
   flex: 1;
   min-height: 0;
   display: flex;
   flex-direction: column;
   overflow: hidden;
+  border-top: 1px solid var(--line-soft);
+  padding-top: 0.9rem;
 }
 
 .weather-forecast-renderer__forecast h4 {
   margin: 0 0 0.75rem 0;
-  font-size: 1rem;
-  color: var(--text-primary);
   flex-shrink: 0;
 }
 
+/* Day columns separated by hairlines — chassis, not boxes. */
 .weather-forecast-renderer__items {
   display: grid;
-  grid-template-columns: repeat(auto-fill, minmax(120px, 1fr));
-  gap: 0.75rem;
-  overflow-y: auto;
+  grid-auto-flow: column;
+  grid-auto-columns: minmax(90px, 1fr);
+  overflow-x: auto;
+  overflow-y: hidden;
   flex: 1;
   min-height: 0;
 }
@@ -287,48 +269,51 @@ function capitalize(value) {
   display: flex;
   flex-direction: column;
   align-items: center;
-  gap: 0.5rem;
+  gap: 0.45rem;
   text-align: center;
+  padding: 0.25rem 0.5rem;
+}
+
+.weather-forecast-renderer__item + .weather-forecast-renderer__item {
+  border-left: 1px solid var(--line-soft);
 }
 
 .weather-forecast-renderer__date {
+  font-family: var(--font-ui);
+  font-size: 0.7rem;
   font-weight: 600;
-  color: var(--text-primary);
-  font-size: 1rem;
+  letter-spacing: 0.09em;
+  text-transform: uppercase;
+  color: var(--ink-3);
 }
 
 .weather-forecast-renderer__small-icon {
-  width: 48px;
-  height: 48px;
-  fill: var(--accent-primary);
+  width: 40px;
+  height: 40px;
+  fill: var(--ink-2);
 }
 
 .weather-forecast-renderer__temps {
   display: flex;
   gap: 0.5rem;
-  align-items: center;
+  align-items: baseline;
+  font-family: var(--font-data);
+  font-variant-numeric: tabular-nums;
 }
 
 .weather-forecast-renderer__high {
-  font-size: 1.25rem;
+  font-size: 1.1rem;
   font-weight: 600;
-  color: var(--text-primary);
+  color: var(--ink);
 }
 
 .weather-forecast-renderer__low {
-  font-size: 1rem;
-  color: var(--text-secondary);
+  font-size: 0.9rem;
+  color: var(--ink-3);
 }
 
 .weather-forecast-renderer__forecast-desc {
-  font-size: 0.9rem;
-  color: var(--text-secondary);
-  text-transform: capitalize;
-}
-
-.weather-forecast-renderer__error {
-  justify-content: center;
-  text-align: center;
-  color: var(--accent-error);
+  font-size: 0.8rem;
+  color: var(--ink-2);
 }
 </style>
