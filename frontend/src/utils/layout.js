@@ -180,7 +180,10 @@ const calendarViewFor = (region, kind) =>
  * The input is not mutated. No-op if the region isn't a calendar region.
  */
 export function setRegionView(screens, regionId, patch) {
-  const next = structuredClone(screens);
+  // JSON round-trip, not structuredClone: `screens` may be a Vue reactive proxy
+  // (from the Pinia store), which structuredClone rejects with DataCloneError.
+  // The screens config is pure JSON-serializable data, so this is safe.
+  const next = JSON.parse(JSON.stringify(screens));
   const active = next.screens.find(s => s.id === next.activeScreenId) || next.screens[0];
   if (!active) return next;
   const visit = regions => {
