@@ -32,7 +32,7 @@ The current UI is generic Material (blue `#2196f3`, emoji icons, system font, cr
 **Non-goals**
 - **Do not change keyboard behavior.** The action vocabulary in `useKeyboardActions.js` and how the 7-button cluster drives it stay exactly as they are. Touch is a *parallel* layer onto the same actions.
 - No mandatory phone layout (design should not actively break narrow widths, but small-screen polish is out of scope).
-- No change to the plugin contract (`instance_config_schema`-driven forms, schema renderers, Pluggy hooks).
+- No change to the plugin contract (`instance_config_schema`-driven forms, schema renderers, plugin registration).
 
 ## 3. Thesis & signature
 

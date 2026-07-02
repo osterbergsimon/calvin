@@ -49,6 +49,12 @@ calvin-plugins/
 
 ### 2. Create `plugins.json` Manifest
 
+Each listed plugin's own `plugin.json` must declare `api_version: 1` (see
+[PLUGIN_PACKAGE_FORMAT.md](PLUGIN_PACKAGE_FORMAT.md)) — the repository
+manifest only handles discovery. In the official `calvin-plugins` repo,
+`scripts/rebuild-manifest.py` regenerates this file from the plugin
+directories; don't edit it by hand there.
+
 ```json
 {
   "version": "1.0.0",
