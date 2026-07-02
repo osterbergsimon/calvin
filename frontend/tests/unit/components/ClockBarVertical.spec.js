@@ -238,10 +238,10 @@ describe("ClockBarVertical", () => {
     expect(timeElement.attributes("style")).toContain("font-size: 18px");
   });
 
-  it("should render statusbar items vertically when weather is enabled", async () => {
+  it("should render statusbar items vertically when plugin items are enabled", async () => {
     const store = useConfigStore();
     store.showUI = true;
-    store.clockBarShowWeather = false;
+    store.clockBarShowPluginItems = false;
 
     const wrapper = mount(ClockBarVertical, {
       props: {
@@ -257,7 +257,7 @@ describe("ClockBarVertical", () => {
 
     expect(wrapper.find(".plugin-statusbar-stub").exists()).toBe(false);
 
-    store.clockBarShowWeather = true;
+    store.clockBarShowPluginItems = true;
     await nextTick();
 
     const statusbar = wrapper.find(".plugin-statusbar-stub");

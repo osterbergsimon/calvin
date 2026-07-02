@@ -475,10 +475,15 @@ async def get_config():
         config["clockBarPadding"] = 8
     elif "clock_bar_padding" in config and "clockBarPadding" not in config:
         config["clockBarPadding"] = config["clock_bar_padding"]
-    if "clockBarShowWeather" not in config and "clock_bar_show_weather" not in config:
-        config["clockBarShowWeather"] = False
-    elif "clock_bar_show_weather" in config and "clockBarShowWeather" not in config:
-        config["clockBarShowWeather"] = config["clock_bar_show_weather"]
+    # Master toggle for plugin statusbar items. Renamed from the legacy
+    # weather-named clockBarShowWeather (retired in the contract-1.0 rename):
+    # any plugin can now ship a statusbar item, and each service opts in via its
+    # own show_in_statusbar. This master defaults on — the per-instance flag is
+    # the real gate — so nothing shows until a service opts in.
+    if "clockBarShowPluginItems" not in config and "clock_bar_show_plugin_items" not in config:
+        config["clockBarShowPluginItems"] = True
+    elif "clock_bar_show_plugin_items" in config and "clockBarShowPluginItems" not in config:
+        config["clockBarShowPluginItems"] = config["clock_bar_show_plugin_items"]
     if "clockBarShowLogo" not in config and "clock_bar_show_logo" not in config:
         config["clockBarShowLogo"] = True
     elif "clock_bar_show_logo" in config and "clockBarShowLogo" not in config:
@@ -636,7 +641,7 @@ async def update_config(config_update: ConfigUpdate):
         "clockBarVerticalDateFontSize": "clock_bar_vertical_date_font_size",
         "clockBarVerticalPadding": "clock_bar_vertical_padding",
         "clockBarPadding": "clock_bar_padding",
-        "clockBarShowWeather": "clock_bar_show_weather",
+        "clockBarShowPluginItems": "clock_bar_show_plugin_items",
         "clockBarShowLogo": "clock_bar_show_logo",
     }
     for camel_key, snake_key in clock_key_map.items():

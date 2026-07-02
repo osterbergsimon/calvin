@@ -221,6 +221,8 @@ const roomLabel = computed(() => configStore.displayName);
 
 .clock-bar-right {
   justify-content: flex-end;
+  /* Keep plugin statusbar items from crowding the ⋯ action cluster. */
+  gap: 0.5rem;
 }
 
 .clock-bar-content {

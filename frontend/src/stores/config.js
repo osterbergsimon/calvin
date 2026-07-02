@@ -64,7 +64,7 @@ export const useConfigStore = defineStore("config", () => {
   const clockBarVerticalDateFontSize = ref(11);
   const clockBarVerticalPadding = ref(8);
   const clockBarPadding = ref(8);
-  const clockBarShowWeather = ref(false);
+  const clockBarShowPluginItems = ref(true);
   const clockBarShowLogo = ref(true);
   const displayName = ref("");
   const focusLightMode = ref("interaction");
@@ -137,7 +137,7 @@ export const useConfigStore = defineStore("config", () => {
     clockBarVerticalDateFontSize,
     clockBarVerticalPadding,
     clockBarPadding,
-    clockBarShowWeather,
+    clockBarShowPluginItems,
     clockBarShowLogo,
     displayName,
     focusLightMode,
@@ -461,7 +461,7 @@ export const useConfigStore = defineStore("config", () => {
     clockBarVerticalDateFontSize,
     clockBarVerticalPadding,
     clockBarPadding,
-    clockBarShowWeather,
+    clockBarShowPluginItems,
     clockBarShowLogo,
     mealPlanCardSize,
     consoleLogEnabled,

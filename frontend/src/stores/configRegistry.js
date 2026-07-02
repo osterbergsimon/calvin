@@ -225,9 +225,9 @@ export const CONFIG_FIELD_DEFINITIONS = [
   },
   { name: "clockBarPadding", keys: ["clockBarPadding", "clock_bar_padding"], defaultValue: 8 },
   {
-    name: "clockBarShowWeather",
-    keys: ["clockBarShowWeather", "clock_bar_show_weather"],
-    defaultValue: false,
+    name: "clockBarShowPluginItems",
+    keys: ["clockBarShowPluginItems", "clock_bar_show_plugin_items"],
+    defaultValue: true,
   },
   {
     name: "clockBarShowLogo",
