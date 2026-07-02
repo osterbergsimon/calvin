@@ -53,7 +53,9 @@ const isWeek = computed(() => props.view?.mode === "week");
 const countLabel = computed(() => (isWeek.value ? "Days" : "Weeks"));
 const countKey = computed(() => (isWeek.value ? "days" : "weeks"));
 const countMax = computed(() => (isWeek.value ? 14 : 12));
-const countValue = computed(() => (isWeek.value ? (props.view?.days ?? 7) : (props.view?.weeks ?? 4)));
+const countValue = computed(() =>
+  isWeek.value ? (props.view?.days ?? 7) : (props.view?.weeks ?? 4)
+);
 
 const persist = patch => {
   configStore.updateRegionView(props.regionId, patch).catch(err => {

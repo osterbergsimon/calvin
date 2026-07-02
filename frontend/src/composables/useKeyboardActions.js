@@ -839,13 +839,8 @@ export function useKeyboardActions() {
         ) {
           const region = getActiveRegion();
           const serviceId =
-            region?.kind === "service"
-              ? region.instanceIds?.[0] || region.serviceId || null
-              : null;
-          modeStore.enterFullscreen(
-            modeStore.MODES.WEB_SERVICES,
-            serviceId ? { serviceId } : null
-          );
+            region?.kind === "service" ? region.instanceIds?.[0] || region.serviceId || null : null;
+          modeStore.enterFullscreen(modeStore.MODES.WEB_SERVICES, serviceId ? { serviceId } : null);
           router.push("/");
         }
         break;
