@@ -35,6 +35,7 @@ import {
   resizeSubRegionPair,
   resolveClockBarForScreen,
   setLayoutDirection,
+  setRegionView,
   setSplitDirection,
   setSubRegionContent,
   splitTopRegion,
@@ -862,5 +863,48 @@ describe("calendar region view", () => {
       weeks: 1,
       days: 14,
     });
+  });
+
+  it("setRegionView merges + clamps a region's view on the active screen without mutating input", () => {
+    const screens = normalizeDashboardScreens(
+      screenWith({ id: "r1", kind: "calendar", instanceIds: [], size: 100 })
+    );
+    const next = setRegionView(screens, "r1", { mode: "week", rolling: true });
+    expect(next.screens[0].layout.regions[0].view).toEqual({
+      mode: "week",
+      rolling: true,
+      weeks: 4,
+      days: 7,
+    });
+    // input is not mutated
+    expect(screens.screens[0].layout.regions[0].view.mode).toBe("month");
+  });
+
+  it("setRegionView finds a calendar region nested in a split", () => {
+    const screens = normalizeDashboardScreens({
+      activeScreenId: "s1",
+      screens: [
+        {
+          id: "s1",
+          layout: {
+            regions: [
+              {
+                id: "r1",
+                kind: "calendar",
+                size: 100,
+                split: {
+                  regions: [
+                    { id: "r1-a", kind: "calendar", size: 50 },
+                    { id: "r1-b", kind: "photos", size: 50 },
+                  ],
+                },
+              },
+            ],
+          },
+        },
+      ],
+    });
+    const next = setRegionView(screens, "r1-a", { mode: "day" });
+    expect(next.screens[0].layout.regions[0].split.regions[0].view.mode).toBe("day");
   });
 });

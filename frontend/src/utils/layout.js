@@ -174,6 +174,33 @@ const calendarViewFor = (region, kind) =>
     ? { view: clampCalendarView({ ...DEFAULT_CALENDAR_VIEW, ...(region?.view || {}) }) }
     : {};
 
+/**
+ * Return a new screens object with `patch` merged into the `view` of the
+ * calendar region `regionId` on the active screen (searching nested splits).
+ * The input is not mutated. No-op if the region isn't a calendar region.
+ */
+export function setRegionView(screens, regionId, patch) {
+  const next = structuredClone(screens);
+  const active = next.screens.find(s => s.id === next.activeScreenId) || next.screens[0];
+  if (!active) return next;
+  const visit = regions => {
+    for (const region of regions || []) {
+      if (region.id === regionId && region.kind === "calendar") {
+        region.view = clampCalendarView({
+          ...DEFAULT_CALENDAR_VIEW,
+          ...(region.view || {}),
+          ...patch,
+        });
+        return true;
+      }
+      if (region.split && visit(region.split.regions)) return true;
+    }
+    return false;
+  };
+  visit(active.layout?.regions);
+  return next;
+}
+
 export function normalizeDashboardScreens(screensConfig) {
   const fallback = {
     version: 2,

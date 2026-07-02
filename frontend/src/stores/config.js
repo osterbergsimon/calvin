@@ -7,6 +7,7 @@ import {
   cycleDashboardScreen,
   normalizeDashboardScreens,
   setActiveDashboardScreen,
+  setRegionView,
 } from "../utils/layout";
 import { applyConfigPayload, createDefaultDisplaySchedule } from "./configRegistry";
 
@@ -380,6 +381,14 @@ export const useConfigStore = defineStore("config", () => {
     await updateConfig({ dashboardScreens: nextScreens });
   };
 
+  // Merge `patch` into a calendar region's `view` (base mode / rolling / counts)
+  // on the active screen, and persist. Drives the on-calendar view controls.
+  const updateRegionView = async (regionId, patch) => {
+    const nextScreens = setRegionView(dashboardScreens.value, regionId, patch);
+    dashboardScreens.value = nextScreens;
+    await updateConfig({ dashboardScreens: nextScreens });
+  };
+
   const setThemeMode = mode => {
     themeMode.value = mode;
   };
@@ -513,6 +522,7 @@ export const useConfigStore = defineStore("config", () => {
     activateDashboardScreen,
     cycleDashboardScreenBy,
     cycleActiveDashboardRegionBy,
+    updateRegionView,
     setThemeMode,
     setDarkModeTime,
     setImageDisplayMode,
