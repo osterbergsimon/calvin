@@ -16,6 +16,7 @@
         :schema="service.display_schema"
         :data="schemaData"
         :plugin-id="service.id"
+        :link-action="linkAction"
       />
       <div v-else class="unknown-service">
         <p>This service can't be shown.</p>
@@ -50,6 +51,7 @@ const props = defineProps({
     type: Boolean,
     default: false,
   },
+  linkAction: { type: String, default: null },
 });
 
 const schemaKind = computed(() => props.service.display_schema?.kind || null);
