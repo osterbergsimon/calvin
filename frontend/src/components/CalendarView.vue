@@ -72,7 +72,7 @@
             >
               ›
             </button>
-            <CalendarViewGear
+            <CalendarViewOptions
               v-if="view && viewMode !== 'day'"
               :region-id="regionId"
               :view="view"
@@ -185,7 +185,7 @@ import DialogScrim from "./ui/DialogScrim.vue";
 import CalendarEventItem from "./CalendarEventItem.vue";
 import DashboardPanel from "./DashboardPanel.vue";
 import RegionControls from "./dashboard/RegionControls.vue";
-import CalendarViewGear from "./dashboard/CalendarViewGear.vue";
+import CalendarViewOptions from "./dashboard/CalendarViewOptions.vue";
 
 const props = defineProps({
   focused: {
@@ -236,6 +236,8 @@ const weekendDays = computed(() => configStore.weekendDays || [0, 6]);
 const showRedDays = computed(() => configStore.showRedDays || false);
 const rollingWeeks = computed(() => Math.min(12, Math.max(1, props.view?.weeks ?? 4)));
 const rollingDays = computed(() => Math.min(14, Math.max(1, props.view?.days ?? 7)));
+// Look-ahead weeks appended after a non-rolling month (0 = just the month).
+const extraWeeks = computed(() => Math.min(8, Math.max(0, props.view?.extraWeeks ?? 0)));
 // Rolling as a windowing modifier: the base view sets the unit + count, and
 // rolling only flips the anchor (period-start when off, today when on).
 //   month → `weeks` weeks (off: from the month's first week; on: from today's week)
@@ -259,10 +261,30 @@ const windowStart = computed(() => {
   return getWeekStart(anchor);
 });
 
+// Weeks needed to render the anchor month in full — leading days from the
+// previous month plus trailing days to complete the last week (4–6 weeks
+// depending on the month). Non-rolling month always shows all of these, so no
+// day is ever hidden by the count.
+const monthGridWeeks = computed(() => {
+  const y = currentDate.value.getFullYear();
+  const m = currentDate.value.getMonth();
+  const start = getWeekStart(new Date(y, m, 1));
+  const lastOfMonth = new Date(y, m + 1, 0);
+  const span = Math.round((lastOfMonth - start) / 86400000) + 1;
+  return Math.ceil(span / 7);
+});
+
 // Number of day cells in the window (day view is handled separately).
-const windowLength = computed(() =>
-  viewMode.value === "week" ? rollingDays.value : rollingWeeks.value * 7
-);
+//   week          → `days` cells
+//   rolling month → `weeks` cells (a pure N-week window from today's week)
+//   non-rolling month → the full month grid + `extraWeeks` look-ahead weeks
+const windowLength = computed(() => {
+  if (viewMode.value === "week") return rollingDays.value;
+  if (viewMode.value === "month" && !rolling.value) {
+    return (monthGridWeeks.value + extraWeeks.value) * 7;
+  }
+  return rollingWeeks.value * 7;
+});
 
 // The agenda strip lays out `days` columns in one row; the count is dynamic, so
 // feed it to the (!important) grid rule via a custom property.
@@ -466,8 +488,14 @@ const currentMonthYear = computed(() => {
       year: "numeric",
     });
   }
-  // Month and week are both day-windows; label them with the inclusive range
-  // they actually span (works for any week/day count, rolling or not).
+  // Non-rolling month is anchored to one calendar month, so name it plainly
+  // ("July 2026"); the leading/trailing padding days are dimmed rather than
+  // spelled out in the header.
+  if (viewMode.value === "month" && !rolling.value) {
+    return currentDate.value.toLocaleDateString("en-US", { month: "long", year: "numeric" });
+  }
+  // Rolling month and week are count-driven windows with no single "month";
+  // label them with the inclusive range they actually span.
   const startDate = new Date(windowStart.value);
   const endDate = new Date(startDate);
   endDate.setDate(startDate.getDate() + windowLength.value - 1);
@@ -686,8 +714,14 @@ const calendarDays = computed(() => {
   }
 
   // Month and week are both windows of consecutive days beginning at
-  // windowStart (rolling only shifts the anchor). The window IS the view, so
-  // nothing is greyed as "other month".
+  // windowStart (rolling only shifts the anchor). For a non-rolling month the
+  // window is anchored to one calendar month, so the leading/trailing padding
+  // days are flagged `otherMonth` and dimmed. Rolling month and week are pure
+  // windows — the window IS the view, so nothing is greyed.
+  const dimOutOfMonth = viewMode.value === "month" && !rolling.value;
+  const anchorMonth = currentDate.value.getMonth();
+  const anchorYear = currentDate.value.getFullYear();
+
   const windowDays = [];
   const windowFirst = new Date(windowStart.value);
   windowFirst.setHours(0, 0, 0, 0);
@@ -696,9 +730,11 @@ const calendarDays = computed(() => {
     date.setDate(windowFirst.getDate() + i);
     const dateOnly = new Date(date);
     dateOnly.setHours(0, 0, 0, 0);
+    const otherMonth =
+      dimOutOfMonth && (date.getMonth() !== anchorMonth || date.getFullYear() !== anchorYear);
     windowDays.push({
       date,
-      otherMonth: false,
+      otherMonth,
       isToday: dateOnly.getTime() === todayDate.getTime(),
       events: getEventsForDate(date),
     });
@@ -1039,6 +1075,11 @@ watch(rollingWeeks, () => {
 
 watch(rollingDays, () => {
   if (viewMode.value === "week") loadEvents();
+});
+
+// Appending look-ahead weeks widens a non-rolling month's fetch range.
+watch(extraWeeks, () => {
+  if (viewMode.value === "month" && !rolling.value) loadEvents();
 });
 
 // Rolling on/off (and base mode) can flip the effective window; reload so the
@@ -1447,9 +1488,11 @@ onActivated(() => {
   background: transparent !important;
 }
 
+/* Leading/trailing padding days of a non-rolling month. No grey block — they
+   belong to the adjacent month, so they just recede and let the current month
+   lift out of the grid. */
 .calendar-day.other-month {
-  opacity: 0.4;
-  background: var(--bg-tertiary) !important;
+  opacity: 0.38;
 }
 
 /* Force reset background for all calendar days (except other-month and today) */

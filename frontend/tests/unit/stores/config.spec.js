@@ -134,7 +134,7 @@ describe("Config Store", () => {
         instanceIds: [],
         size: 60,
         split: null,
-        view: { mode: "month", rolling: false, weeks: 4, days: 7 },
+        view: { mode: "month", rolling: false, weeks: 4, days: 7, extraWeeks: 0 },
       },
       {
         id: "region-2",

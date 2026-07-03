@@ -39,12 +39,19 @@ describe("CalendarView per-region view", () => {
     expect(w.findAll(".calendar-day").length).toBe(21);
   });
 
-  it("non-rolling month shows weeks*7 cells anchored to the month's first week", async () => {
+  it("non-rolling month shows the full month, ignoring the stored `weeks` count", async () => {
+    // Pin July 2026 (1st is a Wed): a Monday-start grid spans 5 weeks. `weeks`
+    // no longer drives non-rolling month — the whole month is always shown.
+    useCalendarStore().setCurrentDate(new Date(2026, 6, 15));
     const w = mountCalendar({ mode: "month", rolling: false, weeks: 4, days: 7 });
     await w.vm.$nextTick();
-    expect(w.findAll(".calendar-day").length).toBe(28);
+    expect(w.findAll(".calendar-day").length).toBe(35);
     // First cell is the week start (Monday) on/before the 1st of the month.
     expect(w.vm.calendarDays[0].date.getDay()).toBe(1);
+    // The last day of the month is always present (never hidden by the count).
+    expect(w.vm.calendarDays.some(d => d.date.getMonth() === 6 && d.date.getDate() === 31)).toBe(
+      true
+    );
   });
 
   it("non-rolling week shows `days` cells from the week start (not today)", async () => {
