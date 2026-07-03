@@ -869,6 +869,43 @@ describe("calendar region view", () => {
     });
   });
 
+  it("omits the optional display-override fields when absent (inherit from global)", () => {
+    const v = clampCalendarView({ mode: "month", rolling: false, weeks: 4, days: 7 });
+    expect("weekNumbers" in v).toBe(false);
+    expect("maxVisibleEvents" in v).toBe(false);
+  });
+
+  it("preserves a weekNumbers override (true/false) and clamps maxVisibleEvents 1-20", () => {
+    expect(clampCalendarView({ weekNumbers: true, maxVisibleEvents: 6 })).toMatchObject({
+      weekNumbers: true,
+      maxVisibleEvents: 6,
+    });
+    expect(clampCalendarView({ weekNumbers: false })).toMatchObject({ weekNumbers: false });
+    expect(clampCalendarView({ maxVisibleEvents: 99 }).maxVisibleEvents).toBe(20);
+    expect(clampCalendarView({ maxVisibleEvents: 0 }).maxVisibleEvents).toBe(1);
+  });
+
+  it("drops invalid override values back to inherit (omitted)", () => {
+    const v = clampCalendarView({ weekNumbers: "yes", maxVisibleEvents: "lots" });
+    expect("weekNumbers" in v).toBe(false);
+    expect("maxVisibleEvents" in v).toBe(false);
+  });
+
+  it("setRegionView clears an override when patched with undefined", () => {
+    const screens = normalizeDashboardScreens(
+      screenWith({
+        id: "r1",
+        kind: "calendar",
+        instanceIds: [],
+        size: 100,
+        view: { mode: "month", rolling: false, weeks: 4, days: 7, weekNumbers: true },
+      })
+    );
+    expect(screens.screens[0].layout.regions[0].view.weekNumbers).toBe(true);
+    const next = setRegionView(screens, "r1", { weekNumbers: undefined });
+    expect("weekNumbers" in next.screens[0].layout.regions[0].view).toBe(false);
+  });
+
   it("setRegionView merges + clamps a region's view on the active screen without mutating input", () => {
     const screens = normalizeDashboardScreens(
       screenWith({ id: "r1", kind: "calendar", instanceIds: [], size: 100 })
