@@ -10,7 +10,11 @@ describe("HandoffOverlay", () => {
   beforeEach(() => vi.clearAllMocks());
 
   const mountIt = (url = "https://mealie.home/g/home/r/soup") =>
-    mount(HandoffOverlay, { props: { url }, attachTo: document.body });
+    mount(HandoffOverlay, {
+      props: { url },
+      attachTo: document.body,
+      global: { stubs: { teleport: true } },
+    });
 
   it("shows the destination host and a QR image", async () => {
     const w = mountIt();

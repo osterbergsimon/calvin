@@ -1,4 +1,5 @@
 <template>
+  <teleport to="body">
   <div class="link-overlay" role="dialog" aria-modal="true" @click.self="emitClose">
     <div class="link-overlay__panel calvin-plugin-surface">
       <button type="button" class="link-overlay__close" data-test="close" aria-label="Close" @click="emitClose">
@@ -12,6 +13,7 @@
       </button>
     </div>
   </div>
+  </teleport>
 </template>
 
 <script setup>
