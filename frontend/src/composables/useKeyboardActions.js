@@ -17,6 +17,20 @@ import {
   setActiveDashboardScreen,
 } from "../utils/layout";
 
+// Back-compat: stored mappings from before py5 (vocabulary unfreeze) may still
+// carry the old `mode_*` action values. The three jump actions were renamed to
+// reflect what they actually do (jump to the first screen containing a region
+// kind — never a mode switch); the two dead actions collapse to "none". A DB
+// migration rewrites persisted rows, but resolve here too so un-migrated
+// clients (localStorage caches, older exports) degrade gracefully.
+const LEGACY_ACTION_ALIASES = {
+  mode_calendar: "screen_jump_calendar",
+  mode_photos: "screen_jump_photos",
+  mode_web_services: "screen_jump_services",
+  mode_cycle: "none",
+  mode_spare: "none",
+};
+
 /**
  * Composable for handling keyboard actions.
  * Maps keyboard actions to actual functions.
@@ -377,6 +391,10 @@ export function useKeyboardActions() {
       "currentMode:",
       modeStore.currentMode
     );
+    // Normalize retired mode_* actions to their current vocabulary first.
+    if (Object.prototype.hasOwnProperty.call(LEGACY_ACTION_ALIASES, action)) {
+      action = LEGACY_ACTION_ALIASES[action];
+    }
     // Handle generic actions that adapt to current mode
     if (action === "generic_next") {
       action = getGenericNextAction();
@@ -389,39 +407,30 @@ export function useKeyboardActions() {
     }
 
     switch (action) {
-      // Mode switching
-      case "mode_calendar":
+      // Screen jump — jump to the first screen containing a region of the given
+      // kind. (These were the old mode_* actions; the setMode() calls are
+      // vestigial and only survive for parity while modeStore is unwound in
+      // calvin-ine.)
+      case "screen_jump_calendar":
         if (!activateFirstScreenContainingKind("calendar")) {
           handleCalendarModePress();
         } else {
           modeStore.setMode(modeStore.MODES.CALENDAR);
         }
         break;
-      case "mode_photos":
+      case "screen_jump_photos":
         activateFirstScreenContainingKind("photos");
         modeStore.setMode(modeStore.MODES.PHOTOS);
         router.push("/");
         break;
-      case "mode_web_services":
+      case "screen_jump_services":
         activateFirstScreenContainingKind("service");
         modeStore.setMode(modeStore.MODES.WEB_SERVICES);
         router.push("/");
         break;
-      case "mode_spare":
-        // Spare button for future use - currently does nothing
-        // Can be mapped to any action later
-        break;
       case "mode_settings":
         modeStore.setMode(modeStore.MODES.SETTINGS);
         router.push("/settings");
-        break;
-      case "mode_cycle":
-        modeStore.cycleMode();
-        if (modeStore.currentMode === modeStore.MODES.SETTINGS) {
-          router.push("/settings");
-        } else {
-          router.push("/");
-        }
         break;
       case "screen_next":
         saveDashboardScreens(cycleDashboardScreen(getDashboardScreens(), 1));

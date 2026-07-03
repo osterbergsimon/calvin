@@ -58,11 +58,10 @@ class KeyboardMappingService:
             List of action names
         """
         return [
-            # Mode selection buttons (4 buttons)
-            "mode_calendar",
-            "mode_photos",
-            "mode_web_services",
-            "mode_spare",
+            # Screen jump (jump to first screen containing a region kind)
+            "screen_jump_calendar",
+            "screen_jump_photos",
+            "screen_jump_services",
             # Screen and region navigation
             "screen_next",
             "screen_prev",
@@ -82,7 +81,6 @@ class KeyboardMappingService:
             "generic_refresh",
             # Legacy/Advanced actions
             "mode_settings",
-            "mode_cycle",
             "calendar_next_month",
             "calendar_prev_month",
             "calendar_expand_today",
