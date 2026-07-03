@@ -7,6 +7,7 @@ import {
   addSubRegion,
   addTopRegion,
   clampCalendarView,
+  clampServiceView,
   computeClockBarModeUpdate,
   computeClockBarPositionUpdate,
   createDashboardLayoutFromPreset,
@@ -189,6 +190,7 @@ describe("Layout Utilities", () => {
           instanceIds: ["weather"],
           size: 70,
           split: null,
+          view: {},
         },
         {
           id: "region-2",
@@ -197,6 +199,7 @@ describe("Layout Utilities", () => {
           instanceIds: ["meals"],
           size: 30,
           split: null,
+          view: {},
         },
       ]);
     });
@@ -948,5 +951,44 @@ describe("calendar region view", () => {
     });
     const next = setRegionView(screens, "r1-a", { mode: "day" });
     expect(next.screens[0].layout.regions[0].split.regions[0].view.mode).toBe("day");
+  });
+});
+
+describe("clampServiceView", () => {
+  it("keeps a valid linkAction override", () => {
+    expect(clampServiceView({ linkAction: "embed" })).toEqual({ linkAction: "embed" });
+    expect(clampServiceView({ linkAction: "handoff" })).toEqual({ linkAction: "handoff" });
+    expect(clampServiceView({ linkAction: "off" })).toEqual({ linkAction: "off" });
+  });
+
+  it("omits an invalid or absent linkAction (inherit)", () => {
+    expect(clampServiceView({})).toEqual({});
+    expect(clampServiceView({ linkAction: "nope" })).toEqual({});
+    expect("linkAction" in clampServiceView({ linkAction: undefined })).toBe(false);
+  });
+});
+
+describe("setRegionView on a service region", () => {
+  const screens = {
+    activeScreenId: "s1",
+    screens: [
+      { id: "s1", layout: { regions: [{ id: "svc-1", kind: "service", instanceIds: ["mealie-1"] }] } },
+    ],
+  };
+
+  it("applies a linkAction patch to a service region", () => {
+    const next = setRegionView(screens, "svc-1", { linkAction: "embed" });
+    expect(next.screens[0].layout.regions[0].view).toEqual({ linkAction: "embed" });
+  });
+
+  it("clears the override when linkAction is undefined", () => {
+    const withOverride = setRegionView(screens, "svc-1", { linkAction: "embed" });
+    const cleared = setRegionView(withOverride, "svc-1", { linkAction: undefined });
+    expect(cleared.screens[0].layout.regions[0].view).toEqual({});
+  });
+
+  it("does not mutate the input", () => {
+    setRegionView(screens, "svc-1", { linkAction: "off" });
+    expect(screens.screens[0].layout.regions[0].view).toBeUndefined();
   });
 });
