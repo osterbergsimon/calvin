@@ -32,7 +32,6 @@ def upgrade() -> None:
     op.create_table(
         "keyboard_mappings",
         sa.Column("id", sa.Integer(), nullable=False),
-        sa.Column("keyboard_type", sa.String(length=50), nullable=False),
         sa.Column("key_code", sa.String(length=100), nullable=False),
         sa.Column("action", sa.String(length=100), nullable=False),
         sa.PrimaryKeyConstraint("id"),

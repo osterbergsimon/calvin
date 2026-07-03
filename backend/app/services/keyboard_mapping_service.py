@@ -5,108 +5,49 @@ from app.models.db_models import KeyboardMappingDB
 
 
 class KeyboardMappingService:
-    """Service for managing keyboard key-to-action mappings."""
+    """Service for managing keyboard key-to-action mappings (single unified keyboard)."""
 
     def __init__(self):
-        """Initialize keyboard mapping service."""
-        self._cache: dict[str, dict[str, str]] = {}
+        self._cache: dict[str, str] | None = None
 
-    async def get_mappings(self, keyboard_type: str) -> dict[str, str]:
-        """
-        Get keyboard mappings for a specific keyboard type.
-
-        Args:
-            keyboard_type: '7-button' or 'standard'
-
-        Returns:
-            Dictionary mapping key codes to actions
-        """
-        cache_key = f"mappings_{keyboard_type}"
-        if cache_key in self._cache:
-            return self._cache[cache_key]
-
-        mappings_db = await KeyboardMappingDB.objects.filter(keyboard_type=keyboard_type).all()
-
-        mappings = {item.key_code: item.action for item in mappings_db}
-        self._cache[cache_key] = mappings
+    async def get_mappings(self) -> dict[str, str]:
+        """Return the full key-code -> action map."""
+        if self._cache is not None:
+            return self._cache
+        rows = await KeyboardMappingDB.objects.all()
+        mappings = {row.key_code: row.action for row in rows}
+        self._cache = mappings
         return mappings
 
-    async def get_all_mappings(self) -> dict[str, dict[str, str]]:
-        """
-        Get all keyboard mappings for all keyboard types.
-
-        Returns:
-            Dictionary with keyboard types as keys and mappings as values
-        """
-        mappings_db = await KeyboardMappingDB.objects.all()
-
-        all_mappings = {}
-        for item in mappings_db:
-            if item.keyboard_type not in all_mappings:
-                all_mappings[item.keyboard_type] = {}
-            all_mappings[item.keyboard_type][item.key_code] = item.action
-
-        return all_mappings
-
-    async def set_mappings(self, keyboard_type: str, mappings: dict[str, str]) -> None:
-        """
-        Set keyboard mappings for a specific keyboard type.
-
-        Args:
-            keyboard_type: '7-button' or 'standard'
-            mappings: Dictionary mapping key codes to actions
-        """
-        # Wrap all operations in a transaction to ensure atomicity
-        # If any operation fails, all changes are rolled back
+    async def set_mappings(self, mappings: dict[str, str]) -> None:
+        """Replace the entire map atomically."""
         async with database.transaction():
-            # Delete existing mappings for this keyboard type
-            existing_mappings = await KeyboardMappingDB.objects.filter(
-                keyboard_type=keyboard_type
-            ).all()
-            for mapping in existing_mappings:
-                await mapping.delete()
-
-            # Add new mappings
+            existing = await KeyboardMappingDB.objects.all()
+            for row in existing:
+                await row.delete()
             for key_code, action in mappings.items():
-                await KeyboardMappingDB.objects.create(
-                    keyboard_type=keyboard_type,
-                    key_code=key_code,
-                    action=action,
-                )
+                await KeyboardMappingDB.objects.create(key_code=key_code, action=action)
+        self._cache = dict(mappings)
 
-        # Update cache only after successful transaction commit
-        cache_key = f"mappings_{keyboard_type}"
-        self._cache[cache_key] = mappings.copy()
-
-    async def set_mapping(self, keyboard_type: str, key_code: str, action: str) -> None:
-        """
-        Set a single keyboard mapping.
-
-        Args:
-            keyboard_type: '7-button' or 'standard'
-            key_code: Key code (e.g., 'KEY_1')
-            action: Action name (e.g., 'calendar_next_month')
-        """
-        mapping = await KeyboardMappingDB.objects.get_or_none(
-            keyboard_type=keyboard_type, key_code=key_code
-        )
-
-        if mapping:
-            mapping.action = action
-            await mapping.update()
+    async def set_mapping(self, key_code: str, action: str) -> None:
+        """Upsert a single binding."""
+        row = await KeyboardMappingDB.objects.get_or_none(key_code=key_code)
+        if row:
+            row.action = action
+            await row.update()
         else:
-            await KeyboardMappingDB.objects.create(
-                keyboard_type=keyboard_type,
-                key_code=key_code,
-                action=action,
-            )
+            await KeyboardMappingDB.objects.create(key_code=key_code, action=action)
+        if self._cache is None:
+            self._cache = {}
+        self._cache[key_code] = action
 
-        # Update cache
-        cache_key = f"mappings_{keyboard_type}"
-        if cache_key in self._cache:
-            self._cache[cache_key][key_code] = action
-        else:
-            self._cache[cache_key] = {key_code: action}
+    async def remove_mapping(self, key_code: str) -> None:
+        """Delete a single binding if present."""
+        row = await KeyboardMappingDB.objects.get_or_none(key_code=key_code)
+        if row:
+            await row.delete()
+        if self._cache is not None:
+            self._cache.pop(key_code, None)
 
     async def get_available_actions(self) -> list[str]:
         """

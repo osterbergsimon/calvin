@@ -33,7 +33,6 @@ class KeyboardMappingDB(ormar.Model):
     )
 
     id: int | None = ormar.Integer(primary_key=True, autoincrement=True)
-    keyboard_type: str = ormar.String(max_length=50, nullable=False)  # '7-button' or 'standard'
     key_code: str = ormar.String(max_length=100, nullable=False)  # e.g., 'KEY_1', 'KEY_RIGHT'
     action: str = ormar.String(max_length=100, nullable=False)  # e.g., 'calendar_next_month'
 
