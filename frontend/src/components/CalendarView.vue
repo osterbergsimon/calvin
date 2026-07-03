@@ -230,7 +230,13 @@ const sourceKey = computed(() =>
 // Base granularity + rolling modifier come from the region's `view` prop.
 const viewMode = computed(() => props.view?.mode ?? "month");
 const rolling = computed(() => props.view?.rolling === true);
-const showWeekNumbers = computed(() => configStore.showWeekNumbers);
+// Display settings can be overridden per region via the view; when the view
+// leaves them unset they inherit the global config (?? only catches
+// null/undefined, so an explicit `false` override still wins).
+const showWeekNumbers = computed(() => props.view?.weekNumbers ?? configStore.showWeekNumbers);
+const maxVisibleEvents = computed(
+  () => props.view?.maxVisibleEvents ?? configStore.maxVisibleEvents ?? 4
+);
 const weekStartDay = computed(() => configStore.weekStartDay ?? 1);
 const weekendDays = computed(() => configStore.weekendDays || [0, 6]);
 const showRedDays = computed(() => configStore.showRedDays || false);
@@ -645,8 +651,7 @@ const getVisibleEvents = events => {
   if (viewMode.value === "week" || viewMode.value === "day") {
     return events;
   }
-  const maxVisible = configStore.maxVisibleEvents || 4;
-  return events.slice(0, maxVisible);
+  return events.slice(0, maxVisibleEvents.value);
 };
 
 // Get count of overflow events
@@ -657,8 +662,7 @@ const getOverflowCount = events => {
   if (viewMode.value === "week" || viewMode.value === "day") {
     return 0;
   }
-  const maxVisible = configStore.maxVisibleEvents || 4;
-  return Math.max(0, events.length - maxVisible);
+  return Math.max(0, events.length - maxVisibleEvents.value);
 };
 
 // Event helper functions moved to useEventHelpers composable

@@ -162,15 +162,28 @@ const clampViewInt = (value, lo, hi, fallback) => {
  * Coerce a calendar region's `view` block into the canonical shape:
  * mode ∈ {month,week,day}, rolling boolean, weeks 1–12, days 1–14,
  * extraWeeks 0–8 (look-ahead weeks after a non-rolling month).
+ *
+ * The display-override fields (`weekNumbers`, `maxVisibleEvents`) are OPTIONAL:
+ * a valid value is kept as a per-region override; anything else is omitted so
+ * the region inherits the global setting. Absent = inherit, so there is no
+ * migration for existing regions.
  */
 export function clampCalendarView(view = {}) {
-  return {
+  const out = {
     mode: ["month", "week", "day"].includes(view.mode) ? view.mode : "month",
     rolling: view.rolling === true || view.rolling === "true" || view.rolling === 1,
     weeks: clampViewInt(view.weeks, 1, 12, DEFAULT_CALENDAR_VIEW.weeks),
     days: clampViewInt(view.days, 1, 14, DEFAULT_CALENDAR_VIEW.days),
     extraWeeks: clampViewInt(view.extraWeeks, 0, 8, DEFAULT_CALENDAR_VIEW.extraWeeks),
   };
+  if (view.weekNumbers === true || view.weekNumbers === false) {
+    out.weekNumbers = view.weekNumbers;
+  }
+  const maxVisible = Number(view.maxVisibleEvents);
+  if (Number.isFinite(maxVisible)) {
+    out.maxVisibleEvents = Math.min(20, Math.max(1, Math.round(maxVisible)));
+  }
+  return out;
 }
 
 // Only calendar regions carry a `view`; others get no such key.

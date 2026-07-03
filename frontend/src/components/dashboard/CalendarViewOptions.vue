@@ -20,6 +20,48 @@
         @click="setRolling(!rolling)"
       />
     </div>
+
+    <div class="cvo-row">
+      <span class="cvo-label">Week numbers</span>
+      <div class="cvo-seg" role="radiogroup" aria-label="Week numbers">
+        <button
+          v-for="opt in weekNumberOptions"
+          :key="opt.value"
+          type="button"
+          role="radio"
+          :class="{ on: weekNumbers === opt.value }"
+          :aria-checked="weekNumbers === opt.value ? 'true' : 'false'"
+          :aria-label="`Week numbers ${opt.value}`"
+          @click="setWeekNumbers(opt.value)"
+        >
+          {{ opt.label }}
+        </button>
+      </div>
+    </div>
+
+    <div v-if="isMonth" class="cvo-row">
+      <span class="cvo-label">Events/day</span>
+      <div class="cvo-density">
+        <button
+          v-if="densityOverridden"
+          type="button"
+          class="cvo-default-chip"
+          aria-label="Use default events per day"
+          @click="clearDensity"
+        >
+          Default
+        </button>
+        <div class="cvo-stepper">
+          <button type="button" aria-label="Fewer events per day" @click="stepDensity(-1)">
+            −
+          </button>
+          <span class="cvo-count-value" :class="{ inheriting: !densityOverridden }">
+            {{ densityValue }}
+          </span>
+          <button type="button" aria-label="More events per day" @click="stepDensity(1)">+</button>
+        </div>
+      </div>
+    </div>
   </RegionViewOptions>
 </template>
 
@@ -69,6 +111,41 @@ const step = delta => {
   const next = Math.min(countMax.value, Math.max(countMin.value, countValue.value + delta));
   if (next !== countValue.value) persist({ [countKey.value]: next });
 };
+
+// --- Per-region display overrides (inherit the global config when unset) ---
+const isMonth = computed(() => props.view?.mode === "month");
+
+// Week numbers: tri-state where "default" means inherit (persisted as absent).
+const weekNumberOptions = [
+  { value: "default", label: "Default" },
+  { value: "on", label: "On" },
+  { value: "off", label: "Off" },
+];
+const weekNumbers = computed(() => {
+  if (props.view?.weekNumbers === true) return "on";
+  if (props.view?.weekNumbers === false) return "off";
+  return "default";
+});
+const setWeekNumbers = value => {
+  if (value === weekNumbers.value) return;
+  const weekNumbersPatch = value === "on" ? true : value === "off" ? false : undefined;
+  persist({ weekNumbers: weekNumbersPatch });
+};
+
+// Events/day density: an override of config.maxVisibleEvents. The stepper shows
+// the effective value (inherited or overridden); stepping creates/updates the
+// override, and the Default chip clears it back to inherit.
+const densityOverridden = computed(() => Number.isFinite(Number(props.view?.maxVisibleEvents)));
+const densityValue = computed(
+  () => props.view?.maxVisibleEvents ?? configStore.maxVisibleEvents ?? 4
+);
+const stepDensity = delta => {
+  const next = Math.min(20, Math.max(1, densityValue.value + delta));
+  if (next !== densityValue.value || !densityOverridden.value) {
+    persist({ maxVisibleEvents: next });
+  }
+};
+const clearDensity = () => persist({ maxVisibleEvents: undefined });
 </script>
 
 <style scoped>
@@ -83,6 +160,73 @@ const step = delta => {
   font-family: var(--font-ui);
   font-size: 0.85rem;
   color: var(--ink);
+}
+
+/* Compact tri-state segmented control (Default / On / Off). */
+.cvo-seg {
+  display: inline-flex;
+  gap: 2px;
+  padding: 2px;
+  background: var(--bg-1);
+  border: 1px solid var(--line);
+  border-radius: 8px;
+}
+
+.cvo-seg button {
+  font-family: var(--font-ui);
+  font-size: 0.72rem;
+  line-height: 1;
+  color: var(--ink-2);
+  background: transparent;
+  border: 0;
+  border-radius: 6px;
+  padding: 0.2rem 0.4rem;
+  min-height: 22px;
+  cursor: pointer;
+}
+
+.cvo-seg button.on {
+  background: var(--focus);
+  color: var(--focus-ink);
+}
+
+.cvo-seg button:focus-visible {
+  outline: 2px solid var(--focus);
+  outline-offset: 1px;
+}
+
+.cvo-density {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.35rem;
+}
+
+/* Reset chip — only shown when the density is an explicit override. */
+.cvo-default-chip {
+  font-family: var(--font-ui);
+  font-size: 0.68rem;
+  color: var(--ink-2);
+  background: var(--bg-1);
+  border: 1px solid var(--line);
+  border-radius: 999px;
+  padding: 0.1rem 0.4rem;
+  min-height: 22px;
+  cursor: pointer;
+}
+
+.cvo-default-chip:hover {
+  border-color: var(--focus-edge);
+  color: var(--ink);
+}
+
+.cvo-default-chip:focus-visible {
+  outline: 2px solid var(--focus);
+  outline-offset: 1px;
+}
+
+/* Muted while inheriting the global value (no explicit override yet). */
+.cvo-count-value.inheriting {
+  color: var(--ink-3);
 }
 
 .cvo-stepper {
