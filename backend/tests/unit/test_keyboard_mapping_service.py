@@ -54,6 +54,23 @@ async def test_remove_missing_mapping_is_noop(test_db):
 
 @pytest.mark.asyncio
 @pytest.mark.unit
+async def test_set_mapping_on_cold_cache_preserves_existing_rows(test_db):
+    # Seed rows via one service instance.
+    seeder = KeyboardMappingService()
+    await seeder.set_mappings({"KEY_1": "generic_prev", "KEY_2": "generic_next"})
+    # Fresh instance with an empty (cold) cache; mutate before any read.
+    service = KeyboardMappingService()
+    await service.set_mapping("KEY_9", "screen_next")
+    # All three must be visible, not just the one just set.
+    assert await service.get_mappings() == {
+        "KEY_1": "generic_prev",
+        "KEY_2": "generic_next",
+        "KEY_9": "screen_next",
+    }
+
+
+@pytest.mark.asyncio
+@pytest.mark.unit
 async def test_get_available_actions(test_db):
     """Test getting list of available keyboard actions."""
     service = KeyboardMappingService()

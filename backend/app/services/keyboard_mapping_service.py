@@ -38,7 +38,8 @@ class KeyboardMappingService:
         else:
             await KeyboardMappingDB.objects.create(key_code=key_code, action=action)
         if self._cache is None:
-            self._cache = {}
+            rows = await KeyboardMappingDB.objects.all()
+            self._cache = {r.key_code: r.action for r in rows}
         self._cache[key_code] = action
 
     async def remove_mapping(self, key_code: str) -> None:
