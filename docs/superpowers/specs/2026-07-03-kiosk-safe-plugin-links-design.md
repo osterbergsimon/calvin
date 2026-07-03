@@ -71,9 +71,19 @@ Plugins may add an optional `link_action` to the `item` spec of a `card-grid`/`i
 }
 ```
 
-**This requires no contract or validation change.** Confirmed against `backend/app/plugins/definitions.py`: `_validate_schema_kind` only checks `kind` presence + whitelist, `panel_variant`, and absence of retired legacy keys. It does **not** whitelist keys and does **not** recurse into `item`. `display_schema` is typed `dict[str, Any]` (extra keys pass through untouched to the frontend). We only teach the renderers (via the composable below) to read `item.link_action`. Constraint: `link_action` must not collide with a retired legacy key name in `_LEGACY_DISPLAY_KEYS`.
+**This requires no contract or validation change.** Plugin authors would not hint `"off"` (there is no reason to ship a dead link); `off` exists only as a user override.
 
-Plugin authors would not hint `"off"` (there is no reason to ship a dead link); `off` exists only as a user override.
+#### Plugin contract 1.0 compliance (verified)
+
+The only contract-touching part of this whole design is this optional `item.link_action` hint — the per-region override (§4) lives entirely in the host layout tree and never touches plugin metadata. Evidence it is legal and needs no contract change:
+
+- **The validator never reaches it.** `_validate_schema_kind` (`backend/app/plugins/definitions.py:45-72`) checks only: no top-level `_LEGACY_DISPLAY_KEYS`, `kind` present + in `SUPPORTED_DISPLAY_KINDS`, valid `panel_variant`. It returns the dict unchanged and does **not** recurse into `card`/`item`. `display_schema` is typed `dict[str, Any]`; the `DisplaySchema` model uses `extra="allow"`.
+- **`link_action` is not a legacy key.** `_LEGACY_DISPLAY_KEYS = {"type", "api_endpoint", "render_template", "component", "data_schema"}`, and that check is top-level only. Our key sits at `display_schema.card.item.link_action` (card-grid) / `display_schema.item.link_action` (item-list) — two levels below anything inspected (confirmed: mealie's `click_url_path` lives exactly there today).
+- **A test already guarantees renderer-specific keys pass through:** `backend/tests/unit/test_plugin_definitions.py::test_display_schema_allows_shell_fields_and_renderer_specific_keys` asserts a renderer key (`current_path`) survives validation untouched. Rejection tests fire only on bad/missing `kind`, legacy keys, or bad `panel_variant`.
+- **Optional → no migration.** Plugins without the hint default to `handoff`; no plugin is forced to change, and `plugin.json`/`api_version: 1` is unaffected.
+- **Frontend imposes no schema strictness either** — renderers read only the keys they know and ignore the rest; there is no `additionalProperties`/reject path.
+
+Constraint for implementers: do not reuse a name in `_LEGACY_DISPLAY_KEYS` for any new schema key.
 
 ### 2. `useLinkOpen()` composable + renderer refactor
 
