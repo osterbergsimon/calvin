@@ -39,6 +39,21 @@ describe("CalendarView per-region view", () => {
     expect(w.findAll(".calendar-day").length).toBe(21);
   });
 
+  it("non-rolling month shows weeks*7 cells anchored to the month's first week", async () => {
+    const w = mountCalendar({ mode: "month", rolling: false, weeks: 4, days: 7 });
+    await w.vm.$nextTick();
+    expect(w.findAll(".calendar-day").length).toBe(28);
+    // First cell is the week start (Monday) on/before the 1st of the month.
+    expect(w.vm.calendarDays[0].date.getDay()).toBe(1);
+  });
+
+  it("non-rolling week shows `days` cells from the week start (not today)", async () => {
+    const w = mountCalendar({ mode: "week", rolling: false, weeks: 4, days: 7 });
+    await w.vm.$nextTick();
+    expect(w.findAll(".calendar-day").length).toBe(7);
+    expect(w.vm.calendarDays[0].date.getDay()).toBe(1); // Monday, not today
+  });
+
   it("rolling-week renders `days` cells starting today", async () => {
     const w = mountCalendar({ mode: "week", rolling: true, weeks: 4, days: 5 });
     await w.vm.$nextTick();
