@@ -1,0 +1,93 @@
+<template>
+  <RegionViewOptions :active="!!view?.linkAction" label="Service view options">
+    <div class="svo-row">
+      <span class="svo-label">Link behavior</span>
+      <div class="svo-seg" role="radiogroup" aria-label="Link behavior">
+        <button
+          v-for="opt in linkOptions"
+          :key="opt.value"
+          type="button"
+          role="radio"
+          :class="{ on: current === opt.value }"
+          :aria-checked="current === opt.value ? 'true' : 'false'"
+          :aria-label="`Link behavior ${opt.value}`"
+          @click="setLink(opt.value)"
+        >
+          {{ opt.label }}
+        </button>
+      </div>
+    </div>
+  </RegionViewOptions>
+</template>
+
+<script setup>
+import { computed } from "vue";
+import { useConfigStore } from "@/stores/config";
+import RegionViewOptions from "./RegionViewOptions.vue";
+
+const props = defineProps({
+  regionId: { type: String, default: null },
+  view: { type: Object, default: () => ({}) },
+});
+
+const configStore = useConfigStore();
+
+// "default" means inherit the plugin hint (persisted as absent).
+const linkOptions = [
+  { value: "default", label: "Default" },
+  { value: "handoff", label: "QR" },
+  { value: "embed", label: "In-app" },
+  { value: "off", label: "Off" },
+];
+const current = computed(() => props.view?.linkAction ?? "default");
+
+const setLink = value => {
+  if (value === current.value) return;
+  const linkAction = value === "default" ? undefined : value;
+  configStore.updateRegionView(props.regionId, { linkAction }).catch(err => {
+    console.error("Failed to update service view:", err);
+  });
+};
+</script>
+
+<style scoped>
+.svo-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.75rem;
+}
+.svo-label {
+  font-family: var(--font-ui);
+  font-size: 0.85rem;
+  color: var(--ink);
+}
+.svo-seg {
+  display: inline-flex;
+  gap: 2px;
+  padding: 2px;
+  background: var(--bg-1);
+  border: 1px solid var(--line);
+  border-radius: 8px;
+}
+.svo-seg button {
+  font-family: var(--font-ui);
+  font-size: 0.72rem;
+  line-height: 1;
+  color: var(--ink-2);
+  background: transparent;
+  border: 0;
+  border-radius: 6px;
+  padding: 0.2rem 0.4rem;
+  min-height: 22px;
+  cursor: pointer;
+}
+.svo-seg button.on {
+  background: var(--focus);
+  color: var(--focus-ink);
+}
+.svo-seg button:focus-visible {
+  outline: 2px solid var(--focus);
+  outline-offset: 1px;
+}
+</style>
