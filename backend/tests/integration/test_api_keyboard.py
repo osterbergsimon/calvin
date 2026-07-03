@@ -6,76 +6,34 @@ from fastapi.testclient import TestClient
 
 @pytest.mark.integration
 class TestKeyboardEndpoints:
-    """Test keyboard mapping endpoints."""
-
-    def test_get_keyboard_mappings_all(self, test_client: TestClient):
-        """Test getting all keyboard mappings."""
+    def test_get_mappings_is_flat(self, test_client: TestClient):
         response = test_client.get("/api/keyboard/mappings")
-
         assert response.status_code == 200
-        data = response.json()
-        assert "mappings" in data
-        assert isinstance(data["mappings"], dict)
+        mappings = response.json()["mappings"]
+        assert isinstance(mappings, dict)
+        # flat: values are action strings, not nested per-type dicts
+        assert all(isinstance(v, str) for v in mappings.values())
 
-    def test_get_keyboard_mappings_filtered(self, test_client: TestClient):
-        """Test getting keyboard mappings for specific type."""
-        response = test_client.get("/api/keyboard/mappings?keyboard_type=7-button")
-
+    def test_post_replaces_mappings(self, test_client: TestClient):
+        body = {"mappings": {"KEY_1": "generic_next", "KEY_2": "generic_prev"}}
+        response = test_client.post("/api/keyboard/mappings", json=body)
         assert response.status_code == 200
-        data = response.json()
-        assert "mappings" in data
-        assert "7-button" in data["mappings"]
+        assert test_client.get("/api/keyboard/mappings").json()["mappings"] == body["mappings"]
+
+    def test_put_single_mapping(self, test_client: TestClient):
+        test_client.post("/api/keyboard/mappings", json={"mappings": {"KEY_1": "generic_next"}})
+        response = test_client.put("/api/keyboard/mappings/KEY_1", json={"action": "screen_next"})
+        assert response.status_code == 200
+        assert test_client.get("/api/keyboard/mappings").json()["mappings"]["KEY_1"] == "screen_next"
+
+    def test_delete_single_mapping(self, test_client: TestClient):
+        test_client.post("/api/keyboard/mappings", json={"mappings": {"KEY_1": "generic_next", "KEY_2": "generic_prev"}})
+        response = test_client.delete("/api/keyboard/mappings/KEY_1")
+        assert response.status_code == 200
+        remaining = test_client.get("/api/keyboard/mappings").json()["mappings"]
+        assert "KEY_1" not in remaining and remaining["KEY_2"] == "generic_prev"
 
     def test_get_available_actions(self, test_client: TestClient):
-        """Test getting available keyboard actions."""
         response = test_client.get("/api/keyboard/actions")
-
         assert response.status_code == 200
-        data = response.json()
-        assert "actions" in data
-        assert isinstance(data["actions"], list)
-
-    def test_update_keyboard_mappings(self, test_client: TestClient):
-        """Test updating keyboard mappings."""
-        update_data = {
-            "mappings": {
-                "7-button": {
-                    "KEY_1": "next_image",
-                    "KEY_2": "previous_image",
-                }
-            }
-        }
-
-        response = test_client.post("/api/keyboard/mappings", json=update_data)
-
-        assert response.status_code == 200
-        data = response.json()
-        assert data["message"] == "Keyboard mappings updated"
-        assert "mappings" in data
-
-    def test_update_single_mapping(self, test_client: TestClient):
-        """Test updating a single keyboard mapping."""
-        update_data = {
-            "keyboard_type": "7-button",
-            "key_code": "KEY_1",
-            "action": "next_image",
-        }
-
-        response = test_client.put("/api/keyboard/mappings/7-button/KEY_1", json=update_data)
-
-        assert response.status_code == 200
-        data = response.json()
-        assert data["message"] == "Mapping updated"
-
-    def test_update_single_mapping_invalid_keyboard_type(self, test_client: TestClient):
-        """Test updating mapping with invalid keyboard type."""
-        update_data = {
-            "keyboard_type": "invalid",
-            "key_code": "KEY_1",
-            "action": "next_image",
-        }
-
-        response = test_client.put("/api/keyboard/mappings/invalid/KEY_1", json=update_data)
-
-        # Should still return 200 (service handles validation)
-        assert response.status_code in [200, 400]
+        assert isinstance(response.json()["actions"], list)
