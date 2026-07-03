@@ -23,4 +23,31 @@ describe("ActionPicker", () => {
     expect(w.text().toLowerCase()).toContain("refresh");
     expect(w.find('[data-action="generic_next"]').exists()).toBe(false);
   });
+
+  it("collapses non-recommended tiers by default", () => {
+    const w = mount(ActionPicker, { props: { keyCode: "KEY_4", currentAction: null } });
+    // Generic (recommended) is always open
+    expect(w.find('[data-action="generic_next"]').exists()).toBe(true);
+    // A collapsed-tier action (Calendar group) is hidden until expanded...
+    expect(w.find('[data-action="calendar_next"]').exists()).toBe(false);
+    // ...but its collapsible header is present
+    expect(w.find('[data-group-toggle="calendar"]').exists()).toBe(true);
+  });
+
+  it("expands a collapsed group when its header is clicked", async () => {
+    const w = mount(ActionPicker, { props: { keyCode: "KEY_4", currentAction: null } });
+    expect(w.find('[data-action="calendar_next"]').exists()).toBe(false);
+    await w.find('[data-group-toggle="calendar"]').trigger("click");
+    expect(w.find('[data-action="calendar_next"]').exists()).toBe(true);
+    // toggles back closed
+    await w.find('[data-group-toggle="calendar"]').trigger("click");
+    expect(w.find('[data-action="calendar_next"]').exists()).toBe(false);
+  });
+
+  it("reveals matches inside collapsed groups while searching", async () => {
+    const w = mount(ActionPicker, { props: { keyCode: "KEY_4", currentAction: null } });
+    // calendar_next lives in a collapsed group; search should surface it without a manual click
+    await w.find("input.ap-search").setValue("calendar: next");
+    expect(w.find('[data-action="calendar_next"]').exists()).toBe(true);
+  });
 });

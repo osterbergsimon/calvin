@@ -21,22 +21,39 @@
         :key="group.id"
         class="ap-group"
         :class="{ 'ap-group--reco': group.tier === 'recommended' }"
+        :data-group="group.id"
       >
-        <h4 class="ap-group-title">
+        <!-- Collapsible header for lower tiers (Jump / per-mode / Legacy) -->
+        <button
+          v-if="isCollapsible(group)"
+          class="ap-group-toggle"
+          :data-group-toggle="group.id"
+          :aria-expanded="isOpen(group)"
+          @click="toggle(group)"
+        >
+          <span class="ap-chevron">{{ isOpen(group) ? "▾" : "▸" }}</span>
+          <span class="ap-group-toggle-label">{{ group.label }}</span>
+          <span class="ap-group-count">{{ group.actions.length }}</span>
+        </button>
+        <!-- Static header for the recommended / primary tiers -->
+        <h4 v-else class="ap-group-title">
           <span v-if="group.tier === 'recommended'" class="ap-star">★</span>
           {{ group.label }}
         </h4>
-        <button
-          v-for="a in group.actions"
-          :key="a.value"
-          class="ap-opt"
-          :class="{ 'ap-opt--current': a.value === currentAction }"
-          :data-action="a.value"
-          @click="$emit('select', a.value)"
-        >
-          <span class="ap-opt-label">{{ a.label }}</span>
-          <span v-if="a.description" class="ap-opt-desc">{{ a.description }}</span>
-        </button>
+
+        <template v-if="isOpen(group)">
+          <button
+            v-for="a in group.actions"
+            :key="a.value"
+            class="ap-opt"
+            :class="{ 'ap-opt--current': a.value === currentAction }"
+            :data-action="a.value"
+            @click="$emit('select', a.value)"
+          >
+            <span class="ap-opt-label">{{ a.label }}</span>
+            <span v-if="a.description" class="ap-opt-desc">{{ a.description }}</span>
+          </button>
+        </template>
       </section>
       <p v-if="visibleGroups.length === 0" class="ap-empty">No matching actions.</p>
     </div>
@@ -54,6 +71,20 @@ defineProps({
 defineEmits(["select", "close"]);
 
 const query = ref("");
+const searching = computed(() => query.value.trim() !== "");
+
+// Lower tiers (Jump to a screen / per-mode / Legacy) collapse behind a
+// disclosure; Generic (recommended) and Navigation (primary) stay open.
+const openGroups = ref(new Set());
+const isCollapsible = group => group.tier === "collapsed";
+// Collapsible groups are closed until opened, but a search forces every
+// matching group open so results are never hidden.
+const isOpen = group => !isCollapsible(group) || searching.value || openGroups.value.has(group.id);
+const toggle = group => {
+  const next = new Set(openGroups.value);
+  next.has(group.id) ? next.delete(group.id) : next.add(group.id);
+  openGroups.value = next;
+};
 
 const visibleGroups = computed(() => {
   const q = query.value.trim().toLowerCase();
@@ -149,6 +180,43 @@ const visibleGroups = computed(() => {
 }
 .ap-star {
   color: var(--warn);
+}
+.ap-group-toggle {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  width: 100%;
+  margin: 8px 0 4px;
+  padding: 6px 4px;
+  background: none;
+  border: none;
+  border-top: 1px solid var(--line);
+  color: var(--ink-2);
+  font-family: var(--font-ui);
+  font-size: 0.7rem;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  cursor: pointer;
+  min-height: 44px;
+}
+.ap-group-toggle:hover {
+  color: var(--ink);
+}
+.ap-group-toggle:focus-visible {
+  outline: 2px solid var(--focus);
+  outline-offset: 2px;
+}
+.ap-chevron {
+  width: 12px;
+  color: var(--ink-2);
+}
+.ap-group-toggle-label {
+  flex: 1;
+  text-align: left;
+}
+.ap-group-count {
+  color: var(--ink-2);
+  font-variant-numeric: tabular-nums;
 }
 .ap-opt {
   display: flex;
