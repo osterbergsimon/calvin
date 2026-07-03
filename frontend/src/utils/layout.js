@@ -147,6 +147,9 @@ export const DEFAULT_CALENDAR_VIEW = Object.freeze({
   rolling: false,
   weeks: 4,
   days: 7,
+  // Non-rolling month always renders the full month; extraWeeks appends this
+  // many look-ahead weeks after it (0 = just the month). Unused by other views.
+  extraWeeks: 0,
 });
 
 const clampViewInt = (value, lo, hi, fallback) => {
@@ -157,7 +160,8 @@ const clampViewInt = (value, lo, hi, fallback) => {
 
 /**
  * Coerce a calendar region's `view` block into the canonical shape:
- * mode ∈ {month,week,day}, rolling boolean, weeks 1–12, days 1–14.
+ * mode ∈ {month,week,day}, rolling boolean, weeks 1–12, days 1–14,
+ * extraWeeks 0–8 (look-ahead weeks after a non-rolling month).
  */
 export function clampCalendarView(view = {}) {
   return {
@@ -165,6 +169,7 @@ export function clampCalendarView(view = {}) {
     rolling: view.rolling === true || view.rolling === "true" || view.rolling === 1,
     weeks: clampViewInt(view.weeks, 1, 12, DEFAULT_CALENDAR_VIEW.weeks),
     days: clampViewInt(view.days, 1, 14, DEFAULT_CALENDAR_VIEW.days),
+    extraWeeks: clampViewInt(view.extraWeeks, 0, 8, DEFAULT_CALENDAR_VIEW.extraWeeks),
   };
 }
 

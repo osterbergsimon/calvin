@@ -838,7 +838,7 @@ describe("calendar region view", () => {
         kind: "calendar",
         instanceIds: [],
         size: 100,
-        view: { mode: "week", rolling: true, weeks: 99, days: 99 },
+        view: { mode: "week", rolling: true, weeks: 99, days: 99, extraWeeks: 99 },
       })
     );
     expect(screens.screens[0].layout.regions[0].view).toEqual({
@@ -846,6 +846,7 @@ describe("calendar region view", () => {
       rolling: true,
       weeks: 12,
       days: 14,
+      extraWeeks: 8,
     });
   });
 
@@ -857,11 +858,14 @@ describe("calendar region view", () => {
   });
 
   it("clampCalendarView coerces bad values to the valid range", () => {
-    expect(clampCalendarView({ mode: "bogus", rolling: 1, weeks: 0, days: 50 })).toEqual({
+    expect(
+      clampCalendarView({ mode: "bogus", rolling: 1, weeks: 0, days: 50, extraWeeks: -3 })
+    ).toEqual({
       mode: "month",
       rolling: true,
       weeks: 1,
       days: 14,
+      extraWeeks: 0,
     });
   });
 
@@ -875,6 +879,7 @@ describe("calendar region view", () => {
       rolling: true,
       weeks: 4,
       days: 7,
+      extraWeeks: 0,
     });
     // input is not mutated
     expect(screens.screens[0].layout.regions[0].view.mode).toBe("month");

@@ -57,7 +57,7 @@ describe("DashboardRegionsEditor (screens & regions logic)", () => {
         instanceIds: [],
         size: 90,
         split: null,
-        view: { mode: "month", rolling: false, weeks: 4, days: 7 },
+        view: { mode: "month", rolling: false, weeks: 4, days: 7, extraWeeks: 0 },
       },
       { id: "region-2", kind: "photos", serviceId: null, instanceIds: [], size: 10, split: null },
     ]);
@@ -80,7 +80,7 @@ describe("DashboardRegionsEditor (screens & regions logic)", () => {
         instanceIds: [],
         size: 100,
         split: null,
-        view: { mode: "month", rolling: false, weeks: 4, days: 7 },
+        view: { mode: "month", rolling: false, weeks: 4, days: 7, extraWeeks: 0 },
       },
     ]);
   });
