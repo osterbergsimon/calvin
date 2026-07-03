@@ -485,9 +485,6 @@ export interface paths {
     /**
      * Get Available Actions
      * @description Get list of available keyboard actions.
-     *
-     *     Returns:
-     *         List of available action names
      */
     get: operations["get_available_actions_api_keyboard_actions_get"];
     put?: never;
@@ -507,31 +504,22 @@ export interface paths {
     };
     /**
      * Get Keyboard Mappings
-     * @description Get keyboard mappings.
-     *
-     *     Args:
-     *         keyboard_type: Optional keyboard type filter ('7-button' or 'standard')
-     *
-     *     Returns:
-     *         Dictionary of keyboard mappings
+     * @description Return the full flat mapping.
      */
     get: operations["get_keyboard_mappings_api_keyboard_mappings_get"];
     put?: never;
     /**
-     * Update Keyboard Mappings
-     * @description Update keyboard mappings.
-     *
-     *     Args:
-     *         mappings: Dictionary of keyboard type to key mappings
+     * Replace Keyboard Mappings
+     * @description Replace the entire mapping.
      */
-    post: operations["update_keyboard_mappings_api_keyboard_mappings_post"];
+    post: operations["replace_keyboard_mappings_api_keyboard_mappings_post"];
     delete?: never;
     options?: never;
     head?: never;
     patch?: never;
     trace?: never;
   };
-  "/api/keyboard/mappings/{keyboard_type}/{key_code}": {
+  "/api/keyboard/mappings/{key_code}": {
     parameters: {
       query?: never;
       header?: never;
@@ -540,17 +528,16 @@ export interface paths {
     };
     get?: never;
     /**
-     * Update Single Mapping
-     * @description Update a single keyboard mapping.
-     *
-     *     Args:
-     *         keyboard_type: Keyboard type ('7-button' or 'standard')
-     *         key_code: Key code (e.g., 'KEY_1')
-     *         mapping_update: Mapping update data
+     * Set Single Mapping
+     * @description Upsert a single binding.
      */
-    put: operations["update_single_mapping_api_keyboard_mappings__keyboard_type___key_code__put"];
+    put: operations["set_single_mapping_api_keyboard_mappings__key_code__put"];
     post?: never;
-    delete?: never;
+    /**
+     * Delete Single Mapping
+     * @description Remove a single binding.
+     */
+    delete: operations["delete_single_mapping_api_keyboard_mappings__key_code__delete"];
     options?: never;
     head?: never;
     patch?: never;
@@ -1639,8 +1626,6 @@ export interface components {
       keyboardFeedbackEnabled?: boolean | null;
       /** Keyboardfeedbackmode */
       keyboardFeedbackMode?: string | null;
-      /** Keyboardtype */
-      keyboardType?: string | null;
       /** Lastsideviewmode */
       lastSideViewMode?: string | null;
       /** Maxvisibleevents */
@@ -1696,27 +1681,13 @@ export interface components {
       detail?: components["schemas"]["ValidationError"][];
     };
     /**
-     * KeyboardMappingUpdate
-     * @description Single keyboard mapping update model.
-     */
-    KeyboardMappingUpdate: {
-      /** Action */
-      action: string;
-      /** Key Code */
-      key_code: string;
-      /** Keyboard Type */
-      keyboard_type: string;
-    };
-    /**
      * KeyboardMappings
-     * @description Keyboard mappings model.
+     * @description Full key-code -> action map.
      */
     KeyboardMappings: {
       /** Mappings */
       mappings: {
-        [key: string]: {
-          [key: string]: string;
-        };
+        [key: string]: string;
       };
     };
     /** PluginDeleteResponse */
@@ -1849,6 +1820,14 @@ export interface components {
       plugin_id: string;
       /** Success */
       success: boolean;
+    };
+    /**
+     * SingleMapping
+     * @description Action for a single key.
+     */
+    SingleMapping: {
+      /** Action */
+      action: string;
     };
     /** ValidationError */
     ValidationError: {
@@ -2539,9 +2518,7 @@ export interface operations {
   };
   get_keyboard_mappings_api_keyboard_mappings_get: {
     parameters: {
-      query?: {
-        keyboard_type?: string;
-      };
+      query?: never;
       header?: never;
       path?: never;
       cookie?: never;
@@ -2557,18 +2534,9 @@ export interface operations {
           "application/json": unknown;
         };
       };
-      /** @description Validation Error */
-      422: {
-        headers: {
-          [name: string]: unknown;
-        };
-        content: {
-          "application/json": components["schemas"]["HTTPValidationError"];
-        };
-      };
     };
   };
-  update_keyboard_mappings_api_keyboard_mappings_post: {
+  replace_keyboard_mappings_api_keyboard_mappings_post: {
     parameters: {
       query?: never;
       header?: never;
@@ -2601,21 +2569,51 @@ export interface operations {
       };
     };
   };
-  update_single_mapping_api_keyboard_mappings__keyboard_type___key_code__put: {
+  set_single_mapping_api_keyboard_mappings__key_code__put: {
     parameters: {
       query?: never;
       header?: never;
       path: {
-        keyboard_type: string;
         key_code: string;
       };
       cookie?: never;
     };
     requestBody: {
       content: {
-        "application/json": components["schemas"]["KeyboardMappingUpdate"];
+        "application/json": components["schemas"]["SingleMapping"];
       };
     };
+    responses: {
+      /** @description Successful Response */
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": unknown;
+        };
+      };
+      /** @description Validation Error */
+      422: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["HTTPValidationError"];
+        };
+      };
+    };
+  };
+  delete_single_mapping_api_keyboard_mappings__key_code__delete: {
+    parameters: {
+      query?: never;
+      header?: never;
+      path: {
+        key_code: string;
+      };
+      cookie?: never;
+    };
+    requestBody?: never;
     responses: {
       /** @description Successful Response */
       200: {

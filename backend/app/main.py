@@ -204,47 +204,24 @@ async def _initialize_plugins():
     )
 
 
+DEFAULT_KEYBOARD_MAPPINGS = {
+    "KEY_1": "generic_prev",
+    "KEY_2": "generic_expand_close",
+    "KEY_3": "generic_next",
+    "KEY_4": "region_next",
+    "KEY_5": "screen_prev",
+    "KEY_6": "screen_next",
+    "KEY_7": "mode_settings",
+}
+
+
 async def _initialize_keyboard_mappings():
-    """Initialize default keyboard mappings if none exist."""
+    """Seed the default keyboard mapping if none exist."""
     from app.services.keyboard_mapping_service import keyboard_mapping_service
 
-    mappings = await keyboard_mapping_service.get_all_mappings()
-
-    # Set default 7-button keyboard mappings
-    default_7button = {
-        "KEY_1": "generic_prev",
-        "KEY_2": "generic_expand_close",
-        "KEY_3": "generic_next",
-        "KEY_4": "region_next",
-        "KEY_5": "screen_prev",
-        "KEY_6": "screen_next",
-        "KEY_7": "mode_settings",
-    }
-
-    # Set default standard keyboard mappings (same pattern, different keys)
-    default_standard = {
-        "KEY_LEFT": "generic_prev",
-        "KEY_UP": "generic_expand_close",
-        "KEY_RIGHT": "generic_next",
-        "KEY_DOWN": "region_next",
-        "KEY_SPACE": "screen_next",
-        "KEY_1": "screen_prev",
-        "KEY_2": "mode_settings",
-    }
-
-    # Initialize mappings if none exist
-    if not mappings:
-        await keyboard_mapping_service.set_mappings("7-button", default_7button)
-        await keyboard_mapping_service.set_mappings("standard", default_standard)
+    if not await keyboard_mapping_service.get_mappings():
+        await keyboard_mapping_service.set_mappings(DEFAULT_KEYBOARD_MAPPINGS)
         logger.info("Initialized default keyboard mappings")
-    else:
-        # Ensure both keyboard types have mappings
-        if "7-button" not in mappings or not mappings["7-button"]:
-            await keyboard_mapping_service.set_mappings("7-button", default_7button)
-            logger.info("Initialized 7-button keyboard mappings")
-        if "standard" not in mappings or not mappings["standard"]:
-            await keyboard_mapping_service.set_mappings("standard", default_standard)
-            logger.info("Initialized standard keyboard mappings")
 
 
 async def _initialize_image_service():
@@ -302,7 +279,6 @@ async def _initialize_default_config():
                 }
             ],
         },
-        "keyboard_type": "7-button",
         "photo_frame_enabled": False,
         "photo_frame_timeout": 300,  # 5 minutes
         "config_poll_interval": 30,  # 30 seconds

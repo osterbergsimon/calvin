@@ -1,544 +1,112 @@
 <template>
   <div class="keyboard-tab">
-    <CollapsibleSection title="Keyboard Type" icon="⌨️" :expanded="true">
-      <SettingItem
-        label="Keyboard Type"
-        help="Select your keyboard type. This determines which keys are available for mapping."
-      >
-        <select
-          :value="config.keyboardType || '7-button'"
-          class="keyboard-type-select"
-          @change="handleKeyboardTypeChange"
-        >
-          <option value="7-button">7-Button Keyboard</option>
-          <option value="standard">Standard Keyboard</option>
-        </select>
-        <span class="help-text">
-          Choose your keyboard type. 7-button keyboards have 7 physical buttons (KEY_1 through
-          KEY_7), while standard keyboards use arrow keys, space, and other standard keys.
-        </span>
-      </SettingItem>
+    <CollapsibleSection title="Keyboard Buttons" icon="⌨️" :expanded="true">
+      <p class="kb-intro">
+        Press a button to bind it, then choose what it does. Any key works — your remote's buttons
+        or a full keyboard.
+      </p>
+
+      <div v-if="store.loading" class="kb-msg">Loading mappings…</div>
+      <div v-else-if="store.error" class="kb-msg kb-msg--err" role="alert">{{ store.error }}</div>
+
+      <KeyBindingBoard
+        v-else
+        :mappings="store.mappings"
+        :capturing="capturing"
+        @edit="openPicker"
+        @clear="clearKey"
+        @add="captureNewKey"
+      />
     </CollapsibleSection>
 
-    <CollapsibleSection title="Keyboard Mappings" icon="⌨️" :expanded="true">
-      <SettingItem
-        label="Keyboard Mappings"
-        help="Configure keyboard shortcuts and mappings for your keyboard type"
-      >
-        <div v-if="loading" class="loading-message">Loading mappings...</div>
-        <div
-          v-else-if="availableKeys.length === 0 && config.keyboardType !== 'standard'"
-          class="no-keys-message"
-        >
-          No keys available for this keyboard type.
-        </div>
-        <div v-else>
-          <div v-if="error" class="error-message" role="alert">{{ error }}</div>
-          <div class="mappings-list">
-            <!-- Add new key button for standard keyboards -->
-            <div v-if="config.keyboardType === 'standard'" class="add-key-section">
-              <select v-model="newKeyToAdd" class="key-selector">
-                <option value="">-- Add a key to map --</option>
-                <option
-                  v-for="key in STANDARD_KEYS.filter(k => !availableKeys.includes(k))"
-                  :key="key"
-                  :value="key"
-                >
-                  {{ formatKeyName(key) }}
-                </option>
-              </select>
-              <button v-if="newKeyToAdd" class="btn-add-key" @click="addNewKey">Add Key</button>
-            </div>
-            <div v-for="key in availableKeys" :key="key" class="mapping-item">
-              <div class="mapping-key">
-                <strong>{{ formatKeyName(key) }}</strong>
-              </div>
-              <select
-                :value="currentMappings[key] || 'none'"
-                class="mapping-action"
-                @change="updateMapping(key, $event.target.value)"
-              >
-                <option
-                  v-for="action in availableActions"
-                  :key="action.value"
-                  :value="action.value"
-                >
-                  {{ action.label }}
-                </option>
-              </select>
-              <button class="btn-clear" title="Clear mapping" @click="clearMapping(key)">×</button>
-            </div>
-          </div>
-        </div>
-      </SettingItem>
-    </CollapsibleSection>
+    <div v-if="pickerKey" class="kb-picker-overlay" @click.self="closePicker">
+      <ActionPicker
+        :key-code="pickerKey"
+        :current-action="store.mappings[pickerKey] || null"
+        @select="onSelect"
+        @close="closePicker"
+      />
+    </div>
   </div>
 </template>
 
 <script setup>
-import { ref, computed, onMounted, watch } from "vue";
+import { ref, onMounted } from "vue";
 import { useKeyboardStore } from "@/stores/keyboard";
+import { useKeyCapture } from "@/composables/useKeyCapture";
+import { logError } from "@/utils/logger";
 import CollapsibleSection from "../../shared/CollapsibleSection.vue";
-import SettingItem from "../../shared/SettingItem.vue";
+import KeyBindingBoard from "./keyboard/KeyBindingBoard.vue";
+import ActionPicker from "./keyboard/ActionPicker.vue";
 
-const props = defineProps({
-  config: {
-    type: Object,
-    required: true,
-  },
+const store = useKeyboardStore();
+const { capturing, capture } = useKeyCapture();
+
+const pickerKey = ref(null);
+
+onMounted(() => {
+  store.fetchMappings().catch(err => logError("[Keyboard]", "load failed:", err));
 });
 
-const keyboardStore = useKeyboardStore();
-
-const emit = defineEmits(["update:config"]);
-
-const currentMappings = ref({});
-const loading = ref(false);
-const error = ref(null);
-const newKeyToAdd = ref("");
-
-// Available actions for keyboard mappings
-const availableActions = [
-  // Mode selection buttons (4 buttons)
-  { value: "mode_calendar", label: "Mode: Calendar" },
-  { value: "mode_photos", label: "Mode: Photos" },
-  { value: "mode_web_services", label: "Mode: Web Services" },
-  { value: "mode_spare", label: "Mode: Spare (Future Use)" },
-
-  // Screen and region navigation
-  { value: "screen_next", label: "Screen: Next" },
-  { value: "screen_prev", label: "Screen: Previous" },
-  { value: "screen_1", label: "Screen: 1" },
-  { value: "screen_2", label: "Screen: 2" },
-  { value: "screen_3", label: "Screen: 3" },
-  { value: "screen_4", label: "Screen: 4" },
-  { value: "screen_5", label: "Screen: 5" },
-  { value: "screen_6", label: "Screen: 6" },
-  { value: "screen_7", label: "Screen: 7" },
-  { value: "region_next", label: "Region: Next Active Region" },
-  { value: "region_prev", label: "Region: Previous Active Region" },
-
-  // Generic context-aware buttons (3 buttons)
-  { value: "generic_next", label: "Generic: Next (context-aware)" },
-  { value: "generic_prev", label: "Generic: Previous (context-aware)" },
-  {
-    value: "generic_expand_close",
-    label: "Generic: Expand/Close (context-aware)",
-  },
-  { value: "generic_refresh", label: "Generic: Refresh (context-aware)" },
-
-  // Legacy/Advanced actions (for direct mapping if needed)
-  { value: "mode_settings", label: "Open Settings" },
-  { value: "mode_cycle", label: "Cycle Between Modes" },
-  { value: "calendar_next", label: "Calendar: Next (context-aware)" },
-  { value: "calendar_prev", label: "Calendar: Previous (context-aware)" },
-  { value: "calendar_next_month", label: "Calendar: Next Month (legacy)" },
-  { value: "calendar_prev_month", label: "Calendar: Previous Month (legacy)" },
-  { value: "calendar_expand", label: "Calendar: Expand (context-aware)" },
-  { value: "calendar_expand_today", label: "Calendar: Expand Today (legacy)" },
-  { value: "calendar_collapse", label: "Calendar: Collapse (direct)" },
-  { value: "calendar_enter_fullscreen", label: "Calendar: Enter Fullscreen" },
-  { value: "calendar_exit_fullscreen", label: "Calendar: Exit Fullscreen" },
-  { value: "calendar_refresh", label: "Calendar: Refresh" },
-
-  // Image-specific actions
-  { value: "images_next", label: "Images: Next" },
-  { value: "images_prev", label: "Images: Previous" },
-  { value: "photos_enter_fullscreen", label: "Photos: Enter Fullscreen" },
-  { value: "photos_exit_fullscreen", label: "Photos: Exit Fullscreen" },
-
-  // Web service-specific actions
-  { value: "web_service_1", label: "Web Service 1" },
-  { value: "web_service_2", label: "Web Service 2" },
-  { value: "web_service_next", label: "Web Service: Next" },
-  { value: "web_service_prev", label: "Web Service: Previous" },
-  { value: "web_service_close", label: "Web Service: Close/Exit" },
-  { value: "service_refresh", label: "Service: Refresh" },
-
-  { value: "none", label: "No Action" },
-];
-
-// Standard keyboard keys - comprehensive list
-const STANDARD_KEYS = [
-  // Arrow keys
-  "KEY_UP",
-  "KEY_DOWN",
-  "KEY_LEFT",
-  "KEY_RIGHT",
-  // Modifier keys
-  "KEY_CTRL",
-  "KEY_ALT",
-  "KEY_SHIFT",
-  "KEY_META",
-  // Function keys
-  "KEY_F1",
-  "KEY_F2",
-  "KEY_F3",
-  "KEY_F4",
-  "KEY_F5",
-  "KEY_F6",
-  "KEY_F7",
-  "KEY_F8",
-  "KEY_F9",
-  "KEY_F10",
-  "KEY_F11",
-  "KEY_F12",
-  // Navigation keys
-  "KEY_HOME",
-  "KEY_END",
-  "KEY_PAGEUP",
-  "KEY_PAGEDOWN",
-  "KEY_INSERT",
-  "KEY_DELETE",
-  // Common keys
-  "KEY_SPACE",
-  "KEY_ENTER",
-  "KEY_TAB",
-  "KEY_ESC",
-  "KEY_BACKSPACE",
-  // Number keys
-  "KEY_0",
-  "KEY_1",
-  "KEY_2",
-  "KEY_3",
-  "KEY_4",
-  "KEY_5",
-  "KEY_6",
-  "KEY_7",
-  "KEY_8",
-  "KEY_9",
-  // Letter keys (common ones)
-  "KEY_A",
-  "KEY_B",
-  "KEY_C",
-  "KEY_D",
-  "KEY_E",
-  "KEY_F",
-  "KEY_G",
-  "KEY_H",
-  "KEY_I",
-  "KEY_J",
-  "KEY_K",
-  "KEY_L",
-  "KEY_M",
-  "KEY_N",
-  "KEY_O",
-  "KEY_P",
-  "KEY_Q",
-  "KEY_R",
-  "KEY_S",
-  "KEY_T",
-  "KEY_U",
-  "KEY_V",
-  "KEY_W",
-  "KEY_X",
-  "KEY_Y",
-  "KEY_Z",
-];
-
-// Get available keys for the current keyboard type
-const availableKeys = computed(() => {
-  const keyboardType = props.config.keyboardType || "7-button";
-
-  if (keyboardType === "7-button") {
-    return ["KEY_1", "KEY_2", "KEY_3", "KEY_4", "KEY_5", "KEY_6", "KEY_7"];
-  } else if (keyboardType === "standard") {
-    // For standard keyboards, show all mapped keys plus allow adding new ones
-    // Start with common defaults, but allow any key to be mapped
-    const mappedKeys = Object.keys(currentMappings.value);
-    const defaultKeys = [
-      "KEY_RIGHT",
-      "KEY_LEFT",
-      "KEY_UP",
-      "KEY_DOWN",
-      "KEY_SPACE",
-      "KEY_1",
-      "KEY_2",
-      "KEY_S",
-    ];
-    // Combine defaults with any already-mapped keys, remove duplicates
-    const allKeys = [...new Set([...defaultKeys, ...mappedKeys])];
-    return allKeys.sort();
-  }
-  return [];
-});
-
-// Format key name for display
-const formatKeyName = key => {
-  return key.replace("KEY_", "").replace(/_/g, " ").toLowerCase();
+const openPicker = key => {
+  pickerKey.value = key;
+};
+const closePicker = () => {
+  pickerKey.value = null;
 };
 
-// Load keyboard mappings
-const loadKeyboardMappings = async () => {
-  loading.value = true;
-  error.value = null;
+const onSelect = async action => {
+  const key = pickerKey.value;
+  closePicker();
   try {
-    const keyboardType = props.config.keyboardType || "7-button";
-    await keyboardStore.fetchMappings(keyboardType);
-
-    // Mappings structure: { "7-button": { "KEY_1": "action" }, "standard": { ... } }
-    if (keyboardStore.mappings[keyboardType]) {
-      currentMappings.value = { ...keyboardStore.mappings[keyboardType] };
-    } else {
-      currentMappings.value = {};
-    }
+    await store.setMapping(key, action);
   } catch (err) {
-    console.error("Failed to load keyboard mappings:", err);
-    error.value = err.response?.data?.detail || err.message || "Failed to load keyboard mappings";
-  } finally {
-    loading.value = false;
+    logError("[Keyboard]", "save failed:", err);
   }
 };
 
-// Save keyboard mappings
-const saveKeyboardMappings = async () => {
+const clearKey = async key => {
   try {
-    const keyboardType = props.config.keyboardType || "7-button";
-    const mappings = {
-      [keyboardType]: { ...currentMappings.value },
-    };
-    await keyboardStore.updateMappings(mappings);
-    error.value = null;
+    await store.removeMapping(key);
   } catch (err) {
-    console.error("Failed to save keyboard mappings:", err);
-    error.value = err.response?.data?.detail || err.message || "Failed to save keyboard mappings";
-    throw err;
+    logError("[Keyboard]", "clear failed:", err);
   }
 };
 
-// Update a mapping
-const updateMapping = async (key, action) => {
-  currentMappings.value[key] = action;
-  await saveKeyboardMappings();
+const captureNewKey = async () => {
+  const key = await capture();
+  if (key) openPicker(key);
 };
-
-// Clear a mapping
-const clearMapping = async key => {
-  // For standard keyboards, remove the key entirely
-  if (props.config.keyboardType === "standard") {
-    delete currentMappings.value[key];
-  } else {
-    currentMappings.value[key] = "none";
-  }
-  await saveKeyboardMappings();
-};
-
-// Add a new key to map (for standard keyboards)
-const addNewKey = async () => {
-  if (newKeyToAdd.value && !currentMappings.value[newKeyToAdd.value]) {
-    currentMappings.value[newKeyToAdd.value] = "none";
-    newKeyToAdd.value = "";
-    await saveKeyboardMappings();
-  }
-};
-
-// Handle keyboard type change
-const handleKeyboardTypeChange = async event => {
-  const newType = event.target.value;
-  // Update keyboard store first
-  keyboardStore.setKeyboardType(newType);
-  // Update config (this will trigger save via parent)
-  emit("update:config", { keyboardType: newType });
-  // Reload mappings for the new type
-  await loadKeyboardMappings();
-};
-
-// Watch for keyboard type changes (for external updates)
-watch(
-  () => props.config.keyboardType,
-  async (newType, oldType) => {
-    if (newType !== oldType && newType) {
-      keyboardStore.setKeyboardType(newType);
-      await loadKeyboardMappings();
-    }
-  }
-);
-
-// Load mappings on mount
-onMounted(async () => {
-  // Set keyboard type in store
-  if (props.config.keyboardType) {
-    keyboardStore.setKeyboardType(props.config.keyboardType);
-  }
-  await loadKeyboardMappings();
-});
 </script>
 
 <style scoped>
 .keyboard-tab {
   width: 100%;
 }
-
-.mappings-list {
-  display: flex;
-  flex-direction: column;
-  gap: 1rem;
-  margin-top: 1rem;
+.kb-intro {
+  color: var(--ink-2);
+  font-size: 0.85rem;
+  margin: 0 0 12px;
 }
-
-.mapping-item {
-  display: flex;
-  align-items: center;
-  gap: 1rem;
-  padding: 1rem;
-  background: var(--bg-2);
+.kb-msg {
+  padding: 12px;
   border-radius: 6px;
-  border: 1px solid var(--line);
-  transition: all 0.2s ease;
-}
-
-.mapping-item:hover {
-  border-color: var(--focus);
-  box-shadow: 0 2px 4px var(--shadow);
-}
-
-.mapping-key {
-  min-width: 150px;
-  font-size: 1rem;
-  color: var(--ink);
-  font-weight: 600;
-  font-family: var(--font-data);
-}
-
-.mapping-action {
-  flex: 1;
-  padding: 0.5rem 0.75rem;
-  border: 1px solid var(--line);
-  border-radius: 4px;
-  font-size: 0.95rem;
-  font-family: var(--font-ui);
-  background: var(--bg-1);
-  color: var(--ink);
-  cursor: pointer;
-  transition: all 0.2s ease;
-  min-height: 44px;
-}
-
-.mapping-action:hover {
-  border-color: var(--focus);
-}
-
-.mapping-action:focus-visible {
-  outline: 2px solid var(--focus);
-  outline-offset: 2px;
-}
-
-.btn-clear {
-  background: var(--err);
-  color: white;
-  border: none;
-  border-radius: 4px;
-  width: 32px;
-  height: 32px;
-  font-size: 1.5rem;
-  line-height: 1;
-  cursor: pointer;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  transition: all 0.2s ease;
-  flex-shrink: 0;
-}
-
-.btn-clear:hover {
-  background: color-mix(in srgb, var(--err) 80%, black);
-  transform: scale(1.05);
-}
-
-.loading-message,
-.error-message,
-.no-keys-message {
-  padding: 1rem;
-  border-radius: 4px;
-  margin-top: 1rem;
-}
-
-.loading-message {
   background: var(--bg-2);
   color: var(--ink-2);
 }
-
-.error-message {
+.kb-msg--err {
   background: color-mix(in srgb, var(--err) 12%, var(--bg-1));
   color: var(--err);
   border: 1px solid var(--err);
 }
-
-.no-keys-message {
-  background: var(--bg-2);
-  color: var(--ink-2);
-}
-
-.keyboard-type-select {
-  width: 100%;
-  max-width: 400px;
-  padding: 0.5rem 0.75rem;
-  border: 1px solid var(--line);
-  border-radius: 4px;
-  font-size: 0.95rem;
-  font-family: var(--font-ui);
-  background: var(--bg-2);
-  color: var(--ink);
-  cursor: pointer;
-  transition: all 0.2s ease;
-  min-height: 44px;
-}
-
-.keyboard-type-select:hover {
-  border-color: var(--focus);
-}
-
-.keyboard-type-select:focus-visible {
-  outline: 2px solid var(--focus);
-  outline-offset: 2px;
-}
-
-.add-key-section {
+.kb-picker-overlay {
+  position: fixed;
+  inset: 0;
+  z-index: 50;
   display: flex;
-  gap: 0.75rem;
   align-items: center;
-  padding: 1rem;
-  background: var(--bg-2);
-  border: 1px dashed var(--line);
-  border-radius: 6px;
-  margin-bottom: 1rem;
-}
-
-.key-selector {
-  flex: 1;
-  padding: 0.5rem 0.75rem;
-  border: 1px solid var(--line);
-  border-radius: 4px;
-  font-size: 0.95rem;
-  font-family: var(--font-ui);
-  background: var(--bg-1);
-  color: var(--ink);
-  cursor: pointer;
-  transition: all 0.2s ease;
-  min-height: 44px;
-}
-
-.key-selector:focus-visible {
-  outline: 2px solid var(--focus);
-  outline-offset: 2px;
-}
-
-.btn-add-key {
-  padding: 0.5rem 1rem;
-  background: var(--focus);
-  color: white;
-  border: 1px solid var(--focus);
-  border-radius: 4px;
-  font-size: 0.95rem;
-  font-family: var(--font-ui);
-  font-weight: 500;
-  cursor: pointer;
-  transition: all 0.2s ease;
-  min-height: 44px;
-}
-
-.btn-add-key:hover {
-  background: color-mix(in srgb, var(--focus) 80%, black);
-  border-color: color-mix(in srgb, var(--focus) 80%, black);
+  justify-content: center;
+  padding: 20px;
+  background: color-mix(in srgb, var(--bg-1) 60%, transparent);
 }
 </style>

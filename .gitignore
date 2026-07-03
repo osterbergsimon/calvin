@@ -126,3 +126,6 @@ bandit-report.json
 
 # Claude Code local (per-user) settings
 .claude/settings.local.json
+
+# superpowers brainstorming visual companion (local only)
+.superpowers/

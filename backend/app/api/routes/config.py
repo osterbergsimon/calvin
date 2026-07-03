@@ -99,7 +99,6 @@ class ConfigUpdate(BaseModel):
     dashboardLayout: dict[str, Any] | None = None
     dashboardScreens: dict[str, Any] | None = None
     lastSideViewMode: str | None = None  # Last side view mode ('photos' | 'web_services')
-    keyboardType: str | None = None
     photoFrameEnabled: bool | None = None
     photoFrameTimeout: int | None = None
     showUI: bool | None = None
@@ -223,10 +222,6 @@ async def get_config():
         }
     elif "dashboard_screens" in config and "dashboardScreens" not in config:
         config["dashboardScreens"] = config["dashboard_screens"]
-    if "keyboardType" not in config and "keyboard_type" not in config:
-        config["keyboardType"] = "7-button"
-    elif "keyboard_type" in config and "keyboardType" not in config:
-        config["keyboardType"] = config["keyboard_type"]
     if "photoFrameEnabled" not in config and "photo_frame_enabled" not in config:
         config["photoFrameEnabled"] = False
     elif "photo_frame_enabled" in config and "photoFrameEnabled" not in config:
@@ -541,8 +536,6 @@ async def update_config(config_update: ConfigUpdate):
         update_dict["dashboard_layout"] = update_dict.pop("dashboardLayout")
     if "dashboardScreens" in update_dict:
         update_dict["dashboard_screens"] = update_dict.pop("dashboardScreens")
-    if "keyboardType" in update_dict:
-        update_dict["keyboard_type"] = update_dict.pop("keyboardType")
     if "photoFrameEnabled" in update_dict:
         update_dict["photo_frame_enabled"] = update_dict.pop("photoFrameEnabled")
     if "photoFrameTimeout" in update_dict:

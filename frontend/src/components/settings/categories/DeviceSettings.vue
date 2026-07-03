@@ -67,7 +67,7 @@
     </SettingsSection>
 
     <SettingsSection id="device-keyboard" title="Keyboard">
-      <KeyboardTab :config="config" @update:config="patch => emit('update:config', patch)" />
+      <KeyboardTab />
     </SettingsSection>
 
     <SettingsSection id="device-notifications" title="Notifications">

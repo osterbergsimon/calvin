@@ -15,6 +15,7 @@ import { useConfigStore } from "../stores/config";
 import NotificationSystem from "./NotificationSystem.vue";
 import { showSystemRebootScheduled } from "../utils/systemNotifications";
 import { useSystem } from "../composables/useSystem";
+import { normalizeKeyCode } from "@/utils/keyCode";
 
 const keyboardStore = useKeyboardStore();
 const configStore = useConfigStore();
@@ -28,29 +29,6 @@ let rebootComboStartTime = null;
 let rebootComboKeys = ["KEY_1", "KEY_7"]; // Will be loaded from config
 let rebootComboDuration = 10000; // Will be loaded from config (10 seconds default)
 let rebootComboCheckInterval = null;
-
-// Map browser key codes to our key codes
-const keyCodeMap = {
-  ArrowRight: "KEY_RIGHT",
-  ArrowLeft: "KEY_LEFT",
-  ArrowUp: "KEY_UP",
-  ArrowDown: "KEY_DOWN",
-  Space: "KEY_SPACE",
-  Enter: "KEY_ENTER",
-  Escape: "KEY_ESCAPE",
-  Home: "KEY_HOME",
-  End: "KEY_END",
-  PageUp: "KEY_PAGEUP",
-  PageDown: "KEY_PAGEDOWN",
-  Digit1: "KEY_1",
-  Digit2: "KEY_2",
-  Digit3: "KEY_3",
-  Digit4: "KEY_4",
-  Digit5: "KEY_5",
-  Digit6: "KEY_6",
-  Digit7: "KEY_7",
-  KeyS: "KEY_S",
-};
 
 const checkRebootCombo = () => {
   // Check if both reboot combo keys are pressed
@@ -108,21 +86,21 @@ const onKeyDown = async event => {
     return;
   }
 
-  // Map browser key to our key code
-  const keyCode = keyCodeMap[event.code] || event.code;
+  const keyCode = normalizeKeyCode(event);
+
+  // Capture mode (settings remap): swallow the key, bind it, dispatch nothing.
+  if (keyboardStore.captureActive) {
+    event.preventDefault();
+    keyboardStore.handleCaptureKey(keyCode);
+    return;
+  }
 
   // Track pressed keys for reboot combo
   pressedKeys.add(keyCode);
   checkRebootCombo();
 
-  // Get keyboard type from store
-  const keyboardType = keyboardStore.keyboardType || "7-button";
-
-  // Get mappings for current keyboard type
-  // Mappings structure: { "7-button": { "KEY_1": "action" }, "standard": { ... } }
-  const mappings = keyboardStore.mappings[keyboardType] || {};
-
-  // Find action for this key
+  // Find action for this key (single unified map)
+  const mappings = keyboardStore.mappings || {};
   const action = mappings[keyCode];
 
   if (action && action !== "none") {
@@ -141,8 +119,7 @@ const onKeyDown = async event => {
 };
 
 const onKeyUp = event => {
-  // Map browser key to our key code
-  const keyCode = keyCodeMap[event.code] || event.code;
+  const keyCode = normalizeKeyCode(event);
 
   // Remove from pressed keys
   pressedKeys.delete(keyCode);
@@ -156,13 +133,10 @@ const onKeyUp = event => {
 const loadKeyboardConfig = async () => {
   try {
     await keyboardStore.fetchMappings();
-    // Load keyboard type from config API
+    // Load reboot-combo settings from config API
     const response = await fetch("/api/config");
     if (response.ok) {
       const config = await response.json();
-      if (config.keyboardType || config.keyboard_type) {
-        keyboardStore.setKeyboardType(config.keyboardType || config.keyboard_type);
-      }
       // Load reboot combo settings
       if (config.rebootComboKey1 || config.reboot_combo_key1) {
         const key1 = config.rebootComboKey1 || config.reboot_combo_key1;
