@@ -6,10 +6,10 @@
       class="item-list__row"
       :class="{
         'calvin-plugin-row': true,
-        'item-list__row--clickable': urlFor(item),
-        'calvin-plugin-clickable': urlFor(item),
+        'item-list__row--clickable': isClickable(urlFor(item), itemLinkAction),
+        'calvin-plugin-clickable': isClickable(urlFor(item), itemLinkAction),
       }"
-      @click="open(urlFor(item))"
+      @click="openLink(urlFor(item), itemLinkAction)"
     >
       <span v-if="timestampFor(item)" class="item-list__timestamp">{{ timestampFor(item) }}</span>
       <div class="item-list__body">
@@ -21,17 +21,32 @@
       {{ schema.empty_text || "Nothing to show yet." }}
     </li>
   </ul>
+  <HandoffOverlay v-if="overlay?.kind === 'handoff'" :url="overlay.url" @close="closeOverlay" />
+  <EmbedOverlay
+    v-else-if="overlay?.kind === 'embed'"
+    :url="overlay.url"
+    @close="closeOverlay"
+    @fallback="fallbackToHandoff"
+  />
 </template>
 
 <script setup>
 import { computed } from "vue";
 import { resolvePath } from "../../../utils/jsonPath";
 import { applyFormat } from "../../../utils/formatters";
+import { useLinkOpen } from "../../../composables/useLinkOpen";
+import HandoffOverlay from "../overlays/HandoffOverlay.vue";
+import EmbedOverlay from "../overlays/EmbedOverlay.vue";
 
 const props = defineProps({
   schema: { type: Object, required: true },
   data: { type: [Object, Array, null], default: null },
+  linkAction: { type: String, default: null },
 });
+
+const { overlay, isClickable, openLink, closeOverlay, fallbackToHandoff } = useLinkOpen(
+  () => props.linkAction
+);
 
 const items = computed(() => {
   const slice = props.schema.data_path
@@ -41,6 +56,7 @@ const items = computed(() => {
 });
 
 const itemSpec = computed(() => props.schema.item || {});
+const itemLinkAction = computed(() => itemSpec.value.link_action);
 
 function pick(item, pathKey, literalKey, formatKey) {
   const spec = itemSpec.value;
@@ -54,9 +70,6 @@ const timestampFor = item => pick(item, "timestamp_path", "timestamp", "timestam
 const urlFor = item =>
   itemSpec.value.click_url_path ? resolvePath(item, itemSpec.value.click_url_path) : null;
 
-function open(url) {
-  if (url) window.open(url, "_blank", "noopener");
-}
 </script>
 
 <style scoped>
