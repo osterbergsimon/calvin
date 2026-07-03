@@ -53,5 +53,7 @@ def upgrade() -> None:
 def downgrade() -> None:
     with op.batch_alter_table("keyboard_mappings") as batch_op:
         batch_op.add_column(
-            sa.Column("keyboard_type", sa.String(length=50), nullable=False, server_default="7-button")
+            sa.Column(
+                "keyboard_type", sa.String(length=50), nullable=False, server_default="7-button"
+            )
         )

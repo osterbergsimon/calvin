@@ -24,10 +24,15 @@ class TestKeyboardEndpoints:
         test_client.post("/api/keyboard/mappings", json={"mappings": {"KEY_1": "generic_next"}})
         response = test_client.put("/api/keyboard/mappings/KEY_1", json={"action": "screen_next"})
         assert response.status_code == 200
-        assert test_client.get("/api/keyboard/mappings").json()["mappings"]["KEY_1"] == "screen_next"
+        assert (
+            test_client.get("/api/keyboard/mappings").json()["mappings"]["KEY_1"] == "screen_next"
+        )
 
     def test_delete_single_mapping(self, test_client: TestClient):
-        test_client.post("/api/keyboard/mappings", json={"mappings": {"KEY_1": "generic_next", "KEY_2": "generic_prev"}})
+        test_client.post(
+            "/api/keyboard/mappings",
+            json={"mappings": {"KEY_1": "generic_next", "KEY_2": "generic_prev"}},
+        )
         response = test_client.delete("/api/keyboard/mappings/KEY_1")
         assert response.status_code == 200
         remaining = test_client.get("/api/keyboard/mappings").json()["mappings"]
