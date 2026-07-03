@@ -40,9 +40,15 @@
           :subtitle="serviceSubtitle"
           :header-visible="!isFullscreen"
           :focused="focused"
+          :link-action="linkAction"
         >
           <template #actions>
             <RegionControls v-if="focused" region-kind="service" />
+            <ServiceRegionViewOptions
+              v-if="focused && isLinkCapable"
+              :region-id="regionId"
+              :view="view"
+            />
             <button
               v-if="!isTouch && canNavigateServices && services.length > 1"
               class="dashboard-panel__icon-button"
@@ -89,6 +95,7 @@ import { useModeStore } from "../stores/mode";
 import DashboardPanel from "./DashboardPanel.vue";
 import ServiceViewer from "./service/ServiceViewer.vue";
 import RegionControls from "./dashboard/RegionControls.vue";
+import ServiceRegionViewOptions from "./dashboard/ServiceRegionViewOptions.vue";
 import { useTouchCapability } from "@/composables/useTouchCapability";
 
 const props = defineProps({
@@ -106,6 +113,14 @@ const props = defineProps({
   },
   serviceId: {
     type: String,
+    default: null,
+  },
+  regionId: {
+    type: String,
+    default: null,
+  },
+  view: {
+    type: Object,
     default: null,
   },
 });
@@ -157,6 +172,11 @@ const emptyState = computed(() => {
   }
   return null;
 });
+
+const linkAction = computed(() => props.view?.linkAction || null);
+const isLinkCapable = computed(() =>
+  ["card-grid", "item-list"].includes(currentService.value?.display_schema?.kind)
+);
 
 // ServiceViewer now handles all service rendering logic
 
