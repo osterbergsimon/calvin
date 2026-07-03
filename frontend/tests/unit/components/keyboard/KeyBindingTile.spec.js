@@ -23,7 +23,9 @@ describe("KeyBindingTile", () => {
   });
 
   it("flags a conflict", () => {
-    const w = mount(KeyBindingTile, { props: { keyCode: "KEY_1", action: "generic_next", conflict: true } });
+    const w = mount(KeyBindingTile, {
+      props: { keyCode: "KEY_1", action: "generic_next", conflict: true },
+    });
     expect(w.find(".kbt--conflict").exists()).toBe(true);
   });
 });

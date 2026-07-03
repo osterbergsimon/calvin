@@ -34,7 +34,9 @@ describe("KeyboardTab", () => {
     expect(w.findComponent(ActionPicker).exists()).toBe(true);
     w.findComponent(ActionPicker).vm.$emit("select", "generic_next");
     await flushPromises();
-    expect(axios.put).toHaveBeenCalledWith("/api/keyboard/mappings/KEY_1", { action: "generic_next" });
+    expect(axios.put).toHaveBeenCalledWith("/api/keyboard/mappings/KEY_1", {
+      action: "generic_next",
+    });
     expect(store.mappings.KEY_1).toBe("generic_next");
   });
 });

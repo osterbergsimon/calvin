@@ -30,7 +30,9 @@ describe("Keyboard Store", () => {
     axios.put.mockResolvedValue({ data: {} });
     const store = useKeyboardStore();
     await store.setMapping("KEY_2", "generic_next");
-    expect(axios.put).toHaveBeenCalledWith("/api/keyboard/mappings/KEY_2", { action: "generic_next" });
+    expect(axios.put).toHaveBeenCalledWith("/api/keyboard/mappings/KEY_2", {
+      action: "generic_next",
+    });
     expect(store.mappings.KEY_2).toBe("generic_next");
   });
 
