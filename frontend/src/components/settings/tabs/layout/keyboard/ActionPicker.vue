@@ -96,8 +96,13 @@ const visibleGroups = computed(() => {
   padding: 3px 12px;
   color: var(--ink);
 }
-.ap-arrow { color: var(--ink-2); }
-.ap-lbl { color: var(--ink-2); flex: 1; }
+.ap-arrow {
+  color: var(--ink-2);
+}
+.ap-lbl {
+  color: var(--ink-2);
+  flex: 1;
+}
 .ap-close {
   background: none;
   border: none;
@@ -115,7 +120,10 @@ const visibleGroups = computed(() => {
   color: var(--ink);
   font-family: var(--font-ui);
 }
-.ap-scroll { overflow-y: auto; padding: 4px 14px 12px; }
+.ap-scroll {
+  overflow-y: auto;
+  padding: 4px 14px 12px;
+}
 .ap-group-title {
   font-size: 0.7rem;
   text-transform: uppercase;
@@ -126,7 +134,9 @@ const visibleGroups = computed(() => {
   align-items: center;
   gap: 6px;
 }
-.ap-star { color: var(--warn); }
+.ap-star {
+  color: var(--warn);
+}
 .ap-opt {
   display: flex;
   flex-direction: column;
@@ -143,9 +153,22 @@ const visibleGroups = computed(() => {
   cursor: pointer;
   min-height: 44px;
 }
-.ap-group--reco .ap-opt { border-color: var(--focus); }
-.ap-opt:hover { border-color: var(--focus); }
-.ap-opt--current { outline: 2px solid var(--focus); outline-offset: 1px; }
-.ap-opt-desc { font-size: 0.72rem; color: var(--ink-2); }
-.ap-empty { color: var(--ink-2); padding: 12px 4px; }
+.ap-group--reco .ap-opt {
+  border-color: var(--focus);
+}
+.ap-opt:hover {
+  border-color: var(--focus);
+}
+.ap-opt--current {
+  outline: 2px solid var(--focus);
+  outline-offset: 1px;
+}
+.ap-opt-desc {
+  font-size: 0.72rem;
+  color: var(--ink-2);
+}
+.ap-empty {
+  color: var(--ink-2);
+  padding: 12px 4px;
+}
 </style>

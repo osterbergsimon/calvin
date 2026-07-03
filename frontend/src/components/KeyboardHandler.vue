@@ -30,7 +30,6 @@ let rebootComboKeys = ["KEY_1", "KEY_7"]; // Will be loaded from config
 let rebootComboDuration = 10000; // Will be loaded from config (10 seconds default)
 let rebootComboCheckInterval = null;
 
-
 const checkRebootCombo = () => {
   // Check if both reboot combo keys are pressed
   const comboKeysPressed = rebootComboKeys.every(key => pressedKeys.has(key));
@@ -134,7 +133,7 @@ const onKeyUp = event => {
 const loadKeyboardConfig = async () => {
   try {
     await keyboardStore.fetchMappings();
-    // Load keyboard type from config API
+    // Load reboot-combo settings from config API
     const response = await fetch("/api/config");
     if (response.ok) {
       const config = await response.json();

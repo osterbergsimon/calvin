@@ -10,7 +10,11 @@ export const ACTION_GROUPS = [
     actions: [
       { value: "generic_next", label: "Next", description: "adapts to the focused region" },
       { value: "generic_prev", label: "Previous", description: "adapts to the focused region" },
-      { value: "generic_expand_close", label: "Expand / Close", description: "expand event · enter/exit fullscreen" },
+      {
+        value: "generic_expand_close",
+        label: "Expand / Close",
+        description: "expand event · enter/exit fullscreen",
+      },
       { value: "generic_refresh", label: "Refresh", description: "refresh the focused region" },
     ],
   },
@@ -38,7 +42,11 @@ export const ACTION_GROUPS = [
     label: "Jump to a screen",
     tier: "collapsed",
     actions: [
-      { value: "mode_calendar", label: "Calendar screen", description: "first screen with a calendar region" },
+      {
+        value: "mode_calendar",
+        label: "Calendar screen",
+        description: "first screen with a calendar region",
+      },
       { value: "mode_photos", label: "Photos screen" },
       { value: "mode_web_services", label: "Services screen" },
     ],

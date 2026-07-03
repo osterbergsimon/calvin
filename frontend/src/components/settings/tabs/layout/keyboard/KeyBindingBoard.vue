@@ -79,14 +79,18 @@ const isConflict = key => {
   grid-template-columns: repeat(auto-fit, minmax(96px, 1fr));
   gap: 8px;
 }
-.kb-other { margin-top: 16px; }
+.kb-other {
+  margin-top: 16px;
+}
 .kb-other-list {
   display: flex;
   flex-wrap: wrap;
   gap: 8px;
   align-items: stretch;
 }
-.kb-other-list .kbt { min-width: 96px; }
+.kb-other-list .kbt {
+  min-width: 96px;
+}
 .kb-add {
   border: 1px dashed var(--line);
   border-radius: 8px;
@@ -96,6 +100,12 @@ const isConflict = key => {
   cursor: pointer;
   min-height: 44px;
 }
-.kb-add:hover:not(:disabled) { border-color: var(--focus); color: var(--ink); }
-.kb-add:disabled { opacity: 0.7; cursor: default; }
+.kb-add:hover:not(:disabled) {
+  border-color: var(--focus);
+  color: var(--ink);
+}
+.kb-add:disabled {
+  opacity: 0.7;
+  cursor: default;
+}
 </style>

@@ -2,8 +2,8 @@
   <div class="keyboard-tab">
     <CollapsibleSection title="Keyboard Buttons" icon="⌨️" :expanded="true">
       <p class="kb-intro">
-        Press a button to bind it, then choose what it does. Buttons 1–7 are your remote; other
-        keys work too for full keyboards.
+        Press a button to bind it, then choose what it does. Buttons 1–7 are your remote; other keys
+        work too for full keyboards.
       </p>
 
       <div v-if="store.loading" class="kb-msg">Loading mappings…</div>
@@ -80,9 +80,20 @@ const captureNewKey = async () => {
 </script>
 
 <style scoped>
-.keyboard-tab { width: 100%; }
-.kb-intro { color: var(--ink-2); font-size: 0.85rem; margin: 0 0 12px; }
-.kb-msg { padding: 12px; border-radius: 6px; background: var(--bg-2); color: var(--ink-2); }
+.keyboard-tab {
+  width: 100%;
+}
+.kb-intro {
+  color: var(--ink-2);
+  font-size: 0.85rem;
+  margin: 0 0 12px;
+}
+.kb-msg {
+  padding: 12px;
+  border-radius: 6px;
+  background: var(--bg-2);
+  color: var(--ink-2);
+}
 .kb-msg--err {
   background: color-mix(in srgb, var(--err) 12%, var(--bg-1));
   color: var(--err);

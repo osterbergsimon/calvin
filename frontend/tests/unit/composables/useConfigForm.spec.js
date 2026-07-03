@@ -6,7 +6,6 @@ import { describe, it, expect, beforeEach, vi } from "vitest";
 import { setActivePinia, createPinia } from "pinia";
 import { useConfigForm } from "@/composables/useConfigForm";
 import { useConfigStore } from "@/stores/config";
-import { useKeyboardStore } from "@/stores/keyboard";
 import * as configApi from "@/services/configApi";
 
 const { logErrorMock } = vi.hoisted(() => ({
@@ -22,10 +21,6 @@ vi.mock("@/stores/config", () => ({
   useConfigStore: vi.fn(),
 }));
 
-vi.mock("@/stores/keyboard", () => ({
-  useKeyboardStore: vi.fn(),
-}));
-
 // Mock configApi
 vi.mock("@/services/configApi", () => ({
   getConfig: vi.fn(),
@@ -34,7 +29,6 @@ vi.mock("@/services/configApi", () => ({
 
 describe("useConfigForm", () => {
   let mockConfigStore;
-  let mockKeyboardStore;
 
   beforeEach(() => {
     setActivePinia(createPinia());
@@ -44,13 +38,7 @@ describe("useConfigForm", () => {
       updateConfig: vi.fn().mockResolvedValue({}),
     };
 
-    mockKeyboardStore = {
-      keyboardType: "7-button",
-      setKeyboardType: vi.fn(),
-    };
-
     useConfigStore.mockReturnValue(mockConfigStore);
-    useKeyboardStore.mockReturnValue(mockKeyboardStore);
   });
 
   describe("Initialization", () => {
@@ -128,19 +116,6 @@ describe("useConfigForm", () => {
       expect(form.localConfig.value.orientation).toBe("landscape");
       expect(form.localConfig.value.calendarSplit).toBe(70);
       expect(form.localConfig.value.showUI).toBe(true);
-    });
-
-    it("should update keyboard store when keyboard type is set", async () => {
-      const mockConfig = {
-        keyboardType: "5-button",
-      };
-
-      configApi.getConfig.mockResolvedValue(mockConfig);
-
-      const form = useConfigForm();
-      await form.loadConfig();
-
-      expect(mockKeyboardStore.setKeyboardType).toHaveBeenCalledWith("5-button");
     });
 
     it("should handle errors when loading config", async () => {

@@ -4,14 +4,12 @@
 
 import { computed, ref } from "vue";
 import { useConfigStore } from "../stores/config";
-import { useKeyboardStore } from "../stores/keyboard";
 import * as configApi from "../services/configApi";
 import { logError } from "../utils/logger";
 import { normalizeDashboardLayout, normalizeDashboardScreens } from "../utils/layout";
 
 export function useConfigForm(initialConfig = {}) {
   const configStore = useConfigStore();
-  const keyboardStore = useKeyboardStore();
   const localConfig = ref({ ...initialConfig });
   const saving = ref(false);
   const error = ref("");
@@ -122,11 +120,6 @@ export function useConfigForm(initialConfig = {}) {
           response.displayTimeoutEnabled ?? response.display_timeout_enabled ?? false,
         displayTimeout: response.displayTimeout ?? response.display_timeout ?? 0,
         // Keyboard
-        keyboardType:
-          response.keyboardType ??
-          response.keyboard_type ??
-          keyboardStore.keyboardType ??
-          "7-button",
         keyboardFeedbackEnabled:
           response.keyboardFeedbackEnabled ?? response.keyboard_feedback_enabled ?? true,
         keyboardFeedbackMode:
@@ -179,11 +172,6 @@ export function useConfigForm(initialConfig = {}) {
         version: response.version ?? null,
         frontendVersion: response.frontendVersion ?? response.frontend_version ?? null,
       };
-
-      // Update keyboard store
-      if (localConfig.value.keyboardType) {
-        keyboardStore.setKeyboardType(localConfig.value.keyboardType);
-      }
     } catch (err) {
       logError("[useConfigForm]", "Failed to load config:", err);
       error.value = "Failed to load configuration";
