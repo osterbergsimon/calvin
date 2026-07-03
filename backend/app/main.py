@@ -290,7 +290,6 @@ async def _initialize_default_config():
         "keyboard_feedback_mode": "normal",
         "week_start_day": 1,  # Monday
         "show_week_numbers": False,
-        "side_view_position": "right",
         "theme_mode": "auto",
         "dark_mode_start": 18,  # 6 PM
         "dark_mode_end": 6,  # 6 AM

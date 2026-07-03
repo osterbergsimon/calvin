@@ -672,17 +672,6 @@
             ],
             "title": "Showweeknumbers"
           },
-          "sideViewPosition": {
-            "anyOf": [
-              {
-                "type": "string"
-              },
-              {
-                "type": "null"
-              }
-            ],
-            "title": "Sideviewposition"
-          },
           "themeMode": {
             "anyOf": [
               {

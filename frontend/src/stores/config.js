@@ -18,7 +18,6 @@ export const useConfigStore = defineStore("config", () => {
   const calendarSplit = ref(70); // Percentage for calendar (10-90%, default 70%)
   const dashboardLayout = ref(null); // Dashboard region layout configuration
   const dashboardScreens = ref(null); // Dashboard screen configuration
-  const sideViewPosition = ref("right"); // 'left' | 'right' for landscape, 'top' | 'bottom' for portrait
   const lastSideViewMode = ref("photos"); // Track last side view mode ('photos' | 'web_services')
   const showWebServices = ref(false); // Toggle for web services view
   const photoFrameEnabled = ref(false); // Photo frame mode enabled
@@ -92,7 +91,6 @@ export const useConfigStore = defineStore("config", () => {
     calendarSplit,
     dashboardLayout,
     dashboardScreens,
-    sideViewPosition,
     lastSideViewMode,
     photoFrameEnabled,
     photoFrameTimeout,
@@ -320,20 +318,6 @@ export const useConfigStore = defineStore("config", () => {
     maxVisibleEvents.value = Math.max(1, Math.min(20, count));
   };
 
-  const setSideViewPosition = position => {
-    sideViewPosition.value = position;
-  };
-
-  const toggleSideViewPosition = () => {
-    if (orientation.value === "landscape") {
-      // Toggle between left and right
-      sideViewPosition.value = sideViewPosition.value === "right" ? "left" : "right";
-    } else {
-      // Toggle between top and bottom
-      sideViewPosition.value = sideViewPosition.value === "bottom" ? "top" : "bottom";
-    }
-  };
-
   const setDashboardScreens = screens => {
     dashboardScreens.value = normalizeDashboardScreens(screens);
   };
@@ -417,7 +401,6 @@ export const useConfigStore = defineStore("config", () => {
     weekendDays,
     showRedDays,
     maxVisibleEvents,
-    sideViewPosition,
     themeMode,
     selectedTheme,
     darkModeStart,
@@ -489,8 +472,6 @@ export const useConfigStore = defineStore("config", () => {
     setWeekendDays,
     setShowRedDays,
     setMaxVisibleEvents,
-    setSideViewPosition,
-    toggleSideViewPosition,
     setDashboardScreens,
     activateDashboardScreen,
     cycleDashboardScreenBy,

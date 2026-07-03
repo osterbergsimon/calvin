@@ -88,19 +88,4 @@ describe("Mode Store", () => {
     expect(store.fullscreenMode).toBe(null);
     expect(store.currentMode).toBe(store.MODES.CALENDAR);
   });
-
-  it("should cycle through modes", () => {
-    const store = useModeStore();
-
-    expect(store.currentMode).toBe(store.MODES.CALENDAR);
-
-    store.cycleMode();
-    expect(store.currentMode).toBe(store.MODES.PHOTOS);
-
-    store.cycleMode();
-    expect(store.currentMode).toBe(store.MODES.WEB_SERVICES);
-
-    store.cycleMode();
-    expect(store.currentMode).toBe(store.MODES.CALENDAR);
-  });
 });

@@ -84,13 +84,6 @@ export const useModeStore = defineStore("mode", () => {
     }
   };
 
-  const cycleMode = () => {
-    const modeOrder = [MODES.CALENDAR, MODES.PHOTOS, MODES.WEB_SERVICES];
-    const currentIndex = modeOrder.indexOf(currentMode.value);
-    const nextIndex = (currentIndex + 1) % modeOrder.length;
-    setMode(modeOrder[nextIndex]);
-  };
-
   return {
     MODES,
     currentMode,
@@ -102,6 +95,5 @@ export const useModeStore = defineStore("mode", () => {
     enterFullscreen,
     exitFullscreen,
     returnFromSettings,
-    cycleMode,
   };
 });
