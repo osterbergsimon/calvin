@@ -71,7 +71,6 @@ export function useConfigForm(initialConfig = {}) {
         dashboardScreens: normalizeDashboardScreens(
           response.dashboardScreens ?? response.dashboard_screens ?? null
         ),
-        sideViewPosition: response.sideViewPosition ?? response.side_view_position ?? "right",
         lastSideViewMode: response.lastSideViewMode ?? response.last_side_view_mode ?? "photos",
         showWebServices: response.showWebServices ?? response.show_web_services ?? false,
         // Photos

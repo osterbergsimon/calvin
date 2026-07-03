@@ -1660,8 +1660,6 @@ export interface components {
       showUI?: boolean | null;
       /** Showweeknumbers */
       showWeekNumbers?: boolean | null;
-      /** Sideviewposition */
-      sideViewPosition?: string | null;
       /** Thememode */
       themeMode?: string | null;
       /** Timeformat */

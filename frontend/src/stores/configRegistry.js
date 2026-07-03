@@ -41,11 +41,6 @@ export const CONFIG_FIELD_DEFINITIONS = [
   },
   { name: "calendarSplit", keys: ["calendarSplit", "calendar_split"], defaultValue: 70 },
   {
-    name: "sideViewPosition",
-    keys: ["sideViewPosition", "side_view_position"],
-    defaultValue: "right",
-  },
-  {
     name: "lastSideViewMode",
     keys: ["lastSideViewMode", "last_side_view_mode"],
     defaultValue: "photos",

@@ -113,9 +113,6 @@ class ConfigUpdate(BaseModel):
     maxVisibleEvents: int | None = None  # Max events visible per day cell
     showRedDays: bool | None = None  # Highlight holidays/red days
     mealPlanCardSize: str | None = None  # Meal plan card size: 'small' | 'medium' | 'large'
-    sideViewPosition: str | None = (
-        None  # Side view position: 'left' | 'right' for landscape, 'top' | 'bottom' for portrait
-    )
     themeMode: str | None = None  # Theme mode: 'light' | 'dark' | 'auto' | 'time'
     selectedTheme: str | None = None  # Selected custom theme ID (null = use themeMode)
     darkModeStart: int | None = None  # Dark mode start hour (0-23)
@@ -274,10 +271,6 @@ async def get_config():
         config["maxVisibleEvents"] = 4  # Max 4 events per day cell by default
     elif "max_visible_events" in config and "maxVisibleEvents" not in config:
         config["maxVisibleEvents"] = config["max_visible_events"]
-    if "sideViewPosition" not in config and "side_view_position" not in config:
-        config["sideViewPosition"] = "right"  # Right/bottom default
-    elif "side_view_position" in config and "sideViewPosition" not in config:
-        config["sideViewPosition"] = config["side_view_position"]
     # Handle themeMode - prioritize saved value from database
     if "theme_mode" in config:
         config["themeMode"] = config["theme_mode"]
@@ -564,8 +557,6 @@ async def update_config(config_update: ConfigUpdate):
         update_dict["show_red_days"] = update_dict.pop("showRedDays")
     if "mealPlanCardSize" in update_dict:
         update_dict["meal_plan_card_size"] = update_dict.pop("mealPlanCardSize")
-    if "sideViewPosition" in update_dict:
-        update_dict["side_view_position"] = update_dict.pop("sideViewPosition")
     if "themeMode" in update_dict:
         update_dict["theme_mode"] = update_dict.pop("themeMode")
     if "selectedTheme" in update_dict:
