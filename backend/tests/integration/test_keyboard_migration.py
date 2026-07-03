@@ -2,9 +2,9 @@
 
 import pytest
 import sqlalchemy as sa
+from alembic.config import Config
 
 from alembic import command
-from alembic.config import Config
 
 
 @pytest.mark.integration
