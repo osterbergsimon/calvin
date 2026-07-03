@@ -1,148 +1,62 @@
 /** Tests for keyboard store. */
-
 import { describe, it, expect, beforeEach, vi } from "vitest";
 import { setActivePinia, createPinia } from "pinia";
 import { useKeyboardStore } from "@/stores/keyboard";
 import axios from "axios";
 
-// Mock axios
 vi.mock("axios");
 
 describe("Keyboard Store", () => {
   beforeEach(() => {
-    // Create a fresh pinia instance for each test
     setActivePinia(createPinia());
     vi.clearAllMocks();
   });
 
-  describe("Initialization", () => {
-    it("should initialize with default values", () => {
-      const store = useKeyboardStore();
-
-      expect(store.mappings).toEqual({});
-      expect(store.keyboardType).toBe("7-button");
-      expect(store.available).toBe(false);
-      expect(store.loading).toBe(false);
-      expect(store.error).toBe(null);
-    });
+  it("initializes with a flat empty map", () => {
+    const store = useKeyboardStore();
+    expect(store.mappings).toEqual({});
+    expect(store.captureActive).toBe(false);
   });
 
-  describe("fetchMappings", () => {
-    it("should fetch keyboard mappings without type", async () => {
-      const mockMappings = {
-        mappings: {
-          button1: "calendar_next",
-          button2: "calendar_prev",
-        },
-      };
-
-      axios.get.mockResolvedValue({ data: mockMappings });
-
-      const store = useKeyboardStore();
-      const result = await store.fetchMappings();
-
-      expect(axios.get).toHaveBeenCalledWith("/api/keyboard/mappings");
-      expect(store.mappings).toEqual(mockMappings.mappings);
-      expect(store.available).toBe(true);
-      expect(store.loading).toBe(false);
-      expect(store.error).toBe(null);
-      expect(result).toEqual(mockMappings);
-    });
-
-    it("should fetch keyboard mappings with specific type", async () => {
-      const mockMappings = {
-        mappings: {
-          button1: "next",
-          button2: "prev",
-        },
-      };
-
-      axios.get.mockResolvedValue({ data: mockMappings });
-
-      const store = useKeyboardStore();
-      await store.fetchMappings("5-button");
-
-      expect(axios.get).toHaveBeenCalledWith("/api/keyboard/mappings?keyboard_type=5-button");
-      expect(store.mappings).toEqual(mockMappings.mappings);
-      expect(store.available).toBe(true);
-    });
-
-    it("should handle API errors", async () => {
-      const error = new Error("Network error");
-      axios.get.mockRejectedValue(error);
-
-      const store = useKeyboardStore();
-      await store.fetchMappings().catch(() => {});
-
-      expect(store.error).toBe("Network error");
-      expect(store.available).toBe(false);
-      expect(store.loading).toBe(false);
-    });
-
-    it("should handle empty mappings", async () => {
-      axios.get.mockResolvedValue({ data: {} });
-
-      const store = useKeyboardStore();
-      await store.fetchMappings();
-
-      expect(store.mappings).toEqual({});
-      expect(store.available).toBe(true);
-    });
+  it("fetchMappings stores the flat map", async () => {
+    axios.get.mockResolvedValue({ data: { mappings: { KEY_1: "generic_prev" } } });
+    const store = useKeyboardStore();
+    await store.fetchMappings();
+    expect(store.mappings).toEqual({ KEY_1: "generic_prev" });
+    expect(axios.get).toHaveBeenCalledWith("/api/keyboard/mappings");
   });
 
-  describe("updateMappings", () => {
-    it("should update keyboard mappings", async () => {
-      const newMappings = {
-        button1: "next",
-        button2: "prev",
-      };
-
-      const mockResponse = {
-        data: { mappings: newMappings },
-      };
-
-      axios.post.mockResolvedValue(mockResponse);
-
-      const store = useKeyboardStore();
-      const result = await store.updateMappings(newMappings);
-
-      // Test functionality: mappings are updated in store
-      expect(store.mappings).toEqual(newMappings);
-      expect(store.loading).toBe(false);
-      expect(store.error).toBe(null);
-      // The store returns response.data which contains mappings
-      expect(result.mappings).toEqual(newMappings);
-    });
-
-    it("should handle update errors", async () => {
-      const error = new Error("Update failed");
-      axios.post.mockRejectedValue(error);
-
-      const store = useKeyboardStore();
-
-      await expect(store.updateMappings({})).rejects.toThrow("Update failed");
-      expect(store.error).toBe("Update failed");
-      expect(store.loading).toBe(false);
-    });
+  it("setMapping PUTs a single key and updates local state", async () => {
+    axios.put.mockResolvedValue({ data: {} });
+    const store = useKeyboardStore();
+    await store.setMapping("KEY_2", "generic_next");
+    expect(axios.put).toHaveBeenCalledWith("/api/keyboard/mappings/KEY_2", { action: "generic_next" });
+    expect(store.mappings.KEY_2).toBe("generic_next");
   });
 
-  describe("setKeyboardType", () => {
-    it("should set keyboard type", () => {
-      const store = useKeyboardStore();
+  it("removeMapping DELETEs a key and drops it locally", async () => {
+    axios.delete.mockResolvedValue({ data: {} });
+    const store = useKeyboardStore();
+    store.mappings.KEY_2 = "generic_next";
+    await store.removeMapping("KEY_2");
+    expect(axios.delete).toHaveBeenCalledWith("/api/keyboard/mappings/KEY_2");
+    expect(store.mappings.KEY_2).toBeUndefined();
+  });
 
-      store.setKeyboardType("5-button");
+  it("beginCapture resolves with the captured key", async () => {
+    const store = useKeyboardStore();
+    const p = store.beginCapture();
+    expect(store.captureActive).toBe(true);
+    store.handleCaptureKey("KEY_S");
+    await expect(p).resolves.toBe("KEY_S");
+    expect(store.captureActive).toBe(false);
+  });
 
-      expect(store.keyboardType).toBe("5-button");
-    });
-
-    it("should update keyboard type multiple times", () => {
-      const store = useKeyboardStore();
-
-      store.setKeyboardType("5-button");
-      expect(store.keyboardType).toBe("5-button");
-
-      store.setKeyboardType("7-button");
-      expect(store.keyboardType).toBe("7-button");
-    });
+  it("Escape cancels capture and resolves null", async () => {
+    const store = useKeyboardStore();
+    const p = store.beginCapture();
+    store.handleCaptureKey("KEY_ESCAPE");
+    await expect(p).resolves.toBeNull();
+    expect(store.captureActive).toBe(false);
   });
 });
