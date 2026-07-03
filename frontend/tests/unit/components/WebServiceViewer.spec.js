@@ -18,11 +18,15 @@ function setupLinkWiring(kind) {
 }
 
 describe("WebServiceViewer link wiring", () => {
-
   it("shows the tune control for a link-capable service region when focused", async () => {
     setupLinkWiring("card-grid");
     const w = mount(WebServiceViewer, {
-      props: { serviceId: "mealie-1", regionId: "svc-1", view: { linkAction: "embed" }, focused: true },
+      props: {
+        serviceId: "mealie-1",
+        regionId: "svc-1",
+        view: { linkAction: "embed" },
+        focused: true,
+      },
       global: { stubs: { ServiceViewer: { template: "<div><slot name='actions' /></div>" } } },
       attachTo: document.body,
     });

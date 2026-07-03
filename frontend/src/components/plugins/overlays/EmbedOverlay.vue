@@ -2,7 +2,13 @@
   <teleport to="body">
     <div class="link-overlay" role="dialog" aria-modal="true" @click.self="$emit('close')">
       <div class="link-overlay__panel link-overlay__panel--frame calvin-plugin-surface">
-        <button type="button" class="link-overlay__close" data-test="close" aria-label="Close" @click="$emit('close')">
+        <button
+          type="button"
+          class="link-overlay__close"
+          data-test="close"
+          aria-label="Close"
+          @click="$emit('close')"
+        >
           ×
         </button>
         <div class="link-overlay__frame">

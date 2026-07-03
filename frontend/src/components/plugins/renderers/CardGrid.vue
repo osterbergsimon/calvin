@@ -107,7 +107,6 @@ function itemUrl(item) {
   const spec = itemSpec();
   return spec.click_url_path ? resolvePath(item, spec.click_url_path) : null;
 }
-
 </script>
 
 <style scoped>

@@ -972,7 +972,10 @@ describe("setRegionView on a service region", () => {
   const screens = {
     activeScreenId: "s1",
     screens: [
-      { id: "s1", layout: { regions: [{ id: "svc-1", kind: "service", instanceIds: ["mealie-1"] }] } },
+      {
+        id: "s1",
+        layout: { regions: [{ id: "svc-1", kind: "service", instanceIds: ["mealie-1"] }] },
+      },
     ],
   };
 

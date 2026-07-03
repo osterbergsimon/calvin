@@ -71,7 +71,6 @@ const valueFor = item => pick(item, "value_path", "value", "value_format");
 const timestampFor = item => pick(item, "timestamp_path", "timestamp", "timestamp_format");
 const urlFor = item =>
   itemSpec.value.click_url_path ? resolvePath(item, itemSpec.value.click_url_path) : null;
-
 </script>
 
 <style scoped>

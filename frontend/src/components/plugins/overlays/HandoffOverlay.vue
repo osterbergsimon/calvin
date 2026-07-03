@@ -1,18 +1,24 @@
 <template>
   <teleport to="body">
-  <div class="link-overlay" role="dialog" aria-modal="true" @click.self="emitClose">
-    <div class="link-overlay__panel calvin-plugin-surface">
-      <button type="button" class="link-overlay__close" data-test="close" aria-label="Close" @click="emitClose">
-        ×
-      </button>
-      <p class="link-overlay__host">{{ host }}</p>
-      <img v-if="qr" class="link-overlay__qr" :src="qr" alt="QR code for this link" />
-      <p class="link-overlay__hint">Scan to open on your phone</p>
-      <button type="button" class="link-overlay__open" data-test="open" @click="openNow">
-        Open ↗
-      </button>
+    <div class="link-overlay" role="dialog" aria-modal="true" @click.self="emitClose">
+      <div class="link-overlay__panel calvin-plugin-surface">
+        <button
+          type="button"
+          class="link-overlay__close"
+          data-test="close"
+          aria-label="Close"
+          @click="emitClose"
+        >
+          ×
+        </button>
+        <p class="link-overlay__host">{{ host }}</p>
+        <img v-if="qr" class="link-overlay__qr" :src="qr" alt="QR code for this link" />
+        <p class="link-overlay__hint">Scan to open on your phone</p>
+        <button type="button" class="link-overlay__open" data-test="open" @click="openNow">
+          Open ↗
+        </button>
+      </div>
     </div>
-  </div>
   </teleport>
 </template>
 
