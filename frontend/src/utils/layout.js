@@ -211,9 +211,10 @@ const viewForKind = (region, kind) => {
 };
 
 /**
- * Return a new screens object with `patch` merged into the `view` of the
- * calendar region `regionId` on the active screen (searching nested splits).
- * The input is not mutated. No-op if the region isn't a calendar region.
+ * Return a new screens object with `patch` merged into the `view` of region
+ * `regionId` on the active screen (searching nested splits). Calendar regions
+ * are patched via `clampCalendarView`; service regions via `clampServiceView`.
+ * The input is not mutated. No-op for other region kinds.
  */
 export function setRegionView(screens, regionId, patch) {
   // JSON round-trip, not structuredClone: `screens` may be a Vue reactive proxy

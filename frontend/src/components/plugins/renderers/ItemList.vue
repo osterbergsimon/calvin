@@ -31,6 +31,8 @@
 </template>
 
 <script setup>
+defineOptions({ inheritAttrs: false });
+
 import { computed } from "vue";
 import { resolvePath } from "../../../utils/jsonPath";
 import { applyFormat } from "../../../utils/formatters";
