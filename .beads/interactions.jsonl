@@ -50,3 +50,4 @@
 {"id":"int-2f2aff1e","kind":"field_change","created_at":"2026-07-02T20:21:03.116256293Z","actor":"Simon Österberg","issue_id":"calvin-8p0","extra":{"field":"status","new_value":"closed","old_value":"in_progress","reason":"Closed"}}
 {"id":"int-77ed2016","kind":"field_change","created_at":"2026-07-02T20:56:18.563324495Z","actor":"Simon Österberg","issue_id":"calvin-y9f","extra":{"field":"status","new_value":"closed","old_value":"in_progress","reason":"Closed"}}
 {"id":"int-3ea7fd5a","kind":"field_change","created_at":"2026-07-02T21:28:53.985922898Z","actor":"Simon Österberg","issue_id":"calvin-0ds","extra":{"field":"status","new_value":"closed","old_value":"in_progress","reason":"Closed"}}
+{"id":"int-3edc3da2","kind":"field_change","created_at":"2026-07-03T08:58:37.912540346Z","actor":"Simon Österberg","issue_id":"calvin-bc5","extra":{"field":"status","new_value":"closed","old_value":"in_progress","reason":"Merged to develop in PR #63 (merge commit a8d2799)."}}
