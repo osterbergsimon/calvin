@@ -1,9 +1,8 @@
 <template>
   <div class="kb">
-    <p class="kb-head">Your buttons</p>
-    <div class="kb-board">
+    <div class="kb-grid">
       <KeyBindingTile
-        v-for="key in DEVICE_KEYS"
+        v-for="key in boundKeys"
         :key="key"
         :key-code="key"
         :action="mappings[key] || null"
@@ -11,24 +10,9 @@
         @edit="$emit('edit', key)"
         @clear="$emit('clear', key)"
       />
-    </div>
-
-    <div class="kb-other">
-      <p class="kb-head">Other keys · {{ otherKeys.length }}</p>
-      <div class="kb-other-list">
-        <KeyBindingTile
-          v-for="key in otherKeys"
-          :key="key"
-          :key-code="key"
-          :action="mappings[key] || null"
-          :conflict="isConflict(key)"
-          @edit="$emit('edit', key)"
-          @clear="$emit('clear', key)"
-        />
-        <button class="kb-add" data-role="add" :disabled="capturing" @click="$emit('add')">
-          {{ capturing ? "Press a button…" : "＋ Press a button to bind" }}
-        </button>
-      </div>
+      <button class="kb-add" data-role="add" :disabled="capturing" @click="$emit('add')">
+        {{ capturing ? "Press a button…" : "＋ Press a button to bind" }}
+      </button>
     </div>
   </div>
 </template>
@@ -37,18 +21,24 @@
 import { computed } from "vue";
 import KeyBindingTile from "./KeyBindingTile.vue";
 
-const DEVICE_KEYS = ["KEY_1", "KEY_2", "KEY_3", "KEY_4", "KEY_5", "KEY_6", "KEY_7"];
-
 const props = defineProps({
   mappings: { type: Object, required: true },
   capturing: { type: Boolean, default: false },
 });
 defineEmits(["edit", "clear", "add"]);
 
-const otherKeys = computed(() =>
-  Object.keys(props.mappings)
-    .filter(k => !DEVICE_KEYS.includes(k))
-    .sort()
+// Single unified list of bound keys: single-digit keys first (the remote's
+// 1–7 read in order), then everything else alphabetically.
+const sortRank = key => {
+  const label = key.replace(/^KEY_/, "");
+  return /^[0-9]$/.test(label) ? [0, label] : [1, label];
+};
+const boundKeys = computed(() =>
+  Object.keys(props.mappings).sort((a, b) => {
+    const ra = sortRank(a);
+    const rb = sortRank(b);
+    return ra[0] - rb[0] || ra[1].localeCompare(rb[1]);
+  })
 );
 
 // An action is in conflict when >1 key maps to it (excluding "none").
@@ -67,29 +57,11 @@ const isConflict = key => {
 </script>
 
 <style scoped>
-.kb-head {
-  font-size: 0.7rem;
-  text-transform: uppercase;
-  letter-spacing: 0.05em;
-  color: var(--ink-2);
-  margin: 4px 0 8px;
-}
-.kb-board {
+.kb-grid {
   display: grid;
   grid-template-columns: repeat(auto-fit, minmax(112px, 1fr));
   gap: 8px;
-}
-.kb-other {
-  margin-top: 16px;
-}
-.kb-other-list {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 8px;
   align-items: stretch;
-}
-.kb-other-list .kbt {
-  min-width: 96px;
 }
 .kb-add {
   border: 1px dashed var(--line);

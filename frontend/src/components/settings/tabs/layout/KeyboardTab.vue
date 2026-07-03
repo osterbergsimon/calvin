@@ -2,8 +2,8 @@
   <div class="keyboard-tab">
     <CollapsibleSection title="Keyboard Buttons" icon="⌨️" :expanded="true">
       <p class="kb-intro">
-        Press a button to bind it, then choose what it does. Buttons 1–7 are your remote; other keys
-        work too for full keyboards.
+        Press a button to bind it, then choose what it does. Any key works — your remote's buttons
+        or a full keyboard.
       </p>
 
       <div v-if="store.loading" class="kb-msg">Loading mappings…</div>
