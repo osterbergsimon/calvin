@@ -244,7 +244,7 @@ describe("ItemList", () => {
     });
     expect(wrapper.text()).toContain("Hello");
     expect(wrapper.text()).toContain("world");
-    expect(wrapper.classes()).toContain("calvin-plugin-list");
+    expect(wrapper.find("ul").classes()).toContain("calvin-plugin-list");
     expect(wrapper.find(".item-list__row").classes()).toContain("calvin-plugin-row");
   });
 

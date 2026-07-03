@@ -10,6 +10,7 @@
     :data="data"
     :plugin-id="pluginId"
     :context="context"
+    :link-action="linkAction"
   />
 </template>
 
@@ -24,6 +25,7 @@ const props = defineProps({
   // "panel" (dashboard region) or "statusbar" — lets a renderer adapt its
   // default presentation to the surface it's drawn on.
   context: { type: String, default: "panel" },
+  linkAction: { type: String, default: null },
 });
 
 const renderer = computed(() => renderers[props.schema?.kind] || null);

@@ -116,4 +116,22 @@ describe("ServiceViewer", () => {
 
     expect(wrapper.find(".dashboard-panel__header").exists()).toBe(false);
   });
+
+  it("forwards linkAction to SchemaRenderer", () => {
+    const service = {
+      id: "mealie-1",
+      name: "Mealie",
+      display_schema: { kind: "card-grid" },
+      config: {},
+    };
+    const w = mount(ServiceViewer, {
+      props: { service, linkAction: "embed" },
+      global: {
+        stubs: {
+          SchemaRenderer: { name: "SchemaRenderer", props: ["linkAction"], template: "<div />" },
+        },
+      },
+    });
+    expect(w.findComponent({ name: "SchemaRenderer" }).props("linkAction")).toBe("embed");
+  });
 });

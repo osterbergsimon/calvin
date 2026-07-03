@@ -43,6 +43,8 @@ const props = defineProps({
   },
 });
 
+const emit = defineEmits(["error"]);
+
 const iframe = ref(null);
 const iframeError = ref(false);
 const iframeLoadTimeout = ref(null);
@@ -57,6 +59,7 @@ const handleIframeLoad = () => {
 
 const handleIframeError = () => {
   iframeError.value = true;
+  emit("error");
   if (iframeLoadTimeout.value) {
     clearTimeout(iframeLoadTimeout.value);
     iframeLoadTimeout.value = null;
@@ -92,6 +95,7 @@ watch(
           const iframeEl = iframe.value;
           if (iframeEl.contentDocument === null && iframeEl.contentWindow === null) {
             iframeError.value = true;
+            emit("error");
           }
         } catch (e) {
           // CORS error is expected, not necessarily a problem

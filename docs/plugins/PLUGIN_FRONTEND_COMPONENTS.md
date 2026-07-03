@@ -98,6 +98,14 @@ display_schema={
 }
 ```
 
+`item.click_url_path` makes rows clickable. **`item.link_action`** (optional,
+`"handoff"` | `"embed"`) — hints how a clickable item's link should open on the
+dashboard. `"handoff"` (default) shows a QR handoff overlay; `"embed"` opens
+the destination in an in-app iframe overlay. A per-region tune override can
+force `handoff`/`embed`/`off` regardless of the hint. Plugins never emit
+`"off"`. The dashboard never navigates the wall away — that is why raw links
+are not honored. The same field applies in `item-list`.
+
 ### `item-list` — timestamped feed/log
 
 [ItemList.vue](../../frontend/src/components/plugins/renderers/ItemList.vue)
@@ -196,6 +204,10 @@ Reference: the `chromecast` plugin in `calvin-plugins`.
 
 Web components are wrapped by the same region shell: fill the host
 (`width: 100%; height: 100%`) and don't draw your own panel header.
+
+**Web-component plugins must not self-navigate** (`window.location` /
+`window.open` / target-navigating anchors). Route link intents through the host
+so kiosk-safe handling applies; direct navigation can strand a wall display.
 
 ## Statusbar items
 

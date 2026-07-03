@@ -186,16 +186,35 @@ export function clampCalendarView(view = {}) {
   return out;
 }
 
-// Only calendar regions carry a `view`; others get no such key.
-const calendarViewFor = (region, kind) =>
-  kind === "calendar"
-    ? { view: clampCalendarView({ ...DEFAULT_CALENDAR_VIEW, ...(region?.view || {}) }) }
-    : {};
+const SERVICE_LINK_ACTIONS = ["handoff", "embed", "off"];
 
 /**
- * Return a new screens object with `patch` merged into the `view` of the
- * calendar region `regionId` on the active screen (searching nested splits).
- * The input is not mutated. No-op if the region isn't a calendar region.
+ * Coerce a service region's `view` block. Only `linkAction` is recognised, and
+ * only when it is one of handoff/embed/off — anything else (or absent) is
+ * omitted so the region inherits the plugin's own hint. Absent = inherit.
+ */
+export function clampServiceView(view = {}) {
+  const out = {};
+  if (SERVICE_LINK_ACTIONS.includes(view.linkAction)) out.linkAction = view.linkAction;
+  return out;
+}
+
+// Calendar and service regions carry a `view`; other kinds get no such key.
+const viewForKind = (region, kind) => {
+  if (kind === "calendar") {
+    return { view: clampCalendarView({ ...DEFAULT_CALENDAR_VIEW, ...(region?.view || {}) }) };
+  }
+  if (kind === "service") {
+    return { view: clampServiceView(region?.view || {}) };
+  }
+  return {};
+};
+
+/**
+ * Return a new screens object with `patch` merged into the `view` of region
+ * `regionId` on the active screen (searching nested splits). Calendar regions
+ * are patched via `clampCalendarView`; service regions via `clampServiceView`.
+ * The input is not mutated. No-op for other region kinds.
  */
 export function setRegionView(screens, regionId, patch) {
   // JSON round-trip, not structuredClone: `screens` may be a Vue reactive proxy
@@ -212,6 +231,10 @@ export function setRegionView(screens, regionId, patch) {
           ...(region.view || {}),
           ...patch,
         });
+        return true;
+      }
+      if (region.id === regionId && region.kind === "service") {
+        region.view = clampServiceView({ ...(region.view || {}), ...patch });
         return true;
       }
       if (region.split && visit(region.split.regions)) return true;
@@ -575,7 +598,7 @@ export function normalizeDashboardLayout(layout, legacyConfig = {}) {
       instanceIds,
       size: clampRegionSize(region.size ?? presetRegion.size ?? 100 / sourceRegions.length),
       split: normalizeRegionSplit(region.split, id),
-      ...calendarViewFor(region, kind),
+      ...viewForKind(region, kind),
     };
   });
 
@@ -682,7 +705,7 @@ function normalizeRegionSplit(split, parentId) {
       serviceId: kind === "service" ? instanceIds[0] || null : null,
       instanceIds,
       size: clampRegionSize(Number(sub.size) || 100 / subs.length),
-      ...calendarViewFor(sub, kind),
+      ...viewForKind(sub, kind),
     };
   });
   return {

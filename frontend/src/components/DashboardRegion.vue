@@ -30,6 +30,8 @@
           v-else-if="sub.kind === 'service'"
           :is-fullscreen="false"
           :service-id="sub.instanceIds?.[0] || sub.serviceId"
+          :region-id="sub.id"
+          :view="sub.view"
           :focused="isFocused(sub.id)"
           :dim="isDim(sub.id)"
         />
@@ -57,6 +59,8 @@
         v-else-if="region.kind === 'service'"
         :is-fullscreen="false"
         :service-id="region.instanceIds?.[0] || region.serviceId"
+        :region-id="region.id"
+        :view="region.view"
         :focused="isFocused(region.id)"
         :dim="isDim(region.id)"
       />

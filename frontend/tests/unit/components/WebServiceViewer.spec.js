@@ -6,6 +6,48 @@ import { useConfigStore } from "@/stores/config";
 import { useWebServicesStore } from "@/stores/webServices";
 import { useModeStore } from "@/stores/mode";
 
+// ---------------------------------------------------------------------------
+// Helpers for the link-wiring tests (Task 8)
+// ---------------------------------------------------------------------------
+function setupLinkWiring(kind) {
+  setActivePinia(createPinia());
+  const store = useWebServicesStore();
+  store.fetchServices = vi.fn().mockResolvedValue();
+  store.services = [{ id: "mealie-1", name: "Mealie", display_schema: { kind }, config: {} }];
+  return store;
+}
+
+describe("WebServiceViewer link wiring", () => {
+  it("shows the tune control for a link-capable service region when focused", async () => {
+    setupLinkWiring("card-grid");
+    const w = mount(WebServiceViewer, {
+      props: {
+        serviceId: "mealie-1",
+        regionId: "svc-1",
+        view: { linkAction: "embed" },
+        focused: true,
+      },
+      global: { stubs: { ServiceViewer: { template: "<div><slot name='actions' /></div>" } } },
+      attachTo: document.body,
+    });
+    await w.vm.$nextTick();
+    expect(w.findComponent({ name: "ServiceRegionViewOptions" }).exists()).toBe(true);
+    w.unmount();
+  });
+
+  it("hides the tune control for a non-link-capable service (iframe)", async () => {
+    setupLinkWiring("iframe");
+    const w = mount(WebServiceViewer, {
+      props: { serviceId: "mealie-1", regionId: "svc-1", view: {}, focused: true },
+      global: { stubs: { ServiceViewer: { template: "<div><slot name='actions' /></div>" } } },
+      attachTo: document.body,
+    });
+    await w.vm.$nextTick();
+    expect(w.findComponent({ name: "ServiceRegionViewOptions" }).exists()).toBe(false);
+    w.unmount();
+  });
+});
+
 describe("WebServiceViewer", () => {
   beforeEach(() => {
     setActivePinia(createPinia());

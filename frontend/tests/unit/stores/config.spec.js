@@ -143,6 +143,7 @@ describe("Config Store", () => {
         instanceIds: [],
         size: 40,
         split: null,
+        view: {},
       },
     ]);
     expect(store.dashboardScreens.activeScreenId).toBe("services");

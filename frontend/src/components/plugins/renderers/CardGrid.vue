@@ -8,10 +8,10 @@
           :key="j"
           class="card-grid__item calvin-plugin-row"
           :class="{
-            'card-grid__item--clickable': itemUrl(item),
-            'calvin-plugin-clickable': itemUrl(item),
+            'card-grid__item--clickable': isClickable(itemUrl(item), itemLinkAction),
+            'calvin-plugin-clickable': isClickable(itemUrl(item), itemLinkAction),
           }"
-          @click="open(itemUrl(item))"
+          @click="openLink(itemUrl(item), itemLinkAction)"
         >
           <span v-if="itemLabel(item)" class="card-grid__item-label">{{ itemLabel(item) }}</span>
           <span v-if="itemValue(item)" class="card-grid__item-value">{{ itemValue(item) }}</span>
@@ -21,6 +21,13 @@
         {{ schema.empty_text || "Nothing planned." }}
       </p>
     </article>
+    <HandoffOverlay v-if="overlay?.kind === 'handoff'" :url="overlay.url" @close="closeOverlay" />
+    <EmbedOverlay
+      v-else-if="overlay?.kind === 'embed'"
+      :url="overlay.url"
+      @close="closeOverlay"
+      @fallback="fallbackToHandoff"
+    />
   </div>
 </template>
 
@@ -28,11 +35,21 @@
 import { computed } from "vue";
 import { resolvePath } from "../../../utils/jsonPath";
 import { applyFormat } from "../../../utils/formatters";
+import { useLinkOpen } from "../../../composables/useLinkOpen";
+import HandoffOverlay from "../overlays/HandoffOverlay.vue";
+import EmbedOverlay from "../overlays/EmbedOverlay.vue";
 
 const props = defineProps({
   schema: { type: Object, required: true },
   data: { type: [Object, Array, null], default: null },
+  linkAction: { type: String, default: null },
 });
+
+const { overlay, isClickable, openLink, closeOverlay, fallbackToHandoff } = useLinkOpen(
+  () => props.linkAction
+);
+
+const itemLinkAction = computed(() => itemSpec().link_action);
 
 const cards = computed(() => {
   const slice = props.schema.data_path
@@ -89,10 +106,6 @@ function itemValue(item) {
 function itemUrl(item) {
   const spec = itemSpec();
   return spec.click_url_path ? resolvePath(item, spec.click_url_path) : null;
-}
-
-function open(url) {
-  if (url) window.open(url, "_blank", "noopener");
 }
 </script>
 
