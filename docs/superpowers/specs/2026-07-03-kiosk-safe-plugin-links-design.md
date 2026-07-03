@@ -2,7 +2,8 @@
 
 **Date:** 2026-07-03
 **Status:** Approved (brainstorming) — ready for implementation plan
-**Area:** frontend plugin renderers + plugin instance config (fits plugin contract 1.0, no contract change)
+**Area:** frontend plugin renderers + per-region view options (fits plugin contract 1.0, no contract change, no backend change)
+**Beads:** closes `calvin-1nl` (the design decision it asks for); first consumer of `calvin-39g` (wire `RegionViewOptions` into service regions).
 
 ## Problem
 
@@ -26,7 +27,7 @@ An earlier draft branched behavior on kiosk-vs-interactive. That was dropped. Ca
 
 - A tapped plugin link can **never** accidentally strand the display.
 - Preserve link value via a QR **handoff** overlay (scan → open on your phone).
-- Let a plugin **hint** its default link action; let the user **override** it per instance.
+- Let a plugin **hint** its default link action; let the user **override** it per region via the existing tune-popover mechanism.
 - Fit **plugin contract 1.0** with **no contract or validation change** for the plugin-authored part.
 - Keep plugins self-contained — a plugin declares *what a link is*, never *what the host does about it*.
 
@@ -34,7 +35,7 @@ An earlier draft branched behavior on kiosk-vs-interactive. That was dropped. Ca
 
 - **True kiosk mode** (navigable screens + selective chrome). Separate future work; this design does not depend on or introduce it.
 - **Web-component self-navigation.** A `web-component` plugin runs arbitrary JS and can call `window.location`/`window.open`, bypassing every host guard. We **document a contract rule** ("route links through the host bridge; do not self-navigate") but do not sandbox it here.
-- **Global kill-switch knob.** Safe-by-default + per-instance `off` covers the need; a global knob can be added later if a real case appears.
+- **Global kill-switch knob.** Safe-by-default + per-region `off` covers the need; a global knob can be added later if a real case appears.
 - **iframe `embed` in interactive contexts as a distinct behavior.** Behavior is mode-independent; `embed` always means the iframe overlay.
 
 ## The model
@@ -42,7 +43,8 @@ An earlier draft branched behavior on kiosk-vs-interactive. That was dropped. Ca
 ### Resolved action (per link, always)
 
 ```
-per-instance override  →  plugin hint  →  default ("handoff")
+per-region override  →  plugin hint  →  default ("handoff")
+   (region.view.linkAction)   (item.link_action)     ("handoff")
 ```
 
 Actions:
@@ -78,10 +80,12 @@ Plugin authors would not hint `"off"` (there is no reason to ship a dead link); 
 Extract the duplicated `open()` helper in `CardGrid.vue` and `ItemList.vue` into a single composable `useLinkOpen()` (frontend). It:
 
 1. Resolves the URL (existing `click_url_path` logic).
-2. Resolves the action: `instance override ?? item.link_action ?? "handoff"`.
+2. Resolves the action: `regionLinkAction ?? item.link_action ?? "handoff"`, where `regionLinkAction` is the per-region override (§4) threaded in as a prop.
 3. Dispatches: `handoff` → open HandoffOverlay; `embed` → open EmbedOverlay; `off` → render as non-clickable (no handler, no `--clickable` affordance).
 
 `CardGrid.vue` and `ItemList.vue` call the composable instead of their own `window.open`. Every current and future link-emitting built-in renderer inherits the behavior for free. The `IframeRenderer` error-fallback anchor is also routed through the composable for consistency.
+
+The override value reaches the renderers by prop-threading through the existing region chain: `DashboardRegion` → `WebServiceViewer` → `ServiceViewer` → `SchemaRenderer` → `CardGrid`/`ItemList`. `SchemaRenderer` currently forwards only `schema`/`data`/`pluginId`/`context`; we add one prop (`linkAction`) alongside `pluginId`. Renderers keep their pure `schema`+`data`(+`linkAction`) contract — no store coupling — which preserves testability and the dev `RendererGallery`.
 
 ### 3. Overlays
 
@@ -90,43 +94,61 @@ Both overlays are dismissable (tap-anywhere / close button / idle auto-dismiss).
 - **HandoffOverlay** — on-dashboard modal showing destination **title + host**, a **QR code**, and an **"Open ↗"** button. QR is generated **client-side** (small `qrcode` npm dep) — no backend endpoint needed. Uses the `calvin-plugin-*` body classes / Calvin surface styling.
 - **EmbedOverlay** — modal hosting an **iframe** of the destination, reusing the existing `IframeViewer` infrastructure, with a close button. On iframe load failure or a timeout (many targets set `X-Frame-Options`/CSP `frame-ancestors` and will not embed), it **falls back to the HandoffOverlay** ("couldn't embed — scan or open"). This covers a plugin author (or user) choosing `embed` for a destination that refuses framing.
 
-### 4. Per-instance override (host-injected — the net-new plumbing)
+### 4. Per-region override (a service-region tune option — the `calvin-39g` mechanism)
 
-The user can override any instance's link action from its settings form: **`Default | QR handoff | Open in-app | Off`** (`Default` = use the plugin hint / global default).
+The override is a **per-region view option**, set live from a tune popover on the dashboard, following the calendar's per-region week-number/event-density precedent (`calvin-g9p`) exactly. It is **not** a plugin-config field and **not** host-injected instance plumbing — an earlier draft proposed that; it's dropped in favor of the established region mechanism the user pointed at.
 
-This is **net-new plumbing** — confirmed there is no host-injected-field hook today; the instance form (`InstanceModal.vue`, `PluginCard.vue`) is built purely by iterating the plugin's own `instance_config_schema`, with only hard-coded name/enabled/calendar-color exceptions. So:
+**Storage — `region.view.linkAction`.** Per-region overrides already live in the layout tree's `region.view` block (`frontend/src/utils/layout.js`), persisted transparently inside `dashboardScreens` (the whole `screens` tree round-trips as an opaque dict via `config.py`; **no backend change**). Today `layout.js` attaches a `view` block only for `kind === "calendar"` (`calendarViewFor`) and `setRegionView` is guarded by `region.kind === "calendar"`. We add a minimal service view:
 
-- **Frontend:** render a reserved **"Link behavior"** select in `InstanceModal.vue` *outside* the schema loop, following the existing **calendar `color`/`show_time` special-case precedent** (`InstanceModal.vue` ~lines 79–109). Shown only for plugins whose `display_schema.kind` is link-capable (`card-grid`, `item-list`).
-- **Persistence:** store the value in the instance `config` JSON blob under a **host-reserved key** (proposed: `_link_action`). Note the reserved-key convention: keys prefixed `_instance_` are *stripped* before persistence (transient metadata), so we deliberately use a different prefix so the value **persists**. `normalize_config` (`base.py`) already passes unknown keys through into `self.config`, so no schema declaration is needed for it to survive.
-- **Read-back:** the instance's config already reaches the frontend with each plugin instance; `useLinkOpen()` reads `instance.config._link_action` and treats a missing/`Default` value as "fall through to the plugin hint."
+- `clampServiceView(view)` — validate-or-omit, mirroring `clampCalendarView`. It keeps `linkAction` only when it's one of `"handoff" | "embed" | "off"`; **absent = inherit** (fall through to the plugin hint). No other keys.
+- `serviceViewFor(region)` — attaches `view` for `kind === "service"` in `normalizeDashboardLayout` / split normalization.
+- Un-guard `setRegionView` so a `service` region routes its patch through `clampServiceView` (branch on `region.kind`).
 
-The plugin never declares this field. It appears for free on every present and future link-capable plugin. **mealie** can thus be set to **Open in-app** (`embed`) purely from the host UI, with no change to the mealie plugin.
+**Write — the existing store action, unchanged.** `configStore.updateRegionView(regionId, patch)` (`config.js`) already writes any region patch and persists via `updateConfig`. Passing `{ linkAction: undefined }` clears the override → inherit (same convention as `weekNumbers`/`maxVisibleEvents`).
+
+**UI — `ServiceRegionViewOptions.vue` (new), copying `CalendarViewOptions.vue`.** Props `regionId` + `view`. Wraps `RegionViewOptions` (the generic tune trigger + popover shell). Exposes one control — **Link behavior**, a segmented Default / QR handoff / Open in-app / Off (`Default` = clear override = inherit the plugin hint). Reads `props.view?.linkAction`; on change calls `updateRegionView(regionId, { linkAction })` (or `undefined` for Default). Mounted in `WebServiceViewer.vue`'s `#actions` slot alongside `RegionControls` (mirroring how `CalendarViewOptions` sits in the calendar header). **Rendered only when the service's `display_schema.kind` is link-capable** (`card-grid`/`item-list`) — otherwise the tune option is irrelevant and hidden.
+
+**Read-back.** `DashboardRegion` already has `region.view`; it passes `:link-action="region.view?.linkAction"` (and `:region-id` / `:view`) into `WebServiceViewer` → `ServiceViewer` → `SchemaRenderer` → renderers. `useLinkOpen()` treats a missing value as "fall through to the plugin hint."
+
+**mealie** needs no change: with no override and no hint it defaults to `handoff`; a user sets a specific Mealie region to **Open in-app** (`embed`) purely by tapping its tune icon and choosing it.
 
 ## Affected files
 
-**Frontend (calvin repo):**
-- `frontend/src/components/plugins/renderers/CardGrid.vue` — use `useLinkOpen()`; honor `off` (non-clickable).
-- `frontend/src/components/plugins/renderers/ItemList.vue` — same.
+**Frontend (calvin repo) — all changes; no backend changes:**
+
+*Link rendering / overlays:*
+- `frontend/src/composables/useLinkOpen.js` — **new**: URL + action resolution (`regionLinkAction ?? item.link_action ?? "handoff"`) + dispatch to overlays.
+- `frontend/src/components/plugins/overlays/HandoffOverlay.vue` — **new**: title/host + client-side QR + "Open ↗".
+- `frontend/src/components/plugins/overlays/EmbedOverlay.vue` — **new**: reuses `IframeViewer`, falls back to Handoff on load failure/timeout.
+- `frontend/src/components/plugins/renderers/CardGrid.vue` — declare `linkAction` prop; use `useLinkOpen()`; honor `off` (non-clickable). Item spec is at `schema.card.item`.
+- `frontend/src/components/plugins/renderers/ItemList.vue` — same; item spec is at `schema.item`.
 - `frontend/src/components/plugins/renderers/IframeRenderer.vue` — route error-fallback anchor through the composable.
-- `frontend/src/composables/useLinkOpen.js` — **new**: URL + action resolution + dispatch.
-- `frontend/src/components/plugins/overlays/HandoffOverlay.vue` — **new**.
-- `frontend/src/components/plugins/overlays/EmbedOverlay.vue` — **new** (reuses `IframeViewer`, falls back to Handoff).
-- `frontend/src/components/settings/specialized/InstanceModal.vue` — **new** reserved "Link behavior" field for link-capable plugins; persist under `_link_action`.
-- `package.json` — add `qrcode` dependency.
+- `frontend/src/components/plugins/SchemaRenderer.vue` — forward a new `:link-action` prop to the renderer (alongside `pluginId`).
+
+*Per-region override (the `calvin-39g` mechanism):*
+- `frontend/src/utils/layout.js` — add `clampServiceView` + `serviceViewFor`; branch `setRegionView` on `region.kind` so `service` regions accept `{ linkAction }` patches.
+- `frontend/src/components/dashboard/ServiceRegionViewOptions.vue` — **new** (copy `CalendarViewOptions.vue` shape): props `regionId` + `view`, wraps `RegionViewOptions`, one "Link behavior" control, persists via `updateRegionView`.
+- `frontend/src/components/WebServiceViewer.vue` — mount `ServiceRegionViewOptions` in `#actions` (only for link-capable `display_schema.kind`); accept + forward `region-id`/`view`/`link-action`.
+- `frontend/src/components/service/ServiceViewer.vue` — forward resolved `link-action` into `SchemaRenderer`.
+- `frontend/src/components/DashboardRegion.vue` — pass `:region-id`, `:view="region.view"`, `:link-action="region.view?.linkAction"` into `WebServiceViewer` (both the main and split branches).
+
+*Dependency:*
+- `frontend/package.json` — add `qrcode`.
 
 **Plugins (calvin-plugins repo) — optional, not required for correctness:**
-- `mealie/plugin.py` — optionally add `item.link_action` hint (recipes are `handoff` by default anyway; a hint is only needed if the *plugin's* preferred default differs from `handoff`).
+- `mealie/plugin.py` — optionally add `item.link_action` hint (recipes default to `handoff` anyway; only needed if the plugin's preferred default differs).
 
 **Docs:**
 - Plugin frontend docs — document `item.link_action` and the web-component "do not self-navigate; route links through the host bridge" contract rule.
 
 ## Testing
 
-- **Composable unit tests:** action resolution precedence (`override > hint > default`), URL resolution, `off` → non-clickable.
-- **Renderer tests:** `CardGrid`/`ItemList` open the correct overlay for each action; `off` renders no click handler/affordance.
-- **HandoffOverlay:** renders QR for a URL, shows title/host, "Open ↗" triggers `window.open`, dismiss paths work.
+- **Composable unit tests:** action resolution precedence (`regionLinkAction > item.link_action > "handoff"`), URL resolution, `off` → non-clickable.
+- **`clampServiceView` unit tests:** keeps a valid `linkAction`, drops an invalid one, drops when absent (inherit). `setRegionView` applies a `linkAction` patch to a `service` region and leaves calendar regions unchanged.
+- **Renderer tests:** `CardGrid`/`ItemList` open the correct overlay per resolved action; `off` renders no click handler/affordance; a `linkAction` prop overrides the item hint.
+- **HandoffOverlay:** renders QR for a URL, shows title/host, "Open ↗" triggers `window.open`, dismiss paths (tap-out / close / idle) work.
 - **EmbedOverlay:** renders iframe; simulated load failure/timeout falls back to HandoffOverlay.
-- **Instance override:** the reserved field renders only for link-capable plugins; value persists into config under `_link_action` and survives `normalize_config`; a set override beats the plugin hint.
+- **`ServiceRegionViewOptions`:** renders only for link-capable kinds; reads `view.linkAction`; selecting an option calls `updateRegionView(regionId, { linkAction })`; Default calls it with `undefined`.
 - **Regression:** mealie (no hint, no override) → HandoffOverlay by default; nothing navigates on a card tap.
 
 ## Open questions / future
