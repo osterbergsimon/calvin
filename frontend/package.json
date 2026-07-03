@@ -32,6 +32,7 @@
     "@vueuse/core": "^10.7.0",
     "axios": "^1.6.0",
     "pinia": "^2.1.7",
+    "qrcode": "^1.5.4",
     "vue": "^3.4.0",
     "vue-router": "^4.2.5",
     "vuedraggable": "^4.1.0"
