@@ -110,6 +110,15 @@ const visibleGroups = computed(() => {
   font-size: 1.4rem;
   line-height: 1;
   cursor: pointer;
+  min-width: 44px;
+  min-height: 44px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+.ap-close:focus-visible {
+  outline: 2px solid var(--focus);
+  outline-offset: 2px;
 }
 .ap-search {
   margin: 10px 14px 6px;
@@ -119,6 +128,10 @@ const visibleGroups = computed(() => {
   border-radius: 6px;
   color: var(--ink);
   font-family: var(--font-ui);
+}
+.ap-search:focus-visible {
+  outline: 2px solid var(--focus);
+  outline-offset: 2px;
 }
 .ap-scroll {
   overflow-y: auto;
@@ -158,6 +171,10 @@ const visibleGroups = computed(() => {
 }
 .ap-opt:hover {
   border-color: var(--focus);
+}
+.ap-opt:focus-visible {
+  outline: 2px solid var(--focus);
+  outline-offset: 2px;
 }
 .ap-opt--current {
   outline: 2px solid var(--focus);

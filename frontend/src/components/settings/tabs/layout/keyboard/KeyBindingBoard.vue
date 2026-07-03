@@ -76,7 +76,7 @@ const isConflict = key => {
 }
 .kb-board {
   display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(96px, 1fr));
+  grid-template-columns: repeat(auto-fit, minmax(112px, 1fr));
   gap: 8px;
 }
 .kb-other {
@@ -107,5 +107,9 @@ const isConflict = key => {
 .kb-add:disabled {
   opacity: 0.7;
   cursor: default;
+}
+.kb-add:focus-visible {
+  outline: 2px solid var(--focus);
+  outline-offset: 2px;
 }
 </style>

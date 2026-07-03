@@ -81,13 +81,17 @@ const keyLabel = computed(() => props.keyCode.replace(/^KEY_/, ""));
   border: 1px solid var(--line);
   border-radius: 5px;
   color: var(--ink-2);
-  width: 28px;
-  height: 28px;
+  min-width: 44px;
+  min-height: 44px;
   cursor: pointer;
 }
 .kbt-btn:hover {
   border-color: var(--focus);
   color: var(--ink);
+}
+.kbt-btn:focus-visible {
+  outline: 2px solid var(--focus);
+  outline-offset: 2px;
 }
 .kbt-conflict-dot {
   position: absolute;
