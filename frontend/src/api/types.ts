@@ -1594,8 +1594,6 @@ export interface components {
       calendarRefreshInterval?: number | null;
       /** Calendarsplit */
       calendarSplit?: number | null;
-      /** Calendarviewmode */
-      calendarViewMode?: string | null;
       /** Clockbarverticaldatefontsize */
       clockBarVerticalDateFontSize?: number | null;
       /** Clockbarverticalfontsize */

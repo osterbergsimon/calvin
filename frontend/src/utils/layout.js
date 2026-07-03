@@ -142,6 +142,73 @@ export function createDashboardScreenFromPreset(preset, existingScreen = null) {
   });
 }
 
+export const DEFAULT_CALENDAR_VIEW = Object.freeze({
+  mode: "month",
+  rolling: false,
+  weeks: 4,
+  days: 7,
+  // Non-rolling month always renders the full month; extraWeeks appends this
+  // many look-ahead weeks after it (0 = just the month). Unused by other views.
+  extraWeeks: 0,
+});
+
+const clampViewInt = (value, lo, hi, fallback) => {
+  const n = Math.round(Number(value));
+  if (!Number.isFinite(n)) return fallback;
+  return Math.min(hi, Math.max(lo, n));
+};
+
+/**
+ * Coerce a calendar region's `view` block into the canonical shape:
+ * mode ∈ {month,week,day}, rolling boolean, weeks 1–12, days 1–14,
+ * extraWeeks 0–8 (look-ahead weeks after a non-rolling month).
+ */
+export function clampCalendarView(view = {}) {
+  return {
+    mode: ["month", "week", "day"].includes(view.mode) ? view.mode : "month",
+    rolling: view.rolling === true || view.rolling === "true" || view.rolling === 1,
+    weeks: clampViewInt(view.weeks, 1, 12, DEFAULT_CALENDAR_VIEW.weeks),
+    days: clampViewInt(view.days, 1, 14, DEFAULT_CALENDAR_VIEW.days),
+    extraWeeks: clampViewInt(view.extraWeeks, 0, 8, DEFAULT_CALENDAR_VIEW.extraWeeks),
+  };
+}
+
+// Only calendar regions carry a `view`; others get no such key.
+const calendarViewFor = (region, kind) =>
+  kind === "calendar"
+    ? { view: clampCalendarView({ ...DEFAULT_CALENDAR_VIEW, ...(region?.view || {}) }) }
+    : {};
+
+/**
+ * Return a new screens object with `patch` merged into the `view` of the
+ * calendar region `regionId` on the active screen (searching nested splits).
+ * The input is not mutated. No-op if the region isn't a calendar region.
+ */
+export function setRegionView(screens, regionId, patch) {
+  // JSON round-trip, not structuredClone: `screens` may be a Vue reactive proxy
+  // (from the Pinia store), which structuredClone rejects with DataCloneError.
+  // The screens config is pure JSON-serializable data, so this is safe.
+  const next = JSON.parse(JSON.stringify(screens));
+  const active = next.screens.find(s => s.id === next.activeScreenId) || next.screens[0];
+  if (!active) return next;
+  const visit = regions => {
+    for (const region of regions || []) {
+      if (region.id === regionId && region.kind === "calendar") {
+        region.view = clampCalendarView({
+          ...DEFAULT_CALENDAR_VIEW,
+          ...(region.view || {}),
+          ...patch,
+        });
+        return true;
+      }
+      if (region.split && visit(region.split.regions)) return true;
+    }
+    return false;
+  };
+  visit(active.layout?.regions);
+  return next;
+}
+
 export function normalizeDashboardScreens(screensConfig) {
   const fallback = {
     version: 2,
@@ -495,6 +562,7 @@ export function normalizeDashboardLayout(layout, legacyConfig = {}) {
       instanceIds,
       size: clampRegionSize(region.size ?? presetRegion.size ?? 100 / sourceRegions.length),
       split: normalizeRegionSplit(region.split, id),
+      ...calendarViewFor(region, kind),
     };
   });
 
@@ -601,6 +669,7 @@ function normalizeRegionSplit(split, parentId) {
       serviceId: kind === "service" ? instanceIds[0] || null : null,
       instanceIds,
       size: clampRegionSize(Number(sub.size) || 100 / subs.length),
+      ...calendarViewFor(sub, kind),
     };
   });
   return {

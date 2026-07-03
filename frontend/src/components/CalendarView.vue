@@ -72,6 +72,11 @@
             >
               ›
             </button>
+            <CalendarViewOptions
+              v-if="view && viewMode !== 'day'"
+              :region-id="regionId"
+              :view="view"
+            />
             <button
               v-if="!isFullscreen"
               type="button"
@@ -95,29 +100,19 @@
         <div
           class="calendar-grid"
           :class="{
-            'rolling-view': viewMode === 'rolling',
-            'week-view': viewMode === 'week',
+            'agenda-view': isAgenda,
             'day-view': viewMode === 'day',
             loading: loading,
           }"
         >
           <!-- Day headers -->
-          <div class="calendar-weekdays">
-            <div
-              v-for="day in viewMode === 'day' ? [getCurrentWeekdayName()] : weekDays"
-              :key="day"
-              class="weekday"
-            >
-              {{ day }}
+          <div class="calendar-weekdays" :style="rollingColumnStyle">
+            <div v-for="header in weekdayHeaders" :key="header.key" class="weekday">
+              {{ header.label }}
             </div>
           </div>
           <!-- Calendar days -->
-          <div
-            class="calendar-days"
-            :class="{
-              'rolling-days': viewMode === 'rolling',
-            }"
-          >
+          <div class="calendar-days" :style="rollingColumnStyle">
             <div
               v-for="(day, dayIndex) in calendarDays"
               :key="day.date.toISOString()"
@@ -190,6 +185,7 @@ import DialogScrim from "./ui/DialogScrim.vue";
 import CalendarEventItem from "./CalendarEventItem.vue";
 import DashboardPanel from "./DashboardPanel.vue";
 import RegionControls from "./dashboard/RegionControls.vue";
+import CalendarViewOptions from "./dashboard/CalendarViewOptions.vue";
 
 const props = defineProps({
   focused: {
@@ -208,6 +204,17 @@ const props = defineProps({
     type: Boolean,
     default: false,
   },
+  // Per-region view config: { mode, rolling, weeks, days }. Owns the calendar's
+  // base granularity + rolling-window modifier (replaces the old global config).
+  view: {
+    type: Object,
+    default: null,
+  },
+  // Region id this calendar belongs to — target for view-mutating controls.
+  regionId: {
+    type: String,
+    default: null,
+  },
 });
 
 const configStore = useConfigStore();
@@ -220,31 +227,87 @@ const sourceKey = computed(() =>
     .sort()
     .join(",")
 );
-const viewMode = computed(() => configStore.calendarViewMode);
+// Base granularity + rolling modifier come from the region's `view` prop.
+const viewMode = computed(() => props.view?.mode ?? "month");
+const rolling = computed(() => props.view?.rolling === true);
 const showWeekNumbers = computed(() => configStore.showWeekNumbers);
 const weekStartDay = computed(() => configStore.weekStartDay ?? 1);
 const weekendDays = computed(() => configStore.weekendDays || [0, 6]);
 const showRedDays = computed(() => configStore.showRedDays || false);
-const rollingWeeks = computed(() => Math.min(12, Math.max(1, configStore.calendarWeeks ?? 4)));
+const rollingWeeks = computed(() => Math.min(12, Math.max(1, props.view?.weeks ?? 4)));
+const rollingDays = computed(() => Math.min(14, Math.max(1, props.view?.days ?? 7)));
+// Look-ahead weeks appended after a non-rolling month (0 = just the month).
+const extraWeeks = computed(() => Math.min(8, Math.max(0, props.view?.extraWeeks ?? 0)));
+// Rolling as a windowing modifier: the base view sets the unit + count, and
+// rolling only flips the anchor (period-start when off, today when on).
+//   month → `weeks` weeks (off: from the month's first week; on: from today's week)
+//   week  → `days` days    (off: from the current week's start; on: from today)
+//   day   → a single day (no count, no rolling)
+const isAgenda = computed(() => viewMode.value === "week");
+
+// First day cell of the rendered window (month + week views).
+const windowStart = computed(() => {
+  if (viewMode.value === "week") {
+    if (rolling.value) {
+      const d = new Date(currentDate.value);
+      d.setHours(0, 0, 0, 0);
+      return d;
+    }
+    return getWeekStart(currentDate.value);
+  }
+  const anchor = rolling.value
+    ? currentDate.value
+    : new Date(currentDate.value.getFullYear(), currentDate.value.getMonth(), 1);
+  return getWeekStart(anchor);
+});
+
+// Weeks needed to render the anchor month in full — leading days from the
+// previous month plus trailing days to complete the last week (4–6 weeks
+// depending on the month). Non-rolling month always shows all of these, so no
+// day is ever hidden by the count.
+const monthGridWeeks = computed(() => {
+  const y = currentDate.value.getFullYear();
+  const m = currentDate.value.getMonth();
+  const start = getWeekStart(new Date(y, m, 1));
+  const lastOfMonth = new Date(y, m + 1, 0);
+  const span = Math.round((lastOfMonth - start) / 86400000) + 1;
+  return Math.ceil(span / 7);
+});
+
+// Number of day cells in the window (day view is handled separately).
+//   week          → `days` cells
+//   rolling month → `weeks` cells (a pure N-week window from today's week)
+//   non-rolling month → the full month grid + `extraWeeks` look-ahead weeks
+const windowLength = computed(() => {
+  if (viewMode.value === "week") return rollingDays.value;
+  if (viewMode.value === "month" && !rolling.value) {
+    return (monthGridWeeks.value + extraWeeks.value) * 7;
+  }
+  return rollingWeeks.value * 7;
+});
+
+// The agenda strip lays out `days` columns in one row; the count is dynamic, so
+// feed it to the (!important) grid rule via a custom property.
+const rollingColumnStyle = computed(() =>
+  isAgenda.value ? { "--rolling-cols": `repeat(${rollingDays.value}, minmax(0, 1fr))` } : null
+);
 
 const viewModeLabel = computed(() => {
-  const labels = {
-    month: "Month",
-    week: "Week",
-    day: "Day",
-    rolling: "Rolling",
-  };
-  return labels[viewMode.value] || "Month";
+  const labels = { month: "Month", week: "Week", day: "Day" };
+  const base = labels[viewMode.value] || "Month";
+  return rolling.value && viewMode.value !== "day" ? `${base} · Rolling` : base;
 });
 
 const calendarStore = useCalendarStore();
 const modeStore = useModeStore();
 const route = useRoute();
 
-// Cycle the calendar view mode (month → week → day) via the shared config
-// action, which also persists the choice to the backend.
+// Cycle this region's base view (month → week → day) and persist it to the
+// region. Rolling stays out of the cycle — it's a separate windowing toggle.
 const cycleView = () => {
-  configStore.cycleCalendarViewMode().catch(err => {
+  const order = ["month", "week", "day"];
+  const next = order[(order.indexOf(viewMode.value) + 1) % order.length];
+  configStore.updateRegionView(props.regionId, { mode: next }).catch(err => {
     console.error("Failed to cycle calendar view mode:", err);
   });
 };
@@ -262,15 +325,13 @@ const isCurrentPeriod = computed(() => {
       cd.getDate() === t.getDate()
     );
   }
-  if (viewMode.value === "week" || viewMode.value === "rolling") {
-    const weeks = viewMode.value === "rolling" ? rollingWeeks.value : 1;
-    const windowStart = getWeekStart(cd);
-    const windowEnd = new Date(windowStart);
-    windowEnd.setDate(windowStart.getDate() + weeks * 7 - 1);
-    return t >= windowStart && t <= windowEnd;
-  }
-  // month
-  return cd.getFullYear() === t.getFullYear() && cd.getMonth() === t.getMonth();
+  // Month and week are both day-windows: today is "current" when it falls in
+  // the rendered [windowStart, windowStart + windowLength) span.
+  const start = new Date(windowStart.value);
+  start.setHours(0, 0, 0, 0);
+  const end = new Date(start);
+  end.setDate(start.getDate() + windowLength.value - 1);
+  return t >= start && t <= end;
 });
 
 const goToToday = () => {
@@ -284,8 +345,11 @@ const handleCloseFullscreen = () => {
 };
 
 const enterFullscreen = () => {
-  // Carry the current sources so the maximized view shows the same calendars.
-  modeStore.enterFullscreen(modeStore.MODES.CALENDAR, { sourceIds: props.sourceIds });
+  // Carry the region's sources and view so the maximized calendar matches.
+  modeStore.enterFullscreen(modeStore.MODES.CALENDAR, {
+    sourceIds: props.sourceIds,
+    view: props.view,
+  });
 };
 
 // Reactive today date that updates periodically to refresh the calendar
@@ -380,6 +444,22 @@ const weekDays = computed(() => {
   return days;
 });
 
+// Column headers for the grid. Fixed weekday names for month; a single weekday
+// for day view; per-day date labels ("Wed 2") for the week agenda strip, since
+// a variable day count breaks fixed weekday columns.
+const weekdayHeaders = computed(() => {
+  if (viewMode.value === "day") {
+    return [{ key: "day", label: getCurrentWeekdayName() }];
+  }
+  if (isAgenda.value) {
+    return calendarDays.value.map(d => ({
+      key: d.date.toISOString(),
+      label: `${weekDayNames[d.date.getDay()]} ${d.date.getDate()}`,
+    }));
+  }
+  return weekDays.value.map(name => ({ key: name, label: name }));
+});
+
 // Format an inclusive start–end date range: "Jan 1 - 7, 2024" when the range
 // stays inside one month, otherwise "Dec 31 - Jan 6, 2025".
 const formatDateRange = (startDate, endDate) => {
@@ -399,19 +479,7 @@ const formatDateRange = (startDate, endDate) => {
 };
 
 const currentMonthYear = computed(() => {
-  if (viewMode.value === "week") {
-    // Show week range for week view
-    const startDate = getWeekStart(currentDate.value);
-    const endDate = new Date(startDate);
-    endDate.setDate(startDate.getDate() + 6);
-    return formatDateRange(startDate, endDate);
-  } else if (viewMode.value === "rolling") {
-    // Rolling view spans several weeks from the anchored week — show the range.
-    const startDate = getWeekStart(currentDate.value);
-    const endDate = new Date(startDate);
-    endDate.setDate(startDate.getDate() + rollingWeeks.value * 7 - 1);
-    return formatDateRange(startDate, endDate);
-  } else if (viewMode.value === "day") {
+  if (viewMode.value === "day") {
     // Show full date for day view
     return currentDate.value.toLocaleDateString("en-US", {
       weekday: "long",
@@ -419,12 +487,19 @@ const currentMonthYear = computed(() => {
       day: "numeric",
       year: "numeric",
     });
-  } else {
-    return currentDate.value.toLocaleDateString("en-US", {
-      month: "long",
-      year: "numeric",
-    });
   }
+  // Non-rolling month is anchored to one calendar month, so name it plainly
+  // ("July 2026"); the leading/trailing padding days are dimmed rather than
+  // spelled out in the header.
+  if (viewMode.value === "month" && !rolling.value) {
+    return currentDate.value.toLocaleDateString("en-US", { month: "long", year: "numeric" });
+  }
+  // Rolling month and week are count-driven windows with no single "month";
+  // label them with the inclusive range they actually span.
+  const startDate = new Date(windowStart.value);
+  const endDate = new Date(startDate);
+  endDate.setDate(startDate.getDate() + windowLength.value - 1);
+  return formatDateRange(startDate, endDate);
 });
 
 // Helper function to normalize a date to calendar date (year, month, day only)
@@ -625,133 +700,46 @@ const calendarDays = computed(() => {
   const todayDate = new Date(today.value);
   todayDate.setHours(0, 0, 0, 0);
 
-  if (viewMode.value === "week") {
-    // Week view: show 7 days starting from week start of current date
-    const days = [];
-    const startDate = getWeekStart(currentDate.value);
-    startDate.setHours(0, 0, 0, 0);
-
-    // Generate 7 days for the week
-    for (let i = 0; i < 7; i++) {
-      const date = new Date(startDate);
-      date.setDate(startDate.getDate() + i);
-      const dateOnly = new Date(date);
-      dateOnly.setHours(0, 0, 0, 0);
-
-      days.push({
-        date,
-        otherMonth: false, // In week view, we show all days regardless of month
-        isToday: dateOnly.getTime() === todayDate.getTime(),
-        events: getEventsForDate(date),
-      });
-    }
-
-    return days;
-  } else if (viewMode.value === "day") {
-    // Day view: show only the current day
-    const date = new Date(currentDate.value);
-    date.setHours(0, 0, 0, 0);
-    const dateOnly = new Date(date);
-    dateOnly.setHours(0, 0, 0, 0);
-
+  if (viewMode.value === "day") {
+    const dayDate = new Date(currentDate.value);
+    dayDate.setHours(0, 0, 0, 0);
     return [
       {
-        date,
+        date: dayDate,
         otherMonth: false,
-        isToday: dateOnly.getTime() === todayDate.getTime(),
-        events: getEventsForDate(date),
+        isToday: dayDate.getTime() === todayDate.getTime(),
+        events: getEventsForDate(dayDate),
       },
     ];
-  } else if (viewMode.value === "rolling") {
-    // Rolling view: show `rollingWeeks` weeks starting from the anchored week.
-    // Anchored to currentDate (which defaults to today) so navigation actually
-    // moves the window; a rolling window spans months, so days are never greyed
-    // as "other month".
-    const days = [];
-    const startDate = getWeekStart(currentDate.value);
-    startDate.setHours(0, 0, 0, 0);
-
-    // Generate rollingWeeks weeks
-    for (let i = 0; i < rollingWeeks.value * 7; i++) {
-      const date = new Date(startDate);
-      date.setDate(startDate.getDate() + i);
-      const dateOnly = new Date(date);
-      dateOnly.setHours(0, 0, 0, 0);
-
-      days.push({
-        date,
-        otherMonth: false,
-        isToday: dateOnly.getTime() === todayDate.getTime(),
-        events: getEventsForDate(date),
-      });
-    }
-
-    return days;
-  } else {
-    // Month view: show full month
-    const year = currentDate.value.getFullYear();
-    const month = currentDate.value.getMonth();
-
-    // First day of month
-    const firstDay = new Date(year, month, 1);
-    const firstDayOfWeek = firstDay.getDay();
-    const adjustedFirstDay = adjustDayOfWeek(firstDayOfWeek);
-
-    // Last day of month
-    const lastDay = new Date(year, month + 1, 0);
-    const lastDate = lastDay.getDate();
-
-    // Days array
-    const days = [];
-
-    // Previous month days
-    const prevMonthLastDay = new Date(year, month, 0).getDate();
-    for (let i = adjustedFirstDay - 1; i >= 0; i--) {
-      const date = new Date(year, month - 1, prevMonthLastDay - i);
-      days.push({
-        date,
-        otherMonth: true,
-        isToday: false,
-        events: getEventsForDate(date),
-      });
-    }
-
-    // Current month days
-    const todayDate = new Date(today.value);
-    todayDate.setHours(0, 0, 0, 0);
-
-    for (let day = 1; day <= lastDate; day++) {
-      const date = new Date(year, month, day);
-      const dateOnly = new Date(date);
-      dateOnly.setHours(0, 0, 0, 0);
-
-      // Ensure current month days are never marked as otherMonth
-      const isCurrentMonth = date.getMonth() === month && date.getFullYear() === year;
-
-      days.push({
-        date,
-        otherMonth: !isCurrentMonth, // Explicitly check month/year
-        isToday: dateOnly.getTime() === todayDate.getTime(),
-        events: getEventsForDate(date),
-      });
-    }
-
-    // Next month days: fill only enough to complete the final week rather than
-    // always padding to 6 rows, which drew a spurious trailing week and shrank
-    // every day cell.
-    const remainingDays = (7 - (days.length % 7)) % 7;
-    for (let day = 1; day <= remainingDays; day++) {
-      const date = new Date(year, month + 1, day);
-      days.push({
-        date,
-        otherMonth: true,
-        isToday: false,
-        events: getEventsForDate(date),
-      });
-    }
-
-    return days;
   }
+
+  // Month and week are both windows of consecutive days beginning at
+  // windowStart (rolling only shifts the anchor). For a non-rolling month the
+  // window is anchored to one calendar month, so the leading/trailing padding
+  // days are flagged `otherMonth` and dimmed. Rolling month and week are pure
+  // windows — the window IS the view, so nothing is greyed.
+  const dimOutOfMonth = viewMode.value === "month" && !rolling.value;
+  const anchorMonth = currentDate.value.getMonth();
+  const anchorYear = currentDate.value.getFullYear();
+
+  const windowDays = [];
+  const windowFirst = new Date(windowStart.value);
+  windowFirst.setHours(0, 0, 0, 0);
+  for (let i = 0; i < windowLength.value; i++) {
+    const date = new Date(windowFirst);
+    date.setDate(windowFirst.getDate() + i);
+    const dateOnly = new Date(date);
+    dateOnly.setHours(0, 0, 0, 0);
+    const otherMonth =
+      dimOutOfMonth && (date.getMonth() !== anchorMonth || date.getFullYear() !== anchorYear);
+    windowDays.push({
+      date,
+      otherMonth,
+      isToday: dateOnly.getTime() === todayDate.getTime(),
+      events: getEventsForDate(date),
+    });
+  }
+  return windowDays;
 });
 
 // Helper function to check if a day is the start of a week
@@ -970,8 +958,11 @@ const navigatePrevious = () => {
   if (viewMode.value === "day") {
     // Day view: move to previous day
     newDate.setDate(newDate.getDate() - 1);
-  } else if (viewMode.value === "week" || viewMode.value === "rolling") {
-    // Week/Rolling view: roll the window back by one week
+  } else if (viewMode.value === "week") {
+    // Week agenda strip: page back by the window's own length
+    newDate.setDate(newDate.getDate() - rollingDays.value);
+  } else if (rolling.value) {
+    // Rolling month: roll the multi-week window back by one week
     const weekStart = getWeekStart(currentDate.value);
     weekStart.setDate(weekStart.getDate() - 7);
     newDate.setTime(weekStart.getTime());
@@ -991,8 +982,11 @@ const navigateNext = () => {
   if (viewMode.value === "day") {
     // Day view: move to next day
     newDate.setDate(newDate.getDate() + 1);
-  } else if (viewMode.value === "week" || viewMode.value === "rolling") {
-    // Week/Rolling view: roll the window forward by one week
+  } else if (viewMode.value === "week") {
+    // Week agenda strip: page forward by the window's own length
+    newDate.setDate(newDate.getDate() + rollingDays.value);
+  } else if (rolling.value) {
+    // Rolling month: roll the multi-week window forward by one week
     const weekStart = getWeekStart(currentDate.value);
     weekStart.setDate(weekStart.getDate() + 7);
     newDate.setTime(weekStart.getTime());
@@ -1014,55 +1008,30 @@ const nextMonth = navigateNext;
 const loadEvents = async (background = false) => {
   lastLoadedAt = Date.now();
   let startDate, endDate;
-  const year = currentDate.value.getFullYear();
-  const month = currentDate.value.getMonth();
 
-  if (viewMode.value === "week") {
-    // Week view: load the week plus buffer days for multi-day events
-    const weekStart = getWeekStart(currentDate.value);
-    startDate = new Date(weekStart);
-    startDate.setDate(startDate.getDate() - 7); // 7 days before week start
-    startDate.setHours(0, 0, 0, 0);
-
-    endDate = new Date(weekStart);
-    endDate.setDate(endDate.getDate() + 14); // 7 days after week end
-    endDate.setHours(23, 59, 59, 999);
-  } else if (viewMode.value === "day") {
-    // Day view: load the day plus buffer days for multi-day events
+  if (viewMode.value === "day") {
+    // Day view: load the day plus a buffer week on each side for multi-day events
     const day = new Date(currentDate.value);
     day.setHours(0, 0, 0, 0);
     startDate = new Date(day);
-    startDate.setDate(startDate.getDate() - 7); // 7 days before
-    startDate.setHours(0, 0, 0, 0);
-
-    endDate = new Date(day);
-    endDate.setDate(endDate.getDate() + 7); // 7 days after
-    endDate.setHours(23, 59, 59, 999);
-  } else if (viewMode.value === "rolling") {
-    // Rolling view: load the full N-week window plus a buffer week on each side
-    // for multi-day events. The month-based range below is too narrow once the
-    // window exceeds a few weeks, which dropped events off the tail.
-    const weekStart = getWeekStart(currentDate.value);
-    startDate = new Date(weekStart);
     startDate.setDate(startDate.getDate() - 7);
     startDate.setHours(0, 0, 0, 0);
 
-    endDate = new Date(weekStart);
-    endDate.setDate(endDate.getDate() + rollingWeeks.value * 7 + 6);
+    endDate = new Date(day);
+    endDate.setDate(endDate.getDate() + 7);
     endDate.setHours(23, 59, 59, 999);
   } else {
-    // Month view: use month-based range
-    // Expand date range to include events that span across month boundaries
-    // Load previous month, current month, and next month for better caching
-    // This ensures we have data cached for adjacent months
-    const prevMonth = month === 0 ? 11 : month - 1;
-    const prevYear = month === 0 ? year - 1 : year;
-    startDate = new Date(prevYear, prevMonth, 1);
+    // Month and week are both day-windows: fetch [windowStart, +windowLength)
+    // plus a buffer week on each side so multi-day events that start/end just
+    // outside the window still render. This scales with any week/day count.
+    const first = new Date(windowStart.value);
+    first.setHours(0, 0, 0, 0);
+    startDate = new Date(first);
+    startDate.setDate(startDate.getDate() - 7);
     startDate.setHours(0, 0, 0, 0);
 
-    const nextMonth = month === 11 ? 0 : month + 1;
-    const nextYear = month === 11 ? year + 1 : year;
-    endDate = new Date(nextYear, nextMonth + 1, 0); // Last day of next month
+    endDate = new Date(first);
+    endDate.setDate(endDate.getDate() + windowLength.value + 6);
     endDate.setHours(23, 59, 59, 999);
   }
 
@@ -1074,7 +1043,7 @@ const loadEvents = async (background = false) => {
 
     await calendarStore.fetchEvents(startDate, endDate, refresh, background, props.sourceIds);
     console.log(
-      `Loaded ${calendarStore.events.length} events for ${year}-${month + 1} (range: ${startDate.toISOString().split("T")[0]} to ${endDate.toISOString().split("T")[0]})`
+      `Loaded ${calendarStore.events.length} events (range: ${startDate.toISOString().split("T")[0]} to ${endDate.toISOString().split("T")[0]})`
     );
   } catch (error) {
     console.error("Failed to load events:", error);
@@ -1098,10 +1067,24 @@ watch(viewMode, () => {
   loadEvents();
 });
 
-// A larger rolling window needs a wider fetch range than what's already loaded.
+// A larger window needs a wider fetch range than what's already loaded. Weeks
+// drive month view; days drive the week agenda strip.
 watch(rollingWeeks, () => {
-  if (viewMode.value === "rolling") loadEvents();
+  if (viewMode.value === "month") loadEvents();
 });
+
+watch(rollingDays, () => {
+  if (viewMode.value === "week") loadEvents();
+});
+
+// Appending look-ahead weeks widens a non-rolling month's fetch range.
+watch(extraWeeks, () => {
+  if (viewMode.value === "month" && !rolling.value) loadEvents();
+});
+
+// Rolling on/off (and base mode) can flip the effective window; reload so the
+// fetched range matches what's rendered.
+watch(rolling, () => loadEvents());
 
 // Watch for route changes to reload events when navigating back to dashboard
 watch(
@@ -1449,11 +1432,6 @@ onActivated(() => {
   isolation: isolate;
 }
 
-/* Week view: taller day cells */
-.calendar-grid.week-view .calendar-day {
-  min-height: 0;
-}
-
 /* Day view: single column, very tall */
 .calendar-grid.day-view .calendar-weekdays {
   grid-template-columns: minmax(0, 1fr) !important;
@@ -1464,6 +1442,18 @@ onActivated(() => {
 }
 
 .calendar-grid.day-view .calendar-day {
+  min-height: 0;
+}
+
+/* Week agenda: a strip of N day columns in a single row. The count is dynamic,
+   so it comes in via the --rolling-cols custom property (set inline). */
+.calendar-grid.agenda-view .calendar-weekdays,
+.calendar-grid.agenda-view .calendar-days {
+  grid-template-columns: var(--rolling-cols) !important;
+  grid-auto-rows: minmax(0, 1fr);
+}
+
+.calendar-grid.agenda-view .calendar-day {
   min-height: 0;
 }
 
@@ -1498,9 +1488,11 @@ onActivated(() => {
   background: transparent !important;
 }
 
+/* Leading/trailing padding days of a non-rolling month. No grey block — they
+   belong to the adjacent month, so they just recede and let the current month
+   lift out of the grid. */
 .calendar-day.other-month {
-  opacity: 0.4;
-  background: var(--bg-tertiary) !important;
+  opacity: 0.38;
 }
 
 /* Force reset background for all calendar days (except other-month and today) */

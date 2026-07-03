@@ -7,6 +7,7 @@ import {
   cycleDashboardScreen,
   normalizeDashboardScreens,
   setActiveDashboardScreen,
+  setRegionView,
 } from "../utils/layout";
 import { applyConfigPayload, createDefaultDisplaySchedule } from "./configRegistry";
 
@@ -27,8 +28,6 @@ export const useConfigStore = defineStore("config", () => {
   const temporaryUITimer = ref(null); // Timer for temporary UI override
   const modeIndicatorTimeout = ref(5); // Mode change notification auto-hide timeout in seconds (0 = never hide, default 5)
   const photoRotationInterval = ref(30); // Photo rotation interval in seconds (default 30)
-  const calendarViewMode = ref("month"); // Calendar view mode: 'month' | 'week' | 'day' | 'rolling'
-  const calendarWeeks = ref(4); // Number of weeks to show in rolling view (default 4)
   const calendarRefreshInterval = ref(15); // Calendar refresh interval in minutes (default 15)
   const timeFormat = ref("24h"); // Time format: '12h' or '24h' (default: '24h')
   const weekStartDay = ref(1); // Week starting day (0=Sunday, 1=Monday, ..., 6=Saturday, default Monday)
@@ -100,8 +99,7 @@ export const useConfigStore = defineStore("config", () => {
     showUI,
     modeIndicatorTimeout,
     photoRotationInterval,
-    calendarViewMode,
-    calendarWeeks,
+
     calendarRefreshInterval,
     timeFormat,
     weekStartDay,
@@ -290,28 +288,6 @@ export const useConfigStore = defineStore("config", () => {
     photoRotationInterval.value = interval;
   };
 
-  const setCalendarViewMode = mode => {
-    calendarViewMode.value = mode;
-  };
-
-  const cycleCalendarViewMode = async () => {
-    // Cycle through: month -> week -> day -> month
-    const modes = ["month", "week", "day"];
-    const currentIndex = modes.indexOf(calendarViewMode.value);
-    const nextIndex = (currentIndex + 1) % modes.length;
-    const newMode = modes[nextIndex];
-    calendarViewMode.value = newMode;
-
-    // Persist to backend
-    try {
-      await updateConfig({ calendarViewMode: newMode });
-    } catch (err) {
-      logError("[ConfigStore]", "Failed to save calendar view mode:", err);
-    }
-
-    return newMode;
-  };
-
   const setTimeFormat = format => {
     timeFormat.value = format;
   };
@@ -380,6 +356,14 @@ export const useConfigStore = defineStore("config", () => {
     await updateConfig({ dashboardScreens: nextScreens });
   };
 
+  // Merge `patch` into a calendar region's `view` (base mode / rolling / counts)
+  // on the active screen, and persist. Drives the on-calendar view controls.
+  const updateRegionView = async (regionId, patch) => {
+    const nextScreens = setRegionView(dashboardScreens.value, regionId, patch);
+    dashboardScreens.value = nextScreens;
+    await updateConfig({ dashboardScreens: nextScreens });
+  };
+
   const setThemeMode = mode => {
     themeMode.value = mode;
   };
@@ -425,8 +409,7 @@ export const useConfigStore = defineStore("config", () => {
     keyboardFeedbackEnabled,
     keyboardFeedbackMode,
     photoRotationInterval,
-    calendarViewMode,
-    calendarWeeks,
+
     calendarRefreshInterval,
     timeFormat,
     weekStartDay,
@@ -499,8 +482,7 @@ export const useConfigStore = defineStore("config", () => {
     shouldShowUI,
     setModeIndicatorTimeout,
     setPhotoRotationInterval,
-    setCalendarViewMode,
-    cycleCalendarViewMode,
+
     setTimeFormat,
     setWeekStartDay,
     setShowWeekNumbers,
@@ -513,6 +495,7 @@ export const useConfigStore = defineStore("config", () => {
     activateDashboardScreen,
     cycleDashboardScreenBy,
     cycleActiveDashboardRegionBy,
+    updateRegionView,
     setThemeMode,
     setDarkModeTime,
     setImageDisplayMode,

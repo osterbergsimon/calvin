@@ -2,9 +2,11 @@
 
 import { describe, it, expect } from "vitest";
 import {
+  DEFAULT_CALENDAR_VIEW,
   MAX_TOP_REGIONS,
   addSubRegion,
   addTopRegion,
+  clampCalendarView,
   computeClockBarModeUpdate,
   computeClockBarPositionUpdate,
   createDashboardLayoutFromPreset,
@@ -33,6 +35,7 @@ import {
   resizeSubRegionPair,
   resolveClockBarForScreen,
   setLayoutDirection,
+  setRegionView,
   setSplitDirection,
   setSubRegionContent,
   splitTopRegion,
@@ -145,6 +148,7 @@ describe("Layout Utilities", () => {
             instanceIds: [],
             size: 65,
             split: null,
+            view: DEFAULT_CALENDAR_VIEW,
           },
           {
             id: "region-2",
@@ -244,6 +248,7 @@ describe("Layout Utilities", () => {
           instanceIds: [],
           size: 100,
           split: null,
+          view: DEFAULT_CALENDAR_VIEW,
         },
       ]);
       expect(getRegionAxisStyle(layout.regions[0], "landscape")).toEqual({
@@ -810,5 +815,101 @@ describe("Layout Utilities", () => {
         });
       });
     });
+  });
+});
+
+describe("calendar region view", () => {
+  const screenWith = region => ({
+    activeScreenId: "s1",
+    screens: [{ id: "s1", layout: { regions: [region] } }],
+  });
+
+  it("backfills the default view on a calendar region with none", () => {
+    const screens = normalizeDashboardScreens(
+      screenWith({ id: "region-1", kind: "calendar", instanceIds: [], size: 100 })
+    );
+    expect(screens.screens[0].layout.regions[0].view).toEqual(DEFAULT_CALENDAR_VIEW);
+  });
+
+  it("preserves and clamps an explicit view", () => {
+    const screens = normalizeDashboardScreens(
+      screenWith({
+        id: "region-1",
+        kind: "calendar",
+        instanceIds: [],
+        size: 100,
+        view: { mode: "week", rolling: true, weeks: 99, days: 99, extraWeeks: 99 },
+      })
+    );
+    expect(screens.screens[0].layout.regions[0].view).toEqual({
+      mode: "week",
+      rolling: true,
+      weeks: 12,
+      days: 14,
+      extraWeeks: 8,
+    });
+  });
+
+  it("does not add a view block to non-calendar regions", () => {
+    const screens = normalizeDashboardScreens(
+      screenWith({ id: "region-1", kind: "photos", instanceIds: [], size: 100 })
+    );
+    expect(screens.screens[0].layout.regions[0].view).toBeUndefined();
+  });
+
+  it("clampCalendarView coerces bad values to the valid range", () => {
+    expect(
+      clampCalendarView({ mode: "bogus", rolling: 1, weeks: 0, days: 50, extraWeeks: -3 })
+    ).toEqual({
+      mode: "month",
+      rolling: true,
+      weeks: 1,
+      days: 14,
+      extraWeeks: 0,
+    });
+  });
+
+  it("setRegionView merges + clamps a region's view on the active screen without mutating input", () => {
+    const screens = normalizeDashboardScreens(
+      screenWith({ id: "r1", kind: "calendar", instanceIds: [], size: 100 })
+    );
+    const next = setRegionView(screens, "r1", { mode: "week", rolling: true });
+    expect(next.screens[0].layout.regions[0].view).toEqual({
+      mode: "week",
+      rolling: true,
+      weeks: 4,
+      days: 7,
+      extraWeeks: 0,
+    });
+    // input is not mutated
+    expect(screens.screens[0].layout.regions[0].view.mode).toBe("month");
+  });
+
+  it("setRegionView finds a calendar region nested in a split", () => {
+    const screens = normalizeDashboardScreens({
+      activeScreenId: "s1",
+      screens: [
+        {
+          id: "s1",
+          layout: {
+            regions: [
+              {
+                id: "r1",
+                kind: "calendar",
+                size: 100,
+                split: {
+                  regions: [
+                    { id: "r1-a", kind: "calendar", size: 50 },
+                    { id: "r1-b", kind: "photos", size: 50 },
+                  ],
+                },
+              },
+            ],
+          },
+        },
+      ],
+    });
+    const next = setRegionView(screens, "r1-a", { mode: "day" });
+    expect(next.screens[0].layout.regions[0].split.regions[0].view.mode).toBe("day");
   });
 });

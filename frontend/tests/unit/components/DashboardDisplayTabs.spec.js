@@ -50,7 +50,15 @@ describe("DashboardRegionsEditor (screens & regions logic)", () => {
     const emitted = wrapper.emitted("update:config").at(-1)[0];
     const screen = emitted.dashboardScreens.screens[0];
     expect(screen.layout.regions).toEqual([
-      { id: "region-1", kind: "calendar", serviceId: null, instanceIds: [], size: 90, split: null },
+      {
+        id: "region-1",
+        kind: "calendar",
+        serviceId: null,
+        instanceIds: [],
+        size: 90,
+        split: null,
+        view: { mode: "month", rolling: false, weeks: 4, days: 7, extraWeeks: 0 },
+      },
       { id: "region-2", kind: "photos", serviceId: null, instanceIds: [], size: 10, split: null },
     ]);
   });
@@ -72,6 +80,7 @@ describe("DashboardRegionsEditor (screens & regions logic)", () => {
         instanceIds: [],
         size: 100,
         split: null,
+        view: { mode: "month", rolling: false, weeks: 4, days: 7, extraWeeks: 0 },
       },
     ]);
   });

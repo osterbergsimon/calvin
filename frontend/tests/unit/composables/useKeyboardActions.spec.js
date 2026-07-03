@@ -57,9 +57,6 @@ describe("useKeyboardActions - Calendar Event Navigation", () => {
   beforeEach(() => {
     setActivePinia(createPinia());
     mocks.configStore = {
-      cycleCalendarViewMode: vi.fn(),
-      calendarViewMode: "month",
-      setCalendarViewMode: vi.fn(),
       updateConfig: vi.fn().mockResolvedValue(undefined),
       setDashboardScreens: vi.fn(screens => {
         mocks.configStore.dashboardScreens = screens;
@@ -283,6 +280,37 @@ describe("useKeyboardActions - Calendar Event Navigation", () => {
 
       // Should navigate to next month
       expect(calendarStore.currentDate.getMonth()).toBe((initialDate.getMonth() + 1) % 12);
+    });
+
+    it("navigates by the focused region's view mode (day steps a day, not a month)", () => {
+      mocks.configStore.dashboardScreens = {
+        version: 2,
+        activeScreenId: "home",
+        screens: [
+          {
+            id: "home",
+            name: "Home",
+            layout: {
+              version: 1,
+              preset: "single",
+              regions: [
+                {
+                  id: "region-1",
+                  kind: "calendar",
+                  size: 100,
+                  view: { mode: "day", rolling: false, weeks: 4, days: 7 },
+                },
+              ],
+            },
+            activeRegionId: "region-1",
+          },
+        ],
+      };
+      calendarStore.setCurrentDate(new Date("2024-01-15T12:00:00"));
+      keyboardActions.handleAction("calendar_next");
+      // Day view → +1 day (Jan 16), not a month jump.
+      expect(calendarStore.currentDate.getDate()).toBe(16);
+      expect(calendarStore.currentDate.getMonth()).toBe(0);
     });
   });
 

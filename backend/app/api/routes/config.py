@@ -104,7 +104,6 @@ class ConfigUpdate(BaseModel):
     photoFrameTimeout: int | None = None
     showUI: bool | None = None
     photoRotationInterval: int | None = None  # Photo rotation interval in seconds
-    calendarViewMode: str | None = None  # 'month' | 'week' | 'day' | 'rolling'
     timeFormat: str | None = None  # '12h' or '24h' (default: '24h')
     modeIndicatorTimeout: int | None = (
         None  # Mode indicator auto-hide timeout in seconds (0 = never hide)
@@ -244,10 +243,6 @@ async def get_config():
         config["photoRotationInterval"] = 30  # 30 seconds default
     elif "photo_rotation_interval" in config and "photoRotationInterval" not in config:
         config["photoRotationInterval"] = config["photo_rotation_interval"]
-    if "calendarViewMode" not in config and "calendar_view_mode" not in config:
-        config["calendarViewMode"] = "month"  # 'month' | 'week' | 'day' | 'rolling'
-    elif "calendar_view_mode" in config and "calendarViewMode" not in config:
-        config["calendarViewMode"] = config["calendar_view_mode"]
     if "timeFormat" not in config and "time_format" not in config:
         config["timeFormat"] = "24h"  # '12h' or '24h' (default: '24h')
     elif "time_format" in config and "timeFormat" not in config:
@@ -556,8 +551,6 @@ async def update_config(config_update: ConfigUpdate):
         update_dict["show_ui"] = update_dict.pop("showUI")
     if "photoRotationInterval" in update_dict:
         update_dict["photo_rotation_interval"] = update_dict.pop("photoRotationInterval")
-    if "calendarViewMode" in update_dict:
-        update_dict["calendar_view_mode"] = update_dict.pop("calendarViewMode")
     if "timeFormat" in update_dict:
         update_dict["time_format"] = update_dict.pop("timeFormat")
     if "modeIndicatorTimeout" in update_dict:

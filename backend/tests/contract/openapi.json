@@ -278,17 +278,6 @@
             ],
             "title": "Calendarsplit"
           },
-          "calendarViewMode": {
-            "anyOf": [
-              {
-                "type": "string"
-              },
-              {
-                "type": "null"
-              }
-            ],
-            "title": "Calendarviewmode"
-          },
           "clockBarVerticalDateFontSize": {
             "anyOf": [
               {

@@ -308,7 +308,6 @@ async def _initialize_default_config():
         "config_poll_interval": 30,  # 30 seconds
         "show_ui": True,
         "photo_rotation_interval": 30,  # 30 seconds
-        "calendar_view_mode": "month",  # 'month' | 'week' | 'day' | 'rolling'
         "time_format": "24h",  # '12h' or '24h'
         "mode_indicator_timeout": 5,  # 5 seconds
         "keyboard_feedback_enabled": True,

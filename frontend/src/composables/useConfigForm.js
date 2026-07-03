@@ -87,8 +87,6 @@ export function useConfigForm(initialConfig = {}) {
         showUI: response.showUI ?? response.show_ui ?? true,
         modeIndicatorTimeout: response.modeIndicatorTimeout ?? response.mode_indicator_timeout ?? 5,
         // Calendar
-        calendarViewMode: response.calendarViewMode ?? response.calendar_view_mode ?? "month",
-        calendarWeeks: response.calendarWeeks ?? response.calendar_weeks ?? 4,
         timeFormat: response.timeFormat ?? response.time_format ?? "24h",
         weekStartDay: response.weekStartDay ?? response.week_start_day ?? 1,
         showWeekNumbers: response.showWeekNumbers ?? response.show_week_numbers ?? false,

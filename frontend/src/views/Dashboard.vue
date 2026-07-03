@@ -35,6 +35,7 @@
               v-if="modeStore.fullscreenMode === modeStore.MODES.CALENDAR"
               :is-fullscreen="true"
               :source-ids="modeStore.fullscreenContext?.sourceIds || []"
+              :view="modeStore.fullscreenContext?.view || null"
             />
             <!-- Fullscreen Photos -->
             <PhotoSlideshow
