@@ -265,6 +265,16 @@ def test_client(temp_db_path: Path, temp_image_dir: Path) -> Generator[TestClien
     finally:
         loop_data.close()
 
+    # Seed default keyboard mappings (mirrors production lifespan behaviour).
+    loop_kbd = asyncio.new_event_loop()
+    asyncio.set_event_loop(loop_kbd)
+    try:
+        from app.main import _initialize_keyboard_mappings
+
+        loop_kbd.run_until_complete(_initialize_keyboard_mappings())
+    finally:
+        loop_kbd.close()
+
     # Load plugins into manager and register their instances from DB.
     loop = asyncio.new_event_loop()
     asyncio.set_event_loop(loop)

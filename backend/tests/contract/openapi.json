@@ -485,17 +485,6 @@
             ],
             "title": "Keyboardfeedbackmode"
           },
-          "keyboardType": {
-            "anyOf": [
-              {
-                "type": "string"
-              },
-              {
-                "type": "null"
-              }
-            ],
-            "title": "Keyboardtype"
-          },
           "lastSideViewMode": {
             "anyOf": [
               {
@@ -769,39 +758,12 @@
         "title": "HTTPValidationError",
         "type": "object"
       },
-      "KeyboardMappingUpdate": {
-        "description": "Single keyboard mapping update model.",
-        "properties": {
-          "action": {
-            "title": "Action",
-            "type": "string"
-          },
-          "key_code": {
-            "title": "Key Code",
-            "type": "string"
-          },
-          "keyboard_type": {
-            "title": "Keyboard Type",
-            "type": "string"
-          }
-        },
-        "required": [
-          "keyboard_type",
-          "key_code",
-          "action"
-        ],
-        "title": "KeyboardMappingUpdate",
-        "type": "object"
-      },
       "KeyboardMappings": {
-        "description": "Keyboard mappings model.",
+        "description": "Full key-code -> action map.",
         "properties": {
           "mappings": {
             "additionalProperties": {
-              "additionalProperties": {
-                "type": "string"
-              },
-              "type": "object"
+              "type": "string"
             },
             "title": "Mappings",
             "type": "object"
@@ -1110,6 +1072,20 @@
           "plugin_id"
         ],
         "title": "PluginTypeConfigUpdateResponse",
+        "type": "object"
+      },
+      "SingleMapping": {
+        "description": "Action for a single key.",
+        "properties": {
+          "action": {
+            "title": "Action",
+            "type": "string"
+          }
+        },
+        "required": [
+          "action"
+        ],
+        "title": "SingleMapping",
         "type": "object"
       },
       "ValidationError": {
@@ -2071,7 +2047,7 @@
     },
     "/api/keyboard/actions": {
       "get": {
-        "description": "Get list of available keyboard actions.\n\nReturns:\n    List of available action names",
+        "description": "Get list of available keyboard actions.",
         "operationId": "get_available_actions_api_keyboard_actions_get",
         "responses": {
           "200": {
@@ -2091,19 +2067,8 @@
     },
     "/api/keyboard/mappings": {
       "get": {
-        "description": "Get keyboard mappings.\n\nArgs:\n    keyboard_type: Optional keyboard type filter ('7-button' or 'standard')\n\nReturns:\n    Dictionary of keyboard mappings",
+        "description": "Return the full flat mapping.",
         "operationId": "get_keyboard_mappings_api_keyboard_mappings_get",
-        "parameters": [
-          {
-            "in": "query",
-            "name": "keyboard_type",
-            "required": false,
-            "schema": {
-              "title": "Keyboard Type",
-              "type": "string"
-            }
-          }
-        ],
         "responses": {
           "200": {
             "content": {
@@ -2112,16 +2077,6 @@
               }
             },
             "description": "Successful Response"
-          },
-          "422": {
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/HTTPValidationError"
-                }
-              }
-            },
-            "description": "Validation Error"
           }
         },
         "summary": "Get Keyboard Mappings",
@@ -2130,8 +2085,8 @@
         ]
       },
       "post": {
-        "description": "Update keyboard mappings.\n\nArgs:\n    mappings: Dictionary of keyboard type to key mappings",
-        "operationId": "update_keyboard_mappings_api_keyboard_mappings_post",
+        "description": "Replace the entire mapping.",
+        "operationId": "replace_keyboard_mappings_api_keyboard_mappings_post",
         "requestBody": {
           "content": {
             "application/json": {
@@ -2162,26 +2117,56 @@
             "description": "Validation Error"
           }
         },
-        "summary": "Update Keyboard Mappings",
+        "summary": "Replace Keyboard Mappings",
         "tags": [
           "keyboard"
         ]
       }
     },
-    "/api/keyboard/mappings/{keyboard_type}/{key_code}": {
-      "put": {
-        "description": "Update a single keyboard mapping.\n\nArgs:\n    keyboard_type: Keyboard type ('7-button' or 'standard')\n    key_code: Key code (e.g., 'KEY_1')\n    mapping_update: Mapping update data",
-        "operationId": "update_single_mapping_api_keyboard_mappings__keyboard_type___key_code__put",
+    "/api/keyboard/mappings/{key_code}": {
+      "delete": {
+        "description": "Remove a single binding.",
+        "operationId": "delete_single_mapping_api_keyboard_mappings__key_code__delete",
         "parameters": [
           {
             "in": "path",
-            "name": "keyboard_type",
+            "name": "key_code",
             "required": true,
             "schema": {
-              "title": "Keyboard Type",
+              "title": "Key Code",
               "type": "string"
             }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            },
+            "description": "Successful Response"
           },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Delete Single Mapping",
+        "tags": [
+          "keyboard"
+        ]
+      },
+      "put": {
+        "description": "Upsert a single binding.",
+        "operationId": "set_single_mapping_api_keyboard_mappings__key_code__put",
+        "parameters": [
           {
             "in": "path",
             "name": "key_code",
@@ -2196,7 +2181,7 @@
           "content": {
             "application/json": {
               "schema": {
-                "$ref": "#/components/schemas/KeyboardMappingUpdate"
+                "$ref": "#/components/schemas/SingleMapping"
               }
             }
           },
@@ -2222,7 +2207,7 @@
             "description": "Validation Error"
           }
         },
-        "summary": "Update Single Mapping",
+        "summary": "Set Single Mapping",
         "tags": [
           "keyboard"
         ]

@@ -37,3 +37,11 @@ class TestKeyboardEndpoints:
         response = test_client.get("/api/keyboard/actions")
         assert response.status_code == 200
         assert isinstance(response.json()["actions"], list)
+
+
+@pytest.mark.integration
+def test_default_seed_present(test_client: TestClient):
+    """A fresh DB seeds the canonical 7-button default map."""
+    mappings = test_client.get("/api/keyboard/mappings").json()["mappings"]
+    assert mappings.get("KEY_1") == "generic_prev"
+    assert mappings.get("KEY_7") == "mode_settings"
