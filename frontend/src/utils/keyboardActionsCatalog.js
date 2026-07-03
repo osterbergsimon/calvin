@@ -1,6 +1,7 @@
-// UI-only presentation metadata for the frozen keyboard action vocabulary
+// UI-only presentation metadata for the keyboard action vocabulary
 // (see composables/useKeyboardActions.js). Grouping/labels live here; the
-// action VALUES must stay in lockstep with the frozen handler.
+// action VALUES must stay in lockstep with the handler's switch cases and the
+// backend allow-list (keyboard_mapping_service.get_available_actions).
 
 export const ACTION_GROUPS = [
   {
@@ -43,12 +44,20 @@ export const ACTION_GROUPS = [
     tier: "collapsed",
     actions: [
       {
-        value: "mode_calendar",
+        value: "screen_jump_calendar",
         label: "Calendar screen",
         description: "first screen with a calendar region",
       },
-      { value: "mode_photos", label: "Photos screen" },
-      { value: "mode_web_services", label: "Services screen" },
+      {
+        value: "screen_jump_photos",
+        label: "Photos screen",
+        description: "first screen with a photos region",
+      },
+      {
+        value: "screen_jump_services",
+        label: "Services screen",
+        description: "first screen with a service region",
+      },
     ],
   },
   {
@@ -94,8 +103,6 @@ export const ACTION_GROUPS = [
     label: "Legacy / advanced",
     tier: "collapsed",
     actions: [
-      { value: "mode_cycle", label: "Cycle modes (legacy)" },
-      { value: "mode_spare", label: "Spare (no action)" },
       { value: "calendar_next_month", label: "Calendar: Next Month (legacy)" },
       { value: "calendar_prev_month", label: "Calendar: Previous Month (legacy)" },
       { value: "calendar_expand_today", label: "Calendar: Expand Today (legacy)" },

@@ -80,8 +80,13 @@ async def test_get_available_actions(test_db):
     assert len(actions) > 0
 
     # Verify some expected actions are present
-    assert "mode_calendar" in actions
-    assert "mode_photos" in actions
+    assert "screen_jump_calendar" in actions
+    assert "screen_jump_photos" in actions
     assert "generic_next" in actions
     assert "generic_prev" in actions
     assert "none" in actions
+
+    # Retired mode_* actions (py5 vocabulary unfreeze) are gone
+    assert "mode_calendar" not in actions
+    assert "mode_cycle" not in actions
+    assert "mode_spare" not in actions

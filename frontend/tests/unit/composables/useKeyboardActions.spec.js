@@ -315,7 +315,7 @@ describe("useKeyboardActions - Calendar Event Navigation", () => {
   });
 
   describe("Dashboard screen activation", () => {
-    it("activates a matching split leaf for mode actions", () => {
+    it("activates a matching split leaf for screen-jump actions", () => {
       mocks.configStore.dashboardScreens = {
         version: 2,
         activeScreenId: "home",
@@ -355,11 +355,45 @@ describe("useKeyboardActions - Calendar Event Navigation", () => {
         ],
       };
 
-      keyboardActions.handleAction("mode_photos");
+      keyboardActions.handleAction("screen_jump_photos");
 
       const nextScreens = mocks.configStore.setDashboardScreens.mock.calls.at(-1)[0];
       expect(nextScreens.activeScreenId).toBe("media");
       expect(nextScreens.screens[1].activeRegionId).toBe("region-1-b");
+    });
+
+    it("resolves the retired mode_photos alias to screen_jump_photos", () => {
+      mocks.configStore.dashboardScreens = {
+        version: 2,
+        activeScreenId: "home",
+        screens: [
+          {
+            id: "home",
+            name: "Home",
+            layout: {
+              version: 1,
+              preset: "single",
+              regions: [{ id: "region-1", kind: "calendar", size: 100 }],
+            },
+            activeRegionId: "region-1",
+          },
+          {
+            id: "media",
+            name: "Media",
+            layout: {
+              version: 1,
+              preset: "single",
+              regions: [{ id: "region-1", kind: "photos", size: 100 }],
+            },
+            activeRegionId: "region-1",
+          },
+        ],
+      };
+
+      keyboardActions.handleAction("mode_photos");
+
+      const nextScreens = mocks.configStore.setDashboardScreens.mock.calls.at(-1)[0];
+      expect(nextScreens.activeScreenId).toBe("media");
     });
   });
 

@@ -51,13 +51,11 @@ const keyLabels = {
 
 // Map actions to user-friendly labels
 const actionLabels = {
-  // Mode switching
-  mode_calendar: "Calendar Mode",
-  mode_photos: "Photos Mode",
-  mode_web_services: "Web Services Mode",
-  mode_spare: "Spare Mode",
+  // Screen jump
+  screen_jump_calendar: "Calendar Screen",
+  screen_jump_photos: "Photos Screen",
+  screen_jump_services: "Services Screen",
   mode_settings: "Settings",
-  mode_cycle: "Cycle Mode",
 
   // Screens and regions
   screen_next: "Next Screen",

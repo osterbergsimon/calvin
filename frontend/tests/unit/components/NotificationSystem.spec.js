@@ -90,12 +90,12 @@ describe("NotificationSystem", () => {
 
       const wrapper = mount(NotificationSystem);
 
-      wrapper.vm.showKeyboardFeedback("KEY_1", "mode_calendar");
+      wrapper.vm.showKeyboardFeedback("KEY_1", "screen_jump_calendar");
       await wrapper.vm.$nextTick();
 
       expect(wrapper.find(".notification").exists()).toBe(true);
       expect(wrapper.find(".notification-icon").text()).toBe("1");
-      expect(wrapper.find(".notification-message").text()).toBe("Calendar Mode");
+      expect(wrapper.find(".notification-message").text()).toBe("Calendar Screen");
     });
 
     it("should not show keyboard feedback when disabled", async () => {
@@ -103,7 +103,7 @@ describe("NotificationSystem", () => {
 
       const wrapper = mount(NotificationSystem);
 
-      wrapper.vm.showKeyboardFeedback("KEY_1", "mode_calendar");
+      wrapper.vm.showKeyboardFeedback("KEY_1", "screen_jump_calendar");
       await wrapper.vm.$nextTick();
 
       expect(wrapper.find(".notification").exists()).toBe(false);
