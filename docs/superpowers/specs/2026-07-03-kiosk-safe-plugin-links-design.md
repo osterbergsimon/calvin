@@ -93,7 +93,7 @@ Extract the duplicated `open()` helper in `CardGrid.vue` and `ItemList.vue` into
 2. Resolves the action: `regionLinkAction ?? item.link_action ?? "handoff"`, where `regionLinkAction` is the per-region override (§4) threaded in as a prop.
 3. Dispatches: `handoff` → open HandoffOverlay; `embed` → open EmbedOverlay; `off` → render as non-clickable (no handler, no `--clickable` affordance).
 
-`CardGrid.vue` and `ItemList.vue` call the composable instead of their own `window.open`. Every current and future link-emitting built-in renderer inherits the behavior for free. The `IframeRenderer` error-fallback anchor is also routed through the composable for consistency.
+`CardGrid.vue` and `ItemList.vue` call the composable instead of their own `window.open`. Every current and future link-emitting built-in renderer inherits the behavior for free. (The `IframeRenderer` error-fallback anchor — a rare edge on the embed-first `iframe` kind — is left as a **follow-up**, not part of the initial implementation; see Open questions.)
 
 The override value reaches the renderers by prop-threading through the existing region chain: `DashboardRegion` → `WebServiceViewer` → `ServiceViewer` → `SchemaRenderer` → `CardGrid`/`ItemList`. `SchemaRenderer` currently forwards only `schema`/`data`/`pluginId`/`context`; we add one prop (`linkAction`) alongside `pluginId`. Renderers keep their pure `schema`+`data`(+`linkAction`) contract — no store coupling — which preserves testability and the dev `RendererGallery`.
 
@@ -132,7 +132,6 @@ The override is a **per-region view option**, set live from a tune popover on th
 - `frontend/src/components/plugins/overlays/EmbedOverlay.vue` — **new**: reuses `IframeViewer`, falls back to Handoff on load failure/timeout.
 - `frontend/src/components/plugins/renderers/CardGrid.vue` — declare `linkAction` prop; use `useLinkOpen()`; honor `off` (non-clickable). Item spec is at `schema.card.item`.
 - `frontend/src/components/plugins/renderers/ItemList.vue` — same; item spec is at `schema.item`.
-- `frontend/src/components/plugins/renderers/IframeRenderer.vue` — route error-fallback anchor through the composable.
 - `frontend/src/components/plugins/SchemaRenderer.vue` — forward a new `:link-action` prop to the renderer (alongside `pluginId`).
 
 *Per-region override (the `calvin-39g` mechanism):*
@@ -167,3 +166,4 @@ The override is a **per-region view option**, set live from a tune popover on th
 - **Web-component sandboxing** to actually enforce "no self-navigation" — later, if untrusted plugins become a concern.
 - **Global default / house-policy knob** — add only if a real need appears.
 - **`embed` in a pointer environment** — currently identical everywhere; revisit if desktop users want click-through-to-navigate instead of an embedded frame.
+- **`IframeRenderer` error-fallback anchor** — the `iframe` display kind embeds by default; on load failure it offers an "Open in new window" anchor that (like any raw link) could strand a kiosk. Routing that escape through the handoff overlay is a small follow-up, deferred to keep the initial change focused on the card-grid/item-list traps that actually bite today. File a bead when the core lands.
