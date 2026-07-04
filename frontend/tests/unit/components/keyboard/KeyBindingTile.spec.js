@@ -28,4 +28,27 @@ describe("KeyBindingTile", () => {
     });
     expect(w.find(".kbt--conflict").exists()).toBe(true);
   });
+
+  it("names the colliding key(s) in the conflict hint", () => {
+    const w = mount(KeyBindingTile, {
+      props: {
+        keyCode: "KEY_0",
+        action: "generic_next",
+        conflict: true,
+        conflictKeys: ["KEY_7"],
+      },
+    });
+    expect(w.find(".kbt-hint").text()).toContain("7");
+  });
+
+  it("toggles the hint open when the badge is tapped", async () => {
+    const w = mount(KeyBindingTile, {
+      props: { keyCode: "KEY_0", action: "generic_next", conflict: true, conflictKeys: ["KEY_7"] },
+    });
+    expect(w.find(".kbt--hint-open").exists()).toBe(false);
+    await w.find(".kbt-conflict-badge").trigger("click");
+    expect(w.find(".kbt--hint-open").exists()).toBe(true);
+    await w.find(".kbt-conflict-badge").trigger("click");
+    expect(w.find(".kbt--hint-open").exists()).toBe(false);
+  });
 });

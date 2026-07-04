@@ -7,6 +7,7 @@
         :key-code="key"
         :action="mappings[key] || null"
         :conflict="isConflict(key)"
+        :conflict-keys="conflictKeysFor(key)"
         @edit="$emit('edit', key)"
         @clear="$emit('clear', key)"
       />
@@ -41,18 +42,26 @@ const boundKeys = computed(() =>
   })
 );
 
-// An action is in conflict when >1 key maps to it (excluding "none").
-const actionCounts = computed(() => {
-  const counts = {};
-  for (const action of Object.values(props.mappings)) {
-    if (action && action !== "none") counts[action] = (counts[action] || 0) + 1;
+// Which keys are bound to each action (excluding "none").
+const keysByAction = computed(() => {
+  const map = {};
+  for (const [key, action] of Object.entries(props.mappings)) {
+    if (action && action !== "none") (map[action] ||= []).push(key);
   }
-  return counts;
+  return map;
 });
 
+// An action is in conflict when >1 key maps to it.
 const isConflict = key => {
   const action = props.mappings[key];
-  return !!action && action !== "none" && actionCounts.value[action] > 1;
+  return !!action && action !== "none" && (keysByAction.value[action]?.length || 0) > 1;
+};
+
+// The other keys sharing this key's action — named in the tile's hint.
+const conflictKeysFor = key => {
+  const action = props.mappings[key];
+  if (!action || action === "none") return [];
+  return (keysByAction.value[action] || []).filter(k => k !== key);
 };
 </script>
 
