@@ -35,16 +35,6 @@
           @update:model-value="v => emit('update:config', { clockBarShowPluginItems: v })"
         />
       </SettingRow>
-      <SettingRow
-        label="Show in kiosk mode"
-        description="Keep the bar visible when the rest of the UI is hidden."
-      >
-        <ToggleSwitch
-          :model-value="config.clockBarShowInKiosk"
-          aria-label="Show in kiosk mode"
-          @update:model-value="v => emit('update:config', { clockBarShowInKiosk: v })"
-        />
-      </SettingRow>
     </SettingsSection>
 
     <SettingsSection id="clock-bar-layout" title="Bar layout">

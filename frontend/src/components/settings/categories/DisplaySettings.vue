@@ -105,31 +105,6 @@
         />
       </SettingRow>
       <SettingRow
-        label="Focus light"
-        description="When the focus spotlight highlights the active region."
-      >
-        <SelectPill
-          :model-value="config.focusLightMode"
-          :options="[
-            { value: 'interaction', label: 'When navigating' },
-            { value: 'always', label: 'Always on' },
-            { value: 'off', label: 'Off' },
-          ]"
-          aria-label="Focus light"
-          @update:model-value="v => emit('update:config', { focusLightMode: v })"
-        />
-      </SettingRow>
-      <SettingRow
-        label="Dim other regions"
-        description="Reduce brightness of non-focused regions while the spotlight is active."
-      >
-        <ToggleSwitch
-          :model-value="config.focusLightDimOthers"
-          aria-label="Dim other regions"
-          @update:model-value="v => emit('update:config', { focusLightDimOthers: v })"
-        />
-      </SettingRow>
-      <SettingRow
         label="Display name"
         description="A friendly name for this dashboard shown in the title bar."
       >
@@ -143,11 +118,12 @@
       </SettingRow>
     </SettingsSection>
 
-    <!-- KIOSK & TOUCH -->
-    <SettingsSection id="kiosk-touch" title="Kiosk & touch">
+    <!-- KIOSK & WALL -->
+    <SettingsSection id="kiosk-touch" title="Kiosk & wall">
+      <!-- Enter the wall state -->
       <SettingRow
         label="Hide controls in kiosk mode"
-        description="Suppress on-screen controls when running in kiosk mode."
+        description="Suppress on-screen controls (the ⋯ menu, headers) for a clean wall display."
       >
         <ToggleSwitch
           :model-value="!config.showUI"
@@ -155,19 +131,47 @@
           @update:model-value="v => emit('update:config', { showUI: !v })"
         />
       </SettingRow>
+      <!-- What survives hiding -->
       <SettingRow
-        label="Tap anywhere to show controls"
-        description="When controls are hidden, tapping the calendar or photos brings them back. Off by default — use the reveal corner instead."
+        label="Keep clock bar visible"
+        description="Keep the clock bar on-screen even when controls are hidden — it still shows the time and any status items."
       >
         <ToggleSwitch
-          :model-value="config.tapAnywhereReveal"
-          aria-label="Tap anywhere to show controls"
-          @update:model-value="v => emit('update:config', { tapAnywhereReveal: v })"
+          :model-value="config.clockBarShowInKiosk"
+          aria-label="Keep clock bar visible"
+          @update:model-value="v => emit('update:config', { clockBarShowInKiosk: v })"
+        />
+      </SettingRow>
+      <!-- Visual calm -->
+      <SettingRow
+        label="Focus light"
+        description="Highlights the active region. 'Only while controls are shown' turns it off when controls are hidden (e.g. a calm wall)."
+      >
+        <SelectPill
+          :model-value="config.focusLightMode"
+          :options="[
+            { value: 'interaction', label: 'Only while controls shown' },
+            { value: 'always', label: 'Always on' },
+            { value: 'off', label: 'Off' },
+          ]"
+          aria-label="Focus light"
+          @update:model-value="v => emit('update:config', { focusLightMode: v })"
         />
       </SettingRow>
       <SettingRow
+        label="Dim other regions"
+        description="Reduce brightness of non-focused regions while the focus light is active."
+      >
+        <ToggleSwitch
+          :model-value="config.focusLightDimOthers"
+          aria-label="Dim other regions"
+          @update:model-value="v => emit('update:config', { focusLightDimOthers: v })"
+        />
+      </SettingRow>
+      <!-- Exit / reveal -->
+      <SettingRow
         label="Reveal corner"
-        description="Which screen corner reveals the controls on a press-and-hold while the UI is hidden."
+        description="Which screen corner reveals the controls on a press-and-hold while they're hidden."
       >
         <SelectPill
           :model-value="config.hotCornerPosition || 'bottom-left'"
@@ -223,8 +227,19 @@
         />
       </SettingRow>
       <SettingRow
-        label="Touch controls"
-        description="Whether on-screen touch navigation controls are shown."
+        label="Tap anywhere to show controls"
+        description="When controls are hidden, tapping the calendar or photos brings them back. Off by default — use the reveal corner instead."
+      >
+        <ToggleSwitch
+          :model-value="config.tapAnywhereReveal"
+          aria-label="Tap anywhere to show controls"
+          @update:model-value="v => emit('update:config', { tapAnywhereReveal: v })"
+        />
+      </SettingRow>
+      <!-- Device: is this a touchscreen -->
+      <SettingRow
+        label="Touchscreen"
+        description="Whether this device is treated as a touchscreen — shows touch navigation controls (region arrows, screen dots). Auto-detects; force on/off for hybrid setups."
       >
         <SelectPill
           :model-value="config.touchControls"
@@ -233,12 +248,12 @@
             { value: 'on', label: 'Always on' },
             { value: 'off', label: 'Off' },
           ]"
-          aria-label="Touch controls"
+          aria-label="Touchscreen"
           @update:model-value="v => emit('update:config', { touchControls: v })"
         />
       </SettingRow>
       <SettingRow
-        label="Touch control size"
+        label="Touch target size"
         description="Size of the on-dashboard touch navigation buttons (calendar, photos, services). Independent of Settings UI size."
       >
         <SegmentedControl
@@ -248,7 +263,7 @@
             { value: 'medium', label: 'Medium' },
             { value: 'large', label: 'Large' },
           ]"
-          aria-label="Touch control size"
+          aria-label="Touch target size"
           @update:model-value="v => emit('update:config', { touchControlSize: v })"
         />
       </SettingRow>

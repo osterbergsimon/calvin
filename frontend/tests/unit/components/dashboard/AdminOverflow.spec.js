@@ -22,11 +22,12 @@ describe("AdminOverflow", () => {
     w.unmount();
   });
 
-  it("offers only Settings + Hide UI; legacy mode/side-view/orientation items are gone (calvin-ayr, calvin-7nm)", async () => {
+  it("offers only Settings + Hide controls; legacy mode/side-view/orientation items are gone (calvin-ayr, calvin-7nm)", async () => {
     const w = mount(AdminOverflow, { attachTo: document.body });
     await w.get(".admin-overflow__trigger").trigger("click");
     expect(w.find('[data-admin="settings"]').exists()).toBe(true);
     expect(w.find('[data-admin="hide-ui"]').exists()).toBe(true);
+    expect(w.get('[data-admin="hide-ui"]').text()).toBe("Hide controls");
     // these are no-ops / belong in Display settings now — removed from the ⋯ menu
     expect(w.find('[data-admin="mode"]').exists()).toBe(false);
     expect(w.find('[data-admin="side-view"]').exists()).toBe(false);
@@ -34,7 +35,7 @@ describe("AdminOverflow", () => {
     w.unmount();
   });
 
-  it("Hide UI toggles the UI and closes the menu", async () => {
+  it("Hide controls toggles the UI and closes the menu", async () => {
     const store = useConfigStore();
     const spy = vi.spyOn(store, "toggleUI");
     const w = mount(AdminOverflow, { attachTo: document.body });

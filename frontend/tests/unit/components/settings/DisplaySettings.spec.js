@@ -12,6 +12,7 @@ const baseConfig = () => ({
   focusLightMode: "interaction",
   focusLightDimOthers: true,
   showUI: true,
+  clockBarShowInKiosk: false,
   touchControls: "auto",
   touchControlSize: "medium",
   displayName: "",
@@ -52,5 +53,24 @@ describe("DisplaySettings", () => {
     // Drive every toggle and assert a showUI:false emit appears for the inverted one.
     for (const t of toggles) t.vm.$emit("update:modelValue", true);
     expect(w.emitted("update:config").some(c => c[0].showUI === false)).toBe(true);
+  });
+
+  it("co-locates the kiosk/wall story: clock-bar + focus light moved into Kiosk & wall (calvin-4qq)", () => {
+    const w = mount(DisplaySettings, { props: { config: baseConfig() }, global: { stubs } });
+    const labels = w.findAllComponents({ name: "SettingRow" }).map(r => r.props("label"));
+    expect(labels).toContain("Keep clock bar visible");
+    expect(labels).toContain("Focus light");
+    // "controls" overload resolved: the touch-capability row is now "Touchscreen"
+    expect(labels).toContain("Touchscreen");
+    expect(labels).not.toContain("Touch controls");
+  });
+
+  it("emits clockBarShowInKiosk from the moved keep-clock-bar toggle", () => {
+    const w = mount(DisplaySettings, { props: { config: baseConfig() }, global: { stubs } });
+    const row = w
+      .findAllComponents({ name: "SettingRow" })
+      .find(r => r.props("label") === "Keep clock bar visible");
+    row.findComponent({ name: "ToggleSwitch" }).vm.$emit("update:modelValue", true);
+    expect(w.emitted("update:config").some(c => c[0].clockBarShowInKiosk === true)).toBe(true);
   });
 });

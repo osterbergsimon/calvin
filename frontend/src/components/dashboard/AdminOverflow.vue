@@ -45,7 +45,7 @@
         data-admin="hide-ui"
         @click="onHideUi"
       >
-        Hide UI
+        Hide controls
       </button>
     </div>
   </div>
