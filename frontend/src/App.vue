@@ -2,6 +2,7 @@
   <div id="app">
     <KeyboardHandler />
     <RouterView />
+    <StatusRail />
   </div>
 </template>
 
@@ -9,6 +10,7 @@
 import { onMounted, onUnmounted } from "vue";
 import { RouterView } from "vue-router";
 import KeyboardHandler from "./components/KeyboardHandler.vue";
+import StatusRail from "./components/StatusRail.vue";
 // Initialize photo frame mode globally
 import { usePhotoFrameMode } from "./composables/usePhotoFrameMode";
 // Initialize theme globally

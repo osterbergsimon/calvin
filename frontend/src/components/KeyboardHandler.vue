@@ -12,6 +12,7 @@ import { useKeyboardStore } from "../stores/keyboard";
 import { useKeyboardActions } from "../composables/useKeyboardActions";
 import { usePhotoFrameMode } from "../composables/usePhotoFrameMode";
 import { useConfigStore } from "../stores/config";
+import { useNotificationsStore } from "../stores/notifications";
 import NotificationSystem from "./NotificationSystem.vue";
 import { showSystemRebootScheduled } from "../utils/systemNotifications";
 import { useSystem } from "../composables/useSystem";
@@ -19,6 +20,7 @@ import { normalizeKeyCode } from "@/utils/keyCode";
 
 const keyboardStore = useKeyboardStore();
 const configStore = useConfigStore();
+const notificationsStore = useNotificationsStore();
 const { handleAction } = useKeyboardActions();
 const { resetInactivityTimer } = usePhotoFrameMode();
 const notificationRef = ref(null);
@@ -67,7 +69,7 @@ const triggerReboot = async () => {
       method: "POST",
     });
     if (response.ok) {
-      showSystemRebootScheduled(notificationRef);
+      showSystemRebootScheduled(notificationsStore);
     } else {
       console.error("Failed to trigger reboot:", await response.text());
     }
@@ -179,31 +181,18 @@ watch(
   }
 );
 
-// Surface restart/update status as a toast so it's visible outside Settings
+// Surface restart/update status on the status rail so it's visible outside Settings
 const { updateMessage, updateMessageClass } = useSystem();
-const _msgClassToNotifType = {
+const _msgClassToSeverity = {
   info: "info",
   success: "success",
   error: "error",
   warning: "warning",
 };
-const _msgClassToDuration = {
-  info: 5000,
-  success: 4000,
-  error: 8000,
-  warning: 8000,
-};
-const _msgClassToIcon = { info: "🔄", success: "✓", error: "✗", warning: "⚠" };
 watch(updateMessage, msg => {
   if (!msg) return;
-  const cls = updateMessageClass.value || "info";
-  const type = _msgClassToNotifType[cls] ?? "info";
-  notificationRef.value?.show(
-    type,
-    _msgClassToIcon[cls] ?? "🔄",
-    msg,
-    _msgClassToDuration[cls] ?? 5000
-  );
+  const severity = _msgClassToSeverity[updateMessageClass.value] ?? "info";
+  notificationsStore.notify({ severity, eyebrow: "System", message: msg });
 });
 
 onMounted(async () => {

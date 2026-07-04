@@ -1,29 +1,45 @@
 <template>
-  <Transition name="notification">
-    <div v-if="visible" class="notification" :class="[typeClass, sizeClass, positionClass]">
-      <div class="notification-content">
-        <div class="notification-icon">
-          {{ icon }}
-        </div>
-        <div class="notification-message">
-          {{ message }}
-        </div>
-      </div>
+  <Transition name="hud">
+    <div v-if="visible" class="hud" :class="[sizeClass, positionClass]">
+      <span class="hud__lamp" aria-hidden="true" />
+      <span v-if="notificationType === 'mode'" class="hud__glyph" aria-hidden="true">
+        <svg viewBox="0 0 24 24" width="100%" height="100%">
+          <path :d="iconPath" fill="currentColor" />
+        </svg>
+      </span>
+      <span v-else class="hud__keycap">{{ keycap }}</span>
+      <span class="hud__label">{{ message }}</span>
     </div>
   </Transition>
 </template>
 
 <script setup>
 import { ref, computed, watch } from "vue";
+import {
+  mdiCalendarBlankOutline,
+  mdiImageOutline,
+  mdiWeb,
+  mdiViewDashboardOutline,
+} from "@mdi/js";
 import { useConfigStore } from "../stores/config";
 import { useModeStore } from "../stores/mode";
+
+/**
+ * Input-echo HUD.
+ *
+ * Confirms a physical keyboard/remote press and echoes mode changes while the
+ * UI is hidden. Ephemeral and non-interactive by design — you're holding a
+ * remote, not touching the glass. System-event toasts live on the StatusRail
+ * (see stores/notifications.js); they do not pass through here.
+ */
 
 const configStore = useConfigStore();
 const modeStore = useModeStore();
 
 const visible = ref(false);
-const notificationType = ref("keyboard"); // 'keyboard', 'mode', 'info', 'success', 'error'
-const icon = ref("");
+const notificationType = ref("keyboard"); // 'keyboard' | 'mode'
+const keycap = ref("");
+const iconPath = ref("");
 const message = ref("");
 
 // Map key codes to user-friendly labels
@@ -107,122 +123,71 @@ const actionLabels = {
   none: "No Action",
 };
 
-const getModeIcon = () => {
+const getModeIconPath = () => {
   if (modeStore.isFullscreen) {
-    if (modeStore.fullscreenMode === modeStore.MODES.PHOTOS) {
-      return "📷";
-    } else if (modeStore.fullscreenMode === modeStore.MODES.WEB_SERVICES) {
-      return "🌐";
-    }
+    if (modeStore.fullscreenMode === modeStore.MODES.PHOTOS) return mdiImageOutline;
+    if (modeStore.fullscreenMode === modeStore.MODES.WEB_SERVICES) return mdiWeb;
   } else {
-    if (modeStore.currentMode === modeStore.MODES.CALENDAR) {
-      return "📅";
-    } else if (modeStore.currentMode === modeStore.MODES.PHOTOS) {
-      return "📷";
-    } else if (modeStore.currentMode === modeStore.MODES.WEB_SERVICES) {
-      return "🌐";
-    }
+    if (modeStore.currentMode === modeStore.MODES.CALENDAR) return mdiCalendarBlankOutline;
+    if (modeStore.currentMode === modeStore.MODES.PHOTOS) return mdiImageOutline;
+    if (modeStore.currentMode === modeStore.MODES.WEB_SERVICES) return mdiWeb;
   }
-  return "•";
+  return mdiViewDashboardOutline;
 };
 
 const getModeMessage = () => {
   if (modeStore.isFullscreen) {
-    if (modeStore.fullscreenMode === modeStore.MODES.PHOTOS) {
-      return "Fullscreen Photos";
-    } else if (modeStore.fullscreenMode === modeStore.MODES.WEB_SERVICES) {
-      return "Fullscreen Web Services";
-    }
+    if (modeStore.fullscreenMode === modeStore.MODES.PHOTOS) return "Fullscreen Photos";
+    if (modeStore.fullscreenMode === modeStore.MODES.WEB_SERVICES) return "Fullscreen Web Services";
   } else {
-    if (modeStore.currentMode === modeStore.MODES.CALENDAR) {
-      return "Calendar Mode";
-    } else if (modeStore.currentMode === modeStore.MODES.PHOTOS) {
-      return "Photos Mode";
-    } else if (modeStore.currentMode === modeStore.MODES.WEB_SERVICES) {
-      return "Web Services Mode";
-    }
+    if (modeStore.currentMode === modeStore.MODES.CALENDAR) return "Calendar Mode";
+    if (modeStore.currentMode === modeStore.MODES.PHOTOS) return "Photos Mode";
+    if (modeStore.currentMode === modeStore.MODES.WEB_SERVICES) return "Web Services Mode";
   }
   return "Dashboard";
 };
 
-const typeClass = computed(() => {
-  if (notificationType.value === "mode") {
-    // Mode-specific colors
-    if (modeStore.isFullscreen) {
-      if (modeStore.fullscreenMode === modeStore.MODES.PHOTOS) {
-        return "notification-photos";
-      } else if (modeStore.fullscreenMode === modeStore.MODES.WEB_SERVICES) {
-        return "notification-web-services";
-      }
-    } else {
-      if (modeStore.currentMode === modeStore.MODES.CALENDAR) {
-        return "notification-calendar";
-      } else if (modeStore.currentMode === modeStore.MODES.PHOTOS) {
-        return "notification-photos";
-      } else if (modeStore.currentMode === modeStore.MODES.WEB_SERVICES) {
-        return "notification-web-services";
-      }
-    }
-    return "notification-default";
-  }
-  // Keyboard feedback classes
-  if (notificationType.value === "keyboard") {
-    const action = message.value;
-    if (action?.startsWith("Mode:")) {
-      return "notification-mode";
-    } else if (action?.startsWith("Calendar:")) {
-      return "notification-calendar";
-    } else if (action?.startsWith("Images:") || action?.startsWith("Web Service:")) {
-      return "notification-media";
-    }
-  }
-  // Generic notification types
-  return `notification-${notificationType.value}`;
-});
-
-const sizeClass = computed(() => {
-  const mode = configStore.keyboardFeedbackMode || "normal";
-  return `notification-${mode}`;
-});
+const sizeClass = computed(() => `hud--${configStore.keyboardFeedbackMode || "normal"}`);
 
 const positionClass = computed(() => {
-  // All notifications use the same position based on feedback mode
-  const mode = configStore.keyboardFeedbackMode || "normal";
-  if (mode === "small") {
-    return "notification-position-bottom-right";
-  }
-  return "notification-position-center";
+  // "small" tucks bottom-centre (clear of the status rail); "normal" centres.
+  return (configStore.keyboardFeedbackMode || "normal") === "small"
+    ? "hud--bottom"
+    : "hud--center";
 });
 
 let hideTimeout = null;
 
+/**
+ * @param {"keyboard"|"mode"} type
+ * @param {string} iconValue  keycap text (keyboard) or MDI path (mode)
+ * @param {string} messageValue
+ * @param {number|null} duration
+ */
 const show = (type, iconValue, messageValue, duration = null) => {
-  // Only show if enabled in config (for keyboard and mode notifications)
-  if ((type === "keyboard" || type === "mode") && !configStore.keyboardFeedbackEnabled) {
-    return;
-  }
+  if (!configStore.keyboardFeedbackEnabled) return;
 
   notificationType.value = type;
-  icon.value = iconValue;
+  if (type === "mode") {
+    iconPath.value = iconValue;
+  } else {
+    keycap.value = iconValue;
+  }
   message.value = messageValue;
   visible.value = true;
 
-  // Clear existing timeout
   if (hideTimeout) {
     clearTimeout(hideTimeout);
     hideTimeout = null;
   }
 
-  // Use provided duration or default based on type
   let timeoutDuration;
   if (duration !== null) {
     timeoutDuration = duration;
   } else if (type === "mode") {
-    // Mode changes use configured timeout
     const timeout = configStore.modeIndicatorTimeout || 0;
     timeoutDuration = timeout > 0 ? timeout * 1000 : 1500;
   } else {
-    // Keyboard feedback shows for 1.5 seconds
     timeoutDuration = 1500;
   }
 
@@ -238,14 +203,11 @@ const showKeyboardFeedback = (key, actionName) => {
 };
 
 const showModeChange = () => {
-  // Don't show mode indicator if UI is visible (only show when UI is hidden)
-  if (configStore.shouldShowUI) {
-    return;
-  }
-  show("mode", getModeIcon(), getModeMessage());
+  // Only surface the mode HUD when the UI chrome is hidden.
+  if (configStore.shouldShowUI) return;
+  show("mode", getModeIconPath(), getModeMessage());
 };
 
-// Watch for mode changes to show mode indicator
 watch(
   () => [modeStore.currentMode, modeStore.isFullscreen, modeStore.fullscreenMode],
   () => {
@@ -254,15 +216,10 @@ watch(
   { immediate: false }
 );
 
-// Watch for config changes
 watch(
   () => configStore.keyboardFeedbackEnabled,
   enabled => {
-    if (
-      !enabled &&
-      visible.value &&
-      (notificationType.value === "keyboard" || notificationType.value === "mode")
-    ) {
+    if (!enabled && visible.value) {
       visible.value = false;
       if (hideTimeout) {
         clearTimeout(hideTimeout);
@@ -272,15 +229,12 @@ watch(
   }
 );
 
-// Watch for UI visibility changes (show mode when UI is hidden)
 watch(
   () => configStore.shouldShowUI,
   showUI => {
     if (!showUI) {
-      // Show mode indicator when UI is hidden
       showModeChange();
     } else if (notificationType.value === "mode" && visible.value) {
-      // Hide mode indicator when UI is shown
       visible.value = false;
       if (hideTimeout) {
         clearTimeout(hideTimeout);
@@ -290,7 +244,6 @@ watch(
   }
 );
 
-// Expose methods for parent components
 defineExpose({
   show,
   showKeyboardFeedback,
@@ -299,170 +252,127 @@ defineExpose({
 </script>
 
 <style scoped>
-.notification {
+.hud {
   position: fixed;
-  z-index: 10000;
+  z-index: 9999;
+  display: inline-flex;
+  align-items: center;
+  gap: 0.6rem;
+  padding: 0.5rem 0.8rem 0.5rem 0.65rem;
+  background: var(--bg-1);
+  border: 1px solid var(--line);
+  border-radius: var(--radius-md);
+  box-shadow: 0 6px 22px color-mix(in srgb, var(--ink) 18%, transparent);
   pointer-events: none;
   user-select: none;
+  max-width: min(90vw, 22rem);
 }
 
-/* Position classes */
-.notification-position-center {
+/* Positions */
+.hud--center {
   top: 50%;
   left: 50%;
   transform: translate(-50%, -50%);
 }
 
-.notification-position-bottom-right {
-  bottom: 20px;
-  right: 20px;
-  transform: none;
+.hud--bottom {
+  bottom: 1rem;
+  left: 50%;
+  transform: translateX(-50%);
 }
 
-.notification-content {
-  background: rgba(0, 0, 0, 0.85);
-  color: white;
-  padding: 20px 30px;
-  border-radius: 12px;
-  box-shadow: 0 4px 20px rgba(0, 0, 0, 0.5);
-  display: flex;
-  flex-direction: column;
+/* Amber "power" lamp — the same instrument-panel motif, held quiet here. */
+.hud__lamp {
+  flex: none;
+  width: 0.5rem;
+  height: 0.5rem;
+  border-radius: 2px;
+  background: var(--focus);
+  box-shadow:
+    0 0 6px 0 var(--focus),
+    0 0 14px 1px var(--focus-glow);
+}
+
+/* Keycap — mono, tabular, boxed like a real key. */
+.hud__keycap {
+  flex: none;
+  display: inline-flex;
   align-items: center;
-  gap: 8px;
-  min-width: 200px;
-  backdrop-filter: blur(10px);
-  border: 2px solid rgba(255, 255, 255, 0.2);
+  justify-content: center;
+  min-width: 1.9rem;
+  height: 1.9rem;
+  padding: 0 0.4rem;
+  font-family: var(--font-data);
+  font-variant-numeric: tabular-nums;
+  font-size: var(--fs-sm);
+  font-weight: 600;
+  color: var(--ink);
+  background: var(--bg-2);
+  border: 1px solid var(--line);
+  border-radius: var(--radius-xs);
 }
 
-/* Small mode styling */
-.notification-small .notification-content {
-  padding: 8px 12px;
-  border-radius: 8px;
-  min-width: auto;
-  gap: 4px;
-  background: rgba(0, 0, 0, 0.75);
-  border: 1px solid rgba(255, 255, 255, 0.15);
-  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.4);
+.hud__glyph {
+  flex: none;
+  width: 1.5rem;
+  height: 1.5rem;
+  color: var(--focus);
 }
 
-.notification-small .notification-icon {
-  font-size: 20px;
-  text-shadow: 0 0 5px rgba(74, 222, 128, 0.4);
-}
-
-.notification-small .notification-message {
-  font-size: 11px;
-  opacity: 0.85;
-}
-
-.notification-icon {
-  font-size: 48px;
-  font-weight: bold;
-  line-height: 1;
-  color: #4ade80; /* Green accent */
-  text-shadow: 0 0 10px rgba(74, 222, 128, 0.5);
-}
-
-.notification-message {
-  font-size: 16px;
+.hud__label {
+  font-family: var(--font-ui);
+  font-size: var(--fs-md);
   font-weight: 500;
-  color: rgba(255, 255, 255, 0.9);
-  text-align: center;
-  text-transform: capitalize;
+  color: var(--ink);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
 }
 
-/* Different colors for different notification types */
-.notification-mode .notification-icon {
-  color: #60a5fa; /* Blue */
-  text-shadow: 0 0 10px rgba(96, 165, 250, 0.5);
+/* Larger, calmer variant when the mode HUD holds centre-screen. */
+.hud--normal {
+  padding: 0.65rem 1rem 0.65rem 0.8rem;
+  gap: 0.75rem;
+}
+.hud--normal .hud__keycap {
+  min-width: 2.4rem;
+  height: 2.4rem;
+  font-size: var(--fs-lg);
+}
+.hud--normal .hud__glyph {
+  width: 2rem;
+  height: 2rem;
+}
+.hud--normal .hud__label {
+  font-size: var(--fs-lg);
 }
 
-.notification-calendar .notification-icon {
-  color: #fbbf24; /* Yellow */
-  text-shadow: 0 0 10px rgba(251, 191, 36, 0.5);
+/* Motion */
+.hud-enter-active {
+  transition:
+    opacity 0.25s ease-out,
+    transform 0.25s cubic-bezier(0.2, 0.7, 0.2, 1);
 }
-
-.notification-media .notification-icon {
-  color: #a78bfa; /* Purple */
-  text-shadow: 0 0 10px rgba(167, 139, 250, 0.5);
+.hud-leave-active {
+  transition:
+    opacity 0.2s ease-in,
+    transform 0.2s ease-in;
 }
-
-.notification-photos .notification-icon {
-  color: #4ade80; /* Green */
-  text-shadow: 0 0 10px rgba(76, 222, 128, 0.5);
-}
-
-.notification-web-services .notification-icon {
-  color: #fbbf24; /* Yellow/Orange */
-  text-shadow: 0 0 10px rgba(251, 191, 36, 0.5);
-}
-
-.notification-info .notification-icon {
-  color: #60a5fa; /* Blue */
-  text-shadow: 0 0 10px rgba(96, 165, 250, 0.5);
-}
-
-.notification-success .notification-icon {
-  color: #4ade80; /* Green */
-  text-shadow: 0 0 10px rgba(76, 222, 128, 0.5);
-}
-
-.notification-error .notification-icon {
-  color: #ef4444; /* Red */
-  text-shadow: 0 0 10px rgba(239, 68, 68, 0.5);
-}
-
-/* Small mode color adjustments */
-.notification-small.notification-mode .notification-icon {
-  text-shadow: 0 0 5px rgba(96, 165, 250, 0.4);
-}
-
-.notification-small.notification-calendar .notification-icon {
-  text-shadow: 0 0 5px rgba(251, 191, 36, 0.4);
-}
-
-.notification-small.notification-media .notification-icon {
-  text-shadow: 0 0 5px rgba(167, 139, 250, 0.4);
-}
-
-.notification-small.notification-photos .notification-icon {
-  text-shadow: 0 0 5px rgba(76, 222, 128, 0.4);
-}
-
-.notification-small.notification-web-services .notification-icon {
-  text-shadow: 0 0 5px rgba(251, 191, 36, 0.4);
-}
-
-/* Transition animations */
-.notification-enter-active {
-  transition: all 0.3s ease-out;
-}
-
-.notification-leave-active {
-  transition: all 0.2s ease-in;
-}
-
-.notification-enter-from {
+.hud--center.hud-enter-from,
+.hud--center.hud-leave-to {
   opacity: 0;
+  transform: translate(-50%, -50%) scale(0.92);
 }
-
-.notification-position-center.notification-enter-from {
-  transform: translate(-50%, -50%) scale(0.8);
-}
-
-.notification-position-bottom-right.notification-enter-from {
-  transform: translateY(10px) scale(0.9);
-}
-
-.notification-leave-to {
+.hud--bottom.hud-enter-from,
+.hud--bottom.hud-leave-to {
   opacity: 0;
+  transform: translate(-50%, 8px);
 }
 
-.notification-position-center.notification-leave-to {
-  transform: translate(-50%, -50%) scale(0.9);
-}
-
-.notification-position-bottom-right.notification-leave-to {
-  transform: translateY(-5px) scale(0.95);
+@media (prefers-reduced-motion: reduce) {
+  .hud-enter-active,
+  .hud-leave-active {
+    transition: none;
+  }
 }
 </style>
