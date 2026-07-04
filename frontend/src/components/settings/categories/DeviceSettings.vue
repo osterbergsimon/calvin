@@ -68,6 +68,7 @@
 
     <SettingsSection id="device-keyboard" title="Keyboard">
       <KeyboardTab />
+      <RebootCombo :config="config" @update:config="patch => emit('update:config', patch)" />
     </SettingsSection>
 
     <SettingsSection id="device-notifications" title="Notifications">
@@ -106,36 +107,6 @@
       </SettingRow>
     </SettingsSection>
 
-    <SettingsSection id="device-reboot" title="Reboot combo">
-      <SettingRow label="First key" description="First key in the reboot key combination.">
-        <SelectPill
-          :model-value="config.rebootComboKey1 || 'KEY_1'"
-          :options="keyOptions"
-          @update:model-value="v => emit('update:config', { rebootComboKey1: v })"
-        />
-      </SettingRow>
-      <SettingRow label="Second key" description="Second key in the reboot key combination.">
-        <SelectPill
-          :model-value="config.rebootComboKey2 || 'KEY_7'"
-          :options="keyOptions"
-          @update:model-value="v => emit('update:config', { rebootComboKey2: v })"
-        />
-      </SettingRow>
-      <SettingRow
-        label="Hold duration"
-        description="How long to hold both keys to trigger a reboot (milliseconds)."
-      >
-        <NumberStepper
-          :model-value="config.rebootComboDuration || 10000"
-          :min="1000"
-          :max="60000"
-          :step="1000"
-          aria-label="Reboot combo duration in milliseconds"
-          @update:model-value="v => emit('update:config', { rebootComboDuration: v })"
-        />
-      </SettingRow>
-      <SettingRow label="Combo" :description="comboHint" />
-    </SettingsSection>
 
     <SettingsSection id="device-hardware" title="Hardware">
       <SettingRow label="Backend version" :description="version || 'Unknown'" />
@@ -159,8 +130,9 @@ import SegmentedControl from "@/components/ui/SegmentedControl.vue";
 import NumberStepper from "@/components/ui/NumberStepper.vue";
 import DisplayScheduleGrid from "@/components/settings/shared/DisplayScheduleGrid.vue";
 import KeyboardTab from "@/components/settings/tabs/layout/KeyboardTab.vue";
+import RebootCombo from "@/components/settings/tabs/layout/keyboard/RebootCombo.vue";
 
-const props = defineProps({
+defineProps({
   config: { type: Object, required: true },
   version: { type: String, default: null },
   frontendVersion: { type: String, default: null },
@@ -169,11 +141,6 @@ const emit = defineEmits(["update:config"]);
 
 const { turnDisplayOn, turnDisplayOff } = useSystem();
 const connectionStore = useConnectionStore();
-
-const keyOptions = ["KEY_1", "KEY_2", "KEY_3", "KEY_4", "KEY_5", "KEY_6", "KEY_7"].map(k => ({
-  value: k,
-  label: k,
-}));
 
 const timezoneOptions = [
   { value: "system", label: "System default" },
@@ -190,13 +157,6 @@ const timezoneOptions = [
   { value: "Asia/Shanghai", label: "Shanghai (CST)" },
   { value: "Australia/Sydney", label: "Sydney (AEDT/AEST)" },
 ];
-
-const comboHint = computed(() => {
-  const k1 = props.config.rebootComboKey1 || "KEY_1";
-  const k2 = props.config.rebootComboKey2 || "KEY_7";
-  const secs = ((props.config.rebootComboDuration || 10000) / 1000).toFixed(1);
-  return `Hold ${k1} + ${k2} for ${secs} seconds to reboot.`;
-});
 
 const statusText = computed(() => (connectionStore.isBackendOnline ? "● Online" : "○ Offline"));
 const statusClass = computed(() => (connectionStore.isBackendOnline ? "is-online" : "is-offline"));

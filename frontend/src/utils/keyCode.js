@@ -43,3 +43,15 @@ export function normalizeKeyCode(event) {
   // Fallback: uppercase the raw code into KEY_ form (e.g. Comma -> KEY_COMMA).
   return `KEY_${code.toUpperCase()}`;
 }
+
+/**
+ * Human-friendly label for a Calvin KEY_* code (strips the KEY_ prefix).
+ * Single source of truth shared by the keyboard binding tiles and the
+ * reboot-combo picker so both render keys the same way.
+ * @param {string} code
+ * @returns {string}
+ */
+export function formatKeyLabel(code) {
+  if (!code) return "";
+  return String(code).replace(/^KEY_/, "");
+}

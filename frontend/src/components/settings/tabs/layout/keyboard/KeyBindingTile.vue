@@ -30,6 +30,7 @@
 <script setup>
 import { computed } from "vue";
 import { actionLabel } from "@/utils/keyboardActionsCatalog";
+import { formatKeyLabel } from "@/utils/keyCode";
 
 const props = defineProps({
   keyCode: { type: String, required: true },
@@ -38,7 +39,7 @@ const props = defineProps({
 });
 defineEmits(["edit", "clear"]);
 
-const keyLabel = computed(() => props.keyCode.replace(/^KEY_/, ""));
+const keyLabel = computed(() => formatKeyLabel(props.keyCode));
 </script>
 
 <style scoped>

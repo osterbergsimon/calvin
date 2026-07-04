@@ -8,7 +8,7 @@ vi.mock("@/composables", () => ({
   useSystem: () => ({ turnDisplayOn: vi.fn(), turnDisplayOff: vi.fn() }),
 }));
 
-const stubs = { DisplayScheduleGrid: true, KeyboardTab: true };
+const stubs = { DisplayScheduleGrid: true, KeyboardTab: true, RebootCombo: true };
 const baseConfig = {
   displayScheduleEnabled: false,
   displaySchedule: [],
@@ -27,7 +27,7 @@ const baseConfig = {
 describe("DeviceSettings", () => {
   beforeEach(() => setActivePinia(createPinia()));
 
-  it("renders the five sections incl. the moved notifications", () => {
+  it("renders the device sections; the reboot combo is folded into Keyboard (calvin-…)", () => {
     const wrapper = mount(DeviceSettings, {
       props: { config: baseConfig, version: "1.2.3", frontendVersion: "4.5.6" },
       global: { stubs },
@@ -36,11 +36,13 @@ describe("DeviceSettings", () => {
       "device-power",
       "device-keyboard",
       "device-notifications",
-      "device-reboot",
       "device-hardware",
     ]) {
       expect(wrapper.find(`#section-${id}`).exists()).toBe(true);
     }
+    // the standalone reboot section is gone; RebootCombo now lives in Keyboard
+    expect(wrapper.find("#section-device-reboot").exists()).toBe(false);
+    expect(wrapper.findComponent({ name: "RebootCombo" }).exists()).toBe(true);
   });
 
   it("emits update:config when keyboard feedback is toggled (notifications)", () => {
@@ -75,15 +77,13 @@ describe("DeviceSettings", () => {
     expect(wrapper.text()).toContain("1.2.3");
   });
 
-  it("emits update:config when the first reboot key changes", async () => {
+  it("passes config through to the folded-in RebootCombo", () => {
     const wrapper = mount(DeviceSettings, {
       props: { config: baseConfig, version: null, frontendVersion: null },
       global: { stubs },
     });
-    // SelectPill exposes its options as buttons; click a non-active option.
-    const pill = wrapper.findAll(".pill").find(p => p.text().includes("KEY_3"));
-    // fallback: emit directly via the component if the markup differs
-    expect(wrapper.find("#section-device-reboot").exists()).toBe(true);
-    if (pill) await pill.trigger("click");
+    const reboot = wrapper.findComponent({ name: "RebootCombo" });
+    expect(reboot.exists()).toBe(true);
+    expect(reboot.props("config")).toMatchObject({ rebootComboKey1: "KEY_1" });
   });
 });
