@@ -23,7 +23,12 @@ describe("IconButton", () => {
       props: { label: "Fullscreen", variant: "primary", size: "lg", shape: "circle", active: true },
     });
     expect(w.classes()).toEqual(
-      expect.arrayContaining(["icon-btn--primary", "icon-btn--lg", "icon-btn--circle", "icon-btn--active"])
+      expect.arrayContaining([
+        "icon-btn--primary",
+        "icon-btn--lg",
+        "icon-btn--circle",
+        "icon-btn--active",
+      ])
     );
   });
 
