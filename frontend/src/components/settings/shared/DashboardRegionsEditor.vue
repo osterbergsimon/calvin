@@ -7,11 +7,11 @@
         class="screen-card"
       >
         <header class="screen-card-header">
-          <button
-            type="button"
-            class="screen-collapse-toggle"
+          <IconButton
+            variant="ghost"
+            size="sm"
             :aria-expanded="expandedScreens.has(screen.id)"
-            :aria-label="
+            :label="
               expandedScreens.has(screen.id)
                 ? `Collapse screen ${screenIndex + 1}`
                 : `Expand screen ${screenIndex + 1}`
@@ -19,7 +19,7 @@
             @click="toggleScreenExpanded(screen.id)"
           >
             {{ expandedScreens.has(screen.id) ? "▾" : "▸" }}
-          </button>
+          </IconButton>
           <span class="screen-index">{{ screenIndex + 1 }}</span>
           <input
             :id="`screen-name-${screen.id}`"
@@ -1216,25 +1216,6 @@ onUnmounted(() => {
   display: flex;
   align-items: center;
   gap: var(--space-md);
-}
-
-.screen-collapse-toggle {
-  flex: 0 0 auto;
-  width: 1.6rem;
-  height: 1.6rem;
-  border: 0;
-  border-radius: var(--radius-xs);
-  background: transparent;
-  color: var(--ink-2);
-  cursor: pointer;
-  font-size: 0.95rem;
-  line-height: 1;
-}
-
-.screen-collapse-toggle:hover,
-.screen-collapse-toggle:focus {
-  color: var(--ink);
-  background: var(--bg-1);
 }
 
 .screen-index {

@@ -173,10 +173,19 @@ describe("DashboardRegionsEditor (screens & regions logic)", () => {
 
   it("toggles a screen's expanded state via its collapse control", async () => {
     const wrapper = mount(DashboardRegionsEditor, { props: { config: {} } });
-    const toggle = wrapper.find(".screen-collapse-toggle");
+    const toggle = wrapper.find('[aria-label="Expand screen 1"], [aria-label="Collapse screen 1"]');
     const before = toggle.attributes("aria-expanded");
     await toggle.trigger("click");
     expect(toggle.attributes("aria-expanded")).not.toBe(before);
+  });
+
+  it("renders the collapse toggle as a ghost IconButton with aria-expanded", () => {
+    const wrapper = mount(DashboardRegionsEditor, { props: { config: {} } });
+    const btn = wrapper.find('[aria-label="Expand screen 1"], [aria-label="Collapse screen 1"]');
+    expect(btn.exists()).toBe(true);
+    expect(btn.classes()).toContain("icon-btn");
+    expect(btn.classes()).toContain("icon-btn--ghost");
+    expect(btn.attributes("aria-expanded")).toBeDefined();
   });
 
   it("renders the screen direction toggle as a default IconButton", () => {
