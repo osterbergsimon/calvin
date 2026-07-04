@@ -1798,14 +1798,23 @@ onUnmounted(() => {
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  background: var(--focus);
-  color: var(--focus-ink);
+  box-sizing: border-box;
+  /* A quiet accent-tinted band, not a solid fill: it represents the clock
+     bar's footprint without competing with the solid --focus that marks the
+     active screen/region. */
+  background: color-mix(in srgb, var(--focus) 14%, var(--bg-1));
+  color: var(--focus);
+  border: 1px solid color-mix(in srgb, var(--focus) 30%, transparent);
   border-radius: 6px;
   font-size: 0.8rem;
-  font-weight: 600;
+  font-weight: 500;
   cursor: grab;
   user-select: none;
   flex-shrink: 0;
+}
+
+.clock-bar-token:hover {
+  background: color-mix(in srgb, var(--focus) 20%, var(--bg-1));
 }
 
 .clock-bar-token:active {
