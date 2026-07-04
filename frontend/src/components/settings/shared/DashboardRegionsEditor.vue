@@ -7,76 +7,60 @@
         class="screen-card"
       >
         <header class="screen-card-header">
-          <button
-            type="button"
-            class="screen-collapse-toggle"
-            :aria-expanded="expandedScreens.has(screen.id)"
-            :aria-label="
-              expandedScreens.has(screen.id)
-                ? `Collapse screen ${screenIndex + 1}`
-                : `Expand screen ${screenIndex + 1}`
-            "
-            @click="toggleScreenExpanded(screen.id)"
-          >
-            {{ expandedScreens.has(screen.id) ? "▾" : "▸" }}
-          </button>
-          <span class="screen-index">{{ screenIndex + 1 }}</span>
-          <input
-            :id="`screen-name-${screen.id}`"
-            :value="screen.name"
-            type="text"
-            class="screen-name-input"
-            :aria-label="`Screen ${screenIndex + 1} name`"
-            @change="handleScreenNameChange(screenIndex, $event)"
-          />
-          <button
-            type="button"
-            class="screen-activate"
-            :class="{ 'screen-activate-active': isActiveScreen(screen) }"
-            :disabled="isActiveScreen(screen)"
-            :aria-pressed="isActiveScreen(screen)"
-            :aria-label="
-              isActiveScreen(screen)
-                ? `Screen ${screenIndex + 1} is active`
-                : `Activate screen ${screenIndex + 1}`
-            "
-            :title="
-              isActiveScreen(screen)
-                ? 'This screen is currently shown on the dashboard'
-                : 'Show this screen on the dashboard'
-            "
-            @click="activateScreen(screenIndex)"
-          >
-            {{ isActiveScreen(screen) ? "● Active" : "Activate" }}
-          </button>
-          <button
-            :id="`add-region-${screen.id}`"
-            type="button"
-            class="add-region-button"
-            :disabled="screen.layout.regions.length >= MAX_TOP_REGIONS"
-            :aria-label="`Add region to screen ${screenIndex + 1}`"
-            @click="addRegion(screenIndex)"
-          >
-            + Region
-          </button>
-          <button
-            type="button"
-            class="direction-toggle"
-            :aria-label="`Toggle screen ${screenIndex + 1} layout direction`"
-            :title="`Direction: ${directionLabel(layoutDirectionFor(screen.layout))}`"
-            @click="toggleLayoutDirection(screenIndex)"
-          >
-            {{ layoutDirectionFor(screen.layout) === "column" ? "▭▭" : "▯|▯" }}
-          </button>
-          <button
-            v-if="dashboardScreens.screens.length > 1"
-            type="button"
-            class="screen-delete"
-            :aria-label="`Delete screen ${screenIndex + 1}`"
-            @click="deleteScreen(screenIndex)"
-          >
-            ×
-          </button>
+          <div class="screen-header-identity">
+            <IconButton
+              variant="ghost"
+              size="sm"
+              :aria-expanded="expandedScreens.has(screen.id)"
+              :label="
+                expandedScreens.has(screen.id)
+                  ? `Collapse screen ${screenIndex + 1}`
+                  : `Expand screen ${screenIndex + 1}`
+              "
+              @click="toggleScreenExpanded(screen.id)"
+            >
+              {{ expandedScreens.has(screen.id) ? "▾" : "▸" }}
+            </IconButton>
+            <span class="screen-index">{{ screenIndex + 1 }}</span>
+            <input
+              :id="`screen-name-${screen.id}`"
+              :value="screen.name"
+              type="text"
+              class="screen-name-input"
+              :aria-label="`Screen ${screenIndex + 1} name`"
+              @change="handleScreenNameChange(screenIndex, $event)"
+            />
+          </div>
+          <div class="screen-header-actions">
+            <button
+              :id="`add-region-${screen.id}`"
+              type="button"
+              class="add-region-button"
+              :disabled="screen.layout.regions.length >= MAX_TOP_REGIONS"
+              :aria-label="`Add region to screen ${screenIndex + 1}`"
+              @click="addRegion(screenIndex)"
+            >
+              + Region
+            </button>
+            <IconButton
+              :label="`Toggle screen ${screenIndex + 1} layout direction`"
+              variant="default"
+              size="sm"
+              :title="`Direction: ${directionLabel(layoutDirectionFor(screen.layout))}`"
+              @click="toggleLayoutDirection(screenIndex)"
+            >
+              <DirectionSplitIcon :direction="layoutDirectionFor(screen.layout)" />
+            </IconButton>
+            <IconButton
+              v-if="dashboardScreens.screens.length > 1"
+              :label="`Delete screen ${screenIndex + 1}`"
+              variant="danger"
+              size="sm"
+              @click="deleteScreen(screenIndex)"
+            >
+              ×
+            </IconButton>
+          </div>
         </header>
 
         <div v-if="expandedScreens.has(screen.id)" class="screen-clock-bar-controls">
@@ -192,16 +176,16 @@
                     Primary
                   </label>
                   <div class="preview-region-label">{{ regionLabel(previewIndex) }}</div>
-                  <button
+                  <IconButton
                     v-if="region.split"
-                    type="button"
-                    class="split-toggle"
-                    :aria-label="`Toggle ${regionLabel(previewIndex)} split direction`"
+                    :label="`Toggle ${regionLabel(previewIndex)} split direction`"
+                    variant="default"
+                    size="sm"
                     :title="`Sub direction: ${directionLabel(splitDirectionFor(screen.layout, region))}`"
                     @click.stop="toggleSubDirection(screenIndex, previewIndex)"
                   >
-                    {{ splitDirectionFor(screen.layout, region) === "column" ? "▭▭" : "▯|▯" }}
-                  </button>
+                    <DirectionSplitIcon :direction="splitDirectionFor(screen.layout, region)" />
+                  </IconButton>
                   <button
                     v-if="region.split && region.split.regions.length < MAX_TOP_REGIONS"
                     type="button"
@@ -223,15 +207,15 @@
                   >
                     {{ region.split ? "Unsplit" : "Split" }}
                   </button>
-                  <button
+                  <IconButton
                     v-if="screen.layout.regions.length > 1"
-                    type="button"
-                    class="region-delete"
-                    :aria-label="`Delete ${regionLabel(previewIndex)}`"
+                    :label="`Delete ${regionLabel(previewIndex)}`"
+                    variant="danger"
+                    size="sm"
                     @click.stop="removeRegion(screenIndex, previewIndex)"
                   >
                     ×
-                  </button>
+                  </IconButton>
                 </div>
 
                 <template v-if="region.split">
@@ -264,15 +248,15 @@
                           <div class="preview-region-label">
                             {{ regionLabel(previewIndex) }}.{{ subIndex + 1 }}
                           </div>
-                          <button
+                          <IconButton
                             v-if="region.split.regions.length > 1"
-                            type="button"
-                            class="region-delete"
-                            :aria-label="`Delete ${regionLabel(previewIndex)} sub ${subIndex + 1}`"
+                            :label="`Delete ${regionLabel(previewIndex)} sub ${subIndex + 1}`"
+                            variant="danger"
+                            size="sm"
                             @click.stop="removeSub(screenIndex, previewIndex, subIndex)"
                           >
                             ×
-                          </button>
+                          </IconButton>
                         </div>
                         <div class="preview-component-picker" @click.stop>
                           <button
@@ -563,6 +547,8 @@ import { useWebServicesStore } from "@/stores/webServices";
 import { useCalendarStore } from "@/stores/calendar";
 import { usePlugins } from "@/composables";
 import ToggleSwitch from "@/components/ui/ToggleSwitch.vue";
+import IconButton from "@/components/ui/IconButton.vue";
+import DirectionSplitIcon from "@/components/settings/shared/DirectionSplitIcon.vue";
 import {
   MAX_TOP_REGIONS,
   addSubRegion,
@@ -736,16 +722,6 @@ const setScreenClockBarPosition = (screenIndex, position) => {
 
 const setScreenClockBarEnabled = (screenIndex, enabled) => {
   updateScreenClockBar(screenIndex, { enabled });
-};
-
-const isActiveScreen = screen => screen?.id === dashboardScreens.value.activeScreenId;
-
-const activateScreen = screenIndex => {
-  const screens = cloneScreens();
-  const target = screens.screens[screenIndex];
-  if (!target) return;
-  screens.activeScreenId = target.id;
-  emitScreensUpdate(screens);
 };
 
 const dashboardScreens = computed(() => configValue.value.dashboardScreens);
@@ -1216,24 +1192,20 @@ onUnmounted(() => {
   align-items: center;
   gap: var(--space-md);
 }
-
-.screen-collapse-toggle {
-  flex: 0 0 auto;
-  width: 1.6rem;
-  height: 1.6rem;
-  border: 0;
-  border-radius: var(--radius-xs);
-  background: transparent;
-  color: var(--ink-2);
-  cursor: pointer;
-  font-size: 0.95rem;
-  line-height: 1;
+.screen-header-identity {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2xs);
+  flex: 1 1 auto;
+  min-width: 0;
 }
-
-.screen-collapse-toggle:hover,
-.screen-collapse-toggle:focus {
-  color: var(--ink);
-  background: var(--bg-1);
+.screen-header-actions {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2xs);
+  flex: 0 0 auto;
+  padding-left: var(--space-md);
+  border-left: 1px solid var(--line);
 }
 
 .screen-index {
@@ -1279,87 +1251,6 @@ onUnmounted(() => {
 .add-region-button:disabled {
   cursor: not-allowed;
   opacity: 0.5;
-}
-
-.region-delete {
-  border: 1px solid var(--line);
-  border-radius: var(--radius-xs);
-  padding: 0 var(--space-xs);
-  background: var(--bg-1);
-  color: var(--err);
-  cursor: pointer;
-  font-size: 0.95rem;
-  line-height: 1.4;
-}
-
-.region-delete:hover,
-.region-delete:focus {
-  border-color: var(--err);
-}
-
-.direction-toggle {
-  flex: 0 0 auto;
-  border: 1px solid var(--line);
-  border-radius: var(--radius-xs);
-  padding: var(--space-xs) var(--space-md);
-  background: var(--bg-1);
-  color: var(--ink-2);
-  cursor: pointer;
-  font-size: var(--fs-sm);
-  letter-spacing: 0.05em;
-}
-
-.direction-toggle:hover,
-.direction-toggle:focus {
-  border-color: var(--focus);
-  color: var(--ink);
-}
-
-.screen-activate {
-  flex: 0 0 auto;
-  border: 1px solid var(--line);
-  border-radius: var(--radius-xs);
-  padding: var(--space-2xs) var(--space-md);
-  background: var(--bg-1);
-  color: var(--ink);
-  cursor: pointer;
-  font-size: var(--fs-xs);
-  font-weight: 600;
-}
-
-.screen-activate:hover:not(:disabled),
-.screen-activate:focus:not(:disabled) {
-  border-color: var(--focus);
-  color: var(--focus);
-}
-
-.screen-activate-active {
-  border-color: var(--focus);
-  background: var(--focus);
-  color: var(--focus-ink);
-  cursor: default;
-}
-
-.screen-activate:disabled {
-  opacity: 1;
-}
-
-.screen-delete {
-  flex: 0 0 auto;
-  width: 1.9rem;
-  height: 1.9rem;
-  border: 1px solid var(--line);
-  border-radius: var(--radius-xs);
-  background: var(--bg-1);
-  color: var(--err);
-  cursor: pointer;
-  font-size: 1.2rem;
-  line-height: 1;
-}
-
-.screen-delete:hover,
-.screen-delete:focus {
-  background: var(--bg-2);
 }
 
 .screen-preview {

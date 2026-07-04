@@ -53,6 +53,14 @@ describe("DashboardRegionsEditor (screens & regions logic)", () => {
     expect(sizes).toContain("30%");
   });
 
+  it("renders region delete as a danger IconButton", () => {
+    const wrapper = mount(DashboardRegionsEditor, { props: { config: {} } });
+    const del = wrapper.find('[aria-label="Delete Region 2"]');
+    expect(del.exists()).toBe(true);
+    expect(del.classes()).toContain("icon-btn");
+    expect(del.classes()).toContain("icon-btn--danger");
+  });
+
   it("removes a region and renormalizes the layout", async () => {
     const wrapper = mount(DashboardRegionsEditor, {
       props: { config: {} },
@@ -165,9 +173,118 @@ describe("DashboardRegionsEditor (screens & regions logic)", () => {
 
   it("toggles a screen's expanded state via its collapse control", async () => {
     const wrapper = mount(DashboardRegionsEditor, { props: { config: {} } });
-    const toggle = wrapper.find(".screen-collapse-toggle");
+    const toggle = wrapper.find('[aria-label="Expand screen 1"], [aria-label="Collapse screen 1"]');
     const before = toggle.attributes("aria-expanded");
     await toggle.trigger("click");
     expect(toggle.attributes("aria-expanded")).not.toBe(before);
+  });
+
+  it("renders the collapse toggle as a ghost IconButton with aria-expanded", () => {
+    const wrapper = mount(DashboardRegionsEditor, { props: { config: {} } });
+    const btn = wrapper.find('[aria-label="Expand screen 1"], [aria-label="Collapse screen 1"]');
+    expect(btn.exists()).toBe(true);
+    expect(btn.classes()).toContain("icon-btn");
+    expect(btn.classes()).toContain("icon-btn--ghost");
+    expect(btn.attributes("aria-expanded")).toBeDefined();
+  });
+
+  it("renders the screen direction toggle as a default IconButton", () => {
+    const wrapper = mount(DashboardRegionsEditor, { props: { config: {} } });
+    const dir = wrapper.find('[aria-label="Toggle screen 1 layout direction"]');
+    expect(dir.exists()).toBe(true);
+    expect(dir.classes()).toContain("icon-btn");
+    expect(dir.classes()).toContain("icon-btn--default");
+  });
+
+  it("groups the screen header into identity and actions clusters", () => {
+    const wrapper = mount(DashboardRegionsEditor, { props: { config: {} } });
+    expect(wrapper.find(".screen-header-identity").exists()).toBe(true);
+    expect(wrapper.find(".screen-header-actions").exists()).toBe(true);
+  });
+
+  it("does not render an Activate control (screen switching lives on the dashboard dots)", () => {
+    // Active screen is screen 2, so under the OLD code screen 1 (inactive) would
+    // have rendered an "Activate screen 1" button and screen 2 (active) a
+    // "Screen 2 is active" button — making all three assertions discriminate a revert.
+    const twoScreenConfig = {
+      dashboardScreens: {
+        version: 2,
+        activeScreenId: "screen-2",
+        screens: [
+          {
+            id: "home",
+            name: "Home",
+            layout: {
+              version: 1,
+              preset: "split_two",
+              regions: [
+                { id: "region-1", kind: "calendar", size: 70 },
+                { id: "region-2", kind: "calendar", size: 30 },
+              ],
+            },
+            activeRegionId: "region-1",
+          },
+          {
+            id: "screen-2",
+            name: "Screen 2",
+            layout: {
+              version: 1,
+              preset: "split_two",
+              regions: [
+                { id: "region-3", kind: "calendar", size: 70 },
+                { id: "region-4", kind: "calendar", size: 30 },
+              ],
+            },
+            activeRegionId: "region-3",
+          },
+        ],
+      },
+    };
+    const wrapper = mount(DashboardRegionsEditor, { props: { config: twoScreenConfig } });
+    expect(wrapper.find('[aria-label="Activate screen 1"]').exists()).toBe(false);
+    expect(wrapper.find('[aria-label="Screen 2 is active"]').exists()).toBe(false);
+    expect(wrapper.find(".screen-activate").exists()).toBe(false);
+  });
+
+  it("renders screen delete as a danger IconButton", () => {
+    const twoScreenConfig = {
+      dashboardScreens: {
+        version: 2,
+        activeScreenId: "home",
+        screens: [
+          {
+            id: "home",
+            name: "Home",
+            layout: {
+              version: 1,
+              preset: "split_two",
+              regions: [
+                { id: "region-1", kind: "calendar", size: 70 },
+                { id: "region-2", kind: "calendar", size: 30 },
+              ],
+            },
+            activeRegionId: "region-1",
+          },
+          {
+            id: "screen-2",
+            name: "Screen 2",
+            layout: {
+              version: 1,
+              preset: "split_two",
+              regions: [
+                { id: "region-3", kind: "calendar", size: 70 },
+                { id: "region-4", kind: "calendar", size: 30 },
+              ],
+            },
+            activeRegionId: "region-3",
+          },
+        ],
+      },
+    };
+    const wrapper = mount(DashboardRegionsEditor, { props: { config: twoScreenConfig } });
+    const del = wrapper.find('[aria-label="Delete screen 1"]');
+    expect(del.exists()).toBe(true);
+    expect(del.classes()).toContain("icon-btn");
+    expect(del.classes()).toContain("icon-btn--danger");
   });
 });
