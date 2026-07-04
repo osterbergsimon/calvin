@@ -12,6 +12,10 @@ last-touched
 # Daemon runtime (lock, log, pid)
 daemon.*
 
+# Git hook shims (installed per-machine by `bd hooks install --beads`;
+# activated via local core.hooksPath, which is not committed)
+hooks/
+
 # Push state (runtime, per-machine)
 push-state.json
 
