@@ -1,8 +1,11 @@
 import { describe, it, expect, vi, beforeEach } from "vitest";
 import { mount, flushPromises } from "@vue/test-utils";
 import { setActivePinia, createPinia } from "pinia";
+import axios from "axios";
 import PluginsCategory from "@/components/settings/categories/PluginsCategory.vue";
 import { useConfigStore } from "@/stores/config";
+
+vi.mock("axios");
 
 // Plain ref-like objects — following the UpdatesTab.spec.js harness pattern.
 // vi.hoisted runs before imports so we can't call Vue's ref() here.
@@ -89,6 +92,7 @@ describe("PluginsCategory repo prefill", () => {
     githubRepoUrl.value = "";
     vi.clearAllMocks();
     mockLoadPlugins.mockResolvedValue(undefined);
+    axios.post.mockResolvedValue({ data: {} });
   });
 
   it("prefills githubRepoUrl from pluginRepositoryUrl when githubRepoUrl is empty", async () => {
@@ -109,5 +113,24 @@ describe("PluginsCategory repo prefill", () => {
     await flushPromises();
 
     expect(githubRepoUrl.value).toBe("https://github.com/other/repo");
+  });
+
+  it("remembers the repository when the user lists GitHub plugins", async () => {
+    const store = useConfigStore();
+    const wrapper = mount(PluginsCategory, { global: { stubs } });
+    await flushPromises();
+
+    wrapper.findComponent({ name: "PluginInstaller" }).vm.$emit("list-plugins", {
+      repoUrl: "https://github.com/new/repo",
+      branch: "main",
+      source: "github",
+    });
+    await flushPromises();
+
+    expect(axios.post).toHaveBeenCalledWith(
+      "/api/config",
+      expect.objectContaining({ pluginRepositoryUrl: "https://github.com/new/repo" })
+    );
+    expect(store.pluginRepositoryUrl).toBe("https://github.com/new/repo");
   });
 });

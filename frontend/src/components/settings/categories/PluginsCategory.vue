@@ -2,18 +2,6 @@
   <div class="plugins-category">
     <!-- Plugin Installation Section -->
     <SettingsSection id="plugins-install" title="Install">
-      <SettingRow
-        label="Plugin repository URL"
-        description="Default GitHub repository the install browser points at."
-      >
-        <input
-          type="url"
-          class="repo-url-input"
-          :value="configStore.pluginRepositoryUrl"
-          @change="onRepoUrlChange"
-          placeholder="https://github.com/owner/repo"
-        />
-      </SettingRow>
       <PluginInstaller
         :repo-url="githubRepoUrl"
         :branch="githubBranch"
@@ -138,7 +126,6 @@ import { useImagesStore } from "@/stores/images";
 import * as pluginsApi from "@/services/pluginsApi";
 import * as calendarApi from "@/services/calendarApi";
 import SettingsSection from "@/components/settings/shell/SettingsSection.vue";
-import SettingRow from "@/components/settings/shell/SettingRow.vue";
 import PluginInstaller from "../specialized/PluginInstaller.vue";
 import PluginManager from "../specialized/PluginManager.vue";
 import InstanceModal from "../specialized/InstanceModal.vue";
@@ -187,12 +174,6 @@ const {
 const { restartBackend } = useSystem();
 const configStore = useConfigStore();
 const imagesStore = useImagesStore();
-
-// Plugin repository URL change handler (persists via the existing store action)
-const onRepoUrlChange = event => {
-  const value = event.target.value.trim();
-  configStore.updateConfig({ pluginRepositoryUrl: value });
-};
 
 // Local state
 const activePluginTab = ref("calendar");
@@ -252,6 +233,12 @@ const handleListPlugins = async ({ repoUrl, branch, source, localPath }) => {
   if (source === "local") {
     await enumeratePluginsFromLocal(localPath);
   } else {
+    // The GitHub field is now the remembered repository — persist it when the
+    // user browses so it seeds the field again next session.
+    const trimmed = (repoUrl || "").trim();
+    if (trimmed && trimmed !== configStore.pluginRepositoryUrl) {
+      configStore.updateConfig({ pluginRepositoryUrl: trimmed });
+    }
     await enumeratePluginsFromGitHub(repoUrl, branch);
   }
 };
@@ -577,24 +564,6 @@ onMounted(async () => {
 <style scoped>
 .plugins-category {
   width: 100%;
-}
-
-.repo-url-input {
-  min-height: var(--touch-target);
-  width: 320px;
-  max-width: 100%;
-  padding: 0.5rem 0.75rem;
-  background: var(--bg-2);
-  color: var(--ink);
-  border: 1px solid var(--line);
-  border-radius: 8px;
-  font-family: var(--font-ui);
-  font-size: 0.95rem;
-}
-.repo-url-input:focus-visible {
-  outline: 2px solid var(--focus);
-  outline-offset: 2px;
-  border-color: var(--focus);
 }
 
 /* Pip warning modal — mirrors ConfirmModal layout */

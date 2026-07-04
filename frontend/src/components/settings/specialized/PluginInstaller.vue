@@ -667,12 +667,10 @@ watch(searchQuery, () => {
 </script>
 
 <style scoped>
-/* Rendered inside the "Install" SettingsSection panel, below the repository-URL
-   row. Divide from that row and inset content to the same 1.25rem as SettingRow. */
+/* Sole content of the "Install" SettingsSection panel; inset to match SettingRow. */
 .plugin-installer {
   width: 100%;
-  padding: 1rem 1.25rem 1.25rem;
-  border-top: 1px solid var(--line-soft);
+  padding: 1.25rem;
 }
 
 .install-method {
