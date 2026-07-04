@@ -178,4 +178,12 @@ describe("DashboardRegionsEditor (screens & regions logic)", () => {
     await toggle.trigger("click");
     expect(toggle.attributes("aria-expanded")).not.toBe(before);
   });
+
+  it("renders the screen direction toggle as a default IconButton", () => {
+    const wrapper = mount(DashboardRegionsEditor, { props: { config: {} } });
+    const dir = wrapper.find('[aria-label="Toggle screen 1 layout direction"]');
+    expect(dir.exists()).toBe(true);
+    expect(dir.classes()).toContain("icon-btn");
+    expect(dir.classes()).toContain("icon-btn--default");
+  });
 });

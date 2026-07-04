@@ -59,15 +59,15 @@
           >
             + Region
           </button>
-          <button
-            type="button"
-            class="direction-toggle"
-            :aria-label="`Toggle screen ${screenIndex + 1} layout direction`"
+          <IconButton
+            :label="`Toggle screen ${screenIndex + 1} layout direction`"
+            variant="default"
+            size="sm"
             :title="`Direction: ${directionLabel(layoutDirectionFor(screen.layout))}`"
             @click="toggleLayoutDirection(screenIndex)"
           >
             {{ layoutDirectionFor(screen.layout) === "column" ? "▭▭" : "▯|▯" }}
-          </button>
+          </IconButton>
           <button
             v-if="dashboardScreens.screens.length > 1"
             type="button"
@@ -192,16 +192,16 @@
                     Primary
                   </label>
                   <div class="preview-region-label">{{ regionLabel(previewIndex) }}</div>
-                  <button
+                  <IconButton
                     v-if="region.split"
-                    type="button"
-                    class="split-toggle"
-                    :aria-label="`Toggle ${regionLabel(previewIndex)} split direction`"
+                    :label="`Toggle ${regionLabel(previewIndex)} split direction`"
+                    variant="default"
+                    size="sm"
                     :title="`Sub direction: ${directionLabel(splitDirectionFor(screen.layout, region))}`"
                     @click.stop="toggleSubDirection(screenIndex, previewIndex)"
                   >
                     {{ splitDirectionFor(screen.layout, region) === "column" ? "▭▭" : "▯|▯" }}
-                  </button>
+                  </IconButton>
                   <button
                     v-if="region.split && region.split.regions.length < MAX_TOP_REGIONS"
                     type="button"
@@ -1282,24 +1282,6 @@ onUnmounted(() => {
   opacity: 0.5;
 }
 
-
-.direction-toggle {
-  flex: 0 0 auto;
-  border: 1px solid var(--line);
-  border-radius: var(--radius-xs);
-  padding: var(--space-xs) var(--space-md);
-  background: var(--bg-1);
-  color: var(--ink-2);
-  cursor: pointer;
-  font-size: var(--fs-sm);
-  letter-spacing: 0.05em;
-}
-
-.direction-toggle:hover,
-.direction-toggle:focus {
-  border-color: var(--focus);
-  color: var(--ink);
-}
 
 .screen-activate {
   flex: 0 0 auto;
