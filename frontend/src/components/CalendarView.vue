@@ -44,13 +44,7 @@
             >
               Today
             </button>
-            <IconButton
-              label="Previous"
-              title="Previous"
-              @click="previousMonth"
-            >
-              ‹
-            </IconButton>
+            <IconButton label="Previous" title="Previous" @click="previousMonth"> ‹ </IconButton>
             <button
               type="button"
               class="calendar-header__view-switch"
@@ -61,13 +55,7 @@
               <span class="calendar-header__view-label">{{ viewModeLabel }}</span>
               <span class="calendar-header__view-caret" aria-hidden="true">▸</span>
             </button>
-            <IconButton
-              label="Next"
-              title="Next"
-              @click="nextMonth"
-            >
-              ›
-            </IconButton>
+            <IconButton label="Next" title="Next" @click="nextMonth"> › </IconButton>
             <CalendarViewOptions
               v-if="view && viewMode !== 'day'"
               :region-id="regionId"
