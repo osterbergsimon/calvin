@@ -1,58 +1,58 @@
 <template>
-  <div class="reboot-combo">
-    <div class="rc-head">
-      <span class="rc-title">Reboot shortcut</span>
-      <span class="rc-sub"
-        >Hold two buttons together for a few seconds to reboot the device. Press a slot, then press
-        the button you want.</span
-      >
+  <CollapsibleSection title="Reboot shortcut" icon="⏻" :expanded="true">
+    <div class="reboot-combo">
+      <p class="rc-sub">
+        Hold two buttons together for a few seconds to reboot the device. Press a slot, then press
+        the button you want.
+      </p>
+
+      <div class="rc-keys">
+        <button
+          type="button"
+          class="rc-key"
+          :class="{ 'rc-key--capturing': capturingSlot === 1 }"
+          :aria-label="`First reboot key (currently ${label1})`"
+          @click="captureKey(1)"
+        >
+          <span class="rc-key-cap">{{ capturingSlot === 1 ? "Press a button…" : label1 }}</span>
+          <span class="rc-key-hint">first key</span>
+        </button>
+        <span class="rc-plus" aria-hidden="true">+</span>
+        <button
+          type="button"
+          class="rc-key"
+          :class="{ 'rc-key--capturing': capturingSlot === 2 }"
+          :aria-label="`Second reboot key (currently ${label2})`"
+          @click="captureKey(2)"
+        >
+          <span class="rc-key-cap">{{ capturingSlot === 2 ? "Press a button…" : label2 }}</span>
+          <span class="rc-key-hint">second key</span>
+        </button>
+      </div>
+
+      <p v-if="warning" class="rc-warn" role="alert">{{ warning }}</p>
+
+      <div class="rc-duration">
+        <span class="rc-dur-label">Hold for</span>
+        <NumberStepper
+          :model-value="durationSeconds"
+          :min="1"
+          :max="60"
+          aria-label="Reboot hold duration in seconds"
+          @update:model-value="onDuration"
+        />
+        <span class="rc-dur-unit">seconds</span>
+      </div>
+
+      <p class="rc-hint">{{ comboHint }}</p>
     </div>
-
-    <div class="rc-keys">
-      <button
-        type="button"
-        class="rc-key"
-        :class="{ 'rc-key--capturing': capturingSlot === 1 }"
-        :aria-label="`First reboot key (currently ${label1})`"
-        @click="captureKey(1)"
-      >
-        <span class="rc-key-cap">{{ capturingSlot === 1 ? "Press a button…" : label1 }}</span>
-        <span class="rc-key-hint">first key</span>
-      </button>
-      <span class="rc-plus" aria-hidden="true">+</span>
-      <button
-        type="button"
-        class="rc-key"
-        :class="{ 'rc-key--capturing': capturingSlot === 2 }"
-        :aria-label="`Second reboot key (currently ${label2})`"
-        @click="captureKey(2)"
-      >
-        <span class="rc-key-cap">{{ capturingSlot === 2 ? "Press a button…" : label2 }}</span>
-        <span class="rc-key-hint">second key</span>
-      </button>
-    </div>
-
-    <p v-if="warning" class="rc-warn" role="alert">{{ warning }}</p>
-
-    <div class="rc-duration">
-      <span class="rc-dur-label">Hold for</span>
-      <NumberStepper
-        :model-value="durationSeconds"
-        :min="1"
-        :max="60"
-        aria-label="Reboot hold duration in seconds"
-        @update:model-value="onDuration"
-      />
-      <span class="rc-dur-unit">seconds</span>
-    </div>
-
-    <p class="rc-hint">{{ comboHint }}</p>
-  </div>
+  </CollapsibleSection>
 </template>
 
 <script setup>
 import { ref, computed } from "vue";
 import NumberStepper from "@/components/ui/NumberStepper.vue";
+import CollapsibleSection from "@/components/settings/shared/CollapsibleSection.vue";
 import { useKeyCapture } from "@/composables/useKeyCapture";
 import { formatKeyLabel } from "@/utils/keyCode";
 
@@ -107,23 +107,8 @@ const onDuration = secs => {
 </script>
 
 <style scoped>
-.reboot-combo {
-  margin-top: 16px;
-  padding-top: 16px;
-  border-top: 1px solid var(--line-soft, var(--line));
-}
-.rc-head {
-  display: flex;
-  flex-direction: column;
-  gap: 2px;
-  margin-bottom: 12px;
-}
-.rc-title {
-  font-family: var(--font-ui);
-  font-weight: 600;
-  color: var(--ink);
-}
 .rc-sub {
+  margin: 0 0 16px;
   font-size: 0.85rem;
   color: var(--ink-2);
 }
@@ -142,7 +127,7 @@ const onDuration = secs => {
   padding: 10px 14px;
   background: var(--bg-2);
   border: 1px solid var(--line);
-  border-radius: 8px;
+  border-radius: var(--radius-sm);
   cursor: pointer;
 }
 .rc-key:hover {
@@ -155,7 +140,7 @@ const onDuration = secs => {
 .rc-key--capturing {
   border-color: var(--focus);
   border-style: dashed;
-  background: color-mix(in srgb, var(--focus) 10%, var(--bg-2));
+  background: color-mix(in srgb, var(--focus) 12%, var(--bg-1));
 }
 .rc-key-cap {
   font-family: var(--font-data);
@@ -172,7 +157,7 @@ const onDuration = secs => {
   font-size: 1.2rem;
 }
 .rc-warn {
-  margin: 10px 0 0;
+  margin: 12px 0 0;
   font-size: 0.8rem;
   color: var(--warn);
 }
@@ -180,7 +165,7 @@ const onDuration = secs => {
   display: flex;
   align-items: center;
   gap: 10px;
-  margin-top: 16px;
+  margin-top: 20px;
 }
 .rc-dur-label {
   color: var(--ink);
@@ -191,7 +176,7 @@ const onDuration = secs => {
   font-size: 0.9rem;
 }
 .rc-hint {
-  margin: 12px 0 0;
+  margin: 16px 0 0;
   font-size: 0.85rem;
   color: var(--ink-2);
 }
