@@ -1177,12 +1177,12 @@ onUnmounted(() => {
 .dashboard-layout-tab {
   width: 100%;
   /* Sits directly inside a SettingsSection panel (no SettingRow padding). */
-  padding: 1rem 1.25rem 1.25rem;
+  padding: var(--space-xl) var(--space-2xl) var(--space-2xl);
 }
 
 .screen-stack {
   display: flex;
-  gap: 1rem;
+  gap: var(--space-xl);
   margin: 0;
 }
 
@@ -1199,9 +1199,9 @@ onUnmounted(() => {
 .screen-card {
   display: flex;
   flex-direction: column;
-  gap: 0.75rem;
+  gap: var(--space-lg);
   border: 1px solid var(--line);
-  border-radius: 8px;
+  border-radius: var(--radius-sm);
   padding: 0.85rem;
   background: var(--bg-2);
   overflow-x: auto;
@@ -1214,7 +1214,7 @@ onUnmounted(() => {
 .screen-card-header {
   display: flex;
   align-items: center;
-  gap: 0.6rem;
+  gap: var(--space-md);
 }
 
 .screen-collapse-toggle {
@@ -1222,7 +1222,7 @@ onUnmounted(() => {
   width: 1.6rem;
   height: 1.6rem;
   border: 0;
-  border-radius: 6px;
+  border-radius: var(--radius-xs);
   background: transparent;
   color: var(--ink-2);
   cursor: pointer;
@@ -1243,7 +1243,7 @@ onUnmounted(() => {
   flex: 0 0 1.75rem;
   width: 1.75rem;
   height: 1.75rem;
-  border-radius: 999px;
+  border-radius: var(--radius-pill);
   background: var(--focus);
   color: var(--focus-ink);
   font-weight: 700;
@@ -1253,7 +1253,7 @@ onUnmounted(() => {
   flex: 1 1 auto;
   min-width: 0;
   border: 1px solid var(--line);
-  border-radius: 6px;
+  border-radius: var(--radius-xs);
   padding: 0.4rem 0.55rem;
   background: var(--bg-1);
   color: var(--ink);
@@ -1263,7 +1263,7 @@ onUnmounted(() => {
 .add-region-button {
   flex: 0 0 auto;
   border: 1px solid var(--line);
-  border-radius: 6px;
+  border-radius: var(--radius-xs);
   padding: 0.4rem 0.65rem;
   background: var(--bg-1);
   color: var(--focus);
@@ -1283,8 +1283,8 @@ onUnmounted(() => {
 
 .region-delete {
   border: 1px solid var(--line);
-  border-radius: 6px;
-  padding: 0 0.4rem;
+  border-radius: var(--radius-xs);
+  padding: 0 var(--space-xs);
   background: var(--bg-1);
   color: var(--err);
   cursor: pointer;
@@ -1300,12 +1300,12 @@ onUnmounted(() => {
 .direction-toggle {
   flex: 0 0 auto;
   border: 1px solid var(--line);
-  border-radius: 6px;
-  padding: 0.4rem 0.6rem;
+  border-radius: var(--radius-xs);
+  padding: var(--space-xs) var(--space-md);
   background: var(--bg-1);
   color: var(--ink-2);
   cursor: pointer;
-  font-size: 0.85rem;
+  font-size: var(--fs-sm);
   letter-spacing: 0.05em;
 }
 
@@ -1318,12 +1318,12 @@ onUnmounted(() => {
 .screen-activate {
   flex: 0 0 auto;
   border: 1px solid var(--line);
-  border-radius: 6px;
-  padding: 0.35rem 0.6rem;
+  border-radius: var(--radius-xs);
+  padding: var(--space-2xs) var(--space-md);
   background: var(--bg-1);
   color: var(--ink);
   cursor: pointer;
-  font-size: 0.8rem;
+  font-size: var(--fs-xs);
   font-weight: 600;
 }
 
@@ -1349,7 +1349,7 @@ onUnmounted(() => {
   width: 1.9rem;
   height: 1.9rem;
   border: 1px solid var(--line);
-  border-radius: 6px;
+  border-radius: var(--radius-xs);
   background: var(--bg-1);
   color: var(--err);
   cursor: pointer;
@@ -1365,9 +1365,9 @@ onUnmounted(() => {
 .screen-preview {
   display: flex;
   margin: 0;
-  padding: 0.75rem;
+  padding: var(--space-lg);
   border: 1px solid var(--line);
-  border-radius: 8px;
+  border-radius: var(--radius-sm);
   background: var(--bg-1);
   box-sizing: border-box;
   width: 100%;
@@ -1385,15 +1385,15 @@ onUnmounted(() => {
   min-width: 0;
   min-height: 0;
   border: 1px solid var(--line);
-  border-radius: 8px;
-  padding: 0.6rem;
+  border-radius: var(--radius-sm);
+  padding: var(--space-md);
   display: flex;
   flex-direction: column;
   cursor: pointer;
   background: var(--bg-2);
   color: var(--ink);
   box-sizing: border-box;
-  gap: 0.5rem;
+  gap: var(--space-sm);
 }
 
 .preview-region-header {
@@ -1403,7 +1403,7 @@ onUnmounted(() => {
   /* Wrap the control cluster so split/remove/etc. stay reachable in a thin
      (small-size) region instead of overflowing and being clipped. */
   flex-wrap: wrap;
-  gap: 0.35rem;
+  gap: var(--space-2xs);
   min-height: 1.75rem;
   flex: 0 0 auto;
 }
@@ -1414,20 +1414,20 @@ onUnmounted(() => {
 .preview-primary-control {
   display: flex;
   align-items: center;
-  gap: 0.35rem;
-  font-size: 0.85rem;
+  gap: var(--space-2xs);
+  font-size: var(--fs-sm);
   color: var(--ink-2);
   cursor: pointer;
 }
 
 .split-toggle {
   border: 1px solid var(--line);
-  border-radius: 6px;
+  border-radius: var(--radius-xs);
   padding: 0.2rem 0.5rem;
   background: var(--bg-1);
   color: var(--ink-2);
   cursor: pointer;
-  font-size: 0.8rem;
+  font-size: var(--fs-xs);
 }
 
 .split-toggle:hover,
@@ -1440,11 +1440,11 @@ onUnmounted(() => {
   width: 100%;
   min-width: 0;
   border: 1px solid var(--line);
-  border-radius: 8px;
+  border-radius: var(--radius-sm);
   padding: 0.45rem 0.55rem;
   background: var(--bg-1);
   color: var(--ink);
-  font-size: 1rem;
+  font-size: var(--fs-base);
   font-weight: 600;
   box-sizing: border-box;
   cursor: pointer;
@@ -1471,7 +1471,7 @@ onUnmounted(() => {
   overscroll-behavior: contain;
   padding: 6px;
   border: 1px solid var(--line);
-  border-radius: 12px;
+  border-radius: var(--radius-xl);
   background: var(--bg-1);
   box-shadow: 0 12px 32px var(--focus-glow);
 }
@@ -1481,7 +1481,7 @@ onUnmounted(() => {
   margin: 0 0 6px;
   padding: 0.55rem;
   border: 1px solid var(--line);
-  border-radius: 8px;
+  border-radius: var(--radius-sm);
   background: var(--bg-2);
   color: var(--ink);
   box-sizing: border-box;
@@ -1494,7 +1494,7 @@ onUnmounted(() => {
   min-height: 44px;
   padding: 0.55rem 0.65rem;
   border: 0;
-  border-radius: 8px;
+  border-radius: var(--radius-sm);
   background: transparent;
   color: var(--ink);
   cursor: pointer;
@@ -1519,10 +1519,10 @@ onUnmounted(() => {
   gap: 0.45rem;
   min-height: 44px;
   padding: 0.45rem 0.65rem;
-  border-radius: 8px;
+  border-radius: var(--radius-sm);
   color: var(--ink);
   cursor: pointer;
-  font-size: 0.9rem;
+  font-size: var(--fs-md);
 }
 
 .source-option:hover {
@@ -1532,15 +1532,15 @@ onUnmounted(() => {
 .component-empty {
   padding: 0.65rem;
   color: var(--ink-2);
-  font-size: 0.85rem;
+  font-size: var(--fs-sm);
 }
 
 .preview-size-control {
   display: flex;
   align-items: center;
-  gap: 0.4rem;
+  gap: var(--space-xs);
   color: var(--ink-2);
-  font-size: 0.85rem;
+  font-size: var(--fs-sm);
 }
 
 .preview-size-value {
@@ -1552,7 +1552,7 @@ onUnmounted(() => {
 .preview-resizer {
   flex: 0 0 14px;
   border: 0;
-  border-radius: 6px;
+  border-radius: var(--radius-xs);
   background: var(--line);
   cursor: col-resize;
   padding: 0;
@@ -1594,7 +1594,7 @@ onUnmounted(() => {
 
 .preview-region-label {
   color: var(--ink-2);
-  font-size: 0.85rem;
+  font-size: var(--fs-sm);
 }
 
 .preview-split-container {
@@ -1604,8 +1604,8 @@ onUnmounted(() => {
   min-height: 0;
   min-width: 0;
   border: 1px dashed var(--line);
-  border-radius: 8px;
-  padding: 0.35rem;
+  border-radius: var(--radius-sm);
+  padding: var(--space-2xs);
 }
 
 .preview-split-row {
@@ -1618,19 +1618,19 @@ onUnmounted(() => {
 
 .add-region-button-small {
   padding: 0.2rem 0.5rem;
-  font-size: 0.8rem;
+  font-size: var(--fs-xs);
   font-weight: 500;
 }
 
 .preview-subregion {
   display: flex;
   flex-direction: column;
-  gap: 0.5rem;
+  gap: var(--space-sm);
   min-width: 0;
   min-height: 0;
   border: 1px solid var(--line);
-  border-radius: 8px;
-  padding: 0.6rem;
+  border-radius: var(--radius-sm);
+  padding: var(--space-md);
   background: var(--bg-1);
   box-sizing: border-box;
   cursor: pointer;
@@ -1644,12 +1644,12 @@ onUnmounted(() => {
   display: flex;
   flex-wrap: wrap;
   align-items: center;
-  gap: 0.6rem;
-  padding: 0.6rem 0.75rem;
+  gap: var(--space-md);
+  padding: var(--space-md) var(--space-lg);
   border: 1px solid var(--line);
-  border-radius: 8px;
+  border-radius: var(--radius-sm);
   background: var(--bg-1);
-  font-size: 0.85rem;
+  font-size: var(--fs-sm);
   color: var(--ink-2);
 }
 
@@ -1661,19 +1661,19 @@ onUnmounted(() => {
 .clock-bar-visibility {
   display: inline-flex;
   align-items: center;
-  gap: 0.5rem;
+  gap: var(--space-sm);
   color: var(--ink);
 }
 
 .clock-bar-visibility-label {
   min-width: 3rem;
-  font-size: 0.85rem;
+  font-size: var(--fs-sm);
 }
 
 .clock-bar-inherit {
   border: 1px solid var(--line);
-  border-radius: 6px;
-  padding: 0.25rem 0.5rem;
+  border-radius: var(--radius-xs);
+  padding: var(--space-3xs) var(--space-sm);
   background: var(--bg-2);
   color: var(--ink);
   cursor: pointer;
@@ -1686,25 +1686,25 @@ onUnmounted(() => {
 
 .clock-bar-inherit-hint {
   font-style: italic;
-  font-size: 0.8rem;
+  font-size: var(--fs-xs);
 }
 
 .clock-bar-drag-hint {
   font-style: italic;
-  font-size: 0.8rem;
+  font-size: var(--fs-xs);
   color: var(--ink-3);
 }
 
 .clock-bar-summary {
   margin-left: auto;
-  font-size: 0.8rem;
+  font-size: var(--fs-xs);
   color: var(--ink-2);
 }
 
 .screen-preview-frame {
   display: flex;
   flex-direction: column;
-  gap: 0.4rem;
+  gap: var(--space-xs);
 }
 
 .clock-bar-token {
@@ -1718,8 +1718,8 @@ onUnmounted(() => {
   background: color-mix(in srgb, var(--focus) 14%, var(--bg-1));
   color: var(--focus);
   border: 1px solid color-mix(in srgb, var(--focus) 30%, transparent);
-  border-radius: 6px;
-  font-size: 0.8rem;
+  border-radius: var(--radius-xs);
+  font-size: var(--fs-xs);
   font-weight: 500;
   cursor: grab;
   user-select: none;
@@ -1737,14 +1737,14 @@ onUnmounted(() => {
 .clock-bar-token-horizontal {
   width: 100%;
   height: 1.6rem;
-  padding: 0 0.5rem;
+  padding: 0 var(--space-sm);
 }
 
 .clock-bar-token-vertical {
   width: 1.6rem;
   align-self: stretch;
   writing-mode: vertical-rl;
-  padding: 0.5rem 0;
+  padding: var(--space-sm) 0;
 }
 
 .clock-bar-token-label {
@@ -1756,10 +1756,10 @@ onUnmounted(() => {
   align-items: center;
   justify-content: center;
   border: 1px dashed var(--focus);
-  border-radius: 6px;
+  border-radius: var(--radius-xs);
   background: rgba(0, 0, 0, 0.05);
   color: var(--focus);
-  font-size: 0.75rem;
+  font-size: var(--fs-2xs);
   font-weight: 600;
   text-transform: uppercase;
   letter-spacing: 0.04em;
@@ -1799,11 +1799,11 @@ onUnmounted(() => {
   flex-direction: column;
   align-items: center;
   justify-content: center;
-  gap: 0.5rem;
+  gap: var(--space-sm);
   min-height: 96px;
   border: 1px dashed var(--focus);
-  border-radius: 8px;
-  padding: 1rem;
+  border-radius: var(--radius-sm);
+  padding: var(--space-xl);
   background: transparent;
   color: var(--focus);
   font-weight: 600;
@@ -1827,7 +1827,7 @@ onUnmounted(() => {
   width: 2.25rem;
   height: 2.25rem;
   border: 1px dashed var(--focus);
-  border-radius: 999px;
+  border-radius: var(--radius-pill);
   font-size: 1.6rem;
   line-height: 1;
 }
