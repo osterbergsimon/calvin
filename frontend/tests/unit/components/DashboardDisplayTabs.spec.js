@@ -19,7 +19,8 @@ describe("DashboardRegionsEditor (screens & regions logic)", () => {
     // orientation controls moved to DisplaySettings rows; not part of this editor
     expect(wrapper.find("#display-orientation").exists()).toBe(false);
     expect(wrapper.find("#add-region-screen-home").exists()).toBe(true);
-    expect(wrapper.find("#region-size-region-1").exists()).toBe(true);
+    // Size control is now a NumberStepper (role=group) keyed by a stable aria-label.
+    expect(wrapper.find('[aria-label="Region 1 size percentage"]').exists()).toBe(true);
     expect(wrapper.find("#region-component-region-1").exists()).toBe(true);
     expect(wrapper.find(".screen-stack").exists()).toBe(true);
     expect(wrapper.find(".screen-card").exists()).toBe(true);
@@ -39,13 +40,17 @@ describe("DashboardRegionsEditor (screens & regions logic)", () => {
     expect(portraitWrapper.find(".screen-stack-portrait").exists()).toBe(true);
   });
 
-  it("emits clamped region size updates from the layout tab", async () => {
+  it("emits region size updates from the layout tab stepper", async () => {
     const wrapper = mount(DashboardRegionsEditor, {
       props: { config: { calendarSplit: 70 } },
     });
 
-    await wrapper.find("#region-size-region-1").setValue("95");
-    await wrapper.find("#region-size-region-1").trigger("change");
+    // Bump Region 1 up one step via the NumberStepper; the adjacent region
+    // compensates so the pair still sums to 100. (Size clamping to 10–90 is
+    // enforced by the stepper's min/max props and covered in layout.spec.)
+    await wrapper
+      .find('[aria-label="Region 1 size percentage"] button[data-step="inc"]')
+      .trigger("click");
 
     const emitted = wrapper.emitted("update:config").at(-1)[0];
     const screen = emitted.dashboardScreens.screens[0];
@@ -55,11 +60,11 @@ describe("DashboardRegionsEditor (screens & regions logic)", () => {
         kind: "calendar",
         serviceId: null,
         instanceIds: [],
-        size: 90,
+        size: 71,
         split: null,
         view: { mode: "month", rolling: false, weeks: 4, days: 7, extraWeeks: 0 },
       },
-      { id: "region-2", kind: "photos", serviceId: null, instanceIds: [], size: 10, split: null },
+      { id: "region-2", kind: "photos", serviceId: null, instanceIds: [], size: 29, split: null },
     ]);
   });
 

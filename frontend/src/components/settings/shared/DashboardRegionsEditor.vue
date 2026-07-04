@@ -361,27 +361,19 @@
                             </div>
                           </div>
                         </div>
-                        <label class="preview-size-control">
-                          Size
-                          <input
-                            :id="`region-size-${sub.id}`"
-                            :value="sub.size"
-                            type="number"
-                            min="10"
-                            max="90"
-                            step="1"
+                        <div class="preview-size-control" @click.stop>
+                          <span class="preview-size-label">Size</span>
+                          <NumberStepper
+                            :model-value="sub.size"
+                            :min="10"
+                            :max="90"
                             :aria-label="`Sub ${subIndex + 1} size percentage`"
-                            @change="
-                              handleSubRegionSizeChange(
-                                screenIndex,
-                                previewIndex,
-                                subIndex,
-                                $event.target.value
-                              )
+                            @update:model-value="
+                              v => handleSubRegionSizeChange(screenIndex, previewIndex, subIndex, v)
                             "
                           />
-                          %
-                        </label>
+                          <span class="preview-size-unit">%</span>
+                        </div>
                       </div>
                       <button
                         v-if="subIndex < region.split.regions.length - 1"
@@ -463,26 +455,23 @@
                       </div>
                     </div>
                   </div>
-                  <label
+                  <div
                     v-if="screen.layout.regions.length > 1"
                     class="preview-size-control"
                     @click.stop
                   >
-                    Size
-                    <input
-                      :id="`region-size-${region.id}`"
-                      :value="region.size"
-                      type="number"
-                      min="10"
-                      max="90"
-                      step="1"
+                    <span class="preview-size-label">Size</span>
+                    <NumberStepper
+                      :model-value="region.size"
+                      :min="10"
+                      :max="90"
                       :aria-label="`${regionLabel(previewIndex)} size percentage`"
-                      @change="
-                        handleRegionSizeChange(screenIndex, previewIndex, $event.target.value)
+                      @update:model-value="
+                        v => handleRegionSizeChange(screenIndex, previewIndex, v)
                       "
                     />
-                    %
-                  </label>
+                    <span class="preview-size-unit">%</span>
+                  </div>
                 </template>
               </div>
               <template v-if="previewIndex < screen.layout.regions.length - 1">
@@ -607,6 +596,7 @@ import { usePlugins } from "@/composables";
 import SelectPill from "@/components/ui/SelectPill.vue";
 import SegmentedControl from "@/components/ui/SegmentedControl.vue";
 import ToggleSwitch from "@/components/ui/ToggleSwitch.vue";
+import NumberStepper from "@/components/ui/NumberStepper.vue";
 import {
   MAX_TOP_REGIONS,
   addSubRegion,
@@ -1326,7 +1316,7 @@ onUnmounted(() => {
   width: 1.6rem;
   height: 1.6rem;
   border: 0;
-  border-radius: 4px;
+  border-radius: 6px;
   background: transparent;
   color: var(--ink-2);
   cursor: pointer;
@@ -1357,7 +1347,7 @@ onUnmounted(() => {
   flex: 1 1 auto;
   min-width: 0;
   border: 1px solid var(--line);
-  border-radius: 4px;
+  border-radius: 6px;
   padding: 0.4rem 0.55rem;
   background: var(--bg-1);
   color: var(--ink);
@@ -1367,7 +1357,7 @@ onUnmounted(() => {
 .add-region-button {
   flex: 0 0 auto;
   border: 1px solid var(--line);
-  border-radius: 4px;
+  border-radius: 6px;
   padding: 0.4rem 0.65rem;
   background: var(--bg-1);
   color: var(--focus);
@@ -1387,7 +1377,7 @@ onUnmounted(() => {
 
 .region-delete {
   border: 1px solid var(--line);
-  border-radius: 4px;
+  border-radius: 6px;
   padding: 0 0.4rem;
   background: var(--bg-1);
   color: var(--err);
@@ -1404,7 +1394,7 @@ onUnmounted(() => {
 .direction-toggle {
   flex: 0 0 auto;
   border: 1px solid var(--line);
-  border-radius: 4px;
+  border-radius: 6px;
   padding: 0.4rem 0.6rem;
   background: var(--bg-1);
   color: var(--ink-2);
@@ -1422,7 +1412,7 @@ onUnmounted(() => {
 .screen-activate {
   flex: 0 0 auto;
   border: 1px solid var(--line);
-  border-radius: 4px;
+  border-radius: 6px;
   padding: 0.35rem 0.6rem;
   background: var(--bg-1);
   color: var(--ink);
@@ -1453,7 +1443,7 @@ onUnmounted(() => {
   width: 1.9rem;
   height: 1.9rem;
   border: 1px solid var(--line);
-  border-radius: 4px;
+  border-radius: 6px;
   background: var(--bg-1);
   color: var(--err);
   cursor: pointer;
@@ -1471,7 +1461,7 @@ onUnmounted(() => {
   margin: 0;
   padding: 0.75rem;
   border: 1px solid var(--line);
-  border-radius: 6px;
+  border-radius: 8px;
   background: var(--bg-1);
   box-sizing: border-box;
   width: 100%;
@@ -1489,7 +1479,7 @@ onUnmounted(() => {
   min-width: 0;
   min-height: 0;
   border: 1px solid var(--line);
-  border-radius: 4px;
+  border-radius: 8px;
   padding: 0.6rem;
   display: flex;
   flex-direction: column;
@@ -1526,7 +1516,7 @@ onUnmounted(() => {
 
 .split-toggle {
   border: 1px solid var(--line);
-  border-radius: 4px;
+  border-radius: 6px;
   padding: 0.2rem 0.5rem;
   background: var(--bg-1);
   color: var(--ink-2);
@@ -1544,7 +1534,7 @@ onUnmounted(() => {
   width: 100%;
   min-width: 0;
   border: 1px solid var(--line);
-  border-radius: 4px;
+  border-radius: 8px;
   padding: 0.45rem 0.55rem;
   background: var(--bg-1);
   color: var(--ink);
@@ -1570,31 +1560,35 @@ onUnmounted(() => {
   top: calc(100% + 0.35rem);
   left: 0;
   right: 0;
-  max-height: 220px;
+  max-height: 240px;
   overflow: auto;
+  overscroll-behavior: contain;
+  padding: 6px;
   border: 1px solid var(--line);
-  border-radius: 6px;
+  border-radius: 12px;
   background: var(--bg-1);
-  box-shadow: 0 8px 24px var(--shadow);
+  box-shadow: 0 12px 32px var(--focus-glow);
 }
 
 .component-search {
-  width: calc(100% - 0.75rem);
-  margin: 0.375rem;
-  padding: 0.45rem 0.55rem;
+  width: 100%;
+  margin: 0 0 6px;
+  padding: 0.55rem;
   border: 1px solid var(--line);
-  border-radius: 4px;
+  border-radius: 8px;
   background: var(--bg-2);
   color: var(--ink);
   box-sizing: border-box;
 }
 
 .component-option {
-  display: block;
+  display: flex;
+  align-items: center;
   width: 100%;
+  min-height: 44px;
   padding: 0.55rem 0.65rem;
   border: 0;
-  border-top: 1px solid var(--line);
+  border-radius: 8px;
   background: transparent;
   color: var(--ink);
   cursor: pointer;
@@ -1608,15 +1602,18 @@ onUnmounted(() => {
 }
 
 .source-options {
-  border-top: 1px solid var(--line);
-  padding: 0.35rem 0;
+  margin-top: 6px;
+  padding-top: 6px;
+  border-top: 1px solid var(--line-soft);
 }
 
 .source-option {
   display: flex;
   align-items: center;
   gap: 0.45rem;
+  min-height: 44px;
   padding: 0.45rem 0.65rem;
+  border-radius: 8px;
   color: var(--ink);
   cursor: pointer;
   font-size: 0.9rem;
@@ -1635,25 +1632,20 @@ onUnmounted(() => {
 .preview-size-control {
   display: flex;
   align-items: center;
-  gap: 0.35rem;
+  gap: 0.4rem;
   color: var(--ink-2);
   font-size: 0.85rem;
 }
 
-.preview-size-control input {
-  width: 4rem;
-  min-width: 0;
-  border: 1px solid var(--line);
-  border-radius: 4px;
-  padding: 0.35rem;
-  background: var(--bg-1);
-  color: var(--ink);
+.preview-size-label,
+.preview-size-unit {
+  flex: 0 0 auto;
 }
 
 .preview-resizer {
   flex: 0 0 14px;
   border: 0;
-  border-radius: 4px;
+  border-radius: 6px;
   background: var(--line);
   cursor: col-resize;
   padding: 0;
@@ -1705,7 +1697,7 @@ onUnmounted(() => {
   min-height: 0;
   min-width: 0;
   border: 1px dashed var(--line);
-  border-radius: 4px;
+  border-radius: 8px;
   padding: 0.35rem;
 }
 
@@ -1730,7 +1722,7 @@ onUnmounted(() => {
   min-width: 0;
   min-height: 0;
   border: 1px solid var(--line);
-  border-radius: 4px;
+  border-radius: 8px;
   padding: 0.6rem;
   background: var(--bg-1);
   box-sizing: border-box;
@@ -1773,7 +1765,7 @@ onUnmounted(() => {
 
 .clock-bar-inherit {
   border: 1px solid var(--line);
-  border-radius: 4px;
+  border-radius: 6px;
   padding: 0.25rem 0.5rem;
   background: var(--bg-2);
   color: var(--ink);
@@ -1808,7 +1800,7 @@ onUnmounted(() => {
   justify-content: center;
   background: var(--focus);
   color: #fff;
-  border-radius: 4px;
+  border-radius: 6px;
   font-size: 0.8rem;
   font-weight: 600;
   cursor: grab;
@@ -1842,7 +1834,7 @@ onUnmounted(() => {
   align-items: center;
   justify-content: center;
   border: 1px dashed var(--focus);
-  border-radius: 4px;
+  border-radius: 6px;
   background: rgba(0, 0, 0, 0.05);
   color: var(--focus);
   font-size: 0.75rem;
