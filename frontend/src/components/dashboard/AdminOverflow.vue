@@ -128,11 +128,21 @@ const onToggleLock = () => {
   align-items: center;
   justify-content: center;
   font-size: 1.25rem;
-  color: var(--ink-2);
-  background: var(--bg-2);
-  border: 1px solid var(--line);
+  /* Discreet by default: just the glyph, no chrome. A muted resting colour and a
+     hover-only surface keep it from competing with the clock, while the full
+     46px hit target and focus ring stay intact. */
+  color: var(--ink-3);
+  background: transparent;
+  border: 0;
   border-radius: 11px;
   cursor: pointer;
+  transition:
+    color 0.15s ease,
+    background-color 0.15s ease;
+}
+.admin-overflow__trigger:hover {
+  color: var(--ink);
+  background: var(--bg-2);
 }
 .admin-overflow__trigger:focus-visible {
   outline: 2px solid var(--focus);
