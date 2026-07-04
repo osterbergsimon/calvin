@@ -1,32 +1,29 @@
 <template>
-  <div class="keyboard-tab">
-    <CollapsibleSection title="Keyboard Buttons" icon="⌨️" :expanded="true">
-      <p class="kb-intro">
-        Press a button to bind it, then choose what it does. Any key works — your remote's buttons
-        or a full keyboard.
-      </p>
+  <SettingRow
+    label="Button bindings"
+    description="Press a button to bind it, then choose what it does. Any key works — your remote's buttons or a full keyboard."
+    stacked
+  >
+    <div v-if="store.loading" class="kb-msg">Loading mappings…</div>
+    <div v-else-if="store.error" class="kb-msg kb-msg--err" role="alert">{{ store.error }}</div>
 
-      <div v-if="store.loading" class="kb-msg">Loading mappings…</div>
-      <div v-else-if="store.error" class="kb-msg kb-msg--err" role="alert">{{ store.error }}</div>
+    <KeyBindingBoard
+      v-else
+      :mappings="store.mappings"
+      :capturing="capturing"
+      @edit="openPicker"
+      @clear="clearKey"
+      @add="captureNewKey"
+    />
+  </SettingRow>
 
-      <KeyBindingBoard
-        v-else
-        :mappings="store.mappings"
-        :capturing="capturing"
-        @edit="openPicker"
-        @clear="clearKey"
-        @add="captureNewKey"
-      />
-    </CollapsibleSection>
-
-    <div v-if="pickerKey" class="kb-picker-overlay" @click.self="closePicker">
-      <ActionPicker
-        :key-code="pickerKey"
-        :current-action="store.mappings[pickerKey] || null"
-        @select="onSelect"
-        @close="closePicker"
-      />
-    </div>
+  <div v-if="pickerKey" class="kb-picker-overlay" @click.self="closePicker">
+    <ActionPicker
+      :key-code="pickerKey"
+      :current-action="store.mappings[pickerKey] || null"
+      @select="onSelect"
+      @close="closePicker"
+    />
   </div>
 </template>
 
@@ -35,7 +32,7 @@ import { ref, onMounted } from "vue";
 import { useKeyboardStore } from "@/stores/keyboard";
 import { useKeyCapture } from "@/composables/useKeyCapture";
 import { logError } from "@/utils/logger";
-import CollapsibleSection from "../../shared/CollapsibleSection.vue";
+import SettingRow from "@/components/settings/shell/SettingRow.vue";
 import KeyBindingBoard from "./keyboard/KeyBindingBoard.vue";
 import ActionPicker from "./keyboard/ActionPicker.vue";
 
@@ -80,17 +77,9 @@ const captureNewKey = async () => {
 </script>
 
 <style scoped>
-.keyboard-tab {
-  width: 100%;
-}
-.kb-intro {
-  color: var(--ink-2);
-  font-size: 0.85rem;
-  margin: 0 0 12px;
-}
 .kb-msg {
   padding: 12px;
-  border-radius: 6px;
+  border-radius: var(--radius-sm);
   background: var(--bg-2);
   color: var(--ink-2);
 }

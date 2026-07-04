@@ -25,11 +25,10 @@ describe("RebootCombo", () => {
     h.cancelled.value = false;
   });
 
-  it("shows friendly key labels (KEY_ stripped) and the combo hint", () => {
+  it("shows friendly key labels (KEY_ stripped) on the combo tiles", () => {
     const w = mountRC();
     const caps = w.findAll(".rc-key-cap").map(c => c.text());
     expect(caps).toEqual(["1", "7"]);
-    expect(w.find(".rc-hint").text()).toBe("Hold 1 + 7 for 10s to reboot.");
   });
 
   it("captures a pressed key and emits the new first key", async () => {

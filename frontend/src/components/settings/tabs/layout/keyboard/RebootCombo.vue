@@ -1,58 +1,56 @@
 <template>
-  <CollapsibleSection title="Reboot shortcut" icon="⏻" :expanded="true">
-    <div class="reboot-combo">
-      <p class="rc-sub">
-        Hold two buttons together for a few seconds to reboot the device. Press a slot, then press
-        the button you want.
-      </p>
-
-      <div class="rc-keys">
-        <button
-          type="button"
-          class="rc-key"
-          :class="{ 'rc-key--capturing': capturingSlot === 1 }"
-          :aria-label="`First reboot key (currently ${label1})`"
-          @click="captureKey(1)"
-        >
-          <span class="rc-key-cap">{{ capturingSlot === 1 ? "Press a button…" : label1 }}</span>
-          <span class="rc-key-hint">first key</span>
-        </button>
-        <span class="rc-plus" aria-hidden="true">+</span>
-        <button
-          type="button"
-          class="rc-key"
-          :class="{ 'rc-key--capturing': capturingSlot === 2 }"
-          :aria-label="`Second reboot key (currently ${label2})`"
-          @click="captureKey(2)"
-        >
-          <span class="rc-key-cap">{{ capturingSlot === 2 ? "Press a button…" : label2 }}</span>
-          <span class="rc-key-hint">second key</span>
-        </button>
-      </div>
-
-      <p v-if="warning" class="rc-warn" role="alert">{{ warning }}</p>
-
-      <div class="rc-duration">
-        <span class="rc-dur-label">Hold for</span>
-        <NumberStepper
-          :model-value="durationSeconds"
-          :min="1"
-          :max="60"
-          aria-label="Reboot hold duration in seconds"
-          @update:model-value="onDuration"
-        />
-        <span class="rc-dur-unit">seconds</span>
-      </div>
-
-      <p class="rc-hint">{{ comboHint }}</p>
+  <SettingRow
+    label="Reboot combination"
+    description="Hold both buttons together for a few seconds to restart the device."
+    stacked
+  >
+    <div class="rc-keys">
+      <button
+        type="button"
+        class="rc-key"
+        :class="{ 'rc-key--capturing': capturingSlot === 1 }"
+        :aria-label="`First reboot key (currently ${label1})`"
+        @click="captureKey(1)"
+      >
+        <span class="rc-key-cap">{{ capturingSlot === 1 ? "Press a button…" : label1 }}</span>
+        <span class="rc-key-hint">first key</span>
+      </button>
+      <span class="rc-plus" aria-hidden="true">+</span>
+      <button
+        type="button"
+        class="rc-key"
+        :class="{ 'rc-key--capturing': capturingSlot === 2 }"
+        :aria-label="`Second reboot key (currently ${label2})`"
+        @click="captureKey(2)"
+      >
+        <span class="rc-key-cap">{{ capturingSlot === 2 ? "Press a button…" : label2 }}</span>
+        <span class="rc-key-hint">second key</span>
+      </button>
     </div>
-  </CollapsibleSection>
+    <p v-if="warning" class="rc-warn" role="alert">{{ warning }}</p>
+  </SettingRow>
+
+  <SettingRow
+    label="Hold duration"
+    description="How long to hold the combination before it reboots."
+  >
+    <div class="rc-duration">
+      <NumberStepper
+        :model-value="durationSeconds"
+        :min="1"
+        :max="60"
+        aria-label="Reboot hold duration in seconds"
+        @update:model-value="onDuration"
+      />
+      <span class="rc-dur-unit">seconds</span>
+    </div>
+  </SettingRow>
 </template>
 
 <script setup>
 import { ref, computed } from "vue";
 import NumberStepper from "@/components/ui/NumberStepper.vue";
-import CollapsibleSection from "@/components/settings/shared/CollapsibleSection.vue";
+import SettingRow from "@/components/settings/shell/SettingRow.vue";
 import { useKeyCapture } from "@/composables/useKeyCapture";
 import { formatKeyLabel } from "@/utils/keyCode";
 
@@ -71,9 +69,6 @@ const label1 = computed(() => formatKeyLabel(key1.value));
 const label2 = computed(() => formatKeyLabel(key2.value));
 const durationSeconds = computed(() =>
   Math.round((props.config.rebootComboDuration || 10000) / 1000)
-);
-const comboHint = computed(
-  () => `Hold ${label1.value} + ${label2.value} for ${durationSeconds.value}s to reboot.`
 );
 
 const captureKey = async slot => {
@@ -107,24 +102,21 @@ const onDuration = secs => {
 </script>
 
 <style scoped>
-.rc-sub {
-  margin: 0 0 16px;
-  font-size: 0.85rem;
-  color: var(--ink-2);
-}
+/* Key tiles mirror the key-binding tiles (.kbt) so the reboot combo reads as
+   part of the same keyboard surface, not a separate widget. */
 .rc-keys {
   display: flex;
   align-items: center;
-  gap: 12px;
+  gap: 10px;
 }
 .rc-key {
   display: flex;
   flex-direction: column;
   align-items: center;
   gap: 4px;
-  min-width: 96px;
+  min-width: 104px;
   min-height: var(--touch-target);
-  padding: 10px 14px;
+  padding: 10px 8px;
   background: var(--bg-2);
   border: 1px solid var(--line);
   border-radius: var(--radius-sm);
@@ -149,8 +141,8 @@ const onDuration = secs => {
   color: var(--ink);
 }
 .rc-key-hint {
-  font-size: 0.7rem;
-  color: var(--ink-3);
+  font-size: 0.75rem;
+  color: var(--ink-2);
 }
 .rc-plus {
   color: var(--ink-3);
@@ -165,19 +157,9 @@ const onDuration = secs => {
   display: flex;
   align-items: center;
   gap: 10px;
-  margin-top: 20px;
-}
-.rc-dur-label {
-  color: var(--ink);
-  font-size: 0.9rem;
 }
 .rc-dur-unit {
   color: var(--ink-2);
   font-size: 0.9rem;
-}
-.rc-hint {
-  margin: 16px 0 0;
-  font-size: 0.85rem;
-  color: var(--ink-2);
 }
 </style>
