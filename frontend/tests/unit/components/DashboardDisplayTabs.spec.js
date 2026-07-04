@@ -53,6 +53,14 @@ describe("DashboardRegionsEditor (screens & regions logic)", () => {
     expect(sizes).toContain("30%");
   });
 
+  it("renders region delete as a danger IconButton", () => {
+    const wrapper = mount(DashboardRegionsEditor, { props: { config: {} } });
+    const del = wrapper.find('[aria-label="Delete Region 2"]');
+    expect(del.exists()).toBe(true);
+    expect(del.classes()).toContain("icon-btn");
+    expect(del.classes()).toContain("icon-btn--danger");
+  });
+
   it("removes a region and renormalizes the layout", async () => {
     const wrapper = mount(DashboardRegionsEditor, {
       props: { config: {} },

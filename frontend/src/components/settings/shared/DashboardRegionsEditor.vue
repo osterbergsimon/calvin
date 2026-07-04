@@ -223,15 +223,15 @@
                   >
                     {{ region.split ? "Unsplit" : "Split" }}
                   </button>
-                  <button
+                  <IconButton
                     v-if="screen.layout.regions.length > 1"
-                    type="button"
-                    class="region-delete"
-                    :aria-label="`Delete ${regionLabel(previewIndex)}`"
+                    :label="`Delete ${regionLabel(previewIndex)}`"
+                    variant="danger"
+                    size="sm"
                     @click.stop="removeRegion(screenIndex, previewIndex)"
                   >
                     ×
-                  </button>
+                  </IconButton>
                 </div>
 
                 <template v-if="region.split">
@@ -264,15 +264,15 @@
                           <div class="preview-region-label">
                             {{ regionLabel(previewIndex) }}.{{ subIndex + 1 }}
                           </div>
-                          <button
+                          <IconButton
                             v-if="region.split.regions.length > 1"
-                            type="button"
-                            class="region-delete"
-                            :aria-label="`Delete ${regionLabel(previewIndex)} sub ${subIndex + 1}`"
+                            :label="`Delete ${regionLabel(previewIndex)} sub ${subIndex + 1}`"
+                            variant="danger"
+                            size="sm"
                             @click.stop="removeSub(screenIndex, previewIndex, subIndex)"
                           >
                             ×
-                          </button>
+                          </IconButton>
                         </div>
                         <div class="preview-component-picker" @click.stop>
                           <button
@@ -563,6 +563,7 @@ import { useWebServicesStore } from "@/stores/webServices";
 import { useCalendarStore } from "@/stores/calendar";
 import { usePlugins } from "@/composables";
 import ToggleSwitch from "@/components/ui/ToggleSwitch.vue";
+import IconButton from "@/components/ui/IconButton.vue";
 import {
   MAX_TOP_REGIONS,
   addSubRegion,
@@ -1281,21 +1282,6 @@ onUnmounted(() => {
   opacity: 0.5;
 }
 
-.region-delete {
-  border: 1px solid var(--line);
-  border-radius: var(--radius-xs);
-  padding: 0 var(--space-xs);
-  background: var(--bg-1);
-  color: var(--err);
-  cursor: pointer;
-  font-size: 0.95rem;
-  line-height: 1.4;
-}
-
-.region-delete:hover,
-.region-delete:focus {
-  border-color: var(--err);
-}
 
 .direction-toggle {
   flex: 0 0 auto;
