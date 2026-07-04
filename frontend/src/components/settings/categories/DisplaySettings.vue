@@ -94,6 +94,17 @@
         <TypefacePicker />
       </SettingRow>
       <SettingRow
+        label="UI size"
+        description="Scale the size of settings controls and dashboard editors."
+      >
+        <SegmentedControl
+          :model-value="config.uiSize"
+          :options="UI_SIZE_OPTIONS"
+          aria-label="UI size"
+          @update:model-value="v => emit('update:config', { uiSize: v })"
+        />
+      </SettingRow>
+      <SettingRow
         label="Focus light"
         description="When the focus spotlight highlights the active region."
       >
@@ -256,6 +267,7 @@ import RangeSlider from "@/components/ui/RangeSlider.vue";
 import ThemePicker from "@/components/settings/shell/ThemePicker.vue";
 import TypefacePicker from "@/components/settings/shell/TypefacePicker.vue";
 import DashboardRegionsEditor from "@/components/settings/shared/DashboardRegionsEditor.vue";
+import { UI_SIZE_OPTIONS } from "@/styles/uiScale";
 
 defineProps({
   config: { type: Object, required: true },
@@ -270,14 +282,14 @@ const emit = defineEmits(["update:config"]);
 }
 
 .display-name-input {
-  height: 48px;
-  min-height: 44px;
-  padding: 0 14px;
+  height: var(--control-height);
+  min-height: var(--touch-target);
+  padding: 0 calc(14px * var(--ui-scale));
   background: var(--bg-2);
   border: 1px solid var(--line);
-  border-radius: 11px;
+  border-radius: var(--radius-lg);
   font-family: var(--font-ui);
-  font-size: 15px;
+  font-size: var(--fs-control-lg);
   color: var(--ink);
   min-width: 180px;
 }

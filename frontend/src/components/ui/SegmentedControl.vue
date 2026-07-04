@@ -56,23 +56,23 @@ const onKey = e => {
   display: inline-flex;
   background: var(--bg-0);
   border: 1px solid var(--line);
-  border-radius: 11px;
-  padding: 4px;
+  border-radius: var(--radius-lg);
+  padding: var(--space-3xs);
 }
 .seg__btn {
   font-family: var(--font-ui);
-  font-size: 14px;
+  font-size: var(--fs-control);
   font-weight: 500;
   color: var(--ink-2);
   background: transparent;
   border: 0;
-  border-radius: 8px;
-  padding: 10px 18px;
-  min-height: 44px;
+  border-radius: var(--radius-sm);
+  padding: calc(10px * var(--ui-scale)) calc(18px * var(--ui-scale));
+  min-height: var(--touch-target);
   cursor: pointer;
   display: flex;
   align-items: center;
-  gap: 7px;
+  gap: calc(7px * var(--ui-scale));
 }
 .seg__btn.on {
   background: var(--focus);

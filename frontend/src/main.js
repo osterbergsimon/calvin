@@ -10,10 +10,15 @@ import "./styles/base.css";
 import { initLogger, logError, logInfo } from "./utils/logger";
 import { useConfigStore } from "./stores/config";
 import { useTypeTheme } from "./composables/useTypeTheme";
+import { useUiScale } from "./composables/useUiScale";
 
 // Apply the persisted typeface before mount so the dashboard boots with the
 // saved font instead of the default (previously only applied on opening Settings).
 useTypeTheme().loadTypeTheme();
+
+// Apply the persisted UI-size preset before mount so controls boot at the saved
+// scale (no flash). The config store reconciles it after /api/config loads.
+useUiScale().loadUiScale();
 
 const app = createApp(App);
 const pinia = createPinia();

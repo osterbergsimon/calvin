@@ -21,10 +21,10 @@ const toggle = () => emit("update:modelValue", !props.modelValue);
 
 <style scoped>
 .tog {
-  width: 56px;
-  height: 32px;
+  width: var(--toggle-w);
+  height: var(--toggle-h);
   border: 0;
-  border-radius: 999px;
+  border-radius: var(--radius-pill);
   background: var(--line);
   position: relative;
   cursor: pointer;
@@ -33,10 +33,10 @@ const toggle = () => emit("update:modelValue", !props.modelValue);
 .tog::after {
   content: "";
   position: absolute;
-  top: 3px;
-  left: 3px;
-  width: 26px;
-  height: 26px;
+  top: var(--toggle-inset);
+  left: var(--toggle-inset);
+  width: var(--toggle-knob);
+  height: var(--toggle-knob);
   border-radius: 50%;
   background: var(--switch-knob);
   transition: transform 0.2s;
@@ -45,7 +45,7 @@ const toggle = () => emit("update:modelValue", !props.modelValue);
   background: var(--focus);
 }
 .tog.on::after {
-  transform: translateX(24px);
+  transform: translateX(var(--toggle-travel));
   background: var(--switch-knob-on);
 }
 .tog:focus-visible {

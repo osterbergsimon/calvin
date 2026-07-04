@@ -161,14 +161,14 @@ onUnmounted(() => {
 .pill {
   display: inline-flex;
   align-items: center;
-  gap: 12px;
-  height: 48px;
-  padding: 0 16px;
+  gap: calc(12px * var(--ui-scale));
+  height: var(--control-height);
+  padding: 0 calc(16px * var(--ui-scale));
   background: var(--bg-2);
   border: 1px solid var(--line);
-  border-radius: 11px;
+  border-radius: var(--radius-lg);
   font-family: var(--font-ui);
-  font-size: 15px;
+  font-size: var(--fs-control-lg);
   color: var(--ink);
   cursor: pointer;
 }
@@ -177,13 +177,13 @@ onUnmounted(() => {
   outline-offset: 2px;
 }
 .pill__swatch {
-  width: 16px;
-  height: 16px;
-  border-radius: 5px;
+  width: calc(16px * var(--ui-scale));
+  height: calc(16px * var(--ui-scale));
+  border-radius: calc(5px * var(--ui-scale));
 }
 .pill__cv {
   color: var(--ink-3);
-  font-size: 12px;
+  font-size: calc(12px * var(--ui-scale));
 }
 .pill__menu {
   position: absolute;
@@ -193,10 +193,10 @@ onUnmounted(() => {
   min-width: 100%;
   list-style: none;
   margin: 0;
-  padding: 6px;
+  padding: calc(6px * var(--ui-scale));
   background: var(--bg-1);
   border: 1px solid var(--line);
-  border-radius: 12px;
+  border-radius: var(--radius-xl);
   box-shadow: 0 12px 32px var(--focus-glow);
   /* Long option lists scroll inside the menu (max-height set inline from the
      viewport space) instead of running off a short screen. */
@@ -208,11 +208,11 @@ onUnmounted(() => {
   bottom: calc(100% + 6px);
 }
 .pill__opt {
-  padding: 12px 14px;
-  min-height: 44px;
+  padding: calc(12px * var(--ui-scale)) calc(14px * var(--ui-scale));
+  min-height: var(--touch-target);
   display: flex;
   align-items: center;
-  border-radius: 8px;
+  border-radius: var(--radius-sm);
   color: var(--ink);
   cursor: pointer;
 }

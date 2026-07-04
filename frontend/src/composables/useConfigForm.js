@@ -161,6 +161,7 @@ export function useConfigForm(initialConfig = {}) {
         clockBarShowLogo: response.clockBarShowLogo ?? response.clock_bar_show_logo ?? true,
         // Other
         mealPlanCardSize: response.mealPlanCardSize ?? response.meal_plan_card_size ?? "medium",
+        uiSize: response.uiSize ?? response.ui_size ?? "default",
         consoleLogEnabled: response.consoleLogEnabled ?? response.console_log_enabled ?? true,
         consoleLogLevel: response.consoleLogLevel ?? response.console_log_level ?? "info",
         configPollInterval: response.configPollInterval ?? response.config_poll_interval ?? 30,
