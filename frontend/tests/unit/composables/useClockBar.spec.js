@@ -46,3 +46,24 @@ describe("useClockBar barPadding", () => {
     expect(api.barPadding.value).toBe(0);
   });
 });
+
+describe("useClockBar barPaddingStyle", () => {
+  beforeEach(() => setActivePinia(createPinia()));
+
+  it("pads only the cross-axis (Y) for a horizontal bar, fixed gutter on X", () => {
+    useConfigStore().clockBarPadding = 10;
+    expect(useBar("horizontal").barPaddingStyle.value).toBe("10px 8px");
+  });
+
+  it("pads only the cross-axis (X) for a vertical bar, fixed gutter on Y", () => {
+    useConfigStore().clockBarVerticalPadding = 10;
+    expect(useBar("vertical").barPaddingStyle.value).toBe("8px 10px");
+  });
+
+  it("keeps the fixed gutter when cross-axis padding is 0 (flush to edge)", () => {
+    useConfigStore().clockBarPadding = 0;
+    expect(useBar("horizontal").barPaddingStyle.value).toBe("0px 8px");
+    useConfigStore().clockBarVerticalPadding = 0;
+    expect(useBar("vertical").barPaddingStyle.value).toBe("8px 0px");
+  });
+});

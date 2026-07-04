@@ -3,7 +3,7 @@
     v-if="shouldShow"
     class="clock-bar-horizontal"
     :class="[`position-${position}`, { 'show-date': showDate }]"
-    :style="{ padding: `${barPadding}px` }"
+    :style="{ padding: barPaddingStyle }"
     role="status"
     aria-label="Status bar"
     aria-live="polite"
@@ -107,7 +107,7 @@ const {
   fontSize,
   dateFontSize,
   layout,
-  barPadding,
+  barPaddingStyle,
 } = useClockBar({
   enabled: () => props.enabled,
   showInKiosk: () => props.showInKiosk,

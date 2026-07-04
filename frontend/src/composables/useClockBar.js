@@ -15,6 +15,10 @@ import { useConfigStore } from "../stores/config";
  * @param {() => number|null} [opts.previewPadding]
  * @param {() => 'horizontal'|'vertical'} [opts.orientation]
  */
+// Fixed edge gutter (px) along the bar's inline axis, so the leading logo is never
+// flush against the screen edge regardless of the thickness slider.
+const INLINE_GUTTER = 8;
+
 export function useClockBar(opts) {
   const configStore = useConfigStore();
 
@@ -68,6 +72,18 @@ export function useClockBar(opts) {
     // must not fall back to the 8px default.
     if (orientation.value === "vertical") return configStore.clockBarVerticalPadding ?? 8;
     return configStore.clockBarPadding ?? 8;
+  });
+
+  // The slider controls the bar's *thickness* (cross-axis) only. Padding along the
+  // bar's inline axis just squeezes the fixed-size logo toward the screen edge, so
+  // that axis stays pinned to a small constant gutter. CSS shorthand is "Y X":
+  //   horizontal bar → Y = thickness (slider), X = gutter
+  //   vertical bar   → Y = gutter,             X = thickness (slider)
+  const barPaddingStyle = computed(() => {
+    const thickness = barPadding.value;
+    return orientation.value === "vertical"
+      ? `${INLINE_GUTTER}px ${thickness}px`
+      : `${thickness}px ${INLINE_GUTTER}px`;
   });
 
   const currentTime = ref(new Date());
@@ -238,5 +254,6 @@ export function useClockBar(opts) {
     dateFontSize,
     layout,
     barPadding,
+    barPaddingStyle,
   };
 }
