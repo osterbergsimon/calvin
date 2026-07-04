@@ -81,18 +81,6 @@
 
         <div v-if="expandedScreens.has(screen.id)" class="screen-clock-bar-controls">
           <span class="clock-bar-row-label">Clock bar</span>
-          <SegmentedControl
-            :model-value="effectiveClockBarFor(screen).mode"
-            :options="clockBarModeOptions"
-            :aria-label="`Screen ${screenIndex + 1} clock bar orientation`"
-            @update:model-value="v => setScreenClockBarMode(screenIndex, v)"
-          />
-          <SelectPill
-            :model-value="effectiveClockBarFor(screen).position"
-            :options="clockBarPositionOptions(screen, effectiveClockBarFor(screen).mode)"
-            :aria-label="`Screen ${screenIndex + 1} clock bar position`"
-            @update:model-value="v => setScreenClockBarPosition(screenIndex, v)"
-          />
           <div class="clock-bar-visibility">
             <ToggleSwitch
               :model-value="effectiveClockBarFor(screen).enabled"
@@ -113,6 +101,9 @@
             Inherit global
           </button>
           <span v-else class="clock-bar-inherit-hint">Inherits global</span>
+          <span v-if="effectiveClockBarFor(screen).enabled" class="clock-bar-drag-hint">
+            Drag the bar in the preview to move it
+          </span>
           <span class="clock-bar-summary">{{ clockBarSummary(screen) }}</span>
         </div>
 
@@ -361,18 +352,9 @@
                             </div>
                           </div>
                         </div>
-                        <div class="preview-size-control" @click.stop>
+                        <div class="preview-size-control">
                           <span class="preview-size-label">Size</span>
-                          <NumberStepper
-                            :model-value="sub.size"
-                            :min="10"
-                            :max="90"
-                            :aria-label="`Sub ${subIndex + 1} size percentage`"
-                            @update:model-value="
-                              v => handleSubRegionSizeChange(screenIndex, previewIndex, subIndex, v)
-                            "
-                          />
-                          <span class="preview-size-unit">%</span>
+                          <span class="preview-size-value">{{ sub.size }}%</span>
                         </div>
                       </div>
                       <button
@@ -455,22 +437,9 @@
                       </div>
                     </div>
                   </div>
-                  <div
-                    v-if="screen.layout.regions.length > 1"
-                    class="preview-size-control"
-                    @click.stop
-                  >
+                  <div v-if="screen.layout.regions.length > 1" class="preview-size-control">
                     <span class="preview-size-label">Size</span>
-                    <NumberStepper
-                      :model-value="region.size"
-                      :min="10"
-                      :max="90"
-                      :aria-label="`${regionLabel(previewIndex)} size percentage`"
-                      @update:model-value="
-                        v => handleRegionSizeChange(screenIndex, previewIndex, v)
-                      "
-                    />
-                    <span class="preview-size-unit">%</span>
+                    <span class="preview-size-value">{{ region.size }}%</span>
                   </div>
                 </template>
               </div>
@@ -593,15 +562,11 @@ import { computed, onMounted, onUnmounted, reactive, ref } from "vue";
 import { useWebServicesStore } from "@/stores/webServices";
 import { useCalendarStore } from "@/stores/calendar";
 import { usePlugins } from "@/composables";
-import SelectPill from "@/components/ui/SelectPill.vue";
-import SegmentedControl from "@/components/ui/SegmentedControl.vue";
 import ToggleSwitch from "@/components/ui/ToggleSwitch.vue";
-import NumberStepper from "@/components/ui/NumberStepper.vue";
 import {
   MAX_TOP_REGIONS,
   addSubRegion,
   addTopRegion,
-  computeClockBarModeUpdate,
   computeClockBarPositionUpdate,
   createDashboardScreenFromPreset,
   getClockBarBetweenIndex,
@@ -612,7 +577,6 @@ import {
   removeSubRegion,
   removeTopRegion,
   resizeAdjacentRegions,
-  resizeSubRegion,
   resizeSubRegionPair,
   resolveClockBarForScreen,
   setLayoutDirection,
@@ -727,30 +691,6 @@ const clockBarPositionLabel = (position, screen) => {
   return "—";
 };
 
-const clockBarModeOptions = [
-  { value: "horizontal", label: "Horizontal" },
-  { value: "vertical", label: "Vertical" },
-];
-
-const clockBarPositionOptions = (screen, mode) => {
-  const options =
-    mode === "vertical"
-      ? [
-          { value: "left", label: "Left edge" },
-          { value: "right", label: "Right edge" },
-        ]
-      : [
-          { value: "top", label: "Top edge" },
-          { value: "bottom", label: "Bottom edge" },
-        ];
-  const regions = screen?.layout?.regions || [];
-  for (let i = 0; i < regions.length - 1; i += 1) {
-    const value = i === 0 ? "between" : `between:${i}`;
-    options.push({ value, label: `Between region ${i + 1} & ${i + 2}` });
-  }
-  return options;
-};
-
 const dropZoneTooltip = (screen, position) => {
   const resolved = effectiveClockBarFor(screen);
   const targetMode =
@@ -781,13 +721,6 @@ const clearScreenClockBar = screenIndex => {
   const screens = cloneScreens();
   screens.screens[screenIndex].clockBar = null;
   emitScreensUpdate(screens);
-};
-
-const setScreenClockBarMode = (screenIndex, mode) => {
-  const screen = dashboardScreens.value.screens[screenIndex];
-  const update = computeClockBarModeUpdate(screen, mode, globalClockBarSettings.value);
-  if (!update) return;
-  updateScreenClockBar(screenIndex, update.patch);
 };
 
 const setScreenClockBarPosition = (screenIndex, position) => {
@@ -892,23 +825,6 @@ const filteredComponentOptions = computed(() => {
   if (!query) return componentOptions.value;
   return componentOptions.value.filter(option => option.label.toLowerCase().includes(query));
 });
-
-const handleRegionSizeChange = (screenIndex, regionIndex, rawValue) => {
-  const value = parseInt(rawValue, 10);
-  if (isNaN(value)) return;
-  const clamped = Math.max(10, Math.min(90, value));
-  const layout = cloneLayout(screenIndex);
-  layout.regions = resizeRegionAtIndex(layout.regions, regionIndex, clamped);
-  updateScreen(screenIndex, { layout });
-};
-
-const handleSubRegionSizeChange = (screenIndex, regionIndex, subIndex, rawValue) => {
-  const value = parseInt(rawValue, 10);
-  if (isNaN(value)) return;
-  const clamped = Math.max(10, Math.min(90, value));
-  const layout = resizeSubRegion(cloneLayout(screenIndex), regionIndex, subIndex, clamped);
-  updateScreen(screenIndex, { layout });
-};
 
 const addRegion = screenIndex => {
   const layout = addTopRegion(cloneLayout(screenIndex));
@@ -1239,16 +1155,6 @@ const getPreviewRegionStyle = region => ({
 const getSubRegionStyle = sub => ({
   flex: `${sub.size} ${sub.size} 0`,
 });
-
-const resizeRegionAtIndex = (regions, index, size) => {
-  if (regions.length <= 1) return regions;
-  if (index >= regions.length - 1) {
-    const resizeIndex = index - 1;
-    const pairTotal = Number(regions[resizeIndex].size) + Number(regions[index].size);
-    return resizeAdjacentRegions(regions, resizeIndex, pairTotal - size);
-  }
-  return resizeAdjacentRegions(regions, index, size);
-};
 
 onMounted(async () => {
   if (webServicesStore.services.length === 0 && !webServicesStore.loading) {
@@ -1637,9 +1543,10 @@ onUnmounted(() => {
   font-size: 0.85rem;
 }
 
-.preview-size-label,
-.preview-size-unit {
-  flex: 0 0 auto;
+.preview-size-value {
+  font-family: var(--font-data);
+  font-variant-numeric: tabular-nums lining-nums;
+  color: var(--ink);
 }
 
 .preview-resizer {
@@ -1780,6 +1687,12 @@ onUnmounted(() => {
 .clock-bar-inherit-hint {
   font-style: italic;
   font-size: 0.8rem;
+}
+
+.clock-bar-drag-hint {
+  font-style: italic;
+  font-size: 0.8rem;
+  color: var(--ink-3);
 }
 
 .clock-bar-summary {

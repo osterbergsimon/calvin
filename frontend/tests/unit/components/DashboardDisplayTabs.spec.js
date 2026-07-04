@@ -19,8 +19,8 @@ describe("DashboardRegionsEditor (screens & regions logic)", () => {
     // orientation controls moved to DisplaySettings rows; not part of this editor
     expect(wrapper.find("#display-orientation").exists()).toBe(false);
     expect(wrapper.find("#add-region-screen-home").exists()).toBe(true);
-    // Size control is now a NumberStepper (role=group) keyed by a stable aria-label.
-    expect(wrapper.find('[aria-label="Region 1 size percentage"]').exists()).toBe(true);
+    // Size is a read-only readout now — resizing is done via the preview drag handles.
+    expect(wrapper.find(".preview-size-value").exists()).toBe(true);
     expect(wrapper.find("#region-component-region-1").exists()).toBe(true);
     expect(wrapper.find(".screen-stack").exists()).toBe(true);
     expect(wrapper.find(".screen-card").exists()).toBe(true);
@@ -40,32 +40,17 @@ describe("DashboardRegionsEditor (screens & regions logic)", () => {
     expect(portraitWrapper.find(".screen-stack-portrait").exists()).toBe(true);
   });
 
-  it("emits region size updates from the layout tab stepper", async () => {
+  it("renders read-only region size readouts", () => {
     const wrapper = mount(DashboardRegionsEditor, {
       props: { config: { calendarSplit: 70 } },
     });
 
-    // Bump Region 1 up one step via the NumberStepper; the adjacent region
-    // compensates so the pair still sums to 100. (Size clamping to 10–90 is
-    // enforced by the stepper's min/max props and covered in layout.spec.)
-    await wrapper
-      .find('[aria-label="Region 1 size percentage"] button[data-step="inc"]')
-      .trigger("click");
-
-    const emitted = wrapper.emitted("update:config").at(-1)[0];
-    const screen = emitted.dashboardScreens.screens[0];
-    expect(screen.layout.regions).toEqual([
-      {
-        id: "region-1",
-        kind: "calendar",
-        serviceId: null,
-        instanceIds: [],
-        size: 71,
-        split: null,
-        view: { mode: "month", rolling: false, weeks: 4, days: 7, extraWeeks: 0 },
-      },
-      { id: "region-2", kind: "photos", serviceId: null, instanceIds: [], size: 29, split: null },
-    ]);
+    // Region sizing is done by dragging the resize handles in the preview; the
+    // cards show the resulting split as a read-only readout. (The resize math
+    // itself is covered by resizeAdjacentRegions in layout.spec.)
+    const sizes = wrapper.findAll(".preview-size-value").map(n => n.text());
+    expect(sizes).toContain("70%");
+    expect(sizes).toContain("30%");
   });
 
   it("removes a region and renormalizes the layout", async () => {
