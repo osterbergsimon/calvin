@@ -196,6 +196,13 @@ describe("DashboardRegionsEditor (screens & regions logic)", () => {
     expect(dir.classes()).toContain("icon-btn--default");
   });
 
+  it("does not render an Activate control (screen switching lives on the dashboard dots)", () => {
+    const wrapper = mount(DashboardRegionsEditor, { props: { config: {} } });
+    expect(wrapper.find('[aria-label="Activate screen 1"]').exists()).toBe(false);
+    expect(wrapper.find('[aria-label="Screen 2 is active"]').exists()).toBe(false);
+    expect(wrapper.find(".screen-activate").exists()).toBe(false);
+  });
+
   it("renders screen delete as a danger IconButton", () => {
     const twoScreenConfig = {
       dashboardScreens: {
