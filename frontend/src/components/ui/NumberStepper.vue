@@ -45,7 +45,7 @@ const bump = delta => {
   background: var(--bg-2);
   border: 1px solid var(--line);
   border-radius: var(--radius-lg);
-  padding: calc(2px * var(--ui-scale));
+  padding: 0.125rem; /* 2px */
 }
 .stepper__btn {
   min-width: var(--touch-target);
@@ -54,7 +54,7 @@ const bump = delta => {
   color: var(--ink);
   background: transparent;
   border: 0;
-  border-radius: calc(9px * var(--ui-scale));
+  border-radius: 0.5625rem; /* 9px */
   cursor: pointer;
 }
 .stepper__btn:hover {

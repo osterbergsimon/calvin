@@ -512,7 +512,7 @@ onMounted(async () => {
   border-radius: 6px;
   font-size: 0.9rem;
   font-family: inherit;
-  min-height: 44px;
+  min-height: var(--touch-target);
 }
 .cst-input:focus,
 .cst-select:focus {
@@ -533,7 +533,7 @@ onMounted(async () => {
 .cst-btn-add {
   align-self: flex-start;
   padding: 0.625rem 1.25rem;
-  min-height: 44px;
+  min-height: var(--touch-target);
   background: var(--focus);
   color: white;
   border: none;
@@ -692,7 +692,7 @@ onMounted(async () => {
 }
 .cst-btn-refresh {
   padding: 0.4rem 0.9rem;
-  min-height: 44px;
+  min-height: var(--touch-target);
   background: var(--bg-2);
   color: var(--ink);
   border: 1px solid var(--line);

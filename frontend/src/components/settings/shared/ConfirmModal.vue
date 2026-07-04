@@ -102,7 +102,7 @@ const handleCancel = () => {
   padding: 0;
   width: 2rem;
   height: 2rem;
-  min-height: 44px;
+  min-height: var(--touch-target);
   display: flex;
   align-items: center;
   justify-content: center;
@@ -140,7 +140,7 @@ const handleCancel = () => {
 
 .btn-secondary {
   padding: 0.5rem 1rem;
-  min-height: 44px;
+  min-height: var(--touch-target);
   background: var(--bg-2);
   color: var(--ink);
   border: 1px solid var(--line);
@@ -163,7 +163,7 @@ const handleCancel = () => {
 
 .btn-danger {
   padding: 0.5rem 1rem;
-  min-height: 44px;
+  min-height: var(--touch-target);
   background: var(--err);
   color: white;
   border: none;

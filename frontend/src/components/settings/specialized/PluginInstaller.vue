@@ -688,7 +688,7 @@ watch(searchQuery, () => {
 
 .install-tab {
   padding: 0.75rem 1.25rem;
-  min-height: 44px;
+  min-height: var(--touch-target);
   background: transparent;
   border: none;
   border-bottom: 3px solid transparent;
@@ -727,7 +727,7 @@ watch(searchQuery, () => {
 
 .btn-autodetect {
   padding: 0.5rem 1rem;
-  min-height: 44px;
+  min-height: var(--touch-target);
   background: var(--bg-2);
   color: var(--ink);
   border: 1px solid var(--line);
@@ -769,7 +769,7 @@ watch(searchQuery, () => {
 
 .btn-upload {
   padding: 0.5rem 1rem;
-  min-height: 44px;
+  min-height: var(--touch-target);
   background: var(--focus);
   color: white;
   border: none;
@@ -848,7 +848,7 @@ watch(searchQuery, () => {
 
 .btn-browse {
   padding: 0.5rem 1rem;
-  min-height: 44px;
+  min-height: var(--touch-target);
   background: var(--focus);
   color: white;
   border: none;
@@ -961,7 +961,7 @@ watch(searchQuery, () => {
 
 .btn-install-selected {
   padding: 0.5rem 1rem;
-  min-height: 44px;
+  min-height: var(--touch-target);
   background: var(--focus);
   color: white;
   border: none;
@@ -1096,7 +1096,7 @@ watch(searchQuery, () => {
 
 .btn-reinstall {
   padding: 0.5rem 1rem;
-  min-height: 44px;
+  min-height: var(--touch-target);
   background: var(--bg-2);
   color: var(--ink);
   border: 1px solid var(--line);
@@ -1126,7 +1126,7 @@ watch(searchQuery, () => {
 
 .btn-install {
   padding: 0.5rem 1rem;
-  min-height: 44px;
+  min-height: var(--touch-target);
   background: var(--focus);
   color: white;
   border: none;
@@ -1217,7 +1217,7 @@ watch(searchQuery, () => {
 
 .btn-primary {
   padding: 0.5rem 1rem;
-  min-height: 44px;
+  min-height: var(--touch-target);
   background: var(--focus);
   color: white;
   border: none;

@@ -10,17 +10,17 @@ This doc is the **single source of truth for the sizing token names and their ba
 
 ## The decision
 
-Calvin is getting a global, user-configurable **"UI size"** setting (Settings → Appearance). It scales the settings chrome and the shared `ui/` control primitives so users can make touch controls smaller or larger to taste.
+Calvin has a user-configurable **"Settings UI size"** (Settings → Dashboard → Appearance) that scales the **settings/config interface only** — text, every control, modals. The **live dashboard is deliberately untouched**: it keeps its own sizing (region touch controls via `touchControlSize`, clock bar via `clockBarFontSize`). A separate "Dashboard UI size" is a distinct future control.
 
 - **Discrete presets** (SegmentedControl), even `0.15` steps: Extra-compact `0.70` · Compact `0.85` · Default `1.0` · Large `1.15` · Extra-large `1.3` (labelled XS · S · M · L · XL).
-- Implemented as **one CSS multiplier**, `--ui-scale`, set on `<html>` at runtime. It is **not** a root font-size change — scope stays precise: only components that consume the tokens below scale.
+- **Mechanism:** `zoom: var(--ui-scale)` on the settings content root (`.settings-scale` in `Settings.vue`). `zoom` scales the whole settings subtree regardless of unit and is contained to it, so nothing leaks to the dashboard. `--ui-scale` is set on `<html>` at runtime by `useUiScale` and inherited down. Scale 1 is a no-op.
 - Persisted as a string preset key `uiSize` via `/api/config`; the key→factor map lives in `frontend/src/styles/uiScale.js`.
 
-### The one principle that makes this safe
+### Where the tokens fit
 
-**Every scaled token's baseline value equals the literal it replaces, wrapped as `calc(<literal> * var(--ui-scale))`.**
+The scaling is the settings zoom above — **not** a per-token multiplier. The `--fs-*` / `--space-*` / `--radius-*` / `--touch-target` tokens below are the shared **sizing vocabulary**: one named scale for the settings shell and the region editor (calvin-bvw), replacing scattered magic numbers.
 
-At `--ui-scale: 1` every token resolves to *exactly* today's pixel value. So **Default (1.0) is a guaranteed visual no-op** — adopting a token in place of its matching literal changes nothing until the user picks another size. That is what makes token adoption a safe, screenshot-diffable mechanical swap.
+**Every token's baseline equals the literal it replaces** (rem baselines are the prior px ÷ 16). So adopting a token in place of its matching literal is a **visual no-op** — a safe, screenshot-diffable mechanical swap — while giving everything one coherent scale that the settings zoom then drives.
 
 ---
 

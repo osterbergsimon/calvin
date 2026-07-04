@@ -105,7 +105,7 @@ const getThemePreviewStyle = theme => {
   flex-direction: column;
   align-items: center;
   padding: 1rem;
-  min-height: 44px;
+  min-height: var(--touch-target);
   background: var(--bg-2);
   border: 2px solid var(--line);
   border-radius: 8px;

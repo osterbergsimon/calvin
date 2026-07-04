@@ -95,7 +95,7 @@ const emitChange = () => {
   background: var(--bg-1);
   color: var(--ink);
   font-family: var(--font-data);
-  min-height: 44px;
+  min-height: var(--touch-target);
 }
 .schedule-time input:focus-visible {
   outline: 2px solid var(--focus);

@@ -397,7 +397,7 @@ const handleInstanceOrderChange = newOrder =>
   align-items: center;
   gap: 0.3rem;
   padding: 0.4rem 0.85rem;
-  min-height: 44px;
+  min-height: var(--touch-target);
   background: var(--bg-1);
   color: var(--ink);
   border: 1px solid var(--line);

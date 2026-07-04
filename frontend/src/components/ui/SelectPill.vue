@@ -161,9 +161,9 @@ onUnmounted(() => {
 .pill {
   display: inline-flex;
   align-items: center;
-  gap: calc(12px * var(--ui-scale));
+  gap: 0.75rem; /* 12px */
   height: var(--control-height);
-  padding: 0 calc(16px * var(--ui-scale));
+  padding: 0 1rem; /* 16px */
   background: var(--bg-2);
   border: 1px solid var(--line);
   border-radius: var(--radius-lg);
@@ -177,13 +177,13 @@ onUnmounted(() => {
   outline-offset: 2px;
 }
 .pill__swatch {
-  width: calc(16px * var(--ui-scale));
-  height: calc(16px * var(--ui-scale));
-  border-radius: calc(5px * var(--ui-scale));
+  width: 1rem; /* 16px */
+  height: 1rem;
+  border-radius: 0.3125rem; /* 5px */
 }
 .pill__cv {
   color: var(--ink-3);
-  font-size: calc(12px * var(--ui-scale));
+  font-size: 0.75rem; /* 12px */
 }
 .pill__menu {
   position: absolute;
@@ -193,7 +193,7 @@ onUnmounted(() => {
   min-width: 100%;
   list-style: none;
   margin: 0;
-  padding: calc(6px * var(--ui-scale));
+  padding: 0.375rem; /* 6px */
   background: var(--bg-1);
   border: 1px solid var(--line);
   border-radius: var(--radius-xl);
@@ -208,7 +208,7 @@ onUnmounted(() => {
   bottom: calc(100% + 6px);
 }
 .pill__opt {
-  padding: calc(12px * var(--ui-scale)) calc(14px * var(--ui-scale));
+  padding: 0.75rem 0.875rem; /* 12px 14px */
   min-height: var(--touch-target);
   display: flex;
   align-items: center;

@@ -580,7 +580,7 @@ onMounted(async () => {
 }
 
 .repo-url-input {
-  min-height: 44px;
+  min-height: var(--touch-target);
   width: 320px;
   max-width: 100%;
   padding: 0.5rem 0.75rem;
@@ -642,8 +642,8 @@ onMounted(async () => {
   color: var(--ink-2);
   cursor: pointer;
   padding: 0;
-  width: 44px;
-  height: 44px;
+  width: var(--touch-target);
+  height: var(--touch-target);
   display: flex;
   align-items: center;
   justify-content: center;
@@ -717,7 +717,7 @@ onMounted(async () => {
   font-weight: 500;
   cursor: pointer;
   transition: all 0.2s;
-  min-height: 44px;
+  min-height: var(--touch-target);
 }
 
 .btn-secondary:hover {
@@ -734,7 +734,7 @@ onMounted(async () => {
   font-weight: 600;
   cursor: pointer;
   transition: all 0.2s;
-  min-height: 44px;
+  min-height: var(--touch-target);
 }
 
 .btn-danger:hover {

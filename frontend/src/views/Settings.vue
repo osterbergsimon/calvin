@@ -20,6 +20,12 @@
         />
 
         <div class="settings-content">
+          <!-- settings-scale carries the global "Settings UI size" zoom. It is a
+               width:auto block so it still fills the column at any scale (zoom,
+               unlike transform, resolves auto width against the zoomed box); only
+               its contents scale, and it scrolls inside .settings-content. The
+               live dashboard is a different view and is never touched by this. -->
+          <div class="settings-scale">
           <div v-if="error" class="settings-banner settings-banner-error">
             {{ error }}
           </div>
@@ -61,6 +67,7 @@
             @update:git-repo-url="handleGitRepoUrlUpdate"
             @update:git-branch="handleGitBranchUpdate"
           />
+          </div>
         </div>
       </div>
     </div>
@@ -415,6 +422,13 @@ onUnmounted(() => {
   min-width: 0;
   min-height: 0;
   overflow-y: auto;
+}
+
+/* Global "Settings UI size": scales the whole settings content (text, every
+   control, modals) via zoom, scoped here so the live dashboard is unaffected.
+   --ui-scale is set on <html> by useUiScale; scale 1 is a no-op. */
+.settings-scale {
+  zoom: var(--ui-scale);
 }
 
 .settings-banner {

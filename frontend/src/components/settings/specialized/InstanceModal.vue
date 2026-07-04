@@ -622,10 +622,10 @@ const handleSave = async () => {
   color: var(--ink-2);
   cursor: pointer;
   padding: 0;
-  width: 44px;
-  height: 44px;
-  min-height: 44px;
-  min-width: 44px;
+  width: var(--touch-target);
+  height: var(--touch-target);
+  min-height: var(--touch-target);
+  min-width: var(--touch-target);
   display: flex;
   align-items: center;
   justify-content: center;
@@ -719,7 +719,7 @@ const handleSave = async () => {
 .btn-primary,
 .btn-secondary {
   padding: 0.75rem 1.5rem;
-  min-height: 44px;
+  min-height: var(--touch-target);
   border: none;
   border-radius: 4px;
   font-size: 0.9rem;
@@ -774,7 +774,7 @@ const handleSave = async () => {
 .btn-geocode {
   margin-top: 0.5rem;
   padding: 0.5rem 1rem;
-  min-height: 44px;
+  min-height: var(--touch-target);
   background: var(--focus);
   color: white;
   border: none;

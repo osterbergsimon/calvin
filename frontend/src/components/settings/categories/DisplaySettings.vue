@@ -94,13 +94,13 @@
         <TypefacePicker />
       </SettingRow>
       <SettingRow
-        label="UI size"
-        description="Scale the size of settings controls and dashboard editors."
+        label="Settings UI size"
+        description="Scale this settings interface — text and controls. The live dashboard is not affected."
       >
         <SegmentedControl
           :model-value="config.uiSize"
           :options="UI_SIZE_OPTIONS"
-          aria-label="UI size"
+          aria-label="Settings UI size"
           @update:model-value="v => emit('update:config', { uiSize: v })"
         />
       </SettingRow>
@@ -239,7 +239,7 @@
       </SettingRow>
       <SettingRow
         label="Touch control size"
-        description="Size of the on-screen touch navigation buttons."
+        description="Size of the on-dashboard touch navigation buttons (calendar, photos, services). Independent of Settings UI size."
       >
         <SegmentedControl
           :model-value="config.touchControlSize"
@@ -284,7 +284,7 @@ const emit = defineEmits(["update:config"]);
 .display-name-input {
   height: var(--control-height);
   min-height: var(--touch-target);
-  padding: 0 calc(14px * var(--ui-scale));
+  padding: 0 0.875rem; /* 14px */
   background: var(--bg-2);
   border: 1px solid var(--line);
   border-radius: var(--radius-lg);

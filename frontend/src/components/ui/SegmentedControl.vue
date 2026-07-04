@@ -67,12 +67,12 @@ const onKey = e => {
   background: transparent;
   border: 0;
   border-radius: var(--radius-sm);
-  padding: calc(10px * var(--ui-scale)) calc(18px * var(--ui-scale));
+  padding: 0.625rem 1.125rem; /* 10px 18px */
   min-height: var(--touch-target);
   cursor: pointer;
   display: flex;
   align-items: center;
-  gap: calc(7px * var(--ui-scale));
+  gap: 0.4375rem; /* 7px */
 }
 .seg__btn.on {
   background: var(--focus);

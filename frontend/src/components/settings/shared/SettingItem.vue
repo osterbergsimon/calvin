@@ -64,7 +64,7 @@ defineProps({
 .setting-item textarea {
   width: 100%;
   padding: 0.5rem 0.75rem;
-  min-height: 44px;
+  min-height: var(--touch-target);
   background: var(--bg-2);
   color: var(--ink);
   border: 1px solid var(--line);
