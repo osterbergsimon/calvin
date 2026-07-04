@@ -7,56 +7,60 @@
         class="screen-card"
       >
         <header class="screen-card-header">
-          <IconButton
-            variant="ghost"
-            size="sm"
-            :aria-expanded="expandedScreens.has(screen.id)"
-            :label="
-              expandedScreens.has(screen.id)
-                ? `Collapse screen ${screenIndex + 1}`
-                : `Expand screen ${screenIndex + 1}`
-            "
-            @click="toggleScreenExpanded(screen.id)"
-          >
-            {{ expandedScreens.has(screen.id) ? "▾" : "▸" }}
-          </IconButton>
-          <span class="screen-index">{{ screenIndex + 1 }}</span>
-          <input
-            :id="`screen-name-${screen.id}`"
-            :value="screen.name"
-            type="text"
-            class="screen-name-input"
-            :aria-label="`Screen ${screenIndex + 1} name`"
-            @change="handleScreenNameChange(screenIndex, $event)"
-          />
-          <button
-            :id="`add-region-${screen.id}`"
-            type="button"
-            class="add-region-button"
-            :disabled="screen.layout.regions.length >= MAX_TOP_REGIONS"
-            :aria-label="`Add region to screen ${screenIndex + 1}`"
-            @click="addRegion(screenIndex)"
-          >
-            + Region
-          </button>
-          <IconButton
-            :label="`Toggle screen ${screenIndex + 1} layout direction`"
-            variant="default"
-            size="sm"
-            :title="`Direction: ${directionLabel(layoutDirectionFor(screen.layout))}`"
-            @click="toggleLayoutDirection(screenIndex)"
-          >
-            {{ layoutDirectionFor(screen.layout) === "column" ? "▭▭" : "▯|▯" }}
-          </IconButton>
-          <IconButton
-            v-if="dashboardScreens.screens.length > 1"
-            :label="`Delete screen ${screenIndex + 1}`"
-            variant="danger"
-            size="sm"
-            @click="deleteScreen(screenIndex)"
-          >
-            ×
-          </IconButton>
+          <div class="screen-header-identity">
+            <IconButton
+              variant="ghost"
+              size="sm"
+              :aria-expanded="expandedScreens.has(screen.id)"
+              :label="
+                expandedScreens.has(screen.id)
+                  ? `Collapse screen ${screenIndex + 1}`
+                  : `Expand screen ${screenIndex + 1}`
+              "
+              @click="toggleScreenExpanded(screen.id)"
+            >
+              {{ expandedScreens.has(screen.id) ? "▾" : "▸" }}
+            </IconButton>
+            <span class="screen-index">{{ screenIndex + 1 }}</span>
+            <input
+              :id="`screen-name-${screen.id}`"
+              :value="screen.name"
+              type="text"
+              class="screen-name-input"
+              :aria-label="`Screen ${screenIndex + 1} name`"
+              @change="handleScreenNameChange(screenIndex, $event)"
+            />
+          </div>
+          <div class="screen-header-actions">
+            <button
+              :id="`add-region-${screen.id}`"
+              type="button"
+              class="add-region-button"
+              :disabled="screen.layout.regions.length >= MAX_TOP_REGIONS"
+              :aria-label="`Add region to screen ${screenIndex + 1}`"
+              @click="addRegion(screenIndex)"
+            >
+              + Region
+            </button>
+            <IconButton
+              :label="`Toggle screen ${screenIndex + 1} layout direction`"
+              variant="default"
+              size="sm"
+              :title="`Direction: ${directionLabel(layoutDirectionFor(screen.layout))}`"
+              @click="toggleLayoutDirection(screenIndex)"
+            >
+              {{ layoutDirectionFor(screen.layout) === "column" ? "▭▭" : "▯|▯" }}
+            </IconButton>
+            <IconButton
+              v-if="dashboardScreens.screens.length > 1"
+              :label="`Delete screen ${screenIndex + 1}`"
+              variant="danger"
+              size="sm"
+              @click="deleteScreen(screenIndex)"
+            >
+              ×
+            </IconButton>
+          </div>
         </header>
 
         <div v-if="expandedScreens.has(screen.id)" class="screen-clock-bar-controls">
@@ -1186,6 +1190,21 @@ onUnmounted(() => {
   display: flex;
   align-items: center;
   gap: var(--space-md);
+}
+.screen-header-identity {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2xs);
+  flex: 1 1 auto;
+  min-width: 0;
+}
+.screen-header-actions {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2xs);
+  flex: 0 0 auto;
+  padding-left: var(--space-md);
+  border-left: 1px solid var(--line);
 }
 
 .screen-index {

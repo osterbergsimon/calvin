@@ -196,6 +196,12 @@ describe("DashboardRegionsEditor (screens & regions logic)", () => {
     expect(dir.classes()).toContain("icon-btn--default");
   });
 
+  it("groups the screen header into identity and actions clusters", () => {
+    const wrapper = mount(DashboardRegionsEditor, { props: { config: {} } });
+    expect(wrapper.find(".screen-header-identity").exists()).toBe(true);
+    expect(wrapper.find(".screen-header-actions").exists()).toBe(true);
+  });
+
   it("does not render an Activate control (screen switching lives on the dashboard dots)", () => {
     const wrapper = mount(DashboardRegionsEditor, { props: { config: {} } });
     expect(wrapper.find('[aria-label="Activate screen 1"]').exists()).toBe(false);
