@@ -40,7 +40,7 @@
       </p>
       <div class="install-compact-row">
         <input
-          :model-value="repoUrl"
+          :value="repoUrl"
           type="text"
           placeholder="https://github.com/user/repo"
           class="github-input-compact"
@@ -48,7 +48,7 @@
           @input="handleRepoUrlInput"
         />
         <input
-          :model-value="branch"
+          :value="branch"
           type="text"
           placeholder="main"
           class="github-branch-compact"
