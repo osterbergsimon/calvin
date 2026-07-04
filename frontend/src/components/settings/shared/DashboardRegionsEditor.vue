@@ -1339,7 +1339,7 @@ onUnmounted(() => {
   height: 1.75rem;
   border-radius: 999px;
   background: var(--focus);
-  color: #fff;
+  color: var(--focus-ink);
   font-weight: 700;
 }
 
@@ -1430,7 +1430,7 @@ onUnmounted(() => {
 .screen-activate-active {
   border-color: var(--focus);
   background: var(--focus);
-  color: #fff;
+  color: var(--focus-ink);
   cursor: default;
 }
 
@@ -1670,15 +1670,15 @@ onUnmounted(() => {
 }
 
 .preview-region-calendar {
-  border-left: 6px solid #4caf50;
+  border-left: 6px solid var(--region-calendar);
 }
 
 .preview-region-photos {
-  border-left: 6px solid #2196f3;
+  border-left: 6px solid var(--region-photos);
 }
 
 .preview-region-service {
-  border-left: 6px solid #ff9800;
+  border-left: 6px solid var(--region-service);
 }
 
 .preview-region-split {
@@ -1799,7 +1799,7 @@ onUnmounted(() => {
   align-items: center;
   justify-content: center;
   background: var(--focus);
-  color: #fff;
+  color: var(--focus-ink);
   border-radius: 6px;
   font-size: 0.8rem;
   font-weight: 600;

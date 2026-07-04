@@ -47,6 +47,12 @@
   --warn: #c8860a;
   --err: #c0392b;
 
+  /* Content-kind accent strips (regions editor, source legends, …). Semantic
+     identity colors — calendar = green, photos = blue, service = orange. */
+  --region-calendar: #4caf50;
+  --region-photos: #2196f3;
+  --region-service: #ff9800;
+
   /* font roles — default = Instrument; overridden by useTypeTheme */
   --font-display: "IBM Plex Sans Condensed", system-ui, sans-serif;
   --font-ui: "IBM Plex Sans", system-ui, sans-serif;
