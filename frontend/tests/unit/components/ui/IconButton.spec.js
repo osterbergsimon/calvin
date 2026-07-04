@@ -52,6 +52,14 @@ describe("IconButton", () => {
     expect(w.find("[data-test='glyph']").exists()).toBe(true);
   });
 
+  it("accepts the custom size escape-hatch (consumer drives --icon-size/--icon-font)", () => {
+    const warn = vi.spyOn(console, "warn").mockImplementation(() => {});
+    const w = mount(IconButton, { props: { label: "Next", size: "custom" } });
+    expect(w.classes()).toContain("icon-btn--custom");
+    expect(warn).not.toHaveBeenCalled();
+    warn.mockRestore();
+  });
+
   it("passes aria-* through to the button", () => {
     const w = mount(IconButton, {
       props: { label: "More" },

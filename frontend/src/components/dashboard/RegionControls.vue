@@ -1,48 +1,46 @@
 <template>
   <div v-if="isTouch" class="region-controls" :class="sizeClass">
-    <button
-      type="button"
-      class="cbtn"
+    <IconButton
+      size="custom"
       data-action="prev"
-      :aria-label="`Previous in ${regionKind}`"
+      :label="`Previous in ${regionKind}`"
       @click="run('prev')"
     >
       ‹
-    </button>
-    <button
-      type="button"
-      class="cbtn"
+    </IconButton>
+    <IconButton
+      size="custom"
       data-action="next"
-      :aria-label="`Next in ${regionKind}`"
+      :label="`Next in ${regionKind}`"
       @click="run('next')"
     >
       ›
-    </button>
-    <button
+    </IconButton>
+    <IconButton
       v-if="actions.refresh"
-      type="button"
-      class="cbtn"
+      size="custom"
       data-action="refresh"
-      :aria-label="`Refresh ${regionKind}`"
+      :label="`Refresh ${regionKind}`"
       @click="run('refresh')"
     >
       ↻
-    </button>
-    <button
+    </IconButton>
+    <IconButton
       v-if="actions.expand"
-      type="button"
-      class="cbtn cbtn--primary"
+      size="custom"
+      variant="primary"
       data-action="expand"
-      :aria-label="`Fullscreen ${regionKind}`"
+      :label="`Fullscreen ${regionKind}`"
       @click="run('expand')"
     >
       ⤢
-    </button>
+    </IconButton>
   </div>
 </template>
 
 <script setup>
 import { computed } from "vue";
+import IconButton from "@/components/ui/IconButton.vue";
 import { useKeyboardActions } from "@/composables/useKeyboardActions";
 import { useTouchCapability } from "@/composables/useTouchCapability";
 import { useConfigStore } from "@/stores/config";
@@ -98,63 +96,29 @@ const run = verb => {
 </script>
 
 <style scoped>
+/* The cluster buttons compose ui/IconButton (size="custom"). touchControlSize
+   drives their box/font via the --icon-size / --icon-font vars, which the
+   IconButton's .icon-btn--custom rule reads (custom properties inherit through
+   the component boundary). All other chrome — border, radius, hover, focus,
+   primary variant, reduced-motion — lives in the primitive. */
 .region-controls {
   display: flex;
   align-items: center;
   gap: 0.35rem;
   /* default = medium */
-  --cbtn-size: 42px;
-  --cbtn-font: 1.05rem;
+  --icon-size: 42px;
+  --icon-font: 1.05rem;
 }
 .region-controls--small {
-  --cbtn-size: 36px;
-  --cbtn-font: 0.95rem;
+  --icon-size: 36px;
+  --icon-font: 0.95rem;
 }
 .region-controls--medium {
-  --cbtn-size: 42px;
-  --cbtn-font: 1.05rem;
+  --icon-size: 42px;
+  --icon-font: 1.05rem;
 }
 .region-controls--large {
-  --cbtn-size: 50px;
-  --cbtn-font: 1.25rem;
-}
-
-.cbtn {
-  min-width: var(--cbtn-size);
-  min-height: var(--cbtn-size);
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  font-size: var(--cbtn-font);
-  font-family: var(--font-ui);
-  color: var(--ink);
-  background: var(--bg-2);
-  border: 1px solid var(--line);
-  border-radius: 9px;
-  cursor: pointer;
-  transition:
-    background 0.2s,
-    border-color 0.2s;
-}
-
-.cbtn:hover {
-  border-color: var(--focus-edge);
-}
-
-.cbtn--primary {
-  background: var(--focus);
-  color: var(--focus-ink);
-  border-color: var(--focus);
-}
-
-.cbtn:focus-visible {
-  outline: 2px solid var(--focus);
-  outline-offset: 2px;
-}
-
-@media (prefers-reduced-motion: reduce) {
-  .cbtn {
-    transition: none;
-  }
+  --icon-size: 50px;
+  --icon-font: 1.25rem;
 }
 </style>

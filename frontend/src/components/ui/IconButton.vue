@@ -26,7 +26,9 @@ defineProps({
   size: {
     type: String,
     default: "sm",
-    validator: v => ["sm", "md", "lg"].includes(v),
+    // "custom" is an escape-hatch: the consumer drives the box/font via the
+    // --icon-size / --icon-font CSS vars (e.g. the touchControlSize cluster).
+    validator: v => ["sm", "md", "lg", "custom"].includes(v),
   },
   shape: {
     type: String,
@@ -76,6 +78,14 @@ defineProps({
   min-width: var(--control-height);
   height: var(--control-height);
   font-size: 1.5rem;
+}
+/* Escape-hatch size: consumer supplies --icon-size / --icon-font (set on the
+   button or any ancestor, inherited through the cascade). Used by the
+   touchControlSize-driven region cluster, whose 36/42/50px don't map to sm/md/lg. */
+.icon-btn--custom {
+  min-width: var(--icon-size);
+  height: var(--icon-size);
+  font-size: var(--icon-font);
 }
 
 /* shapes */

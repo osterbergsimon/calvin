@@ -71,7 +71,7 @@ describe("CalendarViewOptions", () => {
 
   it("lights the trigger when rolling is active", () => {
     const { w } = mountOptions({ mode: "month", rolling: true, weeks: 4, days: 7 });
-    expect(w.find(".region-view-options__trigger").classes()).toContain("active");
+    expect(w.find(".region-view-options__trigger").classes()).toContain("icon-btn--active");
     w.unmount();
   });
 

@@ -43,7 +43,7 @@ describe("ServiceRegionViewOptions", () => {
 
   it("lights the trigger when an override is set", () => {
     const { w } = mountOptions({ linkAction: "off" });
-    expect(w.find(".region-view-options__trigger").classes()).toContain("active");
+    expect(w.find(".region-view-options__trigger").classes()).toContain("icon-btn--active");
     w.unmount();
   });
 });
