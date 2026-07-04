@@ -107,7 +107,6 @@
       </SettingRow>
     </SettingsSection>
 
-
     <SettingsSection id="device-hardware" title="Hardware">
       <SettingRow label="Backend version" :description="version || 'Unknown'" />
       <SettingRow label="Frontend version" :description="frontendVersion || 'Unknown'" />

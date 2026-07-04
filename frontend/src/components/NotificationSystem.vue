@@ -15,12 +15,7 @@
 
 <script setup>
 import { ref, computed, watch } from "vue";
-import {
-  mdiCalendarBlankOutline,
-  mdiImageOutline,
-  mdiWeb,
-  mdiViewDashboardOutline,
-} from "@mdi/js";
+import { mdiCalendarBlankOutline, mdiImageOutline, mdiWeb, mdiViewDashboardOutline } from "@mdi/js";
 import { useConfigStore } from "../stores/config";
 import { useModeStore } from "../stores/mode";
 
@@ -151,9 +146,7 @@ const sizeClass = computed(() => `hud--${configStore.keyboardFeedbackMode || "no
 
 const positionClass = computed(() => {
   // "small" tucks bottom-centre (clear of the status rail); "normal" centres.
-  return (configStore.keyboardFeedbackMode || "normal") === "small"
-    ? "hud--bottom"
-    : "hud--center";
+  return (configStore.keyboardFeedbackMode || "normal") === "small" ? "hud--bottom" : "hud--center";
 });
 
 let hideTimeout = null;

@@ -62,7 +62,8 @@ const hintOpen = ref(false);
 const conflictHint = computed(() => {
   const labels = props.conflictKeys.map(formatKeyLabel);
   if (labels.length === 0) return "Also bound to another key.";
-  const keys = labels.length === 1 ? labels[0] : `${labels.slice(0, -1).join(", ")} and ${labels.at(-1)}`;
+  const keys =
+    labels.length === 1 ? labels[0] : `${labels.slice(0, -1).join(", ")} and ${labels.at(-1)}`;
   return `Same action is also on ${keys}.`;
 });
 </script>

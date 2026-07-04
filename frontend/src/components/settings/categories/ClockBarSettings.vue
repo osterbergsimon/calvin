@@ -101,7 +101,9 @@
           @update:time-size="v => emit('update:config', { clockBarVerticalFontSize: v })"
           @update:date-size="v => emit('update:config', { clockBarVerticalDateFontSize: v })"
           @update:padding="v => emit('update:config', { clockBarVerticalPadding: v })"
-          @update:plugin-item-size="v => emit('update:config', { clockBarVerticalPluginItemSize: v })"
+          @update:plugin-item-size="
+            v => emit('update:config', { clockBarVerticalPluginItemSize: v })
+          "
         />
       </SettingRow>
     </SettingsSection>
