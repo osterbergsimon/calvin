@@ -1,65 +1,63 @@
 <template>
   <div class="clock-bar-items-tab">
-    <CollapsibleSection title="Bar Items" icon="🧩" :expanded="true">
-      <p class="section-description">
-        Choose which plugin tiles appear in the clock bar. Each tile keeps its own preview and live
-        data — toggling here just controls whether it's shown.
+    <p class="section-description">
+      Choose which plugin tiles appear in the clock bar. Each tile keeps its own preview and live
+      data — toggling here just controls whether it's shown.
+    </p>
+
+    <div v-if="loading" class="state-message">Loading installed plugins&hellip;</div>
+
+    <div v-else-if="barCapableServices.length === 0" class="state-message empty-state">
+      <p>No installed plugins expose a clock bar tile.</p>
+      <p>
+        Install a plugin that ships a status bar item to add tiles here. Manage installs in the
+        <strong>Plugins</strong> category.
+      </p>
+    </div>
+
+    <template v-else>
+      <p class="items-summary">
+        <strong>{{ visibleCount }}</strong> of {{ barCapableServices.length }} tile{{
+          barCapableServices.length === 1 ? "" : "s"
+        }}
+        shown
       </p>
 
-      <div v-if="loading" class="state-message">Loading installed plugins&hellip;</div>
-
-      <div v-else-if="barCapableServices.length === 0" class="state-message empty-state">
-        <p>No installed plugins expose a clock bar tile.</p>
-        <p>
-          Install a plugin that ships a status bar item to add tiles here. Manage installs in the
-          <strong>Plugins</strong> category.
-        </p>
-      </div>
-
-      <template v-else>
-        <p class="items-summary">
-          <strong>{{ visibleCount }}</strong> of {{ barCapableServices.length }} tile{{
-            barCapableServices.length === 1 ? "" : "s"
-          }}
-          shown
-        </p>
-
-        <ul class="items-list">
-          <li
-            v-for="service in barCapableServices"
-            :key="service.id"
-            class="item-row"
-            :class="{ 'item-row-hidden': !isVisible(service) }"
+      <ul class="items-list">
+        <li
+          v-for="service in barCapableServices"
+          :key="service.id"
+          class="item-row"
+          :class="{ 'item-row-hidden': !isVisible(service) }"
+        >
+          <div class="preview" :title="`Live preview of ${service.name}`">
+            <SchemaStatusbarItem :service-id="service.id" :schema="service.statusbar_schema" />
+          </div>
+          <div class="meta">
+            <div class="title">{{ service.name }}</div>
+            <div class="subtitle">{{ service.plugin_name || service.plugin_id }}</div>
+          </div>
+          <label
+            class="switch"
+            :class="{ 'switch-on': isVisible(service), saving: pendingId === service.id }"
+            :title="isVisible(service) ? 'Click to hide' : 'Click to show'"
           >
-            <div class="preview" :title="`Live preview of ${service.name}`">
-              <SchemaStatusbarItem :service-id="service.id" :schema="service.statusbar_schema" />
-            </div>
-            <div class="meta">
-              <div class="title">{{ service.name }}</div>
-              <div class="subtitle">{{ service.plugin_name || service.plugin_id }}</div>
-            </div>
-            <label
-              class="switch"
-              :class="{ 'switch-on': isVisible(service), saving: pendingId === service.id }"
-              :title="isVisible(service) ? 'Click to hide' : 'Click to show'"
-            >
-              <input
-                type="checkbox"
-                :checked="isVisible(service)"
-                :disabled="pendingId === service.id"
-                @change="toggle(service, $event.target.checked)"
-              />
-              <span class="switch-track" aria-hidden="true">
-                <span class="switch-thumb" />
-              </span>
-              <span class="switch-label">{{ isVisible(service) ? "Shown" : "Hidden" }}</span>
-            </label>
-          </li>
-        </ul>
-      </template>
+            <input
+              type="checkbox"
+              :checked="isVisible(service)"
+              :disabled="pendingId === service.id"
+              @change="toggle(service, $event.target.checked)"
+            />
+            <span class="switch-track" aria-hidden="true">
+              <span class="switch-thumb" />
+            </span>
+            <span class="switch-label">{{ isVisible(service) ? "Shown" : "Hidden" }}</span>
+          </label>
+        </li>
+      </ul>
+    </template>
 
-      <div v-if="errorMessage" class="error-message" role="alert">{{ errorMessage }}</div>
-    </CollapsibleSection>
+    <div v-if="errorMessage" class="error-message" role="alert">{{ errorMessage }}</div>
   </div>
 </template>
 
@@ -68,7 +66,6 @@ import { computed, onMounted, ref } from "vue";
 import { useWebServicesStore } from "@/stores/webServices";
 import * as pluginsApi from "@/services/pluginsApi";
 import { logError } from "@/utils/logger";
-import CollapsibleSection from "../../shared/CollapsibleSection.vue";
 import SchemaStatusbarItem from "@/components/plugins/SchemaStatusbarItem.vue";
 
 const webServicesStore = useWebServicesStore();
@@ -133,11 +130,12 @@ onMounted(async () => {
 <style scoped>
 .clock-bar-items-tab {
   width: 100%;
+  padding: 1.25rem;
 }
 
 .section-description {
   margin: 0 0 1rem;
-  color: var(--ink-3);
+  color: var(--ink-2);
   font-size: 0.9rem;
   line-height: 1.5;
 }
@@ -178,7 +176,7 @@ onMounted(async () => {
   min-height: var(--touch-target);
   background: var(--bg-2);
   border: 1px solid var(--line);
-  border-radius: 8px;
+  border-radius: var(--radius-sm);
 }
 
 .preview {

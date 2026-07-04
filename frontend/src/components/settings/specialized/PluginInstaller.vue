@@ -1,29 +1,12 @@
 <template>
   <div class="plugin-installer">
-    <div class="plugin-install-tabs">
-      <button
-        class="install-tab"
-        :class="{ active: installMethod === 'zip' }"
-        @click="installMethod = 'zip'"
-      >
-        📦 Zip File
-      </button>
-      <button
-        class="install-tab"
-        :class="{ active: installMethod === 'github' }"
-        @click="installMethod = 'github'"
-      >
-        🐙 GitHub
-      </button>
-      <button
-        v-if="devMode"
-        class="install-tab install-tab--dev"
-        :class="{ active: installMethod === 'local' }"
-        @click="installMethod = 'local'"
-        title="Dev mode: install from local filesystem path"
-      >
-        🗂️ Local Path
-      </button>
+    <div class="install-method">
+      <SegmentedControl
+        :model-value="installMethod"
+        :options="installMethodOptions"
+        aria-label="Install method"
+        @update:model-value="installMethod = $event"
+      />
     </div>
 
     <!-- Zip File Upload -->
@@ -42,7 +25,7 @@
           :disabled="installing"
           @click="$refs.zipInput?.click()"
         >
-          {{ installing ? "Installing..." : "📦 Choose Zip File" }}
+          {{ installing ? "Installing…" : "Choose zip file" }}
         </button>
         <span v-if="selectedFile" class="selected-file-compact">
           {{ selectedFile.name }}
@@ -78,7 +61,7 @@
           :disabled="!repoUrl || enumerating || installing"
           @click="handleListPlugins"
         >
-          {{ enumerating ? "Loading..." : "🔍 List Plugins" }}
+          {{ enumerating ? "Loading…" : "List plugins" }}
         </button>
       </div>
 
@@ -87,7 +70,7 @@
         v-if="branchSwitched && availablePlugins.length > 0"
         class="branch-switch-notice-compact"
       >
-        ℹ️ Using branch: <strong>{{ actualBranch }}</strong>
+        Using branch <strong>{{ actualBranch }}</strong>
       </div>
 
       <!-- Available Plugins List -->
@@ -97,7 +80,7 @@
           <input
             v-model="searchQuery"
             type="text"
-            placeholder="🔍 Search plugins..."
+            placeholder="Search plugins…"
             class="plugin-search-input"
             :disabled="installing"
           />
@@ -129,8 +112,8 @@
           >
             {{
               installing
-                ? `Installing ${selectedPlugins.length}...`
-                : `⬇️ Install Selected (${selectedPlugins.length})`
+                ? `Installing ${selectedPlugins.length}…`
+                : `Install selected (${selectedPlugins.length})`
             }}
           </button>
         </div>
@@ -188,7 +171,7 @@
               :disabled="installing"
               @click="handleInstall(plugin.path)"
             >
-              {{ installing ? "Installing..." : "🔄 Update" }}
+              {{ installing ? "Installing…" : "Update" }}
             </button>
             <button
               v-else-if="plugin._installed"
@@ -198,7 +181,7 @@
               @click="handleForceUpdate(plugin.path)"
               title="Reinstall this plugin"
             >
-              {{ installing ? "Installing..." : "🔁 Reinstall" }}
+              {{ installing ? "Installing…" : "Reinstall" }}
             </button>
             <button
               v-else
@@ -207,7 +190,7 @@
               :disabled="installing"
               @click="handleInstall(plugin.path)"
             >
-              {{ installing ? "Installing..." : "⬇️ Install" }}
+              {{ installing ? "Installing…" : "Install" }}
             </button>
           </div>
         </div>
@@ -234,7 +217,7 @@
           @click="handleAutoDetect"
           title="Auto-detect sibling plugin repositories"
         >
-          {{ detecting ? "Detecting..." : "📂 Auto-detect" }}
+          {{ detecting ? "Detecting…" : "Auto-detect" }}
         </button>
         <button
           type="button"
@@ -242,7 +225,7 @@
           :disabled="!localPath || enumerating || installing || detecting"
           @click="handleListLocalPlugins"
         >
-          {{ enumerating ? "Loading..." : "🔍 List Plugins" }}
+          {{ enumerating ? "Loading…" : "List plugins" }}
         </button>
       </div>
 
@@ -255,7 +238,7 @@
           <input
             v-model="searchQuery"
             type="text"
-            placeholder="🔍 Search plugins..."
+            placeholder="Search plugins…"
             class="plugin-search-input"
             :disabled="installing"
           />
@@ -283,8 +266,8 @@
           >
             {{
               installing
-                ? `Installing ${selectedPlugins.length}...`
-                : `⬇️ Install Selected (${selectedPlugins.length})`
+                ? `Installing ${selectedPlugins.length}…`
+                : `Install selected (${selectedPlugins.length})`
             }}
           </button>
         </div>
@@ -320,7 +303,7 @@
               :disabled="installing"
               @click="handleInstallLocal(plugin.path, true)"
             >
-              {{ installing ? "Installing..." : "🔁 Reinstall" }}
+              {{ installing ? "Installing…" : "Reinstall" }}
             </button>
             <button
               v-else
@@ -329,7 +312,7 @@
               :disabled="installing"
               @click="handleInstallLocal(plugin.path, false)"
             >
-              {{ installing ? "Installing..." : "⬇️ Install" }}
+              {{ installing ? "Installing…" : "Install" }}
             </button>
           </div>
         </div>
@@ -359,7 +342,7 @@
         </p>
         <div class="restart-actions">
           <button type="button" class="btn-primary" @click="handleRestart">
-            🔄 Restart Backend Now
+            Restart backend now
           </button>
           <span class="restart-alternative">
             Or restart manually via SSH:
@@ -374,6 +357,7 @@
 <script setup>
 import { ref, computed, watch } from "vue";
 import TabNavigation from "../shared/TabNavigation.vue";
+import SegmentedControl from "@/components/ui/SegmentedControl.vue";
 import * as pluginsApi from "@/services/pluginsApi";
 
 const props = defineProps({
@@ -442,6 +426,15 @@ const emit = defineEmits([
 
 const installMethod = ref("zip");
 const installSource = ref("github"); // 'github' | 'local'
+
+const installMethodOptions = computed(() => {
+  const opts = [
+    { value: "zip", label: "Zip file" },
+    { value: "github", label: "GitHub" },
+  ];
+  if (props.devMode) opts.push({ value: "local", label: "Local path" });
+  return opts;
+});
 const localPath = ref("");
 const detecting = ref(false);
 const selectedPluginIds = ref(new Set());
@@ -481,21 +474,20 @@ const filteredPluginsByType = computed(() => {
 
 // Get plugin type tabs
 const pluginTypeTabs = computed(() => {
-  const tabs = [{ id: "all", label: "All", icon: "📦" }];
+  const tabs = [{ id: "all", label: "All" }];
   const typeLabels = {
-    calendar: { label: "Calendar", icon: "📅" },
-    image: { label: "Image", icon: "🖼️" },
-    service: { label: "Service", icon: "⚙️" },
-    backend: { label: "Backend", icon: "🔧" },
-    theme: { label: "Theme", icon: "🎨" },
+    calendar: "Calendar",
+    image: "Image",
+    service: "Service",
+    backend: "Backend",
+    theme: "Theme",
   };
 
   Object.entries(filteredPluginsByType.value).forEach(([type, plugins]) => {
     if (plugins.length > 0) {
       tabs.push({
         id: type,
-        label: typeLabels[type]?.label || type,
-        icon: typeLabels[type]?.icon || "📦",
+        label: typeLabels[type] || type,
         badge: plugins.length.toString(),
       });
     }
@@ -675,89 +667,20 @@ watch(searchQuery, () => {
 </script>
 
 <style scoped>
+/* Rendered inside the "Install" SettingsSection panel, below the repository-URL
+   row. Divide from that row and inset content to the same 1.25rem as SettingRow. */
 .plugin-installer {
   width: 100%;
+  padding: 1rem 1.25rem 1.25rem;
+  border-top: 1px solid var(--line-soft);
 }
 
-.plugin-install-tabs {
-  display: flex;
-  gap: 0.5rem;
-  margin-bottom: 1rem;
-  border-bottom: 2px solid var(--line);
-}
-
-.install-tab {
-  padding: 0.75rem 1.25rem;
-  min-height: var(--touch-target);
-  background: transparent;
-  border: none;
-  border-bottom: 3px solid transparent;
-  color: var(--ink-2);
-  font-size: 0.95rem;
-  font-weight: 500;
-  cursor: pointer;
-  transition: all 0.2s ease;
-  margin-bottom: -2px;
-}
-
-.install-tab:hover {
-  color: var(--ink);
-  background: var(--bg-2);
-}
-
-.install-tab:focus-visible {
-  outline: 2px solid var(--focus);
-  outline-offset: 2px;
-}
-
-.install-tab.active {
-  color: var(--focus);
-  border-bottom-color: var(--focus);
-  font-weight: 600;
-}
-
-.install-tab--dev {
-  color: var(--warn);
-}
-
-.install-tab--dev.active {
-  color: var(--warn);
-  border-bottom-color: var(--warn);
-}
-
-.btn-autodetect {
-  padding: 0.5rem 1rem;
-  min-height: var(--touch-target);
-  background: var(--bg-2);
-  color: var(--ink);
-  border: 1px solid var(--line);
-  border-radius: 4px;
-  font-size: 0.9rem;
-  font-weight: 600;
-  cursor: pointer;
-  transition: all 0.2s;
-  white-space: nowrap;
-}
-
-.btn-autodetect:hover:not(:disabled) {
-  border-color: var(--focus);
-  transform: translateY(-1px);
-  box-shadow: 0 2px 4px var(--shadow);
-}
-
-.btn-autodetect:focus-visible {
-  outline: 2px solid var(--focus);
-  outline-offset: 2px;
-}
-
-.btn-autodetect:disabled {
-  opacity: 0.6;
-  cursor: not-allowed;
-  transform: none;
+.install-method {
+  margin-bottom: 0.5rem;
 }
 
 .plugin-install-content {
-  padding: 1rem 0;
+  padding: 1rem 0 0;
 }
 
 .install-compact-row {
@@ -767,116 +690,6 @@ watch(searchQuery, () => {
   flex-wrap: wrap;
 }
 
-.btn-upload {
-  padding: 0.5rem 1rem;
-  min-height: var(--touch-target);
-  background: var(--focus);
-  color: white;
-  border: none;
-  border-radius: 4px;
-  font-size: 0.9rem;
-  font-weight: 600;
-  cursor: pointer;
-  transition: all 0.2s;
-  white-space: nowrap;
-}
-
-.btn-upload:hover:not(:disabled) {
-  background: color-mix(in srgb, var(--focus), black 12%);
-  transform: translateY(-1px);
-  box-shadow: 0 2px 4px var(--shadow);
-}
-
-.btn-upload:focus-visible {
-  outline: 2px solid var(--focus);
-  outline-offset: 2px;
-}
-
-.btn-upload:disabled {
-  opacity: 0.6;
-  cursor: not-allowed;
-  transform: none;
-}
-
-.selected-file-compact {
-  color: var(--ink-2);
-  font-size: 0.875rem;
-}
-
-.github-input-compact {
-  flex: 1;
-  min-width: 200px;
-  padding: 0.5rem;
-  border: 1px solid var(--line);
-  border-radius: 4px;
-  background: var(--bg-2);
-  color: var(--ink);
-  font-size: 0.9rem;
-}
-
-.github-input-compact:focus {
-  outline: none;
-  border-color: var(--focus);
-  box-shadow: 0 0 0 2px color-mix(in srgb, var(--focus) 20%, transparent);
-}
-
-.github-input-compact:focus-visible {
-  outline: 2px solid var(--focus);
-  outline-offset: 2px;
-}
-
-.github-branch-compact {
-  width: 100px;
-  padding: 0.5rem;
-  border: 1px solid var(--line);
-  border-radius: 4px;
-  background: var(--bg-2);
-  color: var(--ink);
-  font-size: 0.9rem;
-}
-
-.github-branch-compact:focus {
-  outline: none;
-  border-color: var(--focus);
-  box-shadow: 0 0 0 2px color-mix(in srgb, var(--focus) 20%, transparent);
-}
-
-.github-branch-compact:focus-visible {
-  outline: 2px solid var(--focus);
-  outline-offset: 2px;
-}
-
-.btn-browse {
-  padding: 0.5rem 1rem;
-  min-height: var(--touch-target);
-  background: var(--focus);
-  color: white;
-  border: none;
-  border-radius: 4px;
-  font-size: 0.9rem;
-  font-weight: 600;
-  cursor: pointer;
-  transition: all 0.2s;
-  white-space: nowrap;
-}
-
-.btn-browse:hover:not(:disabled) {
-  background: color-mix(in srgb, var(--focus), black 12%);
-  transform: translateY(-1px);
-  box-shadow: 0 2px 4px var(--shadow);
-}
-
-.btn-browse:focus-visible {
-  outline: 2px solid var(--focus);
-  outline-offset: 2px;
-}
-
-.btn-browse:disabled {
-  opacity: 0.6;
-  cursor: not-allowed;
-  transform: none;
-}
-
 .help-text-compact {
   font-size: 0.875rem;
   color: var(--ink-2);
@@ -884,14 +697,122 @@ watch(searchQuery, () => {
   line-height: 1.4;
 }
 
-.branch-switch-notice-compact {
-  margin-top: 1rem;
-  padding: 0.75rem;
-  background: color-mix(in srgb, var(--ink-2) 10%, transparent);
-  border: 1px solid color-mix(in srgb, var(--ink-2) 30%, transparent);
-  border-radius: 4px;
-  font-size: 0.875rem;
+.selected-file-compact {
   color: var(--ink-2);
+  font-size: 0.875rem;
+}
+
+/* Buttons — two roles, design tokens, no hover lift.
+   Primary: focus fill. Secondary: bg-2 + border. */
+.btn-upload,
+.btn-browse,
+.btn-install,
+.btn-install-selected,
+.btn-primary {
+  padding: 0.5rem 1rem;
+  min-height: var(--touch-target);
+  background: var(--focus);
+  color: white;
+  border: none;
+  border-radius: var(--radius-md);
+  font-family: var(--font-ui);
+  font-size: 0.9rem;
+  font-weight: 600;
+  cursor: pointer;
+  white-space: nowrap;
+  transition: background 0.15s ease;
+}
+.btn-upload:hover:not(:disabled),
+.btn-browse:hover:not(:disabled),
+.btn-install:hover:not(:disabled),
+.btn-install-selected:hover:not(:disabled),
+.btn-primary:hover:not(:disabled) {
+  background: color-mix(in srgb, var(--focus), black 12%);
+}
+.btn-upload:focus-visible,
+.btn-browse:focus-visible,
+.btn-install:focus-visible,
+.btn-install-selected:focus-visible,
+.btn-primary:focus-visible,
+.btn-autodetect:focus-visible,
+.btn-reinstall:focus-visible {
+  outline: 2px solid var(--focus);
+  outline-offset: 2px;
+}
+.btn-upload:disabled,
+.btn-browse:disabled,
+.btn-install:disabled,
+.btn-install-selected:disabled,
+.btn-autodetect:disabled,
+.btn-reinstall:disabled {
+  opacity: 0.6;
+  cursor: not-allowed;
+}
+
+.btn-autodetect,
+.btn-reinstall {
+  padding: 0.5rem 1rem;
+  min-height: var(--touch-target);
+  background: var(--bg-2);
+  color: var(--ink);
+  border: 1px solid var(--line);
+  border-radius: var(--radius-md);
+  font-family: var(--font-ui);
+  font-size: 0.9rem;
+  font-weight: 600;
+  cursor: pointer;
+  white-space: nowrap;
+  transition: border-color 0.15s ease;
+}
+.btn-autodetect:hover:not(:disabled),
+.btn-reinstall:hover:not(:disabled) {
+  border-color: var(--focus);
+}
+
+.btn-update {
+  background: var(--warn);
+  color: var(--ink);
+}
+.btn-update:hover:not(:disabled) {
+  background: color-mix(in srgb, var(--warn), black 12%);
+}
+
+/* Inputs */
+.github-input-compact,
+.github-branch-compact,
+.plugin-search-input {
+  padding: 0.5rem 0.75rem;
+  border: 1px solid var(--line);
+  border-radius: var(--radius-sm);
+  background: var(--bg-2);
+  color: var(--ink);
+  font-family: var(--font-ui);
+  font-size: 0.9rem;
+}
+.github-input-compact {
+  flex: 1;
+  min-width: 200px;
+}
+.github-branch-compact {
+  width: 100px;
+}
+.plugin-search-input {
+  width: 100%;
+}
+.github-input-compact:focus-visible,
+.github-branch-compact:focus-visible,
+.plugin-search-input:focus-visible {
+  outline: 2px solid var(--focus);
+  outline-offset: 2px;
+  border-color: var(--focus);
+}
+.plugin-search-input:disabled {
+  opacity: 0.6;
+  cursor: not-allowed;
+}
+
+.plugin-search-container {
+  margin-bottom: 1rem;
 }
 
 .available-plugins-compact {
@@ -901,45 +822,15 @@ watch(searchQuery, () => {
   gap: 0.5rem;
 }
 
-.plugin-search-container {
-  margin-bottom: 1rem;
-}
-
-.plugin-search-input {
-  width: 100%;
-  padding: 0.75rem;
-  border: 1px solid var(--line);
-  border-radius: 4px;
-  background: var(--bg-2);
-  color: var(--ink);
-  font-size: 0.9rem;
-}
-
-.plugin-search-input:focus {
-  outline: none;
-  border-color: var(--focus);
-  box-shadow: 0 0 0 2px color-mix(in srgb, var(--focus) 20%, transparent);
-}
-
-.plugin-search-input:focus-visible {
-  outline: 2px solid var(--focus);
-  outline-offset: 2px;
-}
-
-.plugin-search-input:disabled {
-  opacity: 0.6;
-  cursor: not-allowed;
-}
-
 .plugin-list-header {
   display: flex;
   justify-content: space-between;
   align-items: center;
-  padding: 0.75rem;
+  gap: 0.75rem;
+  padding: 0.6rem 0.75rem;
   background: var(--bg-2);
   border: 1px solid var(--line);
-  border-radius: 6px;
-  margin-bottom: 0.5rem;
+  border-radius: var(--radius-sm);
 }
 
 .select-all-checkbox {
@@ -952,61 +843,24 @@ watch(searchQuery, () => {
   color: var(--ink);
   font-family: var(--font-ui);
 }
-
-.select-all-checkbox input[type="checkbox"] {
+.select-all-checkbox input[type="checkbox"],
+.plugin-checkbox-wrapper input[type="checkbox"] {
   width: 18px;
   height: 18px;
   cursor: pointer;
-}
-
-.btn-install-selected {
-  padding: 0.5rem 1rem;
-  min-height: var(--touch-target);
-  background: var(--focus);
-  color: white;
-  border: none;
-  border-radius: 4px;
-  font-size: 0.875rem;
-  font-weight: 600;
-  cursor: pointer;
-  transition: all 0.2s;
-  white-space: nowrap;
-}
-
-.btn-install-selected:hover:not(:disabled) {
-  background: color-mix(in srgb, var(--focus), black 12%);
-  transform: translateY(-1px);
-  box-shadow: 0 2px 4px var(--shadow);
-}
-
-.btn-install-selected:focus-visible {
-  outline: 2px solid var(--focus);
-  outline-offset: 2px;
-}
-
-.btn-install-selected:disabled {
-  opacity: 0.6;
-  cursor: not-allowed;
-  transform: none;
+  accent-color: var(--focus);
 }
 
 .plugin-item-inline {
   display: flex;
   justify-content: space-between;
   align-items: center;
-  padding: 0.75rem;
+  gap: 0.75rem;
+  padding: 0.6rem 0.75rem;
   background: var(--bg-2);
   border: 1px solid var(--line);
-  border-radius: 6px;
-  gap: 0.75rem;
+  border-radius: var(--radius-sm);
 }
-
-.plugin-actions {
-  display: flex;
-  gap: 0.5rem;
-  align-items: center;
-}
-
 .plugin-item-inline.plugin-installed {
   background: color-mix(in srgb, var(--ok) 5%, transparent);
   border-color: color-mix(in srgb, var(--ok) 30%, transparent);
@@ -1017,22 +871,29 @@ watch(searchQuery, () => {
   align-items: center;
 }
 
-.plugin-checkbox-wrapper input[type="checkbox"] {
-  width: 18px;
-  height: 18px;
-  cursor: pointer;
-}
-
 .plugin-info-inline {
   display: flex;
   align-items: center;
   gap: 0.5rem;
   flex: 1;
+  min-width: 0;
+  flex-wrap: wrap;
+}
+.plugin-info-inline strong {
+  font-family: var(--font-ui);
+  color: var(--ink);
+}
+
+.plugin-actions {
+  display: flex;
+  gap: 0.5rem;
+  align-items: center;
+  flex-shrink: 0;
 }
 
 .plugin-type-badge-small {
   padding: 0.125rem 0.5rem;
-  border-radius: 12px;
+  border-radius: var(--radius-pill);
   font-size: 0.75rem;
   font-weight: 600;
 }
@@ -1042,22 +903,18 @@ watch(searchQuery, () => {
   background: #e3f2fd;
   color: #1976d2;
 }
-
 .plugin-type-badge-small.type-image {
   background: #f3e5f5;
   color: #7b1fa2;
 }
-
 .plugin-type-badge-small.type-service {
   background: #e8f5e9;
   color: #388e3c;
 }
-
 .plugin-type-badge-small.type-theme {
   background: #fff3e0;
   color: #f57c00;
 }
-
 .plugin-type-badge-small.type-backend {
   background: #e1bee7;
   color: #6a1b9a;
@@ -1071,117 +928,49 @@ watch(searchQuery, () => {
 
 .plugin-installed-badge {
   padding: 0.125rem 0.5rem;
-  border-radius: 12px;
+  border-radius: var(--radius-pill);
   font-size: 0.7rem;
   font-weight: 500;
   background: color-mix(in srgb, var(--ok) 10%, transparent);
   color: var(--ok);
   border: 1px solid color-mix(in srgb, var(--ok) 30%, transparent);
 }
-
 .plugin-installed-badge.plugin-update-available {
   background: color-mix(in srgb, var(--warn) 10%, transparent);
   color: var(--warn);
   border-color: color-mix(in srgb, var(--warn) 30%, transparent);
 }
 
-.btn-update {
-  background: var(--warn) !important;
-  color: var(--ink) !important;
-}
-
-.btn-update:hover:not(:disabled) {
-  background: color-mix(in srgb, var(--warn), black 12%) !important;
-}
-
-.btn-reinstall {
-  padding: 0.5rem 1rem;
-  min-height: var(--touch-target);
-  background: var(--bg-2);
-  color: var(--ink);
-  border: 1px solid var(--line);
-  border-radius: 4px;
+/* Notices */
+.branch-switch-notice-compact,
+.branch-switch-notice {
+  margin-top: 1rem;
+  padding: 0.6rem 0.75rem;
+  background: color-mix(in srgb, var(--ink-2) 8%, transparent);
+  border: 1px solid color-mix(in srgb, var(--ink-2) 25%, transparent);
+  border-radius: var(--radius-sm);
   font-size: 0.875rem;
-  font-weight: 600;
-  cursor: pointer;
-  transition: all 0.2s;
-  white-space: nowrap;
-}
-
-.btn-reinstall:hover:not(:disabled) {
-  background: var(--bg-2);
-  border-color: var(--focus);
-}
-
-.btn-reinstall:focus-visible {
-  outline: 2px solid var(--focus);
-  outline-offset: 2px;
-}
-
-.btn-reinstall:disabled {
-  opacity: 0.6;
-  cursor: not-allowed;
-  transform: none;
-}
-
-.btn-install {
-  padding: 0.5rem 1rem;
-  min-height: var(--touch-target);
-  background: var(--focus);
-  color: white;
-  border: none;
-  border-radius: 4px;
-  font-size: 0.875rem;
-  font-weight: 600;
-  cursor: pointer;
-  transition: all 0.2s;
-  white-space: nowrap;
-}
-
-.btn-install:hover:not(:disabled) {
-  background: color-mix(in srgb, var(--focus), black 12%);
-  transform: translateY(-1px);
-  box-shadow: 0 2px 4px var(--shadow);
-}
-
-.btn-install:focus-visible {
-  outline: 2px solid var(--focus);
-  outline-offset: 2px;
-}
-
-.btn-install:disabled {
-  opacity: 0.6;
-  cursor: not-allowed;
-  transform: none;
+  color: var(--ink-2);
 }
 
 .error-message {
   margin-top: 1rem;
-  padding: 0.75rem;
+  padding: 0.6rem 0.75rem;
   background: color-mix(in srgb, var(--err) 10%, transparent);
   border: 1px solid color-mix(in srgb, var(--err) 30%, transparent);
-  border-radius: 4px;
+  border-radius: var(--radius-sm);
   color: var(--err);
   font-size: 0.875rem;
 }
 
 .success-message {
   margin-top: 1rem;
-  padding: 0.75rem;
+  padding: 0.6rem 0.75rem;
   background: color-mix(in srgb, var(--ok) 10%, transparent);
   border: 1px solid color-mix(in srgb, var(--ok) 30%, transparent);
-  border-radius: 4px;
+  border-radius: var(--radius-sm);
   color: var(--ok);
   font-size: 0.875rem;
-}
-
-.branch-switch-notice {
-  margin-top: 0.5rem;
-  padding: 0.5rem;
-  background: color-mix(in srgb, var(--ink-2) 10%, transparent);
-  border-radius: 4px;
-  font-size: 0.875rem;
-  color: var(--ink-2);
 }
 
 .restart-notice {
@@ -1189,67 +978,39 @@ watch(searchQuery, () => {
   padding: 1rem;
   background: color-mix(in srgb, var(--warn) 10%, transparent);
   border: 1px solid color-mix(in srgb, var(--warn) 30%, transparent);
-  border-radius: 4px;
+  border-radius: var(--radius-sm);
 }
-
 .restart-notice-content {
   display: flex;
   flex-direction: column;
   gap: 0.75rem;
 }
-
 .restart-notice-content strong {
   color: var(--warn);
   font-size: 1rem;
 }
-
 .restart-notice-content p {
   margin: 0;
   color: var(--warn);
   font-size: 0.875rem;
 }
-
 .restart-actions {
   display: flex;
   flex-direction: column;
   gap: 0.5rem;
 }
-
 .btn-primary {
-  padding: 0.5rem 1rem;
-  min-height: var(--touch-target);
-  background: var(--focus);
-  color: white;
-  border: none;
-  border-radius: 4px;
-  font-size: 0.9rem;
-  font-weight: 600;
-  cursor: pointer;
-  transition: all 0.2s;
   align-self: flex-start;
 }
-
-.btn-primary:hover {
-  background: color-mix(in srgb, var(--focus), black 12%);
-  transform: translateY(-1px);
-  box-shadow: 0 2px 4px var(--shadow);
-}
-
-.btn-primary:focus-visible {
-  outline: 2px solid var(--focus);
-  outline-offset: 2px;
-}
-
 .restart-alternative {
   font-size: 0.875rem;
   color: var(--ink-2);
 }
-
 .restart-alternative code {
   background: var(--bg-2);
   padding: 0.25rem 0.5rem;
-  border-radius: 4px;
-  font-family: monospace;
+  border-radius: var(--radius-xs);
+  font-family: var(--font-data);
   font-size: 0.85rem;
 }
 </style>

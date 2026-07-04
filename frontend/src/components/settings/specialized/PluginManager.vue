@@ -205,6 +205,7 @@ const handleDeleteImage = imageId => emit("delete-image", imageId);
 <style scoped>
 .plugin-manager {
   width: 100%;
+  padding: 1.25rem;
 }
 
 .pm-tabs {
