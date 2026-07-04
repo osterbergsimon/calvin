@@ -1,130 +1,141 @@
 <template>
-  <div class="updates-tab">
-    <CollapsibleSection title="Update Settings" icon="🔄" :expanded="true">
-      <SettingItem label="Git Repository URL" help="GitHub repository URL for updates">
-        <input
-          v-model="localGitRepoUrl"
-          type="text"
-          placeholder="https://github.com/user/repo.git"
-          @change="handleGitRepoChange"
-          @blur="handleGitRepoChange"
+  <SettingRow label="Repository" description="GitHub repository to pull updates from." stacked>
+    <input
+      v-model="localGitRepoUrl"
+      class="field-input"
+      type="text"
+      placeholder="https://github.com/user/repo.git"
+      aria-label="Git repository URL"
+      @change="handleGitRepoChange"
+      @blur="handleGitRepoChange"
+    />
+  </SettingRow>
+
+  <SettingRow label="Branch" description="Which branch to track." stacked>
+    <select
+      class="field-select"
+      :value="gitBranch"
+      aria-label="Git branch"
+      @change="handleGitBranchChange"
+    >
+      <option v-for="branch in availableBranches" :key="branch" :value="branch">
+        {{ branch }}
+      </option>
+    </select>
+  </SettingRow>
+
+  <SettingRow
+    label="Install updates"
+    description="Pull and apply the latest version from the selected branch."
+  >
+    <div class="update-actions">
+      <button
+        type="button"
+        class="update-btn"
+        :disabled="statusRefreshLoading"
+        @click="refreshSystemStatus"
+      >
+        {{ statusRefreshLoading ? "Checking…" : "Check status" }}
+      </button>
+      <button
+        type="button"
+        class="update-btn update-btn--primary"
+        :disabled="updating"
+        @click="handleTriggerUpdate"
+      >
+        {{ updating ? "Updating…" : "Update now" }}
+      </button>
+    </div>
+  </SettingRow>
+
+  <SettingRow label="Status" description="Live backend and updater state." stacked>
+    <div class="update-readout">
+      <div class="readout-line">
+        <span
+          class="readout-lamp"
+          :class="`readout-lamp--${backendLampState}`"
+          aria-hidden="true"
         />
-      </SettingItem>
-
-      <SettingItem label="Git Branch" help="Branch to update from">
-        <select :value="gitBranch" @change="handleGitBranchChange">
-          <option v-for="branch in availableBranches" :key="branch" :value="branch">
-            {{ branch }}
-          </option>
-        </select>
-      </SettingItem>
-
-      <SettingItem label="Update Actions" help="Trigger system update">
-        <div class="button-group">
-          <button
-            class="btn-secondary"
-            :disabled="statusRefreshLoading"
-            @click="refreshSystemStatus"
-          >
-            {{ statusRefreshLoading ? "Checking..." : "Check status" }}
-          </button>
-          <button class="btn-primary" :disabled="updating" @click="handleTriggerUpdate">
-            {{ updating ? "Updating..." : "🔄 Trigger Update" }}
-          </button>
-        </div>
-      </SettingItem>
-
-      <div v-if="updateMessage" :class="updateMessageClass" class="update-message">
-        {{ updateMessage }}
+        <span class="readout-key">Backend API</span>
+        <span class="readout-val">{{ backendHealthLabel }}</span>
+        <span v-if="backendHealthCheckedAt" class="readout-meta">
+          {{ formatDateTime(backendHealthCheckedAt) }}
+        </span>
       </div>
-
-      <div class="health-summary" aria-label="System health summary">
-        <div class="status-tile">
-          <span class="status-label">Backend API</span>
-          <span class="status-pill" :class="backendHealthClass">
-            {{ backendHealthLabel }}
-          </span>
-          <span v-if="backendHealthCheckedAt" class="status-meta">
-            {{ formatDateTime(backendHealthCheckedAt) }}
-          </span>
-        </div>
-        <div class="status-tile">
-          <span class="status-label">Update state</span>
-          <span class="status-pill" :class="updateStatusClass">
-            {{ updateStatusLabel }}
-          </span>
-          <span v-if="updateStatus?.phase" class="status-meta">
-            {{ formatPhase(updateStatus.phase) }}
-          </span>
-        </div>
-        <div v-if="updateStatusCheckedAt" class="status-tile">
-          <span class="status-label">Last checked</span>
-          <span class="status-value">{{ formatDateTime(updateStatusCheckedAt) }}</span>
-        </div>
+      <div class="readout-line">
+        <span
+          class="readout-lamp"
+          :class="`readout-lamp--${updateLampState}`"
+          aria-hidden="true"
+        />
+        <span class="readout-key">Update state</span>
+        <span class="readout-val">{{ updateStatusLabel }}</span>
+        <span v-if="updateStatus?.phase" class="readout-meta">
+          {{ formatPhase(updateStatus.phase) }}
+        </span>
       </div>
-
-      <div v-if="backendHealth?.error" class="update-message warning">
-        {{ backendHealth.error }}
+      <div v-if="updateStatusCheckedAt" class="readout-line">
+        <span class="readout-lamp readout-lamp--muted" aria-hidden="true" />
+        <span class="readout-key">Last checked</span>
+        <span class="readout-val">{{ formatDateTime(updateStatusCheckedAt) }}</span>
       </div>
+      <p v-if="backendHealth?.error" class="readout-note">{{ backendHealth.error }}</p>
+    </div>
+  </SettingRow>
 
-      <div v-if="updateStatus" class="update-status">
-        <SettingItem label="Update Status">
-          <div class="status-details">
-            <p><strong>Status:</strong> {{ updateStatus.status }}</p>
-            <p v-if="updateStatus.phase">
-              <strong>Phase:</strong> {{ formatPhase(updateStatus.phase) }}
-            </p>
-            <p v-if="updateStatus.message"><strong>Message:</strong> {{ updateStatus.message }}</p>
-            <p v-if="updateStatus.progress !== undefined">
-              <strong>Progress:</strong> {{ updateStatus.progress }}%
-            </p>
-            <p v-if="updateStatus.started_at">
-              <strong>Started:</strong> {{ formatDateTime(updateStatus.started_at) }}
-            </p>
-            <p v-if="updateStatus.finished_at">
-              <strong>Finished:</strong> {{ formatDateTime(updateStatus.finished_at) }}
-            </p>
-            <p v-if="updateStatus.log_file">
-              <strong>Log file:</strong> {{ updateStatus.log_file }}
-            </p>
-            <p v-if="updateStatus.error"><strong>Error:</strong> {{ updateStatus.error }}</p>
-          </div>
-        </SettingItem>
+  <SettingRow v-if="updateStatus && hasUpdateDetails" label="Update details" stacked>
+    <dl class="update-detail">
+      <template v-if="updateStatus.message">
+        <dt>Message</dt>
+        <dd>{{ updateStatus.message }}</dd>
+      </template>
+      <template v-if="updateStatus.progress !== undefined">
+        <dt>Progress</dt>
+        <dd>{{ updateStatus.progress }}%</dd>
+      </template>
+      <template v-if="updateStatus.started_at">
+        <dt>Started</dt>
+        <dd>{{ formatDateTime(updateStatus.started_at) }}</dd>
+      </template>
+      <template v-if="updateStatus.finished_at">
+        <dt>Finished</dt>
+        <dd>{{ formatDateTime(updateStatus.finished_at) }}</dd>
+      </template>
+      <template v-if="updateStatus.current_commit_short">
+        <dt>Current</dt>
+        <dd>
+          {{ updateStatus.current_commit_short }}
+          <span v-if="updateStatus.current_commit_msg">— {{ updateStatus.current_commit_msg }}</span>
+        </dd>
+      </template>
+      <template v-if="updateStatus.new_commit_short">
+        <dt>Latest</dt>
+        <dd>
+          {{ updateStatus.new_commit_short }}
+          <span v-if="updateStatus.new_commit_msg">— {{ updateStatus.new_commit_msg }}</span>
+        </dd>
+      </template>
+      <template v-if="updateStatus.log_file">
+        <dt>Log file</dt>
+        <dd>{{ updateStatus.log_file }}</dd>
+      </template>
+      <template v-if="updateStatus.error">
+        <dt>Error</dt>
+        <dd class="update-detail__err">{{ updateStatus.error }}</dd>
+      </template>
+    </dl>
+  </SettingRow>
 
-        <SettingItem v-if="updateStatus.last_log" label="Latest log output">
-          <pre class="update-log">{{ updateStatus.last_log }}</pre>
-        </SettingItem>
-
-        <SettingItem
-          v-if="updateStatus.current_commit_short || updateStatus.new_commit_short"
-          label="Commit info"
-        >
-          <div class="status-details">
-            <p v-if="updateStatus.current_commit_short">
-              <strong>Current:</strong>
-              {{ updateStatus.current_commit_short }}
-              <span v-if="updateStatus.current_commit_msg">
-                — {{ updateStatus.current_commit_msg }}
-              </span>
-            </p>
-            <p v-if="updateStatus.new_commit_short">
-              <strong>Latest:</strong>
-              {{ updateStatus.new_commit_short }}
-              <span v-if="updateStatus.new_commit_msg"> — {{ updateStatus.new_commit_msg }} </span>
-            </p>
-          </div>
-        </SettingItem>
-      </div>
-    </CollapsibleSection>
-  </div>
+  <SettingRow v-if="updateStatus?.last_log" label="Latest log output" stacked>
+    <pre class="update-log">{{ updateStatus.last_log }}</pre>
+  </SettingRow>
 </template>
 
 <script setup>
 import { computed, ref, watch, onMounted } from "vue";
 import { useSystem } from "@/composables";
 import { getGitBranches } from "@/services/configApi";
-import CollapsibleSection from "../../shared/CollapsibleSection.vue";
-import SettingItem from "../../shared/SettingItem.vue";
+import SettingRow from "@/components/settings/shell/SettingRow.vue";
 
 const props = defineProps({
   gitRepoUrl: {
@@ -144,8 +155,6 @@ const {
   updateStatus,
   updateStatusLoading,
   updateStatusCheckedAt,
-  updateMessage,
-  updateMessageClass,
   backendHealth,
   backendHealthLoading,
   backendHealthCheckedAt,
@@ -166,23 +175,43 @@ const backendHealthLabel = computed(() => {
   return backendHealth.value?.status || "Unknown";
 });
 
-const backendHealthClass = computed(() => ({
-  success: backendHealth.value?.status === "healthy",
-  error: backendHealth.value?.status === "unhealthy",
-  neutral: !backendHealth.value,
-}));
+// Lamp state maps health/updater status onto the instrument-readout palette:
+// ok (green) · info (amber, in-flight) · err (red) · muted (unknown/idle meta).
+const backendLampState = computed(() => {
+  if (backendHealthLoading.value) return "info";
+  if (backendHealth.value?.status === "healthy") return "ok";
+  if (backendHealth.value?.status === "unhealthy") return "err";
+  return "muted";
+});
 
 const updateStatusLabel = computed(() => {
   if (updateStatusLoading.value) return "Checking";
   return updateStatus.value?.status || "Unknown";
 });
 
-const updateStatusClass = computed(() => ({
-  success: updateStatus.value?.status === "idle",
-  info: updateStatus.value?.status === "running",
-  error: updateStatus.value?.status === "error",
-  neutral: !updateStatus.value || updateStatus.value?.status === "unknown",
-}));
+const updateLampState = computed(() => {
+  if (updateStatusLoading.value) return "info";
+  const status = updateStatus.value?.status;
+  if (status === "idle") return "ok";
+  if (status === "running") return "info";
+  if (status === "error") return "err";
+  return "muted";
+});
+
+const hasUpdateDetails = computed(() => {
+  const s = updateStatus.value;
+  if (!s) return false;
+  return Boolean(
+    s.message ||
+      s.progress !== undefined ||
+      s.started_at ||
+      s.finished_at ||
+      s.current_commit_short ||
+      s.new_commit_short ||
+      s.log_file ||
+      s.error
+  );
+});
 
 const formatPhase = phase => {
   if (!phase) return "";
@@ -252,184 +281,189 @@ watch(
 </script>
 
 <style scoped>
-.updates-tab {
+/* Full-width inputs for the stacked config rows. */
+.field-input,
+.field-select {
   width: 100%;
-}
-
-.button-group {
-  display: flex;
-  gap: 0.75rem;
-  flex-wrap: wrap;
-}
-
-.btn-primary,
-.btn-secondary {
-  padding: 0.5rem 1rem;
-  border-radius: 4px;
-  font-size: 0.9rem;
-  font-weight: 600;
-  cursor: pointer;
-  transition: all 0.2s;
   min-height: var(--touch-target);
-  font-family: var(--font-ui);
-}
-
-.btn-primary {
-  background: var(--focus);
-  color: white;
-  border: none;
-}
-
-.btn-secondary {
+  padding: 0.5rem 0.75rem;
   background: var(--bg-2);
   color: var(--ink);
   border: 1px solid var(--line);
+  border-radius: var(--radius-sm);
+  font-family: var(--font-ui);
+  font-size: var(--fs-control);
+  transition:
+    border-color 0.2s,
+    box-shadow 0.2s;
+}
+.field-input:hover,
+.field-select:hover {
+  border-color: var(--focus-edge);
+}
+.field-input:focus,
+.field-select:focus {
+  outline: none;
+  border-color: var(--focus);
+  box-shadow: 0 0 0 2px color-mix(in srgb, var(--focus) 20%, transparent);
+}
+.field-select {
+  cursor: pointer;
+  appearance: none;
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='12' viewBox='0 0 12 12'%3E%3Cpath fill='%2393a0a9' d='M6 9L1 4h10z'/%3E%3C/svg%3E");
+  background-repeat: no-repeat;
+  background-position: right 0.75rem center;
+  padding-right: 2.5rem;
 }
 
-.btn-primary:hover:not(:disabled) {
-  background: var(--focus);
-  filter: brightness(1.1);
-  transform: translateY(-1px);
-  box-shadow: 0 2px 4px var(--shadow);
+/* Action buttons — the maintenance button vocabulary + a primary variant. */
+.update-actions {
+  display: flex;
+  gap: 0.5rem;
+  flex-wrap: wrap;
 }
-
-.btn-secondary:hover:not(:disabled) {
+.update-btn {
+  min-height: var(--touch-target);
+  padding: 0 1rem;
+  font-family: var(--font-ui);
+  font-size: var(--fs-control);
+  font-weight: 500;
+  color: var(--ink);
+  background: var(--bg-2);
+  border: 1px solid var(--line);
+  border-radius: var(--radius-md);
+  cursor: pointer;
+  transition:
+    border-color 0.2s,
+    background 0.2s,
+    filter 0.2s;
+}
+.update-btn:hover:not(:disabled) {
   border-color: var(--focus);
 }
-
-.btn-primary:focus-visible,
-.btn-secondary:focus-visible {
+.update-btn:focus-visible {
   outline: 2px solid var(--focus);
   outline-offset: 2px;
 }
-
-.btn-primary:disabled,
-.btn-secondary:disabled {
-  opacity: 0.6;
+.update-btn:disabled {
+  opacity: 0.55;
   cursor: not-allowed;
 }
-
-.update-message {
-  margin-top: 1rem;
-  padding: 0.75rem;
-  border-radius: 4px;
-  font-size: 0.875rem;
+.update-btn--primary {
+  background: var(--focus);
+  color: var(--focus-ink);
+  border-color: var(--focus);
+  font-weight: 600;
+}
+.update-btn--primary:hover:not(:disabled) {
+  filter: brightness(1.08);
 }
 
-.update-message.success {
-  background: color-mix(in srgb, var(--ok) 10%, transparent);
-  border: 1px solid color-mix(in srgb, var(--ok) 30%, transparent);
-  color: var(--ok);
-}
-
-.update-message.error {
-  background: color-mix(in srgb, var(--err) 10%, transparent);
-  border: 1px solid color-mix(in srgb, var(--err) 30%, transparent);
-  color: var(--err);
-}
-
-.update-message.info {
-  background: color-mix(in srgb, var(--focus) 10%, transparent);
-  border: 1px solid color-mix(in srgb, var(--focus) 30%, transparent);
-  color: var(--focus);
-}
-
-.update-message.warning {
-  background: color-mix(in srgb, var(--warn) 10%, transparent);
-  border: 1px solid color-mix(in srgb, var(--warn) 30%, transparent);
-  color: var(--warn);
-}
-
-.update-status {
-  margin-top: 1rem;
-}
-
-.health-summary {
-  display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(160px, 1fr));
-  gap: 0.75rem;
-  margin-top: 1rem;
-}
-
-.status-tile {
+/* Instrument readout — lamp + tracked key + value, hairline-ruled. */
+.update-readout {
   display: flex;
   flex-direction: column;
-  gap: 0.35rem;
-  min-width: 0;
-  padding: 0.75rem;
-  background: var(--bg-2);
-  border: 1px solid var(--line);
-  border-radius: 6px;
 }
-
-.status-label,
-.status-meta {
-  color: var(--ink-2);
-  font-size: 0.78rem;
+.readout-line {
+  display: grid;
+  grid-template-columns: auto minmax(6.5rem, auto) 1fr auto;
+  align-items: center;
+  gap: 0.65rem;
+  padding: 0.5rem 0;
+}
+.readout-line + .readout-line {
+  border-top: 1px solid var(--line-soft);
+}
+.readout-lamp {
+  width: 0.55rem;
+  height: 0.55rem;
+  border-radius: 2px;
+  background: var(--lamp, var(--ink-3));
+  box-shadow:
+    0 0 5px 0 var(--lamp, transparent),
+    0 0 12px 1px color-mix(in srgb, var(--lamp, transparent) 50%, transparent);
+}
+.readout-lamp--ok {
+  --lamp: var(--ok);
+}
+.readout-lamp--info {
+  --lamp: var(--focus);
+}
+.readout-lamp--err {
+  --lamp: var(--err);
+}
+.readout-lamp--muted {
+  --lamp: var(--ink-3);
+  box-shadow: none;
+}
+.readout-key {
+  font-family: var(--font-data);
+  font-size: var(--fs-micro);
+  font-weight: 600;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+  color: var(--ink-3);
+}
+.readout-val {
   font-family: var(--font-ui);
-}
-
-.status-value {
+  font-size: var(--fs-sm);
   color: var(--ink);
-  font-size: 0.875rem;
-  overflow-wrap: anywhere;
-}
-
-.status-pill {
-  align-self: flex-start;
-  padding: 0.2rem 0.5rem;
-  border-radius: 999px;
-  font-size: 0.78rem;
-  font-weight: 700;
   text-transform: capitalize;
 }
-
-.status-pill.success {
-  background: color-mix(in srgb, var(--ok) 18%, transparent);
-  color: var(--ok);
+.readout-meta {
+  font-family: var(--font-data);
+  font-variant-numeric: tabular-nums;
+  font-size: var(--fs-micro);
+  color: var(--ink-3);
+  white-space: nowrap;
 }
-
-.status-pill.info {
-  background: color-mix(in srgb, var(--warn) 18%, transparent);
-  color: var(--warn);
-}
-
-.status-pill.error {
-  background: color-mix(in srgb, var(--err) 18%, transparent);
+.readout-note {
+  margin: 0.5rem 0 0;
+  font-family: var(--font-ui);
+  font-size: var(--fs-xs);
   color: var(--err);
+  line-height: 1.4;
 }
 
-.status-pill.neutral {
-  background: var(--bg-2);
-  color: var(--ink-2);
-}
-
-.status-details {
-  display: flex;
-  flex-direction: column;
-  gap: 0.5rem;
-}
-
-.status-details p {
+/* Verbose detail — mono key/value grid. */
+.update-detail {
+  display: grid;
+  grid-template-columns: auto 1fr;
+  gap: 0.35rem 1rem;
   margin: 0;
-  font-size: 0.875rem;
-  color: var(--ink);
 }
-
-.status-details strong {
+.update-detail dt {
+  font-family: var(--font-data);
+  font-size: var(--fs-micro);
+  font-weight: 600;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  color: var(--ink-3);
+  padding-top: 0.1rem;
+}
+.update-detail dd {
+  margin: 0;
+  font-family: var(--font-ui);
+  font-size: var(--fs-sm);
   color: var(--ink);
+  overflow-wrap: anywhere;
+}
+.update-detail__err {
+  color: var(--err);
 }
 
 .update-log {
   max-height: 260px;
   overflow: auto;
-  background: var(--bg-2);
+  margin: 0;
+  background: var(--bg-0);
   border: 1px solid var(--line);
-  border-radius: 4px;
+  border-radius: var(--radius-sm);
   padding: 0.75rem;
   white-space: pre-wrap;
   font-family: var(--font-data);
-  font-size: 0.8rem;
-  line-height: 1.25rem;
+  font-size: var(--fs-2xs);
+  line-height: 1.3;
+  color: var(--ink-2);
 }
 </style>
