@@ -203,10 +203,13 @@ describe("DashboardRegionsEditor (screens & regions logic)", () => {
   });
 
   it("does not render an Activate control (screen switching lives on the dashboard dots)", () => {
+    // Active screen is screen 2, so under the OLD code screen 1 (inactive) would
+    // have rendered an "Activate screen 1" button and screen 2 (active) a
+    // "Screen 2 is active" button — making all three assertions discriminate a revert.
     const twoScreenConfig = {
       dashboardScreens: {
         version: 2,
-        activeScreenId: "home",
+        activeScreenId: "screen-2",
         screens: [
           {
             id: "home",
