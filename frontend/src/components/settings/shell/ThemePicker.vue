@@ -12,22 +12,24 @@
       <span class="theme-picker__label">{{ selectedThemeName }}</span>
       <span class="theme-picker__chevron" aria-hidden="true">▾</span>
     </button>
-    <div
-      v-if="open"
-      class="theme-picker__popover"
-      :class="{ 'theme-picker__popover--up': openUp }"
-      :style="popoverStyle"
-      role="dialog"
-      aria-label="Choose theme"
-    >
-      <ThemeSelector
-        :themes="themes"
-        :selected-theme-id="selectedThemeId"
-        :loading="loading"
-        :show-help="false"
-        @select="onSelect"
-      />
-    </div>
+    <Teleport to="body">
+      <div
+        v-if="open"
+        ref="popoverEl"
+        class="theme-picker__popover"
+        :style="popoverStyle"
+        role="dialog"
+        aria-label="Choose theme"
+      >
+        <ThemeSelector
+          :themes="themes"
+          :selected-theme-id="selectedThemeId"
+          :loading="loading"
+          :show-help="false"
+          @select="onSelect"
+        />
+      </div>
+    </Teleport>
   </div>
 </template>
 
@@ -45,10 +47,13 @@ const emit = defineEmits(["select"]);
 
 const rootEl = ref(null);
 const triggerEl = ref(null);
+const popoverEl = ref(null);
 const open = ref(false);
 const themes = ref([]);
 const loading = ref(false);
-const { openUp, popoverStyle, place } = usePopoverPlacement();
+// Teleported to <body> to escape the rounded settings panel's overflow:hidden;
+// placed with fixed viewport coords.
+const { popoverStyle, place, reposition } = usePopoverPlacement();
 
 const selectedThemeName = computed(() => {
   if (!props.selectedThemeId || themes.value.length === 0) return "Theme";
@@ -80,9 +85,10 @@ const loadThemes = async () => {
 };
 
 const onDocClick = event => {
-  if (rootEl.value && !rootEl.value.contains(event.target)) {
-    close();
-  }
+  // Popover is teleported to <body>; treat clicks in either the trigger root or
+  // the teleported popover as inside.
+  const inside = rootEl.value?.contains(event.target) || popoverEl.value?.contains(event.target);
+  if (!inside) close();
 };
 
 const onDocKeydown = event => {
@@ -91,11 +97,15 @@ const onDocKeydown = event => {
   }
 };
 
+const onReposition = () => reposition();
+
 const openPopover = () => {
   place(triggerEl);
   open.value = true;
   document.addEventListener("click", onDocClick, true);
   document.addEventListener("keydown", onDocKeydown);
+  window.addEventListener("scroll", onReposition, true);
+  window.addEventListener("resize", onReposition);
 };
 
 const close = () => {
@@ -103,6 +113,8 @@ const close = () => {
   open.value = false;
   document.removeEventListener("click", onDocClick, true);
   document.removeEventListener("keydown", onDocKeydown);
+  window.removeEventListener("scroll", onReposition, true);
+  window.removeEventListener("resize", onReposition);
 };
 
 const toggleOpen = () => {
@@ -121,6 +133,8 @@ onMounted(() => {
 onUnmounted(() => {
   document.removeEventListener("click", onDocClick, true);
   document.removeEventListener("keydown", onDocKeydown);
+  window.removeEventListener("scroll", onReposition, true);
+  window.removeEventListener("resize", onReposition);
 });
 </script>
 
@@ -167,28 +181,21 @@ onUnmounted(() => {
 }
 
 .theme-picker__popover {
-  position: absolute;
-  top: calc(100% + 8px);
-  right: 0;
-  z-index: 20;
+  /* position/coords come from :style (fixed, teleported to <body> to escape the
+     rounded settings panel's overflow:hidden). */
+  z-index: 1000;
   min-width: 17.5rem; /* 280px */
   padding: 0.75rem; /* 12px */
   background: var(--bg-1);
   border: 1px solid var(--line);
   border-radius: var(--radius-xl);
   box-shadow: 0 12px 32px var(--shadow);
-  /* max-height is set inline from the available viewport space (placePopover);
+  /* max-height is set inline from the available viewport space (place());
      this is the fallback cap. The list scrolls inside the popover so it never
      runs off the bottom of a short screen. */
   max-height: min(60vh, 26rem);
   overflow-y: auto;
   overscroll-behavior: contain;
-}
-
-/* Flip above the trigger when there's more room there. */
-.theme-picker__popover--up {
-  top: auto;
-  bottom: calc(100% + 8px);
 }
 
 @media (prefers-reduced-motion: no-preference) {

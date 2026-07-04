@@ -8,22 +8,27 @@ const OPTS = [
   { value: "paper", label: "Paper" },
 ];
 
+// The menu teleports to <body>; stub Teleport so it renders in-place and stays
+// findable within the wrapper for these behavioral assertions.
+const mountPill = (props, opts = {}) =>
+  mount(SelectPill, { props, global: { stubs: { teleport: true } }, ...opts });
+
 describe("SelectPill", () => {
   it("shows the current label and no open list initially", () => {
-    const w = mount(SelectPill, { props: { modelValue: "backlit", options: OPTS } });
+    const w = mountPill({ modelValue: "backlit", options: OPTS });
     expect(w.find(".pill__label").text()).toBe("Backlit");
     expect(w.find('[role="listbox"]').exists()).toBe(false);
   });
 
   it("opens the listbox on trigger click", async () => {
-    const w = mount(SelectPill, { props: { modelValue: "backlit", options: OPTS } });
+    const w = mountPill({ modelValue: "backlit", options: OPTS });
     await w.find(".pill").trigger("click");
     expect(w.find('[role="listbox"]').exists()).toBe(true);
     expect(w.findAll('[role="option"]')).toHaveLength(2);
   });
 
   it("emits selection and closes the listbox", async () => {
-    const w = mount(SelectPill, { props: { modelValue: "backlit", options: OPTS } });
+    const w = mountPill({ modelValue: "backlit", options: OPTS });
     await w.find(".pill").trigger("click");
     await w.findAll('[role="option"]')[1].trigger("click");
     expect(w.emitted("update:modelValue")[0]).toEqual(["paper"]);
@@ -33,16 +38,13 @@ describe("SelectPill", () => {
   // --- keyboard + outside-click behaviors ---
 
   it("ArrowDown on the trigger opens the listbox", async () => {
-    const w = mount(SelectPill, { props: { modelValue: "backlit", options: OPTS } });
+    const w = mountPill({ modelValue: "backlit", options: OPTS });
     await w.find(".pill").trigger("keydown", { key: "ArrowDown" });
     expect(w.find('[role="listbox"]').exists()).toBe(true);
   });
 
   it("Enter on the active option emits update:modelValue and closes", async () => {
-    const w = mount(SelectPill, {
-      props: { modelValue: "backlit", options: OPTS },
-      attachTo: document.body,
-    });
+    const w = mountPill({ modelValue: "backlit", options: OPTS }, { attachTo: document.body });
     await w.find(".pill").trigger("keydown", { key: "ArrowDown" });
     expect(w.find('[role="listbox"]').exists()).toBe(true);
     await w.find('[role="listbox"]').trigger("keydown", { key: "Enter" });
@@ -52,7 +54,7 @@ describe("SelectPill", () => {
   });
 
   it("Escape closes the listbox without emitting", async () => {
-    const w = mount(SelectPill, { props: { modelValue: "backlit", options: OPTS } });
+    const w = mountPill({ modelValue: "backlit", options: OPTS });
     await w.find(".pill").trigger("click");
     await w.find('[role="listbox"]').trigger("keydown", { key: "Escape" });
     expect(w.find('[role="listbox"]').exists()).toBe(false);
@@ -60,10 +62,7 @@ describe("SelectPill", () => {
   });
 
   it("outside click closes the listbox", async () => {
-    const w = mount(SelectPill, {
-      props: { modelValue: "backlit", options: OPTS },
-      attachTo: document.body,
-    });
+    const w = mountPill({ modelValue: "backlit", options: OPTS }, { attachTo: document.body });
     await w.find(".pill").trigger("click");
     expect(w.find('[role="listbox"]').exists()).toBe(true);
     document.body.dispatchEvent(new MouseEvent("click", { bubbles: true }));
@@ -72,15 +71,28 @@ describe("SelectPill", () => {
     w.unmount();
   });
 
-  it("labels the trigger with ariaLabel so the control's purpose is announced", () => {
+  it("teleports the listbox to <body> with fixed positioning so a clipped ancestor can't cut it off", async () => {
+    // No teleport stub here: verify the menu really escapes to document.body.
     const w = mount(SelectPill, {
-      props: { modelValue: "backlit", options: OPTS, ariaLabel: "Theme mode" },
+      props: { modelValue: "backlit", options: OPTS },
+      attachTo: document.body,
     });
+    await w.find(".pill").trigger("click");
+    const menu = document.body.querySelector('[role="listbox"]');
+    expect(menu).not.toBeNull();
+    // it is NOT nested inside the pill wrapper (would be clipped there)
+    expect(w.find(".pill-wrap").element.contains(menu)).toBe(false);
+    expect(menu.style.position).toBe("fixed");
+    w.unmount();
+  });
+
+  it("labels the trigger with ariaLabel so the control's purpose is announced", () => {
+    const w = mountPill({ modelValue: "backlit", options: OPTS, ariaLabel: "Theme mode" });
     expect(w.find(".pill").attributes("aria-label")).toBe("Theme mode");
   });
 
   it("omits aria-label when none is provided (falls back to the value text)", () => {
-    const w = mount(SelectPill, { props: { modelValue: "backlit", options: OPTS } });
+    const w = mountPill({ modelValue: "backlit", options: OPTS });
     expect(w.find(".pill").attributes("aria-label")).toBeUndefined();
   });
 });

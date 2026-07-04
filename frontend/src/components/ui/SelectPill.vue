@@ -20,31 +20,33 @@
       <span class="pill__label">{{ currentLabel }}</span>
       <span class="pill__cv" aria-hidden="true">▾</span>
     </button>
-    <ul
-      v-if="open"
-      class="pill__menu"
-      :class="{ 'pill__menu--up': openUp }"
-      :style="popoverStyle"
-      role="listbox"
-      :id="listboxId"
-      :aria-activedescendant="activeOptionId"
-      @keydown="onListKey"
-    >
-      <li
-        v-for="(o, i) in options"
-        :key="o.value"
-        :id="`${listboxId}-opt-${i}`"
-        role="option"
-        class="pill__opt"
-        :class="{ 'pill__opt--active': i === activeIndex }"
-        :aria-selected="o.value === modelValue ? 'true' : 'false'"
-        tabindex="-1"
-        :ref="el => setOptRef(el, i)"
-        @click="choose(o.value)"
+    <Teleport to="body">
+      <ul
+        v-if="open"
+        ref="menuEl"
+        class="pill__menu"
+        :style="popoverStyle"
+        role="listbox"
+        :id="listboxId"
+        :aria-activedescendant="activeOptionId"
+        @keydown="onListKey"
       >
-        {{ o.label }}
-      </li>
-    </ul>
+        <li
+          v-for="(o, i) in options"
+          :key="o.value"
+          :id="`${listboxId}-opt-${i}`"
+          role="option"
+          class="pill__opt"
+          :class="{ 'pill__opt--active': i === activeIndex }"
+          :aria-selected="o.value === modelValue ? 'true' : 'false'"
+          tabindex="-1"
+          :ref="el => setOptRef(el, i)"
+          @click="choose(o.value)"
+        >
+          {{ o.label }}
+        </li>
+      </ul>
+    </Teleport>
   </div>
 </template>
 
@@ -67,8 +69,11 @@ const open = ref(false);
 const activeIndex = ref(0);
 const rootEl = ref(null);
 const triggerEl = ref(null);
+const menuEl = ref(null);
 const optRefs = ref([]);
-const { openUp, popoverStyle, place } = usePopoverPlacement();
+// The menu teleports to <body> to escape ancestor `overflow: hidden` (the rounded
+// settings panel), so it's placed with fixed viewport coords and pinned to the pill width.
+const { popoverStyle, place, reposition } = usePopoverPlacement({ matchTriggerWidth: true });
 
 const currentLabel = computed(
   () => props.options.find(o => o.value === props.modelValue)?.label ?? ""
@@ -83,15 +88,21 @@ const setOptRef = (el, i) => {
 };
 
 const handleClickOutside = e => {
-  if (rootEl.value && !rootEl.value.contains(e.target)) {
-    open.value = false;
-    document.removeEventListener("click", handleClickOutside);
-  }
+  // The menu lives in <body> (teleported), so "inside" means either the pill root
+  // or the teleported menu itself.
+  const inside = rootEl.value?.contains(e.target) || menuEl.value?.contains(e.target);
+  if (!inside) close();
 };
 
+// Keep the fixed-position menu glued to its trigger as the settings panel scrolls.
+const onReposition = () => reposition();
+
 const close = () => {
+  if (!open.value) return;
   open.value = false;
   document.removeEventListener("click", handleClickOutside);
+  window.removeEventListener("scroll", onReposition, true);
+  window.removeEventListener("resize", onReposition);
   nextTick(() => triggerEl.value?.focus());
 };
 
@@ -103,6 +114,8 @@ const openList = () => {
   nextTick(() => {
     optRefs.value[activeIndex.value]?.focus();
     document.addEventListener("click", handleClickOutside);
+    window.addEventListener("scroll", onReposition, true);
+    window.addEventListener("resize", onReposition);
   });
 };
 
@@ -151,6 +164,8 @@ const onListKey = e => {
 
 onUnmounted(() => {
   document.removeEventListener("click", handleClickOutside);
+  window.removeEventListener("scroll", onReposition, true);
+  window.removeEventListener("resize", onReposition);
 });
 </script>
 
@@ -186,11 +201,9 @@ onUnmounted(() => {
   font-size: 0.75rem; /* 12px */
 }
 .pill__menu {
-  position: absolute;
-  z-index: 20;
-  top: calc(100% + 6px);
-  right: 0;
-  min-width: 100%;
+  /* position/coords come from :style (fixed, teleported to <body> to escape the
+     rounded settings panel's overflow:hidden). */
+  z-index: 1000;
   list-style: none;
   margin: 0;
   padding: 0.375rem; /* 6px */
@@ -202,10 +215,6 @@ onUnmounted(() => {
      viewport space) instead of running off a short screen. */
   overflow-y: auto;
   overscroll-behavior: contain;
-}
-.pill__menu--up {
-  top: auto;
-  bottom: calc(100% + 6px);
 }
 .pill__opt {
   padding: 0.75rem 0.875rem; /* 12px 14px */

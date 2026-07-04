@@ -8,6 +8,9 @@ vi.mock("@/services/pluginsApi", () => ({
 }));
 import ThemePicker from "@/components/settings/shell/ThemePicker.vue";
 const stubs = {
+  // The popover teleports to <body>; stub Teleport so it renders in-place and
+  // stays findable within the wrapper for these assertions.
+  teleport: true,
   ThemeSelector: {
     name: "ThemeSelector",
     props: ["themes", "selectedThemeId", "loading"],
