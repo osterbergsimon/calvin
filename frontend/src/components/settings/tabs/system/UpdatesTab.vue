@@ -63,11 +63,7 @@
         </span>
       </div>
       <div class="readout-line">
-        <span
-          class="readout-lamp"
-          :class="`readout-lamp--${updateLampState}`"
-          aria-hidden="true"
-        />
+        <span class="readout-lamp" :class="`readout-lamp--${updateLampState}`" aria-hidden="true" />
         <span class="readout-key">Update state</span>
         <span class="readout-val">{{ updateStatusLabel }}</span>
         <span v-if="updateStatus?.phase" class="readout-meta">
@@ -105,7 +101,9 @@
         <dt>Current</dt>
         <dd>
           {{ updateStatus.current_commit_short }}
-          <span v-if="updateStatus.current_commit_msg">— {{ updateStatus.current_commit_msg }}</span>
+          <span v-if="updateStatus.current_commit_msg"
+            >— {{ updateStatus.current_commit_msg }}</span
+          >
         </dd>
       </template>
       <template v-if="updateStatus.new_commit_short">

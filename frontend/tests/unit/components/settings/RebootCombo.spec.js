@@ -15,9 +15,14 @@ vi.mock("@/composables/useKeyCapture", () => ({
 }));
 
 const stubs = { NumberStepper: true };
-const config = () => ({ rebootComboKey1: "KEY_1", rebootComboKey2: "KEY_7", rebootComboDuration: 10000 });
+const config = () => ({
+  rebootComboKey1: "KEY_1",
+  rebootComboKey2: "KEY_7",
+  rebootComboDuration: 10000,
+});
 
-const mountRC = (cfg = config()) => mount(RebootCombo, { props: { config: cfg }, global: { stubs } });
+const mountRC = (cfg = config()) =>
+  mount(RebootCombo, { props: { config: cfg }, global: { stubs } });
 
 describe("RebootCombo", () => {
   beforeEach(() => {

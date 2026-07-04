@@ -82,16 +82,7 @@ export const settingsDestinations = [
     category: "clock-bar",
     tabKey: "settings_tab_clock_bar",
     tab: "appearance",
-    keywords: [
-      "clock",
-      "status bar",
-      "date",
-      "seconds",
-      "weather",
-      "font",
-      "logo",
-      "position",
-    ],
+    keywords: ["clock", "status bar", "date", "seconds", "weather", "font", "logo", "position"],
   },
   {
     id: "clock-bar-items",
