@@ -9,6 +9,7 @@ import {
 
 describe("uiScale preset map", () => {
   it("maps each preset key to its scale factor", () => {
+    expect(uiScaleFor("extra-compact")).toBe(0.7);
     expect(uiScaleFor("compact")).toBe(0.85);
     expect(uiScaleFor("default")).toBe(1.0);
     expect(uiScaleFor("large")).toBe(1.15);

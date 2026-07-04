@@ -113,7 +113,7 @@ class ConfigUpdate(BaseModel):
     maxVisibleEvents: int | None = None  # Max events visible per day cell
     showRedDays: bool | None = None  # Highlight holidays/red days
     mealPlanCardSize: str | None = None  # Meal plan card size: 'small' | 'medium' | 'large'
-    uiSize: str | None = None  # Global UI size: 'compact' | 'default' | 'large' | 'extra-large'
+    uiSize: str | None = None  # Global UI size: 'extra-compact' | 'compact' | 'default' | 'large' | 'extra-large'
     themeMode: str | None = None  # Theme mode: 'light' | 'dark' | 'auto' | 'time'
     selectedTheme: str | None = None  # Selected custom theme ID (null = use themeMode)
     darkModeStart: int | None = None  # Dark mode start hour (0-23)

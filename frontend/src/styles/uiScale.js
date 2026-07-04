@@ -8,6 +8,7 @@
 // See docs/design/2026-07-04-ui-sizing-tokens.md for the token vocabulary.
 
 export const UI_SIZE_PRESETS = {
+  "extra-compact": 0.7,
   compact: 0.85,
   default: 1.0,
   large: 1.15,
@@ -16,12 +17,14 @@ export const UI_SIZE_PRESETS = {
 
 export const DEFAULT_UI_SIZE = "default";
 
-// Ordered for UI rendering (SegmentedControl option order).
+// Ordered for UI rendering (SegmentedControl option order). Labels are kept
+// short so all five segments fit the settings-panel width.
 export const UI_SIZE_OPTIONS = [
-  { value: "compact", label: "Compact" },
-  { value: "default", label: "Default" },
-  { value: "large", label: "Large" },
-  { value: "extra-large", label: "Extra" },
+  { value: "extra-compact", label: "XS" },
+  { value: "compact", label: "S" },
+  { value: "default", label: "M" },
+  { value: "large", label: "L" },
+  { value: "extra-large", label: "XL" },
 ];
 
 export const isUiSize = id =>

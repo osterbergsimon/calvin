@@ -22,6 +22,13 @@ describe("useUiScale", () => {
     expect(current.value).toBe("default");
   });
 
+  it("applies the smallest extra-compact preset", () => {
+    const { applyUiScale, current } = useUiScale();
+    applyUiScale("extra-compact");
+    expect(document.documentElement.style.getPropertyValue("--ui-scale")).toBe("0.7");
+    expect(current.value).toBe("extra-compact");
+  });
+
   it("loadUiScale restores the persisted preset before mount", () => {
     localStorage.setItem("calvin-ui-size", "compact");
     const { loadUiScale, current } = useUiScale();

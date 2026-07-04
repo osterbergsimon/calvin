@@ -12,7 +12,7 @@ This doc is the **single source of truth for the sizing token names and their ba
 
 Calvin is getting a global, user-configurable **"UI size"** setting (Settings → Appearance). It scales the settings chrome and the shared `ui/` control primitives so users can make touch controls smaller or larger to taste.
 
-- **Discrete presets** (SegmentedControl): Compact `0.85` · Default `1.0` · Large `1.15` · Extra-large `1.3`.
+- **Discrete presets** (SegmentedControl), even `0.15` steps: Extra-compact `0.70` · Compact `0.85` · Default `1.0` · Large `1.15` · Extra-large `1.3` (labelled XS · S · M · L · XL).
 - Implemented as **one CSS multiplier**, `--ui-scale`, set on `<html>` at runtime. It is **not** a root font-size change — scope stays precise: only components that consume the tokens below scale.
 - Persisted as a string preset key `uiSize` via `/api/config`; the key→factor map lives in `frontend/src/styles/uiScale.js`.
 

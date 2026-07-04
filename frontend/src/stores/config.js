@@ -76,7 +76,7 @@ export const useConfigStore = defineStore("config", () => {
   const touchControls = ref("auto"); // 'auto' (detect) | 'on' (force) | 'off' (hide) touch chrome
   const touchControlSize = ref("medium"); // 'small' | 'medium' | 'large' — region touch control size
   const mealPlanCardSize = ref("medium"); // Meal plan card size: 'small' | 'medium' | 'large'
-  const uiSize = ref("default"); // Global UI size: 'compact' | 'default' | 'large' | 'extra-large'
+  const uiSize = ref("default"); // Global UI size: 'extra-compact' | 'compact' | 'default' | 'large' | 'extra-large'
   const consoleLogEnabled = ref(true); // Enable console logging (default: true for backwards compatibility)
   const consoleLogLevel = ref("info"); // Console log level: 'error' | 'warn' | 'info' | 'debug' (default: 'info')
   const configPollInterval = ref(30); // Config polling interval in seconds (default: 30)
