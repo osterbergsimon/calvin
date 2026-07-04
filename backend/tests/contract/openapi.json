@@ -278,6 +278,17 @@
             ],
             "title": "Calendarsplit"
           },
+          "clockBarPluginItemSize": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Clockbarpluginitemsize"
+          },
           "clockBarVerticalDateFontSize": {
             "anyOf": [
               {
@@ -321,6 +332,17 @@
               }
             ],
             "title": "Clockbarverticalpadding"
+          },
+          "clockBarVerticalPluginItemSize": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Clockbarverticalpluginitemsize"
           },
           "configPollInterval": {
             "anyOf": [

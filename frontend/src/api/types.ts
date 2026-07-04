@@ -1581,6 +1581,8 @@ export interface components {
       calendarRefreshInterval?: number | null;
       /** Calendarsplit */
       calendarSplit?: number | null;
+      /** Clockbarpluginitemsize */
+      clockBarPluginItemSize?: number | null;
       /** Clockbarverticaldatefontsize */
       clockBarVerticalDateFontSize?: number | null;
       /** Clockbarverticalfontsize */
@@ -1589,6 +1591,8 @@ export interface components {
       clockBarVerticalLayout?: string | null;
       /** Clockbarverticalpadding */
       clockBarVerticalPadding?: number | null;
+      /** Clockbarverticalpluginitemsize */
+      clockBarVerticalPluginItemSize?: number | null;
       /** Configpollinterval */
       configPollInterval?: number | null;
       /** Darkmodeend */
