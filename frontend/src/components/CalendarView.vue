@@ -44,15 +44,13 @@
             >
               Today
             </button>
-            <button
-              type="button"
-              class="calendar-header__nav"
+            <IconButton
+              label="Previous"
               title="Previous"
-              aria-label="Previous"
               @click="previousMonth"
             >
               ‹
-            </button>
+            </IconButton>
             <button
               type="button"
               class="calendar-header__view-switch"
@@ -63,30 +61,27 @@
               <span class="calendar-header__view-label">{{ viewModeLabel }}</span>
               <span class="calendar-header__view-caret" aria-hidden="true">▸</span>
             </button>
-            <button
-              type="button"
-              class="calendar-header__nav"
+            <IconButton
+              label="Next"
               title="Next"
-              aria-label="Next"
               @click="nextMonth"
             >
               ›
-            </button>
+            </IconButton>
             <CalendarViewOptions
               v-if="view && viewMode !== 'day'"
               :region-id="regionId"
               :view="view"
             />
-            <button
+            <IconButton
               v-if="!isFullscreen"
-              type="button"
-              class="calendar-header__nav calendar-header__fullscreen"
+              class="calendar-header__fullscreen"
+              label="Fullscreen calendar"
               title="Fullscreen"
-              aria-label="Fullscreen calendar"
               @click="enterFullscreen"
             >
               ⤢
-            </button>
+            </IconButton>
           </div>
         </div>
 
@@ -184,6 +179,7 @@ import EventDetailPanel from "./EventDetailPanel.vue";
 import DialogScrim from "./ui/DialogScrim.vue";
 import CalendarEventItem from "./CalendarEventItem.vue";
 import DashboardPanel from "./DashboardPanel.vue";
+import IconButton from "./ui/IconButton.vue";
 import RegionControls from "./dashboard/RegionControls.vue";
 import CalendarViewOptions from "./dashboard/CalendarViewOptions.vue";
 
@@ -1204,24 +1200,6 @@ onActivated(() => {
   flex-shrink: 0;
 }
 
-.calendar-header__nav {
-  min-width: 1.75rem;
-  height: 1.75rem;
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  font-size: 1.05rem;
-  font-family: var(--font-ui);
-  color: var(--ink);
-  background: var(--bg-2);
-  border: 1px solid var(--line);
-  border-radius: 8px;
-  cursor: pointer;
-  transition:
-    background 0.2s,
-    border-color 0.2s;
-}
-
 .calendar-header__view-switch {
   display: inline-flex;
   align-items: center;
@@ -1269,12 +1247,10 @@ onActivated(() => {
   color: var(--ink-2);
 }
 
-.calendar-header__nav:hover,
 .calendar-header__view-switch:hover {
   border-color: var(--focus-edge);
 }
 
-.calendar-header__nav:focus-visible,
 .calendar-header__view-switch:focus-visible {
   outline: 2px solid var(--focus);
   outline-offset: 2px;

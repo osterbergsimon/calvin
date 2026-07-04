@@ -18,9 +18,9 @@ body {
   height: 100vh;
 }
 
-/* Matches the redesigned region controls (.calendar-header__nav /
-   RegionViewOptions): 1.75rem square, 8px radius, semantic tokens. Keeps the
-   service region's header buttons consistent with the calendar's. */
+/* Matches the ui/IconButton default (sm/square): 1.75rem square, 8px radius,
+   semantic tokens. Keeps the service region's header buttons consistent with the
+   calendar's. Slated to adopt IconButton directly in calvin-0wr. */
 .dashboard-panel__icon-button {
   min-width: 1.75rem;
   height: 1.75rem;

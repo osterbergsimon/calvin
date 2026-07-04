@@ -48,7 +48,8 @@ describe("RegionViewOptions", () => {
 
   it("reflects the active modifier state on the trigger", () => {
     const w = mountShell({ active: true });
-    expect(w.find(".region-view-options__trigger").classes()).toContain("active");
+    // Trigger composes ui/IconButton, whose lit state is the icon-btn--active class.
+    expect(w.find(".region-view-options__trigger").classes()).toContain("icon-btn--active");
     w.unmount();
   });
 

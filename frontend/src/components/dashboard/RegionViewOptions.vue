@@ -1,17 +1,16 @@
 <template>
   <div ref="root" class="region-view-options">
-    <button
-      type="button"
+    <IconButton
       class="region-view-options__trigger"
-      :class="{ active }"
+      :active="active"
+      :label="label"
       :title="label"
-      :aria-label="label"
       :aria-expanded="open ? 'true' : 'false'"
       @click.stop="toggle"
     >
       <!-- Sliders/"tune" glyph: reads as "adjust what I'm looking at", distinct
            from a settings gear (which lives in the Settings screen). -->
-      <svg viewBox="0 0 24 24" width="16" height="16" aria-hidden="true">
+      <svg class="tune-glyph" viewBox="0 0 24 24" width="16" height="16" aria-hidden="true">
         <line x1="4" y1="7" x2="20" y2="7" />
         <line x1="4" y1="12" x2="20" y2="12" />
         <line x1="4" y1="17" x2="20" y2="17" />
@@ -19,7 +18,7 @@
         <circle cx="9" cy="12" r="2.4" class="knob" />
         <circle cx="13" cy="17" r="2.4" class="knob" />
       </svg>
-    </button>
+    </IconButton>
     <div v-if="open" class="region-view-options__popover" @click.stop>
       <slot />
     </div>
@@ -32,6 +31,7 @@
 // service view options later). Owns nothing about a region's data — a consumer
 // fills the default slot and drives `active` from whatever modifier is on.
 import { onBeforeUnmount, ref, watch } from "vue";
+import IconButton from "@/components/ui/IconButton.vue";
 
 defineProps({
   // When a display modifier is engaged (e.g. calendar rolling), the trigger
@@ -80,50 +80,20 @@ defineExpose({ open, close });
   display: inline-flex;
 }
 
-.region-view-options__trigger {
-  min-width: 1.75rem;
-  height: 1.75rem;
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  color: var(--ink-2);
-  background: var(--bg-2);
-  border: 1px solid var(--line);
-  border-radius: 8px;
-  cursor: pointer;
-  transition:
-    background 0.2s,
-    border-color 0.2s,
-    color 0.2s;
-}
-
-.region-view-options__trigger svg {
+/* Button chrome (size/border/hover/focus/active) comes from ui/IconButton; only
+   the tune glyph's stroke styling is region-specific. Slotted SVG is compiled in
+   this component's scope, so these scoped selectors reach it. The glyph inherits
+   the button's `color`, so IconButton's active state (--focus) lights it up. */
+.tune-glyph {
   fill: none;
   stroke: currentColor;
   stroke-width: 2;
   stroke-linecap: round;
 }
 
-.region-view-options__trigger .knob {
+.tune-glyph .knob {
   fill: currentColor;
   stroke: none;
-}
-
-.region-view-options__trigger:hover {
-  color: var(--ink);
-  border-color: var(--focus-edge);
-}
-
-/* Active = a display modifier is on (calendar rolling). The whole glyph adopts
-   the accent so the state is legible at a glance. */
-.region-view-options__trigger.active {
-  color: var(--focus);
-  border-color: var(--focus-edge);
-}
-
-.region-view-options__trigger:focus-visible {
-  outline: 2px solid var(--focus);
-  outline-offset: 2px;
 }
 
 .region-view-options__popover {
