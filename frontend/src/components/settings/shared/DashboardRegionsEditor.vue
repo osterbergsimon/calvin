@@ -81,51 +81,28 @@
 
         <div v-if="expandedScreens.has(screen.id)" class="screen-clock-bar-controls">
           <span class="clock-bar-row-label">Clock bar</span>
-          <select
-            class="clock-bar-control"
-            :value="effectiveClockBarFor(screen).mode"
-            :aria-label="`Screen ${screenIndex + 1} clock bar mode`"
-            @change="setScreenClockBarMode(screenIndex, $event.target.value)"
-          >
-            <option value="horizontal">Horizontal</option>
-            <option value="vertical">Vertical</option>
-          </select>
-          <select
-            class="clock-bar-control"
-            :value="effectiveClockBarFor(screen).position"
+          <SegmentedControl
+            :model-value="effectiveClockBarFor(screen).mode"
+            :options="clockBarModeOptions"
+            :aria-label="`Screen ${screenIndex + 1} clock bar orientation`"
+            @update:model-value="v => setScreenClockBarMode(screenIndex, v)"
+          />
+          <SelectPill
+            :model-value="effectiveClockBarFor(screen).position"
+            :options="clockBarPositionOptions(screen, effectiveClockBarFor(screen).mode)"
             :aria-label="`Screen ${screenIndex + 1} clock bar position`"
-            @change="setScreenClockBarPosition(screenIndex, $event.target.value)"
-          >
-            <option
-              v-for="opt in clockBarPositionOptions(screen, effectiveClockBarFor(screen).mode)"
-              :key="opt.value"
-              :value="opt.value"
-            >
-              {{ opt.label }}
-            </option>
-          </select>
-          <label
-            class="clock-bar-switch"
-            :class="{ 'clock-bar-switch-on': effectiveClockBarFor(screen).enabled }"
-            :title="
-              effectiveClockBarFor(screen).enabled
-                ? 'Hide bar on this screen'
-                : 'Show bar on this screen'
-            "
-          >
-            <input
-              type="checkbox"
-              :checked="effectiveClockBarFor(screen).enabled"
+            @update:model-value="v => setScreenClockBarPosition(screenIndex, v)"
+          />
+          <div class="clock-bar-visibility">
+            <ToggleSwitch
+              :model-value="effectiveClockBarFor(screen).enabled"
               :aria-label="`Show clock bar on screen ${screenIndex + 1}`"
-              @change="setScreenClockBarEnabled(screenIndex, $event.target.checked)"
+              @update:model-value="v => setScreenClockBarEnabled(screenIndex, v)"
             />
-            <span class="clock-bar-switch-track" aria-hidden="true">
-              <span class="clock-bar-switch-thumb" />
-            </span>
-            <span class="clock-bar-switch-label">{{
+            <span class="clock-bar-visibility-label">{{
               effectiveClockBarFor(screen).enabled ? "Shown" : "Hidden"
             }}</span>
-          </label>
+          </div>
           <button
             v-if="screenHasClockBarOverride(screen)"
             type="button"
@@ -627,6 +604,9 @@ import { computed, onMounted, onUnmounted, reactive, ref } from "vue";
 import { useWebServicesStore } from "@/stores/webServices";
 import { useCalendarStore } from "@/stores/calendar";
 import { usePlugins } from "@/composables";
+import SelectPill from "@/components/ui/SelectPill.vue";
+import SegmentedControl from "@/components/ui/SegmentedControl.vue";
+import ToggleSwitch from "@/components/ui/ToggleSwitch.vue";
 import {
   MAX_TOP_REGIONS,
   addSubRegion,
@@ -756,6 +736,11 @@ const clockBarPositionLabel = (position, screen) => {
   }
   return "—";
 };
+
+const clockBarModeOptions = [
+  { value: "horizontal", label: "Horizontal" },
+  { value: "vertical", label: "Vertical" },
+];
 
 const clockBarPositionOptions = (screen, mode) => {
   const options =
@@ -1760,10 +1745,10 @@ onUnmounted(() => {
   display: flex;
   flex-wrap: wrap;
   align-items: center;
-  gap: 0.5rem;
-  padding: 0.4rem 0.6rem;
+  gap: 0.6rem;
+  padding: 0.6rem 0.75rem;
   border: 1px solid var(--line);
-  border-radius: 6px;
+  border-radius: 8px;
   background: var(--bg-1);
   font-size: 0.85rem;
   color: var(--ink-2);
@@ -1774,69 +1759,16 @@ onUnmounted(() => {
   color: var(--ink);
 }
 
-.clock-bar-control {
-  border: 1px solid var(--line);
-  border-radius: 4px;
-  padding: 0.25rem 0.4rem;
-  background: var(--bg-2);
-  color: var(--ink);
-}
-
-.clock-bar-switch {
+.clock-bar-visibility {
   display: inline-flex;
   align-items: center;
-  gap: 0.4rem;
-  cursor: pointer;
-  user-select: none;
-  font-size: 0.8rem;
+  gap: 0.5rem;
   color: var(--ink);
 }
 
-.clock-bar-switch input {
-  position: absolute;
-  opacity: 0;
-  pointer-events: none;
-  width: 0;
-  height: 0;
-}
-
-.clock-bar-switch-track {
-  position: relative;
-  width: 1.9rem;
-  height: 1rem;
-  border-radius: 999px;
-  background: var(--line);
-  transition: background 0.15s ease;
-  flex-shrink: 0;
-}
-
-.clock-bar-switch-thumb {
-  position: absolute;
-  top: 2px;
-  left: 2px;
-  width: 0.75rem;
-  height: 0.75rem;
-  border-radius: 50%;
-  background: var(--bg-1);
-  box-shadow: 0 1px 2px rgba(0, 0, 0, 0.2);
-  transition: transform 0.15s ease;
-}
-
-.clock-bar-switch-on .clock-bar-switch-track {
-  background: var(--focus);
-}
-
-.clock-bar-switch-on .clock-bar-switch-thumb {
-  transform: translateX(0.9rem);
-}
-
-.clock-bar-switch input:focus-visible + .clock-bar-switch-track {
-  outline: 2px solid var(--focus);
-  outline-offset: 2px;
-}
-
-.clock-bar-switch-label {
+.clock-bar-visibility-label {
   min-width: 3rem;
+  font-size: 0.85rem;
 }
 
 .clock-bar-inherit {
