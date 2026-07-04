@@ -203,7 +203,41 @@ describe("DashboardRegionsEditor (screens & regions logic)", () => {
   });
 
   it("does not render an Activate control (screen switching lives on the dashboard dots)", () => {
-    const wrapper = mount(DashboardRegionsEditor, { props: { config: {} } });
+    const twoScreenConfig = {
+      dashboardScreens: {
+        version: 2,
+        activeScreenId: "home",
+        screens: [
+          {
+            id: "home",
+            name: "Home",
+            layout: {
+              version: 1,
+              preset: "split_two",
+              regions: [
+                { id: "region-1", kind: "calendar", size: 70 },
+                { id: "region-2", kind: "calendar", size: 30 },
+              ],
+            },
+            activeRegionId: "region-1",
+          },
+          {
+            id: "screen-2",
+            name: "Screen 2",
+            layout: {
+              version: 1,
+              preset: "split_two",
+              regions: [
+                { id: "region-3", kind: "calendar", size: 70 },
+                { id: "region-4", kind: "calendar", size: 30 },
+              ],
+            },
+            activeRegionId: "region-3",
+          },
+        ],
+      },
+    };
+    const wrapper = mount(DashboardRegionsEditor, { props: { config: twoScreenConfig } });
     expect(wrapper.find('[aria-label="Activate screen 1"]').exists()).toBe(false);
     expect(wrapper.find('[aria-label="Screen 2 is active"]').exists()).toBe(false);
     expect(wrapper.find(".screen-activate").exists()).toBe(false);
