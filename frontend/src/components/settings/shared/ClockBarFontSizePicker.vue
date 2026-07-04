@@ -348,22 +348,26 @@ const handlePaddingInput = event => {
   overflow: hidden;
 }
 
+/* A top/bottom bar hugs its content height on a real screen, so the preview does
+   too (no fixed height, no centering). Padding then grows the bar symmetrically and
+   its bottom divider sits at the true edge — instead of the divider floating
+   mid-box with dead space below it and padding appearing to only push downward. */
 .preview-horizontal {
   width: 100%;
   min-width: 0;
-  height: 96px;
-  display: flex;
-  align-items: center;
   overflow: hidden;
 }
 
+/* A side bar fills screen height but hugs its width. Give the preview a
+   representative height and hug the bar's width so the right divider sits at the
+   true edge (no dead space beside it). align-self keeps the flex-column parent from
+   stretching it; max-width keeps a fat bar from ever widening the editor (calvin-hbp). */
 .preview-vertical {
-  width: 100%;
-  min-width: 0;
   height: 200px;
+  width: fit-content;
+  max-width: 100%;
+  align-self: flex-start;
   display: flex;
-  align-items: stretch;
-  justify-content: center;
   overflow: hidden;
 }
 </style>
