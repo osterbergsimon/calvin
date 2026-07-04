@@ -371,6 +371,17 @@ const handlePluginItemInput = event => {
   font-size: 0.9rem;
   font-family: var(--font-data);
   text-align: center;
+  /* Strip the browser's native spinner chrome — the up/down arrows read as
+     unstyled next to the custom sliders. The value is driven by the slider and
+     by typing; the tokenized field is the whole control. */
+  appearance: textfield;
+  -moz-appearance: textfield;
+}
+
+.font-size-input::-webkit-outer-spin-button,
+.font-size-input::-webkit-inner-spin-button {
+  -webkit-appearance: none;
+  margin: 0;
 }
 
 .font-size-input:focus-visible {
