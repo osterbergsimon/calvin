@@ -81,6 +81,33 @@
           </div>
         </div>
       </div>
+
+      <div class="control-group">
+        <label class="control-label">Plugin Item Size</label>
+        <div class="slider-group">
+          <input
+            type="range"
+            :min="min"
+            :max="max"
+            :step="step"
+            :value="localPluginItemSize"
+            @input="handlePluginItemInput"
+            class="font-size-slider"
+          />
+          <div class="font-size-display">
+            <input
+              type="number"
+              :min="min"
+              :max="max"
+              :step="step"
+              :value="localPluginItemSize"
+              @input="handlePluginItemInput"
+              class="font-size-input"
+            />
+            <span class="font-size-unit">px</span>
+          </div>
+        </div>
+      </div>
     </div>
 
     <div v-if="showPreview" class="preview-container">
@@ -97,6 +124,7 @@
           :preview-date-size="localDateSize"
           :preview-layout="layout"
           :preview-padding="localPadding"
+          :preview-plugin-item-size="localPluginItemSize"
         />
       </div>
       <div v-else class="preview-wrapper preview-horizontal">
@@ -110,6 +138,7 @@
           :preview-date-size="localDateSize"
           :preview-layout="layout"
           :preview-padding="localPadding"
+          :preview-plugin-item-size="localPluginItemSize"
         />
       </div>
     </div>
@@ -150,6 +179,10 @@ const props = defineProps({
     type: Number,
     default: 8,
   },
+  pluginItemSize: {
+    type: Number,
+    default: 16,
+  },
   min: {
     type: Number,
     default: 8,
@@ -164,12 +197,18 @@ const props = defineProps({
   },
 });
 
-const emit = defineEmits(["update:timeSize", "update:dateSize", "update:padding"]);
+const emit = defineEmits([
+  "update:timeSize",
+  "update:dateSize",
+  "update:padding",
+  "update:pluginItemSize",
+]);
 
 // Local reactive values for immediate updates
 const localTimeSize = ref(props.timeSize);
 const localDateSize = ref(props.dateSize);
 const localPadding = ref(props.padding);
+const localPluginItemSize = ref(props.pluginItemSize);
 
 // Sync with props
 watch(
@@ -192,6 +231,14 @@ watch(
   () => props.padding,
   newValue => {
     localPadding.value = newValue;
+  },
+  { immediate: true }
+);
+
+watch(
+  () => props.pluginItemSize,
+  newValue => {
+    localPluginItemSize.value = newValue;
   },
   { immediate: true }
 );
@@ -220,6 +267,15 @@ const handlePaddingInput = event => {
     const clampedValue = Math.max(0, Math.min(32, value));
     localPadding.value = clampedValue;
     emit("update:padding", clampedValue);
+  }
+};
+
+const handlePluginItemInput = event => {
+  const value = parseFloat(event.target.value);
+  if (!isNaN(value)) {
+    const clampedValue = Math.max(props.min, Math.min(props.max, value));
+    localPluginItemSize.value = clampedValue;
+    emit("update:pluginItemSize", clampedValue);
   }
 };
 </script>

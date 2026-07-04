@@ -1,5 +1,9 @@
 <template>
-  <div class="plugin-statusbar-items" :class="[`orientation-${orientation}`, { ghost }]">
+  <div
+    class="plugin-statusbar-items"
+    :class="[`orientation-${orientation}`, { ghost }]"
+    :style="sizeStyle"
+  >
     <SchemaStatusbarItem
       v-for="service in schemaServices"
       :key="service.id"
@@ -16,7 +20,7 @@ import SchemaStatusbarItem from "./plugins/SchemaStatusbarItem.vue";
 
 defineOptions({ name: "PluginStatusbarItems" });
 
-defineProps({
+const props = defineProps({
   ghost: {
     type: Boolean,
     default: false,
@@ -26,7 +30,17 @@ defineProps({
     default: "horizontal",
     validator: value => ["horizontal", "vertical"].includes(value),
   },
+  // Readout value size (px). Overrides --plugin-value-size-sm for this bar only,
+  // so plugin items size independently of the global plugin token. null = inherit.
+  size: {
+    type: Number,
+    default: null,
+  },
 });
+
+const sizeStyle = computed(() =>
+  props.size != null ? { "--plugin-value-size-sm": `${props.size}px` } : null
+);
 
 const webServicesStore = useWebServicesStore();
 

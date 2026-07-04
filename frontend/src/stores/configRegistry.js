@@ -214,6 +214,16 @@ export const CONFIG_FIELD_DEFINITIONS = [
   },
   { name: "clockBarPadding", keys: ["clockBarPadding", "clock_bar_padding"], defaultValue: 8 },
   {
+    name: "clockBarPluginItemSize",
+    keys: ["clockBarPluginItemSize", "clock_bar_plugin_item_size"],
+    defaultValue: 16,
+  },
+  {
+    name: "clockBarVerticalPluginItemSize",
+    keys: ["clockBarVerticalPluginItemSize", "clock_bar_vertical_plugin_item_size"],
+    defaultValue: 16,
+  },
+  {
     name: "clockBarShowPluginItems",
     keys: ["clockBarShowPluginItems", "clock_bar_show_plugin_items"],
     defaultValue: true,

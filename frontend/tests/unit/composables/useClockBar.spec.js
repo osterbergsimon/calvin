@@ -47,6 +47,33 @@ describe("useClockBar barPadding", () => {
   });
 });
 
+describe("useClockBar pluginItemSize", () => {
+  beforeEach(() => setActivePinia(createPinia()));
+
+  it("reads the horizontal plugin item size", () => {
+    useConfigStore().clockBarPluginItemSize = 22;
+    expect(useBar("horizontal").pluginItemSize.value).toBe(22);
+  });
+
+  it("reads the vertical plugin item size", () => {
+    useConfigStore().clockBarVerticalPluginItemSize = 20;
+    expect(useBar("vertical").pluginItemSize.value).toBe(20);
+  });
+
+  it("falls back to 16 when unset", () => {
+    useConfigStore().clockBarPluginItemSize = undefined;
+    expect(useBar("horizontal").pluginItemSize.value).toBe(16);
+  });
+
+  it("prefers a live preview size when in preview mode", () => {
+    const api = useBar("horizontal", {
+      previewMode: () => true,
+      previewPluginItemSize: () => 30,
+    });
+    expect(api.pluginItemSize.value).toBe(30);
+  });
+});
+
 describe("useClockBar barPaddingStyle", () => {
   beforeEach(() => setActivePinia(createPinia()));
 

@@ -150,6 +150,8 @@ class ConfigUpdate(BaseModel):
     clockBarVerticalFontSize: int | None = None
     clockBarVerticalDateFontSize: int | None = None
     clockBarVerticalPadding: int | None = None
+    clockBarPluginItemSize: int | None = None
+    clockBarVerticalPluginItemSize: int | None = None
 
     # Allow arbitrary fields for extensibility
     model_config = ConfigDict(extra="allow")
@@ -461,6 +463,20 @@ async def get_config():
         config["clockBarPadding"] = 8
     elif "clock_bar_padding" in config and "clockBarPadding" not in config:
         config["clockBarPadding"] = config["clock_bar_padding"]
+    if "clockBarPluginItemSize" not in config and "clock_bar_plugin_item_size" not in config:
+        config["clockBarPluginItemSize"] = 16
+    elif "clock_bar_plugin_item_size" in config and "clockBarPluginItemSize" not in config:
+        config["clockBarPluginItemSize"] = config["clock_bar_plugin_item_size"]
+    if (
+        "clockBarVerticalPluginItemSize" not in config
+        and "clock_bar_vertical_plugin_item_size" not in config
+    ):
+        config["clockBarVerticalPluginItemSize"] = 16
+    elif (
+        "clock_bar_vertical_plugin_item_size" in config
+        and "clockBarVerticalPluginItemSize" not in config
+    ):
+        config["clockBarVerticalPluginItemSize"] = config["clock_bar_vertical_plugin_item_size"]
     # Master toggle for plugin statusbar items. Renamed from the legacy
     # weather-named clockBarShowWeather (retired in the contract-1.0 rename):
     # any plugin can now ship a statusbar item, and each service opts in via its
@@ -628,6 +644,8 @@ async def update_config(config_update: ConfigUpdate):
         "clockBarVerticalDateFontSize": "clock_bar_vertical_date_font_size",
         "clockBarVerticalPadding": "clock_bar_vertical_padding",
         "clockBarPadding": "clock_bar_padding",
+        "clockBarPluginItemSize": "clock_bar_plugin_item_size",
+        "clockBarVerticalPluginItemSize": "clock_bar_vertical_plugin_item_size",
         "clockBarShowPluginItems": "clock_bar_show_plugin_items",
         "clockBarShowLogo": "clock_bar_show_logo",
     }

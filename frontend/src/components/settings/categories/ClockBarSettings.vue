@@ -71,11 +71,13 @@
           :date-size="config.clockBarDateFontSize || 14"
           :layout="config.clockBarLayout || 'single-line'"
           :padding="config.clockBarPadding ?? 8"
+          :plugin-item-size="config.clockBarPluginItemSize ?? 16"
           :show-date="config.clockShowDate"
           :is-vertical="false"
           @update:time-size="v => emit('update:config', { clockBarFontSize: v })"
           @update:date-size="v => emit('update:config', { clockBarDateFontSize: v })"
           @update:padding="v => emit('update:config', { clockBarPadding: v })"
+          @update:plugin-item-size="v => emit('update:config', { clockBarPluginItemSize: v })"
         />
       </SettingRow>
       <SettingRow
@@ -102,12 +104,14 @@
           :date-size="config.clockBarVerticalDateFontSize || 11"
           :layout="config.clockBarVerticalLayout || 'upright'"
           :padding="config.clockBarVerticalPadding ?? 8"
+          :plugin-item-size="config.clockBarVerticalPluginItemSize ?? 16"
           :show-date="config.clockShowDate"
           :is-vertical="true"
           :max="48"
           @update:time-size="v => emit('update:config', { clockBarVerticalFontSize: v })"
           @update:date-size="v => emit('update:config', { clockBarVerticalDateFontSize: v })"
           @update:padding="v => emit('update:config', { clockBarVerticalPadding: v })"
+          @update:plugin-item-size="v => emit('update:config', { clockBarVerticalPluginItemSize: v })"
         />
       </SettingRow>
     </SettingsSection>

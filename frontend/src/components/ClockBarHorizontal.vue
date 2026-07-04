@@ -35,7 +35,7 @@
       </div>
 
       <div class="clock-bar-side clock-bar-right">
-        <PluginStatusbarItems v-if="showStatusbar" />
+        <PluginStatusbarItems v-if="showStatusbar" :size="pluginItemSize" />
         <BarActionCluster v-if="!previewMode" :compact="false" />
       </div>
     </div>
@@ -96,6 +96,10 @@ const props = defineProps({
     type: Number,
     default: null,
   },
+  previewPluginItemSize: {
+    type: Number,
+    default: null,
+  },
 });
 
 const {
@@ -106,6 +110,7 @@ const {
   formattedDate,
   fontSize,
   dateFontSize,
+  pluginItemSize,
   layout,
   barPaddingStyle,
 } = useClockBar({
@@ -117,6 +122,7 @@ const {
   previewDateSize: () => props.previewDateSize,
   previewLayout: () => props.previewLayout,
   previewPadding: () => props.previewPadding,
+  previewPluginItemSize: () => props.previewPluginItemSize,
   orientation: () => "horizontal",
 });
 

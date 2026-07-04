@@ -13,6 +13,7 @@ import { useConfigStore } from "../stores/config";
  * @param {() => number|null} [opts.previewDateSize]
  * @param {() => string|null} [opts.previewLayout]
  * @param {() => number|null} [opts.previewPadding]
+ * @param {() => number|null} [opts.previewPluginItemSize]
  * @param {() => 'horizontal'|'vertical'} [opts.orientation]
  */
 // Fixed edge gutter (px) along the bar's inline axis, so the leading logo is never
@@ -53,6 +54,15 @@ export function useClockBar(opts) {
     if (isPreview.value && preview !== null) return preview;
     if (orientation.value === "vertical") return configStore.clockBarVerticalDateFontSize || 11;
     return configStore.clockBarDateFontSize || 14;
+  });
+
+  // Size of plugin statusbar item readouts (the value/number). Drives an override
+  // of --plugin-value-size-sm scoped to the bar's PluginStatusbarItems wrapper.
+  const pluginItemSize = computed(() => {
+    const preview = get(opts.previewPluginItemSize, null);
+    if (isPreview.value && preview !== null) return preview;
+    if (orientation.value === "vertical") return configStore.clockBarVerticalPluginItemSize ?? 16;
+    return configStore.clockBarPluginItemSize ?? 16;
   });
 
   const layout = computed(() => {
@@ -252,6 +262,7 @@ export function useClockBar(opts) {
     compactDateParts,
     fontSize,
     dateFontSize,
+    pluginItemSize,
     layout,
     barPadding,
     barPaddingStyle,

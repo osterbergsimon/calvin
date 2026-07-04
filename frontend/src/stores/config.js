@@ -62,6 +62,8 @@ export const useConfigStore = defineStore("config", () => {
   const clockBarVerticalDateFontSize = ref(11);
   const clockBarVerticalPadding = ref(8);
   const clockBarPadding = ref(8);
+  const clockBarPluginItemSize = ref(16);
+  const clockBarVerticalPluginItemSize = ref(16);
   const clockBarShowPluginItems = ref(true);
   const clockBarShowLogo = ref(true);
   const displayName = ref("");
@@ -134,6 +136,8 @@ export const useConfigStore = defineStore("config", () => {
     clockBarVerticalDateFontSize,
     clockBarVerticalPadding,
     clockBarPadding,
+    clockBarPluginItemSize,
+    clockBarVerticalPluginItemSize,
     clockBarShowPluginItems,
     clockBarShowLogo,
     displayName,
@@ -429,6 +433,8 @@ export const useConfigStore = defineStore("config", () => {
     clockBarVerticalDateFontSize,
     clockBarVerticalPadding,
     clockBarPadding,
+    clockBarPluginItemSize,
+    clockBarVerticalPluginItemSize,
     clockBarShowPluginItems,
     clockBarShowLogo,
     mealPlanCardSize,
