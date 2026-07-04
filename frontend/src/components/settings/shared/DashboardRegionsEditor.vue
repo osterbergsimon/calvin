@@ -49,7 +49,7 @@
               :title="`Direction: ${directionLabel(layoutDirectionFor(screen.layout))}`"
               @click="toggleLayoutDirection(screenIndex)"
             >
-              {{ layoutDirectionFor(screen.layout) === "column" ? "▭▭" : "▯|▯" }}
+              <DirectionSplitIcon :direction="layoutDirectionFor(screen.layout)" />
             </IconButton>
             <IconButton
               v-if="dashboardScreens.screens.length > 1"
@@ -184,7 +184,7 @@
                     :title="`Sub direction: ${directionLabel(splitDirectionFor(screen.layout, region))}`"
                     @click.stop="toggleSubDirection(screenIndex, previewIndex)"
                   >
-                    {{ splitDirectionFor(screen.layout, region) === "column" ? "▭▭" : "▯|▯" }}
+                    <DirectionSplitIcon :direction="splitDirectionFor(screen.layout, region)" />
                   </IconButton>
                   <button
                     v-if="region.split && region.split.regions.length < MAX_TOP_REGIONS"
@@ -548,6 +548,7 @@ import { useCalendarStore } from "@/stores/calendar";
 import { usePlugins } from "@/composables";
 import ToggleSwitch from "@/components/ui/ToggleSwitch.vue";
 import IconButton from "@/components/ui/IconButton.vue";
+import DirectionSplitIcon from "@/components/settings/shared/DirectionSplitIcon.vue";
 import {
   MAX_TOP_REGIONS,
   addSubRegion,
