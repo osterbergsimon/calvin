@@ -45,13 +45,13 @@ const onInput = event => {
 .range-slider {
   display: flex;
   align-items: center;
-  gap: 0.75rem;
-  width: 200px;
+  gap: var(--space-lg);
+  width: 12.5rem; /* 200px */
 }
 .range-slider__input {
   flex: 1;
-  height: 6px;
-  border-radius: 3px;
+  height: 0.375rem; /* 6px */
+  border-radius: 0.1875rem; /* 3px */
   background: var(--bg-2);
   outline: none;
   -webkit-appearance: none;
@@ -60,8 +60,8 @@ const onInput = event => {
 .range-slider__input::-webkit-slider-thumb {
   -webkit-appearance: none;
   appearance: none;
-  width: 18px;
-  height: 18px;
+  width: 1.125rem; /* 18px */
+  height: 1.125rem;
   border-radius: 50%;
   background: var(--focus);
   cursor: pointer;
@@ -69,8 +69,8 @@ const onInput = event => {
   box-shadow: 0 2px 4px var(--shadow);
 }
 .range-slider__input::-moz-range-thumb {
-  width: 18px;
-  height: 18px;
+  width: 1.125rem; /* 18px */
+  height: 1.125rem;
   border-radius: 50%;
   background: var(--focus);
   cursor: pointer;
@@ -85,7 +85,7 @@ const onInput = event => {
   min-width: 3.5ch;
   text-align: right;
   font-family: var(--font-data);
-  font-size: 0.9rem;
+  font-size: var(--fs-md);
   color: var(--ink-2);
 }
 </style>

@@ -228,7 +228,7 @@ const onTurnOff = async () => {
   gap: 0.5rem;
 }
 .device-btn {
-  min-height: 44px;
+  min-height: var(--touch-target);
   padding: 0 1rem;
   font-family: var(--font-ui);
   font-size: 0.95rem;

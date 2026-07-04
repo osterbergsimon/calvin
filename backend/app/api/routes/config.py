@@ -113,6 +113,9 @@ class ConfigUpdate(BaseModel):
     maxVisibleEvents: int | None = None  # Max events visible per day cell
     showRedDays: bool | None = None  # Highlight holidays/red days
     mealPlanCardSize: str | None = None  # Meal plan card size: 'small' | 'medium' | 'large'
+    uiSize: str | None = (
+        None  # Global UI size: 'extra-compact' | 'compact' | 'default' | 'large' | 'extra-large'
+    )
     themeMode: str | None = None  # Theme mode: 'light' | 'dark' | 'auto' | 'time'
     selectedTheme: str | None = None  # Selected custom theme ID (null = use themeMode)
     darkModeStart: int | None = None  # Dark mode start hour (0-23)
@@ -475,6 +478,11 @@ async def get_config():
         config["mealPlanCardSize"] = "medium"  # Default size
     elif "meal_plan_card_size" in config and "mealPlanCardSize" not in config:
         config["mealPlanCardSize"] = config["meal_plan_card_size"]
+
+    if "uiSize" not in config and "ui_size" not in config:
+        config["uiSize"] = "default"  # Global UI size preset
+    elif "ui_size" in config and "uiSize" not in config:
+        config["uiSize"] = config["ui_size"]
     if "gitRepoUrl" not in config and "git_repo_url" not in config:
         config["gitRepoUrl"] = "https://github.com/osterbergsimon/calvin.git"  # Default repo
     elif "git_repo_url" in config and "gitRepoUrl" not in config:
@@ -557,6 +565,8 @@ async def update_config(config_update: ConfigUpdate):
         update_dict["show_red_days"] = update_dict.pop("showRedDays")
     if "mealPlanCardSize" in update_dict:
         update_dict["meal_plan_card_size"] = update_dict.pop("mealPlanCardSize")
+    if "uiSize" in update_dict:
+        update_dict["ui_size"] = update_dict.pop("uiSize")
     if "themeMode" in update_dict:
         update_dict["theme_mode"] = update_dict.pop("themeMode")
     if "selectedTheme" in update_dict:

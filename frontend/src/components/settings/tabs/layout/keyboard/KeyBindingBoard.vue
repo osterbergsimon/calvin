@@ -70,7 +70,7 @@ const isConflict = key => {
   color: var(--ink-2);
   padding: 10px 14px;
   cursor: pointer;
-  min-height: 44px;
+  min-height: var(--touch-target);
 }
 .kb-add:hover:not(:disabled) {
   border-color: var(--focus);

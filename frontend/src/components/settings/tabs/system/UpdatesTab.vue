@@ -270,7 +270,7 @@ watch(
   font-weight: 600;
   cursor: pointer;
   transition: all 0.2s;
-  min-height: 44px;
+  min-height: var(--touch-target);
   font-family: var(--font-ui);
 }
 

@@ -41,20 +41,20 @@ const bump = delta => {
 .stepper {
   display: inline-flex;
   align-items: center;
-  gap: 0.25rem;
+  gap: var(--space-3xs);
   background: var(--bg-2);
   border: 1px solid var(--line);
-  border-radius: 11px;
-  padding: 2px;
+  border-radius: var(--radius-lg);
+  padding: 0.125rem; /* 2px */
 }
 .stepper__btn {
-  min-width: 44px;
-  min-height: 44px;
-  font-size: 1.25rem;
+  min-width: var(--touch-target);
+  min-height: var(--touch-target);
+  font-size: var(--fs-xl);
   color: var(--ink);
   background: transparent;
   border: 0;
-  border-radius: 9px;
+  border-radius: 0.5625rem; /* 9px */
   cursor: pointer;
 }
 .stepper__btn:hover {

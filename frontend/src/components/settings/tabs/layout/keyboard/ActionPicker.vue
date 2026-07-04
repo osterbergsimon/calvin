@@ -141,8 +141,8 @@ const visibleGroups = computed(() => {
   font-size: 1.4rem;
   line-height: 1;
   cursor: pointer;
-  min-width: 44px;
-  min-height: 44px;
+  min-width: var(--touch-target);
+  min-height: var(--touch-target);
   display: flex;
   align-items: center;
   justify-content: center;
@@ -197,7 +197,7 @@ const visibleGroups = computed(() => {
   text-transform: uppercase;
   letter-spacing: 0.05em;
   cursor: pointer;
-  min-height: 44px;
+  min-height: var(--touch-target);
 }
 .ap-group-toggle:hover {
   color: var(--ink);
@@ -232,7 +232,7 @@ const visibleGroups = computed(() => {
   border-radius: 6px;
   color: var(--ink);
   cursor: pointer;
-  min-height: 44px;
+  min-height: var(--touch-target);
 }
 .ap-group--reco .ap-opt {
   border-color: var(--focus);

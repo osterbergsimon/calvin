@@ -61,6 +61,73 @@
   /* switch knob tokens */
   --switch-knob: #cdd6dc;
   --switch-knob-on: #ffffff;
+
+  /* ------------------------------------------------------------------ *
+   * UI sizing tokens. See docs/design/2026-07-04-ui-sizing-tokens.md.
+   *
+   * MECHANISM: the global "UI size" scales ONLY the settings/config UI,
+   * via `zoom: var(--ui-scale)` on the `.settings-page` root (Settings.vue).
+   * zoom scales the whole settings subtree — text, every control, modals —
+   * regardless of unit, and leaves the live dashboard untouched (the
+   * dashboard keeps its own sizing: touchControlSize, clockBarFontSize).
+   * --ui-scale is set on <html> at runtime by useUiScale and inherited
+   * down to .settings-page. At scale 1 zoom is a no-op.
+   *
+   * These tokens are the shared sizing VOCABULARY (rem baselines == prior
+   * px literals, so adopting one is a no-op). They give the settings shell
+   * and the region editor (calvin-bvw) one named scale; the actual UI-size
+   * scaling is the zoom above, not a per-token multiplier.
+   *
+   * NOTE: --text-* and --switch-* above are COLOR tokens; the sizing
+   * scale deliberately uses --fs-* (font-size) and --toggle-* (geometry).
+   * ------------------------------------------------------------------ */
+  --ui-scale: 1;
+
+  /* Control sizing */
+  --touch-target: 2.75rem; /* 44px */
+  --control-height: 3rem; /* 48px */
+
+  /* Toggle switch geometry — sized to sit in the compact control rhythm
+     (~1.5rem tall) rather than the chunky iOS default. */
+  --toggle-w: 2.75rem; /* 44px */
+  --toggle-h: 1.5rem; /* 24px */
+  --toggle-knob: 1.125rem; /* 18px */
+  --toggle-inset: 0.1875rem; /* 3px */
+  --toggle-travel: calc(
+    var(--toggle-w) - var(--toggle-knob) - (2 * var(--toggle-inset))
+  ); /* 20px */
+
+  /* Spacing scale */
+  --space-3xs: 0.25rem;
+  --space-2xs: 0.35rem;
+  --space-xs: 0.4rem;
+  --space-sm: 0.5rem;
+  --space-md: 0.6rem;
+  --space-lg: 0.75rem;
+  --space-xl: 1rem;
+  --space-2xl: 1.25rem;
+  --space-3xl: 1.5rem;
+
+  /* Type scale */
+  --fs-micro: 0.72rem;
+  --fs-2xs: 0.75rem;
+  --fs-xs: 0.8rem;
+  --fs-sm: 0.85rem;
+  --fs-md: 0.9rem;
+  --fs-base: 1rem;
+  --fs-lg: 1.15rem;
+  --fs-xl: 1.25rem;
+  --fs-control: 0.875rem; /* 14px */
+  --fs-control-lg: 0.9375rem; /* 15px */
+
+  /* Radius scale — pill is FIXED (a pill is a pill at any scale) */
+  --radius-xs: 0.375rem; /* 6px */
+  --radius-sm: 0.5rem; /* 8px */
+  --radius-md: 0.625rem; /* 10px */
+  --radius-lg: 0.6875rem; /* 11px */
+  --radius-xl: 0.75rem; /* 12px */
+  --radius-2xl: 1rem; /* 16px */
+  --radius-pill: 999px;
 }
 
 .dark {

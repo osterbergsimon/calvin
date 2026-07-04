@@ -175,7 +175,7 @@ onMounted(async () => {
   gap: 1rem;
   align-items: center;
   padding: 0.75rem 1rem;
-  min-height: 44px;
+  min-height: var(--touch-target);
   background: var(--bg-2);
   border: 1px solid var(--line);
   border-radius: 8px;
@@ -223,7 +223,7 @@ onMounted(async () => {
   font-family: var(--font-ui);
   color: var(--ink);
   user-select: none;
-  min-height: 44px;
+  min-height: var(--touch-target);
 }
 
 .switch input {

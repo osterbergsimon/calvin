@@ -133,14 +133,14 @@ onUnmounted(() => {
 .theme-picker__trigger {
   display: inline-flex;
   align-items: center;
-  gap: 10px;
-  height: 48px;
-  padding: 0 16px;
+  gap: 0.625rem; /* 10px */
+  height: var(--control-height);
+  padding: 0 1rem; /* 16px */
   background: var(--bg-2);
   border: 1px solid var(--line);
-  border-radius: 11px;
+  border-radius: var(--radius-lg);
   font-family: var(--font-ui);
-  font-size: 15px;
+  font-size: var(--fs-control-lg);
   color: var(--ink);
   cursor: pointer;
 }
@@ -151,9 +151,9 @@ onUnmounted(() => {
 }
 
 .theme-picker__swatch {
-  width: 16px;
-  height: 16px;
-  border-radius: 5px;
+  width: 1rem; /* 16px */
+  height: 1rem;
+  border-radius: 0.3125rem; /* 5px */
   background: var(--focus);
 }
 
@@ -163,7 +163,7 @@ onUnmounted(() => {
 
 .theme-picker__chevron {
   color: var(--ink-3);
-  font-size: 12px;
+  font-size: 0.75rem; /* 12px */
 }
 
 .theme-picker__popover {
@@ -171,11 +171,11 @@ onUnmounted(() => {
   top: calc(100% + 8px);
   right: 0;
   z-index: 20;
-  min-width: 280px;
-  padding: 12px;
+  min-width: 17.5rem; /* 280px */
+  padding: 0.75rem; /* 12px */
   background: var(--bg-1);
   border: 1px solid var(--line);
-  border-radius: 12px;
+  border-radius: var(--radius-xl);
   box-shadow: 0 12px 32px var(--shadow);
   /* max-height is set inline from the available viewport space (placePopover);
      this is the fallback cap. The list scrolls inside the popover so it never

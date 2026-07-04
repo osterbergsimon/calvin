@@ -284,6 +284,11 @@ export const CONFIG_FIELD_DEFINITIONS = [
     defaultValue: "medium",
   },
   {
+    name: "uiSize",
+    keys: ["uiSize", "ui_size"],
+    defaultValue: "default",
+  },
+  {
     name: "consoleLogEnabled",
     keys: ["consoleLogEnabled", "console_log_enabled"],
     defaultValue: true,

@@ -52,7 +52,7 @@ const keyLabel = computed(() => props.keyCode.replace(/^KEY_/, ""));
   background: var(--bg-2);
   border: 1px solid var(--line);
   border-radius: 8px;
-  min-height: 44px;
+  min-height: var(--touch-target);
 }
 .kbt--empty {
   border-style: dashed;
@@ -81,8 +81,8 @@ const keyLabel = computed(() => props.keyCode.replace(/^KEY_/, ""));
   border: 1px solid var(--line);
   border-radius: 5px;
   color: var(--ink-2);
-  min-width: 44px;
-  min-height: 44px;
+  min-width: var(--touch-target);
+  min-height: var(--touch-target);
   cursor: pointer;
 }
 .kbt-btn:hover {

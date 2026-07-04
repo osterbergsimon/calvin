@@ -71,6 +71,7 @@ def test_get_config_returns_all_frontend_tracked_fields(test_client: TestClient)
         "clockBarShowPluginItems",
         "clockBarShowLogo",
         "mealPlanCardSize",
+        "uiSize",
         "consoleLogEnabled",
         "consoleLogLevel",
         "configPollInterval",
@@ -102,6 +103,25 @@ def test_update_config(test_client: TestClient):
     updated_config = update_response.json()
     assert updated_config.get("orientation") == "portrait"
     assert updated_config.get("calendarSplit") == 75.0
+
+
+@pytest.mark.integration
+def test_ui_size_defaults_and_round_trips(test_client: TestClient):
+    """uiSize defaults to 'default', round-trips via camelCase, and persists as snake_case."""
+    # Default present in a fresh config
+    get_response = test_client.get("/api/config")
+    assert get_response.status_code == 200
+    assert get_response.json().get("uiSize") == "default"
+
+    # POST camelCase, response echoes it
+    update_response = test_client.post("/api/config", json={"uiSize": "large"})
+    assert update_response.status_code == 200
+    assert update_response.json().get("uiSize") == "large"
+
+    # Persisted and surfaced as camelCase on subsequent GET
+    persisted = test_client.get("/api/config")
+    assert persisted.status_code == 200
+    assert persisted.json().get("uiSize") == "large"
 
 
 @pytest.mark.integration

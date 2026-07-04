@@ -161,14 +161,14 @@ onUnmounted(() => {
 .pill {
   display: inline-flex;
   align-items: center;
-  gap: 12px;
-  height: 48px;
-  padding: 0 16px;
+  gap: 0.75rem; /* 12px */
+  height: var(--control-height);
+  padding: 0 1rem; /* 16px */
   background: var(--bg-2);
   border: 1px solid var(--line);
-  border-radius: 11px;
+  border-radius: var(--radius-lg);
   font-family: var(--font-ui);
-  font-size: 15px;
+  font-size: var(--fs-control-lg);
   color: var(--ink);
   cursor: pointer;
 }
@@ -177,13 +177,13 @@ onUnmounted(() => {
   outline-offset: 2px;
 }
 .pill__swatch {
-  width: 16px;
-  height: 16px;
-  border-radius: 5px;
+  width: 1rem; /* 16px */
+  height: 1rem;
+  border-radius: 0.3125rem; /* 5px */
 }
 .pill__cv {
   color: var(--ink-3);
-  font-size: 12px;
+  font-size: 0.75rem; /* 12px */
 }
 .pill__menu {
   position: absolute;
@@ -193,10 +193,10 @@ onUnmounted(() => {
   min-width: 100%;
   list-style: none;
   margin: 0;
-  padding: 6px;
+  padding: 0.375rem; /* 6px */
   background: var(--bg-1);
   border: 1px solid var(--line);
-  border-radius: 12px;
+  border-radius: var(--radius-xl);
   box-shadow: 0 12px 32px var(--focus-glow);
   /* Long option lists scroll inside the menu (max-height set inline from the
      viewport space) instead of running off a short screen. */
@@ -208,11 +208,11 @@ onUnmounted(() => {
   bottom: calc(100% + 6px);
 }
 .pill__opt {
-  padding: 12px 14px;
-  min-height: 44px;
+  padding: 0.75rem 0.875rem; /* 12px 14px */
+  min-height: var(--touch-target);
   display: flex;
   align-items: center;
-  border-radius: 8px;
+  border-radius: var(--radius-sm);
   color: var(--ink);
   cursor: pointer;
 }

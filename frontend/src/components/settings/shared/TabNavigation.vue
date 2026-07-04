@@ -105,7 +105,7 @@ const handleKeydown = event => {
   align-items: center;
   gap: 0.5rem;
   padding: 0.75rem 1.25rem;
-  min-height: 44px;
+  min-height: var(--touch-target);
   background: transparent;
   border: none;
   border-bottom: 3px solid transparent;

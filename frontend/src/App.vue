@@ -13,16 +13,22 @@ import KeyboardHandler from "./components/KeyboardHandler.vue";
 import { usePhotoFrameMode } from "./composables/usePhotoFrameMode";
 // Initialize theme globally
 import { useTheme } from "./composables/useTheme";
+// Keep the global UI scale in sync with config
+import { useUiScale } from "./composables/useUiScale";
 // Initialize connection store
 import { useConnectionStore } from "./stores/connection";
 
 usePhotoFrameMode();
 const theme = useTheme();
+const uiScale = useUiScale();
 const connectionStore = useConnectionStore();
 
 // Ensure theme is initialized immediately
 onMounted(() => {
   theme.loadTheme();
+  // theme.loadTheme() triggers configStore.fetchConfig(); the immediate watch
+  // reconciles the UI scale once uiSize is populated (API is source of truth).
+  uiScale.syncWithConfig();
   connectionStore.initialize();
 });
 

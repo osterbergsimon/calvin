@@ -155,7 +155,7 @@ const handleOrderChange = newOrder => emit("order-change", newOrder);
 }
 .pi-btn-add {
   padding: 0.4rem 0.85rem;
-  min-height: 44px;
+  min-height: var(--touch-target);
   background: var(--bg-1);
   color: var(--ink);
   border: 1px solid var(--line);
@@ -252,7 +252,7 @@ const handleOrderChange = newOrder => emit("order-change", newOrder);
 }
 .pi-action {
   padding: 0.35rem 0.7rem;
-  min-height: 44px;
+  min-height: var(--touch-target);
   background: transparent;
   color: var(--ink-2);
   border: 1px solid var(--line);

@@ -182,7 +182,7 @@ onUnmounted(() => {
   flex-direction: column;
   gap: 2px;
   width: 100%;
-  min-height: 44px;
+  min-height: var(--touch-target);
   padding: var(--space-2, 8px) var(--space-3, 12px);
   background: transparent;
   border: none;

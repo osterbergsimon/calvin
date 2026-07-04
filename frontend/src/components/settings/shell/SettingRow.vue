@@ -22,7 +22,7 @@ defineProps({
   align-items: center;
   justify-content: space-between;
   gap: 1.5rem;
-  min-height: 72px;
+  min-height: 4.5rem; /* 72px */
   padding: 0.75rem 1.25rem;
 }
 .setting-row + .setting-row {

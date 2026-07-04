@@ -1666,6 +1666,8 @@ export interface components {
       timeFormat?: string | null;
       /** Timezone */
       timezone?: string | null;
+      /** Uisize */
+      uiSize?: string | null;
       /** Weekstartday */
       weekStartDay?: number | null;
       /** Weekenddays */
