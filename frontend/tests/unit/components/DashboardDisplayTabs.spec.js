@@ -195,4 +195,46 @@ describe("DashboardRegionsEditor (screens & regions logic)", () => {
     expect(dir.classes()).toContain("icon-btn");
     expect(dir.classes()).toContain("icon-btn--default");
   });
+
+  it("renders screen delete as a danger IconButton", () => {
+    const twoScreenConfig = {
+      dashboardScreens: {
+        version: 2,
+        activeScreenId: "home",
+        screens: [
+          {
+            id: "home",
+            name: "Home",
+            layout: {
+              version: 1,
+              preset: "split_two",
+              regions: [
+                { id: "region-1", kind: "calendar", size: 70 },
+                { id: "region-2", kind: "calendar", size: 30 },
+              ],
+            },
+            activeRegionId: "region-1",
+          },
+          {
+            id: "screen-2",
+            name: "Screen 2",
+            layout: {
+              version: 1,
+              preset: "split_two",
+              regions: [
+                { id: "region-3", kind: "calendar", size: 70 },
+                { id: "region-4", kind: "calendar", size: 30 },
+              ],
+            },
+            activeRegionId: "region-3",
+          },
+        ],
+      },
+    };
+    const wrapper = mount(DashboardRegionsEditor, { props: { config: twoScreenConfig } });
+    const del = wrapper.find('[aria-label="Delete screen 1"]');
+    expect(del.exists()).toBe(true);
+    expect(del.classes()).toContain("icon-btn");
+    expect(del.classes()).toContain("icon-btn--danger");
+  });
 });

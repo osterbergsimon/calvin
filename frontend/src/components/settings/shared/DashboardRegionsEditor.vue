@@ -68,15 +68,15 @@
           >
             {{ layoutDirectionFor(screen.layout) === "column" ? "▭▭" : "▯|▯" }}
           </IconButton>
-          <button
+          <IconButton
             v-if="dashboardScreens.screens.length > 1"
-            type="button"
-            class="screen-delete"
-            :aria-label="`Delete screen ${screenIndex + 1}`"
+            :label="`Delete screen ${screenIndex + 1}`"
+            variant="danger"
+            size="sm"
             @click="deleteScreen(screenIndex)"
           >
             ×
-          </button>
+          </IconButton>
         </header>
 
         <div v-if="expandedScreens.has(screen.id)" class="screen-clock-bar-controls">
@@ -1291,24 +1291,6 @@ onUnmounted(() => {
 
 .screen-activate:disabled {
   opacity: 1;
-}
-
-.screen-delete {
-  flex: 0 0 auto;
-  width: 1.9rem;
-  height: 1.9rem;
-  border: 1px solid var(--line);
-  border-radius: var(--radius-xs);
-  background: var(--bg-1);
-  color: var(--err);
-  cursor: pointer;
-  font-size: 1.2rem;
-  line-height: 1;
-}
-
-.screen-delete:hover,
-.screen-delete:focus {
-  background: var(--bg-2);
 }
 
 .screen-preview {
