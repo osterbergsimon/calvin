@@ -93,7 +93,9 @@
   --toggle-h: 1.5rem; /* 24px */
   --toggle-knob: 1.125rem; /* 18px */
   --toggle-inset: 0.1875rem; /* 3px */
-  --toggle-travel: calc(var(--toggle-w) - var(--toggle-knob) - (2 * var(--toggle-inset))); /* 20px */
+  --toggle-travel: calc(
+    var(--toggle-w) - var(--toggle-knob) - (2 * var(--toggle-inset))
+  ); /* 20px */
 
   /* Spacing scale */
   --space-3xs: 0.25rem;

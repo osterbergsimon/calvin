@@ -705,6 +705,17 @@
             ],
             "title": "Timezone"
           },
+          "uiSize": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Uisize"
+          },
           "weekStartDay": {
             "anyOf": [
               {

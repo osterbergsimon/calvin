@@ -26,47 +26,47 @@
                its contents scale, and it scrolls inside .settings-content. The
                live dashboard is a different view and is never touched by this. -->
           <div class="settings-scale">
-          <div v-if="error" class="settings-banner settings-banner-error">
-            {{ error }}
-          </div>
+            <div v-if="error" class="settings-banner settings-banner-error">
+              {{ error }}
+            </div>
 
-          <DisplaySettings
-            v-if="activeCategory === 'dashboard' && localConfig"
-            :key="categoryRenderKey"
-            :config="localConfig"
-            @update:config="handleConfigUpdate"
-          />
-          <ClockBarSettings
-            v-if="activeCategory === 'clock-bar' && localConfig"
-            :key="categoryRenderKey"
-            :config="localConfig"
-            @update:config="handleConfigUpdate"
-          />
-          <ContentSettings
-            v-if="activeCategory === 'content' && localConfig"
-            :key="categoryRenderKey"
-            :config="localConfig"
-            @update:config="handleConfigUpdate"
-          />
-          <PluginsCategory v-if="activeCategory === 'plugins'" :key="categoryRenderKey" />
-          <DeviceSettings
-            v-if="activeCategory === 'device' && localConfig"
-            :key="categoryRenderKey"
-            :config="localConfig"
-            :version="version"
-            :frontend-version="frontendVersion"
-            @update:config="handleConfigUpdate"
-          />
-          <MaintenanceSettings
-            v-if="activeCategory === 'maintenance' && localConfig"
-            :key="categoryRenderKey"
-            :config="localConfig"
-            :git-repo-url="localConfig && localConfig.gitRepoUrl"
-            :git-branch="(localConfig && localConfig.gitBranch) || 'main'"
-            @update:config="handleConfigUpdate"
-            @update:git-repo-url="handleGitRepoUrlUpdate"
-            @update:git-branch="handleGitBranchUpdate"
-          />
+            <DisplaySettings
+              v-if="activeCategory === 'dashboard' && localConfig"
+              :key="categoryRenderKey"
+              :config="localConfig"
+              @update:config="handleConfigUpdate"
+            />
+            <ClockBarSettings
+              v-if="activeCategory === 'clock-bar' && localConfig"
+              :key="categoryRenderKey"
+              :config="localConfig"
+              @update:config="handleConfigUpdate"
+            />
+            <ContentSettings
+              v-if="activeCategory === 'content' && localConfig"
+              :key="categoryRenderKey"
+              :config="localConfig"
+              @update:config="handleConfigUpdate"
+            />
+            <PluginsCategory v-if="activeCategory === 'plugins'" :key="categoryRenderKey" />
+            <DeviceSettings
+              v-if="activeCategory === 'device' && localConfig"
+              :key="categoryRenderKey"
+              :config="localConfig"
+              :version="version"
+              :frontend-version="frontendVersion"
+              @update:config="handleConfigUpdate"
+            />
+            <MaintenanceSettings
+              v-if="activeCategory === 'maintenance' && localConfig"
+              :key="categoryRenderKey"
+              :config="localConfig"
+              :git-repo-url="localConfig && localConfig.gitRepoUrl"
+              :git-branch="(localConfig && localConfig.gitBranch) || 'main'"
+              @update:config="handleConfigUpdate"
+              @update:git-repo-url="handleGitRepoUrlUpdate"
+              @update:git-branch="handleGitBranchUpdate"
+            />
           </div>
         </div>
       </div>

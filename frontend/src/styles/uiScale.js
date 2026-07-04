@@ -27,8 +27,7 @@ export const UI_SIZE_OPTIONS = [
   { value: "extra-large", label: "XL" },
 ];
 
-export const isUiSize = id =>
-  Object.prototype.hasOwnProperty.call(UI_SIZE_PRESETS, id);
+export const isUiSize = id => Object.prototype.hasOwnProperty.call(UI_SIZE_PRESETS, id);
 
 // Resolve a preset key to its scale factor, falling back to Default (1.0) for
 // unknown / missing keys so a bad stored value never breaks rendering.

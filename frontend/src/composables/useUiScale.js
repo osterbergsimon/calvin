@@ -46,7 +46,7 @@ export function useUiScale() {
       key => {
         if (key !== undefined && key !== current.value) applyUiScale(key);
       },
-      { immediate: true },
+      { immediate: true }
     );
   };
 
