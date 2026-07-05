@@ -196,6 +196,10 @@ const showKeyboardFeedback = (key, actionName) => {
 };
 
 const showModeChange = () => {
+  // Ignore the boot-time hydration settle: on reload the stores flip from their
+  // defaults to the persisted config (e.g. showUI true->false in kiosk setups),
+  // which would otherwise flash a stale "Calendar Mode" HUD (calvin-2ck).
+  if (!configStore.hydrated) return;
   // Only surface the mode HUD when the UI chrome is hidden.
   if (configStore.shouldShowUI) return;
   show("mode", getModeIconPath(), getModeMessage());

@@ -1,5 +1,5 @@
 import { defineStore } from "pinia";
-import { ref, computed } from "vue";
+import { ref, computed, nextTick } from "vue";
 import axios from "axios";
 import { logError } from "../utils/logger";
 import {
@@ -86,6 +86,11 @@ export const useConfigStore = defineStore("config", () => {
   const pluginRepositoryUrl = ref("https://github.com/osterbergsimon/calvin-plugins"); // Default plugin repo for the GitHub install flow
   const loading = ref(false);
   const error = ref(null);
+  // Latches true once the initial config load has settled. Consumers use this
+  // to ignore the boot-time hydration, where refs flip from their defaults to
+  // the persisted values (e.g. showUI true->false) and would otherwise look
+  // like user-driven changes. See NotificationSystem's mode HUD (calvin-2ck).
+  const hydrated = ref(false);
 
   const configRefs = {
     orientation,
@@ -200,6 +205,14 @@ export const useConfigStore = defineStore("config", () => {
       logError("[ConfigStore]", "Failed to fetch config:", err);
     } finally {
       loading.value = false;
+      // Mark hydrated only after this flush, so any watcher fired by the config
+      // just applied above (e.g. the showUI true->false settle) still observes
+      // hydrated === false and can skip the boot-time transition.
+      if (!hydrated.value) {
+        nextTick(() => {
+          hydrated.value = true;
+        });
+      }
     }
   };
 
@@ -458,6 +471,7 @@ export const useConfigStore = defineStore("config", () => {
     touchControlSize,
     loading,
     error,
+    hydrated,
     calendarWidth,
     photosWidth,
     setOrientation,
