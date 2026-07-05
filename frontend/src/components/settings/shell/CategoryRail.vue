@@ -68,6 +68,13 @@ function focusItem(index) {
      viewport-constrained settings layout on a short kiosk (calvin-g7v). */
   min-height: 0;
   overflow-y: auto;
+  /* A vertical scroll container clips BOTH axes, which otherwise cuts off the
+     selected tile's FocusPanel neon glow (blooms outward + translateY) at the
+     rail's edges (calvin-7ux). Equal negative-margin + padding expands the
+     scrollport for glow room while keeping each tile visually in place; the
+     negative margins bloom into the surrounding grid gap / body padding. */
+  margin: -12px -16px;
+  padding: 12px 16px;
 }
 
 .category-rail__item {
