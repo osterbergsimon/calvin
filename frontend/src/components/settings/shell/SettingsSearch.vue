@@ -101,7 +101,7 @@ onUnmounted(() => {
   display: flex;
   align-items: center;
   gap: var(--space-2, 8px);
-  background: var(--surface-2, var(--surface));
+  background: var(--bg-2);
   border: 1px solid var(--border-color);
   border-radius: var(--radius, 6px);
   padding: 0 var(--space-3, 12px);
@@ -155,7 +155,7 @@ onUnmounted(() => {
   font-family: var(--font-ui);
   font-size: 0.75rem;
   color: var(--ink-3);
-  background: var(--surface-3, var(--surface-2, var(--surface)));
+  background: var(--bg-1);
   border: 1px solid var(--border-color);
   border-radius: 3px;
   padding: 1px 5px;
@@ -168,7 +168,7 @@ onUnmounted(() => {
   left: 0;
   right: 0;
   z-index: 100;
-  background: var(--surface);
+  background: var(--bg-2);
   border: 1px solid var(--border-color);
   border-radius: var(--radius, 6px);
   list-style: none;
@@ -199,7 +199,7 @@ onUnmounted(() => {
 }
 
 .settings-search__result:hover {
-  background: var(--surface-2, var(--surface));
+  background: color-mix(in srgb, var(--focus) 14%, transparent);
 }
 
 .settings-search__result:focus-visible {

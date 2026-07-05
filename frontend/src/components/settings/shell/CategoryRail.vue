@@ -64,10 +64,24 @@ function focusItem(index) {
   display: flex;
   flex-direction: column;
   gap: 4px;
-  /* Scroll the rail independently so its items stay reachable inside the
-     viewport-constrained settings layout on a short kiosk (calvin-g7v). */
   min-height: 0;
-  overflow-y: auto;
+  /* Keep this NOT a scroll container by default: a scroll container clips both
+     axes, which cuts the selected tile's outward FocusPanel glow into an ugly
+     box (calvin-7ux). The 6 categories always fit on a normal viewport, so the
+     glow blooms freely here. Only short kiosks need the rail to scroll
+     (calvin-g7v) — scoped below, where a glow clipped at the scroll edge reads
+     as normal scrolling. */
+  overflow: visible;
+}
+
+/* Wide-short kiosk (e.g. 800x480): the settings layout keeps its constrained
+   internal scroll (calvin-g7v) and the rail's items can exceed the viewport, so
+   let the rail scroll here. Short+narrow falls back to page scroll via the
+   media queries in Settings.vue, so it needs no override. */
+@media (max-height: 600px) and (min-width: 769px) {
+  .category-rail {
+    overflow-y: auto;
+  }
 }
 
 .category-rail__item {
