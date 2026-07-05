@@ -140,7 +140,7 @@ describe("ConfirmModal", () => {
         },
       });
 
-      const closeButton = wrapper.find(".btn-close-modal");
+      const closeButton = wrapper.find('.modal-header [aria-label="Close"]');
       await closeButton.trigger("click");
 
       expect(wrapper.emitted("cancel")).toBeTruthy();

@@ -90,7 +90,7 @@
       <div class="modal-content pip-warning-modal">
         <div class="modal-header">
           <h3>⚠️ Security Warning</h3>
-          <button class="btn-close-modal" @click="cancelPipInstall">×</button>
+          <IconButton variant="ghost" label="Close" @click="cancelPipInstall">×</IconButton>
         </div>
         <div class="modal-body">
           <p>
@@ -126,6 +126,7 @@ import { useImagesStore } from "@/stores/images";
 import * as pluginsApi from "@/services/pluginsApi";
 import * as calendarApi from "@/services/calendarApi";
 import SettingsSection from "@/components/settings/shell/SettingsSection.vue";
+import IconButton from "@/components/ui/IconButton.vue";
 import PluginInstaller from "../specialized/PluginInstaller.vue";
 import PluginManager from "../specialized/PluginManager.vue";
 import InstanceModal from "../specialized/InstanceModal.vue";
@@ -601,26 +602,6 @@ onMounted(async () => {
   margin: 0;
   font-size: 1.1rem;
   font-weight: 600;
-  color: var(--ink);
-}
-
-.btn-close-modal {
-  background: none;
-  border: none;
-  font-size: 1.5rem;
-  color: var(--ink-2);
-  cursor: pointer;
-  padding: 0;
-  width: var(--touch-target);
-  height: var(--touch-target);
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  border-radius: 4px;
-}
-
-.btn-close-modal:hover {
-  background: var(--bg-2);
   color: var(--ink);
 }
 

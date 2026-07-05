@@ -7,7 +7,7 @@
           {{ formatDate(selectedDate || event.start) }}
         </div>
       </div>
-      <button class="btn-close" aria-label="Close" @click="close">×</button>
+      <IconButton variant="ghost" label="Close" @click="close">×</IconButton>
     </div>
     <div class="event-detail-content">
       <!-- Show compact clickable list if multiple events -->
@@ -87,6 +87,7 @@
 
 <script setup>
 import { defineProps, defineEmits, computed } from "vue";
+import IconButton from "@/components/ui/IconButton.vue";
 import { useConfigStore } from "../stores/config";
 import { useCalendarStore } from "../stores/calendar";
 
@@ -222,33 +223,6 @@ const getSourceName = sourceId => {
   color: var(--accent-primary);
   text-transform: uppercase;
   letter-spacing: 0.5px;
-}
-
-.btn-close {
-  background: none;
-  border: none;
-  font-size: 2rem;
-  line-height: 1;
-  cursor: pointer;
-  color: var(--text-secondary);
-  padding: 0;
-  width: 32px;
-  height: 32px;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  border-radius: 4px;
-  transition: all 0.2s;
-}
-
-.btn-close:hover {
-  background: var(--bg-tertiary);
-  color: var(--text-primary);
-}
-
-.btn-close:focus {
-  outline: 2px solid var(--accent-primary);
-  outline-offset: 2px;
 }
 
 .event-detail-content {

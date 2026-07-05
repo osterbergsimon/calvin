@@ -9,7 +9,7 @@
               : `Add ${currentPlugin?.name || ""} ${instanceLabel}`
           }}
         </h3>
-        <button class="btn-close-modal" aria-label="Close" @click="handleClose">×</button>
+        <IconButton variant="ghost" label="Close" @click="handleClose">×</IconButton>
       </div>
       <div class="modal-body">
         <div v-if="error" class="error-message">
@@ -152,6 +152,7 @@ const instanceLabelMap = {
   service: "Instance",
 };
 import PluginFieldRenderer from "@/components/PluginFieldRenderer.vue";
+import IconButton from "@/components/ui/IconButton.vue";
 import * as pluginsApi from "@/services/pluginsApi";
 import { useCalendarStore } from "@/stores/calendar";
 
@@ -615,34 +616,6 @@ const handleSave = async () => {
   font-size: 1.25rem;
   font-weight: 600;
   color: var(--ink);
-}
-
-.btn-close-modal {
-  background: none;
-  border: none;
-  font-size: 1.5rem;
-  color: var(--ink-2);
-  cursor: pointer;
-  padding: 0;
-  width: var(--touch-target);
-  height: var(--touch-target);
-  min-height: var(--touch-target);
-  min-width: var(--touch-target);
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  border-radius: 4px;
-  transition: all 0.2s;
-}
-
-.btn-close-modal:hover {
-  background: var(--bg-2);
-  color: var(--ink);
-}
-
-.btn-close-modal:focus-visible {
-  outline: 2px solid var(--focus);
-  outline-offset: 2px;
 }
 
 .modal-body {

@@ -8,15 +8,17 @@
   >
     <!-- Fullscreen close button (only in fullscreen mode) -->
     <div v-if="isFullscreen" class="fullscreen-close-overlay">
-      <button
+      <IconButton
         class="btn-close-fullscreen"
+        size="lg"
+        shape="circle"
         data-action="exit-fullscreen"
         title="Close Fullscreen (ESC)"
-        aria-label="Exit fullscreen"
+        label="Exit fullscreen"
         @click.stop="handleCloseFullscreen"
       >
         ×
-      </button>
+      </IconButton>
     </div>
 
     <DashboardPanel
@@ -1255,31 +1257,15 @@ onActivated(() => {
 }
 
 .btn-close-fullscreen {
-  background: var(--bg-2);
-  color: var(--ink);
-  border: 2px solid var(--line);
-  border-radius: 50%;
-  width: 48px;
-  height: 48px;
-  font-size: 2rem;
-  cursor: pointer;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  transition: all 0.2s;
   pointer-events: auto;
   box-shadow: 0 4px 12px var(--shadow);
+  /* IconButton's transition covers background/border-color/color only, so
+     animate the overlay's own hover-scale here (was `all 0.2s` pre-migration). */
+  transition: transform 0.2s;
 }
 
 .btn-close-fullscreen:hover {
-  background: var(--bg-1);
-  border-color: var(--ink-2);
   transform: scale(1.1);
-}
-
-.btn-close-fullscreen:focus-visible {
-  outline: 2px solid var(--focus);
-  outline-offset: 2px;
 }
 
 .loading-overlay {

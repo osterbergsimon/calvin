@@ -3,7 +3,7 @@
     <div class="modal-content confirm-modal">
       <div class="modal-header">
         <h3>{{ title }}</h3>
-        <button class="btn-close-modal" @click="handleCancel">×</button>
+        <IconButton variant="ghost" label="Close" @click="handleCancel">×</IconButton>
       </div>
       <div class="modal-body">
         <p>{{ message }}</p>
@@ -19,6 +19,8 @@
 </template>
 
 <script setup>
+import IconButton from "@/components/ui/IconButton.vue";
+
 defineProps({
   show: {
     type: Boolean,
@@ -91,33 +93,6 @@ const handleCancel = () => {
   font-size: 1.25rem;
   font-weight: 600;
   color: var(--ink);
-}
-
-.btn-close-modal {
-  background: none;
-  border: none;
-  font-size: 1.5rem;
-  color: var(--ink-2);
-  cursor: pointer;
-  padding: 0;
-  width: 2rem;
-  height: 2rem;
-  min-height: var(--touch-target);
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  border-radius: 4px;
-  transition: all 0.2s;
-}
-
-.btn-close-modal:hover {
-  background: var(--bg-2);
-  color: var(--ink);
-}
-
-.btn-close-modal:focus-visible {
-  outline: 2px solid var(--focus);
-  outline-offset: 2px;
 }
 
 .modal-body {
