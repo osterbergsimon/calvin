@@ -64,24 +64,24 @@ function focusItem(index) {
   display: flex;
   flex-direction: column;
   gap: 4px;
-  /* Scroll the rail independently so its items stay reachable inside the
-     viewport-constrained settings layout on a short kiosk (calvin-g7v). */
   min-height: 0;
-  overflow-y: auto;
+  /* Keep this NOT a scroll container by default: a scroll container clips both
+     axes, which cuts the selected tile's outward FocusPanel glow into an ugly
+     box (calvin-7ux). The 6 categories always fit on a normal viewport, so the
+     glow blooms freely here. Only short kiosks need the rail to scroll
+     (calvin-g7v) — scoped below, where a glow clipped at the scroll edge reads
+     as normal scrolling. */
+  overflow: visible;
 }
 
-/* The rail must scroll vertically on short kiosks (calvin-g7v), and a scroll
-   container clips BOTH axes — so FocusPanel's default OUTWARD neon glow (tuned
-   for dashboard panels, which sit in overflow:visible space) gets cut off at
-   the rail's edges and reads as an ugly box (calvin-7ux). Give the selected
-   tile a self-contained treatment instead: an inset ring + inner glow that
-   never overflows, so nothing is clipped. Scoped to the rail via :deep so
-   DashboardPanel keeps its full bloom. */
-.category-rail .category-rail__item.is-focused {
-  box-shadow:
-    inset 0 0 0 1.5px var(--focus),
-    inset 0 0 14px 0 var(--focus-edge);
-  transform: none;
+/* Wide-short kiosk (e.g. 800x480): the settings layout keeps its constrained
+   internal scroll (calvin-g7v) and the rail's items can exceed the viewport, so
+   let the rail scroll here. Short+narrow falls back to page scroll via the
+   media queries in Settings.vue, so it needs no override. */
+@media (max-height: 600px) and (min-width: 769px) {
+  .category-rail {
+    overflow-y: auto;
+  }
 }
 
 .category-rail__item {
