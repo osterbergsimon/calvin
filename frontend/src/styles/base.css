@@ -15,6 +15,20 @@
   border-radius: 4px;
 }
 
+/* Strip the browser's native number-input spinner chrome app-wide. The up/down
+   arrows read as unstyled next to Calvin's custom fields; numeric values are
+   driven by typing (and, where present, adjacent steppers/sliders). */
+input[type="number"] {
+  appearance: textfield;
+  -moz-appearance: textfield;
+}
+
+input[type="number"]::-webkit-outer-spin-button,
+input[type="number"]::-webkit-inner-spin-button {
+  -webkit-appearance: none;
+  margin: 0;
+}
+
 @media (prefers-reduced-motion: reduce) {
   *,
   *::before,
