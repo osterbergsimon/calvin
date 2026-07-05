@@ -713,8 +713,16 @@ const handleSave = async () => {
   display: flex;
   gap: 1rem;
   justify-content: flex-end;
-  margin-top: 2rem;
-  padding-top: 1.5rem;
+  /* Sticky footer: on a short 800x480 kiosk the modal scrolls internally, so
+     pin Save/Cancel to the bottom edge instead of leaving them below the fold
+     (calvin-g7v). Negative margins bleed the bar to the body edges and cancel
+     modal-body's bottom padding so it sits flush. */
+  position: sticky;
+  bottom: 0;
+  z-index: 1;
+  margin: 2rem -1.5rem -1.5rem;
+  padding: 1.25rem 1.5rem;
+  background: var(--bg-1);
   border-top: 1px solid var(--line);
 }
 

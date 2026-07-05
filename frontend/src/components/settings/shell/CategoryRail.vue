@@ -64,6 +64,10 @@ function focusItem(index) {
   display: flex;
   flex-direction: column;
   gap: 4px;
+  /* Scroll the rail independently so its items stay reachable inside the
+     viewport-constrained settings layout on a short kiosk (calvin-g7v). */
+  min-height: 0;
+  overflow-y: auto;
 }
 
 .category-rail__item {
