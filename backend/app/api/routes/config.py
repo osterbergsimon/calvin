@@ -112,7 +112,6 @@ class ConfigUpdate(BaseModel):
     weekendDays: list[int] | None = None  # Weekend days (e.g. [0, 6] for Sun+Sat)
     maxVisibleEvents: int | None = None  # Max events visible per day cell
     showRedDays: bool | None = None  # Highlight holidays/red days
-    mealPlanCardSize: str | None = None  # Meal plan card size: 'small' | 'medium' | 'large'
     uiSize: str | None = (
         None  # Global UI size: 'extra-compact' | 'compact' | 'default' | 'large' | 'extra-large'
     )
@@ -490,11 +489,6 @@ async def get_config():
         config["clockBarShowLogo"] = True
     elif "clock_bar_show_logo" in config and "clockBarShowLogo" not in config:
         config["clockBarShowLogo"] = config["clock_bar_show_logo"]
-    if "mealPlanCardSize" not in config and "meal_plan_card_size" not in config:
-        config["mealPlanCardSize"] = "medium"  # Default size
-    elif "meal_plan_card_size" in config and "mealPlanCardSize" not in config:
-        config["mealPlanCardSize"] = config["meal_plan_card_size"]
-
     if "uiSize" not in config and "ui_size" not in config:
         config["uiSize"] = "default"  # Global UI size preset
     elif "ui_size" in config and "uiSize" not in config:
@@ -579,8 +573,6 @@ async def update_config(config_update: ConfigUpdate):
         update_dict["max_visible_events"] = update_dict.pop("maxVisibleEvents")
     if "showRedDays" in update_dict:
         update_dict["show_red_days"] = update_dict.pop("showRedDays")
-    if "mealPlanCardSize" in update_dict:
-        update_dict["meal_plan_card_size"] = update_dict.pop("mealPlanCardSize")
     if "uiSize" in update_dict:
         update_dict["ui_size"] = update_dict.pop("uiSize")
     if "themeMode" in update_dict:

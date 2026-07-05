@@ -529,17 +529,6 @@
             ],
             "title": "Maxvisibleevents"
           },
-          "mealPlanCardSize": {
-            "anyOf": [
-              {
-                "type": "string"
-              },
-              {
-                "type": "null"
-              }
-            ],
-            "title": "Mealplancardsize"
-          },
           "modeIndicatorTimeout": {
             "anyOf": [
               {

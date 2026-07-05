@@ -1634,8 +1634,6 @@ export interface components {
       lastSideViewMode?: string | null;
       /** Maxvisibleevents */
       maxVisibleEvents?: number | null;
-      /** Mealplancardsize */
-      mealPlanCardSize?: string | null;
       /** Modeindicatortimeout */
       modeIndicatorTimeout?: number | null;
       /** Orientation */

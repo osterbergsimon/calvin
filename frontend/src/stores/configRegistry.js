@@ -289,11 +289,6 @@ export const CONFIG_FIELD_DEFINITIONS = [
     defaultValue: "medium",
   },
   {
-    name: "mealPlanCardSize",
-    keys: ["mealPlanCardSize", "meal_plan_card_size"],
-    defaultValue: "medium",
-  },
-  {
     name: "uiSize",
     keys: ["uiSize", "ui_size"],
     defaultValue: "default",

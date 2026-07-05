@@ -77,7 +77,6 @@ export const useConfigStore = defineStore("config", () => {
   const hotCornerLongPressMs = ref(500); // Press-and-hold duration to trigger the reveal, ms
   const touchControls = ref("auto"); // 'auto' (detect) | 'on' (force) | 'off' (hide) touch chrome
   const touchControlSize = ref("medium"); // 'small' | 'medium' | 'large' — region touch control size
-  const mealPlanCardSize = ref("medium"); // Meal plan card size: 'small' | 'medium' | 'large'
   const uiSize = ref("default"); // Global UI size: 'extra-compact' | 'compact' | 'default' | 'large' | 'extra-large'
   const consoleLogEnabled = ref(true); // Enable console logging (default: true for backwards compatibility)
   const consoleLogLevel = ref("info"); // Console log level: 'error' | 'warn' | 'info' | 'debug' (default: 'info')
@@ -156,7 +155,6 @@ export const useConfigStore = defineStore("config", () => {
     hotCornerLongPressMs,
     touchControls,
     touchControlSize,
-    mealPlanCardSize,
     uiSize,
     consoleLogEnabled,
     consoleLogLevel,
@@ -450,7 +448,6 @@ export const useConfigStore = defineStore("config", () => {
     clockBarVerticalPluginItemSize,
     clockBarShowPluginItems,
     clockBarShowLogo,
-    mealPlanCardSize,
     uiSize,
     consoleLogEnabled,
     consoleLogLevel,
