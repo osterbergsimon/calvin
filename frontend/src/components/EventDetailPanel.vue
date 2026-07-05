@@ -225,7 +225,6 @@ const getSourceName = sourceId => {
   letter-spacing: 0.5px;
 }
 
-
 .event-detail-content {
   padding: 1.5rem;
 }
