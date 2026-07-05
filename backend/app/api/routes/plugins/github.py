@@ -263,7 +263,7 @@ async def install_plugin_from_github(request: dict[str, Any] = Body(...)):
             if theme_path.exists():
                 # Install theme
                 manifest = theme_installer.install_theme_from_repo(
-                    repo_root, plugin_path, plugin_id
+                    repo_root, plugin_path, plugin_id, force=force
                 )
                 # Register theme in database
                 await _register_theme_in_db(manifest)
@@ -475,7 +475,9 @@ async def install_plugin_from_local(request: dict[str, Any] = Body(...)):
 
     try:
         if theme_json.exists():
-            manifest = theme_installer.install_theme_from_repo(repo_path, plugin_path, plugin_id)
+            manifest = theme_installer.install_theme_from_repo(
+                repo_path, plugin_path, plugin_id, force=force
+            )
             await _register_theme_in_db(manifest)
             return {
                 "success": True,

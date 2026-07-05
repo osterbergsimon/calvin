@@ -307,6 +307,64 @@ class TestThemeInstaller:
         with pytest.raises(ValueError, match="path traversal"):
             theme_installer.install_theme_from_repo(repo_dir, "../malicious")
 
+    @staticmethod
+    def _repo_with_theme(tmp_path, name, version, bg):
+        """Build a repo dir containing test_theme at a given version."""
+        repo_dir = tmp_path / name
+        theme_dir = repo_dir / "test_theme"
+        theme_dir.mkdir(parents=True)
+        (theme_dir / "theme.json").write_text(
+            json.dumps(
+                {
+                    "id": "test_theme",
+                    "name": "Test Theme",
+                    "version": version,
+                    "variables": {"bg-primary": bg},
+                }
+            )
+        )
+        return repo_dir
+
+    def test_install_theme_from_repo_force_overwrites(
+        self, theme_installer, valid_theme_directory, tmp_path
+    ):
+        """force=True upgrades an already-installed theme in place (calvin-3eu)."""
+        theme_installer.install_theme(valid_theme_directory, "test_theme")  # v1.0.0
+
+        repo_dir = self._repo_with_theme(tmp_path, "repo", "1.1.0", "#111111")
+        manifest = theme_installer.install_theme_from_repo(repo_dir, "test_theme", force=True)
+
+        assert manifest["version"] == "1.1.0"
+        on_disk = json.loads(
+            (theme_installer.get_theme_path("test_theme") / "theme.json").read_text()
+        )
+        assert on_disk["version"] == "1.1.0"
+        assert on_disk["variables"]["bg-primary"] == "#111111"
+
+    def test_install_theme_from_repo_without_force_errors_when_installed(
+        self, theme_installer, valid_theme_directory, tmp_path
+    ):
+        """Without force, reinstalling over an existing theme still errors (calvin-3eu)."""
+        theme_installer.install_theme(valid_theme_directory, "test_theme")
+        repo_dir = self._repo_with_theme(tmp_path, "repo", "1.1.0", "#111111")
+
+        with pytest.raises(ValueError, match="already installed"):
+            theme_installer.install_theme_from_repo(repo_dir, "test_theme")
+
+    def test_install_theme_from_repo_downgrade_guarded(self, theme_installer, tmp_path):
+        """A downgrade is refused without force, but force overrides it (calvin-3eu)."""
+        theme_installer.install_theme(
+            self._repo_with_theme(tmp_path, "v2", "2.0.0", "#ffffff") / "test_theme", "test_theme"
+        )
+
+        repo_v1 = self._repo_with_theme(tmp_path, "repo", "1.0.0", "#000000")
+        with pytest.raises(ValueError, match="older than"):
+            theme_installer.install_theme_from_repo(repo_v1, "test_theme")
+
+        # force overrides the downgrade guard.
+        manifest = theme_installer.install_theme_from_repo(repo_v1, "test_theme", force=True)
+        assert manifest["version"] == "1.0.0"
+
     def test_install_theme_with_force(self, theme_installer, valid_theme_directory):
         """Test installing a theme with force=True overwrites existing installation."""
         # Install theme first

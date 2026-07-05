@@ -466,7 +466,12 @@ class ThemeInstaller:
         return result
 
     def install_theme_from_repo(
-        self, repo_path: Path, theme_path: str, theme_id: str | None = None
+        self,
+        repo_path: Path,
+        theme_path: str,
+        theme_id: str | None = None,
+        check_version: bool = True,
+        force: bool = False,
     ) -> dict[str, Any]:
         """
         Install a specific theme from a repository.
@@ -475,6 +480,8 @@ class ThemeInstaller:
             repo_path: Path to repository root directory
             theme_path: Relative path to theme directory within repo
             theme_id: Optional theme ID override
+            check_version: If True, refuse a downgrade over an installed version
+            force: If True, overwrite an already-installed theme (upgrade in place)
 
         Returns:
             Theme manifest dictionary
@@ -490,16 +497,12 @@ class ThemeInstaller:
         if not theme_dir.exists() or not theme_dir.is_dir():
             raise ValueError(f"Theme directory not found: {theme_path}")
 
-        # Validate and install
+        # Validate, then delegate the already-installed / version / force handling
+        # to install_theme (parity with install_plugin_from_repo) so `force` can
+        # upgrade a theme in place instead of always erroring (calvin-3eu).
         manifest = self._validate_theme_directory(theme_dir)
         install_id = theme_id or manifest["id"]
-
-        # Check if theme already installed
-        if self.get_theme_path(install_id).exists():
-            raise ValueError(f"Theme {install_id} is already installed")
-
-        # Install from directory
-        return self.install_theme(theme_dir, install_id)
+        return self.install_theme(theme_dir, install_id, check_version=check_version, force=force)
 
 
 # Global theme installer instance
