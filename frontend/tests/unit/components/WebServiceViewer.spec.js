@@ -109,14 +109,14 @@ describe("WebServiceViewer", () => {
 
     expect(wrapper.find(".service-viewer-stub h2").text()).toBe("Meals");
     expect(wrapper.find(".service-viewer-stub").text()).toContain("Meals");
-    expect(wrapper.findAll(".dashboard-panel__icon-button")).toHaveLength(2);
+    expect(wrapper.find(".service-viewer-stub").findAll(".icon-btn")).toHaveLength(2);
   });
 
   it("passes service count and local navigation actions in fullscreen cycling mode", () => {
     const wrapper = mountViewer({ isFullscreen: true });
 
     expect(wrapper.find(".service-viewer-stub").text()).toContain("Service 1 of 2");
-    expect(wrapper.findAll(".dashboard-panel__icon-button")).toHaveLength(2);
+    expect(wrapper.find(".service-viewer-stub").findAll(".icon-btn")).toHaveLength(2);
   });
 
   it("enters fullscreen carrying its own pinned service, not the globally current one", async () => {

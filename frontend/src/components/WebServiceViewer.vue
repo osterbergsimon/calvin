@@ -2,15 +2,17 @@
   <div class="web-service-viewer" :class="{ fullscreen: isFullscreen }">
     <!-- Fullscreen Close Button (only in fullscreen mode) -->
     <div v-if="isFullscreen" class="fullscreen-close-overlay">
-      <button
+      <IconButton
         class="btn-close-fullscreen"
+        size="lg"
+        shape="circle"
         data-action="exit-fullscreen"
+        label="Exit fullscreen"
         title="Close Fullscreen (ESC)"
-        aria-label="Exit fullscreen"
         @click.stop="handleCloseFullscreen"
       >
         ×
-      </button>
+      </IconButton>
     </div>
 
     <!-- Viewer Content -->
@@ -50,38 +52,33 @@
               :region-id="regionId"
               :view="view"
             />
-            <button
+            <IconButton
               v-if="!isTouch && canNavigateServices && services.length > 1"
-              class="dashboard-panel__icon-button"
+              label="Previous Service"
               title="Previous Service"
               @click="previousService"
             >
               ‹
-            </button>
-            <button
+            </IconButton>
+            <IconButton
               v-if="!isTouch && canNavigateServices && services.length > 1"
-              class="dashboard-panel__icon-button"
+              label="Next Service"
               title="Next Service"
               @click="nextService"
             >
               ›
-            </button>
-            <button
+            </IconButton>
+            <IconButton
               v-if="!isTouch && !isFullscreen"
-              class="dashboard-panel__icon-button"
+              label="Enter Fullscreen"
               title="Enter Fullscreen"
               @click.stop="handleToggleFullscreen"
             >
               ⤢
-            </button>
-            <button
-              v-if="!isFullscreen"
-              class="dashboard-panel__icon-button"
-              title="Close"
-              @click.stop="handleClose"
-            >
+            </IconButton>
+            <IconButton v-if="!isFullscreen" label="Close" title="Close" @click.stop="handleClose">
               ×
-            </button>
+            </IconButton>
           </template>
         </ServiceViewer>
       </div>
@@ -94,6 +91,7 @@ import { computed, onMounted, onUnmounted } from "vue";
 import { useWebServicesStore } from "../stores/webServices";
 import { useModeStore } from "../stores/mode";
 import DashboardPanel from "./DashboardPanel.vue";
+import IconButton from "@/components/ui/IconButton.vue";
 import ServiceViewer from "./service/ServiceViewer.vue";
 import RegionControls from "./dashboard/RegionControls.vue";
 import ServiceRegionViewOptions from "./dashboard/ServiceRegionViewOptions.vue";
@@ -288,7 +286,7 @@ onUnmounted(() => {
   display: flex;
   flex-direction: column;
   background: var(--bg-1);
-  border-radius: 8px;
+  border-radius: var(--radius-sm);
   overflow: visible; /* let the focused panel glow bloom out */
 }
 
@@ -318,15 +316,15 @@ onUnmounted(() => {
   align-items: center;
   justify-content: center;
   height: 100%;
-  color: var(--text-tertiary);
+  color: var(--ink-3);
   gap: 1rem;
 }
 
 .spinner {
   width: 40px;
   height: 40px;
-  border: 4px solid var(--border-color);
-  border-top: 4px solid var(--accent-primary);
+  border: 4px solid var(--line);
+  border-top: 4px solid var(--focus);
   border-radius: 50%;
   animation: spin 1s linear infinite;
 }
@@ -360,30 +358,14 @@ onUnmounted(() => {
 }
 
 .btn-close-fullscreen {
-  background: var(--bg-2);
-  color: var(--ink);
-  border: 2px solid var(--line);
-  border-radius: 50%;
-  width: 48px;
-  height: 48px;
-  font-size: 2rem;
-  cursor: pointer;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  transition: all 0.2s;
   pointer-events: auto;
   box-shadow: 0 4px 12px var(--shadow);
+  /* IconButton's transition covers background/border-color/color only, so
+     animate the overlay's own hover-scale here (was `all 0.2s` pre-migration). */
+  transition: transform 0.2s;
 }
 
 .btn-close-fullscreen:hover {
-  background: var(--bg-1);
-  border-color: var(--ink-2);
   transform: scale(1.1);
-}
-
-.btn-close-fullscreen:focus-visible {
-  outline: 2px solid var(--focus);
-  outline-offset: 2px;
 }
 </style>
