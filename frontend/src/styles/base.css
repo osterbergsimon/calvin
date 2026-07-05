@@ -29,6 +29,43 @@ input[type="number"]::-webkit-inner-spin-button {
   margin: 0;
 }
 
+/* Themed scrollbars app-wide. Uses the semantic surface tokens so scrollbars
+   follow the active theme + light/dark mode instead of the browser default.
+   Firefox honours the inherited scrollbar-width/scrollbar-color; WebKit/Blink
+   use the ::-webkit-scrollbar pseudo-elements. (A component may still override
+   locally — e.g. TabNavigation's slim 4px bar.) */
+* {
+  scrollbar-width: thin;
+  scrollbar-color: var(--line) transparent;
+}
+
+::-webkit-scrollbar {
+  width: 10px;
+  height: 10px;
+}
+
+::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+::-webkit-scrollbar-thumb {
+  background: var(--line);
+  border-radius: 999px;
+  /* transparent border + padding-box keeps the thumb visually slim inside the
+     track gutter and gives it breathing room from the content edge. */
+  border: 2px solid transparent;
+  background-clip: padding-box;
+}
+
+::-webkit-scrollbar-thumb:hover {
+  background: var(--ink-3);
+  background-clip: padding-box;
+}
+
+::-webkit-scrollbar-corner {
+  background: transparent;
+}
+
 @media (prefers-reduced-motion: reduce) {
   *,
   *::before,
