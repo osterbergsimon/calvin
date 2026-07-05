@@ -18,38 +18,6 @@ body {
   height: 100vh;
 }
 
-/* Matches the ui/IconButton default (sm/square): 1.75rem square, 8px radius,
-   semantic tokens. Keeps the service region's header buttons consistent with the
-   calendar's. Slated to adopt IconButton directly in calvin-0wr. */
-.dashboard-panel__icon-button {
-  min-width: 1.75rem;
-  height: 1.75rem;
-  border-radius: 8px;
-  border: 1px solid var(--line);
-  background: var(--bg-2);
-  color: var(--ink);
-  cursor: pointer;
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  font-size: 1.05rem;
-  line-height: 1;
-  transition:
-    background 0.2s,
-    border-color 0.2s,
-    color 0.2s;
-}
-
-.dashboard-panel__icon-button:hover {
-  color: var(--ink);
-  border-color: var(--focus-edge);
-}
-
-.dashboard-panel__icon-button:focus-visible {
-  outline: 2px solid var(--focus);
-  outline-offset: 2px;
-}
-
 /* ==========================================================================
    Plugin surface vocabulary (.calvin-plugin-*)
 
