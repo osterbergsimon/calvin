@@ -16,7 +16,7 @@ describe("DashboardPanel", () => {
     const wrapper = mount(DashboardPanel, {
       props: { title: "Weather", subtitle: "Service 1 of 2" },
       slots: {
-        actions: '<button class="dashboard-panel__icon-button">Next</button>',
+        actions: '<button class="ctl">Next</button>',
         default: '<div class="panel-body-stub">Body</div>',
       },
     });
