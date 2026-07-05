@@ -341,7 +341,9 @@ class TestPluginInstaller:
         self, plugin_installer, valid_plugin_package, monkeypatch
     ):
         """uninstall_plugin pip-uninstalls the packages it installed (calvin-10s)."""
-        monkeypatch.setattr(plugin_installer, "_install_pip_requirements", lambda m: ["cowsay==6.1"])
+        monkeypatch.setattr(
+            plugin_installer, "_install_pip_requirements", lambda m: ["cowsay==6.1"]
+        )
         plugin_installer.install_plugin(valid_plugin_package)
         assert plugin_installer.get_plugin_manifest("test_plugin")["_installed_packages"] == [
             "cowsay==6.1"
@@ -358,7 +360,9 @@ class TestPluginInstaller:
         self, plugin_installer, valid_plugin_package, valid_plugin_manifest, monkeypatch
     ):
         """A package another installed plugin still declares is not removed (calvin-10s)."""
-        monkeypatch.setattr(plugin_installer, "_install_pip_requirements", lambda m: ["shared==1.0"])
+        monkeypatch.setattr(
+            plugin_installer, "_install_pip_requirements", lambda m: ["shared==1.0"]
+        )
         plugin_installer.install_plugin(valid_plugin_package)
 
         # A second plugin on disk also depends on shared==1.0.
@@ -366,7 +370,11 @@ class TestPluginInstaller:
         other.mkdir()
         (other / "plugin.json").write_text(
             json.dumps(
-                {**valid_plugin_manifest, "id": "other_plugin", "_installed_packages": ["shared==1.0"]}
+                {
+                    **valid_plugin_manifest,
+                    "id": "other_plugin",
+                    "_installed_packages": ["shared==1.0"],
+                }
             )
         )
 
@@ -383,7 +391,9 @@ class TestPluginInstaller:
         """A failure after pip install rolls back the installed packages (calvin-10s)."""
         from app.services import plugin_installer as pi_mod
 
-        monkeypatch.setattr(plugin_installer, "_install_pip_requirements", lambda m: ["cowsay==6.1"])
+        monkeypatch.setattr(
+            plugin_installer, "_install_pip_requirements", lambda m: ["cowsay==6.1"]
+        )
         rolled_back = []
         monkeypatch.setattr(
             plugin_installer, "_uninstall_pip_requirements", lambda pkgs: rolled_back.append(pkgs)

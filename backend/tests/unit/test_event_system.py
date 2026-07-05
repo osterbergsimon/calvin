@@ -116,9 +116,7 @@ async def test_rate_limited_subscriber_does_not_misattribute_results():
     # Rate-limit only A (B has no recent emit), so only B's task is created.
     event_system._rate_limiter["pluginA"] = {"test_event": time.time()}
 
-    results = await event_system.emit_event(
-        "test_event", {"data": "x"}, wait_for_handlers=True
-    )
+    results = await event_system.emit_event("test_event", {"data": "x"}, wait_for_handlers=True)
 
     # A was skipped: its handler never ran and it has no result entry.
     assert a_events == []

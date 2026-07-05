@@ -72,7 +72,9 @@ class TestInstanceIdentityValidation:
         assert metadata.instance_identity == ["account"]
 
     def test_unknown_identity_key_rejected(self):
-        with pytest.raises(ValidationError, match="instance_identity references unknown config key"):
+        with pytest.raises(
+            ValidationError, match="instance_identity references unknown config key"
+        ):
             PluginMetadata(
                 type_id="imap",
                 name="IMAP",
