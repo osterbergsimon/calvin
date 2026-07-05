@@ -198,6 +198,10 @@ class PluginInstaller:
         # Create plugin directory
         plugin_path.mkdir(parents=True, exist_ok=True)
 
+        # Tracked outside the try so a later-stage failure can roll back any
+        # pip packages already installed (calvin-10s).
+        installed_packages: list[str] = []
+
         try:
             # If source is a zip file, extract it
             if source_path.suffix == ".zip":
@@ -276,7 +280,11 @@ class PluginInstaller:
 
         except Exception as e:
             # Cleanup on error — use ignore_errors so a locked file on Windows
-            # doesn't mask the real install error.
+            # doesn't mask the real install error. Roll back any pip packages
+            # this attempt installed so a failed install doesn't leak them into
+            # the shared venv (calvin-10s).
+            if installed_packages:
+                self._uninstall_pip_requirements(installed_packages)
             if plugin_path.exists():
                 shutil.rmtree(plugin_path, ignore_errors=True)
             raise ValueError(f"Failed to install plugin: {e}") from e
@@ -325,6 +333,58 @@ class PluginInstaller:
 
         return installed
 
+    def _uninstall_pip_requirements(self, packages: list[str]) -> None:
+        """Best-effort pip-uninstall of packages a plugin installed.
+
+        Failures are logged, not raised — uninstall/rollback must not be blocked
+        by a package that pip can't remove. See calvin-10s.
+        """
+        if not packages:
+            return
+        pip_cmd = self._resolve_uninstall_pip()
+        for req in packages:
+            cmd = [*pip_cmd, req]
+            logger.info(f"Uninstalling pip package: {' '.join(str(c) for c in cmd)}")
+            try:
+                result = subprocess.run(cmd, capture_output=True, text=True, timeout=120)
+                if result.returncode == 0:
+                    logger.info(f"Uninstalled: {req}")
+                else:
+                    logger.warning(
+                        f"pip uninstall failed for '{req}' (exit {result.returncode}): "
+                        f"{(result.stderr or result.stdout or '').strip()}"
+                    )
+            except (subprocess.TimeoutExpired, OSError) as e:
+                logger.warning(f"Could not uninstall package '{req}': {e}")
+
+    def _packages_required_by_others(self, exclude_plugin_id: str) -> set[str]:
+        """Union of _installed_packages across all OTHER installed plugins.
+
+        Used to avoid pip-uninstalling a package a different plugin still needs.
+        """
+        required: set[str] = set()
+        for plugin in self.get_installed_plugins():
+            if plugin.get("id") == exclude_plugin_id:
+                continue
+            required.update(plugin.get("_installed_packages") or [])
+        return required
+
+    @staticmethod
+    def _resolve_uninstall_pip() -> list[str]:
+        """Like _resolve_pip but for uninstall (adds -y / --python as needed)."""
+        uv = shutil.which("uv")
+        if uv:
+            cmd = [uv, "pip", "uninstall", "--python", sys.executable]
+            if sys.platform == "win32":
+                return ["cmd", "/c"] + cmd
+            return cmd
+        bin_dir = Path(sys.executable).parent
+        for candidate in ("pip", "pip3"):
+            pip_bin = bin_dir / candidate
+            if pip_bin.exists():
+                return [str(pip_bin), "uninstall", "-y"]
+        return [sys.executable, "-m", "pip", "uninstall", "-y"]
+
     @staticmethod
     def _resolve_pip() -> list[str]:
         """Return the best pip invocation prefix for the running venv.
@@ -369,6 +429,17 @@ class PluginInstaller:
         plugin_path = self.get_plugin_path(plugin_id)
         if not plugin_path.exists():
             raise ValueError(f"Plugin {plugin_id} is not installed")
+
+        # Remove pip packages this plugin installed, but keep any that another
+        # installed plugin still declares — avoids breaking a sibling's deps
+        # while preventing shared-venv bloat across install/uninstall cycles
+        # (calvin-10s). Read the manifest before the dir is deleted.
+        manifest = self.get_plugin_manifest(plugin_id) or {}
+        installed = manifest.get("_installed_packages") or []
+        if installed:
+            still_needed = self._packages_required_by_others(plugin_id)
+            removable = [pkg for pkg in installed if pkg not in still_needed]
+            self._uninstall_pip_requirements(removable)
 
         # Remove plugin directory (frontend assets live inside it, so they go too)
         shutil.rmtree(plugin_path)

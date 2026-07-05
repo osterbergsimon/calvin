@@ -337,6 +337,69 @@ class TestPluginInstaller:
         with pytest.raises(ValueError, match="not installed"):
             plugin_installer.uninstall_plugin("nonexistent")
 
+    def test_uninstall_removes_pip_packages(
+        self, plugin_installer, valid_plugin_package, monkeypatch
+    ):
+        """uninstall_plugin pip-uninstalls the packages it installed (calvin-10s)."""
+        monkeypatch.setattr(plugin_installer, "_install_pip_requirements", lambda m: ["cowsay==6.1"])
+        plugin_installer.install_plugin(valid_plugin_package)
+        assert plugin_installer.get_plugin_manifest("test_plugin")["_installed_packages"] == [
+            "cowsay==6.1"
+        ]
+
+        removed = []
+        monkeypatch.setattr(
+            plugin_installer, "_uninstall_pip_requirements", lambda pkgs: removed.append(pkgs)
+        )
+        plugin_installer.uninstall_plugin("test_plugin")
+        assert removed == [["cowsay==6.1"]]
+
+    def test_uninstall_keeps_packages_another_plugin_needs(
+        self, plugin_installer, valid_plugin_package, valid_plugin_manifest, monkeypatch
+    ):
+        """A package another installed plugin still declares is not removed (calvin-10s)."""
+        monkeypatch.setattr(plugin_installer, "_install_pip_requirements", lambda m: ["shared==1.0"])
+        plugin_installer.install_plugin(valid_plugin_package)
+
+        # A second plugin on disk also depends on shared==1.0.
+        other = plugin_installer.plugins_dir / "other_plugin"
+        other.mkdir()
+        (other / "plugin.json").write_text(
+            json.dumps(
+                {**valid_plugin_manifest, "id": "other_plugin", "_installed_packages": ["shared==1.0"]}
+            )
+        )
+
+        removed = []
+        monkeypatch.setattr(
+            plugin_installer, "_uninstall_pip_requirements", lambda pkgs: removed.append(pkgs)
+        )
+        plugin_installer.uninstall_plugin("test_plugin")
+        assert removed == [[]]  # shared==1.0 kept because other_plugin needs it
+
+    def test_failed_install_rolls_back_pip_packages(
+        self, plugin_installer, valid_plugin_package, monkeypatch
+    ):
+        """A failure after pip install rolls back the installed packages (calvin-10s)."""
+        from app.services import plugin_installer as pi_mod
+
+        monkeypatch.setattr(plugin_installer, "_install_pip_requirements", lambda m: ["cowsay==6.1"])
+        rolled_back = []
+        monkeypatch.setattr(
+            plugin_installer, "_uninstall_pip_requirements", lambda pkgs: rolled_back.append(pkgs)
+        )
+
+        def boom(*args, **kwargs):
+            raise OSError("disk full")
+
+        # Manifest write fails after pip install succeeds.
+        monkeypatch.setattr(pi_mod.json, "dump", boom)
+        with pytest.raises(ValueError, match="Failed to install"):
+            plugin_installer.install_plugin(valid_plugin_package)
+
+        assert rolled_back == [["cowsay==6.1"]]
+        assert not plugin_installer.get_plugin_path("test_plugin").exists()
+
     def test_get_installed_plugins_empty(self, plugin_installer):
         """Test getting installed plugins when none are installed."""
         plugins = plugin_installer.get_installed_plugins()
