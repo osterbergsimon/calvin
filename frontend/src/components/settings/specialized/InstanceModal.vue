@@ -9,7 +9,7 @@
               : `Add ${currentPlugin?.name || ""} ${instanceLabel}`
           }}
         </h3>
-        <button class="btn-close-modal" @click="handleClose">×</button>
+        <button class="btn-close-modal" aria-label="Close" @click="handleClose">×</button>
       </div>
       <div class="modal-body">
         <div v-if="error" class="error-message">
@@ -435,7 +435,8 @@ const handleTest = async () => {
           if (schema.type === "string" && typeof value === "string") {
             testConfig[key] = value.trim();
           } else if (schema.type === "integer" || schema.type === "number") {
-            testConfig[key] = Number(value) || schema.default || 0;
+            // Preserve a legitimate 0 — Number(0) is falsy so `|| default` would drop it.
+            testConfig[key] = value !== "" ? Number(value) : (schema.default ?? 0);
           } else if (schema.type === "boolean") {
             testConfig[key] = Boolean(value);
           } else {
@@ -496,7 +497,8 @@ const handleSave = async () => {
           if (schema.type === "string" && typeof value === "string") {
             config[key] = value.trim();
           } else if (schema.type === "integer" || schema.type === "number") {
-            config[key] = Number(value) || schema.default || 0;
+            // Preserve a legitimate 0 — Number(0) is falsy so `|| default` would drop it.
+            config[key] = value !== "" ? Number(value) : (schema.default ?? 0);
           } else if (schema.type === "boolean") {
             config[key] = Boolean(value);
           } else {
@@ -665,7 +667,7 @@ const handleSave = async () => {
   padding: 0.5rem 0.75rem;
   background: var(--bg-2);
   color: var(--ink);
-  border: 1px solid var(--line);
+  border: 1px solid var(--input-border);
   border-radius: 4px;
   font-size: 0.9rem;
   font-family: inherit;

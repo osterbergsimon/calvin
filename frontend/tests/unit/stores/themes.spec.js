@@ -109,10 +109,16 @@ describe("Themes Store", () => {
       axios.get.mockResolvedValue({ data: mockResponse });
 
       const store = useThemesStore();
-      await store.fetchInstalledThemes();
+      const result = await store.fetchInstalledThemes();
 
       expect(axios.get).toHaveBeenCalledWith("/api/plugins/installed");
       expect(store.loading).toBe(false);
+      // The endpoint has no `themes` key — read `plugins` and filter (calvin-8lr).
+      expect(result).toEqual([
+        { id: "theme1", type: "theme", is_builtin: false },
+        { id: "theme2", type: "theme", is_builtin: false },
+      ]);
+      expect(store.installedThemes).toEqual(result);
     });
 
     it("should handle API errors", async () => {
@@ -212,9 +218,10 @@ describe("Themes Store", () => {
       const store = useThemesStore();
       await store.installThemeFromGitHub("https://github.com/user/repo", "theme.json", "main");
 
+      // The handler requires plugin_path (not theme_path) or it 400s (calvin-8lr).
       expect(axios.post).toHaveBeenCalledWith("/api/plugins/github/install", {
         repo_url: "https://github.com/user/repo",
-        theme_path: "theme.json",
+        plugin_path: "theme.json",
         branch: "main",
       });
       expect(store.loading).toBe(false);
@@ -239,7 +246,7 @@ describe("Themes Store", () => {
 
       expect(axios.post).toHaveBeenCalledWith("/api/plugins/github/install", {
         repo_url: "https://github.com/user/repo",
-        theme_path: "theme.json",
+        plugin_path: "theme.json",
         branch: "main",
       });
     });

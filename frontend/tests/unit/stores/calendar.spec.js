@@ -145,6 +145,20 @@ describe("Calendar Store", () => {
       expect(result).toEqual(updatedSource);
     });
 
+    it("should refresh the sources cache so an offline reload keeps the edit (calvin-2ej)", async () => {
+      const store = useCalendarStore();
+      store.sources = [{ id: "1", name: "Source 1", color: "#000000" }];
+
+      const updatedSource = { id: "1", name: "Source 1", color: "#ff0000" };
+      axios.put.mockResolvedValue({ data: updatedSource });
+
+      await store.updateSource("1", { color: "#ff0000" });
+
+      expect(setCachedData).toHaveBeenCalledWith("calendar_sources", {
+        sources: [updatedSource],
+      });
+    });
+
     it("should handle errors when updating source", async () => {
       const error = new Error("Update failed");
       axios.put.mockRejectedValue(error);

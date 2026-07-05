@@ -6,6 +6,7 @@
         class="btn-close-fullscreen"
         data-action="exit-fullscreen"
         title="Close Fullscreen (ESC)"
+        aria-label="Exit fullscreen"
         @click.stop="handleCloseFullscreen"
       >
         ×

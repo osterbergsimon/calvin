@@ -301,7 +301,7 @@ const emit = defineEmits(["update:config"]);
   min-height: var(--touch-target);
   padding: 0 0.875rem; /* 14px */
   background: var(--bg-2);
-  border: 1px solid var(--line);
+  border: 1px solid var(--input-border);
   border-radius: var(--radius-lg);
   font-family: var(--font-ui);
   font-size: var(--fs-control-lg);

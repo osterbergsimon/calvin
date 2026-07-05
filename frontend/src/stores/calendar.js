@@ -88,6 +88,8 @@ export const useCalendarStore = defineStore("calendar", () => {
       if (index !== -1) {
         sources.value[index] = response.data;
       }
+      // Refresh the cache so an offline reload after this edit doesn't revert it
+      setCachedData("calendar_sources", { sources: sources.value });
       return response.data;
     } catch (err) {
       error.value = err.message;

@@ -1,11 +1,15 @@
 <template>
   <div class="card-grid calvin-plugin-grid" :style="gridStyle">
-    <article v-for="(card, idx) in cards" :key="idx" class="card-grid__card calvin-plugin-surface">
+    <article
+      v-for="(card, idx) in cards"
+      :key="cardKey(card, idx)"
+      class="card-grid__card calvin-plugin-surface"
+    >
       <header v-if="cardTitle(card)" class="card-grid__title">{{ cardTitle(card) }}</header>
       <ul v-if="cardItems(card).length" class="card-grid__items calvin-plugin-list">
         <li
           v-for="(item, j) in cardItems(card)"
-          :key="j"
+          :key="itemKey(item, j)"
           class="card-grid__item calvin-plugin-row"
           :class="{
             'card-grid__item--clickable': isClickable(itemUrl(item), itemLinkAction),
@@ -106,6 +110,17 @@ function itemValue(item) {
 function itemUrl(item) {
   const spec = itemSpec();
   return spec.click_url_path ? resolvePath(item, spec.click_url_path) : null;
+}
+
+// Stable content keys so keyed diffs don't misplay transitions when cards or
+// their items reorder on refresh. Fall back to index when nothing identifying exists.
+function cardKey(card, idx) {
+  return cardTitle(card) || idx;
+}
+
+function itemKey(item, idx) {
+  const sig = [itemLabel(item), itemValue(item)].filter(v => v != null && v !== "").join("|");
+  return sig || idx;
 }
 </script>
 
