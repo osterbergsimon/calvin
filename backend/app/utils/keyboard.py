@@ -96,7 +96,13 @@ class KeyboardHandler:
         return None
 
     def read_events(self):
-        """Read keyboard events (Linux only)."""
+        """Read keyboard events (Linux only).
+
+        NOTE: currently unused by the running app — the live keyboard path is
+        browser-side (frontend KeyboardHandler.vue -> DOM keydown). This blocking
+        read_loop has no supervisor or hot-plug reconnect; wire it up properly
+        before relying on it. See calvin-6ez.
+        """
         if not self.is_available or not self.device:
             return
 

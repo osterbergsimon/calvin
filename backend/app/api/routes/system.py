@@ -264,7 +264,7 @@ async def trigger_update():
             )
 
         # Wait a moment to see if process starts successfully
-        time.sleep(0.5)
+        await asyncio.sleep(0.5)
 
         # Check if process is still running (didn't immediately fail)
         if process.poll() is not None:
