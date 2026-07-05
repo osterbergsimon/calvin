@@ -50,6 +50,37 @@ class TestPluginMetadataDefaults:
 
 
 @pytest.mark.unit
+class TestInstanceIdentityValidation:
+    """instance_identity entries must reference real config keys (calvin-eaf)."""
+
+    def test_valid_identity_keys_accepted(self):
+        metadata = PluginMetadata(
+            type_id="imap",
+            name="IMAP",
+            instance_config_schema={"host": {"type": "string"}, "port": {"type": "integer"}},
+            instance_identity=["host", "port"],
+        )
+        assert metadata.instance_identity == ["host", "port"]
+
+    def test_identity_key_from_common_schema_accepted(self):
+        metadata = PluginMetadata(
+            type_id="imap",
+            name="IMAP",
+            common_config_schema={"account": {"type": "string"}},
+            instance_identity=["account"],
+        )
+        assert metadata.instance_identity == ["account"]
+
+    def test_unknown_identity_key_rejected(self):
+        with pytest.raises(ValidationError, match="instance_identity references unknown config key"):
+            PluginMetadata(
+                type_id="imap",
+                name="IMAP",
+                instance_config_schema={"host": {"type": "string"}},
+                instance_identity=["host", "typo_port"],
+            )
+
+
 class TestDisplaySchemaValidation:
     """display_schema / statusbar_schema shell-field validation."""
 

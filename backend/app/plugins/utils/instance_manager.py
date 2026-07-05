@@ -261,11 +261,19 @@ async def handle_plugin_config_update_generic(
         existing = await PluginDB.objects.get_or_none(id=plugin_instance_id)
 
         if existing:
-            # Add timestamp to make unique
+            # The base id collides — append a suffix and re-check until it's
+            # actually free. Without the re-check, a suffixed id that also exists
+            # would be handed to register_plugin, raise "already registered", and
+            # silently re-enable the wrong instance instead of creating a new one
+            # (the timestamp wraps every 100s). See calvin-eaf.
             import time
 
-            timestamp = int(time.time() * 1000) % 100000
-            plugin_instance_id = f"{plugin_instance_id}-{timestamp}"
+            base_id = plugin_instance_id
+            suffix = int(time.time() * 1000) % 100000
+            plugin_instance_id = f"{base_id}-{suffix}"
+            while await PluginDB.objects.get_or_none(id=plugin_instance_id):
+                suffix += 1
+                plugin_instance_id = f"{base_id}-{suffix}"
 
         logger.info(
             f"[{type_id}] Creating new instance: {plugin_instance_id} with name: {instance_name}"
