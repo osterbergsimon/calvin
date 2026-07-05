@@ -68,13 +68,20 @@ function focusItem(index) {
      viewport-constrained settings layout on a short kiosk (calvin-g7v). */
   min-height: 0;
   overflow-y: auto;
-  /* A vertical scroll container clips BOTH axes, which otherwise cuts off the
-     selected tile's FocusPanel neon glow (blooms outward + translateY) at the
-     rail's edges (calvin-7ux). Equal negative-margin + padding expands the
-     scrollport for glow room while keeping each tile visually in place; the
-     negative margins bloom into the surrounding grid gap / body padding. */
-  margin: -12px -16px;
-  padding: 12px 16px;
+}
+
+/* The rail must scroll vertically on short kiosks (calvin-g7v), and a scroll
+   container clips BOTH axes — so FocusPanel's default OUTWARD neon glow (tuned
+   for dashboard panels, which sit in overflow:visible space) gets cut off at
+   the rail's edges and reads as an ugly box (calvin-7ux). Give the selected
+   tile a self-contained treatment instead: an inset ring + inner glow that
+   never overflows, so nothing is clipped. Scoped to the rail via :deep so
+   DashboardPanel keeps its full bloom. */
+.category-rail .category-rail__item.is-focused {
+  box-shadow:
+    inset 0 0 0 1.5px var(--focus),
+    inset 0 0 14px 0 var(--focus-edge);
+  transform: none;
 }
 
 .category-rail__item {
