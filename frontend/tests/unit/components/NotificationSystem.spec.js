@@ -7,9 +7,12 @@
 import { describe, it, expect, beforeEach, afterEach, vi } from "vitest";
 import { mount } from "@vue/test-utils";
 import { setActivePinia, createPinia } from "pinia";
+import axios from "axios";
 import NotificationSystem from "@/components/NotificationSystem.vue";
 import { useConfigStore } from "@/stores/config";
 import { useModeStore } from "@/stores/mode";
+
+vi.mock("axios");
 
 describe("NotificationSystem (input-echo HUD)", () => {
   let configStore;
@@ -26,6 +29,8 @@ describe("NotificationSystem (input-echo HUD)", () => {
     configStore.keyboardFeedbackMode = "normal";
     configStore.modeIndicatorTimeout = 5;
     configStore.showUI = false;
+    // Default to a booted app; the boot-hydration suite overrides this.
+    configStore.hydrated = true;
     modeStore.currentMode = modeStore.MODES.CALENDAR;
     modeStore.isFullscreen = false;
     modeStore.fullscreenMode = null;
@@ -231,6 +236,46 @@ describe("NotificationSystem (input-echo HUD)", () => {
       vi.advanceTimersByTime(100);
       await wrapper.vm.$nextTick();
       expect(wrapper.find(".hud").exists()).toBe(false);
+    });
+  });
+
+  describe("Boot-time hydration (calvin-2ck)", () => {
+    it("does not flash the mode HUD when the initial config load hides the UI", async () => {
+      // Boot state: showUI sits at its default (true) and the app has not yet
+      // hydrated its persisted config. The mode HUD component is already mounted.
+      configStore.showUI = true;
+      configStore.hydrated = false;
+      modeStore.currentMode = modeStore.MODES.CALENDAR;
+
+      const wrapper = mount(NotificationSystem);
+      await wrapper.vm.$nextTick();
+      expect(wrapper.find(".hud").exists()).toBe(false);
+
+      // The initial config load resolves with a kiosk config (showUI:false).
+      // That true->false settle must NOT be echoed as a user mode change —
+      // otherwise a stale "Calendar Mode" HUD flashes on every reload.
+      axios.get.mockResolvedValue({ data: { showUI: false } });
+      await configStore.fetchConfig();
+      await wrapper.vm.$nextTick();
+      vi.advanceTimersByTime(100);
+      await wrapper.vm.$nextTick();
+
+      expect(wrapper.find(".hud").exists()).toBe(false);
+    });
+
+    it("still echoes a genuine UI-hide toggle once hydrated", async () => {
+      configStore.hydrated = true;
+      configStore.showUI = true;
+      const wrapper = mount(NotificationSystem);
+      await wrapper.vm.$nextTick();
+
+      // User hides the chrome after boot — this SHOULD flash the mode HUD.
+      configStore.showUI = false;
+      await wrapper.vm.$nextTick();
+      vi.advanceTimersByTime(100);
+      await wrapper.vm.$nextTick();
+
+      expect(wrapper.find(".hud").exists()).toBe(true);
     });
   });
 
