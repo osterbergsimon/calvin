@@ -125,7 +125,7 @@ onUnmounted(() => {
   width: 100%;
   height: 100%;
   border: none;
-  background: var(--bg-primary);
+  background: var(--bg-1);
 }
 
 .service-iframe.iframe-error {
@@ -141,7 +141,7 @@ onUnmounted(() => {
   display: flex;
   align-items: center;
   justify-content: center;
-  background: var(--bg-primary);
+  background: var(--bg-1);
   z-index: 10;
 }
 
@@ -153,23 +153,23 @@ onUnmounted(() => {
 
 .error-content h3 {
   margin: 0 0 1rem 0;
-  color: var(--accent-error);
+  color: var(--err);
   font-size: 1.5rem;
 }
 
 .error-content p {
   margin: 0.5rem 0;
-  color: var(--text-secondary);
+  color: var(--ink-2);
 }
 
 .service-url {
   font-family: monospace;
   font-size: 0.9rem;
   word-break: break-all;
-  color: var(--text-primary);
-  background: var(--bg-secondary);
+  color: var(--ink);
+  background: var(--bg-2);
   padding: 0.5rem;
-  border-radius: 4px;
+  border-radius: var(--radius-sm);
   margin: 1rem 0;
 }
 
@@ -183,30 +183,30 @@ onUnmounted(() => {
 .btn-open-new,
 .btn-retry {
   padding: 0.75rem 1.5rem;
-  border-radius: 4px;
+  border-radius: var(--radius-sm);
   font-size: 1rem;
   cursor: pointer;
   transition: all 0.2s;
 }
 
 .btn-open-new {
-  background: var(--accent-primary);
-  color: white;
+  background: var(--focus);
+  color: var(--focus-ink);
   text-decoration: none;
   border: none;
 }
 
 .btn-open-new:hover {
-  background: var(--accent-secondary);
+  filter: brightness(1.08);
 }
 
 .btn-retry {
-  background: var(--bg-secondary);
-  color: var(--text-primary);
-  border: 1px solid var(--border-color);
+  background: var(--bg-2);
+  color: var(--ink);
+  border: 1px solid var(--line);
 }
 
 .btn-retry:hover {
-  background: var(--bg-tertiary);
+  background: var(--bg-0);
 }
 </style>
