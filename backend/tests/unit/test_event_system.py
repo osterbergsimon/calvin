@@ -1,6 +1,7 @@
 """Unit tests for event system."""
 
 import asyncio
+import time
 from typing import Any
 
 import pytest
@@ -90,6 +91,43 @@ async def test_multiple_subscribers():
     assert "plugin2" in results
     assert len(plugin1_events) == 1
     assert len(plugin2_events) == 1
+
+
+@pytest.mark.asyncio
+async def test_rate_limited_subscriber_does_not_misattribute_results():
+    """When an earlier subscriber is rate-limited, remaining results must stay
+    keyed to the correct plugin and must not be dropped (calvin-paf)."""
+    event_system = EventSystem()
+    a_events = []
+    b_events = []
+
+    async def handler_a(event_type: str, event_data: dict[str, Any]) -> dict[str, Any] | None:
+        a_events.append(event_data)
+        return {"handled": True, "plugin": "pluginA"}
+
+    async def handler_b(event_type: str, event_data: dict[str, Any]) -> dict[str, Any] | None:
+        b_events.append(event_data)
+        return {"handled": True, "plugin": "pluginB"}
+
+    # Subscription order matters: A is first in the handlers list.
+    event_system.subscribe("pluginA", ["test_event"], handler_a)
+    event_system.subscribe("pluginB", ["test_event"], handler_b)
+
+    # Rate-limit only A (B has no recent emit), so only B's task is created.
+    event_system._rate_limiter["pluginA"] = {"test_event": time.time()}
+
+    results = await event_system.emit_event(
+        "test_event", {"data": "x"}, wait_for_handlers=True
+    )
+
+    # A was skipped: its handler never ran and it has no result entry.
+    assert a_events == []
+    assert "pluginA" not in results
+    # B ran and its result is keyed to B, not misattributed to A.
+    assert len(b_events) == 1
+    assert list(results.keys()) == ["pluginB"]
+    assert results["pluginB"]["success"] is True
+    assert results["pluginB"]["result"] == {"handled": True, "plugin": "pluginB"}
 
 
 @pytest.mark.asyncio
