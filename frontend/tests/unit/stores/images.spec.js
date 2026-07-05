@@ -8,11 +8,21 @@ import axios from "axios";
 // Mock axios
 vi.mock("axios");
 
+// Mock cache utilities so the offline-fallback path is deterministic.
+vi.mock("@/utils/cache", () => ({
+  getCachedData: vi.fn(() => null),
+  setCachedData: vi.fn(),
+  clearCachedData: vi.fn(),
+}));
+
+import { getCachedData, setCachedData } from "@/utils/cache";
+
 describe("Images Store", () => {
   beforeEach(() => {
     // Create a fresh pinia instance for each test
     setActivePinia(createPinia());
     vi.clearAllMocks();
+    getCachedData.mockReturnValue(null);
   });
 
   describe("Initialization", () => {
@@ -95,6 +105,29 @@ describe("Images Store", () => {
       expect(store.error).toBe("Network error");
       expect(store.loading).toBe(false);
     });
+
+    it("should serve the cached feed when the backend is down (calvin-txp)", async () => {
+      const cachedImages = [{ id: "1", filename: "cached.jpg" }];
+      getCachedData.mockReturnValue(cachedImages);
+      axios.get.mockRejectedValue(new Error("Network error"));
+
+      const store = useImagesStore();
+      const result = await store.fetchImages();
+
+      expect(result).toEqual({ images: cachedImages, cached: true });
+      expect(store.images).toEqual(cachedImages);
+    });
+
+    it("should cache the feed on a successful fetch (calvin-txp)", async () => {
+      const mockImages = { images: [{ id: "1", filename: "a.jpg" }] };
+      axios.get.mockResolvedValueOnce({ data: mockImages });
+      axios.get.mockResolvedValueOnce({ data: { image: null } });
+
+      const store = useImagesStore();
+      await store.fetchImages();
+
+      expect(setCachedData).toHaveBeenCalledWith("images_all", mockImages.images);
+    });
   });
 
   describe("fetchCurrentImage", () => {
@@ -121,6 +154,18 @@ describe("Images Store", () => {
       const store = useImagesStore();
 
       await expect(store.fetchCurrentImage()).rejects.toThrow("Network error");
+    });
+
+    it("should fall back to the last-known image on failure (calvin-txp)", async () => {
+      const cachedImage = { id: "9", filename: "last.jpg" };
+      getCachedData.mockReturnValue(cachedImage);
+      axios.get.mockRejectedValue(new Error("Network error"));
+
+      const store = useImagesStore();
+      const result = await store.fetchCurrentImage();
+
+      expect(result).toEqual({ image: cachedImage, cached: true });
+      expect(store.currentImage).toEqual(cachedImage);
     });
   });
 
