@@ -107,7 +107,7 @@ watch(
   justify-content: center;
   height: 100%;
   padding: 2rem;
-  color: var(--text-secondary);
+  color: var(--ink-2);
   gap: 0.5rem;
 }
 
