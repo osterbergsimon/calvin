@@ -3,6 +3,18 @@ import { useConfigStore } from "../stores/config";
 import { useThemesStore } from "../stores/themes";
 
 /**
+ * Normalize a selected-theme id to `null` when there is no custom theme.
+ * A config round-trip can stringify a Python `None` into the literal "None"
+ * (or "null"), which is truthy and would trigger GET /api/plugins/None → 400.
+ * @param {*} id
+ * @returns {string|null}
+ */
+function normalizeThemeId(id) {
+  if (id == null || id === "" || id === "None" || id === "null") return null;
+  return id;
+}
+
+/**
  * Composable for managing theme (dark mode and custom themes).
  * Supports manual toggle, time-based, system theme detection, and custom theme selection.
  */
@@ -57,7 +69,7 @@ export function useTheme() {
 
   // Apply custom theme variables
   const applyCustomTheme = async themeId => {
-    if (!themeId || typeof window === "undefined") return;
+    if (!normalizeThemeId(themeId) || typeof window === "undefined") return;
 
     try {
       const theme = await themesStore.getTheme(themeId);
@@ -185,8 +197,9 @@ export function useTheme() {
       themeMode.value = configStore.themeMode;
     }
     if (configStore.selectedTheme !== undefined) {
-      selectedThemeId.value = configStore.selectedTheme;
-      themesStore.setSelectedTheme(configStore.selectedTheme);
+      const normalized = normalizeThemeId(configStore.selectedTheme);
+      selectedThemeId.value = normalized;
+      themesStore.setSelectedTheme(normalized);
     }
     if (configStore.darkModeStart !== undefined) {
       darkModeStart.value = configStore.darkModeStart;
@@ -250,10 +263,11 @@ export function useTheme() {
   watch(
     () => configStore.selectedTheme,
     async newTheme => {
-      if (newTheme !== undefined && newTheme !== selectedThemeId.value) {
-        selectedThemeId.value = newTheme;
-        themesStore.setSelectedTheme(newTheme);
-        await applyCustomTheme(newTheme);
+      const normalized = normalizeThemeId(newTheme);
+      if (newTheme !== undefined && normalized !== selectedThemeId.value) {
+        selectedThemeId.value = normalized;
+        themesStore.setSelectedTheme(normalized);
+        await applyCustomTheme(normalized);
       }
     }
   );

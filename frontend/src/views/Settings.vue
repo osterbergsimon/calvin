@@ -468,7 +468,12 @@ onUnmounted(() => {
   }
 }
 
-@media (max-height: 600px) {
+/* Short AND narrow (a phone in landscape) → fall back to page scroll, where the
+   browser chrome provides it. A short but WIDE viewport (an 800x480 kiosk) must
+   keep the constrained internal scroll above: a chromeless kiosk has no page
+   scroll, so overflow:visible would push content below the fold unreachably
+   (calvin-g7v). */
+@media (max-height: 600px) and (max-width: 768px) {
   .settings-page {
     height: auto;
     min-height: 100dvh;

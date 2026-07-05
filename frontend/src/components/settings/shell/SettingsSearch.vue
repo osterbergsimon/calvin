@@ -31,7 +31,9 @@
         autocomplete="off"
         @keydown.escape="query = ''"
       />
-      <kbd class="settings-search__hint" aria-label="Press slash to focus search">/</kbd>
+      <kbd v-if="!isTouch" class="settings-search__hint" aria-label="Press slash to focus search"
+        >/</kbd
+      >
     </div>
     <ul
       v-if="results.length"
@@ -52,8 +54,12 @@
 <script setup>
 import { ref, computed, onMounted, onUnmounted, useTemplateRef } from "vue";
 import { filterSettingsDestinations } from "@/components/settings/settingsRegistry";
+import { useTouchCapability } from "@/composables/useTouchCapability";
 
 const emit = defineEmits(["jump"]);
+
+// The '/' focus shortcut is keyboard-only; hide its hint on touch kiosks.
+const { isTouch } = useTouchCapability();
 
 const query = ref("");
 const inputEl = useTemplateRef("inputEl");
@@ -96,7 +102,7 @@ onUnmounted(() => {
   align-items: center;
   gap: var(--space-2, 8px);
   background: var(--surface-2, var(--surface));
-  border: 1px solid var(--border);
+  border: 1px solid var(--border-color);
   border-radius: var(--radius, 6px);
   padding: 0 var(--space-3, 12px);
 }
@@ -150,7 +156,7 @@ onUnmounted(() => {
   font-size: 0.75rem;
   color: var(--ink-3);
   background: var(--surface-3, var(--surface-2, var(--surface)));
-  border: 1px solid var(--border);
+  border: 1px solid var(--border-color);
   border-radius: 3px;
   padding: 1px 5px;
   line-height: 1.4;
@@ -163,7 +169,7 @@ onUnmounted(() => {
   right: 0;
   z-index: 100;
   background: var(--surface);
-  border: 1px solid var(--border);
+  border: 1px solid var(--border-color);
   border-radius: var(--radius, 6px);
   list-style: none;
   margin: 0;

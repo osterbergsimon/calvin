@@ -9,7 +9,7 @@ this model. There are no registration hooks.
 
 from typing import Any
 
-from pydantic import BaseModel, ConfigDict, Field, field_validator
+from pydantic import BaseModel, ConfigDict, Field, field_validator, model_validator
 
 from app.plugins.base import PluginType
 
@@ -175,3 +175,23 @@ class PluginMetadata(BaseModel):
             allowed_kinds=SUPPORTED_STATUSBAR_KINDS,
             check_panel_variant=False,
         )
+
+    @model_validator(mode="after")
+    def validate_instance_identity(self) -> "PluginMetadata":
+        """Every instance_identity entry must be a real config key.
+
+        A typo silently breaks instance identity — a partial typo yields the same
+        id for different instances (collision), so fail plugin load instead of
+        degrading at runtime. Keys may come from either config schema (both feed
+        the config that instance_id_for hashes). See calvin-eaf.
+        """
+        if not self.instance_identity:
+            return self
+        known_keys = set(self.instance_config_schema) | set(self.common_config_schema)
+        unknown = [key for key in self.instance_identity if key not in known_keys]
+        if unknown:
+            raise ValueError(
+                f"instance_identity references unknown config key(s) {unknown}; "
+                f"valid keys: {sorted(known_keys)}"
+            )
+        return self

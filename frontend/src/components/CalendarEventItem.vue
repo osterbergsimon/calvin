@@ -229,7 +229,7 @@ const handleFocus = () => {
 
 .event-item.selected {
   border: 2px solid #fff;
-  box-shadow: 0 0 0 3px rgba(33, 150, 243, 0.8);
+  box-shadow: 0 0 0 3px color-mix(in srgb, var(--accent-primary) 80%, transparent);
 }
 
 /* Responsive styles for smaller screens and portrait mode */

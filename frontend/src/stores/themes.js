@@ -48,9 +48,8 @@ export const useThemesStore = defineStore("themes", () => {
     error.value = null;
     try {
       const response = await axios.get("/api/plugins/installed");
-      // Filter to only themes
-      response.data.plugins = (response.data.plugins || []).filter(p => p.type === "theme");
-      installedThemes.value = response.data.themes || [];
+      // The endpoint returns { plugins: [...] } (no `themes` key) — filter that.
+      installedThemes.value = (response.data.plugins || []).filter(p => p.type === "theme");
       return installedThemes.value;
     } catch (err) {
       error.value = err.message;
@@ -114,7 +113,8 @@ export const useThemesStore = defineStore("themes", () => {
     try {
       const response = await axios.post("/api/plugins/github/install", {
         repo_url: repoUrl,
-        theme_path: themePath,
+        // The handler requires `plugin_path` (themes install through the plugin path).
+        plugin_path: themePath,
         branch: branch,
       });
 

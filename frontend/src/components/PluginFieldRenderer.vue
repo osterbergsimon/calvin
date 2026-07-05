@@ -148,7 +148,7 @@
         :href="ui.help_link"
         target="_blank"
         rel="noopener noreferrer"
-        style="color: var(--accent-color); text-decoration: underline"
+        style="color: var(--accent-primary); text-decoration: underline"
       >
         {{ ui.help_link }}
       </a>
@@ -271,7 +271,7 @@ async function runScan() {
 .form-input {
   width: 100%;
   padding: 0.75rem;
-  border: 1px solid var(--border-color);
+  border: 1px solid var(--input-border);
   border-radius: 4px;
   background: var(--bg-secondary);
   color: var(--text-primary);
@@ -296,7 +296,7 @@ async function runScan() {
 }
 
 .help-text a {
-  color: var(--accent-color);
+  color: var(--accent-primary);
   text-decoration: underline;
 }
 

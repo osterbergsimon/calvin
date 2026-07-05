@@ -69,8 +69,15 @@ synchronously — when the call returns success, the plugin is usable:
 3. The loader unloads the plugin's module and drops its type registrations
    (`unload_installed_plugin`) — the type disappears from
    `get_plugin_types()` without a restart.
-4. The plugin directory (including frontend assets) is removed.
-5. A `plugin_uninstalled` event is emitted.
+4. Pip packages the plugin installed (recorded in the manifest's
+   `_installed_packages`) are uninstalled from the shared venv — **except** any
+   package another installed plugin still declares, which is kept so a sibling's
+   dependencies aren't broken. Uninstall is best-effort (logged, never fatal).
+5. The plugin directory (including frontend assets) is removed.
+6. A `plugin_uninstalled` event is emitted.
+
+A failed install rolls back the same way: any packages the attempt already
+installed are uninstalled before the partial directory is cleaned up.
 
 ## Startup
 

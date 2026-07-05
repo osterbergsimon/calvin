@@ -49,8 +49,12 @@ class EventSystem:
         if not handlers:
             return None if not wait_for_handlers else {}
 
-        # Create tasks for all handlers (non-blocking)
-        tasks = []
+        # Create tasks for all handlers (non-blocking). Rate-limited handlers are
+        # skipped, so we track the plugin_id for each *created* task — zipping
+        # results against the full handlers list would misattribute them once any
+        # handler is skipped (calvin-paf).
+        tasks: list[asyncio.Task] = []
+        task_plugins: list[str] = []
         for plugin_id, handler in handlers:
             # Check rate limiting
             if self._should_rate_limit(plugin_id, event_type):
@@ -60,6 +64,7 @@ class EventSystem:
             # Create task for handler (runs in background)
             task = self._create_handler_task(plugin_id, handler, event_type, event_data)
             tasks.append(task)
+            task_plugins.append(plugin_id)
 
         if not tasks:
             return None if not wait_for_handlers else {}
@@ -67,11 +72,11 @@ class EventSystem:
         if wait_for_handlers:
             # Wait for all handlers to complete
             results = await asyncio.gather(*tasks, return_exceptions=True)
-            return self._process_handler_results(results, handlers)
+            return self._process_handler_results(results, task_plugins)
         else:
             # Fire-and-forget: don't wait for handlers
             # Tasks run in background, errors are logged but not propagated
-            asyncio.create_task(self._await_handlers_with_error_handling(tasks, handlers))
+            asyncio.create_task(self._await_handlers_with_error_handling(tasks, task_plugins))
             return None
 
     def _create_handler_task(
@@ -96,11 +101,15 @@ class EventSystem:
     async def _await_handlers_with_error_handling(
         self,
         tasks: list[asyncio.Task],
-        handlers: list[tuple[str, Callable]],
+        task_plugins: list[str],
     ) -> None:
-        """Await handlers and log errors without propagating."""
+        """Await handlers and log errors without propagating.
+
+        ``task_plugins`` is aligned 1:1 with ``tasks`` (the non-rate-limited
+        subset), so errors are attributed to the correct plugin.
+        """
         results = await asyncio.gather(*tasks, return_exceptions=True)
-        for result, (plugin_id, _) in zip(results, handlers):
+        for result, plugin_id in zip(results, task_plugins):
             if isinstance(result, Exception):
                 logger.opt(exception=result).error("Exception in event handler {}", plugin_id)
             elif result and not result.get("success", False):
@@ -176,11 +185,15 @@ class EventSystem:
     def _process_handler_results(
         self,
         results: list[Any],
-        handlers: list[tuple[str, Callable]],
+        task_plugins: list[str],
     ) -> dict[str, Any]:
-        """Process handler results when waiting for handlers."""
+        """Process handler results when waiting for handlers.
+
+        ``task_plugins`` is aligned 1:1 with ``results`` (the non-rate-limited
+        subset), so each result is keyed to the correct plugin.
+        """
         processed = {}
-        for result, (plugin_id, _) in zip(results, handlers):
+        for result, plugin_id in zip(results, task_plugins):
             if isinstance(result, Exception):
                 processed[plugin_id] = {"success": False, "error": str(result)}
             elif isinstance(result, dict):

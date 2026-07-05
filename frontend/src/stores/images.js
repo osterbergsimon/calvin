@@ -1,6 +1,14 @@
 import { defineStore } from "pinia";
 import { ref, computed } from "vue";
 import axios from "axios";
+import { getCachedData, setCachedData } from "../utils/cache";
+
+// Persist the wall-display feed so a kiosk refresh/reboot during a backend
+// outage keeps showing the last-known photo instead of "No images available".
+// Long TTL — a stale photo through a transient outage is the desired behavior.
+const IMAGES_CACHE_KEY = "images_all";
+const CURRENT_IMAGE_CACHE_KEY = "current_image_all";
+const IMAGE_CACHE_TTL = 24 * 60 * 60 * 1000; // 24 hours
 
 export const useImagesStore = defineStore("images", () => {
   const images = ref([]);
@@ -46,7 +54,10 @@ export const useImagesStore = defineStore("images", () => {
     try {
       const response = await getWithSources("/api/images/list", sourceIds);
       imagesBySourceKey.value[sourceKey] = response.data.images || [];
-      if (sourceKey === "__all__") images.value = response.data.images || [];
+      if (sourceKey === "__all__") {
+        images.value = response.data.images || [];
+        setCachedData(IMAGES_CACHE_KEY, images.value);
+      }
       // If we have images but no current image, fetch current
       const existingCurrent =
         sourceKey === "__all__" ? currentImage.value : currentImagesBySourceKey.value[sourceKey];
@@ -57,6 +68,15 @@ export const useImagesStore = defineStore("images", () => {
     } catch (err) {
       error.value = err.message;
       console.error("Failed to fetch images:", err);
+      // Serve the last-known feed so the wall display survives a backend outage.
+      if (sourceKey === "__all__") {
+        const cached = getCachedData(IMAGES_CACHE_KEY, IMAGE_CACHE_TTL);
+        if (cached && cached.length) {
+          images.value = cached;
+          imagesBySourceKey.value[sourceKey] = cached;
+          return { images: cached, cached: true };
+        }
+      }
       throw err;
     } finally {
       loading.value = false;
@@ -68,10 +88,22 @@ export const useImagesStore = defineStore("images", () => {
     try {
       const response = await getWithSources("/api/images/current", sourceIds);
       currentImagesBySourceKey.value[sourceKey] = response.data.image;
-      if (sourceKey === "__all__") currentImage.value = response.data.image;
+      if (sourceKey === "__all__") {
+        currentImage.value = response.data.image;
+        if (response.data.image) setCachedData(CURRENT_IMAGE_CACHE_KEY, response.data.image);
+      }
       return response.data;
     } catch (err) {
       console.error("Failed to fetch current image:", err);
+      // Fall back to the last-known image so the frame isn't blank during an outage.
+      if (sourceKey === "__all__") {
+        const cached = getCachedData(CURRENT_IMAGE_CACHE_KEY, IMAGE_CACHE_TTL);
+        if (cached) {
+          currentImagesBySourceKey.value[sourceKey] = cached;
+          currentImage.value = cached;
+          return { image: cached, cached: true };
+        }
+      }
       throw err;
     }
   };

@@ -164,6 +164,23 @@ class TestThemeInstaller:
         assert theme_path.exists()
         assert (theme_path / "theme.json").exists()
 
+    def test_install_theme_from_zip_rejects_path_traversal(
+        self, theme_installer, valid_theme_manifest, tmp_path, temp_themes_dir
+    ):
+        """A zip member escaping the theme dir must be rejected, writing nothing (calvin-8cv)."""
+        zip_path = tmp_path / "evil_theme.zip"
+        with zipfile.ZipFile(zip_path, "w") as zipf:
+            # theme.json under a subdir → triggers the subdirectory-extraction branch.
+            zipf.writestr("evil_theme/theme.json", json.dumps(valid_theme_manifest))
+            # Traversal member strips to '../escaped.txt' and would land in themes_dir.
+            zipf.writestr("evil_theme/../escaped.txt", "pwned")
+
+        with pytest.raises(ValueError, match="traversal|[Uu]nsafe"):
+            theme_installer.install_theme(zip_path, "test_theme")
+
+        assert not (temp_themes_dir / "escaped.txt").exists()
+        assert not theme_installer.get_theme_path("test_theme").exists()
+
     def test_install_theme_already_installed(self, theme_installer, valid_theme_directory):
         """Test installing a theme that's already installed."""
         theme_installer.install_theme(valid_theme_directory, "test_theme")

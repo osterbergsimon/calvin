@@ -1,5 +1,6 @@
-import { describe, it, expect, vi } from "vitest";
+import { describe, it, expect, vi, beforeEach } from "vitest";
 import { mount } from "@vue/test-utils";
+import { setActivePinia, createPinia } from "pinia";
 vi.mock("@/components/settings/settingsRegistry", () => ({
   filterSettingsDestinations: q =>
     q === "orient"
@@ -16,6 +17,11 @@ vi.mock("@/components/settings/settingsRegistry", () => ({
 import SettingsSearch from "@/components/settings/shell/SettingsSearch.vue";
 
 describe("SettingsSearch", () => {
+  // The '/' hint uses useTouchCapability → useConfigStore, so a Pinia is required.
+  beforeEach(() => {
+    setActivePinia(createPinia());
+  });
+
   it("shows results and emits jump on selection", async () => {
     const w = mount(SettingsSearch);
     await w.get("input").setValue("orient");

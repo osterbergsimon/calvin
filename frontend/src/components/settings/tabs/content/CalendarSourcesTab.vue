@@ -202,8 +202,8 @@ const loadCalendarPluginTypes = async () => {
 
 // Per-type URL placeholder and help text (preserved verbatim from original)
 const getCalendarTypePlaceholder = type => {
-  const typeInfo = calendarPluginTypes.value.find(t => t.id === type);
-  if (typeInfo && typeInfo.description) return typeInfo.description;
+  // Placeholder shows a URL-format example; the plugin description is reserved
+  // for the help text below so the two don't render the same string twice.
   switch (type) {
     case "google":
       return "https://calendar.google.com/calendar/ical/.../basic.ics";

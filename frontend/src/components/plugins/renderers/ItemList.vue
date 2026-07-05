@@ -2,7 +2,7 @@
   <ul class="item-list calvin-plugin-list calvin-plugin-list--scroll">
     <li
       v-for="(item, i) in items"
-      :key="i"
+      :key="keyFor(item, i)"
       class="item-list__row"
       :class="{
         'calvin-plugin-row': true,
@@ -71,6 +71,15 @@ const valueFor = item => pick(item, "value_path", "value", "value_format");
 const timestampFor = item => pick(item, "timestamp_path", "timestamp", "timestamp_format");
 const urlFor = item =>
   itemSpec.value.click_url_path ? resolvePath(item, itemSpec.value.click_url_path) : null;
+
+// Stable content key so keyed diffs don't misplay transitions when items
+// prepend/reorder on refresh. Falls back to index when nothing identifying exists.
+const keyFor = (item, i) => {
+  const sig = [timestampFor(item), labelFor(item), valueFor(item)]
+    .filter(v => v != null && v !== "")
+    .join("|");
+  return sig || i;
+};
 </script>
 
 <style scoped>

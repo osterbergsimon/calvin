@@ -7,6 +7,8 @@
       class="iframe-renderer__frame"
       :class="{ 'iframe-renderer__frame--error': error }"
       frameborder="0"
+      referrerpolicy="no-referrer"
+      sandbox="allow-scripts allow-same-origin allow-forms allow-popups"
       allowfullscreen
       @load="handleLoad"
       @error="handleError"
