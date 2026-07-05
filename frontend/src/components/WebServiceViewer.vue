@@ -76,12 +76,7 @@
             >
               ⤢
             </IconButton>
-            <IconButton
-              v-if="!isFullscreen"
-              label="Close"
-              title="Close"
-              @click.stop="handleClose"
-            >
+            <IconButton v-if="!isFullscreen" label="Close" title="Close" @click.stop="handleClose">
               ×
             </IconButton>
           </template>
@@ -365,6 +360,9 @@ onUnmounted(() => {
 .btn-close-fullscreen {
   pointer-events: auto;
   box-shadow: 0 4px 12px var(--shadow);
+  /* IconButton's transition covers background/border-color/color only, so
+     animate the overlay's own hover-scale here (was `all 0.2s` pre-migration). */
+  transition: transform 0.2s;
 }
 
 .btn-close-fullscreen:hover {
