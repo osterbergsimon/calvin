@@ -250,6 +250,12 @@ class ThemeInstaller:
                                     else member
                                 )
                                 if target_path:
+                                    # Guard against zip path traversal — a member like
+                                    # 'x/../../evil' resolves outside theme_path (calvin-8cv).
+                                    if not self._is_safe_path(target_path, theme_path):
+                                        raise ValueError(
+                                            f"Unsafe path in theme package (path traversal): {member!r}"
+                                        )
                                     target = theme_path / target_path
                                     if member.endswith("/"):
                                         target.mkdir(parents=True, exist_ok=True)

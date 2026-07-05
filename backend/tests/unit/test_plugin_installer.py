@@ -248,6 +248,25 @@ class TestPluginInstaller:
         assert (plugin_path / "plugin.json").exists()
         assert (plugin_path / "plugin.py").exists()
 
+    def test_install_plugin_from_zip_rejects_path_traversal(
+        self, plugin_installer, tmp_path, valid_plugin_manifest, temp_plugins_dir
+    ):
+        """A zip member escaping the plugin dir must be rejected, writing nothing (calvin-8cv)."""
+        zip_path = tmp_path / "evil_plugin.zip"
+        with zipfile.ZipFile(zip_path, "w") as zipf:
+            # Manifest under a subdir → triggers the subdirectory-extraction branch.
+            zipf.writestr("evil_plugin/plugin.json", json.dumps(valid_plugin_manifest))
+            zipf.writestr("evil_plugin/plugin.py", "# noop\n")
+            # Traversal member: strips to '../escaped.txt' and would land in plugins_dir.
+            zipf.writestr("evil_plugin/../escaped.txt", "pwned")
+
+        with pytest.raises(ValueError, match="traversal|[Uu]nsafe"):
+            plugin_installer.install_plugin(zip_path)
+
+        # Nothing escaped, and the partial plugin dir was cleaned up.
+        assert not (temp_plugins_dir / "escaped.txt").exists()
+        assert not plugin_installer.get_plugin_path("test_plugin").exists()
+
     def test_install_plugin_with_custom_id(self, plugin_installer, valid_plugin_package):
         """Test installing a plugin with a custom ID override."""
         manifest = plugin_installer.install_plugin(valid_plugin_package, plugin_id="custom_id")

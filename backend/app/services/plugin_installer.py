@@ -22,6 +22,19 @@ from app.services.validation import (
 )
 
 
+def _is_within(base: Path, target: Path) -> bool:
+    """True if ``target`` resolves inside ``base``.
+
+    Guards the subdirectory-extraction loop against zip path traversal: a member
+    like ``pkg/../../evil.py`` (or an absolute member) resolves outside the plugin
+    dir and would otherwise be written to disk. See calvin-8cv.
+    """
+    try:
+        return target.resolve().is_relative_to(base.resolve())
+    except (ValueError, OSError):
+        return False
+
+
 class PluginInstaller:
     """Service for installing, updating, and uninstalling plugins."""
 
@@ -218,6 +231,10 @@ class PluginInstaller:
                                 )
                                 if target_path:
                                     target = plugin_path / target_path
+                                    if not _is_within(plugin_path, target):
+                                        raise ValueError(
+                                            f"Unsafe path in plugin package (path traversal): {member!r}"
+                                        )
                                     if member.endswith("/"):
                                         target.mkdir(parents=True, exist_ok=True)
                                     else:
