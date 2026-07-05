@@ -294,7 +294,13 @@
                                 )
                               "
                             >
-                              {{ option.label }}
+                              <span class="component-option__label">{{ option.label }}</span>
+                              <span
+                                v-if="option.pluginName && option.pluginName !== option.label"
+                                class="component-option__type"
+                              >
+                                {{ option.pluginName }}
+                              </span>
                             </button>
                             <div
                               v-if="sourceOptionsFor(sub.kind).length > 0"
@@ -386,7 +392,13 @@
                         class="component-option"
                         @click="selectRegionComponent(screenIndex, previewIndex, option)"
                       >
-                        {{ option.label }}
+                        <span class="component-option__label">{{ option.label }}</span>
+                        <span
+                          v-if="option.pluginName && option.pluginName !== option.label"
+                          class="component-option__type"
+                        >
+                          {{ option.pluginName }}
+                        </span>
                       </button>
                       <div v-if="sourceOptionsFor(region.kind).length > 0" class="source-options">
                         <button
@@ -546,6 +558,7 @@ import { computed, onMounted, onUnmounted, reactive, ref } from "vue";
 import { useWebServicesStore } from "@/stores/webServices";
 import { useCalendarStore } from "@/stores/calendar";
 import { usePlugins } from "@/composables";
+import { buildComponentOptions, filterComponentOptions } from "@/utils/componentPicker";
 import ToggleSwitch from "@/components/ui/ToggleSwitch.vue";
 import IconButton from "@/components/ui/IconButton.vue";
 import DirectionSplitIcon from "@/components/settings/shared/DirectionSplitIcon.vue";
@@ -786,21 +799,10 @@ const imageInstances = computed(() =>
     .filter(instance => instance.enabled !== false)
     .sort((a, b) => (a.display_order ?? 0) - (b.display_order ?? 0))
 );
-const componentOptions = computed(() => [
-  { value: "calendar", label: "Calendar", kind: "calendar", instanceIds: [] },
-  { value: "photos", label: "Photos", kind: "photos", instanceIds: [] },
-  ...services.value.map(service => ({
-    value: `service:${service.id}`,
-    label: service.name,
-    kind: "service",
-    instanceIds: [service.id],
-  })),
-]);
-const filteredComponentOptions = computed(() => {
-  const query = componentSearch.value.trim().toLowerCase();
-  if (!query) return componentOptions.value;
-  return componentOptions.value.filter(option => option.label.toLowerCase().includes(query));
-});
+const componentOptions = computed(() => buildComponentOptions(services.value));
+const filteredComponentOptions = computed(() =>
+  filterComponentOptions(componentOptions.value, componentSearch.value)
+);
 
 const addRegion = screenIndex => {
   const layout = addTopRegion(cloneLayout(screenIndex));
@@ -1380,7 +1382,9 @@ onUnmounted(() => {
 
 .component-option {
   display: flex;
-  align-items: center;
+  flex-direction: column;
+  justify-content: center;
+  gap: 2px;
   width: 100%;
   min-height: 44px;
   padding: 0.55rem 0.65rem;
@@ -1390,6 +1394,11 @@ onUnmounted(() => {
   color: var(--ink);
   cursor: pointer;
   text-align: left;
+}
+
+.component-option__type {
+  font-size: 0.75rem;
+  color: var(--ink-2);
 }
 
 .component-option:hover,
