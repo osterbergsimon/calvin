@@ -212,7 +212,7 @@ describe("EventDetailPanel", () => {
     it("should emit close event when close button is clicked", async () => {
       const wrapper = createWrapper();
 
-      await wrapper.find(".btn-close").trigger("click");
+      await wrapper.find('[aria-label="Close"]').trigger("click");
 
       expect(wrapper.emitted("close")).toBeTruthy();
       expect(wrapper.emitted("close")).toHaveLength(1);

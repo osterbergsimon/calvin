@@ -1,15 +1,16 @@
 <template>
   <div class="photo-slideshow" :class="{ fullscreen: isFullscreen }">
-    <button
+    <IconButton
       v-if="isFullscreen && isTouch"
-      type="button"
       class="fs-close"
+      size="lg"
+      shape="circle"
       data-action="exit-fullscreen"
-      aria-label="Exit fullscreen"
+      label="Exit fullscreen"
       @click="handleAction('photos_exit_fullscreen')"
     >
       ✕
-    </button>
+    </IconButton>
     <DashboardPanel
       title="Photos"
       variant="media"
@@ -55,6 +56,7 @@ import { computed, onMounted, onUnmounted, watch } from "vue";
 import { useImagesStore } from "../stores/images";
 import { useConfigStore } from "../stores/config";
 import DashboardPanel from "./DashboardPanel.vue";
+import IconButton from "@/components/ui/IconButton.vue";
 import RegionControls from "./dashboard/RegionControls.vue";
 import { useKeyboardActions } from "@/composables/useKeyboardActions";
 import { useTouchCapability } from "@/composables/useTouchCapability";
@@ -244,23 +246,6 @@ watch(sourceKey, async () => {
   top: 1rem;
   right: 1rem;
   z-index: 6;
-  width: 46px;
-  height: 46px;
-  background: var(--bg-2);
-  color: var(--ink);
-  border: 1px solid var(--line);
-  border-radius: 50%;
-  font-size: 1.25rem;
-  cursor: pointer;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  transition: opacity 0.2s;
-}
-
-.fs-close:focus-visible {
-  outline: 2px solid var(--focus);
-  outline-offset: 2px;
 }
 
 .photo-slideshow.fullscreen {

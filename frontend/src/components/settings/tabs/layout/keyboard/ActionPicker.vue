@@ -4,7 +4,7 @@
       <span class="ap-key">{{ keyCode }}</span>
       <span class="ap-arrow">→</span>
       <span class="ap-lbl">choose an action</span>
-      <button class="ap-close" aria-label="Cancel" @click="$emit('close')">×</button>
+      <IconButton variant="ghost" label="Cancel" @click="$emit('close')">×</IconButton>
     </header>
 
     <input
@@ -62,6 +62,7 @@
 
 <script setup>
 import { ref, computed } from "vue";
+import IconButton from "@/components/ui/IconButton.vue";
 import { ACTION_GROUPS } from "@/utils/keyboardActionsCatalog";
 
 defineProps({
@@ -133,23 +134,6 @@ const visibleGroups = computed(() => {
 .ap-lbl {
   color: var(--ink-2);
   flex: 1;
-}
-.ap-close {
-  background: none;
-  border: none;
-  color: var(--ink-2);
-  font-size: 1.4rem;
-  line-height: 1;
-  cursor: pointer;
-  min-width: var(--touch-target);
-  min-height: var(--touch-target);
-  display: flex;
-  align-items: center;
-  justify-content: center;
-}
-.ap-close:focus-visible {
-  outline: 2px solid var(--focus);
-  outline-offset: 2px;
 }
 .ap-search {
   margin: 10px 14px 6px;
