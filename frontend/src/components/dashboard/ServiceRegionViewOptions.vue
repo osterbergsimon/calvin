@@ -17,6 +17,16 @@
         </button>
       </div>
     </div>
+    <div class="svo-row">
+      <span class="svo-label">Card size</span>
+      <SelectPill
+        class="svo-size"
+        :model-value="currentCardSize"
+        :options="cardSizeOptions"
+        aria-label="Card size"
+        @update:model-value="setCardSize"
+      />
+    </div>
   </RegionViewOptions>
 </template>
 
@@ -24,6 +34,8 @@
 import { computed } from "vue";
 import { useConfigStore } from "@/stores/config";
 import RegionViewOptions from "./RegionViewOptions.vue";
+import SelectPill from "@/components/ui/SelectPill.vue";
+import { DEFAULT_CARD_SIZE } from "@/styles/cardSizeScale.js";
 
 const props = defineProps({
   regionId: { type: String, default: null },
@@ -46,6 +58,22 @@ const setLink = value => {
   const linkAction = value === "default" ? undefined : value;
   configStore.updateRegionView(props.regionId, { linkAction }).catch(err => {
     console.error("Failed to update service view:", err);
+  });
+};
+
+const cardSizeOptions = [
+  { value: "xsmall", label: "X-Small" },
+  { value: "small", label: "Small" },
+  { value: "medium", label: "Medium" },
+  { value: "large", label: "Large" },
+  { value: "xlarge", label: "X-Large" },
+];
+const currentCardSize = computed(() => props.view?.cardSize ?? DEFAULT_CARD_SIZE);
+
+const setCardSize = value => {
+  if (value === currentCardSize.value) return;
+  configStore.updateRegionView(props.regionId, { cardSize: value }).catch(err => {
+    console.error("Failed to update card size:", err);
   });
 };
 </script>
@@ -89,5 +117,9 @@ const setLink = value => {
 .svo-seg button:focus-visible {
   outline: 2px solid var(--focus);
   outline-offset: 1px;
+}
+.svo-size {
+  flex-wrap: wrap;
+  justify-content: flex-end;
 }
 </style>
