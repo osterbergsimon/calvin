@@ -1,5 +1,5 @@
 <template>
-  <div class="web-service-viewer" :class="{ fullscreen: isFullscreen }">
+  <div class="web-service-viewer" :class="{ fullscreen: isFullscreen }" :style="cardStyle">
     <!-- Fullscreen Close Button (only in fullscreen mode) -->
     <div v-if="isFullscreen" class="fullscreen-close-overlay">
       <IconButton
@@ -96,6 +96,7 @@ import ServiceViewer from "./service/ServiceViewer.vue";
 import RegionControls from "./dashboard/RegionControls.vue";
 import ServiceRegionViewOptions from "./dashboard/ServiceRegionViewOptions.vue";
 import { useTouchCapability } from "@/composables/useTouchCapability";
+import { cardSizeVars } from "@/styles/cardSizeScale.js";
 
 const props = defineProps({
   focused: {
@@ -173,6 +174,7 @@ const emptyState = computed(() => {
 });
 
 const linkAction = computed(() => props.view?.linkAction || null);
+const cardStyle = computed(() => cardSizeVars(props.view?.cardSize));
 const isLinkCapable = computed(() =>
   ["card-grid", "item-list"].includes(currentService.value?.display_schema?.kind)
 );

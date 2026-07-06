@@ -240,3 +240,17 @@ body {
 .calvin-plugin-error {
   color: var(--err);
 }
+
+/* Edge affordance: a soft fade on the scrollable edge, shown only when content
+   overflows and the surface is touch-scrollable. Direction set by the modifier. */
+.calvin-plugin-scroll-shade {
+  --shade: 24px;
+}
+.calvin-plugin-scroll-shade--block {
+  mask-image: linear-gradient(to bottom, #000 calc(100% - var(--shade)), transparent);
+  -webkit-mask-image: linear-gradient(to bottom, #000 calc(100% - var(--shade)), transparent);
+}
+.calvin-plugin-scroll-shade--inline {
+  mask-image: linear-gradient(to right, #000 calc(100% - var(--shade)), transparent);
+  -webkit-mask-image: linear-gradient(to right, #000 calc(100% - var(--shade)), transparent);
+}

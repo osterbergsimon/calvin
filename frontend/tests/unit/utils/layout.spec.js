@@ -864,6 +864,42 @@ describe("clampServiceView", () => {
   });
 });
 
+describe("clampServiceView — cardSize (calvin-fub)", () => {
+  it("preserves a valid cardSize", () => {
+    expect(clampServiceView({ cardSize: "large" })).toEqual({ cardSize: "large" });
+  });
+
+  it("keeps cardSize alongside a valid linkAction", () => {
+    expect(clampServiceView({ linkAction: "embed", cardSize: "xsmall" })).toEqual({
+      linkAction: "embed",
+      cardSize: "xsmall",
+    });
+  });
+
+  it("drops an invalid or absent cardSize", () => {
+    expect(clampServiceView({ cardSize: "gigantic" })).toEqual({});
+    expect(clampServiceView({})).toEqual({});
+  });
+});
+
+describe("setRegionView — cardSize round-trips (calvin-fub)", () => {
+  it("persists cardSize onto a service region's view", () => {
+    const screens = {
+      activeScreenId: "s1",
+      screens: [
+        {
+          id: "s1",
+          layout: {
+            regions: [{ id: "r1", kind: "service", view: {} }],
+          },
+        },
+      ],
+    };
+    const next = setRegionView(screens, "r1", { cardSize: "xlarge" });
+    expect(next.screens[0].layout.regions[0].view.cardSize).toBe("xlarge");
+  });
+});
+
 describe("setRegionView on a service region", () => {
   const screens = {
     activeScreenId: "s1",

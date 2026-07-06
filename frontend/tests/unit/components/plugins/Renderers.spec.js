@@ -439,6 +439,30 @@ describe("WeatherForecast", () => {
   });
 });
 
+describe("CardGrid — footprint vars (calvin-fub)", () => {
+  const schema = {
+    kind: "card-grid",
+    layout: { columns: "auto-fit-220" },
+    card: { title_path: "$.day", items_path: "$.meals", item: { value_path: "$.name" } },
+  };
+  const data = [{ day: "Mon", meals: [{ name: "Korean Noodle Bowl with Tofu" }] }];
+
+  it("drives the auto-fit min-width from --card-min (fallback = schema min)", () => {
+    const wrapper = mount(CardGrid, { props: { schema, data } });
+    const grid = wrapper.find(".card-grid");
+    // The grid-template-columns must reference the CSS var so a region can override it.
+    expect(grid.attributes("style")).toContain("var(--card-min");
+    expect(grid.attributes("style")).toContain("220px"); // schema fallback preserved
+  });
+
+  it("uses max-content rows so cards keep natural height (guards row-collapse)", () => {
+    const wrapper = mount(CardGrid, { props: { schema, data } });
+    // grid-auto-rows:max-content stops the grid from squishing rows to title
+    // height under space pressure — without it the fit-clamp never sees overflow.
+    expect(wrapper.find(".card-grid").attributes("style")).toContain("grid-auto-rows: max-content");
+  });
+});
+
 describe("IframeRenderer", () => {
   it("renders an iframe with src resolved from url_path", () => {
     const wrapper = mount(IframeRenderer, {
