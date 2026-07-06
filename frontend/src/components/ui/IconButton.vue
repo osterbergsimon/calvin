@@ -81,11 +81,14 @@ defineProps({
 }
 /* Escape-hatch size: consumer supplies --icon-size / --icon-font (set on the
    button or any ancestor, inherited through the cascade). Used by the
-   touchControlSize-driven region cluster, whose 36/42/50px don't map to sm/md/lg. */
+   touchControlSize-driven region cluster, whose 36/42/50px don't map to sm/md/lg.
+   The fallbacks match the `sm` box/glyph so a size="custom" button still renders
+   correctly where the vars aren't set — e.g. the fullscreen mode subtree, which
+   is outside the .dashboard-view root that carries the region-chrome scale. */
 .icon-btn--custom {
-  min-width: var(--icon-size);
-  height: var(--icon-size);
-  font-size: var(--icon-font);
+  min-width: var(--icon-size, 1.75rem);
+  height: var(--icon-size, 1.75rem);
+  font-size: var(--icon-font, 1.05rem);
 }
 
 /* shapes */
