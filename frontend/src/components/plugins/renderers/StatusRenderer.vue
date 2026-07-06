@@ -172,6 +172,12 @@ function readoutClass(item) {
   color: var(--ink-3);
 }
 
+/* Scale the microlabel with content only in a scaled panel — StatusRenderer also
+   renders in the statusbar (non-scaled), where the label must keep its fixed rem. */
+.schema-renderer__body--scaled .status__cell-label {
+  font-size: 0.7em;
+}
+
 .status__cell-value {
   font-family: var(--font-data);
   font-variant-numeric: tabular-nums;

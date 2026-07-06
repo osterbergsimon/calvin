@@ -205,7 +205,7 @@ function capitalize(value) {
 .weather-forecast-renderer__temp-value {
   font-family: var(--font-data);
   font-variant-numeric: tabular-nums;
-  font-size: 4rem;
+  font-size: 4em;
   font-weight: 500;
   color: var(--ink);
   line-height: 1;
@@ -213,13 +213,13 @@ function capitalize(value) {
 
 .weather-forecast-renderer__temp-unit {
   font-family: var(--font-data);
-  font-size: 1.75rem;
+  font-size: 1.75em;
   font-weight: 400;
   color: var(--ink-3);
 }
 
 .weather-forecast-renderer__desc {
-  font-size: 1.05rem;
+  font-size: 1.05em;
   color: var(--ink-2);
 }
 
@@ -234,7 +234,7 @@ function capitalize(value) {
 .weather-forecast-renderer__detail-value {
   font-family: var(--font-data);
   font-variant-numeric: tabular-nums;
-  font-size: 1.2rem;
+  font-size: 1.2em;
   font-weight: 600;
   color: var(--ink);
 }
@@ -280,7 +280,7 @@ function capitalize(value) {
 
 .weather-forecast-renderer__date {
   font-family: var(--font-ui);
-  font-size: 0.7rem;
+  font-size: 0.7em;
   font-weight: 600;
   letter-spacing: 0.09em;
   text-transform: uppercase;
@@ -302,18 +302,18 @@ function capitalize(value) {
 }
 
 .weather-forecast-renderer__high {
-  font-size: 1.1rem;
+  font-size: 1.1em;
   font-weight: 600;
   color: var(--ink);
 }
 
 .weather-forecast-renderer__low {
-  font-size: 0.9rem;
+  font-size: 0.9em;
   color: var(--ink-3);
 }
 
 .weather-forecast-renderer__forecast-desc {
-  font-size: 0.8rem;
+  font-size: 0.8em;
   color: var(--ink-2);
 }
 </style>

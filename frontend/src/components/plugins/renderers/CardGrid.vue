@@ -139,7 +139,7 @@ function itemKey(item, idx) {
 /* card title = the readout microlabel: one label voice everywhere */
 .card-grid__title {
   font-family: var(--font-ui);
-  font-size: 0.7rem;
+  font-size: 0.7em;
   font-weight: 600;
   letter-spacing: 0.09em;
   text-transform: uppercase;
@@ -161,7 +161,7 @@ function itemKey(item, idx) {
 
 .card-grid__item-label {
   font-family: var(--font-ui);
-  font-size: 0.7rem;
+  font-size: 0.7em;
   font-weight: 600;
   letter-spacing: 0.09em;
   text-transform: uppercase;
@@ -173,7 +173,7 @@ function itemKey(item, idx) {
 .card-grid__item-value {
   flex: 1;
   color: var(--ink);
-  font-size: 0.95rem;
+  font-size: 0.95em;
   line-height: 1.35;
   word-break: break-word;
 }

@@ -97,7 +97,7 @@ const keyFor = (item, i) => {
 .item-list__timestamp {
   font-family: var(--font-data);
   font-variant-numeric: tabular-nums;
-  font-size: 0.8rem;
+  font-size: 0.8em;
   font-weight: 500;
   color: var(--ink-3);
   min-width: 80px;
@@ -115,13 +115,13 @@ const keyFor = (item, i) => {
 .item-list__label {
   color: var(--ink);
   font-weight: 600;
-  font-size: 0.95rem;
+  font-size: 0.95em;
   line-height: 1.35;
 }
 
 .item-list__value {
   color: var(--ink-2);
-  font-size: 0.85rem;
+  font-size: 0.85em;
   line-height: 1.35;
 }
 </style>

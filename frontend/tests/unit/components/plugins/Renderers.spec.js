@@ -56,6 +56,56 @@ describe("SchemaRenderer dispatcher", () => {
   });
 });
 
+describe("SchemaRenderer content-scaling lever (calvin-fub)", () => {
+  const cardGridSchema = {
+    kind: "card-grid",
+    card: { title: "Mon", item: { label: "Dinner", value: "Korean Noodle Bowl with Tofu" } },
+  };
+
+  it("marks a body renderer scaled in panel context so it reads --region-content-fs", () => {
+    const wrapper = mount(SchemaRenderer, {
+      props: { schema: cardGridSchema, data: [{}], context: "panel" },
+    });
+    expect(wrapper.find(".card-grid").classes()).toContain("schema-renderer__body--scaled");
+  });
+
+  it("does not scale in statusbar context (the clock bar keeps its own sizing)", () => {
+    const wrapper = mount(SchemaRenderer, {
+      props: {
+        schema: { kind: "status", item: { label: "Ping", value: "42" } },
+        data: {},
+        context: "statusbar",
+      },
+    });
+    expect(wrapper.find(".status").classes()).not.toContain("schema-renderer__body--scaled");
+  });
+
+  it("excludes iframe and web-component kinds (out of reach for restyling)", () => {
+    const iframe = mount(SchemaRenderer, {
+      props: {
+        schema: { kind: "iframe", url: "https://example.test" },
+        data: {},
+        context: "panel",
+      },
+    });
+    expect(iframe.classes()).not.toContain("schema-renderer__body--scaled");
+
+    const webc = mount(SchemaRenderer, {
+      props: {
+        schema: { kind: "web-component", element: "calvin-test-card", module: "dist.js" },
+        data: {},
+        context: "panel",
+      },
+      global: {
+        stubs: {
+          WebComponentHost: { template: '<div class="wc-stub" />' },
+        },
+      },
+    });
+    expect(webc.find(".wc-stub").classes()).not.toContain("schema-renderer__body--scaled");
+  });
+});
+
 describe("StatusRenderer", () => {
   const itemSpec = {
     label_path: "$.label",
