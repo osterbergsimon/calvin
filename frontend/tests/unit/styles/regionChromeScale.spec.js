@@ -1,6 +1,5 @@
 import { describe, it, expect } from "vitest";
 import {
-  REGION_CHROME_SCALE,
   REGION_CHROME_SIZES,
   DEFAULT_REGION_CHROME_SIZE,
   regionChromeVars,
