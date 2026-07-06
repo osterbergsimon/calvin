@@ -54,6 +54,7 @@
             />
             <IconButton
               v-if="!isTouch && canNavigateServices && services.length > 1"
+              size="custom"
               label="Previous Service"
               title="Previous Service"
               @click="previousService"
@@ -62,6 +63,7 @@
             </IconButton>
             <IconButton
               v-if="!isTouch && canNavigateServices && services.length > 1"
+              size="custom"
               label="Next Service"
               title="Next Service"
               @click="nextService"
@@ -70,14 +72,12 @@
             </IconButton>
             <IconButton
               v-if="!isTouch && !isFullscreen"
+              size="custom"
               label="Enter Fullscreen"
               title="Enter Fullscreen"
               @click.stop="handleToggleFullscreen"
             >
               ⤢
-            </IconButton>
-            <IconButton v-if="!isFullscreen" label="Close" title="Close" @click.stop="handleClose">
-              ×
             </IconButton>
           </template>
         </ServiceViewer>
@@ -200,12 +200,6 @@ const close = () => {
   setTimeout(() => {
     isHandlingClose = false;
   }, 300);
-};
-
-const handleClose = event => {
-  event.preventDefault();
-  event.stopPropagation();
-  close();
 };
 
 const handleCloseFullscreen = event => {
