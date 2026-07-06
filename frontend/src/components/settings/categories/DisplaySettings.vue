@@ -253,17 +253,19 @@
         />
       </SettingRow>
       <SettingRow
-        label="Touch target size"
-        description="Size of the on-dashboard touch navigation buttons (calendar, photos, services). Independent of Settings UI size."
+        label="Dashboard size"
+        description="Scales the dashboard region labels and touch controls (calendar, photos, services). Independent of Settings UI size and the clock bar."
       >
-        <SegmentedControl
+        <SelectPill
           :model-value="config.touchControlSize"
           :options="[
+            { value: 'xsmall', label: 'X-Small' },
             { value: 'small', label: 'Small' },
             { value: 'medium', label: 'Medium' },
             { value: 'large', label: 'Large' },
+            { value: 'xlarge', label: 'X-Large' },
           ]"
-          aria-label="Touch target size"
+          aria-label="Dashboard size"
           @update:model-value="v => emit('update:config', { touchControlSize: v })"
         />
       </SettingRow>
