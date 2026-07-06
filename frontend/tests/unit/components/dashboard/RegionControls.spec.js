@@ -1,7 +1,6 @@
 import { describe, it, expect, vi, beforeEach } from "vitest";
 import { mount } from "@vue/test-utils";
 import { setActivePinia, createPinia } from "pinia";
-import { useConfigStore } from "@/stores/config";
 
 const handleAction = vi.fn();
 
@@ -72,16 +71,15 @@ describe("RegionControls", () => {
     expect(w.find(".region-controls").exists()).toBe(false);
   });
 
-  it("applies the configured size class (default medium)", () => {
-    const def = mount(RegionControls, { props: { regionKind: "calendar" } });
-    expect(def.find(".region-controls").classes()).toContain("region-controls--medium");
-
-    useConfigStore().touchControlSize = "small";
-    const small = mount(RegionControls, { props: { regionKind: "calendar" } });
-    expect(small.find(".region-controls").classes()).toContain("region-controls--small");
-
-    useConfigStore().touchControlSize = "large";
-    const large = mount(RegionControls, { props: { regionKind: "calendar" } });
-    expect(large.find(".region-controls").classes()).toContain("region-controls--large");
+  it("renders custom-sized icon buttons and no bespoke size class (inherits the dashboard scale)", () => {
+    const w = mount(RegionControls, { props: { regionKind: "calendar" } });
+    expect(w.find(".region-controls").exists()).toBe(true);
+    expect(
+      w
+        .find(".region-controls")
+        .classes()
+        .some(c => c.startsWith("region-controls--"))
+    ).toBe(false);
+    expect(w.findAll(".icon-btn--custom").length).toBeGreaterThan(0);
   });
 });

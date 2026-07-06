@@ -62,6 +62,7 @@
               mainLayoutClass,
               { 'dashboard-view--unlocked': !configStore.regionsLocked },
             ]"
+            :style="regionChromeVars(configStore.touchControlSize)"
           >
             <template v-for="elementType in layoutOrder" :key="elementType">
               <!-- Dashboard Region -->
@@ -160,6 +161,7 @@ import ClockBarVertical from "../components/ClockBarVertical.vue";
 const PhotoSlideshow = defineAsyncComponent(() => import("../components/PhotoSlideshow.vue"));
 const WebServiceViewer = defineAsyncComponent(() => import("../components/WebServiceViewer.vue"));
 const CalendarView = defineAsyncComponent(() => import("../components/CalendarView.vue"));
+import { regionChromeVars } from "@/styles/regionChromeScale";
 import { useConfigStore } from "../stores/config";
 import { useModeStore } from "../stores/mode";
 import { useRoute } from "vue-router";
@@ -522,6 +524,12 @@ onUnmounted(() => {
 .mode-content.dashboard-view {
   padding: 0.5rem;
   position: relative; /* anchor the absolute drag-resize handles */
+}
+
+/* When unlocked, reserve room at the bottom so the fixed .layout-unlock-banner
+   (a centered pill at bottom: 1rem) doesn't occlude the bottom region's label. */
+.mode-content.dashboard-view.dashboard-view--unlocked {
+  padding-bottom: 4.5rem;
 }
 
 .mode-content.dashboard-view.layout-portrait {

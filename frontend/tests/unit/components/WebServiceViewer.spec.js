@@ -18,6 +18,23 @@ function setupLinkWiring(kind) {
 }
 
 describe("WebServiceViewer link wiring", () => {
+  it("does not render a Close button in the non-fullscreen service header", async () => {
+    setupLinkWiring("card-grid");
+    const w = mount(WebServiceViewer, {
+      props: {
+        serviceId: "mealie-1",
+        regionId: "svc-1",
+        view: {},
+        focused: true,
+      },
+      global: { stubs: { ServiceViewer: { template: "<div><slot name='actions' /></div>" } } },
+      attachTo: document.body,
+    });
+    await w.vm.$nextTick();
+    expect(w.find('[aria-label="Close"]').exists()).toBe(false);
+    w.unmount();
+  });
+
   it("shows the tune control for a link-capable service region when focused", async () => {
     setupLinkWiring("card-grid");
     const w = mount(WebServiceViewer, {
@@ -109,7 +126,7 @@ describe("WebServiceViewer", () => {
 
     expect(wrapper.find(".service-viewer-stub h2").text()).toBe("Meals");
     expect(wrapper.find(".service-viewer-stub").text()).toContain("Meals");
-    expect(wrapper.find(".service-viewer-stub").findAll(".icon-btn")).toHaveLength(2);
+    expect(wrapper.find(".service-viewer-stub").findAll(".icon-btn")).toHaveLength(1);
   });
 
   it("passes service count and local navigation actions in fullscreen cycling mode", () => {
