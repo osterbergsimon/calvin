@@ -16,9 +16,14 @@ function mockPointer(coarse) {
   return () => handler && handler({ matches: !coarse });
 }
 
+function setMaxTouchPoints(n) {
+  Object.defineProperty(navigator, "maxTouchPoints", { configurable: true, value: n });
+}
+
 describe("useTouchCapability", () => {
   beforeEach(() => {
     vi.restoreAllMocks();
+    setMaxTouchPoints(0); // deterministic baseline; individual tests raise it
     setActivePinia(createPinia());
   });
 
@@ -41,6 +46,23 @@ describe("useTouchCapability", () => {
     const { isTouch } = useTouchCapability();
     expect(isTouch.value).toBe(true);
     fire(); // dispatch matches:false
+    expect(isTouch.value).toBe(false);
+  });
+
+  // --- maxTouchPoints fallback: touchscreens that don't match (any-pointer: coarse) ---
+
+  it("is true when maxTouchPoints > 0 even without a coarse pointer (auto)", () => {
+    mockPointer(false);
+    setMaxTouchPoints(5);
+    const { isTouch } = useTouchCapability();
+    expect(isTouch.value).toBe(true);
+  });
+
+  it("'off' still overrides a device that reports touch points", () => {
+    mockPointer(false);
+    setMaxTouchPoints(5);
+    useConfigStore().touchControls = "off";
+    const { isTouch } = useTouchCapability();
     expect(isTouch.value).toBe(false);
   });
 
