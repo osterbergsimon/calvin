@@ -84,17 +84,19 @@ same ratio.
 
 ```js
 export const REGION_CHROME_SCALE = {
-  xsmall: { rail: "30px", label: "1.0rem",  sublabel: "0.7rem",  glyph: "0.85rem" },
-  small:  { rail: "36px", label: "1.1rem",  sublabel: "0.75rem", glyph: "0.95rem" },
-  medium: { rail: "42px", label: "1.25rem", sublabel: "0.85rem", glyph: "1.05rem" },
-  large:  { rail: "50px", label: "1.5rem",  sublabel: "0.95rem", glyph: "1.25rem" },
-  xlarge: { rail: "58px", label: "1.7rem",  sublabel: "1.05rem", glyph: "1.4rem" },
+  xsmall: { rail: "30px", label: "1.0rem",  sublabel: "0.7rem",  glyph: "0.85rem", content: "0.85rem" },
+  small:  { rail: "36px", label: "1.1rem",  sublabel: "0.75rem", glyph: "0.95rem", content: "0.92rem" },
+  medium: { rail: "42px", label: "1.25rem", sublabel: "0.85rem", glyph: "1.05rem", content: "1.0rem"  },
+  large:  { rail: "50px", label: "1.5rem",  sublabel: "0.95rem", glyph: "1.25rem", content: "1.12rem" },
+  xlarge: { rail: "58px", label: "1.7rem",  sublabel: "1.05rem", glyph: "1.4rem",  content: "1.25rem" },
 };
 export const REGION_CHROME_SIZES = Object.keys(REGION_CHROME_SCALE); // order = UI order
 export const DEFAULT_REGION_CHROME_SIZE = "medium";
 
 // CSS custom properties for a given size. Includes IconButton size="custom"
 // compat vars (--icon-size / --icon-font) so glyph buttons need no other change.
+// --region-content-fs is set now (ready for the phase-2 renderer adoption) but
+// no built-in renderer consumes it yet in phase 1.
 export function regionChromeVars(size) {
   const t = REGION_CHROME_SCALE[size] ?? REGION_CHROME_SCALE[DEFAULT_REGION_CHROME_SIZE];
   return {
@@ -102,6 +104,7 @@ export function regionChromeVars(size) {
     "--region-label-fs": t.label,
     "--region-sublabel-fs": t.sublabel,
     "--region-glyph-fs": t.glyph,
+    "--region-content-fs": t.content, // reserved for phase 2 (renderer bodies)
     "--icon-size": t.rail,   // IconButton size="custom" box
     "--icon-font": t.glyph,  // IconButton size="custom" glyph
   };
@@ -186,8 +189,27 @@ the `.dashboard-view--touch-*` classes, and `DashboardLabelScale.spec.js`.
 - **Backend enum:** if `touchControlSize` is validated as a 3-value enum server-side,
   the two new values must be added or writes will 422. Confirm early.
 
+## Phase 2 (follow-up, separate spec/plan)
+
+Scale **plugin body content** so the whole dashboard grows as one unit, not just the
+chrome. Reuses this same scale module — `regionChromeVars` already emits
+`--region-content-fs` on the dashboard root, so phase 2 is purely renderer adoption:
+
+- The built-in schema renderers (`card-grid`, `item-list`, `metric-dashboard`,
+  `weather-forecast`, `status`, `image-with-caption`) set their body/base
+  `font-size` from `var(--region-content-fs, 1rem)` and use `em`-relative sizing
+  internally so everything tracks proportionally.
+- **Hard limits (documented, not solved):** `iframe` plugins are sandboxed external
+  pages we cannot restyle; `web-component` plugins ship their own CSS and would have
+  to opt in via their `.data` payload. Phase 2 covers built-in renderers only.
+
+Kept as a separate phase so phase 1 (chrome) can be verified end-to-end first and
+each PR stays reviewable. The token landing in phase 1 means no rework — renderers
+just start reading a var that already exists.
+
 ## Out of scope
 
 - Clock bar sizing (separate settings).
 - Renaming the setting to "Dashboard size" (future).
+- Scaling `iframe` / `web-component` plugin internals (not reachable).
 - Any photo-region chrome beyond what shares DashboardPanel/RegionControls.
