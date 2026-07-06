@@ -104,12 +104,18 @@ beside" and matches the quiet aesthetic.
 
 Reuses the existing per-region view mechanism end-to-end — no new surface.
 
-- **UI:** add a second row to `ServiceRegionViewOptions.vue` — a "Card size"
-  segmented control (S / M / L), next to the existing "Link behavior" row. Shown
-  under the same `focused && isLinkCapable` condition (card-grid / item-list).
+- **UI:** add a second row to `ServiceRegionViewOptions.vue` — a "Card size" control
+  next to the existing "Link behavior" row, shown under the same
+  `focused && isLinkCapable` condition (card-grid / item-list). It uses the **same
+  5-step scale as the global "Dashboard size" setting** so the two align:
+  `xsmall / small / medium / large / xlarge` → labels `X-Small / Small / Medium /
+  Large / X-Large` (identical to `DisplaySettings.vue`'s Dashboard-size `SelectPill`).
+  In the narrow tune popover the five options may stack/wrap (or reuse the compact
+  `.svo-seg` style at five items) — a layout detail for the plan; the **scale keys
+  and labels match Dashboard size exactly**.
 - **Persistence:** `configStore.updateRegionView(regionId, { cardSize })` — the
   generic per-region `view` patch already used for `linkAction`
-  (`utils/layout.js:setRegionView`). Absent = default (M).
+  (`utils/layout.js:setRegionView`). Absent = default (`medium`).
 - **Plumbing:** the region's `view` object already flows to `WebServiceViewer`
   (that is how `linkAction` reaches the renderer today). Derive `cardSize` from
   `view` and pass it to the card-grid the same way `linkAction` is passed, or set a
@@ -117,13 +123,21 @@ Reuses the existing per-region view mechanism end-to-end — no new surface.
   sensible default. CSS-var is preferred: zero prop threading, and a plain default
   keeps card-grid unchanged when no region drives it.
 
-**Size scale (footprint + internal padding):**
+**Size scale (footprint + internal padding), 5 steps aligned with Dashboard size.**
+Mirrors `regionChromeScale.js`: a parallel `frontend/src/styles/cardSizeScale.js`
+module exporting the scale, `DEFAULT_CARD_SIZE = "medium"`, and
+`cardSizeVars(size)` → `{ "--card-min", "--card-pad" }` (same shape/pattern as
+`regionChromeVars`). `medium` equals today's card-grid default (`auto-fit-220`,
+`1rem` padding) so it is a no-op — exactly how Dashboard-size `medium` leaves chrome
+unchanged.
 
-| size | column min-width | card padding |
+| size | `--card-min` | `--card-pad` |
 |---|---|---|
-| S | ~180px | 0.75rem |
-| M (default) | ~220px | 1rem |
-| L | ~280px | 1.25rem |
+| xsmall | 160px | 0.6rem |
+| small | 190px | 0.8rem |
+| medium (default) | 220px | 1rem |
+| large | 260px | 1.2rem |
+| xlarge | 300px | 1.4rem |
 
 `CardGrid`'s `gridStyle` already supports `auto-fit-<min>`; the size control
 overrides the effective min-width via `--card-min` (fallback = the schema's own
