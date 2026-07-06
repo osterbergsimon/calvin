@@ -51,7 +51,7 @@ describe("Dashboard label scale + unlock (calvin-6ig)", () => {
   it("applies the medium scale vars by default (Default anchor)", () => {
     const w = setup();
     const style = w.find(".dashboard-view").attributes("style") || "";
-    expect(style).toContain("--region-rail-h: 42px");
+    expect(style).toContain("--region-rail-h: 28px");
     expect(style).toContain("--region-label-fs: 1.25rem");
     expect(w.find(".dashboard-view").classes()).not.toContain("dashboard-view--touch-medium");
   });
@@ -60,12 +60,12 @@ describe("Dashboard label scale + unlock (calvin-6ig)", () => {
     const large = setup(s => {
       s.touchControlSize = "large";
     });
-    expect(large.find(".dashboard-view").attributes("style")).toContain("--region-rail-h: 50px");
+    expect(large.find(".dashboard-view").attributes("style")).toContain("--region-rail-h: 34px");
 
     const xsmall = setup(s => {
       s.touchControlSize = "xsmall";
     });
-    expect(xsmall.find(".dashboard-view").attributes("style")).toContain("--region-rail-h: 30px");
+    expect(xsmall.find(".dashboard-view").attributes("style")).toContain("--region-rail-h: 22px");
   });
 
   it("marks the view unlocked only when regions are unlocked", () => {

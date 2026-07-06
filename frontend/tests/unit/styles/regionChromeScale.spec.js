@@ -11,21 +11,21 @@ describe("regionChromeScale", () => {
     expect(DEFAULT_REGION_CHROME_SIZE).toBe("medium");
   });
 
-  it("medium is the anchor (42px rail / 1.25rem label / 1.05rem glyph)", () => {
+  it("medium is the anchor (28px rail / 1.25rem label / 0.95rem glyph)", () => {
     const v = regionChromeVars("medium");
-    expect(v["--region-rail-h"]).toBe("42px");
+    expect(v["--region-rail-h"]).toBe("28px");
     expect(v["--region-label-fs"]).toBe("1.25rem");
-    expect(v["--region-glyph-fs"]).toBe("1.05rem");
+    expect(v["--region-glyph-fs"]).toBe("0.95rem");
     // IconButton size="custom" compat mirrors rail + glyph
-    expect(v["--icon-size"]).toBe("42px");
-    expect(v["--icon-font"]).toBe("1.05rem");
+    expect(v["--icon-size"]).toBe("28px");
+    expect(v["--icon-font"]).toBe("0.95rem");
     // phase-2 reserve is present
     expect(v["--region-content-fs"]).toBe("1.0rem");
   });
 
   it("scales the extremes", () => {
-    expect(regionChromeVars("xsmall")["--region-rail-h"]).toBe("30px");
-    expect(regionChromeVars("xlarge")["--region-rail-h"]).toBe("58px");
+    expect(regionChromeVars("xsmall")["--region-rail-h"]).toBe("22px");
+    expect(regionChromeVars("xlarge")["--region-rail-h"]).toBe("40px");
   });
 
   it("falls back to medium for unknown/undefined input", () => {
