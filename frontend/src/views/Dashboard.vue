@@ -60,9 +60,9 @@
               'mode-content',
               'dashboard-view',
               mainLayoutClass,
-              `dashboard-view--touch-${configStore.touchControlSize}`,
               { 'dashboard-view--unlocked': !configStore.regionsLocked },
             ]"
+            :style="regionChromeVars(configStore.touchControlSize)"
           >
             <template v-for="elementType in layoutOrder" :key="elementType">
               <!-- Dashboard Region -->
@@ -161,6 +161,7 @@ import ClockBarVertical from "../components/ClockBarVertical.vue";
 const PhotoSlideshow = defineAsyncComponent(() => import("../components/PhotoSlideshow.vue"));
 const WebServiceViewer = defineAsyncComponent(() => import("../components/WebServiceViewer.vue"));
 const CalendarView = defineAsyncComponent(() => import("../components/CalendarView.vue"));
+import { regionChromeVars } from "@/styles/regionChromeScale";
 import { useConfigStore } from "../stores/config";
 import { useModeStore } from "../stores/mode";
 import { useRoute } from "vue-router";
@@ -523,23 +524,6 @@ onUnmounted(() => {
 .mode-content.dashboard-view {
   padding: 0.5rem;
   position: relative; /* anchor the absolute drag-resize handles */
-}
-
-/* Dashboard "Touch target size" also scales panel/plugin labels. These vars
-   cascade to every DashboardPanel title/subtitle (which read --panel-title-fs
-   / --panel-subtitle-fs). Medium is the Default and equals the prior hardcoded
-   1.5rem / 0.85rem, so Default is unchanged. */
-.dashboard-view--touch-small {
-  --panel-title-fs: 1.3rem;
-  --panel-subtitle-fs: 0.78rem;
-}
-.dashboard-view--touch-medium {
-  --panel-title-fs: 1.5rem;
-  --panel-subtitle-fs: 0.85rem;
-}
-.dashboard-view--touch-large {
-  --panel-title-fs: 1.75rem;
-  --panel-subtitle-fs: 0.95rem;
 }
 
 /* When unlocked, reserve room at the bottom so the fixed .layout-unlock-banner

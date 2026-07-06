@@ -48,21 +48,24 @@ function setup(configMutator) {
 }
 
 describe("Dashboard label scale + unlock (calvin-6ig)", () => {
-  it("applies the medium touch-size class by default (Default is unchanged)", () => {
+  it("applies the medium scale vars by default (Default anchor)", () => {
     const w = setup();
-    expect(w.find(".dashboard-view").classes()).toContain("dashboard-view--touch-medium");
+    const style = w.find(".dashboard-view").attributes("style") || "";
+    expect(style).toContain("--region-rail-h: 42px");
+    expect(style).toContain("--region-label-fs: 1.25rem");
+    expect(w.find(".dashboard-view").classes()).not.toContain("dashboard-view--touch-medium");
   });
 
-  it("reflects the Touch-target size setting so panel labels scale with it", () => {
+  it("reflects the Touch-target size setting on the scale vars", () => {
     const large = setup(s => {
       s.touchControlSize = "large";
     });
-    expect(large.find(".dashboard-view").classes()).toContain("dashboard-view--touch-large");
+    expect(large.find(".dashboard-view").attributes("style")).toContain("--region-rail-h: 50px");
 
-    const small = setup(s => {
-      s.touchControlSize = "small";
+    const xsmall = setup(s => {
+      s.touchControlSize = "xsmall";
     });
-    expect(small.find(".dashboard-view").classes()).toContain("dashboard-view--touch-small");
+    expect(xsmall.find(".dashboard-view").attributes("style")).toContain("--region-rail-h: 30px");
   });
 
   it("marks the view unlocked only when regions are unlocked", () => {
