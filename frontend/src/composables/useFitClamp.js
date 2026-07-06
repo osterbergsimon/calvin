@@ -66,7 +66,11 @@ export function useFitClamp(
     const viewportEl = viewport === "parent" ? el.parentElement : el;
     if (!viewportEl) return;
     const containerSize = axis === "inline" ? viewportEl.clientWidth : viewportEl.clientHeight;
-    // Item bounds are measured relative to the item container's own start edge.
+    // NOTE: item bounds are measured from the item container's own top, while
+    // containerSize is the viewport's client size — exact only while the item
+    // container sits flush at the viewport's content-top (true for the card-grid
+    // in the panel body). If a wrapper is ever inserted between them, offset the
+    // bounds by (container top - viewport content top).
     const orect = el.getBoundingClientRect();
     const originStart = axis === "inline" ? orect.left : orect.top;
     const items = Array.from(el.querySelectorAll(itemSelector));
@@ -83,7 +87,13 @@ export function useFitClamp(
     if (res.hasOverflow !== hasOverflow.value) hasOverflow.value = res.hasOverflow;
   };
 
-  useResizeObserver(containerRef, recompute);
+  // Observe the element whose size reflects available space: in "parent" mode
+  // that's the stable ancestor (the element itself is clamped, so its box won't
+  // change when the region grows and would miss newly-fitting rows).
+  useResizeObserver(() => {
+    const el = unref(containerRef);
+    return viewport === "parent" ? el?.parentElement : el;
+  }, recompute);
 
   return { fits, fitCount, hasOverflow, recompute };
 }
