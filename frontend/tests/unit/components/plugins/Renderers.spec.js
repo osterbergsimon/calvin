@@ -454,6 +454,13 @@ describe("CardGrid — footprint vars (calvin-fub)", () => {
     expect(grid.attributes("style")).toContain("var(--card-min");
     expect(grid.attributes("style")).toContain("220px"); // schema fallback preserved
   });
+
+  it("uses max-content rows so cards keep natural height (guards row-collapse)", () => {
+    const wrapper = mount(CardGrid, { props: { schema, data } });
+    // grid-auto-rows:max-content stops the grid from squishing rows to title
+    // height under space pressure — without it the fit-clamp never sees overflow.
+    expect(wrapper.find(".card-grid").attributes("style")).toContain("grid-auto-rows: max-content");
+  });
 });
 
 describe("IframeRenderer", () => {

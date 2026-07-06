@@ -49,7 +49,10 @@ export function computeFitBoundary(itemBounds, containerSize, epsilon = 1) {
 // Composable: measures `containerRef`'s children (`itemSelector`) along `axis`
 // and exposes reactive clamp outputs. vueuse's useResizeObserver owns the
 // observer lifecycle; this stays a thin measurement layer.
-export function useFitClamp(containerRef, { axis = "block", itemSelector, isTouch: _isTouch }) {
+export function useFitClamp(
+  containerRef,
+  { axis = "block", itemSelector, isTouch: _isTouch, viewport = "self" }
+) {
   const fits = ref(0);
   const fitCount = ref(0);
   const hasOverflow = ref(false);
@@ -57,18 +60,24 @@ export function useFitClamp(containerRef, { axis = "block", itemSelector, isTouc
   const recompute = () => {
     const el = unref(containerRef);
     if (!el) return;
-    const crect = el.getBoundingClientRect();
-    const containerSize = axis === "inline" ? crect.width : crect.height;
+    // "parent": measure available space from the stable fixed-height ancestor
+    // (the region/panel body) so clamping `el` never feeds back into the
+    // measurement. "self" (default) measures the element itself.
+    const viewportEl = viewport === "parent" ? el.parentElement : el;
+    if (!viewportEl) return;
+    const containerSize = axis === "inline" ? viewportEl.clientWidth : viewportEl.clientHeight;
+    // Item bounds are measured relative to the item container's own start edge.
+    const orect = el.getBoundingClientRect();
+    const originStart = axis === "inline" ? orect.left : orect.top;
     const items = Array.from(el.querySelectorAll(itemSelector));
     const bounds = items.map(it => {
       const r = it.getBoundingClientRect();
       if (axis === "inline") {
-        return { start: r.left - crect.left, end: r.right - crect.left };
+        return { start: r.left - originStart, end: r.right - originStart };
       }
-      return { start: r.top - crect.top, end: r.bottom - crect.top };
+      return { start: r.top - originStart, end: r.bottom - originStart };
     });
     const res = computeFitBoundary(bounds, containerSize);
-    // Guard against observer feedback loops: only write on change.
     if (res.fits !== fits.value) fits.value = res.fits;
     if (res.fitCount !== fitCount.value) fitCount.value = res.fitCount;
     if (res.hasOverflow !== hasOverflow.value) hasOverflow.value = res.hasOverflow;
