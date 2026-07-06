@@ -2,6 +2,7 @@
   <div ref="root" class="region-view-options">
     <IconButton
       class="region-view-options__trigger"
+      size="custom"
       :active="active"
       :label="label"
       :title="label"
