@@ -47,7 +47,9 @@
             >
               Today
             </button>
-            <IconButton label="Previous" title="Previous" @click="previousMonth"> ‹ </IconButton>
+            <IconButton size="custom" label="Previous" title="Previous" @click="previousMonth">
+              ‹
+            </IconButton>
             <button
               type="button"
               class="calendar-header__view-switch"
@@ -58,7 +60,7 @@
               <span class="calendar-header__view-label">{{ viewModeLabel }}</span>
               <span class="calendar-header__view-caret" aria-hidden="true">▸</span>
             </button>
-            <IconButton label="Next" title="Next" @click="nextMonth"> › </IconButton>
+            <IconButton size="custom" label="Next" title="Next" @click="nextMonth"> › </IconButton>
             <CalendarViewOptions
               v-if="view && viewMode !== 'day'"
               :region-id="regionId"
@@ -66,6 +68,7 @@
             />
             <IconButton
               v-if="!isFullscreen"
+              size="custom"
               class="calendar-header__fullscreen"
               label="Fullscreen calendar"
               title="Fullscreen"
@@ -1174,7 +1177,7 @@ onActivated(() => {
 
 .calendar-header__label {
   font-family: var(--font-display);
-  font-size: 1rem;
+  font-size: var(--region-label-fs, 1.25rem);
   font-weight: 700;
   color: var(--ink);
   line-height: 1.2;
@@ -1195,7 +1198,7 @@ onActivated(() => {
   display: inline-flex;
   align-items: center;
   gap: 0.35rem;
-  height: 1.75rem;
+  height: var(--region-rail-h, 1.75rem);
   padding: 0 0.7rem;
   font-family: var(--font-ui);
   font-size: 0.85rem;
@@ -1211,7 +1214,7 @@ onActivated(() => {
 }
 
 .calendar-header__today {
-  height: 1.75rem;
+  height: var(--region-rail-h, 1.75rem);
   padding: 0 0.75rem;
   font-family: var(--font-ui);
   font-size: 0.8rem;
