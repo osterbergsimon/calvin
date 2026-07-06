@@ -63,13 +63,13 @@ const metadata = computed(() => pick("metadata_path", "metadata", "metadata_form
 .image-caption__title {
   margin: 0;
   font-family: var(--font-ui);
-  font-size: 1.1rem;
+  font-size: 1.1em;
   font-weight: 700;
 }
 
 .image-caption__caption {
   margin: 0;
-  font-size: 0.9rem;
+  font-size: 0.9em;
   line-height: 1.4;
   opacity: 0.9;
   display: -webkit-box;
@@ -82,7 +82,7 @@ const metadata = computed(() => pick("metadata_path", "metadata", "metadata_form
 .image-caption__meta {
   font-family: var(--font-data);
   font-variant-numeric: tabular-nums;
-  font-size: 0.72rem;
+  font-size: 0.72em;
   opacity: 0.75;
   letter-spacing: 0.04em;
 }
