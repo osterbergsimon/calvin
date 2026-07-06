@@ -1,5 +1,10 @@
 <template>
-  <div class="card-grid calvin-plugin-grid" :style="gridStyle">
+  <div
+    ref="gridEl"
+    class="card-grid calvin-plugin-grid calvin-plugin-scroll-shade calvin-plugin-scroll-shade--block"
+    :class="{ 'card-grid--shaded': showShade }"
+    :style="[gridStyle, clampStyle]"
+  >
     <article
       v-for="(card, idx) in cards"
       :key="cardKey(card, idx)"
@@ -36,10 +41,12 @@
 </template>
 
 <script setup>
-import { computed } from "vue";
+import { ref, computed } from "vue";
 import { resolvePath } from "../../../utils/jsonPath";
 import { applyFormat } from "../../../utils/formatters";
 import { useLinkOpen } from "../../../composables/useLinkOpen";
+import { useFitClamp } from "../../../composables/useFitClamp.js";
+import { useTouchCapability } from "../../../composables/useTouchCapability";
 import HandoffOverlay from "../overlays/HandoffOverlay.vue";
 import EmbedOverlay from "../overlays/EmbedOverlay.vue";
 
@@ -52,6 +59,25 @@ const props = defineProps({
 const { overlay, isClickable, openLink, closeOverlay, fallbackToHandoff } = useLinkOpen(
   () => props.linkAction
 );
+
+const gridEl = ref(null);
+const { isTouch } = useTouchCapability();
+const { fits, hasOverflow } = useFitClamp(gridEl, {
+  axis: "block",
+  itemSelector: ".card-grid__card",
+  isTouch,
+});
+
+// Non-touch (keyboard / kiosk): clamp height to the last whole row so no partial
+// card ever shows, and hide the remainder — nothing to scroll, nothing stranded
+// in the tab order (card items aren't focusable). Touch: let it scroll, snapping
+// to whole rows, and fade the bottom edge when there's more.
+const clampStyle = computed(() =>
+  isTouch.value
+    ? { overflowY: "auto", scrollSnapType: "y proximity" }
+    : { maxBlockSize: fits.value ? `${fits.value}px` : null, overflowY: "hidden" }
+);
+const showShade = computed(() => isTouch.value && hasOverflow.value);
 
 const itemLinkAction = computed(() => itemSpec().link_action);
 
@@ -74,7 +100,10 @@ const gridStyle = computed(() => {
   }
   if (typeof cols === "string" && cols.startsWith("auto-fit-")) {
     const min = cols.slice("auto-fit-".length);
-    return { gridTemplateColumns: `repeat(auto-fit, minmax(${min}px, 1fr))` };
+    // A region's card-size control can override the min via --card-min; the
+    // schema's own min stays the fallback so plugins that don't opt in are
+    // unchanged.
+    return { gridTemplateColumns: `repeat(auto-fit, minmax(var(--card-min, ${min}px), 1fr))` };
   }
   return { gridTemplateColumns: "1fr" };
 });
@@ -129,11 +158,18 @@ function itemKey(item, idx) {
   overflow: hidden;
 }
 
+.card-grid:not(.card-grid--shaded) {
+  -webkit-mask-image: none;
+  mask-image: none;
+}
+
 .card-grid__card {
   display: flex;
   flex-direction: column;
   gap: 0.5rem;
   overflow: hidden;
+  padding: var(--card-pad, 1rem);
+  scroll-snap-align: start;
 }
 
 /* card title = the readout microlabel: one label voice everywhere */

@@ -4,6 +4,7 @@ import { expect, afterEach, vi, beforeEach } from "vitest";
 import { cleanup } from "@testing-library/vue";
 import * as matchers from "@testing-library/jest-dom/matchers";
 import axios from "axios";
+import { setActivePinia, createPinia } from "pinia";
 
 // Mock axios globally to prevent network errors in tests
 // Store created instances so we can apply default mocks to them
@@ -80,6 +81,11 @@ if (typeof window !== "undefined") {
 beforeEach(() => {
   // Reset mocks but keep default implementations
   vi.clearAllMocks();
+
+  // Provide a fresh Pinia instance so components that use stores (e.g.
+  // useTouchCapability → useConfigStore) can mount without errors.
+  // Tests that need specific store state create their own via setActivePinia().
+  setActivePinia(createPinia());
 
   // Helper function to apply default implementations to an axios instance
   const applyDefaults = instance => {
