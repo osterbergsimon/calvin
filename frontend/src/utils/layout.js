@@ -2,6 +2,8 @@
  * Layout utility functions for positioning elements in flexbox layouts.
  */
 
+import { CARD_SIZE_KEYS } from "../styles/cardSizeScale.js";
+
 export const DASHBOARD_REGION_KINDS = ["calendar", "photos", "service"];
 export const MAX_TOP_REGIONS = 8;
 
@@ -111,13 +113,15 @@ export function clampCalendarView(view = {}) {
 const SERVICE_LINK_ACTIONS = ["handoff", "embed", "off"];
 
 /**
- * Coerce a service region's `view` block. Only `linkAction` is recognised, and
- * only when it is one of handoff/embed/off — anything else (or absent) is
- * omitted so the region inherits the plugin's own hint. Absent = inherit.
+ * Coerce a service region's `view` block. Recognises `linkAction` (handoff/
+ * embed/off) and `cardSize` (one of the five card-size keys); anything else (or
+ * an invalid value) is omitted so the region inherits the default. Absent =
+ * inherit.
  */
 export function clampServiceView(view = {}) {
   const out = {};
   if (SERVICE_LINK_ACTIONS.includes(view.linkAction)) out.linkAction = view.linkAction;
+  if (CARD_SIZE_KEYS.includes(view.cardSize)) out.cardSize = view.cardSize;
   return out;
 }
 
