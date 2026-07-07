@@ -121,7 +121,7 @@ describe("CalendarViewOptions", () => {
     const { w, cfg } = mountOptions({ mode: "month", rolling: false, weeks: 4, days: 7 });
     await openPopover(w);
     // No override yet → no reset chip, value is the global default (4).
-    expect(w.find(".cvo-default-chip").exists()).toBe(false);
+    expect(w.find(".cvo-density .cvo-default-chip").exists()).toBe(false);
     expect(w.find(".cvo-density .cvo-count-value").text()).toBe("4");
     await w.find('[aria-label="More events per day"]').trigger("click");
     expect(cfg.updateRegionView).toHaveBeenCalledWith("r1", { maxVisibleEvents: 5 });
@@ -138,8 +138,19 @@ describe("CalendarViewOptions", () => {
     });
     await openPopover(w);
     expect(w.find(".cvo-density .cvo-count-value").text()).toBe("2");
-    await w.find(".cvo-default-chip").trigger("click");
+    await w.find(".cvo-density .cvo-default-chip").trigger("click");
     expect(cfg.updateRegionView).toHaveBeenCalledWith("r1", { maxVisibleEvents: undefined });
+    w.unmount();
+  });
+
+  it("Refresh now calls calendarStore.refreshEvents", async () => {
+    const { useCalendarStore } = await import("@/stores/calendar");
+    const cal = useCalendarStore();
+    cal.refreshEvents = vi.fn().mockResolvedValue();
+    const { w } = mountOptions({ mode: "month", rolling: false, weeks: 4, days: 7 });
+    await openPopover(w);
+    await w.find('[data-action="refresh-now"]').trigger("click");
+    expect(cal.refreshEvents).toHaveBeenCalled();
     w.unmount();
   });
 });

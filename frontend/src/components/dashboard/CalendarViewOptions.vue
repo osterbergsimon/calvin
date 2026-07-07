@@ -62,12 +62,25 @@
         </div>
       </div>
     </div>
+    <div class="cvo-row">
+      <span class="cvo-label">Refresh</span>
+      <button
+        type="button"
+        class="cvo-default-chip"
+        data-action="refresh-now"
+        aria-label="Refresh calendar now"
+        @click="refreshNow"
+      >
+        Refresh now
+      </button>
+    </div>
   </RegionViewOptions>
 </template>
 
 <script setup>
 import { computed } from "vue";
 import { useConfigStore } from "@/stores/config";
+import { useCalendarStore } from "@/stores/calendar";
 import RegionViewOptions from "./RegionViewOptions.vue";
 
 const props = defineProps({
@@ -76,6 +89,12 @@ const props = defineProps({
 });
 
 const configStore = useConfigStore();
+const calendarStore = useCalendarStore();
+const refreshNow = () => {
+  calendarStore.refreshEvents().catch(err => {
+    console.error("Failed to refresh calendar:", err);
+  });
+};
 
 const rolling = computed(() => props.view?.rolling === true);
 const isWeek = computed(() => props.view?.mode === "week");
