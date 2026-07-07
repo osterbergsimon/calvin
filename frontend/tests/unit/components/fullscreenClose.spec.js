@@ -7,7 +7,7 @@ vi.mock("@/composables/useKeyboardActions", () => ({
   useKeyboardActions: () => ({ handleAction }),
 }));
 vi.mock("@/composables/useTouchCapability", () => ({
-  useTouchCapability: () => ({ isTouch: { value: true } }),
+  useTouchCapability: () => ({ isTouch: { value: true }, hasPointer: { value: true } }),
 }));
 
 import PhotoSlideshow from "@/components/PhotoSlideshow.vue";

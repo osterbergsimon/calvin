@@ -62,7 +62,7 @@ if (typeof window !== "undefined") {
     configurable: true,
     value: vi.fn().mockImplementation(query => {
       return {
-        matches: false,
+        matches: /\(any-pointer:\s*fine\)/.test(query),
         media: query,
         onchange: null,
         addListener: vi.fn(), // deprecated

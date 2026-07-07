@@ -3,7 +3,7 @@ import { mount } from "@vue/test-utils";
 import { setActivePinia, createPinia } from "pinia";
 
 vi.mock("@/composables/useTouchCapability", () => ({
-  useTouchCapability: () => ({ isTouch: { value: true } }),
+  useTouchCapability: () => ({ isTouch: { value: true }, hasPointer: { value: true } }),
 }));
 vi.mock("@/composables/useKeyboardActions", () => ({
   useKeyboardActions: () => ({ handleAction: vi.fn() }),
