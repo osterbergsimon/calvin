@@ -442,6 +442,26 @@ describe("WeatherForecast", () => {
     expect(wrapper.text()).toContain("10°C");
     expect(wrapper.findAll("svg path")[0].attributes("d")).toBeTruthy();
   });
+
+  it("makes the forecast strip an inline fit-scroll container with natural columns", () => {
+    const wrapper = mount(WeatherForecast, {
+      props: {
+        schema,
+        data: {
+          location: "Oslo",
+          current: { temperature: 8, display: { icon: "mdi:weather-rainy" } },
+          forecast: [
+            { date: "2099-01-01", temp_min: 2, temp_max: 9, display: { icon: "mdi:weather-cloudy" } },
+            { date: "2099-01-02", temp_min: 1, temp_max: 7, display: { icon: "mdi:weather-cloudy" } },
+          ],
+        },
+      },
+    });
+    const strip = wrapper.find(".weather-forecast-renderer__items");
+    expect(strip.classes()).toContain("calvin-plugin-scroll-shade");
+    expect(strip.attributes("style")).toContain("grid-auto-columns");
+    expect(strip.attributes("style")).toContain("max-content");
+  });
 });
 
 describe("CardGrid — footprint vars (calvin-fub)", () => {

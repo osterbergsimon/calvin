@@ -40,7 +40,12 @@
 
     <div v-if="forecast.length" class="weather-forecast-renderer__forecast">
       <h4 class="calvin-plugin-readout__label">Forecast</h4>
-      <div class="weather-forecast-renderer__items">
+      <div
+        ref="itemsEl"
+        class="weather-forecast-renderer__items"
+        :class="shadeClass"
+        :style="[stripStyle, clampStyle]"
+      >
         <article
           v-for="(day, index) in forecast"
           :key="dateFor(day) || index"
@@ -72,9 +77,10 @@
 </template>
 
 <script setup>
-import { computed } from "vue";
+import { computed, ref } from "vue";
 import { resolvePath } from "../../../utils/jsonPath";
 import { weatherIconPath } from "../../../utils/weatherIcons";
+import { useFitScroll } from "../../../composables/useFitScroll.js";
 
 const props = defineProps({
   schema: { type: Object, required: true },
@@ -96,6 +102,17 @@ const forecast = computed(() => {
     : props.data?.forecast;
   return Array.isArray(items) ? items : [];
 });
+
+const itemsEl = ref(null);
+const { clampStyle, shadeClass } = useFitScroll(itemsEl, {
+  axis: "inline",
+  itemSelector: ".weather-forecast-renderer__item",
+  data: () => props.data,
+});
+// Natural column widths so the strip OVERFLOWS horizontally instead of shrinking
+// columns to fit — that overflow is what useFitScroll clamps/scrolls (X-axis
+// analogue of the card-grid grid-auto-rows:max-content fix).
+const stripStyle = { gridAutoColumns: "minmax(90px, max-content)" };
 
 const temperatureUnit = computed(() => units.value.temperature || "°C");
 const windUnit = computed(() => units.value.wind || "m/s");
@@ -258,8 +275,6 @@ function capitalize(value) {
 .weather-forecast-renderer__items {
   display: grid;
   grid-auto-flow: column;
-  grid-auto-columns: minmax(90px, 1fr);
-  overflow-x: auto;
   overflow-y: hidden;
   flex: 1;
   min-height: 0;
