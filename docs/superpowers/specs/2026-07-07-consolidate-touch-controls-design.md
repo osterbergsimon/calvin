@@ -47,9 +47,11 @@ Delete `RegionControls.vue`.
    (important "what am I looking at" info); everything else in the header row
    (Today, `‹ ›`, Month/Week/Day view-switch, tune, `⤢`) hides unless
    `focused && hasPointer`. This makes calendar consistent with service/photos.
-4. **Consistency** → all three regions' click-controls follow one rule:
-   `focused && hasPointer`. (Service nav, currently shown unfocused on desktop,
-   becomes focus-gated like the rest.)
+4. **Gating per region** → calendar & photos click-controls render on
+   `focused && hasPointer`. **Service** keeps its existing focus behavior (its
+   nav/fullscreen are *not* focus-gated, because the same buttons serve the
+   fullscreen service-cycling mode, which has no region focus); only its
+   capability gate changes from `!isTouch` to `hasPointer`.
 
 ## Design
 
@@ -100,11 +102,11 @@ Region click-controls render when `hasPointer && focused`. All use
 
 - Remove both `<RegionControls>` instances (empty-state panel + ServiceViewer
   actions) and the import.
-- Re-gate the header nav/fullscreen from `!isTouch` to `focused && hasPointer`:
-  - `‹` `›`: `v-if="focused && hasPointer && canNavigateServices && services.length > 1"`
-  - `⤢`: `v-if="focused && hasPointer && !isFullscreen"`
-  - (Adds `focused` so unfocused service regions no longer show nav — matches the
-    "hidden unless selected" rule.)
+- Re-gate the header nav/fullscreen from `!isTouch` to `hasPointer` (keep the
+  existing conditions; do **not** add `focused` — the fullscreen cycling mode
+  reuses these buttons and has no region focus):
+  - `‹` `›`: `v-if="hasPointer && canNavigateServices && services.length > 1"`
+  - `⤢`: `v-if="hasPointer && !isFullscreen"`
 - Swap the `useTouchCapability` import to pull `hasPointer` (drop `isTouch` if it
   becomes unused in this file — the fullscreen-close is `v-if="isFullscreen"`,
   not touch-gated).
