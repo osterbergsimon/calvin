@@ -47,11 +47,16 @@ Delete `RegionControls.vue`.
    (important "what am I looking at" info); everything else in the header row
    (Today, `‹ ›`, Month/Week/Day view-switch, tune, `⤢`) hides unless
    `focused && hasPointer`. This makes calendar consistent with service/photos.
-4. **Gating per region** → calendar & photos click-controls render on
-   `focused && hasPointer`. **Service** keeps its existing focus behavior (its
-   nav/fullscreen are *not* focus-gated, because the same buttons serve the
-   fullscreen service-cycling mode, which has no region focus); only its
-   capability gate changes from `!isTouch` to `hasPointer`.
+4. **Gating per region (uniform)** → all three regions hide their click-controls
+   unless the region is selected: calendar & photos render on `focused &&
+   hasPointer`; **service** nav renders on `(focused || isFullscreen) &&
+   hasPointer && …`, its ⤢ on `focused && hasPointer && !isFullscreen`, and its
+   tune on `focused && hasPointer && isLinkCapable`. The `|| isFullscreen` on the
+   nav preserves the fullscreen service-cycling mode (which has no region focus)
+   — the only place a service control shows without `focused`.
+   *(Revised from an earlier draft that left service controls un-focus-gated;
+   live testing showed an unselected service region wrongly kept showing its
+   fullscreen button, so service was brought in line with calendar/photos.)*
 
 ## Design
 
@@ -102,11 +107,13 @@ Region click-controls render when `hasPointer && focused`. All use
 
 - Remove both `<RegionControls>` instances (empty-state panel + ServiceViewer
   actions) and the import.
-- Re-gate the header nav/fullscreen from `!isTouch` to `hasPointer` (keep the
-  existing conditions; do **not** add `focused` — the fullscreen cycling mode
-  reuses these buttons and has no region focus):
-  - `‹` `›`: `v-if="hasPointer && canNavigateServices && services.length > 1"`
-  - `⤢`: `v-if="hasPointer && !isFullscreen"`
+- Re-gate the header nav/fullscreen from `!isTouch`, and focus-gate them so an
+  unselected service region shows nothing (uniform with calendar/photos). The
+  nav additionally allows `isFullscreen` so the fullscreen service-cycling mode
+  (no region focus) still gets its `‹ ›`:
+  - `‹` `›`: `v-if="(focused || isFullscreen) && hasPointer && canNavigateServices && services.length > 1"`
+  - `⤢`: `v-if="focused && hasPointer && !isFullscreen"`
+  - tune (`ServiceRegionViewOptions`): `v-if="focused && hasPointer && isLinkCapable"`
 - Swap the `useTouchCapability` import to pull `hasPointer` (drop `isTouch` if it
   becomes unused in this file — the fullscreen-close is `v-if="isFullscreen"`,
   not touch-gated).
