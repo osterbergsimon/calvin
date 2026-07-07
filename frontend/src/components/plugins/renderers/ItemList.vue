@@ -1,5 +1,10 @@
 <template>
-  <ul class="item-list calvin-plugin-list calvin-plugin-list--scroll">
+  <ul
+    ref="listEl"
+    class="item-list calvin-plugin-list calvin-plugin-list--scroll"
+    :class="shadeClass"
+    :style="clampStyle"
+  >
     <li
       v-for="(item, i) in items"
       :key="keyFor(item, i)"
@@ -33,10 +38,11 @@
 <script setup>
 defineOptions({ inheritAttrs: false });
 
-import { computed } from "vue";
+import { computed, ref } from "vue";
 import { resolvePath } from "../../../utils/jsonPath";
 import { applyFormat } from "../../../utils/formatters";
 import { useLinkOpen } from "../../../composables/useLinkOpen";
+import { useFitScroll } from "../../../composables/useFitScroll.js";
 import HandoffOverlay from "../overlays/HandoffOverlay.vue";
 import EmbedOverlay from "../overlays/EmbedOverlay.vue";
 
@@ -55,6 +61,13 @@ const items = computed(() => {
     ? resolvePath(props.data, props.schema.data_path)
     : props.data;
   return Array.isArray(slice) ? slice : [];
+});
+
+const listEl = ref(null);
+const { clampStyle, shadeClass } = useFitScroll(listEl, {
+  axis: "block",
+  itemSelector: ".item-list__row",
+  data: () => props.data,
 });
 
 const itemSpec = computed(() => props.schema.item || {});
@@ -87,6 +100,7 @@ const keyFor = (item, i) => {
   display: flex;
   align-items: baseline;
   gap: 0.9rem;
+  flex-shrink: 0;
 }
 
 .item-list__row--clickable {

@@ -312,6 +312,19 @@ describe("ItemList", () => {
     });
     expect(wrapper.find(".item-list__empty").text()).toBe("Nothing here");
   });
+
+  it("makes the list a block fit-scroll container", () => {
+    const wrapper = mount(ItemList, {
+      props: {
+        schema: { kind: "item-list", item: { label_path: "$.label" } },
+        data: [{ label: "one" }, { label: "two" }],
+      },
+    });
+    const ul = wrapper.find(".item-list");
+    expect(ul.classes()).toContain("calvin-plugin-scroll-shade");
+    // pointer is present by default in the test env → scroll style
+    expect(ul.attributes("style") || "").toContain("scroll-snap-type");
+  });
 });
 
 describe("ImageWithCaption", () => {
