@@ -3,7 +3,7 @@ import { mount } from "@vue/test-utils";
 import { setActivePinia, createPinia } from "pinia";
 
 vi.mock("@/composables/useTouchCapability", () => ({
-  useTouchCapability: () => ({ isTouch: { value: true } }),
+  useTouchCapability: () => ({ isTouch: { value: true }, hasPointer: { value: true } }),
 }));
 vi.mock("@/composables/useKeyboardActions", () => ({
   useKeyboardActions: () => ({ handleAction: vi.fn() }),
@@ -45,19 +45,20 @@ describe("region focus forwarding (PhotoSlideshow)", () => {
     expect(panel.attributes("data-focused")).toBe("true");
   });
 
-  it("renders RegionControls in the actions slot when focused", () => {
+  it("renders touch nav in the actions slot when focused", () => {
     const w = mount(PhotoSlideshow, {
       props: { focused: true, isFullscreen: false },
       global: { stubs },
     });
-    expect(w.find(".region-controls").exists()).toBe(true);
+    expect(w.find('[data-action="next"]').exists()).toBe(true);
+    expect(w.find('[data-action="expand"]').exists()).toBe(true);
   });
 
-  it("hides RegionControls when not focused", () => {
+  it("hides touch nav when not focused", () => {
     const w = mount(PhotoSlideshow, {
       props: { focused: false, isFullscreen: false },
       global: { stubs },
     });
-    expect(w.find(".region-controls").exists()).toBe(false);
+    expect(w.find('[data-action="next"]').exists()).toBe(false);
   });
 });

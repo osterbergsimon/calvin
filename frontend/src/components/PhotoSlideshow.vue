@@ -23,7 +23,36 @@
         <div v-if="imagesStore.error" class="error-message">
           {{ imagesStore.error }}
         </div>
-        <RegionControls v-if="focused" region-kind="photos" />
+        <template v-if="focused && hasPointer">
+          <IconButton
+            size="custom"
+            data-action="prev"
+            label="Previous photo"
+            title="Previous"
+            @click="handleAction('images_prev')"
+          >
+            ‹
+          </IconButton>
+          <IconButton
+            size="custom"
+            data-action="next"
+            label="Next photo"
+            title="Next"
+            @click="handleAction('images_next')"
+          >
+            ›
+          </IconButton>
+          <IconButton
+            size="custom"
+            variant="primary"
+            data-action="expand"
+            label="Fullscreen photos"
+            title="Fullscreen"
+            @click="handleAction('photos_enter_fullscreen')"
+          >
+            ⤢
+          </IconButton>
+        </template>
       </template>
 
       <div class="slideshow-content">
@@ -57,13 +86,12 @@ import { useImagesStore } from "../stores/images";
 import { useConfigStore } from "../stores/config";
 import DashboardPanel from "./DashboardPanel.vue";
 import IconButton from "@/components/ui/IconButton.vue";
-import RegionControls from "./dashboard/RegionControls.vue";
 import { useKeyboardActions } from "@/composables/useKeyboardActions";
 import { useTouchCapability } from "@/composables/useTouchCapability";
 
 const configStore = useConfigStore();
 const { handleAction } = useKeyboardActions();
-const { isTouch } = useTouchCapability();
+const { isTouch, hasPointer } = useTouchCapability();
 
 const props = defineProps({
   focused: {
