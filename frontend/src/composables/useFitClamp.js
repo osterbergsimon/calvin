@@ -51,7 +51,7 @@ export function computeFitBoundary(itemBounds, containerSize, epsilon = 1) {
 // observer lifecycle; this stays a thin measurement layer.
 export function useFitClamp(
   containerRef,
-  { axis = "block", itemSelector, isTouch: _isTouch, viewport = "self" }
+  { axis = "block", itemSelector, viewport = "self" }
 ) {
   const fits = ref(0);
   const fitCount = ref(0);
