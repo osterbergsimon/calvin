@@ -72,6 +72,8 @@ const panelClasses = computed(() => [
   display: flex;
   flex-direction: column;
   overflow: hidden;
+  /* Anchor for the absolutely-positioned header overlay below. */
+  position: relative;
 }
 
 .dashboard-panel--media .dashboard-panel__body {
@@ -79,17 +81,30 @@ const panelClasses = computed(() => [
 }
 
 .dashboard-panel__header {
+  /* Transient chrome: the header is only mounted while UI is revealed (on focus/
+     interaction). Float it over the top of the body instead of stacking above it,
+     so the widgets keep their full height and nothing reflows when it appears. */
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  z-index: 5;
   min-height: 0;
-  /* Slim: no large title bar. Collapses to nothing when it holds no title
-     and no controls (the actions slot is empty); grows to fit the ~46px
-     touch controls when they appear on the focused region. */
   padding: 0.5rem 0.75rem;
-  flex-shrink: 0;
   display: flex;
   align-items: center;
   justify-content: flex-end;
   gap: 0.75rem;
-  background: transparent;
+  /* Soft scrim so the title/controls stay legible over whatever the widget draws
+     underneath, without a hard bar edge. */
+  background: linear-gradient(
+    to bottom,
+    color-mix(in srgb, var(--bg-1) 88%, transparent),
+    transparent
+  );
+  /* Let clicks fall through the empty parts of the overlay to the content below;
+     the interactive children opt back in. */
+  pointer-events: none;
 }
 /* When a title IS shown, space it opposite the controls. */
 .dashboard-panel__header:has(.dashboard-panel__title-group) {
@@ -101,6 +116,7 @@ const panelClasses = computed(() => [
   display: flex;
   flex-direction: column;
   gap: 0.2rem;
+  pointer-events: auto;
 }
 
 .dashboard-panel__title {
@@ -133,6 +149,7 @@ const panelClasses = computed(() => [
   display: flex;
   align-items: center;
   gap: 0.5rem;
+  pointer-events: auto;
 }
 
 .dashboard-panel__body {
