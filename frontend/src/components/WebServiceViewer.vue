@@ -51,7 +51,7 @@
               :view="view"
             />
             <IconButton
-              v-if="hasPointer && canNavigateServices && services.length > 1"
+              v-if="(focused || isFullscreen) && hasPointer && canNavigateServices && services.length > 1"
               size="custom"
               label="Previous Service"
               title="Previous Service"
@@ -60,7 +60,7 @@
               ‹
             </IconButton>
             <IconButton
-              v-if="hasPointer && canNavigateServices && services.length > 1"
+              v-if="(focused || isFullscreen) && hasPointer && canNavigateServices && services.length > 1"
               size="custom"
               label="Next Service"
               title="Next Service"
@@ -69,7 +69,7 @@
               ›
             </IconButton>
             <IconButton
-              v-if="hasPointer && !isFullscreen"
+              v-if="focused && hasPointer && !isFullscreen"
               size="custom"
               label="Enter Fullscreen"
               title="Enter Fullscreen"

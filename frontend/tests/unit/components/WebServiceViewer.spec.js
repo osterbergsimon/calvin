@@ -140,7 +140,7 @@ describe("WebServiceViewer", () => {
   });
 
   it("renders a specific service and disables local navigation when service id is provided", () => {
-    const wrapper = mountViewer({ isFullscreen: false, serviceId: "meals" });
+    const wrapper = mountViewer({ isFullscreen: false, serviceId: "meals", focused: true });
 
     expect(wrapper.find(".service-viewer-stub h2").text()).toBe("Meals");
     expect(wrapper.find(".service-viewer-stub").text()).toContain("Meals");
@@ -159,7 +159,7 @@ describe("WebServiceViewer", () => {
     const enterSpy = vi.spyOn(modeStore, "enterFullscreen");
     // currentServiceIndex is 0 ("Weather") — the buggy path would fullscreen
     // that instead of the region's own "meals" service.
-    const wrapper = mountViewer({ isFullscreen: false, serviceId: "meals" });
+    const wrapper = mountViewer({ isFullscreen: false, serviceId: "meals", focused: true });
 
     await wrapper.get('[title="Enter Fullscreen"]').trigger("click");
 
@@ -172,6 +172,11 @@ describe("WebServiceViewer", () => {
     expect(wrapper.text()).toContain("Selected service is unavailable");
     expect(wrapper.text()).toContain("Choose another service in Settings");
     expect(wrapper.find(".service-viewer-stub").exists()).toBe(false);
+  });
+
+  it("hides controls on an unfocused dashboard service region", () => {
+    const wrapper = mountViewer({ isFullscreen: false, serviceId: "meals", focused: false });
+    expect(wrapper.find(".service-viewer-stub").findAll(".icon-btn")).toHaveLength(0);
   });
 });
 
@@ -204,7 +209,7 @@ describe("WebServiceViewer control consolidation", () => {
   });
 
   it("still shows the Enter Fullscreen control with a pointer present", () => {
-    const w = mount2({ isFullscreen: false, serviceId: "b" });
+    const w = mount2({ isFullscreen: false, serviceId: "b", focused: true });
     expect(w.find('[title="Enter Fullscreen"]').exists()).toBe(true);
   });
 });
