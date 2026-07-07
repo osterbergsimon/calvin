@@ -46,7 +46,7 @@
         >
           <template #actions>
             <ServiceRegionViewOptions
-              v-if="focused && isLinkCapable"
+              v-if="focused && hasPointer && isLinkCapable"
               :region-id="regionId"
               :view="view"
             />

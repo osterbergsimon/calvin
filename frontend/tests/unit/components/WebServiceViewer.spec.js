@@ -52,6 +52,24 @@ describe("WebServiceViewer link wiring", () => {
     w.unmount();
   });
 
+  it("hides the tune control on keyboard-only devices (hasPointer=false)", async () => {
+    setupLinkWiring("card-grid");
+    useConfigStore().touchControls = "off";
+    const w = mount(WebServiceViewer, {
+      props: {
+        serviceId: "mealie-1",
+        regionId: "svc-1",
+        view: { linkAction: "embed" },
+        focused: true,
+      },
+      global: { stubs: { ServiceViewer: { template: "<div><slot name='actions' /></div>" } } },
+      attachTo: document.body,
+    });
+    await w.vm.$nextTick();
+    expect(w.findComponent({ name: "ServiceRegionViewOptions" }).exists()).toBe(false);
+    w.unmount();
+  });
+
   it("hides the tune control for a non-link-capable service (iframe)", async () => {
     setupLinkWiring("iframe");
     const w = mount(WebServiceViewer, {
