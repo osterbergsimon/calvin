@@ -498,6 +498,12 @@ onUnmounted(() => {
   flex-direction: row;
   min-height: 0;
   min-width: 0;
+  /* Lift the region area above the perimeter clock bars (z-index:100) so a
+     focused region's glow blooms over the top/bottom bars instead of being
+     clipped at their edge. The bars never overlap region content spatially,
+     so only the neon bloom bleeds across — matching the between-bar behaviour. */
+  position: relative;
+  z-index: 101;
 }
 
 .dashboard-main {
@@ -507,6 +513,9 @@ onUnmounted(() => {
   gap: 1rem;
   min-height: 0;
   min-width: 0;
+  /* Same rationale one level down: sit above the vertical (left/right) bars. */
+  position: relative;
+  z-index: 101;
 }
 
 .mode-content {
