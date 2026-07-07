@@ -1314,13 +1314,21 @@ onActivated(() => {
   }
 }
 
+/* The calendar owns its own surface + spacing, so drop the panel body's default
+   1rem inset — otherwise the grid is framed by a doubled 2rem border that eats
+   the day cells. The grid surface now fills the panel; a slim inner pad keeps the
+   day numbers off the edge. */
+:deep(.dashboard-panel__body) {
+  padding: 0;
+}
+
 .calendar-grid {
   display: flex;
   flex-direction: column;
   height: 100%;
   background: var(--calendar-bg);
   border-radius: 8px;
-  padding: 1rem;
+  padding: 0.5rem;
   min-height: 0;
   width: 100%;
   max-width: 100%;
