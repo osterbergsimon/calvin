@@ -19,6 +19,10 @@
         active screen's layout direction (row vs column).
       -->
       <div class="dashboard-stage">
+        <!-- Ambient loading comet: orbits the framed content area, riding a
+             clock bar's seam where one exists. See calvin-dt7. -->
+        <PerimeterProgress />
+
         <ClockBarVertical
           v-if="showVerticalBarLeft"
           position="left"
@@ -157,6 +161,7 @@ import DashboardRegion from "../components/DashboardRegion.vue";
 import MinimalUIOverlay from "../components/MinimalUIOverlay.vue";
 import ClockBarHorizontal from "../components/ClockBarHorizontal.vue";
 import ClockBarVertical from "../components/ClockBarVertical.vue";
+import PerimeterProgress from "../components/PerimeterProgress.vue";
 
 const PhotoSlideshow = defineAsyncComponent(() => import("../components/PhotoSlideshow.vue"));
 const WebServiceViewer = defineAsyncComponent(() => import("../components/WebServiceViewer.vue"));
@@ -164,6 +169,8 @@ const CalendarView = defineAsyncComponent(() => import("../components/CalendarVi
 import { regionChromeVars } from "@/styles/regionChromeScale";
 import { useConfigStore } from "../stores/config";
 import { useModeStore } from "../stores/mode";
+import { useCalendarStore } from "../stores/calendar";
+import { useProgressStore } from "../stores/progress";
 import { useRoute } from "vue-router";
 import { useKeyboardActions } from "../composables/useKeyboardActions";
 import { useHotCornerReveal } from "../composables/useHotCornerReveal";
@@ -185,7 +192,21 @@ const configStore = useConfigStore();
 // taps pass straight through. See calvin-arv.
 useHotCornerReveal(configStore);
 const modeStore = useModeStore();
+const calendarStore = useCalendarStore();
+const progressStore = useProgressStore();
 const route = useRoute();
+
+// Bridge background work into the perimeter comet. Keyed by source so a future
+// per-region indicator can subscribe to its own id (see calvin-dt7); for now the
+// calendar's background refresh is the single global source.
+watch(
+  () => calendarStore.backgroundRefreshing,
+  refreshing => {
+    if (refreshing) progressStore.begin("calendar");
+    else progressStore.end("calendar");
+  },
+  { immediate: true }
+);
 const { focusRegion } = useKeyboardActions();
 
 let configPollInterval = null;

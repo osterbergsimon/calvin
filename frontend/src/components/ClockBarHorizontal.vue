@@ -18,7 +18,6 @@
           :active-screen-id="activeScreenId"
           @select-screen="activateScreen"
         />
-        <span v-if="isBackgroundRefreshing" class="clock-refresh-icon" aria-hidden="true" />
       </div>
 
       <div
@@ -44,7 +43,6 @@
 
 <script setup>
 import { computed } from "vue";
-import { useCalendarStore } from "../stores/calendar";
 import { useConfigStore } from "../stores/config";
 import { useClockBar } from "../composables/useClockBar";
 import { useKeyboardActions } from "../composables/useKeyboardActions";
@@ -125,9 +123,6 @@ const {
   previewPluginItemSize: () => props.previewPluginItemSize,
   orientation: () => "horizontal",
 });
-
-const calendarStore = useCalendarStore();
-const isBackgroundRefreshing = computed(() => calendarStore.backgroundRefreshing);
 
 const configStore = useConfigStore();
 const showLogo = computed(() => configStore.clockBarShowLogo !== false);
@@ -236,21 +231,4 @@ const roomLabel = computed(() => configStore.displayName);
   min-width: 0;
 }
 
-.clock-refresh-icon {
-  display: inline-block;
-  width: 0.5rem;
-  height: 0.5rem;
-  border: 1.5px solid var(--ink-2);
-  border-top-color: transparent;
-  border-radius: 50%;
-  margin: 0 0.5rem;
-  animation: clock-spin 1s linear infinite;
-  flex-shrink: 0;
-}
-
-@keyframes clock-spin {
-  to {
-    transform: rotate(360deg);
-  }
-}
 </style>
