@@ -1168,7 +1168,10 @@ onActivated(() => {
   justify-content: space-between;
   gap: 0.75rem;
   flex-shrink: 0;
-  padding: 0 0.25rem 0.4rem;
+  /* Panel body is flush now, so the header carries its own inset — top + sides
+     line the month label up with the grid (0.5rem) instead of jamming it into
+     the corner; the bottom keeps the gap above the grid. */
+  padding: 0.5rem 0.5rem 0.4rem;
   min-width: 0;
 }
 
