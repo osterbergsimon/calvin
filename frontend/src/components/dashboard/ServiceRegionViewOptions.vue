@@ -27,12 +27,25 @@
         @update:model-value="setCardSize"
       />
     </div>
+    <div class="svo-row">
+      <span class="svo-label">Refresh</span>
+      <button
+        type="button"
+        class="svo-seg-btn"
+        data-action="refresh-now"
+        aria-label="Refresh service now"
+        @click="refreshNow"
+      >
+        Refresh now
+      </button>
+    </div>
   </RegionViewOptions>
 </template>
 
 <script setup>
 import { computed } from "vue";
 import { useConfigStore } from "@/stores/config";
+import { useWebServicesStore } from "@/stores/webServices";
 import RegionViewOptions from "./RegionViewOptions.vue";
 import SelectPill from "@/components/ui/SelectPill.vue";
 import { DEFAULT_CARD_SIZE } from "@/styles/cardSizeScale.js";
@@ -43,6 +56,12 @@ const props = defineProps({
 });
 
 const configStore = useConfigStore();
+const webServicesStore = useWebServicesStore();
+const refreshNow = () => {
+  webServicesStore.refreshCurrentService().catch(err => {
+    console.error("Failed to refresh service:", err);
+  });
+};
 
 // "default" means inherit the plugin hint (persisted as absent).
 const linkOptions = [
@@ -121,5 +140,24 @@ const setCardSize = value => {
 .svo-size {
   flex-wrap: wrap;
   justify-content: flex-end;
+}
+.svo-seg-btn {
+  font-family: var(--font-ui);
+  font-size: 0.72rem;
+  color: var(--ink-2);
+  background: var(--bg-1);
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  padding: 0.2rem 0.5rem;
+  min-height: 22px;
+  cursor: pointer;
+}
+.svo-seg-btn:hover {
+  border-color: var(--focus-edge);
+  color: var(--ink);
+}
+.svo-seg-btn:focus-visible {
+  outline: 2px solid var(--focus);
+  outline-offset: 1px;
 }
 </style>

@@ -46,4 +46,18 @@ describe("ServiceRegionViewOptions", () => {
     expect(w.find(".region-view-options__trigger").classes()).toContain("icon-btn--active");
     w.unmount();
   });
+
+  it("Refresh now calls webServicesStore.refreshCurrentService", async () => {
+    const { useWebServicesStore } = await import("@/stores/webServices");
+    const store = useWebServicesStore();
+    store.refreshCurrentService = vi.fn().mockResolvedValue();
+    const w = mount(ServiceRegionViewOptions, {
+      attachTo: document.body,
+      props: { regionId: "r1", view: {} },
+    });
+    await w.find(".region-view-options__trigger").trigger("click");
+    await w.find('[data-action="refresh-now"]').trigger("click");
+    expect(store.refreshCurrentService).toHaveBeenCalled();
+    w.unmount();
+  });
 });
