@@ -156,3 +156,37 @@ describe("WebServiceViewer", () => {
     expect(wrapper.find(".service-viewer-stub").exists()).toBe(false);
   });
 });
+
+describe("WebServiceViewer control consolidation", () => {
+  beforeEach(() => setActivePinia(createPinia()));
+
+  const mount2 = props => {
+    const cfg = useConfigStore();
+    cfg.showUI = true;
+    const store = useWebServicesStore();
+    store.services = [
+      { id: "a", name: "A", enabled: true, display_schema: { kind: "status-tile" } },
+      { id: "b", name: "B", enabled: true, display_schema: { kind: "status-tile" } },
+    ];
+    store.currentServiceIndex = 0;
+    vi.spyOn(store, "fetchServices").mockResolvedValue({ services: store.services });
+    return mount(WebServiceViewer, {
+      props,
+      global: {
+        stubs: {
+          ServiceViewer: { template: '<div class="svs"><slot name="actions" /></div>' },
+        },
+      },
+    });
+  };
+
+  it("does not render the legacy RegionControls cluster", () => {
+    const w = mount2({ isFullscreen: true, focused: true });
+    expect(w.find(".region-controls").exists()).toBe(false);
+  });
+
+  it("still shows the Enter Fullscreen control with a pointer present", () => {
+    const w = mount2({ isFullscreen: false, serviceId: "b" });
+    expect(w.find('[title="Enter Fullscreen"]').exists()).toBe(true);
+  });
+});

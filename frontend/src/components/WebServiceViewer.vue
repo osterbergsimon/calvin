@@ -26,7 +26,6 @@
         :dim="dim"
       >
         <template #actions>
-          <RegionControls v-if="focused" region-kind="service" />
         </template>
         <div :class="emptyState.className">
           <div v-if="emptyState.loading" class="spinner" />
@@ -46,14 +45,13 @@
           :link-action="linkAction"
         >
           <template #actions>
-            <RegionControls v-if="focused" region-kind="service" />
             <ServiceRegionViewOptions
               v-if="focused && isLinkCapable"
               :region-id="regionId"
               :view="view"
             />
             <IconButton
-              v-if="!isTouch && canNavigateServices && services.length > 1"
+              v-if="hasPointer && canNavigateServices && services.length > 1"
               size="custom"
               label="Previous Service"
               title="Previous Service"
@@ -62,7 +60,7 @@
               ‹
             </IconButton>
             <IconButton
-              v-if="!isTouch && canNavigateServices && services.length > 1"
+              v-if="hasPointer && canNavigateServices && services.length > 1"
               size="custom"
               label="Next Service"
               title="Next Service"
@@ -71,7 +69,7 @@
               ›
             </IconButton>
             <IconButton
-              v-if="!isTouch && !isFullscreen"
+              v-if="hasPointer && !isFullscreen"
               size="custom"
               label="Enter Fullscreen"
               title="Enter Fullscreen"
@@ -93,7 +91,6 @@ import { useModeStore } from "../stores/mode";
 import DashboardPanel from "./DashboardPanel.vue";
 import IconButton from "@/components/ui/IconButton.vue";
 import ServiceViewer from "./service/ServiceViewer.vue";
-import RegionControls from "./dashboard/RegionControls.vue";
 import ServiceRegionViewOptions from "./dashboard/ServiceRegionViewOptions.vue";
 import { useTouchCapability } from "@/composables/useTouchCapability";
 import { cardSizeVars } from "@/styles/cardSizeScale.js";
@@ -125,7 +122,7 @@ const props = defineProps({
   },
 });
 
-const { isTouch } = useTouchCapability();
+const { hasPointer } = useTouchCapability();
 
 const webServicesStore = useWebServicesStore();
 const modeStore = useModeStore();
