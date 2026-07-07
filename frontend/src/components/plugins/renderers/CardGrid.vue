@@ -1,8 +1,8 @@
 <template>
   <div
     ref="gridEl"
-    class="card-grid calvin-plugin-grid calvin-plugin-scroll-shade calvin-plugin-scroll-shade--block"
-    :class="{ 'card-grid--shaded': showShade }"
+    class="card-grid calvin-plugin-grid"
+    :class="shadeClass"
     :style="[gridStyle, clampStyle]"
   >
     <article
@@ -41,12 +41,11 @@
 </template>
 
 <script setup>
-import { ref, computed, watch, nextTick } from "vue";
+import { ref, computed } from "vue";
 import { resolvePath } from "../../../utils/jsonPath";
 import { applyFormat } from "../../../utils/formatters";
 import { useLinkOpen } from "../../../composables/useLinkOpen";
-import { useFitClamp } from "../../../composables/useFitClamp.js";
-import { useTouchCapability } from "../../../composables/useTouchCapability";
+import { useFitScroll } from "../../../composables/useFitScroll.js";
 import HandoffOverlay from "../overlays/HandoffOverlay.vue";
 import EmbedOverlay from "../overlays/EmbedOverlay.vue";
 
@@ -61,32 +60,11 @@ const { overlay, isClickable, openLink, closeOverlay, fallbackToHandoff } = useL
 );
 
 const gridEl = ref(null);
-const { isTouch } = useTouchCapability();
-const { fits, hasOverflow, recompute } = useFitClamp(gridEl, {
+const { clampStyle, shadeClass } = useFitScroll(gridEl, {
   axis: "block",
   itemSelector: ".card-grid__card",
-  isTouch,
-  viewport: "parent",
+  data: () => props.data,
 });
-
-// The grid's border-box is pinned by height:100%, so ResizeObserver won't fire
-// when card data loads or changes late — recompute the clamp when it does.
-watch(
-  () => props.data,
-  () => nextTick(recompute),
-  { deep: true }
-);
-
-// Non-touch (keyboard / kiosk): clamp height to the last whole row so no partial
-// card ever shows, and hide the remainder — nothing to scroll, nothing stranded
-// in the tab order (card items aren't focusable). Touch: let it scroll, snapping
-// to whole rows, and fade the bottom edge when there's more.
-const clampStyle = computed(() =>
-  isTouch.value
-    ? { overflowY: "auto", scrollSnapType: "y proximity" }
-    : { maxBlockSize: fits.value ? `${fits.value}px` : null, overflowY: "hidden" }
-);
-const showShade = computed(() => isTouch.value && hasOverflow.value);
 
 const itemLinkAction = computed(() => itemSpec().link_action);
 
@@ -167,11 +145,6 @@ function itemKey(item, idx) {
 <style scoped>
 .card-grid {
   overflow: hidden;
-}
-
-.card-grid:not(.card-grid--shaded) {
-  -webkit-mask-image: none;
-  mask-image: none;
 }
 
 .card-grid__card {

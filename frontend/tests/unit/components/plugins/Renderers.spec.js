@@ -271,6 +271,11 @@ describe("CardGrid", () => {
     expect(items[0].classes()).toContain("calvin-plugin-clickable");
     expect(items[1].classes()).not.toContain("card-grid__item--clickable");
   });
+
+  it("marks the grid as a fit-scroll container", () => {
+    const wrapper = mount(CardGrid, { props: { schema, data: mealData } });
+    expect(wrapper.find(".card-grid").classes()).toContain("calvin-plugin-scroll-shade");
+  });
 });
 
 describe("ItemList", () => {
