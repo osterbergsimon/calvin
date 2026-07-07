@@ -7,8 +7,8 @@ import { useConfigStore } from "@/stores/config";
 import { useCalendarStore } from "@/stores/calendar";
 import { useModeStore } from "@/stores/mode";
 
-function mountCalendar(view) {
-  return mount(CalendarView, { props: { sourceIds: [], regionId: "r1", view } });
+function mountCalendar(view, extraProps = {}) {
+  return mount(CalendarView, { props: { sourceIds: [], regionId: "r1", view, ...extraProps } });
 }
 
 describe("CalendarView per-region view", () => {
@@ -24,12 +24,12 @@ describe("CalendarView per-region view", () => {
   });
 
   it("derives the view-switch label from the view prop, not global config", () => {
-    const w = mountCalendar({ mode: "week", rolling: false, weeks: 4, days: 7 });
+    const w = mountCalendar({ mode: "week", rolling: false, weeks: 4, days: 7 }, { focused: true });
     expect(w.find(".calendar-header__view-label").text()).toBe("Week");
   });
 
   it("labels a rolling base view with a rolling suffix", () => {
-    const w = mountCalendar({ mode: "month", rolling: true, weeks: 4, days: 7 });
+    const w = mountCalendar({ mode: "month", rolling: true, weeks: 4, days: 7 }, { focused: true });
     expect(w.find(".calendar-header__view-label").text()).toBe("Month · Rolling");
   });
 
@@ -80,14 +80,14 @@ describe("CalendarView per-region view", () => {
   it("view-switch button cycles the region's base mode via updateRegionView", async () => {
     const cfg = useConfigStore();
     cfg.updateRegionView = vi.fn().mockResolvedValue();
-    const w = mountCalendar({ mode: "month", rolling: false, weeks: 4, days: 7 });
+    const w = mountCalendar({ mode: "month", rolling: false, weeks: 4, days: 7 }, { focused: true });
     await w.find(".calendar-header__view-switch").trigger("click");
     expect(cfg.updateRegionView).toHaveBeenCalledWith("r1", { mode: "week" });
   });
 
   it("entering fullscreen carries the region's view", async () => {
     const view = { mode: "week", rolling: true, weeks: 4, days: 5 };
-    const w = mountCalendar(view);
+    const w = mountCalendar(view, { focused: true });
     await w.find(".calendar-header__fullscreen").trigger("click");
     expect(useModeStore().fullscreenContext.view).toEqual(view);
   });

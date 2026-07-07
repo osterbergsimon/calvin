@@ -28,15 +28,11 @@
       :focused="focused"
       :dim="dim"
     >
-      <template #actions>
-        <RegionControls v-if="focused" region-kind="calendar" />
-      </template>
-
       <div class="calendar-content">
         <!-- Always-visible header: month/year label, navigation + view switch -->
         <div class="calendar-header">
           <div class="calendar-header__label">{{ currentMonthYear }}</div>
-          <div class="calendar-header__controls">
+          <div v-if="focused && hasPointer" class="calendar-header__controls">
             <button
               v-if="!isCurrentPeriod"
               type="button"
@@ -174,8 +170,8 @@ import DialogScrim from "./ui/DialogScrim.vue";
 import CalendarEventItem from "./CalendarEventItem.vue";
 import DashboardPanel from "./DashboardPanel.vue";
 import IconButton from "./ui/IconButton.vue";
-import RegionControls from "./dashboard/RegionControls.vue";
 import CalendarViewOptions from "./dashboard/CalendarViewOptions.vue";
+import { useTouchCapability } from "@/composables/useTouchCapability";
 
 const props = defineProps({
   focused: {
@@ -208,6 +204,7 @@ const props = defineProps({
 });
 
 const configStore = useConfigStore();
+const { hasPointer } = useTouchCapability();
 const sourceKey = computed(() =>
   [
     ...new Set(
