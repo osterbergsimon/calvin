@@ -259,6 +259,7 @@ export const useConfigStore = defineStore("config", () => {
       clearTimeout(temporaryUITimer.value);
       temporaryUITimer.value = null;
     }
+    teardownUiActivityListeners();
     showUITemporary.value = false;
 
     // Update the persistent showUI value
@@ -275,22 +276,59 @@ export const useConfigStore = defineStore("config", () => {
   };
 
   // Show UI temporarily (for accessing settings, etc.)
-  // This doesn't change the persistent showUI setting
-  const showUITemporarily = (durationSeconds = 60) => {
-    // Clear any existing timer
+  // This doesn't change the persistent showUI setting.
+  //
+  // The reveal is an inactivity window, not a hard cut-off: while the chrome is
+  // up, any user activity re-arms the hide timer (see the activity listeners
+  // below), so the UI never disappears out from under someone who is actively
+  // using it. It only hides after `durationSeconds` of genuine idle.
+  const UI_ACTIVITY_EVENTS = ["pointerdown", "pointermove", "keydown", "wheel", "touchstart"];
+  let temporaryUIDurationMs = 60000;
+  let lastUiActivityRearm = 0;
+  let uiActivityListening = false;
+
+  const armTemporaryUITimer = () => {
     if (temporaryUITimer.value) {
       clearTimeout(temporaryUITimer.value);
       temporaryUITimer.value = null;
     }
-
-    // Show UI temporarily
-    showUITemporary.value = true;
-
-    // Hide after duration
     temporaryUITimer.value = setTimeout(() => {
       showUITemporary.value = false;
       temporaryUITimer.value = null;
-    }, durationSeconds * 1000);
+      teardownUiActivityListeners();
+    }, temporaryUIDurationMs);
+  };
+
+  const onUiActivity = () => {
+    // Only meaningful while the temporary reveal is up; ignore otherwise.
+    if (!showUITemporary.value) return;
+    // Throttle re-arms — high-frequency events (pointermove) shouldn't churn the
+    // timer hundreds of times a second; a re-arm every 300ms keeps it alive.
+    const now = Date.now();
+    if (now - lastUiActivityRearm < 300) return;
+    lastUiActivityRearm = now;
+    armTemporaryUITimer();
+  };
+
+  const setupUiActivityListeners = () => {
+    if (uiActivityListening || typeof window === "undefined") return;
+    UI_ACTIVITY_EVENTS.forEach(event =>
+      window.addEventListener(event, onUiActivity, { passive: true })
+    );
+    uiActivityListening = true;
+  };
+
+  const teardownUiActivityListeners = () => {
+    if (!uiActivityListening || typeof window === "undefined") return;
+    UI_ACTIVITY_EVENTS.forEach(event => window.removeEventListener(event, onUiActivity));
+    uiActivityListening = false;
+  };
+
+  const showUITemporarily = (durationSeconds = 60) => {
+    temporaryUIDurationMs = durationSeconds * 1000;
+    showUITemporary.value = true;
+    setupUiActivityListeners();
+    armTemporaryUITimer();
   };
 
   // Computed property to determine if UI should be shown
