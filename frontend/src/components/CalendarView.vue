@@ -57,11 +57,7 @@
               <span class="calendar-header__view-caret" aria-hidden="true">▸</span>
             </button>
             <IconButton size="custom" label="Next" title="Next" @click="nextMonth"> › </IconButton>
-            <CalendarViewOptions
-              v-if="view && viewMode !== 'day'"
-              :region-id="regionId"
-              :view="view"
-            />
+            <CalendarViewOptions v-if="view" :region-id="regionId" :view="view" />
             <IconButton
               v-if="!isFullscreen"
               size="custom"

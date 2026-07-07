@@ -1,6 +1,10 @@
 <template>
   <RegionViewOptions :active="rolling" label="Calendar view options">
-    <div class="cvo-row">
+    <!-- Window + grid options only apply to multi-day views. A day view has no
+         window to size, no rolling toggle, and no week grid, so it shows Refresh
+         alone — but the tune button itself stays put across every view so it
+         doesn't blink in and out when you switch. -->
+    <div v-if="!isDay" class="cvo-row">
       <span class="cvo-label">{{ countLabel }}</span>
       <div class="cvo-stepper">
         <button type="button" aria-label="Decrease count" @click="step(-1)">−</button>
@@ -8,7 +12,7 @@
         <button type="button" aria-label="Increase count" @click="step(1)">+</button>
       </div>
     </div>
-    <div class="cvo-row">
+    <div v-if="!isDay" class="cvo-row">
       <span class="cvo-label">Rolling</span>
       <button
         type="button"
@@ -21,7 +25,7 @@
       />
     </div>
 
-    <div class="cvo-row">
+    <div v-if="!isDay" class="cvo-row">
       <span class="cvo-label">Week numbers</span>
       <div class="cvo-seg" role="radiogroup" aria-label="Week numbers">
         <button
@@ -133,6 +137,8 @@ const step = delta => {
 
 // --- Per-region display overrides (inherit the global config when unset) ---
 const isMonth = computed(() => props.view?.mode === "month");
+// A day view collapses the popover to just Refresh — no window/grid controls apply.
+const isDay = computed(() => props.view?.mode === "day");
 
 // Week numbers: tri-state where "default" means inherit (persisted as absent).
 const weekNumberOptions = [
