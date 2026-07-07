@@ -101,6 +101,7 @@ const keyFor = (item, i) => {
   align-items: baseline;
   gap: 0.9rem;
   flex-shrink: 0;
+  scroll-snap-align: start;
 }
 
 .item-list__row--clickable {

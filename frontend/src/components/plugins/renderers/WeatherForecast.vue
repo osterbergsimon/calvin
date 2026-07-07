@@ -287,6 +287,7 @@ function capitalize(value) {
   gap: 0.45rem;
   text-align: center;
   padding: 0.25rem 0.5rem;
+  scroll-snap-align: start;
 }
 
 .weather-forecast-renderer__item + .weather-forecast-renderer__item {
