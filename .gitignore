@@ -129,3 +129,6 @@ bandit-report.json
 
 # superpowers brainstorming visual companion (local only)
 .superpowers/
+
+# Playwright MCP session snapshots (scratch)
+.playwright-mcp/
