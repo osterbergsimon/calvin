@@ -10,13 +10,17 @@ from app.config import settings
 # rest of the loguru/InterceptHandler bridge.
 
 
+def _database_dialect(database: databases.Database):
+    return getattr(getattr(database, "_backend", None), "_dialect", None)
+
+
+if not hasattr(databases.Database, "dialect"):
+    databases.Database.dialect = property(_database_dialect)
+
+
 def ensure_database_dialect(database: databases.Database) -> databases.Database:
     """Expose the SQLAlchemy dialect where Ormar 0.21 expects it."""
 
-    if not hasattr(database, "dialect") and hasattr(database, "_backend"):
-        dialect = getattr(database._backend, "_dialect", None)
-        if dialect is not None:
-            database.dialect = dialect
     return database
 
 
@@ -39,6 +43,7 @@ metadata = MetaData()
 async def connect_db():
     """Connect to database and configure SQLite for better concurrency."""
     await database.connect()
+    ensure_database_dialect(database)
 
     # Enable WAL mode for better concurrency (allows multiple readers and one writer)
     # This significantly improves SQLite's ability to handle concurrent access
