@@ -115,8 +115,8 @@
     </div>
 
     <p v-else-if="isCalendarProvider" class="pc-provider-note">
-      This provider is available when adding a calendar source. Source name, URL, color,
-      ordering, and event-time display live under Content Sources / Calendars.
+      This provider is available when adding a calendar source. Source name, URL, color, ordering,
+      and event-time display live under Content Sources / Calendars.
     </p>
 
     <!-- Disabled note -->

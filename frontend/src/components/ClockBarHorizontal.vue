@@ -232,5 +232,4 @@ const roomLabel = computed(() => configStore.displayName);
   flex: 0 1 auto;
   min-width: 0;
 }
-
 </style>

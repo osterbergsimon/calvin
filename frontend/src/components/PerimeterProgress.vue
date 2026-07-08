@@ -9,17 +9,8 @@
     The beads always animate; the container's opacity gates *visibility* on the
     active state, so revealing the comet is a cheap fade with no layout churn.
   -->
-  <div
-    class="perimeter-progress"
-    :class="{ 'is-active': show }"
-    aria-hidden="true"
-  >
-    <span
-      v-for="i in beadCount"
-      :key="i"
-      class="perimeter-progress__bead"
-      :style="beadStyle(i)"
-    />
+  <div class="perimeter-progress" :class="{ 'is-active': show }" aria-hidden="true">
+    <span v-for="i in beadCount" :key="i" class="perimeter-progress__bead" :style="beadStyle(i)" />
   </div>
 </template>
 

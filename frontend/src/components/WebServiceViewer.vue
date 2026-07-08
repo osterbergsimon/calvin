@@ -25,8 +25,7 @@
         :focused="focused"
         :dim="dim"
       >
-        <template #actions>
-        </template>
+        <template #actions> </template>
         <div :class="emptyState.className">
           <div v-if="emptyState.loading" class="spinner" />
           <p>{{ emptyState.message }}</p>
@@ -51,7 +50,12 @@
               :view="view"
             />
             <IconButton
-              v-if="(focused || isFullscreen) && hasPointer && canNavigateServices && services.length > 1"
+              v-if="
+                (focused || isFullscreen) &&
+                hasPointer &&
+                canNavigateServices &&
+                services.length > 1
+              "
               size="custom"
               label="Previous Service"
               title="Previous Service"
@@ -60,7 +64,12 @@
               ‹
             </IconButton>
             <IconButton
-              v-if="(focused || isFullscreen) && hasPointer && canNavigateServices && services.length > 1"
+              v-if="
+                (focused || isFullscreen) &&
+                hasPointer &&
+                canNavigateServices &&
+                services.length > 1
+              "
               size="custom"
               label="Next Service"
               title="Next Service"

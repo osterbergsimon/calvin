@@ -49,10 +49,7 @@ export function computeFitBoundary(itemBounds, containerSize, epsilon = 1) {
 // Composable: measures `containerRef`'s children (`itemSelector`) along `axis`
 // and exposes reactive clamp outputs. vueuse's useResizeObserver owns the
 // observer lifecycle; this stays a thin measurement layer.
-export function useFitClamp(
-  containerRef,
-  { axis = "block", itemSelector, viewport = "self" }
-) {
+export function useFitClamp(containerRef, { axis = "block", itemSelector, viewport = "self" }) {
   const fits = ref(0);
   const fitCount = ref(0);
   const hasOverflow = ref(false);

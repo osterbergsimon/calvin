@@ -80,7 +80,10 @@ describe("CalendarView per-region view", () => {
   it("view-switch button cycles the region's base mode via updateRegionView", async () => {
     const cfg = useConfigStore();
     cfg.updateRegionView = vi.fn().mockResolvedValue();
-    const w = mountCalendar({ mode: "month", rolling: false, weeks: 4, days: 7 }, { focused: true });
+    const w = mountCalendar(
+      { mode: "month", rolling: false, weeks: 4, days: 7 },
+      { focused: true }
+    );
     await w.find(".calendar-header__view-switch").trigger("click");
     expect(cfg.updateRegionView).toHaveBeenCalledWith("r1", { mode: "week" });
   });

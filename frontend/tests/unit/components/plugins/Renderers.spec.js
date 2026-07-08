@@ -464,8 +464,18 @@ describe("WeatherForecast", () => {
           location: "Oslo",
           current: { temperature: 8, display: { icon: "mdi:weather-rainy" } },
           forecast: [
-            { date: "2099-01-01", temp_min: 2, temp_max: 9, display: { icon: "mdi:weather-cloudy" } },
-            { date: "2099-01-02", temp_min: 1, temp_max: 7, display: { icon: "mdi:weather-cloudy" } },
+            {
+              date: "2099-01-01",
+              temp_min: 2,
+              temp_max: 9,
+              display: { icon: "mdi:weather-cloudy" },
+            },
+            {
+              date: "2099-01-02",
+              temp_min: 1,
+              temp_max: 7,
+              display: { icon: "mdi:weather-cloudy" },
+            },
           ],
         },
       },

@@ -42,7 +42,10 @@ describe("useFitScroll", () => {
   });
 
   it("shadeClass adds the directional modifier only when pointer AND overflow", () => {
-    const { shadeClass, showShade } = useFitScroll(ref(null), { axis: "inline", itemSelector: ".x" });
+    const { shadeClass, showShade } = useFitScroll(ref(null), {
+      axis: "inline",
+      itemSelector: ".x",
+    });
     expect(showShade.value).toBe(false); // no overflow yet
     clamp.hasOverflow.value = true;
     expect(showShade.value).toBe(true);
