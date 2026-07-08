@@ -9,9 +9,26 @@ from app.config import settings
 # SQL logger configuration (CALVIN_SQL_ECHO) lives in app.main alongside the
 # rest of the loguru/InterceptHandler bridge.
 
+
+def ensure_database_dialect(database: databases.Database) -> databases.Database:
+    """Expose the SQLAlchemy dialect where Ormar 0.21 expects it."""
+
+    if not hasattr(database, "dialect") and hasattr(database, "_backend"):
+        dialect = getattr(database._backend, "_dialect", None)
+        if dialect is not None:
+            database.dialect = dialect
+    return database
+
+
+def create_database(url: str) -> databases.Database:
+    """Create a Database instance with Ormar compatibility shims applied."""
+
+    return ensure_database_dialect(databases.Database(url))
+
+
 # Create database connection for Ormar
 # Use absolute path to avoid path resolution issues
-database = databases.Database(
+database = create_database(
     settings.database_url_absolute.replace("sqlite:///", "sqlite+aiosqlite:///")
 )
 

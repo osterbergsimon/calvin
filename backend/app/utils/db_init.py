@@ -10,7 +10,7 @@ from pathlib import Path
 import databases
 from loguru import logger
 
-from app.database import metadata
+from app.database import create_database, ensure_database_dialect, metadata
 
 
 async def initialize_database(
@@ -41,7 +41,7 @@ async def initialize_database(
     # Create database connection if not provided
     if database is None:
         db_url = f"sqlite+aiosqlite:///{database_path.resolve()}"
-        database = databases.Database(db_url)
+        database = create_database(db_url)
         # Connect to database
         if not database.is_connected:
             await database.connect()
@@ -52,6 +52,8 @@ async def initialize_database(
                 await database.execute("PRAGMA synchronous=NORMAL")
             except Exception as e:
                 logger.warning(f"Failed to configure SQLite PRAGMA settings during init: {e}")
+    else:
+        ensure_database_dialect(database)
 
     # Import all models to ensure they're registered in metadata
     # This is needed for Alembic to know about the models
