@@ -1,0 +1,30 @@
+<?xml version="1.0"?>
+<Container version="2">
+  <Name>Calvin</Name>
+  <Repository>ghcr.io/osterbergsimon/calvin:latest</Repository>
+  <Registry>https://github.com/osterbergsimon/calvin/pkgs/container/calvin</Registry>
+  <Network>bridge</Network>
+  <MyIP/>
+  <Shell>sh</Shell>
+  <Privileged>false</Privileged>
+  <Support>https://github.com/osterbergsimon/calvin/issues</Support>
+  <Project>https://github.com/osterbergsimon/calvin</Project>
+  <Overview>Calvin is a self-hosted Raspberry Pi dashboard for calendars, photos, web services, and plugins. On Unraid, run this container as the backend and point one or more Raspberry Pi kiosk displays at the WebUI URL.</Overview>
+  <Category>HomeAutomation: Productivity: Tools:</Category>
+  <WebUI>http://[IP]:[PORT:8000]/</WebUI>
+  <TemplateURL>https://raw.githubusercontent.com/osterbergsimon/calvin/main/deploy/unraid/calvin.xml</TemplateURL>
+  <Icon>https://raw.githubusercontent.com/osterbergsimon/calvin/main/deploy/unraid/calvin-icon.svg</Icon>
+  <ExtraParams/>
+  <PostArgs/>
+  <CPUset/>
+  <DateInstalled/>
+  <DonateText/>
+  <DonateLink/>
+  <Requires/>
+  <Config Name="WebUI Port" Target="8000" Default="8000" Mode="tcp" Description="Host port for the Calvin web UI and API." Type="Port" Display="always" Required="true" Mask="false">8000</Config>
+  <Config Name="Appdata" Target="/var/lib/calvin" Default="/mnt/user/appdata/calvin" Mode="rw" Description="Persistent Calvin data: SQLite database, images, and installed plugins." Type="Path" Display="always" Required="true" Mask="false">/mnt/user/appdata/calvin</Config>
+  <Config Name="Database URL" Target="DATABASE_URL" Default="sqlite:////var/lib/calvin/db/calvin.db" Description="Database URL used by Calvin. The default stores SQLite inside Appdata." Type="Variable" Display="advanced" Required="true" Mask="false">sqlite:////var/lib/calvin/db/calvin.db</Config>
+  <Config Name="Image Directory" Target="IMAGE_DIR" Default="/var/lib/calvin/images" Description="Container path where Calvin stores and reads image files." Type="Variable" Display="advanced" Required="true" Mask="false">/var/lib/calvin/images</Config>
+  <Config Name="Plugin Directory" Target="PLUGIN_DIR" Default="/var/lib/calvin/plugins" Description="Container path where Calvin stores installed plugins." Type="Variable" Display="advanced" Required="true" Mask="false">/var/lib/calvin/plugins</Config>
+  <Config Name="CORS Origins" Target="CORS_ORIGINS" Default="http://localhost:8000" Description="Allowed CORS origins. Usually not needed for kiosk use because Calvin serves the frontend and API from the same origin." Type="Variable" Display="advanced" Required="false" Mask="false">http://localhost:8000</Config>
+</Container>

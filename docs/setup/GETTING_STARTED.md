@@ -103,6 +103,8 @@ backend; one or more Pis run only Chromium pointed at the server's
 URL. Move SQLite and photos off the SD card, share one backend across
 multiple displays.
 
+For Unraid, use the Docker template in [UNRAID.md](UNRAID.md).
+
 ```bash
 # Server: same Docker compose as Mode A.
 docker compose -f docker/docker-compose.yml up -d

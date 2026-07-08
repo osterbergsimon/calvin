@@ -75,8 +75,9 @@ the frontend. The Pi is genuinely "dumb."
 ### Setup
 
 **1. Server.** Run the standard backend deployment, but bind the port
-to a LAN-reachable interface. The simplest path is the same Docker
-compose used in Mode A:
+to a LAN-reachable interface. On Unraid, use the Docker template in
+[UNRAID.md](UNRAID.md). On a regular Linux server, the simplest path is
+the same Docker compose used in Mode A:
 
 ```bash
 # On the server (any Linux box with Docker):
