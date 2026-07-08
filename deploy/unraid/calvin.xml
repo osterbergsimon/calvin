@@ -1,7 +1,7 @@
 <?xml version="1.0"?>
 <Container version="2">
   <Name>Calvin</Name>
-  <Repository>ghcr.io/osterbergsimon/calvin:latest</Repository>
+  <Repository>ghcr.io/osterbergsimon/calvin:develop</Repository>
   <Registry>https://github.com/osterbergsimon/calvin/pkgs/container/calvin</Registry>
   <Network>bridge</Network>
   <MyIP/>
