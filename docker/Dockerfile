@@ -58,8 +58,7 @@ FROM python:3.12-slim AS runtime
 
 RUN apt-get update && apt-get install -y --no-install-recommends \
     curl \
-    && rm -rf /var/lib/apt/lists/* \
-    && pip install --no-cache-dir uv
+    && rm -rf /var/lib/apt/lists/*
 
 WORKDIR /app
 
@@ -68,7 +67,6 @@ COPY --from=backend-builder /build/.venv /app/.venv
 COPY --from=backend-builder /build/app /app/app
 COPY --from=backend-builder /build/alembic /app/alembic
 COPY --from=backend-builder /build/alembic.ini /app/alembic.ini
-COPY --from=backend-builder /build/pyproject.toml /app/
 
 # Frontend dist — FastAPI serves /assets/* and falls back to index.html
 # for SPA routing. Backend's main.py probes ../frontend/dist relative
@@ -82,11 +80,13 @@ ENV CALVIN_DATA_DIR=/var/lib/calvin \
     DATABASE_URL=sqlite:////var/lib/calvin/db/calvin.db \
     IMAGE_DIR=/var/lib/calvin/images \
     PLUGIN_DIR=/var/lib/calvin/plugins \
-    CALVIN_PORT=8000
+    CALVIN_PORT=8000 \
+    VIRTUAL_ENV=/app/.venv \
+    PATH="/app/.venv/bin:$PATH"
 
 EXPOSE 8000
 
 HEALTHCHECK --interval=30s --timeout=5s --start-period=15s --retries=3 \
     CMD curl -fsS http://localhost:8000/api/health || exit 1
 
-CMD ["/app/.venv/bin/python", "-m", "uvicorn", "app.main:app", "--host", "0.0.0.0", "--port", "8000"]
+CMD ["python", "-m", "uvicorn", "app.main:app", "--host", "0.0.0.0", "--port", "8000"]
