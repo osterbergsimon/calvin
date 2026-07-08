@@ -60,14 +60,17 @@ describe("PluginCard status line", () => {
     expect(w.find(".pc-dot--err").exists()).toBe(true);
   });
 
-  it("counts calendar sources without a run flag and shows no dot", () => {
+  it("shows calendar providers as managed from Content Sources", async () => {
     const cal = { id: "ical", name: "iCal", type: "calendar", enabled: true, _installed: true };
     const w = mountCard(cal, [
       { id: "a", enabled: true },
       { id: "b", enabled: true },
     ]);
-    expect(w.find(".pc-summary").text()).toBe("2 sources");
+    expect(w.find(".pc-summary").text()).toBe("2 sources managed in Content Sources");
     expect(w.find(".pc-dot").exists()).toBe(false);
+    expect(w.find(".pc-provider-note").text()).toContain("Content Sources / Calendars");
+    await w.find(".pc-btn--primary").trigger("click");
+    expect(w.emitted("manage-calendar-sources")?.length).toBe(1);
   });
 
   it("invites the first instance when none exist", () => {

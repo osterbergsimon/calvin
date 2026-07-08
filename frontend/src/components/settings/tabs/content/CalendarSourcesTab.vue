@@ -13,6 +13,9 @@
     <div class="cst-form-row">
       <label class="cst-label" for="cst-type">Type</label>
       <select id="cst-type" v-model="newSource.type" class="cst-select">
+        <option v-if="calendarPluginTypes.length === 0" value="" disabled>
+          No calendar types available
+        </option>
         <option v-for="t in calendarPluginTypes" :key="t.id" :value="t.id">
           {{ t.name }}
         </option>
@@ -180,7 +183,7 @@ const loadCalendarPluginTypes = async () => {
   try {
     const response = await pluginsApi.getPlugins({ plugin_type: "calendar" });
     calendarPluginTypes.value = (response.plugins || [])
-      .filter(p => p.enabled !== false)
+      .filter(p => !p.error_message)
       .map(p => ({ id: p.id, name: p.name, description: p.description }));
     if (calendarPluginTypes.value.length > 0 && !newSource.value.type) {
       newSource.value.type = calendarPluginTypes.value[0].id;
@@ -285,7 +288,10 @@ const sourcesWithStatus = computed(() =>
 const newSource = ref({ type: "", name: "", ical_url: "" });
 
 const canAdd = computed(
-  () => newSource.value.name.trim() !== "" && newSource.value.ical_url.trim() !== ""
+  () =>
+    newSource.value.type !== "" &&
+    newSource.value.name.trim() !== "" &&
+    newSource.value.ical_url.trim() !== ""
 );
 
 const handleAdd = async () => {

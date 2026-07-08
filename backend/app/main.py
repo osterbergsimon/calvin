@@ -577,6 +577,48 @@ if frontend_dist.exists():
     else:
         logger.warning(f"Assets directory not found: {assets_dir}")
 
+    # Serve Vite public/ root assets (favicon, PWA manifest, touch icons) before
+    # the SPA catch-all. Without this, /favicon.svg returns index.html.
+    async def serve_frontend_public_file(file_name: str):
+        public_path = frontend_dist / file_name
+        if public_path.exists() and public_path.is_file():
+            return FileResponse(
+                str(public_path),
+                headers={
+                    "Cache-Control": "no-cache, no-store, must-revalidate",
+                    "Pragma": "no-cache",
+                    "Expires": "0",
+                },
+            )
+
+        from fastapi import HTTPException
+
+        raise HTTPException(status_code=404, detail="Not found")
+
+    @app.api_route("/favicon.svg", methods=["GET", "HEAD"], include_in_schema=False)
+    async def serve_favicon_svg():
+        return await serve_frontend_public_file("favicon.svg")
+
+    @app.api_route("/apple-touch-icon.png", methods=["GET", "HEAD"], include_in_schema=False)
+    async def serve_apple_touch_icon():
+        return await serve_frontend_public_file("apple-touch-icon.png")
+
+    @app.api_route("/site.webmanifest", methods=["GET", "HEAD"], include_in_schema=False)
+    async def serve_site_webmanifest():
+        return await serve_frontend_public_file("site.webmanifest")
+
+    @app.api_route("/icon-192.png", methods=["GET", "HEAD"], include_in_schema=False)
+    async def serve_icon_192():
+        return await serve_frontend_public_file("icon-192.png")
+
+    @app.api_route("/icon-512.png", methods=["GET", "HEAD"], include_in_schema=False)
+    async def serve_icon_512():
+        return await serve_frontend_public_file("icon-512.png")
+
+    @app.api_route("/sw.js", methods=["GET", "HEAD"], include_in_schema=False)
+    async def serve_service_worker():
+        return await serve_frontend_public_file("sw.js")
+
     # Serve index.html for root path
     @app.get("/", operation_id="root__get", summary="Root")
     async def serve_frontend_root():

@@ -98,7 +98,9 @@ data/db/
 backend/data/db/
 backend/data/cache/
 backend/data/plugins/
-backend/data/themes/
+backend/data/themes/*
+!backend/data/themes/
+!backend/data/themes/builtin.json
 
 # Documentation
 docs/archive/

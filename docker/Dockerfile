@@ -67,6 +67,7 @@ COPY --from=backend-builder /build/.venv /app/.venv
 COPY --from=backend-builder /build/app /app/app
 COPY --from=backend-builder /build/alembic /app/alembic
 COPY --from=backend-builder /build/alembic.ini /app/alembic.ini
+COPY backend/data/themes/builtin.json /app/data/themes/builtin.json
 
 # Frontend dist — FastAPI serves /assets/* and falls back to index.html
 # for SPA routing. Backend's main.py probes ../frontend/dist relative

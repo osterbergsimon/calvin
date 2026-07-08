@@ -1,5 +1,5 @@
 <template>
-  <div class="pc-card" :class="{ 'pc-card--off': !plugin.enabled }">
+  <div class="pc-card" :class="{ 'pc-card--off': !plugin.enabled && !isCalendarProvider }">
     <!-- Header: identity + enable -->
     <div class="pc-head">
       <span
@@ -13,6 +13,7 @@
       <span class="pc-badge">{{ plugin.type }}</span>
       <span class="pc-spacer" />
       <ToggleSwitch
+        v-if="!isCalendarProvider"
         :model-value="plugin.enabled"
         :aria-label="`Enable ${plugin.name}`"
         @update:model-value="$emit('toggle-enabled', plugin.id, $event)"
@@ -24,7 +25,15 @@
       <span class="pc-summary">{{ statusSummary }}</span>
       <div class="pc-actions">
         <button
-          v-if="hasSettings && plugin.enabled"
+          v-if="isCalendarProvider"
+          type="button"
+          class="pc-btn pc-btn--primary"
+          @click="$emit('manage-calendar-sources')"
+        >
+          Manage calendar sources
+        </button>
+        <button
+          v-if="!isCalendarProvider && hasSettings && plugin.enabled"
           type="button"
           class="pc-btn"
           :class="{ 'pc-btn--on': expanded }"
@@ -48,7 +57,7 @@
     </div>
 
     <!-- Body: config (when enabled + expanded) -->
-    <div v-if="plugin.enabled && expanded" class="pc-body">
+    <div v-if="!isCalendarProvider && plugin.enabled && expanded" class="pc-body">
       <div v-if="hasGlobalSettings" class="pc-section">
         <h4 class="pc-section-title">Settings</h4>
         <div v-for="(schema, key) in globalConfigSchema" :key="key" class="pc-field">
@@ -104,6 +113,11 @@
         @order-change="handleInstanceOrderChange"
       />
     </div>
+
+    <p v-else-if="isCalendarProvider" class="pc-provider-note">
+      This provider is available when adding a calendar source. Source name, URL, color,
+      ordering, and event-time display live under Content Sources / Calendars.
+    </p>
 
     <!-- Disabled note -->
     <p v-else-if="!plugin.enabled" class="pc-disabled">
@@ -193,6 +207,7 @@ const emit = defineEmits([
   "delete-instance",
   "toggle-instance",
   "instance-order-change",
+  "manage-calendar-sources",
   "upload",
   "delete-image",
 ]);
@@ -209,11 +224,14 @@ const instanceNoun = computed(
     props.plugin.instance_label?.toLowerCase() || instanceLabelMap[props.plugin.type] || "instance"
 );
 
+const isCalendarProvider = computed(() => props.plugin.type === "calendar");
+
 const hasSettings = computed(
   () =>
-    Object.keys(props.plugin.config_schema || {}).length > 0 ||
-    Object.keys(props.plugin.instance_config_schema || {}).length > 0 ||
-    props.instances.length > 0
+    !isCalendarProvider.value &&
+    (Object.keys(props.plugin.config_schema || {}).length > 0 ||
+      Object.keys(props.plugin.instance_config_schema || {}).length > 0 ||
+      props.instances.length > 0)
 );
 
 const globalConfigSchema = computed(() => getGlobalConfigSchema(props.plugin));
@@ -243,6 +261,11 @@ const runningCount = computed(() => props.instances.filter(i => i.running).lengt
 // The one piece of live information in this view: each plugin's operational
 // state at a glance, without expanding it.
 const statusSummary = computed(() => {
+  if (isCalendarProvider.value) {
+    const n = props.instances.length;
+    if (n === 0) return "Available for new calendar sources";
+    return `${n} source${n === 1 ? "" : "s"} managed in Content Sources`;
+  }
   if (!props.plugin.enabled) return "Disabled";
   if (props.plugin.type === "theme") return "Theme";
   if (!showInstances.value) return hasGlobalSettings.value ? "Ready" : "Active";
@@ -259,6 +282,7 @@ const statusSummary = computed(() => {
 // Header dot reflects aggregate running health; hidden when there's nothing
 // running to report (disabled, no instances, or sources without a run flag).
 const statusDot = computed(() => {
+  if (isCalendarProvider.value) return null;
   if (!props.plugin.enabled) return null;
   if (!hasRunningInfo.value || props.instances.length === 0) return null;
   if (runningCount.value === props.instances.length) return "ok";
@@ -421,6 +445,10 @@ const handleInstanceOrderChange = newOrder =>
   border-color: var(--focus);
   background: color-mix(in srgb, var(--focus) 12%, var(--bg-1));
 }
+.pc-btn--primary {
+  border-color: var(--focus-edge);
+  background: color-mix(in srgb, var(--focus) 12%, var(--bg-1));
+}
 .pc-btn--danger {
   color: var(--err);
 }
@@ -468,6 +496,14 @@ const handleInstanceOrderChange = newOrder =>
   font-family: var(--font-ui);
   font-size: 0.85rem;
   color: var(--ink-3);
+  line-height: 1.5;
+}
+.pc-provider-note {
+  margin: 0;
+  padding: 0 1.25rem 0.9rem;
+  font-family: var(--font-ui);
+  font-size: 0.85rem;
+  color: var(--ink-2);
   line-height: 1.5;
 }
 

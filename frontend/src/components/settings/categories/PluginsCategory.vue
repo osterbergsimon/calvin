@@ -61,6 +61,7 @@
         @delete-instance="handleDeleteInstance"
         @toggle-instance="handleToggleInstance"
         @instance-order-change="handleInstanceOrderChange"
+        @manage-calendar-sources="handleManageCalendarSources"
         @upload="handleUpload"
         @delete-image="handleDeleteImage"
       />
@@ -119,6 +120,7 @@
 
 <script setup>
 import { ref, computed, onMounted } from "vue";
+import { useRoute, useRouter } from "vue-router";
 import { usePlugins } from "@/composables";
 import { useSystem } from "@/composables";
 import { useConfigStore } from "@/stores/config";
@@ -175,6 +177,8 @@ const {
 const { restartBackend } = useSystem();
 const configStore = useConfigStore();
 const imagesStore = useImagesStore();
+const route = useRoute();
+const router = useRouter();
 
 // Local state
 const activePluginTab = ref("calendar");
@@ -329,6 +333,10 @@ const handleToggleExpand = pluginId => {
 
 const handleToggleEnabled = async (pluginId, enabled) => {
   await togglePlugin(pluginId, enabled);
+};
+
+const handleManageCalendarSources = () => {
+  router.replace({ query: { ...route.query, setting: "content-calendars" } });
 };
 
 const handleUninstall = (pluginId, pluginType) => {

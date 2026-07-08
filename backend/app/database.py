@@ -15,7 +15,7 @@ def _database_dialect(database: databases.Database):
 
 
 if not hasattr(databases.Database, "dialect"):
-    databases.Database.dialect = property(_database_dialect)
+    setattr(databases.Database, "dialect", property(_database_dialect))
 
 
 def ensure_database_dialect(database: databases.Database) -> databases.Database:

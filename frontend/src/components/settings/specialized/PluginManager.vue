@@ -55,6 +55,7 @@
         @delete-instance="handleDeleteInstance"
         @toggle-instance="handleToggleInstance"
         @instance-order-change="handleInstanceOrderChange"
+        @manage-calendar-sources="$emit('manage-calendar-sources')"
         @upload="handleUpload"
         @delete-image="handleDeleteImage"
       />
@@ -154,6 +155,7 @@ const emit = defineEmits([
   "delete-instance",
   "toggle-instance",
   "instance-order-change",
+  "manage-calendar-sources",
   "upload",
   "delete-image",
 ]);

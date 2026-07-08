@@ -186,7 +186,7 @@ const activeScreenId = computed(() => getActiveDashboardScreen(screensConfig.val
   align-items: stretch;
   gap: 0.75rem;
   position: relative;
-  z-index: 100;
+  z-index: 200;
   user-select: none;
   flex-shrink: 0;
   box-sizing: border-box;
@@ -199,6 +199,7 @@ const activeScreenId = computed(() => getActiveDashboardScreen(screensConfig.val
 }
 
 .clock-bar-vertical.position-between {
+  z-index: 100;
   border: none;
   background: rgba(0, 0, 0, 0.05);
   border-radius: 4px;

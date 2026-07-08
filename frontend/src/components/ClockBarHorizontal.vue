@@ -142,7 +142,8 @@ const roomLabel = computed(() => configStore.displayName);
   display: flex;
   align-items: center;
   justify-content: center;
-  z-index: 100;
+  position: relative;
+  z-index: 200;
   user-select: none;
   flex: 0 0 auto;
   box-sizing: border-box;
@@ -155,6 +156,7 @@ const roomLabel = computed(() => configStore.displayName);
 }
 
 .clock-bar-horizontal.position-between {
+  z-index: 100;
   border: none;
   background: rgba(0, 0, 0, 0.05);
   border-radius: 4px;

@@ -1,0 +1,14 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 32 32" role="img" aria-label="Calvin">
+  <defs>
+    <linearGradient id="tile" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0" stop-color="#1b242b"/>
+      <stop offset="1" stop-color="#0e1316"/>
+    </linearGradient>
+  </defs>
+  <rect x="0" y="0" width="32" height="32" rx="6.5" fill="url(#tile)"/>
+  <!-- Geometric "C": a near-full ring open on the right, echoing the CAL·VIN wordmark. -->
+  <path d="M19.05 9.5 A8 8 0 1 0 19.05 22.5"
+        fill="none" stroke="#eaf0f3" stroke-width="3.7" stroke-linecap="round"/>
+  <!-- The signature amber interpunct, cradled in the mouth of the C. -->
+  <circle cx="22.6" cy="16" r="3.15" fill="#f3b052"/>
+</svg>
