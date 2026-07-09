@@ -207,7 +207,7 @@ const handleFocus = () => {
   outline: 2px solid #fff; /* Keep white for contrast on colored event backgrounds */
   outline-offset: -2px;
   border-color: #fff; /* Keep white for contrast on colored event backgrounds */
-  box-shadow: 0 0 0 2px var(--accent-primary);
+  box-shadow: 0 0 0 2px var(--focus);
   z-index: 10;
   position: relative;
 }
@@ -216,7 +216,7 @@ const handleFocus = () => {
   outline: 2px solid #fff; /* Keep white for contrast on colored event backgrounds */
   outline-offset: -2px;
   border-color: #fff; /* Keep white for contrast on colored event backgrounds */
-  box-shadow: 0 0 0 2px var(--accent-primary);
+  box-shadow: 0 0 0 2px var(--focus);
   z-index: 10;
   position: relative;
 }
@@ -229,7 +229,7 @@ const handleFocus = () => {
 
 .event-item.selected {
   border: 2px solid #fff;
-  box-shadow: 0 0 0 3px color-mix(in srgb, var(--accent-primary) 80%, transparent);
+  box-shadow: 0 0 0 3px color-mix(in srgb, var(--focus) 80%, transparent);
 }
 
 /* Responsive styles for smaller screens and portrait mode */

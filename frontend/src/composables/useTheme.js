@@ -14,6 +14,35 @@ function normalizeThemeId(id) {
   return id;
 }
 
+const THEME_VARIABLE_KEYS = [
+  "shadow",
+  "shadow-hover",
+  "bg-0",
+  "bg-1",
+  "bg-2",
+  "line",
+  "line-soft",
+  "ink",
+  "ink-2",
+  "ink-3",
+  "focus",
+  "focus-ink",
+  "ok",
+  "warn",
+  "err",
+];
+
+const appliedCustomThemeKeys = new Set();
+
+function clearCustomThemeVariables() {
+  if (typeof window === "undefined") return;
+  const root = document.documentElement;
+  for (const key of new Set([...THEME_VARIABLE_KEYS, ...appliedCustomThemeKeys])) {
+    root.style.removeProperty(`--${key}`);
+  }
+  appliedCustomThemeKeys.clear();
+}
+
 /**
  * Composable for managing theme (dark mode and custom themes).
  * Supports manual toggle, time-based, system theme detection, and custom theme selection.
@@ -75,19 +104,15 @@ export function useTheme() {
       const theme = await themesStore.getTheme(themeId);
       if (!theme || !theme.variables) return;
 
+      clearCustomThemeVariables();
+
       const root = document.documentElement;
-      const variables = theme.variables;
+      const variables = { ...theme.variables, ...(isDark.value ? theme.dark_mode || {} : {}) };
 
-      // Apply light mode variables
       for (const [key, value] of Object.entries(variables)) {
+        if (!THEME_VARIABLE_KEYS.includes(key)) continue;
         root.style.setProperty(`--${key}`, value);
-      }
-
-      // Apply dark mode variables if available
-      if (theme.dark_mode && isDark.value) {
-        for (const [key, value] of Object.entries(theme.dark_mode)) {
-          root.style.setProperty(`--${key}`, value);
-        }
+        appliedCustomThemeKeys.add(key);
       }
 
       // The focus-light glow stays Calvin's signature amber unless a theme opts
@@ -122,9 +147,9 @@ export function useTheme() {
     if (selectedThemeId.value) {
       await applyCustomTheme(selectedThemeId.value);
     } else {
-      // No custom theme: clear the theme-applied accent override so the default
-      // (amber, from theme.css) focus accent applies again.
-      document.documentElement.style.removeProperty("--focus");
+      // No custom theme: clear inline custom variables so the .light/.dark
+      // defaults in theme.css can take over again.
+      clearCustomThemeVariables();
     }
   };
 
@@ -237,6 +262,8 @@ export function useTheme() {
   watch(selectedThemeId, async newThemeId => {
     if (newThemeId) {
       await applyCustomTheme(newThemeId);
+    } else {
+      await applyTheme(isDark.value);
     }
     await saveTheme();
   });

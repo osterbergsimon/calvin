@@ -293,7 +293,7 @@ watch(sourceKey, async () => {
 }
 
 .error-message {
-  color: var(--accent-error);
+  color: var(--err);
   font-size: 0.9rem;
   margin: 0;
   padding: 0;
@@ -317,7 +317,7 @@ watch(sourceKey, async () => {
 
 .photo-placeholder {
   text-align: center;
-  color: var(--text-secondary);
+  color: var(--ink-2);
 }
 
 .photo-placeholder p {

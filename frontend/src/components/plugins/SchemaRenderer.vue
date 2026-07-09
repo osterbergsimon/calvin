@@ -44,7 +44,7 @@ const scaled = computed(() => props.context === "panel" && !UNSCALED_KINDS.has(p
 <style scoped>
 .schema-renderer--unknown {
   padding: 0.5rem;
-  color: var(--text-secondary);
+  color: var(--ink-2);
   font-size: 0.85em;
   font-style: italic;
 }

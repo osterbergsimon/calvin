@@ -148,7 +148,7 @@
         :href="ui.help_link"
         target="_blank"
         rel="noopener noreferrer"
-        style="color: var(--accent-primary); text-decoration: underline"
+        style="color: var(--focus); text-decoration: underline"
       >
         {{ ui.help_link }}
       </a>
@@ -229,7 +229,7 @@ async function runScan() {
   display: block;
   margin-bottom: 0.5rem;
   font-weight: 500;
-  color: var(--text-primary);
+  color: var(--ink);
 }
 
 .directory-input {
@@ -247,9 +247,9 @@ async function runScan() {
 }
 
 .btn-secondary {
-  background: var(--bg-tertiary);
-  color: var(--text-primary);
-  border: 1px solid var(--border-color);
+  background: var(--bg-0);
+  color: var(--ink);
+  border: 1px solid var(--line);
   border-radius: 4px;
   padding: 0.75rem 1.5rem;
   font-size: 0.9rem;
@@ -259,8 +259,8 @@ async function runScan() {
 }
 
 .btn-secondary:hover:not(:disabled) {
-  background: var(--bg-secondary);
-  border-color: var(--accent-primary);
+  background: var(--bg-2);
+  border-color: var(--focus);
 }
 
 .btn-secondary:disabled {
@@ -271,32 +271,32 @@ async function runScan() {
 .form-input {
   width: 100%;
   padding: 0.75rem;
-  border: 1px solid var(--input-border);
+  border: 1px solid var(--line);
   border-radius: 4px;
-  background: var(--bg-secondary);
-  color: var(--text-primary);
+  background: var(--bg-2);
+  color: var(--ink);
   font-size: 0.9rem;
   transition: border-color 0.2s ease;
 }
 
 .form-input:focus {
   outline: none;
-  border-color: var(--accent-primary);
+  border-color: var(--focus);
 }
 
 .form-input::placeholder {
-  color: var(--text-secondary);
+  color: var(--ink-2);
 }
 
 .help-text {
   font-size: 0.875rem;
-  color: var(--text-secondary);
+  color: var(--ink-2);
   margin-top: 0.5rem;
   display: block;
 }
 
 .help-text a {
-  color: var(--accent-primary);
+  color: var(--focus);
   text-decoration: underline;
 }
 
@@ -315,7 +315,7 @@ async function runScan() {
 }
 
 .checkbox-text {
-  color: var(--text-primary);
+  color: var(--ink);
   font-size: 0.9rem;
 }
 

@@ -1118,7 +1118,7 @@ onActivated(() => {
   height: 100%;
   display: flex;
   flex-direction: column;
-  background: var(--calendar-bg);
+  background: var(--bg-1);
   border-radius: 8px;
   overflow: visible; /* let the focused panel glow bloom out */
   outline: none;
@@ -1273,7 +1273,7 @@ onActivated(() => {
   left: 0;
   right: 0;
   bottom: 0;
-  background: var(--bg-primary);
+  background: var(--bg-1);
   opacity: 0.9;
   display: flex;
   align-items: center;
@@ -1292,14 +1292,14 @@ onActivated(() => {
 .spinner {
   width: 40px;
   height: 40px;
-  border: 4px solid var(--border-color);
-  border-top: 4px solid var(--accent-primary);
+  border: 4px solid var(--line);
+  border-top: 4px solid var(--focus);
   border-radius: 50%;
   animation: spin 1s linear infinite;
 }
 
 .loading-text {
-  color: var(--text-secondary);
+  color: var(--ink-2);
   font-size: 0.9rem;
   font-weight: 500;
 }
@@ -1325,7 +1325,7 @@ onActivated(() => {
   display: flex;
   flex-direction: column;
   height: 100%;
-  background: var(--calendar-bg);
+  background: var(--bg-1);
   border-radius: 8px;
   padding: 0.5rem;
   min-height: 0;
@@ -1363,7 +1363,7 @@ onActivated(() => {
   text-align: center;
   font-weight: 600;
   font-size: 0.9rem;
-  color: var(--text-secondary);
+  color: var(--ink-2);
   padding: 0.5rem;
   min-width: 0;
   overflow: hidden;
@@ -1420,7 +1420,7 @@ onActivated(() => {
 }
 
 .calendar-day {
-  border: 1px solid var(--border-color);
+  border: 1px solid var(--line);
   border-radius: 4px;
   padding: 0.5rem;
   min-height: 0;
@@ -1429,7 +1429,7 @@ onActivated(() => {
   width: 100%;
   display: flex;
   flex-direction: column;
-  background: var(--calendar-bg) !important;
+  background: var(--bg-1) !important;
   transition: background 0.2s;
   position: relative;
   overflow: hidden;
@@ -1442,7 +1442,7 @@ onActivated(() => {
 }
 
 .calendar-day:hover {
-  background: var(--bg-secondary) !important;
+  background: var(--bg-2) !important;
 }
 
 /* Reset any inherited backgrounds - but allow week-number to have its own background */
@@ -1459,24 +1459,24 @@ onActivated(() => {
 
 /* Force reset background for all calendar days (except other-month and today) */
 .calendar-day:not(.other-month):not(.today) {
-  background: var(--calendar-bg) !important;
+  background: var(--bg-1) !important;
 }
 
 .calendar-day.today {
-  border: 2px solid var(--accent-primary);
-  background: var(--calendar-today-bg) !important;
+  border: 2px solid var(--focus);
+  background: color-mix(in srgb, var(--focus) 12%, var(--bg-1)) !important;
   opacity: 1 !important;
 }
 
 /* Ensure today's day doesn't have other-month styling */
 .calendar-day.today.other-month {
   opacity: 1 !important;
-  background: var(--calendar-today-bg) !important;
+  background: color-mix(in srgb, var(--focus) 12%, var(--bg-1)) !important;
 }
 
 /* Ensure current month days don't have grey background */
 .calendar-day:not(.other-month) {
-  background: var(--calendar-bg) !important;
+  background: var(--bg-1) !important;
   opacity: 1 !important;
 }
 
@@ -1519,7 +1519,7 @@ onActivated(() => {
 .day-number {
   font-weight: 600;
   font-size: 0.9rem;
-  color: var(--text-primary);
+  color: var(--ink);
   flex-shrink: 0;
   white-space: nowrap;
 }
@@ -1557,8 +1557,8 @@ onActivated(() => {
 .event-overflow-indicator {
   font-size: 0.7rem;
   padding: 0.15rem 0.35rem;
-  background: var(--bg-secondary);
-  color: var(--text-secondary);
+  background: var(--bg-2);
+  color: var(--ink-2);
   border-radius: 3px;
   text-align: center;
   cursor: default;

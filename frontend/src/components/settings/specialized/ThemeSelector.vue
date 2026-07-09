@@ -71,13 +71,13 @@ const handleThemeSelect = themeId => {
 const getThemePreviewStyle = theme => {
   // Extract CSS variables from theme if available
   const vars = theme.variables || {};
-  const bgPrimary = vars["bg-primary"] || "#ffffff";
-  const bgSecondary = vars["bg-secondary"] || "#f5f5f5";
-  const accentPrimary = vars["accent-primary"] || "#2196f3";
+  const bgPrimary = vars["bg-1"] || "#ffffff";
+  const bgSecondary = vars["bg-2"] || "#f5f5f5";
+  const accentPrimary = vars.focus || "#e08a1e";
 
   return {
     background: `linear-gradient(135deg, ${bgPrimary} 0%, ${bgSecondary} 50%, ${accentPrimary} 100%)`,
-    color: vars["text-primary"] || "#333333",
+    color: vars.ink || "#1b242b",
   };
 };
 </script>

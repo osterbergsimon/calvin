@@ -640,7 +640,7 @@ const handleSave = async () => {
   padding: 0.5rem 0.75rem;
   background: var(--bg-2);
   color: var(--ink);
-  border: 1px solid var(--input-border);
+  border: 1px solid var(--line);
   border-radius: 4px;
   font-size: 0.9rem;
   font-family: inherit;

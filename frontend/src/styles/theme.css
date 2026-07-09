@@ -1,35 +1,5 @@
 /* Theme CSS Variables */
 :root {
-  /* Light theme colors */
-  --bg-primary: #ffffff;
-  --bg-secondary: #f5f5f5;
-  --bg-tertiary: #f9f9f9;
-  --text-primary: #333333;
-  --text-secondary: #666666;
-  --text-tertiary: #999999;
-  --border-color: #e0e0e0;
-  /* Form-field border. Kept distinct from --border-color so dark mode can lift
-     it to a WCAG 1.4.11 (3:1) contrast without heavying every hairline. */
-  --input-border: var(--border-color);
-  --shadow: rgba(0, 0, 0, 0.1);
-  --shadow-hover: rgba(0, 0, 0, 0.15);
-
-  /* Accent colors */
-  --accent-primary: #2196f3;
-  --accent-secondary: #4caf50;
-  --accent-warning: #ff9800;
-  --accent-error: #f44336;
-
-  /* Calendar colors */
-  --calendar-bg: #ffffff;
-  --calendar-today-bg: #e3f2fd;
-  --calendar-event-bg: #2196f3;
-  --calendar-event-text: #ffffff;
-
-  /* Mode indicator */
-  --indicator-bg: rgba(0, 0, 0, 0.7);
-  --indicator-border: rgba(255, 255, 255, 0.3);
-
   /* --- Redesign semantic tokens (light / "Paper") --- */
   --bg-0: #eef1f4;
   --bg-1: #ffffff;
@@ -49,6 +19,8 @@
   --ok: #2e9e6b;
   --warn: #c8860a;
   --err: #c0392b;
+  --shadow: rgba(0, 0, 0, 0.1);
+  --shadow-hover: rgba(0, 0, 0, 0.15);
 
   /* Content-kind accent strips (regions editor, source legends, …). Semantic
      identity colors — calendar = green, photos = blue, service = orange. */
@@ -134,36 +106,6 @@
 }
 
 .dark {
-  /* Dark theme colors */
-  --bg-primary: #1a1a1a;
-  --bg-secondary: #2d2d2d;
-  --bg-tertiary: #3a3a3a;
-  --text-primary: #e0e0e0;
-  --text-secondary: #b0b0b0;
-  --text-tertiary: #808080;
-  --border-color: #404040;
-  /* ~3.5:1 against the dark input/panel backgrounds so fields are visibly
-     bounded at rest (WCAG 1.4.11). See --input-border in :root. */
-  --input-border: #6b7a87;
-  --shadow: rgba(0, 0, 0, 0.3);
-  --shadow-hover: rgba(0, 0, 0, 0.4);
-
-  /* Accent colors (slightly adjusted for dark mode) */
-  --accent-primary: #42a5f5;
-  --accent-secondary: #66bb6a;
-  --accent-warning: #ffa726;
-  --accent-error: #ef5350;
-
-  /* Calendar colors */
-  --calendar-bg: #1a1a1a;
-  --calendar-today-bg: #1e3a5f;
-  --calendar-event-bg: #42a5f5;
-  --calendar-event-text: #ffffff;
-
-  /* Mode indicator */
-  --indicator-bg: rgba(255, 255, 255, 0.2);
-  --indicator-border: rgba(255, 255, 255, 0.4);
-
   /* --- Redesign semantic tokens (dark / "Backlit") --- */
   --bg-0: #0e1316;
   --bg-1: #151c21;
@@ -180,12 +122,14 @@
   --ok: #5bd0a0;
   --warn: #f3b052;
   --err: #ef6b5e;
+  --shadow: rgba(0, 0, 0, 0.3);
+  --shadow-hover: rgba(0, 0, 0, 0.4);
 }
 
 /* Apply theme variables globally */
 body {
-  background-color: var(--bg-primary);
-  color: var(--text-primary);
+  background-color: var(--bg-0);
+  color: var(--ink);
   transition:
     background-color 0.3s ease,
     color 0.3s ease;
@@ -193,27 +137,27 @@ body {
 
 /* Utility classes for theme-aware components */
 .bg-primary {
-  background-color: var(--bg-primary);
+  background-color: var(--bg-1);
 }
 
 .bg-secondary {
-  background-color: var(--bg-secondary);
+  background-color: var(--bg-2);
 }
 
 .bg-tertiary {
-  background-color: var(--bg-tertiary);
+  background-color: var(--bg-0);
 }
 
 .text-primary {
-  color: var(--text-primary);
+  color: var(--ink);
 }
 
 .text-secondary {
-  color: var(--text-secondary);
+  color: var(--ink-2);
 }
 
 .border-theme {
-  border-color: var(--border-color);
+  border-color: var(--line);
 }
 
 .shadow-theme {

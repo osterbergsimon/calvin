@@ -146,7 +146,7 @@ const handleAction = _action => {
 }
 
 .btn-primary {
-  background: var(--accent-secondary);
+  background: var(--focus);
   color: #fff;
   border: none;
   border-radius: 4px;
@@ -168,9 +168,9 @@ const handleAction = _action => {
 }
 
 .btn-secondary {
-  background: var(--bg-tertiary);
-  color: var(--text-primary);
-  border: 1px solid var(--border-color);
+  background: var(--bg-0);
+  color: var(--ink);
+  border: 1px solid var(--line);
   border-radius: 4px;
   padding: 0.75rem 1.5rem;
   font-size: 0.9rem;
@@ -179,8 +179,8 @@ const handleAction = _action => {
 }
 
 .btn-secondary:hover:not(:disabled) {
-  background: var(--bg-secondary);
-  border-color: var(--accent-primary);
+  background: var(--bg-2);
+  border-color: var(--focus);
 }
 
 .btn-secondary:disabled {
@@ -197,7 +197,7 @@ const handleAction = _action => {
 }
 
 .error-message {
-  background: var(--accent-error, #ef4444);
+  background: var(--err);
   color: #fff;
   padding: 0.5rem 1rem;
   border-radius: 4px;

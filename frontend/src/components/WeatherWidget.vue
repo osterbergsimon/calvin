@@ -170,22 +170,22 @@ const capitalize = str => {
 .weather-header h3 {
   margin: 0;
   font-size: 1.5rem;
-  color: var(--text-primary);
+  color: var(--ink);
 }
 
 .btn-refresh {
-  background: var(--bg-secondary);
-  border: 1px solid var(--border-color);
+  background: var(--bg-2);
+  border: 1px solid var(--line);
   border-radius: 4px;
   padding: 0.5rem 0.75rem;
   font-size: 1.2rem;
   cursor: pointer;
-  color: var(--text-primary);
+  color: var(--ink);
   transition: all 0.2s;
 }
 
 .btn-refresh:hover {
-  background: var(--bg-tertiary);
+  background: var(--bg-0);
   transform: rotate(90deg);
 }
 
@@ -201,7 +201,7 @@ const capitalize = str => {
   align-items: center;
   gap: 0.75rem;
   padding: 1.5rem;
-  background: var(--bg-secondary);
+  background: var(--bg-2);
   border-radius: 8px;
   flex-shrink: 0;
 }
@@ -220,19 +220,19 @@ const capitalize = str => {
 .temp-value {
   font-size: 3rem;
   font-weight: 700;
-  color: var(--text-primary);
+  color: var(--ink);
   line-height: 1;
 }
 
 .temp-unit {
   font-size: 2rem;
   font-weight: 500;
-  color: var(--text-secondary);
+  color: var(--ink-2);
 }
 
 .weather-desc {
   font-size: 1.25rem;
-  color: var(--text-secondary);
+  color: var(--ink-2);
   text-transform: capitalize;
 }
 
@@ -247,13 +247,13 @@ const capitalize = str => {
   flex-direction: column;
   gap: 0.25rem;
   padding: 1rem;
-  background: var(--bg-secondary);
+  background: var(--bg-2);
   border-radius: 6px;
 }
 
 .detail-label {
   font-size: 0.85rem;
-  color: var(--text-secondary);
+  color: var(--ink-2);
   text-transform: uppercase;
   letter-spacing: 0.5px;
 }
@@ -261,7 +261,7 @@ const capitalize = str => {
 .detail-value {
   font-size: 1.25rem;
   font-weight: 600;
-  color: var(--text-primary);
+  color: var(--ink);
 }
 
 .weather-forecast {
@@ -276,7 +276,7 @@ const capitalize = str => {
 .weather-forecast h4 {
   margin: 0 0 0.75rem 0;
   font-size: 1rem;
-  color: var(--text-primary);
+  color: var(--ink);
   flex-shrink: 0;
 }
 
@@ -295,7 +295,7 @@ const capitalize = str => {
   align-items: center;
   gap: 0.5rem;
   padding: 1rem;
-  background: var(--bg-secondary);
+  background: var(--bg-2);
   border-radius: 6px;
   text-align: center;
   flex-shrink: 0;
@@ -303,7 +303,7 @@ const capitalize = str => {
 
 .forecast-date {
   font-weight: 600;
-  color: var(--text-primary);
+  color: var(--ink);
   font-size: 1rem;
 }
 
@@ -321,29 +321,29 @@ const capitalize = str => {
 .temp-high {
   font-size: 1.25rem;
   font-weight: 600;
-  color: var(--text-primary);
+  color: var(--ink);
 }
 
 .temp-low {
   font-size: 1rem;
-  color: var(--text-secondary);
+  color: var(--ink-2);
 }
 
 .forecast-desc {
   font-size: 0.9rem;
-  color: var(--text-secondary);
+  color: var(--ink-2);
   text-transform: capitalize;
 }
 
 .weather-error {
   padding: 2rem;
   text-align: center;
-  color: var(--accent-error);
+  color: var(--err);
 }
 
 .error-detail {
   margin-top: 0.5rem;
   font-size: 0.9rem;
-  color: var(--text-secondary);
+  color: var(--ink-2);
 }
 </style>

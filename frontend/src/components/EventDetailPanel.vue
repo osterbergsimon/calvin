@@ -58,7 +58,7 @@
           <span class="value">{{ formatDate(selectedDate || event.start) }}</span>
         </div>
         <div v-if="showAllDayEvents && dayEvents.length === 0" class="event-detail-row">
-          <span class="value" style="font-style: italic; color: var(--text-secondary)">
+          <span class="value" style="font-style: italic; color: var(--ink-2)">
             No events scheduled for this day. Use arrow keys to navigate to other days.
           </span>
         </div>
@@ -183,7 +183,7 @@ const getSourceName = sourceId => {
   top: 50%;
   left: 50%;
   transform: translate(-50%, -50%);
-  background: var(--bg-primary);
+  background: var(--bg-1);
   border-radius: 8px;
   box-shadow: 0 4px 20px var(--shadow);
   z-index: 1000;
@@ -192,13 +192,13 @@ const getSourceName = sourceId => {
   max-height: 80vh;
   overflow-y: auto;
   outline: none;
-  border: 1px solid var(--border-color);
+  border: 1px solid var(--line);
 }
 
 .event-detail-header {
   padding: 1.5rem;
-  background: var(--bg-secondary);
-  border-bottom: 1px solid var(--border-color);
+  background: var(--bg-2);
+  border-bottom: 1px solid var(--line);
   display: flex;
   justify-content: space-between;
   align-items: center;
@@ -214,13 +214,13 @@ const getSourceName = sourceId => {
 .event-detail-header h3 {
   margin: 0;
   font-size: 1.5rem;
-  color: var(--text-primary);
+  color: var(--ink);
 }
 
 .event-date-header {
   font-size: 1rem;
   font-weight: 600;
-  color: var(--accent-primary);
+  color: var(--focus);
   text-transform: uppercase;
   letter-spacing: 0.5px;
 }
@@ -242,14 +242,14 @@ const getSourceName = sourceId => {
 
 .label {
   font-weight: 600;
-  color: var(--text-secondary);
+  color: var(--ink-2);
   font-size: 0.9rem;
   text-transform: uppercase;
   letter-spacing: 0.5px;
 }
 
 .value {
-  color: var(--text-primary);
+  color: var(--ink);
   font-size: 1rem;
 }
 
@@ -257,14 +257,14 @@ const getSourceName = sourceId => {
   white-space: pre-wrap;
   line-height: 1.6;
   padding: 0.75rem;
-  background: var(--bg-tertiary);
+  background: var(--bg-0);
   border-radius: 4px;
 }
 
 .day-events-list {
   margin-bottom: 1rem;
   padding-bottom: 1rem;
-  border-bottom: 1px solid var(--border-color);
+  border-bottom: 1px solid var(--line);
 }
 
 .day-events-header {
@@ -290,17 +290,17 @@ const getSourceName = sourceId => {
 }
 
 .day-event-item:hover {
-  background: var(--bg-secondary);
+  background: var(--bg-2);
 }
 
 .day-event-item.active {
-  background: var(--calendar-today-bg);
-  border-color: var(--accent-primary);
+  background: color-mix(in srgb, var(--focus) 12%, var(--bg-1));
+  border-color: var(--focus);
 }
 
 .day-event-time {
   font-weight: 600;
-  color: var(--text-secondary);
+  color: var(--ink-2);
   min-width: 70px;
   font-size: 0.85rem;
   flex-shrink: 0;
@@ -308,7 +308,7 @@ const getSourceName = sourceId => {
 
 .day-event-title {
   flex: 1;
-  color: var(--text-primary);
+  color: var(--ink);
   font-size: 0.9rem;
 }
 

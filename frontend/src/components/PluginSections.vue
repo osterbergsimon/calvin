@@ -54,7 +54,7 @@
             {{ section.title || "Manage Images" }}
             <span v-if="imageCount !== undefined"> ({{ imageCount }})</span>
           </h4>
-          <span style="font-size: 0.9rem; color: var(--text-secondary)">
+          <span style="font-size: 0.9rem; color: var(--ink-2)">
             {{ expandedSections[section.id] ? "▼" : "▶" }}
           </span>
         </div>
@@ -258,7 +258,7 @@ const formatFileSize = bytes => {
   align-items: center;
   gap: 1rem;
   padding: 0.75rem;
-  border-bottom: 1px solid var(--border-color);
+  border-bottom: 1px solid var(--line);
 }
 
 .image-thumbnail {
@@ -283,17 +283,17 @@ const formatFileSize = bytes => {
 
 .image-details {
   font-size: 0.875rem;
-  color: var(--text-secondary);
+  color: var(--ink-2);
 }
 
 .empty-state {
   text-align: center;
   padding: 2rem;
-  color: var(--text-secondary);
+  color: var(--ink-2);
 }
 
 .btn-upload {
-  background: var(--accent-secondary);
+  background: var(--focus);
   color: #fff;
   border: none;
   border-radius: 4px;
@@ -305,18 +305,18 @@ const formatFileSize = bytes => {
 }
 
 .btn-upload:hover:not(:disabled) {
-  background: var(--accent-secondary);
+  background: var(--focus);
   opacity: 0.9;
 }
 
 .btn-upload:disabled {
-  background: var(--text-tertiary);
+  background: var(--ink-3);
   cursor: not-allowed;
   opacity: 0.6;
 }
 
 .btn-remove {
-  background: var(--accent-error, #ef4444);
+  background: var(--err);
   color: #fff;
   border: none;
   border-radius: 4px;
@@ -327,12 +327,12 @@ const formatFileSize = bytes => {
 }
 
 .btn-remove:hover {
-  background: var(--accent-error, #ef4444);
+  background: var(--err);
   opacity: 0.9;
 }
 
 .btn-remove-disabled {
-  color: var(--text-secondary);
+  color: var(--ink-2);
   font-size: 0.875rem;
   padding: 0.5rem 1rem;
   opacity: 0.6;
@@ -349,7 +349,7 @@ const formatFileSize = bytes => {
 }
 
 .error-message {
-  background: var(--accent-error, #ef4444);
+  background: var(--err);
   color: #fff;
   padding: 0.75rem 1rem;
   border-radius: 4px;
@@ -359,7 +359,7 @@ const formatFileSize = bytes => {
 
 .help-text {
   font-size: 0.875rem;
-  color: var(--text-secondary);
+  color: var(--ink-2);
   margin-top: 0.5rem;
   display: block;
 }
@@ -368,6 +368,6 @@ const formatFileSize = bytes => {
   font-size: 1rem;
   font-weight: 600;
   margin-bottom: 1rem;
-  color: var(--text-primary);
+  color: var(--ink);
 }
 </style>

@@ -1690,7 +1690,7 @@ onUnmounted(() => {
 
 .clock-bar-drop-zone-mode-switch {
   border-style: dotted;
-  border-color: var(--accent-secondary, var(--focus));
+  border-color: var(--focus);
   background: rgba(255, 165, 0, 0.08);
 }
 

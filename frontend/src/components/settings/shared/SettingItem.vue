@@ -67,7 +67,7 @@ defineProps({
   min-height: var(--touch-target);
   background: var(--bg-2);
   color: var(--ink);
-  border: 1px solid var(--input-border);
+  border: 1px solid var(--line);
   border-radius: 4px;
   font-size: 0.9rem;
   font-family: inherit;
