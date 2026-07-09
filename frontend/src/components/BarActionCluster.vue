@@ -20,9 +20,9 @@
 </template>
 
 <script setup>
-import { ref, computed, watch, onMounted, onUnmounted } from "vue";
-import axios from "axios";
+import { ref, computed, watch, onUnmounted } from "vue";
 import { useConfigStore } from "../stores/config";
+import { useConnectionStore } from "../stores/connection";
 import ConnectionIndicator from "./ConnectionIndicator.vue";
 import AdminOverflow from "./dashboard/AdminOverflow.vue";
 
@@ -36,9 +36,12 @@ defineProps({
 const visible = computed(() => true);
 
 const configStore = useConfigStore();
+const connectionStore = useConnectionStore();
 
-const status = ref("checking...");
-let healthInterval = null;
+const status = computed(() => {
+  if (!connectionStore.lastBackendCheck) return "checking...";
+  return connectionStore.isOnline && connectionStore.isBackendOnline ? "healthy" : "error";
+});
 
 const statusClass = computed(() => {
   if (status.value === "healthy") return "healthy";
@@ -68,29 +71,7 @@ watch(
   { immediate: true }
 );
 
-const checkHealth = async () => {
-  try {
-    const response = await axios.get("/api/health", { timeout: 5000 });
-    status.value = response.data?.status === "healthy" ? "healthy" : "unhealthy";
-  } catch (err) {
-    if (err.code === "ECONNABORTED" || err.message?.includes("timeout")) {
-      status.value = "checking...";
-    } else {
-      status.value = "error";
-    }
-  }
-};
-
-onMounted(() => {
-  checkHealth();
-  healthInterval = setInterval(checkHealth, 30000);
-});
-
 onUnmounted(() => {
-  if (healthInterval) {
-    clearInterval(healthInterval);
-    healthInterval = null;
-  }
   clearTimeout(settleTimer);
 });
 </script>

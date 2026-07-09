@@ -10,7 +10,7 @@ router = APIRouter()
 async def health_check():
     """Basic health check endpoint."""
     try:
-        logger.info("Health check endpoint called")
+        logger.debug("Health check endpoint called")
         return {"status": "healthy"}
     except Exception:
         logger.exception("Error in health check")
