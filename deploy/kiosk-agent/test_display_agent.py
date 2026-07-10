@@ -153,3 +153,37 @@ def test_reconcile_applies_only_on_change():
     # changed desired state → applies
     last = agent.reconcile(cfg, at_on, last, applier=lambda on: applied.append(on))
     assert last is True and applied == [False, True]
+
+
+def test_now_in_naive_when_no_tz():
+    n = agent.now_in({"timezone": None})
+    assert n.tzinfo is None
+
+
+def test_run_sleeps_min_of_boundary_and_refresh(monkeypatch):
+    # desired OFF at 23:00; next boundary 06:00 (7h) but refresh caps to 900s
+    cfg = _cfg()
+    monkeypatch.setattr(agent, "now_in", lambda c: datetime(2026, 7, 11, 23, 0))
+    slept = []
+    applied = []
+    monkeypatch.setattr(agent, "apply_on", lambda on: applied.append(on) or "test")
+
+    def fake_sleep(s):
+        slept.append(s)
+
+    agent.run("http://x", 900, fetch=lambda url: cfg, sleep=fake_sleep, iterations=1)
+    assert applied == [False]        # applied OFF once
+    assert slept == [900]            # capped by refresh, not 7h
+
+
+def test_run_keeps_state_and_backs_off_on_fetch_error(monkeypatch):
+    slept = []
+    applied = []
+    monkeypatch.setattr(agent, "apply_on", lambda on: applied.append(on) or "test")
+
+    def boom(url):
+        raise OSError("network down")
+
+    agent.run("http://x", 900, fetch=boom, sleep=lambda s: slept.append(s), iterations=1)
+    assert applied == []             # never touched the display
+    assert slept == [agent.BACKOFF_SECONDS]

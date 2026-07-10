@@ -5,8 +5,12 @@ Reads the display schedule from a remote Calvin backend and powers the local
 panel on/off to match. Mirrors backend display_power_service semantics. Pure
 Python 3 stdlib — no third-party deps (the kiosk Pi has no venv).
 """
+import json
 import os
 import subprocess
+import sys
+import time as time_module
+import urllib.request
 from datetime import datetime, time, timedelta
 
 try:
@@ -95,6 +99,61 @@ def apply_on(on):
         return f"none ({e})"
 
 
+DEFAULT_REFRESH_SECONDS = 900
+HTTP_TIMEOUT = 10
+BACKOFF_SECONDS = 60
+
+
+def log(msg):
+    print(f"[calvin-display-agent] {msg}", flush=True)
+
+
+def fetch_config(backend_url):
+    url = backend_url.rstrip("/") + "/api/config"
+    with urllib.request.urlopen(url, timeout=HTTP_TIMEOUT) as r:
+        return json.load(r)
+
+
+def now_in(cfg):
+    tzname = cfg_get(cfg, "timezone")
+    if tzname and ZoneInfo:
+        try:
+            return datetime.now(ZoneInfo(tzname))
+        except Exception:
+            pass
+    return datetime.now()
+
+
+def run(backend_url, refresh_seconds, *, fetch=fetch_config, sleep=time_module.sleep, iterations=None):
+    last = None
+    n = 0
+    while iterations is None or n < iterations:
+        n += 1
+        try:
+            cfg = fetch(backend_url)
+        except Exception as e:
+            log(f"config fetch failed ({e}); keeping display state")
+            sleep(BACKOFF_SECONDS)
+            continue
+        now = now_in(cfg)
+        prev = last
+        last = reconcile(cfg, now, last)
+        if prev != last:
+            log(f"display -> {'ON' if last else 'OFF'}")
+        secs = seconds_to_next_boundary(cfg, now)
+        sleep(refresh_seconds if secs is None else max(1, min(secs, refresh_seconds)))
+
+
+def main():
+    backend = os.environ.get("CALVIN_BACKEND_URL", "").strip()
+    if not backend:
+        log("CALVIN_BACKEND_URL not set")
+        sys.exit(1)
+    refresh = int(os.environ.get("CALVIN_DISPLAY_REFRESH_SECONDS", DEFAULT_REFRESH_SECONDS))
+    log(f"starting: backend={backend} refresh={refresh}s")
+    run(backend, refresh)
+
+
 def reconcile(cfg, now, last, applier=None):
     """Apply desired state only when it changed (or on first run). Return new state."""
     on = desired_on(cfg, now)
@@ -103,3 +162,7 @@ def reconcile(cfg, now, last, applier=None):
     if last is None or on != last:
         applier(on)
     return on
+
+
+if __name__ == "__main__":
+    main()
