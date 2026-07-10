@@ -150,10 +150,12 @@ install_kiosk_services() {
     log "Installing systemd services..."
     install_systemd_service "${CALVIN_DIR}/deploy/systemd/calvin-x.service" "${CALVIN_DIR}"
     install_systemd_service "${CALVIN_DIR}/deploy/systemd/calvin-kiosk-remote.service" "${CALVIN_DIR}"
+    install_systemd_service "${CALVIN_DIR}/deploy/systemd/calvin-display-agent.service" "${CALVIN_DIR}"
 
     if systemd_available; then
         enable_systemd_service "calvin-x.service"
         enable_systemd_service "calvin-kiosk-remote.service"
+        enable_systemd_service "calvin-display-agent.service"
     else
         log_warn "systemd is not running; installed service files but skipped enable"
     fi
@@ -165,6 +167,7 @@ start_kiosk_services() {
         start_systemd_service "calvin-x.service"
         sleep 3
         start_systemd_service "calvin-kiosk-remote.service"
+        start_systemd_service "calvin-display-agent.service"
     else
         log_warn "systemd is not running; skipped service start"
     fi
@@ -203,6 +206,10 @@ main() {
     ensure_repo_for_unit_files
     install_kiosk_config
 
+    log "Installing display-power agent..."
+    install_script "${CALVIN_DIR}/deploy/kiosk-agent/calvin_display_agent.py" \
+        /usr/local/bin/calvin_display_agent.py "${CALVIN_USER}"
+
     configure_display "${CALVIN_USER}"
     # Chromium is managed by calvin-kiosk-remote.service; openbox
     # autostart only needs to launch openbox itself plus the usual
@@ -218,7 +225,7 @@ main() {
     log "=========================================="
     log "Backend URL:    ${BACKEND_URL}"
     log "Config file:    /etc/default/calvin-kiosk"
-    log "Systemd units:  calvin-x.service, calvin-kiosk-remote.service"
+    log "Systemd units:  calvin-x.service, calvin-kiosk-remote.service, calvin-display-agent.service"
     log ""
     log "To change the backend URL later:"
     log "  sudo nano /etc/default/calvin-kiosk"
