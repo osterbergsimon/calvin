@@ -1,6 +1,8 @@
 import importlib.util
 import os
+import subprocess
 from datetime import datetime, time
+from types import SimpleNamespace
 
 _MOD = os.path.join(os.path.dirname(__file__), "calvin_display_agent.py")
 _spec = importlib.util.spec_from_file_location("calvin_display_agent", _MOD)
@@ -105,35 +107,40 @@ def test_next_boundary_none_when_disabled():
                                           datetime(2026, 7, 11, 9, 0)) is None
 
 
-import subprocess
-from types import SimpleNamespace
-
-
-def test_apply_on_uses_vcgencmd_when_effective(monkeypatch):
+def test_apply_on_runs_both_when_effective(monkeypatch):
     calls = []
 
     def fake_run(cmd, **kw):
         calls.append(cmd)
-        return SimpleNamespace(returncode=0, stdout="display_power=0\n", stderr="")
+        if cmd[0] == "vcgencmd":
+            return SimpleNamespace(returncode=0, stdout="display_power=0\n", stderr="")
+        return SimpleNamespace(returncode=0, stdout="", stderr="")
 
     monkeypatch.setattr(agent.subprocess, "run", fake_run)
-    assert agent.apply_on(False) == "vcgencmd"
-    assert calls[0][:2] == ["vcgencmd", "display_power"]
-    assert calls[0][2] == "0"
+    assert agent.apply_on(False) == "vcgencmd+xset"
+    assert calls[0][:3] == ["vcgencmd", "display_power", "0"]
+    assert calls[1] == ["xset", "dpms", "force", "off"]
 
 
-def test_apply_on_falls_back_to_xset(monkeypatch):
-    calls = []
-
+def test_apply_on_xset_only_when_vcgencmd_absent(monkeypatch):
     def fake_run(cmd, **kw):
-        calls.append(cmd)
         if cmd[0] == "vcgencmd":
             raise FileNotFoundError("no vcgencmd")
         return SimpleNamespace(returncode=0, stdout="", stderr="")
 
     monkeypatch.setattr(agent.subprocess, "run", fake_run)
     assert agent.apply_on(True) == "xset"
-    assert calls[-1] == ["xset", "dpms", "force", "on"]
+
+
+def test_apply_on_reports_none_when_xset_fails_and_vcgencmd_noop(monkeypatch):
+    def fake_run(cmd, **kw):
+        if cmd[0] == "vcgencmd":
+            # exits 0 but does NOT echo the value -> treated as no-op
+            return SimpleNamespace(returncode=0, stdout="", stderr="")
+        return SimpleNamespace(returncode=1, stdout="", stderr="no display")
+
+    monkeypatch.setattr(agent.subprocess, "run", fake_run)
+    assert agent.apply_on(True) == "none"
 
 
 def test_reconcile_applies_only_on_change():
@@ -186,4 +193,14 @@ def test_run_keeps_state_and_backs_off_on_fetch_error(monkeypatch):
 
     agent.run("http://x", 900, fetch=boom, sleep=lambda s: slept.append(s), iterations=1)
     assert applied == []             # never touched the display
+    assert slept == [agent.BACKOFF_SECONDS]
+
+
+def test_run_survives_non_dict_config(monkeypatch):
+    applied = []
+    slept = []
+    monkeypatch.setattr(agent, "apply_on", lambda on: applied.append(on) or "test")
+    agent.run("http://x", 900, fetch=lambda url: "not a dict",
+              sleep=lambda s: slept.append(s), iterations=1)
+    assert applied == []                 # never touched the display
     assert slept == [agent.BACKOFF_SECONDS]

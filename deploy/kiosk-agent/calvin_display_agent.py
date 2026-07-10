@@ -76,27 +76,32 @@ def seconds_to_next_boundary(cfg, now):
 
 
 def apply_on(on):
-    """Power the panel on/off. Returns the method that appeared to work."""
+    """Power the panel on/off using BOTH vcgencmd and xset (belt-and-suspenders:
+    vcgencmd is a no-op under some KMS drivers, xset needs DPMS). Returns a
+    '+'-joined list of the methods that appeared to work, or 'none'."""
     val = "1" if on else "0"
+    methods = []
     try:
         r = subprocess.run(
             ["vcgencmd", "display_power", val],
             capture_output=True, text=True, timeout=10,
         )
         if r.returncode == 0 and f"display_power={val}" in r.stdout:
-            return "vcgencmd"
+            methods.append("vcgencmd")
     except (FileNotFoundError, subprocess.SubprocessError):
         pass
     env = dict(os.environ, DISPLAY=":0", XAUTHORITY="/home/calvin/.Xauthority")
     action = "on" if on else "off"
     try:
-        subprocess.run(
+        r = subprocess.run(
             ["xset", "dpms", "force", action],
             env=env, capture_output=True, text=True, timeout=10,
         )
-        return "xset"
-    except (FileNotFoundError, subprocess.SubprocessError) as e:
-        return f"none ({e})"
+        if r.returncode == 0:
+            methods.append("xset")
+    except (FileNotFoundError, subprocess.SubprocessError):
+        pass
+    return "+".join(methods) if methods else "none"
 
 
 DEFAULT_REFRESH_SECONDS = 900
@@ -131,17 +136,20 @@ def run(backend_url, refresh_seconds, *, fetch=fetch_config, sleep=time_module.s
         n += 1
         try:
             cfg = fetch(backend_url)
+            if not isinstance(cfg, dict):
+                raise TypeError(f"expected dict config, got {type(cfg).__name__}")
+            now = now_in(cfg)
+            prev = last
+            last = reconcile(cfg, now, last)
+            if prev != last:
+                log(f"display -> {'ON' if last else 'OFF'}")
+            secs = seconds_to_next_boundary(cfg, now)
+            delay = refresh_seconds if secs is None else max(1, min(secs, refresh_seconds))
         except Exception as e:
-            log(f"config fetch failed ({e}); keeping display state")
+            log(f"iteration failed ({e}); keeping display state")
             sleep(BACKOFF_SECONDS)
             continue
-        now = now_in(cfg)
-        prev = last
-        last = reconcile(cfg, now, last)
-        if prev != last:
-            log(f"display -> {'ON' if last else 'OFF'}")
-        secs = seconds_to_next_boundary(cfg, now)
-        sleep(refresh_seconds if secs is None else max(1, min(secs, refresh_seconds)))
+        sleep(delay)
 
 
 def main():
