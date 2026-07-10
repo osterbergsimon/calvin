@@ -1,0 +1,21 @@
+[Unit]
+Description=Calvin Kiosk Display-Power Agent (remote backend)
+After=network-online.target calvin-frontend.service calvin-kiosk-remote.service
+Wants=network-online.target
+
+[Service]
+Type=simple
+User=calvin
+Group=calvin
+EnvironmentFile=/etc/default/calvin-kiosk
+Environment="DISPLAY=:0"
+Environment="XAUTHORITY=/home/calvin/.Xauthority"
+ExecStart=/usr/bin/python3 /usr/local/bin/calvin_display_agent.py
+Restart=always
+RestartSec=10
+StandardOutput=journal
+StandardError=journal
+SyslogIdentifier=calvin-display-agent
+
+[Install]
+WantedBy=multi-user.target
