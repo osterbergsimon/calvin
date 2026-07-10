@@ -689,6 +689,12 @@ configure_openbox_autostart() {
             echo "# No need to start it here"
             echo ""
         fi
+        echo "# Disable automatic screen blanking; keep DPMS available for scheduled off"
+        echo "xset s off &"
+        echo "xset s noblank &"
+        echo "xset +dpms &"
+        echo "xset dpms 0 0 0 &"
+        echo ""
         echo "# Hide cursor after 3 seconds"
         echo "unclutter -idle 3 -root &"
     } > "${user_home}/.config/openbox/autostart"
