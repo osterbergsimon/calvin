@@ -103,3 +103,53 @@ def test_next_boundary_spans_midnight():
 def test_next_boundary_none_when_disabled():
     assert agent.seconds_to_next_boundary(_cfg(display_schedule_enabled=False),
                                           datetime(2026, 7, 11, 9, 0)) is None
+
+
+import subprocess
+from types import SimpleNamespace
+
+
+def test_apply_on_uses_vcgencmd_when_effective(monkeypatch):
+    calls = []
+
+    def fake_run(cmd, **kw):
+        calls.append(cmd)
+        return SimpleNamespace(returncode=0, stdout="display_power=0\n", stderr="")
+
+    monkeypatch.setattr(agent.subprocess, "run", fake_run)
+    assert agent.apply_on(False) == "vcgencmd"
+    assert calls[0][:2] == ["vcgencmd", "display_power"]
+    assert calls[0][2] == "0"
+
+
+def test_apply_on_falls_back_to_xset(monkeypatch):
+    calls = []
+
+    def fake_run(cmd, **kw):
+        calls.append(cmd)
+        if cmd[0] == "vcgencmd":
+            raise FileNotFoundError("no vcgencmd")
+        return SimpleNamespace(returncode=0, stdout="", stderr="")
+
+    monkeypatch.setattr(agent.subprocess, "run", fake_run)
+    assert agent.apply_on(True) == "xset"
+    assert calls[-1] == ["xset", "dpms", "force", "on"]
+
+
+def test_reconcile_applies_only_on_change():
+    applied = []
+    cfg = _cfg()  # 06:00-22:00
+    at_off = datetime(2026, 7, 11, 23, 0)   # desired OFF
+    at_on = datetime(2026, 7, 11, 9, 0)     # desired ON
+
+    # first call (last=None) always applies
+    last = agent.reconcile(cfg, at_off, None, applier=lambda on: applied.append(on))
+    assert last is False and applied == [False]
+
+    # same desired state → no new apply
+    last = agent.reconcile(cfg, at_off, last, applier=lambda on: applied.append(on))
+    assert last is False and applied == [False]
+
+    # changed desired state → applies
+    last = agent.reconcile(cfg, at_on, last, applier=lambda on: applied.append(on))
+    assert last is True and applied == [False, True]

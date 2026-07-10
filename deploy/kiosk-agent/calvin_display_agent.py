@@ -5,6 +5,8 @@ Reads the display schedule from a remote Calvin backend and powers the local
 panel on/off to match. Mirrors backend display_power_service semantics. Pure
 Python 3 stdlib — no third-party deps (the kiosk Pi has no venv).
 """
+import os
+import subprocess
 from datetime import datetime, time, timedelta
 
 try:
@@ -67,3 +69,37 @@ def seconds_to_next_boundary(cfg, now):
     if not candidates:
         return None
     return int((min(candidates) - now).total_seconds())
+
+
+def apply_on(on):
+    """Power the panel on/off. Returns the method that appeared to work."""
+    val = "1" if on else "0"
+    try:
+        r = subprocess.run(
+            ["vcgencmd", "display_power", val],
+            capture_output=True, text=True, timeout=10,
+        )
+        if r.returncode == 0 and f"display_power={val}" in r.stdout:
+            return "vcgencmd"
+    except (FileNotFoundError, subprocess.SubprocessError):
+        pass
+    env = dict(os.environ, DISPLAY=":0", XAUTHORITY="/home/calvin/.Xauthority")
+    action = "on" if on else "off"
+    try:
+        subprocess.run(
+            ["xset", "dpms", "force", action],
+            env=env, capture_output=True, text=True, timeout=10,
+        )
+        return "xset"
+    except (FileNotFoundError, subprocess.SubprocessError) as e:
+        return f"none ({e})"
+
+
+def reconcile(cfg, now, last, applier=None):
+    """Apply desired state only when it changed (or on first run). Return new state."""
+    on = desired_on(cfg, now)
+    if applier is None:
+        applier = apply_on
+    if last is None or on != last:
+        applier(on)
+    return on
