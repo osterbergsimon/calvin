@@ -5,7 +5,7 @@ Reads the display schedule from a remote Calvin backend and powers the local
 panel on/off to match. Mirrors backend display_power_service semantics. Pure
 Python 3 stdlib — no third-party deps (the kiosk Pi has no venv).
 """
-from datetime import datetime, time
+from datetime import datetime, time, timedelta
 
 try:
     from zoneinfo import ZoneInfo
@@ -42,3 +42,28 @@ def desired_on(cfg, now):
     except (ValueError, AttributeError):
         return True
     return _should_be_on(now.time(), time(oh, om), time(fh, fm))
+
+
+def seconds_to_next_boundary(cfg, now):
+    """Seconds until the next on/off transition, or None if no boundaries exist."""
+    if not cfg_get(cfg, "display_schedule_enabled", "displayScheduleEnabled", default=False):
+        return None
+    schedule = cfg_get(cfg, "display_schedule", "displaySchedule", default=[]) or []
+    by_day = {d.get("day"): d for d in schedule if d.get("enabled", False)}
+    candidates = []
+    for offset in range(0, 9):  # today + 8 days covers any weekly gap
+        d = (now + timedelta(days=offset)).date()
+        entry = by_day.get(d.weekday())
+        if not entry:
+            continue
+        for key in ("onTime", "offTime"):
+            try:
+                hh, mm = map(int, str(entry.get(key)).split(":"))
+            except (ValueError, AttributeError):
+                continue
+            dt = datetime(d.year, d.month, d.day, hh, mm, tzinfo=now.tzinfo)
+            if dt > now:
+                candidates.append(dt)
+    if not candidates:
+        return None
+    return int((min(candidates) - now).total_seconds())

@@ -78,3 +78,28 @@ def test_desired_on_day_disabled():
 def test_desired_on_malformed_time():
     cfg = _cfg(display_schedule=[{"day": d, "enabled": True, "onTime": "oops", "offTime": "22:00"} for d in range(7)])
     assert agent.desired_on(cfg, datetime(2026, 7, 11, 23, 0)) is True
+
+
+# next boundary — 06:00-22:00, at 09:00 → 22:00 today (13h)
+def test_next_boundary_daytime():
+    secs = agent.seconds_to_next_boundary(_cfg(), datetime(2026, 7, 11, 9, 0))
+    assert secs == 13 * 3600
+
+
+# next boundary — at 23:00 → 06:00 next day (7h)
+def test_next_boundary_overnight():
+    secs = agent.seconds_to_next_boundary(_cfg(), datetime(2026, 7, 11, 23, 0))
+    assert secs == 7 * 3600
+
+
+# next boundary — midnight-spanning 20:00-07:00, at 23:00 → 07:00 next day (8h)
+def test_next_boundary_spans_midnight():
+    cfg = _cfg(display_schedule=_sched(on="20:00", off="07:00"))
+    secs = agent.seconds_to_next_boundary(cfg, datetime(2026, 7, 11, 23, 0))
+    assert secs == 8 * 3600
+
+
+# next boundary — schedule disabled ⇒ None
+def test_next_boundary_none_when_disabled():
+    assert agent.seconds_to_next_boundary(_cfg(display_schedule_enabled=False),
+                                          datetime(2026, 7, 11, 9, 0)) is None
