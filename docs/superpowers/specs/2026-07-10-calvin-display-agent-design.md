@@ -36,44 +36,54 @@ screen-control mechanism, so this is a genuine gap in the Mode-B path, not just 
 
 ## Architecture
 
-A small **local agent** on the kiosk Pi, run periodically by a systemd timer:
+A small **long-running local agent** on the kiosk Pi. It does **not poll every minute**. The
+scheduled on/off boundaries are computed locally, so the agent sleeps until the *exact* next
+boundary and flips the panel precisely then. The only reason to contact the server is to notice
+**UI edits** to the schedule, which it does on a slow safety refresh (default 15 min, tunable).
 
 ```
-┌────────── central server ──────────┐        ┌──────────── kiosk Pi ────────────┐
-│ Calvin backend                     │  HTTPS │ calvin-display-agent.timer (60s)  │
-│  - schedule authored in UI         │ <──────│   └─ .service (oneshot)           │
-│  - GET /api/config exposes it      │        │       └─ calvin_display_agent.py  │
-│  (display_power_service inert here;│        │            GET /api/config        │
-│   no local display)                │        │            compute desired on/off │
-└────────────────────────────────────┘        │            vcgencmd / xset local  │
-                                               └───────────────────────────────────┘
+┌────────── central server ──────────┐        ┌──────────── kiosk Pi ────────────────┐
+│ Calvin backend                     │  HTTPS │ calvin-display-agent.service          │
+│  - schedule authored in UI         │ <──────│   calvin_display_agent.py (Type=simple)│
+│  - GET /api/config exposes it      │  every │     loop:                             │
+│  (display_power_service inert here;│  ~15m  │       fetch /api/config               │
+│   no local display)                │  +edits│       apply desired state (on change) │
+└────────────────────────────────────┘        │       sleep → min(next boundary, 15m) │
+                                               │       vcgencmd / xset local           │
+                                               └───────────────────────────────────────┘
 ```
 
-**Data flow (every ~60s):**
-1. Timer fires the oneshot service.
-2. Agent reads `CALVIN_BACKEND_URL` from `/etc/default/calvin-kiosk` (the same env file the kiosk
-   browser uses — one source of truth for the backend location).
-3. Agent `GET ${CALVIN_BACKEND_URL}/api/config` (no auth; endpoint is already public and consumed
-   by the kiosk browser).
-4. Agent computes desired state, mirroring `display_power_service`:
+**Traffic:** ~1 config fetch per refresh interval (≈96/day at 15 min) plus one at each boundary —
+versus 1440/day for naive 60s polling. Panel flips happen *at* the boundary, not up to a minute
+late.
+
+**Control loop:**
+1. Agent reads `CALVIN_BACKEND_URL` (and optional `CALVIN_DISPLAY_REFRESH_SECONDS`, default 900)
+   from `/etc/default/calvin-kiosk` — the same env file the kiosk browser uses.
+2. `GET ${CALVIN_BACKEND_URL}/api/config` (no auth; already public, consumed by the kiosk browser).
+   On failure: keep the last applied state, sleep a short backoff (60s), retry — **never blank on a
+   network blip**.
+3. Compute desired state for "now", mirroring `display_power_service`:
    - `display_schedule_enabled` false → **on** (schedule disabled ⇒ keep display on).
    - Else find today's entry by `now.weekday()` (0=Mon … 6=Sun — same as backend).
    - Entry missing or `enabled` false → **on**.
-   - Else `on`/`off` from `onTime`/`offTime`, with midnight-spanning via the backend's exact rule:
+   - Else `on`/`off` from `onTime`/`offTime`, midnight-spanning via the backend's exact rule:
      `off < on ⇒ (now ≥ on or now < off)`, else `on ≤ now < off`.
    - Timezone from config `timezone` (via `zoneinfo`); null → system local time.
-5. Agent applies the state: `vcgencmd display_power 0|1` first; if that isn't effective, fall back
-   to `xset dpms force off|on` (DISPLAY=:0). On config-fetch failure it logs and exits 0 without
-   touching the display.
+4. Apply **only when the desired state differs from the last applied state** (plus once at startup),
+   to avoid needless HDMI toggling: `vcgencmd display_power 0|1` first; if ineffective, fall back to
+   `xset dpms force off|on` (DISPLAY=:0).
+5. Compute seconds to the **next boundary**: enumerate each enabled day's on/off datetimes across
+   the next ~8 days, take the earliest strictly after "now". Sleep `min(that, refresh_interval)` so
+   boundaries are exact *and* edits are still picked up within the refresh window. Loop.
 
 ## Components (all new)
 
 | Path | Purpose |
 |---|---|
-| `deploy/kiosk-agent/calvin_display_agent.py` | The agent (pure Python 3 stdlib). |
-| `deploy/kiosk-agent/test_display_agent.py` | pytest unit tests for the decision logic. |
-| `deploy/systemd/calvin-display-agent.service` | `Type=oneshot`; runs the agent as `calvin` with `EnvironmentFile=/etc/default/calvin-kiosk` and `DISPLAY=:0`. |
-| `deploy/systemd/calvin-display-agent.timer` | `OnBootSec=20`, `OnUnitActiveSec=60`; `WantedBy=timers.target`. |
+| `deploy/kiosk-agent/calvin_display_agent.py` | The agent (pure Python 3 stdlib), long-running control loop. |
+| `deploy/kiosk-agent/test_display_agent.py` | pytest unit tests for decision + next-boundary logic. |
+| `deploy/systemd/calvin-display-agent.service` | `Type=simple`, `Restart=always`, `RestartSec=10`; runs the agent as `calvin` with `EnvironmentFile=/etc/default/calvin-kiosk` and `DISPLAY=:0`; `After=calvin-frontend.service`. No timer — the agent sleeps internally. |
 
 **Modified:**
 - `scripts/setup-kiosk.sh` — install the script to `/usr/local/bin/`, install+enable the
@@ -105,10 +115,12 @@ for hosts where `vcgencmd` is a no-op under the KMS driver.
 
 ## Failure handling
 
-- Config fetch fails / times out → log, exit 0, **leave display unchanged** (never blank on a blip).
+- Config fetch fails / times out → log, **keep the last applied state**, short backoff (60s), retry.
+  Never blank a working display on a blip.
 - `vcgencmd` absent or ineffective → fall through to `xset`.
 - Malformed schedule/time values → treat as "keep on" (matches backend's defensive fallbacks).
-- Agent runs as `oneshot`; a crash affects only that tick. The next timer fire retries.
+- Agent crash → `Restart=always` brings it back; it re-reads config and re-establishes state on
+  startup (startup always applies once, regardless of last-state tracking).
 
 ## Testing
 
@@ -123,6 +135,13 @@ already run against the live server:
 
 `vcgencmd`/`xset` invocation is covered by asserting the correct command is chosen for on vs off
 (subprocess mocked); no real hardware in CI.
+
+**Next-boundary logic** (drives the sleep): with a `06:00–22:00` schedule and injected "now",
+`seconds_to_next_boundary` returns the correct next transition — e.g. at 09:00 → next is 22:00
+today; at 23:00 → next is 06:00 tomorrow; midnight-spanning `20:00–07:00` at 23:00 → next is 07:00.
+Result is always capped by the refresh interval by the caller. "Apply only on change" is verified by
+asserting no command is issued when desired state equals last-applied (except the forced startup
+apply).
 
 ## Integration into `setup-kiosk.sh`
 
