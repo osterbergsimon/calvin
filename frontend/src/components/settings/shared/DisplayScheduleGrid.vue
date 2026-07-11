@@ -40,7 +40,11 @@ watch(
 );
 
 const getDayName = day => {
-  const days = ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"];
+  // Day indices follow the backend's Python weekday() convention (0=Monday …
+  // 6=Sunday), NOT JS getDay() (0=Sunday). Keep this array in that order so the
+  // labels match how the scheduler interprets each entry — see
+  // backend/app/services/display_power_service.py.
+  const days = ["Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"];
   return days[day] || `Day ${day}`;
 };
 
