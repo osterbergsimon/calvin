@@ -146,3 +146,21 @@ class PluginDB(ormar.Model):
         """
         self.updated_at = datetime.utcnow()
         await self.update()
+
+
+class KioskDB(ormar.Model):
+    """Database model for known kiosks (per-device registry)."""
+
+    ormar_config = ormar.OrmarConfig(
+        database=database,
+        metadata=metadata,
+        tablename="kiosks",
+    )
+
+    id: str = ormar.String(max_length=255, primary_key=True, index=True)  # CALVIN_KIOSK_ID
+    hostname: str | None = ormar.String(max_length=255, nullable=True)  # reported by the kiosk
+    last_seen: datetime = ormar.DateTime(default=datetime.utcnow, nullable=False)
+    last_applied_version: str | None = ormar.String(
+        max_length=64, nullable=True
+    )  # device-config version the display-agent last confirmed applied (used by dd9.3)
+    overrides: dict | None = ormar.JSON(nullable=True)  # sparse per-kiosk config (used by dd9.3)
