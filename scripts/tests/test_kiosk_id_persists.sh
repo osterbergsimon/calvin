@@ -12,8 +12,8 @@ trap 'rm -rf "$TMPDIR_TEST"' EXIT
 
 env_file="$TMPDIR_TEST/calvin-kiosk"
 
-# Pre-populate the env file with an operator-set kiosk id.
-printf 'CALVIN_KIOSK_ID=kitchen\n' > "$env_file"
+# Pre-populate the env file with an operator-set kiosk id and hostname.
+printf 'CALVIN_KIOSK_ID=kitchen\nCALVIN_KIOSK_HOSTNAME=pi-operator\n' > "$env_file"
 
 # Export env overrides so they are visible inside install_kiosk_config() when called.
 export CALVIN_KIOSK_ENV_FILE="$env_file"
@@ -50,5 +50,14 @@ if [ "$actual_id" = "kitchen" ]; then
     echo "PASS: CALVIN_KIOSK_ID=kitchen was preserved"
 else
     echo "FAIL: expected CALVIN_KIOSK_ID=kitchen, got CALVIN_KIOSK_ID=${actual_id}"
+    exit 1
+fi
+
+# Assert: the operator-set hostname was preserved across re-run.
+actual_host="$(grep '^CALVIN_KIOSK_HOSTNAME=' "$env_file" | cut -d= -f2-)"
+if [ "$actual_host" = "pi-operator" ]; then
+    echo "PASS: CALVIN_KIOSK_HOSTNAME=pi-operator was preserved"
+else
+    echo "FAIL: expected CALVIN_KIOSK_HOSTNAME=pi-operator, got CALVIN_KIOSK_HOSTNAME=${actual_host}"
     exit 1
 fi

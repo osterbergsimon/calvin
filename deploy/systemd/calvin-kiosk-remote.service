@@ -17,7 +17,11 @@ ExecStartPre=/bin/sleep 2
 ExecStartPre=/bin/bash -c 'pkill -u calvin chromium || pkill -u calvin chromium-browser || true'
 ExecStartPre=/bin/sleep 1
 ExecStartPre=/bin/bash -c 'rm -rf /home/calvin/.cache/chromium/Default/Cache/* "/home/calvin/.cache/chromium/Default/Code Cache"/* 2>/dev/null || true'
-ExecStart=/bin/bash -c '/usr/bin/chromium \
+ExecStart=/bin/bash -c 'q=""; \
+    [ -n "${CALVIN_KIOSK_ID:-}" ] && q="kiosk=${CALVIN_KIOSK_ID}"; \
+    [ -n "${CALVIN_KIOSK_HOSTNAME:-}" ] && q="${q:+${q}&}khost=${CALVIN_KIOSK_HOSTNAME}"; \
+    url="${CALVIN_BACKEND_URL%/}/${q:+?${q}}"; \
+    /usr/bin/chromium \
     --kiosk \
     --noerrdialogs \
     --disable-infobars \
@@ -50,7 +54,7 @@ ExecStart=/bin/bash -c '/usr/bin/chromium \
     --disable-background-downloads \
     --disk-cache-size=0 \
     --media-cache-size=0 \
-    "${CALVIN_BACKEND_URL%/}/${CALVIN_KIOSK_ID:+?kiosk=${CALVIN_KIOSK_ID}}"'
+    "$url"'
 Restart=always
 RestartSec=10
 StandardOutput=journal

@@ -27,9 +27,27 @@ done
 # A stock Pi image defaults hostname to "raspberrypi", so hostname alone collides
 # across multiple Pis; the machine-id suffix disambiguates. Falls back to the
 # primary NIC MAC, then the Pi CPU serial, if machine-id is unavailable.
+# Sanitize a hostname to the kiosk id/hostname allowlist ([A-Za-z0-9.-]) so a
+# weird hostname can't inject odd bytes into CALVIN_KIOSK_ID / CALVIN_KIOSK_HOSTNAME
+# (the backend registry rejects anything outside [A-Za-z0-9._-]).
+sanitize_hostname() {
+    printf '%s' "$1" | tr -cd 'A-Za-z0-9.-'
+}
+
+# The Pi's own hostname, sanitized. In Mode B the backend host differs from the
+# kiosk host, so the kiosk must report its own hostname (default $(hostname),
+# operator-editable in /etc/default/calvin-kiosk).
+compute_default_kiosk_hostname() {
+    local host
+    host="${HOSTNAME_OVERRIDE:-$(hostname 2>/dev/null || echo kiosk)}"
+    host="$(sanitize_hostname "$host")"
+    [ -n "$host" ] || host="kiosk"
+    printf '%s\n' "$host"
+}
+
 compute_default_kiosk_id() {
     local host suffix src
-    host="${HOSTNAME_OVERRIDE:-$(hostname 2>/dev/null || echo kiosk)}"
+    host="$(compute_default_kiosk_hostname)"
     src="${MACHINE_ID_OVERRIDE:-}"
     if [ -z "$src" ] && [ -r /etc/machine-id ]; then src="$(cat /etc/machine-id)"; fi
     if [ -z "$src" ]; then
@@ -56,14 +74,18 @@ compute_default_kiosk_id() {
 install_kiosk_config() {
     local env_file="${CALVIN_KIOSK_ENV_FILE:-/etc/default/calvin-kiosk}"
     log "Writing ${env_file}..."
-    # Preserve an operator-set CALVIN_KIOSK_ID across file recreation.
-    local existing_id=""
+    # Preserve operator-set CALVIN_KIOSK_ID / CALVIN_KIOSK_HOSTNAME across file
+    # recreation (same pattern for both — an operator override wins over defaults).
+    local existing_id="" existing_host=""
     if [ -f "$env_file" ]; then
         existing_id="$(grep '^CALVIN_KIOSK_ID=' "$env_file" | cut -d= -f2- || true)"
+        existing_host="$(grep '^CALVIN_KIOSK_HOSTNAME=' "$env_file" | cut -d= -f2- || true)"
     fi
     install -m 0644 /dev/null "$env_file"
     upsert_env_value "$env_file" CALVIN_BACKEND_URL "${BACKEND_URL}"
     upsert_env_value "$env_file" CALVIN_KIOSK_ID "${existing_id:-$(compute_default_kiosk_id)}"
+    upsert_env_value "$env_file" CALVIN_KIOSK_HOSTNAME \
+        "${existing_host:-$(compute_default_kiosk_hostname)}"
 }
 
 # When sourced for testing, stop here — it only halts execution when the file is
