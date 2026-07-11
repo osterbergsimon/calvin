@@ -1491,8 +1491,42 @@
     },
     "/api/config": {
       "get": {
-        "description": "Get current configuration.",
+        "description": "Get current configuration.\n\nOptional ?kiosk=<id> (+ ?khost=<hostname>) registers the requesting kiosk.\nThe returned config is unchanged here; per-kiosk merge arrives in dd9.3.",
         "operationId": "get_config_api_config_get",
+        "parameters": [
+          {
+            "in": "query",
+            "name": "kiosk",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Kiosk"
+            }
+          },
+          {
+            "in": "query",
+            "name": "khost",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Khost"
+            }
+          }
+        ],
         "responses": {
           "200": {
             "content": {
@@ -1501,6 +1535,16 @@
               }
             },
             "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
           }
         },
         "summary": "Get Config",
@@ -2221,6 +2265,26 @@
         "summary": "Set Single Mapping",
         "tags": [
           "keyboard"
+        ]
+      }
+    },
+    "/api/kiosks": {
+      "get": {
+        "description": "List known kiosks (id, hostname, last-seen).",
+        "operationId": "get_kiosks_api_kiosks_get",
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            },
+            "description": "Successful Response"
+          }
+        },
+        "summary": "Get Kiosks",
+        "tags": [
+          "kiosks"
         ]
       }
     },

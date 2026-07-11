@@ -242,6 +242,7 @@ def test_client(temp_db_path: Path, temp_image_dir: Path) -> Generator[TestClien
     _reload_modules(
         "app.services.config_service",
         "app.services.keyboard_mapping_service",
+        "app.services.kiosk_registry",
         "app.services.plugin_calendar_service",
         "app.services.plugin_image_service",
         "app.plugins.registry",
@@ -255,6 +256,7 @@ def test_client(temp_db_path: Path, temp_image_dir: Path) -> Generator[TestClien
         "app.api.routes.calendar",
         "app.api.routes.images",
         "app.api.routes.keyboard",
+        "app.api.routes.kiosks",
         "app.api.routes.system",
         "app.api.routes.web_services",
     )
@@ -297,6 +299,7 @@ def test_client(temp_db_path: Path, temp_image_dir: Path) -> Generator[TestClien
         health,
         images,
         keyboard,
+        kiosks,
         plugins,
         system,
     )
@@ -311,6 +314,7 @@ def test_client(temp_db_path: Path, temp_image_dir: Path) -> Generator[TestClien
     )
     test_app.include_router(health.router, prefix="/api", tags=["health"])
     test_app.include_router(config.router, prefix="/api", tags=["config"])
+    test_app.include_router(kiosks.router, prefix="/api", tags=["kiosks"])
     test_app.include_router(calendar.router, prefix="/api", tags=["calendar"])
     test_app.include_router(keyboard.router, prefix="/api", tags=["keyboard"])
     test_app.include_router(images.router, prefix="/api", tags=["images"])

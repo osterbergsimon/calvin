@@ -126,6 +126,7 @@ from app.api.routes import (  # noqa: E402
     health,
     images,
     keyboard,
+    kiosks,
     plugins,
     system,
 )
@@ -537,6 +538,7 @@ async def general_exception_handler(request: Request, exc: Exception):
 # Include routers
 app.include_router(health.router, prefix="/api", tags=["health"])
 app.include_router(config.router, prefix="/api", tags=["config"])
+app.include_router(kiosks.router, prefix="/api", tags=["kiosks"])
 app.include_router(calendar.router, prefix="/api", tags=["calendar"])
 app.include_router(keyboard.router, prefix="/api", tags=["keyboard"])
 app.include_router(images.router, prefix="/api", tags=["images"])
