@@ -209,6 +209,30 @@ def test_update_config_partial(test_client: TestClient):
 
 
 @pytest.mark.integration
+def test_get_config_records_kiosk(test_client: TestClient):
+    """A ?kiosk= request registers the kiosk; the config body is unchanged."""
+    baseline = test_client.get("/api/config").json()
+
+    scoped = test_client.get("/api/config?kiosk=kitchen-3f9a2c&khost=raspberrypi")
+    assert scoped.status_code == 200
+    # Body identical to the unscoped response (merge is dd9.3, not dd9.2).
+    scoped_body = scoped.json()
+    scoped_body.pop("frontendVersion", None)
+    baseline.pop("frontendVersion", None)
+    assert scoped_body == baseline
+
+    kiosks = test_client.get("/api/kiosks").json()["kiosks"]
+    assert any(k["id"] == "kitchen-3f9a2c" and k["hostname"] == "raspberrypi" for k in kiosks)
+
+
+@pytest.mark.integration
+def test_get_config_no_kiosk_unchanged(test_client: TestClient):
+    """No ?kiosk= means no registry rows and today's exact behavior."""
+    test_client.get("/api/config")
+    assert test_client.get("/api/kiosks").json() == {"kiosks": []}
+
+
+@pytest.mark.integration
 class TestConfigDisplayOrientation:
     """Test display orientation config endpoint."""
 

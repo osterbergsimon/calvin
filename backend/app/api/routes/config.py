@@ -10,6 +10,7 @@ from loguru import logger
 from pydantic import BaseModel, ConfigDict
 
 from app.config import settings
+from app.services import kiosk_registry
 from app.services.config_service import config_service
 from app.services.display_orientation_service import display_orientation_service
 
@@ -157,8 +158,14 @@ class ConfigUpdate(BaseModel):
 
 
 @router.get("/config")
-async def get_config():
-    """Get current configuration."""
+async def get_config(kiosk: str | None = None, khost: str | None = None):
+    """Get current configuration.
+
+    Optional ?kiosk=<id> (+ ?khost=<hostname>) registers the requesting kiosk.
+    The returned config is unchanged here; per-kiosk merge arrives in dd9.3.
+    """
+    if kiosk:
+        await kiosk_registry.record_kiosk(kiosk, hostname=khost)
     config = await config_service.get_config()
 
     # Set defaults if not present
