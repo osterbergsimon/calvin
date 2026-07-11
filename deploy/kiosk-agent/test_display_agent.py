@@ -204,3 +204,47 @@ def test_run_survives_non_dict_config(monkeypatch):
               sleep=lambda s: slept.append(s), iterations=1)
     assert applied == []                 # never touched the display
     assert slept == [agent.BACKOFF_SECONDS]
+
+
+def test_apply_rotation_invalid_is_skipped(monkeypatch):
+    calls = []
+    monkeypatch.setattr(agent.subprocess, "run", lambda *a, **k: calls.append(a))
+    assert agent.apply_rotation("sideways", "HDMI-1") is None
+    assert calls == []  # never shells out for an invalid value
+
+
+def test_apply_rotation_runs_xrandr(monkeypatch):
+    calls = []
+
+    def fake_run(cmd, **kw):
+        calls.append(cmd)
+        return SimpleNamespace(returncode=0, stdout="", stderr="")
+
+    monkeypatch.setattr(agent.subprocess, "run", fake_run)
+    assert agent.apply_rotation("left", "HDMI-1") == "HDMI-1"
+    assert calls[-1] == ["xrandr", "--output", "HDMI-1", "--rotate", "left"]
+
+
+def test_apply_rotation_autodetects_output(monkeypatch):
+    def fake_run(cmd, **kw):
+        if cmd[:2] == ["xrandr", "--query"]:
+            return SimpleNamespace(
+                returncode=0, stdout="HDMI-1 connected primary 1920x1080+0+0\n", stderr=""
+            )
+        return SimpleNamespace(returncode=0, stdout="", stderr="")
+
+    monkeypatch.setattr(agent.subprocess, "run", fake_run)
+    assert agent.apply_rotation("inverted") == "HDMI-1"
+
+
+def test_detect_primary_output_parses_connected(monkeypatch):
+    out = (
+        "Screen 0: minimum 320 x 200, current 1920 x 1080\n"
+        "HDMI-1 connected primary 1920x1080+0+0 (normal left inverted right) 510mm x 287mm\n"
+        "HDMI-2 disconnected (normal left inverted right)\n"
+    )
+    monkeypatch.setattr(
+        agent.subprocess, "run",
+        lambda *a, **k: SimpleNamespace(returncode=0, stdout=out, stderr=""),
+    )
+    assert agent.detect_primary_output() == "HDMI-1"

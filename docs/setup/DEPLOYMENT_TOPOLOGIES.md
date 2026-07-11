@@ -124,6 +124,23 @@ polling) and re-checks the schedule every `CALVIN_DISPLAY_REFRESH_SECONDS`
 (default 900) to pick up edits. Set the schedule in the UI as usual; the kiosk
 follows it. Logs: `journalctl -u calvin-display-agent.service`.
 
+### Screen rotation on a Mode-B kiosk
+
+Screen rotation is **physical to each Pi**, so it lives in the device-local
+`/etc/default/calvin-kiosk`, not in the (global) server config. Set
+`CALVIN_DISPLAY_ROTATION` to an `xrandr` value — `normal`, `left`, `right`, or
+`inverted` — and the display-agent applies it once on startup (auto-detecting
+the connected output, or use `CALVIN_DISPLAY_OUTPUT` to name it):
+
+```
+CALVIN_DISPLAY_ROTATION=left
+# CALVIN_DISPLAY_OUTPUT=HDMI-1   # optional; auto-detected if unset
+```
+
+Then `sudo systemctl restart calvin-display-agent.service`. This replaces the
+old backend-side `display_orientation_service`, which cannot reach a remote
+kiosk's display. (Per-device settings are tracked under epic `calvin-dd9`.)
+
 ### Changing the backend URL later
 
 ```bash

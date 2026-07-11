@@ -152,11 +152,66 @@ def run(backend_url, refresh_seconds, *, fetch=fetch_config, sleep=time_module.s
         sleep(delay)
 
 
+X11_ENV = {"DISPLAY": ":0", "XAUTHORITY": "/home/calvin/.Xauthority"}
+VALID_ROTATIONS = ("normal", "left", "right", "inverted")
+
+
+def detect_primary_output():
+    """Return the first connected xrandr output name, or None."""
+    try:
+        r = subprocess.run(
+            ["xrandr", "--query"],
+            env=dict(os.environ, **X11_ENV),
+            capture_output=True, text=True, timeout=10,
+        )
+    except (FileNotFoundError, subprocess.SubprocessError):
+        return None
+    if r.returncode != 0:
+        return None
+    for line in r.stdout.splitlines():
+        if " connected" in line:  # excludes " disconnected"
+            return line.split()[0]
+    return None
+
+
+def apply_rotation(rotation, output=None):
+    """Rotate the display once via xrandr (device-local physical setting).
+
+    rotation is an xrandr value: normal | left | right | inverted. Returns the
+    output name applied, or None if skipped/failed. This is a one-shot startup
+    action, not part of the schedule loop.
+    """
+    if rotation not in VALID_ROTATIONS:
+        log(f"ignoring invalid rotation {rotation!r} (expected one of {VALID_ROTATIONS})")
+        return None
+    out = output or detect_primary_output()
+    if not out:
+        log("no connected display output found; cannot apply rotation")
+        return None
+    try:
+        r = subprocess.run(
+            ["xrandr", "--output", out, "--rotate", rotation],
+            env=dict(os.environ, **X11_ENV),
+            capture_output=True, text=True, timeout=10,
+        )
+    except (FileNotFoundError, subprocess.SubprocessError) as e:
+        log(f"rotation failed ({e})")
+        return None
+    if r.returncode == 0:
+        log(f"rotation applied: {out} -> {rotation}")
+        return out
+    log(f"rotation failed (xrandr rc={r.returncode}): {r.stderr.strip()}")
+    return None
+
+
 def main():
     backend = os.environ.get("CALVIN_BACKEND_URL", "").strip()
     if not backend:
         log("CALVIN_BACKEND_URL not set")
         sys.exit(1)
+    rotation = os.environ.get("CALVIN_DISPLAY_ROTATION", "").strip()
+    if rotation:
+        apply_rotation(rotation, os.environ.get("CALVIN_DISPLAY_OUTPUT", "").strip() or None)
     refresh = int(os.environ.get("CALVIN_DISPLAY_REFRESH_SECONDS", DEFAULT_REFRESH_SECONDS))
     log(f"starting: backend={backend} refresh={refresh}s")
     run(backend, refresh)
