@@ -15,6 +15,37 @@
 
 set -euo pipefail
 
+# Allow tests to source this file for its functions without executing setup.
+_CALVIN_SOURCE_ONLY=0
+for _arg in "$@"; do
+    if [ "$_arg" = "--source-only" ]; then
+        _CALVIN_SOURCE_ONLY=1
+    fi
+done
+
+# Compute a collision-proof default kiosk id: <hostname>-<6 hex from machine-id>.
+# A stock Pi image defaults hostname to "raspberrypi", so hostname alone collides
+# across multiple Pis; the machine-id suffix disambiguates. Falls back to the
+# primary NIC MAC, then the Pi CPU serial, if machine-id is unavailable.
+compute_default_kiosk_id() {
+    local host suffix src
+    host="${HOSTNAME_OVERRIDE:-$(hostname 2>/dev/null || echo kiosk)}"
+    src="${MACHINE_ID_OVERRIDE:-}"
+    if [ -z "$src" ] && [ -r /etc/machine-id ]; then src="$(cat /etc/machine-id)"; fi
+    if [ -z "$src" ]; then
+        src="$(cat /sys/class/net/*/address 2>/dev/null | grep -v '00:00:00:00:00:00' | head -n1 | tr -d ':')"
+    fi
+    if [ -z "$src" ]; then
+        src="$(grep -m1 -i Serial /proc/cpuinfo 2>/dev/null | awk '{print $3}')"
+    fi
+    suffix="$(printf '%s' "$src" | tr -cd 'a-f0-9' | cut -c1-6)"
+    [ -n "$suffix" ] || suffix="000000"
+    printf '%s-%s\n' "$host" "$suffix"
+}
+
+# When sourced for testing, stop here — do not run the setup body below.
+[ "${_CALVIN_SOURCE_ONLY}" = "1" ] && return 0 2>/dev/null || true
+
 _ENV_GIT_BRANCH="${GIT_BRANCH:-}"
 _ENV_GIT_REPO="${GIT_REPO:-}"
 
@@ -133,6 +164,9 @@ install_kiosk_config() {
     log "Writing /etc/default/calvin-kiosk..."
     install -m 0644 /dev/null /etc/default/calvin-kiosk
     upsert_env_value /etc/default/calvin-kiosk CALVIN_BACKEND_URL "${BACKEND_URL}"
+    if ! grep -q '^CALVIN_KIOSK_ID=' /etc/default/calvin-kiosk 2>/dev/null; then
+        upsert_env_value /etc/default/calvin-kiosk CALVIN_KIOSK_ID "$(compute_default_kiosk_id)"
+    fi
 }
 
 ensure_repo_for_unit_files() {
