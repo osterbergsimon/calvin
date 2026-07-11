@@ -37,3 +37,23 @@ async def test_list_kiosks_shape(test_db):
     assert kiosks and kiosks[0]["id"] == "hallway-b71e04"
     assert set(kiosks[0]) == {"id", "hostname", "lastSeen", "lastAppliedVersion"}
     assert isinstance(kiosks[0]["lastSeen"], str)  # ISO-8601
+
+
+@pytest.mark.asyncio
+@pytest.mark.unit
+async def test_record_kiosk_rejects_over_long_id(test_db):
+    """A kiosk_id longer than 255 chars must be rejected — no row written."""
+    long_id = "x" * 300
+    await kiosk_registry.record_kiosk(long_id, hostname="somehost")
+    assert await KioskDB.objects.count() == 0
+
+
+@pytest.mark.asyncio
+@pytest.mark.unit
+async def test_record_kiosk_truncates_over_long_hostname(test_db):
+    """A hostname longer than 255 chars must be truncated to 255, not rejected."""
+    long_host = "h" * 300
+    await kiosk_registry.record_kiosk("kiosk-abc123", hostname=long_host)
+    row = await KioskDB.objects.get(id="kiosk-abc123")
+    assert row.hostname is not None
+    assert len(row.hostname) == 255

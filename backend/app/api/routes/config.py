@@ -165,7 +165,10 @@ async def get_config(kiosk: str | None = None, khost: str | None = None):
     The returned config is unchanged here; per-kiosk merge arrives in dd9.3.
     """
     if kiosk:
-        await kiosk_registry.record_kiosk(kiosk, hostname=khost)
+        try:
+            await kiosk_registry.record_kiosk(kiosk, hostname=khost)
+        except Exception as exc:
+            logger.warning(f"Failed to record kiosk {kiosk!r}: {exc}")
     config = await config_service.get_config()
 
     # Set defaults if not present

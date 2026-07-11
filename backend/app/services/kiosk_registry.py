@@ -14,6 +14,13 @@ async def record_kiosk(kiosk_id: str, hostname: str | None = None) -> None:
     if not kiosk_id:
         return
 
+    if len(kiosk_id) > 255:
+        logger.warning(f"Ignoring over-long kiosk_id ({len(kiosk_id)} chars)")
+        return
+
+    if hostname is not None and len(hostname) > 255:
+        hostname = hostname[:255]
+
     existing = await KioskDB.objects.get_or_none(id=kiosk_id)
     now = datetime.utcnow()
     if existing is None:

@@ -233,6 +233,28 @@ def test_get_config_no_kiosk_unchanged(test_client: TestClient):
 
 
 @pytest.mark.integration
+def test_get_config_returns_200_when_record_kiosk_raises(test_client: TestClient):
+    """Config must be delivered even if kiosk registration raises an exception.
+
+    record_kiosk is best-effort: a DB lock or race must not turn the kiosk's
+    /api/config into a 500.
+    """
+    from unittest.mock import AsyncMock, patch
+
+    with patch(
+        "app.api.routes.config.kiosk_registry.record_kiosk",
+        new_callable=AsyncMock,
+        side_effect=RuntimeError("simulated DB lock"),
+    ):
+        response = test_client.get("/api/config?kiosk=test-kiosk-abc&khost=testhost")
+
+    assert response.status_code == 200
+    data = response.json()
+    # Config body must still be present (spot-check a required key)
+    assert "orientation" in data
+
+
+@pytest.mark.integration
 class TestConfigDisplayOrientation:
     """Test display orientation config endpoint."""
 

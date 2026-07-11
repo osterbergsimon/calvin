@@ -9,5 +9,5 @@ router = APIRouter()
 
 @router.get("/kiosks")
 async def get_kiosks():
-    """List known kiosks (id, hostname, last-seen)."""
+    """List known kiosks (id, hostname, last-seen, lastAppliedVersion)."""
     return {"kiosks": await kiosk_registry.list_kiosks()}

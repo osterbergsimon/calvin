@@ -2270,7 +2270,7 @@
     },
     "/api/kiosks": {
       "get": {
-        "description": "List known kiosks (id, hostname, last-seen).",
+        "description": "List known kiosks (id, hostname, last-seen, lastAppliedVersion).",
         "operationId": "get_kiosks_api_kiosks_get",
         "responses": {
           "200": {
