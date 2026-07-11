@@ -134,3 +134,6 @@ bandit-report.json
 
 # Playwright MCP session snapshots (scratch)
 .playwright-mcp/
+
+# Git worktrees (project-local)
+.worktrees/
