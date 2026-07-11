@@ -1,5 +1,7 @@
 """Unit tests for the kiosk registry service."""
 
+import sqlite3
+
 import pytest
 
 from app.models.db_models import KioskDB
@@ -42,10 +44,59 @@ async def test_list_kiosks_shape(test_db):
 @pytest.mark.asyncio
 @pytest.mark.unit
 async def test_record_kiosk_rejects_over_long_id(test_db):
-    """A kiosk_id longer than 255 chars must be rejected — no row written."""
+    """A kiosk_id longer than 64 chars must be rejected — no row written."""
     long_id = "x" * 300
     await kiosk_registry.record_kiosk(long_id, hostname="somehost")
     assert await KioskDB.objects.count() == 0
+
+
+@pytest.mark.asyncio
+@pytest.mark.unit
+@pytest.mark.parametrize("bad_id", ["a b", "x;y", "..%2f", "kitchen\n", "id/../etc", "a\tb"])
+async def test_record_kiosk_rejects_invalid_shape(test_db, bad_id):
+    """An id with characters outside [A-Za-z0-9._-] writes no row."""
+    await kiosk_registry.record_kiosk(bad_id, hostname="somehost")
+    assert await KioskDB.objects.count() == 0
+
+
+@pytest.mark.asyncio
+@pytest.mark.unit
+@pytest.mark.parametrize("good_id", ["kitchen", "raspberrypi-3f9a2c", "pi_hall.2", "A-b_c.1"])
+async def test_record_kiosk_accepts_valid_shape(test_db, good_id):
+    """Friendly names and default <host>-<hex> ids are accepted."""
+    await kiosk_registry.record_kiosk(good_id, hostname="somehost")
+    assert await KioskDB.objects.count() == 1
+
+
+@pytest.mark.asyncio
+@pytest.mark.unit
+async def test_record_kiosk_create_race_falls_through_to_update(test_db, monkeypatch):
+    """If two requests race to create the same new id, the loser's IntegrityError
+    must be swallowed and fall through to the update path — exactly one row, no
+    exception propagates."""
+    from ormar.queryset.queryset import QuerySet
+
+    real_create = QuerySet.create
+    calls = {"n": 0}
+
+    async def racing_create(self, **kwargs):
+        # First create call: simulate the losing side of a create race by
+        # actually inserting the row (so it exists) then raising IntegrityError.
+        if calls["n"] == 0:
+            calls["n"] += 1
+            await real_create(self, **kwargs)
+            raise sqlite3.IntegrityError("UNIQUE constraint failed: kiosks.id")
+        return await real_create(self, **kwargs)
+
+    monkeypatch.setattr(QuerySet, "create", racing_create)
+
+    # Must not raise.
+    await kiosk_registry.record_kiosk("kitchen-3f9a2c", hostname="pi-kitchen")
+
+    assert await KioskDB.objects.count() == 1
+    row = await KioskDB.objects.get(id="kitchen-3f9a2c")
+    assert row.hostname == "pi-kitchen"
+    assert row.last_seen is not None
 
 
 @pytest.mark.asyncio
