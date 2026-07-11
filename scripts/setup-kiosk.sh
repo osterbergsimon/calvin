@@ -33,7 +33,17 @@ compute_default_kiosk_id() {
     src="${MACHINE_ID_OVERRIDE:-}"
     if [ -z "$src" ] && [ -r /etc/machine-id ]; then src="$(cat /etc/machine-id)"; fi
     if [ -z "$src" ]; then
-        src="$(cat /sys/class/net/*/address 2>/dev/null | grep -v '00:00:00:00:00:00' | head -n1 | tr -d ':')"
+        # Iterate interfaces in stable sorted order; skip loopback and obvious
+        # virtual interfaces (docker*, virbr*, veth*, br-*) to get a real NIC.
+        local iface mac
+        for iface in $(find /sys/class/net -maxdepth 1 -mindepth 1 -printf '%f\n' 2>/dev/null | sort); do
+            case "$iface" in lo|docker*|virbr*|veth*|br-*) continue ;; esac
+            mac="$(cat "/sys/class/net/$iface/address" 2>/dev/null || true)"
+            if [ -n "$mac" ] && [ "$mac" != "00:00:00:00:00:00" ]; then
+                src="$(printf '%s' "$mac" | tr -d ':')"
+                break
+            fi
+        done
     fi
     if [ -z "$src" ]; then
         src="$(grep -m1 -i Serial /proc/cpuinfo 2>/dev/null | awk '{print $3}')"
@@ -43,7 +53,21 @@ compute_default_kiosk_id() {
     printf '%s-%s\n' "$host" "$suffix"
 }
 
-# When sourced for testing, stop here — do not run the setup body below.
+install_kiosk_config() {
+    local env_file="${CALVIN_KIOSK_ENV_FILE:-/etc/default/calvin-kiosk}"
+    log "Writing ${env_file}..."
+    # Preserve an operator-set CALVIN_KIOSK_ID across file recreation.
+    local existing_id=""
+    if [ -f "$env_file" ]; then
+        existing_id="$(grep '^CALVIN_KIOSK_ID=' "$env_file" | cut -d= -f2- || true)"
+    fi
+    install -m 0644 /dev/null "$env_file"
+    upsert_env_value "$env_file" CALVIN_BACKEND_URL "${BACKEND_URL}"
+    upsert_env_value "$env_file" CALVIN_KIOSK_ID "${existing_id:-$(compute_default_kiosk_id)}"
+}
+
+# When sourced for testing, stop here — it only halts execution when the file is
+# *sourced* (not when run directly), which is the intended test usage.
 [ "${_CALVIN_SOURCE_ONLY}" = "1" ] && return 0 2>/dev/null || true
 
 _ENV_GIT_BRANCH="${GIT_BRANCH:-}"
@@ -157,15 +181,6 @@ parse_args() {
     if ! echo "${BACKEND_URL}" | grep -qE '^https?://'; then
         echo "Error: --backend-url must start with http:// or https:// (got: ${BACKEND_URL})" >&2
         exit 1
-    fi
-}
-
-install_kiosk_config() {
-    log "Writing /etc/default/calvin-kiosk..."
-    install -m 0644 /dev/null /etc/default/calvin-kiosk
-    upsert_env_value /etc/default/calvin-kiosk CALVIN_BACKEND_URL "${BACKEND_URL}"
-    if ! grep -q '^CALVIN_KIOSK_ID=' /etc/default/calvin-kiosk 2>/dev/null; then
-        upsert_env_value /etc/default/calvin-kiosk CALVIN_KIOSK_ID "$(compute_default_kiosk_id)"
     fi
 }
 

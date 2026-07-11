@@ -50,7 +50,7 @@ ExecStart=/bin/bash -c '/usr/bin/chromium \
     --disable-background-downloads \
     --disk-cache-size=0 \
     --media-cache-size=0 \
-    "${CALVIN_BACKEND_URL%/}/${CALVIN_KIOSK_ID:+?kiosk=$CALVIN_KIOSK_ID}"'
+    "${CALVIN_BACKEND_URL%/}/${CALVIN_KIOSK_ID:+?kiosk=${CALVIN_KIOSK_ID}}"'
 Restart=always
 RestartSec=10
 StandardOutput=journal
