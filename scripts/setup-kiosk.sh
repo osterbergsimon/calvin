@@ -260,6 +260,13 @@ main() {
     mkdir -p "$(dirname "${LOG_FILE}")"
 
     ensure_user_exists "${CALVIN_USER}"
+    # A baked SSH key (from firstrun seeding) makes the kiosk reachable for
+    # recovery; CALVIN_KIOSK_SSH_PUBKEY is read from /etc/default/calvin-kiosk.
+    if [ -f /etc/default/calvin-kiosk ]; then
+        # shellcheck disable=SC1091
+        . /etc/default/calvin-kiosk
+    fi
+    install_authorized_key "${CALVIN_USER}" "${CALVIN_KIOSK_SSH_PUBKEY:-}"
     update_system_packages
 
     log "Installing kiosk dependencies..."

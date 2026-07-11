@@ -499,6 +499,30 @@ install_privileged_sudo_helper_script() {
     log "Script installed: ${target_path} (root:root 0755)"
 }
 
+# Install a single authorized SSH public key for a user, idempotently.
+# CALVIN_HOME_OVERRIDE lets tests point the home root at a temp dir.
+install_authorized_key() {
+    local user="$1"
+    local pubkey="$2"
+    [ -n "${pubkey}" ] || return 0
+
+    local home_root="${CALVIN_HOME_OVERRIDE:-/home}"
+    local ssh_dir="${home_root}/${user}/.ssh"
+    local auth="${ssh_dir}/authorized_keys"
+
+    mkdir -p "${ssh_dir}"
+    chmod 700 "${ssh_dir}"
+    touch "${auth}"
+    if ! grep -qF "${pubkey}" "${auth}"; then
+        printf '%s\n' "${pubkey}" >> "${auth}"
+    fi
+    chmod 600 "${auth}"
+    # chown only when the target user actually exists (skipped in tests).
+    if id "${user}" >/dev/null 2>&1 && [ -z "${CALVIN_HOME_OVERRIDE:-}" ]; then
+        chown -R "${user}:${user}" "${ssh_dir}"
+    fi
+}
+
 # Idempotent KEY=VALUE upsert in a `.env`-style file. Adds the line if
 # missing, replaces it if present. Skips quoting — values must already
 # be in shell-friendly form.
