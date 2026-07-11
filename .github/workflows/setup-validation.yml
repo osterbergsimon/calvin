@@ -77,6 +77,27 @@ jobs:
           fi
           echo "Key functions validated ✓"
 
+      - name: Run scripts/tests/*.sh
+        run: |
+          echo "Running standalone shell tests in scripts/tests/..."
+          shopt -s nullglob
+          failed=0
+          for t in scripts/tests/*.sh; do
+            echo "::group::$t"
+            if bash "$t"; then
+              echo "PASS: $t"
+            else
+              echo "::error file=$t::Shell test failed: $t"
+              failed=1
+            fi
+            echo "::endgroup::"
+          done
+          if [ "$failed" -ne 0 ]; then
+            echo "::error::One or more scripts/tests/*.sh failed"
+            exit 1
+          fi
+          echo "All scripts/tests/*.sh passed ✓"
+
   test-dependency-installation:
     name: Test Dependency Installation
     runs-on: ubuntu-latest

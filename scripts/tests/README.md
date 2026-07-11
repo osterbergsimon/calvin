@@ -6,7 +6,12 @@ This directory contains tests for the Calvin setup scripts.
 
 - `setup-common.bats` - Tests for utility functions in `setup-common.sh`
 - `setup.bats` - Tests for the mode-aware Raspberry Pi setup script and the `setup-dev.sh` compatibility wrapper
+- `test_default_kiosk_id.sh` - Verifies `compute_default_kiosk_id()` / `compute_default_kiosk_hostname()` in `setup-kiosk.sh` (stable `<hostname>-<6hex>` id, machine-id-derived suffix, hostname sanitized to `[A-Za-z0-9.-]`)
+- `test_kiosk_id_persists.sh` - Regression test: an operator-set `CALVIN_KIOSK_ID` / `CALVIN_KIOSK_HOSTNAME` survives re-running `install_kiosk_config()`
 - `helpers/` - Test helper functions and mocks
+
+The two `test_*.sh` files are plain bash (no bats needed) and run in CI via the
+`Run scripts/tests/*.sh` step in `.github/workflows/setup-validation.yml`.
 
 ## Running Tests
 
@@ -34,6 +39,15 @@ bats tests/
 Run specific test file:
 ```bash
 bats tests/setup-common.bats
+```
+
+### Standalone shell tests (no bats)
+
+The `test_*.sh` files run directly with bash and exit non-zero on failure:
+
+```bash
+bash scripts/tests/test_default_kiosk_id.sh
+bash scripts/tests/test_kiosk_id_persists.sh
 ```
 
 ### PowerShell Script Tests (using Pester)
