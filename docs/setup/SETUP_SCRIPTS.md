@@ -168,6 +168,23 @@ npm run dev
 
 **Note:** Keyboard input uses a mock handler on Windows. Full keyboard support is available on Linux/Raspberry Pi.
 
+### Zero-touch Kiosk Provisioning (`scripts/bake-kiosk-firstrun.sh`)
+
+**Purpose:** Bake a first-boot bundle onto a freshly-flashed card so a Pi
+self-provisions into a Mode-B kiosk with no SSH and no per-Pi typing.
+
+**Usage:**
+
+```bash
+sudo bash scripts/bake-kiosk-firstrun.sh \
+  --backend-url http://homeserver.local:8000 \
+  --wifi-ssid HomeNet --wifi-psk 's3cret' --wifi-country SE \
+  --hostname kitchen \
+  --boot-dir /media/$USER/bootfs
+```
+
+Full walkthrough: [KIOSK_PROVISIONING.md](KIOSK_PROVISIONING.md).
+
 ## Script Configuration
 
 All scripts support environment variables for customization:
