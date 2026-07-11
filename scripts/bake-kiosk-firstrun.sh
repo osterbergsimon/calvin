@@ -114,16 +114,18 @@ BOOT_CMDLINE=/boot/firmware/cmdline.txt
 ENV_FILE=/etc/default/calvin-kiosk
 FIRSTRUN_EOF
 
-    # --- baked values (heredoc closed so these expand now) ---
-    cat <<EOF
-CALVIN_HOSTNAME='${HOSTNAME_ARG}'
-WIFI_SSID='${WIFI_SSID}'
-WIFI_PSK='${WIFI_PSK}'
-WIFI_COUNTRY='${WIFI_COUNTRY}'
-BACKEND_URL='${BACKEND_URL}'
-SETUP_KIOSK_URL='${setup_url}'
-SSH_PUBKEY='${pubkey}'
-EOF
+    # --- baked values: printf '%q' produces bash-safe assignments that survive
+    #     single-quotes, double-quotes, $, \, spaces, and other shell metacharacters
+    #     in WPA passphrases, SSIDs, etc.  The generated firstrun starts with
+    #     #!/bin/bash so %q output is always safe to source there.
+    emit_var() { printf '%s=%q\n' "$1" "$2"; }
+    emit_var CALVIN_HOSTNAME "${HOSTNAME_ARG}"
+    emit_var WIFI_SSID       "${WIFI_SSID}"
+    emit_var WIFI_PSK        "${WIFI_PSK}"
+    emit_var WIFI_COUNTRY    "${WIFI_COUNTRY}"
+    emit_var BACKEND_URL     "${BACKEND_URL}"
+    emit_var SETUP_KIOSK_URL "${setup_url}"
+    emit_var SSH_PUBKEY      "${pubkey}"
 
     cat <<'FIRSTRUN_EOF'
 
