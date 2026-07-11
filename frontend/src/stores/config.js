@@ -10,6 +10,7 @@ import {
   setRegionView,
 } from "../utils/layout";
 import { applyConfigPayload, createDefaultDisplaySchedule } from "./configRegistry";
+import { withKiosk } from "@/utils/kioskId";
 
 export const useConfigStore = defineStore("config", () => {
   const orientation = ref("landscape"); // 'landscape' | 'portrait'
@@ -195,7 +196,7 @@ export const useConfigStore = defineStore("config", () => {
     loading.value = true;
     error.value = null;
     try {
-      const response = await axios.get("/api/config");
+      const response = await axios.get(withKiosk("/api/config"));
       applyConfigPayload(response.data, configRefs, { useDefaults: true });
       return response.data;
     } catch (err) {
