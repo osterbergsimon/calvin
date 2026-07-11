@@ -15,7 +15,7 @@ This directory contains tests for the Calvin setup scripts.
 - `test_bake_kiosk_firstrun_cmdline.sh` - Verifies `main()` writes `firstrun.sh` and appends the `cmdline.txt` hook exactly once
 - `helpers/` - Test helper functions and mocks
 
-The two `test_*.sh` files are plain bash (no bats needed) and run in CI via the
+The seven `test_*.sh` files are plain bash (no bats needed) and run in CI via the
 `Run scripts/tests/*.sh` step in `.github/workflows/setup-validation.yml`.
 
 ## Running Tests
