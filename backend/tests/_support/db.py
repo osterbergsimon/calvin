@@ -30,7 +30,7 @@ from app.database import metadata
 logger = logging.getLogger(__name__)
 
 REQUIRED_TABLES: frozenset[str] = frozenset(
-    {"config", "keyboard_mappings", "plugin_types", "plugins"}
+    {"config", "keyboard_mappings", "plugin_types", "plugins", "kiosks"}
 )
 
 _BACKEND_DIR = Path(__file__).resolve().parents[2]
@@ -171,12 +171,13 @@ def update_ormar_models_database(new_database: databases.Database) -> None:
     """
     from app.models.db_models import (
         ConfigDB,
+        KioskDB,
         KeyboardMappingDB,
         PluginDB,
         PluginTypeDB,
     )
 
-    for model in (ConfigDB, KeyboardMappingDB, PluginDB, PluginTypeDB):
+    for model in (ConfigDB, KioskDB, KeyboardMappingDB, PluginDB, PluginTypeDB):
         model.ormar_config.database = new_database
 
 
