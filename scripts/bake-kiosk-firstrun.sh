@@ -191,13 +191,33 @@ reboot
 FIRSTRUN_EOF
 }
 
-# Sourced for testing: stop before running main.
-[ "${_CALVIN_SOURCE_ONLY}" = "1" ] && return 0 2>/dev/null || true
+CMDLINE_HOOK='systemd.run=/boot/firmware/firstrun.sh systemd.run_success_action=reboot systemd.unit=kernel-command-line.target'
+
+append_cmdline_hook() {
+    local cmdline="$1"
+    if grep -q 'systemd.run=/boot/firmware/firstrun.sh' "${cmdline}"; then
+        return 0
+    fi
+    # cmdline.txt must remain a single line: strip the trailing newline,
+    # append the hook, restore one newline.
+    local content
+    content="$(tr -d '\n' < "${cmdline}")"
+    printf '%s %s\n' "${content}" "${CMDLINE_HOOK}" > "${cmdline}"
+}
 
 main() {
     parse_args "$@"
     validate_args
-    echo "TODO: generate firstrun.sh (Task 4) and write cmdline hook (Task 5)"
+    emit_firstrun > "${BOOT_DIR}/firstrun.sh"
+    chmod 755 "${BOOT_DIR}/firstrun.sh"
+    append_cmdline_hook "${BOOT_DIR}/cmdline.txt"
+    echo "Baked kiosk firstrun into ${BOOT_DIR}."
+    echo "Backend: ${BACKEND_URL}"
+    [ -n "${HOSTNAME_ARG}" ] && echo "Hostname: ${HOSTNAME_ARG}"
+    echo "Eject the card, boot the Pi, and wait — it self-provisions (2 reboots)."
 }
+
+# Sourced for testing: stop before running main.
+[ "${_CALVIN_SOURCE_ONLY}" = "1" ] && return 0 2>/dev/null || true
 
 main "$@"
