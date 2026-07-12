@@ -230,6 +230,37 @@ def apply_rotation(rotation, output=None):
     return None
 
 
+def orientation_to_xrandr(cfg):
+    """Map server orientation config to an xrandr rotate value.
+
+    Matches backend display_orientation_service: flipped -> inverted;
+    else portrait -> left; else normal (landscape/unknown).
+    """
+    flipped = cfg_get(cfg, "orientation_flipped", "orientationFlipped", default=False)
+    if flipped:
+        return "inverted"
+    orientation = cfg_get(cfg, "orientation", default="landscape")
+    if orientation == "portrait":
+        return "left"
+    return "normal"
+
+
+def apply_device_physical(cfg, *, applier=apply_rotation, env=None):
+    """Apply device-physical settings (orientation) from the effective config.
+
+    CALVIN_DISPLAY_ROTATION env (device-local escape hatch) wins over the server
+    orientation. Gated on applyDisplayRotation (default True).
+    """
+    if env is None:
+        env = os.environ
+    if not cfg_get(cfg, "apply_display_rotation", "applyDisplayRotation", default=True):
+        return
+    env_rotation = env.get("CALVIN_DISPLAY_ROTATION", "").strip()
+    rotation = env_rotation or orientation_to_xrandr(cfg)
+    output = env.get("CALVIN_DISPLAY_OUTPUT", "").strip() or None
+    applier(rotation, output)
+
+
 def main():
     backend = os.environ.get("CALVIN_BACKEND_URL", "").strip()
     if not backend:

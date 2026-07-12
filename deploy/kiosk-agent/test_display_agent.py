@@ -273,3 +273,47 @@ def test_config_url_per_kiosk_with_khost():
         agent._config_url("http://h:8000", "kitchen-3f9a2c", "pi kitchen")
         == "http://h:8000/api/kiosks/kitchen-3f9a2c/config?khost=pi%20kitchen"
     )
+
+
+def test_orientation_to_xrandr_mapping():
+    assert agent.orientation_to_xrandr({"orientation": "landscape"}) == "normal"
+    assert agent.orientation_to_xrandr({"orientation": "portrait"}) == "left"
+    assert (
+        agent.orientation_to_xrandr({"orientation": "landscape", "orientationFlipped": True})
+        == "inverted"
+    )
+    assert (
+        agent.orientation_to_xrandr({"orientation": "portrait", "orientationFlipped": True})
+        == "inverted"
+    )
+    assert agent.orientation_to_xrandr({}) == "normal"  # default landscape
+
+
+def test_apply_device_physical_uses_server_orientation():
+    calls = []
+    agent.apply_device_physical(
+        {"orientation": "portrait", "applyDisplayRotation": True},
+        applier=lambda rot, output=None: calls.append(rot),
+        env={},
+    )
+    assert calls == ["left"]
+
+
+def test_apply_device_physical_env_escape_hatch_wins():
+    calls = []
+    agent.apply_device_physical(
+        {"orientation": "portrait", "applyDisplayRotation": True},
+        applier=lambda rot, output=None: calls.append(rot),
+        env={"CALVIN_DISPLAY_ROTATION": "inverted"},
+    )
+    assert calls == ["inverted"]  # env wins over server 'portrait'->'left'
+
+
+def test_apply_device_physical_skips_when_rotation_disabled():
+    calls = []
+    agent.apply_device_physical(
+        {"orientation": "portrait", "applyDisplayRotation": False},
+        applier=lambda rot, output=None: calls.append(rot),
+        env={},
+    )
+    assert calls == []
