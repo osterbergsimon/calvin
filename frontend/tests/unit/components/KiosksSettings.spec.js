@@ -5,6 +5,7 @@ import KiosksSettings from "@/components/settings/categories/KiosksSettings.vue"
 import { useKiosksStore } from "@/stores/kiosks";
 import { useConfigStore } from "@/stores/config";
 import SegmentedControl from "@/components/ui/SegmentedControl.vue";
+import ToggleSwitch from "@/components/ui/ToggleSwitch.vue";
 
 function mountWithKiosks(list) {
   setActivePinia(createPinia());
@@ -126,5 +127,25 @@ describe("KiosksSettings — orientation editor", () => {
     await flushPromises();
     expect(w.text()).toContain("Couldn't save to the server. Check the connection and try again.");
     expect(w.text()).not.toContain("Saved.");
+  });
+
+  it("shows offline post-save copy when the kiosk is not recently seen", async () => {
+    const stale = new Date(Date.now() - 10 * 60 * 1000).toISOString();
+    const offline = [{ id: "k1", hostname: "pi", lastSeen: stale, lastAppliedVersion: null }];
+    const { w } = await selectFirst(offline, {});
+    w.findComponent(SegmentedControl).vm.$emit("update:modelValue", "portrait");
+    await flushPromises();
+    expect(w.text()).toContain("Saved. Changes apply when this kiosk reconnects.");
+  });
+
+  it("setFlipped preserves unrelated override keys alongside orientationFlipped", async () => {
+    const { w, store } = await selectFirst(one, { availableScreens: ["a"] });
+    // ToggleSwitch[0] is the Flip 180° control
+    w.findAllComponents(ToggleSwitch)[0].vm.$emit("update:modelValue", true);
+    await flushPromises();
+    expect(store.saveOverrides).toHaveBeenCalledWith("k1", {
+      availableScreens: ["a"],
+      orientationFlipped: true,
+    });
   });
 });

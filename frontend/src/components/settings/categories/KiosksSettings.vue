@@ -28,7 +28,7 @@
     >
       <SettingRow
         label="Orientation"
-        :description="orientationOverridden ? 'set for this kiosk' : 'inherited from global'"
+        :description="orientationOverridden ? '‹set for this kiosk›' : '‹inherited from global›'"
       >
         <SegmentedControl
           :model-value="effOrientation"
@@ -42,7 +42,7 @@
       </SettingRow>
       <SettingRow
         label="Flip 180°"
-        :description="flipOverridden ? 'set for this kiosk' : 'inherited from global'"
+        :description="flipOverridden ? '‹set for this kiosk›' : '‹inherited from global›'"
       >
         <ToggleSwitch
           :model-value="effFlipped"
@@ -52,7 +52,7 @@
       </SettingRow>
       <SettingRow
         label="Apply rotation"
-        :description="applyOverridden ? 'set for this kiosk' : 'inherited from global'"
+        :description="applyOverridden ? '‹set for this kiosk›' : '‹inherited from global›'"
       >
         <ToggleSwitch
           :model-value="effApply"
@@ -69,7 +69,7 @@
       >
         Reset to global
       </button>
-      <p v-if="savedMsg" class="kiosks__saved">{{ savedMsg }}</p>
+      <p v-if="savedMsg" class="kiosks__saved" role="status" aria-live="polite">{{ savedMsg }}</p>
     </SettingsSection>
   </div>
 </template>
