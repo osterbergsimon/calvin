@@ -146,3 +146,27 @@ def test_device_config_version_stable_and_selective():
     assert device_config_version({**merged, "themeMode": "light"}) == v1  # non-device key: no bump
     assert device_config_version({**merged, "orientation": "landscape"}) != v1  # device key: bump
     assert isinstance(v1, str) and len(v1) == 16
+
+
+from app.services.kiosk_registry import get_overrides, set_overrides
+
+
+@pytest.mark.asyncio
+@pytest.mark.unit
+async def test_get_overrides_unknown_is_none(test_db):
+    assert await get_overrides("nope-000000") is None
+
+
+@pytest.mark.asyncio
+@pytest.mark.unit
+async def test_set_overrides_upserts_and_replaces(test_db):
+    await set_overrides("kitchen-3f9a2c", {"orientation": "portrait"})
+    assert await get_overrides("kitchen-3f9a2c") == {"orientation": "portrait"}
+
+    # Replace (not merge): new dict fully supplants the old.
+    await set_overrides("kitchen-3f9a2c", {"themeMode": "dark"})
+    assert await get_overrides("kitchen-3f9a2c") == {"themeMode": "dark"}
+
+    # Clear.
+    await set_overrides("kitchen-3f9a2c", {})
+    assert await get_overrides("kitchen-3f9a2c") == {}

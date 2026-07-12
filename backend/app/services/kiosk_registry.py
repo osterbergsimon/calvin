@@ -107,3 +107,26 @@ def device_config_version(merged: dict) -> str:
     subset = {k: merged.get(k) for k in DEVICE_PHYSICAL_KEYS}
     blob = json.dumps(subset, sort_keys=True, default=str)
     return hashlib.sha256(blob.encode("utf-8")).hexdigest()[:16]
+
+
+async def get_overrides(kiosk_id: str) -> dict | None:
+    """Return a kiosk's raw override layer, or None if the kiosk is unknown."""
+    row = await KioskDB.objects.get_or_none(id=kiosk_id)
+    if row is None:
+        return None
+    return row.overrides or {}
+
+
+@retry_on_db_locked()
+async def set_overrides(kiosk_id: str, overrides: dict) -> None:
+    """Upsert the kiosk row and replace its overrides. No-op on malformed id."""
+    if not kiosk_id or not _KIOSK_ID_RE.fullmatch(kiosk_id):
+        logger.warning(f"Refusing to set overrides for malformed kiosk_id: {kiosk_id!r}")
+        return
+    now = datetime.utcnow()
+    existing = await KioskDB.objects.get_or_none(id=kiosk_id)
+    if existing is None:
+        await KioskDB.objects.create(id=kiosk_id, last_seen=now, overrides=overrides)
+        return
+    existing.overrides = overrides
+    await existing.update()
