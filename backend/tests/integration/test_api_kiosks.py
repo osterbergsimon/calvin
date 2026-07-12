@@ -101,3 +101,19 @@ def test_overrides_put_bad_id_400(test_client: TestClient):
 def test_overrides_put_oversized_rejected(test_client: TestClient):
     big = {"x": "a" * 70000}
     assert test_client.put("/api/kiosks/k3/overrides", json={"overrides": big}).status_code == 400
+
+
+@pytest.mark.integration
+def test_overrides_put_type_invalid_known_key_400(test_client: TestClient):
+    """A type-invalid value for a typed ConfigUpdate field must return 400, not 500."""
+    resp = test_client.put(
+        "/api/kiosks/k4/overrides",
+        json={"overrides": {"weekendDays": "nope"}},
+    )
+    assert resp.status_code == 400
+
+
+@pytest.mark.integration
+def test_overrides_get_bad_id_400(test_client: TestClient):
+    """GET /overrides with a shape-invalid kiosk id must return 400."""
+    assert test_client.get("/api/kiosks/bad id/overrides").status_code == 400

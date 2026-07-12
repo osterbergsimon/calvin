@@ -172,6 +172,36 @@ async def test_get_overrides_unknown_is_none(test_db):
 
 @pytest.mark.asyncio
 @pytest.mark.unit
+async def test_set_overrides_create_race_falls_through_to_update(test_db, monkeypatch):
+    """If two requests race to create the same new kiosk row in set_overrides, the
+    loser's IntegrityError must be swallowed and the overrides still persisted —
+    no exception propagates, exactly one row exists with the expected overrides."""
+    from ormar.queryset.queryset import QuerySet
+
+    real_create = QuerySet.create
+    calls = {"n": 0}
+
+    async def racing_create(self, **kwargs):
+        # First create call: simulate losing the create race by inserting the row
+        # (so it exists) then raising IntegrityError.
+        if calls["n"] == 0:
+            calls["n"] += 1
+            await real_create(self, **kwargs)
+            raise sqlite3.IntegrityError("UNIQUE constraint failed: kiosks.id")
+        return await real_create(self, **kwargs)
+
+    monkeypatch.setattr(QuerySet, "create", racing_create)
+
+    # Must not raise and overrides must be persisted.
+    await set_overrides("kitchen-3f9a2c", {"orientation": "portrait"})
+
+    assert await KioskDB.objects.count() == 1
+    row = await KioskDB.objects.get(id="kitchen-3f9a2c")
+    assert row.overrides == {"orientation": "portrait"}
+
+
+@pytest.mark.asyncio
+@pytest.mark.unit
 async def test_set_overrides_upserts_and_replaces(test_db):
     await set_overrides("kitchen-3f9a2c", {"orientation": "portrait"})
     assert await get_overrides("kitchen-3f9a2c") == {"orientation": "portrait"}

@@ -4,7 +4,7 @@ import json
 
 from fastapi import APIRouter, HTTPException, Request, Response
 from loguru import logger
-from pydantic import BaseModel
+from pydantic import BaseModel, ValidationError
 
 from app.api.routes.config import ConfigUpdate, build_global_config
 from app.services import kiosk_registry
@@ -53,7 +53,10 @@ async def put_kiosk_overrides(kiosk_id: str, body: OverridesBody):
     if len(json.dumps(body.overrides)) > _MAX_OVERRIDES_BYTES:
         raise HTTPException(status_code=400, detail="Overrides payload too large")
     # Type-check known config keys via the existing model (extra keys allowed).
-    ConfigUpdate(**body.overrides)
+    try:
+        ConfigUpdate(**body.overrides)
+    except ValidationError as exc:
+        raise HTTPException(status_code=400, detail="Invalid overrides") from exc
     await set_overrides(kiosk_id, body.overrides)
     return {"id": kiosk_id, "overrides": body.overrides}
 

@@ -126,7 +126,18 @@ async def set_overrides(kiosk_id: str, overrides: dict) -> None:
     now = datetime.utcnow()
     existing = await KioskDB.objects.get_or_none(id=kiosk_id)
     if existing is None:
-        await KioskDB.objects.create(id=kiosk_id, last_seen=now, overrides=overrides)
-        return
+        try:
+            await KioskDB.objects.create(id=kiosk_id, last_seen=now, overrides=overrides)
+            return
+        except _INTEGRITY_ERRORS:
+            # Lost a create race: another request inserted this id between our
+            # get_or_none and create. Fall through to the update path.
+            logger.debug(
+                f"Create race for kiosk {kiosk_id!r} in set_overrides; updating existing row"
+            )
+            existing = await KioskDB.objects.get_or_none(id=kiosk_id)
+            if existing is None:
+                # Extremely unlikely (row vanished again); nothing safe to do.
+                return
     existing.overrides = overrides
     await existing.update()
