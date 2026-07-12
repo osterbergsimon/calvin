@@ -181,6 +181,12 @@ Set a kiosk's orientation with `PUT /api/kiosks/<id>/overrides`. The device-loca
 `CALVIN_DISPLAY_ROTATION` env still **wins** as a break-glass override; the schedule is likewise
 now per-kiosk (each kiosk reads its own effective config).
 
+**Managing kiosks from the UI.** Settings → **Kiosks** lists every kiosk that has connected (id,
+hostname, last-seen, Online/Offline). Select one to set its **orientation** override; the change
+saves immediately and the kiosk applies it at its next check-in (~30s). "Reset to global" clears the
+override so the kiosk inherits the global orientation again. (Content assignment and a confirmed
+"applied" indicator are planned follow-ons.)
+
 ### Changing the backend URL later
 
 ```bash

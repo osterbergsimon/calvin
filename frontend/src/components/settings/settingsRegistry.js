@@ -13,6 +13,7 @@ export const settingsCategories = [
   },
   { id: "plugins", label: "Plugins", icon: "🔌", subtitle: "Install · manage · themes" },
   { id: "device", label: "Device", icon: "🖥️", subtitle: "Power · keyboard · hardware" },
+  { id: "kiosks", label: "Kiosks", icon: "📺", subtitle: "Per-device settings" },
   { id: "maintenance", label: "Maintenance", icon: "⚙️", subtitle: "Updates · diagnostics" },
 ];
 
