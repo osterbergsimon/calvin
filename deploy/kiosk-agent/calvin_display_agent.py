@@ -116,6 +116,8 @@ DEFAULT_REFRESH_SECONDS = 900
 HTTP_TIMEOUT = 10
 BACKOFF_SECONDS = 60
 
+_UNSET = object()  # sentinel: distinguishes "never polled" from version=None
+
 
 def log(msg):
     print(f"[calvin-display-agent] {msg}", flush=True)
@@ -161,7 +163,7 @@ def run(
     if apply_device is None:
         apply_device = apply_device_physical
     last = None
-    last_version = None
+    last_version = _UNSET
     n = 0
     while iterations is None or n < iterations:
         n += 1

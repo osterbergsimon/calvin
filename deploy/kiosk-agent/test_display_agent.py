@@ -328,6 +328,23 @@ def test_apply_device_physical_forwards_output():
     assert calls == [("left", "HDMI-1")]
 
 
+def test_run_applies_once_when_version_absent(monkeypatch):
+    monkeypatch.setattr(agent, "now_in", lambda c: datetime(2026, 7, 11, 12, 0))
+    monkeypatch.setattr(agent, "reconcile", lambda cfg, now, last, applier=None: last)
+    monkeypatch.setattr(agent, "seconds_to_next_boundary", lambda cfg, now: None)
+    cfg = {"orientation": "portrait"}  # no deviceConfigVersion (global /api/config)
+    applied = []
+    agent.run(
+        "http://h",
+        999,
+        fetch=lambda url: cfg,
+        sleep=lambda s: None,
+        iterations=3,
+        apply_device=lambda c: applied.append(c.get("orientation")),
+    )
+    assert applied == ["portrait"]  # applied once at startup, then skipped (version stays None)
+
+
 def test_run_applies_device_physical_only_on_version_change(monkeypatch):
     monkeypatch.setattr(agent, "now_in", lambda c: datetime(2026, 7, 11, 12, 0))
     monkeypatch.setattr(agent, "reconcile", lambda cfg, now, last, applier=None: last)
