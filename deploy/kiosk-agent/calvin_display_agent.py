@@ -5,11 +5,14 @@ Reads the display schedule from a remote Calvin backend and powers the local
 panel on/off to match. Mirrors backend display_power_service semantics. Pure
 Python 3 stdlib — no third-party deps (the kiosk Pi has no venv).
 """
+
 import json
 import os
+import socket
 import subprocess
 import sys
 import time as time_module
+import urllib.parse
 import urllib.request
 from datetime import datetime, time, timedelta
 
@@ -84,7 +87,9 @@ def apply_on(on):
     try:
         r = subprocess.run(
             ["vcgencmd", "display_power", val],
-            capture_output=True, text=True, timeout=10,
+            capture_output=True,
+            text=True,
+            timeout=10,
         )
         if r.returncode == 0 and f"display_power={val}" in r.stdout:
             methods.append("vcgencmd")
@@ -95,7 +100,10 @@ def apply_on(on):
     try:
         r = subprocess.run(
             ["xset", "dpms", "force", action],
-            env=env, capture_output=True, text=True, timeout=10,
+            env=env,
+            capture_output=True,
+            text=True,
+            timeout=10,
         )
         if r.returncode == 0:
             methods.append("xset")
@@ -108,13 +116,27 @@ DEFAULT_REFRESH_SECONDS = 900
 HTTP_TIMEOUT = 10
 BACKOFF_SECONDS = 60
 
+_UNSET = object()  # sentinel: distinguishes "never polled" from version=None
+
 
 def log(msg):
     print(f"[calvin-display-agent] {msg}", flush=True)
 
 
+def _config_url(backend_url, kiosk_id, host):
+    """Effective-config URL: per-kiosk endpoint when a kiosk id is set, else global."""
+    base = backend_url.rstrip("/")
+    if kiosk_id:
+        encoded_host = urllib.parse.quote(host, safe="") if host else ""
+        q = f"khost={encoded_host}" if encoded_host else ""
+        return f"{base}/api/kiosks/{kiosk_id}/config" + (f"?{q}" if q else "")
+    return base + "/api/config"
+
+
 def fetch_config(backend_url):
-    url = backend_url.rstrip("/") + "/api/config"
+    kiosk_id = os.environ.get("CALVIN_KIOSK_ID", "").strip()
+    host = os.environ.get("CALVIN_KIOSK_HOSTNAME", "").strip() or socket.gethostname()
+    url = _config_url(backend_url, kiosk_id, host)
     with urllib.request.urlopen(url, timeout=HTTP_TIMEOUT) as r:
         return json.load(r)
 
@@ -129,8 +151,19 @@ def now_in(cfg):
     return datetime.now()
 
 
-def run(backend_url, refresh_seconds, *, fetch=fetch_config, sleep=time_module.sleep, iterations=None):
+def run(
+    backend_url,
+    refresh_seconds,
+    *,
+    fetch=fetch_config,
+    sleep=time_module.sleep,
+    iterations=None,
+    apply_device=None,
+):
+    if apply_device is None:
+        apply_device = apply_device_physical
     last = None
+    last_version = _UNSET
     n = 0
     while iterations is None or n < iterations:
         n += 1
@@ -138,6 +171,10 @@ def run(backend_url, refresh_seconds, *, fetch=fetch_config, sleep=time_module.s
             cfg = fetch(backend_url)
             if not isinstance(cfg, dict):
                 raise TypeError(f"expected dict config, got {type(cfg).__name__}")
+            version = cfg_get(cfg, "deviceConfigVersion")
+            if version != last_version:
+                apply_device(cfg)
+                last_version = version
             now = now_in(cfg)
             prev = last
             last = reconcile(cfg, now, last)
@@ -162,7 +199,9 @@ def detect_primary_output():
         r = subprocess.run(
             ["xrandr", "--query"],
             env=dict(os.environ, **X11_ENV),
-            capture_output=True, text=True, timeout=10,
+            capture_output=True,
+            text=True,
+            timeout=10,
         )
     except (FileNotFoundError, subprocess.SubprocessError):
         return None
@@ -192,7 +231,9 @@ def apply_rotation(rotation, output=None):
         r = subprocess.run(
             ["xrandr", "--output", out, "--rotate", rotation],
             env=dict(os.environ, **X11_ENV),
-            capture_output=True, text=True, timeout=10,
+            capture_output=True,
+            text=True,
+            timeout=10,
         )
     except (FileNotFoundError, subprocess.SubprocessError) as e:
         log(f"rotation failed ({e})")
@@ -202,6 +243,37 @@ def apply_rotation(rotation, output=None):
         return out
     log(f"rotation failed (xrandr rc={r.returncode}): {r.stderr.strip()}")
     return None
+
+
+def orientation_to_xrandr(cfg):
+    """Map server orientation config to an xrandr rotate value.
+
+    Matches backend display_orientation_service: flipped -> inverted;
+    else portrait -> left; else normal (landscape/unknown).
+    """
+    flipped = cfg_get(cfg, "orientation_flipped", "orientationFlipped", default=False)
+    if flipped:
+        return "inverted"
+    orientation = cfg_get(cfg, "orientation", default="landscape")
+    if orientation == "portrait":
+        return "left"
+    return "normal"
+
+
+def apply_device_physical(cfg, *, applier=apply_rotation, env=None):
+    """Apply device-physical settings (orientation) from the effective config.
+
+    CALVIN_DISPLAY_ROTATION env (device-local escape hatch) wins over the server
+    orientation. Gated on applyDisplayRotation (default True).
+    """
+    if env is None:
+        env = os.environ
+    if not cfg_get(cfg, "apply_display_rotation", "applyDisplayRotation", default=True):
+        return
+    env_rotation = env.get("CALVIN_DISPLAY_ROTATION", "").strip()
+    rotation = env_rotation or orientation_to_xrandr(cfg)
+    output = env.get("CALVIN_DISPLAY_OUTPUT", "").strip() or None
+    applier(rotation, output)
 
 
 def main():

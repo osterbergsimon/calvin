@@ -1,6 +1,5 @@
 import importlib.util
 import os
-import subprocess
 from datetime import datetime, time
 from types import SimpleNamespace
 
@@ -78,7 +77,11 @@ def test_desired_on_day_disabled():
 
 # desired_on — malformed time ⇒ defensive ON
 def test_desired_on_malformed_time():
-    cfg = _cfg(display_schedule=[{"day": d, "enabled": True, "onTime": "oops", "offTime": "22:00"} for d in range(7)])
+    cfg = _cfg(
+        display_schedule=[
+            {"day": d, "enabled": True, "onTime": "oops", "offTime": "22:00"} for d in range(7)
+        ]
+    )
     assert agent.desired_on(cfg, datetime(2026, 7, 11, 23, 0)) is True
 
 
@@ -103,8 +106,12 @@ def test_next_boundary_spans_midnight():
 
 # next boundary — schedule disabled ⇒ None
 def test_next_boundary_none_when_disabled():
-    assert agent.seconds_to_next_boundary(_cfg(display_schedule_enabled=False),
-                                          datetime(2026, 7, 11, 9, 0)) is None
+    assert (
+        agent.seconds_to_next_boundary(
+            _cfg(display_schedule_enabled=False), datetime(2026, 7, 11, 9, 0)
+        )
+        is None
+    )
 
 
 def test_apply_on_runs_both_when_effective(monkeypatch):
@@ -146,8 +153,8 @@ def test_apply_on_reports_none_when_xset_fails_and_vcgencmd_noop(monkeypatch):
 def test_reconcile_applies_only_on_change():
     applied = []
     cfg = _cfg()  # 06:00-22:00
-    at_off = datetime(2026, 7, 11, 23, 0)   # desired OFF
-    at_on = datetime(2026, 7, 11, 9, 0)     # desired ON
+    at_off = datetime(2026, 7, 11, 23, 0)  # desired OFF
+    at_on = datetime(2026, 7, 11, 9, 0)  # desired ON
 
     # first call (last=None) always applies
     last = agent.reconcile(cfg, at_off, None, applier=lambda on: applied.append(on))
@@ -179,8 +186,8 @@ def test_run_sleeps_min_of_boundary_and_refresh(monkeypatch):
         slept.append(s)
 
     agent.run("http://x", 900, fetch=lambda url: cfg, sleep=fake_sleep, iterations=1)
-    assert applied == [False]        # applied OFF once
-    assert slept == [900]            # capped by refresh, not 7h
+    assert applied == [False]  # applied OFF once
+    assert slept == [900]  # capped by refresh, not 7h
 
 
 def test_run_keeps_state_and_backs_off_on_fetch_error(monkeypatch):
@@ -192,7 +199,7 @@ def test_run_keeps_state_and_backs_off_on_fetch_error(monkeypatch):
         raise OSError("network down")
 
     agent.run("http://x", 900, fetch=boom, sleep=lambda s: slept.append(s), iterations=1)
-    assert applied == []             # never touched the display
+    assert applied == []  # never touched the display
     assert slept == [agent.BACKOFF_SECONDS]
 
 
@@ -200,9 +207,14 @@ def test_run_survives_non_dict_config(monkeypatch):
     applied = []
     slept = []
     monkeypatch.setattr(agent, "apply_on", lambda on: applied.append(on) or "test")
-    agent.run("http://x", 900, fetch=lambda url: "not a dict",
-              sleep=lambda s: slept.append(s), iterations=1)
-    assert applied == []                 # never touched the display
+    agent.run(
+        "http://x",
+        900,
+        fetch=lambda url: "not a dict",
+        sleep=lambda s: slept.append(s),
+        iterations=1,
+    )
+    assert applied == []  # never touched the display
     assert slept == [agent.BACKOFF_SECONDS]
 
 
@@ -244,7 +256,152 @@ def test_detect_primary_output_parses_connected(monkeypatch):
         "HDMI-2 disconnected (normal left inverted right)\n"
     )
     monkeypatch.setattr(
-        agent.subprocess, "run",
+        agent.subprocess,
+        "run",
         lambda *a, **k: SimpleNamespace(returncode=0, stdout=out, stderr=""),
     )
     assert agent.detect_primary_output() == "HDMI-1"
+
+
+def test_config_url_global_when_no_kiosk_id():
+    assert agent._config_url("http://h:8000/", "", "pi") == "http://h:8000/api/config"
+
+
+def test_config_url_per_kiosk_with_khost():
+    assert (
+        agent._config_url("http://h:8000", "kitchen-3f9a2c", "pi kitchen")
+        == "http://h:8000/api/kiosks/kitchen-3f9a2c/config?khost=pi%20kitchen"
+    )
+
+
+def test_orientation_to_xrandr_mapping():
+    assert agent.orientation_to_xrandr({"orientation": "landscape"}) == "normal"
+    assert agent.orientation_to_xrandr({"orientation": "portrait"}) == "left"
+    assert (
+        agent.orientation_to_xrandr({"orientation": "landscape", "orientationFlipped": True})
+        == "inverted"
+    )
+    assert (
+        agent.orientation_to_xrandr({"orientation": "portrait", "orientationFlipped": True})
+        == "inverted"
+    )
+    assert agent.orientation_to_xrandr({}) == "normal"  # default landscape
+
+
+def test_apply_device_physical_uses_server_orientation():
+    calls = []
+    agent.apply_device_physical(
+        {"orientation": "portrait", "applyDisplayRotation": True},
+        applier=lambda rot, output=None: calls.append(rot),
+        env={},
+    )
+    assert calls == ["left"]
+
+
+def test_apply_device_physical_env_escape_hatch_wins():
+    calls = []
+    agent.apply_device_physical(
+        {"orientation": "portrait", "applyDisplayRotation": True},
+        applier=lambda rot, output=None: calls.append(rot),
+        env={"CALVIN_DISPLAY_ROTATION": "inverted"},
+    )
+    assert calls == ["inverted"]  # env wins over server 'portrait'->'left'
+
+
+def test_apply_device_physical_skips_when_rotation_disabled():
+    calls = []
+    agent.apply_device_physical(
+        {"orientation": "portrait", "applyDisplayRotation": False},
+        applier=lambda rot, output=None: calls.append(rot),
+        env={},
+    )
+    assert calls == []
+
+
+def test_apply_device_physical_forwards_output():
+    calls = []
+    agent.apply_device_physical(
+        {"orientation": "portrait", "applyDisplayRotation": True},
+        applier=lambda rot, output=None: calls.append((rot, output)),
+        env={"CALVIN_DISPLAY_OUTPUT": "HDMI-1"},
+    )
+    assert calls == [("left", "HDMI-1")]
+
+
+def test_run_applies_once_when_version_absent(monkeypatch):
+    monkeypatch.setattr(agent, "now_in", lambda c: datetime(2026, 7, 11, 12, 0))
+    monkeypatch.setattr(agent, "reconcile", lambda cfg, now, last, applier=None: last)
+    monkeypatch.setattr(agent, "seconds_to_next_boundary", lambda cfg, now: None)
+    cfg = {"orientation": "portrait"}  # no deviceConfigVersion (global /api/config)
+    applied = []
+    agent.run(
+        "http://h",
+        999,
+        fetch=lambda url: cfg,
+        sleep=lambda s: None,
+        iterations=3,
+        apply_device=lambda c: applied.append(c.get("orientation")),
+    )
+    assert applied == ["portrait"]  # applied once at startup, then skipped (version stays None)
+
+
+def test_run_applies_device_physical_only_on_version_change(monkeypatch):
+    monkeypatch.setattr(agent, "now_in", lambda c: datetime(2026, 7, 11, 12, 0))
+    monkeypatch.setattr(agent, "reconcile", lambda cfg, now, last, applier=None: last)
+    monkeypatch.setattr(agent, "seconds_to_next_boundary", lambda cfg, now: None)
+
+    configs = [
+        {"deviceConfigVersion": "v1", "orientation": "portrait"},
+        {"deviceConfigVersion": "v1", "orientation": "portrait"},  # unchanged
+        {"deviceConfigVersion": "v2", "orientation": "landscape"},  # changed
+    ]
+    it = iter(configs)
+    applied = []
+    agent.run(
+        "http://h",
+        999,
+        fetch=lambda url: next(it),
+        sleep=lambda s: None,
+        iterations=3,
+        apply_device=lambda cfg: applied.append(cfg.get("deviceConfigVersion")),
+    )
+    # v1 applied on first sight, skipped when unchanged, v2 applied on change
+    assert applied == ["v1", "v2"]
+
+
+def test_run_retries_apply_when_apply_device_raises(monkeypatch):
+    monkeypatch.setattr(agent, "now_in", lambda c: datetime(2026, 7, 11, 12, 0))
+    monkeypatch.setattr(agent, "reconcile", lambda cfg, now, last, applier=None: last)
+    monkeypatch.setattr(agent, "seconds_to_next_boundary", lambda cfg, now: None)
+    cfg = {"deviceConfigVersion": "v1", "orientation": "portrait"}
+    attempts = []
+
+    def boom(c):
+        attempts.append(c.get("deviceConfigVersion"))
+        raise RuntimeError("xrandr boom")
+
+    # must not raise out of run(); apply retried each iteration since last_version not advanced
+    agent.run(
+        "http://h",
+        999,
+        fetch=lambda url: cfg,
+        sleep=lambda s: None,
+        iterations=3,
+        apply_device=boom,
+    )
+    assert attempts == [
+        "v1",
+        "v1",
+        "v1",
+    ]  # retried every poll (last_version never advanced past the failure)
+
+
+def test_orientation_to_xrandr_snake_case_flipped():
+    assert (
+        agent.orientation_to_xrandr({"orientation": "portrait", "orientation_flipped": True})
+        == "inverted"
+    )
+
+
+def test_config_url_kiosk_id_empty_host_no_query():
+    assert agent._config_url("http://h", "k", "") == "http://h/api/kiosks/k/config"
