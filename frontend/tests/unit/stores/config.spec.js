@@ -214,3 +214,107 @@ describe("Config Store", () => {
     expect(store.loading).toBe(false);
   });
 });
+
+function setSearch(search) {
+  Object.defineProperty(window, "location", { value: { search, hostname: "pi" }, writable: true });
+}
+
+const SCREENS = {
+  version: 2,
+  activeScreenId: "b",
+  screens: [
+    { id: "a", name: "A" },
+    { id: "b", name: "B" },
+    { id: "c", name: "C" },
+  ],
+};
+
+describe("config store — kiosk active screen", () => {
+  beforeEach(() => setActivePinia(createPinia()));
+
+  it("Mode A: effectiveDashboardScreens == normalized global, no filtering", () => {
+    setSearch("");
+    const store = useConfigStore();
+    store.dashboardScreens = SCREENS;
+    expect(store.effectiveDashboardScreens.screens.map(s => s.id)).toEqual(["a", "b", "c"]);
+    expect(store.effectiveDashboardScreens.activeScreenId).toBe("b");
+  });
+
+  it("kiosk mode: filters to availableScreens and overrides active to kioskActiveScreenId", () => {
+    setSearch("?kiosk=k1");
+    const store = useConfigStore();
+    store.dashboardScreens = SCREENS;
+    store.availableScreens = ["a", "c"];
+    store.defaultScreenId = "c";
+    store.seedKioskActiveScreen();
+    expect(store.kioskActiveScreenId).toBe("c");
+    expect(store.effectiveDashboardScreens.screens.map(s => s.id)).toEqual(["a", "c"]);
+    expect(store.effectiveDashboardScreens.activeScreenId).toBe("c");
+  });
+
+  it("seed keeps a still-valid current across re-seed (poll does not clobber)", () => {
+    setSearch("?kiosk=k1");
+    const store = useConfigStore();
+    store.dashboardScreens = SCREENS;
+    store.availableScreens = null;
+    store.defaultScreenId = "c";
+    store.seedKioskActiveScreen(); // -> "c"
+    store.kioskActiveScreenId = "a"; // user switched
+    store.seedKioskActiveScreen(); // simulate next poll
+    expect(store.kioskActiveScreenId).toBe("a"); // preserved
+  });
+});
+
+describe("config store — switch actions branch on kiosk mode", () => {
+  beforeEach(() => {
+    setActivePinia(createPinia());
+    // Reset call counts then set up resolved value so Mode A tests don't throw.
+    vi.clearAllMocks();
+    axios.post.mockResolvedValue({ data: {} });
+  });
+
+  it("kiosk mode: activate updates local id, no updateConfig network call", async () => {
+    setSearch("?kiosk=k1");
+    const store = useConfigStore();
+    store.dashboardScreens = SCREENS;
+    store.kioskActiveScreenId = "a";
+    await store.activateDashboardScreen("c");
+    expect(store.kioskActiveScreenId).toBe("c");
+    // Spy on real network layer — vacuous store-proxy spy replaced with genuine guard.
+    expect(axios.post).not.toHaveBeenCalled();
+  });
+
+  it("kiosk mode: cycle updates local id among available, no updateConfig", async () => {
+    setSearch("?kiosk=k1");
+    const store = useConfigStore();
+    store.dashboardScreens = SCREENS;
+    store.availableScreens = ["a", "c"];
+    store.kioskActiveScreenId = "a";
+    await store.cycleDashboardScreenBy(1);
+    expect(store.kioskActiveScreenId).toBe("c"); // next available after "a" is "c"
+    // Spy on real network layer — vacuous store-proxy spy replaced with genuine guard.
+    expect(axios.post).not.toHaveBeenCalled();
+  });
+
+  it("Mode A: activate still persists via updateConfig (regression)", async () => {
+    setSearch("");
+    const store = useConfigStore();
+    store.dashboardScreens = SCREENS;
+    // Note: in Pinia setup stores, internal calls go via closure (not the proxy),
+    // so we spy on axios.post instead of store.updateConfig to verify persistence.
+    const spy = vi.spyOn(axios, "post");
+    await store.activateDashboardScreen("c");
+    expect(spy).toHaveBeenCalled();
+  });
+
+  it("Mode A: cycleDashboardScreenBy persists via axios.post (global path)", async () => {
+    setSearch("");
+    const store = useConfigStore();
+    store.dashboardScreens = SCREENS;
+    // In Pinia setup stores, internal calls go via closure (not the proxy), so spy on
+    // axios.post directly — a store.updateConfig spy is vacuous for the same reason as above.
+    const spy = vi.spyOn(axios, "post");
+    await store.cycleDashboardScreenBy(1);
+    expect(spy).toHaveBeenCalled();
+  });
+});

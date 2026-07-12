@@ -8,13 +8,11 @@ import { useRouter } from "vue-router";
 import { logInfo, logError, logWarn, logDebug } from "../utils/logger";
 import {
   cycleActiveDashboardRegion,
-  cycleDashboardScreen,
   getActiveDashboardRegion,
   getActiveDashboardScreen,
   getLeafRegions,
   normalizeDashboardScreens,
   setActiveDashboardRegion,
-  setActiveDashboardScreen,
 } from "../utils/layout";
 
 // Back-compat: stored mappings from before py5 (vocabulary unfreeze) may still
@@ -43,10 +41,14 @@ export function useKeyboardActions() {
   const configStore = useConfigStore();
   const router = useRouter();
 
+  // RAW global catalog — used for persistence paths (region-view writes).
+  // Never pass this filtered set to a global save; screen selection uses
+  // configStore.activateDashboardScreen / cycleDashboardScreenBy instead.
   const getDashboardScreens = () => normalizeDashboardScreens(configStore.dashboardScreens);
 
   const getActiveRegion = () => {
-    const screen = getActiveDashboardScreen(getDashboardScreens());
+    // Use effectiveDashboardScreens so the kiosk-local activeScreenId is respected.
+    const screen = getActiveDashboardScreen(configStore.effectiveDashboardScreens);
     return getActiveDashboardRegion(screen);
   };
 
@@ -71,15 +73,19 @@ export function useKeyboardActions() {
   };
 
   const activateScreenByIndex = index => {
-    const screensConfig = getDashboardScreens();
+    // Use effective screens for index look-up so kiosk index 0 = first available.
+    const screensConfig = configStore.effectiveDashboardScreens;
     const screen = screensConfig.screens[index];
     if (!screen) return;
-    saveDashboardScreens(setActiveDashboardScreen(screensConfig, screen.id));
+    configStore.activateDashboardScreen(screen.id);
     router.push("/");
   };
 
   const activateFirstScreenContainingKind = kind => {
-    const screensConfig = getDashboardScreens();
+    // Search the EFFECTIVE (kiosk-filtered) screens so a kiosk only jumps to
+    // screens it is allowed to show. In Mode A, effectiveDashboardScreens equals
+    // the full catalog, so behaviour is unchanged.
+    const screensConfig = configStore.effectiveDashboardScreens;
     let matchScreenIndex = -1;
     let matchLeafId = null;
     for (let index = 0; index < screensConfig.screens.length; index += 1) {
@@ -94,16 +100,21 @@ export function useKeyboardActions() {
     }
     if (matchScreenIndex < 0) return false;
     const screen = screensConfig.screens[matchScreenIndex];
-    const nextScreens = setActiveDashboardScreen(
-      {
-        ...screensConfig,
-        screens: screensConfig.screens.map((candidate, index) =>
-          index === matchScreenIndex ? { ...candidate, activeRegionId: matchLeafId } : candidate
+    // Persist the active-region bookmark on the raw catalog (global write is
+    // correct here: region focus is not kiosk-local). Then activate the screen
+    // through the store's branched action so kiosk stays local-only.
+    const rawScreens = getDashboardScreens();
+    const rawScreen = rawScreens.screens.find(s => s.id === screen.id);
+    if (rawScreen && matchLeafId) {
+      const patchedScreens = {
+        ...rawScreens,
+        screens: rawScreens.screens.map(s =>
+          s.id === screen.id ? { ...s, activeRegionId: matchLeafId } : s
         ),
-      },
-      screen.id
-    );
-    saveDashboardScreens(nextScreens);
+      };
+      saveDashboardScreens(patchedScreens);
+    }
+    configStore.activateDashboardScreen(screen.id);
     router.push("/");
     return true;
   };
@@ -433,11 +444,11 @@ export function useKeyboardActions() {
         router.push("/settings");
         break;
       case "screen_next":
-        saveDashboardScreens(cycleDashboardScreen(getDashboardScreens(), 1));
+        configStore.cycleDashboardScreenBy(1);
         router.push("/");
         break;
       case "screen_prev":
-        saveDashboardScreens(cycleDashboardScreen(getDashboardScreens(), -1));
+        configStore.cycleDashboardScreenBy(-1);
         router.push("/");
         break;
       case "screen_1":
@@ -1002,7 +1013,7 @@ export function useKeyboardActions() {
   };
 
   const activateScreen = screenId => {
-    saveDashboardScreens(setActiveDashboardScreen(getDashboardScreens(), screenId));
+    configStore.activateDashboardScreen(screenId);
     router.push("/");
   };
 

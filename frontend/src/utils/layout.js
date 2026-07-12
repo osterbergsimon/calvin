@@ -944,3 +944,32 @@ function clampRegionSize(size, allowFull = false) {
   if (allowFull && numericSize === 100) return 100;
   return Math.max(10, Math.min(90, numericSize));
 }
+
+// Per-kiosk content assignment (calvin-dd9.4).
+
+// Intersect a screens config's screens[] with an allowlist (catalog order).
+// Fails open: null/empty allowlist, or an empty intersection, returns all screens.
+export function filterAvailableScreens(screensConfig, availableIds) {
+  const normalized = normalizeDashboardScreens(screensConfig);
+  if (!Array.isArray(availableIds) || availableIds.length === 0) return normalized;
+  const allow = new Set(availableIds);
+  const screens = normalized.screens.filter(screen => allow.has(screen.id));
+  if (screens.length === 0) return normalized; // fail open
+  return { ...normalized, screens };
+}
+
+// Resolve which screen a kiosk should show. Precedence:
+//   still-valid `current` → valid `defaultScreenId` → global activeScreenId → first available.
+export function resolveKioskActiveScreen({
+  screensConfig,
+  availableScreens,
+  defaultScreenId,
+  current,
+}) {
+  const filtered = filterAvailableScreens(screensConfig, availableScreens);
+  const ids = new Set(filtered.screens.map(screen => screen.id));
+  if (current && ids.has(current)) return current;
+  if (defaultScreenId && ids.has(defaultScreenId)) return defaultScreenId;
+  if (filtered.activeScreenId && ids.has(filtered.activeScreenId)) return filtered.activeScreenId;
+  return filtered.screens[0]?.id ?? null;
+}

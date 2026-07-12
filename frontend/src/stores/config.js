@@ -5,12 +5,14 @@ import { logError } from "../utils/logger";
 import {
   cycleActiveDashboardRegion,
   cycleDashboardScreen,
+  filterAvailableScreens,
   normalizeDashboardScreens,
+  resolveKioskActiveScreen,
   setActiveDashboardScreen,
   setRegionView,
 } from "../utils/layout";
 import { applyConfigPayload, createDefaultDisplaySchedule } from "./configRegistry";
-import { configUrl } from "@/utils/kioskId";
+import { configUrl, getKioskId } from "@/utils/kioskId";
 
 export const useConfigStore = defineStore("config", () => {
   const orientation = ref("landscape"); // 'landscape' | 'portrait'
@@ -19,6 +21,9 @@ export const useConfigStore = defineStore("config", () => {
   const calendarSplit = ref(70); // Percentage for calendar (10-90%, default 70%)
   const dashboardLayout = ref(null); // Dashboard region layout configuration
   const dashboardScreens = ref(null); // Dashboard screen configuration
+  const availableScreens = ref(null); // per-kiosk allowlist (kiosk mode only)
+  const defaultScreenId = ref(null); // per-kiosk boot screen (kiosk mode only)
+  const kioskActiveScreenId = ref(null); // local active screen in kiosk mode
   const lastSideViewMode = ref("photos"); // Track last side view mode ('photos' | 'web_services')
   const showWebServices = ref(false); // Toggle for web services view
   const photoFrameEnabled = ref(false); // Photo frame mode enabled
@@ -198,6 +203,11 @@ export const useConfigStore = defineStore("config", () => {
     try {
       const response = await axios.get(configUrl());
       applyConfigPayload(response.data, configRefs, { useDefaults: true });
+      if (getKioskId()) {
+        availableScreens.value = response.data?.availableScreens ?? null;
+        defaultScreenId.value = response.data?.defaultScreenId ?? null;
+        seedKioskActiveScreen();
+      }
       return response.data;
     } catch (err) {
       error.value = err.message;
@@ -379,12 +389,26 @@ export const useConfigStore = defineStore("config", () => {
   };
 
   const activateDashboardScreen = async screenId => {
+    if (getKioskId()) {
+      // Kiosk mode: local only — never persist to global. Honor availableScreens.
+      const ids = new Set(effectiveDashboardScreens.value.screens.map(s => s.id));
+      if (ids.has(screenId)) kioskActiveScreenId.value = screenId;
+      return;
+    }
     const nextScreens = setActiveDashboardScreen(dashboardScreens.value, screenId);
     dashboardScreens.value = nextScreens;
     await updateConfig({ dashboardScreens: nextScreens });
   };
 
   const cycleDashboardScreenBy = async direction => {
+    if (getKioskId()) {
+      const screens = effectiveDashboardScreens.value.screens;
+      if (screens.length <= 1) return;
+      const cur = screens.findIndex(s => s.id === kioskActiveScreenId.value);
+      const next = (cur + direction + screens.length) % screens.length;
+      kioskActiveScreenId.value = screens[next].id;
+      return;
+    }
     const nextScreens = cycleDashboardScreen(dashboardScreens.value, direction);
     dashboardScreens.value = nextScreens;
     await updateConfig({ dashboardScreens: nextScreens });
@@ -402,6 +426,23 @@ export const useConfigStore = defineStore("config", () => {
     const nextScreens = setRegionView(dashboardScreens.value, regionId, patch);
     dashboardScreens.value = nextScreens;
     await updateConfig({ dashboardScreens: nextScreens });
+  };
+
+  const effectiveDashboardScreens = computed(() => {
+    const normalized = normalizeDashboardScreens(dashboardScreens.value);
+    if (!getKioskId()) return normalized; // Mode A: unchanged
+    const filtered = filterAvailableScreens(normalized, availableScreens.value);
+    return { ...filtered, activeScreenId: kioskActiveScreenId.value ?? filtered.activeScreenId };
+  });
+
+  const seedKioskActiveScreen = () => {
+    if (!getKioskId()) return;
+    kioskActiveScreenId.value = resolveKioskActiveScreen({
+      screensConfig: dashboardScreens.value,
+      availableScreens: availableScreens.value,
+      defaultScreenId: defaultScreenId.value,
+      current: kioskActiveScreenId.value,
+    });
   };
 
   const setThemeMode = mode => {
@@ -440,6 +481,11 @@ export const useConfigStore = defineStore("config", () => {
     calendarSplit,
     dashboardLayout,
     dashboardScreens,
+    availableScreens,
+    defaultScreenId,
+    kioskActiveScreenId,
+    effectiveDashboardScreens,
+    seedKioskActiveScreen,
     showWebServices,
     lastSideViewMode,
     photoFrameEnabled,

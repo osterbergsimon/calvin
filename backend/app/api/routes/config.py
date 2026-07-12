@@ -152,6 +152,10 @@ class ConfigUpdate(BaseModel):
     clockBarPluginItemSize: int | None = None
     clockBarVerticalPluginItemSize: int | None = None
 
+    # Per-kiosk content assignment (calvin-dd9.4). Override keys; null/absent on global config.
+    availableScreens: list[str] | None = None  # allowlist of screen ids a kiosk may show
+    defaultScreenId: str | None = None  # screen id a kiosk boots into
+
     # Allow arbitrary fields for extensibility
     model_config = ConfigDict(extra="allow")
 

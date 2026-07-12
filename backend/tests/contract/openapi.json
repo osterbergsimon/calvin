@@ -256,6 +256,20 @@
             ],
             "title": "Applydisplayrotation"
           },
+          "availableScreens": {
+            "anyOf": [
+              {
+                "items": {
+                  "type": "string"
+                },
+                "type": "array"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Availablescreens"
+          },
           "calendarRefreshInterval": {
             "anyOf": [
               {
@@ -400,6 +414,17 @@
               }
             ],
             "title": "Dashboardscreens"
+          },
+          "defaultScreenId": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Defaultscreenid"
           },
           "displaySchedule": {
             "anyOf": [

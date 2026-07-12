@@ -221,7 +221,7 @@ const mainLayoutClass = computed(() => {
 
 const barVisible = computed(() => configStore.shouldShowUI || configStore.clockBarShowInKiosk);
 
-const dashboardScreens = computed(() => normalizeDashboardScreens(configStore.dashboardScreens));
+const dashboardScreens = computed(() => configStore.effectiveDashboardScreens);
 const activeScreen = computed(() => getActiveDashboardScreen(dashboardScreens.value));
 
 const effectiveClockBar = computed(() =>
@@ -382,11 +382,15 @@ const stopRegionResize = () => {
 };
 
 const commitRegionSizes = sizes => {
-  const screens = dashboardScreens.value;
-  const activeId = activeScreen.value.id;
+  // WRITE must be based on the RAW full catalog (configStore.dashboardScreens), not
+  // the filtered effective set (dashboardScreens.value). In kiosk mode the effective
+  // set only contains the screens this kiosk can see; posting it to /api/config would
+  // silently delete every other screen from the global catalog (data loss).
+  const fullCatalog = normalizeDashboardScreens(configStore.dashboardScreens);
+  const activeId = activeScreen.value?.id;
   const next = {
-    ...screens,
-    screens: screens.screens.map(screen =>
+    ...fullCatalog,
+    screens: fullCatalog.screens.map(screen =>
       screen.id !== activeId
         ? screen
         : {

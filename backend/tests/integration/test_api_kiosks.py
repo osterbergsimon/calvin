@@ -117,3 +117,24 @@ def test_overrides_put_type_invalid_known_key_400(test_client: TestClient):
 def test_overrides_get_bad_id_400(test_client: TestClient):
     """GET /overrides with a shape-invalid kiosk id must return 400."""
     assert test_client.get("/api/kiosks/bad id/overrides").status_code == 400
+
+
+@pytest.mark.integration
+def test_overrides_accepts_content_assignment(test_client: TestClient):
+    put = test_client.put(
+        "/api/kiosks/kroom-1/overrides",
+        json={"overrides": {"availableScreens": ["screen-home"], "defaultScreenId": "screen-home"}},
+    )
+    assert put.status_code == 200
+    eff = test_client.get("/api/kiosks/kroom-1/config").json()
+    assert eff["availableScreens"] == ["screen-home"]
+    assert eff["defaultScreenId"] == "screen-home"
+
+
+@pytest.mark.integration
+def test_overrides_rejects_bad_available_screens_type(test_client: TestClient):
+    resp = test_client.put(
+        "/api/kiosks/kroom-2/overrides",
+        json={"overrides": {"availableScreens": "not-a-list"}},
+    )
+    assert resp.status_code == 400
