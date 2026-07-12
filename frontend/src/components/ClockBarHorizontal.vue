@@ -46,7 +46,7 @@ import { computed } from "vue";
 import { useConfigStore } from "../stores/config";
 import { useClockBar } from "../composables/useClockBar";
 import { useKeyboardActions } from "../composables/useKeyboardActions";
-import { normalizeDashboardScreens, getActiveDashboardScreen } from "../utils/layout";
+import { getActiveDashboardScreen } from "../utils/layout";
 import PluginStatusbarItems from "./PluginStatusbarItems.vue";
 import BarActionCluster from "./BarActionCluster.vue";
 import BarLogo from "./BarLogo.vue";
@@ -128,7 +128,7 @@ const configStore = useConfigStore();
 const showLogo = computed(() => configStore.clockBarShowLogo !== false);
 
 const { activateScreen } = useKeyboardActions();
-const screensConfig = computed(() => normalizeDashboardScreens(configStore.dashboardScreens));
+const screensConfig = computed(() => configStore.effectiveDashboardScreens);
 const screens = computed(() => screensConfig.value.screens);
 const activeScreenId = computed(() => getActiveDashboardScreen(screensConfig.value)?.id ?? null);
 const roomLabel = computed(() => configStore.displayName);

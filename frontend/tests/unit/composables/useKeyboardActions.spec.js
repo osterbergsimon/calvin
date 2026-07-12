@@ -8,6 +8,7 @@ import { setActivePinia, createPinia } from "pinia";
 import { useKeyboardActions } from "@/composables/useKeyboardActions";
 import { useModeStore } from "@/stores/mode";
 import { useCalendarStore } from "@/stores/calendar";
+import { normalizeDashboardScreens } from "@/utils/layout";
 
 const mocks = vi.hoisted(() => ({
   configStore: null,
@@ -64,6 +65,9 @@ describe("useKeyboardActions - Calendar Event Navigation", () => {
       setLastSideViewMode: vi.fn(),
       shouldShowUI: true,
       dashboardScreens: null,
+      get effectiveDashboardScreens() {
+        return normalizeDashboardScreens(mocks.configStore.dashboardScreens);
+      },
     };
     modeStore = useModeStore();
     calendarStore = useCalendarStore();

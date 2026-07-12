@@ -82,7 +82,7 @@ import { computed } from "vue";
 import { useClockBar } from "../composables/useClockBar";
 import { useConfigStore } from "../stores/config";
 import { useKeyboardActions } from "../composables/useKeyboardActions";
-import { normalizeDashboardScreens, getActiveDashboardScreen } from "../utils/layout";
+import { getActiveDashboardScreen } from "../utils/layout";
 import BarActionCluster from "./BarActionCluster.vue";
 import BarLogo from "./BarLogo.vue";
 import ScreenDots from "./ui/ScreenDots.vue";
@@ -169,7 +169,7 @@ const isCompactLayout = computed(
 );
 
 const { activateScreen } = useKeyboardActions();
-const screensConfig = computed(() => normalizeDashboardScreens(configStore.dashboardScreens));
+const screensConfig = computed(() => configStore.effectiveDashboardScreens);
 const screens = computed(() => screensConfig.value.screens);
 const activeScreenId = computed(() => getActiveDashboardScreen(screensConfig.value)?.id ?? null);
 </script>

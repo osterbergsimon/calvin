@@ -221,7 +221,7 @@ const mainLayoutClass = computed(() => {
 
 const barVisible = computed(() => configStore.shouldShowUI || configStore.clockBarShowInKiosk);
 
-const dashboardScreens = computed(() => normalizeDashboardScreens(configStore.dashboardScreens));
+const dashboardScreens = computed(() => configStore.effectiveDashboardScreens);
 const activeScreen = computed(() => getActiveDashboardScreen(dashboardScreens.value));
 
 const effectiveClockBar = computed(() =>

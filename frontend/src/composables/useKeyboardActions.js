@@ -12,7 +12,6 @@ import {
   getActiveDashboardRegion,
   getActiveDashboardScreen,
   getLeafRegions,
-  normalizeDashboardScreens,
   setActiveDashboardRegion,
   setActiveDashboardScreen,
 } from "../utils/layout";
@@ -43,7 +42,7 @@ export function useKeyboardActions() {
   const configStore = useConfigStore();
   const router = useRouter();
 
-  const getDashboardScreens = () => normalizeDashboardScreens(configStore.dashboardScreens);
+  const getDashboardScreens = () => configStore.effectiveDashboardScreens;
 
   const getActiveRegion = () => {
     const screen = getActiveDashboardScreen(getDashboardScreens());
