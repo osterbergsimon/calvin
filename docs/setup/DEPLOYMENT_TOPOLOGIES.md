@@ -167,6 +167,13 @@ Per-kiosk overrides are edited via `GET/PUT /api/kiosks/<id>/overrides` (a spars
 layer that replaces on PUT). `GET /api/config` is now **global-only** (Mode-A Pis and
 the template new kiosks inherit). List known kiosks with `curl http://<server>:8000/api/kiosks`.
 
+**Assigning content to a kiosk.** Two override keys control which screens a kiosk shows:
+`availableScreens` (a list of screen ids the kiosk may switch between — omit for all) and
+`defaultScreenId` (the screen it boots into). Set them via
+`PUT /api/kiosks/<id>/overrides`. In this mode the active screen is **local to each kiosk** —
+switching screens on one kiosk (keyboard or on-screen dots) no longer changes the others, and
+a kiosk boots to its `defaultScreenId`. The screen catalog itself is authored once, globally.
+
 ### Changing the backend URL later
 
 ```bash
