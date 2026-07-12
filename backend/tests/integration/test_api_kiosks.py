@@ -1,5 +1,7 @@
 """Integration tests for the kiosk registry."""
 
+from unittest.mock import patch
+
 import pytest
 from fastapi.testclient import TestClient
 
@@ -10,3 +12,54 @@ def test_kiosks_table_exists_and_lists_empty(test_client: TestClient):
     response = test_client.get("/api/kiosks")
     assert response.status_code == 200
     assert response.json() == {"kiosks": []}
+
+
+@pytest.mark.integration
+def test_effective_config_merges_overrides_and_records(test_client: TestClient):
+    test_client.put(
+        "/api/kiosks/hallway-3f9a2c/overrides",
+        json={"overrides": {"orientation": "portrait"}},
+    )
+    resp = test_client.get("/api/kiosks/hallway-3f9a2c/config?khost=pi-hallway")
+    assert resp.status_code == 200
+    body = resp.json()
+    assert body["orientation"] == "portrait"          # override applied
+    assert "timeFormat" in body                        # global defaults present
+    assert "deviceConfigVersion" in body
+    assert resp.headers.get("ETag") == body["deviceConfigVersion"]
+
+    kiosks = test_client.get("/api/kiosks").json()["kiosks"]
+    assert any(k["id"] == "hallway-3f9a2c" and k["hostname"] == "pi-hallway" for k in kiosks)
+
+
+@pytest.mark.integration
+def test_effective_config_unknown_kiosk_is_global(test_client: TestClient):
+    resp = test_client.get("/api/kiosks/brand-new-abc123/config")
+    assert resp.status_code == 200
+    assert resp.json()["orientation"] == "landscape"   # defaulted global
+
+
+@pytest.mark.integration
+def test_effective_config_if_none_match_304(test_client: TestClient):
+    first = test_client.get("/api/kiosks/etagtest-1/config")
+    etag = first.headers["ETag"]
+    again = test_client.get("/api/kiosks/etagtest-1/config", headers={"If-None-Match": etag})
+    assert again.status_code == 304
+    assert again.content == b""
+
+
+@pytest.mark.integration
+def test_effective_config_bad_id_400(test_client: TestClient):
+    assert test_client.get("/api/kiosks/bad id!/config").status_code == 400
+
+
+@pytest.mark.integration
+def test_effective_config_best_effort_recording(test_client: TestClient):
+    # A recording failure must not break config delivery.
+    with patch(
+        "app.api.routes.kiosks.kiosk_registry.record_kiosk",
+        side_effect=RuntimeError("db down"),
+    ):
+        resp = test_client.get("/api/kiosks/besteffort-1/config")
+    assert resp.status_code == 200
+    assert "orientation" in resp.json()

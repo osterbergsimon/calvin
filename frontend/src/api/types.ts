@@ -4,3898 +4,4016 @@
  */
 
 export interface paths {
-    "/": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        /**
-         * Root
-         * @description Root endpoint.
-         */
-        get: operations["root__get"];
-        put?: never;
-        post?: never;
-        delete?: never;
-        options?: never;
-        head?: never;
-        patch?: never;
-        trace?: never;
+  "/": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
     };
-    "/api/calendar/events": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        /**
-         * Get Calendar Events
-         * @description Get calendar events for a date range.
-         *
-         *     If start_date and end_date are not provided, defaults to current month.
-         */
-        get: operations["get_calendar_events_api_calendar_events_get"];
-        put?: never;
-        post?: never;
-        delete?: never;
-        options?: never;
-        head?: never;
-        patch?: never;
-        trace?: never;
+    /**
+     * Root
+     * @description Root endpoint.
+     */
+    get: operations["root__get"];
+    put?: never;
+    post?: never;
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  "/api/calendar/events": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
     };
-    "/api/calendar/refresh": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        get?: never;
-        put?: never;
-        /**
-         * Refresh Calendar Cache
-         * @description Manually refresh calendar cache.
-         *
-         *     If month and year are provided, only refreshes that specific month.
-         *     Otherwise, refreshes all cached months (current, previous, next).
-         */
-        post: operations["refresh_calendar_cache_api_calendar_refresh_post"];
-        delete?: never;
-        options?: never;
-        head?: never;
-        patch?: never;
-        trace?: never;
+    /**
+     * Get Calendar Events
+     * @description Get calendar events for a date range.
+     *
+     *     If start_date and end_date are not provided, defaults to current month.
+     */
+    get: operations["get_calendar_events_api_calendar_events_get"];
+    put?: never;
+    post?: never;
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  "/api/calendar/refresh": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
     };
-    "/api/calendar/sources": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        /**
-         * Get Calendar Sources
-         * @description Get all calendar sources from plugins (only from enabled plugin types).
-         */
-        get: operations["get_calendar_sources_api_calendar_sources_get"];
-        put?: never;
-        /**
-         * Add Calendar Source
-         * @description Add a new calendar source plugin.
-         *
-         *     For Google Calendar:
-         *     - type: "google"
-         *     - ical_url: The public iCal URL or share URL from Google Calendar
-         *     - Share URL example: https://calendar.google.com/calendar/u/0?cid=...
-         *     - iCal URL example: https://calendar.google.com/calendar/ical/.../basic.ics
-         *     - The service will automatically convert share URLs to iCal format.
-         *
-         *     For Proton Calendar or other iCal sources:
-         *     - type: "proton" or "ical"
-         *     - ical_url: The iCal feed URL
-         *     - URL format: https://calendar.proton.me/api/calendar/v1/url/{calendar_id}/calendar.ics?CacheKey=...&PassphraseKey=...
-         *     - You can get this URL from Proton Calendar's sharing settings.
-         *     - The URL includes authentication parameters (CacheKey and PassphraseKey) in the query string.
-         *
-         *     Calendar events are cached for 5 minutes and automatically refreshed.
-         *
-         *     Note: Google Calendar URLs are automatically normalized by the plugin during initialization.
-         */
-        post: operations["add_calendar_source_api_calendar_sources_post"];
-        delete?: never;
-        options?: never;
-        head?: never;
-        patch?: never;
-        trace?: never;
+    get?: never;
+    put?: never;
+    /**
+     * Refresh Calendar Cache
+     * @description Manually refresh calendar cache.
+     *
+     *     If month and year are provided, only refreshes that specific month.
+     *     Otherwise, refreshes all cached months (current, previous, next).
+     */
+    post: operations["refresh_calendar_cache_api_calendar_refresh_post"];
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  "/api/calendar/sources": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
     };
-    "/api/calendar/sources/{source_id}": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        get?: never;
-        /**
-         * Update Calendar Source
-         * @description Update a calendar source plugin (e.g., color, show_time).
-         */
-        put: operations["update_calendar_source_api_calendar_sources__source_id__put"];
-        post?: never;
-        /**
-         * Remove Calendar Source
-         * @description Remove a calendar source plugin.
-         */
-        delete: operations["remove_calendar_source_api_calendar_sources__source_id__delete"];
-        options?: never;
-        head?: never;
-        patch?: never;
-        trace?: never;
+    /**
+     * Get Calendar Sources
+     * @description Get all calendar sources from plugins (only from enabled plugin types).
+     */
+    get: operations["get_calendar_sources_api_calendar_sources_get"];
+    put?: never;
+    /**
+     * Add Calendar Source
+     * @description Add a new calendar source plugin.
+     *
+     *     For Google Calendar:
+     *     - type: "google"
+     *     - ical_url: The public iCal URL or share URL from Google Calendar
+     *     - Share URL example: https://calendar.google.com/calendar/u/0?cid=...
+     *     - iCal URL example: https://calendar.google.com/calendar/ical/.../basic.ics
+     *     - The service will automatically convert share URLs to iCal format.
+     *
+     *     For Proton Calendar or other iCal sources:
+     *     - type: "proton" or "ical"
+     *     - ical_url: The iCal feed URL
+     *     - URL format: https://calendar.proton.me/api/calendar/v1/url/{calendar_id}/calendar.ics?CacheKey=...&PassphraseKey=...
+     *     - You can get this URL from Proton Calendar's sharing settings.
+     *     - The URL includes authentication parameters (CacheKey and PassphraseKey) in the query string.
+     *
+     *     Calendar events are cached for 5 minutes and automatically refreshed.
+     *
+     *     Note: Google Calendar URLs are automatically normalized by the plugin during initialization.
+     */
+    post: operations["add_calendar_source_api_calendar_sources_post"];
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  "/api/calendar/sources/{source_id}": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
     };
-    "/api/config": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        /**
-         * Get Config
-         * @description Get current configuration.
-         *
-         *     Optional ?kiosk=<id> (+ ?khost=<hostname>) registers the requesting kiosk.
-         *     The returned config is unchanged here; per-kiosk merge arrives in dd9.3.
-         */
-        get: operations["get_config_api_config_get"];
-        put?: never;
-        /**
-         * Update Config
-         * @description Update configuration.
-         */
-        post: operations["update_config_api_config_post"];
-        delete?: never;
-        options?: never;
-        head?: never;
-        patch?: never;
-        trace?: never;
+    get?: never;
+    /**
+     * Update Calendar Source
+     * @description Update a calendar source plugin (e.g., color, show_time).
+     */
+    put: operations["update_calendar_source_api_calendar_sources__source_id__put"];
+    post?: never;
+    /**
+     * Remove Calendar Source
+     * @description Remove a calendar source plugin.
+     */
+    delete: operations["remove_calendar_source_api_calendar_sources__source_id__delete"];
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  "/api/config": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
     };
-    "/api/config/display/orientation": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        /**
-         * Get Display Orientation
-         * @description Get current display orientation (Raspberry Pi only).
-         *
-         *     Returns:
-         *         Dictionary with current display orientation info
-         */
-        get: operations["get_display_orientation_api_config_display_orientation_get"];
-        put?: never;
-        post?: never;
-        delete?: never;
-        options?: never;
-        head?: never;
-        patch?: never;
-        trace?: never;
+    /**
+     * Get Config
+     * @description Get current configuration.
+     *
+     *     ?kiosk=/?khost= recording is retained here for now; it is retired in a later
+     *     task once the per-kiosk effective endpoint records instead.
+     */
+    get: operations["get_config_api_config_get"];
+    put?: never;
+    /**
+     * Update Config
+     * @description Update configuration.
+     */
+    post: operations["update_config_api_config_post"];
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  "/api/config/display/orientation": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
     };
-    "/api/config/git/branches": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        /**
-         * Get Git Branches
-         * @description Fetch available branches from a git repository.
-         *
-         *     Args:
-         *         repo_url: Git repository URL (e.g., https://github.com/user/repo.git)
-         *                  If not provided, uses the configured git_repo_url or default
-         *
-         *     Returns:
-         *         List of branch names
-         */
-        get: operations["get_git_branches_api_config_git_branches_get"];
-        put?: never;
-        post?: never;
-        delete?: never;
-        options?: never;
-        head?: never;
-        patch?: never;
-        trace?: never;
+    /**
+     * Get Display Orientation
+     * @description Get current display orientation (Raspberry Pi only).
+     *
+     *     Returns:
+     *         Dictionary with current display orientation info
+     */
+    get: operations["get_display_orientation_api_config_display_orientation_get"];
+    put?: never;
+    post?: never;
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  "/api/config/git/branches": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
     };
-    "/api/health": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        /**
-         * Health Check
-         * @description Basic health check endpoint.
-         */
-        get: operations["health_check_api_health_get"];
-        put?: never;
-        post?: never;
-        delete?: never;
-        options?: never;
-        head?: never;
-        patch?: never;
-        trace?: never;
+    /**
+     * Get Git Branches
+     * @description Fetch available branches from a git repository.
+     *
+     *     Args:
+     *         repo_url: Git repository URL (e.g., https://github.com/user/repo.git)
+     *                  If not provided, uses the configured git_repo_url or default
+     *
+     *     Returns:
+     *         List of branch names
+     */
+    get: operations["get_git_branches_api_config_git_branches_get"];
+    put?: never;
+    post?: never;
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  "/api/health": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
     };
-    "/api/health/detailed": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        /**
-         * Detailed Health Check
-         * @description Detailed health check with system status.
-         */
-        get: operations["detailed_health_check_api_health_detailed_get"];
-        put?: never;
-        post?: never;
-        delete?: never;
-        options?: never;
-        head?: never;
-        patch?: never;
-        trace?: never;
+    /**
+     * Health Check
+     * @description Basic health check endpoint.
+     */
+    get: operations["health_check_api_health_get"];
+    put?: never;
+    post?: never;
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  "/api/health/detailed": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
     };
-    "/api/health/test-db": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        /**
-         * Test Db Health Check
-         * @description Test database connection and Ormar models.
-         */
-        get: operations["test_db_health_check_api_health_test_db_get"];
-        put?: never;
-        post?: never;
-        delete?: never;
-        options?: never;
-        head?: never;
-        patch?: never;
-        trace?: never;
+    /**
+     * Detailed Health Check
+     * @description Detailed health check with system status.
+     */
+    get: operations["detailed_health_check_api_health_detailed_get"];
+    put?: never;
+    post?: never;
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  "/api/health/test-db": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
     };
-    "/api/images/config": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        /**
-         * Get Image Config
-         * @description Get image service configuration from plugins.
-         *
-         *     Returns:
-         *         Configuration dictionary
-         */
-        get: operations["get_image_config_api_images_config_get"];
-        put?: never;
-        post?: never;
-        delete?: never;
-        options?: never;
-        head?: never;
-        patch?: never;
-        trace?: never;
+    /**
+     * Test Db Health Check
+     * @description Test database connection and Ormar models.
+     */
+    get: operations["test_db_health_check_api_health_test_db_get"];
+    put?: never;
+    post?: never;
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  "/api/images/config": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
     };
-    "/api/images/current": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        /**
-         * Get Current Image
-         * @description Get current image metadata from plugin service.
-         *
-         *     Returns:
-         *         Current image metadata
-         */
-        get: operations["get_current_image_api_images_current_get"];
-        put?: never;
-        post?: never;
-        delete?: never;
-        options?: never;
-        head?: never;
-        patch?: never;
-        trace?: never;
+    /**
+     * Get Image Config
+     * @description Get image service configuration from plugins.
+     *
+     *     Returns:
+     *         Configuration dictionary
+     */
+    get: operations["get_image_config_api_images_config_get"];
+    put?: never;
+    post?: never;
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  "/api/images/current": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
     };
-    "/api/images/list": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        /**
-         * List Images
-         * @description Get list of all images from all enabled image plugins.
-         *
-         *     Returns:
-         *         List of image metadata
-         */
-        get: operations["list_images_api_images_list_get"];
-        put?: never;
-        post?: never;
-        delete?: never;
-        options?: never;
-        head?: never;
-        patch?: never;
-        trace?: never;
+    /**
+     * Get Current Image
+     * @description Get current image metadata from plugin service.
+     *
+     *     Returns:
+     *         Current image metadata
+     */
+    get: operations["get_current_image_api_images_current_get"];
+    put?: never;
+    post?: never;
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  "/api/images/list": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
     };
-    "/api/images/next": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        get?: never;
-        put?: never;
-        /**
-         * Next Image
-         * @description Move to next image and return it from plugin service.
-         *
-         *     Returns:
-         *         Next image metadata
-         */
-        post: operations["next_image_api_images_next_post"];
-        delete?: never;
-        options?: never;
-        head?: never;
-        patch?: never;
-        trace?: never;
+    /**
+     * List Images
+     * @description Get list of all images from all enabled image plugins.
+     *
+     *     Returns:
+     *         List of image metadata
+     */
+    get: operations["list_images_api_images_list_get"];
+    put?: never;
+    post?: never;
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  "/api/images/next": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
     };
-    "/api/images/previous": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        get?: never;
-        put?: never;
-        /**
-         * Previous Image
-         * @description Move to previous image and return it from plugin service.
-         *
-         *     Returns:
-         *         Previous image metadata
-         */
-        post: operations["previous_image_api_images_previous_post"];
-        delete?: never;
-        options?: never;
-        head?: never;
-        patch?: never;
-        trace?: never;
+    get?: never;
+    put?: never;
+    /**
+     * Next Image
+     * @description Move to next image and return it from plugin service.
+     *
+     *     Returns:
+     *         Next image metadata
+     */
+    post: operations["next_image_api_images_next_post"];
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  "/api/images/previous": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
     };
-    "/api/images/upload": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        get?: never;
-        put?: never;
-        /**
-         * Upload Image
-         * @description Upload an image file to the first plugin that supports upload.
-         *
-         *     Args:
-         *         file: Image file to upload
-         *
-         *     Returns:
-         *         Uploaded image metadata
-         */
-        post: operations["upload_image_api_images_upload_post"];
-        delete?: never;
-        options?: never;
-        head?: never;
-        patch?: never;
-        trace?: never;
+    get?: never;
+    put?: never;
+    /**
+     * Previous Image
+     * @description Move to previous image and return it from plugin service.
+     *
+     *     Returns:
+     *         Previous image metadata
+     */
+    post: operations["previous_image_api_images_previous_post"];
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  "/api/images/upload": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
     };
-    "/api/images/{image_id}": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        /**
-         * Get Image File
-         * @description Get image file by ID from plugin service.
-         *
-         *     For remote images, downloads and serves via the local cache (avoids rate limits,
-         *     enables stale-on-error). For local images, serves the file directly.
-         *
-         *     Args:
-         *         image_id: Image ID
-         *
-         *     Returns:
-         *         Image file response
-         */
-        get: operations["get_image_file_api_images__image_id__get"];
-        put?: never;
-        post?: never;
-        /**
-         * Delete Image
-         * @description Delete an image by ID from plugin service.
-         *
-         *     Args:
-         *         image_id: Image ID
-         *
-         *     Returns:
-         *         Success message
-         */
-        delete: operations["delete_image_api_images__image_id__delete"];
-        options?: never;
-        head?: never;
-        patch?: never;
-        trace?: never;
+    get?: never;
+    put?: never;
+    /**
+     * Upload Image
+     * @description Upload an image file to the first plugin that supports upload.
+     *
+     *     Args:
+     *         file: Image file to upload
+     *
+     *     Returns:
+     *         Uploaded image metadata
+     */
+    post: operations["upload_image_api_images_upload_post"];
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  "/api/images/{image_id}": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
     };
-    "/api/images/{image_id}/thumbnail": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        /**
-         * Get Image Thumbnail
-         * @description Get thumbnail for an image by ID from plugin service.
-         *
-         *     Args:
-         *         image_id: Image ID
-         *
-         *     Returns:
-         *         Thumbnail image file
-         */
-        get: operations["get_image_thumbnail_api_images__image_id__thumbnail_get"];
-        put?: never;
-        post?: never;
-        delete?: never;
-        options?: never;
-        head?: never;
-        patch?: never;
-        trace?: never;
+    /**
+     * Get Image File
+     * @description Get image file by ID from plugin service.
+     *
+     *     For remote images, downloads and serves via the local cache (avoids rate limits,
+     *     enables stale-on-error). For local images, serves the file directly.
+     *
+     *     Args:
+     *         image_id: Image ID
+     *
+     *     Returns:
+     *         Image file response
+     */
+    get: operations["get_image_file_api_images__image_id__get"];
+    put?: never;
+    post?: never;
+    /**
+     * Delete Image
+     * @description Delete an image by ID from plugin service.
+     *
+     *     Args:
+     *         image_id: Image ID
+     *
+     *     Returns:
+     *         Success message
+     */
+    delete: operations["delete_image_api_images__image_id__delete"];
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  "/api/images/{image_id}/thumbnail": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
     };
-    "/api/keyboard/actions": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        /**
-         * Get Available Actions
-         * @description Get list of available keyboard actions.
-         */
-        get: operations["get_available_actions_api_keyboard_actions_get"];
-        put?: never;
-        post?: never;
-        delete?: never;
-        options?: never;
-        head?: never;
-        patch?: never;
-        trace?: never;
+    /**
+     * Get Image Thumbnail
+     * @description Get thumbnail for an image by ID from plugin service.
+     *
+     *     Args:
+     *         image_id: Image ID
+     *
+     *     Returns:
+     *         Thumbnail image file
+     */
+    get: operations["get_image_thumbnail_api_images__image_id__thumbnail_get"];
+    put?: never;
+    post?: never;
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  "/api/keyboard/actions": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
     };
-    "/api/keyboard/mappings": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        /**
-         * Get Keyboard Mappings
-         * @description Return the full flat mapping.
-         */
-        get: operations["get_keyboard_mappings_api_keyboard_mappings_get"];
-        put?: never;
-        /**
-         * Replace Keyboard Mappings
-         * @description Replace the entire mapping.
-         */
-        post: operations["replace_keyboard_mappings_api_keyboard_mappings_post"];
-        delete?: never;
-        options?: never;
-        head?: never;
-        patch?: never;
-        trace?: never;
+    /**
+     * Get Available Actions
+     * @description Get list of available keyboard actions.
+     */
+    get: operations["get_available_actions_api_keyboard_actions_get"];
+    put?: never;
+    post?: never;
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  "/api/keyboard/mappings": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
     };
-    "/api/keyboard/mappings/{key_code}": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        get?: never;
-        /**
-         * Set Single Mapping
-         * @description Upsert a single binding.
-         */
-        put: operations["set_single_mapping_api_keyboard_mappings__key_code__put"];
-        post?: never;
-        /**
-         * Delete Single Mapping
-         * @description Remove a single binding.
-         */
-        delete: operations["delete_single_mapping_api_keyboard_mappings__key_code__delete"];
-        options?: never;
-        head?: never;
-        patch?: never;
-        trace?: never;
+    /**
+     * Get Keyboard Mappings
+     * @description Return the full flat mapping.
+     */
+    get: operations["get_keyboard_mappings_api_keyboard_mappings_get"];
+    put?: never;
+    /**
+     * Replace Keyboard Mappings
+     * @description Replace the entire mapping.
+     */
+    post: operations["replace_keyboard_mappings_api_keyboard_mappings_post"];
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  "/api/keyboard/mappings/{key_code}": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
     };
-    "/api/kiosks": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        /**
-         * Get Kiosks
-         * @description List known kiosks (id, hostname, last-seen).
-         */
-        get: operations["get_kiosks_api_kiosks_get"];
-        put?: never;
-        post?: never;
-        delete?: never;
-        options?: never;
-        head?: never;
-        patch?: never;
-        trace?: never;
+    get?: never;
+    /**
+     * Set Single Mapping
+     * @description Upsert a single binding.
+     */
+    put: operations["set_single_mapping_api_keyboard_mappings__key_code__put"];
+    post?: never;
+    /**
+     * Delete Single Mapping
+     * @description Remove a single binding.
+     */
+    delete: operations["delete_single_mapping_api_keyboard_mappings__key_code__delete"];
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  "/api/kiosks": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
     };
-    "/api/plugins": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        /**
-         * Get Plugins
-         * @description Get all plugin types, optionally filtered by type.
-         *
-         *     Args:
-         *         plugin_type: Optional plugin type filter
-         *             ('calendar', 'image', 'service', 'theme', 'backend')
-         *
-         *     Returns:
-         *         List of plugin types with their common configuration
-         */
-        get: operations["get_plugins_api_plugins_get"];
-        put?: never;
-        post?: never;
-        delete?: never;
-        options?: never;
-        head?: never;
-        patch?: never;
-        trace?: never;
+    /**
+     * Get Kiosks
+     * @description List known kiosks (id, hostname, last-seen, lastAppliedVersion).
+     */
+    get: operations["get_kiosks_api_kiosks_get"];
+    put?: never;
+    post?: never;
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  "/api/kiosks/{kiosk_id}/config": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
     };
-    "/api/plugins/github/enumerate": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        get?: never;
-        put?: never;
-        /**
-         * Enumerate Plugins From Github
-         * @description Enumerate available plugins from a GitHub repository.
-         *
-         *     Args:
-         *         request: Request body containing:
-         *             - repo_url: GitHub repository URL (e.g., https://github.com/user/repo)
-         *             - branch: Optional branch name (defaults to main/master)
-         *
-         *     Returns:
-         *         Dictionary with manifest info and list of available plugins
-         */
-        post: operations["enumerate_plugins_from_github_api_plugins_github_enumerate_post"];
-        delete?: never;
-        options?: never;
-        head?: never;
-        patch?: never;
-        trace?: never;
+    /**
+     * Get Kiosk Config
+     * @description Return a kiosk's effective (merged) config; records the kiosk; ETag + 304.
+     */
+    get: operations["get_kiosk_config_api_kiosks__kiosk_id__config_get"];
+    put?: never;
+    post?: never;
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  "/api/kiosks/{kiosk_id}/overrides": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
     };
-    "/api/plugins/github/install": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        get?: never;
-        put?: never;
-        /**
-         * Install Plugin From Github
-         * @description Install a specific plugin from a GitHub repository.
-         *
-         *     Args:
-         *         request: Request body containing:
-         *             - repo_url: GitHub repository URL
-         *             - plugin_path: Relative path to plugin directory within repo
-         *             - branch: Optional branch name (defaults to main/master)
-         *             - plugin_id: Optional plugin ID override
-         *             - force: Optional boolean to force reinstall even if already installed
-         *
-         *     Returns:
-         *         Installation result with manifest
-         */
-        post: operations["install_plugin_from_github_api_plugins_github_install_post"];
-        delete?: never;
-        options?: never;
-        head?: never;
-        patch?: never;
-        trace?: never;
+    get?: never;
+    /**
+     * Put Kiosk Overrides
+     * @description Replace a kiosk's override layer (upsert).
+     */
+    put: operations["put_kiosk_overrides_api_kiosks__kiosk_id__overrides_put"];
+    post?: never;
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  "/api/plugins": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
     };
-    "/api/plugins/inspect": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        get?: never;
-        put?: never;
-        /**
-         * Inspect Plugin
-         * @description Read plugin.json from a zip without installing it.
-         *
-         *     Returns the manifest so the caller can check dependencies.packages and
-         *     show a security warning before committing to an install.
-         */
-        post: operations["inspect_plugin_api_plugins_inspect_post"];
-        delete?: never;
-        options?: never;
-        head?: never;
-        patch?: never;
-        trace?: never;
+    /**
+     * Get Plugins
+     * @description Get all plugin types, optionally filtered by type.
+     *
+     *     Args:
+     *         plugin_type: Optional plugin type filter
+     *             ('calendar', 'image', 'service', 'theme', 'backend')
+     *
+     *     Returns:
+     *         List of plugin types with their common configuration
+     */
+    get: operations["get_plugins_api_plugins_get"];
+    put?: never;
+    post?: never;
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  "/api/plugins/github/enumerate": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
     };
-    "/api/plugins/install": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        get?: never;
-        put?: never;
-        /**
-         * Install Plugin
-         * @description Install a plugin from a zip file or directory.
-         *
-         *     Args:
-         *         file: Plugin package zip file
-         *         plugin_id: Optional plugin ID override
-         *
-         *     Returns:
-         *         Plugin manifest
-         */
-        post: operations["install_plugin_api_plugins_install_post"];
-        delete?: never;
-        options?: never;
-        head?: never;
-        patch?: never;
-        trace?: never;
+    get?: never;
+    put?: never;
+    /**
+     * Enumerate Plugins From Github
+     * @description Enumerate available plugins from a GitHub repository.
+     *
+     *     Args:
+     *         request: Request body containing:
+     *             - repo_url: GitHub repository URL (e.g., https://github.com/user/repo)
+     *             - branch: Optional branch name (defaults to main/master)
+     *
+     *     Returns:
+     *         Dictionary with manifest info and list of available plugins
+     */
+    post: operations["enumerate_plugins_from_github_api_plugins_github_enumerate_post"];
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  "/api/plugins/github/install": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
     };
-    "/api/plugins/installed": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        /**
-         * Get Installed Plugins
-         * @description Get list of installed plugins and themes.
-         *
-         *     Returns:
-         *         List of installed plugin and theme manifests
-         */
-        get: operations["get_installed_plugins_api_plugins_installed_get"];
-        put?: never;
-        post?: never;
-        delete?: never;
-        options?: never;
-        head?: never;
-        patch?: never;
-        trace?: never;
+    get?: never;
+    put?: never;
+    /**
+     * Install Plugin From Github
+     * @description Install a specific plugin from a GitHub repository.
+     *
+     *     Args:
+     *         request: Request body containing:
+     *             - repo_url: GitHub repository URL
+     *             - plugin_path: Relative path to plugin directory within repo
+     *             - branch: Optional branch name (defaults to main/master)
+     *             - plugin_id: Optional plugin ID override
+     *             - force: Optional boolean to force reinstall even if already installed
+     *
+     *     Returns:
+     *         Installation result with manifest
+     */
+    post: operations["install_plugin_from_github_api_plugins_github_install_post"];
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  "/api/plugins/inspect": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
     };
-    "/api/plugins/installed/{plugin_id}": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        /**
-         * Get Installed Plugin
-         * @description Get manifest for an installed plugin.
-         *
-         *     Args:
-         *         plugin_id: Plugin identifier
-         *
-         *     Returns:
-         *         Plugin manifest
-         */
-        get: operations["get_installed_plugin_api_plugins_installed__plugin_id__get"];
-        put?: never;
-        post?: never;
-        /**
-         * Uninstall Plugin
-         * @description Uninstall a plugin or theme.
-         *
-         *     Args:
-         *         plugin_id: Plugin/theme identifier
-         *
-         *     Returns:
-         *         Success message
-         */
-        delete: operations["uninstall_plugin_api_plugins_installed__plugin_id__delete"];
-        options?: never;
-        head?: never;
-        patch?: never;
-        trace?: never;
+    get?: never;
+    put?: never;
+    /**
+     * Inspect Plugin
+     * @description Read plugin.json from a zip without installing it.
+     *
+     *     Returns the manifest so the caller can check dependencies.packages and
+     *     show a security warning before committing to an install.
+     */
+    post: operations["inspect_plugin_api_plugins_inspect_post"];
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  "/api/plugins/install": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
     };
-    "/api/plugins/instances/{instance_id}": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        get?: never;
-        /**
-         * Update Plugin Instance
-         * @description Update a plugin instance (enabled status, config, etc.).
-         *
-         *     Args:
-         *         instance_id: Plugin instance ID (e.g., 'imap-6444', 'mealie-7040')
-         *         instance_data: Dictionary with fields to update:
-         *             - enabled: bool (optional) - Enable/disable instance
-         *             - config: dict (optional) - Update instance configuration
-         *             - name: str (optional) - Update instance name
-         *
-         *     Returns:
-         *         Success status and updated instance information
-         */
-        put: operations["update_plugin_instance_api_plugins_instances__instance_id__put"];
-        post?: never;
-        /** Delete Plugin Instance */
-        delete: operations["delete_plugin_instance_api_plugins_instances__instance_id__delete"];
-        options?: never;
-        head?: never;
-        patch?: never;
-        trace?: never;
+    get?: never;
+    put?: never;
+    /**
+     * Install Plugin
+     * @description Install a plugin from a zip file or directory.
+     *
+     *     Args:
+     *         file: Plugin package zip file
+     *         plugin_id: Optional plugin ID override
+     *
+     *     Returns:
+     *         Plugin manifest
+     */
+    post: operations["install_plugin_api_plugins_install_post"];
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  "/api/plugins/installed": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
     };
-    "/api/plugins/instances/{instance_id}/start": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        get?: never;
-        put?: never;
-        /**
-         * Start Plugin Instance
-         * @description Start a plugin instance (if enabled).
-         *
-         *     Args:
-         *         instance_id: Plugin instance ID
-         *
-         *     Returns:
-         *         Success status and message
-         */
-        post: operations["start_plugin_instance_api_plugins_instances__instance_id__start_post"];
-        delete?: never;
-        options?: never;
-        head?: never;
-        patch?: never;
-        trace?: never;
+    /**
+     * Get Installed Plugins
+     * @description Get list of installed plugins and themes.
+     *
+     *     Returns:
+     *         List of installed plugin and theme manifests
+     */
+    get: operations["get_installed_plugins_api_plugins_installed_get"];
+    put?: never;
+    post?: never;
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  "/api/plugins/installed/{plugin_id}": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
     };
-    "/api/plugins/instances/{instance_id}/stop": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        get?: never;
-        put?: never;
-        /**
-         * Stop Plugin Instance
-         * @description Stop a plugin instance.
-         *
-         *     Args:
-         *         instance_id: Plugin instance ID
-         *
-         *     Returns:
-         *         Success status and message
-         */
-        post: operations["stop_plugin_instance_api_plugins_instances__instance_id__stop_post"];
-        delete?: never;
-        options?: never;
-        head?: never;
-        patch?: never;
-        trace?: never;
+    /**
+     * Get Installed Plugin
+     * @description Get manifest for an installed plugin.
+     *
+     *     Args:
+     *         plugin_id: Plugin identifier
+     *
+     *     Returns:
+     *         Plugin manifest
+     */
+    get: operations["get_installed_plugin_api_plugins_installed__plugin_id__get"];
+    put?: never;
+    post?: never;
+    /**
+     * Uninstall Plugin
+     * @description Uninstall a plugin or theme.
+     *
+     *     Args:
+     *         plugin_id: Plugin/theme identifier
+     *
+     *     Returns:
+     *         Success message
+     */
+    delete: operations["uninstall_plugin_api_plugins_installed__plugin_id__delete"];
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  "/api/plugins/instances/{instance_id}": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
     };
-    "/api/plugins/local/enumerate": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        get?: never;
-        put?: never;
-        /**
-         * Enumerate Plugins From Local
-         * @description Enumerate available plugins from a local directory (dev mode only).
-         *
-         *     Args:
-         *         request: Request body containing:
-         *             - local_path: Absolute path to the local plugin repository
-         */
-        post: operations["enumerate_plugins_from_local_api_plugins_local_enumerate_post"];
-        delete?: never;
-        options?: never;
-        head?: never;
-        patch?: never;
-        trace?: never;
+    get?: never;
+    /**
+     * Update Plugin Instance
+     * @description Update a plugin instance (enabled status, config, etc.).
+     *
+     *     Args:
+     *         instance_id: Plugin instance ID (e.g., 'imap-6444', 'mealie-7040')
+     *         instance_data: Dictionary with fields to update:
+     *             - enabled: bool (optional) - Enable/disable instance
+     *             - config: dict (optional) - Update instance configuration
+     *             - name: str (optional) - Update instance name
+     *
+     *     Returns:
+     *         Success status and updated instance information
+     */
+    put: operations["update_plugin_instance_api_plugins_instances__instance_id__put"];
+    post?: never;
+    /** Delete Plugin Instance */
+    delete: operations["delete_plugin_instance_api_plugins_instances__instance_id__delete"];
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  "/api/plugins/instances/{instance_id}/start": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
     };
-    "/api/plugins/local/install": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        get?: never;
-        put?: never;
-        /**
-         * Install Plugin From Local
-         * @description Install a specific plugin from a local directory (dev mode only).
-         *
-         *     Args:
-         *         request: Request body containing:
-         *             - local_path: Absolute path to the local plugin repository
-         *             - plugin_path: Relative path to plugin directory within repo
-         *             - plugin_id: Optional plugin ID override
-         *             - force: Optional boolean to force reinstall
-         */
-        post: operations["install_plugin_from_local_api_plugins_local_install_post"];
-        delete?: never;
-        options?: never;
-        head?: never;
-        patch?: never;
-        trace?: never;
+    get?: never;
+    put?: never;
+    /**
+     * Start Plugin Instance
+     * @description Start a plugin instance (if enabled).
+     *
+     *     Args:
+     *         instance_id: Plugin instance ID
+     *
+     *     Returns:
+     *         Success status and message
+     */
+    post: operations["start_plugin_instance_api_plugins_instances__instance_id__start_post"];
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  "/api/plugins/instances/{instance_id}/stop": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
     };
-    "/api/plugins/local/suggest": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        /**
-         * Suggest Local Plugin Paths
-         * @description Suggest local plugin repository paths by scanning sibling directories (dev mode only).
-         *     Returns paths to directories containing plugins.json.
-         */
-        get: operations["suggest_local_plugin_paths_api_plugins_local_suggest_get"];
-        put?: never;
-        post?: never;
-        delete?: never;
-        options?: never;
-        head?: never;
-        patch?: never;
-        trace?: never;
+    get?: never;
+    put?: never;
+    /**
+     * Stop Plugin Instance
+     * @description Stop a plugin instance.
+     *
+     *     Args:
+     *         instance_id: Plugin instance ID
+     *
+     *     Returns:
+     *         Success status and message
+     */
+    post: operations["stop_plugin_instance_api_plugins_instances__instance_id__stop_post"];
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  "/api/plugins/local/enumerate": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
     };
-    "/api/plugins/{plugin_id}": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        /**
-         * Get Plugin
-         * @description Get a specific plugin type or theme by ID.
-         */
-        get: operations["get_plugin_api_plugins__plugin_id__get"];
-        /** Update Plugin */
-        put: operations["update_plugin_api_plugins__plugin_id__put"];
-        post?: never;
-        delete?: never;
-        options?: never;
-        head?: never;
-        patch?: never;
-        trace?: never;
+    get?: never;
+    put?: never;
+    /**
+     * Enumerate Plugins From Local
+     * @description Enumerate available plugins from a local directory (dev mode only).
+     *
+     *     Args:
+     *         request: Request body containing:
+     *             - local_path: Absolute path to the local plugin repository
+     */
+    post: operations["enumerate_plugins_from_local_api_plugins_local_enumerate_post"];
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  "/api/plugins/local/install": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
     };
-    "/api/plugins/{plugin_id}/backend/run-task": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        get?: never;
-        put?: never;
-        /**
-         * Run Backend Plugin Task
-         * @description Manually trigger scheduled task for a backend plugin.
-         *
-         *     Args:
-         *         plugin_id: Plugin instance ID
-         *
-         *     Returns:
-         *         Task execution result with success status and message
-         */
-        post: operations["run_backend_plugin_task_api_plugins__plugin_id__backend_run_task_post"];
-        delete?: never;
-        options?: never;
-        head?: never;
-        patch?: never;
-        trace?: never;
+    get?: never;
+    put?: never;
+    /**
+     * Install Plugin From Local
+     * @description Install a specific plugin from a local directory (dev mode only).
+     *
+     *     Args:
+     *         request: Request body containing:
+     *             - local_path: Absolute path to the local plugin repository
+     *             - plugin_path: Relative path to plugin directory within repo
+     *             - plugin_id: Optional plugin ID override
+     *             - force: Optional boolean to force reinstall
+     */
+    post: operations["install_plugin_from_local_api_plugins_local_install_post"];
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  "/api/plugins/local/suggest": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
     };
-    "/api/plugins/{plugin_id}/backend/status": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        /**
-         * Get Backend Plugin Status
-         * @description Get status information for a backend plugin.
-         *
-         *     Args:
-         *         plugin_id: Plugin instance ID
-         *
-         *     Returns:
-         *         Plugin status information
-         */
-        get: operations["get_backend_plugin_status_api_plugins__plugin_id__backend_status_get"];
-        put?: never;
-        post?: never;
-        delete?: never;
-        options?: never;
-        head?: never;
-        patch?: never;
-        trace?: never;
+    /**
+     * Suggest Local Plugin Paths
+     * @description Suggest local plugin repository paths by scanning sibling directories (dev mode only).
+     *     Returns paths to directories containing plugins.json.
+     */
+    get: operations["suggest_local_plugin_paths_api_plugins_local_suggest_get"];
+    put?: never;
+    post?: never;
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  "/api/plugins/{plugin_id}": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
     };
-    "/api/plugins/{plugin_id}/config": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        /**
-         * Get Plugin Config
-         * @description Get plugin type common configuration.
-         */
-        get: operations["get_plugin_config_api_plugins__plugin_id__config_get"];
-        /** Update Plugin Config */
-        put: operations["update_plugin_config_api_plugins__plugin_id__config_put"];
-        post?: never;
-        delete?: never;
-        options?: never;
-        head?: never;
-        patch?: never;
-        trace?: never;
+    /**
+     * Get Plugin
+     * @description Get a specific plugin type or theme by ID.
+     */
+    get: operations["get_plugin_api_plugins__plugin_id__get"];
+    /** Update Plugin */
+    put: operations["update_plugin_api_plugins__plugin_id__put"];
+    post?: never;
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  "/api/plugins/{plugin_id}/backend/run-task": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
     };
-    "/api/plugins/{plugin_id}/data": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        /**
-         * Get Plugin Data
-         * @description Get data from a service plugin instance.
-         *
-         *     This is a generic endpoint that works for all service plugins that implement
-         *     the fetch() method (e.g., weather plugins).
-         *
-         *     Args:
-         *         plugin_id: Plugin instance ID
-         *         start_date: Optional start date (plugin-specific)
-         *         end_date: Optional end date (plugin-specific)
-         *
-         *     Returns:
-         *         Plugin data (format depends on plugin type)
-         */
-        get: operations["get_plugin_data_api_plugins__plugin_id__data_get"];
-        put?: never;
-        post?: never;
-        delete?: never;
-        options?: never;
-        head?: never;
-        patch?: never;
-        trace?: never;
+    get?: never;
+    put?: never;
+    /**
+     * Run Backend Plugin Task
+     * @description Manually trigger scheduled task for a backend plugin.
+     *
+     *     Args:
+     *         plugin_id: Plugin instance ID
+     *
+     *     Returns:
+     *         Task execution result with success status and message
+     */
+    post: operations["run_backend_plugin_task_api_plugins__plugin_id__backend_run_task_post"];
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  "/api/plugins/{plugin_id}/backend/status": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
     };
-    "/api/plugins/{plugin_id}/fetch": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        get?: never;
-        put?: never;
-        /**
-         * Fetch Plugin
-         * @description Manually trigger a fetch/check operation on a plugin type's instances.
-         *
-         *     Calls `fetch()` on each enabled instance of the type (e.g. an imap
-         *     plugin's "check now" action).
-         *
-         *     Args:
-         *         plugin_id: Plugin type ID (e.g., 'imap')
-         *
-         *     Returns:
-         *         Fetch result with success status, message, and details
-         */
-        post: operations["fetch_plugin_api_plugins__plugin_id__fetch_post"];
-        delete?: never;
-        options?: never;
-        head?: never;
-        patch?: never;
-        trace?: never;
+    /**
+     * Get Backend Plugin Status
+     * @description Get status information for a backend plugin.
+     *
+     *     Args:
+     *         plugin_id: Plugin instance ID
+     *
+     *     Returns:
+     *         Plugin status information
+     */
+    get: operations["get_backend_plugin_status_api_plugins__plugin_id__backend_status_get"];
+    put?: never;
+    post?: never;
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  "/api/plugins/{plugin_id}/config": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
     };
-    "/api/plugins/{plugin_id}/geocode": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        get?: never;
-        put?: never;
-        /**
-         * Geocode Location
-         * @description Geocode a location name to coordinates using OpenStreetMap Nominatim API.
-         *
-         *     This endpoint is used by plugins (e.g., Yr.no weather) to convert location
-         *     names to latitude/longitude coordinates.
-         *
-         *     Args:
-         *         plugin_id: Plugin instance ID
-         *         request: Request body with "location" field
-         *
-         *     Returns:
-         *         Dictionary with latitude, longitude, and display_name
-         */
-        post: operations["geocode_location_api_plugins__plugin_id__geocode_post"];
-        delete?: never;
-        options?: never;
-        head?: never;
-        patch?: never;
-        trace?: never;
+    /**
+     * Get Plugin Config
+     * @description Get plugin type common configuration.
+     */
+    get: operations["get_plugin_config_api_plugins__plugin_id__config_get"];
+    /** Update Plugin Config */
+    put: operations["update_plugin_config_api_plugins__plugin_id__config_put"];
+    post?: never;
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  "/api/plugins/{plugin_id}/data": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
     };
-    "/api/plugins/{plugin_id}/instances": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        /**
-         * Get Plugin Instances
-         * @description Get all plugin instances for a plugin type, including running status.
-         *
-         *     Args:
-         *         plugin_id: Plugin type ID
-         *
-         *     Returns:
-         *         List of plugin instances with their running status
-         */
-        get: operations["get_plugin_instances_api_plugins__plugin_id__instances_get"];
-        put?: never;
-        /**
-         * Create Plugin Instance
-         * @description Create a plugin instance via an explicit instance lifecycle endpoint.
-         *
-         *     The typed payload is translated into the config-update metadata fields
-         *     understood by the generic instance manager.
-         */
-        post: operations["create_plugin_instance_api_plugins__plugin_id__instances_post"];
-        delete?: never;
-        options?: never;
-        head?: never;
-        patch?: never;
-        trace?: never;
+    /**
+     * Get Plugin Data
+     * @description Get data from a service plugin instance.
+     *
+     *     This is a generic endpoint that works for all service plugins that implement
+     *     the fetch() method (e.g., weather plugins).
+     *
+     *     Args:
+     *         plugin_id: Plugin instance ID
+     *         start_date: Optional start date (plugin-specific)
+     *         end_date: Optional end date (plugin-specific)
+     *
+     *     Returns:
+     *         Plugin data (format depends on plugin type)
+     */
+    get: operations["get_plugin_data_api_plugins__plugin_id__data_get"];
+    put?: never;
+    post?: never;
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  "/api/plugins/{plugin_id}/fetch": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
     };
-    "/api/plugins/{plugin_id}/instances/order": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        get?: never;
-        /**
-         * Update Plugin Instances Order
-         * @description Update display order for plugin instances.
-         *
-         *     Args:
-         *         plugin_id: Plugin type ID
-         *         instance_orders: Dictionary mapping instance IDs to their new display_order values
-         *
-         *     Returns:
-         *         Success status and message
-         */
-        put: operations["update_plugin_instances_order_api_plugins__plugin_id__instances_order_put"];
-        post?: never;
-        delete?: never;
-        options?: never;
-        head?: never;
-        patch?: never;
-        trace?: never;
+    get?: never;
+    put?: never;
+    /**
+     * Fetch Plugin
+     * @description Manually trigger a fetch/check operation on a plugin type's instances.
+     *
+     *     Calls `fetch()` on each enabled instance of the type (e.g. an imap
+     *     plugin's "check now" action).
+     *
+     *     Args:
+     *         plugin_id: Plugin type ID (e.g., 'imap')
+     *
+     *     Returns:
+     *         Fetch result with success status, message, and details
+     */
+    post: operations["fetch_plugin_api_plugins__plugin_id__fetch_post"];
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  "/api/plugins/{plugin_id}/geocode": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
     };
-    "/api/plugins/{plugin_id}/scan": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        /**
-         * Scan Plugin Options
-         * @description Scan/discover available options for a plugin config field.
-         *
-         *     Args:
-         *         plugin_id: Plugin type ID (e.g., 'chromecast')
-         *         field: Config field key to scan (e.g., 'device_name')
-         *
-         *     Returns:
-         *         Dict with 'options' list of {value, label} dicts
-         */
-        get: operations["scan_plugin_options_api_plugins__plugin_id__scan_get"];
-        put?: never;
-        post?: never;
-        delete?: never;
-        options?: never;
-        head?: never;
-        patch?: never;
-        trace?: never;
+    get?: never;
+    put?: never;
+    /**
+     * Geocode Location
+     * @description Geocode a location name to coordinates using OpenStreetMap Nominatim API.
+     *
+     *     This endpoint is used by plugins (e.g., Yr.no weather) to convert location
+     *     names to latitude/longitude coordinates.
+     *
+     *     Args:
+     *         plugin_id: Plugin instance ID
+     *         request: Request body with "location" field
+     *
+     *     Returns:
+     *         Dictionary with latitude, longitude, and display_name
+     */
+    post: operations["geocode_location_api_plugins__plugin_id__geocode_post"];
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  "/api/plugins/{plugin_id}/instances": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
     };
-    "/api/plugins/{plugin_id}/static/{asset_path}": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        /** Get Plugin Static Asset */
-        get: operations["get_plugin_static_asset_api_plugins__plugin_id__static__asset_path__get"];
-        put?: never;
-        post?: never;
-        delete?: never;
-        options?: never;
-        head?: never;
-        patch?: never;
-        trace?: never;
+    /**
+     * Get Plugin Instances
+     * @description Get all plugin instances for a plugin type, including running status.
+     *
+     *     Args:
+     *         plugin_id: Plugin type ID
+     *
+     *     Returns:
+     *         List of plugin instances with their running status
+     */
+    get: operations["get_plugin_instances_api_plugins__plugin_id__instances_get"];
+    put?: never;
+    /**
+     * Create Plugin Instance
+     * @description Create a plugin instance via an explicit instance lifecycle endpoint.
+     *
+     *     The typed payload is translated into the config-update metadata fields
+     *     understood by the generic instance manager.
+     */
+    post: operations["create_plugin_instance_api_plugins__plugin_id__instances_post"];
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  "/api/plugins/{plugin_id}/instances/order": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
     };
-    "/api/plugins/{plugin_id}/test": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        get?: never;
-        put?: never;
-        /**
-         * Test Plugin
-         * @description Test plugin connection/configuration.
-         *
-         *     Dispatches to the plugin class's test_connection() classmethod.
-         *
-         *     Args:
-         *         plugin_id: Plugin type ID (e.g., 'imap', 'mealie')
-         *         test_config: Optional config to use for testing (if not provided, uses saved config)
-         *
-         *     Returns:
-         *         Test result with success status and message
-         */
-        post: operations["test_plugin_api_plugins__plugin_id__test_post"];
-        delete?: never;
-        options?: never;
-        head?: never;
-        patch?: never;
-        trace?: never;
+    get?: never;
+    /**
+     * Update Plugin Instances Order
+     * @description Update display order for plugin instances.
+     *
+     *     Args:
+     *         plugin_id: Plugin type ID
+     *         instance_orders: Dictionary mapping instance IDs to their new display_order values
+     *
+     *     Returns:
+     *         Success status and message
+     */
+    put: operations["update_plugin_instances_order_api_plugins__plugin_id__instances_order_put"];
+    post?: never;
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  "/api/plugins/{plugin_id}/scan": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
     };
-    "/api/system/display/power/off": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        get?: never;
-        put?: never;
-        /**
-         * Turn Display Off
-         * @description Turn display off.
-         */
-        post: operations["turn_display_off_api_system_display_power_off_post"];
-        delete?: never;
-        options?: never;
-        head?: never;
-        patch?: never;
-        trace?: never;
+    /**
+     * Scan Plugin Options
+     * @description Scan/discover available options for a plugin config field.
+     *
+     *     Args:
+     *         plugin_id: Plugin type ID (e.g., 'chromecast')
+     *         field: Config field key to scan (e.g., 'device_name')
+     *
+     *     Returns:
+     *         Dict with 'options' list of {value, label} dicts
+     */
+    get: operations["scan_plugin_options_api_plugins__plugin_id__scan_get"];
+    put?: never;
+    post?: never;
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  "/api/plugins/{plugin_id}/static/{asset_path}": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
     };
-    "/api/system/display/power/on": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        get?: never;
-        put?: never;
-        /**
-         * Turn Display On
-         * @description Turn display on.
-         */
-        post: operations["turn_display_on_api_system_display_power_on_post"];
-        delete?: never;
-        options?: never;
-        head?: never;
-        patch?: never;
-        trace?: never;
+    /** Get Plugin Static Asset */
+    get: operations["get_plugin_static_asset_api_plugins__plugin_id__static__asset_path__get"];
+    put?: never;
+    post?: never;
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  "/api/plugins/{plugin_id}/test": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
     };
-    "/api/system/display/power/state": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        /**
-         * Get Display State
-         * @description Get current display power state.
-         */
-        get: operations["get_display_state_api_system_display_power_state_get"];
-        put?: never;
-        post?: never;
-        delete?: never;
-        options?: never;
-        head?: never;
-        patch?: never;
-        trace?: never;
+    get?: never;
+    put?: never;
+    /**
+     * Test Plugin
+     * @description Test plugin connection/configuration.
+     *
+     *     Dispatches to the plugin class's test_connection() classmethod.
+     *
+     *     Args:
+     *         plugin_id: Plugin type ID (e.g., 'imap', 'mealie')
+     *         test_config: Optional config to use for testing (if not provided, uses saved config)
+     *
+     *     Returns:
+     *         Test result with success status and message
+     */
+    post: operations["test_plugin_api_plugins__plugin_id__test_post"];
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  "/api/system/display/power/off": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
     };
-    "/api/system/display/timeout/configure": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        get?: never;
-        put?: never;
-        /**
-         * Configure Display Timeout
-         * @description Apply display timeout settings immediately.
-         */
-        post: operations["configure_display_timeout_api_system_display_timeout_configure_post"];
-        delete?: never;
-        options?: never;
-        head?: never;
-        patch?: never;
-        trace?: never;
+    get?: never;
+    put?: never;
+    /**
+     * Turn Display Off
+     * @description Turn display off.
+     */
+    post: operations["turn_display_off_api_system_display_power_off_post"];
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  "/api/system/display/power/on": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
     };
-    "/api/system/reboot": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        get?: never;
-        put?: never;
-        /**
-         * Reboot System
-         * @description Reboot the Raspberry Pi.
-         */
-        post: operations["reboot_system_api_system_reboot_post"];
-        delete?: never;
-        options?: never;
-        head?: never;
-        patch?: never;
-        trace?: never;
+    get?: never;
+    put?: never;
+    /**
+     * Turn Display On
+     * @description Turn display on.
+     */
+    post: operations["turn_display_on_api_system_display_power_on_post"];
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  "/api/system/display/power/state": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
     };
-    "/api/system/reload-ui": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        get?: never;
-        put?: never;
-        /**
-         * Reload Ui
-         * @description Signal that the UI should be reloaded.
-         *     This endpoint doesn't actually reload anything server-side,
-         *     but can be used to trigger a client-side reload.
-         */
-        post: operations["reload_ui_api_system_reload_ui_post"];
-        delete?: never;
-        options?: never;
-        head?: never;
-        patch?: never;
-        trace?: never;
+    /**
+     * Get Display State
+     * @description Get current display power state.
+     */
+    get: operations["get_display_state_api_system_display_power_state_get"];
+    put?: never;
+    post?: never;
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  "/api/system/display/timeout/configure": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
     };
-    "/api/system/restart-backend": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        get?: never;
-        put?: never;
-        /**
-         * Restart Backend
-         * @description Restart the backend service.
-         *     Uses a helper script with sudo permissions to restart the calvin-backend service.
-         *
-         *     The actual restart runs after a short delay on a background thread so this process
-         *     can return HTTP 200 before systemd stops it; otherwise clients typically see a
-         *     network error even when the restart succeeds.
-         */
-        post: operations["restart_backend_api_system_restart_backend_post"];
-        delete?: never;
-        options?: never;
-        head?: never;
-        patch?: never;
-        trace?: never;
+    get?: never;
+    put?: never;
+    /**
+     * Configure Display Timeout
+     * @description Apply display timeout settings immediately.
+     */
+    post: operations["configure_display_timeout_api_system_display_timeout_configure_post"];
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  "/api/system/reboot": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
     };
-    "/api/system/restart-frontend": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        get?: never;
-        put?: never;
-        /**
-         * Restart Frontend
-         * @description Restart the frontend service.
-         *     Uses a helper script with sudo permissions to restart the calvin-frontend service.
-         */
-        post: operations["restart_frontend_api_system_restart_frontend_post"];
-        delete?: never;
-        options?: never;
-        head?: never;
-        patch?: never;
-        trace?: never;
+    get?: never;
+    put?: never;
+    /**
+     * Reboot System
+     * @description Reboot the Raspberry Pi.
+     */
+    post: operations["reboot_system_api_system_reboot_post"];
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  "/api/system/reload-ui": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
     };
-    "/api/system/update": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        get?: never;
-        put?: never;
-        /**
-         * Trigger Update
-         * @description Trigger manual update from GitHub.
-         *     Runs the update script asynchronously and returns immediately.
-         */
-        post: operations["trigger_update_api_system_update_post"];
-        delete?: never;
-        options?: never;
-        head?: never;
-        patch?: never;
-        trace?: never;
+    get?: never;
+    put?: never;
+    /**
+     * Reload Ui
+     * @description Signal that the UI should be reloaded.
+     *     This endpoint doesn't actually reload anything server-side,
+     *     but can be used to trigger a client-side reload.
+     */
+    post: operations["reload_ui_api_system_reload_ui_post"];
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  "/api/system/restart-backend": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
     };
-    "/api/system/update/status": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        /**
-         * Get Update Status
-         * @description Get the status of the last update.
-         *     Reads the last few lines from the update log.
-         */
-        get: operations["get_update_status_api_system_update_status_get"];
-        put?: never;
-        post?: never;
-        delete?: never;
-        options?: never;
-        head?: never;
-        patch?: never;
-        trace?: never;
+    get?: never;
+    put?: never;
+    /**
+     * Restart Backend
+     * @description Restart the backend service.
+     *     Uses a helper script with sudo permissions to restart the calvin-backend service.
+     *
+     *     The actual restart runs after a short delay on a background thread so this process
+     *     can return HTTP 200 before systemd stops it; otherwise clients typically see a
+     *     network error even when the restart succeeds.
+     */
+    post: operations["restart_backend_api_system_restart_backend_post"];
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  "/api/system/restart-frontend": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
     };
-    "/api/system/update/stream": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        /**
-         * Stream Update Log
-         * @description Stream update log output as Server-Sent Events starting from log_offset bytes.
-         */
-        get: operations["stream_update_log_api_system_update_stream_get"];
-        put?: never;
-        post?: never;
-        delete?: never;
-        options?: never;
-        head?: never;
-        patch?: never;
-        trace?: never;
+    get?: never;
+    put?: never;
+    /**
+     * Restart Frontend
+     * @description Restart the frontend service.
+     *     Uses a helper script with sudo permissions to restart the calvin-frontend service.
+     */
+    post: operations["restart_frontend_api_system_restart_frontend_post"];
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  "/api/system/update": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
     };
+    get?: never;
+    put?: never;
+    /**
+     * Trigger Update
+     * @description Trigger manual update from GitHub.
+     *     Runs the update script asynchronously and returns immediately.
+     */
+    post: operations["trigger_update_api_system_update_post"];
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  "/api/system/update/status": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    /**
+     * Get Update Status
+     * @description Get the status of the last update.
+     *     Reads the last few lines from the update log.
+     */
+    get: operations["get_update_status_api_system_update_status_get"];
+    put?: never;
+    post?: never;
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  "/api/system/update/stream": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    /**
+     * Stream Update Log
+     * @description Stream update log output as Server-Sent Events starting from log_offset bytes.
+     */
+    get: operations["stream_update_log_api_system_update_stream_get"];
+    put?: never;
+    post?: never;
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
 }
 export type webhooks = Record<string, never>;
 export interface components {
-    schemas: {
-        /** Body_inspect_plugin_api_plugins_inspect_post */
-        Body_inspect_plugin_api_plugins_inspect_post: {
-            /**
-             * File
-             * Format: binary
-             */
-            file: string;
-        };
-        /** Body_install_plugin_api_plugins_install_post */
-        Body_install_plugin_api_plugins_install_post: {
-            /**
-             * File
-             * Format: binary
-             */
-            file: string;
-        };
-        /** Body_upload_image_api_images_upload_post */
-        Body_upload_image_api_images_upload_post: {
-            /**
-             * File
-             * Format: binary
-             */
-            file: string;
-        };
-        /**
-         * CalendarEvent
-         * @description Calendar event model.
-         */
-        CalendarEvent: {
-            /**
-             * All Day
-             * @default false
-             */
-            all_day: boolean;
-            /** Color */
-            color?: string | null;
-            /** Description */
-            description?: string | null;
-            /**
-             * End
-             * Format: date-time
-             */
-            end: string;
-            /** Id */
-            id: string;
-            /** Location */
-            location?: string | null;
-            /** Source */
-            source: string;
-            /**
-             * Start
-             * Format: date-time
-             */
-            start: string;
-            /** Title */
-            title: string;
-        };
-        /**
-         * CalendarEventsResponse
-         * @description Response model for calendar events.
-         */
-        CalendarEventsResponse: {
-            /**
-             * End Date
-             * Format: date-time
-             */
-            end_date: string;
-            /** Events */
-            events?: components["schemas"]["CalendarEvent"][];
-            /**
-             * Start Date
-             * Format: date-time
-             */
-            start_date: string;
-            /**
-             * Total
-             * @default 0
-             */
-            total: number;
-        };
-        /**
-         * CalendarSource
-         * @description Calendar source model.
-         */
-        CalendarSource: {
-            /** Api Key */
-            api_key?: string | null;
-            /** Color */
-            color?: string | null;
-            /**
-             * Enabled
-             * @default true
-             */
-            enabled: boolean;
-            /** Ical Url */
-            ical_url?: string | null;
-            /** Id */
-            id: string;
-            /** Name */
-            name: string;
-            /**
-             * Running
-             * @default false
-             */
-            running: boolean;
-            /**
-             * Show Time
-             * @default true
-             */
-            show_time: boolean;
-            /** Type */
-            type: string;
-        };
-        /**
-         * CalendarSourcesResponse
-         * @description Response model for calendar sources.
-         */
-        CalendarSourcesResponse: {
-            /** Sources */
-            sources?: components["schemas"]["CalendarSource"][];
-            /**
-             * Total
-             * @default 0
-             */
-            total: number;
-        };
-        /**
-         * ConfigUpdate
-         * @description Configuration update model.
-         */
-        ConfigUpdate: {
-            /** Applydisplayrotation */
-            applyDisplayRotation?: boolean | null;
-            /** Calendarrefreshinterval */
-            calendarRefreshInterval?: number | null;
-            /** Calendarsplit */
-            calendarSplit?: number | null;
-            /** Clockbarpluginitemsize */
-            clockBarPluginItemSize?: number | null;
-            /** Clockbarverticaldatefontsize */
-            clockBarVerticalDateFontSize?: number | null;
-            /** Clockbarverticalfontsize */
-            clockBarVerticalFontSize?: number | null;
-            /** Clockbarverticallayout */
-            clockBarVerticalLayout?: string | null;
-            /** Clockbarverticalpadding */
-            clockBarVerticalPadding?: number | null;
-            /** Clockbarverticalpluginitemsize */
-            clockBarVerticalPluginItemSize?: number | null;
-            /** Configpollinterval */
-            configPollInterval?: number | null;
-            /** Darkmodeend */
-            darkModeEnd?: number | null;
-            /** Darkmodestart */
-            darkModeStart?: number | null;
-            /** Dashboardlayout */
-            dashboardLayout?: {
-                [key: string]: unknown;
-            } | null;
-            /** Dashboardscreens */
-            dashboardScreens?: {
-                [key: string]: unknown;
-            } | null;
-            /** Displayschedule */
-            displaySchedule?: string | {
-                [key: string]: unknown;
-            }[] | null;
-            /** Displayscheduleenabled */
-            displayScheduleEnabled?: boolean | null;
-            /** Displaytimeout */
-            displayTimeout?: number | null;
-            /** Displaytimeoutenabled */
-            displayTimeoutEnabled?: boolean | null;
-            /** Gitbranch */
-            gitBranch?: string | null;
-            /** Gitrepourl */
-            gitRepoUrl?: string | null;
-            /** Imagedisplaymode */
-            imageDisplayMode?: string | null;
-            /** Keyboardfeedbackenabled */
-            keyboardFeedbackEnabled?: boolean | null;
-            /** Keyboardfeedbackmode */
-            keyboardFeedbackMode?: string | null;
-            /** Lastsideviewmode */
-            lastSideViewMode?: string | null;
-            /** Maxvisibleevents */
-            maxVisibleEvents?: number | null;
-            /** Modeindicatortimeout */
-            modeIndicatorTimeout?: number | null;
-            /** Orientation */
-            orientation?: string | null;
-            /** Orientationflipped */
-            orientationFlipped?: boolean | null;
-            /** Photoframeenabled */
-            photoFrameEnabled?: boolean | null;
-            /** Photoframetimeout */
-            photoFrameTimeout?: number | null;
-            /** Photorotationinterval */
-            photoRotationInterval?: number | null;
-            /** Randomizeimages */
-            randomizeImages?: boolean | null;
-            /** Rebootcomboduration */
-            rebootComboDuration?: number | null;
-            /** Rebootcombokey1 */
-            rebootComboKey1?: string | null;
-            /** Rebootcombokey2 */
-            rebootComboKey2?: string | null;
-            /** Selectedtheme */
-            selectedTheme?: string | null;
-            /** Showreddays */
-            showRedDays?: boolean | null;
-            /** Showui */
-            showUI?: boolean | null;
-            /** Showweeknumbers */
-            showWeekNumbers?: boolean | null;
-            /** Thememode */
-            themeMode?: string | null;
-            /** Timeformat */
-            timeFormat?: string | null;
-            /** Timezone */
-            timezone?: string | null;
-            /** Uisize */
-            uiSize?: string | null;
-            /** Weekstartday */
-            weekStartDay?: number | null;
-            /** Weekenddays */
-            weekendDays?: number[] | null;
-        } & {
-            [key: string]: unknown;
-        };
-        /** HTTPValidationError */
-        HTTPValidationError: {
-            /** Detail */
-            detail?: components["schemas"]["ValidationError"][];
-        };
-        /**
-         * KeyboardMappings
-         * @description Full key-code -> action map.
-         */
-        KeyboardMappings: {
-            /** Mappings */
-            mappings: {
-                [key: string]: string;
-            };
-        };
-        /** PluginDeleteResponse */
-        PluginDeleteResponse: {
-            /** Message */
-            message: string;
-            /** Success */
-            success: boolean;
-        };
-        /** PluginInstallResponse */
-        PluginInstallResponse: {
-            /** Manifest */
-            manifest: {
-                [key: string]: unknown;
-            };
-            /** Message */
-            message: string;
-            /** Requires Restart */
-            requires_restart: boolean;
-            /** Success */
-            success: boolean;
-        };
-        /** PluginInstanceActionResponse */
-        PluginInstanceActionResponse: {
-            /** Message */
-            message: string;
-            /** Running */
-            running: boolean;
-            /** Success */
-            success: boolean;
-        };
-        /** PluginInstanceCreateRequest */
-        PluginInstanceCreateRequest: {
-            /**
-             * Config
-             * @default {}
-             */
-            config: {
-                [key: string]: unknown;
-            };
-            /**
-             * Enabled
-             * @default true
-             */
-            enabled: boolean;
-            /** Name */
-            name: string;
-        };
-        /** PluginInstanceDeleteResponse */
-        PluginInstanceDeleteResponse: {
-            /** Message */
-            message: string;
-            /** Success */
-            success: boolean;
-        };
-        /** PluginInstanceListResponse */
-        PluginInstanceListResponse: {
-            /** Instances */
-            instances: components["schemas"]["PluginInstanceResponse"][];
-            /** Total */
-            total: number;
-        };
-        /** PluginInstanceOrderUpdateResponse */
-        PluginInstanceOrderUpdateResponse: {
-            /** Message */
-            message: string;
-            /** Success */
-            success: boolean;
-            /** Updated */
-            updated: number;
-        };
-        /** PluginInstanceResponse */
-        PluginInstanceResponse: {
-            /** Config */
-            config: {
-                [key: string]: unknown;
-            };
-            /** Display Order */
-            display_order: number;
-            /** Enabled */
-            enabled: boolean;
-            /** Id */
-            id: string;
-            /** Name */
-            name: string;
-            /** Running */
-            running: boolean;
-        };
-        /** PluginInstanceUpdateResponse */
-        PluginInstanceUpdateResponse: {
-            instance: components["schemas"]["PluginInstanceResponse"];
-            /** Message */
-            message: string;
-            /** Success */
-            success: boolean;
-        };
-        /** PluginListResponse */
-        PluginListResponse: {
-            /** Plugins */
-            plugins: {
-                [key: string]: unknown;
-            }[];
-            /** Total */
-            total: number;
-        };
-        /** PluginManifestEnvelope */
-        PluginManifestEnvelope: {
-            /** Manifest */
-            manifest: {
-                [key: string]: unknown;
-            };
-        };
-        /** PluginTypeConfigUpdateRequest */
-        PluginTypeConfigUpdateRequest: {
-            /**
-             * Config
-             * @default {}
-             */
-            config: {
-                [key: string]: unknown;
-            };
-            /** Enabled */
-            enabled?: boolean | null;
-        };
-        /** PluginTypeConfigUpdateResponse */
-        PluginTypeConfigUpdateResponse: {
-            /** Message */
-            message: string;
-            /** Plugin Id */
-            plugin_id: string;
-            /** Success */
-            success: boolean;
-        };
-        /**
-         * SingleMapping
-         * @description Action for a single key.
-         */
-        SingleMapping: {
-            /** Action */
-            action: string;
-        };
-        /** ValidationError */
-        ValidationError: {
-            /** Location */
-            loc: (string | number)[];
-            /** Message */
-            msg: string;
-            /** Error Type */
-            type: string;
-        };
+  schemas: {
+    /** Body_inspect_plugin_api_plugins_inspect_post */
+    Body_inspect_plugin_api_plugins_inspect_post: {
+      /**
+       * File
+       * Format: binary
+       */
+      file: string;
     };
-    responses: never;
-    parameters: never;
-    requestBodies: never;
-    headers: never;
-    pathItems: never;
+    /** Body_install_plugin_api_plugins_install_post */
+    Body_install_plugin_api_plugins_install_post: {
+      /**
+       * File
+       * Format: binary
+       */
+      file: string;
+    };
+    /** Body_upload_image_api_images_upload_post */
+    Body_upload_image_api_images_upload_post: {
+      /**
+       * File
+       * Format: binary
+       */
+      file: string;
+    };
+    /**
+     * CalendarEvent
+     * @description Calendar event model.
+     */
+    CalendarEvent: {
+      /**
+       * All Day
+       * @default false
+       */
+      all_day: boolean;
+      /** Color */
+      color?: string | null;
+      /** Description */
+      description?: string | null;
+      /**
+       * End
+       * Format: date-time
+       */
+      end: string;
+      /** Id */
+      id: string;
+      /** Location */
+      location?: string | null;
+      /** Source */
+      source: string;
+      /**
+       * Start
+       * Format: date-time
+       */
+      start: string;
+      /** Title */
+      title: string;
+    };
+    /**
+     * CalendarEventsResponse
+     * @description Response model for calendar events.
+     */
+    CalendarEventsResponse: {
+      /**
+       * End Date
+       * Format: date-time
+       */
+      end_date: string;
+      /** Events */
+      events?: components["schemas"]["CalendarEvent"][];
+      /**
+       * Start Date
+       * Format: date-time
+       */
+      start_date: string;
+      /**
+       * Total
+       * @default 0
+       */
+      total: number;
+    };
+    /**
+     * CalendarSource
+     * @description Calendar source model.
+     */
+    CalendarSource: {
+      /** Api Key */
+      api_key?: string | null;
+      /** Color */
+      color?: string | null;
+      /**
+       * Enabled
+       * @default true
+       */
+      enabled: boolean;
+      /** Ical Url */
+      ical_url?: string | null;
+      /** Id */
+      id: string;
+      /** Name */
+      name: string;
+      /**
+       * Running
+       * @default false
+       */
+      running: boolean;
+      /**
+       * Show Time
+       * @default true
+       */
+      show_time: boolean;
+      /** Type */
+      type: string;
+    };
+    /**
+     * CalendarSourcesResponse
+     * @description Response model for calendar sources.
+     */
+    CalendarSourcesResponse: {
+      /** Sources */
+      sources?: components["schemas"]["CalendarSource"][];
+      /**
+       * Total
+       * @default 0
+       */
+      total: number;
+    };
+    /**
+     * ConfigUpdate
+     * @description Configuration update model.
+     */
+    ConfigUpdate: {
+      /** Applydisplayrotation */
+      applyDisplayRotation?: boolean | null;
+      /** Calendarrefreshinterval */
+      calendarRefreshInterval?: number | null;
+      /** Calendarsplit */
+      calendarSplit?: number | null;
+      /** Clockbarpluginitemsize */
+      clockBarPluginItemSize?: number | null;
+      /** Clockbarverticaldatefontsize */
+      clockBarVerticalDateFontSize?: number | null;
+      /** Clockbarverticalfontsize */
+      clockBarVerticalFontSize?: number | null;
+      /** Clockbarverticallayout */
+      clockBarVerticalLayout?: string | null;
+      /** Clockbarverticalpadding */
+      clockBarVerticalPadding?: number | null;
+      /** Clockbarverticalpluginitemsize */
+      clockBarVerticalPluginItemSize?: number | null;
+      /** Configpollinterval */
+      configPollInterval?: number | null;
+      /** Darkmodeend */
+      darkModeEnd?: number | null;
+      /** Darkmodestart */
+      darkModeStart?: number | null;
+      /** Dashboardlayout */
+      dashboardLayout?: {
+        [key: string]: unknown;
+      } | null;
+      /** Dashboardscreens */
+      dashboardScreens?: {
+        [key: string]: unknown;
+      } | null;
+      /** Displayschedule */
+      displaySchedule?:
+        | string
+        | {
+            [key: string]: unknown;
+          }[]
+        | null;
+      /** Displayscheduleenabled */
+      displayScheduleEnabled?: boolean | null;
+      /** Displaytimeout */
+      displayTimeout?: number | null;
+      /** Displaytimeoutenabled */
+      displayTimeoutEnabled?: boolean | null;
+      /** Gitbranch */
+      gitBranch?: string | null;
+      /** Gitrepourl */
+      gitRepoUrl?: string | null;
+      /** Imagedisplaymode */
+      imageDisplayMode?: string | null;
+      /** Keyboardfeedbackenabled */
+      keyboardFeedbackEnabled?: boolean | null;
+      /** Keyboardfeedbackmode */
+      keyboardFeedbackMode?: string | null;
+      /** Lastsideviewmode */
+      lastSideViewMode?: string | null;
+      /** Maxvisibleevents */
+      maxVisibleEvents?: number | null;
+      /** Modeindicatortimeout */
+      modeIndicatorTimeout?: number | null;
+      /** Orientation */
+      orientation?: string | null;
+      /** Orientationflipped */
+      orientationFlipped?: boolean | null;
+      /** Photoframeenabled */
+      photoFrameEnabled?: boolean | null;
+      /** Photoframetimeout */
+      photoFrameTimeout?: number | null;
+      /** Photorotationinterval */
+      photoRotationInterval?: number | null;
+      /** Randomizeimages */
+      randomizeImages?: boolean | null;
+      /** Rebootcomboduration */
+      rebootComboDuration?: number | null;
+      /** Rebootcombokey1 */
+      rebootComboKey1?: string | null;
+      /** Rebootcombokey2 */
+      rebootComboKey2?: string | null;
+      /** Selectedtheme */
+      selectedTheme?: string | null;
+      /** Showreddays */
+      showRedDays?: boolean | null;
+      /** Showui */
+      showUI?: boolean | null;
+      /** Showweeknumbers */
+      showWeekNumbers?: boolean | null;
+      /** Thememode */
+      themeMode?: string | null;
+      /** Timeformat */
+      timeFormat?: string | null;
+      /** Timezone */
+      timezone?: string | null;
+      /** Uisize */
+      uiSize?: string | null;
+      /** Weekstartday */
+      weekStartDay?: number | null;
+      /** Weekenddays */
+      weekendDays?: number[] | null;
+    } & {
+      [key: string]: unknown;
+    };
+    /** HTTPValidationError */
+    HTTPValidationError: {
+      /** Detail */
+      detail?: components["schemas"]["ValidationError"][];
+    };
+    /**
+     * KeyboardMappings
+     * @description Full key-code -> action map.
+     */
+    KeyboardMappings: {
+      /** Mappings */
+      mappings: {
+        [key: string]: string;
+      };
+    };
+    /** OverridesPayload */
+    OverridesPayload: {
+      /** Overrides */
+      overrides: {
+        [key: string]: unknown;
+      };
+    };
+    /** PluginDeleteResponse */
+    PluginDeleteResponse: {
+      /** Message */
+      message: string;
+      /** Success */
+      success: boolean;
+    };
+    /** PluginInstallResponse */
+    PluginInstallResponse: {
+      /** Manifest */
+      manifest: {
+        [key: string]: unknown;
+      };
+      /** Message */
+      message: string;
+      /** Requires Restart */
+      requires_restart: boolean;
+      /** Success */
+      success: boolean;
+    };
+    /** PluginInstanceActionResponse */
+    PluginInstanceActionResponse: {
+      /** Message */
+      message: string;
+      /** Running */
+      running: boolean;
+      /** Success */
+      success: boolean;
+    };
+    /** PluginInstanceCreateRequest */
+    PluginInstanceCreateRequest: {
+      /**
+       * Config
+       * @default {}
+       */
+      config: {
+        [key: string]: unknown;
+      };
+      /**
+       * Enabled
+       * @default true
+       */
+      enabled: boolean;
+      /** Name */
+      name: string;
+    };
+    /** PluginInstanceDeleteResponse */
+    PluginInstanceDeleteResponse: {
+      /** Message */
+      message: string;
+      /** Success */
+      success: boolean;
+    };
+    /** PluginInstanceListResponse */
+    PluginInstanceListResponse: {
+      /** Instances */
+      instances: components["schemas"]["PluginInstanceResponse"][];
+      /** Total */
+      total: number;
+    };
+    /** PluginInstanceOrderUpdateResponse */
+    PluginInstanceOrderUpdateResponse: {
+      /** Message */
+      message: string;
+      /** Success */
+      success: boolean;
+      /** Updated */
+      updated: number;
+    };
+    /** PluginInstanceResponse */
+    PluginInstanceResponse: {
+      /** Config */
+      config: {
+        [key: string]: unknown;
+      };
+      /** Display Order */
+      display_order: number;
+      /** Enabled */
+      enabled: boolean;
+      /** Id */
+      id: string;
+      /** Name */
+      name: string;
+      /** Running */
+      running: boolean;
+    };
+    /** PluginInstanceUpdateResponse */
+    PluginInstanceUpdateResponse: {
+      instance: components["schemas"]["PluginInstanceResponse"];
+      /** Message */
+      message: string;
+      /** Success */
+      success: boolean;
+    };
+    /** PluginListResponse */
+    PluginListResponse: {
+      /** Plugins */
+      plugins: {
+        [key: string]: unknown;
+      }[];
+      /** Total */
+      total: number;
+    };
+    /** PluginManifestEnvelope */
+    PluginManifestEnvelope: {
+      /** Manifest */
+      manifest: {
+        [key: string]: unknown;
+      };
+    };
+    /** PluginTypeConfigUpdateRequest */
+    PluginTypeConfigUpdateRequest: {
+      /**
+       * Config
+       * @default {}
+       */
+      config: {
+        [key: string]: unknown;
+      };
+      /** Enabled */
+      enabled?: boolean | null;
+    };
+    /** PluginTypeConfigUpdateResponse */
+    PluginTypeConfigUpdateResponse: {
+      /** Message */
+      message: string;
+      /** Plugin Id */
+      plugin_id: string;
+      /** Success */
+      success: boolean;
+    };
+    /**
+     * SingleMapping
+     * @description Action for a single key.
+     */
+    SingleMapping: {
+      /** Action */
+      action: string;
+    };
+    /** ValidationError */
+    ValidationError: {
+      /** Location */
+      loc: (string | number)[];
+      /** Message */
+      msg: string;
+      /** Error Type */
+      type: string;
+    };
+  };
+  responses: never;
+  parameters: never;
+  requestBodies: never;
+  headers: never;
+  pathItems: never;
 }
 export type $defs = Record<string, never>;
 export interface operations {
-    root__get: {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        requestBody?: never;
-        responses: {
-            /** @description Successful Response */
-            200: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": unknown;
-                };
-            };
-        };
-    };
-    get_calendar_events_api_calendar_events_get: {
-        parameters: {
-            query?: {
-                /** @description Start date for events */
-                start_date?: string | null;
-                /** @description End date for events */
-                end_date?: string | null;
-                /** @description Comma-separated source IDs */
-                source_ids?: string | null;
-                /** @description Force refresh (clear cache) */
-                refresh?: boolean | null;
-            };
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        requestBody?: never;
-        responses: {
-            /** @description Successful Response */
-            200: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["CalendarEventsResponse"];
-                };
-            };
-            /** @description Validation Error */
-            422: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["HTTPValidationError"];
-                };
-            };
-        };
-    };
-    refresh_calendar_cache_api_calendar_refresh_post: {
-        parameters: {
-            query?: {
-                /** @description Optional month (1-12) to refresh specific month */
-                month?: number | null;
-                /** @description Optional year to refresh specific month */
-                year?: number | null;
-            };
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        requestBody?: never;
-        responses: {
-            /** @description Successful Response */
-            200: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": unknown;
-                };
-            };
-            /** @description Validation Error */
-            422: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["HTTPValidationError"];
-                };
-            };
-        };
-    };
-    get_calendar_sources_api_calendar_sources_get: {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        requestBody?: never;
-        responses: {
-            /** @description Successful Response */
-            200: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["CalendarSourcesResponse"];
-                };
-            };
-        };
-    };
-    add_calendar_source_api_calendar_sources_post: {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        requestBody: {
-            content: {
-                "application/json": components["schemas"]["CalendarSource"];
-            };
-        };
-        responses: {
-            /** @description Successful Response */
-            200: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["CalendarSource"];
-                };
-            };
-            /** @description Validation Error */
-            422: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["HTTPValidationError"];
-                };
-            };
-        };
-    };
-    update_calendar_source_api_calendar_sources__source_id__put: {
-        parameters: {
-            query?: never;
-            header?: never;
-            path: {
-                source_id: string;
-            };
-            cookie?: never;
-        };
-        requestBody: {
-            content: {
-                "application/json": components["schemas"]["CalendarSource"];
-            };
-        };
-        responses: {
-            /** @description Successful Response */
-            200: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["CalendarSource"];
-                };
-            };
-            /** @description Validation Error */
-            422: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["HTTPValidationError"];
-                };
-            };
-        };
-    };
-    remove_calendar_source_api_calendar_sources__source_id__delete: {
-        parameters: {
-            query?: never;
-            header?: never;
-            path: {
-                source_id: string;
-            };
-            cookie?: never;
-        };
-        requestBody?: never;
-        responses: {
-            /** @description Successful Response */
-            200: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": unknown;
-                };
-            };
-            /** @description Validation Error */
-            422: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["HTTPValidationError"];
-                };
-            };
-        };
-    };
-    get_config_api_config_get: {
-        parameters: {
-            query?: {
-                kiosk?: string | null;
-                khost?: string | null;
-            };
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        requestBody?: never;
-        responses: {
-            /** @description Successful Response */
-            200: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": unknown;
-                };
-            };
-            /** @description Validation Error */
-            422: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["HTTPValidationError"];
-                };
-            };
-        };
-    };
-    update_config_api_config_post: {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        requestBody: {
-            content: {
-                "application/json": components["schemas"]["ConfigUpdate"];
-            };
-        };
-        responses: {
-            /** @description Successful Response */
-            200: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": unknown;
-                };
-            };
-            /** @description Validation Error */
-            422: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["HTTPValidationError"];
-                };
-            };
-        };
-    };
-    get_display_orientation_api_config_display_orientation_get: {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        requestBody?: never;
-        responses: {
-            /** @description Successful Response */
-            200: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": unknown;
-                };
-            };
-        };
-    };
-    get_git_branches_api_config_git_branches_get: {
-        parameters: {
-            query?: {
-                repo_url?: string | null;
-            };
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        requestBody?: never;
-        responses: {
-            /** @description Successful Response */
-            200: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": unknown;
-                };
-            };
-            /** @description Validation Error */
-            422: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["HTTPValidationError"];
-                };
-            };
-        };
-    };
-    health_check_api_health_get: {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        requestBody?: never;
-        responses: {
-            /** @description Successful Response */
-            200: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": unknown;
-                };
-            };
-        };
-    };
-    detailed_health_check_api_health_detailed_get: {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        requestBody?: never;
-        responses: {
-            /** @description Successful Response */
-            200: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": unknown;
-                };
-            };
-        };
-    };
-    test_db_health_check_api_health_test_db_get: {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        requestBody?: never;
-        responses: {
-            /** @description Successful Response */
-            200: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": unknown;
-                };
-            };
-        };
-    };
-    get_image_config_api_images_config_get: {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        requestBody?: never;
-        responses: {
-            /** @description Successful Response */
-            200: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": unknown;
-                };
-            };
-        };
-    };
-    get_current_image_api_images_current_get: {
-        parameters: {
-            query?: {
-                /** @description Comma-separated source IDs */
-                source_ids?: string | null;
-            };
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        requestBody?: never;
-        responses: {
-            /** @description Successful Response */
-            200: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": unknown;
-                };
-            };
-            /** @description Validation Error */
-            422: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["HTTPValidationError"];
-                };
-            };
-        };
-    };
-    list_images_api_images_list_get: {
-        parameters: {
-            query?: {
-                /** @description Comma-separated source IDs */
-                source_ids?: string | null;
-            };
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        requestBody?: never;
-        responses: {
-            /** @description Successful Response */
-            200: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": unknown;
-                };
-            };
-            /** @description Validation Error */
-            422: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["HTTPValidationError"];
-                };
-            };
-        };
-    };
-    next_image_api_images_next_post: {
-        parameters: {
-            query?: {
-                /** @description Comma-separated source IDs */
-                source_ids?: string | null;
-            };
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        requestBody?: never;
-        responses: {
-            /** @description Successful Response */
-            200: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": unknown;
-                };
-            };
-            /** @description Validation Error */
-            422: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["HTTPValidationError"];
-                };
-            };
-        };
-    };
-    previous_image_api_images_previous_post: {
-        parameters: {
-            query?: {
-                /** @description Comma-separated source IDs */
-                source_ids?: string | null;
-            };
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        requestBody?: never;
-        responses: {
-            /** @description Successful Response */
-            200: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": unknown;
-                };
-            };
-            /** @description Validation Error */
-            422: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["HTTPValidationError"];
-                };
-            };
-        };
-    };
-    upload_image_api_images_upload_post: {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        requestBody: {
-            content: {
-                "multipart/form-data": components["schemas"]["Body_upload_image_api_images_upload_post"];
-            };
-        };
-        responses: {
-            /** @description Successful Response */
-            200: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": unknown;
-                };
-            };
-            /** @description Validation Error */
-            422: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["HTTPValidationError"];
-                };
-            };
-        };
-    };
-    get_image_file_api_images__image_id__get: {
-        parameters: {
-            query?: never;
-            header?: never;
-            path: {
-                image_id: string;
-            };
-            cookie?: never;
-        };
-        requestBody?: never;
-        responses: {
-            /** @description Successful Response */
-            200: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": unknown;
-                };
-            };
-            /** @description Validation Error */
-            422: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["HTTPValidationError"];
-                };
-            };
-        };
-    };
-    delete_image_api_images__image_id__delete: {
-        parameters: {
-            query?: never;
-            header?: never;
-            path: {
-                image_id: string;
-            };
-            cookie?: never;
-        };
-        requestBody?: never;
-        responses: {
-            /** @description Successful Response */
-            200: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": unknown;
-                };
-            };
-            /** @description Validation Error */
-            422: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["HTTPValidationError"];
-                };
-            };
-        };
-    };
-    get_image_thumbnail_api_images__image_id__thumbnail_get: {
-        parameters: {
-            query?: never;
-            header?: never;
-            path: {
-                image_id: string;
-            };
-            cookie?: never;
-        };
-        requestBody?: never;
-        responses: {
-            /** @description Successful Response */
-            200: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": unknown;
-                };
-            };
-            /** @description Validation Error */
-            422: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["HTTPValidationError"];
-                };
-            };
-        };
-    };
-    get_available_actions_api_keyboard_actions_get: {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        requestBody?: never;
-        responses: {
-            /** @description Successful Response */
-            200: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": unknown;
-                };
-            };
-        };
-    };
-    get_keyboard_mappings_api_keyboard_mappings_get: {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        requestBody?: never;
-        responses: {
-            /** @description Successful Response */
-            200: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": unknown;
-                };
-            };
-        };
-    };
-    replace_keyboard_mappings_api_keyboard_mappings_post: {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        requestBody: {
-            content: {
-                "application/json": components["schemas"]["KeyboardMappings"];
-            };
-        };
-        responses: {
-            /** @description Successful Response */
-            200: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": unknown;
-                };
-            };
-            /** @description Validation Error */
-            422: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["HTTPValidationError"];
-                };
-            };
-        };
-    };
-    set_single_mapping_api_keyboard_mappings__key_code__put: {
-        parameters: {
-            query?: never;
-            header?: never;
-            path: {
-                key_code: string;
-            };
-            cookie?: never;
-        };
-        requestBody: {
-            content: {
-                "application/json": components["schemas"]["SingleMapping"];
-            };
-        };
-        responses: {
-            /** @description Successful Response */
-            200: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": unknown;
-                };
-            };
-            /** @description Validation Error */
-            422: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["HTTPValidationError"];
-                };
-            };
-        };
-    };
-    delete_single_mapping_api_keyboard_mappings__key_code__delete: {
-        parameters: {
-            query?: never;
-            header?: never;
-            path: {
-                key_code: string;
-            };
-            cookie?: never;
-        };
-        requestBody?: never;
-        responses: {
-            /** @description Successful Response */
-            200: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": unknown;
-                };
-            };
-            /** @description Validation Error */
-            422: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["HTTPValidationError"];
-                };
-            };
-        };
-    };
-    get_kiosks_api_kiosks_get: {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        requestBody?: never;
-        responses: {
-            /** @description Successful Response */
-            200: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": unknown;
-                };
-            };
-        };
-    };
-    get_plugins_api_plugins_get: {
-        parameters: {
-            query?: {
-                /** @description Optional plugin type filter */
-                plugin_type?: string | null;
-            };
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        requestBody?: never;
-        responses: {
-            /** @description Successful Response */
-            200: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["PluginListResponse"];
-                };
-            };
-            /** @description Validation Error */
-            422: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["HTTPValidationError"];
-                };
-            };
-        };
-    };
-    enumerate_plugins_from_github_api_plugins_github_enumerate_post: {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        requestBody: {
-            content: {
-                "application/json": {
-                    [key: string]: unknown;
-                };
-            };
-        };
-        responses: {
-            /** @description Successful Response */
-            200: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": unknown;
-                };
-            };
-            /** @description Validation Error */
-            422: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["HTTPValidationError"];
-                };
-            };
-        };
-    };
-    install_plugin_from_github_api_plugins_github_install_post: {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        requestBody: {
-            content: {
-                "application/json": {
-                    [key: string]: unknown;
-                };
-            };
-        };
-        responses: {
-            /** @description Successful Response */
-            200: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": unknown;
-                };
-            };
-            /** @description Validation Error */
-            422: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["HTTPValidationError"];
-                };
-            };
-        };
-    };
-    inspect_plugin_api_plugins_inspect_post: {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        requestBody: {
-            content: {
-                "multipart/form-data": components["schemas"]["Body_inspect_plugin_api_plugins_inspect_post"];
-            };
-        };
-        responses: {
-            /** @description Successful Response */
-            200: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["PluginManifestEnvelope"];
-                };
-            };
-            /** @description Validation Error */
-            422: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["HTTPValidationError"];
-                };
-            };
-        };
-    };
-    install_plugin_api_plugins_install_post: {
-        parameters: {
-            query?: {
-                plugin_id?: string | null;
-            };
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        requestBody: {
-            content: {
-                "multipart/form-data": components["schemas"]["Body_install_plugin_api_plugins_install_post"];
-            };
-        };
-        responses: {
-            /** @description Successful Response */
-            200: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["PluginInstallResponse"];
-                };
-            };
-            /** @description Validation Error */
-            422: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["HTTPValidationError"];
-                };
-            };
-        };
-    };
-    get_installed_plugins_api_plugins_installed_get: {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        requestBody?: never;
-        responses: {
-            /** @description Successful Response */
-            200: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["PluginListResponse"];
-                };
-            };
-        };
-    };
-    get_installed_plugin_api_plugins_installed__plugin_id__get: {
-        parameters: {
-            query?: never;
-            header?: never;
-            path: {
-                plugin_id: string;
-            };
-            cookie?: never;
-        };
-        requestBody?: never;
-        responses: {
-            /** @description Successful Response */
-            200: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": unknown;
-                };
-            };
-            /** @description Validation Error */
-            422: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["HTTPValidationError"];
-                };
-            };
-        };
-    };
-    uninstall_plugin_api_plugins_installed__plugin_id__delete: {
-        parameters: {
-            query?: never;
-            header?: never;
-            path: {
-                plugin_id: string;
-            };
-            cookie?: never;
-        };
-        requestBody?: never;
-        responses: {
-            /** @description Successful Response */
-            200: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["PluginDeleteResponse"];
-                };
-            };
-            /** @description Validation Error */
-            422: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["HTTPValidationError"];
-                };
-            };
-        };
-    };
-    update_plugin_instance_api_plugins_instances__instance_id__put: {
-        parameters: {
-            query?: never;
-            header?: never;
-            path: {
-                instance_id: string;
-            };
-            cookie?: never;
-        };
-        requestBody: {
-            content: {
-                "application/json": {
-                    [key: string]: unknown;
-                };
-            };
-        };
-        responses: {
-            /** @description Successful Response */
-            200: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["PluginInstanceUpdateResponse"];
-                };
-            };
-            /** @description Validation Error */
-            422: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["HTTPValidationError"];
-                };
-            };
-        };
-    };
-    delete_plugin_instance_api_plugins_instances__instance_id__delete: {
-        parameters: {
-            query?: never;
-            header?: never;
-            path: {
-                instance_id: string;
-            };
-            cookie?: never;
-        };
-        requestBody?: never;
-        responses: {
-            /** @description Successful Response */
-            200: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["PluginInstanceDeleteResponse"];
-                };
-            };
-            /** @description Validation Error */
-            422: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["HTTPValidationError"];
-                };
-            };
-        };
-    };
-    start_plugin_instance_api_plugins_instances__instance_id__start_post: {
-        parameters: {
-            query?: never;
-            header?: never;
-            path: {
-                instance_id: string;
-            };
-            cookie?: never;
-        };
-        requestBody?: never;
-        responses: {
-            /** @description Successful Response */
-            200: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["PluginInstanceActionResponse"];
-                };
-            };
-            /** @description Validation Error */
-            422: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["HTTPValidationError"];
-                };
-            };
-        };
-    };
-    stop_plugin_instance_api_plugins_instances__instance_id__stop_post: {
-        parameters: {
-            query?: never;
-            header?: never;
-            path: {
-                instance_id: string;
-            };
-            cookie?: never;
-        };
-        requestBody?: never;
-        responses: {
-            /** @description Successful Response */
-            200: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["PluginInstanceActionResponse"];
-                };
-            };
-            /** @description Validation Error */
-            422: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["HTTPValidationError"];
-                };
-            };
-        };
-    };
-    enumerate_plugins_from_local_api_plugins_local_enumerate_post: {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        requestBody: {
-            content: {
-                "application/json": {
-                    [key: string]: unknown;
-                };
-            };
-        };
-        responses: {
-            /** @description Successful Response */
-            200: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": unknown;
-                };
-            };
-            /** @description Validation Error */
-            422: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["HTTPValidationError"];
-                };
-            };
-        };
-    };
-    install_plugin_from_local_api_plugins_local_install_post: {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        requestBody: {
-            content: {
-                "application/json": {
-                    [key: string]: unknown;
-                };
-            };
-        };
-        responses: {
-            /** @description Successful Response */
-            200: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": unknown;
-                };
-            };
-            /** @description Validation Error */
-            422: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["HTTPValidationError"];
-                };
-            };
-        };
-    };
-    suggest_local_plugin_paths_api_plugins_local_suggest_get: {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        requestBody?: never;
-        responses: {
-            /** @description Successful Response */
-            200: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": unknown;
-                };
-            };
-        };
-    };
-    get_plugin_api_plugins__plugin_id__get: {
-        parameters: {
-            query?: never;
-            header?: never;
-            path: {
-                plugin_id: string;
-            };
-            cookie?: never;
-        };
-        requestBody?: never;
-        responses: {
-            /** @description Successful Response */
-            200: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": unknown;
-                };
-            };
-            /** @description Validation Error */
-            422: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["HTTPValidationError"];
-                };
-            };
-        };
-    };
-    update_plugin_api_plugins__plugin_id__put: {
-        parameters: {
-            query?: never;
-            header?: never;
-            path: {
-                plugin_id: string;
-            };
-            cookie?: never;
-        };
-        requestBody: {
-            content: {
-                "application/json": {
-                    [key: string]: unknown;
-                };
-            };
-        };
-        responses: {
-            /** @description Successful Response */
-            200: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["PluginTypeConfigUpdateResponse"];
-                };
-            };
-            /** @description Validation Error */
-            422: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["HTTPValidationError"];
-                };
-            };
-        };
-    };
-    run_backend_plugin_task_api_plugins__plugin_id__backend_run_task_post: {
-        parameters: {
-            query?: never;
-            header?: never;
-            path: {
-                plugin_id: string;
-            };
-            cookie?: never;
-        };
-        requestBody?: never;
-        responses: {
-            /** @description Successful Response */
-            200: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": unknown;
-                };
-            };
-            /** @description Validation Error */
-            422: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["HTTPValidationError"];
-                };
-            };
-        };
-    };
-    get_backend_plugin_status_api_plugins__plugin_id__backend_status_get: {
-        parameters: {
-            query?: never;
-            header?: never;
-            path: {
-                plugin_id: string;
-            };
-            cookie?: never;
-        };
-        requestBody?: never;
-        responses: {
-            /** @description Successful Response */
-            200: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": unknown;
-                };
-            };
-            /** @description Validation Error */
-            422: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["HTTPValidationError"];
-                };
-            };
-        };
-    };
-    get_plugin_config_api_plugins__plugin_id__config_get: {
-        parameters: {
-            query?: never;
-            header?: never;
-            path: {
-                plugin_id: string;
-            };
-            cookie?: never;
-        };
-        requestBody?: never;
-        responses: {
-            /** @description Successful Response */
-            200: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": unknown;
-                };
-            };
-            /** @description Validation Error */
-            422: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["HTTPValidationError"];
-                };
-            };
-        };
-    };
-    update_plugin_config_api_plugins__plugin_id__config_put: {
-        parameters: {
-            query?: never;
-            header?: never;
-            path: {
-                plugin_id: string;
-            };
-            cookie?: never;
-        };
-        requestBody: {
-            content: {
-                "application/json": components["schemas"]["PluginTypeConfigUpdateRequest"];
-            };
-        };
-        responses: {
-            /** @description Successful Response */
-            200: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["PluginTypeConfigUpdateResponse"];
-                };
-            };
-            /** @description Validation Error */
-            422: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["HTTPValidationError"];
-                };
-            };
-        };
-    };
-    get_plugin_data_api_plugins__plugin_id__data_get: {
-        parameters: {
-            query?: {
-                /** @description Start date (YYYY-MM-DD) */
-                start_date?: string | null;
-                /** @description End date (YYYY-MM-DD) */
-                end_date?: string | null;
-            };
-            header?: never;
-            path: {
-                plugin_id: string;
-            };
-            cookie?: never;
-        };
-        requestBody?: never;
-        responses: {
-            /** @description Successful Response */
-            200: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": unknown;
-                };
-            };
-            /** @description Validation Error */
-            422: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["HTTPValidationError"];
-                };
-            };
-        };
-    };
-    fetch_plugin_api_plugins__plugin_id__fetch_post: {
-        parameters: {
-            query?: never;
-            header?: never;
-            path: {
-                plugin_id: string;
-            };
-            cookie?: never;
-        };
-        requestBody?: never;
-        responses: {
-            /** @description Successful Response */
-            200: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": unknown;
-                };
-            };
-            /** @description Validation Error */
-            422: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["HTTPValidationError"];
-                };
-            };
-        };
-    };
-    geocode_location_api_plugins__plugin_id__geocode_post: {
-        parameters: {
-            query?: never;
-            header?: never;
-            path: {
-                plugin_id: string;
-            };
-            cookie?: never;
-        };
-        requestBody: {
-            content: {
-                "application/json": {
-                    [key: string]: unknown;
-                };
-            };
-        };
-        responses: {
-            /** @description Successful Response */
-            200: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": unknown;
-                };
-            };
-            /** @description Validation Error */
-            422: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["HTTPValidationError"];
-                };
-            };
-        };
-    };
-    get_plugin_instances_api_plugins__plugin_id__instances_get: {
-        parameters: {
-            query?: never;
-            header?: never;
-            path: {
-                plugin_id: string;
-            };
-            cookie?: never;
-        };
-        requestBody?: never;
-        responses: {
-            /** @description Successful Response */
-            200: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["PluginInstanceListResponse"];
-                };
-            };
-            /** @description Validation Error */
-            422: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["HTTPValidationError"];
-                };
-            };
-        };
-    };
-    create_plugin_instance_api_plugins__plugin_id__instances_post: {
-        parameters: {
-            query?: never;
-            header?: never;
-            path: {
-                plugin_id: string;
-            };
-            cookie?: never;
-        };
-        requestBody: {
-            content: {
-                "application/json": components["schemas"]["PluginInstanceCreateRequest"];
-            };
-        };
-        responses: {
-            /** @description Successful Response */
-            200: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["PluginInstanceUpdateResponse"];
-                };
-            };
-            /** @description Validation Error */
-            422: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["HTTPValidationError"];
-                };
-            };
-        };
-    };
-    update_plugin_instances_order_api_plugins__plugin_id__instances_order_put: {
-        parameters: {
-            query?: never;
-            header?: never;
-            path: {
-                plugin_id: string;
-            };
-            cookie?: never;
-        };
-        requestBody: {
-            content: {
-                "application/json": {
-                    [key: string]: number;
-                };
-            };
-        };
-        responses: {
-            /** @description Successful Response */
-            200: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["PluginInstanceOrderUpdateResponse"];
-                };
-            };
-            /** @description Validation Error */
-            422: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["HTTPValidationError"];
-                };
-            };
-        };
-    };
-    scan_plugin_options_api_plugins__plugin_id__scan_get: {
-        parameters: {
-            query: {
-                /** @description Config field key to scan options for */
-                field: string;
-            };
-            header?: never;
-            path: {
-                plugin_id: string;
-            };
-            cookie?: never;
-        };
-        requestBody?: never;
-        responses: {
-            /** @description Successful Response */
-            200: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": unknown;
-                };
-            };
-            /** @description Validation Error */
-            422: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["HTTPValidationError"];
-                };
-            };
-        };
-    };
-    get_plugin_static_asset_api_plugins__plugin_id__static__asset_path__get: {
-        parameters: {
-            query?: never;
-            header?: never;
-            path: {
-                plugin_id: string;
-                asset_path: string;
-            };
-            cookie?: never;
-        };
-        requestBody?: never;
-        responses: {
-            /** @description Successful Response */
-            200: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": unknown;
-                };
-            };
-            /** @description Validation Error */
-            422: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["HTTPValidationError"];
-                };
-            };
-        };
-    };
-    test_plugin_api_plugins__plugin_id__test_post: {
-        parameters: {
-            query?: never;
-            header?: never;
-            path: {
-                plugin_id: string;
-            };
-            cookie?: never;
-        };
-        requestBody?: {
-            content: {
-                "application/json": {
-                    [key: string]: unknown;
-                } | null;
-            };
-        };
-        responses: {
-            /** @description Successful Response */
-            200: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": unknown;
-                };
-            };
-            /** @description Validation Error */
-            422: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["HTTPValidationError"];
-                };
-            };
-        };
-    };
-    turn_display_off_api_system_display_power_off_post: {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        requestBody?: never;
-        responses: {
-            /** @description Successful Response */
-            200: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": unknown;
-                };
-            };
-        };
-    };
-    turn_display_on_api_system_display_power_on_post: {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        requestBody?: never;
-        responses: {
-            /** @description Successful Response */
-            200: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": unknown;
-                };
-            };
-        };
-    };
-    get_display_state_api_system_display_power_state_get: {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        requestBody?: never;
-        responses: {
-            /** @description Successful Response */
-            200: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": unknown;
-                };
-            };
-        };
-    };
-    configure_display_timeout_api_system_display_timeout_configure_post: {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        requestBody?: never;
-        responses: {
-            /** @description Successful Response */
-            200: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": unknown;
-                };
-            };
-        };
-    };
-    reboot_system_api_system_reboot_post: {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        requestBody?: never;
-        responses: {
-            /** @description Successful Response */
-            200: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": unknown;
-                };
-            };
-        };
-    };
-    reload_ui_api_system_reload_ui_post: {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        requestBody?: never;
-        responses: {
-            /** @description Successful Response */
-            200: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": unknown;
-                };
-            };
-        };
-    };
-    restart_backend_api_system_restart_backend_post: {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        requestBody?: never;
-        responses: {
-            /** @description Successful Response */
-            200: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": unknown;
-                };
-            };
-        };
-    };
-    restart_frontend_api_system_restart_frontend_post: {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        requestBody?: never;
-        responses: {
-            /** @description Successful Response */
-            200: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": unknown;
-                };
-            };
-        };
-    };
-    trigger_update_api_system_update_post: {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        requestBody?: never;
-        responses: {
-            /** @description Successful Response */
-            200: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": unknown;
-                };
-            };
-        };
-    };
-    get_update_status_api_system_update_status_get: {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        requestBody?: never;
-        responses: {
-            /** @description Successful Response */
-            200: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": unknown;
-                };
-            };
-        };
-    };
-    stream_update_log_api_system_update_stream_get: {
-        parameters: {
-            query?: {
-                log_offset?: number;
-            };
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        requestBody?: never;
-        responses: {
-            /** @description Successful Response */
-            200: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": unknown;
-                };
-            };
-            /** @description Validation Error */
-            422: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["HTTPValidationError"];
-                };
-            };
-        };
-    };
+  root__get: {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    requestBody?: never;
+    responses: {
+      /** @description Successful Response */
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": unknown;
+        };
+      };
+    };
+  };
+  get_calendar_events_api_calendar_events_get: {
+    parameters: {
+      query?: {
+        /** @description Start date for events */
+        start_date?: string | null;
+        /** @description End date for events */
+        end_date?: string | null;
+        /** @description Comma-separated source IDs */
+        source_ids?: string | null;
+        /** @description Force refresh (clear cache) */
+        refresh?: boolean | null;
+      };
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    requestBody?: never;
+    responses: {
+      /** @description Successful Response */
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["CalendarEventsResponse"];
+        };
+      };
+      /** @description Validation Error */
+      422: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["HTTPValidationError"];
+        };
+      };
+    };
+  };
+  refresh_calendar_cache_api_calendar_refresh_post: {
+    parameters: {
+      query?: {
+        /** @description Optional month (1-12) to refresh specific month */
+        month?: number | null;
+        /** @description Optional year to refresh specific month */
+        year?: number | null;
+      };
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    requestBody?: never;
+    responses: {
+      /** @description Successful Response */
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": unknown;
+        };
+      };
+      /** @description Validation Error */
+      422: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["HTTPValidationError"];
+        };
+      };
+    };
+  };
+  get_calendar_sources_api_calendar_sources_get: {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    requestBody?: never;
+    responses: {
+      /** @description Successful Response */
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["CalendarSourcesResponse"];
+        };
+      };
+    };
+  };
+  add_calendar_source_api_calendar_sources_post: {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    requestBody: {
+      content: {
+        "application/json": components["schemas"]["CalendarSource"];
+      };
+    };
+    responses: {
+      /** @description Successful Response */
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["CalendarSource"];
+        };
+      };
+      /** @description Validation Error */
+      422: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["HTTPValidationError"];
+        };
+      };
+    };
+  };
+  update_calendar_source_api_calendar_sources__source_id__put: {
+    parameters: {
+      query?: never;
+      header?: never;
+      path: {
+        source_id: string;
+      };
+      cookie?: never;
+    };
+    requestBody: {
+      content: {
+        "application/json": components["schemas"]["CalendarSource"];
+      };
+    };
+    responses: {
+      /** @description Successful Response */
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["CalendarSource"];
+        };
+      };
+      /** @description Validation Error */
+      422: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["HTTPValidationError"];
+        };
+      };
+    };
+  };
+  remove_calendar_source_api_calendar_sources__source_id__delete: {
+    parameters: {
+      query?: never;
+      header?: never;
+      path: {
+        source_id: string;
+      };
+      cookie?: never;
+    };
+    requestBody?: never;
+    responses: {
+      /** @description Successful Response */
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": unknown;
+        };
+      };
+      /** @description Validation Error */
+      422: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["HTTPValidationError"];
+        };
+      };
+    };
+  };
+  get_config_api_config_get: {
+    parameters: {
+      query?: {
+        kiosk?: string | null;
+        khost?: string | null;
+      };
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    requestBody?: never;
+    responses: {
+      /** @description Successful Response */
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": unknown;
+        };
+      };
+      /** @description Validation Error */
+      422: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["HTTPValidationError"];
+        };
+      };
+    };
+  };
+  update_config_api_config_post: {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    requestBody: {
+      content: {
+        "application/json": components["schemas"]["ConfigUpdate"];
+      };
+    };
+    responses: {
+      /** @description Successful Response */
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": unknown;
+        };
+      };
+      /** @description Validation Error */
+      422: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["HTTPValidationError"];
+        };
+      };
+    };
+  };
+  get_display_orientation_api_config_display_orientation_get: {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    requestBody?: never;
+    responses: {
+      /** @description Successful Response */
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": unknown;
+        };
+      };
+    };
+  };
+  get_git_branches_api_config_git_branches_get: {
+    parameters: {
+      query?: {
+        repo_url?: string | null;
+      };
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    requestBody?: never;
+    responses: {
+      /** @description Successful Response */
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": unknown;
+        };
+      };
+      /** @description Validation Error */
+      422: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["HTTPValidationError"];
+        };
+      };
+    };
+  };
+  health_check_api_health_get: {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    requestBody?: never;
+    responses: {
+      /** @description Successful Response */
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": unknown;
+        };
+      };
+    };
+  };
+  detailed_health_check_api_health_detailed_get: {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    requestBody?: never;
+    responses: {
+      /** @description Successful Response */
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": unknown;
+        };
+      };
+    };
+  };
+  test_db_health_check_api_health_test_db_get: {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    requestBody?: never;
+    responses: {
+      /** @description Successful Response */
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": unknown;
+        };
+      };
+    };
+  };
+  get_image_config_api_images_config_get: {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    requestBody?: never;
+    responses: {
+      /** @description Successful Response */
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": unknown;
+        };
+      };
+    };
+  };
+  get_current_image_api_images_current_get: {
+    parameters: {
+      query?: {
+        /** @description Comma-separated source IDs */
+        source_ids?: string | null;
+      };
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    requestBody?: never;
+    responses: {
+      /** @description Successful Response */
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": unknown;
+        };
+      };
+      /** @description Validation Error */
+      422: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["HTTPValidationError"];
+        };
+      };
+    };
+  };
+  list_images_api_images_list_get: {
+    parameters: {
+      query?: {
+        /** @description Comma-separated source IDs */
+        source_ids?: string | null;
+      };
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    requestBody?: never;
+    responses: {
+      /** @description Successful Response */
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": unknown;
+        };
+      };
+      /** @description Validation Error */
+      422: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["HTTPValidationError"];
+        };
+      };
+    };
+  };
+  next_image_api_images_next_post: {
+    parameters: {
+      query?: {
+        /** @description Comma-separated source IDs */
+        source_ids?: string | null;
+      };
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    requestBody?: never;
+    responses: {
+      /** @description Successful Response */
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": unknown;
+        };
+      };
+      /** @description Validation Error */
+      422: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["HTTPValidationError"];
+        };
+      };
+    };
+  };
+  previous_image_api_images_previous_post: {
+    parameters: {
+      query?: {
+        /** @description Comma-separated source IDs */
+        source_ids?: string | null;
+      };
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    requestBody?: never;
+    responses: {
+      /** @description Successful Response */
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": unknown;
+        };
+      };
+      /** @description Validation Error */
+      422: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["HTTPValidationError"];
+        };
+      };
+    };
+  };
+  upload_image_api_images_upload_post: {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    requestBody: {
+      content: {
+        "multipart/form-data": components["schemas"]["Body_upload_image_api_images_upload_post"];
+      };
+    };
+    responses: {
+      /** @description Successful Response */
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": unknown;
+        };
+      };
+      /** @description Validation Error */
+      422: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["HTTPValidationError"];
+        };
+      };
+    };
+  };
+  get_image_file_api_images__image_id__get: {
+    parameters: {
+      query?: never;
+      header?: never;
+      path: {
+        image_id: string;
+      };
+      cookie?: never;
+    };
+    requestBody?: never;
+    responses: {
+      /** @description Successful Response */
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": unknown;
+        };
+      };
+      /** @description Validation Error */
+      422: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["HTTPValidationError"];
+        };
+      };
+    };
+  };
+  delete_image_api_images__image_id__delete: {
+    parameters: {
+      query?: never;
+      header?: never;
+      path: {
+        image_id: string;
+      };
+      cookie?: never;
+    };
+    requestBody?: never;
+    responses: {
+      /** @description Successful Response */
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": unknown;
+        };
+      };
+      /** @description Validation Error */
+      422: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["HTTPValidationError"];
+        };
+      };
+    };
+  };
+  get_image_thumbnail_api_images__image_id__thumbnail_get: {
+    parameters: {
+      query?: never;
+      header?: never;
+      path: {
+        image_id: string;
+      };
+      cookie?: never;
+    };
+    requestBody?: never;
+    responses: {
+      /** @description Successful Response */
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": unknown;
+        };
+      };
+      /** @description Validation Error */
+      422: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["HTTPValidationError"];
+        };
+      };
+    };
+  };
+  get_available_actions_api_keyboard_actions_get: {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    requestBody?: never;
+    responses: {
+      /** @description Successful Response */
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": unknown;
+        };
+      };
+    };
+  };
+  get_keyboard_mappings_api_keyboard_mappings_get: {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    requestBody?: never;
+    responses: {
+      /** @description Successful Response */
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": unknown;
+        };
+      };
+    };
+  };
+  replace_keyboard_mappings_api_keyboard_mappings_post: {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    requestBody: {
+      content: {
+        "application/json": components["schemas"]["KeyboardMappings"];
+      };
+    };
+    responses: {
+      /** @description Successful Response */
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": unknown;
+        };
+      };
+      /** @description Validation Error */
+      422: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["HTTPValidationError"];
+        };
+      };
+    };
+  };
+  set_single_mapping_api_keyboard_mappings__key_code__put: {
+    parameters: {
+      query?: never;
+      header?: never;
+      path: {
+        key_code: string;
+      };
+      cookie?: never;
+    };
+    requestBody: {
+      content: {
+        "application/json": components["schemas"]["SingleMapping"];
+      };
+    };
+    responses: {
+      /** @description Successful Response */
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": unknown;
+        };
+      };
+      /** @description Validation Error */
+      422: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["HTTPValidationError"];
+        };
+      };
+    };
+  };
+  delete_single_mapping_api_keyboard_mappings__key_code__delete: {
+    parameters: {
+      query?: never;
+      header?: never;
+      path: {
+        key_code: string;
+      };
+      cookie?: never;
+    };
+    requestBody?: never;
+    responses: {
+      /** @description Successful Response */
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": unknown;
+        };
+      };
+      /** @description Validation Error */
+      422: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["HTTPValidationError"];
+        };
+      };
+    };
+  };
+  get_kiosks_api_kiosks_get: {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    requestBody?: never;
+    responses: {
+      /** @description Successful Response */
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": unknown;
+        };
+      };
+    };
+  };
+  get_kiosk_config_api_kiosks__kiosk_id__config_get: {
+    parameters: {
+      query?: {
+        khost?: string | null;
+      };
+      header?: never;
+      path: {
+        kiosk_id: string;
+      };
+      cookie?: never;
+    };
+    requestBody?: never;
+    responses: {
+      /** @description Successful Response */
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": unknown;
+        };
+      };
+      /** @description Validation Error */
+      422: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["HTTPValidationError"];
+        };
+      };
+    };
+  };
+  put_kiosk_overrides_api_kiosks__kiosk_id__overrides_put: {
+    parameters: {
+      query?: never;
+      header?: never;
+      path: {
+        kiosk_id: string;
+      };
+      cookie?: never;
+    };
+    requestBody: {
+      content: {
+        "application/json": components["schemas"]["OverridesPayload"];
+      };
+    };
+    responses: {
+      /** @description Successful Response */
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": unknown;
+        };
+      };
+      /** @description Validation Error */
+      422: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["HTTPValidationError"];
+        };
+      };
+    };
+  };
+  get_plugins_api_plugins_get: {
+    parameters: {
+      query?: {
+        /** @description Optional plugin type filter */
+        plugin_type?: string | null;
+      };
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    requestBody?: never;
+    responses: {
+      /** @description Successful Response */
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["PluginListResponse"];
+        };
+      };
+      /** @description Validation Error */
+      422: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["HTTPValidationError"];
+        };
+      };
+    };
+  };
+  enumerate_plugins_from_github_api_plugins_github_enumerate_post: {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    requestBody: {
+      content: {
+        "application/json": {
+          [key: string]: unknown;
+        };
+      };
+    };
+    responses: {
+      /** @description Successful Response */
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": unknown;
+        };
+      };
+      /** @description Validation Error */
+      422: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["HTTPValidationError"];
+        };
+      };
+    };
+  };
+  install_plugin_from_github_api_plugins_github_install_post: {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    requestBody: {
+      content: {
+        "application/json": {
+          [key: string]: unknown;
+        };
+      };
+    };
+    responses: {
+      /** @description Successful Response */
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": unknown;
+        };
+      };
+      /** @description Validation Error */
+      422: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["HTTPValidationError"];
+        };
+      };
+    };
+  };
+  inspect_plugin_api_plugins_inspect_post: {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    requestBody: {
+      content: {
+        "multipart/form-data": components["schemas"]["Body_inspect_plugin_api_plugins_inspect_post"];
+      };
+    };
+    responses: {
+      /** @description Successful Response */
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["PluginManifestEnvelope"];
+        };
+      };
+      /** @description Validation Error */
+      422: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["HTTPValidationError"];
+        };
+      };
+    };
+  };
+  install_plugin_api_plugins_install_post: {
+    parameters: {
+      query?: {
+        plugin_id?: string | null;
+      };
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    requestBody: {
+      content: {
+        "multipart/form-data": components["schemas"]["Body_install_plugin_api_plugins_install_post"];
+      };
+    };
+    responses: {
+      /** @description Successful Response */
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["PluginInstallResponse"];
+        };
+      };
+      /** @description Validation Error */
+      422: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["HTTPValidationError"];
+        };
+      };
+    };
+  };
+  get_installed_plugins_api_plugins_installed_get: {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    requestBody?: never;
+    responses: {
+      /** @description Successful Response */
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["PluginListResponse"];
+        };
+      };
+    };
+  };
+  get_installed_plugin_api_plugins_installed__plugin_id__get: {
+    parameters: {
+      query?: never;
+      header?: never;
+      path: {
+        plugin_id: string;
+      };
+      cookie?: never;
+    };
+    requestBody?: never;
+    responses: {
+      /** @description Successful Response */
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": unknown;
+        };
+      };
+      /** @description Validation Error */
+      422: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["HTTPValidationError"];
+        };
+      };
+    };
+  };
+  uninstall_plugin_api_plugins_installed__plugin_id__delete: {
+    parameters: {
+      query?: never;
+      header?: never;
+      path: {
+        plugin_id: string;
+      };
+      cookie?: never;
+    };
+    requestBody?: never;
+    responses: {
+      /** @description Successful Response */
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["PluginDeleteResponse"];
+        };
+      };
+      /** @description Validation Error */
+      422: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["HTTPValidationError"];
+        };
+      };
+    };
+  };
+  update_plugin_instance_api_plugins_instances__instance_id__put: {
+    parameters: {
+      query?: never;
+      header?: never;
+      path: {
+        instance_id: string;
+      };
+      cookie?: never;
+    };
+    requestBody: {
+      content: {
+        "application/json": {
+          [key: string]: unknown;
+        };
+      };
+    };
+    responses: {
+      /** @description Successful Response */
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["PluginInstanceUpdateResponse"];
+        };
+      };
+      /** @description Validation Error */
+      422: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["HTTPValidationError"];
+        };
+      };
+    };
+  };
+  delete_plugin_instance_api_plugins_instances__instance_id__delete: {
+    parameters: {
+      query?: never;
+      header?: never;
+      path: {
+        instance_id: string;
+      };
+      cookie?: never;
+    };
+    requestBody?: never;
+    responses: {
+      /** @description Successful Response */
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["PluginInstanceDeleteResponse"];
+        };
+      };
+      /** @description Validation Error */
+      422: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["HTTPValidationError"];
+        };
+      };
+    };
+  };
+  start_plugin_instance_api_plugins_instances__instance_id__start_post: {
+    parameters: {
+      query?: never;
+      header?: never;
+      path: {
+        instance_id: string;
+      };
+      cookie?: never;
+    };
+    requestBody?: never;
+    responses: {
+      /** @description Successful Response */
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["PluginInstanceActionResponse"];
+        };
+      };
+      /** @description Validation Error */
+      422: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["HTTPValidationError"];
+        };
+      };
+    };
+  };
+  stop_plugin_instance_api_plugins_instances__instance_id__stop_post: {
+    parameters: {
+      query?: never;
+      header?: never;
+      path: {
+        instance_id: string;
+      };
+      cookie?: never;
+    };
+    requestBody?: never;
+    responses: {
+      /** @description Successful Response */
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["PluginInstanceActionResponse"];
+        };
+      };
+      /** @description Validation Error */
+      422: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["HTTPValidationError"];
+        };
+      };
+    };
+  };
+  enumerate_plugins_from_local_api_plugins_local_enumerate_post: {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    requestBody: {
+      content: {
+        "application/json": {
+          [key: string]: unknown;
+        };
+      };
+    };
+    responses: {
+      /** @description Successful Response */
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": unknown;
+        };
+      };
+      /** @description Validation Error */
+      422: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["HTTPValidationError"];
+        };
+      };
+    };
+  };
+  install_plugin_from_local_api_plugins_local_install_post: {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    requestBody: {
+      content: {
+        "application/json": {
+          [key: string]: unknown;
+        };
+      };
+    };
+    responses: {
+      /** @description Successful Response */
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": unknown;
+        };
+      };
+      /** @description Validation Error */
+      422: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["HTTPValidationError"];
+        };
+      };
+    };
+  };
+  suggest_local_plugin_paths_api_plugins_local_suggest_get: {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    requestBody?: never;
+    responses: {
+      /** @description Successful Response */
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": unknown;
+        };
+      };
+    };
+  };
+  get_plugin_api_plugins__plugin_id__get: {
+    parameters: {
+      query?: never;
+      header?: never;
+      path: {
+        plugin_id: string;
+      };
+      cookie?: never;
+    };
+    requestBody?: never;
+    responses: {
+      /** @description Successful Response */
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": unknown;
+        };
+      };
+      /** @description Validation Error */
+      422: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["HTTPValidationError"];
+        };
+      };
+    };
+  };
+  update_plugin_api_plugins__plugin_id__put: {
+    parameters: {
+      query?: never;
+      header?: never;
+      path: {
+        plugin_id: string;
+      };
+      cookie?: never;
+    };
+    requestBody: {
+      content: {
+        "application/json": {
+          [key: string]: unknown;
+        };
+      };
+    };
+    responses: {
+      /** @description Successful Response */
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["PluginTypeConfigUpdateResponse"];
+        };
+      };
+      /** @description Validation Error */
+      422: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["HTTPValidationError"];
+        };
+      };
+    };
+  };
+  run_backend_plugin_task_api_plugins__plugin_id__backend_run_task_post: {
+    parameters: {
+      query?: never;
+      header?: never;
+      path: {
+        plugin_id: string;
+      };
+      cookie?: never;
+    };
+    requestBody?: never;
+    responses: {
+      /** @description Successful Response */
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": unknown;
+        };
+      };
+      /** @description Validation Error */
+      422: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["HTTPValidationError"];
+        };
+      };
+    };
+  };
+  get_backend_plugin_status_api_plugins__plugin_id__backend_status_get: {
+    parameters: {
+      query?: never;
+      header?: never;
+      path: {
+        plugin_id: string;
+      };
+      cookie?: never;
+    };
+    requestBody?: never;
+    responses: {
+      /** @description Successful Response */
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": unknown;
+        };
+      };
+      /** @description Validation Error */
+      422: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["HTTPValidationError"];
+        };
+      };
+    };
+  };
+  get_plugin_config_api_plugins__plugin_id__config_get: {
+    parameters: {
+      query?: never;
+      header?: never;
+      path: {
+        plugin_id: string;
+      };
+      cookie?: never;
+    };
+    requestBody?: never;
+    responses: {
+      /** @description Successful Response */
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": unknown;
+        };
+      };
+      /** @description Validation Error */
+      422: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["HTTPValidationError"];
+        };
+      };
+    };
+  };
+  update_plugin_config_api_plugins__plugin_id__config_put: {
+    parameters: {
+      query?: never;
+      header?: never;
+      path: {
+        plugin_id: string;
+      };
+      cookie?: never;
+    };
+    requestBody: {
+      content: {
+        "application/json": components["schemas"]["PluginTypeConfigUpdateRequest"];
+      };
+    };
+    responses: {
+      /** @description Successful Response */
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["PluginTypeConfigUpdateResponse"];
+        };
+      };
+      /** @description Validation Error */
+      422: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["HTTPValidationError"];
+        };
+      };
+    };
+  };
+  get_plugin_data_api_plugins__plugin_id__data_get: {
+    parameters: {
+      query?: {
+        /** @description Start date (YYYY-MM-DD) */
+        start_date?: string | null;
+        /** @description End date (YYYY-MM-DD) */
+        end_date?: string | null;
+      };
+      header?: never;
+      path: {
+        plugin_id: string;
+      };
+      cookie?: never;
+    };
+    requestBody?: never;
+    responses: {
+      /** @description Successful Response */
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": unknown;
+        };
+      };
+      /** @description Validation Error */
+      422: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["HTTPValidationError"];
+        };
+      };
+    };
+  };
+  fetch_plugin_api_plugins__plugin_id__fetch_post: {
+    parameters: {
+      query?: never;
+      header?: never;
+      path: {
+        plugin_id: string;
+      };
+      cookie?: never;
+    };
+    requestBody?: never;
+    responses: {
+      /** @description Successful Response */
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": unknown;
+        };
+      };
+      /** @description Validation Error */
+      422: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["HTTPValidationError"];
+        };
+      };
+    };
+  };
+  geocode_location_api_plugins__plugin_id__geocode_post: {
+    parameters: {
+      query?: never;
+      header?: never;
+      path: {
+        plugin_id: string;
+      };
+      cookie?: never;
+    };
+    requestBody: {
+      content: {
+        "application/json": {
+          [key: string]: unknown;
+        };
+      };
+    };
+    responses: {
+      /** @description Successful Response */
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": unknown;
+        };
+      };
+      /** @description Validation Error */
+      422: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["HTTPValidationError"];
+        };
+      };
+    };
+  };
+  get_plugin_instances_api_plugins__plugin_id__instances_get: {
+    parameters: {
+      query?: never;
+      header?: never;
+      path: {
+        plugin_id: string;
+      };
+      cookie?: never;
+    };
+    requestBody?: never;
+    responses: {
+      /** @description Successful Response */
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["PluginInstanceListResponse"];
+        };
+      };
+      /** @description Validation Error */
+      422: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["HTTPValidationError"];
+        };
+      };
+    };
+  };
+  create_plugin_instance_api_plugins__plugin_id__instances_post: {
+    parameters: {
+      query?: never;
+      header?: never;
+      path: {
+        plugin_id: string;
+      };
+      cookie?: never;
+    };
+    requestBody: {
+      content: {
+        "application/json": components["schemas"]["PluginInstanceCreateRequest"];
+      };
+    };
+    responses: {
+      /** @description Successful Response */
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["PluginInstanceUpdateResponse"];
+        };
+      };
+      /** @description Validation Error */
+      422: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["HTTPValidationError"];
+        };
+      };
+    };
+  };
+  update_plugin_instances_order_api_plugins__plugin_id__instances_order_put: {
+    parameters: {
+      query?: never;
+      header?: never;
+      path: {
+        plugin_id: string;
+      };
+      cookie?: never;
+    };
+    requestBody: {
+      content: {
+        "application/json": {
+          [key: string]: number;
+        };
+      };
+    };
+    responses: {
+      /** @description Successful Response */
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["PluginInstanceOrderUpdateResponse"];
+        };
+      };
+      /** @description Validation Error */
+      422: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["HTTPValidationError"];
+        };
+      };
+    };
+  };
+  scan_plugin_options_api_plugins__plugin_id__scan_get: {
+    parameters: {
+      query: {
+        /** @description Config field key to scan options for */
+        field: string;
+      };
+      header?: never;
+      path: {
+        plugin_id: string;
+      };
+      cookie?: never;
+    };
+    requestBody?: never;
+    responses: {
+      /** @description Successful Response */
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": unknown;
+        };
+      };
+      /** @description Validation Error */
+      422: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["HTTPValidationError"];
+        };
+      };
+    };
+  };
+  get_plugin_static_asset_api_plugins__plugin_id__static__asset_path__get: {
+    parameters: {
+      query?: never;
+      header?: never;
+      path: {
+        plugin_id: string;
+        asset_path: string;
+      };
+      cookie?: never;
+    };
+    requestBody?: never;
+    responses: {
+      /** @description Successful Response */
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": unknown;
+        };
+      };
+      /** @description Validation Error */
+      422: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["HTTPValidationError"];
+        };
+      };
+    };
+  };
+  test_plugin_api_plugins__plugin_id__test_post: {
+    parameters: {
+      query?: never;
+      header?: never;
+      path: {
+        plugin_id: string;
+      };
+      cookie?: never;
+    };
+    requestBody?: {
+      content: {
+        "application/json": {
+          [key: string]: unknown;
+        } | null;
+      };
+    };
+    responses: {
+      /** @description Successful Response */
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": unknown;
+        };
+      };
+      /** @description Validation Error */
+      422: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["HTTPValidationError"];
+        };
+      };
+    };
+  };
+  turn_display_off_api_system_display_power_off_post: {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    requestBody?: never;
+    responses: {
+      /** @description Successful Response */
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": unknown;
+        };
+      };
+    };
+  };
+  turn_display_on_api_system_display_power_on_post: {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    requestBody?: never;
+    responses: {
+      /** @description Successful Response */
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": unknown;
+        };
+      };
+    };
+  };
+  get_display_state_api_system_display_power_state_get: {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    requestBody?: never;
+    responses: {
+      /** @description Successful Response */
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": unknown;
+        };
+      };
+    };
+  };
+  configure_display_timeout_api_system_display_timeout_configure_post: {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    requestBody?: never;
+    responses: {
+      /** @description Successful Response */
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": unknown;
+        };
+      };
+    };
+  };
+  reboot_system_api_system_reboot_post: {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    requestBody?: never;
+    responses: {
+      /** @description Successful Response */
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": unknown;
+        };
+      };
+    };
+  };
+  reload_ui_api_system_reload_ui_post: {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    requestBody?: never;
+    responses: {
+      /** @description Successful Response */
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": unknown;
+        };
+      };
+    };
+  };
+  restart_backend_api_system_restart_backend_post: {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    requestBody?: never;
+    responses: {
+      /** @description Successful Response */
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": unknown;
+        };
+      };
+    };
+  };
+  restart_frontend_api_system_restart_frontend_post: {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    requestBody?: never;
+    responses: {
+      /** @description Successful Response */
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": unknown;
+        };
+      };
+    };
+  };
+  trigger_update_api_system_update_post: {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    requestBody?: never;
+    responses: {
+      /** @description Successful Response */
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": unknown;
+        };
+      };
+    };
+  };
+  get_update_status_api_system_update_status_get: {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    requestBody?: never;
+    responses: {
+      /** @description Successful Response */
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": unknown;
+        };
+      };
+    };
+  };
+  stream_update_log_api_system_update_stream_get: {
+    parameters: {
+      query?: {
+        log_offset?: number;
+      };
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    requestBody?: never;
+    responses: {
+      /** @description Successful Response */
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": unknown;
+        };
+      };
+      /** @description Validation Error */
+      422: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["HTTPValidationError"];
+        };
+      };
+    };
+  };
 }
