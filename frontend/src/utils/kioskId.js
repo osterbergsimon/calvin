@@ -26,10 +26,9 @@ export function getKioskHost() {
   return window.location.hostname || "";
 }
 
-export function withKiosk(url) {
+export function configUrl() {
   const id = getKioskId();
-  if (!id) return url;
-  const sep = url.includes("?") ? "&" : "?";
-  const host = encodeURIComponent(getKioskHost());
-  return `${url}${sep}kiosk=${encodeURIComponent(id)}&khost=${host}`;
+  if (!id) return "/api/config";
+  const khost = encodeURIComponent(getKioskHost());
+  return `/api/kiosks/${encodeURIComponent(id)}/config?khost=${khost}`;
 }
