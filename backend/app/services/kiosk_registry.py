@@ -1,5 +1,7 @@
 """Registry of known kiosks (per-device settings model — calvin-dd9.2)."""
 
+import hashlib
+import json
 import re
 import sqlite3
 from datetime import datetime
@@ -15,6 +17,21 @@ from app.utils.db_retry import retry_on_db_locked
 # path separators, control chars, URL-encoded junk) is rejected before any DB
 # write to bound growth and neutralise garbage/hostile input.
 _KIOSK_ID_RE = re.compile(r"[A-Za-z0-9._-]{1,64}")
+
+# Config keys a device-side agent physically applies (rotation, schedule, and
+# reserved future backlight/output/mode). Used to compute a cheap per-kiosk
+# version so the agent can detect device-physical changes without diffing full
+# config. Extend this as dd9.1 follow-ups (brightness/output) land.
+DEVICE_PHYSICAL_KEYS: tuple[str, ...] = (
+    "orientation",
+    "orientationFlipped",
+    "applyDisplayRotation",
+    "displayScheduleEnabled",
+    "displaySchedule",
+    "displayBrightness",
+    "displayOutput",
+    "displayResolution",
+)
 
 # Ormar/`databases` surface the raw sqlite3 error on a PK/UNIQUE conflict; other
 # backends may raise the SQLAlchemy wrapper. Catch both so the create-race
@@ -69,3 +86,24 @@ async def list_kiosks() -> list[dict]:
         }
         for row in rows
     ]
+
+
+def merge_overrides(base: dict, overrides: dict | None) -> dict:
+    """Shallow top-level merge: each override key replaces that base key wholesale.
+
+    No recursion, no array merge. Returns a new dict; `base` is not mutated.
+    """
+    if not overrides:
+        return dict(base)
+    return {**base, **overrides}
+
+
+def device_config_version(merged: dict) -> str:
+    """Stable 16-char hex digest of the device-physical subset of a merged config.
+
+    Same inputs -> same version; any DEVICE_PHYSICAL_KEYS change -> new version;
+    non-device-physical changes do not bump it.
+    """
+    subset = {k: merged.get(k) for k in DEVICE_PHYSICAL_KEYS}
+    blob = json.dumps(subset, sort_keys=True, default=str)
+    return hashlib.sha256(blob.encode("utf-8")).hexdigest()[:16]

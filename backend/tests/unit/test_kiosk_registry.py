@@ -6,6 +6,11 @@ import pytest
 
 from app.models.db_models import KioskDB
 from app.services import kiosk_registry
+from app.services.kiosk_registry import (
+    DEVICE_PHYSICAL_KEYS,
+    device_config_version,
+    merge_overrides,
+)
 
 
 @pytest.mark.asyncio
@@ -108,3 +113,36 @@ async def test_record_kiosk_truncates_over_long_hostname(test_db):
     row = await KioskDB.objects.get(id="kiosk-abc123")
     assert row.hostname is not None
     assert len(row.hostname) == 255
+
+
+@pytest.mark.unit
+def test_merge_overrides_shallow_replace():
+    base = {"orientation": "landscape", "timeFormat": "24h", "themeMode": "auto"}
+    out = merge_overrides(base, {"orientation": "portrait"})
+    assert out["orientation"] == "portrait"      # override wins
+    assert out["timeFormat"] == "24h"            # falls through
+    assert base["orientation"] == "landscape"    # base not mutated
+
+
+@pytest.mark.unit
+def test_merge_overrides_top_level_only():
+    base = {"dashboardScreens": {"version": 2, "screens": ["a", "b"]}}
+    out = merge_overrides(base, {"dashboardScreens": {"version": 3}})
+    assert out["dashboardScreens"] == {"version": 3}  # wholesale replace, no deep merge
+
+
+@pytest.mark.unit
+def test_merge_overrides_empty_and_none():
+    base = {"a": 1}
+    assert merge_overrides(base, None) == {"a": 1}
+    assert merge_overrides(base, {}) == {"a": 1}
+
+
+@pytest.mark.unit
+def test_device_config_version_stable_and_selective():
+    merged = {"orientation": "portrait", "displayScheduleEnabled": True, "themeMode": "dark"}
+    v1 = device_config_version(merged)
+    assert v1 == device_config_version(dict(merged))          # stable
+    assert device_config_version({**merged, "themeMode": "light"}) == v1  # non-device key: no bump
+    assert device_config_version({**merged, "orientation": "landscape"}) != v1  # device key: bump
+    assert isinstance(v1, str) and len(v1) == 16
