@@ -57,6 +57,7 @@
               :frontend-version="frontendVersion"
               @update:config="handleConfigUpdate"
             />
+            <KiosksSettings v-if="activeCategory === 'kiosks'" :key="categoryRenderKey" />
             <MaintenanceSettings
               v-if="activeCategory === 'maintenance' && localConfig"
               :key="categoryRenderKey"
@@ -107,6 +108,9 @@ const DeviceSettings = defineAsyncComponent(
 );
 const MaintenanceSettings = defineAsyncComponent(
   () => import("@/components/settings/categories/MaintenanceSettings.vue")
+);
+const KiosksSettings = defineAsyncComponent(
+  () => import("@/components/settings/categories/KiosksSettings.vue")
 );
 
 const router = useRouter();

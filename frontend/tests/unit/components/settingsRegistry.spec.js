@@ -15,6 +15,7 @@ describe("settings registry", () => {
       "content",
       "plugins",
       "device",
+      "kiosks",
       "maintenance",
     ]);
     expect(defaultSettingsCategoryId).toBe("dashboard");
