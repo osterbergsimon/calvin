@@ -389,12 +389,26 @@ export const useConfigStore = defineStore("config", () => {
   };
 
   const activateDashboardScreen = async screenId => {
+    if (getKioskId()) {
+      // Kiosk mode: local only — never persist to global. Honor availableScreens.
+      const ids = new Set(effectiveDashboardScreens.value.screens.map(s => s.id));
+      if (ids.has(screenId)) kioskActiveScreenId.value = screenId;
+      return;
+    }
     const nextScreens = setActiveDashboardScreen(dashboardScreens.value, screenId);
     dashboardScreens.value = nextScreens;
     await updateConfig({ dashboardScreens: nextScreens });
   };
 
   const cycleDashboardScreenBy = async direction => {
+    if (getKioskId()) {
+      const screens = effectiveDashboardScreens.value.screens;
+      if (screens.length <= 1) return;
+      const cur = screens.findIndex(s => s.id === kioskActiveScreenId.value);
+      const next = (cur + direction + screens.length) % screens.length;
+      kioskActiveScreenId.value = screens[next].id;
+      return;
+    }
     const nextScreens = cycleDashboardScreen(dashboardScreens.value, direction);
     dashboardScreens.value = nextScreens;
     await updateConfig({ dashboardScreens: nextScreens });

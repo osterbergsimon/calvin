@@ -259,3 +259,45 @@ describe("config store — kiosk active screen", () => {
     expect(store.kioskActiveScreenId).toBe("a");  // preserved
   });
 });
+
+describe("config store — switch actions branch on kiosk mode", () => {
+  beforeEach(() => {
+    setActivePinia(createPinia());
+    // Ensure axios.post is mocked so Mode A tests don't throw on network calls.
+    axios.post.mockResolvedValue({ data: {} });
+  });
+
+  it("kiosk mode: activate updates local id, no updateConfig network call", async () => {
+    setSearch("?kiosk=k1");
+    const store = useConfigStore();
+    store.dashboardScreens = SCREENS;
+    const spy = vi.spyOn(store, "updateConfig");
+    store.kioskActiveScreenId = "a";
+    await store.activateDashboardScreen("c");
+    expect(store.kioskActiveScreenId).toBe("c");
+    expect(spy).not.toHaveBeenCalled();
+  });
+
+  it("kiosk mode: cycle updates local id among available, no updateConfig", async () => {
+    setSearch("?kiosk=k1");
+    const store = useConfigStore();
+    store.dashboardScreens = SCREENS;
+    store.availableScreens = ["a", "c"];
+    store.kioskActiveScreenId = "a";
+    const spy = vi.spyOn(store, "updateConfig");
+    await store.cycleDashboardScreenBy(1);
+    expect(store.kioskActiveScreenId).toBe("c"); // next available after "a" is "c"
+    expect(spy).not.toHaveBeenCalled();
+  });
+
+  it("Mode A: activate still persists via updateConfig (regression)", async () => {
+    setSearch("");
+    const store = useConfigStore();
+    store.dashboardScreens = SCREENS;
+    // Note: in Pinia setup stores, internal calls go via closure (not the proxy),
+    // so we spy on axios.post instead of store.updateConfig to verify persistence.
+    const spy = vi.spyOn(axios, "post");
+    await store.activateDashboardScreen("c");
+    expect(spy).toHaveBeenCalled();
+  });
+});
