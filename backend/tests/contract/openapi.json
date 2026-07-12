@@ -1505,42 +1505,8 @@
     },
     "/api/config": {
       "get": {
-        "description": "Get current configuration.\n\n?kiosk=/?khost= recording is retained here for now; it is retired in a later\ntask once the per-kiosk effective endpoint records instead.",
+        "description": "Get the global configuration (per-kiosk config: GET /api/kiosks/{id}/config).",
         "operationId": "get_config_api_config_get",
-        "parameters": [
-          {
-            "in": "query",
-            "name": "kiosk",
-            "required": false,
-            "schema": {
-              "anyOf": [
-                {
-                  "type": "string"
-                },
-                {
-                  "type": "null"
-                }
-              ],
-              "title": "Kiosk"
-            }
-          },
-          {
-            "in": "query",
-            "name": "khost",
-            "required": false,
-            "schema": {
-              "anyOf": [
-                {
-                  "type": "string"
-                },
-                {
-                  "type": "null"
-                }
-              ],
-              "title": "Khost"
-            }
-          }
-        ],
         "responses": {
           "200": {
             "content": {
@@ -1549,16 +1515,6 @@
               }
             },
             "description": "Successful Response"
-          },
-          "422": {
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/HTTPValidationError"
-                }
-              }
-            },
-            "description": "Validation Error"
           }
         },
         "summary": "Get Config",

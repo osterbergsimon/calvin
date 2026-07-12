@@ -209,49 +209,11 @@ def test_update_config_partial(test_client: TestClient):
 
 
 @pytest.mark.integration
-def test_get_config_records_kiosk(test_client: TestClient):
-    """A ?kiosk= request registers the kiosk; the config body is unchanged."""
-    baseline = test_client.get("/api/config").json()
-
-    scoped = test_client.get("/api/config?kiosk=kitchen-3f9a2c&khost=raspberrypi")
-    assert scoped.status_code == 200
-    # Body identical to the unscoped response (merge is dd9.3, not dd9.2).
-    scoped_body = scoped.json()
-    scoped_body.pop("frontendVersion", None)
-    baseline.pop("frontendVersion", None)
-    assert scoped_body == baseline
-
-    kiosks = test_client.get("/api/kiosks").json()["kiosks"]
-    assert any(k["id"] == "kitchen-3f9a2c" and k["hostname"] == "raspberrypi" for k in kiosks)
-
-
-@pytest.mark.integration
-def test_get_config_no_kiosk_unchanged(test_client: TestClient):
-    """No ?kiosk= means no registry rows and today's exact behavior."""
-    test_client.get("/api/config")
+def test_get_config_is_global_and_records_nothing(test_client: TestClient):
+    resp = test_client.get("/api/config")
+    assert resp.status_code == 200
+    assert "orientation" in resp.json()
     assert test_client.get("/api/kiosks").json() == {"kiosks": []}
-
-
-@pytest.mark.integration
-def test_get_config_returns_200_when_record_kiosk_raises(test_client: TestClient):
-    """Config must be delivered even if kiosk registration raises an exception.
-
-    record_kiosk is best-effort: a DB lock or race must not turn the kiosk's
-    /api/config into a 500.
-    """
-    from unittest.mock import AsyncMock, patch
-
-    with patch(
-        "app.api.routes.config.kiosk_registry.record_kiosk",
-        new_callable=AsyncMock,
-        side_effect=RuntimeError("simulated DB lock"),
-    ):
-        response = test_client.get("/api/config?kiosk=test-kiosk-abc&khost=testhost")
-
-    assert response.status_code == 200
-    data = response.json()
-    # Config body must still be present (spot-check a required key)
-    assert "orientation" in data
 
 
 @pytest.mark.integration

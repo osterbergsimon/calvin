@@ -10,7 +10,6 @@ from loguru import logger
 from pydantic import BaseModel, ConfigDict
 
 from app.config import settings
-from app.services import kiosk_registry
 from app.services.config_service import config_service
 from app.services.display_orientation_service import display_orientation_service
 
@@ -534,17 +533,8 @@ async def build_global_config() -> dict:
 
 
 @router.get("/config")
-async def get_config(kiosk: str | None = None, khost: str | None = None):
-    """Get current configuration.
-
-    ?kiosk=/?khost= recording is retained here for now; it is retired in a later
-    task once the per-kiosk effective endpoint records instead.
-    """
-    if kiosk:
-        try:
-            await kiosk_registry.record_kiosk(kiosk, hostname=khost)
-        except Exception as exc:
-            logger.warning(f"Failed to record kiosk {kiosk!r}: {exc}")
+async def get_config():
+    """Get the global configuration (per-kiosk config: GET /api/kiosks/{id}/config)."""
     return await build_global_config()
 
 

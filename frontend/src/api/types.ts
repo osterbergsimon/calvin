@@ -144,10 +144,7 @@ export interface paths {
     };
     /**
      * Get Config
-     * @description Get current configuration.
-     *
-     *     ?kiosk=/?khost= recording is retained here for now; it is retired in a later
-     *     task once the per-kiosk effective endpoint records instead.
+     * @description Get the global configuration (per-kiosk config: GET /api/kiosks/{id}/config).
      */
     get: operations["get_config_api_config_get"];
     put?: never;
@@ -2136,10 +2133,7 @@ export interface operations {
   };
   get_config_api_config_get: {
     parameters: {
-      query?: {
-        kiosk?: string | null;
-        khost?: string | null;
-      };
+      query?: never;
       header?: never;
       path?: never;
       cookie?: never;
@@ -2153,15 +2147,6 @@ export interface operations {
         };
         content: {
           "application/json": unknown;
-        };
-      };
-      /** @description Validation Error */
-      422: {
-        headers: {
-          [name: string]: unknown;
-        };
-        content: {
-          "application/json": components["schemas"]["HTTPValidationError"];
         };
       };
     };
