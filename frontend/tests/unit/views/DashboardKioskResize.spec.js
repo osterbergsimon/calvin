@@ -69,7 +69,14 @@ const GLOBAL_SCREENS = {
 const stubs = {
   DashboardRegion: {
     name: "DashboardRegion",
-    props: ["region", "photoRotationInterval", "parentDirection", "activeRegionId", "lightActive", "dimOthers"],
+    props: [
+      "region",
+      "photoRotationInterval",
+      "parentDirection",
+      "activeRegionId",
+      "lightActive",
+      "dimOthers",
+    ],
     emits: ["focus-region"],
     template: '<div class="region-stub" />',
   },

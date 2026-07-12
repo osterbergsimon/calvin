@@ -960,7 +960,12 @@ export function filterAvailableScreens(screensConfig, availableIds) {
 
 // Resolve which screen a kiosk should show. Precedence:
 //   still-valid `current` → valid `defaultScreenId` → global activeScreenId → first available.
-export function resolveKioskActiveScreen({ screensConfig, availableScreens, defaultScreenId, current }) {
+export function resolveKioskActiveScreen({
+  screensConfig,
+  availableScreens,
+  defaultScreenId,
+  current,
+}) {
   const filtered = filterAvailableScreens(screensConfig, availableScreens);
   const ids = new Set(filtered.screens.map(screen => screen.id));
   if (current && ids.has(current)) return current;

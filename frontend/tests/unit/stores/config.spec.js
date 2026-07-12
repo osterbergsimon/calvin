@@ -220,8 +220,13 @@ function setSearch(search) {
 }
 
 const SCREENS = {
-  version: 2, activeScreenId: "b",
-  screens: [{ id: "a", name: "A" }, { id: "b", name: "B" }, { id: "c", name: "C" }],
+  version: 2,
+  activeScreenId: "b",
+  screens: [
+    { id: "a", name: "A" },
+    { id: "b", name: "B" },
+    { id: "c", name: "C" },
+  ],
 };
 
 describe("config store — kiosk active screen", () => {
@@ -253,10 +258,10 @@ describe("config store — kiosk active screen", () => {
     store.dashboardScreens = SCREENS;
     store.availableScreens = null;
     store.defaultScreenId = "c";
-    store.seedKioskActiveScreen();      // -> "c"
-    store.kioskActiveScreenId = "a";    // user switched
-    store.seedKioskActiveScreen();      // simulate next poll
-    expect(store.kioskActiveScreenId).toBe("a");  // preserved
+    store.seedKioskActiveScreen(); // -> "c"
+    store.kioskActiveScreenId = "a"; // user switched
+    store.seedKioskActiveScreen(); // simulate next poll
+    expect(store.kioskActiveScreenId).toBe("a"); // preserved
   });
 });
 

@@ -77,7 +77,7 @@ describe("useKeyboardActions - Calendar Event Navigation", () => {
         const filtered = normalized.screens.filter(s => allowed.has(s.id));
         const activeInFiltered = filtered.find(s => s.id === normalized.activeScreenId)
           ? normalized.activeScreenId
-          : filtered[0]?.id ?? null;
+          : (filtered[0]?.id ?? null);
         return { ...normalized, screens: filtered, activeScreenId: activeInFiltered };
       },
     };
@@ -617,7 +617,7 @@ describe("useKeyboardActions - Kiosk screen selection does not corrupt global ca
         const filtered = normalized.screens.filter(s => allowed.has(s.id));
         const activeInFiltered = filtered.find(s => s.id === normalized.activeScreenId)
           ? normalized.activeScreenId
-          : filtered[0]?.id ?? null;
+          : (filtered[0]?.id ?? null);
         return { ...normalized, screens: filtered, activeScreenId: activeInFiltered };
       },
     };
