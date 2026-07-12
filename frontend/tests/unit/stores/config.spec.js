@@ -263,7 +263,8 @@ describe("config store — kiosk active screen", () => {
 describe("config store — switch actions branch on kiosk mode", () => {
   beforeEach(() => {
     setActivePinia(createPinia());
-    // Ensure axios.post is mocked so Mode A tests don't throw on network calls.
+    // Reset call counts then set up resolved value so Mode A tests don't throw.
+    vi.clearAllMocks();
     axios.post.mockResolvedValue({ data: {} });
   });
 
@@ -271,11 +272,11 @@ describe("config store — switch actions branch on kiosk mode", () => {
     setSearch("?kiosk=k1");
     const store = useConfigStore();
     store.dashboardScreens = SCREENS;
-    const spy = vi.spyOn(store, "updateConfig");
     store.kioskActiveScreenId = "a";
     await store.activateDashboardScreen("c");
     expect(store.kioskActiveScreenId).toBe("c");
-    expect(spy).not.toHaveBeenCalled();
+    // Spy on real network layer — vacuous store-proxy spy replaced with genuine guard.
+    expect(axios.post).not.toHaveBeenCalled();
   });
 
   it("kiosk mode: cycle updates local id among available, no updateConfig", async () => {
@@ -284,10 +285,10 @@ describe("config store — switch actions branch on kiosk mode", () => {
     store.dashboardScreens = SCREENS;
     store.availableScreens = ["a", "c"];
     store.kioskActiveScreenId = "a";
-    const spy = vi.spyOn(store, "updateConfig");
     await store.cycleDashboardScreenBy(1);
     expect(store.kioskActiveScreenId).toBe("c"); // next available after "a" is "c"
-    expect(spy).not.toHaveBeenCalled();
+    // Spy on real network layer — vacuous store-proxy spy replaced with genuine guard.
+    expect(axios.post).not.toHaveBeenCalled();
   });
 
   it("Mode A: activate still persists via updateConfig (regression)", async () => {
