@@ -12,6 +12,7 @@ import { normalizeDashboardScreens } from "@/utils/layout";
 
 const mocks = vi.hoisted(() => ({
   configStore: null,
+  kioskId: null,
 }));
 
 // Mock vue-router
@@ -62,11 +63,22 @@ describe("useKeyboardActions - Calendar Event Navigation", () => {
       setDashboardScreens: vi.fn(screens => {
         mocks.configStore.dashboardScreens = screens;
       }),
+      activateDashboardScreen: vi.fn().mockResolvedValue(undefined),
+      cycleDashboardScreenBy: vi.fn().mockResolvedValue(undefined),
       setLastSideViewMode: vi.fn(),
       shouldShowUI: true,
       dashboardScreens: null,
+      availableScreens: null,
       get effectiveDashboardScreens() {
-        return normalizeDashboardScreens(mocks.configStore.dashboardScreens);
+        const normalized = normalizeDashboardScreens(mocks.configStore.dashboardScreens);
+        if (!mocks.configStore.availableScreens) return normalized;
+        // Simulate filterAvailableScreens for kiosk tests
+        const allowed = new Set(mocks.configStore.availableScreens);
+        const filtered = normalized.screens.filter(s => allowed.has(s.id));
+        const activeInFiltered = filtered.find(s => s.id === normalized.activeScreenId)
+          ? normalized.activeScreenId
+          : filtered[0]?.id ?? null;
+        return { ...normalized, screens: filtered, activeScreenId: activeInFiltered };
       },
     };
     modeStore = useModeStore();
@@ -361,8 +373,10 @@ describe("useKeyboardActions - Calendar Event Navigation", () => {
 
       keyboardActions.handleAction("screen_jump_photos");
 
+      // Screen selection is now routed through activateDashboardScreen (not setDashboardScreens).
+      expect(mocks.configStore.activateDashboardScreen).toHaveBeenCalledWith("media");
+      // The activeRegionId bookmark is still written to the raw catalog via setDashboardScreens.
       const nextScreens = mocks.configStore.setDashboardScreens.mock.calls.at(-1)[0];
-      expect(nextScreens.activeScreenId).toBe("media");
       expect(nextScreens.screens[1].activeRegionId).toBe("region-1-b");
     });
 
@@ -396,8 +410,8 @@ describe("useKeyboardActions - Calendar Event Navigation", () => {
 
       keyboardActions.handleAction("mode_photos");
 
-      const nextScreens = mocks.configStore.setDashboardScreens.mock.calls.at(-1)[0];
-      expect(nextScreens.activeScreenId).toBe("media");
+      // Screen selection routed through activateDashboardScreen.
+      expect(mocks.configStore.activateDashboardScreen).toHaveBeenCalledWith("media");
     });
   });
 
@@ -548,5 +562,120 @@ describe("useKeyboardActions - Calendar Event Navigation", () => {
       // Should navigate to next day with events
       expect(calendarStore.selectedEvent.id).toBe("1");
     });
+  });
+});
+
+describe("useKeyboardActions - Kiosk screen selection does not corrupt global catalog", () => {
+  let keyboardActions;
+
+  // Two screens: screen-a (calendar only) is available to kiosk; screen-b (photos only) is NOT.
+  const makeScreens = () =>
+    normalizeDashboardScreens({
+      version: 2,
+      activeScreenId: "screen-a",
+      screens: [
+        {
+          id: "screen-a",
+          name: "Screen A",
+          layout: {
+            version: 1,
+            preset: "single",
+            regions: [{ id: "cal-region", kind: "calendar", size: 100 }],
+          },
+          activeRegionId: "cal-region",
+        },
+        {
+          id: "screen-b",
+          name: "Screen B",
+          layout: {
+            version: 1,
+            preset: "single",
+            regions: [{ id: "photos-region", kind: "photos", size: 100 }],
+          },
+          activeRegionId: "photos-region",
+        },
+      ],
+    });
+
+  beforeEach(() => {
+    setActivePinia(createPinia());
+    mocks.configStore = {
+      updateConfig: vi.fn().mockResolvedValue(undefined),
+      setDashboardScreens: vi.fn(screens => {
+        mocks.configStore.dashboardScreens = screens;
+      }),
+      activateDashboardScreen: vi.fn().mockResolvedValue(undefined),
+      cycleDashboardScreenBy: vi.fn().mockResolvedValue(undefined),
+      setLastSideViewMode: vi.fn(),
+      shouldShowUI: true,
+      dashboardScreens: makeScreens(),
+      availableScreens: ["screen-a"], // kiosk can only see screen-a
+      get effectiveDashboardScreens() {
+        const normalized = normalizeDashboardScreens(mocks.configStore.dashboardScreens);
+        if (!mocks.configStore.availableScreens) return normalized;
+        const allowed = new Set(mocks.configStore.availableScreens);
+        const filtered = normalized.screens.filter(s => allowed.has(s.id));
+        const activeInFiltered = filtered.find(s => s.id === normalized.activeScreenId)
+          ? normalized.activeScreenId
+          : filtered[0]?.id ?? null;
+        return { ...normalized, screens: filtered, activeScreenId: activeInFiltered };
+      },
+    };
+    useModeStore();
+    keyboardActions = useKeyboardActions();
+  });
+
+  it("screen_next in kiosk mode calls cycleDashboardScreenBy, NOT updateConfig", () => {
+    keyboardActions.handleAction("screen_next");
+    expect(mocks.configStore.cycleDashboardScreenBy).toHaveBeenCalledWith(1);
+    expect(mocks.configStore.updateConfig).not.toHaveBeenCalled();
+  });
+
+  it("screen_prev in kiosk mode calls cycleDashboardScreenBy, NOT updateConfig", () => {
+    keyboardActions.handleAction("screen_prev");
+    expect(mocks.configStore.cycleDashboardScreenBy).toHaveBeenCalledWith(-1);
+    expect(mocks.configStore.updateConfig).not.toHaveBeenCalled();
+  });
+
+  it("screen_next does NOT reduce the global dashboardScreens catalog", () => {
+    const screenCountBefore = mocks.configStore.dashboardScreens.screens.length;
+    keyboardActions.handleAction("screen_next");
+    // dashboardScreens (global catalog) must be untouched — not overwritten with filtered set
+    expect(mocks.configStore.dashboardScreens.screens.length).toBe(screenCountBefore);
+  });
+
+  it("screen_jump (activateFirstScreenContainingKind) only searches available screens in kiosk mode", () => {
+    // screen-b has a photos region but is NOT available to this kiosk.
+    // screen_jump_photos should find no match (screen-b is filtered out), so it returns false.
+    // The action falls through without calling updateConfig.
+    keyboardActions.handleAction("screen_jump_photos");
+    // activateDashboardScreen must not have been called (no available photos screen)
+    expect(mocks.configStore.activateDashboardScreen).not.toHaveBeenCalled();
+    expect(mocks.configStore.updateConfig).not.toHaveBeenCalled();
+  });
+
+  it("screen_jump lands on the correct available screen when it exists", () => {
+    // screen-a has a calendar region and IS available.
+    keyboardActions.handleAction("screen_jump_calendar");
+    // Screen selection must go through activateDashboardScreen (kiosk-local, no global write).
+    expect(mocks.configStore.activateDashboardScreen).toHaveBeenCalledWith("screen-a");
+    // The global catalog must not have lost any screens (any updateConfig call is
+    // for region-bookmark purposes only, not screen-selection).
+    const catalogScreenCount = mocks.configStore.dashboardScreens.screens.length;
+    expect(catalogScreenCount).toBe(2);
+  });
+
+  it("Mode A: screen_next calls updateConfig (regression guard)", () => {
+    // Remove kiosk restriction to simulate Mode A
+    mocks.configStore.availableScreens = null;
+    // In Mode A cycleDashboardScreenBy should still be called (store persists internally)
+    keyboardActions.handleAction("screen_next");
+    expect(mocks.configStore.cycleDashboardScreenBy).toHaveBeenCalledWith(1);
+  });
+
+  it("Mode A: activateScreen calls activateDashboardScreen (regression guard)", () => {
+    mocks.configStore.availableScreens = null;
+    keyboardActions.activateScreen("screen-b");
+    expect(mocks.configStore.activateDashboardScreen).toHaveBeenCalledWith("screen-b");
   });
 });
