@@ -25,6 +25,9 @@ describe("filterAvailableScreens", () => {
   it("empty intersection fails open to all", () => {
     expect(filterAvailableScreens(screensConfig, ["zzz"]).screens.map(s => s.id)).toEqual(["a", "b", "c"]);
   });
+  it("empty array availableIds => all (fail open)", () => {
+    expect(filterAvailableScreens(screensConfig, []).screens.map(s => s.id)).toEqual(["a", "b", "c"]);
+  });
 });
 
 describe("resolveKioskActiveScreen", () => {
@@ -43,5 +46,14 @@ describe("resolveKioskActiveScreen", () => {
   });
   it("current no longer available => reseed to first available", () => {
     expect(resolveKioskActiveScreen({ ...base, availableScreens: ["c"], defaultScreenId: null, current: "a" })).toBe("c");
+  });
+  // normalizeDashboardScreens always injects a fallback "screen-home" for empty/null screens[], so
+  // filtered.screens can never be zero-length in practice — the `?? null` at the end of
+  // resolveKioskActiveScreen is defensive dead code. The minimum realistic case returns the
+  // fallback screen id ("screen-home"), not null.
+  it("empty catalog is normalized to a fallback screen — resolver returns its id, not null", () => {
+    const result = resolveKioskActiveScreen({ screensConfig: { version: 2, activeScreenId: null, screens: [] }, availableScreens: null, defaultScreenId: null, current: null });
+    expect(typeof result).toBe("string");
+    expect(result).toBe("screen-home");
   });
 });

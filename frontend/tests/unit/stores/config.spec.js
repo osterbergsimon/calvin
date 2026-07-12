@@ -301,4 +301,15 @@ describe("config store — switch actions branch on kiosk mode", () => {
     await store.activateDashboardScreen("c");
     expect(spy).toHaveBeenCalled();
   });
+
+  it("Mode A: cycleDashboardScreenBy persists via axios.post (global path)", async () => {
+    setSearch("");
+    const store = useConfigStore();
+    store.dashboardScreens = SCREENS;
+    // In Pinia setup stores, internal calls go via closure (not the proxy), so spy on
+    // axios.post directly — a store.updateConfig spy is vacuous for the same reason as above.
+    const spy = vi.spyOn(axios, "post");
+    await store.cycleDashboardScreenBy(1);
+    expect(spy).toHaveBeenCalled();
+  });
 });

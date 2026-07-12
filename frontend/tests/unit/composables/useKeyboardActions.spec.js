@@ -637,11 +637,15 @@ describe("useKeyboardActions - Kiosk screen selection does not corrupt global ca
     expect(mocks.configStore.updateConfig).not.toHaveBeenCalled();
   });
 
-  it("screen_next does NOT reduce the global dashboardScreens catalog", () => {
-    const screenCountBefore = mocks.configStore.dashboardScreens.screens.length;
+  // This test only verifies that the composable routes screen_next to cycleDashboardScreenBy
+  // (not updateConfig). The store is mocked here so cycleDashboardScreenBy is a no-op;
+  // the catalog-length assertion is trivially true because the mock never mutates dashboardScreens.
+  // The meaningful guard that cycleDashboardScreenBy does NOT overwrite the global catalog with a
+  // filtered subset lives in config.spec.js ("kiosk mode: cycle updates local id among available").
+  it("screen_next routes to cycleDashboardScreenBy (composable→store routing only)", () => {
     keyboardActions.handleAction("screen_next");
-    // dashboardScreens (global catalog) must be untouched — not overwritten with filtered set
-    expect(mocks.configStore.dashboardScreens.screens.length).toBe(screenCountBefore);
+    expect(mocks.configStore.cycleDashboardScreenBy).toHaveBeenCalledWith(1);
+    expect(mocks.configStore.updateConfig).not.toHaveBeenCalled();
   });
 
   it("screen_jump (activateFirstScreenContainingKind) only searches available screens in kiosk mode", () => {
@@ -665,6 +669,10 @@ describe("useKeyboardActions - Kiosk screen selection does not corrupt global ca
     expect(catalogScreenCount).toBe(2);
   });
 
+  // This test only verifies composable→store routing: that screen_next calls cycleDashboardScreenBy
+  // regardless of kiosk mode. The store is mocked, so actual Mode-A/kiosk persistence branching
+  // (i.e. Mode A writes to the global config via axios.post, kiosk mode does not) is covered
+  // in config.spec.js ("Mode A: activate still persists via updateConfig" and the kiosk cycle test).
   it("Mode A: screen_next routes through cycleDashboardScreenBy", () => {
     // Remove kiosk restriction to simulate Mode A
     mocks.configStore.availableScreens = null;
