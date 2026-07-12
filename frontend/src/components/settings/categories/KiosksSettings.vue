@@ -21,20 +21,94 @@
         <span class="kiosk-card__meta">{{ k.hostname }} · seen {{ relativeTime(k.lastSeen) }}</span>
       </button>
     </SettingsSection>
-    <!-- Task 3 inserts the orientation editor here, guarded by v-if="selectedId" -->
+    <SettingsSection
+      v-if="selectedId"
+      id="kiosks-orientation"
+      :title="`${selectedId} — Orientation`"
+    >
+      <SettingRow
+        label="Orientation"
+        :description="orientationOverridden ? 'set for this kiosk' : 'inherited from global'"
+      >
+        <SegmentedControl
+          :model-value="effOrientation"
+          aria-label="Orientation"
+          :options="[
+            { value: 'landscape', label: 'Landscape' },
+            { value: 'portrait', label: 'Portrait' },
+          ]"
+          @update:model-value="setOrientation"
+        />
+      </SettingRow>
+      <SettingRow
+        label="Flip 180°"
+        :description="flipOverridden ? 'set for this kiosk' : 'inherited from global'"
+      >
+        <ToggleSwitch
+          :model-value="effFlipped"
+          aria-label="Flip 180 degrees"
+          @update:model-value="setFlipped"
+        />
+      </SettingRow>
+      <SettingRow
+        label="Apply rotation"
+        :description="applyOverridden ? 'set for this kiosk' : 'inherited from global'"
+      >
+        <ToggleSwitch
+          :model-value="effApply"
+          aria-label="Apply rotation"
+          @update:model-value="setApply"
+        />
+      </SettingRow>
+      <button
+        type="button"
+        class="kiosks__reset"
+        data-test="reset-orientation"
+        :disabled="!orientationOverridden && !flipOverridden && !applyOverridden"
+        @click="resetOrientation"
+      >
+        Reset to global
+      </button>
+      <p v-if="savedMsg" class="kiosks__saved">{{ savedMsg }}</p>
+    </SettingsSection>
   </div>
 </template>
 
 <script setup>
-import { ref, onMounted } from "vue";
+import { ref, computed, onMounted } from "vue";
 import { useKiosksStore } from "@/stores/kiosks";
+import { useConfigStore } from "@/stores/config";
 import SettingsSection from "@/components/settings/shell/SettingsSection.vue";
+import SettingRow from "@/components/settings/shell/SettingRow.vue";
+import SegmentedControl from "@/components/ui/SegmentedControl.vue";
+import ToggleSwitch from "@/components/ui/ToggleSwitch.vue";
 
 const store = useKiosksStore();
-const kiosks = ref([]);
+const config = useConfigStore();
+const kiosks = computed(() => store.kiosks);
 const selectedId = ref(null);
+const overrides = ref({});
+const savedMsg = ref("");
 
 const ONLINE_WINDOW_MS = 120000; // 2 minutes
+
+const ORI_KEYS = ["orientation", "orientationFlipped", "applyDisplayRotation"];
+
+const orientationOverridden = computed(() => "orientation" in overrides.value);
+const flipOverridden = computed(() => "orientationFlipped" in overrides.value);
+const applyOverridden = computed(() => "applyDisplayRotation" in overrides.value);
+
+const effOrientation = computed(() =>
+  orientationOverridden.value ? overrides.value.orientation : config.orientation
+);
+const effFlipped = computed(() =>
+  flipOverridden.value ? overrides.value.orientationFlipped : config.orientationFlipped
+);
+const effApply = computed(() =>
+  applyOverridden.value
+    ? overrides.value.applyDisplayRotation
+    : (config.applyDisplayRotation ?? true)
+);
 
 function isOnline(k) {
   if (!k.lastSeen) return false;
@@ -50,13 +124,43 @@ function relativeTime(iso) {
   return `${Math.round(secs / 86400)}d ago`;
 }
 
-function select(id) {
+function selectedKiosk() {
+  return kiosks.value.find(k => k.id === selectedId.value);
+}
+
+async function persist(next) {
+  overrides.value = next;
+  await store.saveOverrides(selectedId.value, next);
+  const online = selectedKiosk() ? isOnline(selectedKiosk()) : false;
+  savedMsg.value = online
+    ? "Saved. This kiosk applies orientation at its next check-in (~30s)."
+    : "Saved. Changes apply when this kiosk reconnects.";
+}
+
+function setOrientation(value) {
+  persist({ ...overrides.value, orientation: value });
+}
+function setFlipped(value) {
+  persist({ ...overrides.value, orientationFlipped: value });
+}
+function setApply(value) {
+  persist({ ...overrides.value, applyDisplayRotation: value });
+}
+
+function resetOrientation() {
+  const next = { ...overrides.value };
+  for (const k of ORI_KEYS) delete next[k];
+  persist(next);
+}
+
+async function select(id) {
   selectedId.value = id;
+  savedMsg.value = "";
+  overrides.value = await store.fetchOverrides(id);
 }
 
 onMounted(async () => {
   await store.loadKiosks();
-  kiosks.value = store.kiosks;
 });
 </script>
 
@@ -96,6 +200,25 @@ onMounted(async () => {
 }
 .kiosk-card__meta {
   grid-column: 1 / -1;
+  font-size: 0.85em;
+  opacity: 0.7;
+}
+.kiosks__reset {
+  margin-top: 8px;
+  padding: 6px 14px;
+  border: 1px solid var(--border-color, rgba(255, 255, 255, 0.12));
+  border-radius: 6px;
+  background: transparent;
+  color: inherit;
+  cursor: pointer;
+  font-size: 0.9em;
+}
+.kiosks__reset:disabled {
+  opacity: 0.4;
+  cursor: default;
+}
+.kiosks__saved {
+  margin-top: 8px;
   font-size: 0.85em;
   opacity: 0.7;
 }

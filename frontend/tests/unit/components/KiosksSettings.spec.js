@@ -3,6 +3,8 @@ import { mount, flushPromises } from "@vue/test-utils";
 import { createPinia, setActivePinia } from "pinia";
 import KiosksSettings from "@/components/settings/categories/KiosksSettings.vue";
 import { useKiosksStore } from "@/stores/kiosks";
+import { useConfigStore } from "@/stores/config";
+import SegmentedControl from "@/components/ui/SegmentedControl.vue";
 
 function mountWithKiosks(list) {
   setActivePinia(createPinia());
@@ -44,5 +46,59 @@ describe("KiosksSettings — list", () => {
     const cards = w.findAll("[data-test='kiosk-card']");
     expect(cards[0].text()).toContain("Online");
     expect(cards[1].text()).toContain("Offline");
+  });
+});
+
+describe("KiosksSettings — orientation editor", () => {
+  beforeEach(() => vi.clearAllMocks());
+
+  async function selectFirst(list, overrides = {}) {
+    setActivePinia(createPinia());
+    const store = useKiosksStore();
+    store.loadKiosks = vi.fn(async () => {
+      store.kiosks = list;
+    });
+    store.fetchOverrides = vi.fn(async () => overrides);
+    store.saveOverrides = vi.fn(async () => {});
+    const cfg = useConfigStore();
+    cfg.orientation = "landscape";
+    cfg.orientationFlipped = false;
+    const w = mount(KiosksSettings);
+    await flushPromises();
+    await w.find("[data-test='kiosk-card']").trigger("click");
+    await flushPromises();
+    return { w, store, cfg };
+  }
+
+  const one = [
+    { id: "k1", hostname: "pi", lastSeen: new Date().toISOString(), lastAppliedVersion: null },
+  ];
+
+  it("shows the global default as effective when no override, tagged inherited", async () => {
+    const { w } = await selectFirst(one, {});
+    expect(w.text().toLowerCase()).toContain("inherited from global");
+  });
+
+  it("changing orientation saves a merged override and tags it set", async () => {
+    const { w, store } = await selectFirst(one, { availableScreens: ["a"] });
+    // Emit SegmentedControl's event to exercise the parent's @update:model-value handler
+    // without depending on SegmentedControl's internal button markup.
+    w.findComponent(SegmentedControl).vm.$emit("update:modelValue", "portrait");
+    await flushPromises();
+    expect(store.saveOverrides).toHaveBeenCalledWith("k1", {
+      availableScreens: ["a"],
+      orientation: "portrait",
+    });
+    expect(w.text().toLowerCase()).toContain("set for this kiosk");
+  });
+
+  it("Reset to global removes only orientation keys and is disabled with no override", async () => {
+    const { w, store } = await selectFirst(one, {
+      orientation: "portrait",
+      availableScreens: ["a"],
+    });
+    await w.find("[data-test='reset-orientation']").trigger("click");
+    await flushPromises();
+    expect(store.saveOverrides).toHaveBeenCalledWith("k1", { availableScreens: ["a"] });
   });
 });
