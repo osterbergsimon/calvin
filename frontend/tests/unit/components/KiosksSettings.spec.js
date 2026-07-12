@@ -92,7 +92,7 @@ describe("KiosksSettings — orientation editor", () => {
     expect(w.text().toLowerCase()).toContain("set for this kiosk");
   });
 
-  it("Reset to global removes only orientation keys and is disabled with no override", async () => {
+  it("Reset to global removes only the orientation keys", async () => {
     const { w, store } = await selectFirst(one, {
       orientation: "portrait",
       availableScreens: ["a"],
@@ -100,5 +100,31 @@ describe("KiosksSettings — orientation editor", () => {
     await w.find("[data-test='reset-orientation']").trigger("click");
     await flushPromises();
     expect(store.saveOverrides).toHaveBeenCalledWith("k1", { availableScreens: ["a"] });
+  });
+
+  it("Reset to global button is disabled when there is no orientation override", async () => {
+    const { w } = await selectFirst(one, {});
+    const btn = w.find("[data-test='reset-orientation']");
+    expect(btn.attributes("disabled")).toBeDefined();
+  });
+
+  it("shows save-failure copy and no success copy when saveOverrides rejects", async () => {
+    setActivePinia(createPinia());
+    const store = useKiosksStore();
+    store.loadKiosks = vi.fn(async () => {
+      store.kiosks = one;
+    });
+    store.fetchOverrides = vi.fn(async () => ({}));
+    store.saveOverrides = vi.fn(async () => {
+      throw new Error("network error");
+    });
+    const w = mount(KiosksSettings);
+    await flushPromises();
+    await w.find("[data-test='kiosk-card']").trigger("click");
+    await flushPromises();
+    w.findComponent(SegmentedControl).vm.$emit("update:modelValue", "portrait");
+    await flushPromises();
+    expect(w.text()).toContain("Couldn't save to the server. Check the connection and try again.");
+    expect(w.text()).not.toContain("Saved.");
   });
 });

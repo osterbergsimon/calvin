@@ -130,11 +130,15 @@ function selectedKiosk() {
 
 async function persist(next) {
   overrides.value = next;
-  await store.saveOverrides(selectedId.value, next);
-  const online = selectedKiosk() ? isOnline(selectedKiosk()) : false;
-  savedMsg.value = online
-    ? "Saved. This kiosk applies orientation at its next check-in (~30s)."
-    : "Saved. Changes apply when this kiosk reconnects.";
+  try {
+    await store.saveOverrides(selectedId.value, next);
+    const online = selectedKiosk() ? isOnline(selectedKiosk()) : false;
+    savedMsg.value = online
+      ? "Saved. This kiosk applies orientation at its next check-in (~30s)."
+      : "Saved. Changes apply when this kiosk reconnects.";
+  } catch {
+    savedMsg.value = "Couldn't save to the server. Check the connection and try again.";
+  }
 }
 
 function setOrientation(value) {
