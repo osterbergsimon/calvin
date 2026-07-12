@@ -7,7 +7,7 @@ from fastapi import APIRouter, HTTPException, Request, Response
 from loguru import logger
 from pydantic import BaseModel
 
-from app.api.routes.config import build_global_config
+from app.api.routes.config import ConfigUpdate, build_global_config
 from app.services import kiosk_registry
 from app.services.kiosk_registry import (
     _KIOSK_ID_RE,
@@ -19,14 +19,16 @@ from app.services.kiosk_registry import (
 
 router = APIRouter()
 
+_MAX_OVERRIDES_BYTES = 64 * 1024
+
 
 def _valid_id_or_400(kiosk_id: str) -> None:
     if not _KIOSK_ID_RE.fullmatch(kiosk_id):
         raise HTTPException(status_code=400, detail="Invalid kiosk id")
 
 
-class OverridesPayload(BaseModel):
-    overrides: dict[str, Any]
+class OverridesBody(BaseModel):
+    overrides: dict
 
 
 @router.get("/kiosks")
@@ -35,12 +37,26 @@ async def get_kiosks():
     return {"kiosks": await kiosk_registry.list_kiosks()}
 
 
-@router.put("/kiosks/{kiosk_id}/overrides")
-async def put_kiosk_overrides(kiosk_id: str, payload: OverridesPayload):
-    """Replace a kiosk's override layer (upsert)."""
+@router.get("/kiosks/{kiosk_id}/overrides")
+async def get_kiosk_overrides(kiosk_id: str):
+    """Return a kiosk's raw override layer (not merged). 404 if kiosk unknown."""
     _valid_id_or_400(kiosk_id)
-    await set_overrides(kiosk_id, payload.overrides)
-    return {"ok": True}
+    overrides = await get_overrides(kiosk_id)
+    if overrides is None:
+        raise HTTPException(status_code=404, detail="Unknown kiosk")
+    return {"id": kiosk_id, "overrides": overrides}
+
+
+@router.put("/kiosks/{kiosk_id}/overrides")
+async def put_kiosk_overrides(kiosk_id: str, body: OverridesBody):
+    """Replace a kiosk's override layer (upsert). Validated + size-capped."""
+    _valid_id_or_400(kiosk_id)
+    if len(json.dumps(body.overrides)) > _MAX_OVERRIDES_BYTES:
+        raise HTTPException(status_code=400, detail="Overrides payload too large")
+    # Type-check known config keys via the existing model (extra keys allowed).
+    ConfigUpdate(**body.overrides)
+    await set_overrides(kiosk_id, body.overrides)
+    return {"id": kiosk_id, "overrides": body.overrides}
 
 
 @router.get("/kiosks/{kiosk_id}/config")

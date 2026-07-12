@@ -63,3 +63,39 @@ def test_effective_config_best_effort_recording(test_client: TestClient):
         resp = test_client.get("/api/kiosks/besteffort-1/config")
     assert resp.status_code == 200
     assert "orientation" in resp.json()
+
+
+@pytest.mark.integration
+def test_overrides_put_then_get_roundtrip(test_client: TestClient):
+    put = test_client.put(
+        "/api/kiosks/kitchen-1/overrides",
+        json={"overrides": {"orientation": "portrait", "timeFormat": "12h"}},
+    )
+    assert put.status_code == 200
+    got = test_client.get("/api/kiosks/kitchen-1/overrides").json()
+    assert got == {"id": "kitchen-1", "overrides": {"orientation": "portrait", "timeFormat": "12h"}}
+
+
+@pytest.mark.integration
+def test_overrides_put_replaces_and_clears(test_client: TestClient):
+    test_client.put("/api/kiosks/k2/overrides", json={"overrides": {"orientation": "portrait"}})
+    test_client.put("/api/kiosks/k2/overrides", json={"overrides": {"themeMode": "dark"}})
+    assert test_client.get("/api/kiosks/k2/overrides").json()["overrides"] == {"themeMode": "dark"}
+    test_client.put("/api/kiosks/k2/overrides", json={"overrides": {}})
+    assert test_client.get("/api/kiosks/k2/overrides").json()["overrides"] == {}
+
+
+@pytest.mark.integration
+def test_overrides_get_unknown_404(test_client: TestClient):
+    assert test_client.get("/api/kiosks/ghost-1/overrides").status_code == 404
+
+
+@pytest.mark.integration
+def test_overrides_put_bad_id_400(test_client: TestClient):
+    assert test_client.put("/api/kiosks/bad id/overrides", json={"overrides": {}}).status_code == 400
+
+
+@pytest.mark.integration
+def test_overrides_put_oversized_rejected(test_client: TestClient):
+    big = {"x": "a" * 70000}
+    assert test_client.put("/api/kiosks/k3/overrides", json={"overrides": big}).status_code == 400

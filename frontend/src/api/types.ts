@@ -593,10 +593,14 @@ export interface paths {
       path?: never;
       cookie?: never;
     };
-    get?: never;
+    /**
+     * Get Kiosk Overrides
+     * @description Return a kiosk's raw override layer (not merged). 404 if kiosk unknown.
+     */
+    get: operations["get_kiosk_overrides_api_kiosks__kiosk_id__overrides_get"];
     /**
      * Put Kiosk Overrides
-     * @description Replace a kiosk's override layer (upsert).
+     * @description Replace a kiosk's override layer (upsert). Validated + size-capped.
      */
     put: operations["put_kiosk_overrides_api_kiosks__kiosk_id__overrides_put"];
     post?: never;
@@ -1755,8 +1759,8 @@ export interface components {
         [key: string]: string;
       };
     };
-    /** OverridesPayload */
-    OverridesPayload: {
+    /** OverridesBody */
+    OverridesBody: {
       /** Overrides */
       overrides: {
         [key: string]: unknown;
@@ -2772,6 +2776,37 @@ export interface operations {
       };
     };
   };
+  get_kiosk_overrides_api_kiosks__kiosk_id__overrides_get: {
+    parameters: {
+      query?: never;
+      header?: never;
+      path: {
+        kiosk_id: string;
+      };
+      cookie?: never;
+    };
+    requestBody?: never;
+    responses: {
+      /** @description Successful Response */
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": unknown;
+        };
+      };
+      /** @description Validation Error */
+      422: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["HTTPValidationError"];
+        };
+      };
+    };
+  };
   put_kiosk_overrides_api_kiosks__kiosk_id__overrides_put: {
     parameters: {
       query?: never;
@@ -2783,7 +2818,7 @@ export interface operations {
     };
     requestBody: {
       content: {
-        "application/json": components["schemas"]["OverridesPayload"];
+        "application/json": components["schemas"]["OverridesBody"];
       };
     };
     responses: {

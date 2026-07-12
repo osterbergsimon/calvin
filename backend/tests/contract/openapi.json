@@ -786,7 +786,7 @@
         "title": "KeyboardMappings",
         "type": "object"
       },
-      "OverridesPayload": {
+      "OverridesBody": {
         "properties": {
           "overrides": {
             "additionalProperties": true,
@@ -797,7 +797,7 @@
         "required": [
           "overrides"
         ],
-        "title": "OverridesPayload",
+        "title": "OverridesBody",
         "type": "object"
       },
       "PluginDeleteResponse": {
@@ -2360,8 +2360,47 @@
       }
     },
     "/api/kiosks/{kiosk_id}/overrides": {
+      "get": {
+        "description": "Return a kiosk's raw override layer (not merged). 404 if kiosk unknown.",
+        "operationId": "get_kiosk_overrides_api_kiosks__kiosk_id__overrides_get",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "kiosk_id",
+            "required": true,
+            "schema": {
+              "title": "Kiosk Id",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Get Kiosk Overrides",
+        "tags": [
+          "kiosks"
+        ]
+      },
       "put": {
-        "description": "Replace a kiosk's override layer (upsert).",
+        "description": "Replace a kiosk's override layer (upsert). Validated + size-capped.",
         "operationId": "put_kiosk_overrides_api_kiosks__kiosk_id__overrides_put",
         "parameters": [
           {
@@ -2378,7 +2417,7 @@
           "content": {
             "application/json": {
               "schema": {
-                "$ref": "#/components/schemas/OverridesPayload"
+                "$ref": "#/components/schemas/OverridesBody"
               }
             }
           },
