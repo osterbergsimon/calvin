@@ -15,8 +15,8 @@ from fastapi.testclient import TestClient
 # This MUST happen at module level, before any fixture runs — see tests/README.md.
 from app.models.db_models import (  # noqa: F401
     ConfigDB,
-    KioskDB,
     KeyboardMappingDB,
+    KioskDB,
     PluginDB,
     PluginTypeDB,
 )

@@ -171,8 +171,8 @@ def update_ormar_models_database(new_database: databases.Database) -> None:
     """
     from app.models.db_models import (
         ConfigDB,
-        KioskDB,
         KeyboardMappingDB,
+        KioskDB,
         PluginDB,
         PluginTypeDB,
     )
