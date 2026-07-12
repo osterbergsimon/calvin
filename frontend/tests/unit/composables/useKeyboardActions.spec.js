@@ -665,7 +665,7 @@ describe("useKeyboardActions - Kiosk screen selection does not corrupt global ca
     expect(catalogScreenCount).toBe(2);
   });
 
-  it("Mode A: screen_next calls updateConfig (regression guard)", () => {
+  it("Mode A: screen_next routes through cycleDashboardScreenBy", () => {
     // Remove kiosk restriction to simulate Mode A
     mocks.configStore.availableScreens = null;
     // In Mode A cycleDashboardScreenBy should still be called (store persists internally)
