@@ -174,6 +174,13 @@ the template new kiosks inherit). List known kiosks with `curl http://<server>:8
 switching screens on one kiosk (keyboard or on-screen dots) no longer changes the others, and
 a kiosk boots to its `defaultScreenId`. The screen catalog itself is authored once, globally.
 
+**Per-kiosk orientation from the server.** When `CALVIN_KIOSK_ID` is set, the display-agent
+fetches the kiosk's effective config (`/api/kiosks/<id>/config`) and applies the server-configured
+`orientation` via `xrandr` — re-applying only when it changes (tracked by `deviceConfigVersion`).
+Set a kiosk's orientation with `PUT /api/kiosks/<id>/overrides`. The device-local
+`CALVIN_DISPLAY_ROTATION` env still **wins** as a break-glass override; the schedule is likewise
+now per-kiosk (each kiosk reads its own effective config).
+
 ### Changing the backend URL later
 
 ```bash
