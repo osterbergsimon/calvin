@@ -1641,6 +1641,8 @@ export interface components {
     ConfigUpdate: {
       /** Applydisplayrotation */
       applyDisplayRotation?: boolean | null;
+      /** Availablescreens */
+      availableScreens?: string[] | null;
       /** Calendarrefreshinterval */
       calendarRefreshInterval?: number | null;
       /** Calendarsplit */
@@ -1671,6 +1673,8 @@ export interface components {
       dashboardScreens?: {
         [key: string]: unknown;
       } | null;
+      /** Defaultscreenid */
+      defaultScreenId?: string | null;
       /** Displayschedule */
       displaySchedule?:
         | string
