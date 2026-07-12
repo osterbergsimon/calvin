@@ -367,3 +367,41 @@ def test_run_applies_device_physical_only_on_version_change(monkeypatch):
     )
     # v1 applied on first sight, skipped when unchanged, v2 applied on change
     assert applied == ["v1", "v2"]
+
+
+def test_run_retries_apply_when_apply_device_raises(monkeypatch):
+    monkeypatch.setattr(agent, "now_in", lambda c: datetime(2026, 7, 11, 12, 0))
+    monkeypatch.setattr(agent, "reconcile", lambda cfg, now, last, applier=None: last)
+    monkeypatch.setattr(agent, "seconds_to_next_boundary", lambda cfg, now: None)
+    cfg = {"deviceConfigVersion": "v1", "orientation": "portrait"}
+    attempts = []
+
+    def boom(c):
+        attempts.append(c.get("deviceConfigVersion"))
+        raise RuntimeError("xrandr boom")
+
+    # must not raise out of run(); apply retried each iteration since last_version not advanced
+    agent.run(
+        "http://h",
+        999,
+        fetch=lambda url: cfg,
+        sleep=lambda s: None,
+        iterations=3,
+        apply_device=boom,
+    )
+    assert attempts == [
+        "v1",
+        "v1",
+        "v1",
+    ]  # retried every poll (last_version never advanced past the failure)
+
+
+def test_orientation_to_xrandr_snake_case_flipped():
+    assert (
+        agent.orientation_to_xrandr({"orientation": "portrait", "orientation_flipped": True})
+        == "inverted"
+    )
+
+
+def test_config_url_kiosk_id_empty_host_no_query():
+    assert agent._config_url("http://h", "k", "") == "http://h/api/kiosks/k/config"
