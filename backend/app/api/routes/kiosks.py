@@ -1,7 +1,6 @@
 """Kiosk registry + per-kiosk config endpoints (per-device settings — dd9.2/dd9.3)."""
 
 import json
-from typing import Any
 
 from fastapi import APIRouter, HTTPException, Request, Response
 from loguru import logger

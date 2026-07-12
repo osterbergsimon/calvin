@@ -23,8 +23,8 @@ def test_effective_config_merges_overrides_and_records(test_client: TestClient):
     resp = test_client.get("/api/kiosks/hallway-3f9a2c/config?khost=pi-hallway")
     assert resp.status_code == 200
     body = resp.json()
-    assert body["orientation"] == "portrait"          # override applied
-    assert "timeFormat" in body                        # global defaults present
+    assert body["orientation"] == "portrait"  # override applied
+    assert "timeFormat" in body  # global defaults present
     assert "deviceConfigVersion" in body
     assert resp.headers.get("ETag") == body["deviceConfigVersion"]
 
@@ -36,7 +36,7 @@ def test_effective_config_merges_overrides_and_records(test_client: TestClient):
 def test_effective_config_unknown_kiosk_is_global(test_client: TestClient):
     resp = test_client.get("/api/kiosks/brand-new-abc123/config")
     assert resp.status_code == 200
-    assert resp.json()["orientation"] == "landscape"   # defaulted global
+    assert resp.json()["orientation"] == "landscape"  # defaulted global
 
 
 @pytest.mark.integration
@@ -92,7 +92,9 @@ def test_overrides_get_unknown_404(test_client: TestClient):
 
 @pytest.mark.integration
 def test_overrides_put_bad_id_400(test_client: TestClient):
-    assert test_client.put("/api/kiosks/bad id/overrides", json={"overrides": {}}).status_code == 400
+    assert (
+        test_client.put("/api/kiosks/bad id/overrides", json={"overrides": {}}).status_code == 400
+    )
 
 
 @pytest.mark.integration

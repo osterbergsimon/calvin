@@ -9,7 +9,9 @@ from app.services import kiosk_registry
 from app.services.kiosk_registry import (
     DEVICE_PHYSICAL_KEYS,
     device_config_version,
+    get_overrides,
     merge_overrides,
+    set_overrides,
 )
 
 
@@ -119,9 +121,9 @@ async def test_record_kiosk_truncates_over_long_hostname(test_db):
 def test_merge_overrides_shallow_replace():
     base = {"orientation": "landscape", "timeFormat": "24h", "themeMode": "auto"}
     out = merge_overrides(base, {"orientation": "portrait"})
-    assert out["orientation"] == "portrait"      # override wins
-    assert out["timeFormat"] == "24h"            # falls through
-    assert base["orientation"] == "landscape"    # base not mutated
+    assert out["orientation"] == "portrait"  # override wins
+    assert out["timeFormat"] == "24h"  # falls through
+    assert base["orientation"] == "landscape"  # base not mutated
 
 
 @pytest.mark.unit
@@ -142,13 +144,24 @@ def test_merge_overrides_empty_and_none():
 def test_device_config_version_stable_and_selective():
     merged = {"orientation": "portrait", "displayScheduleEnabled": True, "themeMode": "dark"}
     v1 = device_config_version(merged)
-    assert v1 == device_config_version(dict(merged))          # stable
+    assert v1 == device_config_version(dict(merged))  # stable
     assert device_config_version({**merged, "themeMode": "light"}) == v1  # non-device key: no bump
     assert device_config_version({**merged, "orientation": "landscape"}) != v1  # device key: bump
     assert isinstance(v1, str) and len(v1) == 16
 
 
-from app.services.kiosk_registry import get_overrides, set_overrides
+@pytest.mark.unit
+def test_device_physical_keys_membership():
+    assert set(DEVICE_PHYSICAL_KEYS) == {
+        "orientation",
+        "orientationFlipped",
+        "applyDisplayRotation",
+        "displayScheduleEnabled",
+        "displaySchedule",
+        "displayBrightness",
+        "displayOutput",
+        "displayResolution",
+    }
 
 
 @pytest.mark.asyncio
