@@ -335,6 +335,16 @@ async def _start_schedulers():
 
 async def _sync_display_orientation():
     """Sync display orientation with config (on Raspberry Pi, if enabled)."""
+    from app.utils.platform import has_x11
+
+    if not has_x11():
+        # Mode B (remote/display-less backend): the device-side display-agent owns
+        # orientation. Skip the backend-local xrandr sync instead of failing on it.
+        logger.debug(
+            "No local X display; skipping backend orientation sync (device-side agent owns it)"
+        )
+        return
+
     from app.services.config_service import config_service
     from app.services.display_orientation_service import display_orientation_service
 
