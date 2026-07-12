@@ -155,6 +155,18 @@ registers the kiosk (id, hostname, last-seen). List known kiosks with
 `curl http://<server>:8000/api/kiosks`. A request with **no** id behaves exactly
 as before — this is the foundation the per-kiosk config model builds on.
 
+### Per-kiosk configuration
+
+Each kiosk reads its **effective config** from `GET /api/kiosks/<id>/config` — the
+global config with that kiosk's overrides applied (device-physical values like
+rotation included; the browser ignores what it can't act on, the display-agent
+applies them). The response carries an `ETag`/`deviceConfigVersion` so a client can
+cheaply detect device-physical changes (`If-None-Match` → `304`).
+
+Per-kiosk overrides are edited via `GET/PUT /api/kiosks/<id>/overrides` (a sparse
+layer that replaces on PUT). `GET /api/config` is now **global-only** (Mode-A Pis and
+the template new kiosks inherit). List known kiosks with `curl http://<server>:8000/api/kiosks`.
+
 ### Changing the backend URL later
 
 ```bash
