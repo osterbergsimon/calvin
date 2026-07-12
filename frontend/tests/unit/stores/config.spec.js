@@ -214,3 +214,48 @@ describe("Config Store", () => {
     expect(store.loading).toBe(false);
   });
 });
+
+function setSearch(search) {
+  Object.defineProperty(window, "location", { value: { search, hostname: "pi" }, writable: true });
+}
+
+const SCREENS = {
+  version: 2, activeScreenId: "b",
+  screens: [{ id: "a", name: "A" }, { id: "b", name: "B" }, { id: "c", name: "C" }],
+};
+
+describe("config store — kiosk active screen", () => {
+  beforeEach(() => setActivePinia(createPinia()));
+
+  it("Mode A: effectiveDashboardScreens == normalized global, no filtering", () => {
+    setSearch("");
+    const store = useConfigStore();
+    store.dashboardScreens = SCREENS;
+    expect(store.effectiveDashboardScreens.screens.map(s => s.id)).toEqual(["a", "b", "c"]);
+    expect(store.effectiveDashboardScreens.activeScreenId).toBe("b");
+  });
+
+  it("kiosk mode: filters to availableScreens and overrides active to kioskActiveScreenId", () => {
+    setSearch("?kiosk=k1");
+    const store = useConfigStore();
+    store.dashboardScreens = SCREENS;
+    store.availableScreens = ["a", "c"];
+    store.defaultScreenId = "c";
+    store.seedKioskActiveScreen();
+    expect(store.kioskActiveScreenId).toBe("c");
+    expect(store.effectiveDashboardScreens.screens.map(s => s.id)).toEqual(["a", "c"]);
+    expect(store.effectiveDashboardScreens.activeScreenId).toBe("c");
+  });
+
+  it("seed keeps a still-valid current across re-seed (poll does not clobber)", () => {
+    setSearch("?kiosk=k1");
+    const store = useConfigStore();
+    store.dashboardScreens = SCREENS;
+    store.availableScreens = null;
+    store.defaultScreenId = "c";
+    store.seedKioskActiveScreen();      // -> "c"
+    store.kioskActiveScreenId = "a";    // user switched
+    store.seedKioskActiveScreen();      // simulate next poll
+    expect(store.kioskActiveScreenId).toBe("a");  // preserved
+  });
+});
