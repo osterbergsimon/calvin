@@ -1,6 +1,5 @@
 import importlib.util
 import os
-import subprocess
 from datetime import datetime, time
 from types import SimpleNamespace
 
@@ -317,6 +316,16 @@ def test_apply_device_physical_skips_when_rotation_disabled():
         env={},
     )
     assert calls == []
+
+
+def test_apply_device_physical_forwards_output():
+    calls = []
+    agent.apply_device_physical(
+        {"orientation": "portrait", "applyDisplayRotation": True},
+        applier=lambda rot, output=None: calls.append((rot, output)),
+        env={"CALVIN_DISPLAY_OUTPUT": "HDMI-1"},
+    )
+    assert calls == [("left", "HDMI-1")]
 
 
 def test_run_applies_device_physical_only_on_version_change(monkeypatch):
