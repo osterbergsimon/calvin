@@ -150,9 +150,18 @@ def now_in(cfg):
 
 
 def run(
-    backend_url, refresh_seconds, *, fetch=fetch_config, sleep=time_module.sleep, iterations=None
+    backend_url,
+    refresh_seconds,
+    *,
+    fetch=fetch_config,
+    sleep=time_module.sleep,
+    iterations=None,
+    apply_device=None,
 ):
+    if apply_device is None:
+        apply_device = apply_device_physical
     last = None
+    last_version = None
     n = 0
     while iterations is None or n < iterations:
         n += 1
@@ -160,6 +169,10 @@ def run(
             cfg = fetch(backend_url)
             if not isinstance(cfg, dict):
                 raise TypeError(f"expected dict config, got {type(cfg).__name__}")
+            version = cfg_get(cfg, "deviceConfigVersion")
+            if version != last_version:
+                apply_device(cfg)
+                last_version = version
             now = now_in(cfg)
             prev = last
             last = reconcile(cfg, now, last)

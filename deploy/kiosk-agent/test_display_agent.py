@@ -317,3 +317,27 @@ def test_apply_device_physical_skips_when_rotation_disabled():
         env={},
     )
     assert calls == []
+
+
+def test_run_applies_device_physical_only_on_version_change(monkeypatch):
+    monkeypatch.setattr(agent, "now_in", lambda c: datetime(2026, 7, 11, 12, 0))
+    monkeypatch.setattr(agent, "reconcile", lambda cfg, now, last, applier=None: last)
+    monkeypatch.setattr(agent, "seconds_to_next_boundary", lambda cfg, now: None)
+
+    configs = [
+        {"deviceConfigVersion": "v1", "orientation": "portrait"},
+        {"deviceConfigVersion": "v1", "orientation": "portrait"},  # unchanged
+        {"deviceConfigVersion": "v2", "orientation": "landscape"},  # changed
+    ]
+    it = iter(configs)
+    applied = []
+    agent.run(
+        "http://h",
+        999,
+        fetch=lambda url: next(it),
+        sleep=lambda s: None,
+        iterations=3,
+        apply_device=lambda cfg: applied.append(cfg.get("deviceConfigVersion")),
+    )
+    # v1 applied on first sight, skipped when unchanged, v2 applied on change
+    assert applied == ["v1", "v2"]
