@@ -157,18 +157,12 @@ class ConfigUpdate(BaseModel):
     model_config = ConfigDict(extra="allow")
 
 
-@router.get("/config")
-async def get_config(kiosk: str | None = None, khost: str | None = None):
-    """Get current configuration.
+async def build_global_config() -> dict:
+    """Build the fully-defaulted global configuration.
 
-    Optional ?kiosk=<id> (+ ?khost=<hostname>) registers the requesting kiosk.
-    The returned config is unchanged here; per-kiosk merge arrives in dd9.3.
+    Shared by GET /api/config and the per-kiosk effective-config endpoint so the
+    ~370-line defaulting block is not duplicated.
     """
-    if kiosk:
-        try:
-            await kiosk_registry.record_kiosk(kiosk, hostname=khost)
-        except Exception as exc:
-            logger.warning(f"Failed to record kiosk {kiosk!r}: {exc}")
     config = await config_service.get_config()
 
     # Set defaults if not present
@@ -537,6 +531,21 @@ async def get_config(kiosk: str | None = None, khost: str | None = None):
     config["devMode"] = settings.is_dev_mode
 
     return config
+
+
+@router.get("/config")
+async def get_config(kiosk: str | None = None, khost: str | None = None):
+    """Get current configuration.
+
+    ?kiosk=/?khost= recording is retained here for now; it is retired in a later
+    task once the per-kiosk effective endpoint records instead.
+    """
+    if kiosk:
+        try:
+            await kiosk_registry.record_kiosk(kiosk, hostname=khost)
+        except Exception as exc:
+            logger.warning(f"Failed to record kiosk {kiosk!r}: {exc}")
+    return await build_global_config()
 
 
 @router.post("/config")

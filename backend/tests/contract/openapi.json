@@ -1491,7 +1491,7 @@
     },
     "/api/config": {
       "get": {
-        "description": "Get current configuration.\n\nOptional ?kiosk=<id> (+ ?khost=<hostname>) registers the requesting kiosk.\nThe returned config is unchanged here; per-kiosk merge arrives in dd9.3.",
+        "description": "Get current configuration.\n\n?kiosk=/?khost= recording is retained here for now; it is retired in a later\ntask once the per-kiosk effective endpoint records instead.",
         "operationId": "get_config_api_config_get",
         "parameters": [
           {
