@@ -126,20 +126,28 @@ follows it. Logs: `journalctl -u calvin-display-agent.service`.
 
 ### Screen rotation on a Mode-B kiosk
 
-Screen rotation is **physical to each Pi**, so it lives in the device-local
-`/etc/default/calvin-kiosk`, not in the (global) server config. Set
-`CALVIN_DISPLAY_ROTATION` to an `xrandr` value — `normal`, `left`, `right`, or
-`inverted` — and the display-agent applies it once on startup (auto-detecting
-the connected output, or use `CALVIN_DISPLAY_OUTPUT` to name it):
+Screen rotation, output selection, and resolution are **physical to each Pi**, so they live in
+the device-local `/etc/default/calvin-kiosk`, not in the (global) server config. The display-agent
+applies them via `xrandr` at startup and whenever the per-kiosk device-config version changes:
+
+- `CALVIN_DISPLAY_ROTATION` — rotation mode: `normal`, `left`, `right`, or `inverted`.
+- `CALVIN_DISPLAY_OUTPUT` — the xrandr output name (e.g. `HDMI-1`) to select as **primary** and
+  target for resolution/rotation. Optional; when unset the agent auto-detects the first connected output.
+- `CALVIN_DISPLAY_RESOLUTION` — the mode to apply, as `WIDTHxHEIGHT` or `WIDTHxHEIGHT@RATE`
+  (e.g. `1920x1080` or `1920x1080@60`). Optional; when unset the current mode is left unchanged.
+
+Example:
 
 ```
 CALVIN_DISPLAY_ROTATION=left
-# CALVIN_DISPLAY_OUTPUT=HDMI-1   # optional; auto-detected if unset
+CALVIN_DISPLAY_OUTPUT=HDMI-1
+CALVIN_DISPLAY_RESOLUTION=1920x1080@60
 ```
 
-Then `sudo systemctl restart calvin-display-agent.service`. This replaces the
-old backend-side `display_orientation_service`, which cannot reach a remote
-kiosk's display. (Per-device settings are tracked under epic `calvin-dd9`.)
+These device-local env vars win over the equivalent server config (`displayOutput` / `displayResolution` / `displayRotation`);
+the display-agent applies them via `xrandr` at startup and whenever the per-kiosk device-config version
+changes. Then `sudo systemctl restart calvin-display-agent.service`. This replaces the
+old backend-side `display_orientation_service`, which cannot reach a remote kiosk's display. (Per-device settings are tracked under epic `calvin-dd9`.)
 
 ### Kiosk identity
 
