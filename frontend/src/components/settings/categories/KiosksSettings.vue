@@ -71,6 +71,27 @@
       </button>
       <p v-if="savedMsg" class="kiosks__saved" role="status" aria-live="polite">{{ savedMsg }}</p>
     </SettingsSection>
+    <SettingsSection v-if="selectedId" id="kiosks-content" :title="`${selectedId} — Content`">
+      <p v-if="!hasEnoughScreens" class="kiosks__hint">
+        Add more screens in Display → Screens & regions to assign different content per kiosk.
+      </p>
+      <template v-else>
+        <SettingRow
+          label="Screens shown"
+          :description="availableOverridden ? '‹set for this kiosk›' : '‹inherited from global›'"
+        >
+          <ChipMultiSelect
+            :model-value="effAvailable"
+            aria-label="Screens shown"
+            :options="screenOptions"
+            @update:model-value="setAvailable"
+          />
+        </SettingRow>
+        <p v-if="contentMsg" class="kiosks__saved" role="status" aria-live="polite">
+          {{ contentMsg }}
+        </p>
+      </template>
+    </SettingsSection>
   </div>
 </template>
 
@@ -82,6 +103,7 @@ import SettingsSection from "@/components/settings/shell/SettingsSection.vue";
 import SettingRow from "@/components/settings/shell/SettingRow.vue";
 import SegmentedControl from "@/components/ui/SegmentedControl.vue";
 import ToggleSwitch from "@/components/ui/ToggleSwitch.vue";
+import ChipMultiSelect from "@/components/ui/ChipMultiSelect.vue";
 
 const store = useKiosksStore();
 const config = useConfigStore();
@@ -89,6 +111,7 @@ const kiosks = computed(() => store.kiosks);
 const selectedId = ref(null);
 const overrides = ref({});
 const savedMsg = ref("");
+const contentMsg = ref("");
 
 const ONLINE_WINDOW_MS = 120000; // 2 minutes
 
@@ -109,6 +132,51 @@ const effApply = computed(() =>
     ? overrides.value.applyDisplayRotation
     : (config.applyDisplayRotation ?? true)
 );
+
+const _CONTENT_KEYS = ["availableScreens", "defaultScreenId"];
+
+const screenCatalog = computed(() => config.dashboardScreens?.screens ?? []);
+const screenOptions = computed(() =>
+  screenCatalog.value.map(s => ({ value: s.id, label: s.name }))
+);
+const hasEnoughScreens = computed(() => screenCatalog.value.length >= 2);
+
+const availableOverridden = computed(() => "availableScreens" in overrides.value);
+const effAvailable = computed(() =>
+  availableOverridden.value ? overrides.value.availableScreens : screenCatalog.value.map(s => s.id)
+);
+
+async function persistContent(next) {
+  overrides.value = next;
+  try {
+    await store.saveOverrides(selectedId.value, next);
+    const online = selectedKiosk() ? isOnline(selectedKiosk()) : false;
+    contentMsg.value = online
+      ? "Saved. This kiosk picks up content changes at its next check-in (~30s)."
+      : "Saved. Changes apply when this kiosk reconnects.";
+  } catch {
+    contentMsg.value = "Couldn't save to the server. Check the connection and try again.";
+  }
+}
+
+function setAvailable(ids) {
+  if (ids.length === 0) {
+    contentMsg.value = "Pick at least one screen, or Reset to show all.";
+    return;
+  }
+  const next = { ...overrides.value };
+  const allIds = screenCatalog.value.map(s => s.id);
+  if (ids.length === allIds.length) {
+    delete next.availableScreens;
+  } else {
+    next.availableScreens = ids;
+  }
+  const effIds = "availableScreens" in next ? next.availableScreens : allIds;
+  if ("defaultScreenId" in next && !effIds.includes(next.defaultScreenId)) {
+    delete next.defaultScreenId;
+  }
+  persistContent(next);
+}
 
 function isOnline(k) {
   if (!k.lastSeen) return false;
@@ -160,6 +228,7 @@ function resetOrientation() {
 async function select(id) {
   selectedId.value = id;
   savedMsg.value = "";
+  contentMsg.value = "";
   overrides.value = await store.fetchOverrides(id);
 }
 
@@ -171,6 +240,10 @@ onMounted(async () => {
 <style scoped>
 .kiosks__empty {
   opacity: 0.7;
+}
+.kiosks__hint {
+  opacity: 0.7;
+  font-size: 0.9em;
 }
 .kiosk-card {
   display: grid;
