@@ -15,16 +15,20 @@
         @click="select(k.id)"
       >
         <span class="kiosk-card__id">{{ k.id }}</span>
-        <span class="kiosk-card__status" :class="isOnline(k) ? 'is-online' : 'is-offline'">
-          {{ isOnline(k) ? "● Online" : "○ Offline" }}
+        <span class="kiosk-card__meta-end">
+          <span
+            v-if="isPending(k)"
+            class="kiosk-card__badge"
+            data-test="kiosk-pending-badge"
+            role="img"
+            :aria-label="`${k.id}: offline, hardware config not yet applied`"
+            title="Offline — this kiosk hasn't applied the current hardware config yet"
+            >⚠</span
+          >
+          <span class="kiosk-card__status" :class="isOnline(k) ? 'is-online' : 'is-offline'">
+            {{ isOnline(k) ? "● Online" : "○ Offline" }}
+          </span>
         </span>
-        <span
-          v-if="isPending(k)"
-          class="kiosk-card__badge"
-          data-test="kiosk-pending-badge"
-          title="Offline — this kiosk hasn't applied the current hardware config yet"
-          >⚠</span
-        >
         <span class="kiosk-card__meta">{{ k.hostname }} · seen {{ relativeTime(k.lastSeen) }}</span>
       </button>
     </SettingsSection>
@@ -301,6 +305,11 @@ function selectedKiosk() {
   return kiosks.value.find(k => k.id === selectedId.value);
 }
 
+async function refreshDesiredVersion(id) {
+  const v = await store.fetchDeviceConfigVersion(id);
+  if (v) desiredVersions.value = { ...desiredVersions.value, [id]: v };
+}
+
 async function persist(next) {
   overrides.value = next;
   try {
@@ -309,6 +318,7 @@ async function persist(next) {
     savedMsg.value = online
       ? "Saved. This kiosk applies orientation at its next check-in (~30s)."
       : "Saved. Changes apply when this kiosk reconnects.";
+    await refreshDesiredVersion(selectedId.value);
   } catch {
     savedMsg.value = "Couldn't save to the server. Check the connection and try again.";
   }
@@ -353,6 +363,7 @@ async function persistSchedule(next) {
     scheduleMsg.value = online
       ? "Saved. This kiosk applies the schedule at its next check-in (~30s)."
       : "Saved. Changes apply when this kiosk reconnects.";
+    await refreshDesiredVersion(selectedId.value);
   } catch {
     scheduleMsg.value = "Couldn't save to the server. Check the connection and try again.";
   }
@@ -377,8 +388,7 @@ async function select(id) {
   scheduleMsg.value = "";
   hardwareOpen.value = false;
   overrides.value = await store.fetchOverrides(id);
-  const v = await store.fetchDeviceConfigVersion(id);
-  if (v) desiredVersions.value = { ...desiredVersions.value, [id]: v };
+  await refreshDesiredVersion(id);
 }
 
 onMounted(async () => {
@@ -423,8 +433,13 @@ onMounted(async () => {
 .kiosk-card__id {
   font-weight: 600;
 }
-.kiosk-card__status {
+.kiosk-card__meta-end {
   justify-self: end;
+  display: inline-flex;
+  align-items: baseline;
+  gap: 6px;
+}
+.kiosk-card__status {
   font-size: 0.85em;
 }
 .kiosk-card__status.is-online {
@@ -434,7 +449,6 @@ onMounted(async () => {
   color: rgba(255, 255, 255, 0.45);
 }
 .kiosk-card__badge {
-  justify-self: end;
   font-size: 0.85em;
   color: var(--warn);
 }

@@ -485,6 +485,42 @@ describe("KiosksSettings — schedule editor", () => {
     await flushPromises();
     expect(w.get("#section-kiosks-schedule").text()).toContain("Couldn't save to the server");
   });
+
+  it("refreshes desiredVersion after a schedule save so Applied becomes Pending", async () => {
+    setActivePinia(createPinia());
+    const store = useKiosksStore();
+    const stale = new Date(Date.now() - 6 * 60 * 60 * 1000).toISOString();
+    store.loadKiosks = vi.fn(async () => {
+      store.kiosks = [
+        { id: "k1", hostname: "pi", lastSeen: stale, lastAppliedVersion: "v1" },
+      ];
+    });
+    store.fetchOverrides = vi.fn(async () => ({}));
+    store.saveOverrides = vi.fn(async () => {});
+    // onMounted prefetch → "v1"; select() call → "v1"; post-save refetch → "v2"
+    store.fetchDeviceConfigVersion = vi.fn()
+      .mockResolvedValueOnce("v1") // onMounted prefetch for k1
+      .mockResolvedValueOnce("v1") // select() call
+      .mockResolvedValueOnce("v2"); // post-save refreshDesiredVersion
+    const cfg = useConfigStore();
+    cfg.displayScheduleEnabled = true;
+    cfg.displaySchedule = [{ day: 0, enabled: true, onTime: "06:00", offTime: "22:00" }];
+    const w = mount(KiosksSettings);
+    await flushPromises();
+    await w.find("[data-test='kiosk-card']").trigger("click");
+    await flushPromises();
+    // Before save: desiredVersion === "v1", appliedVersion === "v1" → Applied
+    const header = w.findComponent(KioskStatusHeader);
+    expect(header.props("desiredVersion")).toBe("v1");
+    expect(header.props("appliedVersion")).toBe("v1");
+    // Trigger a schedule edit and save
+    w.findComponent(DisplayScheduleGrid).vm.$emit("update:modelValue", [
+      { day: 0, enabled: false, onTime: "07:00", offTime: "23:00" },
+    ]);
+    await flushPromises();
+    // After save: desiredVersion should have been refreshed to "v2" → Pending
+    expect(w.findComponent(KioskStatusHeader).props("desiredVersion")).toBe("v2");
+  });
 });
 
 describe("KiosksSettings — detail order and hardware drawer", () => {
