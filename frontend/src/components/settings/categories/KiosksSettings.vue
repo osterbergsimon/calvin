@@ -289,12 +289,15 @@ async function select(id) {
 
 onMounted(async () => {
   await store.loadKiosks();
-  await Promise.all(
-    kiosks.value.map(async k => {
-      const v = await store.fetchDeviceConfigVersion(k.id);
-      if (v) desiredVersions.value = { ...desiredVersions.value, [k.id]: v };
-    })
+  // Fetch all versions concurrently, then commit ONCE — writing the map inside
+  // each concurrent callback races (each spreads a stale base, last write wins,
+  // dropping entries).
+  const entries = await Promise.all(
+    kiosks.value.map(async k => [k.id, await store.fetchDeviceConfigVersion(k.id)])
   );
+  const next = { ...desiredVersions.value };
+  for (const [id, v] of entries) if (v) next[id] = v;
+  desiredVersions.value = next;
 });
 </script>
 
