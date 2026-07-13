@@ -10,6 +10,7 @@ import ChipMultiSelect from "@/components/ui/ChipMultiSelect.vue";
 import SelectPill from "@/components/ui/SelectPill.vue";
 import SettingRow from "@/components/settings/shell/SettingRow.vue";
 import KioskStatusHeader from "@/components/settings/shared/KioskStatusHeader.vue";
+import DisplayScheduleGrid from "@/components/settings/shared/DisplayScheduleGrid.vue";
 
 function mountWithKiosks(list) {
   setActivePinia(createPinia());
@@ -397,5 +398,90 @@ describe("KiosksSettings — status header", () => {
     expect(header.props("appliedVersion")).toBe("old");
     expect(header.props("desiredVersion")).toBe("new");
     expect(header.props("kioskId")).toBe("k1");
+  });
+});
+
+describe("KiosksSettings — schedule editor", () => {
+  beforeEach(() => vi.clearAllMocks());
+
+  async function selectFirst(overrides = {}) {
+    setActivePinia(createPinia());
+    const store = useKiosksStore();
+    store.loadKiosks = vi.fn(async () => {
+      store.kiosks = [
+        { id: "k1", hostname: "pi", lastSeen: new Date().toISOString(), lastAppliedVersion: null },
+      ];
+    });
+    store.fetchOverrides = vi.fn(async () => overrides);
+    store.saveOverrides = vi.fn(async () => {});
+    store.fetchDeviceConfigVersion = vi.fn(async () => null);
+    const cfg = useConfigStore();
+    cfg.displayScheduleEnabled = true;
+    cfg.displaySchedule = [{ day: 0, enabled: true, onTime: "06:00", offTime: "22:00" }];
+    const w = mount(KiosksSettings);
+    await flushPromises();
+    await w.find("[data-test='kiosk-card']").trigger("click");
+    await flushPromises();
+    return { w, store };
+  }
+
+  it("shows the global schedule as effective and tagged inherited when no override", async () => {
+    const { w } = await selectFirst({});
+    const section = w.get("#section-kiosks-schedule");
+    expect(section.text().toLowerCase()).toContain("inherited from global");
+  });
+
+  it("editing the grid saves a merged displaySchedule override, preserving unrelated keys", async () => {
+    const { w, store } = await selectFirst({ orientation: "portrait" });
+    const next = [{ day: 0, enabled: false, onTime: "07:00", offTime: "23:00" }];
+    w.findComponent(DisplayScheduleGrid).vm.$emit("update:modelValue", next);
+    await flushPromises();
+    expect(store.saveOverrides).toHaveBeenCalledWith("k1", {
+      orientation: "portrait",
+      displaySchedule: next,
+    });
+  });
+
+  it("Reset schedule removes only the schedule keys", async () => {
+    const { w, store } = await selectFirst({
+      orientation: "portrait",
+      displayScheduleEnabled: false,
+      displaySchedule: [{ day: 0, enabled: false, onTime: "07:00", offTime: "23:00" }],
+    });
+    await w.find("[data-test='reset-schedule']").trigger("click");
+    await flushPromises();
+    expect(store.saveOverrides).toHaveBeenCalledWith("k1", { orientation: "portrait" });
+  });
+
+  it("Reset schedule is disabled when there is no schedule override", async () => {
+    const { w } = await selectFirst({});
+    expect(w.find("[data-test='reset-schedule']").attributes("disabled")).toBeDefined();
+  });
+
+  it("shows save-failure copy when saveOverrides rejects", async () => {
+    setActivePinia(createPinia());
+    const store = useKiosksStore();
+    store.loadKiosks = vi.fn(async () => {
+      store.kiosks = [
+        { id: "k1", hostname: "pi", lastSeen: new Date().toISOString(), lastAppliedVersion: null },
+      ];
+    });
+    store.fetchOverrides = vi.fn(async () => ({}));
+    store.saveOverrides = vi.fn(async () => {
+      throw new Error("boom");
+    });
+    store.fetchDeviceConfigVersion = vi.fn(async () => null);
+    const cfg = useConfigStore();
+    cfg.displayScheduleEnabled = true;
+    cfg.displaySchedule = [{ day: 0, enabled: true, onTime: "06:00", offTime: "22:00" }];
+    const w = mount(KiosksSettings);
+    await flushPromises();
+    await w.find("[data-test='kiosk-card']").trigger("click");
+    await flushPromises();
+    w.findComponent(DisplayScheduleGrid).vm.$emit("update:modelValue", [
+      { day: 0, enabled: false, onTime: "07:00", offTime: "23:00" },
+    ]);
+    await flushPromises();
+    expect(w.get("#section-kiosks-schedule").text()).toContain("Couldn't save to the server");
   });
 });

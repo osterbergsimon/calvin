@@ -127,6 +127,41 @@
         </p>
       </template>
     </SettingsSection>
+    <SettingsSection
+      v-if="selectedId"
+      id="kiosks-schedule"
+      :title="`${selectedId} — Display schedule`"
+    >
+      <SettingRow
+        label="Power schedule"
+        :description="scheduleEnabledOverridden ? '‹set for this kiosk›' : '‹inherited from global›'"
+      >
+        <ToggleSwitch
+          :model-value="effScheduleEnabled"
+          aria-label="Power schedule"
+          @update:model-value="setScheduleEnabled"
+        />
+      </SettingRow>
+      <SettingRow
+        v-if="effScheduleEnabled"
+        label="Daily schedule"
+        :description="scheduleOverridden ? '‹set for this kiosk›' : '‹inherited from global›'"
+      >
+        <DisplayScheduleGrid :model-value="effSchedule || []" @update:model-value="setSchedule" />
+      </SettingRow>
+      <button
+        type="button"
+        class="kiosks__reset"
+        data-test="reset-schedule"
+        :disabled="!anyScheduleOverridden"
+        @click="resetSchedule"
+      >
+        Reset schedule to global
+      </button>
+      <p v-if="scheduleMsg" class="kiosks__saved" role="status" aria-live="polite">
+        {{ scheduleMsg }}
+      </p>
+    </SettingsSection>
   </div>
 </template>
 
@@ -141,6 +176,7 @@ import ToggleSwitch from "@/components/ui/ToggleSwitch.vue";
 import ChipMultiSelect from "@/components/ui/ChipMultiSelect.vue";
 import SelectPill from "@/components/ui/SelectPill.vue";
 import KioskStatusHeader from "@/components/settings/shared/KioskStatusHeader.vue";
+import DisplayScheduleGrid from "@/components/settings/shared/DisplayScheduleGrid.vue";
 
 const store = useKiosksStore();
 const config = useConfigStore();
@@ -290,10 +326,51 @@ function resetOrientation() {
   persist(next);
 }
 
+const SCHED_KEYS = ["displayScheduleEnabled", "displaySchedule"];
+const scheduleMsg = ref("");
+
+const scheduleEnabledOverridden = computed(() => "displayScheduleEnabled" in overrides.value);
+const scheduleOverridden = computed(() => "displaySchedule" in overrides.value);
+const anyScheduleOverridden = computed(
+  () => scheduleEnabledOverridden.value || scheduleOverridden.value
+);
+const effScheduleEnabled = computed(() =>
+  scheduleEnabledOverridden.value ? overrides.value.displayScheduleEnabled : config.displayScheduleEnabled
+);
+const effSchedule = computed(() =>
+  scheduleOverridden.value ? overrides.value.displaySchedule : config.displaySchedule
+);
+
+async function persistSchedule(next) {
+  overrides.value = next;
+  try {
+    await store.saveOverrides(selectedId.value, next);
+    const online = selectedKiosk() ? isOnline(selectedKiosk()) : false;
+    scheduleMsg.value = online
+      ? "Saved. This kiosk applies the schedule at its next check-in (~30s)."
+      : "Saved. Changes apply when this kiosk reconnects.";
+  } catch {
+    scheduleMsg.value = "Couldn't save to the server. Check the connection and try again.";
+  }
+}
+
+function setScheduleEnabled(value) {
+  persistSchedule({ ...overrides.value, displayScheduleEnabled: value });
+}
+function setSchedule(value) {
+  persistSchedule({ ...overrides.value, displaySchedule: value });
+}
+function resetSchedule() {
+  const next = { ...overrides.value };
+  for (const k of SCHED_KEYS) delete next[k];
+  persistSchedule(next);
+}
+
 async function select(id) {
   selectedId.value = id;
   savedMsg.value = "";
   contentMsg.value = "";
+  scheduleMsg.value = "";
   overrides.value = await store.fetchOverrides(id);
   const v = await store.fetchDeviceConfigVersion(id);
   if (v) desiredVersions.value = { ...desiredVersions.value, [id]: v };
