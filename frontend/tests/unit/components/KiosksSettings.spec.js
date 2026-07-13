@@ -331,6 +331,47 @@ describe("KiosksSettings — content editor", () => {
   });
 });
 
+describe("KiosksSettings — pending badge", () => {
+  beforeEach(() => vi.clearAllMocks());
+
+  it("shows the pending badge for an offline kiosk whose applied != desired", async () => {
+    setActivePinia(createPinia());
+    const store = useKiosksStore();
+    const stale = new Date(Date.now() - 6 * 60 * 60 * 1000).toISOString();
+    store.loadKiosks = vi.fn(async () => {
+      store.kiosks = [{ id: "off", hostname: "b", lastSeen: stale, lastAppliedVersion: "old" }];
+    });
+    store.fetchOverrides = vi.fn(async () => ({}));
+    store.fetchDeviceConfigVersion = vi.fn(async () => "new");
+    const w = mount(KiosksSettings);
+    await flushPromises();
+    expect(w.find("[data-test='kiosk-pending-badge']").exists()).toBe(true);
+  });
+
+  it("hides the badge when online, when versions match, or when desired is unknown", async () => {
+    setActivePinia(createPinia());
+    const store = useKiosksStore();
+    const recent = new Date().toISOString();
+    const stale = new Date(Date.now() - 6 * 60 * 60 * 1000).toISOString();
+    store.loadKiosks = vi.fn(async () => {
+      store.kiosks = [
+        { id: "online-mismatch", hostname: "a", lastSeen: recent, lastAppliedVersion: "old" },
+        { id: "offline-match", hostname: "b", lastSeen: stale, lastAppliedVersion: "same" },
+        { id: "offline-unknown", hostname: "c", lastSeen: stale, lastAppliedVersion: "old" },
+      ];
+    });
+    store.fetchOverrides = vi.fn(async () => ({}));
+    store.fetchDeviceConfigVersion = vi.fn(async id => {
+      if (id === "online-mismatch") return "new";
+      if (id === "offline-match") return "same";
+      return null; // offline-unknown → desired unknown → fail-open, no badge
+    });
+    const w = mount(KiosksSettings);
+    await flushPromises();
+    expect(w.findAll("[data-test='kiosk-pending-badge']").length).toBe(0);
+  });
+});
+
 describe("KiosksSettings — status header", () => {
   beforeEach(() => vi.clearAllMocks());
 

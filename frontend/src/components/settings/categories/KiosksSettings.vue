@@ -18,6 +18,13 @@
         <span class="kiosk-card__status" :class="isOnline(k) ? 'is-online' : 'is-offline'">
           {{ isOnline(k) ? "● Online" : "○ Offline" }}
         </span>
+        <span
+          v-if="isPending(k)"
+          class="kiosk-card__badge"
+          data-test="kiosk-pending-badge"
+          title="Offline — this kiosk hasn't applied the current hardware config yet"
+          >⚠</span
+        >
         <span class="kiosk-card__meta">{{ k.hostname }} · seen {{ relativeTime(k.lastSeen) }}</span>
       </button>
     </SettingsSection>
@@ -231,6 +238,11 @@ function setAvailable(ids) {
   persistContent(next);
 }
 
+function isPending(k) {
+  const desired = desiredVersions.value[k.id];
+  return !isOnline(k) && !!desired && k.lastAppliedVersion !== desired;
+}
+
 function isOnline(k) {
   if (!k.lastSeen) return false;
   return Date.now() - Date.parse(k.lastSeen) < ONLINE_WINDOW_MS;
@@ -338,6 +350,11 @@ onMounted(async () => {
 }
 .kiosk-card__status.is-offline {
   color: rgba(255, 255, 255, 0.45);
+}
+.kiosk-card__badge {
+  justify-self: end;
+  font-size: 0.85em;
+  color: var(--warn);
 }
 .kiosk-card__meta {
   grid-column: 1 / -1;
