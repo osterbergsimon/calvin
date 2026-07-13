@@ -11,6 +11,7 @@ import SelectPill from "@/components/ui/SelectPill.vue";
 import SettingRow from "@/components/settings/shell/SettingRow.vue";
 import KioskStatusHeader from "@/components/settings/shared/KioskStatusHeader.vue";
 import DisplayScheduleGrid from "@/components/settings/shared/DisplayScheduleGrid.vue";
+import CollapsibleSection from "@/components/settings/shared/CollapsibleSection.vue";
 
 function mountWithKiosks(list) {
   setActivePinia(createPinia());
@@ -148,8 +149,8 @@ describe("KiosksSettings — orientation editor", () => {
 
   it("setFlipped preserves unrelated override keys alongside orientationFlipped", async () => {
     const { w, store } = await selectFirst(one, { availableScreens: ["a"] });
-    // ToggleSwitch[0] is the Flip 180° control
-    w.findAllComponents(ToggleSwitch)[0].vm.$emit("update:modelValue", true);
+    // ToggleSwitch[1] is the Flip 180° control (index 0 is the Power schedule toggle in the schedule section)
+    w.findAllComponents(ToggleSwitch)[1].vm.$emit("update:modelValue", true);
     await flushPromises();
     expect(store.saveOverrides).toHaveBeenCalledWith("k1", {
       availableScreens: ["a"],
@@ -483,5 +484,61 @@ describe("KiosksSettings — schedule editor", () => {
     ]);
     await flushPromises();
     expect(w.get("#section-kiosks-schedule").text()).toContain("Couldn't save to the server");
+  });
+});
+
+describe("KiosksSettings — detail order and hardware drawer", () => {
+  beforeEach(() => vi.clearAllMocks());
+
+  async function selectFirst() {
+    setActivePinia(createPinia());
+    const store = useKiosksStore();
+    store.loadKiosks = vi.fn(async () => {
+      store.kiosks = [
+        { id: "k1", hostname: "pi", lastSeen: new Date().toISOString(), lastAppliedVersion: null },
+        { id: "k2", hostname: "pi2", lastSeen: new Date().toISOString(), lastAppliedVersion: null },
+      ];
+    });
+    store.fetchOverrides = vi.fn(async () => ({}));
+    store.saveOverrides = vi.fn(async () => {});
+    store.fetchDeviceConfigVersion = vi.fn(async () => null);
+    const cfg = useConfigStore();
+    cfg.orientation = "landscape";
+    cfg.orientationFlipped = false;
+    const w = mount(KiosksSettings);
+    await flushPromises();
+    await w.find("[data-test='kiosk-card']").trigger("click");
+    await flushPromises();
+    return { w };
+  }
+
+  it("orders detail sections Content, then Schedule, then the hardware drawer", async () => {
+    const { w } = await selectFirst();
+    const html = w.html();
+    const iContent = html.indexOf("section-kiosks-content");
+    const iSchedule = html.indexOf("section-kiosks-schedule");
+    const iHardware = html.indexOf("Display hardware");
+    expect(iContent).toBeGreaterThan(-1);
+    expect(iContent).toBeLessThan(iSchedule);
+    expect(iSchedule).toBeLessThan(iHardware);
+  });
+
+  it("puts the orientation editor inside a collapsed drawer that starts closed", async () => {
+    const { w } = await selectFirst();
+    const drawer = w.findComponent(CollapsibleSection);
+    expect(drawer.exists()).toBe(true);
+    expect(drawer.get("section").classes()).not.toContain("expanded");
+    // orientation controls are still present (v-show keeps them mounted)
+    expect(w.find("[data-test='reset-orientation']").exists()).toBe(true);
+  });
+
+  it("re-collapses the drawer when switching kiosks", async () => {
+    const { w } = await selectFirst();
+    const drawer = w.findComponent(CollapsibleSection);
+    await drawer.get("button.section-header").trigger("click"); // expand
+    expect(drawer.get("section").classes()).toContain("expanded");
+    await w.findAll("[data-test='kiosk-card']")[1].trigger("click"); // switch kiosk
+    await flushPromises();
+    expect(w.findComponent(CollapsibleSection).get("section").classes()).not.toContain("expanded");
   });
 });

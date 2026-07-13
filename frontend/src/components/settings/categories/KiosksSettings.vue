@@ -36,56 +36,6 @@
       :applied-version="selectedKiosk()?.lastAppliedVersion ?? null"
       :desired-version="desiredVersions[selectedId] ?? null"
     />
-    <SettingsSection
-      v-if="selectedId"
-      id="kiosks-orientation"
-      :title="`${selectedId} — Orientation`"
-    >
-      <SettingRow
-        label="Orientation"
-        :description="orientationOverridden ? '‹set for this kiosk›' : '‹inherited from global›'"
-      >
-        <SegmentedControl
-          :model-value="effOrientation"
-          aria-label="Orientation"
-          :options="[
-            { value: 'landscape', label: 'Landscape' },
-            { value: 'portrait', label: 'Portrait' },
-          ]"
-          @update:model-value="setOrientation"
-        />
-      </SettingRow>
-      <SettingRow
-        label="Flip 180°"
-        :description="flipOverridden ? '‹set for this kiosk›' : '‹inherited from global›'"
-      >
-        <ToggleSwitch
-          :model-value="effFlipped"
-          aria-label="Flip 180 degrees"
-          @update:model-value="setFlipped"
-        />
-      </SettingRow>
-      <SettingRow
-        label="Apply rotation"
-        :description="applyOverridden ? '‹set for this kiosk›' : '‹inherited from global›'"
-      >
-        <ToggleSwitch
-          :model-value="effApply"
-          aria-label="Apply rotation"
-          @update:model-value="setApply"
-        />
-      </SettingRow>
-      <button
-        type="button"
-        class="kiosks__reset"
-        data-test="reset-orientation"
-        :disabled="!orientationOverridden && !flipOverridden && !applyOverridden"
-        @click="resetOrientation"
-      >
-        Reset to global
-      </button>
-      <p v-if="savedMsg" class="kiosks__saved" role="status" aria-live="polite">{{ savedMsg }}</p>
-    </SettingsSection>
     <SettingsSection v-if="selectedId" id="kiosks-content" :title="`${selectedId} — Content`">
       <p v-if="!hasEnoughScreens" class="kiosks__hint">
         Add more screens in Display → Screens & regions to assign different content per kiosk.
@@ -162,6 +112,58 @@
         {{ scheduleMsg }}
       </p>
     </SettingsSection>
+    <CollapsibleSection
+      v-if="selectedId"
+      title="Display hardware"
+      variant="drawer"
+      :expanded="hardwareOpen"
+      @update:expanded="hardwareOpen = $event"
+    >
+      <SettingRow
+        label="Orientation"
+        :description="orientationOverridden ? '‹set for this kiosk›' : '‹inherited from global›'"
+      >
+        <SegmentedControl
+          :model-value="effOrientation"
+          aria-label="Orientation"
+          :options="[
+            { value: 'landscape', label: 'Landscape' },
+            { value: 'portrait', label: 'Portrait' },
+          ]"
+          @update:model-value="setOrientation"
+        />
+      </SettingRow>
+      <SettingRow
+        label="Flip 180°"
+        :description="flipOverridden ? '‹set for this kiosk›' : '‹inherited from global›'"
+      >
+        <ToggleSwitch
+          :model-value="effFlipped"
+          aria-label="Flip 180 degrees"
+          @update:model-value="setFlipped"
+        />
+      </SettingRow>
+      <SettingRow
+        label="Apply rotation"
+        :description="applyOverridden ? '‹set for this kiosk›' : '‹inherited from global›'"
+      >
+        <ToggleSwitch
+          :model-value="effApply"
+          aria-label="Apply rotation"
+          @update:model-value="setApply"
+        />
+      </SettingRow>
+      <button
+        type="button"
+        class="kiosks__reset"
+        data-test="reset-orientation"
+        :disabled="!orientationOverridden && !flipOverridden && !applyOverridden"
+        @click="resetOrientation"
+      >
+        Reset to global
+      </button>
+      <p v-if="savedMsg" class="kiosks__saved" role="status" aria-live="polite">{{ savedMsg }}</p>
+    </CollapsibleSection>
   </div>
 </template>
 
@@ -177,6 +179,7 @@ import ChipMultiSelect from "@/components/ui/ChipMultiSelect.vue";
 import SelectPill from "@/components/ui/SelectPill.vue";
 import KioskStatusHeader from "@/components/settings/shared/KioskStatusHeader.vue";
 import DisplayScheduleGrid from "@/components/settings/shared/DisplayScheduleGrid.vue";
+import CollapsibleSection from "@/components/settings/shared/CollapsibleSection.vue";
 
 const store = useKiosksStore();
 const config = useConfigStore();
@@ -186,6 +189,7 @@ const overrides = ref({});
 const savedMsg = ref("");
 const contentMsg = ref("");
 const desiredVersions = ref({});
+const hardwareOpen = ref(false);
 
 const ONLINE_WINDOW_MS = 120000; // 2 minutes
 
@@ -371,6 +375,7 @@ async function select(id) {
   savedMsg.value = "";
   contentMsg.value = "";
   scheduleMsg.value = "";
+  hardwareOpen.value = false;
   overrides.value = await store.fetchOverrides(id);
   const v = await store.fetchDeviceConfigVersion(id);
   if (v) desiredVersions.value = { ...desiredVersions.value, [id]: v };
