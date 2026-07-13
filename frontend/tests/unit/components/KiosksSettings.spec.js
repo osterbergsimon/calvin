@@ -7,6 +7,7 @@ import { useConfigStore } from "@/stores/config";
 import SegmentedControl from "@/components/ui/SegmentedControl.vue";
 import ToggleSwitch from "@/components/ui/ToggleSwitch.vue";
 import ChipMultiSelect from "@/components/ui/ChipMultiSelect.vue";
+import SelectPill from "@/components/ui/SelectPill.vue";
 
 function mountWithKiosks(list) {
   setActivePinia(createPinia());
@@ -244,5 +245,29 @@ describe("KiosksSettings — content editor", () => {
     w.findComponent(ChipMultiSelect).vm.$emit("update:modelValue", ["a"]);
     await flushPromises();
     expect(w.text()).toContain("Saved. Changes apply when this kiosk reconnects.");
+  });
+
+  it("shows the global active screen as the effective default, tagged inherited", async () => {
+    const { w } = await selectContent(one, {});
+    const pill = w.findComponent(SelectPill);
+    expect(pill.props("modelValue")).toBe("a");
+    // both controls are inherited → the inherited tag appears
+    expect(w.text().toLowerCase()).toContain("inherited from global");
+  });
+
+  it("limits the default-screen options to the available set", async () => {
+    const { w } = await selectContent(one, { availableScreens: ["b"] });
+    const pill = w.findComponent(SelectPill);
+    expect(pill.props("options")).toEqual([{ value: "b", label: "Agenda" }]);
+  });
+
+  it("choosing a default saves defaultScreenId merged, preserving unrelated keys", async () => {
+    const { w, store } = await selectContent(one, { orientation: "portrait" });
+    w.findComponent(SelectPill).vm.$emit("update:modelValue", "b");
+    await flushPromises();
+    expect(store.saveOverrides).toHaveBeenCalledWith("k1", {
+      orientation: "portrait",
+      defaultScreenId: "b",
+    });
   });
 });

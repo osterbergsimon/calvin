@@ -87,6 +87,17 @@
             @update:model-value="setAvailable"
           />
         </SettingRow>
+        <SettingRow
+          label="Default screen"
+          :description="defaultOverridden ? '‹set for this kiosk›' : '‹inherited from global›'"
+        >
+          <SelectPill
+            :model-value="effDefault"
+            aria-label="Default screen"
+            :options="availableOptions"
+            @update:model-value="setDefault"
+          />
+        </SettingRow>
         <p v-if="contentMsg" class="kiosks__saved" role="status" aria-live="polite">
           {{ contentMsg }}
         </p>
@@ -104,6 +115,7 @@ import SettingRow from "@/components/settings/shell/SettingRow.vue";
 import SegmentedControl from "@/components/ui/SegmentedControl.vue";
 import ToggleSwitch from "@/components/ui/ToggleSwitch.vue";
 import ChipMultiSelect from "@/components/ui/ChipMultiSelect.vue";
+import SelectPill from "@/components/ui/SelectPill.vue";
 
 const store = useKiosksStore();
 const config = useConfigStore();
@@ -157,6 +169,20 @@ async function persistContent(next) {
   } catch {
     contentMsg.value = "Couldn't save to the server. Check the connection and try again.";
   }
+}
+
+const defaultOverridden = computed(() => "defaultScreenId" in overrides.value);
+const effDefault = computed(() =>
+  defaultOverridden.value
+    ? overrides.value.defaultScreenId
+    : (config.dashboardScreens?.activeScreenId ?? null)
+);
+const availableOptions = computed(() =>
+  screenOptions.value.filter(o => effAvailable.value.includes(o.value))
+);
+
+function setDefault(id) {
+  persistContent({ ...overrides.value, defaultScreenId: id });
 }
 
 function setAvailable(ids) {
