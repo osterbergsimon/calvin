@@ -557,3 +557,46 @@ def test_apply_mode_skips_bad_mode_but_still_sets_primary(monkeypatch):
 def test_apply_mode_does_not_raise_on_xrandr_failure(monkeypatch):
     _capture_xrandr(monkeypatch, rc=1, stderr="cannot find mode")
     assert agent.apply_mode("HDMI-1", "9999x9999") is None  # failure marker, no raise
+
+
+def test_apply_mode_coerces_non_string_resolution(monkeypatch):
+    calls = _capture_xrandr(monkeypatch)
+    # int resolution coerced to "1080" -> not WxH -> no --mode; --primary still applied
+    agent.apply_mode("HDMI-1", 1080)
+    assert calls[-1] == ["xrandr", "--output", "HDMI-1", "--primary"]
+
+
+def test_apply_mode_coerces_non_string_output(monkeypatch):
+    calls = _capture_xrandr(monkeypatch)
+    # int output coerced to "1080"; valid resolution -> --mode applied
+    agent.apply_mode(1080, "1920x1080")
+    assert calls[-1] == [
+        "xrandr",
+        "--output",
+        "1080",
+        "--primary",
+        "--mode",
+        "1920x1080",
+    ]
+
+
+def test_apply_mode_autodetects_output_for_resolution_only(monkeypatch):
+    calls = _capture_xrandr(monkeypatch)
+    monkeypatch.setattr(agent, "detect_primary_output", lambda: "HDMI-9")
+    agent.apply_mode(None, "1920x1080")
+    assert calls[-1] == [
+        "xrandr",
+        "--output",
+        "HDMI-9",
+        "--primary",
+        "--mode",
+        "1920x1080",
+    ]
+
+
+def test_apply_mode_skips_when_no_output_found(monkeypatch):
+    calls = _capture_xrandr(monkeypatch)
+    monkeypatch.setattr(agent, "detect_primary_output", lambda: None)
+    result = agent.apply_mode(None, "1920x1080")
+    assert result is None
+    assert calls == []

@@ -271,6 +271,10 @@ def apply_mode(output, resolution):
     Does nothing when neither is configured. A configured output is marked --primary.
     Returns the argv applied, or None if skipped/failed. Never raises.
     """
+    if output is not None:
+        output = str(output).strip() or None
+    if resolution is not None:
+        resolution = str(resolution).strip() or None
     if not output and not resolution:
         return None
     out = output or detect_primary_output()
