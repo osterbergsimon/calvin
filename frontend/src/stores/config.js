@@ -415,7 +415,14 @@ export const useConfigStore = defineStore("config", () => {
   };
 
   const cycleActiveDashboardRegionBy = async direction => {
-    const nextScreens = cycleActiveDashboardRegion(dashboardScreens.value, direction);
+    // Target the screen the operator is actually viewing. In kiosk mode that is the
+    // local kioskActiveScreenId (via effectiveDashboardScreens); in Mode A it equals the
+    // global activeScreenId. Region state itself stays global (persisted) by dd9.4 design.
+    const nextScreens = cycleActiveDashboardRegion(
+      dashboardScreens.value,
+      direction,
+      effectiveDashboardScreens.value.activeScreenId
+    );
     dashboardScreens.value = nextScreens;
     await updateConfig({ dashboardScreens: nextScreens });
   };
@@ -423,7 +430,12 @@ export const useConfigStore = defineStore("config", () => {
   // Merge `patch` into a calendar region's `view` (base mode / rolling / counts)
   // on the active screen, and persist. Drives the on-calendar view controls.
   const updateRegionView = async (regionId, patch) => {
-    const nextScreens = setRegionView(dashboardScreens.value, regionId, patch);
+    const nextScreens = setRegionView(
+      dashboardScreens.value,
+      regionId,
+      patch,
+      effectiveDashboardScreens.value.activeScreenId
+    );
     dashboardScreens.value = nextScreens;
     await updateConfig({ dashboardScreens: nextScreens });
   };

@@ -265,6 +265,81 @@ describe("config store — kiosk active screen", () => {
   });
 });
 
+const REGION_SCREENS = {
+  version: 2,
+  activeScreenId: "a",
+  screens: [
+    {
+      id: "a",
+      name: "A",
+      activeRegionId: "a1",
+      layout: {
+        regions: [
+          { id: "a1", kind: "calendar", instanceIds: [], size: 50 },
+          { id: "a2", kind: "photos", instanceIds: [], size: 50 },
+        ],
+      },
+    },
+    {
+      id: "b",
+      name: "B",
+      activeRegionId: "b1",
+      layout: {
+        regions: [
+          { id: "b1", kind: "calendar", instanceIds: [], size: 50 },
+          { id: "b2", kind: "photos", instanceIds: [], size: 50 },
+        ],
+      },
+    },
+  ],
+};
+
+describe("config store — region writes target the effective screen (dd9.8)", () => {
+  beforeEach(() => {
+    setActivePinia(createPinia());
+    vi.clearAllMocks();
+    axios.post.mockResolvedValue({ data: {} });
+  });
+
+  it("kiosk mode: cycleActiveDashboardRegionBy cycles the kiosk-active screen, not global", async () => {
+    setSearch("?kiosk=k1");
+    const store = useConfigStore();
+    store.dashboardScreens = REGION_SCREENS;
+    store.availableScreens = null;
+    store.kioskActiveScreenId = "b"; // global active is "a"
+    await store.cycleActiveDashboardRegionBy(1);
+    expect(store.dashboardScreens.screens.find(s => s.id === "b").activeRegionId).toBe("b2");
+    expect(store.dashboardScreens.screens.find(s => s.id === "a").activeRegionId).toBe("a1");
+    expect(store.dashboardScreens.activeScreenId).toBe("a"); // global active unchanged
+  });
+
+  it("kiosk mode: updateRegionView patches the kiosk-active screen's region", async () => {
+    setSearch("?kiosk=k1");
+    const store = useConfigStore();
+    store.dashboardScreens = REGION_SCREENS;
+    store.availableScreens = null;
+    store.kioskActiveScreenId = "b";
+    await store.updateRegionView("b1", { weeks: 3 });
+    const bCal = store.dashboardScreens.screens
+      .find(s => s.id === "b")
+      .layout.regions.find(r => r.id === "b1");
+    expect(bCal.view.weeks).toBe(3);
+    const aCal = store.dashboardScreens.screens
+      .find(s => s.id === "a")
+      .layout.regions.find(r => r.id === "a1");
+    expect(aCal.view.weeks).toBe(4); // untouched: default, not the patch
+  });
+
+  it("Mode A: cycleActiveDashboardRegionBy still cycles the global active screen", async () => {
+    setSearch("");
+    const store = useConfigStore();
+    store.dashboardScreens = REGION_SCREENS; // active "a"
+    await store.cycleActiveDashboardRegionBy(1);
+    expect(store.dashboardScreens.screens.find(s => s.id === "a").activeRegionId).toBe("a2");
+    expect(store.dashboardScreens.screens.find(s => s.id === "b").activeRegionId).toBe("b1");
+  });
+});
+
 describe("config store — switch actions branch on kiosk mode", () => {
   beforeEach(() => {
     setActivePinia(createPinia());

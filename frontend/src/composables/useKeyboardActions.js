@@ -461,10 +461,22 @@ export function useKeyboardActions() {
         activateScreenByIndex(Number(action.replace("screen_", "")) - 1);
         break;
       case "region_next":
-        saveDashboardScreens(cycleActiveDashboardRegion(getDashboardScreens(), 1));
+        saveDashboardScreens(
+          cycleActiveDashboardRegion(
+            getDashboardScreens(),
+            1,
+            configStore.effectiveDashboardScreens.activeScreenId
+          )
+        );
         break;
       case "region_prev":
-        saveDashboardScreens(cycleActiveDashboardRegion(getDashboardScreens(), -1));
+        saveDashboardScreens(
+          cycleActiveDashboardRegion(
+            getDashboardScreens(),
+            -1,
+            configStore.effectiveDashboardScreens.activeScreenId
+          )
+        );
         break;
 
       // Calendar actions - context-aware based on view mode
@@ -1009,7 +1021,13 @@ export function useKeyboardActions() {
   };
 
   const focusRegion = regionId => {
-    saveDashboardScreens(setActiveDashboardRegion(getDashboardScreens(), regionId));
+    saveDashboardScreens(
+      setActiveDashboardRegion(
+        getDashboardScreens(),
+        regionId,
+        configStore.effectiveDashboardScreens.activeScreenId
+      )
+    );
   };
 
   const activateScreen = screenId => {
