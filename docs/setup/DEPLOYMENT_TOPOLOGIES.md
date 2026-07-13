@@ -184,8 +184,10 @@ now per-kiosk (each kiosk reads its own effective config).
 **Managing kiosks from the UI.** Settings → **Kiosks** lists every kiosk that has connected (id,
 hostname, last-seen, Online/Offline). Select one to set its **orientation** override; the change
 saves immediately and the kiosk applies it at its next check-in (~30s). "Reset to global" clears the
-override so the kiosk inherits the global orientation again. (Content assignment and a confirmed
-"applied" indicator are planned follow-ons.)
+override so the kiosk inherits the global orientation again. Below orientation, **Content** lets you
+pick which dashboard screens that kiosk may show (a per-kiosk allowlist) and which screen it boots
+into; leaving it untouched means the kiosk shows all global screens. "Reset content to global"
+clears the per-kiosk selection.
 
 ### Changing the backend URL later
 
