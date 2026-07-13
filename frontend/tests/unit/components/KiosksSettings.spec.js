@@ -8,6 +8,7 @@ import SegmentedControl from "@/components/ui/SegmentedControl.vue";
 import ToggleSwitch from "@/components/ui/ToggleSwitch.vue";
 import ChipMultiSelect from "@/components/ui/ChipMultiSelect.vue";
 import SelectPill from "@/components/ui/SelectPill.vue";
+import SettingRow from "@/components/settings/shell/SettingRow.vue";
 
 function mountWithKiosks(list) {
   setActivePinia(createPinia());
@@ -247,12 +248,47 @@ describe("KiosksSettings — content editor", () => {
     expect(w.text()).toContain("Saved. Changes apply when this kiosk reconnects.");
   });
 
+  it("shows save-failure copy and no success copy when persistContent's saveOverrides rejects", async () => {
+    setActivePinia(createPinia());
+    const store = useKiosksStore();
+    store.loadKiosks = vi.fn(async () => {
+      store.kiosks = one;
+    });
+    store.fetchOverrides = vi.fn(async () => ({}));
+    store.saveOverrides = vi.fn(async () => {
+      throw new Error("network error");
+    });
+    const cfg = useConfigStore();
+    cfg.orientation = "landscape";
+    cfg.orientationFlipped = false;
+    cfg.dashboardScreens = twoScreens;
+    const w = mount(KiosksSettings);
+    await flushPromises();
+    await w.find("[data-test='kiosk-card']").trigger("click");
+    await flushPromises();
+    w.findComponent(ChipMultiSelect).vm.$emit("update:modelValue", ["a"]);
+    await flushPromises();
+    expect(w.text()).toContain("Couldn't save to the server. Check the connection and try again.");
+    expect(w.text()).not.toContain("Saved.");
+  });
+
   it("shows the global active screen as the effective default, tagged inherited", async () => {
     const { w } = await selectContent(one, {});
     const pill = w.findComponent(SelectPill);
     expect(pill.props("modelValue")).toBe("a");
-    // both controls are inherited → the inherited tag appears
-    expect(w.text().toLowerCase()).toContain("inherited from global");
+    // find the "Default screen" SettingRow specifically and assert its description prop
+    const defaultRow = w
+      .findAllComponents(SettingRow)
+      .find(r => r.props("label") === "Default screen");
+    expect(defaultRow.props("description")).toBe("‹inherited from global›");
+  });
+
+  it("Default screen row description is set for this kiosk when defaultScreenId is overridden", async () => {
+    const { w } = await selectContent(one, { defaultScreenId: "b" });
+    const defaultRow = w
+      .findAllComponents(SettingRow)
+      .find(r => r.props("label") === "Default screen");
+    expect(defaultRow.props("description")).toBe("‹set for this kiosk›");
   });
 
   it("limits the default-screen options to the available set", async () => {

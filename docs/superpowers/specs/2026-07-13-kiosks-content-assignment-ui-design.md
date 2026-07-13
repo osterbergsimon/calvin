@@ -142,10 +142,11 @@ Reset content to global → drop CONTENT_KEYS → save → controls show ‹inhe
   control or silently drop the edit.
 - Missing/empty catalog (`dashboardScreens` absent or `screens` empty/one) → the degenerate-state hint; no
   controls, no save path.
-- A kiosk whose stored `availableScreens`/`defaultScreenId` reference ids no longer in the catalog: the
-  effective value computeds intersect against the current catalog for display, so stale ids are shown as
-  deselected/ignored; the next save writes back a catalog-consistent layer. (Read tolerates stale data; the
-  UI never *authors* an inconsistent layer.)
+- A kiosk whose stored `availableScreens`/`defaultScreenId` reference ids no longer in the catalog:
+  `effAvailable` returns the stored array verbatim, but `ChipMultiSelect` renders only the options supplied
+  via `screenOptions` (the current catalog), so stale ids do not appear as selected chips. When the operator
+  next saves, the emitted selection is derived from those rendered options, writing back a catalog-consistent
+  layer. (Read tolerates stale data; the UI never *authors* an inconsistent layer.)
 
 ## Testing strategy
 
