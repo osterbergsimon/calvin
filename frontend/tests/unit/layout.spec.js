@@ -1,5 +1,9 @@
 import { describe, it, expect } from "vitest";
-import { filterAvailableScreens, resolveKioskActiveScreen } from "@/utils/layout";
+import {
+  filterAvailableScreens,
+  resolveKioskActiveScreen,
+  normalizeDashboardScreens,
+} from "@/utils/layout";
 
 const screensConfig = {
   version: 2,
@@ -109,5 +113,24 @@ describe("resolveKioskActiveScreen", () => {
     });
     expect(typeof result).toBe("string");
     expect(result).toBe("screen-home");
+  });
+
+  it("resolveKioskActiveScreen never returns null; falls back to first available (dd9.8)", () => {
+    const cfg = normalizeDashboardScreens({
+      version: 2,
+      activeScreenId: "a",
+      screens: [
+        { id: "a", name: "A" },
+        { id: "b", name: "B" },
+      ],
+    });
+    const id = resolveKioskActiveScreen({
+      screensConfig: cfg,
+      availableScreens: ["zzz"], // no catalog match -> fail-open to all
+      defaultScreenId: null,
+      current: null,
+    });
+    expect(id).toBeTruthy();
+    expect(cfg.screens.some(s => s.id === id)).toBe(true);
   });
 });

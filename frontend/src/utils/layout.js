@@ -142,12 +142,13 @@ const viewForKind = (region, kind) => {
  * are patched via `clampCalendarView`; service regions via `clampServiceView`.
  * The input is not mutated. No-op for other region kinds.
  */
-export function setRegionView(screens, regionId, patch) {
+export function setRegionView(screens, regionId, patch, activeScreenId = null) {
   // JSON round-trip, not structuredClone: `screens` may be a Vue reactive proxy
   // (from the Pinia store), which structuredClone rejects with DataCloneError.
   // The screens config is pure JSON-serializable data, so this is safe.
   const next = JSON.parse(JSON.stringify(screens));
-  const active = next.screens.find(s => s.id === next.activeScreenId) || next.screens[0];
+  const targetId = activeScreenId || next.activeScreenId;
+  const active = next.screens.find(s => s.id === targetId) || next.screens[0];
   if (!active) return next;
   const visit = regions => {
     for (const region of regions || []) {
@@ -400,12 +401,10 @@ export function getLeafRegions(layout) {
   );
 }
 
-export function getActiveDashboardScreen(screensConfig) {
+export function getActiveDashboardScreen(screensConfig, activeScreenId = null) {
   const normalized = normalizeDashboardScreens(screensConfig);
-  return (
-    normalized.screens.find(screen => screen.id === normalized.activeScreenId) ||
-    normalized.screens[0]
-  );
+  const targetId = activeScreenId || normalized.activeScreenId;
+  return normalized.screens.find(screen => screen.id === targetId) || normalized.screens[0];
 }
 
 export function getActiveDashboardRegion(screen) {
@@ -425,9 +424,9 @@ export function setActiveDashboardScreen(screensConfig, screenId) {
   };
 }
 
-export function setActiveDashboardRegion(screensConfig, regionId) {
+export function setActiveDashboardRegion(screensConfig, regionId, activeScreenId = null) {
   const config = normalizeDashboardScreens(screensConfig);
-  const activeScreen = getActiveDashboardScreen(config);
+  const activeScreen = getActiveDashboardScreen(config, activeScreenId);
   if (!activeScreen) return config;
   const isLeaf = getLeafRegions(activeScreen.layout).some(region => region.id === regionId);
   if (!isLeaf) return config;
@@ -453,11 +452,10 @@ export function cycleDashboardScreen(screensConfig, direction = 1) {
   };
 }
 
-export function cycleActiveDashboardRegion(screensConfig, direction = 1) {
+export function cycleActiveDashboardRegion(screensConfig, direction = 1, activeScreenId = null) {
   const normalized = normalizeDashboardScreens(screensConfig);
-  const screenIndex = normalized.screens.findIndex(
-    screen => screen.id === normalized.activeScreenId
-  );
+  const targetId = activeScreenId || normalized.activeScreenId;
+  const screenIndex = normalized.screens.findIndex(screen => screen.id === targetId);
   if (screenIndex < 0) return normalized;
   const screen = normalized.screens[screenIndex];
   const leaves = getLeafRegions(screen.layout);
@@ -470,10 +468,7 @@ export function cycleActiveDashboardRegion(screensConfig, direction = 1) {
   const screens = normalized.screens.map((candidate, index) =>
     index === screenIndex ? { ...candidate, activeRegionId: leaves[nextIndex].id } : candidate
   );
-  return {
-    ...normalized,
-    screens,
-  };
+  return { ...normalized, screens };
 }
 
 function createScreenId() {
