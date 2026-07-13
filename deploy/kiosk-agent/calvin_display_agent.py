@@ -8,6 +8,7 @@ Python 3 stdlib — no third-party deps (the kiosk Pi has no venv).
 
 import json
 import os
+import re
 import socket
 import subprocess
 import sys
@@ -39,7 +40,9 @@ def _should_be_on(now_t, on_t, off_t):
 
 def desired_on(cfg, now):
     """Return True if the display should be ON at `now` (a datetime)."""
-    if not cfg_get(cfg, "display_schedule_enabled", "displayScheduleEnabled", default=False):
+    if not cfg_get(
+        cfg, "display_schedule_enabled", "displayScheduleEnabled", default=False
+    ):
         return True
     schedule = cfg_get(cfg, "display_schedule", "displaySchedule", default=[]) or []
     entry = next((d for d in schedule if d.get("day") == now.weekday()), None)
@@ -55,7 +58,9 @@ def desired_on(cfg, now):
 
 def seconds_to_next_boundary(cfg, now):
     """Seconds until the next on/off transition, or None if no boundaries exist."""
-    if not cfg_get(cfg, "display_schedule_enabled", "displayScheduleEnabled", default=False):
+    if not cfg_get(
+        cfg, "display_schedule_enabled", "displayScheduleEnabled", default=False
+    ):
         return None
     schedule = cfg_get(cfg, "display_schedule", "displaySchedule", default=[]) or []
     by_day = {d.get("day"): d for d in schedule if d.get("enabled", False)}
@@ -181,7 +186,9 @@ def run(
             if prev != last:
                 log(f"display -> {'ON' if last else 'OFF'}")
             secs = seconds_to_next_boundary(cfg, now)
-            delay = refresh_seconds if secs is None else max(1, min(secs, refresh_seconds))
+            delay = (
+                refresh_seconds if secs is None else max(1, min(secs, refresh_seconds))
+            )
         except Exception as e:
             log(f"iteration failed ({e}); keeping display state")
             sleep(BACKOFF_SECONDS)
@@ -191,6 +198,7 @@ def run(
 
 X11_ENV = {"DISPLAY": ":0", "XAUTHORITY": "/home/calvin/.Xauthority"}
 VALID_ROTATIONS = ("normal", "left", "right", "inverted")
+_RESOLUTION_RE = re.compile(r"^(\d+x\d+)(?:@(\d+(?:\.\d+)?))?$")
 
 
 def detect_primary_output():
@@ -221,7 +229,9 @@ def apply_rotation(rotation, output=None):
     action, not part of the schedule loop.
     """
     if rotation not in VALID_ROTATIONS:
-        log(f"ignoring invalid rotation {rotation!r} (expected one of {VALID_ROTATIONS})")
+        log(
+            f"ignoring invalid rotation {rotation!r} (expected one of {VALID_ROTATIONS})"
+        )
         return None
     out = output or detect_primary_output()
     if not out:
@@ -245,6 +255,62 @@ def apply_rotation(rotation, output=None):
     return None
 
 
+def _parse_resolution(resolution):
+    """Parse 'WxH' or 'WxH@RATE' into (mode, rate_or_None). Return None if malformed."""
+    m = _RESOLUTION_RE.match(resolution.strip())
+    if not m:
+        return None
+    return m.group(1), m.group(2)
+
+
+def apply_mode(output, resolution):
+    """Select the primary output and optionally set its mode via xrandr.
+
+    output: an explicitly-configured xrandr output name (env/server), or None.
+    resolution: 'WxH' or 'WxH@RATE', or None.
+    Does nothing when neither is configured. A configured output is marked --primary.
+    Returns the argv applied, or None if skipped/failed. Never raises.
+    """
+    if output is not None:
+        output = str(output).strip() or None
+    if resolution is not None:
+        resolution = str(resolution).strip() or None
+    if not output and not resolution:
+        return None
+    out = output or detect_primary_output()
+    if not out:
+        log("no connected display output found; cannot set output/mode")
+        return None
+    argv = ["xrandr", "--output", out, "--primary"]
+    if resolution:
+        parsed = _parse_resolution(resolution)
+        if parsed is None:
+            log(
+                f"ignoring invalid resolution {resolution!r} (expected WxH or WxH@RATE)"
+            )
+        else:
+            mode, rate = parsed
+            argv += ["--mode", mode]
+            if rate:
+                argv += ["--rate", rate]
+    try:
+        r = subprocess.run(
+            argv,
+            env=dict(os.environ, **X11_ENV),
+            capture_output=True,
+            text=True,
+            timeout=10,
+        )
+    except (FileNotFoundError, subprocess.SubprocessError) as e:
+        log(f"output/mode apply failed ({e})")
+        return None
+    if r.returncode == 0:
+        log(f"output/mode applied: {' '.join(argv[1:])}")
+        return argv
+    log(f"output/mode apply failed (xrandr rc={r.returncode}): {r.stderr.strip()}")
+    return None
+
+
 def orientation_to_xrandr(cfg):
     """Map server orientation config to an xrandr rotate value.
 
@@ -260,20 +326,36 @@ def orientation_to_xrandr(cfg):
     return "normal"
 
 
-def apply_device_physical(cfg, *, applier=apply_rotation, env=None):
-    """Apply device-physical settings (orientation) from the effective config.
+def apply_device_physical(
+    cfg, *, applier=apply_rotation, mode_applier=apply_mode, env=None
+):
+    """Apply device-physical settings (output/resolution/orientation) from the config.
 
-    CALVIN_DISPLAY_ROTATION env (device-local escape hatch) wins over the server
-    orientation. Gated on applyDisplayRotation (default True).
+    Device-local env vars win over server config:
+      CALVIN_DISPLAY_OUTPUT     -> output selected as primary / rotation target
+      CALVIN_DISPLAY_RESOLUTION -> 'WxH' or 'WxH@RATE'
+      CALVIN_DISPLAY_ROTATION   -> xrandr rotate value
+    Output+mode apply first (a mode change can reset rotation), then rotation.
+    Rotation is gated on applyDisplayRotation (default True); output/resolution are
+    independent of that gate.
     """
     if env is None:
         env = os.environ
-    if not cfg_get(cfg, "apply_display_rotation", "applyDisplayRotation", default=True):
-        return
-    env_rotation = env.get("CALVIN_DISPLAY_ROTATION", "").strip()
-    rotation = env_rotation or orientation_to_xrandr(cfg)
-    output = env.get("CALVIN_DISPLAY_OUTPUT", "").strip() or None
-    applier(rotation, output)
+    output = (
+        env.get("CALVIN_DISPLAY_OUTPUT", "").strip()
+        or cfg_get(cfg, "display_output", "displayOutput", default="")
+        or None
+    )
+    resolution = (
+        env.get("CALVIN_DISPLAY_RESOLUTION", "").strip()
+        or cfg_get(cfg, "display_resolution", "displayResolution", default="")
+        or None
+    )
+    mode_applier(output, resolution)
+    if cfg_get(cfg, "apply_display_rotation", "applyDisplayRotation", default=True):
+        env_rotation = env.get("CALVIN_DISPLAY_ROTATION", "").strip()
+        rotation = env_rotation or orientation_to_xrandr(cfg)
+        applier(rotation, output)
 
 
 def main():
@@ -281,10 +363,18 @@ def main():
     if not backend:
         log("CALVIN_BACKEND_URL not set")
         sys.exit(1)
+    out_env = os.environ.get("CALVIN_DISPLAY_OUTPUT", "").strip() or None
+    res_env = os.environ.get("CALVIN_DISPLAY_RESOLUTION", "").strip() or None
+    if out_env or res_env:
+        apply_mode(out_env, res_env)
     rotation = os.environ.get("CALVIN_DISPLAY_ROTATION", "").strip()
     if rotation:
-        apply_rotation(rotation, os.environ.get("CALVIN_DISPLAY_OUTPUT", "").strip() or None)
-    refresh = int(os.environ.get("CALVIN_DISPLAY_REFRESH_SECONDS", DEFAULT_REFRESH_SECONDS))
+        apply_rotation(
+            rotation, os.environ.get("CALVIN_DISPLAY_OUTPUT", "").strip() or None
+        )
+    refresh = int(
+        os.environ.get("CALVIN_DISPLAY_REFRESH_SECONDS", DEFAULT_REFRESH_SECONDS)
+    )
     log(f"starting: backend={backend} refresh={refresh}s")
     run(backend, refresh)
 
