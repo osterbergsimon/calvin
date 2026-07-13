@@ -176,4 +176,25 @@ describe("CollapsibleSection", () => {
       expect(wrapper.find(".section-content").isVisible()).toBe(false);
     });
   });
+
+  describe("CollapsibleSection — drawer variant", () => {
+    it("adds is-drawer class when variant is drawer", () => {
+      const w = mount(CollapsibleSection, {
+        props: { title: "Display hardware", variant: "drawer" },
+      });
+      expect(w.get("section").classes()).toContain("is-drawer");
+    });
+
+    it("does not add is-drawer for the default variant (no regression)", () => {
+      const w = mount(CollapsibleSection, { props: { title: "Anything" } });
+      expect(w.get("section").classes()).not.toContain("is-drawer");
+    });
+
+    it("still toggles expansion", async () => {
+      const w = mount(CollapsibleSection, { props: { title: "T", expanded: false } });
+      expect(w.get("section").classes()).not.toContain("expanded");
+      await w.get("button.section-header").trigger("click");
+      expect(w.get("section").classes()).toContain("expanded");
+    });
+  });
 });

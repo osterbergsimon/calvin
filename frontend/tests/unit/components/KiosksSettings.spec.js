@@ -9,6 +9,9 @@ import ToggleSwitch from "@/components/ui/ToggleSwitch.vue";
 import ChipMultiSelect from "@/components/ui/ChipMultiSelect.vue";
 import SelectPill from "@/components/ui/SelectPill.vue";
 import SettingRow from "@/components/settings/shell/SettingRow.vue";
+import KioskStatusHeader from "@/components/settings/shared/KioskStatusHeader.vue";
+import DisplayScheduleGrid from "@/components/settings/shared/DisplayScheduleGrid.vue";
+import CollapsibleSection from "@/components/settings/shared/CollapsibleSection.vue";
 
 function mountWithKiosks(list) {
   setActivePinia(createPinia());
@@ -17,6 +20,7 @@ function mountWithKiosks(list) {
     store.kiosks = list;
   });
   store.fetchOverrides = vi.fn(async () => ({}));
+  store.fetchDeviceConfigVersion = vi.fn(async () => null);
   return mount(KiosksSettings);
 }
 
@@ -64,6 +68,7 @@ describe("KiosksSettings — orientation editor", () => {
     });
     store.fetchOverrides = vi.fn(async () => overrides);
     store.saveOverrides = vi.fn(async () => {});
+    store.fetchDeviceConfigVersion = vi.fn(async () => null);
     const cfg = useConfigStore();
     cfg.orientation = "landscape";
     cfg.orientationFlipped = false;
@@ -122,6 +127,7 @@ describe("KiosksSettings — orientation editor", () => {
     store.saveOverrides = vi.fn(async () => {
       throw new Error("network error");
     });
+    store.fetchDeviceConfigVersion = vi.fn(async () => null);
     const w = mount(KiosksSettings);
     await flushPromises();
     await w.find("[data-test='kiosk-card']").trigger("click");
@@ -143,8 +149,8 @@ describe("KiosksSettings — orientation editor", () => {
 
   it("setFlipped preserves unrelated override keys alongside orientationFlipped", async () => {
     const { w, store } = await selectFirst(one, { availableScreens: ["a"] });
-    // ToggleSwitch[0] is the Flip 180° control
-    w.findAllComponents(ToggleSwitch)[0].vm.$emit("update:modelValue", true);
+    // ToggleSwitch[1] is the Flip 180° control (index 0 is the Power schedule toggle in the schedule section)
+    w.findAllComponents(ToggleSwitch)[1].vm.$emit("update:modelValue", true);
     await flushPromises();
     expect(store.saveOverrides).toHaveBeenCalledWith("k1", {
       availableScreens: ["a"],
@@ -178,6 +184,7 @@ describe("KiosksSettings — content editor", () => {
     });
     store.fetchOverrides = vi.fn(async () => overrides);
     store.saveOverrides = vi.fn(async () => {});
+    store.fetchDeviceConfigVersion = vi.fn(async () => null);
     const cfg = useConfigStore();
     cfg.orientation = "landscape";
     cfg.orientationFlipped = false;
@@ -258,6 +265,7 @@ describe("KiosksSettings — content editor", () => {
     store.saveOverrides = vi.fn(async () => {
       throw new Error("network error");
     });
+    store.fetchDeviceConfigVersion = vi.fn(async () => null);
     const cfg = useConfigStore();
     cfg.orientation = "landscape";
     cfg.orientationFlipped = false;
@@ -322,5 +330,250 @@ describe("KiosksSettings — content editor", () => {
     const { w } = await selectContent(one, { orientation: "portrait" });
     const btn = w.find("[data-test='reset-content']");
     expect(btn.attributes("disabled")).toBeDefined();
+  });
+});
+
+describe("KiosksSettings — pending badge", () => {
+  beforeEach(() => vi.clearAllMocks());
+
+  it("shows the pending badge for an offline kiosk whose applied != desired", async () => {
+    setActivePinia(createPinia());
+    const store = useKiosksStore();
+    const stale = new Date(Date.now() - 6 * 60 * 60 * 1000).toISOString();
+    store.loadKiosks = vi.fn(async () => {
+      store.kiosks = [{ id: "off", hostname: "b", lastSeen: stale, lastAppliedVersion: "old" }];
+    });
+    store.fetchOverrides = vi.fn(async () => ({}));
+    store.fetchDeviceConfigVersion = vi.fn(async () => "new");
+    const w = mount(KiosksSettings);
+    await flushPromises();
+    expect(w.find("[data-test='kiosk-pending-badge']").exists()).toBe(true);
+  });
+
+  it("hides the badge when online, when versions match, or when desired is unknown", async () => {
+    setActivePinia(createPinia());
+    const store = useKiosksStore();
+    const recent = new Date().toISOString();
+    const stale = new Date(Date.now() - 6 * 60 * 60 * 1000).toISOString();
+    store.loadKiosks = vi.fn(async () => {
+      store.kiosks = [
+        { id: "online-mismatch", hostname: "a", lastSeen: recent, lastAppliedVersion: "old" },
+        { id: "offline-match", hostname: "b", lastSeen: stale, lastAppliedVersion: "same" },
+        { id: "offline-unknown", hostname: "c", lastSeen: stale, lastAppliedVersion: "old" },
+      ];
+    });
+    store.fetchOverrides = vi.fn(async () => ({}));
+    store.fetchDeviceConfigVersion = vi.fn(async id => {
+      if (id === "online-mismatch") return "new";
+      if (id === "offline-match") return "same";
+      return null; // offline-unknown → desired unknown → fail-open, no badge
+    });
+    const w = mount(KiosksSettings);
+    await flushPromises();
+    expect(w.findAll("[data-test='kiosk-pending-badge']").length).toBe(0);
+  });
+});
+
+describe("KiosksSettings — status header", () => {
+  beforeEach(() => vi.clearAllMocks());
+
+  it("renders KioskStatusHeader for the selected kiosk with applied and desired versions", async () => {
+    setActivePinia(createPinia());
+    const store = useKiosksStore();
+    store.loadKiosks = vi.fn(async () => {
+      store.kiosks = [
+        { id: "k1", hostname: "pi", lastSeen: new Date().toISOString(), lastAppliedVersion: "old" },
+      ];
+    });
+    store.fetchOverrides = vi.fn(async () => ({}));
+    store.saveOverrides = vi.fn(async () => {});
+    store.fetchDeviceConfigVersion = vi.fn(async () => "new");
+    const w = mount(KiosksSettings);
+    await flushPromises();
+    // No selection yet → no header.
+    expect(w.findComponent(KioskStatusHeader).exists()).toBe(false);
+    await w.find("[data-test='kiosk-card']").trigger("click");
+    await flushPromises();
+    const header = w.findComponent(KioskStatusHeader);
+    expect(header.exists()).toBe(true);
+    expect(header.props("appliedVersion")).toBe("old");
+    expect(header.props("desiredVersion")).toBe("new");
+    expect(header.props("kioskId")).toBe("k1");
+  });
+});
+
+describe("KiosksSettings — schedule editor", () => {
+  beforeEach(() => vi.clearAllMocks());
+
+  async function selectFirst(overrides = {}) {
+    setActivePinia(createPinia());
+    const store = useKiosksStore();
+    store.loadKiosks = vi.fn(async () => {
+      store.kiosks = [
+        { id: "k1", hostname: "pi", lastSeen: new Date().toISOString(), lastAppliedVersion: null },
+      ];
+    });
+    store.fetchOverrides = vi.fn(async () => overrides);
+    store.saveOverrides = vi.fn(async () => {});
+    store.fetchDeviceConfigVersion = vi.fn(async () => null);
+    const cfg = useConfigStore();
+    cfg.displayScheduleEnabled = true;
+    cfg.displaySchedule = [{ day: 0, enabled: true, onTime: "06:00", offTime: "22:00" }];
+    const w = mount(KiosksSettings);
+    await flushPromises();
+    await w.find("[data-test='kiosk-card']").trigger("click");
+    await flushPromises();
+    return { w, store };
+  }
+
+  it("shows the global schedule as effective and tagged inherited when no override", async () => {
+    const { w } = await selectFirst({});
+    const section = w.get("#section-kiosks-schedule");
+    expect(section.text().toLowerCase()).toContain("inherited from global");
+  });
+
+  it("editing the grid saves a merged displaySchedule override, preserving unrelated keys", async () => {
+    const { w, store } = await selectFirst({ orientation: "portrait" });
+    const next = [{ day: 0, enabled: false, onTime: "07:00", offTime: "23:00" }];
+    w.findComponent(DisplayScheduleGrid).vm.$emit("update:modelValue", next);
+    await flushPromises();
+    expect(store.saveOverrides).toHaveBeenCalledWith("k1", {
+      orientation: "portrait",
+      displaySchedule: next,
+    });
+  });
+
+  it("Reset schedule removes only the schedule keys", async () => {
+    const { w, store } = await selectFirst({
+      orientation: "portrait",
+      displayScheduleEnabled: false,
+      displaySchedule: [{ day: 0, enabled: false, onTime: "07:00", offTime: "23:00" }],
+    });
+    await w.find("[data-test='reset-schedule']").trigger("click");
+    await flushPromises();
+    expect(store.saveOverrides).toHaveBeenCalledWith("k1", { orientation: "portrait" });
+  });
+
+  it("Reset schedule is disabled when there is no schedule override", async () => {
+    const { w } = await selectFirst({});
+    expect(w.find("[data-test='reset-schedule']").attributes("disabled")).toBeDefined();
+  });
+
+  it("shows save-failure copy when saveOverrides rejects", async () => {
+    setActivePinia(createPinia());
+    const store = useKiosksStore();
+    store.loadKiosks = vi.fn(async () => {
+      store.kiosks = [
+        { id: "k1", hostname: "pi", lastSeen: new Date().toISOString(), lastAppliedVersion: null },
+      ];
+    });
+    store.fetchOverrides = vi.fn(async () => ({}));
+    store.saveOverrides = vi.fn(async () => {
+      throw new Error("boom");
+    });
+    store.fetchDeviceConfigVersion = vi.fn(async () => null);
+    const cfg = useConfigStore();
+    cfg.displayScheduleEnabled = true;
+    cfg.displaySchedule = [{ day: 0, enabled: true, onTime: "06:00", offTime: "22:00" }];
+    const w = mount(KiosksSettings);
+    await flushPromises();
+    await w.find("[data-test='kiosk-card']").trigger("click");
+    await flushPromises();
+    w.findComponent(DisplayScheduleGrid).vm.$emit("update:modelValue", [
+      { day: 0, enabled: false, onTime: "07:00", offTime: "23:00" },
+    ]);
+    await flushPromises();
+    expect(w.get("#section-kiosks-schedule").text()).toContain("Couldn't save to the server");
+  });
+
+  it("refreshes desiredVersion after a schedule save so Applied becomes Pending", async () => {
+    setActivePinia(createPinia());
+    const store = useKiosksStore();
+    const stale = new Date(Date.now() - 6 * 60 * 60 * 1000).toISOString();
+    store.loadKiosks = vi.fn(async () => {
+      store.kiosks = [{ id: "k1", hostname: "pi", lastSeen: stale, lastAppliedVersion: "v1" }];
+    });
+    store.fetchOverrides = vi.fn(async () => ({}));
+    store.saveOverrides = vi.fn(async () => {});
+    // onMounted prefetch → "v1"; select() call → "v1"; post-save refetch → "v2"
+    store.fetchDeviceConfigVersion = vi
+      .fn()
+      .mockResolvedValueOnce("v1") // onMounted prefetch for k1
+      .mockResolvedValueOnce("v1") // select() call
+      .mockResolvedValueOnce("v2"); // post-save refreshDesiredVersion
+    const cfg = useConfigStore();
+    cfg.displayScheduleEnabled = true;
+    cfg.displaySchedule = [{ day: 0, enabled: true, onTime: "06:00", offTime: "22:00" }];
+    const w = mount(KiosksSettings);
+    await flushPromises();
+    await w.find("[data-test='kiosk-card']").trigger("click");
+    await flushPromises();
+    // Before save: desiredVersion === "v1", appliedVersion === "v1" → Applied
+    const header = w.findComponent(KioskStatusHeader);
+    expect(header.props("desiredVersion")).toBe("v1");
+    expect(header.props("appliedVersion")).toBe("v1");
+    // Trigger a schedule edit and save
+    w.findComponent(DisplayScheduleGrid).vm.$emit("update:modelValue", [
+      { day: 0, enabled: false, onTime: "07:00", offTime: "23:00" },
+    ]);
+    await flushPromises();
+    // After save: desiredVersion should have been refreshed to "v2" → Pending
+    expect(w.findComponent(KioskStatusHeader).props("desiredVersion")).toBe("v2");
+  });
+});
+
+describe("KiosksSettings — detail order and hardware drawer", () => {
+  beforeEach(() => vi.clearAllMocks());
+
+  async function selectFirst() {
+    setActivePinia(createPinia());
+    const store = useKiosksStore();
+    store.loadKiosks = vi.fn(async () => {
+      store.kiosks = [
+        { id: "k1", hostname: "pi", lastSeen: new Date().toISOString(), lastAppliedVersion: null },
+        { id: "k2", hostname: "pi2", lastSeen: new Date().toISOString(), lastAppliedVersion: null },
+      ];
+    });
+    store.fetchOverrides = vi.fn(async () => ({}));
+    store.saveOverrides = vi.fn(async () => {});
+    store.fetchDeviceConfigVersion = vi.fn(async () => null);
+    const cfg = useConfigStore();
+    cfg.orientation = "landscape";
+    cfg.orientationFlipped = false;
+    const w = mount(KiosksSettings);
+    await flushPromises();
+    await w.find("[data-test='kiosk-card']").trigger("click");
+    await flushPromises();
+    return { w };
+  }
+
+  it("orders detail sections Content, then Schedule, then the hardware drawer", async () => {
+    const { w } = await selectFirst();
+    const html = w.html();
+    const iContent = html.indexOf("section-kiosks-content");
+    const iSchedule = html.indexOf("section-kiosks-schedule");
+    const iHardware = html.indexOf("Display hardware");
+    expect(iContent).toBeGreaterThan(-1);
+    expect(iContent).toBeLessThan(iSchedule);
+    expect(iSchedule).toBeLessThan(iHardware);
+  });
+
+  it("puts the orientation editor inside a collapsed drawer that starts closed", async () => {
+    const { w } = await selectFirst();
+    const drawer = w.findComponent(CollapsibleSection);
+    expect(drawer.exists()).toBe(true);
+    expect(drawer.get("section").classes()).not.toContain("expanded");
+    // orientation controls are still present (v-show keeps them mounted)
+    expect(w.find("[data-test='reset-orientation']").exists()).toBe(true);
+  });
+
+  it("re-collapses the drawer when switching kiosks", async () => {
+    const { w } = await selectFirst();
+    const drawer = w.findComponent(CollapsibleSection);
+    await drawer.get("button.section-header").trigger("click"); // expand
+    expect(drawer.get("section").classes()).toContain("expanded");
+    await w.findAll("[data-test='kiosk-card']")[1].trigger("click"); // switch kiosk
+    await flushPromises();
+    expect(w.findComponent(CollapsibleSection).get("section").classes()).not.toContain("expanded");
   });
 });

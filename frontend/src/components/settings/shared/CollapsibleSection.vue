@@ -1,5 +1,8 @@
 <template>
-  <section class="settings-section collapsible" :class="{ expanded: isExpanded }">
+  <section
+    class="settings-section collapsible"
+    :class="{ expanded: isExpanded, 'is-drawer': variant === 'drawer' }"
+  >
     <button
       type="button"
       class="section-header"
@@ -36,6 +39,10 @@ const props = defineProps({
   expanded: {
     type: Boolean,
     default: false,
+  },
+  variant: {
+    type: String,
+    default: "default",
   },
 });
 
@@ -122,5 +129,10 @@ const toggle = () => {
 
 .settings-section.expanded .section-header {
   border-bottom: 1px solid var(--line);
+}
+
+.settings-section.is-drawer {
+  border-radius: 16px;
+  margin-bottom: 0;
 }
 </style>

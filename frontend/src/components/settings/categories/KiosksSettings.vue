@@ -15,16 +15,115 @@
         @click="select(k.id)"
       >
         <span class="kiosk-card__id">{{ k.id }}</span>
-        <span class="kiosk-card__status" :class="isOnline(k) ? 'is-online' : 'is-offline'">
-          {{ isOnline(k) ? "● Online" : "○ Offline" }}
+        <span class="kiosk-card__meta-end">
+          <span
+            v-if="isPending(k)"
+            class="kiosk-card__badge"
+            data-test="kiosk-pending-badge"
+            role="img"
+            :aria-label="`${k.id}: offline, hardware config not yet applied`"
+            title="Offline — this kiosk hasn't applied the current hardware config yet"
+            >⚠</span
+          >
+          <span class="kiosk-card__status" :class="isOnline(k) ? 'is-online' : 'is-offline'">
+            {{ isOnline(k) ? "● Online" : "○ Offline" }}
+          </span>
         </span>
         <span class="kiosk-card__meta">{{ k.hostname }} · seen {{ relativeTime(k.lastSeen) }}</span>
       </button>
     </SettingsSection>
+    <KioskStatusHeader
+      v-if="selectedId"
+      :kiosk-id="selectedId"
+      :online="selectedKiosk() ? isOnline(selectedKiosk()) : false"
+      :last-seen-label="relativeTime(selectedKiosk()?.lastSeen)"
+      :applied-version="selectedKiosk()?.lastAppliedVersion ?? null"
+      :desired-version="desiredVersions[selectedId] ?? null"
+    />
+    <SettingsSection v-if="selectedId" id="kiosks-content" :title="`${selectedId} — Content`">
+      <p v-if="!hasEnoughScreens" class="kiosks__hint">
+        Add more screens in Display → Screens & regions to assign different content per kiosk.
+      </p>
+      <template v-else>
+        <SettingRow
+          label="Screens shown"
+          :description="availableOverridden ? '‹set for this kiosk›' : '‹inherited from global›'"
+        >
+          <ChipMultiSelect
+            :model-value="effAvailable"
+            aria-label="Screens shown"
+            :options="screenOptions"
+            @update:model-value="setAvailable"
+          />
+        </SettingRow>
+        <SettingRow
+          label="Default screen"
+          :description="defaultOverridden ? '‹set for this kiosk›' : '‹inherited from global›'"
+        >
+          <SelectPill
+            :model-value="effDefault"
+            aria-label="Default screen"
+            :options="availableOptions"
+            @update:model-value="setDefault"
+          />
+        </SettingRow>
+        <button
+          type="button"
+          class="kiosks__reset"
+          data-test="reset-content"
+          :disabled="!contentOverridden"
+          @click="resetContent"
+        >
+          Reset content to global
+        </button>
+        <p v-if="contentMsg" class="kiosks__saved" role="status" aria-live="polite">
+          {{ contentMsg }}
+        </p>
+      </template>
+    </SettingsSection>
     <SettingsSection
       v-if="selectedId"
-      id="kiosks-orientation"
-      :title="`${selectedId} — Orientation`"
+      id="kiosks-schedule"
+      :title="`${selectedId} — Display schedule`"
+    >
+      <SettingRow
+        label="Power schedule"
+        :description="
+          scheduleEnabledOverridden ? '‹set for this kiosk›' : '‹inherited from global›'
+        "
+      >
+        <ToggleSwitch
+          :model-value="effScheduleEnabled"
+          aria-label="Power schedule"
+          @update:model-value="setScheduleEnabled"
+        />
+      </SettingRow>
+      <SettingRow
+        v-if="effScheduleEnabled"
+        label="Daily schedule"
+        :description="scheduleOverridden ? '‹set for this kiosk›' : '‹inherited from global›'"
+      >
+        <DisplayScheduleGrid :model-value="effSchedule || []" @update:model-value="setSchedule" />
+      </SettingRow>
+      <button
+        type="button"
+        class="kiosks__reset"
+        data-test="reset-schedule"
+        :disabled="!anyScheduleOverridden"
+        @click="resetSchedule"
+      >
+        Reset schedule to global
+      </button>
+      <p v-if="scheduleMsg" class="kiosks__saved" role="status" aria-live="polite">
+        {{ scheduleMsg }}
+      </p>
+    </SettingsSection>
+    <CollapsibleSection
+      v-if="selectedId"
+      title="Display hardware"
+      variant="drawer"
+      :expanded="hardwareOpen"
+      @update:expanded="hardwareOpen = $event"
     >
       <SettingRow
         label="Orientation"
@@ -70,48 +169,7 @@
         Reset to global
       </button>
       <p v-if="savedMsg" class="kiosks__saved" role="status" aria-live="polite">{{ savedMsg }}</p>
-    </SettingsSection>
-    <SettingsSection v-if="selectedId" id="kiosks-content" :title="`${selectedId} — Content`">
-      <p v-if="!hasEnoughScreens" class="kiosks__hint">
-        Add more screens in Display → Screens & regions to assign different content per kiosk.
-      </p>
-      <template v-else>
-        <SettingRow
-          label="Screens shown"
-          :description="availableOverridden ? '‹set for this kiosk›' : '‹inherited from global›'"
-        >
-          <ChipMultiSelect
-            :model-value="effAvailable"
-            aria-label="Screens shown"
-            :options="screenOptions"
-            @update:model-value="setAvailable"
-          />
-        </SettingRow>
-        <SettingRow
-          label="Default screen"
-          :description="defaultOverridden ? '‹set for this kiosk›' : '‹inherited from global›'"
-        >
-          <SelectPill
-            :model-value="effDefault"
-            aria-label="Default screen"
-            :options="availableOptions"
-            @update:model-value="setDefault"
-          />
-        </SettingRow>
-        <button
-          type="button"
-          class="kiosks__reset"
-          data-test="reset-content"
-          :disabled="!contentOverridden"
-          @click="resetContent"
-        >
-          Reset content to global
-        </button>
-        <p v-if="contentMsg" class="kiosks__saved" role="status" aria-live="polite">
-          {{ contentMsg }}
-        </p>
-      </template>
-    </SettingsSection>
+    </CollapsibleSection>
   </div>
 </template>
 
@@ -125,6 +183,9 @@ import SegmentedControl from "@/components/ui/SegmentedControl.vue";
 import ToggleSwitch from "@/components/ui/ToggleSwitch.vue";
 import ChipMultiSelect from "@/components/ui/ChipMultiSelect.vue";
 import SelectPill from "@/components/ui/SelectPill.vue";
+import KioskStatusHeader from "@/components/settings/shared/KioskStatusHeader.vue";
+import DisplayScheduleGrid from "@/components/settings/shared/DisplayScheduleGrid.vue";
+import CollapsibleSection from "@/components/settings/shared/CollapsibleSection.vue";
 
 const store = useKiosksStore();
 const config = useConfigStore();
@@ -133,6 +194,8 @@ const selectedId = ref(null);
 const overrides = ref({});
 const savedMsg = ref("");
 const contentMsg = ref("");
+const desiredVersions = ref({});
+const hardwareOpen = ref(false);
 
 const ONLINE_WINDOW_MS = 120000; // 2 minutes
 
@@ -221,6 +284,11 @@ function setAvailable(ids) {
   persistContent(next);
 }
 
+function isPending(k) {
+  const desired = desiredVersions.value[k.id];
+  return !isOnline(k) && !!desired && k.lastAppliedVersion !== desired;
+}
+
 function isOnline(k) {
   if (!k.lastSeen) return false;
   return Date.now() - Date.parse(k.lastSeen) < ONLINE_WINDOW_MS;
@@ -239,6 +307,11 @@ function selectedKiosk() {
   return kiosks.value.find(k => k.id === selectedId.value);
 }
 
+async function refreshDesiredVersion(id) {
+  const v = await store.fetchDeviceConfigVersion(id);
+  if (v) desiredVersions.value = { ...desiredVersions.value, [id]: v };
+}
+
 async function persist(next) {
   overrides.value = next;
   try {
@@ -247,6 +320,7 @@ async function persist(next) {
     savedMsg.value = online
       ? "Saved. This kiosk applies orientation at its next check-in (~30s)."
       : "Saved. Changes apply when this kiosk reconnects.";
+    await refreshDesiredVersion(selectedId.value);
   } catch {
     savedMsg.value = "Couldn't save to the server. Check the connection and try again.";
   }
@@ -268,15 +342,70 @@ function resetOrientation() {
   persist(next);
 }
 
+const SCHED_KEYS = ["displayScheduleEnabled", "displaySchedule"];
+const scheduleMsg = ref("");
+
+const scheduleEnabledOverridden = computed(() => "displayScheduleEnabled" in overrides.value);
+const scheduleOverridden = computed(() => "displaySchedule" in overrides.value);
+const anyScheduleOverridden = computed(
+  () => scheduleEnabledOverridden.value || scheduleOverridden.value
+);
+const effScheduleEnabled = computed(() =>
+  scheduleEnabledOverridden.value
+    ? overrides.value.displayScheduleEnabled
+    : config.displayScheduleEnabled
+);
+const effSchedule = computed(() =>
+  scheduleOverridden.value ? overrides.value.displaySchedule : config.displaySchedule
+);
+
+async function persistSchedule(next) {
+  overrides.value = next;
+  try {
+    await store.saveOverrides(selectedId.value, next);
+    const online = selectedKiosk() ? isOnline(selectedKiosk()) : false;
+    scheduleMsg.value = online
+      ? "Saved. This kiosk applies the schedule at its next check-in (~30s)."
+      : "Saved. Changes apply when this kiosk reconnects.";
+    await refreshDesiredVersion(selectedId.value);
+  } catch {
+    scheduleMsg.value = "Couldn't save to the server. Check the connection and try again.";
+  }
+}
+
+function setScheduleEnabled(value) {
+  persistSchedule({ ...overrides.value, displayScheduleEnabled: value });
+}
+function setSchedule(value) {
+  persistSchedule({ ...overrides.value, displaySchedule: value });
+}
+function resetSchedule() {
+  const next = { ...overrides.value };
+  for (const k of SCHED_KEYS) delete next[k];
+  persistSchedule(next);
+}
+
 async function select(id) {
   selectedId.value = id;
   savedMsg.value = "";
   contentMsg.value = "";
+  scheduleMsg.value = "";
+  hardwareOpen.value = false;
   overrides.value = await store.fetchOverrides(id);
+  await refreshDesiredVersion(id);
 }
 
 onMounted(async () => {
   await store.loadKiosks();
+  // Fetch all versions concurrently, then commit ONCE — writing the map inside
+  // each concurrent callback races (each spreads a stale base, last write wins,
+  // dropping entries).
+  const entries = await Promise.all(
+    kiosks.value.map(async k => [k.id, await store.fetchDeviceConfigVersion(k.id)])
+  );
+  const next = { ...desiredVersions.value };
+  for (const [id, v] of entries) if (v) next[id] = v;
+  desiredVersions.value = next;
 });
 </script>
 
@@ -308,8 +437,13 @@ onMounted(async () => {
 .kiosk-card__id {
   font-weight: 600;
 }
-.kiosk-card__status {
+.kiosk-card__meta-end {
   justify-self: end;
+  display: inline-flex;
+  align-items: baseline;
+  gap: 6px;
+}
+.kiosk-card__status {
   font-size: 0.85em;
 }
 .kiosk-card__status.is-online {
@@ -317,6 +451,10 @@ onMounted(async () => {
 }
 .kiosk-card__status.is-offline {
   color: rgba(255, 255, 255, 0.45);
+}
+.kiosk-card__badge {
+  font-size: 0.85em;
+  color: var(--warn);
 }
 .kiosk-card__meta {
   grid-column: 1 / -1;

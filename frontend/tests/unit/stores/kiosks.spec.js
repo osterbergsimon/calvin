@@ -53,3 +53,37 @@ describe("kiosks store", () => {
     });
   });
 });
+
+describe("kiosks store — fetchDeviceConfigVersion", () => {
+  beforeEach(() => {
+    setActivePinia(createPinia());
+    vi.restoreAllMocks();
+  });
+
+  it("returns deviceConfigVersion from GET /config", async () => {
+    vi.spyOn(axios, "get").mockResolvedValue({ data: { deviceConfigVersion: "9f2a" } });
+    const store = useKiosksStore();
+    const v = await store.fetchDeviceConfigVersion("k1");
+    expect(v).toBe("9f2a");
+    expect(axios.get).toHaveBeenCalledWith("/api/kiosks/k1/config");
+  });
+
+  it("returns null when the request fails", async () => {
+    vi.spyOn(axios, "get").mockRejectedValue(new Error("network"));
+    const store = useKiosksStore();
+    expect(await store.fetchDeviceConfigVersion("k1")).toBeNull();
+  });
+
+  it("returns null when the field is missing", async () => {
+    vi.spyOn(axios, "get").mockResolvedValue({ data: {} });
+    const store = useKiosksStore();
+    expect(await store.fetchDeviceConfigVersion("k1")).toBeNull();
+  });
+
+  it("url-encodes the id", async () => {
+    vi.spyOn(axios, "get").mockResolvedValue({ data: { deviceConfigVersion: "x" } });
+    const store = useKiosksStore();
+    await store.fetchDeviceConfigVersion("a/b");
+    expect(axios.get).toHaveBeenCalledWith("/api/kiosks/a%2Fb/config");
+  });
+});
