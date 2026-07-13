@@ -98,6 +98,15 @@
             @update:model-value="setDefault"
           />
         </SettingRow>
+        <button
+          type="button"
+          class="kiosks__reset"
+          data-test="reset-content"
+          :disabled="!contentOverridden"
+          @click="resetContent"
+        >
+          Reset content to global
+        </button>
         <p v-if="contentMsg" class="kiosks__saved" role="status" aria-live="polite">
           {{ contentMsg }}
         </p>
@@ -145,7 +154,7 @@ const effApply = computed(() =>
     : (config.applyDisplayRotation ?? true)
 );
 
-const _CONTENT_KEYS = ["availableScreens", "defaultScreenId"];
+const CONTENT_KEYS = ["availableScreens", "defaultScreenId"];
 
 const screenCatalog = computed(() => config.dashboardScreens?.screens ?? []);
 const screenOptions = computed(() =>
@@ -183,6 +192,14 @@ const availableOptions = computed(() =>
 
 function setDefault(id) {
   persistContent({ ...overrides.value, defaultScreenId: id });
+}
+
+const contentOverridden = computed(() => availableOverridden.value || defaultOverridden.value);
+
+function resetContent() {
+  const next = { ...overrides.value };
+  for (const k of CONTENT_KEYS) delete next[k];
+  persistContent(next);
 }
 
 function setAvailable(ids) {

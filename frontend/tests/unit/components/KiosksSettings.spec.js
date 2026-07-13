@@ -270,4 +270,21 @@ describe("KiosksSettings — content editor", () => {
       defaultScreenId: "b",
     });
   });
+
+  it("Reset content to global removes only the content keys", async () => {
+    const { w, store } = await selectContent(one, {
+      orientation: "portrait",
+      availableScreens: ["a"],
+      defaultScreenId: "a",
+    });
+    await w.find("[data-test='reset-content']").trigger("click");
+    await flushPromises();
+    expect(store.saveOverrides).toHaveBeenCalledWith("k1", { orientation: "portrait" });
+  });
+
+  it("Reset content button is disabled when there is no content override", async () => {
+    const { w } = await selectContent(one, { orientation: "portrait" });
+    const btn = w.find("[data-test='reset-content']");
+    expect(btn.attributes("disabled")).toBeDefined();
+  });
 });
