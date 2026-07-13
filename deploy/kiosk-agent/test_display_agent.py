@@ -14,7 +14,11 @@ def _sched(on="06:00", off="22:00", days=range(7), enabled=True):
 
 
 def _cfg(**over):
-    base = {"display_schedule_enabled": True, "display_schedule": _sched(), "timezone": None}
+    base = {
+        "display_schedule_enabled": True,
+        "display_schedule": _sched(),
+        "timezone": None,
+    }
     base.update(over)
     return base
 
@@ -65,7 +69,11 @@ def test_desired_on_on_window():
 
 # desired_on — camelCase keys accepted
 def test_desired_on_camelcase_keys():
-    cfg = {"displayScheduleEnabled": True, "displaySchedule": _sched(), "timezone": None}
+    cfg = {
+        "displayScheduleEnabled": True,
+        "displaySchedule": _sched(),
+        "timezone": None,
+    }
     assert agent.desired_on(cfg, datetime(2026, 7, 11, 23, 0)) is False
 
 
@@ -79,7 +87,8 @@ def test_desired_on_day_disabled():
 def test_desired_on_malformed_time():
     cfg = _cfg(
         display_schedule=[
-            {"day": d, "enabled": True, "onTime": "oops", "offTime": "22:00"} for d in range(7)
+            {"day": d, "enabled": True, "onTime": "oops", "offTime": "22:00"}
+            for d in range(7)
         ]
     )
     assert agent.desired_on(cfg, datetime(2026, 7, 11, 23, 0)) is True
@@ -198,7 +207,9 @@ def test_run_keeps_state_and_backs_off_on_fetch_error(monkeypatch):
     def boom(url):
         raise OSError("network down")
 
-    agent.run("http://x", 900, fetch=boom, sleep=lambda s: slept.append(s), iterations=1)
+    agent.run(
+        "http://x", 900, fetch=boom, sleep=lambda s: slept.append(s), iterations=1
+    )
     assert applied == []  # never touched the display
     assert slept == [agent.BACKOFF_SECONDS]
 
@@ -241,7 +252,9 @@ def test_apply_rotation_autodetects_output(monkeypatch):
     def fake_run(cmd, **kw):
         if cmd[:2] == ["xrandr", "--query"]:
             return SimpleNamespace(
-                returncode=0, stdout="HDMI-1 connected primary 1920x1080+0+0\n", stderr=""
+                returncode=0,
+                stdout="HDMI-1 connected primary 1920x1080+0+0\n",
+                stderr="",
             )
         return SimpleNamespace(returncode=0, stdout="", stderr="")
 
@@ -278,11 +291,15 @@ def test_orientation_to_xrandr_mapping():
     assert agent.orientation_to_xrandr({"orientation": "landscape"}) == "normal"
     assert agent.orientation_to_xrandr({"orientation": "portrait"}) == "left"
     assert (
-        agent.orientation_to_xrandr({"orientation": "landscape", "orientationFlipped": True})
+        agent.orientation_to_xrandr(
+            {"orientation": "landscape", "orientationFlipped": True}
+        )
         == "inverted"
     )
     assert (
-        agent.orientation_to_xrandr({"orientation": "portrait", "orientationFlipped": True})
+        agent.orientation_to_xrandr(
+            {"orientation": "portrait", "orientationFlipped": True}
+        )
         == "inverted"
     )
     assert agent.orientation_to_xrandr({}) == "normal"  # default landscape
@@ -342,7 +359,9 @@ def test_run_applies_once_when_version_absent(monkeypatch):
         iterations=3,
         apply_device=lambda c: applied.append(c.get("orientation")),
     )
-    assert applied == ["portrait"]  # applied once at startup, then skipped (version stays None)
+    assert applied == [
+        "portrait"
+    ]  # applied once at startup, then skipped (version stays None)
 
 
 def test_run_applies_device_physical_only_on_version_change(monkeypatch):
@@ -398,10 +417,84 @@ def test_run_retries_apply_when_apply_device_raises(monkeypatch):
 
 def test_orientation_to_xrandr_snake_case_flipped():
     assert (
-        agent.orientation_to_xrandr({"orientation": "portrait", "orientation_flipped": True})
+        agent.orientation_to_xrandr(
+            {"orientation": "portrait", "orientation_flipped": True}
+        )
         == "inverted"
     )
 
 
 def test_config_url_kiosk_id_empty_host_no_query():
     assert agent._config_url("http://h", "k", "") == "http://h/api/kiosks/k/config"
+
+
+# --- output + resolution (dd9.1) ---
+def _capture_xrandr(monkeypatch, rc=0, stderr=""):
+    calls = []
+
+    def fake_run(cmd, **kw):
+        calls.append(cmd)
+        return SimpleNamespace(returncode=rc, stdout="", stderr=stderr)
+
+    monkeypatch.setattr(agent.subprocess, "run", fake_run)
+    return calls
+
+
+def test_parse_resolution_plain():
+    assert agent._parse_resolution("1920x1080") == ("1920x1080", None)
+
+
+def test_parse_resolution_with_rate():
+    assert agent._parse_resolution("1920x1080@60") == ("1920x1080", "60")
+
+
+def test_parse_resolution_malformed():
+    assert agent._parse_resolution("1080p") is None
+    assert agent._parse_resolution("1920x") is None
+    assert agent._parse_resolution("1920x1080@x") is None
+
+
+def test_apply_mode_sets_output_and_mode(monkeypatch):
+    calls = _capture_xrandr(monkeypatch)
+    result = agent.apply_mode("HDMI-1", "1920x1080")
+    expected = ["xrandr", "--output", "HDMI-1", "--primary", "--mode", "1920x1080"]
+    assert result == expected
+    assert calls[-1] == expected
+
+
+def test_apply_mode_with_rate(monkeypatch):
+    calls = _capture_xrandr(monkeypatch)
+    agent.apply_mode("HDMI-1", "1920x1080@60")
+    assert calls[-1] == [
+        "xrandr",
+        "--output",
+        "HDMI-1",
+        "--primary",
+        "--mode",
+        "1920x1080",
+        "--rate",
+        "60",
+    ]
+
+
+def test_apply_mode_output_only_marks_primary(monkeypatch):
+    calls = _capture_xrandr(monkeypatch)
+    agent.apply_mode("HDMI-1", None)
+    assert calls[-1] == ["xrandr", "--output", "HDMI-1", "--primary"]
+
+
+def test_apply_mode_noop_when_neither_configured(monkeypatch):
+    calls = _capture_xrandr(monkeypatch)
+    assert agent.apply_mode(None, None) is None
+    assert calls == []
+
+
+def test_apply_mode_skips_bad_mode_but_still_sets_primary(monkeypatch):
+    calls = _capture_xrandr(monkeypatch)
+    agent.apply_mode("HDMI-1", "1080p")
+    assert calls[-1] == ["xrandr", "--output", "HDMI-1", "--primary"]  # no --mode
+
+
+def test_apply_mode_does_not_raise_on_xrandr_failure(monkeypatch):
+    _capture_xrandr(monkeypatch, rc=1, stderr="cannot find mode")
+    assert agent.apply_mode("HDMI-1", "9999x9999") is None  # failure marker, no raise
