@@ -21,6 +21,14 @@
         <span class="kiosk-card__meta">{{ k.hostname }} · seen {{ relativeTime(k.lastSeen) }}</span>
       </button>
     </SettingsSection>
+    <KioskStatusHeader
+      v-if="selectedId"
+      :kiosk-id="selectedId"
+      :online="selectedKiosk() ? isOnline(selectedKiosk()) : false"
+      :last-seen-label="relativeTime(selectedKiosk()?.lastSeen)"
+      :applied-version="selectedKiosk()?.lastAppliedVersion ?? null"
+      :desired-version="desiredVersions[selectedId] ?? null"
+    />
     <SettingsSection
       v-if="selectedId"
       id="kiosks-orientation"
@@ -125,6 +133,7 @@ import SegmentedControl from "@/components/ui/SegmentedControl.vue";
 import ToggleSwitch from "@/components/ui/ToggleSwitch.vue";
 import ChipMultiSelect from "@/components/ui/ChipMultiSelect.vue";
 import SelectPill from "@/components/ui/SelectPill.vue";
+import KioskStatusHeader from "@/components/settings/shared/KioskStatusHeader.vue";
 
 const store = useKiosksStore();
 const config = useConfigStore();
@@ -133,6 +142,7 @@ const selectedId = ref(null);
 const overrides = ref({});
 const savedMsg = ref("");
 const contentMsg = ref("");
+const desiredVersions = ref({});
 
 const ONLINE_WINDOW_MS = 120000; // 2 minutes
 
@@ -273,10 +283,18 @@ async function select(id) {
   savedMsg.value = "";
   contentMsg.value = "";
   overrides.value = await store.fetchOverrides(id);
+  const v = await store.fetchDeviceConfigVersion(id);
+  if (v) desiredVersions.value = { ...desiredVersions.value, [id]: v };
 }
 
 onMounted(async () => {
   await store.loadKiosks();
+  await Promise.all(
+    kiosks.value.map(async k => {
+      const v = await store.fetchDeviceConfigVersion(k.id);
+      if (v) desiredVersions.value = { ...desiredVersions.value, [k.id]: v };
+    })
+  );
 });
 </script>
 

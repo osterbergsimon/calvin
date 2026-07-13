@@ -9,6 +9,7 @@ import ToggleSwitch from "@/components/ui/ToggleSwitch.vue";
 import ChipMultiSelect from "@/components/ui/ChipMultiSelect.vue";
 import SelectPill from "@/components/ui/SelectPill.vue";
 import SettingRow from "@/components/settings/shell/SettingRow.vue";
+import KioskStatusHeader from "@/components/settings/shared/KioskStatusHeader.vue";
 
 function mountWithKiosks(list) {
   setActivePinia(createPinia());
@@ -17,6 +18,7 @@ function mountWithKiosks(list) {
     store.kiosks = list;
   });
   store.fetchOverrides = vi.fn(async () => ({}));
+  store.fetchDeviceConfigVersion = vi.fn(async () => null);
   return mount(KiosksSettings);
 }
 
@@ -64,6 +66,7 @@ describe("KiosksSettings — orientation editor", () => {
     });
     store.fetchOverrides = vi.fn(async () => overrides);
     store.saveOverrides = vi.fn(async () => {});
+    store.fetchDeviceConfigVersion = vi.fn(async () => null);
     const cfg = useConfigStore();
     cfg.orientation = "landscape";
     cfg.orientationFlipped = false;
@@ -122,6 +125,7 @@ describe("KiosksSettings — orientation editor", () => {
     store.saveOverrides = vi.fn(async () => {
       throw new Error("network error");
     });
+    store.fetchDeviceConfigVersion = vi.fn(async () => null);
     const w = mount(KiosksSettings);
     await flushPromises();
     await w.find("[data-test='kiosk-card']").trigger("click");
@@ -178,6 +182,7 @@ describe("KiosksSettings — content editor", () => {
     });
     store.fetchOverrides = vi.fn(async () => overrides);
     store.saveOverrides = vi.fn(async () => {});
+    store.fetchDeviceConfigVersion = vi.fn(async () => null);
     const cfg = useConfigStore();
     cfg.orientation = "landscape";
     cfg.orientationFlipped = false;
@@ -258,6 +263,7 @@ describe("KiosksSettings — content editor", () => {
     store.saveOverrides = vi.fn(async () => {
       throw new Error("network error");
     });
+    store.fetchDeviceConfigVersion = vi.fn(async () => null);
     const cfg = useConfigStore();
     cfg.orientation = "landscape";
     cfg.orientationFlipped = false;
@@ -322,5 +328,33 @@ describe("KiosksSettings — content editor", () => {
     const { w } = await selectContent(one, { orientation: "portrait" });
     const btn = w.find("[data-test='reset-content']");
     expect(btn.attributes("disabled")).toBeDefined();
+  });
+});
+
+describe("KiosksSettings — status header", () => {
+  beforeEach(() => vi.clearAllMocks());
+
+  it("renders KioskStatusHeader for the selected kiosk with applied and desired versions", async () => {
+    setActivePinia(createPinia());
+    const store = useKiosksStore();
+    store.loadKiosks = vi.fn(async () => {
+      store.kiosks = [
+        { id: "k1", hostname: "pi", lastSeen: new Date().toISOString(), lastAppliedVersion: "old" },
+      ];
+    });
+    store.fetchOverrides = vi.fn(async () => ({}));
+    store.saveOverrides = vi.fn(async () => {});
+    store.fetchDeviceConfigVersion = vi.fn(async () => "new");
+    const w = mount(KiosksSettings);
+    await flushPromises();
+    // No selection yet → no header.
+    expect(w.findComponent(KioskStatusHeader).exists()).toBe(false);
+    await w.find("[data-test='kiosk-card']").trigger("click");
+    await flushPromises();
+    const header = w.findComponent(KioskStatusHeader);
+    expect(header.exists()).toBe(true);
+    expect(header.props("appliedVersion")).toBe("old");
+    expect(header.props("desiredVersion")).toBe("new");
+    expect(header.props("kioskId")).toBe("k1");
   });
 });
