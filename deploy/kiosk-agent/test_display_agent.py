@@ -337,12 +337,71 @@ def test_apply_device_physical_skips_when_rotation_disabled():
 
 def test_apply_device_physical_forwards_output():
     calls = []
+    mode_calls = []
     agent.apply_device_physical(
         {"orientation": "portrait", "applyDisplayRotation": True},
         applier=lambda rot, output=None: calls.append((rot, output)),
+        mode_applier=lambda output, resolution: mode_calls.append((output, resolution)),
         env={"CALVIN_DISPLAY_OUTPUT": "HDMI-1"},
     )
     assert calls == [("left", "HDMI-1")]
+    assert mode_calls == [("HDMI-1", None)]
+
+
+def test_apply_device_physical_resolution_env_wins_over_server():
+    mode_calls = []
+    agent.apply_device_physical(
+        {"displayResolution": "1280x720", "applyDisplayRotation": True},
+        applier=lambda *a, **k: None,
+        mode_applier=lambda output, resolution: mode_calls.append((output, resolution)),
+        env={
+            "CALVIN_DISPLAY_RESOLUTION": "1920x1080",
+            "CALVIN_DISPLAY_OUTPUT": "HDMI-1",
+        },
+    )
+    assert mode_calls == [("HDMI-1", "1920x1080")]
+
+
+def test_apply_device_physical_uses_server_output_and_resolution():
+    mode_calls = []
+    agent.apply_device_physical(
+        {
+            "displayOutput": "HDMI-2",
+            "displayResolution": "1280x720",
+            "applyDisplayRotation": True,
+        },
+        applier=lambda *a, **k: None,
+        mode_applier=lambda output, resolution: mode_calls.append((output, resolution)),
+        env={},
+    )
+    assert mode_calls == [("HDMI-2", "1280x720")]
+
+
+def test_apply_device_physical_applies_mode_before_rotation():
+    order = []
+    agent.apply_device_physical(
+        {"orientation": "portrait", "applyDisplayRotation": True},
+        applier=lambda rot, output=None: order.append("rotate"),
+        mode_applier=lambda output, resolution: order.append("mode"),
+        env={
+            "CALVIN_DISPLAY_OUTPUT": "HDMI-1",
+            "CALVIN_DISPLAY_RESOLUTION": "1920x1080",
+        },
+    )
+    assert order == ["mode", "rotate"]
+
+
+def test_apply_device_physical_applies_output_even_when_rotation_disabled():
+    mode_calls = []
+    rot_calls = []
+    agent.apply_device_physical(
+        {"displayOutput": "HDMI-1", "applyDisplayRotation": False},
+        applier=lambda rot, output=None: rot_calls.append(rot),
+        mode_applier=lambda output, resolution: mode_calls.append((output, resolution)),
+        env={},
+    )
+    assert mode_calls == [("HDMI-1", None)]
+    assert rot_calls == []  # rotation still gated off
 
 
 def test_run_applies_once_when_version_absent(monkeypatch):

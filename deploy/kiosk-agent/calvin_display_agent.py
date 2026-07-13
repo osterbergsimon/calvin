@@ -322,20 +322,36 @@ def orientation_to_xrandr(cfg):
     return "normal"
 
 
-def apply_device_physical(cfg, *, applier=apply_rotation, env=None):
-    """Apply device-physical settings (orientation) from the effective config.
+def apply_device_physical(
+    cfg, *, applier=apply_rotation, mode_applier=apply_mode, env=None
+):
+    """Apply device-physical settings (output/resolution/orientation) from the config.
 
-    CALVIN_DISPLAY_ROTATION env (device-local escape hatch) wins over the server
-    orientation. Gated on applyDisplayRotation (default True).
+    Device-local env vars win over server config:
+      CALVIN_DISPLAY_OUTPUT     -> output selected as primary / rotation target
+      CALVIN_DISPLAY_RESOLUTION -> 'WxH' or 'WxH@RATE'
+      CALVIN_DISPLAY_ROTATION   -> xrandr rotate value
+    Output+mode apply first (a mode change can reset rotation), then rotation.
+    Rotation is gated on applyDisplayRotation (default True); output/resolution are
+    independent of that gate.
     """
     if env is None:
         env = os.environ
-    if not cfg_get(cfg, "apply_display_rotation", "applyDisplayRotation", default=True):
-        return
-    env_rotation = env.get("CALVIN_DISPLAY_ROTATION", "").strip()
-    rotation = env_rotation or orientation_to_xrandr(cfg)
-    output = env.get("CALVIN_DISPLAY_OUTPUT", "").strip() or None
-    applier(rotation, output)
+    output = (
+        env.get("CALVIN_DISPLAY_OUTPUT", "").strip()
+        or cfg_get(cfg, "display_output", "displayOutput", default="")
+        or None
+    )
+    resolution = (
+        env.get("CALVIN_DISPLAY_RESOLUTION", "").strip()
+        or cfg_get(cfg, "display_resolution", "displayResolution", default="")
+        or None
+    )
+    mode_applier(output, resolution)
+    if cfg_get(cfg, "apply_display_rotation", "applyDisplayRotation", default=True):
+        env_rotation = env.get("CALVIN_DISPLAY_ROTATION", "").strip()
+        rotation = env_rotation or orientation_to_xrandr(cfg)
+        applier(rotation, output)
 
 
 def main():
@@ -343,6 +359,10 @@ def main():
     if not backend:
         log("CALVIN_BACKEND_URL not set")
         sys.exit(1)
+    out_env = os.environ.get("CALVIN_DISPLAY_OUTPUT", "").strip() or None
+    res_env = os.environ.get("CALVIN_DISPLAY_RESOLUTION", "").strip() or None
+    if out_env or res_env:
+        apply_mode(out_env, res_env)
     rotation = os.environ.get("CALVIN_DISPLAY_ROTATION", "").strip()
     if rotation:
         apply_rotation(
