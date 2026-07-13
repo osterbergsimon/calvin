@@ -60,7 +60,7 @@ const config = computed(() => {
   font-size: 0.85em;
 }
 .kiosk-status__presence.is-online {
-  color: #4ade80;
+  color: var(--ok);
 }
 .kiosk-status__presence.is-offline {
   color: var(--ink-3, rgba(255, 255, 255, 0.45));
@@ -70,6 +70,9 @@ const config = computed(() => {
   opacity: 0.85;
 }
 .kiosk-status__config.is-pending {
-  color: #fbbf24;
+  color: var(--warn);
+}
+.kiosk-status__config.is-applied {
+  color: var(--ok);
 }
 </style>
