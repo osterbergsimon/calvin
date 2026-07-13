@@ -4,11 +4,7 @@
     <span class="kiosk-status__presence" :class="online ? 'is-online' : 'is-offline'">
       {{ online ? "● Online" : "○ Offline" }} · seen {{ lastSeenLabel }}
     </span>
-    <span
-      class="kiosk-status__config"
-      :class="config.cls"
-      data-test="hardware-config-status"
-    >
+    <span class="kiosk-status__config" :class="config.cls" data-test="hardware-config-status">
       {{ config.label }}
     </span>
   </div>

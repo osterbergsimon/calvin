@@ -179,7 +179,9 @@ describe("CollapsibleSection", () => {
 
   describe("CollapsibleSection — drawer variant", () => {
     it("adds is-drawer class when variant is drawer", () => {
-      const w = mount(CollapsibleSection, { props: { title: "Display hardware", variant: "drawer" } });
+      const w = mount(CollapsibleSection, {
+        props: { title: "Display hardware", variant: "drawer" },
+      });
       expect(w.get("section").classes()).toContain("is-drawer");
     });
 

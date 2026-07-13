@@ -1,5 +1,8 @@
 <template>
-  <section class="settings-section collapsible" :class="{ expanded: isExpanded, 'is-drawer': variant === 'drawer' }">
+  <section
+    class="settings-section collapsible"
+    :class="{ expanded: isExpanded, 'is-drawer': variant === 'drawer' }"
+  >
     <button
       type="button"
       class="section-header"

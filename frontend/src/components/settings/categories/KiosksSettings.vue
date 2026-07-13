@@ -88,7 +88,9 @@
     >
       <SettingRow
         label="Power schedule"
-        :description="scheduleEnabledOverridden ? '‹set for this kiosk›' : '‹inherited from global›'"
+        :description="
+          scheduleEnabledOverridden ? '‹set for this kiosk›' : '‹inherited from global›'
+        "
       >
         <ToggleSwitch
           :model-value="effScheduleEnabled"
@@ -349,7 +351,9 @@ const anyScheduleOverridden = computed(
   () => scheduleEnabledOverridden.value || scheduleOverridden.value
 );
 const effScheduleEnabled = computed(() =>
-  scheduleEnabledOverridden.value ? overrides.value.displayScheduleEnabled : config.displayScheduleEnabled
+  scheduleEnabledOverridden.value
+    ? overrides.value.displayScheduleEnabled
+    : config.displayScheduleEnabled
 );
 const effSchedule = computed(() =>
   scheduleOverridden.value ? overrides.value.displaySchedule : config.displaySchedule

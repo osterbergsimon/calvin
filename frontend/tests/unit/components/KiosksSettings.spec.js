@@ -491,14 +491,13 @@ describe("KiosksSettings — schedule editor", () => {
     const store = useKiosksStore();
     const stale = new Date(Date.now() - 6 * 60 * 60 * 1000).toISOString();
     store.loadKiosks = vi.fn(async () => {
-      store.kiosks = [
-        { id: "k1", hostname: "pi", lastSeen: stale, lastAppliedVersion: "v1" },
-      ];
+      store.kiosks = [{ id: "k1", hostname: "pi", lastSeen: stale, lastAppliedVersion: "v1" }];
     });
     store.fetchOverrides = vi.fn(async () => ({}));
     store.saveOverrides = vi.fn(async () => {});
     // onMounted prefetch → "v1"; select() call → "v1"; post-save refetch → "v2"
-    store.fetchDeviceConfigVersion = vi.fn()
+    store.fetchDeviceConfigVersion = vi
+      .fn()
       .mockResolvedValueOnce("v1") // onMounted prefetch for k1
       .mockResolvedValueOnce("v1") // select() call
       .mockResolvedValueOnce("v2"); // post-save refreshDesiredVersion
