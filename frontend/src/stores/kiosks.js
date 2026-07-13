@@ -36,5 +36,14 @@ export const useKiosksStore = defineStore("kiosks", () => {
     await axios.put(`/api/kiosks/${encodeURIComponent(id)}/overrides`, { overrides });
   }
 
-  return { kiosks, loadKiosks, fetchOverrides, saveOverrides };
+  async function fetchDeviceConfigVersion(id) {
+    try {
+      const response = await axios.get(`/api/kiosks/${encodeURIComponent(id)}/config`);
+      return response.data?.deviceConfigVersion ?? null;
+    } catch {
+      return null; // fail-open — caller degrades to "Not yet reported"
+    }
+  }
+
+  return { kiosks, loadKiosks, fetchOverrides, saveOverrides, fetchDeviceConfigVersion };
 });
