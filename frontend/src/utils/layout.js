@@ -6,6 +6,7 @@ import { CARD_SIZE_KEYS } from "../styles/cardSizeScale.js";
 
 export const DASHBOARD_REGION_KINDS = ["calendar", "photos", "service"];
 export const MAX_TOP_REGIONS = 8;
+export const MAX_SPLIT_DEPTH = 3;
 
 export const DASHBOARD_LAYOUT_PRESETS = {
   single: {
@@ -399,6 +400,67 @@ export function getLeafRegions(layout) {
   return layout.regions.flatMap(region =>
     region.split ? region.split.regions.map(sub => ({ ...sub, parentId: region.id })) : [region]
   );
+}
+
+export function getNodeAtPath(layout, path) {
+  if (!layout?.regions || !Array.isArray(path) || path.length === 0) return null;
+  let nodes = layout.regions;
+  let node = null;
+  for (const index of path) {
+    node = nodes?.[index] ?? null;
+    if (!node) return null;
+    nodes = node.split?.regions;
+  }
+  return node;
+}
+
+export function getContainerAtPath(layout, containerPath) {
+  if (!Array.isArray(containerPath) || containerPath.length === 0) {
+    return layout?.regions ?? null;
+  }
+  const node = getNodeAtPath(layout, containerPath);
+  return node?.split?.regions ?? null;
+}
+
+export function updateContainerAtPath(layout, containerPath, fn) {
+  const clone = JSON.parse(JSON.stringify(layout));
+  if (!Array.isArray(containerPath) || containerPath.length === 0) {
+    clone.regions = fn(clone.regions);
+    return clone;
+  }
+  const node = getNodeAtPath(clone, containerPath);
+  if (!node?.split) return layout;
+  node.split.regions = fn(node.split.regions);
+  return clone;
+}
+
+export function updateNodeAtPath(layout, path, fn) {
+  if (!Array.isArray(path) || path.length === 0) return layout;
+  const parentPath = path.slice(0, -1);
+  const index = path[path.length - 1];
+  return updateContainerAtPath(layout, parentPath, regions =>
+    regions.map((region, i) => (i === index ? fn(region) : region))
+  );
+}
+
+export function getPathById(layout, id) {
+  const walk = (regions, prefix) => {
+    for (let i = 0; i < (regions?.length || 0); i += 1) {
+      const region = regions[i];
+      const here = [...prefix, i];
+      if (region.id === id) return here;
+      if (region.split) {
+        const found = walk(region.split.regions, here);
+        if (found) return found;
+      }
+    }
+    return null;
+  };
+  return walk(layout?.regions, []);
+}
+
+export function canSplitAtPath(path) {
+  return Array.isArray(path) && path.length >= 1 && path.length < MAX_SPLIT_DEPTH;
 }
 
 export function getActiveDashboardScreen(screensConfig, activeScreenId = null) {

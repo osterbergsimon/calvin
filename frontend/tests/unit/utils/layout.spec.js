@@ -4,8 +4,10 @@ import { describe, it, expect } from "vitest";
 import {
   DEFAULT_CALENDAR_VIEW,
   MAX_TOP_REGIONS,
+  MAX_SPLIT_DEPTH,
   addSubRegion,
   addTopRegion,
+  canSplitAtPath,
   clampCalendarView,
   clampServiceView,
   computeClockBarModeUpdate,
@@ -17,9 +19,12 @@ import {
   getActiveDashboardScreen,
   getClockBarBetweenIndex,
   getClockBarPlacementGap,
+  getContainerAtPath,
   getGlobalClockBarSettings,
   getLayoutDirection,
   getLeafRegions,
+  getNodeAtPath,
+  getPathById,
   getRegionAxisStyle,
   getSplitDirection,
   isClockBarBetweenPosition,
@@ -39,6 +44,8 @@ import {
   setSubRegionContent,
   splitTopRegion,
   unsplitTopRegion,
+  updateContainerAtPath,
+  updateNodeAtPath,
 } from "@/utils/layout";
 
 describe("Layout Utilities", () => {
@@ -925,5 +932,70 @@ describe("setRegionView on a service region", () => {
   it("does not mutate the input", () => {
     setRegionView(screens, "svc-1", { linkAction: "off" });
     expect(screens.screens[0].layout.regions[0].view).toBeUndefined();
+  });
+});
+
+describe("path addressing", () => {
+  // region-1 split into [a, b]; b split again into [b-a, b-b] (3 levels).
+  const deep = () => ({
+    version: 1,
+    preset: "single",
+    direction: null,
+    regions: [
+      {
+        id: "region-1",
+        kind: "calendar",
+        size: 100,
+        split: {
+          direction: null,
+          regions: [
+            { id: "region-1-a", kind: "photos", size: 50 },
+            {
+              id: "region-1-b",
+              kind: "calendar",
+              size: 50,
+              split: {
+                direction: null,
+                regions: [
+                  { id: "region-1-b-a", kind: "photos", size: 50 },
+                  { id: "region-1-b-b", kind: "service", size: 50 },
+                ],
+              },
+            },
+          ],
+        },
+      },
+    ],
+  });
+
+  it("getNodeAtPath walks indices to the node", () => {
+    const layout = deep();
+    expect(getNodeAtPath(layout, [0]).id).toBe("region-1");
+    expect(getNodeAtPath(layout, [0, 0]).id).toBe("region-1-a");
+    expect(getNodeAtPath(layout, [0, 1, 0]).id).toBe("region-1-b-a");
+    expect(getNodeAtPath(layout, [9])).toBeNull();
+    expect(getNodeAtPath(layout, [])).toBeNull();
+  });
+
+  it("getPathById round-trips with getNodeAtPath", () => {
+    const layout = deep();
+    expect(getPathById(layout, "region-1-b-b")).toEqual([0, 1, 1]);
+    expect(getNodeAtPath(layout, getPathById(layout, "region-1-a")).id).toBe("region-1-a");
+    expect(getPathById(layout, "nope")).toBeNull();
+  });
+
+  it("updateNodeAtPath immutably replaces a nested node", () => {
+    const layout = deep();
+    const next = updateNodeAtPath(layout, [0, 1, 0], n => ({ ...n, size: 77 }));
+    expect(getNodeAtPath(next, [0, 1, 0]).size).toBe(77);
+    expect(getNodeAtPath(layout, [0, 1, 0]).size).not.toBe(77); // original untouched
+  });
+
+  it("canSplitAtPath enforces MAX_SPLIT_DEPTH", () => {
+    expect(canSplitAtPath([0])).toBe(true);
+    expect(canSplitAtPath([0, 1])).toBe(true);
+    expect(canSplitAtPath([0, 1, 0])).toBe(false);
+    expect(canSplitAtPath([])).toBe(false);
+    expect(MAX_SPLIT_DEPTH).toBe(3);
   });
 });
