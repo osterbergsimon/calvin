@@ -37,9 +37,22 @@
 
     <!-- DASHBOARD SCREENS / REGIONS -->
     <SettingsSection id="regions" title="Screens & regions">
-      <DashboardRegionsEditor
+      <div class="regions-launch">
+        <div class="regions-launch__summary">
+          <span class="regions-launch__count">{{ screenSummary }}</span>
+          <span class="regions-launch__hint"
+            >Design each screen’s regions in the full-size editor.</span
+          >
+        </div>
+        <button type="button" class="regions-launch__btn" @click="editorOpen = true">
+          Open editor
+        </button>
+      </div>
+      <ScreenRegionEditor
         :config="config"
+        :open="editorOpen"
         @update:config="patch => emit('update:config', patch)"
+        @close="editorOpen = false"
       />
     </SettingsSection>
 
@@ -283,14 +296,28 @@ import NumberStepper from "@/components/ui/NumberStepper.vue";
 import RangeSlider from "@/components/ui/RangeSlider.vue";
 import ThemePicker from "@/components/settings/shell/ThemePicker.vue";
 import TypefacePicker from "@/components/settings/shell/TypefacePicker.vue";
-import DashboardRegionsEditor from "@/components/settings/shared/DashboardRegionsEditor.vue";
+import ScreenRegionEditor from "@/components/settings/shared/ScreenRegionEditor.vue";
 import { UI_SIZE_OPTIONS } from "@/styles/uiScale";
+import { computed, ref } from "vue";
+import { normalizeDashboardScreens } from "@/utils/layout";
 
-defineProps({
+const props = defineProps({
   config: { type: Object, required: true },
 });
 
 const emit = defineEmits(["update:config"]);
+
+const editorOpen = ref(false);
+const screenSummary = computed(() => {
+  const screens = normalizeDashboardScreens(props.config.dashboardScreens).screens;
+  const regionCount = screens.reduce((sum, s) => {
+    const regions = s.layout.regions;
+    return sum + regions.reduce((n, r) => n + (r.split ? r.split.regions.length : 1), 0);
+  }, 0);
+  const s = screens.length === 1 ? "" : "s";
+  const r = regionCount === 1 ? "" : "s";
+  return `${screens.length} screen${s} · ${regionCount} region${r}`;
+});
 </script>
 
 <style scoped>
@@ -312,6 +339,51 @@ const emit = defineEmits(["update:config"]);
 }
 
 .display-name-input:focus {
+  outline: 2px solid var(--focus);
+  outline-offset: 2px;
+}
+
+.regions-launch {
+  display: flex;
+  align-items: center;
+  gap: var(--space-xl);
+  padding: var(--space-xl) var(--space-2xl);
+}
+.regions-launch__summary {
+  display: flex;
+  flex-direction: column;
+  gap: 0.15rem;
+  min-width: 0;
+}
+.regions-launch__count {
+  font-family: var(--font-data);
+  font-variant-numeric: tabular-nums;
+  font-weight: 600;
+  color: var(--ink);
+}
+.regions-launch__hint {
+  font-size: var(--fs-sm);
+  color: var(--ink-2);
+}
+.regions-launch__btn {
+  margin-left: auto;
+  flex: 0 0 auto;
+  height: var(--control-height);
+  min-height: var(--touch-target);
+  padding: 0 1.25rem;
+  border: 0;
+  border-radius: var(--radius-lg);
+  background: var(--focus);
+  color: var(--focus-ink);
+  font-family: var(--font-ui);
+  font-size: var(--fs-control-lg);
+  font-weight: 600;
+  cursor: pointer;
+}
+.regions-launch__btn:hover {
+  filter: brightness(1.06);
+}
+.regions-launch__btn:focus-visible {
   outline: 2px solid var(--focus);
   outline-offset: 2px;
 }
