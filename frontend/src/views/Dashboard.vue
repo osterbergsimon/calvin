@@ -155,7 +155,7 @@
 </template>
 
 <script setup>
-import { onMounted, onUnmounted, computed, ref, watch, defineAsyncComponent } from "vue";
+import { onMounted, onUnmounted, computed, ref, watch, defineAsyncComponent, provide } from "vue";
 import LayoutManager from "../components/LayoutManager.vue";
 import DashboardRegion from "../components/DashboardRegion.vue";
 import MinimalUIOverlay from "../components/MinimalUIOverlay.vue";
@@ -179,8 +179,10 @@ import {
   getClockBarPlacementGap,
   getGlobalClockBarSettings,
   getLayoutDirection,
+  getNodeAtPath,
   getRegionAxisStyle,
   normalizeDashboardScreens,
+  applyDragSizesById,
   resizeAdjacentRegions,
   resolveClockBarForScreen,
 } from "../utils/layout";
@@ -303,10 +305,18 @@ const getRegionStyle = elementType => {
   return getRegionAxisStyle(sized, layoutDirection.value);
 };
 
-// ── Drag-to-resize top-level regions (calvin-fou) ───────────────────────────
+// ── Drag-to-resize regions (top-level and nested) (calvin-fou) ──────────────
 const dashboardViewEl = ref(null);
 const dragSizes = ref(null); // { [regionId]: size } live override while dragging
-let resizeState = null;
+let resizeState = null; // { containerPath, firstIndex, rect, direction }
+
+// Provide the resize context so nested DashboardRegion components can
+// render their own handles and report drag-start events.
+provide("dashboardResize", {
+  dragSizes,
+  regionsLocked: computed(() => configStore.regionsLocked),
+  start: startNestedResize,
+});
 
 // One handle per divider between adjacent top-level regions, skipping the
 // divider occupied by a between-clock-bar. Positioned by cumulative size %.
@@ -331,54 +341,43 @@ const resizerStyle = handle =>
     ? { top: `${handle.position}%` }
     : { left: `${handle.position}%` };
 
-const startRegionResize = (firstIndex, event) => {
-  if (configStore.regionsLocked) return;
-  event.preventDefault();
-  event.stopPropagation();
-  const el = dashboardViewEl.value;
-  if (!el) return;
-  resizeState = { firstIndex, rect: el.getBoundingClientRect(), direction: layoutDirection.value };
-  window.addEventListener("pointermove", onRegionResizeMove);
-  window.addEventListener("pointerup", stopRegionResize, { once: true });
-};
+// Generalised drag handler: works for any container in the layout tree.
+// containerPath=[] → top-level regions; else → split.regions of the node at that path.
+// containerEl is the DOM element whose bounding rect defines the drag coordinate space.
+function startNestedResize(containerPath, firstIndex, containerEl, direction) {
+  if (configStore.regionsLocked || !containerEl) return;
+  resizeState = {
+    containerPath,
+    firstIndex,
+    rect: containerEl.getBoundingClientRect(),
+    direction,
+  };
+  window.addEventListener("pointermove", onNestedResizeMove);
+  window.addEventListener("pointerup", stopNestedResize, { once: true });
+}
 
-const onRegionResizeMove = event => {
+const onNestedResizeMove = event => {
   if (!resizeState) return;
-  const isColumn = resizeState.direction === "column";
-  const offset = isColumn
-    ? event.clientY - resizeState.rect.top
-    : event.clientX - resizeState.rect.left;
-  const axis = isColumn ? resizeState.rect.height : resizeState.rect.width;
+  const { containerPath, firstIndex, rect, direction } = resizeState;
+  const isColumn = direction === "column";
+  const offset = isColumn ? event.clientY - rect.top : event.clientX - rect.left;
+  const axis = isColumn ? rect.height : rect.width;
   if (axis <= 0) return;
-  const regions = activeScreen.value.layout.regions;
-  const before = regions
-    .slice(0, resizeState.firstIndex)
-    .reduce((sum, region) => sum + (Number(region.size) || 0), 0);
+  const layout = activeScreen.value.layout;
+  const container =
+    containerPath.length === 0
+      ? layout.regions
+      : (getNodeAtPath(layout, containerPath)?.split?.regions ?? []);
+  const before = container
+    .slice(0, firstIndex)
+    .reduce((s, r) => s + (Number(dragSizes.value?.[r.id] ?? r.size) || 0), 0);
   const nextFirstSize = (offset / axis) * 100 - before;
-  const resized = resizeAdjacentRegions(regions, resizeState.firstIndex, nextFirstSize);
-  const map = {};
-  resized.forEach(region => {
-    map[region.id] = region.size;
+  const resized = resizeAdjacentRegions(container, firstIndex, nextFirstSize);
+  const map = { ...(dragSizes.value || {}) };
+  resized.forEach(r => {
+    map[r.id] = r.size;
   });
   dragSizes.value = map;
-};
-
-const stopRegionResize = () => {
-  window.removeEventListener("pointermove", onRegionResizeMove);
-  const sizes = dragSizes.value;
-  resizeState = null;
-  if (!sizes) {
-    dragSizes.value = null;
-    return;
-  }
-  // Keep the live override applied until the persisted config reflects the new
-  // sizes, then clear it. Clearing first would render one frame at the old
-  // committed size before the update lands — a visible snap-back on drop.
-  commitRegionSizes(sizes)
-    .catch(() => {}) // updateConfig already logs; keep the override-clear unconditional
-    .finally(() => {
-      dragSizes.value = null;
-    });
 };
 
 const commitRegionSizes = sizes => {
@@ -395,18 +394,44 @@ const commitRegionSizes = sizes => {
         ? screen
         : {
             ...screen,
-            layout: {
-              ...screen.layout,
-              regions: screen.layout.regions.map(region => ({
-                ...region,
-                size: sizes[region.id] ?? region.size,
-              })),
-            },
+            // applyDragSizesById walks the entire layout tree and patches any node
+            // whose id appears in `sizes`, so it works for both top-level and nested
+            // regions without separate code paths.
+            layout: applyDragSizesById(screen.layout, sizes),
           }
     ),
   };
   return configStore.updateConfig({ dashboardScreens: normalizeDashboardScreens(next) });
 };
+
+const stopNestedResize = () => {
+  window.removeEventListener("pointermove", onNestedResizeMove);
+  const sizes = dragSizes.value;
+  resizeState = null;
+  if (!sizes) {
+    dragSizes.value = null;
+    return;
+  }
+  // Keep the live override applied until the persisted config reflects the new
+  // sizes, then clear it. Clearing first would render one frame at the old
+  // committed size before the update lands — a visible snap-back on drop.
+  commitRegionSizes(sizes)
+    .catch(() => {}) // updateConfig already logs; keep the override-clear unconditional
+    .finally(() => {
+      dragSizes.value = null;
+    });
+};
+
+// Backward-compat aliases so the template's @pointerdown still works.
+const startRegionResize = (firstIndex, event) => {
+  if (configStore.regionsLocked) return;
+  event.preventDefault();
+  event.stopPropagation();
+  const el = dashboardViewEl.value;
+  if (!el) return;
+  startNestedResize([], firstIndex, el, layoutDirection.value);
+};
+
 
 const lockLayout = () => {
   configStore.updateConfig({ regionsLocked: true });
@@ -499,7 +524,7 @@ onUnmounted(() => {
   }
   // Drop any in-flight drag listeners and re-lock the layout on the way out so
   // it never stays editable behind the user's back.
-  window.removeEventListener("pointermove", onRegionResizeMove);
+  window.removeEventListener("pointermove", onNestedResizeMove);
   if (!configStore.regionsLocked) {
     configStore.updateConfig({ regionsLocked: true });
   }
