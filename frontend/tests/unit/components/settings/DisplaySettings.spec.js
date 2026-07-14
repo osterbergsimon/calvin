@@ -32,8 +32,9 @@ describe("DisplaySettings", () => {
     ["calendar", "notifications", "plugin-display"].forEach(id =>
       expect(w.find(`#section-${id}`).exists()).toBe(false)
     );
-    // the regions editor is embedded and reachable (calvin-4k8 regression fix)
-    expect(w.findComponent({ name: "DashboardRegionsEditor" }).exists()).toBe(true);
+    // the regions editor is embedded and reachable (calvin-4k8 regression fix);
+    // redesigned as the full-size ScreenRegionEditor modal launched from this section
+    expect(w.findComponent({ name: "ScreenRegionEditor" }).exists()).toBe(true);
   });
 
   it("emits update:config for the focus-light mode select", async () => {
