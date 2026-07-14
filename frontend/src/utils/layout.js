@@ -396,10 +396,15 @@ export function computeClockBarModeUpdate(screen, mode, globalSettings = {}) {
 }
 
 export function getLeafRegions(layout) {
-  if (!layout?.regions) return [];
-  return layout.regions.flatMap(region =>
-    region.split ? region.split.regions.map(sub => ({ ...sub, parentId: region.id })) : [region]
-  );
+  const walk = (regions, parentId) =>
+    (regions || []).flatMap(region =>
+      region.split
+        ? walk(region.split.regions, region.id)
+        : parentId
+          ? [{ ...region, parentId }]
+          : [region]
+    );
+  return walk(layout?.regions, null);
 }
 
 export function getNodeAtPath(layout, path) {
@@ -661,19 +666,21 @@ export function resizeAdjacentRegions(regions, firstIndex, firstSize, minSize = 
   );
 }
 
-function normalizeRegionSplit(split, parentId) {
+function normalizeRegionSplit(split, parentId, childLevel = 2) {
   if (!split || typeof split !== "object" || !Array.isArray(split.regions)) return null;
   const subs = split.regions.slice(0, MAX_TOP_REGIONS);
   if (subs.length < 2) return null;
   const normalized = subs.map((sub, index) => {
     const kind = DASHBOARD_REGION_KINDS.includes(sub.kind) ? sub.kind : "photos";
     const instanceIds = normalizeRegionInstanceIds(sub, kind);
+    const id = sub.id || `${parentId}-${String.fromCharCode(97 + index)}`;
     return {
-      id: sub.id || `${parentId}-${String.fromCharCode(97 + index)}`,
+      id,
       kind,
       serviceId: kind === "service" ? instanceIds[0] || null : null,
       instanceIds,
       size: clampRegionSize(Number(sub.size) || 100 / subs.length),
+      split: childLevel < MAX_SPLIT_DEPTH ? normalizeRegionSplit(sub.split, id, childLevel + 1) : null,
       ...viewForKind(sub, kind),
     };
   });

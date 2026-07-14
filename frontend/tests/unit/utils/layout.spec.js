@@ -1009,4 +1009,57 @@ describe("path addressing", () => {
     expect(getContainerAtPath(layout, [0, 0])).toBeNull();                 // leaf node has no split container
     expect(getContainerAtPath(layout, [9])).toBeNull();                   // out of range
   });
+
+  it("normalizeRegionSplit preserves nesting up to 3 levels and drops deeper", () => {
+    const raw = {
+      version: 1,
+      preset: "single",
+      regions: [
+        {
+          id: "r1", kind: "calendar", size: 100,
+          split: {
+            regions: [
+              { id: "r1-a", kind: "photos", size: 50 },
+              {
+                id: "r1-b", kind: "calendar", size: 50,
+                split: {
+                  regions: [
+                    { id: "r1-b-a", kind: "photos", size: 50 },
+                    // 4th level must be stripped:
+                    { id: "r1-b-b", kind: "service", size: 50,
+                      split: { regions: [
+                        { id: "x", kind: "photos", size: 50 },
+                        { id: "y", kind: "photos", size: 50 },
+                      ] } },
+                  ],
+                },
+              },
+            ],
+          },
+        },
+      ],
+    };
+    const layout = normalizeDashboardLayout(raw);
+    expect(getNodeAtPath(layout, [0, 1]).split).toBeTruthy();       // level-2 split kept
+    expect(getNodeAtPath(layout, [0, 1, 0]).split).toBeNull();      // level-3 leaf, no split
+    expect(getNodeAtPath(layout, [0, 1, 1]).split).toBeNull();      // level-3: deeper split dropped
+  });
+
+  it("getLeafRegions recurses to the deepest leaves", () => {
+    const layout = normalizeDashboardLayout({
+      version: 1, preset: "single",
+      regions: [{
+        id: "r1", kind: "calendar", size: 100,
+        split: { regions: [
+          { id: "r1-a", kind: "photos", size: 50 },
+          { id: "r1-b", kind: "calendar", size: 50,
+            split: { regions: [
+              { id: "r1-b-a", kind: "photos", size: 50 },
+              { id: "r1-b-b", kind: "service", size: 50 },
+            ] } },
+        ] },
+      }],
+    });
+    expect(getLeafRegions(layout).map(l => l.id)).toEqual(["r1-a", "r1-b-a", "r1-b-b"]);
+  });
 });
