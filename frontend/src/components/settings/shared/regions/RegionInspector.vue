@@ -178,7 +178,7 @@
         Size <strong>{{ region.size }}%</strong> — drag the divider in the preview to resize.
       </p>
       <div class="btn-row">
-        <button v-if="splittable" type="button" class="link-btn" @click="$emit('toggle-split')">
+        <button v-if="splittable || region.split" type="button" class="link-btn" @click="$emit('toggle-split')">
           {{ region.split ? "Unsplit" : "Split region" }}
         </button>
         <button
