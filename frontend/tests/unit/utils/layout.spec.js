@@ -946,19 +946,21 @@ describe("path addressing", () => {
         id: "region-1",
         kind: "calendar",
         size: 100,
+        instanceIds: [],
         split: {
           direction: null,
           regions: [
-            { id: "region-1-a", kind: "photos", size: 50 },
+            { id: "region-1-a", kind: "photos", size: 50, instanceIds: [] },
             {
               id: "region-1-b",
               kind: "calendar",
               size: 50,
+              instanceIds: [],
               split: {
                 direction: null,
                 regions: [
-                  { id: "region-1-b-a", kind: "photos", size: 50 },
-                  { id: "region-1-b-b", kind: "service", size: 50 },
+                  { id: "region-1-b-a", kind: "photos", size: 50, instanceIds: [] },
+                  { id: "region-1-b-b", kind: "service", size: 50, instanceIds: [] },
                 ],
               },
             },
@@ -997,5 +999,14 @@ describe("path addressing", () => {
     expect(canSplitAtPath([0, 1, 0])).toBe(false);
     expect(canSplitAtPath([])).toBe(false);
     expect(MAX_SPLIT_DEPTH).toBe(3);
+  });
+
+  it("getContainerAtPath returns the addressed regions array", () => {
+    const layout = deep();
+    expect(getContainerAtPath(layout, [])).toBe(layout.regions);          // root container
+    expect(getContainerAtPath(layout, [0]).map(r => r.id)).toEqual(["region-1-a", "region-1-b"]);
+    expect(getContainerAtPath(layout, [0, 1]).map(r => r.id)).toEqual(["region-1-b-a", "region-1-b-b"]);
+    expect(getContainerAtPath(layout, [0, 0])).toBeNull();                 // leaf node has no split container
+    expect(getContainerAtPath(layout, [9])).toBeNull();                   // out of range
   });
 });
