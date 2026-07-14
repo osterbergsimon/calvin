@@ -14,7 +14,8 @@
           <div class="sre-title">
             <h2>Screens &amp; regions</h2>
             <p class="sre-sub">
-              Design the layouts your kiosks display · drag a divider to resize · changes apply live
+              Design the layouts your kiosks display · drag dividers to resize, the clock bar to
+              reposition · changes apply live
             </p>
           </div>
           <IconButton
@@ -87,24 +88,86 @@
                   :class="`dir-${layoutDir}`"
                   :style="clockAxisStyle"
                 >
+                  <!-- perimeter drop zones (only while dragging the clock bar) -->
+                  <template v-if="clock.enabled && clockDrag">
+                    <div
+                      v-if="clock.position !== 'top'"
+                      class="sre-drop perim top"
+                      @dragenter.prevent
+                      @dragover.prevent
+                      @drop.prevent="dropClock('top')"
+                    >
+                      <span>Top</span>
+                    </div>
+                    <div
+                      v-if="clock.position !== 'bottom'"
+                      class="sre-drop perim bottom"
+                      @dragenter.prevent
+                      @dragover.prevent
+                      @drop.prevent="dropClock('bottom')"
+                    >
+                      <span>Bottom</span>
+                    </div>
+                    <div
+                      v-if="clock.position !== 'left'"
+                      class="sre-drop perim left"
+                      @dragenter.prevent
+                      @dragover.prevent
+                      @drop.prevent="dropClock('left')"
+                    >
+                      <span>Left</span>
+                    </div>
+                    <div
+                      v-if="clock.position !== 'right'"
+                      class="sre-drop perim right"
+                      @dragenter.prevent
+                      @dragover.prevent
+                      @drop.prevent="dropClock('right')"
+                    >
+                      <span>Right</span>
+                    </div>
+                  </template>
+
                   <!-- clock bar: top/left (leading perimeter) -->
                   <div
                     v-if="clock.enabled && clock.position === leadingPerimeter"
-                    class="sre-clockbar"
+                    class="sre-clockbar drag"
                     :class="clock.mode === 'vertical' ? 'v' : 'h'"
+                    draggable="true"
+                    title="Drag to reposition the clock bar"
+                    aria-label="Clock bar — drag to reposition"
+                    @dragstart="beginClockDrag"
+                    @dragend="endClockDrag"
                   >
-                    12:45 · Tue
+                    <span class="sre-clock-grip" aria-hidden="true">⠿</span> 12:45 · Tue
                   </div>
 
                   <div class="sre-regions" :class="`dir-${layoutDir}`">
                     <template v-for="(region, i) in activeScreen.layout.regions" :key="region.id">
+                      <!-- clock drop zone at the gap before region i -->
+                      <div
+                        v-if="clock.enabled && clockDrag && i > 0 && betweenIndex !== i - 1"
+                        class="sre-drop gap"
+                        :class="layoutDir === 'row' ? 'v' : 'h'"
+                        @dragenter.prevent
+                        @dragover.prevent
+                        @drop.prevent="dropClock(i - 1 === 0 ? 'between' : `between:${i - 1}`)"
+                      >
+                        <span class="sre-drop-plus">+</span>
+                      </div>
+
                       <!-- clock bar between region i-1 and i -->
                       <div
                         v-if="clock.enabled && betweenIndex === i - 1"
-                        class="sre-clockbar between"
+                        class="sre-clockbar between drag"
                         :class="layoutDir === 'row' ? 'v' : 'h'"
+                        draggable="true"
+                        title="Drag to reposition the clock bar"
+                        aria-label="Clock bar — drag to reposition"
+                        @dragstart="beginClockDrag"
+                        @dragend="endClockDrag"
                       >
-                        12:45
+                        <span class="sre-clock-grip" aria-hidden="true">⠿</span> 12:45
                       </div>
 
                       <div
@@ -185,10 +248,15 @@
                   <!-- clock bar: bottom/right (trailing perimeter) -->
                   <div
                     v-if="clock.enabled && clock.position === trailingPerimeter"
-                    class="sre-clockbar"
+                    class="sre-clockbar drag"
                     :class="clock.mode === 'vertical' ? 'v' : 'h'"
+                    draggable="true"
+                    title="Drag to reposition the clock bar"
+                    aria-label="Clock bar — drag to reposition"
+                    @dragstart="beginClockDrag"
+                    @dragend="endClockDrag"
                   >
-                    12:45 · Tue
+                    <span class="sre-clock-grip" aria-hidden="true">⠿</span> 12:45 · Tue
                   </div>
                 </div>
               </div>
@@ -590,6 +658,25 @@ const setClockPosition = position => {
 };
 const clearClock = () => patchActiveScreen({ clockBar: null });
 
+/* --- clock bar drag-to-reposition (HTML5 DnD; keyboard users use the rail's
+   Position picker, which enumerates every gap) --- */
+const clockDrag = ref(false);
+const beginClockDrag = event => {
+  clockDrag.value = true;
+  if (event?.dataTransfer) {
+    event.dataTransfer.effectAllowed = "move";
+    // Firefox refuses to start a drag unless data is set.
+    event.dataTransfer.setData("text/plain", "clock-bar");
+  }
+};
+const endClockDrag = () => {
+  clockDrag.value = false;
+};
+const dropClock = position => {
+  setClockPosition(position);
+  clockDrag.value = false;
+};
+
 /* --- resize (ported from DashboardRegionsEditor) --- */
 const startResize = (firstIndex, event) => {
   event.preventDefault();
@@ -905,6 +992,7 @@ onUnmounted(() => window.removeEventListener("pointermove", onResizeMove));
     height 0.5s cubic-bezier(0.16, 1, 0.3, 1);
 }
 .sre-screen {
+  position: relative;
   width: 100%;
   height: 100%;
   display: flex;
@@ -1089,6 +1177,83 @@ onUnmounted(() => window.removeEventListener("pointermove", onResizeMove));
   width: 26px;
   align-self: stretch;
   writing-mode: vertical-rl;
+}
+.sre-clockbar.drag {
+  cursor: grab;
+  gap: 3px;
+}
+.sre-clockbar.drag:active {
+  cursor: grabbing;
+}
+.sre-clock-grip {
+  opacity: 0.55;
+  letter-spacing: -1px;
+}
+
+/* --- clock bar drop zones (visible only while dragging) --- */
+.sre-drop {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 5px;
+  background: color-mix(in srgb, var(--focus) 9%, transparent);
+  border: 1px dashed color-mix(in srgb, var(--focus) 50%, transparent);
+  color: color-mix(in srgb, var(--focus) 85%, #fff 15%);
+  font-size: var(--fs-micro);
+  font-weight: 600;
+  transition:
+    background 0.12s,
+    border-color 0.12s;
+}
+.sre-drop > span {
+  pointer-events: none;
+  opacity: 0.8;
+}
+.sre-drop:hover {
+  background: color-mix(in srgb, var(--focus) 28%, transparent);
+  border-style: solid;
+  border-color: var(--focus);
+}
+.sre-drop.perim {
+  position: absolute;
+  z-index: 6;
+}
+.sre-drop.perim.top {
+  top: 3px;
+  left: 3px;
+  right: 3px;
+  height: 24px;
+}
+.sre-drop.perim.bottom {
+  bottom: 3px;
+  left: 3px;
+  right: 3px;
+  height: 24px;
+}
+.sre-drop.perim.left {
+  top: 3px;
+  bottom: 3px;
+  left: 3px;
+  width: 26px;
+}
+.sre-drop.perim.right {
+  top: 3px;
+  bottom: 3px;
+  right: 3px;
+  width: 26px;
+}
+.sre-drop.perim.left > span,
+.sre-drop.perim.right > span {
+  writing-mode: vertical-rl;
+}
+.sre-drop.gap {
+  flex: 0 0 24px;
+  align-self: stretch;
+  z-index: 3;
+}
+.sre-drop-plus {
+  font-size: var(--fs-2xs);
+  font-weight: 700;
 }
 
 .sre-rail {

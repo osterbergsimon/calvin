@@ -72,7 +72,8 @@
           @update:model-value="v => $emit('clock-position', v)"
         />
         <p class="ins-help">
-          Or drag the bar in the preview. “Between” sits it between two regions.
+          Or drag the bar in the preview onto any edge or gap. With 3+ regions,
+          each gap is listed so you can pick exactly where it sits.
         </p>
       </div>
       <button v-if="hasOverride" type="button" class="link-btn" @click="$emit('clock-inherit')">
@@ -108,7 +109,7 @@ import { computed } from "vue";
 import SegmentedControl from "@/components/ui/SegmentedControl.vue";
 import ToggleSwitch from "@/components/ui/ToggleSwitch.vue";
 import SelectPill from "@/components/ui/SelectPill.vue";
-import { getClockBarBetweenIndex, MAX_TOP_REGIONS } from "@/utils/layout";
+import { MAX_TOP_REGIONS } from "@/utils/layout";
 
 const props = defineProps({
   screen: { type: Object, required: true },
@@ -140,9 +141,9 @@ const isCustom = computed(
 const atMax = computed(() => props.screen.layout.regions.length >= MAX_TOP_REGIONS);
 const hasOverride = computed(() => Boolean(props.screen.clockBar));
 
-const positionValue = computed(() =>
-  getClockBarBetweenIndex(props.clock.position) !== null ? "between" : props.clock.position
-);
+// The resolved position ("top" | … | "between" | "between:N") already matches
+// the option values below verbatim, so no remapping is needed for selection.
+const positionValue = computed(() => props.clock.position);
 const positionOptions = computed(() => {
   const opts = [
     { value: "top", label: "Top" },
@@ -150,7 +151,16 @@ const positionOptions = computed(() => {
     { value: "left", label: "Left" },
     { value: "right", label: "Right" },
   ];
-  if (props.screen.layout.regions.length >= 2) opts.push({ value: "between", label: "Between" });
+  const n = props.screen.layout.regions.length;
+  if (n === 2) {
+    opts.push({ value: "between", label: "Between" });
+  } else if (n > 2) {
+    // With 3+ regions there are multiple gaps — name each so it's pickable
+    // without dragging. Gap 0 uses the bare "between" alias.
+    for (let i = 0; i < n - 1; i++) {
+      opts.push({ value: i === 0 ? "between" : `between:${i}`, label: `Between ${i + 1} & ${i + 2}` });
+    }
+  }
   return opts;
 });
 </script>
