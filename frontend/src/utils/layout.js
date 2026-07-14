@@ -680,8 +680,8 @@ function normalizeRegionSplit(split, parentId, childLevel = 2) {
       serviceId: kind === "service" ? instanceIds[0] || null : null,
       instanceIds,
       size: clampRegionSize(Number(sub.size) || 100 / subs.length),
-      split: childLevel < MAX_SPLIT_DEPTH ? normalizeRegionSplit(sub.split, id, childLevel + 1) : null,
       ...viewForKind(sub, kind),
+      split: childLevel < MAX_SPLIT_DEPTH ? normalizeRegionSplit(sub.split, id, childLevel + 1) : null,
     };
   });
   return {

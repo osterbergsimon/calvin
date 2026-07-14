@@ -1061,5 +1061,9 @@ describe("path addressing", () => {
       }],
     });
     expect(getLeafRegions(layout).map(l => l.id)).toEqual(["r1-a", "r1-b-a", "r1-b-b"]);
+    const leaves = getLeafRegions(layout);
+    expect(leaves.find(l => l.id === "r1-a").parentId).toBe("r1");
+    expect(leaves.find(l => l.id === "r1-b-a").parentId).toBe("r1-b");
+    expect(leaves.find(l => l.id === "r1-b-b").parentId).toBe("r1-b");
   });
 });
