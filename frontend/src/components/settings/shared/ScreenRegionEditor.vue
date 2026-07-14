@@ -142,7 +142,7 @@
                     <span class="sre-clock-grip" aria-hidden="true">⠿</span> 12:45 · Tue
                   </div>
 
-                  <div class="sre-regions" :class="`dir-${layoutDir}`">
+                  <div :ref="el => (regionsEl = el)" class="sre-regions" :class="`dir-${layoutDir}`">
                     <template v-for="(region, i) in activeScreen.layout.regions" :key="region.id">
                       <!-- clock drop zone at the gap before region i -->
                       <div
@@ -170,64 +170,15 @@
                         <span class="sre-clock-grip" aria-hidden="true">⠿</span> 12:45
                       </div>
 
-                      <div
-                        class="sre-region"
-                        :class="[
-                          region.split ? 'is-split' : `kind-${region.kind}`,
-                          { 'is-active': isSelected(region) },
-                        ]"
-                        :style="regionFlex(region)"
-                        tabindex="0"
-                        @click="selectRegion(region.id)"
-                        @keydown.enter.prevent="selectRegion(region.id)"
-                        @keydown.space.prevent="selectRegion(region.id)"
-                      >
-                        <!-- nested split -->
-                        <div
-                          v-if="region.split"
-                          :ref="el => setSubRef(region.id, el)"
-                          class="sre-subsplit"
-                          :class="`dir-${subDir(region)}`"
-                        >
-                          <template v-for="(sub, si) in region.split.regions" :key="sub.id">
-                            <div
-                              class="sre-region sub"
-                              :class="[`kind-${sub.kind}`, { 'is-active': isSelected(sub) }]"
-                              :style="regionFlex(sub)"
-                              tabindex="0"
-                              @click.stop="selectRegion(sub.id)"
-                              @keydown.enter.prevent="selectRegion(sub.id)"
-                            >
-                              <div class="sre-region-face">
-                                <span class="sre-region-emoji">{{ kindEmoji(sub.kind) }}</span>
-                                <span class="sre-region-name">{{ regionTitle(sub) }}</span>
-                                <span class="sre-region-size">{{ sub.size }}%</span>
-                              </div>
-                            </div>
-                            <button
-                              v-if="si < region.split.regions.length - 1"
-                              type="button"
-                              class="sre-resizer"
-                              :class="subDir(region) === 'row' ? 'col' : 'row'"
-                              aria-label="Resize sub-regions"
-                              @pointerdown.stop="startSubResize(region, si, $event)"
-                            >
-                              <span class="grip" />
-                            </button>
-                          </template>
-                        </div>
-                        <!-- leaf face -->
-                        <div v-else class="sre-region-face">
-                          <span class="sre-region-emoji">{{ kindEmoji(region.kind) }}</span>
-                          <span class="sre-region-name">{{ regionTitle(region) }}</span>
-                          <span
-                            v-if="activeScreen.layout.regions.length > 1"
-                            class="sre-region-size"
-                          >
-                            {{ region.size }}%
-                          </span>
-                        </div>
-                      </div>
+                      <RegionNode
+                        :region="region"
+                        :path="[i]"
+                        :parent-direction="layoutDir"
+                        :selected-id="selectedRegionId"
+                        :layout-dir="layoutDir"
+                        @select="selectRegion"
+                        @resize="onNodeResize"
+                      />
 
                       <button
                         v-if="i < activeScreen.layout.regions.length - 1"
@@ -278,6 +229,7 @@
               :layout-dir="layoutDir"
               :component-options="componentOptions"
               :source-options="sourceOptionsFor(selectedRegion.kind)"
+              :context="selectionContext"
               @patch-view="patchSelectedView"
               @set-component="setSelectedComponent"
               @toggle-source="toggleSelectedSource"
@@ -323,29 +275,31 @@ import IconButton from "@/components/ui/IconButton.vue";
 import SelectPill from "@/components/ui/SelectPill.vue";
 import ScreenInspector from "./regions/ScreenInspector.vue";
 import RegionInspector from "./regions/RegionInspector.vue";
+import RegionNode from "./regions/RegionNode.vue";
 import {
   MAX_TOP_REGIONS,
-  addSubRegion,
   addTopRegion,
+  canSplitAtPath,
   computeClockBarPositionUpdate,
   createDashboardScreenFromPreset,
   createDashboardLayoutFromPreset,
   getClockBarBetweenIndex,
   getGlobalClockBarSettings,
   getLayoutDirection,
+  getNodeAtPath,
+  getPathById,
   getSplitDirection,
   normalizeDashboardScreens,
-  removeSubRegion,
-  removeTopRegion,
-  resizeAdjacentRegions,
-  resizeSubRegionPair,
+  removeRegionAtPath,
+  resizePairAtPath,
   resolveClockBarForScreen,
   setLayoutDirection,
+  setRegionContentAtPath,
   setRegionView,
-  setSplitDirection,
-  setSubRegionContent,
-  splitTopRegion,
-  unsplitTopRegion,
+  setSplitDirectionAtPath,
+  splitRegionAtPath,
+  unsplitRegionAtPath,
+  addSubRegionAtPath,
 } from "@/utils/layout";
 
 const props = defineProps({
@@ -363,13 +317,8 @@ const { plugins, pluginInstances, loadingPlugins, loadPlugins } = usePlugins();
 const selectedRegionId = ref(null);
 const previewKioskId = ref(GLOBAL);
 const screenEl = ref(null);
-const subRefs = new Map();
+const regionsEl = ref(null);
 const dragState = ref(null);
-
-const setSubRef = (id, el) => {
-  if (el) subRefs.set(id, el);
-  else subRefs.delete(id);
-};
 
 /* --- model --- */
 const configValue = computed(() => props.config || {});
@@ -428,7 +377,6 @@ const stageTag = computed(() =>
 
 /* --- layout direction + clock bar --- */
 const layoutDir = computed(() => getLayoutDirection(activeScreen.value.layout, orientation.value));
-const subDir = region => getSplitDirection(region.split, layoutDir.value);
 const globalClock = computed(() => getGlobalClockBarSettings(configValue.value));
 const clock = computed(() => resolveClockBarForScreen(activeScreen.value, globalClock.value));
 const betweenIndex = computed(() => getClockBarBetweenIndex(clock.value.position));
@@ -448,20 +396,30 @@ const deviceSize = computed(() =>
 );
 
 /* --- selection --- */
-const findRegion = id => {
-  for (const r of activeScreen.value.layout.regions) {
-    if (r.id === id) return r;
-    if (r.split) {
-      const sub = r.split.regions.find(s => s.id === id);
-      if (sub) return sub;
-    }
-  }
-  return null;
-};
-const selectedRegion = computed(() =>
-  selectedRegionId.value ? findRegion(selectedRegionId.value) : null
+const selectedPath = computed(() =>
+  selectedRegionId.value
+    ? getPathById(activeScreen.value.layout, selectedRegionId.value)
+    : null
 );
-const isSelected = region => region.id === selectedRegionId.value;
+const selectedRegion = computed(() => {
+  const path = selectedPath.value;
+  return path ? getNodeAtPath(activeScreen.value.layout, path) : null;
+});
+const selectionContext = computed(() => {
+  const path = selectedPath.value;
+  if (!path) return null;
+  const node = getNodeAtPath(activeScreen.value.layout, path);
+  const parent =
+    path.length > 1 ? getNodeAtPath(activeScreen.value.layout, path.slice(0, -1)) : null;
+  const owner = node?.split ? node : parent;
+  return {
+    depth: path.length,
+    isSub: path.length > 1,
+    canSplit: canSplitAtPath(path) && !node?.split,
+    canAddSub: Boolean(owner?.split) && owner.split.regions.length < MAX_TOP_REGIONS,
+    splitDir: owner?.split ? getSplitDirection(owner.split, layoutDir.value) : layoutDir.value,
+  };
+});
 const selectRegion = id => {
   selectedRegionId.value = selectedRegionId.value === id ? null : id;
 };
@@ -551,97 +509,74 @@ const addRegion = () => {
   if (activeScreen.value.layout.regions.length >= MAX_TOP_REGIONS) return;
   updateActiveLayout(addTopRegion(cloneLayout()));
 };
-const topIndexOf = region =>
-  activeScreen.value.layout.regions.findIndex(
-    r => r.id === region.id || r.split?.regions.some(s => s.id === region.id)
-  );
 const removeSelected = () => {
-  const region = selectedRegion.value;
-  if (!region) return;
-  const ti = topIndexOf(region);
-  const top = activeScreen.value.layout.regions[ti];
-  if (top.split && top.id !== region.id) {
-    const si = top.split.regions.findIndex(s => s.id === region.id);
-    updateActiveLayout(removeSubRegion(cloneLayout(), ti, si));
-  } else {
-    if (activeScreen.value.layout.regions.length <= 1) return;
-    updateActiveLayout(removeTopRegion(cloneLayout(), ti));
-  }
+  const p = selectedPath.value;
+  if (!p) return;
+  updateActiveLayout(removeRegionAtPath(cloneLayout(), p));
   selectedRegionId.value = null;
 };
 const toggleSplitSelected = () => {
-  const region = selectedRegion.value;
-  if (!region) return;
-  const ti = topIndexOf(region);
-  const top = activeScreen.value.layout.regions[ti];
+  const p = selectedPath.value;
+  if (!p) return;
+  const node = getNodeAtPath(activeScreen.value.layout, p);
+  if (!node) return;
   updateActiveLayout(
-    top.split ? unsplitTopRegion(cloneLayout(), ti) : splitTopRegion(cloneLayout(), ti)
+    node.split ? unsplitRegionAtPath(cloneLayout(), p) : splitRegionAtPath(cloneLayout(), p)
   );
 };
 const toggleSubDirSelected = () => {
-  const region = selectedRegion.value;
-  if (!region) return;
-  const ti = topIndexOf(region);
-  const top = activeScreen.value.layout.regions[ti];
-  if (!top.split) return;
-  const cur = getSplitDirection(top.split, layoutDir.value);
-  updateActiveLayout(setSplitDirection(cloneLayout(), ti, cur === "column" ? "row" : "column"));
+  const p = selectedPath.value;
+  if (!p) return;
+  const node = getNodeAtPath(activeScreen.value.layout, p);
+  if (!node) return;
+  // Owner is the node itself if split, otherwise its parent.
+  const ownerPath = node.split ? p : p.slice(0, -1);
+  const owner = getNodeAtPath(activeScreen.value.layout, ownerPath);
+  if (!owner?.split) return;
+  const cur = getSplitDirection(owner.split, layoutDir.value);
+  updateActiveLayout(
+    setSplitDirectionAtPath(cloneLayout(), ownerPath, cur === "column" ? "row" : "column")
+  );
 };
 const addSubToSelected = () => {
-  const region = selectedRegion.value;
-  if (!region) return;
-  const ti = topIndexOf(region);
-  if (ti < 0) return;
-  updateActiveLayout(addSubRegion(cloneLayout(), ti));
+  const p = selectedPath.value;
+  if (!p) return;
+  const node = getNodeAtPath(activeScreen.value.layout, p);
+  if (!node) return;
+  const ownerPath = node.split ? p : p.slice(0, -1);
+  updateActiveLayout(addSubRegionAtPath(cloneLayout(), ownerPath));
 };
 const setSelectedComponent = option => {
-  const region = selectedRegion.value;
-  if (!region) return;
-  const ti = topIndexOf(region);
-  const top = activeScreen.value.layout.regions[ti];
-  const patch = {
-    kind: option.kind,
-    serviceId: option.kind === "service" ? option.instanceIds?.[0] || null : null,
-    instanceIds: option.instanceIds || [],
-  };
-  if (top.split && top.id !== region.id) {
-    const si = top.split.regions.findIndex(s => s.id === region.id);
-    updateActiveLayout(setSubRegionContent(cloneLayout(), ti, si, patch));
-  } else {
-    const layout = cloneLayout();
-    layout.regions[ti] = { ...layout.regions[ti], ...patch };
-    updateActiveLayout(layout);
-  }
+  const p = selectedPath.value;
+  if (!p) return;
+  updateActiveLayout(
+    setRegionContentAtPath(cloneLayout(), p, {
+      kind: option.kind,
+      serviceId: option.kind === "service" ? option.instanceIds?.[0] || null : null,
+      instanceIds: option.instanceIds || [],
+    })
+  );
 };
 const toggleSelectedSource = (sourceId, checked) => {
-  const region = selectedRegion.value;
-  if (!region || region.kind === "service") return;
-  const cur = new Set(region.instanceIds || []);
+  const p = selectedPath.value;
+  if (!p) return;
+  const node = getNodeAtPath(activeScreen.value.layout, p);
+  if (!node || node.kind === "service") return;
+  const cur = new Set(node.instanceIds || []);
   if (checked) cur.add(sourceId);
   else cur.delete(sourceId);
-  applySourceIds(region, [...cur]);
+  updateActiveLayout(
+    setRegionContentAtPath(cloneLayout(), p, { kind: node.kind, instanceIds: [...cur] })
+  );
 };
 const clearSelectedSources = () => {
-  const region = selectedRegion.value;
-  if (region) applySourceIds(region, []);
-};
-const applySourceIds = (region, ids) => {
-  const ti = topIndexOf(region);
-  const top = activeScreen.value.layout.regions[ti];
-  if (top.split && top.id !== region.id) {
-    const si = top.split.regions.findIndex(s => s.id === region.id);
-    const layout = cloneLayout();
-    layout.regions[ti].split.regions[si] = {
-      ...layout.regions[ti].split.regions[si],
-      instanceIds: ids,
-      serviceId: null,
-    };
-    updateActiveLayout(layout);
-  } else {
-    const layout = cloneLayout();
-    layout.regions[ti] = { ...layout.regions[ti], instanceIds: ids, serviceId: null };
-    updateActiveLayout(layout);
-  }
+  const p = selectedPath.value;
+  if (!p) return;
+  const node = getNodeAtPath(activeScreen.value.layout, p);
+  if (!node) return;
+  updateActiveLayout(
+    setRegionContentAtPath(cloneLayout(), p, { kind: node.kind, instanceIds: [] })
+  );
 };
 const patchSelectedView = patch => {
   const region = selectedRegion.value;
@@ -686,28 +621,27 @@ const dropClock = position => {
   clockDrag.value = false;
 };
 
-/* --- resize (ported from DashboardRegionsEditor) --- */
-const startResize = (firstIndex, event) => {
-  event.preventDefault();
-  const rect = screenEl.value?.querySelector(".sre-regions")?.getBoundingClientRect();
+/* --- resize --- */
+// Unified handler for both top-level and nested resizers.
+// Top-level resizers call this with containerId = null and el = the .sre-regions element.
+// Nested resizers (from RegionNode) call via the @resize event with containerId = the
+// split node's id and el = the RegionNode's containerEl (the .sre-subsplit div).
+const onNodeResize = ({ containerId, firstIndex, event, direction, el }) => {
+  if (event) event.preventDefault();
+  const rect = el?.getBoundingClientRect();
   if (!rect) return;
-  dragState.value = { kind: "top", firstIndex, direction: layoutDir.value, rect };
+  const containerPath = containerId
+    ? getPathById(activeScreen.value.layout, containerId)
+    : [];
+  dragState.value = { containerPath, firstIndex, direction, rect };
   window.addEventListener("pointermove", onResizeMove);
   window.addEventListener("pointerup", stopResize, { once: true });
 };
-const startSubResize = (region, firstIndex, event) => {
+const startResize = (firstIndex, event) => {
   event.preventDefault();
-  const rect = subRefs.get(region.id)?.getBoundingClientRect();
-  if (!rect) return;
-  dragState.value = {
-    kind: "sub",
-    topIndex: topIndexOf(region),
-    firstIndex,
-    direction: subDir(region),
-    rect,
-  };
-  window.addEventListener("pointermove", onResizeMove);
-  window.addEventListener("pointerup", stopResize, { once: true });
+  const el = regionsEl.value;
+  if (!el) return;
+  onNodeResize({ containerId: null, firstIndex, event: null, direction: layoutDir.value, el });
 };
 const onResizeMove = event => {
   const s = dragState.value;
@@ -715,37 +649,20 @@ const onResizeMove = event => {
   const isColumn = s.direction === "column";
   const offset = isColumn ? event.clientY - s.rect.top : event.clientX - s.rect.left;
   const axis = isColumn ? s.rect.height : s.rect.width;
-  if (s.kind === "top") {
-    const prev = activeScreen.value.layout.regions
-      .slice(0, s.firstIndex)
-      .reduce((a, r) => a + r.size, 0);
-    const nextSize = (offset / axis) * 100 - prev;
-    const layout = cloneLayout();
-    layout.regions = resizeAdjacentRegions(layout.regions, s.firstIndex, nextSize);
-    updateActiveLayout(layout);
-  } else {
-    const top = activeScreen.value.layout.regions[s.topIndex];
-    if (!top?.split) return;
-    const prev = top.split.regions.slice(0, s.firstIndex).reduce((a, r) => a + r.size, 0);
-    const nextSize = (offset / axis) * 100 - prev;
-    updateActiveLayout(resizeSubRegionPair(cloneLayout(), s.topIndex, s.firstIndex, nextSize));
-  }
+  // Compute the cumulative size of regions before firstIndex in the container.
+  const containerRegions = s.containerPath.length === 0
+    ? activeScreen.value.layout.regions
+    : getNodeAtPath(activeScreen.value.layout, s.containerPath)?.split?.regions ?? [];
+  const prev = containerRegions
+    .slice(0, s.firstIndex)
+    .reduce((a, r) => a + r.size, 0);
+  const nextSize = (offset / axis) * 100 - prev;
+  updateActiveLayout(resizePairAtPath(cloneLayout(), s.containerPath, s.firstIndex, nextSize));
 };
 const stopResize = () => {
   dragState.value = null;
   window.removeEventListener("pointermove", onResizeMove);
 };
-
-/* --- labels --- */
-const kindEmoji = kind => (kind === "calendar" ? "📅" : kind === "photos" ? "🖼️" : "🌐");
-const regionTitle = region => {
-  if (region.kind === "service") {
-    const svc = services.value.find(s => s.id === (region.instanceIds?.[0] || region.serviceId));
-    return svc?.name || "Service";
-  }
-  return region.kind === "calendar" ? "Calendar" : "Photos";
-};
-const regionFlex = region => ({ flex: `${region.size} ${region.size} 0` });
 
 const setPreviewKiosk = id => (previewKioskId.value = id);
 
@@ -1027,90 +944,6 @@ onUnmounted(() => window.removeEventListener("pointermove", onResizeMove));
   flex-direction: column;
 }
 
-.sre-region {
-  position: relative;
-  display: flex;
-  min-width: 0;
-  min-height: 0;
-  border-radius: 5px;
-  cursor: pointer;
-  overflow: hidden;
-  transition:
-    box-shadow 0.15s,
-    filter 0.15s;
-}
-.sre-region.kind-calendar {
-  background: color-mix(in srgb, var(--region-calendar) 16%, transparent);
-  box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--region-calendar) 55%, transparent);
-}
-.sre-region.kind-photos {
-  background: color-mix(in srgb, var(--region-photos) 15%, transparent);
-  box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--region-photos) 55%, transparent);
-}
-.sre-region.kind-service {
-  background: color-mix(in srgb, var(--region-service) 16%, transparent);
-  box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--region-service) 55%, transparent);
-}
-.sre-region.is-split {
-  background: transparent;
-  box-shadow: inset 0 0 0 1px var(--line-soft);
-}
-.sre-region.is-active {
-  filter: brightness(1.08);
-  box-shadow:
-    inset 0 0 0 2px var(--focus),
-    0 0 0 2px var(--focus-glow);
-  z-index: 2;
-}
-.sre-region-face {
-  flex: 1 1 auto;
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  justify-content: center;
-  gap: 0.2rem;
-  padding: 0.3rem;
-  text-align: center;
-  pointer-events: none;
-}
-/* The device screen is always a dark, lit surface regardless of the app theme,
-   so on-screen text is fixed light rather than theme-driven --ink. */
-.sre-region-emoji {
-  font-size: 1.2rem;
-  filter: saturate(1.05);
-}
-.sre-region-name {
-  font-size: var(--fs-2xs);
-  font-weight: 600;
-  color: rgba(240, 244, 248, 0.92);
-  letter-spacing: 0.01em;
-}
-.sre-region-size {
-  position: absolute;
-  right: 5px;
-  bottom: 4px;
-  font-size: var(--fs-micro);
-  color: rgba(240, 244, 248, 0.55);
-  font-family: var(--font-data);
-  font-variant-numeric: tabular-nums;
-}
-.sre-subsplit {
-  display: flex;
-  flex: 1 1 auto;
-  gap: 2px;
-  min-width: 0;
-  min-height: 0;
-  padding: 2px;
-}
-.sre-subsplit.dir-row {
-  flex-direction: row;
-}
-.sre-subsplit.dir-column {
-  flex-direction: column;
-}
-.sre-region.sub {
-  background: var(--bg-2);
-}
 
 .sre-resizer {
   position: relative;
@@ -1271,7 +1104,6 @@ onUnmounted(() => window.removeEventListener("pointermove", onResizeMove));
   overflow-y: auto;
 }
 
-.sre-region:focus-visible,
 .sre-tab:focus-visible,
 .sre-resizer:focus-visible {
   outline: 2px solid var(--focus);

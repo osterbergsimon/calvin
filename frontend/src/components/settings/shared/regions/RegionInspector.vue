@@ -203,7 +203,6 @@ import SegmentedControl from "@/components/ui/SegmentedControl.vue";
 import ToggleSwitch from "@/components/ui/ToggleSwitch.vue";
 import NumberStepper from "@/components/ui/NumberStepper.vue";
 import { filterComponentOptions } from "@/utils/componentPicker";
-import { getSplitDirection, MAX_TOP_REGIONS } from "@/utils/layout";
 
 const props = defineProps({
   region: { type: Object, required: true },
@@ -211,6 +210,7 @@ const props = defineProps({
   layoutDir: { type: String, required: true },
   componentOptions: { type: Array, default: () => [] },
   sourceOptions: { type: Array, default: () => [] },
+  context: { type: Object, default: null },
 });
 const emit = defineEmits([
   "patch-view",
@@ -244,28 +244,15 @@ const componentLabel = computed(() => {
   );
   return opt?.label || "Service";
 });
-// The split this region belongs to: itself when it's a split parent, otherwise
-// the top-level region whose sub-regions include it.
-const splitOwner = computed(() =>
-  props.region.split
-    ? props.region
-    : props.screen.layout.regions.find(r =>
-        r.split?.regions.some(s => s.id === props.region.id)
-      ) || null
-);
-const isSub = computed(() => !props.region.split && Boolean(splitOwner.value));
-const splitDir = computed(() =>
-  splitOwner.value ? getSplitDirection(splitOwner.value.split, props.layoutDir) : props.layoutDir
-);
-// A split can hold up to MAX_TOP_REGIONS sub-regions.
-const canAddSub = computed(
-  () => Boolean(splitOwner.value) && splitOwner.value.split.regions.length < MAX_TOP_REGIONS
-);
+
+// Context-driven computed properties — provided by ScreenRegionEditor via the
+// `context` prop so this component no longer needs to walk the tree itself.
+const isSub = computed(() => props.context?.isSub ?? false);
+const splitDir = computed(() => props.context?.splitDir ?? props.layoutDir);
+const canAddSub = computed(() => props.context?.canAddSub ?? false);
 const addSubLabel = computed(() => (splitDir.value === "column" ? "＋ Add row" : "＋ Add column"));
 
-// Top-level regions can be split; sub-regions cannot. The parent only marks a
-// region splittable when it is a top-level region of the active screen.
-const splittable = computed(() => props.screen.layout.regions.some(r => r.id === props.region.id));
+const splittable = computed(() => props.context?.canSplit ?? false);
 const canRemove = computed(() => {
   const isTop = props.screen.layout.regions.some(r => r.id === props.region.id);
   if (isTop) return props.screen.layout.regions.length > 1;
