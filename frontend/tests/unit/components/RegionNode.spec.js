@@ -21,9 +21,8 @@ describe("RegionNode", () => {
     });
     // findAllComponents finds descendants only (excludes the root wrapper itself).
     // The tree has 5 total RegionNode instances; 4 are descendants of the root.
-    expect(wrapper.findAllComponents(RegionNode).length).toBeGreaterThanOrEqual(4);
+    expect(wrapper.findAllComponents(RegionNode).length).toBe(4); // 4 descendants (root wrapper excluded): r1-a, r1-b, r1-b-a, r1-b-b
     await wrapper.find("[data-region-id='r1-b-a']").trigger("click");
-    const selects = wrapper.emittedByComponent ? null : wrapper.emitted("select");
     // The deepest node re-emits up to the root; assert the root saw a select for r1-b-a.
     expect(wrapper.emitted("select").flat()).toContain("r1-b-a");
   });
