@@ -1,5 +1,5 @@
 <template>
-  <div class="dashboard-region" :class="containerClass" @click="emit('focus-region', region.id)">
+  <div class="dashboard-region" @click="emit('focus-region', region.id)">
     <template v-if="region.split">
       <div ref="splitContainerEl" class="split-container" :class="`split-container--${splitDirection}`">
         <DashboardRegion
@@ -126,10 +126,6 @@ const splitDirection = computed(() =>
   props.region.split ? getSplitDirection(props.region.split, props.parentDirection) : null
 );
 
-const containerClass = computed(() =>
-  splitDirection.value ? `dashboard-region-split-${splitDirection.value}` : null
-);
-
 const getSubStyle = sub => {
   // During a live drag, use the override from the Dashboard resize context for
   // instant visual feedback without persisting on every pointer move.
@@ -168,14 +164,6 @@ const subResizeHandles = computed(() => {
   min-width: 0;
   min-height: 0;
   display: flex;
-  flex-direction: column;
-}
-
-.dashboard-region-split-row {
-  flex-direction: row;
-}
-
-.dashboard-region-split-column {
   flex-direction: column;
 }
 
@@ -222,8 +210,8 @@ const subResizeHandles = computed(() => {
   align-items: center;
   justify-content: center;
   touch-action: none;
-  /* Handles are positioned by flex order within the container;
-     they sit between siblings but need absolute placement for the grip. */
+  /* Handles are positioned absolutely (left/top %) relative to the
+     split-container, which is position:relative. */
   flex-shrink: 0;
 }
 .subregion-resizer--row {

@@ -298,8 +298,8 @@ const getRegionForElement = elementType => {
 };
 
 const regionPath = elementType => {
-  const region = getRegionForElement(elementType);
-  const idx = activeScreen.value.layout.regions.findIndex(r => r.id === region.id);
+  const regionId = elementType.replace("region:", "");
+  const idx = activeScreen.value.layout.regions.findIndex(r => r.id === regionId);
   return idx >= 0 ? [idx] : [];
 };
 
