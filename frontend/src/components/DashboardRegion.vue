@@ -13,6 +13,7 @@
         :active-region-id="activeRegionId"
         :light-active="lightActive"
         :dim-others="dimOthers"
+        @click.stop
         @focus-region="emit('focus-region', $event)"
       />
     </template>

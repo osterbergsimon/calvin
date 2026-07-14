@@ -25,4 +25,33 @@ describe("DashboardRegion recursion", () => {
     const all = wrapper.findAllComponents(DashboardRegion);
     expect(all.length).toBeGreaterThanOrEqual(4);
   });
+
+  it("clicking a nested leaf emits focus-region with the leaf id, not an ancestor", async () => {
+    const wrapper = mount(DashboardRegion, {
+      props: { region: threeLevel, photoRotationInterval: 5, parentDirection: "row" },
+      global: { stubs: { CalendarView: true, PhotoSlideshow: true, WebServiceViewer: true } },
+    });
+    const leaf = wrapper
+      .findAllComponents(DashboardRegion)
+      .find(c => c.props("region").id === "r1-b-a");
+    await leaf.find(".dashboard-region").trigger("click");
+    const events = wrapper.emitted("focus-region");
+    expect(events).toBeTruthy();
+    // .stop prevents ancestor @click handlers from firing, so every bubbled emit is the leaf id.
+    expect(events.every(e => e[0] === "r1-b-a")).toBe(true);
+  });
+
+  it("lights the branch containing the active leaf", () => {
+    const wrapper = mount(DashboardRegion, {
+      props: {
+        region: threeLevel, photoRotationInterval: 5, parentDirection: "row",
+        activeRegionId: "r1-b-b", lightActive: true,
+      },
+      global: { stubs: { CalendarView: true, PhotoSlideshow: true, WebServiceViewer: true } },
+    });
+    const byId = id =>
+      wrapper.findAllComponents(DashboardRegion).find(c => c.props("region").id === id);
+    expect(byId("r1-b").classes()).toContain("dashboard-subregion--lit");
+    expect(byId("r1-a").classes()).not.toContain("dashboard-subregion--lit");
+  });
 });
