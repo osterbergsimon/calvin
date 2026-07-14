@@ -6,7 +6,9 @@ import {
   MAX_TOP_REGIONS,
   MAX_SPLIT_DEPTH,
   addSubRegion,
+  addSubRegionAtPath,
   addTopRegion,
+  applyDragSizesById,
   canSplitAtPath,
   clampCalendarView,
   clampServiceView,
@@ -32,17 +34,23 @@ import {
   normalizeDashboardLayout,
   normalizeDashboardScreens,
   normalizeScreenClockBar,
+  removeRegionAtPath,
   removeSubRegion,
   removeTopRegion,
   resizeAdjacentRegions,
+  resizePairAtPath,
   resizeSubRegion,
   resizeSubRegionPair,
   resolveClockBarForScreen,
   setLayoutDirection,
+  setRegionContentAtPath,
   setRegionView,
   setSplitDirection,
+  setSplitDirectionAtPath,
   setSubRegionContent,
+  splitRegionAtPath,
   splitTopRegion,
+  unsplitRegionAtPath,
   unsplitTopRegion,
   updateContainerAtPath,
   updateNodeAtPath,
@@ -1065,5 +1073,50 @@ describe("path addressing", () => {
     expect(leaves.find(l => l.id === "r1-a").parentId).toBe("r1");
     expect(leaves.find(l => l.id === "r1-b-a").parentId).toBe("r1-b");
     expect(leaves.find(l => l.id === "r1-b-b").parentId).toBe("r1-b");
+  });
+
+  describe("path mutations", () => {
+    const twoTop = () => addTopRegion(createDashboardLayoutFromPreset("single")); // [region-1, region-2]
+
+    it("splitRegionAtPath splits a nested cell but refuses at depth 3", () => {
+      let l = splitRegionAtPath(twoTop(), [0]);           // region-1 -> a,b (level 2)
+      l = splitRegionAtPath(l, [0, 1]);                    // region-1-b -> b-a,b-b (level 3)
+      expect(getNodeAtPath(l, [0, 1, 0]).id).toBe("region-1-b-a");
+      const refused = splitRegionAtPath(l, [0, 1, 0]);     // level 3 -> no-op
+      expect(refused).toBe(l);
+    });
+
+    it("addSubRegionAtPath adds a sub to a nested split", () => {
+      let l = splitRegionAtPath(twoTop(), [0]);
+      l = addSubRegionAtPath(l, [0]);
+      expect(getNodeAtPath(l, [0]).split.regions).toHaveLength(3);
+    });
+
+    it("removeRegionAtPath collapses a 2-child split, preserving the survivor's subtree", () => {
+      let l = splitRegionAtPath(twoTop(), [0]);   // region-1 -> a,b
+      l = splitRegionAtPath(l, [0, 1]);           // region-1-b -> b-a,b-b
+      l = removeRegionAtPath(l, [0, 0]);          // remove region-1-a; survivor region-1-b (split) adopts slot
+      expect(getNodeAtPath(l, [0]).split.regions.map(r => r.id)).toEqual(["region-1-b-a", "region-1-b-b"]);
+    });
+
+    it("removeRegionAtPath keeps a min of one top-level region", () => {
+      const single = createDashboardLayoutFromPreset("single");
+      expect(removeRegionAtPath(single, [0])).toBe(single);
+    });
+
+    it("resizePairAtPath rescales a nested container to 100%", () => {
+      const l = splitRegionAtPath(twoTop(), [0]);
+      const resized = resizePairAtPath(l, [0], 0, 70);    // container = region-1.split
+      const subs = getNodeAtPath(resized, [0]).split.regions;
+      expect(subs[0].size + subs[1].size).toBe(100);
+      expect(subs[0].size).toBe(70);
+    });
+
+    it("applyDragSizesById overrides sizes by id at any depth", () => {
+      const l = splitRegionAtPath(twoTop(), [0]);
+      const out = applyDragSizesById(l, { "region-1-a": 80, "region-1-b": 20 });
+      expect(getNodeAtPath(out, [0, 0]).size).toBe(80);
+      expect(getNodeAtPath(out, [0, 1]).size).toBe(20);
+    });
   });
 });

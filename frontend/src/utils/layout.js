@@ -468,6 +468,147 @@ export function canSplitAtPath(path) {
   return Array.isArray(path) && path.length >= 1 && path.length < MAX_SPLIT_DEPTH;
 }
 
+export function splitRegionAtPath(layout, path) {
+  if (!canSplitAtPath(path)) return layout;
+  const node = getNodeAtPath(layout, path);
+  if (!node || node.split) return layout;
+  const secondaryKind = node.kind === "calendar" ? "photos" : "calendar";
+  return updateNodeAtPath(layout, path, target => ({
+    ...target,
+    split: {
+      direction: null,
+      regions: [
+        {
+          id: `${target.id}-a`,
+          kind: target.kind,
+          serviceId:
+            target.kind === "service" ? target.instanceIds?.[0] || target.serviceId || null : null,
+          instanceIds: normalizeRegionInstanceIds(target, target.kind),
+          size: 50,
+        },
+        {
+          id: `${target.id}-b`,
+          kind: secondaryKind,
+          serviceId: null,
+          instanceIds: [],
+          size: 50,
+        },
+      ],
+    },
+  }));
+}
+
+export function unsplitRegionAtPath(layout, path) {
+  const node = getNodeAtPath(layout, path);
+  if (!node?.split) return layout;
+  const first = node.split.regions[0];
+  return updateNodeAtPath(layout, path, target => ({
+    id: target.id,
+    kind: first.kind,
+    serviceId: first.kind === "service" ? first.instanceIds?.[0] || first.serviceId || null : null,
+    instanceIds: normalizeRegionInstanceIds(first, first.kind),
+    size: target.size,
+    split: null,
+  }));
+}
+
+export function addSubRegionAtPath(layout, path) {
+  const node = getNodeAtPath(layout, path);
+  if (!node?.split || node.split.regions.length >= MAX_TOP_REGIONS) return layout;
+  return updateNodeAtPath(layout, path, target => {
+    const subs = target.split.regions;
+    const nextCount = subs.length + 1;
+    const newSize = Math.max(10, Math.round(100 / nextCount));
+    const remaining = 100 - newSize;
+    const total = subs.reduce((sum, sub) => sum + (Number(sub.size) || 0), 0) || 100;
+    const scaled = subs.map(sub => ({
+      ...sub,
+      size: Math.max(10, Math.round(((Number(sub.size) || 0) / total) * remaining)),
+    }));
+    const newSub = {
+      id: nextSubId(target.id, subs),
+      kind: "service",
+      serviceId: null,
+      instanceIds: [],
+      size: newSize,
+    };
+    return { ...target, split: { ...target.split, regions: [...scaled, newSub] } };
+  });
+}
+
+export function setSplitDirectionAtPath(layout, path, direction) {
+  const node = getNodeAtPath(layout, path);
+  if (!node?.split) return layout;
+  return updateNodeAtPath(layout, path, target => ({
+    ...target,
+    split: { ...target.split, direction: normalizeDirection(direction) },
+  }));
+}
+
+export function setRegionContentAtPath(layout, path, { kind, serviceId, instanceIds }) {
+  const node = getNodeAtPath(layout, path);
+  if (!node) return layout;
+  const nextKind = DASHBOARD_REGION_KINDS.includes(kind) ? kind : node.kind;
+  return updateNodeAtPath(layout, path, target => ({
+    ...target,
+    kind: nextKind,
+    serviceId: nextKind === "service" ? instanceIds?.[0] || serviceId || null : null,
+    instanceIds: normalizeRegionInstanceIds({ serviceId, instanceIds }, nextKind),
+  }));
+}
+
+export function removeRegionAtPath(layout, path) {
+  if (!Array.isArray(path) || path.length === 0) return layout;
+  const parentPath = path.slice(0, -1);
+  const index = path[path.length - 1];
+  if (parentPath.length === 0) {
+    if (layout.regions.length <= 1) return layout;
+    return normalizeRegionSizes(
+      updateContainerAtPath(layout, [], regions => regions.filter((_, i) => i !== index))
+    );
+  }
+  const parent = getNodeAtPath(layout, parentPath);
+  if (!parent?.split) return layout;
+  const subs = parent.split.regions;
+  if (index < 0 || index >= subs.length) return layout;
+  if (subs.length <= 2) {
+    const surviving = subs[index === 0 ? 1 : 0];
+    // Preserve the survivor's full subtree; it adopts the parent's slot (id + size).
+    return updateNodeAtPath(layout, parentPath, target => ({
+      ...surviving,
+      id: target.id,
+      size: target.size,
+    }));
+  }
+  return updateNodeAtPath(layout, parentPath, target => ({
+    ...target,
+    split: {
+      ...target.split,
+      regions: normalizeRegionPercentages(subs.filter((_, i) => i !== index)),
+    },
+  }));
+}
+
+export function resizePairAtPath(layout, containerPath, firstIndex, firstSize) {
+  const regions = getContainerAtPath(layout, containerPath);
+  if (!Array.isArray(regions) || regions.length < 2) return layout;
+  return updateContainerAtPath(layout, containerPath, regs =>
+    resizeAdjacentRegions(regs, firstIndex, firstSize)
+  );
+}
+
+export function applyDragSizesById(layout, sizeById) {
+  if (!sizeById) return layout;
+  const walk = regions =>
+    regions.map(region => {
+      const next = { ...region };
+      if (sizeById[region.id] != null) next.size = sizeById[region.id];
+      if (region.split) next.split = { ...region.split, regions: walk(region.split.regions) };
+      return next;
+    });
+  return { ...layout, regions: walk(layout.regions) };
+}
+
 export function getActiveDashboardScreen(screensConfig, activeScreenId = null) {
   const normalized = normalizeDashboardScreens(screensConfig);
   const targetId = activeScreenId || normalized.activeScreenId;
