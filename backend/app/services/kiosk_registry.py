@@ -4,7 +4,7 @@ import hashlib
 import json
 import re
 import sqlite3
-from datetime import datetime
+from datetime import UTC, datetime
 
 from loguru import logger
 from sqlalchemy.exc import IntegrityError as SAIntegrityError
@@ -74,6 +74,22 @@ async def record_kiosk(kiosk_id: str, hostname: str | None = None) -> None:
     await existing.update()
 
 
+def _to_utc_iso(dt: datetime | None) -> str | None:
+    """Serialize a stored last_seen as an explicit-UTC ISO string.
+
+    last_seen is written with a naive UTC value (``datetime.utcnow``) and read
+    back naive from SQLite. Stamping ``tzinfo=UTC`` makes the ISO string carry
+    a ``+00:00`` offset so a JS client (``Date.parse``) cannot misread a
+    tz-less string as local time and show a just-seen kiosk as stale
+    (calvin-dd9.16).
+    """
+    if dt is None:
+        return None
+    if dt.tzinfo is None:
+        dt = dt.replace(tzinfo=UTC)
+    return dt.isoformat()
+
+
 async def list_kiosks() -> list[dict]:
     """Return known kiosks, newest-seen first."""
     rows = await KioskDB.objects.order_by("-last_seen").all()
@@ -81,7 +97,7 @@ async def list_kiosks() -> list[dict]:
         {
             "id": row.id,
             "hostname": row.hostname,
-            "lastSeen": row.last_seen.isoformat() if row.last_seen else None,
+            "lastSeen": _to_utc_iso(row.last_seen),
             "lastAppliedVersion": row.last_applied_version,
         }
         for row in rows
