@@ -1,41 +1,20 @@
 <template>
   <div class="dashboard-region" :class="containerClass" @click="emit('focus-region', region.id)">
     <template v-if="region.split">
-      <div
+      <DashboardRegion
         v-for="sub in region.split.regions"
         :key="sub.id"
         class="dashboard-subregion"
-        :class="{ 'dashboard-subregion--lit': isFocused(sub.id) }"
+        :class="{ 'dashboard-subregion--lit': subtreeContainsActive(sub) }"
         :style="getSubStyle(sub)"
-        @click.stop="emit('focus-region', sub.id)"
-      >
-        <CalendarView
-          v-if="sub.kind === 'calendar'"
-          :source-ids="sub.instanceIds || []"
-          :view="sub.view"
-          :region-id="sub.id"
-          :focused="isFocused(sub.id)"
-          :dim="isDim(sub.id)"
-        />
-        <PhotoSlideshow
-          v-else-if="sub.kind === 'photos'"
-          :is-fullscreen="false"
-          :auto-rotate="true"
-          :rotation-interval="photoRotationInterval * 1000"
-          :source-ids="sub.instanceIds || []"
-          :focused="isFocused(sub.id)"
-          :dim="isDim(sub.id)"
-        />
-        <WebServiceViewer
-          v-else-if="sub.kind === 'service'"
-          :is-fullscreen="false"
-          :service-id="sub.instanceIds?.[0] || sub.serviceId"
-          :region-id="sub.id"
-          :view="sub.view"
-          :focused="isFocused(sub.id)"
-          :dim="isDim(sub.id)"
-        />
-      </div>
+        :region="sub"
+        :photo-rotation-interval="photoRotationInterval"
+        :parent-direction="splitDirection"
+        :active-region-id="activeRegionId"
+        :light-active="lightActive"
+        :dim-others="dimOthers"
+        @focus-region="emit('focus-region', $event)"
+      />
     </template>
     <template v-else>
       <CalendarView
@@ -103,6 +82,12 @@ const emit = defineEmits(["focus-region"]);
 
 const isFocused = leafId => props.lightActive && leafId === props.activeRegionId;
 const isDim = leafId => props.lightActive && props.dimOthers && leafId !== props.activeRegionId;
+
+const subtreeContainsActive = node => {
+  if (!props.lightActive || !props.activeRegionId) return false;
+  if (!node.split) return node.id === props.activeRegionId;
+  return node.split.regions.some(subtreeContainsActive);
+};
 
 const CalendarView = defineAsyncComponent(() => import("./CalendarView.vue"));
 const PhotoSlideshow = defineAsyncComponent(() => import("./PhotoSlideshow.vue"));
