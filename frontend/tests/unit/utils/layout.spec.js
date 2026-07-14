@@ -1118,5 +1118,34 @@ describe("path addressing", () => {
       expect(getNodeAtPath(out, [0, 0]).size).toBe(80);
       expect(getNodeAtPath(out, [0, 1]).size).toBe(20);
     });
+
+    it("unsplitRegionAtPath collapses a split back to the first sub's content", () => {
+      const l = splitRegionAtPath(twoTop(), [0]);
+      const out = unsplitRegionAtPath(l, [0]);
+      const node = getNodeAtPath(out, [0]);
+      expect(node.split).toBeNull();
+      expect(node.kind).toBe("calendar");   // adopts first sub (inherits parent kind)
+      expect(node.id).toBe("region-1");     // keeps the slot id
+    });
+
+    it("unsplitRegionAtPath no-ops on an unsplit node", () => {
+      const l = twoTop();
+      expect(unsplitRegionAtPath(l, [0])).toBe(l);
+    });
+
+    it("setSplitDirectionAtPath sets an explicit sub direction", () => {
+      const l = splitRegionAtPath(twoTop(), [0]);
+      const out = setSplitDirectionAtPath(l, [0], "column");
+      expect(getNodeAtPath(out, [0]).split.direction).toBe("column");
+    });
+
+    it("setRegionContentAtPath changes a cell's kind and instance ids", () => {
+      const l = splitRegionAtPath(twoTop(), [0]);
+      const out = setRegionContentAtPath(l, [0, 0], { kind: "service", instanceIds: ["svc-1"] });
+      const node = getNodeAtPath(out, [0, 0]);
+      expect(node.kind).toBe("service");
+      expect(node.serviceId).toBe("svc-1");
+      expect(node.instanceIds).toEqual(["svc-1"]);
+    });
   });
 });
