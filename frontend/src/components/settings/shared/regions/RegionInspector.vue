@@ -8,7 +8,7 @@
         <div class="ins-field">
           <span class="ins-label">Sub-region direction</span>
           <SegmentedControl
-            :model-value="subDirection"
+            :model-value="splitDir"
             :options="[
               { value: 'row', label: 'Side-by-side' },
               { value: 'column', label: 'Stacked' },
@@ -16,6 +16,16 @@
             aria-label="Sub-region direction"
             @update:model-value="$emit('toggle-sub-direction')"
           />
+        </div>
+        <div class="btn-row">
+          <button
+            v-if="canAddSub"
+            type="button"
+            class="link-btn"
+            @click="$emit('add-sub')"
+          >
+            {{ addSubLabel }}
+          </button>
         </div>
         <p class="ins-help">
           This region is split into sub-regions. Select a sub-region to set its content.
@@ -140,6 +150,28 @@
       </section>
     </template>
 
+    <section v-if="isSub" class="ins-group">
+      <h3 class="ins-h">Split</h3>
+      <div class="ins-field">
+        <span class="ins-label">Sub-region direction</span>
+        <SegmentedControl
+          :model-value="splitDir"
+          :options="[
+            { value: 'row', label: 'Side-by-side' },
+            { value: 'column', label: 'Stacked' },
+          ]"
+          aria-label="Sub-region direction"
+          @update:model-value="$emit('toggle-sub-direction')"
+        />
+      </div>
+      <div class="btn-row">
+        <button v-if="canAddSub" type="button" class="link-btn" @click="$emit('add-sub')">
+          {{ addSubLabel }}
+        </button>
+      </div>
+      <p class="ins-help">This region is one cell of a split. Add more to build rows and columns.</p>
+    </section>
+
     <section class="ins-group">
       <h3 class="ins-h">Arrange</h3>
       <p class="ins-help sz">
@@ -171,7 +203,7 @@ import SegmentedControl from "@/components/ui/SegmentedControl.vue";
 import ToggleSwitch from "@/components/ui/ToggleSwitch.vue";
 import NumberStepper from "@/components/ui/NumberStepper.vue";
 import { filterComponentOptions } from "@/utils/componentPicker";
-import { getSplitDirection } from "@/utils/layout";
+import { getSplitDirection, MAX_TOP_REGIONS } from "@/utils/layout";
 
 const props = defineProps({
   region: { type: Object, required: true },
@@ -187,6 +219,7 @@ const emit = defineEmits([
   "clear-sources",
   "toggle-split",
   "toggle-sub-direction",
+  "add-sub",
   "remove",
   "deselect",
 ]);
@@ -211,7 +244,24 @@ const componentLabel = computed(() => {
   );
   return opt?.label || "Service";
 });
-const subDirection = computed(() => getSplitDirection(props.region.split, props.layoutDir));
+// The split this region belongs to: itself when it's a split parent, otherwise
+// the top-level region whose sub-regions include it.
+const splitOwner = computed(() =>
+  props.region.split
+    ? props.region
+    : props.screen.layout.regions.find(r =>
+        r.split?.regions.some(s => s.id === props.region.id)
+      ) || null
+);
+const isSub = computed(() => !props.region.split && Boolean(splitOwner.value));
+const splitDir = computed(() =>
+  splitOwner.value ? getSplitDirection(splitOwner.value.split, props.layoutDir) : props.layoutDir
+);
+// A split can hold up to MAX_TOP_REGIONS sub-regions.
+const canAddSub = computed(
+  () => Boolean(splitOwner.value) && splitOwner.value.split.regions.length < MAX_TOP_REGIONS
+);
+const addSubLabel = computed(() => (splitDir.value === "column" ? "＋ Add row" : "＋ Add column"));
 
 // Top-level regions can be split; sub-regions cannot. The parent only marks a
 // region splittable when it is a top-level region of the active screen.

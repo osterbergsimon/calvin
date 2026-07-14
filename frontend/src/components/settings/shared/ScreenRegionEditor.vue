@@ -284,6 +284,7 @@
               @clear-sources="clearSelectedSources"
               @toggle-split="toggleSplitSelected"
               @toggle-sub-direction="toggleSubDirSelected"
+              @add-sub="addSubToSelected"
               @remove="removeSelected"
               @deselect="selectedRegionId = null"
             />
@@ -324,6 +325,7 @@ import ScreenInspector from "./regions/ScreenInspector.vue";
 import RegionInspector from "./regions/RegionInspector.vue";
 import {
   MAX_TOP_REGIONS,
+  addSubRegion,
   addTopRegion,
   computeClockBarPositionUpdate,
   createDashboardScreenFromPreset,
@@ -584,6 +586,13 @@ const toggleSubDirSelected = () => {
   if (!top.split) return;
   const cur = getSplitDirection(top.split, layoutDir.value);
   updateActiveLayout(setSplitDirection(cloneLayout(), ti, cur === "column" ? "row" : "column"));
+};
+const addSubToSelected = () => {
+  const region = selectedRegion.value;
+  if (!region) return;
+  const ti = topIndexOf(region);
+  if (ti < 0) return;
+  updateActiveLayout(addSubRegion(cloneLayout(), ti));
 };
 const setSelectedComponent = option => {
   const region = selectedRegion.value;
