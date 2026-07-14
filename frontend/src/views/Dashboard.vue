@@ -78,6 +78,7 @@
               >
                 <DashboardRegion
                   :region="getRegionForElement(elementType)"
+                  :path="regionPath(elementType)"
                   :photo-rotation-interval="configStore.photoRotationInterval"
                   :parent-direction="layoutDirection"
                   :active-region-id="activeScreen.activeRegionId"
@@ -294,6 +295,12 @@ const isRegionElement = elementType => elementType.startsWith("region:");
 const getRegionForElement = elementType => {
   const regionId = elementType.replace("region:", "");
   return activeScreen.value.layout.regions.find(region => region.id === regionId);
+};
+
+const regionPath = elementType => {
+  const region = getRegionForElement(elementType);
+  const idx = activeScreen.value.layout.regions.findIndex(r => r.id === region.id);
+  return idx >= 0 ? [idx] : [];
 };
 
 const getRegionStyle = elementType => {
