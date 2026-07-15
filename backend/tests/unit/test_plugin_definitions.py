@@ -50,6 +50,46 @@ class TestPluginMetadataDefaults:
 
 
 @pytest.mark.unit
+class TestBrowserOrigins:
+    """browser_origins declares plugin-intrinsic CSP host-sources."""
+
+    def test_defaults_to_empty_list(self):
+        metadata = PluginMetadata(type_id="p", name="P")
+        assert metadata.browser_origins == []
+
+    def test_accepts_and_normalizes_valid_forms(self):
+        metadata = PluginMetadata(
+            type_id="p",
+            name="P",
+            browser_origins=["Grafana.LAB", "*.lab.example.com", "https://X:3000", "10.0.0.5:8080"],
+        )
+        assert metadata.browser_origins == [
+            "grafana.lab",
+            "*.lab.example.com",
+            "https://x:3000",
+            "10.0.0.5:8080",
+        ]
+
+    def test_dedupes_preserving_order(self):
+        metadata = PluginMetadata(
+            type_id="p", name="P", browser_origins=["a.lab", "b.lab", "a.lab"]
+        )
+        assert metadata.browser_origins == ["a.lab", "b.lab"]
+
+    def test_rejects_cidr(self):
+        with pytest.raises(ValidationError):
+            PluginMetadata(type_id="p", name="P", browser_origins=["10.0.0.0/24"])
+
+    def test_rejects_path(self):
+        with pytest.raises(ValidationError):
+            PluginMetadata(type_id="p", name="P", browser_origins=["grafana.lab/d/home"])
+
+    def test_rejects_empty_entry(self):
+        with pytest.raises(ValidationError):
+            PluginMetadata(type_id="p", name="P", browser_origins=[""])
+
+
+@pytest.mark.unit
 class TestInstanceIdentityValidation:
     """instance_identity entries must reference real config keys (calvin-eaf)."""
 

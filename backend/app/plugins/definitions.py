@@ -147,6 +147,11 @@ class PluginMetadata(BaseModel):
     ui_sections: list[dict[str, Any]] = Field(default_factory=list)
     display_schema: dict[str, Any] | None = None
     statusbar_schema: dict[str, Any] | None = None
+    # Origins intrinsic to the plugin that the kiosk browser may reach (CSP
+    # host-sources; e.g. a fixed SDK host). Default empty = the plugin promises
+    # the kiosk only talks to Calvin. Site-specific origins belong in the admin
+    # allowlist, not here. See docs/superpowers/specs/2026-07-15-offline-kiosks-csp-design.md.
+    browser_origins: list[str] = Field(default_factory=list)
 
     # Runtime fields, filled by the loader.
     plugin_type: PluginType | None = None
@@ -175,6 +180,27 @@ class PluginMetadata(BaseModel):
             allowed_kinds=SUPPORTED_STATUSBAR_KINDS,
             check_panel_variant=False,
         )
+
+    @field_validator("browser_origins")
+    @classmethod
+    def validate_browser_origins(cls, value: list[str]) -> list[str]:
+        """Each entry must be a valid CSP host-source (no CIDR); normalize + dedupe.
+
+        A malformed entry fails plugin load rather than silently emitting an
+        invalid CSP token at runtime. Imported lazily to avoid any
+        plugins<->services import ordering surprise during early load.
+        """
+        from app.services.csp import validate_origin
+
+        normalized: list[str] = []
+        for entry in value:
+            try:
+                origin = validate_origin(entry)
+            except (ValueError, TypeError) as exc:
+                raise ValueError(f"browser_origins entry {entry!r} is invalid: {exc}") from exc
+            if origin not in normalized:
+                normalized.append(origin)
+        return normalized
 
     @model_validator(mode="after")
     def validate_instance_identity(self) -> "PluginMetadata":
