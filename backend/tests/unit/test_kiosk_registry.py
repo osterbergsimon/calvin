@@ -231,3 +231,12 @@ async def test_set_overrides_upserts_and_replaces(test_db):
     # Clear.
     await set_overrides("kitchen-3f9a2c", {})
     assert await get_overrides("kitchen-3f9a2c") == {}
+
+
+@pytest.mark.asyncio
+@pytest.mark.unit
+async def test_agent_version_columns_roundtrip(test_db):
+    await KioskDB.objects.create(id="k-cols", agent_version="abc123", agent_update_status="ok")
+    row = await KioskDB.objects.get(id="k-cols")
+    assert row.agent_version == "abc123"
+    assert row.agent_update_status == "ok"

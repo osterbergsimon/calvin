@@ -164,3 +164,9 @@ class KioskDB(ormar.Model):
         max_length=64, nullable=True
     )  # device-config version the display-agent last confirmed applied (used by dd9.3)
     overrides: dict | None = ormar.JSON(nullable=True)  # sparse per-kiosk config (used by dd9.3)
+    agent_version: str | None = ormar.String(
+        max_length=64, nullable=True
+    )  # running display-agent bundle version, reported by the agent (calvin-lxw)
+    agent_update_status: str | None = ormar.String(
+        max_length=128, nullable=True
+    )  # ok | updating | error:<reason> (calvin-lxw)
