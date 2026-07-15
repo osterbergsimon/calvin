@@ -5,6 +5,7 @@ import tempfile
 from collections.abc import Generator
 from datetime import datetime
 from pathlib import Path
+from unittest.mock import AsyncMock, patch
 
 import databases
 import pytest
@@ -137,3 +138,20 @@ class TestSecurityHeaders:
         response = security_test_client.get("/api/health")
         csp = response.headers.get("content-security-policy", "")
         assert "https://grafana.lab:3000" in csp
+
+    def test_db_error_falls_back_to_baseline_csp(self, security_test_client: TestClient):
+        """A DB failure during origins lookup must never discard the response as a 500.
+
+        The middleware must catch the exception and fall back to the baseline
+        self-only CSP so the underlying route's response is still returned.
+        """
+        with patch(
+            "app.middleware.security_headers.get_web_service_origins",
+            new=AsyncMock(side_effect=Exception("simulated DB lock")),
+        ):
+            response = security_test_client.get("/api/health")
+
+        assert response.status_code != 500
+        csp = response.headers.get("content-security-policy", "")
+        assert "default-src 'self'" in csp
+        assert "frame-src 'self'" in csp
