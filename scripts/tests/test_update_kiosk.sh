@@ -255,3 +255,45 @@ grep -q 'OLD-UPDATER' "$UPD_TARGET" || { echo "FAIL updater-selfcheck: updater c
 grep -q 'OLD' "$tmp/local/calvin_display_agent.py" || { echo "FAIL updater-selfcheck: agent swapped despite abort"; exit 1; }
 grep -q 'verify' "$tmp/state/agent-update-state.json" || { echo "FAIL updater-selfcheck: no verify error state"; exit 1; }
 echo "PASS updater-selfcheck-fails-aborts"
+
+# --- receipt + atomic writes: receipt written on success; corrupt prior receipt tolerated;
+#     no .tmp residue; all three state files are valid JSON ---
+mkdir -p "$tmp/state_rcpt"
+printf 'import sys\nsys.exit(0)\n' > "$tmp/srv/calvin_display_agent.py"
+RCPT_SHA="$(sha256sum "$tmp/srv/calvin_display_agent.py" | cut -d' ' -f1)"
+echo 'print("OLD")' > "$tmp/local/calvin_display_agent.py"
+cat > "$tmp/srv/manifest.json" <<EOF
+{"version":"rcpt000000000000","min_python":"3.9","files":[
+ {"name":"calvin_display_agent.py","sha256":"$RCPT_SHA","mode":"0755",
+  "target_path":"$tmp/local/calvin_display_agent.py","restart_unit":"calvin-display-agent.service","enable":false}]}
+EOF
+cat > "$tmp/bin/systemctl" <<EOF
+#!/usr/bin/env bash
+echo "\$*" >> "$tmp/systemctl.log"
+if [ "\$1" = "restart" ]; then ( sleep 1 && mkdir -p "$tmp/run" && touch "$tmp/run/agent-ready" ) & fi
+case "\$1" in "is-active"|"show") exit 0;; esac
+exit 0
+EOF
+chmod +x "$tmp/bin/systemctl"
+cat > "$tmp/bin/curl" <<EOF
+#!/usr/bin/env bash
+for a in "\$@"; do case "\$a" in
+  */agent/manifest) cat "$tmp/srv/manifest.json"; exit 0;;
+  */agent/files/calvin_display_agent.py) cat "$tmp/srv/calvin_display_agent.py"; exit 0;;
+esac; done
+exit 22
+EOF
+chmod +x "$tmp/bin/curl"
+echo 'not json{' > "$tmp/state_rcpt/agent-manifest.json"          # corrupt prior receipt
+CALVIN_AGENT_STATE_DIR="$tmp/state_rcpt" bash "$SCRIPT" || { echo "FAIL receipt: exited non-zero"; exit 1; }
+python3 - "$tmp/state_rcpt/agent-manifest.json" <<'PY' || { echo "FAIL receipt: not written/invalid"; exit 1; }
+import json, sys
+m = json.load(open(sys.argv[1]))
+assert m["version"] == "rcpt000000000000", m
+assert {f["name"] for f in m["files"]} == {"calvin_display_agent.py"}, m
+assert all("target_path" in f and "enable" in f for f in m["files"]), m
+PY
+[ -z "$(find "$tmp/state_rcpt" -name '*.tmp' -print -quit)" ] || { echo "FAIL receipt: left a .tmp file"; exit 1; }
+python3 -c 'import json,sys; json.load(open(sys.argv[1]))' "$tmp/state_rcpt/agent-version.json" || { echo "FAIL receipt: version json invalid"; exit 1; }
+python3 -c 'import json,sys; json.load(open(sys.argv[1]))' "$tmp/state_rcpt/agent-update-state.json" || { echo "FAIL receipt: state json invalid"; exit 1; }
+echo "PASS receipt-and-atomic-writes"
