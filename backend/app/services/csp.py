@@ -96,6 +96,7 @@ def is_valid_origin(value: str) -> bool:
 
 
 def _dedupe(origins: list[str]) -> list[str]:
+    """Return origins with falsy values and duplicates removed, order preserved."""
     seen: list[str] = []
     for origin in origins:
         if origin and origin not in seen:
@@ -114,9 +115,9 @@ def build_csp(frame_origins: list[str], allowed_origins: list[str] | None = None
     allowed = _dedupe(allowed_origins or [])
     directives: list[str] = []
     for directive in _BASELINE:
-        if allowed and directive == "img-src 'self' data:":
+        if allowed and directive.startswith("img-src"):
             directives.append(" ".join([directive, *allowed]))
-        elif allowed and directive == "connect-src 'self'":
+        elif allowed and directive.startswith("connect-src"):
             directives.append(" ".join([directive, *allowed]))
         else:
             directives.append(directive)
