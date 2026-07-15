@@ -103,6 +103,7 @@ restart_all
 # --- health check (only meaningful when the agent was among the restarts) ---
 agent_restarted=0; [ -n "${RESTART_UNITS[calvin-display-agent.service]:-}" ] && agent_restarted=1
 if [ "$agent_restarted" = 1 ]; then
+  rm -f "$READY_MARKER"   # clear stale marker; only a fresh one created by the new agent counts
   deadline=$((SECONDS + HEALTH_TIMEOUT)); healthy=0
   while [ "$SECONDS" -lt "$deadline" ]; do
     if "$SYSTEMCTL" is-active --quiet calvin-display-agent.service && [ -f "$READY_MARKER" ]; then

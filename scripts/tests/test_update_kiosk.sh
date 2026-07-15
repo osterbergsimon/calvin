@@ -29,10 +29,15 @@ esac; done
 exit 22
 EOF
 # mock systemctl: is-active succeeds (healthy) by default; log calls
+# On restart, spawn a background process that recreates the readiness marker after
+# a short delay, simulating the new agent coming up after the updater clears it.
 cat > "$tmp/bin/systemctl" <<EOF
 #!/usr/bin/env bash
 echo "\$*" >> "$tmp/systemctl.log"
-case "\$1 \$2" in "is-active"*|"show"*) exit 0;; esac
+if [ "\$1" = "restart" ]; then
+  ( sleep 1 && mkdir -p "$tmp/run" && touch "$tmp/run/agent-ready" ) &
+fi
+case "\$1" in "is-active"|"show") exit 0;; esac
 exit 0
 EOF
 chmod +x "$tmp/bin/curl" "$tmp/bin/systemctl"
@@ -43,8 +48,8 @@ export CALVIN_AGENT_STATE_DIR="$tmp/state" CALVIN_SYSTEMD_DIR="$tmp/systemd"
 export CALVIN_AGENT_READY_MARKER="$tmp/run/agent-ready"
 export CALVIN_UPDATE_HEALTH_TIMEOUT=4
 
-# health: mark ready so the health check passes
-: > "$CALVIN_AGENT_READY_MARKER"
+# No pre-created marker: the updater deletes any stale marker after restart,
+# and the mock restart above recreates it to simulate a healthy new agent.
 
 bash "$SCRIPT"
 
