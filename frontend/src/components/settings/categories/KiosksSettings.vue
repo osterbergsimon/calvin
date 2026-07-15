@@ -37,7 +37,7 @@
             class="kiosk-card__update"
             data-test="kiosk-update-btn"
             :disabled="k.agentUpdateRequested"
-            @click="onUpdate(k.id)"
+            @click.stop="onUpdate(k.id)"
           >
             {{ k.agentUpdateRequested ? "Updating…" : "Update" }}
           </button>
