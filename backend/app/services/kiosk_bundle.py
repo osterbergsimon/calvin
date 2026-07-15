@@ -102,4 +102,4 @@ def _version_from(files: list[dict]) -> str:
 
 
 def bundle_version(root: Path | None = None) -> str:
-    return build_manifest(root)["version"]
+    return str(build_manifest(root)["version"])
