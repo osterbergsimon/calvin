@@ -1,7 +1,11 @@
 <template>
   <div class="dashboard-region" @click="emit('focus-region', region.id)">
     <template v-if="region.split">
-      <div ref="splitContainerEl" class="split-container" :class="`split-container--${splitDirection}`">
+      <div
+        ref="splitContainerEl"
+        class="split-container"
+        :class="`split-container--${splitDirection}`"
+      >
         <DashboardRegion
           v-for="(sub, i) in region.split.regions"
           :key="sub.id"
@@ -27,7 +31,9 @@
           :style="handle.style"
           role="separator"
           :aria-label="`Drag to resize sub-regions ${handle.firstIndex + 1} and ${handle.firstIndex + 2}`"
-          @pointerdown.stop.prevent="resizeCtx.start([...path], handle.firstIndex, splitContainerEl, splitDirection)"
+          @pointerdown.stop.prevent="
+            resizeCtx.start([...path], handle.firstIndex, splitContainerEl, splitDirection)
+          "
         >
           <span class="subregion-resizer__grip" aria-hidden="true" />
         </div>
@@ -148,9 +154,7 @@ const subResizeHandles = computed(() => {
   for (let i = 0; i < subs.length - 1; i++) {
     cumulative += sizeOf(subs[i]);
     const style =
-      splitDirection.value === "column"
-        ? { top: `${cumulative}%` }
-        : { left: `${cumulative}%` };
+      splitDirection.value === "column" ? { top: `${cumulative}%` } : { left: `${cumulative}%` };
     handles.push({ firstIndex: i, style });
   }
   return handles;

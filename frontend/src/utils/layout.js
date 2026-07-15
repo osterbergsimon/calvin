@@ -822,7 +822,8 @@ function normalizeRegionSplit(split, parentId, childLevel = 2) {
       instanceIds,
       size: clampRegionSize(Number(sub.size) || 100 / subs.length),
       ...viewForKind(sub, kind),
-      split: childLevel < MAX_SPLIT_DEPTH ? normalizeRegionSplit(sub.split, id, childLevel + 1) : null,
+      split:
+        childLevel < MAX_SPLIT_DEPTH ? normalizeRegionSplit(sub.split, id, childLevel + 1) : null,
     };
   });
   return {

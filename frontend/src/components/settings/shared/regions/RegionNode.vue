@@ -1,7 +1,10 @@
 <template>
   <div
     class="sre-region"
-    :class="[region.split ? 'is-split' : `kind-${region.kind}`, { 'is-active': region.id === selectedId }]"
+    :class="[
+      region.split ? 'is-split' : `kind-${region.kind}`,
+      { 'is-active': region.id === selectedId },
+    ]"
     :style="{ flex: `${region.size} ${region.size} 0` }"
     tabindex="0"
     :data-region-id="region.id"
@@ -58,7 +61,11 @@ const emoji = computed(() =>
   props.region.kind === "calendar" ? "📅" : props.region.kind === "photos" ? "🖼️" : "🌐"
 );
 const title = computed(() =>
-  props.region.kind === "calendar" ? "Calendar" : props.region.kind === "photos" ? "Photos" : "Service"
+  props.region.kind === "calendar"
+    ? "Calendar"
+    : props.region.kind === "photos"
+      ? "Photos"
+      : "Service"
 );
 const onResize = (firstIndex, event) =>
   emit("resize", {

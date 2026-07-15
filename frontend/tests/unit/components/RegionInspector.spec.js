@@ -74,7 +74,7 @@ describe("RegionInspector split toggle", () => {
     const w = mountWith(
       region,
       { depth: 3, isSub: true, canSplit: false, canAddSub: false, splitDir: "row" },
-      [top],
+      [top]
     );
     const t = toggleText(w);
     expect(t.some(x => x.includes("Split region"))).toBe(false);

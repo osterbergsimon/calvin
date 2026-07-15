@@ -52,7 +52,6 @@ import {
   splitTopRegion,
   unsplitRegionAtPath,
   unsplitTopRegion,
-  updateContainerAtPath,
   updateNodeAtPath,
 } from "@/utils/layout";
 
@@ -1011,11 +1010,14 @@ describe("path addressing", () => {
 
   it("getContainerAtPath returns the addressed regions array", () => {
     const layout = deep();
-    expect(getContainerAtPath(layout, [])).toBe(layout.regions);          // root container
+    expect(getContainerAtPath(layout, [])).toBe(layout.regions); // root container
     expect(getContainerAtPath(layout, [0]).map(r => r.id)).toEqual(["region-1-a", "region-1-b"]);
-    expect(getContainerAtPath(layout, [0, 1]).map(r => r.id)).toEqual(["region-1-b-a", "region-1-b-b"]);
-    expect(getContainerAtPath(layout, [0, 0])).toBeNull();                 // leaf node has no split container
-    expect(getContainerAtPath(layout, [9])).toBeNull();                   // out of range
+    expect(getContainerAtPath(layout, [0, 1]).map(r => r.id)).toEqual([
+      "region-1-b-a",
+      "region-1-b-b",
+    ]);
+    expect(getContainerAtPath(layout, [0, 0])).toBeNull(); // leaf node has no split container
+    expect(getContainerAtPath(layout, [9])).toBeNull(); // out of range
   });
 
   it("normalizeRegionSplit preserves nesting up to 3 levels and drops deeper", () => {
@@ -1024,21 +1026,31 @@ describe("path addressing", () => {
       preset: "single",
       regions: [
         {
-          id: "r1", kind: "calendar", size: 100,
+          id: "r1",
+          kind: "calendar",
+          size: 100,
           split: {
             regions: [
               { id: "r1-a", kind: "photos", size: 50 },
               {
-                id: "r1-b", kind: "calendar", size: 50,
+                id: "r1-b",
+                kind: "calendar",
+                size: 50,
                 split: {
                   regions: [
                     { id: "r1-b-a", kind: "photos", size: 50 },
                     // 4th level must be stripped:
-                    { id: "r1-b-b", kind: "service", size: 50,
-                      split: { regions: [
-                        { id: "x", kind: "photos", size: 50 },
-                        { id: "y", kind: "photos", size: 50 },
-                      ] } },
+                    {
+                      id: "r1-b-b",
+                      kind: "service",
+                      size: 50,
+                      split: {
+                        regions: [
+                          { id: "x", kind: "photos", size: 50 },
+                          { id: "y", kind: "photos", size: 50 },
+                        ],
+                      },
+                    },
                   ],
                 },
               },
@@ -1048,25 +1060,38 @@ describe("path addressing", () => {
       ],
     };
     const layout = normalizeDashboardLayout(raw);
-    expect(getNodeAtPath(layout, [0, 1]).split).toBeTruthy();       // level-2 split kept
-    expect(getNodeAtPath(layout, [0, 1, 0]).split).toBeNull();      // level-3 leaf, no split
-    expect(getNodeAtPath(layout, [0, 1, 1]).split).toBeNull();      // level-3: deeper split dropped
+    expect(getNodeAtPath(layout, [0, 1]).split).toBeTruthy(); // level-2 split kept
+    expect(getNodeAtPath(layout, [0, 1, 0]).split).toBeNull(); // level-3 leaf, no split
+    expect(getNodeAtPath(layout, [0, 1, 1]).split).toBeNull(); // level-3: deeper split dropped
   });
 
   it("getLeafRegions recurses to the deepest leaves", () => {
     const layout = normalizeDashboardLayout({
-      version: 1, preset: "single",
-      regions: [{
-        id: "r1", kind: "calendar", size: 100,
-        split: { regions: [
-          { id: "r1-a", kind: "photos", size: 50 },
-          { id: "r1-b", kind: "calendar", size: 50,
-            split: { regions: [
-              { id: "r1-b-a", kind: "photos", size: 50 },
-              { id: "r1-b-b", kind: "service", size: 50 },
-            ] } },
-        ] },
-      }],
+      version: 1,
+      preset: "single",
+      regions: [
+        {
+          id: "r1",
+          kind: "calendar",
+          size: 100,
+          split: {
+            regions: [
+              { id: "r1-a", kind: "photos", size: 50 },
+              {
+                id: "r1-b",
+                kind: "calendar",
+                size: 50,
+                split: {
+                  regions: [
+                    { id: "r1-b-a", kind: "photos", size: 50 },
+                    { id: "r1-b-b", kind: "service", size: 50 },
+                  ],
+                },
+              },
+            ],
+          },
+        },
+      ],
     });
     expect(getLeafRegions(layout).map(l => l.id)).toEqual(["r1-a", "r1-b-a", "r1-b-b"]);
     const leaves = getLeafRegions(layout);
@@ -1079,10 +1104,10 @@ describe("path addressing", () => {
     const twoTop = () => addTopRegion(createDashboardLayoutFromPreset("single")); // [region-1, region-2]
 
     it("splitRegionAtPath splits a nested cell but refuses at depth 3", () => {
-      let l = splitRegionAtPath(twoTop(), [0]);           // region-1 -> a,b (level 2)
-      l = splitRegionAtPath(l, [0, 1]);                    // region-1-b -> b-a,b-b (level 3)
+      let l = splitRegionAtPath(twoTop(), [0]); // region-1 -> a,b (level 2)
+      l = splitRegionAtPath(l, [0, 1]); // region-1-b -> b-a,b-b (level 3)
       expect(getNodeAtPath(l, [0, 1, 0]).id).toBe("region-1-b-a");
-      const refused = splitRegionAtPath(l, [0, 1, 0]);     // level 3 -> no-op
+      const refused = splitRegionAtPath(l, [0, 1, 0]); // level 3 -> no-op
       expect(refused).toBe(l);
     });
 
@@ -1093,10 +1118,13 @@ describe("path addressing", () => {
     });
 
     it("removeRegionAtPath collapses a 2-child split, preserving the survivor's subtree", () => {
-      let l = splitRegionAtPath(twoTop(), [0]);   // region-1 -> a,b
-      l = splitRegionAtPath(l, [0, 1]);           // region-1-b -> b-a,b-b
-      l = removeRegionAtPath(l, [0, 0]);          // remove region-1-a; survivor region-1-b (split) adopts slot
-      expect(getNodeAtPath(l, [0]).split.regions.map(r => r.id)).toEqual(["region-1-b-a", "region-1-b-b"]);
+      let l = splitRegionAtPath(twoTop(), [0]); // region-1 -> a,b
+      l = splitRegionAtPath(l, [0, 1]); // region-1-b -> b-a,b-b
+      l = removeRegionAtPath(l, [0, 0]); // remove region-1-a; survivor region-1-b (split) adopts slot
+      expect(getNodeAtPath(l, [0]).split.regions.map(r => r.id)).toEqual([
+        "region-1-b-a",
+        "region-1-b-b",
+      ]);
     });
 
     it("removeRegionAtPath keeps a min of one top-level region", () => {
@@ -1106,7 +1134,7 @@ describe("path addressing", () => {
 
     it("resizePairAtPath rescales a nested container to 100%", () => {
       const l = splitRegionAtPath(twoTop(), [0]);
-      const resized = resizePairAtPath(l, [0], 0, 70);    // container = region-1.split
+      const resized = resizePairAtPath(l, [0], 0, 70); // container = region-1.split
       const subs = getNodeAtPath(resized, [0]).split.regions;
       expect(subs[0].size + subs[1].size).toBe(100);
       expect(subs[0].size).toBe(70);
@@ -1124,8 +1152,8 @@ describe("path addressing", () => {
       const out = unsplitRegionAtPath(l, [0]);
       const node = getNodeAtPath(out, [0]);
       expect(node.split).toBeNull();
-      expect(node.kind).toBe("calendar");   // adopts first sub (inherits parent kind)
-      expect(node.id).toBe("region-1");     // keeps the slot id
+      expect(node.kind).toBe("calendar"); // adopts first sub (inherits parent kind)
+      expect(node.id).toBe("region-1"); // keeps the slot id
     });
 
     it("unsplitRegionAtPath no-ops on an unsplit node", () => {

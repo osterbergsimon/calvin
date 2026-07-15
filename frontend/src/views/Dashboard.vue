@@ -439,7 +439,6 @@ const startRegionResize = (firstIndex, event) => {
   startNestedResize([], firstIndex, el, layoutDirection.value);
 };
 
-
 const lockLayout = () => {
   configStore.updateConfig({ regionsLocked: true });
 };

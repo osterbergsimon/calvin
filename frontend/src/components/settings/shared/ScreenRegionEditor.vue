@@ -142,7 +142,11 @@
                     <span class="sre-clock-grip" aria-hidden="true">⠿</span> 12:45 · Tue
                   </div>
 
-                  <div :ref="el => (regionsEl = el)" class="sre-regions" :class="`dir-${layoutDir}`">
+                  <div
+                    :ref="el => (regionsEl = el)"
+                    class="sre-regions"
+                    :class="`dir-${layoutDir}`"
+                  >
                     <template v-for="(region, i) in activeScreen.layout.regions" :key="region.id">
                       <!-- clock drop zone at the gap before region i -->
                       <div
@@ -397,9 +401,7 @@ const deviceSize = computed(() =>
 
 /* --- selection --- */
 const selectedPath = computed(() =>
-  selectedRegionId.value
-    ? getPathById(activeScreen.value.layout, selectedRegionId.value)
-    : null
+  selectedRegionId.value ? getPathById(activeScreen.value.layout, selectedRegionId.value) : null
 );
 const selectedRegion = computed(() => {
   const path = selectedPath.value;
@@ -630,9 +632,7 @@ const onNodeResize = ({ containerId, firstIndex, event, direction, el }) => {
   if (event) event.preventDefault();
   const rect = el?.getBoundingClientRect();
   if (!rect) return;
-  const containerPath = containerId
-    ? getPathById(activeScreen.value.layout, containerId)
-    : [];
+  const containerPath = containerId ? getPathById(activeScreen.value.layout, containerId) : [];
   dragState.value = { containerPath, firstIndex, direction, rect };
   window.addEventListener("pointermove", onResizeMove);
   window.addEventListener("pointerup", stopResize, { once: true });
@@ -650,12 +650,11 @@ const onResizeMove = event => {
   const offset = isColumn ? event.clientY - s.rect.top : event.clientX - s.rect.left;
   const axis = isColumn ? s.rect.height : s.rect.width;
   // Compute the cumulative size of regions before firstIndex in the container.
-  const containerRegions = s.containerPath.length === 0
-    ? activeScreen.value.layout.regions
-    : getNodeAtPath(activeScreen.value.layout, s.containerPath)?.split?.regions ?? [];
-  const prev = containerRegions
-    .slice(0, s.firstIndex)
-    .reduce((a, r) => a + r.size, 0);
+  const containerRegions =
+    s.containerPath.length === 0
+      ? activeScreen.value.layout.regions
+      : (getNodeAtPath(activeScreen.value.layout, s.containerPath)?.split?.regions ?? []);
+  const prev = containerRegions.slice(0, s.firstIndex).reduce((a, r) => a + r.size, 0);
   const nextSize = (offset / axis) * 100 - prev;
   updateActiveLayout(resizePairAtPath(cloneLayout(), s.containerPath, s.firstIndex, nextSize));
 };
@@ -943,7 +942,6 @@ onUnmounted(() => window.removeEventListener("pointermove", onResizeMove));
 .sre-regions.dir-column {
   flex-direction: column;
 }
-
 
 .sre-resizer {
   position: relative;

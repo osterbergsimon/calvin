@@ -72,8 +72,8 @@
           @update:model-value="v => $emit('clock-position', v)"
         />
         <p class="ins-help">
-          Or drag the bar in the preview onto any edge or gap. With 3+ regions,
-          each gap is listed so you can pick exactly where it sits.
+          Or drag the bar in the preview onto any edge or gap. With 3+ regions, each gap is listed
+          so you can pick exactly where it sits.
         </p>
       </div>
       <button v-if="hasOverride" type="button" class="link-btn" @click="$emit('clock-inherit')">
@@ -158,7 +158,10 @@ const positionOptions = computed(() => {
     // With 3+ regions there are multiple gaps — name each so it's pickable
     // without dragging. Gap 0 uses the bare "between" alias.
     for (let i = 0; i < n - 1; i++) {
-      opts.push({ value: i === 0 ? "between" : `between:${i}`, label: `Between ${i + 1} & ${i + 2}` });
+      opts.push({
+        value: i === 0 ? "between" : `between:${i}`,
+        label: `Between ${i + 1} & ${i + 2}`,
+      });
     }
   }
   return opts;

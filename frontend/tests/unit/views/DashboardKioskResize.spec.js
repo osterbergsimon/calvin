@@ -287,7 +287,9 @@ describe("Dashboard top-level region path wiring (nested resize)", () => {
 
     // The top-level region is split, so a .subregion-resizer must appear inside it.
     const handle = wrapper.find(".subregion-resizer");
-    expect(handle.exists(), ".subregion-resizer must be rendered inside the split region").toBe(true);
+    expect(handle.exists(), ".subregion-resizer must be rendered inside the split region").toBe(
+      true
+    );
 
     // Provide a bounding rect for the split container element so that coordinate
     // math produces a valid percentage. The split container is a .split-container
@@ -417,8 +419,9 @@ describe("Dashboard nested drag-resize", () => {
     // Access dragSizes from the component's internal state via expose or provide.
     // Since Dashboard uses provide("dashboardResize", ctx), we drive the resize
     // by calling startNestedResize directly on the provided object.
-    const resizeCtx = dashboardVm.$.appContext.app._context.provides?.dashboardResize
-      ?? dashboardVm.$.provides?.dashboardResize;
+    const resizeCtx =
+      dashboardVm.$.appContext.app._context.provides?.dashboardResize ??
+      dashboardVm.$.provides?.dashboardResize;
 
     expect(resizeCtx, "dashboardResize context must be provided").toBeTruthy();
 

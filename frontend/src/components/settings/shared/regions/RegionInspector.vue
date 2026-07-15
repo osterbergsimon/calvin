@@ -18,12 +18,7 @@
           />
         </div>
         <div class="btn-row">
-          <button
-            v-if="canAddSub"
-            type="button"
-            class="link-btn"
-            @click="$emit('add-sub')"
-          >
+          <button v-if="canAddSub" type="button" class="link-btn" @click="$emit('add-sub')">
             {{ addSubLabel }}
           </button>
         </div>
@@ -169,7 +164,9 @@
           {{ addSubLabel }}
         </button>
       </div>
-      <p class="ins-help">This region is one cell of a split. Add more to build rows and columns.</p>
+      <p class="ins-help">
+        This region is one cell of a split. Add more to build rows and columns.
+      </p>
     </section>
 
     <section class="ins-group">
@@ -178,7 +175,12 @@
         Size <strong>{{ region.size }}%</strong> — drag the divider in the preview to resize.
       </p>
       <div class="btn-row">
-        <button v-if="splittable || region.split" type="button" class="link-btn" @click="$emit('toggle-split')">
+        <button
+          v-if="splittable || region.split"
+          type="button"
+          class="link-btn"
+          @click="$emit('toggle-split')"
+        >
           {{ region.split ? "Unsplit" : "Split region" }}
         </button>
         <button
