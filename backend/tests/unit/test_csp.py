@@ -3,6 +3,7 @@
 import pytest
 
 from app.services.csp import build_csp, origin_from_url, validate_origin, is_valid_origin
+from app.services.csp import get_allowed_origins
 
 
 @pytest.mark.unit
@@ -94,3 +95,43 @@ class TestValidateOrigin:
     def test_is_valid_origin_bool(self):
         assert is_valid_origin("grafana.lab") is True
         assert is_valid_origin("10.0.0.0/24") is False
+
+
+@pytest.mark.unit
+class TestBuildCspAllowlist:
+    def test_empty_allowlist_is_byte_identical_to_no_allowlist(self):
+        assert build_csp(["https://a.lab"], []) == build_csp(["https://a.lab"])
+        assert build_csp([], None) == build_csp([])
+
+    def test_allowlist_extends_three_directives(self):
+        csp = build_csp([], ["https://grafana.lab"])
+        assert "img-src 'self' data: https://grafana.lab" in csp
+        assert "connect-src 'self' https://grafana.lab" in csp
+        assert "frame-src 'self' https://grafana.lab" in csp
+
+    def test_frame_src_merges_web_service_and_allowlist_deduped(self):
+        csp = build_csp(["https://a.lab"], ["https://a.lab", "https://b.lab"])
+        # 'a.lab' appears once in frame-src despite being in both inputs
+        frame = [d for d in csp.split("; ") if d.startswith("frame-src")][0]
+        assert frame.count("https://a.lab") == 1
+        assert "https://b.lab" in frame
+
+
+@pytest.mark.unit
+class TestGetAllowedOrigins:
+    async def test_reads_and_filters_config(self, monkeypatch):
+        async def fake_get_value(key, default=None):
+            assert key == "security_allowed_origins"
+            return ["grafana.lab", "10.0.0.0/24", "grafana.lab"]  # bad + dupe
+
+        import app.services.csp as csp_module
+        monkeypatch.setattr(csp_module.config_service, "get_value", fake_get_value)
+        assert await get_allowed_origins() == ["grafana.lab"]
+
+    async def test_non_list_config_returns_empty(self, monkeypatch):
+        async def fake_get_value(key, default=None):
+            return "not-a-list"
+
+        import app.services.csp as csp_module
+        monkeypatch.setattr(csp_module.config_service, "get_value", fake_get_value)
+        assert await get_allowed_origins() == []

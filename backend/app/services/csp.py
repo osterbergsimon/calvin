@@ -9,6 +9,7 @@ import re
 from urllib.parse import urlsplit
 
 from app.models.db_models import PluginDB
+from app.services.config_service import config_service
 
 # Baseline directives. frame-src is appended per-request with configured origins.
 _BASELINE = [
@@ -94,14 +95,34 @@ def is_valid_origin(value: str) -> bool:
         return False
 
 
-def build_csp(frame_origins: list[str]) -> str:
-    """Build the full CSP header value with frame-src = 'self' + given origins."""
+def _dedupe(origins: list[str]) -> list[str]:
     seen: list[str] = []
-    for origin in frame_origins:
+    for origin in origins:
         if origin and origin not in seen:
             seen.append(origin)
-    frame_src = " ".join(["frame-src 'self'", *seen]).rstrip()
-    return "; ".join([*_BASELINE, frame_src])
+    return seen
+
+
+def build_csp(frame_origins: list[str], allowed_origins: list[str] | None = None) -> str:
+    """Build the CSP header value.
+
+    frame_origins (auto-derived web-service embeds) extend frame-src only.
+    allowed_origins (admin allowlist) are trusted broadly and extend
+    frame-src, img-src, and connect-src. With no allowlist the output is
+    byte-identical to the Phase-1 baseline-plus-frame-src policy.
+    """
+    allowed = _dedupe(allowed_origins or [])
+    directives: list[str] = []
+    for directive in _BASELINE:
+        if allowed and directive == "img-src 'self' data:":
+            directives.append(" ".join([directive, *allowed]))
+        elif allowed and directive == "connect-src 'self'":
+            directives.append(" ".join([directive, *allowed]))
+        else:
+            directives.append(directive)
+    frame = _dedupe([*frame_origins, *allowed])
+    frame_src = " ".join(["frame-src 'self'", *frame]).rstrip()
+    return "; ".join([*directives, frame_src])
 
 
 async def get_web_service_origins() -> list[str]:
@@ -114,3 +135,23 @@ async def get_web_service_origins() -> list[str]:
         if origin:
             origins.add(origin)
     return sorted(origins)
+
+
+async def get_allowed_origins() -> list[str]:
+    """Admin-configured trusted origins (security_allowed_origins), validated.
+
+    Any stored entry that fails validation is dropped so a hand-edited or
+    corrupt config can never emit a malformed CSP token.
+    """
+    raw = await config_service.get_value("security_allowed_origins", [])
+    if not isinstance(raw, list):
+        return []
+    result: list[str] = []
+    for entry in raw:
+        try:
+            normalized = validate_origin(entry)
+        except (ValueError, TypeError):
+            continue
+        if normalized not in result:
+            result.append(normalized)
+    return result
