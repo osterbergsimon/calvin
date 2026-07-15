@@ -20,6 +20,7 @@ from app.plugins.manager import plugin_manager
 from app.plugins.registry.loader import load_plugin_types_for_single
 from app.plugins.utils.instance_manager import apply_plugin_config_update
 from app.services.config_service import config_service
+from app.services.csp import get_sealed_mode
 from app.services.event_system import event_system
 from app.services.plugin_installer import plugin_installer
 from app.services.theme_installer import theme_installer
@@ -671,6 +672,20 @@ async def _update_plugin_type(
 
     # Check if it's a theme first (themes use type_id directly)
     db_type = await PluginTypeDB.objects.get_or_none(type_id=plugin_id)
+
+    # Sealed-mode guard: refuse to ENABLE a plugin that declares browser_origins,
+    # so the operator never ends up with a silently browser-blocked widget. Only
+    # a False->True transition is blocked; already-enabled plugins are untouched.
+    if enabled is True and getattr(type_info, "browser_origins", None):
+        already_enabled = bool(db_type and db_type.enabled)
+        if not already_enabled and await get_sealed_mode():
+            raise HTTPException(
+                status_code=403,
+                detail=(
+                    "Cannot enable a plugin that declares browser_origins while "
+                    "sealed mode is on. Disable sealed mode first (Settings → Security)."
+                ),
+            )
 
     if db_type and db_type.plugin_type == PluginType.THEME.value:
         # It's a theme - handle enabled status only (themes don't have config)
