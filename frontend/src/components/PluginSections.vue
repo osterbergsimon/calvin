@@ -70,20 +70,7 @@
           <div v-for="image in filteredImages" :key="image.id" class="image-item">
             <div class="image-thumbnail">
               <img
-                v-if="
-                  !image.url ||
-                  (!image.url.startsWith('http://') && !image.url.startsWith('https://'))
-                "
                 :src="`/api/images/${image.id}/thumbnail`"
-                :alt="image.filename"
-                class="thumbnail-img"
-                loading="lazy"
-                decoding="async"
-                @error="handleThumbnailError"
-              />
-              <img
-                v-else
-                :src="image.url || image.raw_url"
                 :alt="image.filename"
                 class="thumbnail-img"
                 loading="lazy"

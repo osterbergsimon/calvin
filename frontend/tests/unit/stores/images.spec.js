@@ -227,7 +227,7 @@ describe("Images Store", () => {
       expect(store.getCurrentImageUrl).toBe("/api/images/1");
     });
 
-    it("should return direct URL for remote images (has URL field)", () => {
+    it("should return API proxy URL for remote images (never a raw CDN URL)", () => {
       const store = useImagesStore();
       store.currentImage = {
         id: "1",
@@ -235,22 +235,10 @@ describe("Images Store", () => {
         url: "https://picsum.photos/id/123/800/600",
       };
 
-      expect(store.getCurrentImageUrl).toBe("https://picsum.photos/id/123/800/600");
+      expect(store.getCurrentImageUrl).toBe("/api/images/1");
     });
 
-    it("should prefer url over raw_url for remote images", () => {
-      const store = useImagesStore();
-      store.currentImage = {
-        id: "1",
-        filename: "image.jpg",
-        url: "https://picsum.photos/id/123/800/600",
-        raw_url: "https://picsum.photos/id/123/1920/1080",
-      };
-
-      expect(store.getCurrentImageUrl).toBe("https://picsum.photos/id/123/800/600");
-    });
-
-    it("should use raw_url if url is not available", () => {
+    it("should return API proxy URL even when only raw_url is present", () => {
       const store = useImagesStore();
       store.currentImage = {
         id: "1",
@@ -258,7 +246,7 @@ describe("Images Store", () => {
         raw_url: "https://picsum.photos/id/123/1920/1080",
       };
 
-      expect(store.getCurrentImageUrl).toBe("https://picsum.photos/id/123/1920/1080");
+      expect(store.getCurrentImageUrl).toBe("/api/images/1");
     });
 
     it("should return null when no current image", () => {

@@ -451,6 +451,10 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
+from app.middleware.security_headers import SecurityHeadersMiddleware  # noqa: E402
+
+app.add_middleware(SecurityHeadersMiddleware)
+
 
 # Dev-only HTTP request logging — enable with CALVIN_DEV_LOG_HTTP=1
 if os.environ.get("CALVIN_DEV_LOG_HTTP") == "1":
