@@ -68,6 +68,7 @@
               @update:git-repo-url="handleGitRepoUrlUpdate"
               @update:git-branch="handleGitBranchUpdate"
             />
+            <SecuritySettings v-if="activeCategory === 'security'" :key="categoryRenderKey" />
           </div>
         </div>
       </div>
@@ -111,6 +112,9 @@ const MaintenanceSettings = defineAsyncComponent(
 );
 const KiosksSettings = defineAsyncComponent(
   () => import("@/components/settings/categories/KiosksSettings.vue")
+);
+const SecuritySettings = defineAsyncComponent(
+  () => import("@/components/settings/categories/SecuritySettings.vue")
 );
 
 const router = useRouter();
