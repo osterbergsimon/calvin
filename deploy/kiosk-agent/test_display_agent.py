@@ -644,3 +644,52 @@ def test_maybe_update_no_retry_same_failed_version(tmp_path):
     cfg = {"agentUpdateRequested": True, "agentAvailableVersion": "bad0000000000000"}
     st = {"attempted": {"bad0000000000000"}}   # already tried this version
     assert agent.maybe_update(cfg, trigger=lambda: None, state=st, state_dir=str(tmp_path)) is False
+
+
+def test_maybe_update_durable_no_retry_after_restart(tmp_path):
+    """Durable guard: error-state file from updater prevents re-firing even with fresh state."""
+    # Running version differs from the failed version (simulates a rollback that restored old ver)
+    (tmp_path / "agent-version.json").write_text('{"version": "old0000000000000"}')
+    # Updater wrote an error state recording the failed bundle version
+    (tmp_path / "agent-update-state.json").write_text(
+        '{"status": "error", "phase": "rollback", "message": "rolled back", "version": "bad0000000000000"}'
+    )
+    cfg = {"agentUpdateRequested": True, "agentAvailableVersion": "bad0000000000000"}
+    # Fresh state (simulating agent restart — attempted set is empty)
+    calls = []
+    fired = agent.maybe_update(cfg, trigger=lambda: calls.append("go"),
+                               state={"attempted": set()}, state_dir=str(tmp_path))
+    assert fired is False, "should NOT fire when updater already recorded error for this version"
+    assert calls == []
+
+
+def test_maybe_update_durable_guard_clears_on_new_version(tmp_path):
+    """A new bundle version (different hash) fires normally even when old one errored."""
+    (tmp_path / "agent-version.json").write_text('{"version": "old0000000000000"}')
+    (tmp_path / "agent-update-state.json").write_text(
+        '{"status": "error", "phase": "rollback", "message": "rolled back", "version": "bad0000000000000"}'
+    )
+    cfg = {"agentUpdateRequested": True, "agentAvailableVersion": "new0000000000000"}
+    calls = []
+    fired = agent.maybe_update(cfg, trigger=lambda: calls.append("go"),
+                               state={"attempted": set()}, state_dir=str(tmp_path))
+    assert fired is True, "should fire for a different (new) version even when old one errored"
+    assert calls == ["go"]
+
+
+def test_last_failed_version_returns_version_on_error(tmp_path):
+    (tmp_path / "agent-update-state.json").write_text(
+        '{"status": "error", "phase": "rollback", "message": "rolled back", "version": "bad0000000000000"}'
+    )
+    assert agent.last_failed_version(str(tmp_path)) == "bad0000000000000"
+
+
+def test_last_failed_version_returns_none_on_success(tmp_path):
+    (tmp_path / "agent-update-state.json").write_text(
+        '{"status": "success", "phase": "complete", "message": "ok", "version": "v1"}'
+    )
+    assert agent.last_failed_version(str(tmp_path)) is None
+
+
+def test_last_failed_version_returns_none_when_missing(tmp_path):
+    assert agent.last_failed_version(str(tmp_path)) is None

@@ -173,11 +173,24 @@ def _fire_updater():
         log(f"could not trigger updater ({e})")
 
 
+def last_failed_version(state_dir=STATE_DIR):
+    """Version the updater last recorded as errored, or None. Durable no-retry signal."""
+    try:
+        with open(os.path.join(state_dir, "agent-update-state.json")) as f:
+            st = json.load(f)
+    except (OSError, ValueError):
+        return None
+    status = st.get("status") or ""
+    return st.get("version") if status.startswith("error") else None
+
+
 def maybe_update(cfg, *, trigger=_fire_updater, state=None, state_dir=STATE_DIR):
     """Trigger a self-update when the server requested one and we're stale.
 
     `state["attempted"]` is a set of versions already tried this process, so a
-    failed/rolled-back version is not retried in a loop.
+    failed/rolled-back version is not retried in a loop within one process lifetime.
+    `last_failed_version` provides a durable guard across restarts: if the updater
+    recorded an error for the available version, skip it even after a fresh start.
     """
     if state is None or not cfg_get(cfg, "agentUpdateRequested", default=False):
         return False
@@ -185,6 +198,8 @@ def maybe_update(cfg, *, trigger=_fire_updater, state=None, state_dir=STATE_DIR)
     if not available or available == running_version(state_dir):
         return False
     if available in state["attempted"]:
+        return False
+    if available == last_failed_version(state_dir):
         return False
     state["attempted"].add(available)
     log(f"update requested: {running_version(state_dir)} -> {available}; triggering updater")

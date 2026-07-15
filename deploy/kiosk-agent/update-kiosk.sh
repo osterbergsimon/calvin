@@ -25,28 +25,31 @@ BASE="${CALVIN_BACKEND_URL%/}"
 mkdir -p "$STATE_DIR"
 log() { printf '[update-kiosk] %s\n' "$*"; }
 
-write_state() {  # status phase message
+write_state() {  # status phase message [version]
   mkdir -p "$STATE_DIR"
-  "$PYTHON" - "$1" "$2" "$3" "$STATE_FILE" <<'PY'
+  "$PYTHON" - "$1" "$2" "$3" "${4:-}" "$STATE_FILE" <<'PY'
 import json, sys
-status, phase, message, path = sys.argv[1:5]
-json.dump({"status": status, "phase": phase, "message": message}, open(path, "w"))
+status, phase, message, version, path = sys.argv[1:6]
+d = {"status": status, "phase": phase, "message": message}
+if version:
+    d["version"] = version
+json.dump(d, open(path, "w"))
 PY
 }
 
 manifest="$("$CURL" -fsSL "$BASE/api/kiosks/agent/manifest")" || {
   write_state error fetch "manifest fetch failed"; log "manifest fetch failed"; exit 1; }
 
+version="$(printf '%s' "$manifest" | "$PYTHON" -c 'import sys,json;print(json.load(sys.stdin)["version"])')"
+
 # --- min_python precheck ---
 min_py="$(printf '%s' "$manifest" | "$PYTHON" -c 'import sys,json;print(json.load(sys.stdin).get("min_python",""))')"
 if [ -n "$min_py" ]; then
   if ! "$PYTHON" -c 'import sys;a=tuple(int(x) for x in sys.argv[1].split("."));sys.exit(0 if sys.version_info[:2]>=a else 1)' "$min_py"; then
-    write_state error python-too-old "device python < ${min_py}; keeping current agent"
+    write_state error python-too-old "device python < ${min_py}; keeping current agent" "$version"
     log "python-too-old (need ${min_py}); aborting"; exit 1
   fi
 fi
-
-version="$(printf '%s' "$manifest" | "$PYTHON" -c 'import sys,json;print(json.load(sys.stdin)["version"])')"
 # Emit one TAB-separated line per file: name sha256 mode target_path restart_unit
 files_tsv="$(printf '%s' "$manifest" | "$PYTHON" -c '
 import sys, json
@@ -67,11 +70,11 @@ while IFS=$'\t' read -r name sha mode target unit; do
   if [ "$(installed_sha "$target")" = "$sha" ]; then continue; fi   # unchanged
   # fetch + verify
   "$CURL" -fsSL "$BASE/api/kiosks/agent/files/$name" > "$STAGE/$name" || {
-    write_state error fetch "download failed: $name"; exit 1; }
+    write_state error fetch "download failed: $name" "$version"; exit 1; }
   got="$(sha256sum "$STAGE/$name" | cut -d' ' -f1)"
-  [ "$got" = "$sha" ] || { write_state error verify "checksum mismatch: $name"; exit 1; }
+  [ "$got" = "$sha" ] || { write_state error verify "checksum mismatch: $name" "$version"; exit 1; }
   if [ "$name" = "calvin_display_agent.py" ]; then
-    "$PYTHON" -m py_compile "$STAGE/$name" || { write_state error verify "py_compile failed"; exit 1; }
+    "$PYTHON" -m py_compile "$STAGE/$name" || { write_state error verify "py_compile failed" "$version"; exit 1; }
   fi
   CHANGED_NAME+=("$name"); CHANGED_TARGET+=("$target"); CHANGED_MODE+=("$mode")
   [ -n "$unit" ] && RESTART_UNITS["$unit"]=1
@@ -79,7 +82,7 @@ while IFS=$'\t' read -r name sha mode target unit; do
 done <<< "$files_tsv"
 
 if [ "${#CHANGED_NAME[@]}" -eq 0 ]; then
-  write_state success noop "already at ${version}"
+  write_state success noop "already at ${version}" "$version"
   "$PYTHON" -c 'import json,sys;json.dump({"version":sys.argv[1]},open(sys.argv[2],"w"))' "$version" "$VERSION_FILE"
   log "no changes; already ${version}"; exit 0
 fi
@@ -124,11 +127,11 @@ if [ "$agent_restarted" = 1 ]; then
     done
     [ "$unit_changed" = 1 ] && "$SYSTEMCTL" daemon-reload || true
     restart_all
-    write_state error rollback "rolled back to previous version"
+    write_state error rollback "rolled back to previous version" "$version"
     exit 1
   fi
 fi
 
 "$PYTHON" -c 'import json,sys;json.dump({"version":sys.argv[1]},open(sys.argv[2],"w"))' "$version" "$VERSION_FILE"
-write_state success complete "updated to ${version}"
+write_state success complete "updated to ${version}" "$version"
 log "updated to ${version}"
