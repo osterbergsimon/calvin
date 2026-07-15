@@ -28,8 +28,9 @@ class TestBuildCsp:
         assert "default-src 'self'" in csp
         assert "img-src 'self' data:" in csp
         assert "connect-src 'self'" in csp
-        assert "font-src 'self'" in csp
+        assert "font-src 'self' data:" in csp
         assert "frame-src 'self'" in csp
+        assert "frame-ancestors 'self'" in csp
 
     def test_frame_src_includes_given_origins(self):
         csp = build_csp(["https://grafana.lab", "http://192.168.1.50:3000"])

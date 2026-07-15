@@ -139,6 +139,59 @@ class TestSecurityHeaders:
         csp = response.headers.get("content-security-policy", "")
         assert "https://grafana.lab:3000" in csp
 
+    def test_disabled_and_non_iframe_instances_excluded_from_frame_src(
+        self, security_test_client: TestClient
+    ):
+        """Disabled iframe instances and enabled non-iframe instances must not
+        appear in frame-src — only enabled type_id='iframe' instances count."""
+
+        async def _seed():
+            import ormar
+
+            # (a) disabled iframe instance — should be excluded
+            try:
+                await PluginDB.objects.get(id="ws-disabled-iframe")
+            except ormar.NoMatch:
+                await PluginDB.objects.create(
+                    id="ws-disabled-iframe",
+                    type_id="iframe",
+                    plugin_type="service",
+                    name="Disabled Iframe",
+                    enabled=False,
+                    config={"url": "https://disabled-kiosk.internal/board"},
+                    display_order=0,
+                    created_at=datetime.utcnow(),
+                    updated_at=datetime.utcnow(),
+                )
+
+            # (b) enabled non-iframe service instance — should be excluded
+            try:
+                await PluginDB.objects.get(id="ws-mealie-enabled")
+            except ormar.NoMatch:
+                await PluginDB.objects.create(
+                    id="ws-mealie-enabled",
+                    type_id="mealie",
+                    plugin_type="service",
+                    name="Mealie",
+                    enabled=True,
+                    config={"url": "https://mealie.internal/api"},
+                    display_order=1,
+                    created_at=datetime.utcnow(),
+                    updated_at=datetime.utcnow(),
+                )
+
+        loop = asyncio.new_event_loop()
+        asyncio.set_event_loop(loop)
+        try:
+            loop.run_until_complete(_seed())
+        finally:
+            loop.close()
+
+        response = security_test_client.get("/api/health")
+        csp = response.headers.get("content-security-policy", "")
+        assert "https://disabled-kiosk.internal" not in csp
+        assert "https://mealie.internal" not in csp
+
     def test_db_error_falls_back_to_baseline_csp(self, security_test_client: TestClient):
         """A DB failure during origins lookup must never discard the response as a 500.
 
