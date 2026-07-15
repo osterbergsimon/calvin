@@ -63,8 +63,9 @@ A small, single-responsibility module: load-or-create the key, sign, verify.
   bytes. Otherwise generate `secrets.token_hex(32)` (256-bit), write it with
   `os.open(path, O_CREAT|O_EXCL|O_WRONLY, 0o600)` then `os.write`; if a concurrent creator won
   the race (`FileExistsError`), read the existing file. Return the decoded key bytes.
-- The resolved key path is logged once at startup (via the existing lifespan/init path) so the
-  operator knows where to read it from — the value is never logged.
+- On first creation the module logs the key path via loguru (`logger.info`) — the value is never
+  logged. The path is a fixed setting with a documented default (`KIOSK_PROVISIONING.md`), so
+  operators can find it later without a per-startup log. (No `main.py`/lifespan change.)
 - `canonical(manifest: dict) -> bytes`: `json.dumps(manifest, sort_keys=True,
   separators=(",", ":")).encode()`. Manifest values are only str/int/bool/list/dict (no floats),
   so this round-trips identically on both sides.
@@ -95,22 +96,31 @@ access:
 cat <kiosk_signing_key_path>       # e.g. cat ./data/kiosk-signing.key on the server
 ```
 
-and passes the hex to provisioning:
+and passes the hex to provisioning. Because the key is a **secret**, it is stored in a
+**dedicated `0600` root-owned file** — `/etc/default/calvin-kiosk-signing` — **not** the
+world-readable (`0644`) `/etc/default/calvin-kiosk` that also holds non-secret config (backend
+URL, kiosk id) read by the unprivileged agent. Only root-side code (the updater and the bootstrap
+shim) needs the key; the `calvin`-user agent never does. This isolation also sidesteps the
+truncate-and-rewrite in `install_kiosk_config` (the key lives in a separate file it doesn't
+touch).
 
 - `scripts/bake-kiosk-firstrun.sh` gains `--signing-key <hex>` (and `--signing-key-file <path>`
-  reading a local copy) → writes `CALVIN_KIOSK_SIGNING_KEY=<hex>` into the baked
-  `/etc/default/calvin-kiosk`.
-- `scripts/setup-kiosk.sh` gains `--signing-key <hex>` → same, for manual installs (threaded
-  through `install_kiosk_config`, preserved across env-file rewrites like `CALVIN_KIOSK_ID`).
-- Omitting it → `CALVIN_KIOSK_SIGNING_KEY` absent → current LAN-trust behavior (opt-in per
-  kiosk).
+  reading a local copy) → the generated first-boot script writes
+  `CALVIN_KIOSK_SIGNING_KEY=<hex>` into `/etc/default/calvin-kiosk-signing`, mode `0600`.
+- `scripts/setup-kiosk.sh` gains `--signing-key <hex>` → writes the same `0600` file for manual
+  installs. If a key is neither passed nor already present, the file is not created.
+- Omitting it everywhere → no signing file → `CALVIN_KIOSK_SIGNING_KEY` absent → current
+  LAN-trust behavior (opt-in per kiosk).
 
 ### 4. Kiosk verification — fail-closed when a key is present
 
-The env file gains `CALVIN_KIOSK_SIGNING_KEY` (hex, or absent). Verification is pure stdlib
-(`hmac` + `hashlib`, `compare_digest`): parse the fetched manifest JSON, remove the `signature`
-and `sig_alg` keys, recompute `canonical()` over the remainder, HMAC with the decoded key, and
-`compare_digest` against the provided `signature`.
+The updater sources the dedicated signing-key file
+(`SIGNING_ENV_FILE="${CALVIN_KIOSK_SIGNING_ENV_FILE:-/etc/default/calvin-kiosk-signing}"`, sourced
+after the main env file) to pick up `CALVIN_KIOSK_SIGNING_KEY` (hex, or absent). Verification is
+pure stdlib (`hmac` + `hashlib`, `compare_digest`): parse the fetched manifest JSON, remove the
+`signature` and `sig_alg` keys, recompute `canonical()` over the remainder, HMAC with the decoded
+key, and `compare_digest` against the provided `signature`. The `CALVIN_KIOSK_SIGNING_ENV_FILE`
+override lets tests point the signing file at a temp path.
 
 Applied wherever the manifest is fetched-and-trusted:
 
@@ -180,9 +190,12 @@ signature to downgrade.
 
 ### Setup — `scripts/tests/test_setup_kiosk_bundle.sh` (extend) + env-write coverage
 
-- `--signing-key <hex>` writes `CALVIN_KIOSK_SIGNING_KEY=<hex>` to the env file.
-- `bootstrap_kiosk` with a key set + valid manifest signature → verifies, then runs `--bootstrap`.
-- `bootstrap_kiosk` with a key set + bad/missing manifest signature → aborts; the updater is
+- `setup-kiosk.sh --signing-key <hex>` writes `CALVIN_KIOSK_SIGNING_KEY=<hex>` into the dedicated
+  signing file (path overridable via `CALVIN_KIOSK_SIGNING_ENV_FILE`) at mode `0600`, and leaves
+  the main `/etc/default/calvin-kiosk` free of the secret.
+- `bootstrap_kiosk <url> <key>` with a valid manifest signature → verifies, then runs
+  `--bootstrap`.
+- `bootstrap_kiosk <url> <key>` with a bad/missing manifest signature → aborts; the updater is
   **never executed** (marker not written).
 
 ## Files touched
@@ -193,11 +206,10 @@ signature to downgrade.
 | `backend/app/config.py` | New `kiosk_signing_key_path` setting |
 | `backend/app/services/kiosk_bundle.py` | `build_signed_manifest()` |
 | `backend/app/api/routes/kiosks.py` | manifest route returns signed manifest |
-| `backend/app/main.py` (or lifespan/init) | log key path once at startup |
-| `deploy/kiosk-agent/update-kiosk.sh` | verify signature post-fetch (update + bootstrap + self-check) |
-| `scripts/setup-common.sh` | `bootstrap_kiosk` verifies signature; env plumbing |
-| `scripts/setup-kiosk.sh` | `--signing-key` arg → env file |
-| `scripts/bake-kiosk-firstrun.sh` | `--signing-key` / `--signing-key-file` → baked env |
+| `deploy/kiosk-agent/update-kiosk.sh` | source `/etc/default/calvin-kiosk-signing`; verify signature post-fetch (update + bootstrap + self-check) |
+| `scripts/setup-common.sh` | `bootstrap_kiosk` takes the key, verifies signature before running updater |
+| `scripts/setup-kiosk.sh` | `--signing-key` arg → writes `0600` signing file; passes key to `bootstrap_kiosk` |
+| `scripts/bake-kiosk-firstrun.sh` | `--signing-key` / `--signing-key-file` → first-boot writes `0600` signing file |
 | `docs/setup/KIOSK_PROVISIONING.md` | signing section: obtain key, bake, fail-closed, rotation |
 | tests | backend signing tests; updater sig tests; setup sig tests |
 
