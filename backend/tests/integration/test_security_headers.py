@@ -14,8 +14,8 @@ from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import HTMLResponse
 from fastapi.testclient import TestClient
 
-from app.models.db_models import PluginDB
 from app.middleware.security_headers import SecurityHeadersMiddleware
+from app.models.db_models import PluginDB
 from tests._support.db import (
     cleanup_db_file,
     create_tables_with_verify,
