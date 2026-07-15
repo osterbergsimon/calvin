@@ -4,8 +4,12 @@ import { describe, it, expect } from "vitest";
 import {
   DEFAULT_CALENDAR_VIEW,
   MAX_TOP_REGIONS,
+  MAX_SPLIT_DEPTH,
   addSubRegion,
+  addSubRegionAtPath,
   addTopRegion,
+  applyDragSizesById,
+  canSplitAtPath,
   clampCalendarView,
   clampServiceView,
   computeClockBarModeUpdate,
@@ -17,9 +21,12 @@ import {
   getActiveDashboardScreen,
   getClockBarBetweenIndex,
   getClockBarPlacementGap,
+  getContainerAtPath,
   getGlobalClockBarSettings,
   getLayoutDirection,
   getLeafRegions,
+  getNodeAtPath,
+  getPathById,
   getRegionAxisStyle,
   getSplitDirection,
   isClockBarBetweenPosition,
@@ -27,18 +34,25 @@ import {
   normalizeDashboardLayout,
   normalizeDashboardScreens,
   normalizeScreenClockBar,
+  removeRegionAtPath,
   removeSubRegion,
   removeTopRegion,
   resizeAdjacentRegions,
+  resizePairAtPath,
   resizeSubRegion,
   resizeSubRegionPair,
   resolveClockBarForScreen,
   setLayoutDirection,
+  setRegionContentAtPath,
   setRegionView,
   setSplitDirection,
+  setSplitDirectionAtPath,
   setSubRegionContent,
+  splitRegionAtPath,
   splitTopRegion,
+  unsplitRegionAtPath,
   unsplitTopRegion,
+  updateNodeAtPath,
 } from "@/utils/layout";
 
 describe("Layout Utilities", () => {
@@ -925,5 +939,241 @@ describe("setRegionView on a service region", () => {
   it("does not mutate the input", () => {
     setRegionView(screens, "svc-1", { linkAction: "off" });
     expect(screens.screens[0].layout.regions[0].view).toBeUndefined();
+  });
+});
+
+describe("path addressing", () => {
+  // region-1 split into [a, b]; b split again into [b-a, b-b] (3 levels).
+  const deep = () => ({
+    version: 1,
+    preset: "single",
+    direction: null,
+    regions: [
+      {
+        id: "region-1",
+        kind: "calendar",
+        size: 100,
+        instanceIds: [],
+        split: {
+          direction: null,
+          regions: [
+            { id: "region-1-a", kind: "photos", size: 50, instanceIds: [] },
+            {
+              id: "region-1-b",
+              kind: "calendar",
+              size: 50,
+              instanceIds: [],
+              split: {
+                direction: null,
+                regions: [
+                  { id: "region-1-b-a", kind: "photos", size: 50, instanceIds: [] },
+                  { id: "region-1-b-b", kind: "service", size: 50, instanceIds: [] },
+                ],
+              },
+            },
+          ],
+        },
+      },
+    ],
+  });
+
+  it("getNodeAtPath walks indices to the node", () => {
+    const layout = deep();
+    expect(getNodeAtPath(layout, [0]).id).toBe("region-1");
+    expect(getNodeAtPath(layout, [0, 0]).id).toBe("region-1-a");
+    expect(getNodeAtPath(layout, [0, 1, 0]).id).toBe("region-1-b-a");
+    expect(getNodeAtPath(layout, [9])).toBeNull();
+    expect(getNodeAtPath(layout, [])).toBeNull();
+  });
+
+  it("getPathById round-trips with getNodeAtPath", () => {
+    const layout = deep();
+    expect(getPathById(layout, "region-1-b-b")).toEqual([0, 1, 1]);
+    expect(getNodeAtPath(layout, getPathById(layout, "region-1-a")).id).toBe("region-1-a");
+    expect(getPathById(layout, "nope")).toBeNull();
+  });
+
+  it("updateNodeAtPath immutably replaces a nested node", () => {
+    const layout = deep();
+    const next = updateNodeAtPath(layout, [0, 1, 0], n => ({ ...n, size: 77 }));
+    expect(getNodeAtPath(next, [0, 1, 0]).size).toBe(77);
+    expect(getNodeAtPath(layout, [0, 1, 0]).size).not.toBe(77); // original untouched
+  });
+
+  it("canSplitAtPath enforces MAX_SPLIT_DEPTH", () => {
+    expect(canSplitAtPath([0])).toBe(true);
+    expect(canSplitAtPath([0, 1])).toBe(true);
+    expect(canSplitAtPath([0, 1, 0])).toBe(false);
+    expect(canSplitAtPath([])).toBe(false);
+    expect(MAX_SPLIT_DEPTH).toBe(3);
+  });
+
+  it("getContainerAtPath returns the addressed regions array", () => {
+    const layout = deep();
+    expect(getContainerAtPath(layout, [])).toBe(layout.regions); // root container
+    expect(getContainerAtPath(layout, [0]).map(r => r.id)).toEqual(["region-1-a", "region-1-b"]);
+    expect(getContainerAtPath(layout, [0, 1]).map(r => r.id)).toEqual([
+      "region-1-b-a",
+      "region-1-b-b",
+    ]);
+    expect(getContainerAtPath(layout, [0, 0])).toBeNull(); // leaf node has no split container
+    expect(getContainerAtPath(layout, [9])).toBeNull(); // out of range
+  });
+
+  it("normalizeRegionSplit preserves nesting up to 3 levels and drops deeper", () => {
+    const raw = {
+      version: 1,
+      preset: "single",
+      regions: [
+        {
+          id: "r1",
+          kind: "calendar",
+          size: 100,
+          split: {
+            regions: [
+              { id: "r1-a", kind: "photos", size: 50 },
+              {
+                id: "r1-b",
+                kind: "calendar",
+                size: 50,
+                split: {
+                  regions: [
+                    { id: "r1-b-a", kind: "photos", size: 50 },
+                    // 4th level must be stripped:
+                    {
+                      id: "r1-b-b",
+                      kind: "service",
+                      size: 50,
+                      split: {
+                        regions: [
+                          { id: "x", kind: "photos", size: 50 },
+                          { id: "y", kind: "photos", size: 50 },
+                        ],
+                      },
+                    },
+                  ],
+                },
+              },
+            ],
+          },
+        },
+      ],
+    };
+    const layout = normalizeDashboardLayout(raw);
+    expect(getNodeAtPath(layout, [0, 1]).split).toBeTruthy(); // level-2 split kept
+    expect(getNodeAtPath(layout, [0, 1, 0]).split).toBeNull(); // level-3 leaf, no split
+    expect(getNodeAtPath(layout, [0, 1, 1]).split).toBeNull(); // level-3: deeper split dropped
+  });
+
+  it("getLeafRegions recurses to the deepest leaves", () => {
+    const layout = normalizeDashboardLayout({
+      version: 1,
+      preset: "single",
+      regions: [
+        {
+          id: "r1",
+          kind: "calendar",
+          size: 100,
+          split: {
+            regions: [
+              { id: "r1-a", kind: "photos", size: 50 },
+              {
+                id: "r1-b",
+                kind: "calendar",
+                size: 50,
+                split: {
+                  regions: [
+                    { id: "r1-b-a", kind: "photos", size: 50 },
+                    { id: "r1-b-b", kind: "service", size: 50 },
+                  ],
+                },
+              },
+            ],
+          },
+        },
+      ],
+    });
+    expect(getLeafRegions(layout).map(l => l.id)).toEqual(["r1-a", "r1-b-a", "r1-b-b"]);
+    const leaves = getLeafRegions(layout);
+    expect(leaves.find(l => l.id === "r1-a").parentId).toBe("r1");
+    expect(leaves.find(l => l.id === "r1-b-a").parentId).toBe("r1-b");
+    expect(leaves.find(l => l.id === "r1-b-b").parentId).toBe("r1-b");
+  });
+
+  describe("path mutations", () => {
+    const twoTop = () => addTopRegion(createDashboardLayoutFromPreset("single")); // [region-1, region-2]
+
+    it("splitRegionAtPath splits a nested cell but refuses at depth 3", () => {
+      let l = splitRegionAtPath(twoTop(), [0]); // region-1 -> a,b (level 2)
+      l = splitRegionAtPath(l, [0, 1]); // region-1-b -> b-a,b-b (level 3)
+      expect(getNodeAtPath(l, [0, 1, 0]).id).toBe("region-1-b-a");
+      const refused = splitRegionAtPath(l, [0, 1, 0]); // level 3 -> no-op
+      expect(refused).toBe(l);
+    });
+
+    it("addSubRegionAtPath adds a sub to a nested split", () => {
+      let l = splitRegionAtPath(twoTop(), [0]);
+      l = addSubRegionAtPath(l, [0]);
+      expect(getNodeAtPath(l, [0]).split.regions).toHaveLength(3);
+    });
+
+    it("removeRegionAtPath collapses a 2-child split, preserving the survivor's subtree", () => {
+      let l = splitRegionAtPath(twoTop(), [0]); // region-1 -> a,b
+      l = splitRegionAtPath(l, [0, 1]); // region-1-b -> b-a,b-b
+      l = removeRegionAtPath(l, [0, 0]); // remove region-1-a; survivor region-1-b (split) adopts slot
+      expect(getNodeAtPath(l, [0]).split.regions.map(r => r.id)).toEqual([
+        "region-1-b-a",
+        "region-1-b-b",
+      ]);
+    });
+
+    it("removeRegionAtPath keeps a min of one top-level region", () => {
+      const single = createDashboardLayoutFromPreset("single");
+      expect(removeRegionAtPath(single, [0])).toBe(single);
+    });
+
+    it("resizePairAtPath rescales a nested container to 100%", () => {
+      const l = splitRegionAtPath(twoTop(), [0]);
+      const resized = resizePairAtPath(l, [0], 0, 70); // container = region-1.split
+      const subs = getNodeAtPath(resized, [0]).split.regions;
+      expect(subs[0].size + subs[1].size).toBe(100);
+      expect(subs[0].size).toBe(70);
+    });
+
+    it("applyDragSizesById overrides sizes by id at any depth", () => {
+      const l = splitRegionAtPath(twoTop(), [0]);
+      const out = applyDragSizesById(l, { "region-1-a": 80, "region-1-b": 20 });
+      expect(getNodeAtPath(out, [0, 0]).size).toBe(80);
+      expect(getNodeAtPath(out, [0, 1]).size).toBe(20);
+    });
+
+    it("unsplitRegionAtPath collapses a split back to the first sub's content", () => {
+      const l = splitRegionAtPath(twoTop(), [0]);
+      const out = unsplitRegionAtPath(l, [0]);
+      const node = getNodeAtPath(out, [0]);
+      expect(node.split).toBeNull();
+      expect(node.kind).toBe("calendar"); // adopts first sub (inherits parent kind)
+      expect(node.id).toBe("region-1"); // keeps the slot id
+    });
+
+    it("unsplitRegionAtPath no-ops on an unsplit node", () => {
+      const l = twoTop();
+      expect(unsplitRegionAtPath(l, [0])).toBe(l);
+    });
+
+    it("setSplitDirectionAtPath sets an explicit sub direction", () => {
+      const l = splitRegionAtPath(twoTop(), [0]);
+      const out = setSplitDirectionAtPath(l, [0], "column");
+      expect(getNodeAtPath(out, [0]).split.direction).toBe("column");
+    });
+
+    it("setRegionContentAtPath changes a cell's kind and instance ids", () => {
+      const l = splitRegionAtPath(twoTop(), [0]);
+      const out = setRegionContentAtPath(l, [0, 0], { kind: "service", instanceIds: ["svc-1"] });
+      const node = getNodeAtPath(out, [0, 0]);
+      expect(node.kind).toBe("service");
+      expect(node.serviceId).toBe("svc-1");
+      expect(node.instanceIds).toEqual(["svc-1"]);
+    });
   });
 });

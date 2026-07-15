@@ -207,3 +207,262 @@ describe("Dashboard commitRegionSizes — kiosk catalog preservation (dd9.4)", (
     expect(Math.round(total)).toBe(100);
   });
 });
+
+// ── Top-level region path wiring: sub-regions receive the correct path ────────
+//
+// Regression test for the bug where the top-level <DashboardRegion> was rendered
+// without a :path prop (defaulting to []). When a top-level region is split and
+// the user drags the inner divider, DashboardRegion calls
+// resizeCtx.start([...path], firstIndex, ...) with path=[], so containerPath=[]
+// ends up resolving to layout.regions (top-level) instead of the split sub-regions.
+//
+// The fix wires :path="regionPath(elementType)" on the top-level DashboardRegion
+// so the correct [idx] path reaches the nested handler.
+const SPLIT_TOP_SCREENS = {
+  version: 2,
+  activeScreenId: "screen-split-top",
+  screens: [
+    {
+      id: "screen-split-top",
+      name: "Split Top",
+      activeRegionId: "region-1-a",
+      layout: {
+        regions: [
+          {
+            id: "region-1",
+            kind: "calendar",
+            instanceIds: [],
+            size: 100,
+            split: {
+              direction: "row",
+              regions: [
+                { id: "region-1-a", kind: "calendar", instanceIds: [], size: 50 },
+                { id: "region-1-b", kind: "photos", instanceIds: [], size: 50 },
+              ],
+            },
+          },
+        ],
+      },
+    },
+  ],
+};
+
+describe("Dashboard top-level region path wiring (nested resize)", () => {
+  let store;
+
+  beforeEach(() => {
+    setSearch("");
+    setActivePinia(createPinia());
+    store = useConfigStore();
+    store.setDashboardScreens(SPLIT_TOP_SCREENS);
+    store.availableScreens = null;
+    store.kioskActiveScreenId = null;
+    store.showUI = true;
+    store.regionsLocked = false;
+    store.fetchConfig = vi.fn().mockResolvedValue({});
+    vi.spyOn(store, "updateConfig").mockResolvedValue(undefined);
+  });
+
+  afterEach(() => {
+    setSearch("");
+  });
+
+  it("dragging .subregion-resizer updates sub-region ids, not top-level ids", async () => {
+    // Mount with real DashboardRegion so .subregion-resizer is actually rendered.
+    const wrapper = mount(Dashboard, {
+      global: {
+        stubs: {
+          CalendarView: true,
+          PhotoSlideshow: true,
+          WebServiceViewer: true,
+          ClockBarHorizontal: true,
+          ClockBarVertical: true,
+          MinimalUIOverlay: true,
+          PerimeterProgress: true,
+          LayoutManager: { template: "<div><slot /></div>" },
+        },
+      },
+    });
+    await flushPromises();
+
+    // The top-level region is split, so a .subregion-resizer must appear inside it.
+    const handle = wrapper.find(".subregion-resizer");
+    expect(handle.exists(), ".subregion-resizer must be rendered inside the split region").toBe(
+      true
+    );
+
+    // Provide a bounding rect for the split container element so that coordinate
+    // math produces a valid percentage. The split container is a .split-container
+    // inside the DashboardRegion. jsdom returns zeroed rects by default, so we
+    // patch the method on its DOM element.
+    const splitContainerEl = wrapper.find(".split-container").element;
+    splitContainerEl.getBoundingClientRect = () => ({
+      top: 0,
+      left: 0,
+      width: 800,
+      height: 600,
+    });
+
+    // Fire pointerdown on the rendered handle — this triggers DashboardRegion's
+    // @pointerdown.stop.prevent which calls resizeCtx.start([...path], ...).
+    handle.element.dispatchEvent(new Event("pointerdown", { bubbles: true }));
+    await flushPromises();
+
+    // pointermove at clientX=320 (40% of 800px wide container) should resize
+    // region-1-a to ~40 and region-1-b to ~60 within the split container.
+    window.dispatchEvent(makePointerEvent("pointermove", { clientX: 320, clientY: 0 }));
+
+    // Grab dragSizes from the Dashboard's provided resize context.
+    const dashboardVm = wrapper.vm;
+    const resizeCtx =
+      dashboardVm.$.appContext.app._context.provides?.dashboardResize ??
+      dashboardVm.$.provides?.dashboardResize;
+
+    expect(resizeCtx, "dashboardResize context must be provided").toBeTruthy();
+
+    const sizes = resizeCtx.dragSizes.value;
+    expect(sizes, "dragSizes must be set after pointermove").toBeTruthy();
+
+    // The sub-region ids must appear in dragSizes.
+    expect(sizes["region-1-a"], "region-1-a must have a drag size").toBeDefined();
+    expect(sizes["region-1-b"], "region-1-b must have a drag size").toBeDefined();
+
+    // Sub-region sizes must sum to 100, proving the path resolved to the
+    // split container and NOT to the top-level regions array.
+    const subTotal = (sizes["region-1-a"] ?? 0) + (sizes["region-1-b"] ?? 0);
+    expect(Math.round(subTotal)).toBe(100);
+
+    // Clean up
+    window.dispatchEvent(makePointerEvent("pointerup"));
+    await flushPromises();
+  });
+});
+
+// ── Nested resize: sub-regions inside a split container ──────────────────────
+//
+// Screen with one top-level region (r1) split into two sub-regions (r1-a, r1-b).
+// Dragging the divider inside r1 must update ONLY r1-a and r1-b in dragSizes;
+// top-level region sizes must remain untouched.
+const NESTED_SCREENS = {
+  version: 2,
+  activeScreenId: "screen-nested",
+  screens: [
+    {
+      id: "screen-nested",
+      name: "Nested",
+      activeRegionId: "r1-a",
+      layout: {
+        regions: [
+          {
+            id: "r1",
+            kind: "calendar",
+            instanceIds: [],
+            size: 100,
+            split: {
+              direction: "row",
+              regions: [
+                { id: "r1-a", kind: "calendar", instanceIds: [], size: 50 },
+                { id: "r1-b", kind: "photos", instanceIds: [], size: 50 },
+              ],
+            },
+          },
+        ],
+      },
+    },
+  ],
+};
+
+describe("Dashboard nested drag-resize", () => {
+  let store;
+  let updateConfigSpy;
+
+  beforeEach(() => {
+    setSearch("");
+    setActivePinia(createPinia());
+    store = useConfigStore();
+    store.setDashboardScreens(NESTED_SCREENS);
+    store.availableScreens = null;
+    store.kioskActiveScreenId = null;
+    store.showUI = true;
+    store.regionsLocked = false;
+    store.fetchConfig = vi.fn().mockResolvedValue({});
+    updateConfigSpy = vi.spyOn(store, "updateConfig").mockResolvedValue(undefined);
+  });
+
+  afterEach(() => {
+    setSearch("");
+  });
+
+  it("dragging a nested divider rescales only that container's children", async () => {
+    // Use real DashboardRegion so the nested handles are rendered.
+    const wrapper = mount(Dashboard, {
+      global: {
+        stubs: {
+          // Keep DashboardRegion real; stub only leaf components.
+          CalendarView: true,
+          PhotoSlideshow: true,
+          WebServiceViewer: true,
+          ClockBarHorizontal: true,
+          ClockBarVertical: true,
+          MinimalUIOverlay: true,
+          PerimeterProgress: true,
+          LayoutManager: { template: "<div><slot /></div>" },
+        },
+      },
+    });
+    await flushPromises();
+
+    // Expose the startNestedResize function via the provide context.
+    // We call it directly by grabbing the vm's provided value.
+    // The provide key is "dashboardResize".
+    const dashboardVm = wrapper.vm;
+    // Access dragSizes from the component's internal state via expose or provide.
+    // Since Dashboard uses provide("dashboardResize", ctx), we drive the resize
+    // by calling startNestedResize directly on the provided object.
+    const resizeCtx =
+      dashboardVm.$.appContext.app._context.provides?.dashboardResize ??
+      dashboardVm.$.provides?.dashboardResize;
+
+    expect(resizeCtx, "dashboardResize context must be provided").toBeTruthy();
+
+    // Build a fake container element (the split container inside r1).
+    const fakeContainer = {
+      getBoundingClientRect: () => ({ top: 0, left: 0, width: 800, height: 600 }),
+    };
+
+    // Start a nested resize at containerPath=[0] (inside r1), firstIndex=0, direction="row".
+    resizeCtx.start([0], 0, fakeContainer, "row");
+
+    // pointermove: clientX=400 → 50% of 800px container → each sub stays 50 (no change from start)
+    // Use clientX=320 → 40% of 800 → r1-a=40, r1-b=60
+    window.dispatchEvent(makePointerEvent("pointermove", { clientX: 320, clientY: 0 }));
+
+    // dragSizes should now have r1-a and r1-b but NOT r1.
+    const sizes = resizeCtx.dragSizes.value;
+    expect(sizes, "dragSizes must be set after pointermove").toBeTruthy();
+    expect(sizes["r1-a"], "r1-a must have a drag size").toBeDefined();
+    expect(sizes["r1-b"], "r1-b must have a drag size").toBeDefined();
+    expect(sizes["r1"], "top-level r1 must NOT appear in dragSizes").toBeUndefined();
+
+    // Sub-region sizes must sum to 100.
+    const subTotal = sizes["r1-a"] + sizes["r1-b"];
+    expect(Math.round(subTotal)).toBe(100);
+
+    // pointerup commits
+    window.dispatchEvent(makePointerEvent("pointerup"));
+    await flushPromises();
+
+    expect(updateConfigSpy).toHaveBeenCalled();
+    const payload = updateConfigSpy.mock.calls[0][0];
+    const screen = payload.dashboardScreens.screens.find(s => s.id === "screen-nested");
+    const r1 = screen.layout.regions[0];
+    // Top-level r1 size must be unchanged (100).
+    expect(r1.size).toBe(100);
+    // Sub-region sizes must be updated.
+    const subA = r1.split.regions.find(s => s.id === "r1-a");
+    const subB = r1.split.regions.find(s => s.id === "r1-b");
+    expect(typeof subA.size).toBe("number");
+    expect(typeof subB.size).toBe("number");
+    expect(Math.round(subA.size + subB.size)).toBe(100);
+  });
+});
