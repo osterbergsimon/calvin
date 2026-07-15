@@ -59,6 +59,7 @@ grep -q 'deadbeefdeadbeef' "$tmp/state/agent-version.json" || { echo "FAIL: vers
 echo "PASS happy-path"
 
 # --- python-too-old: manifest demands 3.99 ---
+rm -f "$tmp/state/agent-update-state.json"
 sed 's/"3.9"/"3.99"/' "$tmp/srv/manifest.json" > "$tmp/srv/manifest.json.hi"
 mv "$tmp/srv/manifest.json.hi" "$tmp/srv/manifest.json"
 echo 'print("OLD")' > "$tmp/local/calvin_display_agent.py"
@@ -68,6 +69,7 @@ grep -q 'OLD' "$tmp/local/calvin_display_agent.py" || { echo "FAIL: agent change
 echo "PASS python-too-old"
 
 # --- rollback: is-active fails -> restore backup ---
+rm -f "$tmp/state/agent-update-state.json"
 cat > "$tmp/bin/systemctl" <<EOF
 #!/usr/bin/env bash
 echo "\$*" >> "$tmp/systemctl.log"
@@ -77,8 +79,71 @@ EOF
 chmod +x "$tmp/bin/systemctl"
 sed 's/"3.99"/"3.9"/' "$tmp/srv/manifest.json" > "$tmp/srv/m2"; mv "$tmp/srv/m2" "$tmp/srv/manifest.json"
 echo 'print("OLD")' > "$tmp/local/calvin_display_agent.py"
+# Add a brand-new file to the bundle (no prior install) to prove rollback removes it
+NEW_CONFIG="$tmp/local/calvin_new_config.py"
+printf 'NEW_CONFIG=True\n' > "$tmp/srv/calvin_new_config.py"
+NEW_CONFIG_SHA="$(sha256sum "$tmp/srv/calvin_new_config.py" | cut -d' ' -f1)"
+python3 - "$tmp/srv/manifest.json" "$NEW_CONFIG_SHA" "$NEW_CONFIG" <<'PY'
+import json, sys
+path, sha, target = sys.argv[1:4]
+m = json.load(open(path))
+m["files"].append({"name":"calvin_new_config.py","sha256":sha,"mode":"0644","target_path":target,"restart_unit":"calvin-display-agent.service"})
+json.dump(m, open(path,"w"))
+PY
+# Patch mock curl to serve the new file too
+cat > "$tmp/bin/curl" <<EOF
+#!/usr/bin/env bash
+for a in "\$@"; do case "\$a" in
+  */agent/manifest) cat "$tmp/srv/manifest.json"; exit 0;;
+  */agent/files/calvin_display_agent.py) cat "$tmp/srv/calvin_display_agent.py"; exit 0;;
+  */agent/files/calvin_new_config.py) cat "$tmp/srv/calvin_new_config.py"; exit 0;;
+esac; done
+exit 22
+EOF
+chmod +x "$tmp/bin/curl"
 export CALVIN_UPDATE_HEALTH_TIMEOUT=2
 if bash "$SCRIPT"; then echo "FAIL: should exit non-zero on rollback"; exit 1; fi
 grep -q 'OLD' "$tmp/local/calvin_display_agent.py" || { echo "FAIL: not rolled back"; exit 1; }
 grep -q 'rolled back' "$tmp/state/agent-update-state.json" || { echo "FAIL: no rollback state"; exit 1; }
+[ ! -f "$NEW_CONFIG" ] || { echo "FAIL: newly-introduced file not removed on rollback"; exit 1; }
 echo "PASS rollback"
+
+# --- noop: sha already matches; nothing should change ---
+# Restore healthy systemctl for this block
+cat > "$tmp/bin/systemctl" <<EOF
+#!/usr/bin/env bash
+echo "\$*" >> "$tmp/systemctl.log"
+if [ "\$1" = "restart" ]; then
+  ( sleep 1 && mkdir -p "$tmp/run" && touch "$tmp/run/agent-ready" ) &
+fi
+case "\$1" in "is-active"|"show") exit 0;; esac
+exit 0
+EOF
+chmod +x "$tmp/bin/systemctl"
+# Build a minimal manifest whose sha matches the currently-installed agent bytes
+mkdir -p "$tmp/srv2"
+printf 'import sys\nsys.exit(0)\n' > "$tmp/local/calvin_display_agent.py"
+NOOP_SHA="$(sha256sum "$tmp/local/calvin_display_agent.py" | cut -d' ' -f1)"
+cp "$tmp/local/calvin_display_agent.py" "$tmp/srv2/calvin_display_agent.py"
+cat > "$tmp/srv2/manifest.json" <<MEOF
+{"version":"noopversion1234","min_python":"3.9","files":[
+ {"name":"calvin_display_agent.py","sha256":"$NOOP_SHA","mode":"0755",
+  "target_path":"$tmp/local/calvin_display_agent.py","restart_unit":"calvin-display-agent.service"}]}
+MEOF
+# Point mock curl at the noop manifest
+cat > "$tmp/bin/curl" <<EOF
+#!/usr/bin/env bash
+for a in "\$@"; do case "\$a" in
+  */agent/manifest) cat "$tmp/srv2/manifest.json"; exit 0;;
+  */agent/files/calvin_display_agent.py) cat "$tmp/srv2/calvin_display_agent.py"; exit 0;;
+esac; done
+exit 22
+EOF
+chmod +x "$tmp/bin/curl"
+rm -f "$tmp/systemctl.log" "$tmp/state/agent-update-state.json"
+export CALVIN_UPDATE_HEALTH_TIMEOUT=4
+bash "$SCRIPT" || { echo "FAIL noop: script exited non-zero"; exit 1; }
+grep -q 'noopversion1234' "$tmp/state/agent-version.json" || { echo "FAIL noop: version not recorded"; exit 1; }
+! grep -q 'restart' "$tmp/systemctl.log" 2>/dev/null || { echo "FAIL noop: unexpected restart in systemctl.log"; exit 1; }
+grep -q 'noop\|success' "$tmp/state/agent-update-state.json" || { echo "FAIL noop: state not success/noop"; exit 1; }
+echo "PASS noop"

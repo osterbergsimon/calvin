@@ -116,7 +116,11 @@ if [ "$agent_restarted" = 1 ]; then
     log "unhealthy; rolling back"
     for i in "${!CHANGED_NAME[@]}"; do
       b="$BACKUP_DIR/${CHANGED_NAME[$i]}"
-      [ -f "$b" ] && install -m "${CHANGED_MODE[$i]}" "$b" "${CHANGED_TARGET[$i]}"
+      if [ -f "$b" ]; then
+        install -m "${CHANGED_MODE[$i]}" "$b" "${CHANGED_TARGET[$i]}"
+      else
+        rm -f "${CHANGED_TARGET[$i]}"   # file was newly introduced by this update; undo it
+      fi
     done
     [ "$unit_changed" = 1 ] && "$SYSTEMCTL" daemon-reload || true
     restart_all
