@@ -121,6 +121,7 @@ mkdir -p "$BACKUP_DIR"
 declare -a CHANGED_TARGET=() CHANGED_MODE=() CHANGED_NAME=()
 declare -A RESTART_UNITS=()
 declare -a NEW_ENABLE_UNITS=()
+declare -a DROPPED_TARGETS=()
 unit_changed=0
 
 installed_sha() { [ -f "$1" ] && sha256sum "$1" | cut -d' ' -f1 || echo ""; }
@@ -153,7 +154,12 @@ done <<< "$files_tsv"
 
 for u in "${NEW_ENABLE_UNITS[@]:-}"; do [ -n "$u" ] && unset 'RESTART_UNITS[$u]'; done
 
-if [ "${#CHANGED_NAME[@]}" -eq 0 ]; then
+while IFS=$'\t' read -r rname rtarget renable; do
+  [ -n "$rname" ] || continue
+  case "$ALL_NAMES" in *" $rname "*) : ;; *) DROPPED_TARGETS+=("$rtarget") ;; esac
+done < <(read_receipt_tsv)
+
+if [ "${#CHANGED_NAME[@]}" -eq 0 ] && [ "${#DROPPED_TARGETS[@]}" -eq 0 ]; then
   write_state success noop "already at ${version}" "$version"
   write_version "$version"
   write_receipt
@@ -176,6 +182,23 @@ done
 restart_all() { for u in "${!RESTART_UNITS[@]}"; do "$SYSTEMCTL" restart "$u"; done; }
 enable_units() { for u in "$@"; do "$SYSTEMCTL" enable "$u" || log "enable failed: $u"; done; }
 start_units()  { for u in "$@"; do "$SYSTEMCTL" start  "$u" || log "start failed: $u";  done; }
+decommission_drops() {
+  local removed_unit=0 t base
+  for t in "${DROPPED_TARGETS[@]:-}"; do
+    [ -n "$t" ] || continue
+    case "$t" in
+      "$SYSTEMD_DIR"/*.service)
+        base="$(basename "$t")"
+        "$SYSTEMCTL" stop "$base" 2>/dev/null || true
+        "$SYSTEMCTL" disable "$base" 2>/dev/null || true
+        removed_unit=1
+        ;;
+    esac
+    rm -f "$t"
+    log "decommissioned ${t}"
+  done
+  [ "$removed_unit" = 1 ] && "$SYSTEMCTL" daemon-reload || true
+}
 restart_all
 
 # --- health check (only meaningful when the agent was among the restarts) ---
@@ -210,6 +233,10 @@ fi
 if [ "${#NEW_ENABLE_UNITS[@]}" -gt 0 ]; then
   enable_units "${NEW_ENABLE_UNITS[@]}"
   start_units "${NEW_ENABLE_UNITS[@]}"
+fi
+
+if [ "${#DROPPED_TARGETS[@]}" -gt 0 ]; then
+  decommission_drops
 fi
 
 write_version "$version"

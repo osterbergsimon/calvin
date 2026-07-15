@@ -339,3 +339,76 @@ grep -q 'start calvin-foo.service'  "$tmp/systemctl.log" || { echo "FAIL ixk: ne
 ! grep -q 'restart calvin-foo.service' "$tmp/systemctl.log" || { echo "FAIL ixk: new unit should not be restarted"; exit 1; }
 grep -q "\[Unit\]" "$NEWUNIT" || { echo "FAIL ixk: new unit file not installed"; exit 1; }
 echo "PASS ixk-enable-new-unit"
+
+# --- 0ug: a unit dropped from the manifest is decommissioned post-health ---
+mkdir -p "$tmp/state_0ug"
+DROP_UNIT="$tmp/systemd/calvin-old.service"
+printf '[Unit]\nDescription=old\n' > "$DROP_UNIT"          # currently installed
+cat > "$tmp/state_0ug/agent-manifest.json" <<EOF
+{"version":"prev000000000000","files":[
+ {"name":"calvin_display_agent.py","target_path":"$tmp/local/calvin_display_agent.py","enable":false},
+ {"name":"calvin-old.service","target_path":"$DROP_UNIT","enable":true}]}
+EOF
+printf 'import sys\nsys.exit(0)\n' > "$tmp/srv/calvin_display_agent.py"
+D_AGENT_SHA="$(sha256sum "$tmp/srv/calvin_display_agent.py" | cut -d' ' -f1)"
+echo 'print("OLD")' > "$tmp/local/calvin_display_agent.py"
+cat > "$tmp/srv/manifest.json" <<EOF
+{"version":"0ug0000000000000","min_python":"3.9","files":[
+ {"name":"calvin_display_agent.py","sha256":"$D_AGENT_SHA","mode":"0755",
+  "target_path":"$tmp/local/calvin_display_agent.py","restart_unit":"calvin-display-agent.service","enable":false}]}
+EOF
+cat > "$tmp/bin/systemctl" <<EOF
+#!/usr/bin/env bash
+echo "\$*" >> "$tmp/systemctl.log"
+if [ "\$1" = "restart" ]; then ( sleep 1 && mkdir -p "$tmp/run" && touch "$tmp/run/agent-ready" ) & fi
+case "\$1" in "is-active"|"show") exit 0;; esac
+exit 0
+EOF
+chmod +x "$tmp/bin/systemctl"
+cat > "$tmp/bin/curl" <<EOF
+#!/usr/bin/env bash
+for a in "\$@"; do case "\$a" in
+  */agent/manifest) cat "$tmp/srv/manifest.json"; exit 0;;
+  */agent/files/calvin_display_agent.py) cat "$tmp/srv/calvin_display_agent.py"; exit 0;;
+esac; done
+exit 22
+EOF
+chmod +x "$tmp/bin/curl"
+rm -f "$tmp/systemctl.log"
+CALVIN_AGENT_STATE_DIR="$tmp/state_0ug" bash "$SCRIPT" || { echo "FAIL 0ug: exited non-zero"; exit 1; }
+grep -q 'stop calvin-old.service'    "$tmp/systemctl.log" || { echo "FAIL 0ug: dropped unit not stopped"; exit 1; }
+grep -q 'disable calvin-old.service' "$tmp/systemctl.log" || { echo "FAIL 0ug: dropped unit not disabled"; exit 1; }
+[ ! -f "$DROP_UNIT" ] || { echo "FAIL 0ug: dropped unit file not removed"; exit 1; }
+echo "PASS 0ug-decommission-dropped-unit"
+
+# --- 0ug: an unhealthy update does NOT decommission ---
+mkdir -p "$tmp/state_0ug2"
+DROP_UNIT2="$tmp/systemd/calvin-old2.service"
+printf '[Unit]\nDescription=old2\n' > "$DROP_UNIT2"
+cat > "$tmp/state_0ug2/agent-manifest.json" <<EOF
+{"version":"prev200000000000","files":[
+ {"name":"calvin_display_agent.py","target_path":"$tmp/local/calvin_display_agent.py","enable":false},
+ {"name":"calvin-old2.service","target_path":"$DROP_UNIT2","enable":true}]}
+EOF
+printf 'import sys\nsys.exit(0)\n' > "$tmp/srv/calvin_display_agent.py"
+D2_AGENT_SHA="$(sha256sum "$tmp/srv/calvin_display_agent.py" | cut -d' ' -f1)"
+echo 'print("OLD")' > "$tmp/local/calvin_display_agent.py"
+cat > "$tmp/srv/manifest.json" <<EOF
+{"version":"0ug2000000000000","min_python":"3.9","files":[
+ {"name":"calvin_display_agent.py","sha256":"$D2_AGENT_SHA","mode":"0755",
+  "target_path":"$tmp/local/calvin_display_agent.py","restart_unit":"calvin-display-agent.service","enable":false}]}
+EOF
+cat > "$tmp/bin/systemctl" <<EOF
+#!/usr/bin/env bash
+echo "\$*" >> "$tmp/systemctl.log"
+[ "\$1" = "is-active" ] && exit 3    # never healthy => rollback path
+exit 0
+EOF
+chmod +x "$tmp/bin/systemctl"
+export CALVIN_UPDATE_HEALTH_TIMEOUT=2
+rm -f "$tmp/systemctl.log"
+if CALVIN_AGENT_STATE_DIR="$tmp/state_0ug2" bash "$SCRIPT"; then echo "FAIL 0ug2: should exit non-zero (rollback)"; exit 1; fi
+[ -f "$DROP_UNIT2" ] || { echo "FAIL 0ug2: dropped unit removed despite unhealthy (decommission must be post-health)"; exit 1; }
+! grep -q 'disable calvin-old2.service' "$tmp/systemctl.log" || { echo "FAIL 0ug2: disabled dropped unit despite unhealthy"; exit 1; }
+echo "PASS 0ug-no-decommission-on-unhealthy"
+export CALVIN_UPDATE_HEALTH_TIMEOUT=4
