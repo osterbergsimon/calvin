@@ -15,6 +15,7 @@ export const settingsCategories = [
   { id: "device", label: "Device", icon: "🖥️", subtitle: "Power · keyboard · hardware" },
   { id: "kiosks", label: "Kiosks", icon: "📺", subtitle: "Per-device settings" },
   { id: "maintenance", label: "Maintenance", icon: "⚙️", subtitle: "Updates · diagnostics" },
+  { id: "security", label: "Security", icon: "🔒", subtitle: "Allowed origins · network access" },
 ];
 
 export const settingsDestinations = [

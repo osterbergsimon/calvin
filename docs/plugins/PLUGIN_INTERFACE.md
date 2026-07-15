@@ -39,6 +39,7 @@ Declared as a class attribute; validated by Pydantic at class-definition time
 | `ui_sections` | `list[dict] = []` | Structured settings sections (e.g. upload). |
 | `display_schema` | `dict \| None` | Panel declaration; `kind` required, must be in `SUPPORTED_DISPLAY_KINDS`. |
 | `statusbar_schema` | `dict \| None` | Statusbar item; `kind` must be in `SUPPORTED_STATUSBAR_KINDS` (`status` only). |
+| `browser_origins` | `list[str]` (default `[]`) | Origins **intrinsic to the plugin** that the kiosk browser may reach (CSP host-sources). Extends the kiosk CSP's `frame-src`, `img-src`, `connect-src` for enabled plugins. Empty by default — see below. |
 | `plugin_type`, `plugin_class` | runtime | Filled by the loader — **plugins never declare them**. `plugin_type` is derived from the family base class. |
 
 Validation at class definition (so errors surface at import, not render):
@@ -52,6 +53,20 @@ Validation at class definition (so errors surface at import, not render):
 - Retired pre-1.0 display keys are rejected loudly: `type` (as in
   `type: "api"`), `api_endpoint`, `render_template`, `component`,
   `data_schema`.
+- `browser_origins` entries must each be a valid CSP host-source: a host
+  (`grafana.lab`), `host:port`, a `*.` wildcard (`*.lab.example.com`), or an
+  `http(s)://` URL. **CIDR / IP ranges are rejected** (not expressible in CSP —
+  use a wildcard domain). A malformed entry rejects the plugin at load. Entries
+  are normalized (host lowercased) and deduped.
+
+**When to set `browser_origins`.** Leave it empty (the default) unless the
+plugin's frontend genuinely must load from a *fixed* external origin the plugin
+author knows and that is the same for every install (e.g. a fixed SDK host).
+**Site-specific** origins — the operator's own self-hosted services — belong in
+the operator's Security → Allowed origins list, not here. Variable, per-user
+hosts (e.g. album-art CDNs that differ by casting app) are not a fit for a fixed
+list; proxy those through Calvin or add them to the admin allowlist. Backend-side
+network access needs no declaration — it is invisible to the kiosk browser.
 
 Renderer schema fields per kind: [PLUGIN_FRONTEND_COMPONENTS.md](PLUGIN_FRONTEND_COMPONENTS.md).
 

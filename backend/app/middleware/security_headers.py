@@ -4,7 +4,12 @@ from loguru import logger
 from starlette.middleware.base import BaseHTTPMiddleware
 from starlette.requests import Request
 
-from app.services.csp import build_csp, get_web_service_origins
+from app.services.csp import (
+    build_csp,
+    get_allowed_origins,
+    get_plugin_browser_origins,
+    get_web_service_origins,
+)
 
 
 def _is_csp_exempt(path: str) -> bool:
@@ -31,11 +36,15 @@ class SecurityHeadersMiddleware(BaseHTTPMiddleware):
         if _is_csp_exempt(request.url.path):
             return response
         try:
-            origins = await get_web_service_origins()
+            frame_origins = await get_web_service_origins()
+            allowed = await get_allowed_origins()
+            plugin_origins = await get_plugin_browser_origins()
         except Exception:
-            # A CSP header must never fail the response. On any DB hiccup fall
-            # back to the baseline self-only policy rather than 500-ing.
+            # A CSP header must never fail the response. On any DB/registry hiccup
+            # fall back to the baseline self-only policy rather than 500-ing.
             logger.warning("CSP origins lookup failed; falling back to baseline self-only policy")
-            origins = []
-        response.headers["Content-Security-Policy"] = build_csp(origins)
+            frame_origins, allowed, plugin_origins = [], [], []
+        response.headers["Content-Security-Policy"] = build_csp(
+            frame_origins, [*allowed, *plugin_origins]
+        )
         return response

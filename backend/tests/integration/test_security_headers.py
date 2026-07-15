@@ -217,6 +217,42 @@ class TestSecurityHeaders:
         assert "default-src 'self'" in csp
         assert "frame-src 'self'" in csp
 
+    def test_allowlist_origin_appears_in_three_directives(self, security_test_client):
+        import json
+
+        from app.models.db_models import ConfigDB
+
+        async def _seed():
+            await ConfigDB.objects.create(
+                key="security_allowed_origins",
+                value=json.dumps(["https://grafana.lab:3000"]),
+                value_type="json",
+            )
+
+        loop = asyncio.new_event_loop()
+        asyncio.set_event_loop(loop)
+        try:
+            loop.run_until_complete(_seed())
+        finally:
+            loop.close()
+
+        csp = security_test_client.get("/api/health").headers.get("content-security-policy", "")
+        assert "img-src 'self' data: https://grafana.lab:3000" in csp
+        assert "connect-src 'self' https://grafana.lab:3000" in csp
+        assert "frame-src 'self' https://grafana.lab:3000" in csp
+
+    def test_plugin_browser_origins_appear_in_three_directives(self, security_test_client):
+        """An enabled plugin's declared browser_origins extend frame/img/connect-src."""
+        with patch(
+            "app.middleware.security_headers.get_plugin_browser_origins",
+            new=AsyncMock(return_value=["cast.example.com"]),
+        ):
+            csp = security_test_client.get("/api/health").headers.get("content-security-policy", "")
+
+        assert "img-src 'self' data: cast.example.com" in csp
+        assert "connect-src 'self' cast.example.com" in csp
+        assert "frame-src 'self' cast.example.com" in csp
+
     def test_db_error_falls_back_to_baseline_csp(self, security_test_client: TestClient):
         """A DB failure during origins lookup must never discard the response as a 500.
 
