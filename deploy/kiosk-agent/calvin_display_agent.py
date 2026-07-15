@@ -155,9 +155,41 @@ BACKOFF_SECONDS = 60
 
 _UNSET = object()  # sentinel: distinguishes "never polled" from version=None
 
+UPDATE_UNIT = "calvin-kiosk-update.service"
+
 
 def log(msg):
     print(f"[calvin-display-agent] {msg}", flush=True)
+
+
+def _fire_updater():
+    """Kick the root oneshot updater; returns without waiting (it restarts us)."""
+    try:
+        subprocess.run(
+            ["sudo", "-n", "systemctl", "start", "--no-block", UPDATE_UNIT],
+            capture_output=True, text=True, timeout=10,
+        )
+    except (FileNotFoundError, subprocess.SubprocessError) as e:
+        log(f"could not trigger updater ({e})")
+
+
+def maybe_update(cfg, *, trigger=_fire_updater, state=None, state_dir=STATE_DIR):
+    """Trigger a self-update when the server requested one and we're stale.
+
+    `state["attempted"]` is a set of versions already tried this process, so a
+    failed/rolled-back version is not retried in a loop.
+    """
+    if state is None or not cfg_get(cfg, "agentUpdateRequested", default=False):
+        return False
+    available = cfg_get(cfg, "agentAvailableVersion")
+    if not available or available == running_version(state_dir):
+        return False
+    if available in state["attempted"]:
+        return False
+    state["attempted"].add(available)
+    log(f"update requested: {running_version(state_dir)} -> {available}; triggering updater")
+    trigger()
+    return True
 
 
 def _config_url(backend_url, kiosk_id, host, kagent=None, kstat=None):
@@ -209,6 +241,7 @@ def run(
         apply_device = apply_device_physical
     last = None
     last_version = _UNSET
+    update_state = {"attempted": set()}
     n = 0
     while iterations is None or n < iterations:
         n += 1
@@ -216,6 +249,7 @@ def run(
             cfg = fetch(backend_url)
             if not isinstance(cfg, dict):
                 raise TypeError(f"expected dict config, got {type(cfg).__name__}")
+            maybe_update(cfg, state=update_state)
             version = cfg_get(cfg, "deviceConfigVersion")
             if version != last_version:
                 apply_device(cfg)

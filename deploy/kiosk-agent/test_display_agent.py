@@ -621,3 +621,26 @@ def test_check_python_below_floor_exits(monkeypatch):
     import pytest
     with pytest.raises(SystemExit):
         agent.check_python()
+
+
+def test_maybe_update_triggers_when_requested_and_stale(monkeypatch, tmp_path):
+    (tmp_path / "agent-version.json").write_text('{"version": "current0000000000"}')
+    calls = []
+    cfg = {"agentUpdateRequested": True, "agentAvailableVersion": "newer00000000000"}
+    fired = agent.maybe_update(cfg, trigger=lambda: calls.append("go"),
+                               state={"attempted": set()}, state_dir=str(tmp_path))
+    assert fired is True and calls == ["go"]
+
+
+def test_maybe_update_skips_when_already_current(tmp_path):
+    (tmp_path / "agent-version.json").write_text('{"version": "same000000000000"}')
+    cfg = {"agentUpdateRequested": True, "agentAvailableVersion": "same000000000000"}
+    assert agent.maybe_update(cfg, trigger=lambda: None,
+                              state={"attempted": set()}, state_dir=str(tmp_path)) is False
+
+
+def test_maybe_update_no_retry_same_failed_version(tmp_path):
+    (tmp_path / "agent-version.json").write_text('{"version": "cur0000000000000"}')
+    cfg = {"agentUpdateRequested": True, "agentAvailableVersion": "bad0000000000000"}
+    st = {"attempted": {"bad0000000000000"}}   # already tried this version
+    assert agent.maybe_update(cfg, trigger=lambda: None, state=st, state_dir=str(tmp_path)) is False
