@@ -1,6 +1,22 @@
 {
   "components": {
     "schemas": {
+      "AllowedOriginsBody": {
+        "properties": {
+          "origins": {
+            "items": {
+              "type": "string"
+            },
+            "title": "Origins",
+            "type": "array"
+          }
+        },
+        "required": [
+          "origins"
+        ],
+        "title": "AllowedOriginsBody",
+        "type": "object"
+      },
       "Body_inspect_plugin_api_plugins_inspect_post": {
         "properties": {
           "file": {
@@ -3936,6 +3952,64 @@
         "summary": "Test Plugin",
         "tags": [
           "plugins"
+        ]
+      }
+    },
+    "/api/security/allowed-origins": {
+      "get": {
+        "description": "Return the configured trusted origins.",
+        "operationId": "get_allowed_origins_api_security_allowed_origins_get",
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            },
+            "description": "Successful Response"
+          }
+        },
+        "summary": "Get Allowed Origins",
+        "tags": [
+          "security"
+        ]
+      },
+      "put": {
+        "description": "Validate + replace the trusted-origin allowlist (all-or-nothing).",
+        "operationId": "put_allowed_origins_api_security_allowed_origins_put",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/AllowedOriginsBody"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Put Allowed Origins",
+        "tags": [
+          "security"
         ]
       }
     },
