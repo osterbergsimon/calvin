@@ -27,7 +27,8 @@ describe("CalendarView per-region display overrides (inherit from global)", () =
     useConfigStore().showWeekNumbers = true;
     const w = mountCalendar({ mode: "month", rolling: false, weeks: 4, days: 7 });
     expect(w.vm.showWeekNumbers).toBe(true);
-    expect(w.findAll(".week-number").length).toBeGreaterThan(0);
+    // Month view renders week numbers as a left-gutter spine, not inline chips.
+    expect(w.findAll(".week-spine").length).toBeGreaterThan(0);
   });
 
   it("a weekNumbers=true override wins over a global-off setting", () => {
@@ -40,7 +41,7 @@ describe("CalendarView per-region display overrides (inherit from global)", () =
       weekNumbers: true,
     });
     expect(w.vm.showWeekNumbers).toBe(true);
-    expect(w.findAll(".week-number").length).toBeGreaterThan(0);
+    expect(w.findAll(".week-spine").length).toBeGreaterThan(0);
   });
 
   it("a weekNumbers=false override wins over a global-on setting", () => {
@@ -53,6 +54,7 @@ describe("CalendarView per-region display overrides (inherit from global)", () =
       weekNumbers: false,
     });
     expect(w.vm.showWeekNumbers).toBe(false);
+    expect(w.findAll(".week-spine").length).toBe(0);
     expect(w.findAll(".week-number").length).toBe(0);
   });
 
