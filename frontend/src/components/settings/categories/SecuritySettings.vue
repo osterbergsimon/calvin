@@ -2,9 +2,9 @@
   <section id="section-security-origins" class="security-settings">
     <h2>Allowed origins</h2>
     <p class="security-settings__intro">
-      Origins the kiosk may embed, load images from, or connect to. Everything else is
-      blocked. Use a domain (grafana.lab), a wildcard (*.lab.example.com), a host:port, or
-      an http(s):// URL. IP ranges (CIDR) are not supported.
+      Origins the kiosk may embed, load images from, or connect to. Everything else is blocked. Use
+      a domain (grafana.lab), a wildcard (*.lab.example.com), a host:port, or an http(s):// URL. IP
+      ranges (CIDR) are not supported.
     </p>
 
     <ul class="security-settings__list">

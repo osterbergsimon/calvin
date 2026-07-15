@@ -2,8 +2,13 @@
 
 import pytest
 
-from app.services.csp import build_csp, origin_from_url, validate_origin, is_valid_origin
-from app.services.csp import get_allowed_origins
+from app.services.csp import (
+    build_csp,
+    get_allowed_origins,
+    is_valid_origin,
+    origin_from_url,
+    validate_origin,
+)
 
 
 @pytest.mark.unit
@@ -125,6 +130,7 @@ class TestGetAllowedOrigins:
             return ["grafana.lab", "10.0.0.0/24", "grafana.lab"]  # bad + dupe
 
         import app.services.csp as csp_module
+
         monkeypatch.setattr(csp_module.config_service, "get_value", fake_get_value)
         assert await get_allowed_origins() == ["grafana.lab"]
 
@@ -133,5 +139,6 @@ class TestGetAllowedOrigins:
             return "not-a-list"
 
         import app.services.csp as csp_module
+
         monkeypatch.setattr(csp_module.config_service, "get_value", fake_get_value)
         assert await get_allowed_origins() == []
