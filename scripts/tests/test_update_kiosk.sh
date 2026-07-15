@@ -412,3 +412,53 @@ if CALVIN_AGENT_STATE_DIR="$tmp/state_0ug2" bash "$SCRIPT"; then echo "FAIL 0ug2
 ! grep -q 'disable calvin-old2.service' "$tmp/systemctl.log" || { echo "FAIL 0ug2: disabled dropped unit despite unhealthy"; exit 1; }
 echo "PASS 0ug-no-decommission-on-unhealthy"
 export CALVIN_UPDATE_HEALTH_TIMEOUT=4
+
+# --- 5ti: --bootstrap installs fresh, enables units, no restart/health, idempotent ---
+mkdir -p "$tmp/state_boot" "$tmp/boot_local" "$tmp/boot_systemd"
+BOOT_AGENT="$tmp/boot_local/calvin_display_agent.py"
+BOOT_UNIT="$tmp/boot_systemd/calvin-display-agent.service"
+rm -f "$BOOT_AGENT" "$BOOT_UNIT"                       # nothing installed yet
+printf 'import sys\nsys.exit(0)\n' > "$tmp/srv/calvin_display_agent.py"
+B_AGENT_SHA="$(sha256sum "$tmp/srv/calvin_display_agent.py" | cut -d' ' -f1)"
+printf '[Unit]\nDescription=agent\n' > "$tmp/srv/calvin-display-agent.service"
+B_UNIT_SHA="$(sha256sum "$tmp/srv/calvin-display-agent.service" | cut -d' ' -f1)"
+cat > "$tmp/srv/manifest.json" <<EOF
+{"version":"boot000000000000","min_python":"3.9","files":[
+ {"name":"calvin_display_agent.py","sha256":"$B_AGENT_SHA","mode":"0755",
+  "target_path":"$BOOT_AGENT","restart_unit":"calvin-display-agent.service","enable":false},
+ {"name":"calvin-display-agent.service","sha256":"$B_UNIT_SHA","mode":"0644",
+  "target_path":"$BOOT_UNIT","restart_unit":"calvin-display-agent.service","enable":true}]}
+EOF
+cat > "$tmp/bin/systemctl" <<EOF
+#!/usr/bin/env bash
+echo "\$*" >> "$tmp/systemctl.log"
+exit 0
+EOF
+chmod +x "$tmp/bin/systemctl"
+cat > "$tmp/bin/curl" <<EOF
+#!/usr/bin/env bash
+for a in "\$@"; do case "\$a" in
+  */agent/manifest) cat "$tmp/srv/manifest.json"; exit 0;;
+  */agent/files/calvin_display_agent.py) cat "$tmp/srv/calvin_display_agent.py"; exit 0;;
+  */agent/files/calvin-display-agent.service) cat "$tmp/srv/calvin-display-agent.service"; exit 0;;
+esac; done
+exit 22
+EOF
+chmod +x "$tmp/bin/curl"
+rm -f "$tmp/systemctl.log"
+CALVIN_AGENT_STATE_DIR="$tmp/state_boot" CALVIN_SYSTEMD_DIR="$tmp/boot_systemd" bash "$SCRIPT" --bootstrap \
+  || { echo "FAIL bootstrap: exited non-zero"; exit 1; }
+grep -q 'sys.exit(0)' "$BOOT_AGENT" || { echo "FAIL bootstrap: agent not installed"; exit 1; }
+grep -q "\[Unit\]" "$BOOT_UNIT"      || { echo "FAIL bootstrap: unit not installed"; exit 1; }
+grep -q 'enable calvin-display-agent.service' "$tmp/systemctl.log" || { echo "FAIL bootstrap: unit not enabled"; exit 1; }
+! grep -q 'restart' "$tmp/systemctl.log" || { echo "FAIL bootstrap: must not restart during bootstrap"; exit 1; }
+! grep -q 'is-active' "$tmp/systemctl.log" || { echo "FAIL bootstrap: must not health-check during bootstrap"; exit 1; }
+grep -q 'boot000000000000' "$tmp/state_boot/agent-version.json"  || { echo "FAIL bootstrap: version not seeded"; exit 1; }
+grep -q 'boot000000000000' "$tmp/state_boot/agent-manifest.json" || { echo "FAIL bootstrap: receipt not seeded"; exit 1; }
+grep -q 'bootstrap' "$tmp/state_boot/agent-update-state.json" || { echo "FAIL bootstrap: state not bootstrap"; exit 1; }
+# Idempotent: a second bootstrap changes nothing.
+rm -f "$tmp/systemctl.log"
+CALVIN_AGENT_STATE_DIR="$tmp/state_boot" CALVIN_SYSTEMD_DIR="$tmp/boot_systemd" bash "$SCRIPT" --bootstrap \
+  || { echo "FAIL bootstrap-idempotent: exited non-zero"; exit 1; }
+grep -q 'noop\|success' "$tmp/state_boot/agent-update-state.json" || { echo "FAIL bootstrap-idempotent: not noop/success"; exit 1; }
+echo "PASS bootstrap-install-and-idempotent"

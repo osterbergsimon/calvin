@@ -37,6 +37,9 @@ if [ "${1:-}" = "--self-check" ]; then
   log "self-check: ok"; exit 0
 fi
 
+BOOTSTRAP=0
+if [ "${1:-}" = "--bootstrap" ]; then BOOTSTRAP=1; fi
+
 mkdir -p "$STATE_DIR"
 
 write_state() {  # status phase message [version]
@@ -182,6 +185,19 @@ done
 restart_all() { for u in "${!RESTART_UNITS[@]}"; do "$SYSTEMCTL" restart "$u"; done; }
 enable_units() { for u in "$@"; do "$SYSTEMCTL" enable "$u" || log "enable failed: $u"; done; }
 start_units()  { for u in "$@"; do "$SYSTEMCTL" start  "$u" || log "start failed: $u";  done; }
+
+if [ "$BOOTSTRAP" = 1 ]; then
+  # First-boot install: enable boot units; no restart, health, rollback, or decommission.
+  if [ "${#NEW_ENABLE_UNITS[@]}" -gt 0 ]; then
+    enable_units "${NEW_ENABLE_UNITS[@]}"
+  fi
+  write_version "$version"
+  write_receipt
+  write_state success bootstrap "installed ${version}" "$version"
+  log "bootstrap: installed ${version}"
+  exit 0
+fi
+
 decommission_drops() {
   local removed_unit=0 t base
   for t in "${DROPPED_TARGETS[@]:-}"; do
