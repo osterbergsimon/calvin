@@ -97,11 +97,12 @@ async def get_kiosk_config(
     _valid_id_or_400(kiosk_id)
     # Compute available version BEFORE record_kiosk so we can pass it in,
     # enabling auto-clear of the update flag when agent_version == available_version.
-    # Falls back to "" when bundle files are unavailable (e.g. dev without Pi deploy tree).
+    # Falls back to None when bundle files are unavailable (e.g. dev without Pi deploy tree).
+    # None is safe: the auto-clear guard requires both versions non-None before comparing.
     try:
         available = kiosk_bundle.bundle_version()
     except Exception:
-        available = ""
+        available = None
     try:
         await kiosk_registry.record_kiosk(
             kiosk_id, hostname=khost, agent_version=kagent, agent_status=kstat,
@@ -117,7 +118,7 @@ async def get_kiosk_config(
     version = device_config_version(merged)
     update_requested = agent_update_requested(overrides)
 
-    etag = f"{version}.{available}.{int(update_requested)}"
+    etag = f"{version}.{available or ''}.{int(update_requested)}"
     if request.headers.get("If-None-Match") == etag:
         return Response(status_code=304, headers={"ETag": etag})
 

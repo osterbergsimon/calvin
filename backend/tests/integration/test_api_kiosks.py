@@ -30,7 +30,8 @@ def test_effective_config_merges_overrides_and_records(test_client: TestClient):
     assert body["orientation"] == "portrait"  # override applied
     assert "timeFormat" in body  # global defaults present
     assert "deviceConfigVersion" in body
-    # ETag now incorporates deviceConfigVersion + agentAvailableVersion + updateRequested flag
+    # ETag now incorporates deviceConfigVersion + agentAvailableVersion + updateRequested flag.
+    # agentAvailableVersion may be null here (no repo_dir patch), so only check containment.
     assert body["deviceConfigVersion"] in resp.headers.get("ETag", "")
 
     kiosks = test_client.get("/api/kiosks").json()["kiosks"]
@@ -178,10 +179,14 @@ def test_config_reports_available_version_and_flag(test_client: TestClient):
         # first contact registers the kiosk + records its running version
         test_client.get("/api/kiosks/k-upd/config?khost=pi&kagent=oldver&kstat=ok")
         assert test_client.post("/api/kiosks/k-upd/update").json()["requested"] is True
-        body = test_client.get("/api/kiosks/k-upd/config").json()
+        resp = test_client.get("/api/kiosks/k-upd/config")
+        body = resp.json()
     assert len(body["agentAvailableVersion"]) == 16
     assert body["agentUpdateRequested"] is True
     assert "_agentUpdateRequested" not in body  # internal key never leaks
+    # Full ETag assertion: ensures order, all three components, no reordering/omission bug.
+    expected_etag = f"{body['deviceConfigVersion']}.{body['agentAvailableVersion']}.{int(body['agentUpdateRequested'])}"
+    assert resp.headers.get("ETag") == expected_etag
 
 
 @pytest.mark.integration
