@@ -7,7 +7,7 @@ from loguru import logger
 from pydantic import BaseModel, ValidationError
 
 from app.api.routes.config import ConfigUpdate, build_global_config
-from app.services import kiosk_registry
+from app.services import kiosk_bundle, kiosk_registry
 from app.services.kiosk_registry import (
     _KIOSK_ID_RE,
     device_config_version,
@@ -59,6 +59,22 @@ async def put_kiosk_overrides(kiosk_id: str, body: OverridesBody):
         raise HTTPException(status_code=400, detail="Invalid overrides") from exc
     await set_overrides(kiosk_id, body.overrides)
     return {"id": kiosk_id, "overrides": body.overrides}
+
+
+@router.get("/kiosks/agent/manifest")
+async def get_agent_manifest():
+    """Serve the kiosk bundle manifest (version + per-file hashes)."""
+    return kiosk_bundle.build_manifest()
+
+
+@router.get("/kiosks/agent/files/{name}")
+async def get_agent_file(name: str):
+    """Serve one allowlisted bundle file's raw bytes. 404 for anything else."""
+    try:
+        data = kiosk_bundle.read_bundle_file(name)
+    except (KeyError, FileNotFoundError):
+        raise HTTPException(status_code=404, detail="Unknown bundle file")
+    return Response(content=data, media_type="application/octet-stream")
 
 
 @router.get("/kiosks/{kiosk_id}/config")

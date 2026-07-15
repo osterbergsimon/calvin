@@ -1,9 +1,13 @@
 """Integration tests for the kiosk registry."""
 
+from pathlib import Path
 from unittest.mock import patch
 
 import pytest
 from fastapi.testclient import TestClient
+
+# Root of the Calvin checkout — used to give bundle tests a real repo_dir.
+_REPO_ROOT = Path(__file__).parent.parent.parent.parent
 
 
 @pytest.mark.integration
@@ -138,3 +142,28 @@ def test_overrides_rejects_bad_available_screens_type(test_client: TestClient):
         json={"overrides": {"availableScreens": "not-a-list"}},
     )
     assert resp.status_code == 400
+
+
+@pytest.mark.integration
+def test_agent_manifest_served(test_client: TestClient):
+    from app.services import kiosk_bundle
+
+    with patch.object(kiosk_bundle.settings, "repo_dir", _REPO_ROOT):
+        r = test_client.get("/api/kiosks/agent/manifest")
+    assert r.status_code == 200
+    body = r.json()
+    assert len(body["version"]) == 16
+    assert body["min_python"] == "3.9"
+    assert any(f["name"] == "calvin_display_agent.py" for f in body["files"])
+
+
+@pytest.mark.integration
+def test_agent_file_served_and_allowlisted(test_client: TestClient):
+    from app.services import kiosk_bundle
+
+    with patch.object(kiosk_bundle.settings, "repo_dir", _REPO_ROOT):
+        r = test_client.get("/api/kiosks/agent/files/calvin-x.service")
+        assert r.status_code == 200
+        assert r.content  # non-empty
+        assert test_client.get("/api/kiosks/agent/files/..%2F..%2Fetc%2Fpasswd").status_code == 404
+        assert test_client.get("/api/kiosks/agent/files/nope.txt").status_code == 404
