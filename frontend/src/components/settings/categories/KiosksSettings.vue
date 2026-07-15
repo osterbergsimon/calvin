@@ -28,7 +28,9 @@
               {{ isOnline(k) ? "● Online" : "○ Offline" }}
             </span>
           </span>
-          <span class="kiosk-card__meta">{{ k.hostname }} · seen {{ relativeTime(k.lastSeen) }}</span>
+          <span class="kiosk-card__meta"
+            >{{ k.hostname }} · seen {{ relativeTime(k.lastSeen) }}</span
+          >
         </button>
         <div v-if="updateAvailable(k) || k.agentUpdateRequested" class="kiosk-card__update-row">
           <button
@@ -44,7 +46,8 @@
           <span
             v-if="k.agentUpdateStatus && k.agentUpdateStatus.startsWith('error')"
             class="kiosk-card__update-error"
-          >needs OS update</span>
+            >needs OS update</span
+          >
         </div>
       </div>
     </SettingsSection>
@@ -215,7 +218,11 @@ const hardwareOpen = ref(false);
 const availableVersion = ref(null);
 
 function updateAvailable(k) {
-  return availableVersion.value != null && k.agentVersion != null && k.agentVersion !== availableVersion.value;
+  return (
+    availableVersion.value != null &&
+    k.agentVersion != null &&
+    k.agentVersion !== availableVersion.value
+  );
 }
 
 async function onUpdate(id) {
@@ -426,9 +433,7 @@ onMounted(async () => {
   // each concurrent callback races (each spreads a stale base, last write wins,
   // dropping entries).
   const [entries, agentVersion] = await Promise.all([
-    Promise.all(
-      kiosks.value.map(async k => [k.id, await store.fetchDeviceConfigVersion(k.id)])
-    ),
+    Promise.all(kiosks.value.map(async k => [k.id, await store.fetchDeviceConfigVersion(k.id)])),
     store.fetchAvailableAgentVersion(),
   ]);
   const next = { ...desiredVersions.value };

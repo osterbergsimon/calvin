@@ -1,5 +1,7 @@
 from pathlib import Path
+
 import pytest
+
 from app.services import kiosk_bundle
 
 
@@ -25,9 +27,9 @@ def test_manifest_lists_all_files_with_hashes(tmp_path):
 def test_version_is_stable_and_content_sensitive(tmp_path):
     _seed(tmp_path)
     v1 = kiosk_bundle.bundle_version(tmp_path)
-    assert v1 == kiosk_bundle.bundle_version(tmp_path)          # stable
+    assert v1 == kiosk_bundle.bundle_version(tmp_path)  # stable
     (tmp_path / kiosk_bundle.BUNDLE_FILES[0].repo_path).write_text("CHANGED\n")
-    assert kiosk_bundle.bundle_version(tmp_path) != v1          # content-sensitive
+    assert kiosk_bundle.bundle_version(tmp_path) != v1  # content-sensitive
 
 
 def test_read_bundle_file_rejects_unknown_name(tmp_path):

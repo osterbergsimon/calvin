@@ -90,8 +90,11 @@ async def get_agent_file(name: str):
 
 @router.get("/kiosks/{kiosk_id}/config")
 async def get_kiosk_config(
-    kiosk_id: str, request: Request,
-    khost: str | None = None, kagent: str | None = None, kstat: str | None = None,
+    kiosk_id: str,
+    request: Request,
+    khost: str | None = None,
+    kagent: str | None = None,
+    kstat: str | None = None,
 ):
     """Return a kiosk's effective (merged) config; records the kiosk + its agent report."""
     _valid_id_or_400(kiosk_id)
@@ -105,7 +108,10 @@ async def get_kiosk_config(
         available = None
     try:
         await kiosk_registry.record_kiosk(
-            kiosk_id, hostname=khost, agent_version=kagent, agent_status=kstat,
+            kiosk_id,
+            hostname=khost,
+            agent_version=kagent,
+            agent_status=kstat,
             available_version=available,
         )
     except Exception as exc:

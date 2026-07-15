@@ -19,18 +19,48 @@ class BundleFile:
 
 
 BUNDLE_FILES: list[BundleFile] = [
-    BundleFile("calvin_display_agent.py", "deploy/kiosk-agent/calvin_display_agent.py",
-               "/usr/local/bin/calvin_display_agent.py", "0755", "calvin-display-agent.service"),
-    BundleFile("calvin-display-agent.service", "deploy/systemd/calvin-display-agent.service",
-               "/etc/systemd/system/calvin-display-agent.service", "0644", "calvin-display-agent.service"),
-    BundleFile("calvin-kiosk-remote.service", "deploy/systemd/calvin-kiosk-remote.service",
-               "/etc/systemd/system/calvin-kiosk-remote.service", "0644", "calvin-kiosk-remote.service"),
-    BundleFile("calvin-x.service", "deploy/systemd/calvin-x.service",
-               "/etc/systemd/system/calvin-x.service", "0644", "calvin-x.service"),
-    BundleFile("update-kiosk.sh", "deploy/kiosk-agent/update-kiosk.sh",
-               "/usr/local/bin/update-kiosk.sh", "0755", None),
-    BundleFile("calvin-kiosk-update.service", "deploy/systemd/calvin-kiosk-update.service",
-               "/etc/systemd/system/calvin-kiosk-update.service", "0644", None),
+    BundleFile(
+        "calvin_display_agent.py",
+        "deploy/kiosk-agent/calvin_display_agent.py",
+        "/usr/local/bin/calvin_display_agent.py",
+        "0755",
+        "calvin-display-agent.service",
+    ),
+    BundleFile(
+        "calvin-display-agent.service",
+        "deploy/systemd/calvin-display-agent.service",
+        "/etc/systemd/system/calvin-display-agent.service",
+        "0644",
+        "calvin-display-agent.service",
+    ),
+    BundleFile(
+        "calvin-kiosk-remote.service",
+        "deploy/systemd/calvin-kiosk-remote.service",
+        "/etc/systemd/system/calvin-kiosk-remote.service",
+        "0644",
+        "calvin-kiosk-remote.service",
+    ),
+    BundleFile(
+        "calvin-x.service",
+        "deploy/systemd/calvin-x.service",
+        "/etc/systemd/system/calvin-x.service",
+        "0644",
+        "calvin-x.service",
+    ),
+    BundleFile(
+        "update-kiosk.sh",
+        "deploy/kiosk-agent/update-kiosk.sh",
+        "/usr/local/bin/update-kiosk.sh",
+        "0755",
+        None,
+    ),
+    BundleFile(
+        "calvin-kiosk-update.service",
+        "deploy/systemd/calvin-kiosk-update.service",
+        "/etc/systemd/system/calvin-kiosk-update.service",
+        "0644",
+        None,
+    ),
 ]
 
 _BY_NAME = {bf.name: bf for bf in BUNDLE_FILES}
@@ -54,13 +84,15 @@ def build_manifest(root: Path | None = None) -> dict:
     r = _root(root)
     files = []
     for bf in BUNDLE_FILES:
-        files.append({
-            "name": bf.name,
-            "sha256": _sha256(r / bf.repo_path),
-            "mode": bf.mode,
-            "target_path": bf.target_path,
-            "restart_unit": bf.restart_unit,
-        })
+        files.append(
+            {
+                "name": bf.name,
+                "sha256": _sha256(r / bf.repo_path),
+                "mode": bf.mode,
+                "target_path": bf.target_path,
+                "restart_unit": bf.restart_unit,
+            }
+        )
     return {"version": _version_from(files), "min_python": MIN_PYTHON, "files": files}
 
 

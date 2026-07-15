@@ -38,7 +38,9 @@ DEVICE_PHYSICAL_KEYS: tuple[str, ...] = (
 # fallthrough works regardless of the underlying driver.
 _INTEGRITY_ERRORS = (sqlite3.IntegrityError, SAIntegrityError)
 
-_UPDATE_FLAG_KEY = "_agentUpdateRequested"  # stored in overrides; host-internal, not a device setting
+_UPDATE_FLAG_KEY = (
+    "_agentUpdateRequested"  # stored in overrides; host-internal, not a device setting
+)
 
 
 def agent_update_requested(overrides: dict | None) -> bool:
@@ -67,8 +69,11 @@ async def record_kiosk(
     if existing is None:
         try:
             await KioskDB.objects.create(
-                id=kiosk_id, hostname=hostname, last_seen=now,
-                agent_version=agent_version, agent_update_status=agent_status,
+                id=kiosk_id,
+                hostname=hostname,
+                last_seen=now,
+                agent_version=agent_version,
+                agent_update_status=agent_status,
             )
             logger.info(f"Registered new kiosk: {kiosk_id!r} (hostname={hostname!r})")
             return

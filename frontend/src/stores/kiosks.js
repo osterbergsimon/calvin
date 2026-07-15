@@ -59,5 +59,13 @@ export const useKiosksStore = defineStore("kiosks", () => {
     }
   }
 
-  return { kiosks, loadKiosks, fetchOverrides, saveOverrides, fetchDeviceConfigVersion, triggerUpdate, fetchAvailableAgentVersion };
+  return {
+    kiosks,
+    loadKiosks,
+    fetchOverrides,
+    saveOverrides,
+    fetchDeviceConfigVersion,
+    triggerUpdate,
+    fetchAvailableAgentVersion,
+  };
 });
