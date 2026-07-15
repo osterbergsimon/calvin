@@ -45,5 +45,10 @@ export const useKiosksStore = defineStore("kiosks", () => {
     }
   }
 
-  return { kiosks, loadKiosks, fetchOverrides, saveOverrides, fetchDeviceConfigVersion };
+  async function triggerUpdate(id) {
+    await axios.post(`/api/kiosks/${encodeURIComponent(id)}/update`);
+    await loadKiosks();
+  }
+
+  return { kiosks, loadKiosks, fetchOverrides, saveOverrides, fetchDeviceConfigVersion, triggerUpdate };
 });

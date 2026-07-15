@@ -87,3 +87,27 @@ describe("kiosks store — fetchDeviceConfigVersion", () => {
     expect(axios.get).toHaveBeenCalledWith("/api/kiosks/a%2Fb/config");
   });
 });
+
+describe("kiosks store — triggerUpdate", () => {
+  beforeEach(() => {
+    setActivePinia(createPinia());
+    vi.clearAllMocks();
+  });
+
+  it("POSTs the update and refreshes the list", async () => {
+    axios.post.mockResolvedValue({ data: { id: "k1", requested: true } });
+    axios.get.mockResolvedValue({ data: { kiosks: [] } });
+    const store = useKiosksStore();
+    await store.triggerUpdate("k1");
+    expect(axios.post).toHaveBeenCalledWith("/api/kiosks/k1/update");
+    expect(axios.get).toHaveBeenCalledWith("/api/kiosks");
+  });
+
+  it("url-encodes the id in the POST path", async () => {
+    axios.post.mockResolvedValue({ data: {} });
+    axios.get.mockResolvedValue({ data: { kiosks: [] } });
+    const store = useKiosksStore();
+    await store.triggerUpdate("a/b");
+    expect(axios.post).toHaveBeenCalledWith("/api/kiosks/a%2Fb/update");
+  });
+});
