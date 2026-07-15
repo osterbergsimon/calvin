@@ -11,6 +11,7 @@ import databases
 import pytest
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
+from fastapi.responses import HTMLResponse
 from fastapi.testclient import TestClient
 
 from app.models.db_models import PluginDB
@@ -69,6 +70,14 @@ def security_test_client(temp_image_dir: Path) -> Generator[TestClient, None, No
     )
     test_app.add_middleware(SecurityHeadersMiddleware)
     test_app.include_router(health.router, prefix="/api", tags=["health"])
+
+    # HTMLResponse stand-in for the SPA's index.html FileResponse.
+    # (Using HTMLResponse rather than FileResponse to avoid needing a real file
+    # path in the fixture; the fragile BaseHTTPMiddleware+FileResponse combo is
+    # covered by the dedicated test_csp_present_on_html_response test below.)
+    @test_app.get("/spa")
+    async def _spa_root():
+        return HTMLResponse("<html><body>kiosk</body></html>")
 
     with TestClient(test_app) as client:
         yield client
@@ -191,6 +200,22 @@ class TestSecurityHeaders:
         csp = response.headers.get("content-security-policy", "")
         assert "https://disabled-kiosk.internal" not in csp
         assert "https://mealie.internal" not in csp
+
+    def test_csp_present_on_html_response(self, security_test_client: TestClient):
+        """Middleware must stamp CSP on non-API HTML (SPA) responses.
+
+        BaseHTTPMiddleware + FileResponse/HTMLResponse is a historically fragile
+        combo in Starlette — this test locks in that stamping still works when
+        the underlying response is HTML rather than JSON.  The route uses
+        HTMLResponse (a FileResponse stand-in) to avoid requiring a real file
+        path in the fixture.
+        """
+        response = security_test_client.get("/spa")
+        assert response.status_code == 200
+        csp = response.headers.get("content-security-policy")
+        assert csp is not None, "CSP header must be present on HTML responses"
+        assert "default-src 'self'" in csp
+        assert "frame-src 'self'" in csp
 
     def test_db_error_falls_back_to_baseline_csp(self, security_test_client: TestClient):
         """A DB failure during origins lookup must never discard the response as a 500.

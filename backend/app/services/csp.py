@@ -26,11 +26,15 @@ _BASELINE = [
 
 
 def origin_from_url(url: str | None) -> str | None:
-    """Reduce a URL to its CSP origin ('scheme://host[:port]'), or None."""
+    """Reduce a URL to its CSP origin ('scheme://host[:port]'), or None.
+
+    Only http and https schemes are accepted; any other scheme (e.g. ftp)
+    returns None so operator-mistyped URLs never become frame-src tokens.
+    """
     if not url:
         return None
     parts = urlsplit(url)
-    if not parts.scheme or not parts.netloc:
+    if parts.scheme not in ("http", "https") or not parts.netloc:
         return None
     return f"{parts.scheme}://{parts.netloc}"
 

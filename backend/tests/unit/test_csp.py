@@ -20,6 +20,15 @@ class TestOriginFromUrl:
     def test_none_for_schemeless(self):
         assert origin_from_url("grafana.lab:3000") is None
 
+    def test_none_for_ftp_scheme(self):
+        assert origin_from_url("ftp://x.lab") is None
+
+    def test_http_scheme_accepted(self):
+        assert origin_from_url("http://x.lab") == "http://x.lab"
+
+    def test_https_scheme_accepted(self):
+        assert origin_from_url("https://x.lab") == "https://x.lab"
+
 
 @pytest.mark.unit
 class TestBuildCsp:
