@@ -58,7 +58,6 @@ def test_enable_does_not_change_version(tmp_path):
     _seed(tmp_path)
     m = kiosk_bundle.build_manifest(tmp_path)
     blob = "\n".join(
-        f"{f['name']}:{f['sha256']}"
-        for f in sorted(m["files"], key=lambda f: f["name"])
+        f"{f['name']}:{f['sha256']}" for f in sorted(m["files"], key=lambda f: f["name"])
     )
     assert m["version"] == hashlib.sha256(blob.encode()).hexdigest()[:16]
