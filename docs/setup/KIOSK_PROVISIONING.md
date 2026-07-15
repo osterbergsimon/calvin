@@ -136,6 +136,34 @@ env var, is only partially exercised. That residual gap is bounded by the durabl
 guard (`agent-update-state.json`), which prevents a failing version from re-triggering in a
 loop.
 
+### New units and removed components
+
+The updater is authoritative over kiosk-side bundle state. When a bundle release adds a new
+always-on service (a unit marked `enable` in the manifest), the update enables and starts it
+after the agent health check passes. When a release drops a file or unit, the updater compares
+the manifest against the device receipt (`agent-manifest.json`) and, again only after the agent
+is confirmed healthy, stops + disables the unit and removes the file. Both actions happen only
+post-health, so an unhealthy update rolls back the changed agent files and reconciles nothing.
+
+### Interrupted updates self-heal
+
+The version file and receipt are written last, only on success. If power is lost mid-update the
+version is not advanced, so the backend still sees the old version, the update stays pending, and
+the next poll re-runs the updater; the checksum loop re-syncs any half-written file. Combined
+with the durable no-retry guard (`agent-update-state.json`), a kiosk cannot get stuck in a
+half-updated state.
+
+### Trust model (accepted risk)
+
+The updater verifies file **integrity** (sha256 from the manifest) but not **authenticity**: the
+manifest and files come from the same plain-HTTP backend over the LAN, and the updater runs as
+root. A LAN attacker who can MITM the backend could serve matching-sha malicious files. This is
+the existing LAN-trust posture (same as `/api/config`) and is acceptable on a trusted home
+network. Closing it — signed manifests pinned to a key baked at provisioning, so there is no
+trust-on-first-use window — is tracked as **calvin-5vw**. The bundle version is a content hash
+(a change marker, not a monotonic counter), so there is no anti-rollback protection: a server
+rolled back to an older bundle will be adopted.
+
 ### Python version floor (`min_python`)
 
 The bundle manifest carries `"min_python": "3.9"`. The updater checks the
@@ -150,9 +178,13 @@ immediately if it runs on Python older than 3.9.
 
 ### Initial install
 
-`setup-kiosk.sh` calls `install_kiosk_bundle` (in `scripts/setup-common.sh`)
-to fetch and install the bundle during first-time setup. The agent version is
-seeded into `/var/lib/calvin/agent-version.json` at that point.
+`setup-kiosk.sh` calls `bootstrap_kiosk` (in `scripts/setup-common.sh`), which fetches
+`update-kiosk.sh` from the backend, verifies it against the manifest, and runs it with
+`--bootstrap`. `--bootstrap` installs the whole bundle (agent, units, updater), enables the
+boot units, and seeds both `/var/lib/calvin/agent-version.json` and the device receipt
+`/var/lib/calvin/agent-manifest.json`. It performs no restart, health check, or rollback —
+first boot has nothing running and reboots afterward. The updater is now the single install
+path; there is no separate bundle-install routine.
 
 ### Future option: zipapp
 
