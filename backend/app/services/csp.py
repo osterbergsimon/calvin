@@ -5,6 +5,7 @@ origins of the operator's own configured web-service (iframe) embeds. See
 docs/superpowers/specs/2026-07-15-offline-kiosks-csp-design.md.
 """
 
+import re
 from urllib.parse import urlsplit
 
 from app.models.db_models import PluginDB
@@ -37,6 +38,60 @@ def origin_from_url(url: str | None) -> str | None:
     if parts.scheme not in ("http", "https") or not parts.netloc:
         return None
     return f"{parts.scheme}://{parts.netloc}"
+
+
+# A CSP host-source: optional leading "*." wildcard, dot-separated labels, optional :port.
+# Accepts domains and bare IPv4 hosts (over-strict IP validation is unnecessary — CSP
+# treats the value as an opaque host token).
+_HOST_SOURCE_RE = re.compile(
+    r"^(?:\*\.)?"
+    r"(?:[a-z0-9](?:[a-z0-9-]*[a-z0-9])?\.)*"
+    r"[a-z0-9](?:[a-z0-9-]*[a-z0-9])?"
+    r"(?::\d{1,5})?$"
+)
+
+
+def validate_origin(value: str) -> str:
+    """Normalize a trusted-origin string or raise ValueError with a reason.
+
+    Accepts CSP host-sources: 'grafana.lab', '*.lab.example.com',
+    'host:port', and 'http(s)://host[:port]'. Rejects CIDR/IP-ranges,
+    paths, spaces, non-http(s) schemes, and empties.
+    """
+    if not value or not value.strip():
+        raise ValueError("Origin must not be empty")
+    raw = value.strip()
+
+    scheme = ""
+    host_part = raw
+    if "://" in raw:
+        scheme, host_part = raw.split("://", 1)
+        scheme = scheme.lower()
+        if scheme not in ("http", "https"):
+            raise ValueError(f"Unsupported scheme '{scheme}://' — use http:// or https://")
+
+    if "/" in host_part:
+        raise ValueError(
+            "IP ranges (CIDR) and paths are not supported — use a domain, a wildcard "
+            "like *.lab.example.com, or host:port"
+        )
+    if any(c in host_part for c in " \t?#"):
+        raise ValueError("Origin must not contain spaces, query, or fragment")
+
+    host_lower = host_part.lower()
+    if not _HOST_SOURCE_RE.match(host_lower):
+        raise ValueError(f"'{value}' is not a valid domain, wildcard, or host")
+
+    return f"{scheme}://{host_lower}" if scheme else host_lower
+
+
+def is_valid_origin(value: str) -> bool:
+    """True iff validate_origin accepts the value."""
+    try:
+        validate_origin(value)
+        return True
+    except (ValueError, TypeError):
+        return False
 
 
 def build_csp(frame_origins: list[str]) -> str:

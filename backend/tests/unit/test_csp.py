@@ -2,7 +2,7 @@
 
 import pytest
 
-from app.services.csp import build_csp, origin_from_url
+from app.services.csp import build_csp, origin_from_url, validate_origin, is_valid_origin
 
 
 @pytest.mark.unit
@@ -48,3 +48,49 @@ class TestBuildCsp:
     def test_frame_src_dedupes(self):
         csp = build_csp(["https://a.lab", "https://a.lab"])
         assert csp.count("https://a.lab") == 1
+
+
+@pytest.mark.unit
+class TestValidateOrigin:
+    def test_bare_host(self):
+        assert validate_origin("grafana.lab") == "grafana.lab"
+
+    def test_host_and_port(self):
+        assert validate_origin("192.168.1.50:3000") == "192.168.1.50:3000"
+
+    def test_subdomain_wildcard(self):
+        assert validate_origin("*.lab.example.com") == "*.lab.example.com"
+
+    def test_scheme_host_port(self):
+        assert validate_origin("https://grafana.lab:3000") == "https://grafana.lab:3000"
+
+    def test_lowercases_host_keeps_scheme(self):
+        assert validate_origin("HTTPS://Grafana.Lab") == "https://grafana.lab"
+
+    def test_rejects_cidr(self):
+        with pytest.raises(ValueError):
+            validate_origin("10.0.0.0/24")
+
+    def test_rejects_path(self):
+        with pytest.raises(ValueError):
+            validate_origin("grafana.lab/d/home")
+
+    def test_rejects_space(self):
+        with pytest.raises(ValueError):
+            validate_origin("a b")
+
+    def test_rejects_empty(self):
+        with pytest.raises(ValueError):
+            validate_origin("")
+
+    def test_rejects_bare_wildcard(self):
+        with pytest.raises(ValueError):
+            validate_origin("*")
+
+    def test_rejects_non_http_scheme(self):
+        with pytest.raises(ValueError):
+            validate_origin("ftp://x.lab")
+
+    def test_is_valid_origin_bool(self):
+        assert is_valid_origin("grafana.lab") is True
+        assert is_valid_origin("10.0.0.0/24") is False
