@@ -8,9 +8,14 @@ This directory contains tests for the Calvin setup scripts.
 - `setup.bats` - Tests for the mode-aware Raspberry Pi setup script and the `setup-dev.sh` compatibility wrapper
 - `test_default_kiosk_id.sh` - Verifies `compute_default_kiosk_id()` / `compute_default_kiosk_hostname()` in `setup-kiosk.sh` (stable `<hostname>-<6hex>` id, machine-id-derived suffix, hostname sanitized to `[A-Za-z0-9.-]`)
 - `test_kiosk_id_persists.sh` - Regression test: an operator-set `CALVIN_KIOSK_ID` / `CALVIN_KIOSK_HOSTNAME` survives re-running `install_kiosk_config()`
+- `test_install_authorized_key.sh` - Verifies `install_authorized_key()` appends an SSH key once, idempotently, with 0600 perms
+- `test_firstboot_wrapper.sh` - Verifies the boot-2 firstboot wrapper runs setup once, is idempotent via a sentinel, and reboots
+- `test_bake_kiosk_firstrun_args.sh` - Verifies `bake-kiosk-firstrun.sh` argument validation and raw-URL derivation
+- `test_bake_kiosk_firstrun_emit.sh` - Verifies `emit_firstrun` bakes host/wifi/ssh/config into the generated `firstrun.sh`
+- `test_bake_kiosk_firstrun_cmdline.sh` - Verifies `main()` writes `firstrun.sh` and appends the `cmdline.txt` hook exactly once
 - `helpers/` - Test helper functions and mocks
 
-The two `test_*.sh` files are plain bash (no bats needed) and run in CI via the
+The seven `test_*.sh` files are plain bash (no bats needed) and run in CI via the
 `Run scripts/tests/*.sh` step in `.github/workflows/setup-validation.yml`.
 
 ## Running Tests

@@ -1,0 +1,16 @@
+[Unit]
+Description=Calvin Kiosk First-Boot Provisioning
+After=network-online.target
+Wants=network-online.target
+ConditionPathExists=!/var/lib/calvin/firstboot.done
+
+[Service]
+Type=oneshot
+ExecStart=/usr/local/bin/calvin-kiosk-firstboot.sh
+RemainAfterExit=yes
+StandardOutput=journal
+StandardError=journal
+SyslogIdentifier=calvin-kiosk-firstboot
+
+[Install]
+WantedBy=multi-user.target

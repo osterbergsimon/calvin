@@ -113,6 +113,11 @@ two systemd units:
 
 Reboot. Chromium opens to the dashboard.
 
+> **Zero-touch alternative:** instead of SSHing in to run `setup-kiosk.sh`
+> by hand, you can bake the backend URL + wifi into the card before first
+> boot so the Pi self-provisions. See
+> [KIOSK_PROVISIONING.md](KIOSK_PROVISIONING.md).
+
 ### Screen scheduling on a Mode-B kiosk
 
 Calvin's screen on/off schedule is authored in the dashboard UI, but the
