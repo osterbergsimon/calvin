@@ -1,6 +1,7 @@
 /**
- * Unit tests for EventDetailPanel component
- * Tests functionality: event details display, multi-day events, multiple events, close/selection
+ * Unit tests for EventDetailPanel — redesigned "the event is the hero" panel:
+ * a colour spine, a timetable "when", location/description, and a de-emphasised
+ * list of the day's other events.
  */
 
 import { describe, it, expect, beforeEach, vi } from "vitest";
@@ -21,7 +22,6 @@ describe("EventDetailPanel", () => {
     configStore = useConfigStore();
     calendarStore = useCalendarStore();
 
-    // Reset stores
     configStore.timeFormat = "24h";
     calendarStore.dayEvents = [];
     calendarStore.showAllDayEvents = false;
@@ -39,230 +39,146 @@ describe("EventDetailPanel", () => {
     ...overrides,
   });
 
-  const createWrapper = (props = {}) => {
-    const defaultProps = {
-      event: createEvent(),
-      ...props,
-    };
-
-    return mount(EventDetailPanel, {
-      props: defaultProps,
-      global: {
-        plugins: [pinia],
-      },
+  const createWrapper = (props = {}) =>
+    mount(EventDetailPanel, {
+      props: { event: createEvent(), ...props },
+      global: { plugins: [pinia] },
     });
-  };
 
   describe("Visibility", () => {
-    it("should render when event is provided", () => {
-      const event = createEvent();
-      const wrapper = createWrapper({ event });
-
-      expect(wrapper.find(".event-detail-panel").exists()).toBe(true);
+    it("renders when an event is provided", () => {
+      expect(createWrapper().find(".event-detail-panel").exists()).toBe(true);
     });
 
-    it("should not render when event is null", () => {
-      const wrapper = createWrapper({ event: null });
-
-      expect(wrapper.find(".event-detail-panel").exists()).toBe(false);
+    it("does not render when event is null", () => {
+      expect(createWrapper({ event: null }).find(".event-detail-panel").exists()).toBe(false);
     });
   });
 
-  describe("Event Display", () => {
-    it("should display event title", () => {
-      const event = createEvent({ title: "Important Meeting" });
-      const wrapper = createWrapper({ event });
-
-      expect(wrapper.find("h3").text()).toBe("Important Meeting");
+  describe("Event display", () => {
+    it("shows the title", () => {
+      const wrapper = createWrapper({ event: createEvent({ title: "Important Meeting" }) });
+      expect(wrapper.find(".event-detail__title").text()).toBe("Important Meeting");
     });
 
-    it("should display event date in header", () => {
-      const event = createEvent({ start: "2024-01-15T10:00:00" });
-      const wrapper = createWrapper({ event });
-
-      const dateHeader = wrapper.find(".event-date-header");
-      expect(dateHeader.exists()).toBe(true);
-      expect(dateHeader.text()).toBeTruthy();
+    it("carries the event colour onto the panel spine", () => {
+      const wrapper = createWrapper({ event: createEvent({ color: "#5ab58a" }) });
+      expect(wrapper.find(".event-detail-panel").attributes("style")).toContain("#5ab58a");
+      expect(wrapper.find(".event-detail__spine").exists()).toBe(true);
     });
 
-    it("should display location when provided", () => {
-      const event = createEvent({ location: "Conference Room A" });
-      const wrapper = createWrapper({ event });
-
-      const locationRow = wrapper
-        .findAll(".event-detail-row")
-        .find(row => row.text().includes("Location:"));
-      expect(locationRow.exists()).toBe(true);
-      expect(locationRow.text()).toContain("Conference Room A");
-    });
-
-    it("should display description when provided", () => {
-      const event = createEvent({ description: "This is a test description" });
-      const wrapper = createWrapper({ event });
-
-      const descriptionRow = wrapper
-        .findAll(".event-detail-row")
-        .find(row => row.text().includes("Description:"));
-      expect(descriptionRow.exists()).toBe(true);
-      expect(descriptionRow.text()).toContain("This is a test description");
-    });
-  });
-
-  describe("Single-Day Events", () => {
-    it("should display date and time for single-day timed events", () => {
-      const event = createEvent({
-        start: "2024-01-15T10:00:00",
-        end: "2024-01-15T12:00:00",
-        all_day: false,
-      });
-      const wrapper = createWrapper({ event });
-
-      const dateRow = wrapper
-        .findAll(".event-detail-row")
-        .find(row => row.text().includes("Date:"));
-      expect(dateRow.exists()).toBe(true);
-
-      const timeRow = wrapper
-        .findAll(".event-detail-row")
-        .find(row => row.text().includes("Time:"));
-      expect(timeRow.exists()).toBe(true);
-      expect(timeRow.text()).toMatch(/\d{1,2}:\d{2}/); // Time format
-    });
-
-    it("should display all-day indicator for all-day events", () => {
-      const event = createEvent({
-        start: "2024-01-15T00:00:00",
-        end: "2024-01-15T23:59:59",
-        all_day: true,
-      });
-      calendarStore.dayEvents = [event];
-      const wrapper = createWrapper({ event });
-
-      // For all-day events in the day events list
-      const allDayText = wrapper.text();
-      // Note: All-day check is in dayEvents list, not detail panel directly
-      expect(allDayText).toBeTruthy();
-    });
-  });
-
-  describe("Multi-Day Events", () => {
-    it("should display start and end dates for multi-day events", () => {
-      const event = createEvent({
-        start: "2024-01-15T10:00:00",
-        end: "2024-01-17T14:00:00",
-        all_day: false,
-      });
-      const wrapper = createWrapper({ event });
-
-      const selectedDateRow = wrapper
-        .findAll(".event-detail-row")
-        .find(row => row.text().includes("Selected Date:"));
-      expect(selectedDateRow.exists()).toBe(true);
-
-      const startRow = wrapper
-        .findAll(".event-detail-row")
-        .find(row => row.text().includes("Start:"));
-      expect(startRow.exists()).toBe(true);
-
-      const endRow = wrapper.findAll(".event-detail-row").find(row => row.text().includes("End:"));
-      expect(endRow.exists()).toBe(true);
-    });
-  });
-
-  describe("Multiple Events for a Day", () => {
-    it("should show events list when multiple events exist", () => {
-      const event1 = createEvent({ id: "1", title: "Event 1" });
-      const event2 = createEvent({ id: "2", title: "Event 2" });
-      calendarStore.dayEvents = [event1, event2];
-
-      const wrapper = createWrapper({ event: event1 });
-
-      expect(wrapper.find(".day-events-list").exists()).toBe(true);
-      expect(wrapper.find(".day-events-header").text()).toContain("All Events (2)");
-    });
-
-    it("should highlight active event in events list", () => {
-      const event1 = createEvent({ id: "1", title: "Event 1" });
-      const event2 = createEvent({ id: "2", title: "Event 2" });
-      calendarStore.dayEvents = [event1, event2];
-
-      const wrapper = createWrapper({ event: event1 });
-
-      const eventItems = wrapper.findAll(".day-event-item");
-      expect(eventItems[0].classes()).toContain("active");
-      expect(eventItems[1].classes()).not.toContain("active");
-    });
-
-    it("should allow selecting different event from list", async () => {
-      const event1 = createEvent({ id: "1", title: "Event 1" });
-      const event2 = createEvent({ id: "2", title: "Event 2" });
-      calendarStore.dayEvents = [event1, event2];
-      const selectEventSpy = vi.spyOn(calendarStore, "selectEvent");
-
-      const wrapper = createWrapper({ event: event1 });
-
-      const eventItems = wrapper.findAll(".day-event-item");
-      await eventItems[1].trigger("click");
-
-      expect(selectEventSpy).toHaveBeenCalledWith(event2);
-    });
-  });
-
-  describe("Close Functionality", () => {
-    it("should emit close event when close button is clicked", async () => {
+    it("shows the time and day for a single-day timed event", () => {
       const wrapper = createWrapper();
+      expect(wrapper.find(".event-detail__time").text()).toMatch(/\d{1,2}:\d{2}/);
+      expect(wrapper.find(".event-detail__subwhen").text()).toBeTruthy();
+    });
 
+    it("shows an all-day marker instead of a time", () => {
+      const wrapper = createWrapper({
+        event: createEvent({
+          start: "2024-01-15T00:00:00",
+          end: "2024-01-15T23:59:59",
+          all_day: true,
+        }),
+      });
+      expect(wrapper.find(".event-detail__time").text()).toBe("All day");
+    });
+
+    it("shows the location when provided", () => {
+      const wrapper = createWrapper({ event: createEvent({ location: "Conference Room A" }) });
+      const where = wrapper.find(".event-detail__where");
+      expect(where.exists()).toBe(true);
+      expect(where.text()).toContain("Conference Room A");
+    });
+
+    it("shows the description when provided", () => {
+      const wrapper = createWrapper({ event: createEvent({ description: "A test description" }) });
+      expect(wrapper.find(".event-detail__desc").text()).toContain("A test description");
+    });
+  });
+
+  describe("Multi-day events", () => {
+    it("shows a from/to range instead of a single time", () => {
+      const wrapper = createWrapper({
+        event: createEvent({ start: "2024-01-15T10:00:00", end: "2024-01-17T14:00:00" }),
+      });
+      expect(wrapper.find(".event-detail__range").exists()).toBe(true);
+      const dates = wrapper.findAll(".event-detail__range-date");
+      expect(dates).toHaveLength(2);
+      expect(dates[0].text()).toContain("15");
+      expect(dates[1].text()).toContain("17");
+    });
+
+    it("does not show the single-day time block", () => {
+      const wrapper = createWrapper({
+        event: createEvent({ start: "2024-01-15T10:00:00", end: "2024-01-17T14:00:00" }),
+      });
+      expect(wrapper.find(".event-detail__when").exists()).toBe(false);
+    });
+  });
+
+  describe("The day's other events", () => {
+    it("lists the other events for the day, excluding the current one", () => {
+      const event1 = createEvent({ id: "1", title: "Event 1" });
+      const event2 = createEvent({ id: "2", title: "Event 2" });
+      calendarStore.dayEvents = [event1, event2];
+
+      const wrapper = createWrapper({ event: event1 });
+      const items = wrapper.findAll(".event-detail__also-item");
+      expect(items).toHaveLength(1);
+      expect(items[0].text()).toContain("Event 2");
+    });
+
+    it("selects another event when its row is clicked", async () => {
+      const event1 = createEvent({ id: "1", title: "Event 1" });
+      const event2 = createEvent({ id: "2", title: "Event 2" });
+      calendarStore.dayEvents = [event1, event2];
+      const spy = vi.spyOn(calendarStore, "selectEvent");
+
+      const wrapper = createWrapper({ event: event1 });
+      await wrapper.find(".event-detail__also-item").trigger("click");
+
+      expect(spy).toHaveBeenCalledWith(event2);
+    });
+
+    it("has no footer list when the event is the only one that day", () => {
+      calendarStore.dayEvents = [createEvent({ id: "1" })];
+      const wrapper = createWrapper({ event: createEvent({ id: "1" }) });
+      expect(wrapper.find(".event-detail__also").exists()).toBe(false);
+    });
+  });
+
+  describe("Close", () => {
+    it("emits close when the close button is clicked", async () => {
+      const wrapper = createWrapper();
       await wrapper.find('[aria-label="Close"]').trigger("click");
-
-      expect(wrapper.emitted("close")).toBeTruthy();
       expect(wrapper.emitted("close")).toHaveLength(1);
     });
 
-    it("should emit close event on Escape key", async () => {
+    it("emits close on Escape", async () => {
       const wrapper = createWrapper();
-
-      await wrapper.find(".event-detail-panel").trigger("keydown", {
-        key: "Escape",
-      });
-
-      expect(wrapper.emitted("close")).toBeTruthy();
+      await wrapper.find(".event-detail-panel").trigger("keydown", { key: "Escape" });
       expect(wrapper.emitted("close")).toHaveLength(1);
     });
 
-    it("should not close on other keys", async () => {
+    it("does not close on other keys", async () => {
       const wrapper = createWrapper();
-
-      await wrapper.find(".event-detail-panel").trigger("keydown", {
-        key: "ArrowLeft",
-      });
-
+      await wrapper.find(".event-detail-panel").trigger("keydown", { key: "ArrowLeft" });
       expect(wrapper.emitted("close")).toBeFalsy();
     });
   });
 
-  describe("Source Display", () => {
-    it("should display source name when source exists in store", () => {
+  describe("Calendar / source", () => {
+    it("shows the calendar name when the source is known", () => {
       calendarStore.sources = [{ id: "test-source", name: "Test Calendar" }];
-      const event = createEvent({ source: "test-source" });
-      const wrapper = createWrapper({ event });
-
-      const sourceRow = wrapper
-        .findAll(".event-detail-row")
-        .find(row => row.text().includes("Source:"));
-      expect(sourceRow.exists()).toBe(true);
-      expect(sourceRow.text()).toContain("Test Calendar");
+      const wrapper = createWrapper({ event: createEvent({ source: "test-source" }) });
+      expect(wrapper.find(".event-detail__calendar").text()).toContain("Test Calendar");
     });
 
-    it("should display source ID when source not found in store", () => {
+    it("falls back to the source id when the calendar is unknown", () => {
       calendarStore.sources = [];
-      const event = createEvent({ source: "unknown-source" });
-      const wrapper = createWrapper({ event });
-
-      const sourceRow = wrapper
-        .findAll(".event-detail-row")
-        .find(row => row.text().includes("Source:"));
-      expect(sourceRow.exists()).toBe(true);
-      expect(sourceRow.text()).toContain("unknown-source");
+      const wrapper = createWrapper({ event: createEvent({ source: "unknown-source" }) });
+      expect(wrapper.find(".event-detail__calendar").text()).toContain("unknown-source");
     });
   });
 });
