@@ -117,6 +117,11 @@ sudo reboot
 Details and the picker table live in
 [DEPLOYMENT_TOPOLOGIES.md](DEPLOYMENT_TOPOLOGIES.md).
 
+The Pi's display-agent (rotation, resolution, on/off schedule) can be updated
+later without SSH or re-flashing: click **Update** on the kiosk in Settings →
+Kiosks, and it pulls a verified bundle from the server on its next poll. See
+[Kiosk agent self-update](KIOSK_PROVISIONING.md#kiosk-agent-self-update).
+
 ## Verifying it works
 
 After `make dev` (or after a Pi reboot), check:

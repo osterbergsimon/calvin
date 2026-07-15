@@ -342,6 +342,16 @@ Development installs pull the configured git branch into `/home/calvin/calvin`
 with `--autostash`, then recreate the dev Compose containers so dependency
 changes are picked up.
 
+### Kiosk Pis (Mode B)
+
+A remote kiosk Pi runs only the display-agent, not the full stack, so it does
+not use `update-calvin.sh` and does not carry a repo checkout. Update its agent
+from the server instead: **Settings → Kiosks → Update**. The kiosk pulls a
+verified file bundle from the backend on its next poll, swaps only what changed,
+restarts only the affected services, and auto-rolls-back if the agent does not
+come up healthy — no SSH or re-provisioning needed. See
+[Kiosk agent self-update](KIOSK_PROVISIONING.md#kiosk-agent-self-update).
+
 ## Contributing
 
 When modifying setup scripts:
