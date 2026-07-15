@@ -87,80 +87,157 @@
             loading: loading,
           }"
         >
-          <!-- Day headers -->
-          <div class="calendar-weekdays" :style="rollingColumnStyle">
-            <div v-if="showWeekNumbers && !isAgenda && viewMode !== 'day'" class="week-spine-head">
-              wk
-            </div>
-            <div v-for="header in weekdayHeaders" :key="header.key" class="weekday">
-              {{ header.label }}
-            </div>
-          </div>
-          <!-- Calendar days -->
-          <div class="calendar-days" :style="rollingColumnStyle">
-            <template v-for="(day, dayIndex) in calendarDays" :key="day.date.toISOString()">
-              <!-- Week-number spine: one tick per row, left of the month grid -->
-              <div
-                v-if="showWeekNumbers && !isAgenda && viewMode !== 'day' && isWeekStart(dayIndex)"
-                class="week-spine"
-                :class="{ 'current-week': isCurrentWeek(dayIndex) }"
-                :aria-label="`Week ${getWeekNumberForDay(dayIndex)}`"
-              >
-                <span class="week-spine-num">{{ getWeekNumberForDay(dayIndex) }}</span>
+          <!-- MONTH VIEW: week rows with a continuous spanning ribbon band.
+               Multi-day / all-day events become bars that hold a stable lane
+               across the week; timed events drop to a light per-day list. -->
+          <template v-if="isMonthView">
+            <div class="calendar-weekdays month-weekdays">
+              <div v-if="showWeekNumbers" class="week-spine-head">wk</div>
+              <div v-for="header in weekdayHeaders" :key="header.key" class="weekday">
+                {{ header.label }}
               </div>
+            </div>
+            <div class="calendar-weeks">
               <div
-                :class="[
-                  'calendar-day',
-                  {
-                    'other-month': day.otherMonth,
-                    today: day.isToday,
-                    'week-start': isWeekStart(dayIndex),
-                    weekend: isWeekend(day.date),
-                    'red-day': showRedDays && isRedDay(day.date),
-                  },
-                ]"
+                v-for="wk in monthWeeks"
+                :key="wk.weekIndex"
+                class="week-row"
+                :class="{ 'has-spine': showWeekNumbers }"
+                :style="{ gridTemplateRows: weekRowRows(wk) }"
               >
-                <div class="day-header">
-                  <div class="day-number">
+                <div
+                  v-if="showWeekNumbers"
+                  class="week-spine"
+                  :class="{ 'current-week': wk.isCurrent }"
+                  :style="{ gridColumn: '1', gridRow: '1 / -1' }"
+                  :aria-label="`Week ${wk.weekNumber}`"
+                >
+                  <span class="week-spine-num">{{ wk.weekNumber }}</span>
+                </div>
+
+                <template v-for="day in wk.days" :key="day.date.toISOString()">
+                  <!-- Day background box (also the target of existing cell tests) -->
+                  <div
+                    class="calendar-day"
+                    :class="{
+                      'other-month': day.otherMonth,
+                      today: day.isToday,
+                      weekend: isWeekend(day.date),
+                      'red-day': showRedDays && isRedDay(day.date),
+                      'last-col': day.col === 6,
+                    }"
+                    :style="{ gridColumn: dayGridColumn(day.col), gridRow: '1 / -1' }"
+                  ></div>
+                  <div
+                    class="mv-daynum"
+                    :class="{ 'other-month': day.otherMonth, today: day.isToday }"
+                    :style="{ gridColumn: dayGridColumn(day.col), gridRow: '1' }"
+                  >
                     {{ day.date.getDate() }}
                   </div>
-                  <!-- Agenda/day layouts keep the inline chip (no row to label) -->
                   <div
-                    v-if="
-                      showWeekNumbers && (isAgenda || viewMode === 'day') && isWeekStart(dayIndex)
-                    "
-                    class="week-number"
+                    class="mv-timed"
+                    :class="{ 'other-month': day.otherMonth }"
+                    :style="{
+                      gridColumn: dayGridColumn(day.col),
+                      gridRow: String(2 + wk.laneCount),
+                    }"
                   >
-                    {{ getWeekNumberForDay(dayIndex) }}
+                    <CalendarTimedEvent
+                      v-for="item in day.timed"
+                      :key="item.focusKey"
+                      :ref="el => setMonthRef(el, item.focusKey)"
+                      :event="item.ev"
+                      :date="day.date"
+                      :is-focused="isMonthFocused(item.focusKey)"
+                      :is-selected="isEventSelected(item.ev, day.date)"
+                      @click="selectEvent"
+                      @focus="() => setMonthFocus(item.focusKey)"
+                    />
+                    <div
+                      v-if="day.hiddenCount > 0"
+                      class="event-overflow-indicator"
+                      :title="`${day.hiddenCount} more event${day.hiddenCount > 1 ? 's' : ''}`"
+                    >
+                      +{{ day.hiddenCount }} more
+                    </div>
                   </div>
-                </div>
-                <div class="day-events">
-                  <!-- Visible events for this day (limited) -->
-                  <CalendarEventItem
-                    v-for="(event, eventIndex) in getVisibleEvents(day.events)"
-                    :key="`${event.id}-${day.date.toISOString()}-${eventIndex}`"
-                    :ref="el => setEventRef(el, dayIndex, eventIndex)"
-                    :event="event"
-                    :day-index="dayIndex"
-                    :event-index="eventIndex"
-                    :day-date="day.date"
-                    :is-focused="isFocused(dayIndex, eventIndex)"
-                    :is-selected="isEventSelected(event, day.date)"
+                </template>
+
+                <!-- The band overlays the lane rows across all seven day columns -->
+                <div v-if="wk.laneCount > 0" class="mv-band" :style="bandGridStyle(wk)">
+                  <CalendarRibbon
+                    v-for="seg in wk.ribbons"
+                    :key="seg.focusKey"
+                    :ref="el => setMonthRef(el, seg.focusKey)"
+                    :ribbon="seg"
+                    :date="seg.date"
+                    :is-focused="isMonthFocused(seg.focusKey)"
+                    :is-selected="isEventSelected(seg.event, seg.date)"
                     @click="selectEvent"
-                    @focus="setFocusedEvent"
+                    @focus="() => setMonthFocus(seg.focusKey)"
                   />
-                  <!-- Overflow indicator -->
-                  <div
-                    v-if="getOverflowCount(day.events) > 0"
-                    class="event-overflow-indicator"
-                    :title="`${getOverflowCount(day.events)} more event${getOverflowCount(day.events) > 1 ? 's' : ''}`"
-                  >
-                    +{{ getOverflowCount(day.events) }} more
-                  </div>
                 </div>
               </div>
-            </template>
-          </div>
+            </div>
+          </template>
+
+          <!-- AGENDA (week strip) / DAY: unchanged per-day chip grid -->
+          <template v-else>
+            <div class="calendar-weekdays" :style="rollingColumnStyle">
+              <div v-for="header in weekdayHeaders" :key="header.key" class="weekday">
+                {{ header.label }}
+              </div>
+            </div>
+            <div class="calendar-days" :style="rollingColumnStyle">
+              <template v-for="(day, dayIndex) in calendarDays" :key="day.date.toISOString()">
+                <div
+                  :class="[
+                    'calendar-day',
+                    {
+                      'other-month': day.otherMonth,
+                      today: day.isToday,
+                      'week-start': isWeekStart(dayIndex),
+                      weekend: isWeekend(day.date),
+                      'red-day': showRedDays && isRedDay(day.date),
+                    },
+                  ]"
+                >
+                  <div class="day-header">
+                    <div class="day-number">
+                      {{ day.date.getDate() }}
+                    </div>
+                    <!-- Agenda/day layouts keep the inline week chip (no row to label) -->
+                    <div v-if="showWeekNumbers && isWeekStart(dayIndex)" class="week-number">
+                      {{ getWeekNumberForDay(dayIndex) }}
+                    </div>
+                  </div>
+                  <div class="day-events">
+                    <CalendarEventItem
+                      v-for="(event, eventIndex) in getVisibleEvents(day.events)"
+                      :key="`${event.id}-${day.date.toISOString()}-${eventIndex}`"
+                      :ref="el => setEventRef(el, dayIndex, eventIndex)"
+                      :event="event"
+                      :day-index="dayIndex"
+                      :event-index="eventIndex"
+                      :day-date="day.date"
+                      :is-focused="isFocused(dayIndex, eventIndex)"
+                      :is-selected="isEventSelected(event, day.date)"
+                      @click="selectEvent"
+                      @focus="setFocusedEvent"
+                    />
+                    <div
+                      v-if="getOverflowCount(day.events) > 0"
+                      class="event-overflow-indicator"
+                      :title="`${getOverflowCount(day.events)} more event${getOverflowCount(day.events) > 1 ? 's' : ''}`"
+                    >
+                      +{{ getOverflowCount(day.events) }} more
+                    </div>
+                  </div>
+                </div>
+              </template>
+            </div>
+          </template>
         </div>
       </div>
     </DashboardPanel>
@@ -183,6 +260,9 @@ import { useModeStore } from "../stores/mode";
 import EventDetailPanel from "./EventDetailPanel.vue";
 import DialogScrim from "./ui/DialogScrim.vue";
 import CalendarEventItem from "./CalendarEventItem.vue";
+import CalendarRibbon from "./CalendarRibbon.vue";
+import CalendarTimedEvent from "./CalendarTimedEvent.vue";
+import { buildMonthWeeks } from "../composables/useMonthLayout";
 import DashboardPanel from "./DashboardPanel.vue";
 import IconButton from "./ui/IconButton.vue";
 import CalendarViewOptions from "./dashboard/CalendarViewOptions.vue";
@@ -252,6 +332,8 @@ const extraWeeks = computed(() => Math.min(8, Math.max(0, props.view?.extraWeeks
 //   week  → `days` days    (off: from the current week's start; on: from today)
 //   day   → a single day (no count, no rolling)
 const isAgenda = computed(() => viewMode.value === "week");
+// Month is the only layout that uses the ribbon band; agenda/day keep chips.
+const isMonthView = computed(() => viewMode.value === "month");
 
 // First day cell of the rendered window (month + week views).
 const windowStart = computed(() => {
@@ -346,6 +428,7 @@ const goToToday = () => {
   calendarStore.setCurrentDate(new Date());
   focusedDayIndex.value = null;
   focusedEventIndex.value = null;
+  focusedMonthKey.value = null;
 };
 
 const handleCloseFullscreen = () => {
@@ -771,13 +854,87 @@ const getWeekNumberForDay = dayIndex => {
   return weekNum;
 };
 
-// Helper: does the week starting at dayIndex contain today?
-const isCurrentWeek = dayIndex => {
-  const end = Math.min(dayIndex + 7, calendarDays.value.length);
-  for (let i = dayIndex; i < end; i++) {
-    if (calendarDays.value[i]?.isToday) return true;
-  }
-  return false;
+// --- Month ribbon-band layout -------------------------------------------------
+// Turn the flat day window into week rows: spanning events become lane-assigned
+// ribbons, timed events stay a per-day list. Decorate each week/segment with the
+// week number, current-week flag, a representative date, and a stable focus key.
+const monthWeeks = computed(() => {
+  const weeks = buildMonthWeeks(calendarDays.value, { maxTimed: maxVisibleEvents.value });
+  return weeks.map((wk, weekIndex) => ({
+    weekIndex,
+    laneCount: wk.laneCount,
+    weekNumber: getWeekNumber(getWeekStart(wk.days[0].date)),
+    isCurrent: wk.days.some(d => d.isToday),
+    ribbons: wk.ribbons.map(seg => ({
+      ...seg,
+      date: wk.days[seg.startCol].date,
+      focusKey: `m-${weekIndex}-r-${seg.event.id}`,
+    })),
+    days: wk.days.map((day, col) => ({
+      ...day,
+      col,
+      timed: day.timed.map((ev, ti) => ({
+        ev,
+        focusKey: `m-${weekIndex}-t-${col}-${ev.id}-${ti}`,
+      })),
+    })),
+  }));
+});
+
+// 1-based grid column for a day, accounting for the optional week-number spine.
+const dayGridColumn = col => String((showWeekNumbers.value ? 2 : 1) + col);
+
+// Row track template: a day-number row, one row per lane, then the timed list.
+const weekRowRows = wk => `auto ${"minmax(1.35rem, auto) ".repeat(wk.laneCount)}1fr`;
+
+// Place + shape the ribbon band so it overlays exactly the seven day columns.
+const bandGridStyle = wk => ({
+  gridColumn: `${dayGridColumn(0)} / span 7`,
+  gridRow: `2 / span ${wk.laneCount}`,
+  gridTemplateColumns: "repeat(7, 1fr)",
+  gridTemplateRows: `repeat(${wk.laneCount}, 1fr)`,
+});
+
+// Focus model for month view. Ribbons and timed rows aren't per-(day,index)
+// like the agenda chips, so they get their own flat, ordered focus list keyed
+// by a stable string: ribbons first (top band), then each day's timed events.
+const focusedMonthKey = ref(null);
+const monthRefs = ref({});
+
+const setMonthRef = (el, key) => {
+  if (el) monthRefs.value[key] = el;
+};
+const isMonthFocused = key => focusedMonthKey.value === key;
+const setMonthFocus = key => {
+  focusedMonthKey.value = key;
+};
+
+const monthFocusables = computed(() => {
+  const list = [];
+  monthWeeks.value.forEach(wk => {
+    [...wk.ribbons]
+      .sort((a, b) => a.lane - b.lane || a.startCol - b.startCol)
+      .forEach(seg => list.push({ key: seg.focusKey, event: seg.event, date: seg.date }));
+    wk.days.forEach(day => {
+      day.timed.forEach(item => list.push({ key: item.focusKey, event: item.ev, date: day.date }));
+    });
+  });
+  return list;
+});
+
+const navigateMonth = direction => {
+  const list = monthFocusables.value;
+  if (!list.length) return;
+  const current = list.findIndex(f => f.key === focusedMonthKey.value);
+  let next;
+  if (direction === "next") next = current < list.length - 1 ? current + 1 : 0;
+  else if (direction === "prev") next = current > 0 ? current - 1 : list.length - 1;
+  else if (direction === "first") next = 0;
+  else next = list.length - 1;
+  if (current === -1 && (direction === "next" || direction === "prev")) next = 0;
+  const target = list[next];
+  focusedMonthKey.value = target.key;
+  nextTick(() => monthRefs.value[target.key]?.focus());
 };
 
 // Helper function to check if a date is a weekend day
@@ -926,33 +1083,40 @@ const handleKeydown = event => {
     return;
   }
 
+  // Month view drives a separate focus model (ribbons + timed rows); agenda and
+  // day views keep the per-(day,index) chip navigation.
+  const stepEvents = direction =>
+    isMonthView.value ? navigateMonth(direction) : navigateEvents(direction);
+
   switch (event.key) {
     case "ArrowRight":
-      navigateEvents("next");
+      stepEvents("next");
       event.preventDefault();
       break;
     case "ArrowLeft":
-      navigateEvents("prev");
+      stepEvents("prev");
       event.preventDefault();
       break;
     case "Home":
-      navigateEvents("first");
+      stepEvents("first");
       event.preventDefault();
       break;
     case "End":
-      navigateEvents("last");
+      stepEvents("last");
       event.preventDefault();
       break;
     case "Enter":
-      // Expand the focused event or all events for the focused day
-      if (focusedDayIndex.value !== null) {
+      if (isMonthView.value) {
+        // Open the focused ribbon or timed event
+        const focused = monthFocusables.value.find(f => f.key === focusedMonthKey.value);
+        if (focused) selectEvent(focused.event, focused.date);
+      } else if (focusedDayIndex.value !== null) {
+        // Expand the focused event or the first event for the focused day
         const day = calendarDays.value[focusedDayIndex.value];
         if (day && day.events.length > 0) {
           if (focusedEventIndex.value !== null && focusedEventIndex.value < day.events.length) {
-            // Expand the focused event
             selectEvent(day.events[focusedEventIndex.value], day.date);
           } else {
-            // Expand the first event of the day
             selectEvent(day.events[0], day.date);
           }
         }
@@ -990,6 +1154,7 @@ const navigatePrevious = () => {
   // Clear focus when view changes
   focusedDayIndex.value = null;
   focusedEventIndex.value = null;
+  focusedMonthKey.value = null;
 };
 
 const navigateNext = () => {
@@ -1014,6 +1179,7 @@ const navigateNext = () => {
   // Clear focus when view changes
   focusedDayIndex.value = null;
   focusedEventIndex.value = null;
+  focusedMonthKey.value = null;
 };
 
 // Legacy function names for backward compatibility (used by header buttons)
@@ -1079,6 +1245,7 @@ watch(sourceKey, () => {
 watch(viewMode, () => {
   focusedDayIndex.value = null;
   focusedEventIndex.value = null;
+  focusedMonthKey.value = null;
   loadEvents();
 });
 
@@ -1641,6 +1808,118 @@ onActivated(() => {
   opacity: 0.8;
   font-weight: 500;
   flex-shrink: 0;
+}
+
+/* ===== Month view: week rows + continuous ribbon band =====================
+   Each week is its own grid. Day background boxes span every row of the week;
+   the day number sits on the top row, the ribbon band occupies the lane rows,
+   and the timed list fills the bottom. Bars cross the hairline day dividers so
+   a multi-day event reads as one continuous span, not a row of stitched chips. */
+.month-weekdays {
+  gap: 0 !important;
+}
+.month-weekdays.calendar-weekdays {
+  grid-template-columns: 1fr 1fr 1fr 1fr 1fr 1fr 1fr !important;
+}
+.calendar-grid.show-week-numbers .month-weekdays.calendar-weekdays {
+  grid-template-columns: minmax(1.15rem, auto) 1fr 1fr 1fr 1fr 1fr 1fr 1fr !important;
+}
+
+.calendar-weeks {
+  display: flex;
+  flex-direction: column;
+  flex: 1;
+  min-height: 0;
+  width: 100%;
+  box-sizing: border-box;
+  overflow: hidden;
+}
+
+.week-row {
+  display: grid;
+  grid-template-columns: 1fr 1fr 1fr 1fr 1fr 1fr 1fr;
+  flex: 1;
+  min-height: 0;
+  border-bottom: 1px solid var(--line);
+  position: relative;
+}
+.week-row.has-spine {
+  grid-template-columns: minmax(1.15rem, auto) 1fr 1fr 1fr 1fr 1fr 1fr 1fr;
+}
+.week-row:last-child {
+  border-bottom: 0;
+}
+
+/* Day background box (reuses .calendar-day so cell-count / other-month / today
+   tests keep working) — flattened here into a hairline grid cell. */
+.calendar-weeks .calendar-day {
+  border: 0 !important;
+  border-right: 1px solid var(--line-soft) !important;
+  border-radius: 0;
+  padding: 0;
+  min-height: 0;
+  z-index: 0;
+}
+.calendar-weeks .calendar-day.last-col {
+  border-right: 0 !important;
+}
+.calendar-weeks .calendar-day.today {
+  border: 1px solid var(--focus) !important;
+  border-radius: 3px;
+}
+
+.mv-daynum {
+  font-family: var(--font-data);
+  font-size: 0.72rem;
+  color: var(--ink-2);
+  line-height: 1;
+  padding: 0.35rem 0 0 0.4rem;
+  z-index: 1;
+  pointer-events: none;
+  align-self: start;
+}
+.mv-daynum.today {
+  color: var(--focus);
+  font-weight: 600;
+}
+.mv-daynum.other-month {
+  opacity: 0.4;
+}
+
+.mv-timed {
+  display: flex;
+  flex-direction: column;
+  gap: 0.1rem;
+  min-width: 0;
+  min-height: 0;
+  padding: 0.15rem 0.3rem 0.3rem;
+  overflow: hidden;
+  z-index: 1;
+  align-content: flex-start;
+}
+.mv-timed.other-month {
+  opacity: 0.45;
+}
+.mv-timed .event-overflow-indicator {
+  text-align: left;
+  background: transparent;
+  padding: 0.05rem 0.1rem;
+  font-family: var(--font-data);
+  font-size: 0.58rem;
+  letter-spacing: 0.02em;
+}
+
+/* The band overlays the lane rows; individual ribbons place themselves. */
+.mv-band {
+  display: grid;
+  align-content: center;
+  gap: 3px;
+  padding: 0 0.15rem;
+  z-index: 2;
+  pointer-events: none;
+}
+.mv-band :deep(.ribbon) {
+  pointer-events: auto;
 }
 
 /* Responsive styles for smaller screens and portrait mode */

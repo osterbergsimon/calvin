@@ -49,6 +49,23 @@ export function useEventHelpers() {
   };
 
   /**
+   * Format just the start time (HH:MM) — used by the compact month-view
+   * timed-event rows where the end time would be noise.
+   */
+  const formatEventStartTime = event => {
+    if (event.all_day) {
+      return "";
+    }
+    const start = new Date(event.start);
+    const timeFormat = configStore.timeFormat || "24h";
+    const timeOptions =
+      timeFormat === "24h"
+        ? { hour: "2-digit", minute: "2-digit", hour12: false }
+        : { hour: "numeric", minute: "2-digit", hour12: true };
+    return start.toLocaleTimeString("en-US", timeOptions);
+  };
+
+  /**
    * Get event title with time for tooltip
    */
   const getEventTitle = event => {
@@ -100,6 +117,7 @@ export function useEventHelpers() {
   return {
     getEventColor,
     formatEventTime,
+    formatEventStartTime,
     getEventTitle,
     truncateEventTitle,
     getEventDisplayText,
