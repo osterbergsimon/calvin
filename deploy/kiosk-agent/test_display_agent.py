@@ -600,3 +600,24 @@ def test_apply_mode_skips_when_no_output_found(monkeypatch):
     result = agent.apply_mode(None, "1920x1080")
     assert result is None
     assert calls == []
+
+
+def test_running_version_reads_state_file(tmp_path):
+    (tmp_path / "agent-version.json").write_text('{"version": "abc123def4560000"}')
+    assert agent.running_version(str(tmp_path)) == "abc123def4560000"
+
+
+def test_running_version_missing_is_none(tmp_path):
+    assert agent.running_version(str(tmp_path)) is None
+
+
+def test_config_url_appends_agent_report():
+    url = agent._config_url("http://s:8000", "k1", "pi", kagent="v9", kstat="ok")
+    assert "kagent=v9" in url and "kstat=ok" in url and "khost=pi" in url
+
+
+def test_check_python_below_floor_exits(monkeypatch):
+    monkeypatch.setattr(agent.sys, "version_info", (3, 8, 0))
+    import pytest
+    with pytest.raises(SystemExit):
+        agent.check_python()

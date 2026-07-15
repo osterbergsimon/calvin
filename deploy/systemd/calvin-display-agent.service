@@ -11,6 +11,7 @@ EnvironmentFile=/etc/default/calvin-kiosk
 Environment="DISPLAY=:0"
 Environment="XAUTHORITY=/home/calvin/.Xauthority"
 ExecStart=/usr/bin/python3 /usr/local/bin/calvin_display_agent.py
+RuntimeDirectory=calvin
 Restart=always
 RestartSec=10
 StandardOutput=journal

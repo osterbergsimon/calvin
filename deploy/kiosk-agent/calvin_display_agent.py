@@ -23,6 +23,38 @@ except ImportError:  # pragma: no cover - py<3.9
     ZoneInfo = None
 
 
+MIN_PYTHON = (3, 9)
+STATE_DIR = "/var/lib/calvin"
+READY_MARKER = "/run/calvin/agent-ready"
+
+
+def check_python():
+    if sys.version_info[:2] < MIN_PYTHON:
+        got = ".".join(map(str, sys.version_info[:3]))
+        need = ".".join(map(str, MIN_PYTHON))
+        log(f"python {got} is below the required {need}; refusing to start")
+        sys.exit(1)
+
+
+def running_version(state_dir=STATE_DIR):
+    """Return the applied bundle version from the state file, or None."""
+    try:
+        with open(os.path.join(state_dir, "agent-version.json")) as f:
+            return json.load(f).get("version")
+    except (OSError, ValueError):
+        return None
+
+
+def touch_ready(marker=READY_MARKER):
+    """Signal 'this agent booted and reached the backend' for the updater health check."""
+    try:
+        os.makedirs(os.path.dirname(marker), exist_ok=True)
+        with open(marker, "w") as f:
+            f.write("ok")
+    except OSError:
+        pass
+
+
 def cfg_get(cfg, *keys, default=None):
     """First non-None value among keys (snake_case preferred, camelCase fallback)."""
     for k in keys:
@@ -128,22 +160,30 @@ def log(msg):
     print(f"[calvin-display-agent] {msg}", flush=True)
 
 
-def _config_url(backend_url, kiosk_id, host):
+def _config_url(backend_url, kiosk_id, host, kagent=None, kstat=None):
     """Effective-config URL: per-kiosk endpoint when a kiosk id is set, else global."""
     base = backend_url.rstrip("/")
     if kiosk_id:
-        encoded_host = urllib.parse.quote(host, safe="") if host else ""
-        q = f"khost={encoded_host}" if encoded_host else ""
+        params = {}
+        if host:
+            params["khost"] = host
+        if kagent:
+            params["kagent"] = kagent
+        if kstat:
+            params["kstat"] = kstat
+        q = urllib.parse.urlencode(params, quote_via=urllib.parse.quote)
         return f"{base}/api/kiosks/{kiosk_id}/config" + (f"?{q}" if q else "")
     return base + "/api/config"
 
 
-def fetch_config(backend_url):
+def fetch_config(backend_url, kstat="ok"):
     kiosk_id = os.environ.get("CALVIN_KIOSK_ID", "").strip()
     host = os.environ.get("CALVIN_KIOSK_HOSTNAME", "").strip() or socket.gethostname()
-    url = _config_url(backend_url, kiosk_id, host)
+    url = _config_url(backend_url, kiosk_id, host, kagent=running_version(), kstat=kstat)
     with urllib.request.urlopen(url, timeout=HTTP_TIMEOUT) as r:
-        return json.load(r)
+        cfg = json.load(r)
+    touch_ready()
+    return cfg
 
 
 def now_in(cfg):
@@ -359,6 +399,7 @@ def apply_device_physical(
 
 
 def main():
+    check_python()
     backend = os.environ.get("CALVIN_BACKEND_URL", "").strip()
     if not backend:
         log("CALVIN_BACKEND_URL not set")
