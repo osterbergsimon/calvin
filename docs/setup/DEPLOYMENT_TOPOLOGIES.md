@@ -154,6 +154,36 @@ the display-agent applies them via `xrandr` at startup and whenever the per-kios
 changes. Then `sudo systemctl restart calvin-display-agent.service`. This replaces the
 old backend-side `display_orientation_service`, which cannot reach a remote kiosk's display. (Per-device settings are tracked under epic `calvin-dd9`.)
 
+### Kiosk agent self-update
+
+The small Python display-agent and its systemd units that `setup-kiosk.sh`
+installs can be updated remotely without re-running setup or SSHing into the Pi.
+
+**Flow:** Settings → Kiosks → click **Update** → the backend sets a
+per-kiosk `agentUpdateRequested` flag → the kiosk picks it up on its next
+config poll → it fires the root oneshot `calvin-kiosk-update.service` →
+`update-kiosk.sh` fetches the bundle from
+`${CALVIN_BACKEND_URL}/api/kiosks/agent/*`, verifies sha256 (+ `py_compile`
+for Python files), backs up the current files, atomic-swaps only changed files,
+restarts only the affected units, and auto-rolls-back if the agent doesn't come
+up healthy within 30 seconds.
+
+The **bundle source is the local Calvin server** — the kiosk needs no internet
+access and carries no full repo checkout. Six files make up the bundle: the
+display-agent script, three systemd units, the updater script, and the oneshot
+update service unit.
+
+**`min_python` floor:** the manifest carries `"min_python": "3.9"`. If the
+kiosk's Python is below 3.9 the update is aborted (status: "device python <
+3.9; keeping current agent") — the kiosk needs an OS upgrade before it can
+accept a newer bundle. The same floor is enforced at startup: the agent exits
+immediately on Python < 3.9.
+
+For full details — health-check readiness marker, sudoers fragment, auto-clear
+of the flag, initial bundle install, and the `zipapp` future option — see the
+[Kiosk agent self-update](KIOSK_PROVISIONING.md#kiosk-agent-self-update)
+section in `KIOSK_PROVISIONING.md`.
+
 ### Kiosk identity
 
 Each kiosk Pi has a stable **`CALVIN_KIOSK_ID`** in `/etc/default/calvin-kiosk`,
