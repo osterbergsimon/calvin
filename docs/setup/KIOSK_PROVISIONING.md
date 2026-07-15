@@ -129,9 +129,12 @@ new copy is adopted it is verified up front — `bash -n` for syntax and a read-
 `--self-check` run (which fetches and parses the manifest but changes nothing). If either
 fails, the whole update aborts before anything is swapped and the current, known-good updater
 stays installed. This is what makes it safe to evolve the updater remotely: a dead-on-arrival
-updater is never installed. A new updater that starts cleanly but misbehaves only mid-apply is
-not caught by this check; the durable no-retry guard (`agent-update-state.json`) prevents such
-a version from re-triggering in a loop.
+updater is never installed. `--self-check` validates the new code against the *current*
+manifest and environment, so it proves the updater starts and can parse today's manifest — a
+new updater that misbehaves only mid-apply, or that expects a future manifest shape or a new
+env var, is only partially exercised. That residual gap is bounded by the durable no-retry
+guard (`agent-update-state.json`), which prevents a failing version from re-triggering in a
+loop.
 
 ### Python version floor (`min_python`)
 
