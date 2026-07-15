@@ -83,64 +83,83 @@
           :class="{
             'agenda-view': isAgenda,
             'day-view': viewMode === 'day',
+            'show-week-numbers': showWeekNumbers && !isAgenda && viewMode !== 'day',
             loading: loading,
           }"
         >
           <!-- Day headers -->
           <div class="calendar-weekdays" :style="rollingColumnStyle">
+            <div v-if="showWeekNumbers && !isAgenda && viewMode !== 'day'" class="week-spine-head">
+              wk
+            </div>
             <div v-for="header in weekdayHeaders" :key="header.key" class="weekday">
               {{ header.label }}
             </div>
           </div>
           <!-- Calendar days -->
           <div class="calendar-days" :style="rollingColumnStyle">
-            <div
-              v-for="(day, dayIndex) in calendarDays"
-              :key="day.date.toISOString()"
-              :class="[
-                'calendar-day',
-                {
-                  'other-month': day.otherMonth,
-                  today: day.isToday,
-                  'week-start': isWeekStart(dayIndex),
-                  weekend: isWeekend(day.date),
-                  'red-day': showRedDays && isRedDay(day.date),
-                },
-              ]"
-            >
-              <div class="day-header">
-                <div class="day-number">
-                  {{ day.date.getDate() }}
+            <template v-for="(day, dayIndex) in calendarDays" :key="day.date.toISOString()">
+              <!-- Week-number spine: one tick per row, left of the month grid -->
+              <div
+                v-if="showWeekNumbers && !isAgenda && viewMode !== 'day' && isWeekStart(dayIndex)"
+                class="week-spine"
+                :class="{ 'current-week': isCurrentWeek(dayIndex) }"
+                :aria-label="`Week ${getWeekNumberForDay(dayIndex)}`"
+              >
+                <span class="week-spine-num">{{ getWeekNumberForDay(dayIndex) }}</span>
+              </div>
+              <div
+                :class="[
+                  'calendar-day',
+                  {
+                    'other-month': day.otherMonth,
+                    today: day.isToday,
+                    'week-start': isWeekStart(dayIndex),
+                    weekend: isWeekend(day.date),
+                    'red-day': showRedDays && isRedDay(day.date),
+                  },
+                ]"
+              >
+                <div class="day-header">
+                  <div class="day-number">
+                    {{ day.date.getDate() }}
+                  </div>
+                  <!-- Agenda/day layouts keep the inline chip (no row to label) -->
+                  <div
+                    v-if="
+                      showWeekNumbers && (isAgenda || viewMode === 'day') && isWeekStart(dayIndex)
+                    "
+                    class="week-number"
+                  >
+                    {{ getWeekNumberForDay(dayIndex) }}
+                  </div>
                 </div>
-                <div v-if="showWeekNumbers && isWeekStart(dayIndex)" class="week-number">
-                  {{ getWeekNumberForDay(dayIndex) }}
+                <div class="day-events">
+                  <!-- Visible events for this day (limited) -->
+                  <CalendarEventItem
+                    v-for="(event, eventIndex) in getVisibleEvents(day.events)"
+                    :key="`${event.id}-${day.date.toISOString()}-${eventIndex}`"
+                    :ref="el => setEventRef(el, dayIndex, eventIndex)"
+                    :event="event"
+                    :day-index="dayIndex"
+                    :event-index="eventIndex"
+                    :day-date="day.date"
+                    :is-focused="isFocused(dayIndex, eventIndex)"
+                    :is-selected="isEventSelected(event, day.date)"
+                    @click="selectEvent"
+                    @focus="setFocusedEvent"
+                  />
+                  <!-- Overflow indicator -->
+                  <div
+                    v-if="getOverflowCount(day.events) > 0"
+                    class="event-overflow-indicator"
+                    :title="`${getOverflowCount(day.events)} more event${getOverflowCount(day.events) > 1 ? 's' : ''}`"
+                  >
+                    +{{ getOverflowCount(day.events) }} more
+                  </div>
                 </div>
               </div>
-              <div class="day-events">
-                <!-- Visible events for this day (limited) -->
-                <CalendarEventItem
-                  v-for="(event, eventIndex) in getVisibleEvents(day.events)"
-                  :key="`${event.id}-${day.date.toISOString()}-${eventIndex}`"
-                  :ref="el => setEventRef(el, dayIndex, eventIndex)"
-                  :event="event"
-                  :day-index="dayIndex"
-                  :event-index="eventIndex"
-                  :day-date="day.date"
-                  :is-focused="isFocused(dayIndex, eventIndex)"
-                  :is-selected="isEventSelected(event, day.date)"
-                  @click="selectEvent"
-                  @focus="setFocusedEvent"
-                />
-                <!-- Overflow indicator -->
-                <div
-                  v-if="getOverflowCount(day.events) > 0"
-                  class="event-overflow-indicator"
-                  :title="`${getOverflowCount(day.events)} more event${getOverflowCount(day.events) > 1 ? 's' : ''}`"
-                >
-                  +{{ getOverflowCount(day.events) }} more
-                </div>
-              </div>
-            </div>
+            </template>
           </div>
         </div>
       </div>
@@ -750,6 +769,15 @@ const getWeekNumberForDay = dayIndex => {
   const weekStart = getWeekStart(day.date);
   const weekNum = getWeekNumber(weekStart);
   return weekNum;
+};
+
+// Helper: does the week starting at dayIndex contain today?
+const isCurrentWeek = dayIndex => {
+  const end = Math.min(dayIndex + 7, calendarDays.value.length);
+  for (let i = dayIndex; i < end; i++) {
+    if (calendarDays.value[i]?.isToday) return true;
+  }
+  return false;
 };
 
 // Helper function to check if a date is a weekend day
@@ -1536,6 +1564,53 @@ onActivated(() => {
   line-height: 1.35;
   white-space: nowrap;
   align-self: flex-start;
+}
+
+/* Week-number spine: a ruler down the left edge of the month grid, one tick per
+   week row. The gutter column is added to both header + day grids by the
+   .show-week-numbers modifier (month layout only — agenda/day keep the chip). */
+.calendar-grid.show-week-numbers .calendar-weekdays,
+.calendar-grid.show-week-numbers .calendar-days {
+  grid-template-columns: minmax(1.15rem, auto) 1fr 1fr 1fr 1fr 1fr 1fr 1fr !important;
+}
+
+.week-spine-head {
+  display: flex;
+  align-items: flex-end;
+  justify-content: center;
+  font-family: var(--font-data);
+  font-size: 0.55rem;
+  font-weight: 600;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--ink-2);
+  opacity: 0.6;
+  padding: 0.5rem 0;
+  border-right: 1px solid var(--line);
+  min-width: 0;
+}
+
+.week-spine {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border-right: 1px solid var(--line);
+  min-width: 0;
+}
+
+.week-spine-num {
+  font-family: var(--font-data);
+  font-size: 0.62rem;
+  font-weight: 600;
+  letter-spacing: 0.02em;
+  line-height: 1.2;
+  color: var(--ink-2);
+  font-variant-numeric: tabular-nums;
+  white-space: nowrap;
+}
+
+.week-spine.current-week .week-spine-num {
+  color: var(--focus);
 }
 
 .day-events {
