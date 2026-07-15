@@ -50,5 +50,14 @@ export const useKiosksStore = defineStore("kiosks", () => {
     await loadKiosks();
   }
 
-  return { kiosks, loadKiosks, fetchOverrides, saveOverrides, fetchDeviceConfigVersion, triggerUpdate };
+  async function fetchAvailableAgentVersion() {
+    try {
+      const response = await axios.get("/api/kiosks/agent/manifest");
+      return response.data?.version ?? null;
+    } catch {
+      return null; // fail-open — caller degrades gracefully
+    }
+  }
+
+  return { kiosks, loadKiosks, fetchOverrides, saveOverrides, fetchDeviceConfigVersion, triggerUpdate, fetchAvailableAgentVersion };
 });
