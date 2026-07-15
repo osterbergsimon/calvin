@@ -16,6 +16,7 @@ class BundleFile:
     target_path: str
     mode: str
     restart_unit: str | None
+    enable: bool = False
 
 
 BUNDLE_FILES: list[BundleFile] = [
@@ -32,6 +33,7 @@ BUNDLE_FILES: list[BundleFile] = [
         "/etc/systemd/system/calvin-display-agent.service",
         "0644",
         "calvin-display-agent.service",
+        enable=True,
     ),
     BundleFile(
         "calvin-kiosk-remote.service",
@@ -39,6 +41,7 @@ BUNDLE_FILES: list[BundleFile] = [
         "/etc/systemd/system/calvin-kiosk-remote.service",
         "0644",
         "calvin-kiosk-remote.service",
+        enable=True,
     ),
     BundleFile(
         "calvin-x.service",
@@ -46,6 +49,7 @@ BUNDLE_FILES: list[BundleFile] = [
         "/etc/systemd/system/calvin-x.service",
         "0644",
         "calvin-x.service",
+        enable=True,
     ),
     BundleFile(
         "update-kiosk.sh",
@@ -91,6 +95,7 @@ def build_manifest(root: Path | None = None) -> dict:
                 "mode": bf.mode,
                 "target_path": bf.target_path,
                 "restart_unit": bf.restart_unit,
+                "enable": bf.enable,
             }
         )
     return {"version": _version_from(files), "min_python": MIN_PYTHON, "files": files}

@@ -2,78 +2,59 @@
 set -euo pipefail
 here="$(dirname "$0")"
 tmp="$(mktemp -d)"; trap 'rm -rf "$tmp"' EXIT
-mkdir -p "$tmp/bin" "$tmp/dest" "$tmp/state"
+mkdir -p "$tmp/bin"
+export MARKER="$tmp/bootstrapped"
 
-# The agent body that the mock curl will serve
-AGENT_BODY="AGENT-BODY"
-
-# Compute the REAL sha256 of the bytes the mock curl will serve.
-# The mock uses: printf '%s\n' "$AGENT_BODY" > outfile  (adds a newline)
-AGENT_SHA="$(printf '%s\n' "$AGENT_BODY" | sha256sum | cut -d' ' -f1)"
-
-# Mock manifest: sha256 matches what curl will serve
-cat > "$tmp/manifest.json" <<EOF
-{"version":"feedfacefeedface","min_python":"3.9","files":[
- {"name":"calvin_display_agent.py","sha256":"${AGENT_SHA}","mode":"0755","target_path":"$tmp/dest/agent.py","restart_unit":"calvin-display-agent.service"}]}
-EOF
-
-# Mock manifest with WRONG sha256 for the negative/checksum-mismatch test
-BAD_SHA="0000000000000000000000000000000000000000000000000000000000000000"
-cat > "$tmp/manifest-bad-sha.json" <<EOF
-{"version":"feedfacefeedface","min_python":"3.9","files":[
- {"name":"calvin_display_agent.py","sha256":"${BAD_SHA}","mode":"0755","target_path":"$tmp/dest/agent.py","restart_unit":"calvin-display-agent.service"}]}
-EOF
-
-# State variable to let the mock curl switch manifests
-MANIFEST_FILE="$tmp/manifest.json"
-
-cat > "$tmp/bin/curl" <<'CURL_EOF'
+# Stub updater the shim will fetch + run. On --bootstrap it records the backend url.
+cat > "$tmp/updater.sh" <<'UEOF'
 #!/usr/bin/env bash
-# Parse -o <file> flag if present
-outfile=""
-url=""
-args=("$@")
-i=0
-while [ $i -lt ${#args[@]} ]; do
-    case "${args[$i]}" in
-        -o) i=$((i+1)); outfile="${args[$i]}";;
-        -o*) outfile="${args[$i]#-o}";;
-        http*) url="${args[$i]}";;
-    esac
-    i=$((i+1))
+[ "${1:-}" = "--bootstrap" ] && { echo "BOOTSTRAPPED $CALVIN_BACKEND_URL" > "$MARKER"; exit 0; }
+exit 1
+UEOF
+UPD_SHA="$(sha256sum "$tmp/updater.sh" | cut -d' ' -f1)"
+cat > "$tmp/manifest.json" <<EOF
+{"version":"setup00000000000","min_python":"3.9","files":[
+ {"name":"update-kiosk.sh","sha256":"${UPD_SHA}","mode":"0755","target_path":"/usr/local/bin/update-kiosk.sh","restart_unit":"","enable":false}]}
+EOF
+sed 's/'"${UPD_SHA}"'/0000000000000000000000000000000000000000000000000000000000000000/' \
+    "$tmp/manifest.json" > "$tmp/manifest-bad.json"
+
+cat > "$tmp/bin/curl" <<CEOF
+#!/usr/bin/env bash
+outfile=""; url=""
+args=("\$@"); i=0
+while [ \$i -lt \${#args[@]} ]; do
+  case "\${args[\$i]}" in
+    -o) i=\$((i+1)); outfile="\${args[\$i]}";;
+    http*) url="\${args[\$i]}";;
+  esac; i=\$((i+1))
 done
-emit() {
-    if [ -n "$outfile" ]; then printf '%s\n' "$1" > "$outfile"; else printf '%s\n' "$1"; fi
-}
-case "$url" in
-  */agent/manifest) cat "${MOCK_MANIFEST_FILE}"; exit 0;;
-  */agent/files/calvin_display_agent.py) emit "AGENT-BODY"; exit 0;;
+case "\$url" in
+  */agent/manifest)
+    body="\$(cat "\${MOCK_MANIFEST}")"
+    if [ -n "\$outfile" ]; then printf '%s' "\$body" > "\$outfile"; else printf '%s' "\$body"; fi;;
+  */agent/files/update-kiosk.sh)
+    if [ -n "\$outfile" ]; then cat "$tmp/updater.sh" > "\$outfile"; else cat "$tmp/updater.sh"; fi;;
+  *) exit 22;;
 esac
-exit 22
-CURL_EOF
+CEOF
 chmod +x "$tmp/bin/curl"; export PATH="$tmp/bin:$PATH"
 
 # shellcheck disable=SC1090
 . "$here/../setup-common.sh"
-export CALVIN_AGENT_STATE_DIR="$tmp/state"
 
-# --- Happy path: correct sha256 ---
-export MOCK_MANIFEST_FILE="$tmp/manifest.json"
-install_kiosk_bundle "http://server.local:8000" "$(id -un)"
+# --- Happy path: shim fetches + verifies + runs --bootstrap ---
+export MOCK_MANIFEST="$tmp/manifest.json"
+bootstrap_kiosk "http://server.local:8000"
+grep -q 'BOOTSTRAPPED http://server.local:8000' "$MARKER" || { echo "FAIL: --bootstrap not invoked with backend url"; exit 1; }
+echo "PASS bootstrap-shim-runs-updater"
 
-grep -q AGENT-BODY "$tmp/dest/agent.py" || { echo "FAIL: agent not installed from bundle"; exit 1; }
-grep -q feedfacefeedface "$tmp/state/agent-version.json" || { echo "FAIL: version not seeded"; exit 1; }
-echo "PASS happy-path (agent installed + version seeded + checksum verified)"
-
-# --- Negative: wrong sha256 in manifest should cause install_kiosk_bundle to fail ---
-rm -f "$tmp/dest/agent.py" "$tmp/state/agent-version.json"
-export MOCK_MANIFEST_FILE="$tmp/manifest-bad-sha.json"
-# Run in a subshell so that error_exit's `exit` doesn't terminate the test runner
-if ( export MOCK_MANIFEST_FILE="$tmp/manifest-bad-sha.json"
+# --- Negative: wrong updater sha in manifest aborts before running it ---
+rm -f "$MARKER"
+if ( export MOCK_MANIFEST="$tmp/manifest-bad.json"
      . "$here/../setup-common.sh"
-     export CALVIN_AGENT_STATE_DIR="$tmp/state"
-     install_kiosk_bundle "http://server.local:8000" "$(id -un)" ) 2>/dev/null; then
-    echo "FAIL: install_kiosk_bundle should have failed on checksum mismatch but succeeded"
-    exit 1
+     bootstrap_kiosk "http://server.local:8000" ) 2>/dev/null; then
+  echo "FAIL: bootstrap_kiosk should reject a bad updater checksum"; exit 1
 fi
-echo "PASS checksum-mismatch negative (install correctly rejected bad sha256)"
+[ ! -f "$MARKER" ] || { echo "FAIL: updater ran despite checksum mismatch"; exit 1; }
+echo "PASS bootstrap-shim-rejects-bad-sha"

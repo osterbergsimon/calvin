@@ -20,6 +20,7 @@ HEALTH_TIMEOUT="${CALVIN_UPDATE_HEALTH_TIMEOUT:-30}"
 BACKUP_DIR="${STATE_DIR}/agent-backup"
 VERSION_FILE="${STATE_DIR}/agent-version.json"
 STATE_FILE="${STATE_DIR}/agent-update-state.json"
+RECEIPT_FILE="${STATE_DIR}/agent-manifest.json"
 BASE="${CALVIN_BACKEND_URL%/}"
 
 log() { printf '[update-kiosk] %s\n' "$*"; }
@@ -36,17 +37,63 @@ if [ "${1:-}" = "--self-check" ]; then
   log "self-check: ok"; exit 0
 fi
 
+BOOTSTRAP=0
+if [ "${1:-}" = "--bootstrap" ]; then BOOTSTRAP=1; fi
+
 mkdir -p "$STATE_DIR"
 
 write_state() {  # status phase message [version]
   mkdir -p "$STATE_DIR"
   "$PYTHON" - "$1" "$2" "$3" "${4:-}" "$STATE_FILE" <<'PY'
-import json, sys
+import json, os, sys
 status, phase, message, version, path = sys.argv[1:6]
 d = {"status": status, "phase": phase, "message": message}
 if version:
     d["version"] = version
-json.dump(d, open(path, "w"))
+tmp = path + ".tmp"
+with open(tmp, "w") as fh:
+    json.dump(d, fh)
+os.replace(tmp, path)
+PY
+}
+
+write_version() {  # version
+  "$PYTHON" - "$1" "$VERSION_FILE" <<'PY'
+import json, os, sys
+version, path = sys.argv[1:3]
+tmp = path + ".tmp"
+with open(tmp, "w") as fh:
+    json.dump({"version": version}, fh)
+os.replace(tmp, path)
+PY
+}
+
+write_receipt() {  # reads $manifest from the environment
+  MANIFEST_JSON="$manifest" "$PYTHON" - "$RECEIPT_FILE" <<'PY'
+import json, os, sys
+path = sys.argv[1]
+m = json.loads(os.environ["MANIFEST_JSON"])
+files = [{"name": f["name"], "target_path": f["target_path"], "enable": bool(f.get("enable"))}
+         for f in m["files"]]
+out = {"version": m["version"], "files": files}
+tmp = path + ".tmp"
+with open(tmp, "w") as fh:
+    json.dump(out, fh)
+os.replace(tmp, path)
+PY
+}
+
+read_receipt_tsv() {
+  [ -f "$RECEIPT_FILE" ] || return 0
+  "$PYTHON" - "$RECEIPT_FILE" <<'PY' 2>/dev/null || true
+import json, sys
+try:
+    m = json.load(open(sys.argv[1]))
+    for f in m.get("files", []):
+        print("\t".join([f.get("name", ""), f.get("target_path", ""),
+                         "1" if f.get("enable") else "0"]))
+except Exception:
+    pass
 PY
 }
 
@@ -54,6 +101,7 @@ manifest="$("$CURL" -fsSL "$BASE/api/kiosks/agent/manifest")" || {
   write_state error fetch "manifest fetch failed"; log "manifest fetch failed"; exit 1; }
 
 version="$(printf '%s' "$manifest" | "$PYTHON" -c 'import sys,json;print(json.load(sys.stdin)["version"])')"
+ALL_NAMES=" $(printf '%s' "$manifest" | "$PYTHON" -c 'import sys,json;print(" ".join(f["name"] for f in json.load(sys.stdin)["files"]))') "
 
 # --- min_python precheck ---
 min_py="$(printf '%s' "$manifest" | "$PYTHON" -c 'import sys,json;print(json.load(sys.stdin).get("min_python",""))')"
@@ -63,24 +111,28 @@ if [ -n "$min_py" ]; then
     log "python-too-old (need ${min_py}); aborting"; exit 1
   fi
 fi
-# Emit one TAB-separated line per file: name sha256 mode target_path restart_unit
+# Emit one TAB-separated line per file: name sha256 mode target_path restart_unit enable
 files_tsv="$(printf '%s' "$manifest" | "$PYTHON" -c '
 import sys, json
 for f in json.load(sys.stdin)["files"]:
-    print("\t".join([f["name"], f["sha256"], f["mode"], f["target_path"], f.get("restart_unit") or ""]))')"
+    print("\t".join([f["name"], f["sha256"], f["mode"], f["target_path"],
+                     f.get("restart_unit") or "", "1" if f.get("enable") else ""]))')"
 
 write_state running fetch "checking bundle ${version}"
 STAGE="$(mktemp -d)"; trap 'rm -rf "$STAGE"' EXIT
 mkdir -p "$BACKUP_DIR"
 declare -a CHANGED_TARGET=() CHANGED_MODE=() CHANGED_NAME=()
 declare -A RESTART_UNITS=()
+declare -a NEW_ENABLE_UNITS=()
+declare -a DROPPED_TARGETS=()
 unit_changed=0
 
 installed_sha() { [ -f "$1" ] && sha256sum "$1" | cut -d' ' -f1 || echo ""; }
 
-while IFS=$'\t' read -r name sha mode target unit; do
+while IFS=$'\t' read -r name sha mode target unit enable; do
   [ -n "$name" ] || continue
-  if [ "$(installed_sha "$target")" = "$sha" ]; then continue; fi   # unchanged
+  old="$(installed_sha "$target")"
+  if [ "$old" = "$sha" ]; then continue; fi   # unchanged
   # fetch + verify
   "$CURL" -fsSL "$BASE/api/kiosks/agent/files/$name" > "$STAGE/$name" || {
     write_state error fetch "download failed: $name" "$version"; exit 1; }
@@ -98,11 +150,22 @@ while IFS=$'\t' read -r name sha mode target unit; do
   CHANGED_NAME+=("$name"); CHANGED_TARGET+=("$target"); CHANGED_MODE+=("$mode")
   [ -n "$unit" ] && RESTART_UNITS["$unit"]=1
   case "$target" in "$SYSTEMD_DIR"/*) unit_changed=1;; esac
+  if [ -z "$old" ] && [ "$enable" = "1" ]; then
+    case "$target" in "$SYSTEMD_DIR"/*.service) NEW_ENABLE_UNITS+=("$(basename "$target")");; esac
+  fi
 done <<< "$files_tsv"
 
-if [ "${#CHANGED_NAME[@]}" -eq 0 ]; then
+for u in "${NEW_ENABLE_UNITS[@]:-}"; do [ -n "$u" ] && unset 'RESTART_UNITS[$u]'; done
+
+while IFS=$'\t' read -r rname rtarget renable; do
+  [ -n "$rname" ] || continue
+  case "$ALL_NAMES" in *" $rname "*) : ;; *) DROPPED_TARGETS+=("$rtarget") ;; esac
+done < <(read_receipt_tsv)
+
+if [ "${#CHANGED_NAME[@]}" -eq 0 ] && [ "${#DROPPED_TARGETS[@]}" -eq 0 ]; then
   write_state success noop "already at ${version}" "$version"
-  "$PYTHON" -c 'import json,sys;json.dump({"version":sys.argv[1]},open(sys.argv[2],"w"))' "$version" "$VERSION_FILE"
+  write_version "$version"
+  write_receipt
   log "no changes; already ${version}"; exit 0
 fi
 
@@ -120,6 +183,38 @@ done
 [ "$unit_changed" = 1 ] && "$SYSTEMCTL" daemon-reload || true
 
 restart_all() { for u in "${!RESTART_UNITS[@]}"; do "$SYSTEMCTL" restart "$u"; done; }
+enable_units() { for u in "$@"; do "$SYSTEMCTL" enable "$u" || log "enable failed: $u"; done; }
+start_units()  { for u in "$@"; do "$SYSTEMCTL" start  "$u" || log "start failed: $u";  done; }
+
+if [ "$BOOTSTRAP" = 1 ]; then
+  # First-boot install: enable boot units; no restart, health, rollback, or decommission.
+  if [ "${#NEW_ENABLE_UNITS[@]}" -gt 0 ]; then
+    enable_units "${NEW_ENABLE_UNITS[@]}"
+  fi
+  write_version "$version"
+  write_receipt
+  write_state success bootstrap "installed ${version}" "$version"
+  log "bootstrap: installed ${version}"
+  exit 0
+fi
+
+decommission_drops() {
+  local removed_unit=0 t base
+  for t in "${DROPPED_TARGETS[@]:-}"; do
+    [ -n "$t" ] || continue
+    case "$t" in
+      "$SYSTEMD_DIR"/*.service)
+        base="$(basename "$t")"
+        "$SYSTEMCTL" stop "$base" 2>/dev/null || true
+        "$SYSTEMCTL" disable "$base" 2>/dev/null || true
+        removed_unit=1
+        ;;
+    esac
+    rm -f "$t"
+    log "decommissioned ${t}"
+  done
+  [ "$removed_unit" = 1 ] && "$SYSTEMCTL" daemon-reload || true
+}
 restart_all
 
 # --- health check (only meaningful when the agent was among the restarts) ---
@@ -151,6 +246,16 @@ if [ "$agent_restarted" = 1 ]; then
   fi
 fi
 
-"$PYTHON" -c 'import json,sys;json.dump({"version":sys.argv[1]},open(sys.argv[2],"w"))' "$version" "$VERSION_FILE"
+if [ "${#NEW_ENABLE_UNITS[@]}" -gt 0 ]; then
+  enable_units "${NEW_ENABLE_UNITS[@]}"
+  start_units "${NEW_ENABLE_UNITS[@]}"
+fi
+
+if [ "${#DROPPED_TARGETS[@]}" -gt 0 ]; then
+  decommission_drops
+fi
+
+write_version "$version"
+write_receipt
 write_state success complete "updated to ${version}" "$version"
 log "updated to ${version}"
