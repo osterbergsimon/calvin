@@ -87,9 +87,9 @@
             loading: loading,
           }"
         >
-          <!-- MONTH VIEW: week rows with a continuous spanning ribbon band.
-               Multi-day / all-day events become bars that hold a stable lane
-               across the week; timed events drop to a light per-day list. -->
+          <!-- MONTH VIEW: each week is a spanning ribbon strip sitting in the
+               gutter above its day cells (not overlaying them), then the day
+               cells with their numbers and a light timed-event list. -->
           <template v-if="isMonthView">
             <div class="calendar-weekdays month-weekdays">
               <div v-if="showWeekNumbers" class="week-spine-head">wk</div>
@@ -101,9 +101,9 @@
               <div
                 v-for="wk in monthWeeks"
                 :key="wk.weekIndex"
-                class="week-row"
-                :class="{ 'has-spine': showWeekNumbers }"
-                :style="{ gridTemplateRows: weekRowRows(wk) }"
+                class="week-unit"
+                :class="{ 'has-spine': showWeekNumbers, 'has-strip': wk.laneCount > 0 }"
+                :style="{ gridTemplateRows: weekUnitRows(wk) }"
               >
                 <div
                   v-if="showWeekNumbers"
@@ -115,34 +115,39 @@
                   <span class="week-spine-num">{{ wk.weekNumber }}</span>
                 </div>
 
-                <template v-for="day in wk.days" :key="day.date.toISOString()">
-                  <!-- Day background box (also the target of existing cell tests) -->
-                  <div
-                    class="calendar-day"
-                    :class="{
-                      'other-month': day.otherMonth,
-                      today: day.isToday,
-                      weekend: isWeekend(day.date),
-                      'red-day': showRedDays && isRedDay(day.date),
-                      'last-col': day.col === 6,
-                    }"
-                    :style="{ gridColumn: dayGridColumn(day.col), gridRow: '1 / -1' }"
-                  ></div>
-                  <div
-                    class="mv-daynum"
-                    :class="{ 'other-month': day.otherMonth, today: day.isToday }"
-                    :style="{ gridColumn: dayGridColumn(day.col), gridRow: '1' }"
-                  >
-                    {{ day.date.getDate() }}
+                <!-- Ribbon strip: a dedicated band above the day cells -->
+                <div v-if="wk.laneCount > 0" class="mv-strip" :style="stripStyle(wk)">
+                  <CalendarRibbon
+                    v-for="seg in wk.ribbons"
+                    :key="seg.focusKey"
+                    :ref="el => setMonthRef(el, seg.focusKey)"
+                    :ribbon="seg"
+                    :date="seg.date"
+                    :is-focused="isMonthFocused(seg.focusKey)"
+                    :is-selected="isEventSelected(seg.event, seg.date)"
+                    @click="selectEvent"
+                    @focus="() => setMonthFocus(seg.focusKey)"
+                  />
+                </div>
+
+                <!-- Day cells -->
+                <div
+                  v-for="day in wk.days"
+                  :key="day.date.toISOString()"
+                  class="calendar-day"
+                  :class="{
+                    'other-month': day.otherMonth,
+                    today: day.isToday,
+                    weekend: isWeekend(day.date),
+                    'red-day': showRedDays && isRedDay(day.date),
+                    'last-col': day.col === 6,
+                  }"
+                  :style="{ gridColumn: dayGridColumn(day.col), gridRow: wk.laneCount ? '2' : '1' }"
+                >
+                  <div class="day-header">
+                    <div class="day-number">{{ day.date.getDate() }}</div>
                   </div>
-                  <div
-                    class="mv-timed"
-                    :class="{ 'other-month': day.otherMonth }"
-                    :style="{
-                      gridColumn: dayGridColumn(day.col),
-                      gridRow: String(2 + wk.laneCount),
-                    }"
-                  >
+                  <div class="mv-timed">
                     <CalendarTimedEvent
                       v-for="item in day.timed"
                       :key="item.focusKey"
@@ -162,21 +167,6 @@
                       +{{ day.hiddenCount }} more
                     </div>
                   </div>
-                </template>
-
-                <!-- The band overlays the lane rows across all seven day columns -->
-                <div v-if="wk.laneCount > 0" class="mv-band" :style="bandGridStyle(wk)">
-                  <CalendarRibbon
-                    v-for="seg in wk.ribbons"
-                    :key="seg.focusKey"
-                    :ref="el => setMonthRef(el, seg.focusKey)"
-                    :ribbon="seg"
-                    :date="seg.date"
-                    :is-focused="isMonthFocused(seg.focusKey)"
-                    :is-selected="isEventSelected(seg.event, seg.date)"
-                    @click="selectEvent"
-                    @focus="() => setMonthFocus(seg.focusKey)"
-                  />
                 </div>
               </div>
             </div>
@@ -884,15 +874,17 @@ const monthWeeks = computed(() => {
 // 1-based grid column for a day, accounting for the optional week-number spine.
 const dayGridColumn = col => String((showWeekNumbers.value ? 2 : 1) + col);
 
-// Row track template: a day-number row, one row per lane, then the timed list.
-const weekRowRows = wk => `auto ${"minmax(1.35rem, auto) ".repeat(wk.laneCount)}1fr`;
+// A week is a ribbon strip (auto height, sized to its lanes) above the day
+// cells (1fr). No strip row when the week has no spanning events.
+const weekUnitRows = wk => (wk.laneCount ? "auto 1fr" : "1fr");
 
-// Place + shape the ribbon band so it overlays exactly the seven day columns.
-const bandGridStyle = wk => ({
+// The strip spans the seven day columns and lays its ribbons out on lane rows.
+const RIBBON_LANE_HEIGHT = "0.95rem";
+const stripStyle = wk => ({
   gridColumn: `${dayGridColumn(0)} / span 7`,
-  gridRow: `2 / span ${wk.laneCount}`,
+  gridRow: "1",
   gridTemplateColumns: "repeat(7, 1fr)",
-  gridTemplateRows: `repeat(${wk.laneCount}, 1fr)`,
+  gridTemplateRows: `repeat(${wk.laneCount}, ${RIBBON_LANE_HEIGHT})`,
 });
 
 // Focus model for month view. Ribbons and timed rows aren't per-(day,index)
@@ -1810,11 +1802,11 @@ onActivated(() => {
   flex-shrink: 0;
 }
 
-/* ===== Month view: week rows + continuous ribbon band =====================
-   Each week is its own grid. Day background boxes span every row of the week;
-   the day number sits on the top row, the ribbon band occupies the lane rows,
-   and the timed list fills the bottom. Bars cross the hairline day dividers so
-   a multi-day event reads as one continuous span, not a row of stitched chips. */
+/* ===== Month view: ribbon strip above the day cells =======================
+   Each week is a grid: a spanning ribbon strip in the gutter above the day
+   cells (never overlaying them, so it can't collide with the today border),
+   then the day cells with their numbers and a light timed-event list. Bars
+   cross the hairline day dividers so a multi-day event reads as one span. */
 .month-weekdays {
   gap: 0 !important;
 }
@@ -1835,30 +1827,31 @@ onActivated(() => {
   overflow: hidden;
 }
 
-.week-row {
+.week-unit {
   display: grid;
   grid-template-columns: 1fr 1fr 1fr 1fr 1fr 1fr 1fr;
   flex: 1;
   min-height: 0;
   border-bottom: 1px solid var(--line);
-  position: relative;
 }
-.week-row.has-spine {
+.week-unit.has-spine {
   grid-template-columns: minmax(1.15rem, auto) 1fr 1fr 1fr 1fr 1fr 1fr 1fr;
 }
-.week-row:last-child {
+.week-unit:last-child {
   border-bottom: 0;
 }
 
-/* Day background box (reuses .calendar-day so cell-count / other-month / today
-   tests keep working) — flattened here into a hairline grid cell. */
+/* Day cell: a clean flex container (reuses .calendar-day so cell-count /
+   other-month / today tests keep working). */
 .calendar-weeks .calendar-day {
   border: 0 !important;
   border-right: 1px solid var(--line-soft) !important;
   border-radius: 0;
-  padding: 0;
+  padding: 0.15rem 0.3rem 0.3rem;
   min-height: 0;
-  z-index: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 0.15rem;
 }
 .calendar-weeks .calendar-day.last-col {
   border-right: 0 !important;
@@ -1867,23 +1860,19 @@ onActivated(() => {
   border: 1px solid var(--focus) !important;
   border-radius: 3px;
 }
-
-.mv-daynum {
+.calendar-weeks .calendar-day .day-header {
+  margin-bottom: 0;
+  min-height: 0;
+}
+.calendar-weeks .calendar-day .day-number {
   font-family: var(--font-data);
   font-size: 0.72rem;
+  font-weight: 500;
   color: var(--ink-2);
-  line-height: 1;
-  padding: 0.35rem 0 0 0.4rem;
-  z-index: 1;
-  pointer-events: none;
-  align-self: start;
 }
-.mv-daynum.today {
+.calendar-weeks .calendar-day.today .day-number {
   color: var(--focus);
   font-weight: 600;
-}
-.mv-daynum.other-month {
-  opacity: 0.4;
 }
 
 .mv-timed {
@@ -1892,13 +1881,8 @@ onActivated(() => {
   gap: 0.1rem;
   min-width: 0;
   min-height: 0;
-  padding: 0.15rem 0.3rem 0.3rem;
   overflow: hidden;
-  z-index: 1;
   align-content: flex-start;
-}
-.mv-timed.other-month {
-  opacity: 0.45;
 }
 .mv-timed .event-overflow-indicator {
   text-align: left;
@@ -1909,17 +1893,13 @@ onActivated(() => {
   letter-spacing: 0.02em;
 }
 
-/* The band overlays the lane rows; individual ribbons place themselves. */
-.mv-band {
+/* Ribbon strip: a dedicated band in the gutter above the day cells. */
+.mv-strip {
   display: grid;
   align-content: center;
-  gap: 3px;
-  padding: 0 0.15rem;
-  z-index: 2;
-  pointer-events: none;
-}
-.mv-band :deep(.ribbon) {
-  pointer-events: auto;
+  row-gap: 2px;
+  padding: 0.15rem 0.15rem 0.05rem;
+  min-width: 0;
 }
 
 /* Responsive styles for smaller screens and portrait mode */

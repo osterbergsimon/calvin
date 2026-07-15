@@ -97,12 +97,12 @@ const handleFocus = () => emit("focus", props.ribbon);
 .ribbon {
   display: flex;
   align-items: center;
-  gap: 0.3rem;
+  gap: 0.28rem;
   height: 100%;
   min-width: 0;
-  padding: 0 0.5rem;
+  padding: 0 0.45rem;
   font-family: var(--font-display);
-  font-size: 0.72rem;
+  font-size: 0.64rem;
   font-weight: 500;
   line-height: 1;
   color: var(--ink);
@@ -114,8 +114,8 @@ const handleFocus = () => emit("focus", props.ribbon);
   /* Tinted glass, not paint: the source hue reads as a wash with a solid edge. */
   background: color-mix(in srgb, var(--ribbon-hue) 26%, var(--bg-1));
   border: 1px solid color-mix(in srgb, var(--ribbon-hue) 55%, transparent);
-  border-left: 3px solid var(--ribbon-hue);
-  border-radius: 4px;
+  border-left: 2px solid var(--ribbon-hue);
+  border-radius: 3px;
   transition:
     background 0.15s,
     box-shadow 0.15s;
@@ -150,7 +150,7 @@ const handleFocus = () => emit("focus", props.ribbon);
   margin-left: auto;
   flex-shrink: 0;
   font-family: var(--font-data);
-  font-size: 0.58rem;
+  font-size: 0.54rem;
   letter-spacing: 0.02em;
   color: var(--ink-2);
 }
