@@ -247,9 +247,7 @@ class TestSecurityHeaders:
             "app.middleware.security_headers.get_plugin_browser_origins",
             new=AsyncMock(return_value=["cast.example.com"]),
         ):
-            csp = security_test_client.get("/api/health").headers.get(
-                "content-security-policy", ""
-            )
+            csp = security_test_client.get("/api/health").headers.get("content-security-policy", "")
 
         assert "img-src 'self' data: cast.example.com" in csp
         assert "connect-src 'self' cast.example.com" in csp
