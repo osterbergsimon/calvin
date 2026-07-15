@@ -156,14 +156,10 @@ export const useImagesStore = defineStore("images", () => {
 
   const getImageUrl = image => {
     if (!image) return null;
-    // For remote images (like Picsum, Unsplash), use the URL directly
-    // This avoids unnecessary backend redirects and improves performance
-    const imageUrl = image.url || image.raw_url;
-    if (imageUrl && (imageUrl.startsWith("http://") || imageUrl.startsWith("https://"))) {
-      return imageUrl;
-    }
-
-    // For local images, use the API endpoint
+    // Always serve images through the Calvin server proxy (/api/images/{id}).
+    // Remote CDN URLs (picsum/unsplash/nasa-apod) are cached + served by the
+    // backend so the kiosk browser never contacts an external origin directly.
+    // See docs/superpowers/specs/2026-07-15-offline-kiosks-csp-design.md.
     return `/api/images/${image.id}`;
   };
 
