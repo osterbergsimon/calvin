@@ -87,9 +87,9 @@
             loading: loading,
           }"
         >
-          <!-- MONTH VIEW: each week is a spanning ribbon strip sitting in the
-               gutter above its day cells (not overlaying them), then the day
-               cells with their numbers and a light timed-event list. -->
+          <!-- MONTH VIEW: the day-cell rows are uniform height (flex:1); each
+               week's spanning ribbons ride a compact strip that sits in the
+               seam between weeks, so events never shrink the day rows. -->
           <template v-if="isMonthView">
             <div class="calendar-weekdays month-weekdays">
               <div v-if="showWeekNumbers" class="week-spine-head">wk</div>
@@ -98,25 +98,14 @@
               </div>
             </div>
             <div class="calendar-weeks">
-              <div
-                v-for="wk in monthWeeks"
-                :key="wk.weekIndex"
-                class="week-unit"
-                :class="{ 'has-spine': showWeekNumbers, 'has-strip': wk.laneCount > 0 }"
-                :style="{ gridTemplateRows: weekUnitRows(wk) }"
-              >
+              <template v-for="wk in monthWeeks" :key="wk.weekIndex">
+                <!-- Ribbon strip: a compact band in the seam above this week -->
                 <div
-                  v-if="showWeekNumbers"
-                  class="week-spine"
-                  :class="{ 'current-week': wk.isCurrent }"
-                  :style="{ gridColumn: '1', gridRow: '1 / -1' }"
-                  :aria-label="`Week ${wk.weekNumber}`"
+                  v-if="wk.laneCount > 0"
+                  class="mv-strip"
+                  :class="{ 'has-spine': showWeekNumbers }"
+                  :style="stripStyle(wk)"
                 >
-                  <span class="week-spine-num">{{ wk.weekNumber }}</span>
-                </div>
-
-                <!-- Ribbon strip: a dedicated band above the day cells -->
-                <div v-if="wk.laneCount > 0" class="mv-strip" :style="stripStyle(wk)">
                   <CalendarRibbon
                     v-for="seg in wk.ribbons"
                     :key="seg.focusKey"
@@ -130,45 +119,54 @@
                   />
                 </div>
 
-                <!-- Day cells -->
-                <div
-                  v-for="day in wk.days"
-                  :key="day.date.toISOString()"
-                  class="calendar-day"
-                  :class="{
-                    'other-month': day.otherMonth,
-                    today: day.isToday,
-                    weekend: isWeekend(day.date),
-                    'red-day': showRedDays && isRedDay(day.date),
-                    'last-col': day.col === 6,
-                  }"
-                  :style="{ gridColumn: dayGridColumn(day.col), gridRow: wk.laneCount ? '2' : '1' }"
-                >
-                  <div class="day-header">
-                    <div class="day-number">{{ day.date.getDate() }}</div>
+                <!-- Uniform-height day-cell row -->
+                <div class="week-days" :class="{ 'has-spine': showWeekNumbers }">
+                  <div
+                    v-if="showWeekNumbers"
+                    class="week-spine"
+                    :class="{ 'current-week': wk.isCurrent }"
+                    :aria-label="`Week ${wk.weekNumber}`"
+                  >
+                    <span class="week-spine-num">{{ wk.weekNumber }}</span>
                   </div>
-                  <div class="mv-timed">
-                    <CalendarTimedEvent
-                      v-for="item in day.timed"
-                      :key="item.focusKey"
-                      :ref="el => setMonthRef(el, item.focusKey)"
-                      :event="item.ev"
-                      :date="day.date"
-                      :is-focused="isMonthFocused(item.focusKey)"
-                      :is-selected="isEventSelected(item.ev, day.date)"
-                      @click="selectEvent"
-                      @focus="() => setMonthFocus(item.focusKey)"
-                    />
-                    <div
-                      v-if="day.hiddenCount > 0"
-                      class="event-overflow-indicator"
-                      :title="`${day.hiddenCount} more event${day.hiddenCount > 1 ? 's' : ''}`"
-                    >
-                      +{{ day.hiddenCount }} more
+                  <div
+                    v-for="day in wk.days"
+                    :key="day.date.toISOString()"
+                    class="calendar-day"
+                    :class="{
+                      'other-month': day.otherMonth,
+                      today: day.isToday,
+                      weekend: isWeekend(day.date),
+                      'red-day': showRedDays && isRedDay(day.date),
+                      'last-col': day.col === 6,
+                    }"
+                  >
+                    <div class="day-header">
+                      <div class="day-number">{{ day.date.getDate() }}</div>
+                    </div>
+                    <div class="mv-timed">
+                      <CalendarTimedEvent
+                        v-for="item in day.timed"
+                        :key="item.focusKey"
+                        :ref="el => setMonthRef(el, item.focusKey)"
+                        :event="item.ev"
+                        :date="day.date"
+                        :is-focused="isMonthFocused(item.focusKey)"
+                        :is-selected="isEventSelected(item.ev, day.date)"
+                        @click="selectEvent"
+                        @focus="() => setMonthFocus(item.focusKey)"
+                      />
+                      <div
+                        v-if="day.hiddenCount > 0"
+                        class="event-overflow-indicator"
+                        :title="`${day.hiddenCount} more event${day.hiddenCount > 1 ? 's' : ''}`"
+                      >
+                        +{{ day.hiddenCount }} more
+                      </div>
                     </div>
                   </div>
                 </div>
-              </div>
+              </template>
             </div>
           </template>
 
@@ -871,19 +869,10 @@ const monthWeeks = computed(() => {
   }));
 });
 
-// 1-based grid column for a day, accounting for the optional week-number spine.
-const dayGridColumn = col => String((showWeekNumbers.value ? 2 : 1) + col);
-
-// A week is a ribbon strip (auto height, sized to its lanes) above the day
-// cells (1fr). No strip row when the week has no spanning events.
-const weekUnitRows = wk => (wk.laneCount ? "auto 1fr" : "1fr");
-
-// The strip spans the seven day columns and lays its ribbons out on lane rows.
+// The strip is a 7-column grid (day columns line up via a left pad for the
+// spine); ribbons place themselves by column span and ride one row per lane.
 const RIBBON_LANE_HEIGHT = "0.95rem";
 const stripStyle = wk => ({
-  gridColumn: `${dayGridColumn(0)} / span 7`,
-  gridRow: "1",
-  gridTemplateColumns: "repeat(7, 1fr)",
   gridTemplateRows: `repeat(${wk.laneCount}, ${RIBBON_LANE_HEIGHT})`,
 });
 
@@ -1807,6 +1796,13 @@ onActivated(() => {
    cells (never overlaying them, so it can't collide with the today border),
    then the day cells with their numbers and a light timed-event list. Bars
    cross the hairline day dividers so a multi-day event reads as one span. */
+/* One fixed spine width shared by the header, strips, and day rows so every
+   column lines up regardless of the week number's digit count. */
+.calendar-grid.show-week-numbers .calendar-weeks,
+.calendar-grid.show-week-numbers .month-weekdays {
+  --spine-w: 1.6rem;
+}
+
 .month-weekdays {
   gap: 0 !important;
 }
@@ -1814,7 +1810,7 @@ onActivated(() => {
   grid-template-columns: 1fr 1fr 1fr 1fr 1fr 1fr 1fr !important;
 }
 .calendar-grid.show-week-numbers .month-weekdays.calendar-weekdays {
-  grid-template-columns: minmax(1.15rem, auto) 1fr 1fr 1fr 1fr 1fr 1fr 1fr !important;
+  grid-template-columns: var(--spine-w) 1fr 1fr 1fr 1fr 1fr 1fr 1fr !important;
 }
 
 .calendar-weeks {
@@ -1827,17 +1823,19 @@ onActivated(() => {
   overflow: hidden;
 }
 
-.week-unit {
+/* Day-cell row: flex:1 so every week's day area is the same height — ribbon
+   strips never steal from it. */
+.week-days {
   display: grid;
   grid-template-columns: 1fr 1fr 1fr 1fr 1fr 1fr 1fr;
   flex: 1;
   min-height: 0;
   border-bottom: 1px solid var(--line);
 }
-.week-unit.has-spine {
-  grid-template-columns: minmax(1.15rem, auto) 1fr 1fr 1fr 1fr 1fr 1fr 1fr;
+.week-days.has-spine {
+  grid-template-columns: var(--spine-w) 1fr 1fr 1fr 1fr 1fr 1fr 1fr;
 }
-.week-unit:last-child {
+.week-days:last-child {
   border-bottom: 0;
 }
 
@@ -1847,7 +1845,7 @@ onActivated(() => {
   border: 0 !important;
   border-right: 1px solid var(--line-soft) !important;
   border-radius: 0;
-  padding: 0.15rem 0.3rem 0.3rem;
+  padding: 0.2rem 0.3rem 0.3rem;
   min-height: 0;
   display: flex;
   flex-direction: column;
@@ -1893,13 +1891,20 @@ onActivated(() => {
   letter-spacing: 0.02em;
 }
 
-/* Ribbon strip: a dedicated band in the gutter above the day cells. */
+/* Ribbon strip: a compact band in the seam between weeks. flex:none so it takes
+   only its lanes' height; the day rows keep all the flexible space. The 7-column
+   grid is inset by the spine width so bars align to the day columns. */
 .mv-strip {
+  flex: none;
   display: grid;
+  grid-template-columns: 1fr 1fr 1fr 1fr 1fr 1fr 1fr;
   align-content: center;
   row-gap: 2px;
-  padding: 0.15rem 0.15rem 0.05rem;
+  padding: 0.2rem 0 0.1rem;
   min-width: 0;
+}
+.mv-strip.has-spine {
+  padding-left: var(--spine-w);
 }
 
 /* Responsive styles for smaller screens and portrait mode */
