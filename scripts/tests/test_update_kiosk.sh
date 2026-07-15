@@ -175,3 +175,83 @@ CEOF
 chmod +x "$tmp/bin/curl"
 if CALVIN_AGENT_STATE_DIR="$tmp/state_sc" bash "$SCRIPT" --self-check; then echo "FAIL self-check: expected non-zero on unreachable backend"; exit 1; fi
 echo "PASS self-check-unreachable"
+
+# ===== Updater self-verification: verify the new updater before adopting it =====
+UPD_TARGET="$tmp/local/update-kiosk.sh"
+
+# healthy systemctl for these blocks (agent restart recreates the readiness marker)
+cat > "$tmp/bin/systemctl" <<EOF
+#!/usr/bin/env bash
+echo "\$*" >> "$tmp/systemctl.log"
+if [ "\$1" = "restart" ]; then ( sleep 1 && mkdir -p "$tmp/run" && touch "$tmp/run/agent-ready" ) & fi
+case "\$1" in "is-active"|"show") exit 0;; esac
+exit 0
+EOF
+chmod +x "$tmp/bin/systemctl"
+export CALVIN_UPDATE_HEALTH_TIMEOUT=4
+
+# Build a manifest with a CHANGED agent + the updater entry, and a curl mock that
+# serves the given "new updater" content. $1 = path to the new-updater file to serve.
+make_updater_manifest() {
+  cp "$1" "$tmp/srv/update-kiosk.sh"
+  local upd_sha agent_sha
+  upd_sha="$(sha256sum "$tmp/srv/update-kiosk.sh" | cut -d' ' -f1)"
+  printf 'import sys\nsys.exit(0)\n' > "$tmp/srv/calvin_display_agent.py"
+  echo 'print("OLD")' > "$tmp/local/calvin_display_agent.py"          # installed agent differs => "changed"
+  agent_sha="$(sha256sum "$tmp/srv/calvin_display_agent.py" | cut -d' ' -f1)"
+  cat > "$tmp/srv/manifest.json" <<MEOF
+{"version":"upd0000000000000","min_python":"3.9","files":[
+ {"name":"calvin_display_agent.py","sha256":"$agent_sha","mode":"0755","target_path":"$tmp/local/calvin_display_agent.py","restart_unit":"calvin-display-agent.service"},
+ {"name":"update-kiosk.sh","sha256":"$upd_sha","mode":"0755","target_path":"$UPD_TARGET","restart_unit":""}]}
+MEOF
+  cat > "$tmp/bin/curl" <<'CEOF'
+#!/usr/bin/env bash
+for a in "$@"; do case "$a" in
+  */agent/manifest) cat "SRVDIR/manifest.json"; exit 0;;
+  */agent/files/calvin_display_agent.py) cat "SRVDIR/calvin_display_agent.py"; exit 0;;
+  */agent/files/update-kiosk.sh) cat "SRVDIR/update-kiosk.sh"; exit 0;;
+esac; done
+exit 22
+CEOF
+  sed -i "s#SRVDIR#$tmp/srv#g" "$tmp/bin/curl"
+  chmod +x "$tmp/bin/curl"
+}
+reset_updater() { printf '#!/usr/bin/env bash\necho OLD-UPDATER\n' > "$UPD_TARGET"; }
+
+# --- valid new updater: passes bash -n and --self-check -> adopted ---
+cat > "$tmp/newupd_ok.sh" <<'UEOF'
+#!/usr/bin/env bash
+[ "${1:-}" = "--self-check" ] && exit 0
+exit 0
+UEOF
+make_updater_manifest "$tmp/newupd_ok.sh"; reset_updater
+rm -f "$tmp/state/agent-update-state.json"
+bash "$SCRIPT" || { echo "FAIL updater-valid: script exited non-zero"; exit 1; }
+{ grep -q -- '--self-check' "$UPD_TARGET" && ! grep -q 'OLD-UPDATER' "$UPD_TARGET"; } || { echo "FAIL updater-valid: new updater not adopted"; exit 1; }
+echo "PASS updater-valid-adopted"
+
+# --- broken-syntax new updater: bash -n fails -> whole update aborts atomically ---
+printf '#!/usr/bin/env bash\nif [ ; then echo broken\n' > "$tmp/newupd_bad.sh"
+make_updater_manifest "$tmp/newupd_bad.sh"; reset_updater
+echo 'print("OLD")' > "$tmp/local/calvin_display_agent.py"
+rm -f "$tmp/state/agent-update-state.json"
+if bash "$SCRIPT"; then echo "FAIL updater-broken: should abort"; exit 1; fi
+grep -q 'OLD-UPDATER' "$UPD_TARGET" || { echo "FAIL updater-broken: updater changed despite abort"; exit 1; }
+grep -q 'OLD' "$tmp/local/calvin_display_agent.py" || { echo "FAIL updater-broken: agent swapped despite abort (not atomic)"; exit 1; }
+grep -q 'verify' "$tmp/state/agent-update-state.json" || { echo "FAIL updater-broken: no verify error state"; exit 1; }
+echo "PASS updater-broken-syntax-aborts"
+
+# --- self-check-failing new updater: parses but --self-check exits 1 -> aborts atomically ---
+cat > "$tmp/newupd_sc.sh" <<'UEOF'
+#!/usr/bin/env bash
+[ "${1:-}" = "--self-check" ] && exit 1
+exit 0
+UEOF
+make_updater_manifest "$tmp/newupd_sc.sh"; reset_updater
+echo 'print("OLD")' > "$tmp/local/calvin_display_agent.py"
+rm -f "$tmp/state/agent-update-state.json"
+if bash "$SCRIPT"; then echo "FAIL updater-selfcheck: should abort"; exit 1; fi
+grep -q 'OLD-UPDATER' "$UPD_TARGET" || { echo "FAIL updater-selfcheck: updater changed despite abort"; exit 1; }
+grep -q 'OLD' "$tmp/local/calvin_display_agent.py" || { echo "FAIL updater-selfcheck: agent swapped despite abort"; exit 1; }
+grep -q 'verify' "$tmp/state/agent-update-state.json" || { echo "FAIL updater-selfcheck: no verify error state"; exit 1; }
+echo "PASS updater-selfcheck-fails-aborts"

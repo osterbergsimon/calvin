@@ -89,6 +89,12 @@ while IFS=$'\t' read -r name sha mode target unit; do
   if [ "$name" = "calvin_display_agent.py" ]; then
     "$PYTHON" -m py_compile "$STAGE/$name" || { write_state error verify "py_compile failed" "$version"; exit 1; }
   fi
+  case "$name" in
+    *.sh) bash -n "$STAGE/$name" || { write_state error verify "syntax check failed: $name" "$version"; exit 1; } ;;
+  esac
+  if [ "$name" = "update-kiosk.sh" ]; then
+    bash "$STAGE/update-kiosk.sh" --self-check || { write_state error verify "updater self-check failed" "$version"; exit 1; }
+  fi
   CHANGED_NAME+=("$name"); CHANGED_TARGET+=("$target"); CHANGED_MODE+=("$mode")
   [ -n "$unit" ] && RESTART_UNITS["$unit"]=1
   case "$target" in "$SYSTEMD_DIR"/*) unit_changed=1;; esac
@@ -109,7 +115,7 @@ done
 write_state running swap "applying ${version}"
 for i in "${!CHANGED_NAME[@]}"; do
   t="${CHANGED_TARGET[$i]}"; s="$STAGE/${CHANGED_NAME[$i]}"
-  install -m "${CHANGED_MODE[$i]}" "$s" "$t"    # atomic replace + mode
+  install -m "${CHANGED_MODE[$i]}" "$s" "$t"    # replace via new inode (safe over a running script) + mode
 done
 [ "$unit_changed" = 1 ] && "$SYSTEMCTL" daemon-reload || true
 

@@ -122,6 +122,17 @@ from the Calvin admin UI — no SSH, no re-flash.
 and no copy of the Calvin git repo; everything comes from the server it is
 already talking to.
 
+### Updating the updater itself
+
+`update-kiosk.sh` is part of the bundle, so it updates itself like any other file. Before a
+new copy is adopted it is verified up front — `bash -n` for syntax and a read-only
+`--self-check` run (which fetches and parses the manifest but changes nothing). If either
+fails, the whole update aborts before anything is swapped and the current, known-good updater
+stays installed. This is what makes it safe to evolve the updater remotely: a dead-on-arrival
+updater is never installed. A new updater that starts cleanly but misbehaves only mid-apply is
+not caught by this check; the durable no-retry guard (`agent-update-state.json`) prevents such
+a version from re-triggering in a loop.
+
 ### Python version floor (`min_python`)
 
 The bundle manifest carries `"min_python": "3.9"`. The updater checks the
