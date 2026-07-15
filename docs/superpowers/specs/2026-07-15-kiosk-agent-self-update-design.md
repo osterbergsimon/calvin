@@ -113,8 +113,8 @@ provisioning.
   `khost` pattern: `kagent=<running_version>`, `kstat=<ok|updating|error>`. Stored on the
   registry row.
 - `POST /api/kiosks/{id}/update` sets the per-kiosk `agentUpdateRequested` flag. The flag is
-  cleared when the agent next reports `running == available`. (`POST /api/kiosks/update-all`
-  fans the flag across kiosks for the UI "Update all" action.)
+  cleared when the agent next reports `running == available`. (A bulk `POST
+  /api/kiosks/update-all` is **deferred** — tracked as calvin-3d1.)
 
 ## Agent (`calvin_display_agent.py`)
 
@@ -180,7 +180,7 @@ The Kiosks list already shows `lastSeen` / `lastAppliedVersion`. Add:
 
 - Running version vs available version.
 - An **Update** button per kiosk, enabled when `running != available`.
-- An **Update all** action.
+- ~~An **Update all** action.~~ Deferred — calvin-3d1.
 - Update-in-progress / failed status surfaced from `agent_update_status` (including the
   `python-too-old` case → "kiosk needs OS update").
 
@@ -237,4 +237,5 @@ bundle endpoint) falls back to GitHub-raw at provisioning time.
 
 - Exact readiness-marker mechanism for the health check (touch a file under `/run/calvin/` on
   first successful config fetch vs. rely on `systemctl is-active` + `NRestarts` alone).
-- Whether "Update all" is in the first cut or a fast follow.
+
+("Update all" resolved: deferred to calvin-3d1 — per-kiosk update ships first.)
