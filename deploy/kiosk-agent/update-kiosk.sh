@@ -22,8 +22,21 @@ VERSION_FILE="${STATE_DIR}/agent-version.json"
 STATE_FILE="${STATE_DIR}/agent-update-state.json"
 BASE="${CALVIN_BACKEND_URL%/}"
 
-mkdir -p "$STATE_DIR"
 log() { printf '[update-kiosk] %s\n' "$*"; }
+
+# --self-check: read-only validation of THIS updater's startup + fetch/parse path.
+# A running updater invokes this on a STAGED new updater before adopting it, so a
+# dead-on-arrival updater is never installed. Mutates nothing (no state-dir mkdir,
+# no swap/restart/state/version/backup/marker writes) and triggers no update, so it
+# cannot recurse.
+if [ "${1:-}" = "--self-check" ]; then
+  _m="$("$CURL" -fsSL "$BASE/api/kiosks/agent/manifest")" || { log "self-check: manifest fetch failed"; exit 1; }
+  printf '%s' "$_m" | "$PYTHON" -c 'import sys,json; d=json.load(sys.stdin); sys.exit(0 if d.get("version") and isinstance(d.get("files"), list) else 1)' || {
+    log "self-check: manifest invalid"; exit 1; }
+  log "self-check: ok"; exit 0
+fi
+
+mkdir -p "$STATE_DIR"
 
 write_state() {  # status phase message [version]
   mkdir -p "$STATE_DIR"

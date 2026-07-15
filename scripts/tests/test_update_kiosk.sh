@@ -147,3 +147,31 @@ grep -q 'noopversion1234' "$tmp/state/agent-version.json" || { echo "FAIL noop: 
 ! grep -q 'restart' "$tmp/systemctl.log" 2>/dev/null || { echo "FAIL noop: unexpected restart in systemctl.log"; exit 1; }
 grep -q 'noop\|success' "$tmp/state/agent-update-state.json" || { echo "FAIL noop: state not success/noop"; exit 1; }
 echo "PASS noop"
+
+# --- --self-check contract: exits 0 on a good manifest and mutates nothing ---
+mkdir -p "$tmp/state_sc"; rm -f "$tmp/systemctl.log"
+cat > "$tmp/srv/sc_manifest.json" <<'MEOF'
+{"version":"scv0000000000000","min_python":"3.9","files":[]}
+MEOF
+cat > "$tmp/bin/curl" <<CEOF
+#!/usr/bin/env bash
+for a in "\$@"; do case "\$a" in
+  */agent/manifest) cat "$tmp/srv/sc_manifest.json"; exit 0;;
+esac; done
+exit 22
+CEOF
+chmod +x "$tmp/bin/curl"
+CALVIN_AGENT_STATE_DIR="$tmp/state_sc" bash "$SCRIPT" --self-check || { echo "FAIL self-check: expected exit 0"; exit 1; }
+[ ! -e "$tmp/state_sc/agent-update-state.json" ] || { echo "FAIL self-check: wrote state file"; exit 1; }
+[ ! -e "$tmp/state_sc/agent-version.json" ]      || { echo "FAIL self-check: wrote version file"; exit 1; }
+[ ! -e "$tmp/systemctl.log" ]                    || { echo "FAIL self-check: called systemctl"; exit 1; }
+echo "PASS self-check-ok"
+
+# --- --self-check fails when the backend is unreachable ---
+cat > "$tmp/bin/curl" <<'CEOF'
+#!/usr/bin/env bash
+exit 7
+CEOF
+chmod +x "$tmp/bin/curl"
+if CALVIN_AGENT_STATE_DIR="$tmp/state_sc" bash "$SCRIPT" --self-check; then echo "FAIL self-check: expected non-zero on unreachable backend"; exit 1; fi
+echo "PASS self-check-unreachable"
