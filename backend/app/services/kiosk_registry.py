@@ -51,6 +51,7 @@ async def record_kiosk(
     hostname: str | None = None,
     agent_version: str | None = None,
     agent_status: str | None = None,
+    available_version: str | None = None,
 ) -> None:
     """Upsert a kiosk's registry row. No-op when kiosk_id is empty/None."""
     if not kiosk_id:
@@ -72,8 +73,14 @@ async def record_kiosk(
             logger.info(f"Registered new kiosk: {kiosk_id!r} (hostname={hostname!r})")
             return
         except _INTEGRITY_ERRORS:
+            # Lost a create race: another request inserted this id between our
+            # get_or_none and create. Fall through to the update path.
+            logger.debug(
+                f"Create race for kiosk {kiosk_id!r} in record_kiosk; updating existing row"
+            )
             existing = await KioskDB.objects.get_or_none(id=kiosk_id)
             if existing is None:
+                # Extremely unlikely (row vanished again); nothing safe to do.
                 return
 
     existing.last_seen = now
@@ -83,8 +90,15 @@ async def record_kiosk(
         existing.agent_version = agent_version
     if agent_status is not None:
         existing.agent_update_status = agent_status
-    # Auto-clear the update flag once the agent confirms it runs the requested version.
-    if agent_version is not None and existing.overrides:
+    # Auto-clear the update flag only once the agent confirms it runs the AVAILABLE
+    # (target) version — clearing on any reported version would cancel a just-issued
+    # request before the agent ever sees it.
+    if (
+        agent_version is not None
+        and available_version is not None
+        and agent_version == available_version
+        and existing.overrides
+    ):
         ov = dict(existing.overrides)
         if ov.pop(_UPDATE_FLAG_KEY, None) is not None:
             existing.overrides = ov

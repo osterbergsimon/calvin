@@ -243,6 +243,7 @@ async def test_agent_version_columns_roundtrip(test_db):
 
 
 @pytest.mark.asyncio
+@pytest.mark.unit
 async def test_record_kiosk_stores_agent_report(test_db):
     from app.services import kiosk_registry as kr
     await kr.record_kiosk("k1", hostname="pi", agent_version="v1", agent_status="ok")
@@ -253,19 +254,26 @@ async def test_record_kiosk_stores_agent_report(test_db):
 
 
 @pytest.mark.asyncio
+@pytest.mark.unit
 async def test_request_and_autoclear_update_flag(test_db):
     from app.services import kiosk_registry as kr
     await kr.record_kiosk("k2", agent_version="old")
     assert await kr.request_agent_update("k2") is True
     ov = await kr.get_overrides("k2")
     assert kr.agent_update_requested(ov) is True
-    # agent reports it now runs the target -> flag auto-clears
-    await kr.record_kiosk("k2", agent_version="new", agent_status="ok")
+    # Agent still reports OLD version but available is NEW — flag must NOT clear
+    # (regression guard: clearing here would mean the agent never sees the update request).
+    await kr.record_kiosk("k2", agent_version="old", available_version="new")
     ov2 = await kr.get_overrides("k2")
-    assert kr.agent_update_requested(ov2) is False
+    assert kr.agent_update_requested(ov2) is True, "flag must survive while agent is still on stale version"
+    # Agent now reports it runs the NEW version — flag must clear.
+    await kr.record_kiosk("k2", agent_version="new", available_version="new")
+    ov3 = await kr.get_overrides("k2")
+    assert kr.agent_update_requested(ov3) is False, "flag must clear once agent reaches available version"
 
 
 @pytest.mark.asyncio
+@pytest.mark.unit
 async def test_request_update_unknown_id_returns_false(test_db):
     from app.services import kiosk_registry as kr
     assert await kr.request_agent_update("../bad") is False
