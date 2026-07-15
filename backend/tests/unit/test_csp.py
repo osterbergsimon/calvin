@@ -6,6 +6,7 @@ from app.services.csp import (
     build_csp,
     get_allowed_origins,
     get_plugin_browser_origins,
+    get_sealed_mode,
     is_valid_origin,
     origin_from_url,
     validate_origin,
@@ -174,3 +175,25 @@ class TestGetPluginBrowserOrigins:
             manager_module.plugin_manager, "get_plugins", lambda enabled_only=True: []
         )
         assert await get_plugin_browser_origins() == []
+
+
+@pytest.mark.unit
+class TestGetSealedMode:
+    async def test_true_when_config_true(self, monkeypatch):
+        async def fake_get_value(key, default=None):
+            assert key == "sealed_mode"
+            return True
+
+        import app.services.csp as csp_module
+
+        monkeypatch.setattr(csp_module.config_service, "get_value", fake_get_value)
+        assert await get_sealed_mode() is True
+
+    async def test_false_when_absent(self, monkeypatch):
+        async def fake_get_value(key, default=None):
+            return default
+
+        import app.services.csp as csp_module
+
+        monkeypatch.setattr(csp_module.config_service, "get_value", fake_get_value)
+        assert await get_sealed_mode() is False

@@ -8,6 +8,7 @@ from app.services.csp import (
     build_csp,
     get_allowed_origins,
     get_plugin_browser_origins,
+    get_sealed_mode,
     get_web_service_origins,
 )
 
@@ -36,12 +37,17 @@ class SecurityHeadersMiddleware(BaseHTTPMiddleware):
         if _is_csp_exempt(request.url.path):
             return response
         try:
-            frame_origins = await get_web_service_origins()
-            allowed = await get_allowed_origins()
-            plugin_origins = await get_plugin_browser_origins()
+            if await get_sealed_mode():
+                # Sealed: collapse to baseline self-only — no embeds, allowlist,
+                # or plugin origins reach the kiosk browser.
+                frame_origins, allowed, plugin_origins = [], [], []
+            else:
+                frame_origins = await get_web_service_origins()
+                allowed = await get_allowed_origins()
+                plugin_origins = await get_plugin_browser_origins()
         except Exception:
-            # A CSP header must never fail the response. On any DB/registry hiccup
-            # fall back to the baseline self-only policy rather than 500-ing.
+            # A CSP header must never fail the response. The fallback is already
+            # the self-only shape, so a config/DB hiccup fails toward sealed.
             logger.warning("CSP origins lookup failed; falling back to baseline self-only policy")
             frame_origins, allowed, plugin_origins = [], [], []
         response.headers["Content-Security-Policy"] = build_csp(
