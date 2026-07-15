@@ -210,14 +210,11 @@ systemd_available() {
 }
 
 install_kiosk_services() {
-    log "Enabling kiosk systemd services..."
+    log "Reloading systemd (units enabled by --bootstrap)..."
     if systemd_available; then
         systemctl daemon-reload
-        enable_systemd_service "calvin-x.service"
-        enable_systemd_service "calvin-kiosk-remote.service"
-        enable_systemd_service "calvin-display-agent.service"
     else
-        log_warn "systemd is not running; skipped daemon-reload and enable"
+        log_warn "systemd is not running; skipped daemon-reload"
     fi
 }
 
@@ -268,8 +265,8 @@ main() {
         x11-xserver-utils
 
     install_kiosk_config
-    log "Installing kiosk bundle (agent + units + updater) from ${BACKEND_URL}..."
-    install_kiosk_bundle "${BACKEND_URL}" "${CALVIN_USER}"
+    log "Bootstrapping kiosk bundle via update-kiosk.sh --bootstrap from ${BACKEND_URL}..."
+    bootstrap_kiosk "${BACKEND_URL}"
     log "Installing sudoers fragment..."
     install -m 0440 /dev/stdin /etc/sudoers.d/calvin-kiosk-update <<'SUDOERS'
 calvin ALL=(root) NOPASSWD: /bin/systemctl start --no-block calvin-kiosk-update.service
