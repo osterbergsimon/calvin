@@ -1,6 +1,25 @@
 <template>
   <section id="section-security-origins" class="security-settings">
+    <div class="security-settings__sealed">
+      <label class="security-settings__sealed-label">
+        <input
+          type="checkbox"
+          data-test="sealed-mode-toggle"
+          :checked="sealed"
+          @change="onSealedToggle($event.target.checked)"
+        />
+        <span>Sealed mode</span>
+      </label>
+      <p class="security-settings__intro">
+        Locks the kiosk to your Calvin server only — no external embeds, allowed origins, or plugins
+        that reach outside. Calendars, photos, and local-data plugins keep working.
+      </p>
+    </div>
+
     <h2>Allowed origins</h2>
+    <p v-if="sealed" data-test="allowlist-inactive" class="security-settings__inactive">
+      Ignored while sealed mode is on.
+    </p>
     <p class="security-settings__intro">
       Origins the kiosk may embed, load images from, or connect to. Everything else is blocked. Use
       a domain (grafana.lab), a wildcard (*.lab.example.com), a host:port, or an http(s):// URL. IP
@@ -42,14 +61,27 @@ const origins = ref([]);
 const draft = ref("");
 const error = ref("");
 const saving = ref(false);
+const sealed = ref(false);
 
 onMounted(async () => {
   try {
     origins.value = await store.fetchAllowedOrigins();
+    sealed.value = await store.fetchSealedMode();
   } catch (err) {
     logError("[SecuritySettings]", "load failed", err);
   }
 });
+
+async function onSealedToggle(value) {
+  sealed.value = value;
+  try {
+    await store.saveSealedMode(value);
+  } catch (err) {
+    error.value = err?.response?.data?.detail || "Failed to save sealed mode.";
+    logError("[SecuritySettings]", "sealed save failed", err);
+    sealed.value = !value; // revert optimistic toggle on failure
+  }
+}
 
 // Light client-side check for instant feedback; the server validator is authoritative.
 function inputError(value) {
