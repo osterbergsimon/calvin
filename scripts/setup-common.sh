@@ -764,4 +764,23 @@ verify_setup() {
     
     log "Setup verification complete"
 }
+# Fetch + install the kiosk bundle (agent, units, updater) from the local backend.
+install_kiosk_bundle() {
+    local backend_url="${1%/}" user="${2:-$DEFAULT_CALVIN_USER}"
+    local state_dir="${CALVIN_AGENT_STATE_DIR:-/var/lib/calvin}"
+    local manifest; manifest="$(curl -fsSL "${backend_url}/api/kiosks/agent/manifest")" \
+        || error_exit "Failed to fetch kiosk bundle manifest from ${backend_url}" 1
+    local version; version="$(printf '%s' "$manifest" | python3 -c 'import sys,json;print(json.load(sys.stdin)["version"])')"
+    printf '%s' "$manifest" | python3 -c '
+import sys, json
+for f in json.load(sys.stdin)["files"]:
+    print("\t".join([f["name"], f["mode"], f["target_path"]]))' | while IFS=$'\t' read -r name mode target; do
+        mkdir -p "$(dirname "$target")"
+        curl -fsSL "${backend_url}/api/kiosks/agent/files/${name}" -o "$target" \
+            || error_exit "Failed to fetch bundle file ${name}" 1
+        chmod "$mode" "$target"
+    done
+    mkdir -p "$state_dir"
+    printf '{"version": "%s"}\n' "$version" > "${state_dir}/agent-version.json"
+}
 # Workflow trigger
