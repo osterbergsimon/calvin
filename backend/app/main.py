@@ -128,6 +128,7 @@ from app.api.routes import (  # noqa: E402
     keyboard,
     kiosks,
     plugins,
+    security,
     system,
 )
 from app.services.scheduler import calendar_scheduler  # noqa: E402
@@ -558,6 +559,7 @@ app.include_router(keyboard.router, prefix="/api", tags=["keyboard"])
 app.include_router(images.router, prefix="/api", tags=["images"])
 app.include_router(plugins.router, prefix="/api", tags=["plugins"])
 app.include_router(system.router, prefix="/api/system", tags=["system"])
+app.include_router(security.router, prefix="/api", tags=["security"])
 
 # Serve static files from frontend dist directory
 # Get the project root (parent of backend directory)

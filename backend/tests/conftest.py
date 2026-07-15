@@ -301,6 +301,7 @@ def test_client(temp_db_path: Path, temp_image_dir: Path) -> Generator[TestClien
         keyboard,
         kiosks,
         plugins,
+        security,
         system,
     )
 
@@ -320,6 +321,7 @@ def test_client(temp_db_path: Path, temp_image_dir: Path) -> Generator[TestClien
     test_app.include_router(images.router, prefix="/api", tags=["images"])
     test_app.include_router(plugins.router, prefix="/api", tags=["plugins"])
     test_app.include_router(system.router, prefix="/api/system", tags=["system"])
+    test_app.include_router(security.router, prefix="/api", tags=["security"])
 
     @test_app.get("/")
     async def root():
