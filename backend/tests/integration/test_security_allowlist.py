@@ -5,6 +5,31 @@ from fastapi.testclient import TestClient
 
 
 @pytest.mark.integration
+class TestSealedModeApi:
+    def test_get_defaults_to_false(self, test_client: TestClient):
+        response = test_client.get("/api/security/sealed-mode")
+        assert response.status_code == 200
+        assert response.json() == {"sealed_mode": False}
+
+    def test_put_persists_and_roundtrips(self, test_client: TestClient):
+        assert test_client.put("/api/security/sealed-mode", json={"sealed_mode": True}).json() == {
+            "sealed_mode": True
+        }
+        assert test_client.get("/api/security/sealed-mode").json() == {"sealed_mode": True}
+
+        assert test_client.put("/api/security/sealed-mode", json={"sealed_mode": False}).json() == {
+            "sealed_mode": False
+        }
+        assert test_client.get("/api/security/sealed-mode").json() == {"sealed_mode": False}
+
+    def test_put_non_bool_is_422(self, test_client: TestClient):
+        assert (
+            test_client.put("/api/security/sealed-mode", json={"sealed_mode": "yes"}).status_code
+            == 422
+        )
+
+
+@pytest.mark.integration
 class TestAllowedOriginsApi:
     def test_get_defaults_to_empty(self, test_client: TestClient):
         response = test_client.get("/api/security/allowed-origins")

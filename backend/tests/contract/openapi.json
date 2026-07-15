@@ -1140,6 +1140,19 @@
         "title": "PluginTypeConfigUpdateResponse",
         "type": "object"
       },
+      "SealedModeBody": {
+        "properties": {
+          "sealed_mode": {
+            "title": "Sealed Mode",
+            "type": "boolean"
+          }
+        },
+        "required": [
+          "sealed_mode"
+        ],
+        "title": "SealedModeBody",
+        "type": "object"
+      },
       "SingleMapping": {
         "description": "Action for a single key.",
         "properties": {
@@ -4008,6 +4021,64 @@
           }
         },
         "summary": "Put Allowed Origins",
+        "tags": [
+          "security"
+        ]
+      }
+    },
+    "/api/security/sealed-mode": {
+      "get": {
+        "description": "Return whether sealed mode (self-only CSP lockdown) is on.",
+        "operationId": "get_sealed_mode_setting_api_security_sealed_mode_get",
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            },
+            "description": "Successful Response"
+          }
+        },
+        "summary": "Get Sealed Mode Setting",
+        "tags": [
+          "security"
+        ]
+      },
+      "put": {
+        "description": "Enable or disable sealed mode.",
+        "operationId": "put_sealed_mode_setting_api_security_sealed_mode_put",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/SealedModeBody"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Put Sealed Mode Setting",
         "tags": [
           "security"
         ]

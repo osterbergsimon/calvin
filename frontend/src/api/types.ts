@@ -1358,6 +1358,30 @@ export interface paths {
     patch?: never;
     trace?: never;
   };
+  "/api/security/sealed-mode": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    /**
+     * Get Sealed Mode Setting
+     * @description Return whether sealed mode (self-only CSP lockdown) is on.
+     */
+    get: operations["get_sealed_mode_setting_api_security_sealed_mode_get"];
+    /**
+     * Put Sealed Mode Setting
+     * @description Enable or disable sealed mode.
+     */
+    put: operations["put_sealed_mode_setting_api_security_sealed_mode_put"];
+    post?: never;
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
   "/api/system/display/power/off": {
     parameters: {
       query?: never;
@@ -1986,6 +2010,11 @@ export interface components {
       plugin_id: string;
       /** Success */
       success: boolean;
+    };
+    /** SealedModeBody */
+    SealedModeBody: {
+      /** Sealed Mode */
+      sealed_mode: boolean;
     };
     /**
      * SingleMapping
@@ -4012,6 +4041,59 @@ export interface operations {
     requestBody: {
       content: {
         "application/json": components["schemas"]["AllowedOriginsBody"];
+      };
+    };
+    responses: {
+      /** @description Successful Response */
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": unknown;
+        };
+      };
+      /** @description Validation Error */
+      422: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["HTTPValidationError"];
+        };
+      };
+    };
+  };
+  get_sealed_mode_setting_api_security_sealed_mode_get: {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    requestBody?: never;
+    responses: {
+      /** @description Successful Response */
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": unknown;
+        };
+      };
+    };
+  };
+  put_sealed_mode_setting_api_security_sealed_mode_put: {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    requestBody: {
+      content: {
+        "application/json": components["schemas"]["SealedModeBody"];
       };
     };
     responses: {
