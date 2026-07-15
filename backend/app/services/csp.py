@@ -156,3 +156,28 @@ async def get_allowed_origins() -> list[str]:
         if normalized not in result:
             result.append(normalized)
     return result
+
+
+async def get_plugin_browser_origins() -> list[str]:
+    """Union of enabled plugins' declared browser_origins, validated.
+
+    These are origins intrinsic to a plugin (declared in its PluginMetadata).
+    Re-validated on read so a metadata value can never emit a malformed CSP
+    token. plugin_manager is imported lazily to avoid a plugins<->services
+    import cycle (definitions.py already imports this module's validate_origin).
+    """
+    from app.plugins.manager import plugin_manager
+
+    result: list[str] = []
+    for plugin in plugin_manager.get_plugins(enabled_only=True):
+        metadata = getattr(plugin, "metadata", None)
+        if metadata is None:
+            continue
+        for entry in getattr(metadata, "browser_origins", None) or []:
+            try:
+                normalized = validate_origin(entry)
+            except (ValueError, TypeError):
+                continue
+            if normalized not in result:
+                result.append(normalized)
+    return result

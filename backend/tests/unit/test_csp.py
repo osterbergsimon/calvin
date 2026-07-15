@@ -5,6 +5,7 @@ import pytest
 from app.services.csp import (
     build_csp,
     get_allowed_origins,
+    get_plugin_browser_origins,
     is_valid_origin,
     origin_from_url,
     validate_origin,
@@ -142,3 +143,34 @@ class TestGetAllowedOrigins:
 
         monkeypatch.setattr(csp_module.config_service, "get_value", fake_get_value)
         assert await get_allowed_origins() == []
+
+
+@pytest.mark.unit
+class TestGetPluginBrowserOrigins:
+    async def test_unions_and_dedupes_enabled_plugin_origins(self, monkeypatch):
+        class _Meta:
+            def __init__(self, origins):
+                self.browser_origins = origins
+
+        class _Plugin:
+            def __init__(self, origins):
+                self.metadata = _Meta(origins)
+
+        import app.plugins.manager as manager_module
+
+        def fake_get_plugins(enabled_only=True):
+            assert enabled_only is True
+            return [_Plugin(["a.lab", "10.0.0.0/24"]), _Plugin(["b.lab", "a.lab"])]
+
+        monkeypatch.setattr(manager_module.plugin_manager, "get_plugins", fake_get_plugins)
+
+        # invalid entry (CIDR) is defensively dropped; valid ones deduped, order preserved
+        assert await get_plugin_browser_origins() == ["a.lab", "b.lab"]
+
+    async def test_empty_when_no_plugins(self, monkeypatch):
+        import app.plugins.manager as manager_module
+
+        monkeypatch.setattr(
+            manager_module.plugin_manager, "get_plugins", lambda enabled_only=True: []
+        )
+        assert await get_plugin_browser_origins() == []
