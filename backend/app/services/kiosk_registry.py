@@ -38,17 +38,26 @@ DEVICE_PHYSICAL_KEYS: tuple[str, ...] = (
 # fallthrough works regardless of the underlying driver.
 _INTEGRITY_ERRORS = (sqlite3.IntegrityError, SAIntegrityError)
 
+_UPDATE_FLAG_KEY = "_agentUpdateRequested"  # stored in overrides; host-internal, not a device setting
+
+
+def agent_update_requested(overrides: dict | None) -> bool:
+    return bool((overrides or {}).get(_UPDATE_FLAG_KEY))
+
 
 @retry_on_db_locked()
-async def record_kiosk(kiosk_id: str, hostname: str | None = None) -> None:
+async def record_kiosk(
+    kiosk_id: str,
+    hostname: str | None = None,
+    agent_version: str | None = None,
+    agent_status: str | None = None,
+) -> None:
     """Upsert a kiosk's registry row. No-op when kiosk_id is empty/None."""
     if not kiosk_id:
         return
-
     if not _KIOSK_ID_RE.fullmatch(kiosk_id):
         logger.warning(f"Ignoring malformed kiosk_id: {kiosk_id!r}")
         return
-
     if hostname is not None and len(hostname) > 255:
         hostname = hostname[:255]
 
@@ -56,21 +65,29 @@ async def record_kiosk(kiosk_id: str, hostname: str | None = None) -> None:
     existing = await KioskDB.objects.get_or_none(id=kiosk_id)
     if existing is None:
         try:
-            await KioskDB.objects.create(id=kiosk_id, hostname=hostname, last_seen=now)
+            await KioskDB.objects.create(
+                id=kiosk_id, hostname=hostname, last_seen=now,
+                agent_version=agent_version, agent_update_status=agent_status,
+            )
             logger.info(f"Registered new kiosk: {kiosk_id!r} (hostname={hostname!r})")
             return
         except _INTEGRITY_ERRORS:
-            # Lost a create race: another request inserted this id between our
-            # get_or_none and create. Fall through to the update path.
-            logger.debug(f"Create race for kiosk {kiosk_id!r}; updating existing row")
             existing = await KioskDB.objects.get_or_none(id=kiosk_id)
             if existing is None:
-                # Extremely unlikely (row vanished again); nothing safe to do.
                 return
 
     existing.last_seen = now
     if hostname:
         existing.hostname = hostname
+    if agent_version is not None:
+        existing.agent_version = agent_version
+    if agent_status is not None:
+        existing.agent_update_status = agent_status
+    # Auto-clear the update flag once the agent confirms it runs the requested version.
+    if agent_version is not None and existing.overrides:
+        ov = dict(existing.overrides)
+        if ov.pop(_UPDATE_FLAG_KEY, None) is not None:
+            existing.overrides = ov
     await existing.update()
 
 
@@ -99,9 +116,28 @@ async def list_kiosks() -> list[dict]:
             "hostname": row.hostname,
             "lastSeen": _to_utc_iso(row.last_seen),
             "lastAppliedVersion": row.last_applied_version,
+            "agentVersion": row.agent_version,
+            "agentUpdateStatus": row.agent_update_status,
+            "agentUpdateRequested": agent_update_requested(row.overrides),
         }
         for row in rows
     ]
+
+
+@retry_on_db_locked()
+async def request_agent_update(kiosk_id: str) -> bool:
+    """Flag a kiosk for agent update. False if the kiosk is unknown/malformed."""
+    if not kiosk_id or not _KIOSK_ID_RE.fullmatch(kiosk_id):
+        return False
+    existing = await KioskDB.objects.get_or_none(id=kiosk_id)
+    if existing is None:
+        return False
+    ov = dict(existing.overrides or {})
+    ov[_UPDATE_FLAG_KEY] = True
+    existing.overrides = ov
+    existing.agent_update_status = "updating"
+    await existing.update()
+    return True
 
 
 def merge_overrides(base: dict, overrides: dict | None) -> dict:
