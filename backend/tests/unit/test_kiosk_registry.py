@@ -1,6 +1,7 @@
 """Unit tests for the kiosk registry service."""
 
 import sqlite3
+from datetime import UTC, datetime, timedelta
 
 import pytest
 
@@ -46,6 +47,23 @@ async def test_list_kiosks_shape(test_db):
     assert kiosks and kiosks[0]["id"] == "hallway-b71e04"
     assert set(kiosks[0]) == {"id", "hostname", "lastSeen", "lastAppliedVersion"}
     assert isinstance(kiosks[0]["lastSeen"], str)  # ISO-8601
+
+
+@pytest.mark.asyncio
+@pytest.mark.unit
+async def test_list_kiosks_last_seen_is_utc_aware(test_db):
+    """lastSeen must carry an explicit UTC offset so a JS client parsing a
+    tz-less string as local time cannot misread a just-seen kiosk as hours
+    stale (calvin-dd9.16)."""
+    before = datetime.now(UTC)
+    await kiosk_registry.record_kiosk("hallway-b71e04", hostname="pi-hallway")
+    kiosks = await kiosk_registry.list_kiosks()
+
+    parsed = datetime.fromisoformat(kiosks[0]["lastSeen"])
+    assert parsed.tzinfo is not None, "lastSeen must be timezone-aware, not naive"
+    assert parsed.utcoffset() == timedelta(0), "lastSeen must be expressed in UTC"
+    # And it must represent ~now in UTC, not shifted by the local tz offset.
+    assert abs((parsed - before).total_seconds()) < 60
 
 
 @pytest.mark.asyncio
