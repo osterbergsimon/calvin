@@ -297,3 +297,45 @@ PY
 python3 -c 'import json,sys; json.load(open(sys.argv[1]))' "$tmp/state_rcpt/agent-version.json" || { echo "FAIL receipt: version json invalid"; exit 1; }
 python3 -c 'import json,sys; json.load(open(sys.argv[1]))' "$tmp/state_rcpt/agent-update-state.json" || { echo "FAIL receipt: state json invalid"; exit 1; }
 echo "PASS receipt-and-atomic-writes"
+
+# --- ixk: a brand-new enable:true unit is enabled + started post-health, not restarted ---
+mkdir -p "$tmp/state_ixk"
+NEWUNIT="$tmp/systemd/calvin-foo.service"
+rm -f "$NEWUNIT"                                   # not installed before => "new"
+printf 'import sys\nsys.exit(0)\n' > "$tmp/srv/calvin_display_agent.py"
+IXK_AGENT_SHA="$(sha256sum "$tmp/srv/calvin_display_agent.py" | cut -d' ' -f1)"
+echo 'print("OLD")' > "$tmp/local/calvin_display_agent.py"   # agent changes => health runs
+printf '[Unit]\nDescription=foo\n' > "$tmp/srv/calvin-foo.service"
+IXK_UNIT_SHA="$(sha256sum "$tmp/srv/calvin-foo.service" | cut -d' ' -f1)"
+cat > "$tmp/srv/manifest.json" <<EOF
+{"version":"ixk0000000000000","min_python":"3.9","files":[
+ {"name":"calvin_display_agent.py","sha256":"$IXK_AGENT_SHA","mode":"0755",
+  "target_path":"$tmp/local/calvin_display_agent.py","restart_unit":"calvin-display-agent.service","enable":false},
+ {"name":"calvin-foo.service","sha256":"$IXK_UNIT_SHA","mode":"0644",
+  "target_path":"$NEWUNIT","restart_unit":"calvin-foo.service","enable":true}]}
+EOF
+cat > "$tmp/bin/systemctl" <<EOF
+#!/usr/bin/env bash
+echo "\$*" >> "$tmp/systemctl.log"
+if [ "\$1" = "restart" ]; then ( sleep 1 && mkdir -p "$tmp/run" && touch "$tmp/run/agent-ready" ) & fi
+case "\$1" in "is-active"|"show") exit 0;; esac
+exit 0
+EOF
+chmod +x "$tmp/bin/systemctl"
+cat > "$tmp/bin/curl" <<EOF
+#!/usr/bin/env bash
+for a in "\$@"; do case "\$a" in
+  */agent/manifest) cat "$tmp/srv/manifest.json"; exit 0;;
+  */agent/files/calvin_display_agent.py) cat "$tmp/srv/calvin_display_agent.py"; exit 0;;
+  */agent/files/calvin-foo.service) cat "$tmp/srv/calvin-foo.service"; exit 0;;
+esac; done
+exit 22
+EOF
+chmod +x "$tmp/bin/curl"
+rm -f "$tmp/systemctl.log"
+CALVIN_AGENT_STATE_DIR="$tmp/state_ixk" bash "$SCRIPT" || { echo "FAIL ixk: exited non-zero"; exit 1; }
+grep -q 'enable calvin-foo.service' "$tmp/systemctl.log" || { echo "FAIL ixk: new unit not enabled"; exit 1; }
+grep -q 'start calvin-foo.service'  "$tmp/systemctl.log" || { echo "FAIL ixk: new unit not started"; exit 1; }
+! grep -q 'restart calvin-foo.service' "$tmp/systemctl.log" || { echo "FAIL ixk: new unit should not be restarted"; exit 1; }
+grep -q "\[Unit\]" "$NEWUNIT" || { echo "FAIL ixk: new unit file not installed"; exit 1; }
+echo "PASS ixk-enable-new-unit"

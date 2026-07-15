@@ -120,13 +120,15 @@ STAGE="$(mktemp -d)"; trap 'rm -rf "$STAGE"' EXIT
 mkdir -p "$BACKUP_DIR"
 declare -a CHANGED_TARGET=() CHANGED_MODE=() CHANGED_NAME=()
 declare -A RESTART_UNITS=()
+declare -a NEW_ENABLE_UNITS=()
 unit_changed=0
 
 installed_sha() { [ -f "$1" ] && sha256sum "$1" | cut -d' ' -f1 || echo ""; }
 
 while IFS=$'\t' read -r name sha mode target unit enable; do
   [ -n "$name" ] || continue
-  if [ "$(installed_sha "$target")" = "$sha" ]; then continue; fi   # unchanged
+  old="$(installed_sha "$target")"
+  if [ "$old" = "$sha" ]; then continue; fi   # unchanged
   # fetch + verify
   "$CURL" -fsSL "$BASE/api/kiosks/agent/files/$name" > "$STAGE/$name" || {
     write_state error fetch "download failed: $name" "$version"; exit 1; }
@@ -144,7 +146,12 @@ while IFS=$'\t' read -r name sha mode target unit enable; do
   CHANGED_NAME+=("$name"); CHANGED_TARGET+=("$target"); CHANGED_MODE+=("$mode")
   [ -n "$unit" ] && RESTART_UNITS["$unit"]=1
   case "$target" in "$SYSTEMD_DIR"/*) unit_changed=1;; esac
+  if [ -z "$old" ] && [ "$enable" = "1" ]; then
+    case "$target" in "$SYSTEMD_DIR"/*.service) NEW_ENABLE_UNITS+=("$(basename "$target")");; esac
+  fi
 done <<< "$files_tsv"
+
+for u in "${NEW_ENABLE_UNITS[@]:-}"; do [ -n "$u" ] && unset 'RESTART_UNITS[$u]'; done
 
 if [ "${#CHANGED_NAME[@]}" -eq 0 ]; then
   write_state success noop "already at ${version}" "$version"
@@ -167,6 +174,8 @@ done
 [ "$unit_changed" = 1 ] && "$SYSTEMCTL" daemon-reload || true
 
 restart_all() { for u in "${!RESTART_UNITS[@]}"; do "$SYSTEMCTL" restart "$u"; done; }
+enable_units() { for u in "$@"; do "$SYSTEMCTL" enable "$u" || log "enable failed: $u"; done; }
+start_units()  { for u in "$@"; do "$SYSTEMCTL" start  "$u" || log "start failed: $u";  done; }
 restart_all
 
 # --- health check (only meaningful when the agent was among the restarts) ---
@@ -196,6 +205,11 @@ if [ "$agent_restarted" = 1 ]; then
     write_state error rollback "rolled back to previous version" "$version"
     exit 1
   fi
+fi
+
+if [ "${#NEW_ENABLE_UNITS[@]}" -gt 0 ]; then
+  enable_units "${NEW_ENABLE_UNITS[@]}"
+  start_units "${NEW_ENABLE_UNITS[@]}"
 fi
 
 write_version "$version"
