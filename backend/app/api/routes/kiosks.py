@@ -74,8 +74,8 @@ async def post_kiosk_update(kiosk_id: str):
 
 @router.get("/kiosks/agent/manifest")
 async def get_agent_manifest():
-    """Serve the kiosk bundle manifest (version + per-file hashes)."""
-    return kiosk_bundle.build_manifest()
+    """Serve the signed kiosk bundle manifest (version + per-file hashes + HMAC signature)."""
+    return kiosk_bundle.build_signed_manifest()
 
 
 @router.get("/kiosks/agent/files/{name}")

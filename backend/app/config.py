@@ -79,6 +79,7 @@ class Settings(BaseSettings):
     update_script_path: Path = Path("/usr/local/bin/update-calvin.sh")
     repo_dir: Path = Path("/home/calvin/calvin")
     system_path: str = "/home/calvin/.local/bin:/usr/local/bin:/usr/bin:/bin"
+    kiosk_signing_key_path: Path = Path("./data/kiosk-signing.key")
 
     @property
     def is_dev_mode(self) -> bool:

@@ -5,6 +5,7 @@ from dataclasses import dataclass
 from pathlib import Path
 
 from app.config import settings
+from app.services import kiosk_signing
 
 MIN_PYTHON = "3.9"
 
@@ -99,6 +100,13 @@ def build_manifest(root: Path | None = None) -> dict:
             }
         )
     return {"version": _version_from(files), "min_python": MIN_PYTHON, "files": files}
+
+
+def build_signed_manifest(root: Path | None = None) -> dict:
+    """build_manifest() plus an HMAC signature over its canonical form."""
+    m = build_manifest(root)
+    key = kiosk_signing.load_or_create_key(settings.kiosk_signing_key_path)
+    return {**m, "signature": kiosk_signing.sign(m, key), "sig_alg": kiosk_signing.ALG}
 
 
 def _version_from(files: list[dict]) -> str:
