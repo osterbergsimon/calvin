@@ -1,0 +1,39 @@
+from pathlib import Path
+
+import pytest
+
+from app.services import kiosk_bundle
+
+
+def _seed(root: Path):
+    for bf in kiosk_bundle.BUNDLE_FILES:
+        p = root / bf.repo_path
+        p.parent.mkdir(parents=True, exist_ok=True)
+        p.write_text(f"content-of-{bf.name}\n")
+
+
+def test_manifest_lists_all_files_with_hashes(tmp_path):
+    _seed(tmp_path)
+    m = kiosk_bundle.build_manifest(tmp_path)
+    assert m["min_python"] == "3.9"
+    assert len(m["version"]) == 16
+    names = {f["name"] for f in m["files"]}
+    assert names == {bf.name for bf in kiosk_bundle.BUNDLE_FILES}
+    for f in m["files"]:
+        assert len(f["sha256"]) == 64
+        assert f["target_path"].startswith("/")
+
+
+def test_version_is_stable_and_content_sensitive(tmp_path):
+    _seed(tmp_path)
+    v1 = kiosk_bundle.bundle_version(tmp_path)
+    assert v1 == kiosk_bundle.bundle_version(tmp_path)  # stable
+    (tmp_path / kiosk_bundle.BUNDLE_FILES[0].repo_path).write_text("CHANGED\n")
+    assert kiosk_bundle.bundle_version(tmp_path) != v1  # content-sensitive
+
+
+def test_read_bundle_file_rejects_unknown_name(tmp_path):
+    _seed(tmp_path)
+    assert kiosk_bundle.read_bundle_file("calvin-x.service", tmp_path)
+    with pytest.raises(KeyError):
+        kiosk_bundle.read_bundle_file("../../etc/passwd", tmp_path)

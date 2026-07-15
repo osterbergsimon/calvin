@@ -149,7 +149,6 @@ fi
 
 GIT_REPO="${_ENV_GIT_REPO:-${GIT_REPO:-$DEFAULT_GIT_REPO}}"
 GIT_BRANCH="${_ENV_GIT_BRANCH:-${GIT_BRANCH:-$DEFAULT_GIT_BRANCH}}"
-CALVIN_DIR="${CALVIN_DIR:-$DEFAULT_CALVIN_DIR}"
 CALVIN_USER="${CALVIN_USER:-$DEFAULT_CALVIN_USER}"
 LOG_FILE="${LOG_FILE:-$DEFAULT_LOG_FILE}"
 BACKEND_URL=""
@@ -167,7 +166,7 @@ Required:
                         http://homeserver.local:8000
 
 Environment overrides:
-  GIT_REPO, GIT_BRANCH, CALVIN_DIR, CALVIN_USER
+  GIT_REPO, GIT_BRANCH, CALVIN_USER
 EOF
 }
 
@@ -206,29 +205,19 @@ parse_args() {
     fi
 }
 
-ensure_repo_for_unit_files() {
-    # We only need the systemd unit files from the repo. The cheapest
-    # honest way is a shallow clone via the existing helper — same path
-    # as the all-in-one setup so future maintenance touches one place.
-    ensure_git_repo "${GIT_REPO}" "${GIT_BRANCH}" "${CALVIN_DIR}" "${CALVIN_USER}"
-}
-
 systemd_available() {
     [ -d /run/systemd/system ] && systemctl list-unit-files >/dev/null 2>&1
 }
 
 install_kiosk_services() {
-    log "Installing systemd services..."
-    install_systemd_service "${CALVIN_DIR}/deploy/systemd/calvin-x.service" "${CALVIN_DIR}"
-    install_systemd_service "${CALVIN_DIR}/deploy/systemd/calvin-kiosk-remote.service" "${CALVIN_DIR}"
-    install_systemd_service "${CALVIN_DIR}/deploy/systemd/calvin-display-agent.service" "${CALVIN_DIR}"
-
+    log "Enabling kiosk systemd services..."
     if systemd_available; then
+        systemctl daemon-reload
         enable_systemd_service "calvin-x.service"
         enable_systemd_service "calvin-kiosk-remote.service"
         enable_systemd_service "calvin-display-agent.service"
     else
-        log_warn "systemd is not running; installed service files but skipped enable"
+        log_warn "systemd is not running; skipped daemon-reload and enable"
     fi
 }
 
@@ -251,8 +240,6 @@ main() {
     log "Calvin Raspberry Pi Kiosk Setup"
     log "=========================================="
     log "Backend URL: ${BACKEND_URL}"
-    log "Repository:  ${GIT_REPO}"
-    log "Branch:      ${GIT_BRANCH}"
     log "User:        ${CALVIN_USER}"
     log ""
 
@@ -272,7 +259,6 @@ main() {
     log "Installing kiosk dependencies..."
     install_system_packages \
         curl \
-        git \
         xserver-xorg \
         xinit \
         openbox \
@@ -281,12 +267,13 @@ main() {
         xdotool \
         x11-xserver-utils
 
-    ensure_repo_for_unit_files
     install_kiosk_config
-
-    log "Installing display-power agent..."
-    install_script "${CALVIN_DIR}/deploy/kiosk-agent/calvin_display_agent.py" \
-        /usr/local/bin/calvin_display_agent.py "${CALVIN_USER}"
+    log "Installing kiosk bundle (agent + units + updater) from ${BACKEND_URL}..."
+    install_kiosk_bundle "${BACKEND_URL}" "${CALVIN_USER}"
+    log "Installing sudoers fragment..."
+    install -m 0440 /dev/stdin /etc/sudoers.d/calvin-kiosk-update <<'SUDOERS'
+calvin ALL=(root) NOPASSWD: /bin/systemctl start --no-block calvin-kiosk-update.service
+SUDOERS
 
     configure_display "${CALVIN_USER}"
     # Chromium is managed by calvin-kiosk-remote.service; openbox

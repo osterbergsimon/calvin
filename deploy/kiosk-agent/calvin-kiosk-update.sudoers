@@ -1,0 +1,3 @@
+# Installed to /etc/sudoers.d/calvin-kiosk-update (mode 0440).
+# Lets the unprivileged display-agent kick off the root updater — nothing else.
+calvin ALL=(root) NOPASSWD: /bin/systemctl start --no-block calvin-kiosk-update.service

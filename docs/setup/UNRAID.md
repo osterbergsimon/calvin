@@ -48,6 +48,9 @@ sudo reboot
 Use a stable hostname or IP for `<unraid-host>` so the kiosk URL does not
 change after reboot.
 
+To update the Pi's display-agent later, use **Settings → Kiosks → Update** — no
+SSH needed. See [Kiosk agent self-update](KIOSK_PROVISIONING.md#kiosk-agent-self-update).
+
 ## Persistent Data
 
 The template maps:

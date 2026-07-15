@@ -5,32 +5,51 @@
         No kiosks have connected yet. A kiosk registers itself the first time it loads the
         dashboard.
       </p>
-      <button
-        v-for="k in kiosks"
-        :key="k.id"
-        type="button"
-        class="kiosk-card"
-        :class="{ 'is-selected': k.id === selectedId }"
-        data-test="kiosk-card"
-        @click="select(k.id)"
-      >
-        <span class="kiosk-card__id">{{ k.id }}</span>
-        <span class="kiosk-card__meta-end">
-          <span
-            v-if="isPending(k)"
-            class="kiosk-card__badge"
-            data-test="kiosk-pending-badge"
-            role="img"
-            :aria-label="`${k.id}: offline, hardware config not yet applied`"
-            title="Offline — this kiosk hasn't applied the current hardware config yet"
-            >⚠</span
-          >
-          <span class="kiosk-card__status" :class="isOnline(k) ? 'is-online' : 'is-offline'">
-            {{ isOnline(k) ? "● Online" : "○ Offline" }}
+      <div v-for="k in kiosks" :key="k.id" class="kiosk-row">
+        <button
+          type="button"
+          class="kiosk-card"
+          :class="{ 'is-selected': k.id === selectedId }"
+          data-test="kiosk-card"
+          @click="select(k.id)"
+        >
+          <span class="kiosk-card__id">{{ k.id }}</span>
+          <span class="kiosk-card__meta-end">
+            <span
+              v-if="isPending(k)"
+              class="kiosk-card__badge"
+              data-test="kiosk-pending-badge"
+              role="img"
+              :aria-label="`${k.id}: offline, hardware config not yet applied`"
+              title="Offline — this kiosk hasn't applied the current hardware config yet"
+              >⚠</span
+            >
+            <span class="kiosk-card__status" :class="isOnline(k) ? 'is-online' : 'is-offline'">
+              {{ isOnline(k) ? "● Online" : "○ Offline" }}
+            </span>
           </span>
-        </span>
-        <span class="kiosk-card__meta">{{ k.hostname }} · seen {{ relativeTime(k.lastSeen) }}</span>
-      </button>
+          <span class="kiosk-card__meta"
+            >{{ k.hostname }} · seen {{ relativeTime(k.lastSeen) }}</span
+          >
+        </button>
+        <div v-if="updateAvailable(k) || k.agentUpdateRequested" class="kiosk-card__update-row">
+          <button
+            v-if="updateAvailable(k) || k.agentUpdateRequested"
+            type="button"
+            class="kiosk-card__update"
+            data-test="kiosk-update-btn"
+            :disabled="k.agentUpdateRequested"
+            @click.stop="onUpdate(k.id)"
+          >
+            {{ k.agentUpdateRequested ? "Updating…" : "Update" }}
+          </button>
+          <span
+            v-if="k.agentUpdateStatus && k.agentUpdateStatus.startsWith('error')"
+            class="kiosk-card__update-error"
+            >needs OS update</span
+          >
+        </div>
+      </div>
     </SettingsSection>
     <KioskStatusHeader
       v-if="selectedId"
@@ -196,6 +215,19 @@ const savedMsg = ref("");
 const contentMsg = ref("");
 const desiredVersions = ref({});
 const hardwareOpen = ref(false);
+const availableVersion = ref(null);
+
+function updateAvailable(k) {
+  return (
+    availableVersion.value != null &&
+    k.agentVersion != null &&
+    k.agentVersion !== availableVersion.value
+  );
+}
+
+async function onUpdate(id) {
+  await store.triggerUpdate(id);
+}
 
 const ONLINE_WINDOW_MS = 120000; // 2 minutes
 
@@ -400,12 +432,14 @@ onMounted(async () => {
   // Fetch all versions concurrently, then commit ONCE — writing the map inside
   // each concurrent callback races (each spreads a stale base, last write wins,
   // dropping entries).
-  const entries = await Promise.all(
-    kiosks.value.map(async k => [k.id, await store.fetchDeviceConfigVersion(k.id)])
-  );
+  const [entries, agentVersion] = await Promise.all([
+    Promise.all(kiosks.value.map(async k => [k.id, await store.fetchDeviceConfigVersion(k.id)])),
+    store.fetchAvailableAgentVersion(),
+  ]);
   const next = { ...desiredVersions.value };
   for (const [id, v] of entries) if (v) next[id] = v;
   desiredVersions.value = next;
+  availableVersion.value = agentVersion;
 });
 </script>
 
@@ -424,7 +458,6 @@ onMounted(async () => {
   width: 100%;
   text-align: left;
   padding: 10px 12px;
-  margin-bottom: 8px;
   border: 1px solid var(--border-color, rgba(255, 255, 255, 0.12));
   border-radius: 10px;
   background: transparent;
@@ -479,5 +512,35 @@ onMounted(async () => {
   margin-top: 8px;
   font-size: 0.85em;
   opacity: 0.7;
+}
+.kiosk-row {
+  margin-bottom: 8px;
+}
+.kiosk-row .kiosk-card {
+  margin-bottom: 0;
+}
+.kiosk-card__update-row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 4px 12px 6px;
+}
+.kiosk-card__update {
+  padding: 4px 12px;
+  border: 1px solid var(--accent-color, #6ea8fe);
+  border-radius: 6px;
+  background: transparent;
+  color: var(--accent-color, #6ea8fe);
+  cursor: pointer;
+  font-size: 0.85em;
+}
+.kiosk-card__update:disabled {
+  opacity: 0.5;
+  cursor: default;
+}
+.kiosk-card__update-error {
+  font-size: 0.8em;
+  opacity: 0.7;
+  color: var(--warn);
 }
 </style>

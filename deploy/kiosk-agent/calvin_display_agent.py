@@ -23,6 +23,38 @@ except ImportError:  # pragma: no cover - py<3.9
     ZoneInfo = None
 
 
+MIN_PYTHON = (3, 9)
+STATE_DIR = "/var/lib/calvin"
+READY_MARKER = "/run/calvin/agent-ready"
+
+
+def check_python():
+    if sys.version_info[:2] < MIN_PYTHON:
+        got = ".".join(map(str, sys.version_info[:3]))
+        need = ".".join(map(str, MIN_PYTHON))
+        log(f"python {got} is below the required {need}; refusing to start")
+        sys.exit(1)
+
+
+def running_version(state_dir=STATE_DIR):
+    """Return the applied bundle version from the state file, or None."""
+    try:
+        with open(os.path.join(state_dir, "agent-version.json")) as f:
+            return json.load(f).get("version")
+    except (OSError, ValueError):
+        return None
+
+
+def touch_ready(marker=READY_MARKER):
+    """Signal 'this agent booted and reached the backend' for the updater health check."""
+    try:
+        os.makedirs(os.path.dirname(marker), exist_ok=True)
+        with open(marker, "w") as f:
+            f.write("ok")
+    except OSError:
+        pass
+
+
 def cfg_get(cfg, *keys, default=None):
     """First non-None value among keys (snake_case preferred, camelCase fallback)."""
     for k in keys:
@@ -123,27 +155,82 @@ BACKOFF_SECONDS = 60
 
 _UNSET = object()  # sentinel: distinguishes "never polled" from version=None
 
+UPDATE_UNIT = "calvin-kiosk-update.service"
+
 
 def log(msg):
     print(f"[calvin-display-agent] {msg}", flush=True)
 
 
-def _config_url(backend_url, kiosk_id, host):
+def _fire_updater():
+    """Kick the root oneshot updater; returns without waiting (it restarts us)."""
+    try:
+        subprocess.run(
+            ["sudo", "-n", "systemctl", "start", "--no-block", UPDATE_UNIT],
+            capture_output=True, text=True, timeout=10,
+        )
+    except (FileNotFoundError, subprocess.SubprocessError) as e:
+        log(f"could not trigger updater ({e})")
+
+
+def last_failed_version(state_dir=STATE_DIR):
+    """Version the updater last recorded as errored, or None. Durable no-retry signal."""
+    try:
+        with open(os.path.join(state_dir, "agent-update-state.json")) as f:
+            st = json.load(f)
+    except (OSError, ValueError):
+        return None
+    status = st.get("status") or ""
+    return st.get("version") if status.startswith("error") else None
+
+
+def maybe_update(cfg, *, trigger=_fire_updater, state=None, state_dir=STATE_DIR):
+    """Trigger a self-update when the server requested one and we're stale.
+
+    `state["attempted"]` is a set of versions already tried this process, so a
+    failed/rolled-back version is not retried in a loop within one process lifetime.
+    `last_failed_version` provides a durable guard across restarts: if the updater
+    recorded an error for the available version, skip it even after a fresh start.
+    """
+    if state is None or not cfg_get(cfg, "agentUpdateRequested", default=False):
+        return False
+    available = cfg_get(cfg, "agentAvailableVersion")
+    if not available or available == running_version(state_dir):
+        return False
+    if available in state["attempted"]:
+        return False
+    if available == last_failed_version(state_dir):
+        return False
+    state["attempted"].add(available)
+    log(f"update requested: {running_version(state_dir)} -> {available}; triggering updater")
+    trigger()
+    return True
+
+
+def _config_url(backend_url, kiosk_id, host, kagent=None, kstat=None):
     """Effective-config URL: per-kiosk endpoint when a kiosk id is set, else global."""
     base = backend_url.rstrip("/")
     if kiosk_id:
-        encoded_host = urllib.parse.quote(host, safe="") if host else ""
-        q = f"khost={encoded_host}" if encoded_host else ""
+        params = {}
+        if host:
+            params["khost"] = host
+        if kagent:
+            params["kagent"] = kagent
+        if kstat:
+            params["kstat"] = kstat
+        q = urllib.parse.urlencode(params, quote_via=urllib.parse.quote)
         return f"{base}/api/kiosks/{kiosk_id}/config" + (f"?{q}" if q else "")
     return base + "/api/config"
 
 
-def fetch_config(backend_url):
+def fetch_config(backend_url, kstat="ok"):
     kiosk_id = os.environ.get("CALVIN_KIOSK_ID", "").strip()
     host = os.environ.get("CALVIN_KIOSK_HOSTNAME", "").strip() or socket.gethostname()
-    url = _config_url(backend_url, kiosk_id, host)
+    url = _config_url(backend_url, kiosk_id, host, kagent=running_version(), kstat=kstat)
     with urllib.request.urlopen(url, timeout=HTTP_TIMEOUT) as r:
-        return json.load(r)
+        cfg = json.load(r)
+    touch_ready()
+    return cfg
 
 
 def now_in(cfg):
@@ -169,6 +256,7 @@ def run(
         apply_device = apply_device_physical
     last = None
     last_version = _UNSET
+    update_state = {"attempted": set()}
     n = 0
     while iterations is None or n < iterations:
         n += 1
@@ -176,6 +264,7 @@ def run(
             cfg = fetch(backend_url)
             if not isinstance(cfg, dict):
                 raise TypeError(f"expected dict config, got {type(cfg).__name__}")
+            maybe_update(cfg, state=update_state)
             version = cfg_get(cfg, "deviceConfigVersion")
             if version != last_version:
                 apply_device(cfg)
@@ -359,6 +448,7 @@ def apply_device_physical(
 
 
 def main():
+    check_python()
     backend = os.environ.get("CALVIN_BACKEND_URL", "").strip()
     if not backend:
         log("CALVIN_BACKEND_URL not set")

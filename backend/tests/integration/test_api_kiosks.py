@@ -1,9 +1,13 @@
 """Integration tests for the kiosk registry."""
 
+from pathlib import Path
 from unittest.mock import patch
 
 import pytest
 from fastapi.testclient import TestClient
+
+# Root of the Calvin checkout — used to give bundle tests a real repo_dir.
+_REPO_ROOT = Path(__file__).parent.parent.parent.parent
 
 
 @pytest.mark.integration
@@ -26,7 +30,9 @@ def test_effective_config_merges_overrides_and_records(test_client: TestClient):
     assert body["orientation"] == "portrait"  # override applied
     assert "timeFormat" in body  # global defaults present
     assert "deviceConfigVersion" in body
-    assert resp.headers.get("ETag") == body["deviceConfigVersion"]
+    # ETag now incorporates deviceConfigVersion + agentAvailableVersion + updateRequested flag.
+    # agentAvailableVersion may be null here (no repo_dir patch), so only check containment.
+    assert body["deviceConfigVersion"] in resp.headers.get("ETag", "")
 
     kiosks = test_client.get("/api/kiosks").json()["kiosks"]
     assert any(k["id"] == "hallway-3f9a2c" and k["hostname"] == "pi-hallway" for k in kiosks)
@@ -138,3 +144,51 @@ def test_overrides_rejects_bad_available_screens_type(test_client: TestClient):
         json={"overrides": {"availableScreens": "not-a-list"}},
     )
     assert resp.status_code == 400
+
+
+@pytest.mark.integration
+def test_agent_manifest_served(test_client: TestClient):
+    from app.services import kiosk_bundle
+
+    with patch.object(kiosk_bundle.settings, "repo_dir", _REPO_ROOT):
+        r = test_client.get("/api/kiosks/agent/manifest")
+    assert r.status_code == 200
+    body = r.json()
+    assert len(body["version"]) == 16
+    assert body["min_python"] == "3.9"
+    assert any(f["name"] == "calvin_display_agent.py" for f in body["files"])
+
+
+@pytest.mark.integration
+def test_agent_file_served_and_allowlisted(test_client: TestClient):
+    from app.services import kiosk_bundle
+
+    with patch.object(kiosk_bundle.settings, "repo_dir", _REPO_ROOT):
+        r = test_client.get("/api/kiosks/agent/files/calvin-x.service")
+        assert r.status_code == 200
+        assert r.content  # non-empty
+        assert test_client.get("/api/kiosks/agent/files/..%2F..%2Fetc%2Fpasswd").status_code == 404
+        assert test_client.get("/api/kiosks/agent/files/nope.txt").status_code == 404
+
+
+@pytest.mark.integration
+def test_config_reports_available_version_and_flag(test_client: TestClient):
+    from app.services import kiosk_bundle
+
+    with patch.object(kiosk_bundle.settings, "repo_dir", _REPO_ROOT):
+        # first contact registers the kiosk + records its running version
+        test_client.get("/api/kiosks/k-upd/config?khost=pi&kagent=oldver&kstat=ok")
+        assert test_client.post("/api/kiosks/k-upd/update").json()["requested"] is True
+        resp = test_client.get("/api/kiosks/k-upd/config")
+        body = resp.json()
+    assert len(body["agentAvailableVersion"]) == 16
+    assert body["agentUpdateRequested"] is True
+    assert "_agentUpdateRequested" not in body  # internal key never leaks
+    # Full ETag assertion: ensures order, all three components, no reordering/omission bug.
+    expected_etag = f"{body['deviceConfigVersion']}.{body['agentAvailableVersion']}.{int(body['agentUpdateRequested'])}"
+    assert resp.headers.get("ETag") == expected_etag
+
+
+@pytest.mark.integration
+def test_post_update_unknown_kiosk_404(test_client: TestClient):
+    assert test_client.post("/api/kiosks/never-seen/update").status_code == 404

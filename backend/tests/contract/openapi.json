@@ -2283,9 +2283,70 @@
         ]
       }
     },
+    "/api/kiosks/agent/files/{name}": {
+      "get": {
+        "description": "Serve one allowlisted bundle file's raw bytes. 404 for anything else.",
+        "operationId": "get_agent_file_api_kiosks_agent_files__name__get",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "name",
+            "required": true,
+            "schema": {
+              "title": "Name",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Get Agent File",
+        "tags": [
+          "kiosks"
+        ]
+      }
+    },
+    "/api/kiosks/agent/manifest": {
+      "get": {
+        "description": "Serve the kiosk bundle manifest (version + per-file hashes).",
+        "operationId": "get_agent_manifest_api_kiosks_agent_manifest_get",
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            },
+            "description": "Successful Response"
+          }
+        },
+        "summary": "Get Agent Manifest",
+        "tags": [
+          "kiosks"
+        ]
+      }
+    },
     "/api/kiosks/{kiosk_id}/config": {
       "get": {
-        "description": "Return a kiosk's effective (merged) config; records the kiosk; ETag + 304.",
+        "description": "Return a kiosk's effective (merged) config; records the kiosk + its agent report.",
         "operationId": "get_kiosk_config_api_kiosks__kiosk_id__config_get",
         "parameters": [
           {
@@ -2311,6 +2372,38 @@
                 }
               ],
               "title": "Khost"
+            }
+          },
+          {
+            "in": "query",
+            "name": "kagent",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Kagent"
+            }
+          },
+          {
+            "in": "query",
+            "name": "kstat",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Kstat"
             }
           }
         ],
@@ -2425,6 +2518,47 @@
           }
         },
         "summary": "Put Kiosk Overrides",
+        "tags": [
+          "kiosks"
+        ]
+      }
+    },
+    "/api/kiosks/{kiosk_id}/update": {
+      "post": {
+        "description": "Flag a kiosk to self-update its agent on the next poll. 404 if unknown.",
+        "operationId": "post_kiosk_update_api_kiosks__kiosk_id__update_post",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "kiosk_id",
+            "required": true,
+            "schema": {
+              "title": "Kiosk Id",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Post Kiosk Update",
         "tags": [
           "kiosks"
         ]

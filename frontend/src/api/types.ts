@@ -563,6 +563,46 @@ export interface paths {
     patch?: never;
     trace?: never;
   };
+  "/api/kiosks/agent/files/{name}": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    /**
+     * Get Agent File
+     * @description Serve one allowlisted bundle file's raw bytes. 404 for anything else.
+     */
+    get: operations["get_agent_file_api_kiosks_agent_files__name__get"];
+    put?: never;
+    post?: never;
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  "/api/kiosks/agent/manifest": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    /**
+     * Get Agent Manifest
+     * @description Serve the kiosk bundle manifest (version + per-file hashes).
+     */
+    get: operations["get_agent_manifest_api_kiosks_agent_manifest_get"];
+    put?: never;
+    post?: never;
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
   "/api/kiosks/{kiosk_id}/config": {
     parameters: {
       query?: never;
@@ -572,7 +612,7 @@ export interface paths {
     };
     /**
      * Get Kiosk Config
-     * @description Return a kiosk's effective (merged) config; records the kiosk; ETag + 304.
+     * @description Return a kiosk's effective (merged) config; records the kiosk + its agent report.
      */
     get: operations["get_kiosk_config_api_kiosks__kiosk_id__config_get"];
     put?: never;
@@ -601,6 +641,26 @@ export interface paths {
      */
     put: operations["put_kiosk_overrides_api_kiosks__kiosk_id__overrides_put"];
     post?: never;
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  "/api/kiosks/{kiosk_id}/update": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    get?: never;
+    put?: never;
+    /**
+     * Post Kiosk Update
+     * @description Flag a kiosk to self-update its agent on the next poll. 404 if unknown.
+     */
+    post: operations["post_kiosk_update_api_kiosks__kiosk_id__update_post"];
     delete?: never;
     options?: never;
     head?: never;
@@ -2732,10 +2792,63 @@ export interface operations {
       };
     };
   };
+  get_agent_file_api_kiosks_agent_files__name__get: {
+    parameters: {
+      query?: never;
+      header?: never;
+      path: {
+        name: string;
+      };
+      cookie?: never;
+    };
+    requestBody?: never;
+    responses: {
+      /** @description Successful Response */
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": unknown;
+        };
+      };
+      /** @description Validation Error */
+      422: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["HTTPValidationError"];
+        };
+      };
+    };
+  };
+  get_agent_manifest_api_kiosks_agent_manifest_get: {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    requestBody?: never;
+    responses: {
+      /** @description Successful Response */
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": unknown;
+        };
+      };
+    };
+  };
   get_kiosk_config_api_kiosks__kiosk_id__config_get: {
     parameters: {
       query?: {
         khost?: string | null;
+        kagent?: string | null;
+        kstat?: string | null;
       };
       header?: never;
       path: {
@@ -2810,6 +2923,37 @@ export interface operations {
         "application/json": components["schemas"]["OverridesBody"];
       };
     };
+    responses: {
+      /** @description Successful Response */
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": unknown;
+        };
+      };
+      /** @description Validation Error */
+      422: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["HTTPValidationError"];
+        };
+      };
+    };
+  };
+  post_kiosk_update_api_kiosks__kiosk_id__update_post: {
+    parameters: {
+      query?: never;
+      header?: never;
+      path: {
+        kiosk_id: string;
+      };
+      cookie?: never;
+    };
+    requestBody?: never;
     responses: {
       /** @description Successful Response */
       200: {

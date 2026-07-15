@@ -1,0 +1,12 @@
+[Unit]
+Description=Calvin Kiosk Agent Updater (oneshot)
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=oneshot
+EnvironmentFile=/etc/default/calvin-kiosk
+ExecStart=/usr/local/bin/update-kiosk.sh
+StandardOutput=journal
+StandardError=journal
+SyslogIdentifier=calvin-kiosk-update

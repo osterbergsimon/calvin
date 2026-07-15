@@ -60,6 +60,99 @@ stable `CALVIN_KIOSK_ID`, display-power agent, rotation via
 `/etc/default/calvin-kiosk`. See the [kiosk identity](DEPLOYMENT_TOPOLOGIES.md#kiosk-identity)
 section to rename it.
 
+## Kiosk agent self-update
+
+The kiosk's Python display-agent and its systemd units can be updated remotely
+from the Calvin admin UI — no SSH, no re-flash.
+
+### How it works
+
+1. **Admin triggers the update.** In Settings → Kiosks, click **Update** next to
+   a kiosk. This sets a per-kiosk `agentUpdateRequested` flag in the backend
+   registry (`POST /api/kiosks/{id}/update`).
+
+2. **Agent sees the flag on its next config poll.** On every successful
+   `GET /api/kiosks/{id}/config` (roughly once per minute), the display-agent
+   checks for `agentUpdateRequested: true` and a new `agentAvailableVersion`. If
+   the available version differs from its own running version
+   (`/var/lib/calvin/agent-version.json`) and hasn't already been tried this
+   session, the agent fires the root oneshot updater:
+
+   ```
+   sudo -n systemctl start --no-block calvin-kiosk-update.service
+   ```
+
+   The sudoers fragment installed at `/etc/sudoers.d/calvin-kiosk-update`
+   (mode 0440) allows exactly this call for the `calvin` user — nothing else.
+
+3. **Updater fetches the bundle from the local backend.** `update-kiosk.sh`
+   (installed to `/usr/local/bin/`) pulls the bundle manifest from
+   `GET /api/kiosks/agent/manifest` and downloads only changed files from
+   `GET /api/kiosks/agent/files/{name}`. The bundle source is the **local
+   Calvin server**, not GitHub — no internet access required on the kiosk.
+
+   The bundle is ~6 files: the display-agent script, three systemd units, the
+   updater itself, and the oneshot service unit. No full repo checkout lives
+   on the kiosk.
+
+4. **Verify, backup, atomic swap, restart.** For each changed file the updater:
+   - verifies the sha256 against the manifest value,
+   - runs `py_compile` on Python files,
+   - backs up the current file to `/var/lib/calvin/agent-backup/`,
+   - atomic-replaces via `install -m <mode>`,
+   - restarts only the systemd units that own the changed files (uses
+     `daemon-reload` when a unit file changed).
+
+5. **Auto-rollback on unhealthy agent.** If the display-agent was among the
+   restarted units, the updater waits up to 30 seconds for it to become both
+   `active` and to have written the ready-marker
+   (`/run/calvin/agent-ready`, a tmpfs file created on the first successful
+   backend contact). If the agent doesn't come up healthy in time, all changed
+   files are restored from backup and the affected units are restarted again.
+
+6. **Update flag auto-clears.** On the next config poll after a successful
+   update the agent reports its new version via the `kagent` query parameter.
+   The backend auto-clears `agentUpdateRequested` once it sees
+   `kagent == agentAvailableVersion`.
+
+### Bundle source: local Calvin server only
+
+`setup-kiosk.sh` and `update-kiosk.sh` both pull the bundle from
+`${CALVIN_BACKEND_URL}/api/kiosks/agent/*`. The kiosk needs no internet access
+and no copy of the Calvin git repo; everything comes from the server it is
+already talking to.
+
+### Python version floor (`min_python`)
+
+The bundle manifest carries `"min_python": "3.9"`. The updater checks the
+kiosk's Python version before downloading anything; if the device Python is
+below 3.9 the update is aborted with a `python-too-old` status and the current
+agent is left in place. This surfaces in the backend's `agentUpdateStatus` field
+as `"device python < 3.9; keeping current agent"` — the kiosk will need an OS
+upgrade before the agent can be updated.
+
+The display-agent itself enforces the same floor at startup and exits
+immediately if it runs on Python older than 3.9.
+
+### Initial install
+
+`setup-kiosk.sh` calls `install_kiosk_bundle` (in `scripts/setup-common.sh`)
+to fetch and install the bundle during first-time setup. The agent version is
+seeded into `/var/lib/calvin/agent-version.json` at that point.
+
+### Future option: zipapp
+
+If the agent is ever split into multiple Python modules, packaging it as a
+`zipapp` `.pyz` file is a supported path — the bundle endpoint can serve any
+allowlisted file. PyInstaller and PyCrucible were rejected because they produce
+architecture-specific artifacts; the current `python3` script works on any
+Debian-family Raspberry Pi OS without recompilation.
+
+### "Update all" kiosks
+
+Bulk-updating all kiosks at once is not yet implemented. Each kiosk must be
+triggered individually. Bulk update is tracked as `calvin-3d1`.
+
 ## Troubleshooting
 
 - **Nothing happens on first boot:** confirm you flashed a *clean* image
