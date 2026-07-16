@@ -11,7 +11,7 @@ from typing import Any
 import httpx
 from fastapi import APIRouter, Body, File, HTTPException, Query, UploadFile
 from loguru import logger
-from pydantic import BaseModel
+from pydantic import BaseModel, TypeAdapter, ValidationError
 
 from app.models.db_models import PluginDB, PluginTypeDB
 from app.plugins.base import PluginType
@@ -20,6 +20,7 @@ from app.plugins.manager import plugin_manager
 from app.plugins.registry.loader import load_plugin_types_for_single
 from app.plugins.utils.instance_manager import apply_plugin_config_update
 from app.services.config_service import config_service
+from app.services.csp import get_sealed_mode
 from app.services.event_system import event_system
 from app.services.plugin_installer import plugin_installer
 from app.services.theme_installer import theme_installer
@@ -672,6 +673,20 @@ async def _update_plugin_type(
     # Check if it's a theme first (themes use type_id directly)
     db_type = await PluginTypeDB.objects.get_or_none(type_id=plugin_id)
 
+    # Sealed-mode guard: refuse to ENABLE a plugin that declares browser_origins,
+    # so the operator never ends up with a silently browser-blocked widget. Only
+    # a False->True transition is blocked; already-enabled plugins are untouched.
+    if enabled is True and getattr(type_info, "browser_origins", None):
+        already_enabled = bool(db_type and db_type.enabled)
+        if not already_enabled and await get_sealed_mode():
+            raise HTTPException(
+                status_code=403,
+                detail=(
+                    "Cannot enable a plugin that declares browser_origins while "
+                    "sealed mode is on. Disable sealed mode first (Settings → Security)."
+                ),
+            )
+
     if db_type and db_type.plugin_type == PluginType.THEME.value:
         # It's a theme - handle enabled status only (themes don't have config)
         if enabled is not None:
@@ -821,9 +836,19 @@ async def _update_plugin_type(
     }
 
 
+# Coerce a raw JSON `enabled` to `bool | None` with the same lax semantics as the
+# typed PluginTypeConfigUpdateRequest.enabled, so both enable endpoints behave
+# identically. This closes a guard bypass: an untyped {"enabled": "true"} must not
+# skip the sealed-mode check by staying a truthy string.
+_ENABLED_ADAPTER = TypeAdapter(bool | None)
+
+
 @router.put("/plugins/{plugin_id}", response_model=PluginTypeConfigUpdateResponse)
 async def update_plugin(plugin_id: str, config: dict[str, Any]):
-    enabled = config.get("enabled") if "enabled" in config else None
+    try:
+        enabled = _ENABLED_ADAPTER.validate_python(config.get("enabled"))
+    except ValidationError:
+        raise HTTPException(status_code=422, detail="'enabled' must be a boolean")
     config_without_enabled = {k: v for k, v in config.items() if k != "enabled"}
     return await _update_plugin_type(plugin_id, config_without_enabled, enabled)
 

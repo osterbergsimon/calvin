@@ -158,6 +158,16 @@ async def get_allowed_origins() -> list[str]:
     return result
 
 
+async def get_sealed_mode() -> bool:
+    """Whether sealed mode is on — the self-only CSP lockdown flag.
+
+    When on, the middleware suppresses all external origins (web-service
+    embeds, admin allowlist, plugin browser_origins) so the effective CSP is
+    baseline self-only.
+    """
+    return bool(await config_service.get_value("sealed_mode", False))
+
+
 async def get_plugin_browser_origins() -> list[str]:
     """Union of enabled plugins' declared browser_origins, validated.
 

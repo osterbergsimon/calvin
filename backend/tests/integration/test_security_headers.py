@@ -253,6 +253,63 @@ class TestSecurityHeaders:
         assert "connect-src 'self' cast.example.com" in csp
         assert "frame-src 'self' cast.example.com" in csp
 
+    def test_sealed_mode_forces_self_only_csp(self, security_test_client, monkeypatch):
+        """With sealed_mode on, the CSP is baseline self-only even when a web-service
+        embed, an admin allowlist entry, and a plugin browser_origins all exist."""
+        import json
+
+        from app.models.db_models import ConfigDB, PluginDB
+
+        class _Meta:
+            browser_origins = ["cast.example.com"]
+
+        class _Plugin:
+            metadata = _Meta()
+
+        import app.plugins.manager as manager_module
+
+        monkeypatch.setattr(
+            manager_module.plugin_manager, "get_plugins", lambda enabled_only=True: [_Plugin()]
+        )
+
+        async def _seed():
+            await ConfigDB.objects.create(
+                key="security_allowed_origins",
+                value=json.dumps(["https://grafana.lab:3000"]),
+                value_type="json",
+            )
+            await ConfigDB.objects.create(key="sealed_mode", value="true", value_type="bool")
+            await PluginDB.objects.create(
+                id="ws-embed",
+                type_id="iframe",
+                plugin_type="service",
+                name="Embed",
+                enabled=True,
+                config={"url": "https://embed.internal/board"},
+                display_order=0,
+                created_at=datetime.utcnow(),
+                updated_at=datetime.utcnow(),
+            )
+
+        loop = asyncio.new_event_loop()
+        asyncio.set_event_loop(loop)
+        try:
+            loop.run_until_complete(_seed())
+        finally:
+            loop.close()
+
+        csp = security_test_client.get("/api/health").headers.get("content-security-policy", "")
+        # frame-src must have no extra origins beyond 'self'
+        frame_directive = next((d for d in csp.split("; ") if d.startswith("frame-src")), "")
+        assert frame_directive == "frame-src 'self'"
+        assert "cast.example.com" not in csp
+        assert "grafana.lab" not in csp
+        assert "embed.internal" not in csp
+        # Baseline directives intact
+        assert "default-src 'self'" in csp
+        assert "img-src 'self' data:" in csp
+        assert "connect-src 'self'" in csp
+
     def test_db_error_falls_back_to_baseline_csp(self, security_test_client: TestClient):
         """A DB failure during origins lookup must never discard the response as a 500.
 

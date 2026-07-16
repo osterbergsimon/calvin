@@ -17,5 +17,19 @@ export const useSecurityStore = defineStore("security", () => {
     await axios.put("/api/security/allowed-origins", { origins });
   }
 
-  return { fetchAllowedOrigins, saveAllowedOrigins };
+  async function fetchSealedMode() {
+    try {
+      const response = await axios.get("/api/security/sealed-mode");
+      return response.data?.sealed_mode ?? false;
+    } catch (err) {
+      logError("[security]", "Failed to fetch sealed mode:", err);
+      throw err;
+    }
+  }
+
+  async function saveSealedMode(sealedMode) {
+    await axios.put("/api/security/sealed-mode", { sealed_mode: sealedMode });
+  }
+
+  return { fetchAllowedOrigins, saveAllowedOrigins, fetchSealedMode, saveSealedMode };
 });
