@@ -18,6 +18,7 @@ SYSTEMCTL="${CALVIN_SYSTEMCTL:-systemctl}"
 PYTHON="${CALVIN_PYTHON:-python3}"
 STATE_DIR="${CALVIN_AGENT_STATE_DIR:-/var/lib/calvin}"
 SYSTEMD_DIR="${CALVIN_SYSTEMD_DIR:-/etc/systemd/system}"
+BIN_DIR="${CALVIN_BIN_DIR:-/usr/local/bin}"
 READY_MARKER="${CALVIN_AGENT_READY_MARKER:-/run/calvin/agent-ready}"
 HEALTH_TIMEOUT="${CALVIN_UPDATE_HEALTH_TIMEOUT:-30}"
 BACKUP_DIR="${STATE_DIR}/agent-backup"
@@ -27,6 +28,14 @@ RECEIPT_FILE="${STATE_DIR}/agent-manifest.json"
 BASE="${CALVIN_BACKEND_URL%/}"
 
 log() { printf '[update-kiosk] %s\n' "$*"; }
+
+path_allowed() {  # $1 = absolute target path
+  case "$1" in
+    *..*) return 1 ;;                         # no traversal
+    "$BIN_DIR"/*|"$SYSTEMD_DIR"/*) return 0 ;;
+    *) return 1 ;;
+  esac
+}
 
 # Verify the manifest HMAC signature when a signing key is configured (calvin-5vw).
 # $1 = manifest JSON. Prints a failure reason to stdout and returns non-zero on failure.
@@ -172,6 +181,10 @@ installed_sha() { [ -f "$1" ] && sha256sum "$1" | cut -d' ' -f1 || echo ""; }
 
 while IFS=$'\t' read -r name sha mode target unit enable; do
   [ -n "$name" ] || continue
+  if ! path_allowed "$target"; then
+    write_state error verify "target path not allowed: $target" "$version"
+    log "target path not allowed: $target"; exit 1
+  fi
   old="$(installed_sha "$target")"
   if [ "$old" = "$sha" ]; then continue; fi   # unchanged
   # fetch + verify
@@ -243,6 +256,9 @@ decommission_drops() {
   local removed_unit=0 t base
   for t in "${DROPPED_TARGETS[@]:-}"; do
     [ -n "$t" ] || continue
+    if ! path_allowed "$t"; then
+      log "refusing to decommission out-of-allowlist path: $t"; continue
+    fi
     case "$t" in
       "$SYSTEMD_DIR"/*.service)
         base="$(basename "$t")"
