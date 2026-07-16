@@ -19,7 +19,11 @@ def load_or_create_key(path: Path) -> bytes:
     try:
         fd = os.open(path, os.O_CREAT | os.O_EXCL | os.O_WRONLY, 0o600)
     except FileExistsError:
-        return bytes.fromhex(path.read_text().strip())
+        raw = path.read_text().strip()
+        try:
+            return bytes.fromhex(raw)
+        except ValueError as exc:
+            raise ValueError(f"kiosk signing key at {path} is not valid hex") from exc
     try:
         hex_key = secrets.token_hex(32)
         os.write(fd, hex_key.encode())

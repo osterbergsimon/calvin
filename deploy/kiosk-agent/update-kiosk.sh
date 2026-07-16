@@ -78,8 +78,8 @@ if [ "${1:-}" = "--self-check" ]; then
   _m="$("$CURL" -fsSL "$BASE/api/kiosks/agent/manifest")" || { log "self-check: manifest fetch failed"; exit 1; }
   printf '%s' "$_m" | "$PYTHON" -c 'import sys,json; d=json.load(sys.stdin); sys.exit(0 if d.get("version") and isinstance(d.get("files"), list) else 1)' || {
     log "self-check: manifest invalid"; exit 1; }
-  if ! verify_manifest_sig "$_m" >/dev/null; then
-    log "self-check: manifest signature verification failed"; exit 1; fi
+  _sc_reason="$(verify_manifest_sig "$_m")" || {
+    log "self-check: manifest ${_sc_reason:-signature verification failed}"; exit 1; }
   log "self-check: ok"; exit 0
 fi
 

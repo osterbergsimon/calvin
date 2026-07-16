@@ -39,6 +39,9 @@ Options:
   --ssh-pubkey <FILE>   Public key to install for the calvin user
   --git-repo <URL>      Override Calvin repo (default: $DEFAULT_GIT_REPO)
   --git-branch <NAME>   Override branch (default: $DEFAULT_GIT_BRANCH)
+  --signing-key <HEX>   Out-of-band 0600 manifest signing secret (hex)
+  --signing-key-file <FILE>
+                        Read signing secret from a 0600 file
 EOF
 }
 
