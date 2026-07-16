@@ -61,3 +61,31 @@ def test_enable_does_not_change_version(tmp_path):
         f"{f['name']}:{f['sha256']}" for f in sorted(m["files"], key=lambda f: f["name"])
     )
     assert m["version"] == hashlib.sha256(blob.encode()).hexdigest()[:16]
+
+
+def test_signed_manifest_verifies(tmp_path, monkeypatch):
+    from app.services import kiosk_signing
+
+    _seed(tmp_path)
+    keyfile = tmp_path / "kiosk-signing.key"
+    monkeypatch.setattr(kiosk_bundle.settings, "kiosk_signing_key_path", keyfile)
+    m = kiosk_bundle.build_signed_manifest(tmp_path)
+    assert m["sig_alg"] == "hmac-sha256"
+    unsigned = {k: v for k, v in m.items() if k not in ("signature", "sig_alg")}
+    key = kiosk_signing.load_or_create_key(keyfile)
+    assert kiosk_signing.verify(unsigned, m["signature"], key) is True
+    # signing does not change the version hash
+    assert unsigned["version"] == kiosk_bundle.build_manifest(tmp_path)["version"]
+
+
+def test_signed_manifest_tamper_detected(tmp_path, monkeypatch):
+    from app.services import kiosk_signing
+
+    _seed(tmp_path)
+    keyfile = tmp_path / "kiosk-signing.key"
+    monkeypatch.setattr(kiosk_bundle.settings, "kiosk_signing_key_path", keyfile)
+    m = kiosk_bundle.build_signed_manifest(tmp_path)
+    key = kiosk_signing.load_or_create_key(keyfile)
+    m["files"][0]["sha256"] = "f" * 64  # tamper after signing
+    unsigned = {k: v for k, v in m.items() if k not in ("signature", "sig_alg")}
+    assert kiosk_signing.verify(unsigned, m["signature"], key) is False

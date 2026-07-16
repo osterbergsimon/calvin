@@ -764,14 +764,42 @@ verify_setup() {
     
     log "Setup verification complete"
 }
+# Write the kiosk manifest signing key to a root-only 0600 file (calvin-5vw). No-op if empty.
+install_signing_key() {
+    local key="$1"
+    local file="${CALVIN_KIOSK_SIGNING_ENV_FILE:-/etc/default/calvin-kiosk-signing}"
+    [ -n "$key" ] || return 0
+    install -m 0600 /dev/null "$file"
+    printf 'CALVIN_KIOSK_SIGNING_KEY=%s\n' "$key" > "$file"
+}
+
 # Fetch the updater from the local backend, verify it against the manifest, and
 # run it in --bootstrap mode to install the whole bundle (agent, units, updater,
 # version, receipt). The updater is the single authoritative install path.
 bootstrap_kiosk() {
     local backend_url="${1%/}"
-    local manifest sha tmp got
+    local sig_file="${CALVIN_KIOSK_SIGNING_ENV_FILE:-/etc/default/calvin-kiosk-signing}"
+    local key="" manifest sha tmp got
+    [ -f "$sig_file" ] && key="$(grep '^CALVIN_KIOSK_SIGNING_KEY=' "$sig_file" | cut -d= -f2- || true)"
     manifest="$(curl -fsSL "${backend_url}/api/kiosks/agent/manifest")" \
         || error_exit "Failed to fetch kiosk bundle manifest from ${backend_url}" 1
+    if [ -n "$key" ]; then
+        # Pass the manifest via env var, NOT a pipe: a heredoc (`<<'PY'`) claims python's
+        # stdin, so a `printf ... | python - <<'PY'` pipe is silently discarded.
+        MANIFEST_JSON="$manifest" CALVIN_KIOSK_SIGNING_KEY="$key" python3 - <<'PY' \
+            || error_exit "kiosk manifest signature verification failed" 1
+import json, hmac, hashlib, os
+m = json.loads(os.environ["MANIFEST_JSON"])
+key = os.environ["CALVIN_KIOSK_SIGNING_KEY"]
+sig = m.pop("signature", None)
+alg = m.pop("sig_alg", None)
+if sig is None or alg is None or alg != "hmac-sha256":
+    raise SystemExit(1)
+canon = json.dumps(m, sort_keys=True, separators=(",", ":")).encode()
+raise SystemExit(0 if hmac.compare_digest(
+    hmac.new(bytes.fromhex(key), canon, hashlib.sha256).hexdigest(), str(sig)) else 1)
+PY
+    fi
     sha="$(printf '%s' "$manifest" | python3 -c 'import sys, json
 m = json.load(sys.stdin)
 print(next((f["sha256"] for f in m["files"] if f["name"] == "update-kiosk.sh"), ""))')"

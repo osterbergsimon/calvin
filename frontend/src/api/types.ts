@@ -592,7 +592,7 @@ export interface paths {
     };
     /**
      * Get Agent Manifest
-     * @description Serve the kiosk bundle manifest (version + per-file hashes).
+     * @description Serve the signed kiosk bundle manifest (version + per-file hashes + HMAC signature).
      */
     get: operations["get_agent_manifest_api_kiosks_agent_manifest_get"];
     put?: never;

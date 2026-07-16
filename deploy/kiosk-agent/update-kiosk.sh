@@ -8,6 +8,9 @@ set -euo pipefail
 ENV_FILE="${CALVIN_KIOSK_ENV_FILE:-/etc/default/calvin-kiosk}"
 # shellcheck disable=SC1090
 [ -f "$ENV_FILE" ] && . "$ENV_FILE"
+SIGNING_ENV_FILE="${CALVIN_KIOSK_SIGNING_ENV_FILE:-/etc/default/calvin-kiosk-signing}"
+# shellcheck disable=SC1090
+[ -f "$SIGNING_ENV_FILE" ] && . "$SIGNING_ENV_FILE"
 : "${CALVIN_BACKEND_URL:?CALVIN_BACKEND_URL not set}"
 
 CURL="${CALVIN_CURL:-curl}"
@@ -25,6 +28,38 @@ BASE="${CALVIN_BACKEND_URL%/}"
 
 log() { printf '[update-kiosk] %s\n' "$*"; }
 
+# Verify the manifest HMAC signature when a signing key is configured (calvin-5vw).
+# $1 = manifest JSON. Prints a failure reason to stdout and returns non-zero on failure.
+# No key configured -> returns 0 (LAN-trust, unchanged behavior).
+verify_manifest_sig() {
+  [ -n "${CALVIN_KIOSK_SIGNING_KEY:-}" ] || return 0
+  CALVIN_KIOSK_SIGNING_KEY="$CALVIN_KIOSK_SIGNING_KEY" MANIFEST_JSON="$1" "$PYTHON" - <<'PY'
+import sys, json, hmac, hashlib, os
+key_hex = os.environ.get("CALVIN_KIOSK_SIGNING_KEY", "")
+def fail(msg):
+    sys.stdout.write(msg)
+    sys.exit(1)
+try:
+    m = json.loads(os.environ["MANIFEST_JSON"])
+except Exception:
+    fail("signature: manifest unparseable")
+sig = m.pop("signature", None)
+alg = m.pop("sig_alg", None)
+if sig is None or alg is None:
+    fail("signature required but missing")
+if alg != "hmac-sha256":
+    fail("unsupported manifest sig_alg")
+try:
+    key = bytes.fromhex(key_hex)
+except ValueError:
+    fail("signing key malformed")
+canon = json.dumps(m, sort_keys=True, separators=(",", ":")).encode()
+tag = hmac.new(key, canon, hashlib.sha256).hexdigest()
+if not hmac.compare_digest(tag, str(sig)):
+    fail("signature invalid")
+PY
+}
+
 # --self-check: read-only validation of THIS updater's startup + fetch/parse path.
 # A running updater invokes this on a STAGED new updater before adopting it, so a
 # dead-on-arrival updater is never installed. Mutates nothing (no state-dir mkdir,
@@ -34,6 +69,8 @@ if [ "${1:-}" = "--self-check" ]; then
   _m="$("$CURL" -fsSL "$BASE/api/kiosks/agent/manifest")" || { log "self-check: manifest fetch failed"; exit 1; }
   printf '%s' "$_m" | "$PYTHON" -c 'import sys,json; d=json.load(sys.stdin); sys.exit(0 if d.get("version") and isinstance(d.get("files"), list) else 1)' || {
     log "self-check: manifest invalid"; exit 1; }
+  if ! verify_manifest_sig "$_m" >/dev/null; then
+    log "self-check: manifest signature verification failed"; exit 1; fi
   log "self-check: ok"; exit 0
 fi
 
@@ -99,6 +136,10 @@ PY
 
 manifest="$("$CURL" -fsSL "$BASE/api/kiosks/agent/manifest")" || {
   write_state error fetch "manifest fetch failed"; log "manifest fetch failed"; exit 1; }
+
+_sig_reason="$(verify_manifest_sig "$manifest")" || {
+  write_state error verify "manifest ${_sig_reason:-signature verification failed}"
+  log "manifest ${_sig_reason:-signature verification failed}"; exit 1; }
 
 version="$(printf '%s' "$manifest" | "$PYTHON" -c 'import sys,json;print(json.load(sys.stdin)["version"])')"
 ALL_NAMES=" $(printf '%s' "$manifest" | "$PYTHON" -c 'import sys,json;print(" ".join(f["name"] for f in json.load(sys.stdin)["files"]))') "

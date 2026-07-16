@@ -19,7 +19,7 @@ SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]:-$0}")" && pwd)"
 REPO_ROOT="$(cd "${SCRIPT_DIR}/.." && pwd)"
 
 BACKEND_URL=""; WIFI_SSID=""; WIFI_PSK=""; WIFI_COUNTRY=""
-HOSTNAME_ARG=""; SSH_PUBKEY_FILE=""; BOOT_DIR=""
+HOSTNAME_ARG=""; SSH_PUBKEY_FILE=""; BOOT_DIR=""; SIGNING_KEY=""
 GIT_REPO="${GIT_REPO:-$DEFAULT_GIT_REPO}"; GIT_BRANCH="${GIT_BRANCH:-$DEFAULT_GIT_BRANCH}"
 
 usage() {
@@ -45,7 +45,7 @@ EOF
 parse_args() {
     # Reset flag-driven globals so repeated calls (and tests) don't accumulate.
     BACKEND_URL=""; WIFI_SSID=""; WIFI_PSK=""; WIFI_COUNTRY=""
-    HOSTNAME_ARG=""; SSH_PUBKEY_FILE=""; BOOT_DIR=""
+    HOSTNAME_ARG=""; SSH_PUBKEY_FILE=""; BOOT_DIR=""; SIGNING_KEY=""
     GIT_REPO="${DEFAULT_GIT_REPO}"; GIT_BRANCH="${DEFAULT_GIT_BRANCH}"
     while [ "$#" -gt 0 ]; do
         case "$1" in
@@ -67,6 +67,10 @@ parse_args() {
             --git-repo=*) GIT_REPO="${1#*=}"; shift ;;
             --git-branch) GIT_BRANCH="${2:-}"; shift 2 ;;
             --git-branch=*) GIT_BRANCH="${1#*=}"; shift ;;
+            --signing-key) SIGNING_KEY="${2:-}"; shift 2 ;;
+            --signing-key=*) SIGNING_KEY="${1#*=}"; shift ;;
+            --signing-key-file) SIGNING_KEY="$(cat "${2:-}")"; shift 2 ;;
+            --signing-key-file=*) SIGNING_KEY="$(cat "${1#*=}")"; shift ;;
             --source-only) shift ;;
             -h|--help) usage; exit 0 ;;
             *) echo "Unknown argument: $1" >&2; usage >&2; exit 1 ;;
@@ -126,6 +130,7 @@ FIRSTRUN_EOF
     emit_var BACKEND_URL     "${BACKEND_URL}"
     emit_var SETUP_KIOSK_URL "${setup_url}"
     emit_var SSH_PUBKEY      "${pubkey}"
+    emit_var SIGNING_KEY     "${SIGNING_KEY}"
 
     cat <<'FIRSTRUN_EOF'
 
@@ -169,6 +174,13 @@ touch "${ENV_FILE}"; chmod 644 "${ENV_FILE}"
     echo "CALVIN_SETUP_KIOSK_URL=${SETUP_KIOSK_URL}"
     [ -n "${SSH_PUBKEY}" ] && echo "CALVIN_KIOSK_SSH_PUBKEY=${SSH_PUBKEY}"
 } > "${ENV_FILE}"
+
+# 4b. Seed the root-only manifest signing key (calvin-5vw), if one was baked.
+if [ -n "${SIGNING_KEY}" ]; then
+    SIGNING_ENV_FILE=/etc/default/calvin-kiosk-signing
+    touch "${SIGNING_ENV_FILE}"; chmod 600 "${SIGNING_ENV_FILE}"
+    echo "CALVIN_KIOSK_SIGNING_KEY=${SIGNING_KEY}" > "${SIGNING_ENV_FILE}"
+fi
 
 # 5. Install the boot-2 wrapper + oneshot service.
 cat > /usr/local/bin/calvin-kiosk-firstboot.sh <<'WRAPPER_EOF'

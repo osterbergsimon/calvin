@@ -462,3 +462,110 @@ CALVIN_AGENT_STATE_DIR="$tmp/state_boot" CALVIN_SYSTEMD_DIR="$tmp/boot_systemd" 
   || { echo "FAIL bootstrap-idempotent: exited non-zero"; exit 1; }
 grep -q 'noop\|success' "$tmp/state_boot/agent-update-state.json" || { echo "FAIL bootstrap-idempotent: not noop/success"; exit 1; }
 echo "PASS bootstrap-install-and-idempotent"
+
+# ===== manifest signature verification (calvin-5vw) =====
+TEST_SIGNING_KEY="0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef"
+
+# Sign the JSON manifest at $1 in place (adds signature + sig_alg), using TEST_SIGNING_KEY.
+sign_manifest() {
+  CALVIN_KIOSK_SIGNING_KEY="$TEST_SIGNING_KEY" python3 - "$1" <<'PY'
+import sys, json, hmac, hashlib, os
+path = sys.argv[1]
+m = json.load(open(path))
+key = bytes.fromhex(os.environ["CALVIN_KIOSK_SIGNING_KEY"])
+canon = json.dumps(m, sort_keys=True, separators=(",", ":")).encode()
+m["signature"] = hmac.new(key, canon, hashlib.sha256).hexdigest()
+m["sig_alg"] = "hmac-sha256"
+json.dump(m, open(path, "w"))
+PY
+}
+
+# healthy systemctl (agent restart recreates the readiness marker)
+cat > "$tmp/bin/systemctl" <<EOF
+#!/usr/bin/env bash
+echo "\$*" >> "$tmp/systemctl.log"
+if [ "\$1" = "restart" ]; then ( sleep 1 && mkdir -p "$tmp/run" && touch "$tmp/run/agent-ready" ) & fi
+case "\$1" in "is-active"|"show") exit 0;; esac
+exit 0
+EOF
+chmod +x "$tmp/bin/systemctl"
+export CALVIN_UPDATE_HEALTH_TIMEOUT=4
+
+# Build a fresh unsigned manifest (agent-only) into $tmp/srv/manifest.json
+build_sig_manifest() {
+  printf 'import sys\nsys.exit(0)\n' > "$tmp/srv/calvin_display_agent.py"
+  local sha; sha="$(sha256sum "$tmp/srv/calvin_display_agent.py" | cut -d' ' -f1)"
+  echo 'print("OLD")' > "$tmp/local/calvin_display_agent.py"
+  cat > "$tmp/srv/manifest.json" <<MEOF
+{"version":"sigv000000000000","min_python":"3.9","files":[
+ {"name":"calvin_display_agent.py","sha256":"$sha","mode":"0755",
+  "target_path":"$tmp/local/calvin_display_agent.py","restart_unit":"calvin-display-agent.service","enable":false}]}
+MEOF
+  cat > "$tmp/bin/curl" <<CEOF
+#!/usr/bin/env bash
+for a in "\$@"; do case "\$a" in
+  */agent/manifest) cat "$tmp/srv/manifest.json"; exit 0;;
+  */agent/files/calvin_display_agent.py) cat "$tmp/srv/calvin_display_agent.py"; exit 0;;
+esac; done
+exit 22
+CEOF
+  chmod +x "$tmp/bin/curl"
+}
+
+# A signing env-file the updater will source.
+printf 'CALVIN_KIOSK_SIGNING_KEY=%s\n' "$TEST_SIGNING_KEY" > "$tmp/signing.env"
+
+# --- valid signature + key set -> update proceeds ---
+mkdir -p "$tmp/state_sig1"
+build_sig_manifest; sign_manifest "$tmp/srv/manifest.json"
+CALVIN_AGENT_STATE_DIR="$tmp/state_sig1" CALVIN_KIOSK_SIGNING_ENV_FILE="$tmp/signing.env" \
+  bash "$SCRIPT" || { echo "FAIL sig-valid: exited non-zero"; exit 1; }
+grep -q 'sys.exit(0)' "$tmp/local/calvin_display_agent.py" || { echo "FAIL sig-valid: agent not swapped"; exit 1; }
+echo "PASS sig-valid"
+
+# --- tampered manifest (field changed after signing) -> abort, nothing installed ---
+mkdir -p "$tmp/state_sig2"
+build_sig_manifest; sign_manifest "$tmp/srv/manifest.json"
+sed -i 's/sigv000000000000/TAMPERED00000000/' "$tmp/srv/manifest.json"   # break the signed bytes
+if CALVIN_AGENT_STATE_DIR="$tmp/state_sig2" CALVIN_KIOSK_SIGNING_ENV_FILE="$tmp/signing.env" bash "$SCRIPT"; then
+  echo "FAIL sig-tamper: should abort"; exit 1; fi
+grep -q 'OLD' "$tmp/local/calvin_display_agent.py" || { echo "FAIL sig-tamper: agent swapped despite bad signature"; exit 1; }
+grep -q 'verify' "$tmp/state_sig2/agent-update-state.json" || { echo "FAIL sig-tamper: no verify error state"; exit 1; }
+echo "PASS sig-tampered-manifest"
+
+# --- corrupt signature value -> abort ---
+mkdir -p "$tmp/state_sig3"
+build_sig_manifest; sign_manifest "$tmp/srv/manifest.json"
+python3 - "$tmp/srv/manifest.json" <<'PY'
+import sys, json
+p = sys.argv[1]; m = json.load(open(p)); m["signature"] = "00" * 32; json.dump(m, open(p, "w"))
+PY
+if CALVIN_AGENT_STATE_DIR="$tmp/state_sig3" CALVIN_KIOSK_SIGNING_ENV_FILE="$tmp/signing.env" bash "$SCRIPT"; then
+  echo "FAIL sig-bad: should abort"; exit 1; fi
+grep -q 'OLD' "$tmp/local/calvin_display_agent.py" || { echo "FAIL sig-bad: agent swapped"; exit 1; }
+echo "PASS sig-bad-signature"
+
+# --- missing signature while key set -> abort (downgrade defense) ---
+mkdir -p "$tmp/state_sig4"
+build_sig_manifest   # NOT signed
+if CALVIN_AGENT_STATE_DIR="$tmp/state_sig4" CALVIN_KIOSK_SIGNING_ENV_FILE="$tmp/signing.env" bash "$SCRIPT"; then
+  echo "FAIL sig-missing: should abort"; exit 1; fi
+grep -q 'OLD' "$tmp/local/calvin_display_agent.py" || { echo "FAIL sig-missing: agent swapped"; exit 1; }
+echo "PASS sig-missing-is-downgrade-defense"
+
+# --- unknown sig_alg while key set -> abort ---
+mkdir -p "$tmp/state_sig5"
+build_sig_manifest; sign_manifest "$tmp/srv/manifest.json"
+sed -i 's/hmac-sha256/hmac-sha512/' "$tmp/srv/manifest.json"
+if CALVIN_AGENT_STATE_DIR="$tmp/state_sig5" CALVIN_KIOSK_SIGNING_ENV_FILE="$tmp/signing.env" bash "$SCRIPT"; then
+  echo "FAIL sig-alg: should abort"; exit 1; fi
+grep -q 'OLD' "$tmp/local/calvin_display_agent.py" || { echo "FAIL sig-alg: agent swapped"; exit 1; }
+echo "PASS sig-unknown-alg"
+
+# --- no key configured -> signature ignored, update proceeds (backward compatible) ---
+mkdir -p "$tmp/state_sig6"
+build_sig_manifest   # unsigned; no signing env file provided
+CALVIN_AGENT_STATE_DIR="$tmp/state_sig6" CALVIN_KIOSK_SIGNING_ENV_FILE="$tmp/nonexistent.env" \
+  bash "$SCRIPT" || { echo "FAIL sig-nokey: exited non-zero"; exit 1; }
+grep -q 'sys.exit(0)' "$tmp/local/calvin_display_agent.py" || { echo "FAIL sig-nokey: agent not swapped"; exit 1; }
+echo "PASS sig-no-key-backward-compatible"

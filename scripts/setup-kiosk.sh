@@ -152,6 +152,7 @@ GIT_BRANCH="${_ENV_GIT_BRANCH:-${GIT_BRANCH:-$DEFAULT_GIT_BRANCH}}"
 CALVIN_USER="${CALVIN_USER:-$DEFAULT_CALVIN_USER}"
 LOG_FILE="${LOG_FILE:-$DEFAULT_LOG_FILE}"
 BACKEND_URL=""
+SIGNING_KEY=""
 
 usage() {
     cat <<EOF
@@ -181,6 +182,8 @@ parse_args() {
                 BACKEND_URL="${1#*=}"
                 shift
                 ;;
+            --signing-key) SIGNING_KEY="${2:-}"; shift 2 ;;
+            --signing-key=*) SIGNING_KEY="${1#*=}"; shift ;;
             -h|--help)
                 usage
                 exit 0
@@ -265,6 +268,7 @@ main() {
         x11-xserver-utils
 
     install_kiosk_config
+    install_signing_key "${SIGNING_KEY}"
     log "Bootstrapping kiosk bundle via update-kiosk.sh --bootstrap from ${BACKEND_URL}..."
     bootstrap_kiosk "${BACKEND_URL}"
     log "Installing sudoers fragment..."
