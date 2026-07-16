@@ -128,7 +128,9 @@ regenerates this file — don't edit it by hand there.
 > external origins its frontend may reach in `PluginMetadata` (plugin.py), not in
 > the manifest — see [PLUGIN_INTERFACE.md](PLUGIN_INTERFACE.md#pluginmetadata). It
 > extends the kiosk CSP for enabled plugins and is validated (host-source shape,
-> no CIDR) at plugin load and by the `calvin-plugins` repo validator.
+> no CIDR) at plugin load and by the `calvin-plugins` repo validator. It is
+> operator-revocable — sealed mode suppresses it and blocks enabling the plugin;
+> see [PLUGIN_INTERFACE.md](PLUGIN_INTERFACE.md#pluginmetadata).
 
 ### Dependencies
 

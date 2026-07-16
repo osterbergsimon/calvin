@@ -68,6 +68,14 @@ hosts (e.g. album-art CDNs that differ by casting app) are not a fit for a fixed
 list; proxy those through Calvin or add them to the admin allowlist. Backend-side
 network access needs no declaration — it is invisible to the kiosk browser.
 
+**`browser_origins` is operator-revocable — degrade gracefully.** Declaring an
+origin is a request, not a guarantee. An operator can enable **sealed mode**
+(Settings → Security), a lockdown that collapses the kiosk CSP to self-only:
+while it is on, every plugin's `browser_origins` is suppressed from the CSP, and
+enabling a plugin that declares any is refused (`403`). Treat kiosk-browser reach
+to an external origin as best-effort — the plugin's frontend should stay usable,
+or fail visibly rather than silently, when its declared origins are blocked.
+
 Renderer schema fields per kind: [PLUGIN_FRONTEND_COMPONENTS.md](PLUGIN_FRONTEND_COMPONENTS.md).
 
 ### Config field shape
