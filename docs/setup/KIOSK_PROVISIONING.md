@@ -164,6 +164,42 @@ trust-on-first-use window — is tracked as **calvin-5vw**. The bundle version i
 (a change marker, not a monotonic counter), so there is no anti-rollback protection: a server
 rolled back to an older bundle will be adopted.
 
+### Manifest signing (closing the LAN-MITM)
+
+The backend signs the bundle manifest with HMAC-SHA256 using a shared secret generated on first
+run at `./data/kiosk-signing.key` (mode `0600`; the path is logged the first time it is created).
+When a kiosk has that secret baked, it verifies the manifest signature before trusting the
+manifest, the file hashes, or any downloaded file — closing the LAN man-in-the-middle gap that
+plain sha256 integrity leaves open.
+
+**Enable it on a kiosk (out-of-band — never over the LAN):**
+
+1. On the server, read the secret over your existing trusted access:
+   ```bash
+   cat ./data/kiosk-signing.key
+   ```
+2. Pass it to provisioning:
+   - Zero-touch: `bake-kiosk-firstrun.sh ... --signing-key <hex>` (or `--signing-key-file <path>`).
+   - Manual: `setup-kiosk.sh --backend-url <url> --signing-key <hex>`.
+
+   The key is written to a dedicated root-only file `/etc/default/calvin-kiosk-signing` (mode
+   `0600`) — never the world-readable `/etc/default/calvin-kiosk`.
+
+**Behavior once a key is baked (fail-closed):** the updater aborts and installs nothing if the
+signature is invalid, **missing** (an attacker must not be able to strip it to fall back to
+LAN-trust), or uses an unknown algorithm. A kiosk with **no** key baked keeps the previous
+LAN-trust behavior, so signing is opt-in per kiosk — but note the backend always signs, so a
+keyed kiosk requires a backend running this version or newer.
+
+**Key rotation:** delete `./data/kiosk-signing.key` on the server (a new one is generated on the
+next manifest request) and re-bake / re-run `--signing-key` on each kiosk. There is no automatic
+rotation.
+
+**Stronger isolation (future):** the shared key means a kiosk that is already root-compromised
+holds a secret usable to forge to another kiosk the attacker can also MITM. Per-kiosk keys
+derived from a backend master (`Ki = HMAC(master, kiosk_id)`) remove that residual and are
+tracked as a follow-up; the kiosk-side verification here is unchanged by that upgrade.
+
 ### Python version floor (`min_python`)
 
 The bundle manifest carries `"min_python": "3.9"`. The updater checks the
