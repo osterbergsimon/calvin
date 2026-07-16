@@ -32,4 +32,15 @@ parse_args --backend-url http://h:8000 --boot-dir /tmp
 out2="$(emit_firstrun)"
 echo "$out2" | grep -qF "WIFI_SSID=''" || { echo "FAIL: empty wifi not baked"; exit 1; }
 
+# --- signing key is baked and written to a 0600 file at first boot (calvin-5vw) ---
+SIG_KEY_HEX="0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef"
+parse_args --backend-url http://h:8000 --boot-dir /tmp --signing-key "$SIG_KEY_HEX"
+out3="$(emit_firstrun)"
+echo "$out3" | grep -qF "SIGNING_KEY=$SIG_KEY_HEX" || { echo "FAIL: signing key not baked (emit_var)"; exit 1; }
+echo "$out3" | grep -q "calvin-kiosk-signing" || { echo "FAIL: firstrun does not write the signing file"; exit 1; }
+echo "$out3" | grep -q "chmod 600" || { echo "FAIL: signing file not chmod 600"; exit 1; }
+# And with no signing key, printf '%q' of empty string bakes SIGNING_KEY=''
+parse_args --backend-url http://h:8000 --boot-dir /tmp
+echo "$(emit_firstrun)" | grep -qF "SIGNING_KEY=''" || { echo "FAIL: empty signing key not baked"; exit 1; }
+
 echo "PASS"
