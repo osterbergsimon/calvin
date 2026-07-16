@@ -51,6 +51,32 @@ class TestSealedModeEnableGuard:
         assert resp.status_code == 403
         assert "sealed mode" in resp.json()["detail"].lower()
 
+    def test_enabling_via_string_enabled_while_sealed_is_403(self, test_client: TestClient):
+        """The untyped PUT /plugins/{id} endpoint must not let a string 'true'
+        slip a browser_origins plugin past the guard while sealed."""
+        with (
+            patch(
+                "app.api.routes.plugins.management.plugin_loader.get_plugin_types",
+                return_value=_fake_types(),
+            ),
+            patch(
+                "app.api.routes.plugins.management.get_sealed_mode",
+                new=AsyncMock(return_value=True),
+            ),
+        ):
+            resp = test_client.put("/api/plugins/castish", json={"enabled": "true"})
+        assert resp.status_code == 403
+        assert "sealed mode" in resp.json()["detail"].lower()
+
+    def test_invalid_enabled_value_is_422(self, test_client: TestClient):
+        """A non-boolean-ish 'enabled' is rejected, not silently truthy-enabled."""
+        with patch(
+            "app.api.routes.plugins.management.plugin_loader.get_plugin_types",
+            return_value=_fake_types(),
+        ):
+            resp = test_client.put("/api/plugins/castish", json={"enabled": "maybe"})
+        assert resp.status_code == 422
+
     def test_enabling_plugin_without_browser_origins_while_sealed_is_allowed(
         self, test_client: TestClient
     ):

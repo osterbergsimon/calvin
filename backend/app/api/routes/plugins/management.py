@@ -11,7 +11,7 @@ from typing import Any
 import httpx
 from fastapi import APIRouter, Body, File, HTTPException, Query, UploadFile
 from loguru import logger
-from pydantic import BaseModel
+from pydantic import BaseModel, TypeAdapter, ValidationError
 
 from app.models.db_models import PluginDB, PluginTypeDB
 from app.plugins.base import PluginType
@@ -836,9 +836,19 @@ async def _update_plugin_type(
     }
 
 
+# Coerce a raw JSON `enabled` to `bool | None` with the same lax semantics as the
+# typed PluginTypeConfigUpdateRequest.enabled, so both enable endpoints behave
+# identically. This closes a guard bypass: an untyped {"enabled": "true"} must not
+# skip the sealed-mode check by staying a truthy string.
+_ENABLED_ADAPTER = TypeAdapter(bool | None)
+
+
 @router.put("/plugins/{plugin_id}", response_model=PluginTypeConfigUpdateResponse)
 async def update_plugin(plugin_id: str, config: dict[str, Any]):
-    enabled = config.get("enabled") if "enabled" in config else None
+    try:
+        enabled = _ENABLED_ADAPTER.validate_python(config.get("enabled"))
+    except ValidationError:
+        raise HTTPException(status_code=422, detail="'enabled' must be a boolean")
     config_without_enabled = {k: v for k, v in config.items() if k != "enabled"}
     return await _update_plugin_type(plugin_id, config_without_enabled, enabled)
 
