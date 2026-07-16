@@ -38,7 +38,7 @@ parse_args --backend-url http://h:8000 --boot-dir /tmp --signing-key "$SIG_KEY_H
 out3="$(emit_firstrun)"
 echo "$out3" | grep -qF "SIGNING_KEY=$SIG_KEY_HEX" || { echo "FAIL: signing key not baked (emit_var)"; exit 1; }
 echo "$out3" | grep -q "calvin-kiosk-signing" || { echo "FAIL: firstrun does not write the signing file"; exit 1; }
-echo "$out3" | grep -q "chmod 600" || { echo "FAIL: signing file not chmod 600"; exit 1; }
+echo "$out3" | grep -q 'chmod 600 "${SIGNING_ENV_FILE}"' || { echo "FAIL: signing file not chmod 600"; exit 1; }
 # And with no signing key, printf '%q' of empty string bakes SIGNING_KEY=''
 parse_args --backend-url http://h:8000 --boot-dir /tmp
 echo "$(emit_firstrun)" | grep -qF "SIGNING_KEY=''" || { echo "FAIL: empty signing key not baked"; exit 1; }

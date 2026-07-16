@@ -1,6 +1,15 @@
 import stat
 
+import pytest
+
 from app.services import kiosk_signing
+
+
+def test_corrupt_key_file_names_path(tmp_path):
+    p = tmp_path / "k.key"
+    p.write_text("not-hex-zzzz")
+    with pytest.raises(ValueError, match=str(p)):
+        kiosk_signing.load_or_create_key(p)
 
 
 def test_key_created_0600_and_idempotent(tmp_path):

@@ -166,6 +166,9 @@ Required:
   --backend-url <URL>   Where the Calvin backend lives, e.g.
                         http://homeserver.local:8000
 
+Options:
+  --signing-key <HEX>   Out-of-band 0600 manifest signing secret (hex)
+
 Environment overrides:
   GIT_REPO, GIT_BRANCH, CALVIN_USER
 EOF

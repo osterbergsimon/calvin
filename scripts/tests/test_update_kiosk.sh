@@ -45,6 +45,7 @@ chmod +x "$tmp/bin/curl" "$tmp/bin/systemctl"
 export CALVIN_BACKEND_URL="http://server.local:8000"
 export CALVIN_CURL="$tmp/bin/curl" CALVIN_SYSTEMCTL="$tmp/bin/systemctl"
 export CALVIN_AGENT_STATE_DIR="$tmp/state" CALVIN_SYSTEMD_DIR="$tmp/systemd"
+export CALVIN_BIN_DIR="$tmp/local"
 export CALVIN_AGENT_READY_MARKER="$tmp/run/agent-ready"
 export CALVIN_UPDATE_HEALTH_TIMEOUT=4
 
@@ -446,7 +447,7 @@ exit 22
 EOF
 chmod +x "$tmp/bin/curl"
 rm -f "$tmp/systemctl.log"
-CALVIN_AGENT_STATE_DIR="$tmp/state_boot" CALVIN_SYSTEMD_DIR="$tmp/boot_systemd" bash "$SCRIPT" --bootstrap \
+CALVIN_BIN_DIR="$tmp/boot_local" CALVIN_AGENT_STATE_DIR="$tmp/state_boot" CALVIN_SYSTEMD_DIR="$tmp/boot_systemd" bash "$SCRIPT" --bootstrap \
   || { echo "FAIL bootstrap: exited non-zero"; exit 1; }
 grep -q 'sys.exit(0)' "$BOOT_AGENT" || { echo "FAIL bootstrap: agent not installed"; exit 1; }
 grep -q "\[Unit\]" "$BOOT_UNIT"      || { echo "FAIL bootstrap: unit not installed"; exit 1; }
@@ -458,7 +459,7 @@ grep -q 'boot000000000000' "$tmp/state_boot/agent-manifest.json" || { echo "FAIL
 grep -q 'bootstrap' "$tmp/state_boot/agent-update-state.json" || { echo "FAIL bootstrap: state not bootstrap"; exit 1; }
 # Idempotent: a second bootstrap changes nothing.
 rm -f "$tmp/systemctl.log"
-CALVIN_AGENT_STATE_DIR="$tmp/state_boot" CALVIN_SYSTEMD_DIR="$tmp/boot_systemd" bash "$SCRIPT" --bootstrap \
+CALVIN_BIN_DIR="$tmp/boot_local" CALVIN_AGENT_STATE_DIR="$tmp/state_boot" CALVIN_SYSTEMD_DIR="$tmp/boot_systemd" bash "$SCRIPT" --bootstrap \
   || { echo "FAIL bootstrap-idempotent: exited non-zero"; exit 1; }
 grep -q 'noop\|success' "$tmp/state_boot/agent-update-state.json" || { echo "FAIL bootstrap-idempotent: not noop/success"; exit 1; }
 echo "PASS bootstrap-install-and-idempotent"
@@ -569,3 +570,77 @@ CALVIN_AGENT_STATE_DIR="$tmp/state_sig6" CALVIN_KIOSK_SIGNING_ENV_FILE="$tmp/non
   bash "$SCRIPT" || { echo "FAIL sig-nokey: exited non-zero"; exit 1; }
 grep -q 'sys.exit(0)' "$tmp/local/calvin_display_agent.py" || { echo "FAIL sig-nokey: agent not swapped"; exit 1; }
 echo "PASS sig-no-key-backward-compatible"
+
+# ===== calvin-a0c: target-path allowlist =====
+# --- install target outside the allowlist -> abort, nothing written ---
+mkdir -p "$tmp/state_al1" "$tmp/evil"
+EVIL_TARGET="$tmp/evil/pwned"
+printf 'PWNED\n' > "$tmp/srv/pwned"
+EVIL_SHA="$(sha256sum "$tmp/srv/pwned" | cut -d' ' -f1)"
+cat > "$tmp/srv/manifest.json" <<EOF
+{"version":"al10000000000000","min_python":"3.9","files":[
+ {"name":"pwned","sha256":"$EVIL_SHA","mode":"0644",
+  "target_path":"$EVIL_TARGET","restart_unit":"","enable":false}]}
+EOF
+cat > "$tmp/bin/curl" <<EOF
+#!/usr/bin/env bash
+for a in "\$@"; do case "\$a" in
+  */agent/manifest) cat "$tmp/srv/manifest.json"; exit 0;;
+  */agent/files/pwned) cat "$tmp/srv/pwned"; exit 0;;
+esac; done
+exit 22
+EOF
+chmod +x "$tmp/bin/curl"
+if CALVIN_AGENT_STATE_DIR="$tmp/state_al1" bash "$SCRIPT"; then echo "FAIL a0c-install: should abort on out-of-allowlist target"; exit 1; fi
+[ ! -e "$EVIL_TARGET" ] || { echo "FAIL a0c-install: wrote out-of-allowlist target"; exit 1; }
+grep -q 'not allowed' "$tmp/state_al1/agent-update-state.json" || { echo "FAIL a0c-install: no 'not allowed' state"; exit 1; }
+echo "PASS a0c-install-target-rejected"
+
+# --- traversal via .. under an allowed prefix -> also rejected ---
+mkdir -p "$tmp/state_al1b"
+cat > "$tmp/srv/manifest.json" <<EOF
+{"version":"al1b000000000000","min_python":"3.9","files":[
+ {"name":"pwned","sha256":"$EVIL_SHA","mode":"0644",
+  "target_path":"$tmp/local/../evil/pwned2","restart_unit":"","enable":false}]}
+EOF
+if CALVIN_AGENT_STATE_DIR="$tmp/state_al1b" bash "$SCRIPT"; then echo "FAIL a0c-traversal: should abort on .. path"; exit 1; fi
+[ ! -e "$tmp/evil/pwned2" ] || { echo "FAIL a0c-traversal: wrote traversal target"; exit 1; }
+echo "PASS a0c-traversal-rejected"
+
+# --- decommission target outside allowlist -> skipped, file kept ---
+mkdir -p "$tmp/state_al2"
+KEEP="$tmp/evil/keepme"; printf 'KEEP\n' > "$KEEP"
+cat > "$tmp/state_al2/agent-manifest.json" <<EOF
+{"version":"prevalt00000000","files":[
+ {"name":"calvin_display_agent.py","target_path":"$tmp/local/calvin_display_agent.py","enable":false},
+ {"name":"rogue","target_path":"$KEEP","enable":false}]}
+EOF
+printf 'import sys\nsys.exit(0)\n' > "$tmp/srv/calvin_display_agent.py"
+AL2_SHA="$(sha256sum "$tmp/srv/calvin_display_agent.py" | cut -d' ' -f1)"
+echo 'print("OLD")' > "$tmp/local/calvin_display_agent.py"
+cat > "$tmp/srv/manifest.json" <<EOF
+{"version":"al20000000000000","min_python":"3.9","files":[
+ {"name":"calvin_display_agent.py","sha256":"$AL2_SHA","mode":"0755",
+  "target_path":"$tmp/local/calvin_display_agent.py","restart_unit":"calvin-display-agent.service","enable":false}]}
+EOF
+cat > "$tmp/bin/systemctl" <<EOF
+#!/usr/bin/env bash
+echo "\$*" >> "$tmp/systemctl.log"
+if [ "\$1" = "restart" ]; then ( sleep 1 && mkdir -p "$tmp/run" && touch "$tmp/run/agent-ready" ) & fi
+case "\$1" in "is-active"|"show") exit 0;; esac
+exit 0
+EOF
+chmod +x "$tmp/bin/systemctl"
+cat > "$tmp/bin/curl" <<EOF
+#!/usr/bin/env bash
+for a in "\$@"; do case "\$a" in
+  */agent/manifest) cat "$tmp/srv/manifest.json"; exit 0;;
+  */agent/files/calvin_display_agent.py) cat "$tmp/srv/calvin_display_agent.py"; exit 0;;
+esac; done
+exit 22
+EOF
+chmod +x "$tmp/bin/curl"
+export CALVIN_UPDATE_HEALTH_TIMEOUT=4
+CALVIN_AGENT_STATE_DIR="$tmp/state_al2" bash "$SCRIPT" || { echo "FAIL a0c-decommission: exited non-zero"; exit 1; }
+[ -f "$KEEP" ] || { echo "FAIL a0c-decommission: removed out-of-allowlist path"; exit 1; }
+echo "PASS a0c-decommission-skipped"
