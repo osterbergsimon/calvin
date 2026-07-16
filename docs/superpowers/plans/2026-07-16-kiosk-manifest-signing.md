@@ -593,16 +593,19 @@ bootstrap_kiosk() {
     manifest="$(curl -fsSL "${backend_url}/api/kiosks/agent/manifest")" \
         || error_exit "Failed to fetch kiosk bundle manifest from ${backend_url}" 1
     if [ -n "$key" ]; then
-        printf '%s' "$manifest" | CALVIN_KIOSK_SIGNING_KEY="$key" python3 - <<'PY' \
+        # Pass the manifest via env var, NOT a pipe: a heredoc (`<<'PY'`) claims python's
+        # stdin, so a `printf ... | python - <<'PY'` pipe is silently discarded.
+        MANIFEST_JSON="$manifest" CALVIN_KIOSK_SIGNING_KEY="$key" python3 - <<'PY' \
             || error_exit "kiosk manifest signature verification failed" 1
-import sys, json, hmac, hashlib, os
-m = json.load(sys.stdin)
+import json, hmac, hashlib, os
+m = json.loads(os.environ["MANIFEST_JSON"])
 key = os.environ["CALVIN_KIOSK_SIGNING_KEY"]
-sig = m.pop("signature", None); alg = m.pop("sig_alg", None)
+sig = m.pop("signature", None)
+alg = m.pop("sig_alg", None)
 if sig is None or alg is None or alg != "hmac-sha256":
-    sys.exit(1)
+    raise SystemExit(1)
 canon = json.dumps(m, sort_keys=True, separators=(",", ":")).encode()
-sys.exit(0 if hmac.compare_digest(
+raise SystemExit(0 if hmac.compare_digest(
     hmac.new(bytes.fromhex(key), canon, hashlib.sha256).hexdigest(), str(sig)) else 1)
 PY
     fi
