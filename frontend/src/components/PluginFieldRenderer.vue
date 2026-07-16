@@ -40,6 +40,7 @@
       :value="fieldValue"
       :min="ui.validation?.min"
       :max="ui.validation?.max"
+      :step="numberStep"
       :placeholder="ui.placeholder"
       class="form-input"
       @input="$emit('update', $event.target.value)"
@@ -183,6 +184,16 @@ defineEmits(["update"]);
 
 const ui = computed(() => {
   return props.schema && typeof props.schema === "object" ? props.schema.ui : null;
+});
+
+// `<input type="number">` defaults to step=1, which rejects decimals (e.g.
+// geographic coordinates) as a stepMismatch on form submit. Derive step from
+// the declared type — decimals for "number", whole numbers for "integer" — and
+// let an explicit ui.step (or ui.validation.step) override.
+const numberStep = computed(() => {
+  const explicit = ui.value?.step ?? ui.value?.validation?.step;
+  if (explicit != null) return explicit;
+  return props.schema?.type === "integer" ? "1" : "any";
 });
 
 // Config values are bare scalars in the 1.0 contract; callers resolve
