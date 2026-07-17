@@ -97,6 +97,7 @@ backend/data/images/
 data/db/
 backend/data/db/
 backend/data/cache/
+backend/data/image_cache/
 backend/data/plugins/
 backend/data/themes/*
 !backend/data/themes/
@@ -128,6 +129,9 @@ bandit-report.json
 
 # Claude Code local (per-user) settings
 .claude/settings.local.json
+
+# OpenCode local tooling (per-machine)
+.opencode/
 
 # superpowers brainstorming visual companion (local only)
 .superpowers/

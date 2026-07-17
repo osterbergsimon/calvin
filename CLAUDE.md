@@ -97,6 +97,7 @@ A plugin directory:
 
 ## House rules
 
+- **Always use superpowers skills.** If there's even a remote chance a Superpowers skill applies to what you're doing, invoke it — brainstorming before creative work, systematic-debugging before any bugfix, test-driven-development before writing implementation, writing-plans/executing-plans for multi-step work, and so on. When in doubt, invoke the skill. Process skills set the approach first; implementation skills follow. This is not optional.
 - **Keep plugins self-contained.** If you're tempted to import plugin A from plugin B, put the shared code in `app/` or publish a library. Plugins never reach across.
 - **Schema-driven UI first.** Prefer extending `instance_config_schema` over writing a custom settings component.
 - **Don't bypass the instance manager.** If you need CRUD for instances, use the generic helpers.
