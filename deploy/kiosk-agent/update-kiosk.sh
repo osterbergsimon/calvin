@@ -37,6 +37,13 @@ path_allowed() {  # $1 = absolute target path
   esac
 }
 
+name_allowed() {  # $1 = manifest file name; must be a bare filename (calvin-10n)
+  case "$1" in
+    ''|.|..|*/*|*..*) return 1 ;;             # no empty, dot-dirs, slashes, traversal
+    *) return 0 ;;
+  esac
+}
+
 # Verify the manifest HMAC signature when a signing key is configured (calvin-5vw).
 # $1 = manifest JSON. Prints a failure reason to stdout and returns non-zero on failure.
 # No key configured -> returns 0 (LAN-trust, unchanged behavior).
@@ -181,6 +188,10 @@ installed_sha() { [ -f "$1" ] && sha256sum "$1" | cut -d' ' -f1 || echo ""; }
 
 while IFS=$'\t' read -r name sha mode target unit enable; do
   [ -n "$name" ] || continue
+  if ! name_allowed "$name"; then
+    write_state error verify "file name not allowed: $name" "$version"
+    log "file name not allowed: $name"; exit 1
+  fi
   if ! path_allowed "$target"; then
     write_state error verify "target path not allowed: $target" "$version"
     log "target path not allowed: $target"; exit 1

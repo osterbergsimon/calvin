@@ -75,7 +75,12 @@ async def post_kiosk_update(kiosk_id: str):
 @router.get("/kiosks/agent/manifest")
 async def get_agent_manifest():
     """Serve the signed kiosk bundle manifest (version + per-file hashes + HMAC signature)."""
-    return kiosk_bundle.build_signed_manifest()
+    try:
+        return kiosk_bundle.build_signed_manifest()
+    except OSError as exc:
+        # Broken/incomplete server checkout (missing bundle file): degrade like the
+        # config poll does instead of a 500 stack (calvin-exe).
+        raise HTTPException(status_code=503, detail="Kiosk bundle unavailable on server") from exc
 
 
 @router.get("/kiosks/agent/files/{name}")
