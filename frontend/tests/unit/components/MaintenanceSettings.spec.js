@@ -68,6 +68,16 @@ describe("MaintenanceSettings — deployment awareness", () => {
     expect(guidance.text()).toContain("update-calvin.sh");
   });
 
+  it("shows native copy (no docker command) when updates are unsupported outside a container", async () => {
+    const wrapper = mountTab({ ...NATIVE_ENV, update_supported: false });
+    await flushPromises();
+    expect(wrapper.find('[data-test="updates-tab"]').exists()).toBe(false);
+    const guidance = wrapper.find('[data-test="update-guidance"]');
+    expect(guidance.exists()).toBe(true);
+    expect(guidance.text()).not.toContain("update-calvin.sh");
+    expect(wrapper.text()).not.toContain("Docker container");
+  });
+
   it("hides the frontend restart row when unsupported, keeps backend restart", async () => {
     const wrapper = mountTab(DOCKER_ENV);
     await flushPromises();

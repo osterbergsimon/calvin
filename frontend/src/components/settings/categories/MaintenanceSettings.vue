@@ -8,18 +8,19 @@
         @update:git-repo-url="v => emit('update:gitRepoUrl', v)"
         @update:git-branch="v => emit('update:gitBranch', v)"
       />
-      <SettingRow
-        v-else
-        label="Server updates"
-        description="This server runs as a Docker container, so updates are applied on the host by pulling the published image."
-        stacked
-      >
+      <SettingRow v-else label="Server updates" :description="guidanceDescription" stacked>
         <div class="maint-guidance" data-test="update-guidance">
-          <code class="maint-guidance__cmd">sudo /usr/local/bin/update-calvin.sh</code>
-          <p class="maint-guidance__note">
-            …or manually: <code>docker compose pull && docker compose up -d</code> in
-            <code>/etc/calvin</code>. Kiosk agents are updated below — they don't need a server
-            update.
+          <template v-if="cap.deployment === 'docker'">
+            <code class="maint-guidance__cmd">sudo /usr/local/bin/update-calvin.sh</code>
+            <p class="maint-guidance__note">
+              …or manually: <code>docker compose pull && docker compose up -d</code> in
+              <code>/etc/calvin</code>. Kiosk agents are updated below — they don't need a server
+              update.
+            </p>
+          </template>
+          <p v-else class="maint-guidance__note">
+            Pull the latest code and restart the services manually. Kiosk agents are updated below —
+            they don't need a server update.
           </p>
         </div>
       </SettingRow>
@@ -158,6 +159,12 @@ onMounted(async () => {
     console.error("Failed to load system environment:", e);
   }
 });
+
+const guidanceDescription = computed(() =>
+  cap.value.deployment === "docker"
+    ? "This server runs as a Docker container, so updates are applied on the host by pulling the published image."
+    : "No update script is installed in this environment, so updates are managed outside Calvin."
+);
 
 const confirm = reactive({ show: false, title: "", message: "", action: null });
 
