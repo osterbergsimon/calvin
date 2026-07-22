@@ -86,6 +86,35 @@ def _attempt_restart_calvin_service(service: str) -> bool:
     return False
 
 
+# Marker file Docker creates in every container; module-level so tests can patch it.
+_DOCKERENV_MARKER = Path("/.dockerenv")
+
+
+def _in_container() -> bool:
+    """True when running inside a container (Docker marker or explicit env opt-in)."""
+    return _DOCKERENV_MARKER.exists() or os.environ.get("CALVIN_CONTAINER") == "1"
+
+
+@router.get("/environment")
+async def get_system_environment():
+    """
+    Report deployment capabilities so the UI only offers actions that can work.
+
+    In Docker deployments the update script and systemctl live on the host, so
+    updates/restarts via script are impossible from inside the container; backend
+    restart is still possible via graceful exit + the container restart policy.
+    """
+    in_container = _in_container()
+    restart_mechanism = _restart_mechanism_available()
+    return {
+        "deployment": "docker" if in_container else "native",
+        "is_dev_mode": settings.is_dev_mode,
+        "update_supported": settings.get_update_script_path().exists(),
+        "restart_backend_supported": restart_mechanism or in_container,
+        "restart_frontend_supported": restart_mechanism,
+    }
+
+
 _UPDATE_LOG_LOCATIONS = [
     lambda: settings.repo_dir / "backend" / "logs" / "calvin-update.log",
     lambda: settings.repo_dir.parent / "calvin-update.log",
