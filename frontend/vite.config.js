@@ -129,6 +129,8 @@ export default defineConfig({
     sourcemap: false,
   },
   server: {
+    // Honor an externally assigned port (e.g. tooling that sets PORT); default 5173.
+    port: process.env.PORT ? Number(process.env.PORT) : undefined,
     proxy: {
       "/api": {
         target: process.env.VITE_API_PROXY_TARGET || "http://127.0.0.1:8000",

@@ -46,14 +46,16 @@ describe("SecuritySettings", () => {
   it("renders the sealed-mode toggle reflecting current state", async () => {
     const { wrapper } = mountWith([], true);
     await flushPromises();
-    expect(wrapper.find("[data-test='sealed-mode-toggle']").element.checked).toBe(true);
+    expect(wrapper.find("[data-test='sealed-mode-toggle']").attributes("aria-checked")).toBe(
+      "true"
+    );
   });
 
   it("saves sealed mode when toggled", async () => {
     const { wrapper, store } = mountWith([], false);
     await flushPromises();
     const toggle = wrapper.find("[data-test='sealed-mode-toggle']");
-    await toggle.setValue(true);
+    await toggle.trigger("click");
     await flushPromises();
     expect(store.saveSealedMode).toHaveBeenCalledWith(true);
   });

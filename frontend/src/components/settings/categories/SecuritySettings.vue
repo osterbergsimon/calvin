@@ -1,60 +1,80 @@
 <template>
-  <section id="section-security-origins" class="security-settings">
-    <div class="security-settings__sealed">
-      <label class="security-settings__sealed-label">
-        <input
-          type="checkbox"
+  <div class="security-settings">
+    <SettingsSection id="security-sealed" title="Sealed mode">
+      <SettingRow
+        label="Sealed mode"
+        description="Locks the kiosk to your Calvin server only — no external embeds, allowed origins, or plugins that reach outside. Calendars, photos, and local-data plugins keep working."
+      >
+        <ToggleSwitch
+          :model-value="sealed"
+          aria-label="Sealed mode"
           data-test="sealed-mode-toggle"
-          :checked="sealed"
-          @change="onSealedToggle($event.target.checked)"
+          @update:model-value="onSealedToggle"
         />
-        <span>Sealed mode</span>
-      </label>
-      <p class="security-settings__intro">
-        Locks the kiosk to your Calvin server only — no external embeds, allowed origins, or plugins
-        that reach outside. Calendars, photos, and local-data plugins keep working.
-      </p>
-    </div>
+      </SettingRow>
+    </SettingsSection>
 
-    <h2>Allowed origins</h2>
-    <p v-if="sealed" data-test="allowlist-inactive" class="security-settings__inactive">
-      Ignored while sealed mode is on.
-    </p>
-    <p class="security-settings__intro">
-      Origins the kiosk may embed, load images from, or connect to. Everything else is blocked. Use
-      a domain (grafana.lab), a wildcard (*.lab.example.com), a host:port, or an http(s):// URL. IP
-      ranges (CIDR) are not supported.
-    </p>
+    <SettingsSection id="security-origins" title="Allowed origins">
+      <div class="security-origins">
+        <p v-if="sealed" data-test="allowlist-inactive" class="security-origins__inactive">
+          Ignored while sealed mode is on.
+        </p>
+        <p class="security-origins__intro">
+          Origins the kiosk may embed, load images from, or connect to. Everything else is blocked.
+          Use a domain (grafana.lab), a wildcard (*.lab.example.com), a host:port, or an http(s)://
+          URL. IP ranges (CIDR) are not supported.
+        </p>
 
-    <ul class="security-settings__list">
-      <li v-for="origin in origins" :key="origin" class="security-settings__row">
-        <span class="security-settings__origin">{{ origin }}</span>
-        <button type="button" data-test="origin-remove" @click="remove(origin)">Remove</button>
-      </li>
-      <li v-if="origins.length === 0" class="security-settings__empty">No allowed origins.</li>
-    </ul>
+        <ul class="security-origins__list">
+          <li v-for="origin in origins" :key="origin" class="security-origins__row">
+            <span class="security-origins__origin">{{ origin }}</span>
+            <button
+              type="button"
+              class="security-btn"
+              data-test="origin-remove"
+              @click="remove(origin)"
+            >
+              Remove
+            </button>
+          </li>
+          <li v-if="origins.length === 0" class="security-origins__empty">No allowed origins.</li>
+        </ul>
 
-    <div class="security-settings__add">
-      <input
-        v-model="draft"
-        data-test="origin-input"
-        placeholder="grafana.lab or *.lab.example.com"
-        @keyup.enter="add"
-      />
-      <button type="button" data-test="origin-add" @click="add">Add</button>
-    </div>
-    <p v-if="error" class="security-settings__error" data-test="origin-error">{{ error }}</p>
+        <div class="security-origins__add">
+          <input
+            v-model="draft"
+            class="security-origins__input"
+            data-test="origin-input"
+            placeholder="grafana.lab or *.lab.example.com"
+            @keyup.enter="add"
+          />
+          <button type="button" class="security-btn" data-test="origin-add" @click="add">
+            Add
+          </button>
+        </div>
+        <p v-if="error" class="security-origins__error" data-test="origin-error">{{ error }}</p>
 
-    <button type="button" data-test="origins-save" :disabled="saving" @click="save">
-      {{ saving ? "Saving…" : "Save" }}
-    </button>
-  </section>
+        <button
+          type="button"
+          class="security-btn security-btn--primary"
+          data-test="origins-save"
+          :disabled="saving"
+          @click="save"
+        >
+          {{ saving ? "Saving…" : "Save" }}
+        </button>
+      </div>
+    </SettingsSection>
+  </div>
 </template>
 
 <script setup>
 import { onMounted, ref } from "vue";
 import { useSecurityStore } from "@/stores/security";
 import { logError } from "@/utils/logger";
+import SettingsSection from "@/components/settings/shell/SettingsSection.vue";
+import SettingRow from "@/components/settings/shell/SettingRow.vue";
+import ToggleSwitch from "@/components/ui/ToggleSwitch.vue";
 
 const store = useSecurityStore();
 const origins = ref([]);
@@ -124,3 +144,131 @@ async function save() {
   }
 }
 </script>
+
+<style scoped>
+.security-settings {
+  display: flex;
+  flex-direction: column;
+  gap: 1.5rem;
+}
+
+.security-origins {
+  padding: 0.75rem 1.25rem 1rem;
+}
+.security-origins__inactive {
+  margin: 0 0 0.5rem;
+  font-size: 0.85rem;
+  font-weight: 500;
+  color: var(--warn);
+}
+.security-origins__intro {
+  margin: 0 0 0.75rem;
+  font-size: 0.85rem;
+  line-height: 1.4;
+  color: var(--ink-2);
+}
+
+.security-origins__list {
+  list-style: none;
+  margin: 0 0 0.75rem;
+  padding: 0;
+  border: 1px solid var(--line);
+  border-radius: var(--radius-md);
+  overflow: hidden;
+}
+.security-origins__row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 1rem;
+  min-height: var(--touch-target);
+  padding: 0.35rem 0.75rem;
+}
+.security-origins__row + .security-origins__row,
+.security-origins__row + .security-origins__empty {
+  border-top: 1px solid var(--line-soft);
+}
+.security-origins__origin {
+  font-family: var(--font-data);
+  font-size: 0.9rem;
+  color: var(--ink);
+  overflow-wrap: anywhere;
+}
+.security-origins__empty {
+  padding: 0.65rem 0.75rem;
+  font-size: 0.85rem;
+  color: var(--ink-2);
+}
+
+.security-origins__add {
+  display: flex;
+  gap: 0.5rem;
+  margin-bottom: 0.75rem;
+}
+.security-origins__input {
+  flex: 1;
+  min-width: 0;
+  min-height: var(--touch-target);
+  padding: 0.5rem 0.75rem;
+  background: var(--bg-2);
+  color: var(--ink);
+  border: 1px solid var(--line);
+  border-radius: var(--radius-sm);
+  font-family: var(--font-ui);
+  font-size: var(--fs-control);
+  transition:
+    border-color 0.2s,
+    box-shadow 0.2s;
+}
+.security-origins__input:hover {
+  border-color: var(--focus-edge);
+}
+.security-origins__input:focus {
+  outline: none;
+  border-color: var(--focus);
+  box-shadow: 0 0 0 2px color-mix(in srgb, var(--focus) 20%, transparent);
+}
+
+.security-btn {
+  min-height: var(--touch-target);
+  padding: 0 1rem;
+  font-family: var(--font-ui);
+  font-size: var(--fs-control);
+  font-weight: 500;
+  color: var(--ink);
+  background: var(--bg-2);
+  border: 1px solid var(--line);
+  border-radius: var(--radius-md);
+  cursor: pointer;
+  transition:
+    border-color 0.2s,
+    background 0.2s,
+    filter 0.2s;
+}
+.security-btn:hover:not(:disabled) {
+  border-color: var(--focus);
+}
+.security-btn:focus-visible {
+  outline: 2px solid var(--focus);
+  outline-offset: 2px;
+}
+.security-btn:disabled {
+  opacity: 0.55;
+  cursor: not-allowed;
+}
+.security-btn--primary {
+  background: var(--focus);
+  color: var(--focus-ink);
+  border-color: var(--focus);
+  font-weight: 600;
+}
+.security-btn--primary:hover:not(:disabled) {
+  filter: brightness(1.08);
+}
+
+.security-origins__error {
+  margin: 0 0 0.75rem;
+  font-size: 0.85rem;
+  color: var(--err);
+}
+</style>
