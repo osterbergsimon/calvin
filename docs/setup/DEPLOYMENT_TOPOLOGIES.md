@@ -159,7 +159,8 @@ old backend-side `display_orientation_service`, which cannot reach a remote kios
 The small Python display-agent and its systemd units that `setup-kiosk.sh`
 installs can be updated remotely without re-running setup or SSHing into the Pi.
 
-**Flow:** Settings → Kiosks → click **Update** → the backend sets a
+**Flow:** Settings → Kiosks → click **Update** (or Settings → Maintenance →
+**Kiosk agents**) → the backend sets a
 per-kiosk `agentUpdateRequested` flag → the kiosk picks it up on its next
 config poll → it fires the root oneshot `calvin-kiosk-update.service` →
 `update-kiosk.sh` fetches the bundle from

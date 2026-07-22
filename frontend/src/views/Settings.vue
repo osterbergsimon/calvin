@@ -288,6 +288,8 @@ const SECTION_BY_CATEGORY_TAB = {
   },
   maintenance: {
     updates: "maintenance-updates",
+    "kiosk-agents": "maintenance-kiosk-agents",
+    system: "maintenance-system",
     diagnostics: "maintenance-diagnostics",
   },
   plugins: {

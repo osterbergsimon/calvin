@@ -5,6 +5,7 @@ import json
 import os
 import re
 import shutil
+import signal
 import subprocess
 import threading
 import time
@@ -84,6 +85,35 @@ def _attempt_restart_calvin_service(service: str) -> bool:
         logger.exception("systemctl restart error")
 
     return False
+
+
+# Marker file Docker creates in every container; module-level so tests can patch it.
+_DOCKERENV_MARKER = Path("/.dockerenv")
+
+
+def _in_container() -> bool:
+    """True when running inside a container (Docker marker or explicit env opt-in)."""
+    return _DOCKERENV_MARKER.exists() or os.environ.get("CALVIN_CONTAINER") == "1"
+
+
+@router.get("/environment")
+async def get_system_environment():
+    """
+    Report deployment capabilities so the UI only offers actions that can work.
+
+    In Docker deployments the update script and systemctl live on the host, so
+    updates/restarts via script are impossible from inside the container; backend
+    restart is still possible via graceful exit + the container restart policy.
+    """
+    in_container = _in_container()
+    restart_mechanism = _restart_mechanism_available()
+    return {
+        "deployment": "docker" if in_container else "native",
+        "is_dev_mode": settings.is_dev_mode,
+        "update_supported": settings.get_update_script_path().exists(),
+        "restart_backend_supported": restart_mechanism or in_container,
+        "restart_frontend_supported": restart_mechanism,
+    }
 
 
 _UPDATE_LOG_LOCATIONS = [
@@ -717,6 +747,23 @@ async def restart_backend():
     """
     try:
         if not _restart_mechanism_available():
+            if _in_container():
+                # Docker path: exit gracefully after the response is sent; the
+                # container's restart policy (restart: unless-stopped in the
+                # shipped compose file) starts a fresh container.
+                def _run_container_restart() -> None:
+                    time.sleep(_BACKEND_RESTART_DELAY_SEC)
+                    logger.info("Container restart requested — sending SIGTERM to self")
+                    os.kill(os.getpid(), signal.SIGTERM)
+
+                threading.Thread(target=_run_container_restart, daemon=True).start()
+                return {
+                    "status": "success",
+                    "message": (
+                        "Backend container restarting — it will come back automatically "
+                        "via the container restart policy."
+                    ),
+                }
             raise HTTPException(
                 status_code=500,
                 detail=(

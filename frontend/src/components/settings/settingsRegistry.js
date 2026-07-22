@@ -14,7 +14,12 @@ export const settingsCategories = [
   { id: "plugins", label: "Plugins", icon: "🔌", subtitle: "Install · manage · themes" },
   { id: "device", label: "Device", icon: "🖥️", subtitle: "Power · keyboard · hardware" },
   { id: "kiosks", label: "Kiosks", icon: "📺", subtitle: "Per-device settings" },
-  { id: "maintenance", label: "Maintenance", icon: "⚙️", subtitle: "Updates · diagnostics" },
+  {
+    id: "maintenance",
+    label: "Maintenance",
+    icon: "⚙️",
+    subtitle: "Updates · agents · diagnostics",
+  },
   { id: "security", label: "Security", icon: "🔒", subtitle: "Allowed origins · network access" },
 ];
 
@@ -208,7 +213,25 @@ export const settingsDestinations = [
     category: "maintenance",
     tabKey: "settings_tab_maintenance",
     tab: "updates",
-    keywords: ["updates", "git", "repository", "branch"],
+    keywords: ["updates", "git", "repository", "branch", "docker", "image", "pull", "version"],
+  },
+  {
+    id: "maintenance-kiosk-agents",
+    label: "Kiosk agent updates",
+    path: "Maintenance / Kiosk agents",
+    category: "maintenance",
+    tabKey: "settings_tab_maintenance",
+    tab: "kiosk-agents",
+    keywords: ["kiosk", "agent", "update", "bundle", "fleet", "display agent"],
+  },
+  {
+    id: "maintenance-system",
+    label: "Restart and reload",
+    path: "Maintenance / System",
+    category: "maintenance",
+    tabKey: "settings_tab_maintenance",
+    tab: "system",
+    keywords: ["restart", "reload", "backend", "frontend", "container"],
   },
   {
     id: "maintenance-diagnostics",
