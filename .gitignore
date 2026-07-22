@@ -102,6 +102,8 @@ backend/data/plugins/
 backend/data/themes/*
 !backend/data/themes/
 !backend/data/themes/builtin.json
+# Auto-generated kiosk manifest signing secret — never commit
+backend/data/kiosk-signing.key
 
 # Documentation
 docs/archive/
@@ -141,3 +143,8 @@ bandit-report.json
 
 # Git worktrees (project-local)
 .worktrees/
+
+# Beads / Dolt files (added by bd init)
+.dolt/
+.beads-credential-key
+.beads/proxieddb/
