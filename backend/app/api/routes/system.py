@@ -5,6 +5,7 @@ import json
 import os
 import re
 import shutil
+import signal
 import subprocess
 import threading
 import time
@@ -746,6 +747,23 @@ async def restart_backend():
     """
     try:
         if not _restart_mechanism_available():
+            if _in_container():
+                # Docker path: exit gracefully after the response is sent; the
+                # container's restart policy (restart: unless-stopped in the
+                # shipped compose file) starts a fresh container.
+                def _run_container_restart() -> None:
+                    time.sleep(_BACKEND_RESTART_DELAY_SEC)
+                    logger.info("Container restart requested — sending SIGTERM to self")
+                    os.kill(os.getpid(), signal.SIGTERM)
+
+                threading.Thread(target=_run_container_restart, daemon=True).start()
+                return {
+                    "status": "success",
+                    "message": (
+                        "Backend container restarting — it will come back automatically "
+                        "via the container restart policy."
+                    ),
+                }
             raise HTTPException(
                 status_code=500,
                 detail=(

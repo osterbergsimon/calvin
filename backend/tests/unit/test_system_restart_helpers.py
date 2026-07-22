@@ -84,3 +84,29 @@ def test_attempt_restart_falls_back_to_systemctl():
         "restart",
         "calvin-frontend",
     ]
+
+
+@pytest.mark.unit
+def test_restart_backend_container_path(test_client):
+    """In a container with no restart mechanism, respond 200 and schedule self-signal."""
+    with (
+        patch("app.api.routes.system._restart_mechanism_available", return_value=False),
+        patch("app.api.routes.system._in_container", return_value=True),
+        patch("app.api.routes.system.threading.Thread") as mock_thread,
+    ):
+        response = test_client.post("/api/system/restart-backend")
+    assert response.status_code == 200
+    assert "restart" in response.json()["message"].lower()
+    mock_thread.assert_called_once()
+    assert mock_thread.call_args.kwargs.get("daemon") is True
+    mock_thread.return_value.start.assert_called_once()
+
+
+@pytest.mark.unit
+def test_restart_backend_native_without_mechanism_still_fails(test_client):
+    with (
+        patch("app.api.routes.system._restart_mechanism_available", return_value=False),
+        patch("app.api.routes.system._in_container", return_value=False),
+    ):
+        response = test_client.post("/api/system/restart-backend")
+    assert response.status_code == 500
