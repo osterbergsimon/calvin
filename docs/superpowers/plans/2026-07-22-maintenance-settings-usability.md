@@ -32,7 +32,7 @@
 - Produces: `_in_container() -> bool` (module-level, patchable; also used by Task 2) and route `GET /api/system/environment` returning `{deployment: "docker"|"native", is_dev_mode: bool, update_supported: bool, restart_backend_supported: bool, restart_frontend_supported: bool}`.
 - Consumes: existing `_restart_mechanism_available()`, `settings.is_dev_mode`, `settings.get_update_script_path()`.
 
-- [ ] **Step 1: Write the failing tests**
+- [x] **Step 1: Write the failing tests**
 
 Create `backend/tests/unit/test_system_environment.py`:
 
@@ -129,12 +129,12 @@ def test_environment_native_bare(test_client: TestClient, tmp_path):
     assert data["restart_frontend_supported"] is False
 ```
 
-- [ ] **Step 2: Run tests to verify they fail**
+- [x] **Step 2: Run tests to verify they fail**
 
 Run: `cd backend && uv run pytest tests/unit/test_system_environment.py -v`
 Expected: FAIL — `AttributeError: ... has no attribute '_DOCKERENV_MARKER'` / 404 on `/api/system/environment`.
 
-- [ ] **Step 3: Implement**
+- [x] **Step 3: Implement**
 
 In `backend/app/api/routes/system.py`, directly below the `_restart_mechanism_available` function, add:
 
@@ -170,12 +170,12 @@ async def get_system_environment():
 
 (`os`, `Path`, `settings`, `router` are already imported in this file.)
 
-- [ ] **Step 4: Run tests to verify they pass**
+- [x] **Step 4: Run tests to verify they pass**
 
 Run: `cd backend && uv run pytest tests/unit/test_system_environment.py -v`
 Expected: 6 PASS.
 
-- [ ] **Step 5: Commit**
+- [x] **Step 5: Commit**
 
 ```bash
 git add backend/app/api/routes/system.py backend/tests/unit/test_system_environment.py
@@ -194,7 +194,7 @@ git commit -m "feat(system): report deployment capabilities via /api/system/envi
 - Consumes: `_in_container()` from Task 1.
 - Produces: `POST /api/system/restart-backend` returns 200 in containers (self-SIGTERM after `_BACKEND_RESTART_DELAY_SEC`); native-without-mechanism still 500.
 
-- [ ] **Step 1: Write the failing tests**
+- [x] **Step 1: Write the failing tests**
 
 Append to `backend/tests/unit/test_system_restart_helpers.py`:
 
@@ -227,12 +227,12 @@ def test_restart_backend_native_without_mechanism_still_fails(test_client):
 
 Also add the missing import at the top of the test file if not present: `from fastapi.testclient import TestClient` is not needed (the `test_client` fixture provides it); `patch` is already imported.
 
-- [ ] **Step 2: Run tests to verify they fail**
+- [x] **Step 2: Run tests to verify they fail**
 
 Run: `cd backend && uv run pytest tests/unit/test_system_restart_helpers.py -v`
 Expected: the two new tests FAIL (container path returns 500 today).
 
-- [ ] **Step 3: Implement**
+- [x] **Step 3: Implement**
 
 Add `import signal` to the imports of `backend/app/api/routes/system.py`. In `restart_backend`, replace the single availability guard:
 
@@ -277,12 +277,12 @@ with:
             )
 ```
 
-- [ ] **Step 4: Run tests to verify they pass**
+- [x] **Step 4: Run tests to verify they pass**
 
 Run: `cd backend && uv run pytest tests/unit/test_system_restart_helpers.py tests/unit/test_system_environment.py -v`
 Expected: all PASS.
 
-- [ ] **Step 5: Commit**
+- [x] **Step 5: Commit**
 
 ```bash
 git add backend/app/api/routes/system.py backend/tests/unit/test_system_restart_helpers.py
@@ -302,7 +302,7 @@ git commit -m "feat(system): restart backend inside Docker via graceful self-ter
 - Consumes: `GET /api/system/environment` (Task 1).
 - Produces: `getSystemEnvironment(): Promise<{deployment, is_dev_mode, update_supported, restart_backend_supported, restart_frontend_supported}>`; `MaintenanceSettings` renders `[data-test="update-guidance"]` when updates are unsupported and hides restart rows per capability. Task 4 adds the kiosk-agents section between Updates and System.
 
-- [ ] **Step 1: Write the failing tests**
+- [x] **Step 1: Write the failing tests**
 
 Create `frontend/tests/unit/components/MaintenanceSettings.spec.js`:
 
@@ -404,12 +404,12 @@ describe("MaintenanceSettings — deployment awareness", () => {
 });
 ```
 
-- [ ] **Step 2: Run tests to verify they fail**
+- [x] **Step 2: Run tests to verify they fail**
 
 Run: `cd frontend && npx vitest run tests/unit/components/MaintenanceSettings.spec.js`
 Expected: FAIL — `getSystemEnvironment` is not exported; `data-test` hooks don't exist.
 
-- [ ] **Step 3: Implement**
+- [x] **Step 3: Implement**
 
 **`frontend/src/services/systemApi.js`** — append:
 
@@ -552,12 +552,12 @@ Style additions (scoped block):
 }
 ```
 
-- [ ] **Step 4: Run tests to verify they pass**
+- [x] **Step 4: Run tests to verify they pass**
 
 Run: `cd frontend && npx vitest run tests/unit/components/MaintenanceSettings.spec.js tests/unit/components/UpdatesTab.spec.js`
 Expected: all PASS (UpdatesTab spec guards against regressions in the extracted flow).
 
-- [ ] **Step 5: Commit**
+- [x] **Step 5: Commit**
 
 ```bash
 git add frontend/src/services/systemApi.js frontend/src/components/settings/categories/MaintenanceSettings.vue frontend/tests/unit/components/MaintenanceSettings.spec.js
@@ -577,7 +577,7 @@ git commit -m "feat(settings): deployment-aware Maintenance tab (calvin-ebl)"
 - Consumes: `useKiosksStore` — `kiosks` ref, `loadKiosks()`, `fetchAvailableAgentVersion()`, `triggerUpdate(id)` (all existing, see `frontend/src/stores/kiosks.js`).
 - Produces: `<KioskAgentsSection />` (no props) — renders nothing when no kiosks are registered.
 
-- [ ] **Step 1: Write the failing tests**
+- [x] **Step 1: Write the failing tests**
 
 Create `frontend/tests/unit/components/KioskAgentsSection.spec.js`:
 
@@ -672,12 +672,12 @@ describe("KioskAgentsSection", () => {
 });
 ```
 
-- [ ] **Step 2: Run tests to verify they fail**
+- [x] **Step 2: Run tests to verify they fail**
 
 Run: `cd frontend && npx vitest run tests/unit/components/KioskAgentsSection.spec.js`
 Expected: FAIL — component file does not exist.
 
-- [ ] **Step 3: Implement the component**
+- [x] **Step 3: Implement the component**
 
 Create `frontend/src/components/settings/shared/KioskAgentsSection.vue`:
 
@@ -835,12 +835,12 @@ In `MaintenanceSettings.vue`, between the Updates and System sections, add:
 
 with the import `import KioskAgentsSection from "@/components/settings/shared/KioskAgentsSection.vue";` — and stub it in `MaintenanceSettings.spec.js` (`KioskAgentsSection: { template: "<div />" }` added to the shared `stubs` object) so that spec stays isolated from Pinia.
 
-- [ ] **Step 4: Run tests to verify they pass**
+- [x] **Step 4: Run tests to verify they pass**
 
 Run: `cd frontend && npx vitest run tests/unit/components/KioskAgentsSection.spec.js tests/unit/components/MaintenanceSettings.spec.js tests/unit/components/KiosksSettings.spec.js tests/unit/components/KiosksSettings.updateButton.spec.js`
 Expected: all PASS.
 
-- [ ] **Step 5: Commit**
+- [x] **Step 5: Commit**
 
 ```bash
 git add frontend/src/components/settings/shared/KioskAgentsSection.vue frontend/src/components/settings/categories/MaintenanceSettings.vue frontend/tests/unit/components/KioskAgentsSection.spec.js frontend/tests/unit/components/MaintenanceSettings.spec.js
@@ -861,7 +861,7 @@ git commit -m "feat(settings): kiosk agent update overview in Maintenance (calvi
 - Consumes: section ids `maintenance-kiosk-agents` (Task 4) and `maintenance-system` (Task 3, already the SettingsSection id).
 - Produces: search destinations `maintenance-kiosk-agents`, `maintenance-system`.
 
-- [ ] **Step 1: Write the failing test**
+- [x] **Step 1: Write the failing test**
 
 Append to the `describe` block in `frontend/tests/unit/components/settingsRegistry.spec.js`:
 
@@ -881,12 +881,12 @@ Append to the `describe` block in `frontend/tests/unit/components/settingsRegist
   });
 ```
 
-- [ ] **Step 2: Run test to verify it fails**
+- [x] **Step 2: Run test to verify it fails**
 
 Run: `cd frontend && npx vitest run tests/unit/components/settingsRegistry.spec.js`
 Expected: new test FAILS (destinations undefined).
 
-- [ ] **Step 3: Implement**
+- [x] **Step 3: Implement**
 
 **`settingsRegistry.js`:**
 
@@ -943,18 +943,18 @@ Expected: new test FAILS (destinations undefined).
 **Kiosk agents**) → the backend sets a per-kiosk `agentUpdateRequested` flag → …
 ```
 
-- [ ] **Step 4: Run the full test suites**
+- [x] **Step 4: Run the full test suites**
 
 Run: `cd frontend && npx vitest run` and `cd backend && uv run pytest tests/unit -q`
 Expected: all PASS (fix anything that regressed before proceeding).
 
-- [ ] **Step 5: Lint/format checks**
+- [x] **Step 5: Lint/format checks**
 
 Run: `cd frontend && npx eslint src/components/settings/categories/MaintenanceSettings.vue src/components/settings/shared/KioskAgentsSection.vue src/components/settings/settingsRegistry.js src/services/systemApi.js && npx prettier --check src/components/settings/ src/services/systemApi.js`
 Run: `cd backend && uv run ruff check app/api/routes/system.py && uv run ruff format --check app/api/routes/system.py`
 Expected: clean (apply fixes if not).
 
-- [ ] **Step 6: Commit and close the bead**
+- [x] **Step 6: Commit and close the bead**
 
 ```bash
 git add frontend/src/components/settings/settingsRegistry.js frontend/src/views/Settings.vue frontend/tests/unit/components/settingsRegistry.spec.js docs/setup/DEPLOYMENT_TOPOLOGIES.md
