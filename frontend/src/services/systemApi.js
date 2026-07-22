@@ -77,3 +77,11 @@ export async function getHealth() {
   const response = await api.get("/health");
   return response.data;
 }
+
+/**
+ * Get deployment capabilities (docker vs native, which actions work here).
+ */
+export async function getSystemEnvironment() {
+  const response = await api.get("/system/environment");
+  return response.data;
+}

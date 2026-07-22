@@ -2,24 +2,62 @@
   <div class="maintenance-settings">
     <SettingsSection id="maintenance-updates" title="Updates">
       <UpdatesTab
+        v-if="cap.update_supported"
         :git-repo-url="gitRepoUrl"
         :git-branch="gitBranch"
         @update:git-repo-url="v => emit('update:gitRepoUrl', v)"
         @update:git-branch="v => emit('update:gitBranch', v)"
       />
+      <SettingRow
+        v-else
+        label="Server updates"
+        description="This server runs as a Docker container, so updates are applied on the host by pulling the published image."
+        stacked
+      >
+        <div class="maint-guidance" data-test="update-guidance">
+          <code class="maint-guidance__cmd">sudo /usr/local/bin/update-calvin.sh</code>
+          <p class="maint-guidance__note">
+            …or manually: <code>docker compose pull && docker compose up -d</code> in
+            <code>/etc/calvin</code>. Kiosk agents are updated below — they don't need a server
+            update.
+          </p>
+        </div>
+      </SettingRow>
     </SettingsSection>
 
     <SettingsSection id="maintenance-system" title="System">
-      <SettingRow label="Restart backend" description="Restart the backend API server.">
-        <button type="button" class="maint-btn" @click="askRestartBackend">Restart backend</button>
+      <SettingRow
+        v-if="cap.restart_backend_supported"
+        label="Restart backend"
+        description="Restart the backend API server."
+      >
+        <button
+          type="button"
+          class="maint-btn"
+          data-test="restart-backend"
+          @click="askRestartBackend"
+        >
+          Restart backend
+        </button>
       </SettingRow>
-      <SettingRow label="Restart frontend" description="Restart the frontend service.">
-        <button type="button" class="maint-btn" @click="askRestartFrontend">
+      <SettingRow
+        v-if="cap.restart_frontend_supported"
+        label="Restart frontend"
+        description="Restart the frontend service."
+      >
+        <button
+          type="button"
+          class="maint-btn"
+          data-test="restart-frontend"
+          @click="askRestartFrontend"
+        >
           Restart frontend
         </button>
       </SettingRow>
       <SettingRow label="Reload UI" description="Reload the browser page.">
-        <button type="button" class="maint-btn" @click="reloadUi">Reload UI</button>
+        <button type="button" class="maint-btn" data-test="reload-ui" @click="reloadUi">
+          Reload UI
+        </button>
       </SettingRow>
     </SettingsSection>
 
@@ -77,8 +115,9 @@
 </template>
 
 <script setup>
-import { reactive } from "vue";
+import { computed, onMounted, reactive, ref } from "vue";
 import { useSystem } from "@/composables";
+import { getSystemEnvironment } from "@/services/systemApi";
 import SettingsSection from "@/components/settings/shell/SettingsSection.vue";
 import SettingRow from "@/components/settings/shell/SettingRow.vue";
 import ToggleSwitch from "@/components/ui/ToggleSwitch.vue";
@@ -96,11 +135,35 @@ const emit = defineEmits(["update:config", "update:gitRepoUrl", "update:gitBranc
 
 const { restartBackend, restartFrontend } = useSystem();
 
+// Deployment capabilities. null until fetched; on fetch failure we deliberately
+// fall back to "show everything" so a transient error can't hide working controls.
+const environment = ref(null);
+const cap = computed(
+  () =>
+    environment.value ?? {
+      deployment: "unknown",
+      update_supported: true,
+      restart_backend_supported: true,
+      restart_frontend_supported: true,
+    }
+);
+
+onMounted(async () => {
+  try {
+    environment.value = await getSystemEnvironment();
+  } catch (e) {
+    console.error("Failed to load system environment:", e);
+  }
+});
+
 const confirm = reactive({ show: false, title: "", message: "", action: null });
 
 const askRestartBackend = () => {
   confirm.title = "Restart backend?";
-  confirm.message = "The display will briefly disconnect while the backend restarts.";
+  confirm.message =
+    cap.value.deployment === "docker"
+      ? "The backend container will restart via its restart policy. The display briefly disconnects."
+      : "The display will briefly disconnect while the backend restarts.";
   confirm.action = "backend";
   confirm.show = true;
 };
@@ -149,5 +212,32 @@ const reloadUi = () => {
 .maint-btn:focus-visible {
   outline: 2px solid var(--focus);
   outline-offset: 2px;
+}
+.maint-guidance {
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+}
+.maint-guidance__cmd {
+  display: block;
+  padding: 0.6rem 0.75rem;
+  background: var(--bg-0);
+  border: 1px solid var(--line);
+  border-radius: var(--radius-sm);
+  font-family: var(--font-data);
+  font-size: var(--fs-sm);
+  color: var(--ink);
+  user-select: all;
+}
+.maint-guidance__note {
+  margin: 0;
+  font-family: var(--font-ui);
+  font-size: var(--fs-xs);
+  color: var(--ink-3);
+  line-height: 1.5;
+}
+.maint-guidance__note code {
+  font-family: var(--font-data);
+  font-size: 0.9em;
 }
 </style>
