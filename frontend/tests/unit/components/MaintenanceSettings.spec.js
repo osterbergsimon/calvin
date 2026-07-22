@@ -21,6 +21,8 @@ vi.mock("@/services/systemApi", () => apiMock);
 // about whether MaintenanceSettings renders it.
 const stubs = {
   UpdatesTab: { template: '<div data-test="updates-tab" />' },
+  // Uses Pinia; stubbed so this spec stays isolated from the kiosks store.
+  KioskAgentsSection: { template: "<div />" },
 };
 
 const mountTab = (env, extraStubs = {}) => {

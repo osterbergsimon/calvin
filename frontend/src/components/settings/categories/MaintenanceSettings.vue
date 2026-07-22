@@ -25,6 +25,8 @@
       </SettingRow>
     </SettingsSection>
 
+    <KioskAgentsSection />
+
     <SettingsSection id="maintenance-system" title="System">
       <SettingRow
         v-if="cap.restart_backend_supported"
@@ -124,6 +126,7 @@ import ToggleSwitch from "@/components/ui/ToggleSwitch.vue";
 import SelectPill from "@/components/ui/SelectPill.vue";
 import NumberStepper from "@/components/ui/NumberStepper.vue";
 import ConfirmModal from "@/components/settings/shared/ConfirmModal.vue";
+import KioskAgentsSection from "@/components/settings/shared/KioskAgentsSection.vue";
 import UpdatesTab from "@/components/settings/tabs/system/UpdatesTab.vue";
 
 defineProps({
