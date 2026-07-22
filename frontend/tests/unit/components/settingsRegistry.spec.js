@@ -53,4 +53,18 @@ describe("settings registry", () => {
   it("limits search results", () => {
     expect(filterSettingsDestinations("display", 2)).toHaveLength(2);
   });
+
+  it("resolves the maintenance destinations", () => {
+    expect(getSettingDestinationById("maintenance-kiosk-agents")).toMatchObject({
+      category: "maintenance",
+      tab: "kiosk-agents",
+    });
+    expect(getSettingDestinationById("maintenance-system")).toMatchObject({
+      category: "maintenance",
+      tab: "system",
+    });
+    expect(filterSettingsDestinations("agent").map(item => item.id)).toContain(
+      "maintenance-kiosk-agents"
+    );
+  });
 });
