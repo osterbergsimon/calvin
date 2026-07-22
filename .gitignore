@@ -141,3 +141,8 @@ bandit-report.json
 
 # Git worktrees (project-local)
 .worktrees/
+
+# Beads / Dolt files (added by bd init)
+.dolt/
+.beads-credential-key
+.beads/proxieddb/
