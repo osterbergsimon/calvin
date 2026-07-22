@@ -63,8 +63,9 @@ const modeStore = useModeStore();
 const router = useRouter();
 
 // Drag-resize only makes sense with at least two top-level regions to share.
+// effectiveDashboardScreens so kiosk mode reflects the kiosk-active screen (calvin-yu0).
 const canResizeRegions = computed(() => {
-  const screen = getActiveDashboardScreen(configStore.dashboardScreens);
+  const screen = getActiveDashboardScreen(configStore.effectiveDashboardScreens);
   return (screen?.layout?.regions?.length || 0) > 1;
 });
 
