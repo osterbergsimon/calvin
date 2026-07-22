@@ -160,6 +160,19 @@ def test_agent_manifest_served(test_client: TestClient):
 
 
 @pytest.mark.integration
+def test_agent_manifest_503_on_broken_checkout(test_client: TestClient):
+    """A missing bundle file (broken server checkout) degrades to 503, not a 500 stack."""
+    from pathlib import Path
+
+    from app.services import kiosk_bundle
+
+    with patch.object(kiosk_bundle.settings, "repo_dir", Path("/nonexistent-checkout")):
+        r = test_client.get("/api/kiosks/agent/manifest")
+    assert r.status_code == 503
+    assert "unavailable" in r.json()["detail"].lower()
+
+
+@pytest.mark.integration
 def test_agent_file_served_and_allowlisted(test_client: TestClient):
     from app.services import kiosk_bundle
 

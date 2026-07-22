@@ -1,3 +1,6 @@
 # Installed to /etc/sudoers.d/calvin-kiosk-update (mode 0440).
 # Lets the unprivileged display-agent kick off the root updater — nothing else.
+# /bin/systemctl assumes a merged-usr layout (/bin -> /usr/bin), true on Debian
+# Bullseye+ incl. RPi OS. The agent calls bare `sudo -n systemctl` (resolved via
+# secure_path), so on a non-merged-usr distro this path must match `which systemctl`.
 calvin ALL=(root) NOPASSWD: /bin/systemctl start --no-block calvin-kiosk-update.service

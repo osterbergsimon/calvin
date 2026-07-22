@@ -263,14 +263,19 @@ const effAvailable = computed(() =>
 );
 
 async function persistContent(next) {
+  // Optimistic set with snapshot revert so a failed save doesn't leave the UI
+  // showing apparently-applied values under the error banner (calvin-dd9.13).
+  const kioskId = selectedId.value;
+  const prior = overrides.value;
   overrides.value = next;
   try {
-    await store.saveOverrides(selectedId.value, next);
+    await store.saveOverrides(kioskId, next);
     const online = selectedKiosk() ? isOnline(selectedKiosk()) : false;
     contentMsg.value = online
       ? "Saved. This kiosk picks up content changes at its next check-in (~30s)."
       : "Saved. Changes apply when this kiosk reconnects.";
   } catch {
+    if (selectedId.value === kioskId) overrides.value = prior;
     contentMsg.value = "Couldn't save to the server. Check the connection and try again.";
   }
 }
@@ -345,15 +350,19 @@ async function refreshDesiredVersion(id) {
 }
 
 async function persist(next) {
+  // Snapshot + revert on failure (calvin-dd9.13), see persistContent.
+  const kioskId = selectedId.value;
+  const prior = overrides.value;
   overrides.value = next;
   try {
-    await store.saveOverrides(selectedId.value, next);
+    await store.saveOverrides(kioskId, next);
     const online = selectedKiosk() ? isOnline(selectedKiosk()) : false;
     savedMsg.value = online
       ? "Saved. This kiosk applies orientation at its next check-in (~30s)."
       : "Saved. Changes apply when this kiosk reconnects.";
-    await refreshDesiredVersion(selectedId.value);
+    await refreshDesiredVersion(kioskId);
   } catch {
+    if (selectedId.value === kioskId) overrides.value = prior;
     savedMsg.value = "Couldn't save to the server. Check the connection and try again.";
   }
 }
@@ -392,15 +401,19 @@ const effSchedule = computed(() =>
 );
 
 async function persistSchedule(next) {
+  // Snapshot + revert on failure (calvin-dd9.13), see persistContent.
+  const kioskId = selectedId.value;
+  const prior = overrides.value;
   overrides.value = next;
   try {
-    await store.saveOverrides(selectedId.value, next);
+    await store.saveOverrides(kioskId, next);
     const online = selectedKiosk() ? isOnline(selectedKiosk()) : false;
     scheduleMsg.value = online
       ? "Saved. This kiosk applies the schedule at its next check-in (~30s)."
       : "Saved. Changes apply when this kiosk reconnects.";
-    await refreshDesiredVersion(selectedId.value);
+    await refreshDesiredVersion(kioskId);
   } catch {
+    if (selectedId.value === kioskId) overrides.value = prior;
     scheduleMsg.value = "Couldn't save to the server. Check the connection and try again.";
   }
 }
@@ -423,7 +436,11 @@ async function select(id) {
   contentMsg.value = "";
   scheduleMsg.value = "";
   hardwareOpen.value = false;
-  overrides.value = await store.fetchOverrides(id);
+  const fetched = await store.fetchOverrides(id);
+  // Guard the stale-selection race: clicking kiosk A then B before A's fetch
+  // resolves must not land A's overrides under B's selection (calvin-vk3).
+  if (selectedId.value !== id) return;
+  overrides.value = fetched;
   await refreshDesiredVersion(id);
 }
 

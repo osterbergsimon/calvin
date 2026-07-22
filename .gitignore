@@ -102,6 +102,8 @@ backend/data/plugins/
 backend/data/themes/*
 !backend/data/themes/
 !backend/data/themes/builtin.json
+# Auto-generated kiosk manifest signing secret — never commit
+backend/data/kiosk-signing.key
 
 # Documentation
 docs/archive/
