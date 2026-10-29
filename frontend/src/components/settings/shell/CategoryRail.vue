@@ -1,5 +1,5 @@
 <template>
-  <nav ref="railEl" class="category-rail" role="list">
+  <nav ref="railEl" class="category-rail" :class="{ 'is-scrollable': scrollable }" role="list">
     <FocusPanel
       v-for="(cat, index) in categories"
       :key="cat.id"
@@ -22,7 +22,7 @@
 </template>
 
 <script setup>
-import { useTemplateRef } from "vue";
+import { onBeforeUnmount, onMounted, ref, useTemplateRef } from "vue";
 import FocusPanel from "@/components/ui/FocusPanel.vue";
 
 const props = defineProps({
@@ -33,6 +33,27 @@ const props = defineProps({
 defineEmits(["select"]);
 
 const railEl = useTemplateRef("railEl");
+
+// Scroll only when the items really don't fit. A viewport-height breakpoint
+// guessed wrong once the rail grew to 8 categories: windows 601-650px tall
+// clipped the last tiles with no way to reach them. Measuring keeps the glow
+// unclipped whenever everything fits (calvin-7ux).
+const scrollable = ref(false);
+let resizeObserver = null;
+
+function measure() {
+  const el = railEl.value;
+  if (!el) return;
+  scrollable.value = el.scrollHeight > el.clientHeight + 1;
+}
+
+onMounted(() => {
+  if (typeof ResizeObserver === "undefined" || !railEl.value) return;
+  resizeObserver = new ResizeObserver(measure);
+  resizeObserver.observe(railEl.value);
+  for (const item of railEl.value.children) resizeObserver.observe(item);
+});
+onBeforeUnmount(() => resizeObserver?.disconnect());
 
 function onKeydown(event, index) {
   if (event.key === "ArrowDown") {
@@ -65,23 +86,15 @@ function focusItem(index) {
   flex-direction: column;
   gap: 4px;
   min-height: 0;
-  /* Keep this NOT a scroll container by default: a scroll container clips both
-     axes, which cuts the selected tile's outward FocusPanel glow into an ugly
-     box (calvin-7ux). The 6 categories always fit on a normal viewport, so the
-     glow blooms freely here. Only short kiosks need the rail to scroll
-     (calvin-g7v) — scoped below, where a glow clipped at the scroll edge reads
-     as normal scrolling. */
+  /* Not a scroll container while everything fits: a scroll container clips
+     both axes, which cuts the selected tile's outward FocusPanel glow into an
+     ugly box (calvin-7ux). `is-scrollable` is set from a measurement in the
+     script when the items overflow, at any viewport size. */
   overflow: visible;
 }
 
-/* Wide-short kiosk (e.g. 800x480): the settings layout keeps its constrained
-   internal scroll (calvin-g7v) and the rail's items can exceed the viewport, so
-   let the rail scroll here. Short+narrow falls back to page scroll via the
-   media queries in Settings.vue, so it needs no override. */
-@media (max-height: 600px) and (min-width: 769px) {
-  .category-rail {
-    overflow-y: auto;
-  }
+.category-rail.is-scrollable {
+  overflow-y: auto;
 }
 
 .category-rail__item {
