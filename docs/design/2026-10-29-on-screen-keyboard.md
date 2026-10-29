@@ -136,10 +136,11 @@ fr                   {shift} w x c v b n - _ {shift}
   **Amended by [CLV-21](2026-10-29-keyboard-layout-picker.md):** without extras a tap opens the layout
   picker instead, and a long-press always does. The space bar always shows the active **layout's** name
   (`--ink-3`, `--fs-sm`, as in K6); its label opens the picker. Neither ever shows the UI language.
-- The active layout survives hiding and showing. It is remembered per device in `localStorage`
-  (`calvin-osk-layout`, wrapped in try/catch) and resets to the main layout if that entry stops being valid.
-  **Amended by [CLV-21](2026-10-29-keyboard-layout-picker.md):** a device choice is honoured even when it
-  isn't the main or an extra layout.
+- The active layout survives hiding and showing. An explicit choice is remembered per device in
+  `localStorage` (`calvin-osk-device-layout`, wrapped in try/catch) and resets to the main layout if that
+  entry stops being valid. **Amended by [CLV-21](2026-10-29-keyboard-layout-picker.md):** a device choice is
+  honoured even when it isn't the main or an extra layout, and the legacy `calvin-osk-layout` key is removed
+  on load because older builds wrote it on every device.
 
 ### Keys
 
