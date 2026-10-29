@@ -66,9 +66,14 @@ export function getKioskHost() {
   return captured("khost", KIOSK_HOST_KEY) || window.location.hostname || "";
 }
 
-export function configUrl() {
+// Config path relative to the API base (for the shared `services/api.js` client).
+export function configPath() {
   const id = getKioskId();
-  if (!id) return "/api/config";
+  if (!id) return "/config";
   const khost = encodeURIComponent(getKioskHost());
-  return `/api/kiosks/${encodeURIComponent(id)}/config?khost=${khost}`;
+  return `/kiosks/${encodeURIComponent(id)}/config?khost=${khost}`;
+}
+
+export function configUrl() {
+  return `/api${configPath()}`;
 }
