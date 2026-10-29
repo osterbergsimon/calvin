@@ -254,7 +254,9 @@ class LocalImagePlugin(ImagePlugin):
         """
         name = (filename or "").replace("\\", "/").rsplit("/", 1)[-1].strip()
         if not name or name.startswith("."):
-            name = f"upload-{uuid.uuid4().hex[:12]}.jpg"
+            suffix = Path(name).suffix.lower()
+            suffix = suffix if suffix in self.supported_formats else ".jpg"
+            name = f"upload-{uuid.uuid4().hex[:12]}{suffix}"
         file_path = self.image_dir / name
         if file_path.exists():
             file_path = (

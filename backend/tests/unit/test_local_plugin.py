@@ -194,6 +194,14 @@ class TestLocalConfigUpdate:
 class TestUploadFilenameSafety:
     """Upload filenames are untrusted (audit S3, calvin-ua2)."""
 
+    @pytest.fixture
+    def temp_image_dir(self, tmp_path):
+        # A fresh parent per test, so "nothing escaped to the parent" can't
+        # be confused by files other runs left in the shared temp dir.
+        image_dir = tmp_path / "images"
+        image_dir.mkdir()
+        return image_dir
+
     @pytest.mark.parametrize(
         "filename",
         ["../escaped.png", "../../escaped.png", "sub/../../escaped.png", "..\\escaped.png"],
@@ -238,3 +246,14 @@ class TestUploadFilenameSafety:
 
         assert existing.read_bytes() == b"original"
         assert len([p for p in temp_image_dir.iterdir() if p.is_file()]) == 2
+
+    @pytest.mark.parametrize(
+        ("filename", "suffix"), [(".hidden.png", ".png"), (".x.webp", ".webp"), ("..", ".jpg")]
+    )
+    async def test_generated_name_keeps_image_extension(
+        self, local_plugin, temp_image_dir, filename, suffix
+    ):
+        await local_plugin.upload_image(b"\x89PNG data", filename)
+
+        (written,) = [p for p in temp_image_dir.iterdir() if p.is_file()]
+        assert written.suffix == suffix
