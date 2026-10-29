@@ -212,7 +212,26 @@ def maybe_update(cfg, *, trigger=_fire_updater, state=None, state_dir=STATE_DIR)
     return True
 
 
-def _config_url(backend_url, kiosk_id, host, kagent=None, kstat=None):
+def update_report(state_dir=STATE_DIR):
+    """The updater's last (status, message), or ("ok", None) when it never ran.
+
+    update-kiosk.sh writes ``{"status", "phase", "message"}`` to
+    agent-update-state.json; reporting both lets the server's kiosk software
+    view tell a python-too-old abort from a rollback (CLV-19).
+    """
+    try:
+        with open(os.path.join(state_dir, "agent-update-state.json")) as f:
+            st = json.load(f)
+    except (OSError, ValueError):
+        return "ok", None
+    status = str(st.get("status") or "").strip()
+    if status not in ("ok", "error", "running", "success"):
+        return "ok", None
+    message = st.get("message")
+    return status, (str(message)[:255] if message else None)
+
+
+def _config_url(backend_url, kiosk_id, host, kagent=None, kstat=None, kmsg=None):
     """Effective-config URL: per-kiosk endpoint when a kiosk id is set, else global."""
     base = backend_url.rstrip("/")
     if kiosk_id:
@@ -223,15 +242,21 @@ def _config_url(backend_url, kiosk_id, host, kagent=None, kstat=None):
             params["kagent"] = kagent
         if kstat:
             params["kstat"] = kstat
+        if kmsg:
+            params["kmsg"] = kmsg
         q = urllib.parse.urlencode(params, quote_via=urllib.parse.quote)
         return f"{base}/api/kiosks/{kiosk_id}/config" + (f"?{q}" if q else "")
     return base + "/api/config"
 
 
-def fetch_config(backend_url, kstat="ok"):
+def fetch_config(backend_url, kstat=None, kmsg=None):
     kiosk_id = os.environ.get("CALVIN_KIOSK_ID", "").strip()
     host = os.environ.get("CALVIN_KIOSK_HOSTNAME", "").strip() or socket.gethostname()
-    url = _config_url(backend_url, kiosk_id, host, kagent=running_version(), kstat=kstat)
+    if kstat is None:
+        kstat, kmsg = update_report()
+    url = _config_url(
+        backend_url, kiosk_id, host, kagent=running_version(), kstat=kstat, kmsg=kmsg
+    )
     with urllib.request.urlopen(url, timeout=HTTP_TIMEOUT) as r:
         cfg = json.load(r)
     touch_ready()

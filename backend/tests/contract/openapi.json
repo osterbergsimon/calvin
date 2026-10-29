@@ -3121,6 +3121,22 @@
               ],
               "title": "Kstat"
             }
+          },
+          {
+            "in": "query",
+            "name": "kmsg",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Kmsg"
+            }
           }
         ],
         "responses": {
