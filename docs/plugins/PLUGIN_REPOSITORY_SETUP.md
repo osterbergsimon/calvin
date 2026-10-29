@@ -104,7 +104,7 @@ Community-contributed plugins for [Calvin Dashboard](https://github.com/your-org
 
 ## Contributing
 
-See [CONTRIBUTING.md](./CONTRIBUTING.md) for guidelines on creating plugins.
+See [CONTRIBUTING.md](../CONTRIBUTING.md) for guidelines on creating plugins.
 ```
 
 ## Working with Multiple Repositories

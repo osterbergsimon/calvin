@@ -5,7 +5,7 @@ contract 1.0** (`api_version: 1`): what the host expects from a plugin, and
 where each piece is enforced.
 
 If you are creating a plugin, start with
-[`calvin-plugins/CREATING_PLUGINS.md`](../../../calvin-plugins/CREATING_PLUGINS.md) —
+[`calvin-plugins/CREATING_PLUGINS.md`](https://github.com/osterbergsimon/calvin-plugins/tree/main/CREATING_PLUGINS.md) —
 it has the scaffold script, the walkthrough, and the publishing checklist.
 Use this guide when you need the host's view of the contract. For the package
 format (`plugin.json`), see [PLUGIN_PACKAGE_FORMAT.md](PLUGIN_PACKAGE_FORMAT.md);
@@ -14,7 +14,7 @@ for the full method reference, see [PLUGIN_INTERFACE.md](PLUGIN_INTERFACE.md).
 ## Where Plugins Live
 
 Plugins are **not** part of the Calvin host repo. They live in
-[`../calvin-plugins/`](../../../calvin-plugins/) (a sibling repo) and are
+[`../calvin-plugins/`](https://github.com/osterbergsimon/calvin-plugins/tree/main/) (a sibling repo) and are
 installed at runtime into `backend/data/plugins/{plugin_id}/`. Each installed
 plugin is a directory with a `plugin.json` manifest, a `plugin.py` entry
 point, and optional `frontend/` assets. The host imports `plugin.py` and
@@ -69,7 +69,7 @@ class HelloPlugin(ServicePlugin):
 
 What the host does with it:
 
-1. **Discovery.** [loader.py](../../backend/app/plugins/loader.py) imports
+1. **Discovery.** [loader.py](https://github.com/osterbergsimon/calvin/blob/develop/backend/app/plugins/loader.py) imports
    `plugin.py` and registers every `BasePlugin`-family subclass that declares
    its own `metadata = PluginMetadata(...)`. No registration hooks — Pluggy
    is gone.
@@ -86,16 +86,16 @@ What the host does with it:
    selected by `display_schema.kind` draws it. The plugin ships no frontend
    code.
 
-Reference implementation: [`mealie/`](../../../calvin-plugins/mealie) — a real
+Reference implementation: [`mealie/`](https://github.com/osterbergsimon/calvin-plugins/tree/main/mealie) — a real
 service plugin with connection testing, per-instance identity
 (`instance_identity=["mealie_url"]`), payload shaping for `card-grid`, and a
 contract-shaped test suite.
 
 ## Plugin Types
 
-The `PluginType` enum in [base.py](../../backend/app/plugins/base.py) defines
+The `PluginType` enum in [base.py](https://github.com/osterbergsimon/calvin/blob/develop/backend/app/plugins/base.py) defines
 the categories. Each non-theme type has a protocol class in
-[protocols.py](../../backend/app/plugins/protocols.py) that the plugin
+[protocols.py](https://github.com/osterbergsimon/calvin/blob/develop/backend/app/plugins/protocols.py) that the plugin
 subclasses; the loader derives the type from the base class — it is never
 declared.
 
@@ -110,7 +110,7 @@ declared.
 ## Optional Class-Level Hooks
 
 Override only what you need (all on the plugin class; defaults in
-[base.py](../../backend/app/plugins/base.py)):
+[base.py](https://github.com/osterbergsimon/calvin/blob/develop/backend/app/plugins/base.py)):
 
 | Method | Kind | Purpose |
 |---|---|---|
@@ -122,7 +122,7 @@ Override only what you need (all on the plugin class; defaults in
 | `initialize()` / `cleanup()` / `configure()` | async instance | Lifecycle; `configure` overrides call `super().configure(config)` first. |
 
 Instance CRUD is entirely host-side: `apply_plugin_config_update` in
-[instance_manager.py](../../backend/app/plugins/utils/instance_manager.py)
+[instance_manager.py](https://github.com/osterbergsimon/calvin/blob/develop/backend/app/plugins/utils/instance_manager.py)
 derives everything from `metadata` plus these hooks. Plugins implement no
 config-update handler.
 
@@ -133,7 +133,7 @@ Calvin dispatches on `kind` and renders with a built-in Vue component —
 plugins ship data, not markup.
 
 `kind` is required and must be one of `SUPPORTED_DISPLAY_KINDS` in
-[definitions.py](../../backend/app/plugins/definitions.py):
+[definitions.py](https://github.com/osterbergsimon/calvin/blob/develop/backend/app/plugins/definitions.py):
 
 | Kind | Used for |
 |---|---|
@@ -183,9 +183,9 @@ instance_config_schema={
 
 **Field types**: `string`, `password`, `integer`, `number`, `boolean` —
 `string`/`integer`/`number`/`boolean` drive value conversion in
-`normalize_config` (see [base.py](../../backend/app/plugins/base.py)).
+`normalize_config` (see [base.py](https://github.com/osterbergsimon/calvin/blob/develop/backend/app/plugins/base.py)).
 
-**UI components** (see [PluginFieldRenderer.vue](../../frontend/src/components/PluginFieldRenderer.vue)):
+**UI components** (see [PluginFieldRenderer.vue](https://github.com/osterbergsimon/calvin/blob/develop/frontend/src/components/PluginFieldRenderer.vue)):
 `input`, `password`, `number`, `textarea`, `select` (with `options`),
 `select-scan` (options discovered via `scan_options`), `checkbox`,
 `directory` (filesystem picker).
@@ -221,8 +221,9 @@ not import each other** — keep them self-contained.
 5. **Copy is interface.** Error strings in payloads (`{"error": "..."}`)
    surface on the wall — write direction, not stack traces.
 6. **Validate at boundaries** in `validate_config`; trust internal callers.
-7. **Declare pip deps** in `plugin.json` `dependencies.packages` and exclude
-   tests/docs via `files.exclude`.
+7. **Declare pip deps** in `plugin.json` `dependencies.packages`. Keep
+   tests/docs out of the packaged directory: `files.exclude` is accepted by
+   the repo validator, but the host does not apply the globs.
 
 ## Troubleshooting
 
@@ -241,10 +242,10 @@ the API returns the error. Common causes:
 
 The kind isn't in `SUPPORTED_DISPLAY_KINDS`. Fix the typo — or, if you
 genuinely need a new kind, add a renderer under
-[frontend/src/components/plugins/renderers/](../../frontend/src/components/plugins/renderers/),
-register it in [rendererRegistry.js](../../frontend/src/components/plugins/rendererRegistry.js),
+[frontend/src/components/plugins/renderers/](https://github.com/osterbergsimon/calvin/tree/develop/frontend/src/components/plugins/renderers),
+register it in [rendererRegistry.js](https://github.com/osterbergsimon/calvin/blob/develop/frontend/src/components/plugins/rendererRegistry.js),
 and add the kind to `SUPPORTED_DISPLAY_KINDS` in
-[definitions.py](../../backend/app/plugins/definitions.py). The kind-sync test
+[definitions.py](https://github.com/osterbergsimon/calvin/blob/develop/backend/app/plugins/definitions.py). The kind-sync test
 (`backend/tests/unit/test_display_kind_sync.py`) fails the build if the lists
 drift.
 
@@ -264,7 +265,8 @@ SQLite contention during plugin operations. Host-side writes are wrapped with
 ### Web component doesn't render
 
 - `frontend/dist.js` (or whatever `display_schema.module` names) must exist in
-  the installed plugin directory and be listed in `files.include`.
+  the installed plugin directory. The host ignores `files.include`; it serves
+  whatever is actually present under `frontend/`.
 - The module must register the custom element named by
   `display_schema.element` — the host errors if it isn't registered after
   import.
@@ -282,7 +284,7 @@ SQLite contention during plugin operations. Host-side writes are wrapped with
   persistence and install/uninstall lifecycle.
 - [PLUGIN_INSTALLATION.md](PLUGIN_INSTALLATION.md) — install flow and API.
 - [EVENT_SYSTEM.md](../EVENT_SYSTEM.md) — cross-plugin events.
-- [`calvin-plugins/CREATING_PLUGINS.md`](../../../calvin-plugins/CREATING_PLUGINS.md) —
+- [`calvin-plugins/CREATING_PLUGINS.md`](https://github.com/osterbergsimon/calvin-plugins/tree/main/CREATING_PLUGINS.md) —
   scaffold, testing, publishing.
-- Built-in plugins: [`backend/app/plugins/`](../../backend/app/plugins/).
-  Reference plugin: [`mealie/`](../../../calvin-plugins/mealie).
+- Built-in plugins: [`backend/app/plugins/`](https://github.com/osterbergsimon/calvin/tree/develop/backend/app/plugins).
+  Reference plugin: [`mealie/`](https://github.com/osterbergsimon/calvin-plugins/tree/main/mealie).
