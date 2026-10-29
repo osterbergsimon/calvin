@@ -192,7 +192,7 @@ export const settingsDestinations = [
     category: "device",
     tabKey: "settings_tab_device",
     tab: "keyboard",
-    keywords: ["keyboard", "buttons", "mappings", "shortcuts"],
+    keywords: ["keyboard", "on-screen", "typing", "osk", "buttons", "mappings", "shortcuts"],
   },
   {
     id: "device-notifications",

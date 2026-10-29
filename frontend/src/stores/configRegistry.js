@@ -289,6 +289,12 @@ export const CONFIG_FIELD_DEFINITIONS = [
     defaultValue: "medium",
   },
   {
+    name: "onScreenKeyboard",
+    keys: ["onScreenKeyboard", "on_screen_keyboard"],
+    defaultValue: "auto",
+    parse: value => (["auto", "on", "off"].includes(value) ? value : "auto"),
+  },
+  {
     name: "uiSize",
     keys: ["uiSize", "ui_size"],
     defaultValue: "default",

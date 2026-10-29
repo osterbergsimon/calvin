@@ -1,0 +1,213 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>On-screen keyboard mocks</title>
+<link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500&family=IBM+Plex+Sans+Condensed:wght@500;600&family=IBM+Plex+Sans:wght@400;500;600&display=swap" rel="stylesheet" />
+<style>
+/* Real Calvin tokens (frontend/src/styles/theme.css) */
+:root {
+  --bg-0: #eef1f4; --bg-1: #ffffff; --bg-2: #ffffff; --line: #dde3e8; --line-soft: #e8edf1;
+  --ink: #1b242b; --ink-2: #5d6b75; --ink-3: #93a0a9; --focus: #e08a1e; --focus-ink: #ffffff;
+  --err: #c0392b; --shadow-hover: rgba(0,0,0,.15);
+  --font-display: "IBM Plex Sans Condensed", system-ui, sans-serif;
+  --font-ui: "IBM Plex Sans", system-ui, sans-serif; --font-data: "IBM Plex Mono", ui-monospace, monospace;
+  --touch-target: 2.75rem; --control-height: 3rem; --radius-sm: .5rem; --radius-md: .625rem;
+  --fs-control: .875rem; --fs-md: .9rem; --fs-sm: .85rem; --fs-xl: 1.25rem;
+}
+.dark { --bg-0: #0e1316; --bg-1: #151c21; --bg-2: #1d262d; --line: #27313a; --line-soft: #1e272e;
+  --ink: #eaf0f3; --ink-2: #9aa7b0; --ink-3: #62707a; --focus: #f3b052; --focus-ink: #1a130a; --shadow-hover: rgba(0,0,0,.4); }
+* { box-sizing: border-box; }
+body { margin: 0; background: #d9dee3; font-family: var(--font-ui); color: #1b242b; }
+.board { padding: 32px 16px 80px; max-width: 1360px; margin: 0 auto; }
+.board > h1 { font-family: var(--font-display); font-size: 2rem; margin: 0 0 4px; }
+.board > p { margin: 0 0 32px; color: #5d6b75; max-width: 70ch; }
+.shot { margin: 0 0 40px; } .shot figcaption { font-size: .85rem; color: #5d6b75; margin: 8px 2px 0; max-width: 1280px; }
+.shot figcaption b { color: #1b242b; } .scroll { overflow-x: auto; max-width: 100%; }
+.frame { position: relative; overflow: hidden; background: var(--bg-0); color: var(--ink); border-radius: 6px; box-shadow: 0 2px 12px rgba(0,0,0,.18); }
+.kiosk { width: 1280px; height: 720px; } .small { width: 800px; height: 480px; }
+
+.topbar { display: flex; align-items: center; justify-content: space-between; height: 64px; padding: 0 20px; background: var(--bg-1); border-bottom: 1px solid var(--line); }
+.wordmark { font-family: var(--font-display); font-weight: 600; letter-spacing: .12em; } .wordmark i { font-style: normal; color: var(--focus); }
+.location { color: var(--ink-2); margin-left: 16px; }
+.btn { display: inline-flex; align-items: center; justify-content: center; min-height: var(--touch-target); padding: 0 1rem; border-radius: var(--radius-md);
+  border: 1px solid var(--line); background: var(--bg-2); color: var(--ink); font: 500 var(--fs-control) var(--font-ui); }
+.btn--primary { background: var(--focus); border-color: var(--focus); color: var(--focus-ink); font-weight: 600; }
+.btn--block { width: 100%; height: var(--control-height); font-size: 1rem; }
+
+/* page area above keyboard */
+.above { position: absolute; top: 64px; left: 0; right: 0; bottom: var(--osk-h); display: flex; align-items: center; justify-content: center; padding: 16px; }
+.card { width: 26rem; padding: 1.5rem 2rem; background: var(--bg-1); border: 1px solid var(--line); border-radius: 16px; }
+.card h2 { margin: 0 0 6px; font: 600 var(--fs-xl)/1.3 var(--font-ui); } .lead { margin: 0 0 16px; color: var(--ink-2); font-size: .95rem; }
+.field { margin-bottom: 14px; } .field label { display: block; margin-bottom: 6px; font-weight: 500; font-size: var(--fs-md); }
+.input { position: relative; }
+.input input { width: 100%; height: var(--control-height); padding: 0 4.75rem 0 .875rem; background: var(--bg-2); color: var(--ink);
+  border: 1px solid var(--focus); box-shadow: 0 0 0 2px color-mix(in srgb, var(--focus) 20%, transparent); border-radius: var(--radius-sm); font: 1rem var(--font-ui); letter-spacing: .15em; }
+.input input.plain { letter-spacing: normal; padding-right: .875rem; }
+.input input.rest { border-color: var(--line); box-shadow: none; }
+.show { position: absolute; right: 2px; top: 2px; height: 44px; min-width: 44px; padding: 0 .875rem; border: 0; background: transparent; color: var(--ink-2); font: 500 var(--fs-control) var(--font-ui); }
+.caret { display: inline-block; width: 2px; height: 1.2em; background: var(--focus); vertical-align: middle; }
+
+/* settings shell for the Content example */
+.shell { position: absolute; top: 64px; left: 0; right: 0; bottom: var(--osk-h); display: grid; grid-template-columns: 240px 1fr; }
+.rail { padding: 16px 12px; border-right: 1px solid var(--line); background: var(--bg-1); }
+.rail div { padding: 12px 14px; border-radius: 10px; color: var(--ink-2); font-size: .95rem; }
+.rail .on { background: color-mix(in srgb, var(--focus) 12%, transparent); color: var(--ink); font-weight: 600; box-shadow: inset 3px 0 0 var(--focus); }
+.content { padding: 8px 32px; overflow: hidden; }
+.eyebrow { font-family: var(--font-data); font-size: .72rem; letter-spacing: .18em; text-transform: uppercase; color: var(--ink-3); margin: 1.25rem .25rem .5rem; }
+.panel { background: var(--bg-1); border: 1px solid var(--line); border-radius: 16px; padding: 1rem 1.25rem; }
+
+/* ===== The keyboard ===== */
+.osk { position: absolute; left: 0; right: 0; bottom: 0; height: var(--osk-h); padding: 10px 12px 12px;
+  background: var(--bg-0); border-top: 1px solid var(--line); box-shadow: 0 -10px 30px -18px var(--shadow-hover);
+  display: flex; flex-direction: column; gap: 8px; }
+.osk__row { flex: 1; display: flex; gap: 8px; justify-content: center; }
+.k { flex: 1 1 0; min-width: 0; min-height: 44px; display: flex; align-items: center; justify-content: center;
+  background: var(--bg-2); color: var(--ink); border: 1px solid var(--line); border-radius: var(--radius-sm);
+  font: 400 1.25rem var(--font-ui); box-shadow: 0 1px 0 var(--line); user-select: none; }
+.k--fn { background: color-mix(in srgb, var(--ink) 6%, var(--bg-0)); color: var(--ink-2); font-size: var(--fs-md); font-weight: 500; }
+.k--w15 { flex-grow: 1.5; } .k--w2 { flex-grow: 2; } .k--space { flex-grow: 6; }
+.k--enter { background: var(--focus); border-color: var(--focus); color: var(--focus-ink); font-weight: 600; font-size: var(--fs-md); }
+.k--on { background: color-mix(in srgb, var(--focus) 16%, var(--bg-2)); border-color: var(--focus); color: var(--ink); }
+.k--pressed { background: color-mix(in srgb, var(--focus) 22%, var(--bg-2)); transform: translateY(1px); box-shadow: none; }
+.osk--num { align-items: center; }
+.osk--num .osk__row { width: 440px; flex: 1; }
+.small .k { font-size: 1.05rem; } .small .osk { gap: 6px; padding: 8px; } .small .osk__row { gap: 6px; }
+svg.i { width: 22px; height: 22px; stroke: currentColor; fill: none; stroke-width: 2; stroke-linecap: round; stroke-linejoin: round; }
+</style>
+</head>
+<body>
+<main class="board">
+  <h1>On-screen keyboard (OSK)</h1>
+  <p>Mockups for <code>docs/design/2026-10-29-on-screen-keyboard.md</code>, using the real Paper and Backlit tokens. It is the <code>simple-keyboard</code>
+    renderer with a <code>calvin-osk</code> theme. The rows below are the layouts the spec defines.</p>
+
+  <figure class="shot scroll">
+    <div class="frame kiosk" style="--osk-h: 300px">
+      <div class="topbar"><div><span class="wordmark">CAL<i>·</i>VIN</span><span class="location">Settings</span></div><button class="btn">Done</button></div>
+      <div class="above">
+        <form class="card">
+          <h2>Sign in to Settings</h2>
+          <p class="lead">Enter the admin password for this Calvin.</p>
+          <div class="field"><label>Admin password</label><div class="input"><input type="password" value="garden" /><button type="button" class="show">Show</button></div></div>
+          <button class="btn btn--primary btn--block" type="button">Sign in</button>
+        </form>
+      </div>
+      <div class="osk" data-layout="default"></div>
+    </div>
+    <figcaption><b>K1 · Kiosk lock screen, typing the password.</b> While the keyboard is up, the "or" seam and the phone card are hidden, and the card centres in the space above the keyboard. Enter is labelled "Sign in" because the field belongs to a form whose submit button says so. Shift is one-shot.</figcaption>
+  </figure>
+
+  <figure class="shot scroll">
+    <div class="frame kiosk" style="--osk-h: 300px">
+      <div class="topbar"><div><span class="wordmark">CAL<i>·</i>VIN</span><span class="location">Calendars</span></div><button class="btn">Done</button></div>
+      <div class="shell">
+        <div class="rail"><div>Dashboard</div><div>Clock bar</div><div class="on">Content</div><div>Plugins</div><div>Device</div></div>
+        <div class="content">
+          <div class="eyebrow">Add calendar</div>
+          <div class="panel">
+            <div class="field"><label>Calendar address (iCal URL)</label><div class="input"><input class="plain" type="url" value="https://calendar.google.com/calendar/ical/fam" /></div></div>
+            <div style="display:flex;gap:10px"><button class="btn">Cancel</button><button class="btn btn--primary">Add calendar</button></div>
+          </div>
+        </div>
+      </div>
+      <div class="osk" data-layout="url"></div>
+    </div>
+    <figcaption><b>K2 · Settings, URL field.</b> <code>type="url"</code> swaps the bottom row to <code>/ : . .com</code>. The settings column gets bottom padding equal to the keyboard height, and the focused field scrolls to the centre of the visible area. Enter says "Enter" here because the field isn't in a form with a named submit button, and it sends an Enter keypress.</figcaption>
+  </figure>
+
+  <div style="display:flex;gap:24px;flex-wrap:wrap">
+    <figure class="shot scroll">
+      <div class="frame small dark" style="--osk-h: 216px">
+        <div class="topbar"><div><span class="wordmark">CAL<i>·</i>VIN</span><span class="location">Settings</span></div><button class="btn">Done</button></div>
+        <div class="above" style="padding:8px">
+          <form class="card" style="padding:1rem 1.25rem;width:24rem"><div class="field" style="margin:0"><label>Admin password</label><div class="input"><input type="password" value="garden-g" /><button type="button" class="show">Show</button></div></div></form>
+        </div>
+        <div class="osk" data-layout="symbols"></div>
+      </div>
+      <figcaption><b>K3 · 800×480, Backlit, symbols layer.</b> The keyboard is capped at 45% of the height.<br/>The lock card drops its title, lead and button and keeps only the field, so it fits.<br/>Enter submits the form.</figcaption>
+    </figure>
+
+    <figure class="shot scroll">
+      <div class="frame small" style="--osk-h: 216px">
+        <div class="topbar"><div><span class="wordmark">CAL<i>·</i>VIN</span><span class="location">Photos</span></div><button class="btn">Done</button></div>
+        <div class="above" style="padding:8px">
+          <div class="card" style="padding:1rem 1.25rem;width:24rem"><div class="field" style="margin:0"><label>Seconds per photo</label><div class="input"><input class="plain" type="text" value="30" /></div></div></div>
+        </div>
+        <div class="osk osk--num" data-layout="numeric"></div>
+      </div>
+      <figcaption><b>K4 · Number field.</b> <code>type="number"</code> / <code>inputmode="numeric"</code> gets a 4×4, 440px<br/>number pad, centred.</figcaption>
+    </figure>
+  </div>
+
+  <figure class="shot scroll">
+    <div class="frame kiosk" style="--osk-h: 300px">
+      <div class="topbar"><div><span class="wordmark">CAL<i>·</i>VIN</span><span class="location">Settings</span></div><button class="btn">Done</button></div>
+      <div class="above"><form class="card"><div class="field" style="margin:0"><label>Admin password</label><div class="input"><input type="password" value="smörgås" /><button type="button" class="show">Show</button></div></div></form></div>
+      <div class="osk" data-layout="accents"></div>
+    </div>
+    <figcaption><b>K5 · Accents layer (åäö).</b> Nordic and common European letters. Shift gives the capitals. The layer stays on until you tap "abc".</figcaption>
+  </figure>
+</main>
+
+<script>
+// Mock-only renderer for the layouts in the spec (§4). Not production code.
+const I = {
+  bksp: '<svg class="i" viewBox="0 0 24 24"><path d="M21 5H9l-6 7 6 7h12z"/><path d="M17 9l-6 6M11 9l6 6"/></svg>',
+  shift: '<svg class="i" viewBox="0 0 24 24"><path d="M12 4l8 8h-4v8H8v-8H4z"/></svg>',
+  hide: '<svg class="i" viewBox="0 0 24 24"><rect x="3" y="4" width="18" height="11" rx="2"/><path d="M8 19l4 3 4-3"/></svg>',
+};
+const L = {
+  default: [
+    "q w e r t y u i o p {bksp}",
+    "a s d f g h j k l {enter}",
+    "{shift} z x c v b n m , . {shift}",
+    "{numbers} {accents} {space} - {hide}",
+  ],
+  url: [
+    "q w e r t y u i o p {bksp}",
+    "a s d f g h j k l {enter:Enter}",
+    "{shift} z x c v b n m - _ {shift}",
+    "{numbers} / : {space} . .com {hide}",
+  ],
+  symbols: [
+    "1 2 3 4 5 6 7 8 9 0 {bksp}",
+    "@ # $ % & * - + ( ) {enter}",
+    "{abc} ! \" ' : ; / ? _ = {abc}",
+    "{abc} {space} . , {hide}",
+  ],
+  accents: [
+    "å ä ö æ ø é è ü ñ ß {bksp}",
+    "á à â ê ë í ï ó ô ú {enter}",
+    "{shift} ç õ œ ã ' ` ~ ^ ¨ {shift}",
+    "{abc} {space} . , {hide}",
+  ],
+  numeric: ["1 2 3 {bksp}", "4 5 6 -", "7 8 9 .", "{hide} 0 , {enter:Done}"],
+};
+const FN = {
+  bksp: ['k--fn k--w15', I.bksp, 'Backspace'], shift: ['k--fn k--w15', I.shift, 'Shift'], hide: ['k--fn k--w15', I.hide, 'Hide keyboard'],
+  numbers: ['k--fn k--w15', '?123'], abc: ['k--fn k--w15', 'abc'], accents: ['k--fn k--w15', 'åäö'],
+  space: ['k--space', ''], enter: ['k--enter k--w2', 'Sign in'],
+};
+document.querySelectorAll('.osk').forEach(el => {
+  const name = el.dataset.layout;
+  if (name === 'numeric') el.classList.add('osk--num');
+  L[name].forEach((row, r) => {
+    const rowEl = document.createElement('div'); rowEl.className = 'osk__row';
+    row.split(' ').forEach((tok, c) => {
+      const b = document.createElement('div'); b.className = 'k';
+      const m = tok.match(/^\{(\w+)(?::(.+))?\}$/);
+      if (m) { const f = FN[m[1]]; b.className += ' ' + f[0]; b.innerHTML = m[2] || f[1];
+        if (m[1] === 'enter' && name === 'numeric') b.className = 'k k--enter'; if (name === 'numeric') b.classList.remove('k--w15','k--w2'); }
+      else b.textContent = name === 'accents' ? tok : tok;
+      if (name === 'default' && r === 1 && c === 4) b.classList.add('k--pressed');
+      if (name === 'symbols' && m && m[1] === 'enter') b.innerHTML = 'Sign in';
+      rowEl.appendChild(b);
+    });
+    el.appendChild(rowEl);
+  });
+});
+</script>
+</body>
+</html>

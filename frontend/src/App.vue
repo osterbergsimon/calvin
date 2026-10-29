@@ -3,6 +3,7 @@
     <KeyboardHandler />
     <RouterView />
     <StatusRail />
+    <OnScreenKeyboard />
   </div>
 </template>
 
@@ -11,6 +12,7 @@ import { onMounted, onUnmounted } from "vue";
 import { RouterView } from "vue-router";
 import KeyboardHandler from "./components/KeyboardHandler.vue";
 import StatusRail from "./components/StatusRail.vue";
+import OnScreenKeyboard from "./components/ui/OnScreenKeyboard.vue";
 // Initialize photo frame mode globally
 import { usePhotoFrameMode } from "./composables/usePhotoFrameMode";
 // Initialize theme globally

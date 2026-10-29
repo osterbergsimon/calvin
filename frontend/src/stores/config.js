@@ -88,6 +88,7 @@ export const useConfigStore = defineStore("config", () => {
   const hotCornerLongPressMs = ref(500); // Press-and-hold duration to trigger the reveal, ms
   const touchControls = ref("auto"); // 'auto' (detect) | 'on' (force) | 'off' (hide) touch chrome
   const touchControlSize = ref("medium"); // 'small' | 'medium' | 'large' — region touch control size
+  const onScreenKeyboard = ref("auto"); // 'auto' (touch ≥720px) | 'on' (always) | 'off' (never)
   const uiSize = ref("default"); // Global UI size: 'extra-compact' | 'compact' | 'default' | 'large' | 'extra-large'
   const consoleLogEnabled = ref(true); // Enable console logging (default: true for backwards compatibility)
   const consoleLogLevel = ref("info"); // Console log level: 'error' | 'warn' | 'info' | 'debug' (default: 'info')
@@ -171,6 +172,7 @@ export const useConfigStore = defineStore("config", () => {
     hotCornerLongPressMs,
     touchControls,
     touchControlSize,
+    onScreenKeyboard,
     uiSize,
     consoleLogEnabled,
     consoleLogLevel,
@@ -590,6 +592,7 @@ export const useConfigStore = defineStore("config", () => {
     toggleRegionsLock,
     touchControls,
     touchControlSize,
+    onScreenKeyboard,
     loading,
     error,
     stale,

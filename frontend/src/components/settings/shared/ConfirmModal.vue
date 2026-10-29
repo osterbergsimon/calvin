@@ -1,5 +1,5 @@
 <template>
-  <div v-if="show" class="modal-overlay" @click.self="handleCancel">
+  <div v-if="show" class="modal-overlay dialog-above-osk" @click.self="handleCancel">
     <div class="modal-content confirm-modal">
       <div class="modal-header">
         <h3>{{ title }}</h3>

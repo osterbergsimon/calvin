@@ -67,6 +67,21 @@
     </SettingsSection>
 
     <SettingsSection id="device-keyboard" title="Keyboard">
+      <SettingRow
+        label="On-screen keyboard"
+        description="Shows a keyboard on the screen when you tap a text field. Auto turns it on for touch screens."
+      >
+        <SegmentedControl
+          :model-value="config.onScreenKeyboard || 'auto'"
+          :options="[
+            { value: 'auto', label: 'Auto' },
+            { value: 'on', label: 'Always' },
+            { value: 'off', label: 'Off' },
+          ]"
+          aria-label="On-screen keyboard"
+          @update:model-value="v => emit('update:config', { onScreenKeyboard: v })"
+        />
+      </SettingRow>
       <KeyboardTab />
       <RebootCombo :config="config" @update:config="patch => emit('update:config', patch)" />
     </SettingsSection>

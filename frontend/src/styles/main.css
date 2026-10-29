@@ -18,6 +18,17 @@ body {
   height: 100vh;
 }
 
+/* Fixed dialogs stay centred in the area above the on-screen keyboard
+   (calvin-maoo). --osk-height is published on :root by useOnScreenKeyboard
+   and is 0px whenever the keyboard is hidden. The #app prefix outranks the
+   dialogs' scoped rules without needing !important. */
+#app .dialog-above-osk {
+  bottom: var(--osk-height, 0px);
+}
+#app .dialog-above-osk--center {
+  top: calc((100dvh - var(--osk-height, 0px)) / 2);
+}
+
 /* ==========================================================================
    Plugin surface vocabulary (.calvin-plugin-*)
 
