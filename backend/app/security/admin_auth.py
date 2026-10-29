@@ -8,9 +8,11 @@ recovery path: it also discards ``server_secret``, so every old cookie dies.
 import hashlib
 import hmac
 import json
+import math
 import os
 import secrets
 import time
+from collections import deque
 from pathlib import Path
 
 from loguru import logger
@@ -199,6 +201,63 @@ class AdminAuthStore:
             return False
         expected = self._cookie_mac(issued_at, generation, server_secret)
         return hmac.compare_digest(expected, parts[2])
+
+
+class LoginRateLimiter:
+    """In-memory per-IP login throttle (spec §4).
+
+    Five failures inside ``window`` seconds lock the IP out for
+    ``base_cooldown`` seconds; each further lockout doubles the cooldown up to
+    ``max_cooldown``. Restarting the process clears it, which is acceptable:
+    the password is scrypt-hashed, so a restart is not a cheap bypass.
+    """
+
+    def __init__(
+        self,
+        max_failures: int = 5,
+        window: int = 60,
+        base_cooldown: int = 60,
+        max_cooldown: int = 900,
+    ):
+        self.max_failures = max_failures
+        self.window = window
+        self.base_cooldown = base_cooldown
+        self.max_cooldown = max_cooldown
+        self._failures: dict[str, deque[float]] = {}
+        self._lockouts: dict[str, tuple[float, int]] = {}
+
+    def check(self, ip: str, now: float | None = None) -> int:
+        """Return 0 when allowed, else the whole seconds the caller must wait."""
+        current = time.time() if now is None else now
+        lockout = self._lockouts.get(ip)
+        if lockout is not None:
+            locked_until, _ = lockout
+            if current < locked_until:
+                return max(1, math.ceil(locked_until - current))
+        return 0
+
+    def record_failure(self, ip: str, now: float | None = None) -> None:
+        """Record one wrong password; lock the IP out at the threshold."""
+        current = time.time() if now is None else now
+        failures = self._failures.setdefault(ip, deque())
+        failures.append(current)
+        while failures and current - failures[0] > self.window:
+            failures.popleft()
+        if len(failures) >= self.max_failures:
+            _, previous_lockouts = self._lockouts.get(ip, (0.0, 0))
+            lockouts = previous_lockouts + 1
+            cooldown = min(self.base_cooldown * (2 ** (lockouts - 1)), self.max_cooldown)
+            self._lockouts[ip] = (current + cooldown, lockouts)
+            # Start counting a fresh window after this lockout; the lockout
+            # itself is what blocks requests until it expires.
+            failures.clear()
+
+    def record_success(self, ip: str) -> None:
+        """A good password clears the failure history but keeps the lockout count."""
+        self._failures.pop(ip, None)
+
+
+login_limiter = LoginRateLimiter()
 
 
 _store: AdminAuthStore | None = None
