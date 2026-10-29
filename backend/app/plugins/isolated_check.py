@@ -14,6 +14,7 @@ import json
 import os
 import subprocess
 import sys
+from pathlib import Path
 
 from loguru import logger
 
@@ -22,6 +23,17 @@ from app.services.plugin_installer import plugin_installer
 
 CHECK_MODULE = "app.plugins.check_plugin"
 DEFAULT_TIMEOUT = 60.0
+
+# `-I` isolates the child, but it also drops the cwd and PYTHONPATH from
+# sys.path. The backend dir must therefore be inserted explicitly: in the
+# runtime image the venv is an editable install whose .pth points at a build
+# directory that does not exist at runtime, so `import app` would otherwise
+# only resolve through the process cwd — and `-m` would never find it.
+CHILD_BOOTSTRAP = (
+    "import runpy, sys; "
+    "sys.path.insert(0, sys.argv[1]); "
+    f"runpy.run_module({CHECK_MODULE!r}, run_name='__main__', alter_sys=True)"
+)
 
 
 def _child_env() -> dict[str, str]:
@@ -55,6 +67,23 @@ def _parse_result(stdout: str) -> dict[str, list[str]] | None:
     return None
 
 
+def _child_command(plugin_dir: Path) -> list[str]:
+    """Build the child argv: isolated interpreter, backend dir on ``sys.path``.
+
+    The plugin dir travels as the last argument; the bootstrap inserts
+    ``BACKEND_DIR`` ahead of whatever the interpreter's install provides, so the
+    check works no matter how the backend was installed or where it is run from.
+    """
+    return [
+        sys.executable,
+        "-I",
+        "-c",
+        CHILD_BOOTSTRAP,
+        str(BACKEND_DIR),
+        str(plugin_dir),
+    ]
+
+
 def run_isolated_plugin_check(plugin_id: str, timeout: float = DEFAULT_TIMEOUT) -> list[str]:
     """Import a freshly installed plugin in a child process.
 
@@ -70,7 +99,7 @@ def run_isolated_plugin_check(plugin_id: str, timeout: float = DEFAULT_TIMEOUT) 
     if not plugin_dir.is_dir():
         return [f"Plugin directory {plugin_dir} does not exist"]
 
-    cmd = [sys.executable, "-I", "-m", CHECK_MODULE, str(plugin_dir)]
+    cmd = _child_command(plugin_dir)
     logger.debug("Checking plugin {} in a child process: {}", plugin_id, " ".join(cmd))
     try:
         completed = subprocess.run(

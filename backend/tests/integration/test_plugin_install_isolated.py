@@ -7,6 +7,7 @@ and the server only loads plugins after the child reports a clean result.
 
 import json
 import os
+import subprocess
 import sys
 import zipfile
 from pathlib import Path
@@ -65,6 +66,79 @@ def installed_ids():
         except Exception:
             pass
         sys.modules.pop(f"installed_plugin_{plugin_id}", None)
+
+
+def test_child_command_puts_backend_dir_on_sys_path(tmp_path):
+    """The child must not depend on cwd or on how the backend was installed.
+
+    ``-I`` drops the cwd and PYTHONPATH from ``sys.path``, so ``-m`` cannot find
+    ``app`` in the runtime image (editable install whose .pth points at a build
+    directory that no longer exists). The backend dir must be passed explicitly.
+    """
+    cmd = isolated_check._child_command(tmp_path)
+
+    assert cmd[0] == sys.executable
+    assert cmd[1] == "-I"
+    assert "-m" not in cmd
+    assert "sys.path.insert(0, sys.argv[1])" in cmd[3]
+    assert Path(cmd[4]) == isolated_check.BACKEND_DIR
+    assert Path(cmd[5]) == tmp_path
+
+
+def test_child_check_runs_without_cwd_or_installed_package(tmp_path):
+    """The real child command works in an image-like environment.
+
+    Reproduces what the runtime image does: the venv's editable install points at
+    a build directory that does not exist, so ``app`` is importable only through
+    the backend dir the child inserts. Every ``sys.path`` entry that provides an
+    ``app`` package is dropped here, and the child runs from a foreign cwd.
+    """
+    plugin_id = "iso_container_plugin"
+    plugin_dir = tmp_path / "plugins" / plugin_id
+    plugin_dir.mkdir(parents=True)
+    (plugin_dir / "plugin.json").write_text(
+        json.dumps(
+            {
+                "id": plugin_id,
+                "name": "Container Plugin",
+                "version": "1.0.0",
+                "type": "service",
+                "api_version": CURRENT_PLUGIN_API_VERSION,
+            }
+        )
+    )
+    (plugin_dir / "plugin.py").write_text(
+        f"""
+from app.plugins.definitions import PluginMetadata
+from app.plugins.protocols import ServicePlugin
+
+
+class ContainerPlugin(ServicePlugin):
+    metadata = PluginMetadata(type_id={plugin_id!r}, name="Container Plugin")
+"""
+    )
+
+    cmd = isolated_check._child_command(plugin_dir)
+    scrub = (
+        "import os, sys; "
+        "sys.path[:] = [p for p in sys.path "
+        "if not (p and os.path.isdir(os.path.join(p, 'app')))]; "
+    )
+    hostile_cmd = [*cmd[:3], scrub + cmd[3], *cmd[4:]]
+
+    completed = subprocess.run(
+        hostile_cmd,
+        cwd=tmp_path,
+        env=isolated_check._child_env(),
+        capture_output=True,
+        text=True,
+        timeout=60,
+        check=False,
+    )
+
+    assert completed.returncode == 0, completed.stderr
+    payload = json.loads(completed.stdout.strip().splitlines()[-1])
+    assert payload == {"errors": [], "type_ids": [plugin_id]}
 
 
 def test_bad_plugin_never_imported_in_server(test_client, tmp_path, installed_ids):

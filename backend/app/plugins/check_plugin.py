@@ -1,8 +1,14 @@
 """Validate one installed plugin in a fresh interpreter.
 
-Run by :mod:`app.plugins.isolated_check` as::
+Run by :mod:`app.plugins.isolated_check` with an isolated interpreter::
 
-    python -I -m app.plugins.check_plugin <plugin_dir>
+    python -I -c "<bootstrap>" <backend_dir> <plugin_dir>
+
+The bootstrap puts the backend dir on ``sys.path`` and runs this module through
+:func:`runpy.run_module`, so the plugin dir is the LAST argument. Running it
+directly also works::
+
+    python -m app.plugins.check_plugin <plugin_dir>
 
 It imports ``plugin.py`` through the same seam the loader uses for installed
 plugins (``app.plugins.loader.import_plugin_module``) and runs the same class
@@ -63,9 +69,9 @@ def check_plugin_dir(plugin_dir: Path) -> dict[str, list[str]]:
 
 
 def main(argv: list[str] | None = None) -> int:
-    """Entry point: one argv path in, one JSON line out."""
+    """Entry point: one JSON line out; the plugin dir is the last argument."""
     args = sys.argv[1:] if argv is None else argv
-    if len(args) != 1:
+    if not args:
         print(
             json.dumps(
                 {
@@ -76,7 +82,7 @@ def main(argv: list[str] | None = None) -> int:
         )
         return 2
 
-    print(json.dumps(check_plugin_dir(Path(args[0]))))
+    print(json.dumps(check_plugin_dir(Path(args[-1]))))
     return 0
 
 
