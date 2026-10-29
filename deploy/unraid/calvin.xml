@@ -9,7 +9,7 @@
   <Privileged>false</Privileged>
   <Support>https://github.com/osterbergsimon/calvin/issues</Support>
   <Project>https://github.com/osterbergsimon/calvin</Project>
-  <Overview>Calvin is a self-hosted dashboard for calendars, photos, web services, and plugins. On Unraid, run this container as the backend and point one or more Raspberry Pi kiosk displays at the WebUI URL. Tracks the develop branch: every push to develop publishes a new :develop image; use Check for Updates in the Docker tab to pull it.</Overview>
+  <Overview>Calvin is a self-hosted dashboard for calendars, photos, web services, and plugins. On Unraid, run this container as the backend and point one or more Raspberry Pi kiosk displays at the WebUI URL. Tracks the develop branch: every push to develop publishes a new :develop image; use Check for Updates in the Docker tab to pull it. The container never controls the Unraid host: reboot, backend/frontend restarts, update and display commands are disabled (CALVIN_HOST_CONTROL does not override this) — update and restart from the Docker tab instead.</Overview>
   <Category>HomeAutomation: Productivity: Tools:</Category>
   <WebUI>http://[IP]:[PORT:8000]/</WebUI>
   <TemplateURL>https://raw.githubusercontent.com/osterbergsimon/calvin/develop/deploy/unraid/calvin.xml</TemplateURL>
