@@ -18,7 +18,7 @@
 
 services:
   calvin:
-    image: ghcr.io/osterbergsimon/calvin:${CALVIN_IMAGE_TAG:-latest}
+    image: ghcr.io/osterbergsimon/calvin:${CALVIN_IMAGE_TAG:-develop}
     container_name: calvin
     restart: unless-stopped
     environment:
@@ -29,6 +29,11 @@ services:
       # Address phones and new kiosks use to reach this server (QR codes, the
       # "Add kiosk" command). The container only sees its own IP — set it.
       PUBLIC_URL: ${PUBLIC_URL:-}
+      # Owner of the files under CALVIN_DATA_DIR. 0/0 runs as root;
+      # Unraid's appdata convention is 99/100 (nobody:users).
+      PUID: ${PUID:-0}
+      PGID: ${PGID:-0}
+      TZ: ${TZ:-Etc/UTC}
     ports:
       - "${CALVIN_PORT:-8000}:8000"
     volumes:
@@ -39,5 +44,5 @@ services:
       test: ["CMD", "curl", "-fsS", "http://localhost:8000/api/health"]
       interval: 30s
       timeout: 5s
-      start_period: 15s
+      start_period: 180s  # entrypoint restores plugin packages first
       retries: 3

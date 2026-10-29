@@ -68,9 +68,9 @@ the frontend. The Pi is genuinely "dumb."
 ### What moves to the server
 
 - The backend Docker container (or whatever you use to run it).
-- `/var/lib/calvin/` — SQLite database, photos, plugin install dirs.
-- The frontend rebuild that runs after a plugin install (the server
-  has more headroom than a Pi 3).
+- `/var/lib/calvin/` — SQLite database, photos, plugin install dirs,
+  kiosk signing key.
+- Plugin installs, including their pip dependencies (live, no rebuild).
 
 ### Setup
 
@@ -81,7 +81,7 @@ the same Docker compose used in Mode A:
 
 ```bash
 # On the server (any Linux box with Docker):
-git clone https://github.com/osterbergsimon/calvin.git
+git clone -b develop https://github.com/osterbergsimon/calvin.git
 cd calvin
 cp deploy/calvin.env.example docker/.env
 # Edit docker/.env — set CALVIN_PORT, DATABASE_URL, etc. as needed.

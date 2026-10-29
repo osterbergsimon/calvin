@@ -1643,6 +1643,26 @@ export interface paths {
     patch?: never;
     trace?: never;
   };
+  "/api/system/environment": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    /**
+     * Get Environment
+     * @description Report the deployment and which host actions the UI can offer.
+     */
+    get: operations["get_environment_api_system_environment_get"];
+    put?: never;
+    post?: never;
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
   "/api/system/network": {
     parameters: {
       query?: never;
@@ -4758,6 +4778,26 @@ export interface operations {
     };
   };
   configure_display_timeout_api_system_display_timeout_configure_post: {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    requestBody?: never;
+    responses: {
+      /** @description Successful Response */
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": unknown;
+        };
+      };
+    };
+  };
+  get_environment_api_system_environment_get: {
     parameters: {
       query?: never;
       header?: never;
