@@ -82,6 +82,37 @@
           @update:model-value="v => emit('update:config', { onScreenKeyboard: v })"
         />
       </SettingRow>
+      <SettingRow
+        class="device-osk-layout"
+        :class="{ 'setting-row--muted': oskOff }"
+        label="Keyboard layout"
+        description="The letters the on-screen keyboard uses. Separate from the language Calvin is shown in."
+      >
+        <div class="device-control" :inert="oskOff ? '' : undefined">
+          <SelectPill
+            :model-value="mainLayout"
+            :options="layoutOptions"
+            :display-label="mainLayoutLabel"
+            aria-label="Keyboard layout"
+            @update:model-value="onLayoutChange"
+          />
+        </div>
+      </SettingRow>
+      <SettingRow
+        class="device-osk-extra"
+        :class="{ 'setting-row--muted': oskOff }"
+        label="Also switch to"
+        :description="extraLayoutsDescription"
+      >
+        <div class="device-control" :inert="oskOff ? '' : undefined">
+          <ChipMultiSelect
+            :model-value="extraLayouts"
+            :options="extraLayoutOptions"
+            aria-label="Also switch to"
+            @update:model-value="v => emit('update:config', { oskExtraLayouts: v })"
+          />
+        </div>
+      </SettingRow>
       <KeyboardTab />
       <RebootCombo :config="config" @update:config="patch => emit('update:config', patch)" />
     </SettingsSection>
@@ -145,8 +176,15 @@ import NumberStepper from "@/components/ui/NumberStepper.vue";
 import DisplayScheduleGrid from "@/components/settings/shared/DisplayScheduleGrid.vue";
 import KeyboardTab from "@/components/settings/tabs/layout/KeyboardTab.vue";
 import RebootCombo from "@/components/settings/tabs/layout/keyboard/RebootCombo.vue";
+import ChipMultiSelect from "@/components/ui/ChipMultiSelect.vue";
+import {
+  normalizeOskExtraLayouts,
+  oskLayoutName,
+  oskLayoutOptions,
+  resolveOskMainLayout,
+} from "@/utils/oskLayouts";
 
-defineProps({
+const props = defineProps({
   config: { type: Object, required: true },
   version: { type: String, default: null },
   frontendVersion: { type: String, default: null },
@@ -155,6 +193,36 @@ const emit = defineEmits(["update:config"]);
 
 const { turnDisplayOn, turnDisplayOff } = useSystem();
 const connectionStore = useConnectionStore();
+
+// --- On-screen keyboard layout (spec §7, K7) -------------------------------
+// The keyboard layout is its own setting. It is never derived from, and never
+// changes, the language Calvin's UI is shown in.
+const layoutOptions = oskLayoutOptions();
+const oskOff = computed(() => (props.config.onScreenKeyboard || "auto") === "off");
+// Unset `oskLayout` means the device's one-time browser hint is in effect.
+// Resolve it once: the hint is cached per device and never follows the UI.
+const layoutHint = resolveOskMainLayout(null);
+const mainLayout = computed(() => resolveOskMainLayout(props.config.oskLayout ?? layoutHint));
+const mainLayoutLabel = computed(() =>
+  props.config.oskLayout ? "" : `${oskLayoutName(mainLayout.value)} (suggested)`
+);
+const extraLayouts = computed(() =>
+  normalizeOskExtraLayouts(props.config.oskExtraLayouts ?? [], mainLayout.value)
+);
+const extraLayoutOptions = computed(() =>
+  layoutOptions.filter(option => option.value !== mainLayout.value)
+);
+const extraLayoutsDescription = computed(
+  () =>
+    `Adds a key to the keyboard that switches between these and ${oskLayoutName(mainLayout.value)}.`
+);
+const onLayoutChange = value => {
+  // The new main layout can't also be one of its own extras.
+  emit("update:config", {
+    oskLayout: value,
+    oskExtraLayouts: extraLayouts.value.filter(id => id !== value),
+  });
+};
 
 const timezoneOptions = [
   { value: "system", label: "System default" },
@@ -200,6 +268,14 @@ const onTurnOff = async () => {
 .device-actions {
   display: flex;
   gap: 0.5rem;
+}
+.device-control {
+  display: flex;
+  justify-content: flex-end;
+}
+/* Rows 2 and 3 of the keyboard section while the on-screen keyboard is Off. */
+.setting-row--muted {
+  opacity: 0.55;
 }
 .device-btn {
   min-height: var(--touch-target);

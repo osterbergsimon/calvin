@@ -7,6 +7,7 @@ import { useConfigStore } from "../stores/config";
 import * as configApi from "../services/configApi";
 import { logError } from "../utils/logger";
 import { normalizeDashboardLayout, normalizeDashboardScreens } from "../utils/layout";
+import { normalizeOskExtraLayouts, normalizeOskLayout } from "../utils/oskLayouts";
 
 export function useConfigForm(initialConfig = {}) {
   const configStore = useConfigStore();
@@ -120,6 +121,11 @@ export function useConfigForm(initialConfig = {}) {
         displayTimeout: response.displayTimeout ?? response.display_timeout ?? 0,
         // Keyboard
         onScreenKeyboard: response.onScreenKeyboard ?? response.on_screen_keyboard ?? "auto",
+        // The on-screen keyboard's layout is its own setting, never the UI language.
+        oskLayout: normalizeOskLayout(response.oskLayout ?? response.osk_layout ?? null),
+        oskExtraLayouts: normalizeOskExtraLayouts(
+          response.oskExtraLayouts ?? response.osk_extra_layouts ?? []
+        ),
         keyboardFeedbackEnabled:
           response.keyboardFeedbackEnabled ?? response.keyboard_feedback_enabled ?? true,
         keyboardFeedbackMode:

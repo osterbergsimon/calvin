@@ -2,21 +2,37 @@ import { computed, inject, nextTick, onScopeDispose, readonly, ref, watch } from
 import { routeLocationKey } from "vue-router";
 import { useConfigStore } from "../stores/config";
 import { useTouchCapability } from "./useTouchCapability";
+import {
+  DEFAULT_OSK_LAYOUT,
+  buildOskLayouts,
+  layoutSwitchOrder,
+  nextOskLayout,
+  normalizeOskExtraLayouts,
+  oskLayoutCode,
+  oskLayoutName,
+  readStoredOskLayout,
+  resolveOskMainLayout,
+  storeOskLayout,
+} from "../utils/oskLayouts";
 
 /**
  * Global on-screen keyboard state for touch kiosks.
  *
  * simple-keyboard is only the renderer (see OnScreenKeyboard.vue). This
- * composable decides when the keyboard shows, which layout a field gets, and
- * how taps reach the focused input. It deliberately does not use
- * simple-keyboard's input buffer: those edits lose the caret on mid-string
- * changes.
+ * composable decides when the keyboard shows, which layer and which letter
+ * layout a field gets, and how taps reach the focused input. It deliberately
+ * does not use simple-keyboard's input buffer: those edits lose the caret on
+ * mid-string changes.
  *
  * Show rules (docs/design/2026-10-29-on-screen-keyboard.md §3):
  *   - config `onScreenKeyboard: 'on'` always, `'auto'` on touch screens at
  *     least 720px wide, `'off'` never;
  *   - text-like inputs and textareas, never native pickers/readonly fields,
  *     never inside `[data-osk="off"]`.
+ *
+ * Layout rules (§4): the keyboard layout is its own setting (`oskLayout` plus
+ * `oskExtraLayouts`). It is independent of the language Calvin's UI is shown
+ * in — nothing here reads or follows the UI/app language.
  */
 
 const TEXT_INPUT_TYPES = new Set(["text", "search", "url", "email", "password", "number"]);
@@ -40,41 +56,6 @@ const sharedHeight = ref(0);
 export function useOskState() {
   return { visible: readonly(sharedVisible), height: readonly(sharedHeight) };
 }
-
-export const OSK_LAYOUTS = {
-  default: [
-    "q w e r t y u i o p {bksp}",
-    "a s d f g h j k l {enter}",
-    "{shift} z x c v b n m , . {shift}",
-    "{numbers} {accents} {space} - {hide}",
-  ],
-  url: [
-    "q w e r t y u i o p {bksp}",
-    "a s d f g h j k l {enter}",
-    "{shift} z x c v b n m - _ {shift}",
-    "{numbers} / : {space} . .com {hide}",
-  ],
-  // Email keeps every URL key except "/" and ":" — "@" takes their place.
-  email: [
-    "q w e r t y u i o p {bksp}",
-    "a s d f g h j k l {enter}",
-    "{shift} z x c v b n m - _ {shift}",
-    "{numbers} @ {space} . .com {hide}",
-  ],
-  symbols: [
-    "1 2 3 4 5 6 7 8 9 0 {bksp}",
-    "@ # $ % & * - + ( ) {enter}",
-    "{abc} ! \" ' : ; / ? _ = {abc}",
-    "{abc} {space} . , {hide}",
-  ],
-  accents: [
-    "å ä ö æ ø é è ü ñ ß {bksp}",
-    "á à â ê ë í ï ó ô ú {enter}",
-    "{shift} ç õ œ ã ' ` ~ ^ ¨ {shift}",
-    "{abc} {space} . , {hide}",
-  ],
-  numeric: ["1 2 3 {bksp}", "4 5 6 -", "7 8 9 .", "{hide} 0 , {enter}"],
-};
 
 const isElement = value =>
   typeof Element !== "undefined" && value instanceof Element ? value : null;
@@ -157,6 +138,41 @@ export function useOnScreenKeyboard() {
   const shiftActive = ref(false);
   const capsLock = ref(false);
   const enterLabel = ref("Enter");
+
+  // --- Letter layout (spec §4 "Keyboard layouts") -------------------------
+  // `oskLayout` is the main layout, `oskExtraLayouts` the ones the layout key
+  // cycles through. Neither has anything to do with Calvin's UI language.
+  const preferredLetterLayout = ref(readStoredOskLayout());
+  const mainLayout = computed(() => resolveOskMainLayout(configStore.oskLayout));
+  const layoutOrder = computed(() =>
+    layoutSwitchOrder(
+      mainLayout.value,
+      normalizeOskExtraLayouts(configStore.oskExtraLayouts, mainLayout.value)
+    )
+  );
+  // The active layout survives hiding and showing, and falls back to the main
+  // layout when the one remembered on this device stops being valid (for
+  // example, it was removed from Settings).
+  const activeLetterLayout = computed(() => {
+    const order = layoutOrder.value;
+    if (preferredLetterLayout.value && order.includes(preferredLetterLayout.value)) {
+      return preferredLetterLayout.value;
+    }
+    return order[0] ?? DEFAULT_OSK_LAYOUT;
+  });
+  const showLayoutKey = computed(() => layoutOrder.value.length > 1);
+  const activeLayoutName = computed(() => oskLayoutName(activeLetterLayout.value));
+  const activeLayoutCode = computed(() => oskLayoutCode(activeLetterLayout.value));
+  const layouts = computed(() =>
+    buildOskLayouts({
+      layout: activeLetterLayout.value,
+      showLayoutKey: showLayoutKey.value,
+    })
+  );
+  const cycleLetterLayout = () => {
+    preferredLetterLayout.value = nextOskLayout(layoutOrder.value, activeLetterLayout.value);
+  };
+  watch(activeLetterLayout, id => storeOskLayout(id), { immediate: true });
 
   const shiftOn = computed(() => shiftActive.value || capsLock.value);
   const isNumeric = computed(() => layout.value === "numeric");
@@ -464,6 +480,9 @@ export function useOnScreenKeyboard() {
       case "{accents}":
         layout.value = "accents";
         return;
+      case "{layout}":
+        cycleLetterLayout();
+        return;
       case "{abc}":
         layout.value = baseLayout.value;
         return;
@@ -573,6 +592,15 @@ export function useOnScreenKeyboard() {
     capsLock,
     enterLabel,
     enabled,
+    // Letter layout state and switching.
+    mainLayout,
+    layoutOrder,
+    activeLetterLayout,
+    activeLayoutName,
+    activeLayoutCode,
+    showLayoutKey,
+    layouts,
+    cycleLetterLayout,
     start,
     stop,
     hide,

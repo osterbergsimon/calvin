@@ -62,6 +62,9 @@ const props = defineProps({
   options: { type: Array, required: true },
   swatch: { type: String, default: null },
   ariaLabel: { type: String, default: "" },
+  // Replaces the selected option's label, e.g. "Svenska (suggested)" while
+  // the value is only the device's guess.
+  displayLabel: { type: String, default: "" },
 });
 const emit = defineEmits(["update:modelValue"]);
 
@@ -76,7 +79,7 @@ const optRefs = ref([]);
 const { popoverStyle, place, reposition } = usePopoverPlacement({ matchTriggerWidth: true });
 
 const currentLabel = computed(
-  () => props.options.find(o => o.value === props.modelValue)?.label ?? ""
+  () => props.displayLabel || props.options.find(o => o.value === props.modelValue)?.label || ""
 );
 
 const activeOptionId = computed(() =>

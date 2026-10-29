@@ -1,4 +1,5 @@
 import { normalizeDashboardLayout, normalizeDashboardScreens } from "../utils/layout";
+import { normalizeOskExtraLayouts, normalizeOskLayout } from "../utils/oskLayouts";
 
 export const createDefaultDisplaySchedule = () => [
   { day: 0, enabled: true, onTime: "06:00", offTime: "22:00" },
@@ -293,6 +294,22 @@ export const CONFIG_FIELD_DEFINITIONS = [
     keys: ["onScreenKeyboard", "on_screen_keyboard"],
     defaultValue: "auto",
     parse: value => (["auto", "on", "off"].includes(value) ? value : "auto"),
+  },
+  {
+    // The on-screen keyboard's letter layout. Never derived from the UI
+    // language: an unset value means the device hint applies.
+    name: "oskLayout",
+    keys: ["oskLayout", "osk_layout"],
+    defaultValue: null,
+    parse: value => normalizeOskLayout(value),
+  },
+  {
+    name: "oskExtraLayouts",
+    keys: ["oskExtraLayouts", "osk_extra_layouts"],
+    defaultValue: [],
+    // The main layout is never one of its own extras.
+    parse: (value, refsByName) =>
+      normalizeOskExtraLayouts(value, refsByName.oskLayout?.value ?? null),
   },
   {
     name: "uiSize",

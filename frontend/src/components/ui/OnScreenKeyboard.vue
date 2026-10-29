@@ -23,11 +23,7 @@
 <script setup>
 import { computed, nextTick, onMounted, onUnmounted, ref, watch } from "vue";
 import SimpleKeyboard from "simple-keyboard";
-import {
-  OSK_CASE_CHARS,
-  OSK_LAYOUTS,
-  useOnScreenKeyboard,
-} from "@/composables/useOnScreenKeyboard";
+import { OSK_CASE_CHARS, useOnScreenKeyboard } from "@/composables/useOnScreenKeyboard";
 
 const ICONS = {
   bksp: '<svg class="osk-ic" aria-hidden="true" viewBox="0 0 24 24"><path d="M21 5H9l-6 7 6 7h12z"/><path d="M17 9l-6 6M11 9l6 6"/></svg>',
@@ -35,15 +31,6 @@ const ICONS = {
     '<svg class="osk-ic" aria-hidden="true" viewBox="0 0 24 24"><path d="M12 4l8 8h-4v8H8v-8H4z"/></svg>',
   hide: '<svg class="osk-ic" aria-hidden="true" viewBox="0 0 24 24"><rect x="3" y="4" width="18" height="11" rx="2"/><path d="M8 19l4 3 4-3"/></svg>',
 };
-
-const BUTTON_ATTRIBUTES = [
-  { attribute: "type", value: "button" },
-  { attribute: "tabindex", value: "-1" },
-  { attribute: "aria-label", value: "Backspace", buttons: "{bksp}" },
-  { attribute: "aria-label", value: "Shift", buttons: "{shift}" },
-  { attribute: "aria-label", value: "Hide keyboard", buttons: "{hide}" },
-  { attribute: "aria-label", value: "Space", buttons: "{space}" },
-];
 
 // Shift changes the printed label only; the button token stays lowercase so
 // the caret insertion knows which code point to replace.
@@ -59,6 +46,21 @@ let repeatDelay = null;
 let repeatInterval = null;
 let resizeObserver = null;
 
+const buttonAttributes = computed(() => [
+  { attribute: "type", value: "button" },
+  { attribute: "tabindex", value: "-1" },
+  { attribute: "aria-label", value: "Backspace", buttons: "{bksp}" },
+  { attribute: "aria-label", value: "Shift", buttons: "{shift}" },
+  { attribute: "aria-label", value: "Hide keyboard", buttons: "{hide}" },
+  { attribute: "aria-label", value: "Space", buttons: "{space}" },
+  // The layout key names the LAYOUT, never the UI language.
+  {
+    attribute: "aria-label",
+    value: `Switch keyboard layout, now ${osk.activeLayoutName.value}`,
+    buttons: "{layout}",
+  },
+]);
+
 const display = computed(() => {
   const map = {
     "{bksp}": ICONS.bksp,
@@ -70,8 +72,13 @@ const display = computed(() => {
     "{numbers}": "?123",
     "{accents}": "åäö",
     "{abc}": "abc",
+    "{layout}": osk.activeLayoutCode.value,
     "{enter}": osk.enterLabel.value,
   };
+  // While extra layouts are set, the space bar names the active layout (K6).
+  if (osk.showLayoutKey.value) {
+    map["{space}"] = `<small class="osk-space-name">${osk.activeLayoutName.value}</small>`;
+  }
   if (osk.shiftOn.value) Object.assign(map, SHIFTED_LABELS);
   return map;
 });
@@ -110,20 +117,22 @@ const measureHeight = () => {
 
 const applyLayout = () => {
   keyboard?.setOptions({
+    layout: osk.layouts.value,
     layoutName: osk.layout.value,
     display: display.value,
     buttonTheme: buttonTheme.value,
+    buttonAttributes: buttonAttributes.value,
   });
 };
 
 onMounted(() => {
   keyboard = new SimpleKeyboard(host.value, {
-    layout: OSK_LAYOUTS,
+    layout: osk.layouts.value,
     layoutName: osk.layout.value,
     theme: "calvin-osk",
     display: display.value,
     buttonTheme: buttonTheme.value,
-    buttonAttributes: BUTTON_ATTRIBUTES,
+    buttonAttributes: buttonAttributes.value,
     preventMouseDownDefault: true,
     disableButtonHold: true,
     disableCaretPositioning: true,
@@ -154,7 +163,13 @@ onUnmounted(() => {
 });
 
 watch(
-  () => [osk.layout.value, osk.shiftOn.value, osk.enterLabel.value],
+  () => [
+    osk.layout.value,
+    osk.shiftOn.value,
+    osk.enterLabel.value,
+    osk.activeLetterLayout.value,
+    osk.showLayoutKey.value,
+  ],
   () => nextTick(applyLayout)
 );
 
@@ -270,6 +285,18 @@ defineExpose({
   background: var(--bg-2);
   color: var(--ink);
   font-size: 1.25rem;
+  font-weight: 400;
+}
+
+/* The layout key is a 1× function key showing the active layout's code. */
+:deep(.hg-button.hg-button-layout) {
+  flex-grow: 1;
+}
+
+/* With extra layouts set, the space bar names the active layout (K6). */
+:deep(.osk-space-name) {
+  color: var(--ink-3);
+  font-size: var(--fs-sm);
   font-weight: 400;
 }
 
