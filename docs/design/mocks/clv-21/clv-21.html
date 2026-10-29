@@ -1,0 +1,77 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>Keyboard layout picker</title>
+<style>
+:root { --bg-0:#eef1f4; --bg-1:#fff; --bg-2:#fff; --line:#dde3e8; --ink:#1b242b; --ink-2:#5d6b75; --ink-3:#93a0a9; --focus:#e08a1e; --focus-ink:#fff; --shadow-hover:rgba(0,0,0,.15);
+  --font-ui:"IBM Plex Sans",system-ui,sans-serif; --font-data:"IBM Plex Mono",ui-monospace,monospace; }
+.dark { --bg-0:#0e1316; --bg-1:#151c21; --bg-2:#1d262d; --line:#27313a; --ink:#eaf0f3; --ink-2:#9aa7b0; --ink-3:#62707a; --focus:#f3b052; --focus-ink:#1a130a; --shadow-hover:rgba(0,0,0,.4); }
+* { box-sizing:border-box; } body { margin:0; background:#d9dee3; font-family:var(--font-ui); color:#1b242b; }
+.board { padding:32px 16px; max-width:1360px; margin:0 auto; } figure { margin:0 0 32px; } figcaption { font-size:.85rem; color:#5d6b75; margin-top:8px; max-width:1280px; }
+.frame { position:relative; background:var(--bg-0); color:var(--ink); border-radius:6px; box-shadow:0 2px 12px rgba(0,0,0,.18); overflow:hidden; }
+.kiosk { width:1280px; height:720px; } .small { width:800px; height:480px; }
+.top { height:64px; background:var(--bg-1); border-bottom:1px solid var(--line); display:flex; align-items:center; padding:0 20px; font-weight:600; letter-spacing:.12em; }
+.above { position:absolute; top:64px; left:0; right:0; bottom:var(--h); display:flex; align-items:center; justify-content:center; }
+.card { width:26rem; padding:1.25rem 1.75rem; background:var(--bg-1); border:1px solid var(--line); border-radius:16px; }
+.card label { display:block; font-weight:500; font-size:.9rem; margin-bottom:6px; }
+.card input { width:100%; height:48px; border:1px solid var(--focus); box-shadow:0 0 0 2px color-mix(in srgb, var(--focus) 20%, transparent); border-radius:8px; padding:0 14px; font:1rem var(--font-ui); letter-spacing:.15em; background:var(--bg-2); color:var(--ink); }
+.osk { position:absolute; left:0; right:0; bottom:0; height:var(--h); padding:10px 12px 12px; background:var(--bg-0); border-top:1px solid var(--line); box-shadow:0 -10px 30px -18px var(--shadow-hover); display:flex; flex-direction:column; gap:8px; }
+.small .osk { padding:8px; gap:6px; }
+.row { flex:1; display:flex; gap:8px; } .small .row { gap:6px; }
+.k { flex:1 1 0; min-width:0; min-height:44px; display:flex; align-items:center; justify-content:center; gap:8px; background:var(--bg-2); color:var(--ink); border:1px solid var(--line); border-radius:8px; font-size:1.2rem; box-shadow:0 1px 0 var(--line); }
+.fn { background:color-mix(in srgb, var(--ink) 6%, var(--bg-0)); color:var(--ink-2); font-size:.9rem; font-weight:500; flex-grow:1.5; }
+.lay { flex-grow:1; } .space { flex-grow:6; } .enter { flex-grow:2; background:var(--focus); border-color:var(--focus); color:var(--focus-ink); font-size:.9rem; font-weight:600; }
+.space span { font-size:.85rem; color:var(--ink-3); border:1px dashed color-mix(in srgb, var(--ink-3) 60%, transparent); border-radius:6px; padding:4px 10px; }
+.head { flex:0 0 28px; display:flex; align-items:center; font-size:.9rem; color:var(--ink-2); padding-left:4px; }
+.opt { font-size:1rem; justify-content:center; } .opt code { font-family:var(--font-data); font-size:.8rem; color:var(--ink-3); }
+.on { background:color-mix(in srgb, var(--focus) 16%, var(--bg-2)); border-color:var(--focus); }
+.spacer { flex:6; }
+</style>
+</head>
+<body>
+<main class="board">
+  <h1>CLV-21: keyboard layout picker</h1>
+  <figure>
+    <div class="frame kiosk" style="--h:300px">
+      <div class="top">CAL·VIN</div>
+      <div class="above"><div class="card"><label>Admin password</label><input type="password" value="garden" /></div></div>
+      <div class="osk">
+        <div class="row"><div class="k">q</div><div class="k">w</div><div class="k">e</div><div class="k">r</div><div class="k">t</div><div class="k">y</div><div class="k">u</div><div class="k">i</div><div class="k">o</div><div class="k">p</div><div class="k fn">⌫</div></div>
+        <div class="row"><div class="k">a</div><div class="k">s</div><div class="k">d</div><div class="k">f</div><div class="k">g</div><div class="k">h</div><div class="k">j</div><div class="k">k</div><div class="k">l</div><div class="k enter">Sign in</div></div>
+        <div class="row"><div class="k fn">⇧</div><div class="k">z</div><div class="k">x</div><div class="k">c</div><div class="k">v</div><div class="k">b</div><div class="k">n</div><div class="k">m</div><div class="k">,</div><div class="k">.</div><div class="k fn">⇧</div></div>
+        <div class="row"><div class="k fn">?123</div><div class="k fn lay">EN</div><div class="k fn">åäö</div><div class="k space"><span>English</span></div><div class="k">-</div><div class="k fn">⌄</div></div>
+      </div>
+    </div>
+    <figcaption><b>L1 · Sign-in, no extra layouts set.</b> The <b>EN</b> layout key is always there now, and the space bar always names the layout. Tapping EN (or the "English" label on the space bar) opens the picker.</figcaption>
+  </figure>
+  <figure>
+    <div class="frame kiosk" style="--h:300px">
+      <div class="top">CAL·VIN</div>
+      <div class="above"><div class="card"><label>Admin password</label><input type="password" value="garden" /></div></div>
+      <div class="osk">
+        <div class="head">Keyboard layout</div>
+        <div class="row"><div class="k opt">Default (English)</div><div class="k opt">English <code>EN</code></div><div class="k opt on">Svenska <code>SV</code></div><div class="k opt">Suomi <code>FI</code></div></div>
+        <div class="row"><div class="k opt">Norsk <code>NO</code></div><div class="k opt">Dansk <code>DA</code></div><div class="k opt">Deutsch <code>DE</code></div><div class="k opt">Français <code>FR</code></div></div>
+        <div class="row" style="flex:0 0 52px"><div class="spacer"></div><div class="k fn" style="flex:0 0 140px">abc</div></div>
+      </div>
+    </div>
+    <figcaption><b>L2 · The picker layer.</b> It replaces the key rows inside the same panel, so the field and button above stay visible. Svenska is this device's choice (highlighted). <b>Default (English)</b> goes back to the Settings layout. Saved per device and works signed out.</figcaption>
+  </figure>
+  <figure>
+    <div class="frame small dark" style="--h:216px">
+      <div class="top">CAL·VIN</div>
+      <div class="above"><div class="card" style="width:22rem;padding:1rem 1.25rem"><label>Admin password</label><input type="password" value="garden" /></div></div>
+      <div class="osk">
+        <div class="head" style="flex-basis:22px">Keyboard layout</div>
+        <div class="row"><div class="k opt">Default (EN)</div><div class="k opt">English</div><div class="k opt on">Svenska</div><div class="k opt">Suomi</div></div>
+        <div class="row"><div class="k opt">Norsk</div><div class="k opt">Dansk</div><div class="k opt">Deutsch</div><div class="k opt">Français</div></div>
+        <div class="row" style="flex:0 0 44px"><div class="spacer"></div><div class="k fn" style="flex:0 0 110px">abc</div></div>
+      </div>
+    </div>
+    <figcaption><b>L3 · 800×480, Backlit.</b> Codes drop and the Default label shortens. All options are still ≥ 44px.</figcaption>
+  </figure>
+</main>
+</body>
+</html>
