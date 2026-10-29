@@ -1028,7 +1028,10 @@ LABWC_RC_EOF
 warn_unvalidated_wayland_os() {
     [ "${1:-x11}" = "wayland" ] || return 0
     local codename=""
-    codename="$( . /etc/os-release 2>/dev/null; printf '%s' "${VERSION_CODENAME:-}" )"
+    # Read, don't source: sourcing /etc/os-release inside a command substitution
+    # makes shellcheck think VERSION_CODENAME changes in a subshell in setup.sh.
+    codename="$(grep -m1 '^VERSION_CODENAME=' /etc/os-release 2>/dev/null \
+        | cut -d= -f2- | tr -d '\"' || true)"
     case "${codename}" in
         ""|trixie) return 0 ;;
     esac
