@@ -180,16 +180,30 @@ the next poll re-runs the updater; the checksum loop re-syncs any half-written f
 with the durable no-retry guard (`agent-update-state.json`), a kiosk cannot get stuck in a
 half-updated state.
 
-### Trust model (accepted risk)
+### Trust model
 
-The updater verifies file **integrity** (sha256 from the manifest) but not **authenticity**: the
-manifest and files come from the same plain-HTTP backend over the LAN, and the updater runs as
-root. A LAN attacker who can MITM the backend could serve matching-sha malicious files. This is
-the existing LAN-trust posture (same as `/api/config`) and is acceptable on a trusted home
-network. Closing it — signed manifests pinned to a key baked at provisioning, so there is no
-trust-on-first-use window — is tracked as **calvin-5vw**. The bundle version is a content hash
-(a change marker, not a monotonic counter), so there is no anti-rollback protection: a server
-rolled back to an older bundle will be adopted.
+Two controls now protect a kiosk update:
+
+- **Manifest signing is implemented** (see below). A kiosk with a baked key
+  verifies the signature before trusting the manifest, the file hashes or any
+  downloaded file.
+- **The signing key and backups need the admin password.** Kiosk signing is
+  host-side, and `GET /api/backup/export` — which can include the kiosk signing
+  key and stored plugin secrets — answers only an admin session (CLV-9, see
+  [Admin authentication](../configuration/ADMIN_AUTH.md)). A LAN client without
+  the password can no longer download the key or a backup.
+
+Residuals:
+
+- **Unsigned kiosks still trust the LAN.** A kiosk with no key baked keeps
+  integrity-only (sha256) checks, so a LAN attacker who can MITM the backend
+  could serve matching-sha files. Bake the key to close that gap.
+- **The server process holds the HMAC key**, so code an admin installs (a
+  plugin) can read it. Moving to Ed25519 manifests signed at release time, where
+  the server holds only the public key, is planned (see below).
+- **No anti-rollback.** The bundle version is a content hash (a change marker,
+  not a monotonic counter), so a server rolled back to an older bundle will be
+  adopted.
 
 ### Manifest signing (closing the LAN-MITM)
 
@@ -228,10 +242,12 @@ keyed kiosk requires a backend running this version or newer.
 next manifest request) and re-bake / re-run `--signing-key` on each kiosk. There is no automatic
 rotation.
 
-**Stronger isolation (future):** the shared key means a kiosk that is already root-compromised
-holds a secret usable to forge to another kiosk the attacker can also MITM. Per-kiosk keys
-derived from a backend master (`Ki = HMAC(master, kiosk_id)`) remove that residual and are
-tracked as a follow-up; the kiosk-side verification here is unchanged by that upgrade.
+**Stronger isolation (planned):** the shared key means the server process — and
+therefore any installed plugin — can forge manifests. The plan is Ed25519
+manifests signed at release time in CI (private key in a GitHub Actions secret),
+with kiosks pinning the public key: the server then holds no signing key at all.
+That supersedes the earlier per-kiosk KDF idea (calvin-580); kiosk-side
+verification for the current HMAC scheme is unchanged until it lands.
 
 ### Python version floor (`min_python`)
 
