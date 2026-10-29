@@ -3,7 +3,7 @@
 Status: spec, rescuing the still-useful parts of PR #110 ("Deployment-aware Maintenance settings tab",
 calvin-ebl, July 2026) onto today's Settings. Mockup: [mocks/clv-19/clv-19.html](mocks/clv-19/clv-19.html), PNGs in
 [mocks/clv-19/png/](mocks/clv-19/png/) (`s1.png` … `s4.png`). Built only from existing tokens and components.
-**One owner decision is open (§4).** Everything else can be built without it.
+**Owner decision (§4): container self-restart is not built.**
 
 ## 1. Gap analysis: PR #110's five ideas against develop
 
@@ -94,7 +94,7 @@ Each `kiosk-card` keeps its layout (id, online dot, hostname · seen). A third m
 - **Reload UI** stays visible always (it is client-side, `MaintenanceSettings.vue:157`).
 - When the restart rows are hidden in a container, add one `--fs-sm` `--ink-2` line under Reload UI:
   **To restart the server, restart the Calvin container from Docker (Unraid: Docker tab).** Show it only when
-  `deployment === "docker"` and §4 option B isn't built.
+  `deployment === "docker"`.
 
 ### 3.4 System › Updates: pointer to kiosk updates
 
@@ -113,7 +113,9 @@ It reads the same kiosks store, so it is never out of sync with §3.1. It doesn'
 - `docs/setup/DEPLOYMENT_TOPOLOGIES.md` "Kiosk agent self-update": the flow starts at
   "Settings → Kiosks → Kiosk software → **Update all** (or **Update** on one kiosk)". Mention the System pointer.
 
-## 4. Owner decision: should a container restart itself?
+## 4. Container self-restart
+
+**Decision (owner, 2026-10-29): A, not built.** Containers are restarted from Docker. In a container, System › Restart shows only Reload UI and the one-line Docker pointer (§3.3). Options B and C below are recorded for context and are **out of build scope**.
 
 **Background.** `CALVIN_HOST_CONTROL` guards actions on the *machine* (reboot, systemd, the update script,
 display power). A container's self-exit touches **only its own process**, so it isn't host control. But it
@@ -127,9 +129,9 @@ by design).
 
 **Options**
 
-- **A. Don't build it (recommended).** Containers keep restarting from Docker; §3.3 adds the one-line pointer.
+- **A. Don't build it (chosen).** Containers keep restarting from Docker; §3.3 adds the one-line pointer.
   Restarts are rarely needed now: plugin installs are live and config is hot.
-- **B. Build it behind its own opt-in.** A separate setting `CALVIN_SELF_RESTART=1`, **not** a host-control
+- **B. (Not built.) Build it behind its own opt-in.** A separate setting `CALVIN_SELF_RESTART=1`, **not** a host-control
   exception. It defaults on only in `docker/docker-compose.yml` (next to `restart: unless-stopped`). The Unraid
   template gets it plus `--restart=unless-stopped` in ExtraParams. `GET /api/system/environment` adds
   `capabilities.restart_self`. `POST /api/system/restart-backend` in a container then returns 200 and, after
@@ -138,7 +140,7 @@ by design).
   guards read side by side and can't be confused. UI: the **Restart Calvin server** row (§3.3) shows when
   `restart_self` is true. Confirm message: **Calvin restarts its container. Docker starts it again in a few
   seconds. If it doesn't come back, start it from Docker.**
-- **C. Build it with no opt-in.** Not recommended: it silently strands Unraid installs that lack a restart policy.
+- **C. (Not built.) Build it with no opt-in.** Not recommended: it silently strands Unraid installs that lack a restart policy.
 
 ## 5. Tests
 
@@ -154,6 +156,3 @@ by design).
 
 **Backend (pytest)**
 - `GET /api/kiosks` includes `agentUpdateMessage` from the stored status.
-- Option B only: `restart_self` is false unless `CALVIN_SELF_RESTART=1`; the container path returns 200 and
-  schedules `os.kill(os.getpid(), SIGTERM)` (patched); `require_host_control` behaviour is unchanged; native
-  routes are unchanged.
