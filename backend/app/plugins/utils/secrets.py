@@ -21,8 +21,13 @@ SECRET_KEY_NAMES = frozenset(
         "access_token",
         "refresh_token",
         "client_secret",
+        "ical_url",
     }
 )
+
+# Fields naming where a secret is sent. A stored secret is only reused while
+# these are unchanged, else one request could make Calvin send it to any host.
+_ENDPOINT_KEY_RE = re.compile(r"(url|uri|host|server|endpoint|domain|port)", re.IGNORECASE)
 
 # The old masking produced "***" or first char + "***" + last char.
 _MASKED_RE = re.compile(r"^.?\*{3}.?$", re.DOTALL)
@@ -51,8 +56,7 @@ def secret_keys(schema: dict[str, Any] | None, config: dict[str, Any] | None = N
     return keys
 
 
-def secret_keys_for_type(type_id: str, config: dict[str, Any] | None = None) -> set[str]:
-    """Secret keys for a plugin type's instance and common config."""
+def _type_schema(type_id: str) -> dict[str, Any]:
     from app.plugins.loader import plugin_loader
 
     cls = plugin_loader.get_plugin_class(type_id)
@@ -61,7 +65,71 @@ def secret_keys_for_type(type_id: str, config: dict[str, Any] | None = None) -> 
     if metadata is not None:
         schema.update(getattr(metadata, "common_config_schema", None) or {})
         schema.update(getattr(metadata, "instance_config_schema", None) or {})
-    return secret_keys(schema, config)
+    return schema
+
+
+def secret_keys_for_type(type_id: str, config: dict[str, Any] | None = None) -> set[str]:
+    """Secret keys for a plugin type's instance and common config."""
+    return secret_keys(_type_schema(type_id), config)
+
+
+def endpoint_keys(schema: dict[str, Any] | None, config: dict[str, Any] | None = None) -> set[str]:
+    """Keys that say where a secret goes: url/host/server/port-like names, or url-typed fields."""
+    keys = {key for key in (config or {}) if _ENDPOINT_KEY_RE.search(key)}
+    for key, entry in (schema or {}).items():
+        if not isinstance(entry, dict):
+            continue
+        ui = entry.get("ui") if isinstance(entry.get("ui"), dict) else {}
+        validation = ui.get("validation") if isinstance(ui.get("validation"), dict) else {}
+        if _ENDPOINT_KEY_RE.search(key) or "url" in (entry.get("type"), validation.get("type")):
+            keys.add(key)
+    return keys
+
+
+def endpoint_keys_for_type(type_id: str, config: dict[str, Any] | None = None) -> set[str]:
+    """Endpoint keys for a plugin type's instance and common config."""
+    return endpoint_keys(_type_schema(type_id), config)
+
+
+class SecretEndpointChangedError(ValueError):
+    """A stored secret was about to be reused for a different endpoint."""
+
+
+def check_secret_endpoint(
+    incoming: dict[str, Any],
+    stored: dict[str, Any],
+    secrets: set[str],
+    endpoints: set[str],
+) -> None:
+    """
+    Refuse to keep a stored secret (sent back blank/masked) when the same
+    request changes an endpoint field: the caller must re-enter the secret.
+
+    Raises:
+        SecretEndpointChangedError: naming the secret and endpoint keys involved
+    """
+    # A secret is kept when it is stored and the request doesn't replace it
+    # (absent, blank or masked).
+    kept = sorted(
+        key
+        for key in secrets
+        if stored.get(key) and (key not in incoming or is_unchanged_secret(incoming[key]))
+    )
+    if not kept:
+        return
+    changed = sorted(
+        key
+        for key in endpoints
+        if key in incoming
+        and not is_unchanged_secret(incoming[key])
+        and str(incoming[key]).strip()
+        != str(stored.get(key) if stored.get(key) is not None else "").strip()
+    )
+    if changed:
+        raise SecretEndpointChangedError(
+            f"Re-enter {', '.join(kept)}: the stored value is not reused when "
+            f"{', '.join(changed)} changes"
+        )
 
 
 def is_unchanged_secret(value: Any) -> bool:

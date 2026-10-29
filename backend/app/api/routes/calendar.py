@@ -12,7 +12,13 @@ from app.models.calendar import (
     CalendarSourcesResponse,
 )
 from app.plugins.calendar.google import _normalize_google_calendar_url
-from app.plugins.utils.secrets import drop_unchanged_secrets, is_unchanged_secret, redact_secrets
+from app.plugins.utils.secrets import (
+    SecretEndpointChangedError,
+    check_secret_endpoint,
+    drop_unchanged_secrets,
+    is_unchanged_secret,
+    redact_secrets,
+)
 from app.services import plugin_calendar_service
 
 # Loguru automatically includes module/function info in logs
@@ -369,6 +375,17 @@ async def update_calendar_source(source_id: str, source: CalendarSource):
 
     if not db_plugin:
         raise HTTPException(status_code=404, detail="Calendar source not found")
+
+    # Never reuse a stored api_key for a different feed URL.
+    try:
+        check_secret_endpoint(
+            {"ical_url": source.ical_url, "api_key": source.api_key},
+            db_plugin.config or {},
+            set(CALENDAR_SECRET_KEYS),
+            {"ical_url"},
+        )
+    except SecretEndpointChangedError as e:
+        raise HTTPException(status_code=400, detail=str(e)) from e
 
     # Update database
     db_plugin.name = source.name

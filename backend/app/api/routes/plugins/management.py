@@ -19,7 +19,13 @@ from app.plugins.loader import plugin_loader
 from app.plugins.manager import plugin_manager
 from app.plugins.registry.loader import load_plugin_types_for_single
 from app.plugins.utils.instance_manager import apply_plugin_config_update
-from app.plugins.utils.secrets import keep_stored_secrets, secret_keys_for_type
+from app.plugins.utils.secrets import (
+    SecretEndpointChangedError,
+    check_secret_endpoint,
+    endpoint_keys_for_type,
+    keep_stored_secrets,
+    secret_keys_for_type,
+)
 from app.services.config_service import config_service
 from app.services.csp import get_sealed_mode
 from app.services.event_system import event_system
@@ -649,11 +655,10 @@ async def _keep_stored_type_secrets(
 
     Secrets are never sent to the frontend, so a blank one means "unchanged"
     (audit S4). Stored values come from the type config and, when the update
-    targets an instance, from that instance.
+    targets an instance, from that instance. A stored secret is never reused
+    when the request changes the URL/host it authenticates against; that is a
+    400 asking the caller to re-enter it.
     """
-    keys = secret_keys_for_type(plugin_id, config)
-    if not keys:
-        return config
     stored: dict[str, Any] = {}
     stored_json = await config_service.get_value(f"plugin_{plugin_id}_config")
     if stored_json:
@@ -666,6 +671,14 @@ async def _keep_stored_type_secrets(
         db_instance = await PluginDB.objects.get_or_none(id=instance_id, type_id=plugin_id)
         if db_instance:
             stored.update(db_instance.config or {})
+    known = {**stored, **config}
+    keys = secret_keys_for_type(plugin_id, known)
+    if not keys:
+        return config
+    try:
+        check_secret_endpoint(config, stored, keys, endpoint_keys_for_type(plugin_id, known))
+    except SecretEndpointChangedError as e:
+        raise HTTPException(status_code=400, detail=str(e)) from e
     return keep_stored_secrets(config, stored, keys)
 
 

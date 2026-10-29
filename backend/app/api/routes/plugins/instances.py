@@ -12,7 +12,14 @@ from app.models.db_models import PluginDB, PluginTypeDB
 from app.plugins.loader import plugin_loader
 from app.plugins.manager import plugin_manager
 from app.plugins.utils.instance_manager import apply_plugin_config_update
-from app.plugins.utils.secrets import drop_unchanged_secrets, redact_secrets, secret_keys_for_type
+from app.plugins.utils.secrets import (
+    SecretEndpointChangedError,
+    check_secret_endpoint,
+    drop_unchanged_secrets,
+    endpoint_keys_for_type,
+    redact_secrets,
+    secret_keys_for_type,
+)
 from app.services.event_system import event_system
 
 router = APIRouter()
@@ -424,7 +431,20 @@ async def update_plugin_instance(instance_id: str, instance_data: dict[str, Any]
         if isinstance(config, dict):
             # Secrets come back blank (or legacy-masked) from the edit form;
             # those mean "unchanged" and must not overwrite the stored value.
-            config = drop_unchanged_secrets(config, secret_keys_for_type(db_plugin.type_id, config))
+            stored_config = dict(db_plugin.config or {})
+            known = {**stored_config, **config}
+            secrets = secret_keys_for_type(db_plugin.type_id, known)
+            # ...unless the endpoint they authenticate against changes.
+            try:
+                check_secret_endpoint(
+                    config,
+                    stored_config,
+                    secrets,
+                    endpoint_keys_for_type(db_plugin.type_id, known),
+                )
+            except SecretEndpointChangedError as e:
+                raise HTTPException(status_code=400, detail=str(e)) from e
+            config = drop_unchanged_secrets(config, secrets)
             # Ormar JSON fields detect changes automatically
             existing_config = dict(db_plugin.config or {})
             existing_config.update(config)

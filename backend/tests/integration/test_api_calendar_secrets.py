@@ -5,6 +5,7 @@ source from the list and PUTs it back, so a blank value must keep the stored one
 """
 
 import asyncio
+from unittest.mock import AsyncMock, patch
 
 import pytest
 
@@ -77,3 +78,17 @@ def test_source_edit_round_trip_keeps_feed_url_and_api_key(test_client, ical_sou
     assert stored["ical_url"] == FEED
     assert stored["api_key"] == KEY
     assert stored["color"] == "#00ff00"
+
+
+def test_source_put_refuses_stored_api_key_for_changed_feed_url(test_client, ical_source):
+    source = _listed_source(test_client)
+    new_feed = "https://attacker.example/calendar.ics"
+
+    with patch("app.api.routes.calendar.validate_calendar_url", new=AsyncMock()):
+        response = test_client.put(
+            f"/api/calendar/sources/{SOURCE_ID}", json={**source, "ical_url": new_feed}
+        )
+
+    assert response.status_code == 400
+    assert _stored_config()["api_key"] == KEY
+    assert _stored_config()["ical_url"] == FEED

@@ -33,8 +33,11 @@ class SecretDemoPlugin(ServicePlugin):
         },
     )
 
+    tested_with: list = []
+
     @classmethod
     async def test_connection(cls, config):
+        cls.tested_with.append(dict(config))
         return {"success": config.get("api_key") == SECRET, "message": "checked"}
 
     async def fetch(self, start_date=None, end_date=None):
@@ -175,12 +178,12 @@ def test_type_config_get_returns_blank_secret(test_client, secret_type_config):
 def test_type_config_put_keeps_secret_sent_back_blank(test_client, secret_type_config, sent):
     response = test_client.put(
         f"/api/plugins/{TYPE_ID}/config",
-        json={"config": {"url": "http://new.local", "api_key": sent}},
+        json={"config": {"url": "http://demo.local", "api_key": sent}},
     )
 
     assert response.status_code == 200
     assert SECRET not in response.text
-    assert secret_type_config() == {"url": "http://new.local", "api_key": SECRET}
+    assert secret_type_config() == {"url": "http://demo.local", "api_key": SECRET}
 
 
 def test_test_connection_fills_blank_secret_from_type_config(test_client, secret_type_config):
@@ -190,3 +193,116 @@ def test_test_connection_fills_blank_secret_from_type_config(test_client, secret
 
     assert response.status_code == 200
     assert response.json()["success"] is True
+
+
+# A stored secret must only ever go back to the endpoint it was stored for.
+# Otherwise one request naming another URL makes Calvin send it there.
+
+
+def test_test_connection_refuses_stored_secret_for_changed_url(test_client, secret_instance):
+    SecretDemoPlugin.tested_with.clear()
+
+    response = test_client.post(
+        f"/api/plugins/{TYPE_ID}/test",
+        params={"instance_id": INSTANCE_ID},
+        json={"url": "http://attacker.example:18766", "api_key": ""},
+    )
+
+    assert response.status_code == 400
+    assert "api_key" in response.json()["detail"]
+    assert all(c.get("api_key") != SECRET for c in SecretDemoPlugin.tested_with)
+
+
+def test_test_connection_refuses_stored_type_secret_for_changed_url(
+    test_client, secret_type_config
+):
+    SecretDemoPlugin.tested_with.clear()
+
+    response = test_client.post(
+        f"/api/plugins/{TYPE_ID}/test", json={"url": "http://attacker.example", "api_key": ""}
+    )
+
+    assert response.status_code == 400
+    assert all(c.get("api_key") != SECRET for c in SecretDemoPlugin.tested_with)
+
+
+def test_test_connection_with_changed_url_and_new_secret_works(test_client, secret_instance):
+    response = test_client.post(
+        f"/api/plugins/{TYPE_ID}/test",
+        params={"instance_id": INSTANCE_ID},
+        json={"url": "http://elsewhere.example", "api_key": SECRET, "pin": PIN},
+    )
+
+    assert response.status_code == 200
+    assert response.json()["success"] is True
+
+
+def test_put_refuses_changed_url_with_blank_secret(test_client, secret_instance):
+    response = test_client.put(
+        f"/api/plugins/instances/{INSTANCE_ID}",
+        json={"config": {"url": "http://attacker.example", "api_key": "", "pin": ""}},
+    )
+
+    assert response.status_code == 400
+    stored = _stored_config()
+    assert stored["url"] == "http://demo.local"
+    assert stored["api_key"] == SECRET
+
+
+def test_put_changed_url_with_new_secrets_is_saved(test_client, secret_instance):
+    response = test_client.put(
+        f"/api/plugins/instances/{INSTANCE_ID}",
+        json={"config": {"url": "http://new.example", "api_key": "fresh", "pin": "9999"}},
+    )
+
+    assert response.status_code == 200
+    stored = _stored_config()
+    assert stored["url"] == "http://new.example"
+    assert stored["api_key"] == "fresh"
+
+
+def test_put_unchanged_url_with_blank_secret_still_keeps_it(test_client, secret_instance):
+    """The normal edit (rename, other fields) keeps working."""
+    response = test_client.put(
+        f"/api/plugins/instances/{INSTANCE_ID}",
+        json={"config": {"url": "http://demo.local", "api_key": "", "token_count": 9}},
+    )
+
+    assert response.status_code == 200
+    assert _stored_config()["api_key"] == SECRET
+    assert _stored_config()["token_count"] == 9
+
+
+def test_type_config_put_refuses_changed_url_with_blank_secret(test_client, secret_type_config):
+    response = test_client.put(
+        f"/api/plugins/{TYPE_ID}/config",
+        json={"config": {"url": "http://attacker.example", "api_key": ""}},
+    )
+
+    assert response.status_code == 400
+    assert secret_type_config()["api_key"] == SECRET
+
+
+def test_ical_instance_list_hides_feed_url(test_client):
+    """The S5 credential must not be readable via the instances endpoint either."""
+    feed = "https://calendar.example.com/feed/calendar.ics?token=PRIVATEFEEDTOKEN"
+
+    async def create():
+        await PluginDB.objects.create(
+            id="ical-hidden-1",
+            type_id="ical",
+            plugin_type=PluginType.CALENDAR.value,
+            name="Private",
+            enabled=False,
+            config={"ical_url": feed},
+        )
+
+    _run(create())
+
+    response = test_client.get("/api/plugins/ical/instances")
+
+    assert response.status_code == 200
+    assert "PRIVATEFEEDTOKEN" not in response.text
+    (instance,) = [i for i in response.json()["instances"] if i["id"] == "ical-hidden-1"]
+    assert instance["config"]["ical_url"] == ""
+    assert instance["has_value"]["ical_url"] is True
