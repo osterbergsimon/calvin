@@ -57,6 +57,26 @@ describe("DeviceSettings", () => {
     );
   });
 
+  it("offers Auto / Always / Off for the on-screen keyboard", () => {
+    const wrapper = mount(DeviceSettings, {
+      props: {
+        config: { ...baseConfig, onScreenKeyboard: "auto" },
+        version: null,
+        frontendVersion: null,
+      },
+      global: { stubs },
+    });
+    const control = wrapper
+      .findAllComponents({ name: "SegmentedControl" })
+      .find(c => c.props("ariaLabel") === "On-screen keyboard");
+
+    expect(control).toBeTruthy();
+    expect(control.props("options").map(o => o.label)).toEqual(["Auto", "Always", "Off"]);
+
+    control.vm.$emit("update:modelValue", "on");
+    expect(wrapper.emitted("update:config").some(c => c[0].onScreenKeyboard === "on")).toBe(true);
+  });
+
   it("shows the timeout stepper only when timeout is enabled", async () => {
     const wrapper = mount(DeviceSettings, {
       props: {
