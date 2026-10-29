@@ -25,6 +25,17 @@ vi.mock("@/utils/serverUrl", () => ({
 }));
 
 import Settings from "@/views/Settings.vue";
+import api from "@/services/api";
+import { useAuthStore } from "@/stores/auth";
+
+function signInAsAdmin() {
+  useAuthStore().applyStatus({ configured: true, authenticated: true });
+  api.get.mockImplementation(url =>
+    url === "/auth/status"
+      ? Promise.resolve({ data: { configured: true, authenticated: true } })
+      : Promise.resolve({ data: {} })
+  );
+}
 
 const stubs = {
   SettingsSearch: true,
@@ -38,6 +49,7 @@ const stubs = {
 describe("Settings ?setting= deep link (F3/F4)", () => {
   beforeEach(() => {
     setActivePinia(createPinia());
+    signInAsAdmin();
     route.query = {};
     Element.prototype.scrollIntoView = vi.fn();
   });
@@ -57,6 +69,7 @@ describe("Settings ?setting= deep link (F3/F4)", () => {
 describe("Settings header after a deep link", () => {
   beforeEach(() => {
     setActivePinia(createPinia());
+    signInAsAdmin();
     Element.prototype.scrollIntoView = vi.fn();
   });
 
@@ -91,6 +104,7 @@ describe("Settings header after a deep link", () => {
 describe("Settings phone hand-off (F2)", () => {
   beforeEach(() => {
     setActivePinia(createPinia());
+    signInAsAdmin();
     route.query = {};
   });
 

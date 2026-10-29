@@ -19,6 +19,7 @@ import { detailMessage } from "../utils/apiErrors";
 import { useSystem } from "../composables/useSystem";
 import { normalizeKeyCode } from "@/utils/keyCode";
 import { configUrl } from "@/utils/kioskId";
+import api from "@/services/api";
 
 const keyboardStore = useKeyboardStore();
 const configStore = useConfigStore();
@@ -67,26 +68,19 @@ const checkRebootCombo = () => {
 
 const triggerReboot = async () => {
   try {
-    const response = await fetch("/api/system/reboot", {
-      method: "POST",
-    });
-    if (response.ok) {
-      showSystemRebootScheduled(notificationsStore);
-      return;
-    }
+    // The shared client is required: a 401 admin_required opens the in-place
+    // sign-in dialog here (CLV-9 §7), which a bare fetch() would bypass.
+    await api.post("/system/reboot");
+    showSystemRebootScheduled(notificationsStore);
+  } catch (error) {
+    // A 401 admin_required has already opened the in-place sign-in dialog via
+    // the shared client's interceptor; don't also report a failure.
+    if (error?.adminRequired) return;
     // A refused reboot (e.g. 409 host_control_disabled) carries the reason the
     // user needs; a generic "failed" would hide it.
-    let body = null;
-    try {
-      body = await response.json();
-    } catch {
-      // Non-JSON error body; fall back to the generic message.
-    }
-    showSystemRebootFailed(notificationsStore, detailMessage(body?.detail, ""));
-    console.error("Failed to trigger reboot:", body?.detail ?? response.statusText);
-  } catch (error) {
-    showSystemRebootFailed(notificationsStore, "");
-    console.error("Error triggering reboot:", error);
+    const detail = error?.response?.data?.detail;
+    showSystemRebootFailed(notificationsStore, detailMessage(detail, ""));
+    console.error("Failed to trigger reboot:", detail ?? error?.message ?? error);
   }
 };
 

@@ -20,7 +20,12 @@ export const settingsCategories = [
     icon: "⚙️",
     subtitle: "Updates · backup · diagnostics",
   },
-  { id: "security", label: "Security", icon: "🔒", subtitle: "Allowed origins · network access" },
+  {
+    id: "security",
+    label: "Security",
+    icon: "🔒",
+    subtitle: "Admin password · allowed origins · network access",
+  },
 ];
 
 export const settingsDestinations = [
@@ -220,6 +225,15 @@ export const settingsDestinations = [
     tabKey: "settings_tab_device",
     tab: "hardware",
     keywords: ["hardware", "version", "status", "backend", "frontend"],
+  },
+  {
+    id: "security-admin",
+    label: "Admin access",
+    path: "Security / Admin access",
+    category: "security",
+    tabKey: "settings_tab_security",
+    tab: "admin",
+    keywords: ["password", "sign out", "admin", "lock", "admin password", "security"],
   },
   {
     id: "maintenance-updates",
