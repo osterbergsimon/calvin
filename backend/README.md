@@ -10,29 +10,28 @@ FastAPI backend for Calvin Dashboard.
 # Install UV if not already installed
 pip install uv
 
-# Install dependencies (evdev is skipped on Windows, includes dev tools for testing)
+# Install dependencies (including dev tools for testing)
 uv sync --extra dev
 
 # Run development server
 uv run uvicorn app.main:app --reload --host 0.0.0.0 --port 8000
 ```
 
-**Note:** On Windows, keyboard input (`evdev`) is automatically disabled. All other features work normally. This is fine for development and testing.
-
-### Linux/Raspberry Pi (Development & Production)
+### Linux/Raspberry Pi
 
 ```bash
 # Install UV if not already installed
 curl -LsSf https://astral.sh/uv/install.sh | sh
 
-# Install dependencies (includes evdev for keyboard support)
-uv sync --extra linux
+# Install dependencies (including dev tools for testing)
+uv sync --extra dev
 
 # Run development server
 uv run uvicorn app.main:app --reload --host 0.0.0.0 --port 8000
 ```
 
-**Note:** On Linux/Raspberry Pi, full keyboard support is available via `evdev`.
+Keyboard input is handled in the browser, so no `evdev`/`--extra linux`
+install or kernel headers are needed on either platform.
 
 ## Development
 
@@ -54,10 +53,9 @@ uv run ruff format .
 ./scripts/fix-lint.ps1
 
 # Setup pre-commit hooks (one-time)
-# Note: Pre-commit will run ruff-format (Black-compatible) and ruff check automatically
-# Ruff format handles formatting (whitespace, indentation, quotes) - it's Black-compatible
-# Ruff check handles linting (including line length) - some E501 errors may need manual fixes
-uv run pre-commit install
+# Uses the repo helper, which works with both plain clones and a
+# core.hooksPath set by beads.
+../scripts/install-git-hooks.sh
 
 # Type check
 uv run mypy app/
@@ -71,29 +69,28 @@ Once the server is running, visit:
 
 ## Platform Support
 
-- **Linux/Raspberry Pi (Development & Production)**: Full support including keyboard input via `evdev`
-- **Windows (Development/Testing)**: All features work except keyboard input (automatically disabled)
-- **macOS (Development/Testing)**: All features work except keyboard input (automatically disabled)
+- **Linux/Raspberry Pi**: full support
+- **Windows**: full support (development and testing)
+- **macOS**: full support (development and testing)
+
+Keyboard input is browser-side on every platform.
 
 ## Development Workflow
 
-You can develop on either Windows or Linux:
+You can develop on either Windows or Linux; behavior is the same:
 
-1. **Develop on Windows**: Write code, test features (keyboard input disabled)
-2. **Develop on Linux**: Write code, test all features including keyboard input
-3. **Test on Raspberry Pi**: Deploy to Pi for full testing including keyboard input
-4. **Production**: Deploy to Raspberry Pi with full keyboard support
+1. **Develop on Windows**: write code, run tests and the dashboard
+2. **Develop on Linux**: same workflow, with Docker or native tooling
+3. **Test on Raspberry Pi**: deploy the container image and the kiosk
 
-The code automatically detects the platform and enables/disables keyboard features accordingly.
-
-### Installing on Linux
+## Installing on Linux
 
 ```bash
 # Install UV if not already installed
-curl -LsSf https://astral.sh/uv/install.sh | sh
+curl -LsS https://astral.sh/uv/install.sh | sh
 
-# Install dependencies (includes evdev for keyboard support)
-uv sync --extra linux
+# Install dependencies
+uv sync --extra dev
 
 # Run development server
 uv run uvicorn app.main:app --reload --host 0.0.0.0 --port 8000
