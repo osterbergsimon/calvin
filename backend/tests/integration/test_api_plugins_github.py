@@ -668,6 +668,7 @@ class TestInstallRestartRequired:
     )
     @patch("app.api.routes.plugins.github.load_plugin_types_for_single", new_callable=AsyncMock)
     @patch("app.api.routes.plugins.github._validate_just_installed_plugin")
+    @patch("app.api.routes.plugins.github._check_plugin_in_child", new_callable=AsyncMock)
     @patch("app.api.routes.plugins.github.plugin_loader")
     @patch("app.api.routes.plugins.github.plugin_installer")
     @patch("httpx.AsyncClient")
@@ -676,6 +677,7 @@ class TestInstallRestartRequired:
         mock_client_class,
         mock_plugin_installer,
         mock_plugin_loader,
+        mock_check_in_child,
         mock_validate,
         mock_load_single,
         requirements,

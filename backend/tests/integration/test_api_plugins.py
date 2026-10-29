@@ -1114,6 +1114,10 @@ class TestZipInstallRestartRequired:
         new_callable=AsyncMock,
     )
     @patch("app.api.routes.plugins.management.event_system")
+    @patch(
+        "app.api.routes.plugins.management._check_plugin_in_child",
+        new_callable=AsyncMock,
+    )
     @patch("app.api.routes.plugins.management._validate_just_installed_plugin")
     @patch("app.api.routes.plugins.management.plugin_loader")
     @patch("app.api.routes.plugins.management.plugin_installer")
@@ -1122,6 +1126,7 @@ class TestZipInstallRestartRequired:
         mock_plugin_installer,
         mock_plugin_loader,
         mock_validate,
+        mock_check_in_child,
         mock_event_system,
         mock_load_single,
         requirements,

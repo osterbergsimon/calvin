@@ -38,6 +38,37 @@ def _plugin_family(cls: type[BasePlugin]) -> PluginType | None:
     return None
 
 
+def import_plugin_module(plugin_id: str, plugin_path: Path, module_name: str) -> ModuleType:
+    """Import an installed plugin's ``plugin.py`` under its unique module name.
+
+    The plugin directory is on ``sys.path`` only while the module executes,
+    so a bundled ``json.py``/``app.py`` can't shadow stdlib or host modules
+    for every later import (audit R12).
+
+    Shared with the isolated install check (``app.plugins.check_plugin``) so a
+    child process validates exactly the import the server will perform.
+    """
+    plugin_py = plugin_path / "plugin.py"
+    plugin_dir_str = str(plugin_path)
+    added_to_path = plugin_dir_str not in sys.path
+    if added_to_path:
+        sys.path.insert(0, plugin_dir_str)
+    try:
+        spec = importlib.util.spec_from_file_location(module_name, plugin_py)
+        if not spec or not spec.loader:
+            raise ImportError(f"Could not create an import spec for {plugin_py}")
+        module = importlib.util.module_from_spec(spec)
+        sys.modules[module_name] = module
+        spec.loader.exec_module(module)
+        return module
+    finally:
+        if added_to_path:
+            try:
+                sys.path.remove(plugin_dir_str)
+            except ValueError:
+                pass
+
+
 class PluginLoader:
     """Discovers plugin classes and keeps the type registry."""
 
@@ -179,7 +210,7 @@ class PluginLoader:
                 continue
 
             try:
-                module = self._import_plugin_module(plugin_id, plugin_path, module_name)
+                module = import_plugin_module(plugin_id, plugin_path, module_name)
 
                 registered = self.register_module(module)
                 if registered:
@@ -206,34 +237,6 @@ class PluginLoader:
                 logger.opt(exception=exc).error(
                     "Error loading installed plugin {} ({}): {}", plugin_id, type(exc).__name__, exc
                 )
-
-    @staticmethod
-    def _import_plugin_module(plugin_id: str, plugin_path: Path, module_name: str) -> ModuleType:
-        """Import an installed plugin's ``plugin.py`` under its unique module name.
-
-        The plugin directory is on ``sys.path`` only while the module executes,
-        so a bundled ``json.py``/``app.py`` can't shadow stdlib or host modules
-        for every later import (audit R12).
-        """
-        plugin_py = plugin_path / "plugin.py"
-        plugin_dir_str = str(plugin_path)
-        added_to_path = plugin_dir_str not in sys.path
-        if added_to_path:
-            sys.path.insert(0, plugin_dir_str)
-        try:
-            spec = importlib.util.spec_from_file_location(module_name, plugin_py)
-            if not spec or not spec.loader:
-                raise ImportError(f"Could not create an import spec for {plugin_py}")
-            module = importlib.util.module_from_spec(spec)
-            sys.modules[module_name] = module
-            spec.loader.exec_module(module)
-            return module
-        finally:
-            if added_to_path:
-                try:
-                    sys.path.remove(plugin_dir_str)
-                except ValueError:
-                    pass
 
     def unload_installed_plugin(self, plugin_id: str) -> None:
         """Remove an installed plugin's classes and module (on uninstall)."""

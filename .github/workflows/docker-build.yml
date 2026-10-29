@@ -104,6 +104,30 @@ jobs:
           cache-from: type=gha
           cache-to: type=gha,mode=max
 
+      # Catches install-layout regressions the dev-venv tests cannot see: in the
+      # runtime image `app` is only importable via the cwd, and `python -I` drops
+      # that, so the child check must put the backend dir on sys.path itself.
+      - name: Build runtime image for the plugin-check smoke test
+        uses: docker/build-push-action@v6
+        with:
+          context: .
+          file: docker/Dockerfile
+          build-args: |
+            VITE_API_URL=/api
+          # The image from the step above, amd64-only and loaded locally so the
+          # check can run inside it. The GHA cache makes this a cache hit.
+          platforms: linux/amd64
+          load: true
+          push: false
+          tags: calvin-smoke:ci
+          cache-from: type=gha
+
+      - name: Smoke-test the isolated plugin check inside the image
+        run: |
+          docker run --rm --entrypoint /bin/sh \
+            -v "$PWD/docker/smoke-plugin-check.sh:/smoke.sh:ro" \
+            calvin-smoke:ci /smoke.sh
+
       - name: Summary
         env:
           TAGS: ${{ steps.meta.outputs.tags }}

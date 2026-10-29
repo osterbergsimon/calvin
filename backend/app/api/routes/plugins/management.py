@@ -15,6 +15,7 @@ from pydantic import BaseModel, TypeAdapter, ValidationError
 
 from app.models.db_models import PluginDB, PluginTypeDB
 from app.plugins.base import PluginType
+from app.plugins.isolated_check import run_isolated_plugin_check
 from app.plugins.loader import plugin_loader
 from app.plugins.manager import plugin_manager
 from app.plugins.registry.loader import load_plugin_types_for_single
@@ -50,6 +51,28 @@ router = APIRouter()
 # Cross-cutting type-level keys that all plugins support, regardless of
 # whether they declare them in their own common_config_schema.
 UNIVERSAL_TYPE_CONFIG_KEYS = frozenset({"display_order"})
+
+
+async def _check_plugin_in_child(plugin_id: str) -> None:
+    """Import a freshly installed plugin in a child process before the server does.
+
+    A rejected upload is never imported into the server: the child reports import,
+    ``sys.exit()`` and metadata errors, and on any error the plugin is rolled back
+    (directory removed, pip packages undone) and the caller gets a 400.
+    """
+    errors = await run_installer_op(run_isolated_plugin_check, plugin_id)
+    if not errors:
+        return
+    try:
+        await run_installer_op(plugin_installer.uninstall_plugin, plugin_id)
+    except Exception as cleanup_exc:  # noqa: BLE001
+        logger.warning(
+            "Failed to roll back plugin {} after the isolated check failed: {}",
+            plugin_id,
+            cleanup_exc,
+        )
+    detail = f"Plugin {plugin_id} failed validation:\n  - " + "\n  - ".join(errors)
+    raise HTTPException(status_code=400, detail=detail)
 
 
 def _validate_just_installed_plugin(plugin_id: str) -> list[str]:
@@ -364,6 +387,11 @@ async def install_plugin(
         try:
             manifest = await run_installer_op(plugin_installer.install_plugin, temp_path, plugin_id)
 
+            # Validate it in a child interpreter first: the server must never
+            # import an upload that errors, exits or hangs at import time.
+            installed_id = manifest["id"]
+            await _check_plugin_in_child(installed_id)
+
             # Reload plugins to include the newly installed one
             plugin_loader.load_installed_plugins()
 
@@ -371,7 +399,6 @@ async def install_plugin(
             # a plugin with (e.g.) an invalid display_schema.kind would install
             # "successfully" but never appear in the UI because get_plugin_types
             # silently swallows the PluginDefinition.from_raw error.
-            installed_id = manifest["id"]
             validation_errors = _validate_just_installed_plugin(installed_id)
             if validation_errors:
                 # Roll back: remove the broken plugin so the user can fix and retry.
