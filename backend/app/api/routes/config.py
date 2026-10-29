@@ -7,7 +7,7 @@ from typing import Any
 
 from fastapi import APIRouter, HTTPException
 from loguru import logger
-from pydantic import BaseModel, ConfigDict
+from pydantic import BaseModel, ConfigDict, field_validator
 
 from app.config import settings
 from app.services.config_service import config_service
@@ -87,6 +87,54 @@ def get_frontend_version() -> str | None:
         return None
 
 
+# Sourced as shell by update-calvin.sh, so every value written here must be
+# validated first (audit S7, calvin-ua2).
+CALVIN_UPDATE_FILE = Path("/etc/default/calvin-update")
+
+# https only, no userinfo/query/fragment, no shell metacharacters or whitespace.
+_GIT_REPO_URL_RE = re.compile(r"https://[A-Za-z0-9.-]+(:[0-9]{1,5})?(/[A-Za-z0-9._~%+/-]*)?")
+# A conservative subset of git's ref-name rules.
+_GIT_BRANCH_RE = re.compile(r"[A-Za-z0-9_][A-Za-z0-9._/-]{0,199}")
+
+
+def validate_git_repo_url(url: str) -> str:
+    """Accept only a plain https:// git URL; raise ValueError otherwise."""
+    if not isinstance(url, str) or not _GIT_REPO_URL_RE.fullmatch(url):
+        raise ValueError("Repository URL must be a plain https:// URL")
+    return url
+
+
+def validate_git_branch(branch: str) -> str:
+    """Accept only a safe git branch name; raise ValueError otherwise."""
+    if (
+        not isinstance(branch, str)
+        or not _GIT_BRANCH_RE.fullmatch(branch)
+        or ".." in branch
+        or "//" in branch
+        or branch.endswith(("/", ".", ".lock"))
+    ):
+        raise ValueError("Invalid branch name")
+    return branch
+
+
+def _write_update_setting(key: str, value: str | None) -> None:
+    """Set KEY=value in the update script's config file, if it exists."""
+    if value is None or not CALVIN_UPDATE_FILE.exists():
+        return
+    try:
+        lines = CALVIN_UPDATE_FILE.read_text().splitlines(keepends=True)
+        new_line = f"{key}={value}\n"
+        new_lines = [new_line if line.startswith(f"{key}=") else line for line in lines]
+        if new_line not in new_lines:
+            if new_lines and not new_lines[-1].endswith("\n"):
+                new_lines[-1] += "\n"
+            new_lines.append(new_line)
+        CALVIN_UPDATE_FILE.write_text("".join(new_lines))
+    except Exception as e:
+        # Log error but don't fail the config update
+        logger.warning(f"Failed to update {CALVIN_UPDATE_FILE}: {e}")
+
+
 class ConfigUpdate(BaseModel):
     """Configuration update model."""
 
@@ -141,6 +189,17 @@ class ConfigUpdate(BaseModel):
         None  # Git repository URL for updates (default: 'https://github.com/osterbergsimon/calvin.git')
     )
     gitBranch: str | None = None  # Git branch to use for updates (default: 'main')
+
+    @field_validator("gitRepoUrl")
+    @classmethod
+    def _check_git_repo_url(cls, value: str | None) -> str | None:
+        return None if value is None else validate_git_repo_url(value)
+
+    @field_validator("gitBranch")
+    @classmethod
+    def _check_git_branch(cls, value: str | None) -> str | None:
+        return None if value is None else validate_git_branch(value)
+
     configPollInterval: int | None = None  # Config polling interval in seconds (default: 30)
     calendarRefreshInterval: int | None = (
         None  # Calendar cache refresh interval in minutes (default: 15)
@@ -659,64 +718,10 @@ async def update_config(config_update: ConfigUpdate):
             update_dict[snake_key] = update_dict.pop(camel_key)
     if "gitRepoUrl" in update_dict:
         update_dict["git_repo_url"] = update_dict.pop("gitRepoUrl")
-        # Also update /etc/default/calvin-update file
-        calvin_update_file = Path("/etc/default/calvin-update")
-        if calvin_update_file.exists():
-            try:
-                # Read existing file
-                with open(calvin_update_file) as f:
-                    lines = f.readlines()
-
-                # Update or add GIT_REPO line
-                updated = False
-                new_lines = []
-                for line in lines:
-                    if line.startswith("GIT_REPO="):
-                        new_lines.append(f"GIT_REPO={update_dict['git_repo_url']}\n")
-                        updated = True
-                    else:
-                        new_lines.append(line)
-
-                if not updated:
-                    # Add GIT_REPO if it doesn't exist
-                    new_lines.append(f"GIT_REPO={update_dict['git_repo_url']}\n")
-
-                # Write back
-                with open(calvin_update_file, "w") as f:
-                    f.writelines(new_lines)
-            except Exception as e:
-                # Log error but don't fail the config update
-                print(f"Warning: Failed to update /etc/default/calvin-update: {e}")
+        _write_update_setting("GIT_REPO", update_dict["git_repo_url"])
     if "gitBranch" in update_dict:
         update_dict["git_branch"] = update_dict.pop("gitBranch")
-        # Also update /etc/default/calvin-update file
-        calvin_update_file = Path("/etc/default/calvin-update")
-        if calvin_update_file.exists():
-            try:
-                # Read existing file
-                with open(calvin_update_file) as f:
-                    lines = f.readlines()
-
-                # Update or add GIT_BRANCH line
-                updated = False
-                new_lines = []
-                for line in lines:
-                    if line.startswith("GIT_BRANCH="):
-                        new_lines.append(f"GIT_BRANCH={update_dict['git_branch']}\n")
-                        updated = True
-                    else:
-                        new_lines.append(line)
-
-                if not updated:
-                    # Add GIT_BRANCH if it doesn't exist
-                    new_lines.append(f"GIT_BRANCH={update_dict['git_branch']}\n")
-
-                # Write back
-                with open(calvin_update_file, "w") as f:
-                    f.writelines(new_lines)
-            except Exception as e:
-                # Log error but don't fail the config update
-                print(f"Warning: Failed to update /etc/default/calvin-update: {e}")
+        _write_update_setting("GIT_BRANCH", update_dict["git_branch"])
     if "consoleLogEnabled" in update_dict:
         update_dict["console_log_enabled"] = update_dict.pop("consoleLogEnabled")
     if "consoleLogLevel" in update_dict:
@@ -792,8 +797,8 @@ async def get_git_branches(repo_url: str | None = None):
     Returns:
         List of branch names
     """
-    import re
-    import subprocess
+    import asyncio
+    import os
 
     # Get repo URL from parameter, config, or default
     if not repo_url:
@@ -803,20 +808,27 @@ async def get_git_branches(repo_url: str | None = None):
         if not repo_url:
             repo_url = "https://github.com/osterbergsimon/calvin.git"
 
+    # https only: no file://, ssh or option-looking "URLs" (audit S6)
     try:
-        # Use git ls-remote to fetch branches without cloning
-        # This works for public repos and doesn't require authentication
-        result = subprocess.run(
-            ["git", "ls-remote", "--heads", repo_url],
+        validate_git_repo_url(repo_url)
+    except ValueError as e:
+        raise HTTPException(status_code=400, detail=str(e)) from e
+
+    try:
+        # Use git ls-remote to fetch branches without cloning. "--" ends option
+        # parsing; it runs in a thread so it can't block the event loop.
+        result = await asyncio.to_thread(
+            subprocess.run,
+            ["git", "ls-remote", "--heads", "--", repo_url],
             capture_output=True,
             text=True,
             timeout=10,
+            env={**os.environ, "GIT_TERMINAL_PROMPT": "0"},
         )
 
         if result.returncode != 0:
-            raise HTTPException(
-                status_code=400, detail=f"Failed to fetch branches: {result.stderr}"
-            )
+            logger.warning(f"git ls-remote failed for {repo_url}: {result.stderr.strip()}")
+            raise HTTPException(status_code=400, detail="Failed to fetch branches")
 
         # Parse branch names from output
         # Format: <commit_hash>	refs/heads/branch_name
@@ -838,9 +850,12 @@ async def get_git_branches(repo_url: str | None = None):
 
         return {"branches": branches, "repo_url": repo_url}
 
+    except HTTPException:
+        raise
     except subprocess.TimeoutExpired:
         raise HTTPException(status_code=408, detail="Request timeout while fetching branches")
     except FileNotFoundError:
         raise HTTPException(status_code=500, detail="Git is not installed on this system")
-    except Exception as e:
-        raise HTTPException(status_code=500, detail=f"Failed to fetch branches: {str(e)}")
+    except Exception:
+        logger.exception("Failed to fetch branches for {}", repo_url)
+        raise HTTPException(status_code=500, detail="Failed to fetch branches")
