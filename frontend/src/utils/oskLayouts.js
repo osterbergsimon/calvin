@@ -78,6 +78,16 @@ export const OSK_LAYOUT_IDS = ["en", "sv", "fi", "no", "da", "de", "fr"];
 const URL_BOTTOM_ROW = "{numbers} / : {space} . .com {hide}";
 const EMAIL_BOTTOM_ROW = "{numbers} @ {space} . .com {hide}";
 
+/**
+ * The third row of the url/email keyboards: the active layout's row-3 letters
+ * (a–z only, accented letters and punctuation dropped) followed by "- _",
+ * because hyphens and underscores are common in addresses (spec §4).
+ */
+const urlThirdRow = row => {
+  const letters = row.split(" ").filter(key => /^[a-z]$/.test(key));
+  return ["{shift}", ...letters, "-", "_", "{shift}"].join(" ");
+};
+
 // The symbols, accents and numeric layers are the same for every layout.
 const SHARED_LAYERS = {
   symbols: [
@@ -126,16 +136,18 @@ const bottomRow = (layout, showLayoutKey) => {
 
 /**
  * The simple-keyboard layout object for the active letter layout.
- * URL and email fields use the active layout's first three rows and their own
+ * URL and email fields keep the active layout's first two rows unchanged,
+ * replace the third row with its a–z letters plus "- _", and use their own
  * bottom row (spec §4).
  */
 export const buildOskLayouts = ({ layout, showLayoutKey = false } = {}) => {
   const id = layoutOrDefault(layout);
   const rows = OSK_LAYOUTS_BY_ID[id].rows;
+  const addressRows = [rows[0], rows[1], urlThirdRow(rows[2])];
   return {
     default: [...rows, bottomRow(id, showLayoutKey)],
-    url: [...rows, URL_BOTTOM_ROW],
-    email: [...rows, EMAIL_BOTTOM_ROW],
+    url: [...addressRows, URL_BOTTOM_ROW],
+    email: [...addressRows, EMAIL_BOTTOM_ROW],
     ...SHARED_LAYERS,
   };
 };

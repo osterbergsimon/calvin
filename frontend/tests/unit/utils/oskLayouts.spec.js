@@ -139,12 +139,43 @@ describe("oskLayouts", () => {
       );
     });
 
-    it("builds url and email from the active layout's rows with their own bottom row", () => {
+    it("builds url and email from the active layout's first two rows and their own bottom row", () => {
       const layouts = buildOskLayouts({ layout: "de", showLayoutKey: true });
-      expect(layouts.url.slice(0, 3)).toEqual(rowsOf("de"));
+      expect(layouts.url.slice(0, 2)).toEqual(rowsOf("de").slice(0, 2));
       expect(layouts.url[3]).toBe("{numbers} / : {space} . .com {hide}");
-      expect(layouts.email.slice(0, 3)).toEqual(rowsOf("de"));
+      expect(layouts.email.slice(0, 2)).toEqual(rowsOf("de").slice(0, 2));
       expect(layouts.email[3]).toBe("{numbers} @ {space} . .com {hide}");
+    });
+
+    it("gives every layout the spec's url and email third row (a–z letters then - _)", () => {
+      const expected = {
+        en: "{shift} z x c v b n m - _ {shift}",
+        sv: "{shift} z x c v b n m - _ {shift}",
+        fi: "{shift} z x c v b n m - _ {shift}",
+        no: "{shift} z x c v b n m - _ {shift}",
+        da: "{shift} z x c v b n m - _ {shift}",
+        de: "{shift} y x c v b n m - _ {shift}",
+        fr: "{shift} w x c v b n - _ {shift}",
+      };
+
+      for (const id of OSK_LAYOUT_IDS) {
+        const layouts = buildOskLayouts({ layout: id });
+        expect(layouts.url[2]).toBe(expected[id]);
+        expect(layouts.email[2]).toBe(expected[id]);
+        // Rows 1-2 are the layout's own, unchanged.
+        expect(layouts.url.slice(0, 2)).toEqual(rowsOf(id).slice(0, 2));
+        expect(layouts.email.slice(0, 2)).toEqual(rowsOf(id).slice(0, 2));
+      }
+    });
+
+    it("keeps only a–z on the url third row, never accents or punctuation", () => {
+      for (const id of OSK_LAYOUT_IDS) {
+        const row = buildOskLayouts({ layout: id }).url[2].split(" ");
+        for (const key of row.slice(1, -1)) {
+          expect(key === "-" || key === "_" || /^[a-z]$/.test(key)).toBe(true);
+        }
+        expect(row.slice(-3)).toEqual(["-", "_", "{shift}"]);
+      }
     });
 
     it("falls back to the default letter layer for an unknown layout", () => {
