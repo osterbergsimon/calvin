@@ -33,7 +33,9 @@ const props = defineProps({
 const serverUrl = ref("");
 const qr = ref("");
 
-const link = computed(() => props.url || (serverUrl.value ? settingsLink(serverUrl.value, props.settingId) : ""));
+const link = computed(
+  () => props.url || (serverUrl.value ? settingsLink(serverUrl.value, props.settingId) : "")
+);
 
 const renderQr = async value => {
   if (!value) {

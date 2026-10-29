@@ -12,12 +12,7 @@
       >
         {{ actionLabel }}
       </button>
-      <PhoneSetupCard
-        v-if="showPhone"
-        class="empty-state__phone"
-        compact
-        :setting-id="settingId"
-      />
+      <PhoneSetupCard v-if="showPhone" class="empty-state__phone" compact :setting-id="settingId" />
     </div>
   </div>
 </template>
@@ -46,8 +41,8 @@ const router = useRouter();
 const modeStore = useModeStore();
 const { isTouch } = useTouchCapability();
 
-const showPhone = computed(() =>
-  Boolean(props.settingId) && (props.phoneHint === null ? isTouch.value : props.phoneHint)
+const showPhone = computed(
+  () => Boolean(props.settingId) && (props.phoneHint === null ? isTouch.value : props.phoneHint)
 );
 
 const openSetting = () => {

@@ -350,8 +350,7 @@ const handleInstallSelected = async ({ plugins: pluginsToInstall, repoUrl, branc
 const handleInstallLocal = async ({ path, localPath, force }) => {
   const plugin = availablePlugins.value.find(p => p.path === path);
   const deps = plugin?.manifest?.dependencies?.packages ?? [];
-  const doInstall = async () =>
-    afterInstall(await installPluginFromLocal(localPath, path, force));
+  const doInstall = async () => afterInstall(await installPluginFromLocal(localPath, path, force));
   if (deps.length > 0) {
     triggerPipWarning(deps, plugin?.name ?? path, doInstall);
     return;
