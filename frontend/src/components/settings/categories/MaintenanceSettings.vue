@@ -10,8 +10,10 @@
     </SettingsSection>
 
     <SettingsSection id="maintenance-system" title="System">
-      <!-- In Docker the container is restarted from the host (Unraid / compose). -->
-      <template v-if="!isContainer">
+      <!-- In Docker the container is restarted from the host (Unraid / compose).
+           A native backend that does not own the machine (CALVIN_HOST_CONTROL
+           off) refuses these too, so don't offer them. -->
+      <template v-if="hostActionsAvailable">
         <SettingRow label="Restart backend" description="Restart the backend API server.">
           <button type="button" class="maint-btn" @click="askRestartBackend">
             Restart backend
@@ -104,7 +106,13 @@ const emit = defineEmits(["update:config", "update:gitRepoUrl", "update:gitBranc
 
 const { restartBackend, restartFrontend, environment, loadEnvironment } = useSystem();
 
-const isContainer = computed(() => environment.value?.deployment === "docker");
+// A missing environment (request failed) keeps the actions visible; the
+// backend guard then answers with the real reason.
+const hostActionsAvailable = computed(() => {
+  const env = environment.value;
+  if (!env) return true;
+  return env.deployment !== "docker" && env.host_control !== false;
+});
 onMounted(loadEnvironment);
 
 const confirm = reactive({ show: false, title: "", message: "", action: null });

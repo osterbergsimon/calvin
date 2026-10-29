@@ -4,6 +4,7 @@
 
 import { ref } from "vue";
 import * as systemApi from "../services/systemApi";
+import { errorDetailMessage } from "../utils/apiErrors";
 
 // Singleton refs so any component using useSystem() shares the same status
 const updating = ref(false);
@@ -96,7 +97,7 @@ export function useSystem() {
       backendHealth.value = {
         status: "unhealthy",
         data: null,
-        error: error.response?.data?.detail || error.message || "Backend health check failed",
+        error: errorDetailMessage(error, error.message || "Backend health check failed"),
       };
       backendHealthCheckedAt.value = new Date().toISOString();
       return backendHealth.value;
@@ -147,7 +148,7 @@ export function useSystem() {
       // A network error here means the backend killed itself before sending the
       // response (old behaviour). Treat it the same as a successful initiation.
       if (error.response) {
-        updateMessage.value = error.response?.data?.detail || "Failed to restart backend";
+        updateMessage.value = errorDetailMessage(error, "Failed to restart backend");
         updateMessageClass.value = "error";
         _scheduleMessageClear(8000);
         console.error("Failed to restart backend:", error);
@@ -179,7 +180,7 @@ export function useSystem() {
       await systemApi.restartFrontend();
     } catch (error) {
       if (error.response) {
-        updateMessage.value = error.response?.data?.detail || "Failed to restart frontend";
+        updateMessage.value = errorDetailMessage(error, "Failed to restart frontend");
         updateMessageClass.value = "error";
         _scheduleMessageClear(8000);
         console.error("Failed to restart frontend:", error);
@@ -308,8 +309,7 @@ export function useSystem() {
       }
     } catch (error) {
       console.error("Failed to trigger update:", error);
-      updateMessage.value =
-        error.response?.data?.detail || error.message || "Failed to start update";
+      updateMessage.value = errorDetailMessage(error, error.message || "Failed to start update");
       updateMessageClass.value = "error";
       _scheduleMessageClear(8000);
     } finally {

@@ -19,6 +19,7 @@ from loguru import logger
 from app.config import settings
 from app.services.display_power_service import display_power_service
 from app.utils.git_refs import validate_git_branch
+from app.utils.host_control import host_control_enabled, require_host_control
 from app.utils.platform import run_command
 
 router = APIRouter()
@@ -272,11 +273,22 @@ async def get_environment():
     if _in_container():
         return {
             "deployment": "docker",
+            "host_control": False,
             "capabilities": {"update": False, "restart": False, "reboot": False},
             "update_instructions": CONTAINER_UPDATE_INSTRUCTIONS,
         }
+    if not host_control_enabled():
+        # Native, but not a machine Calvin owns (dev backend, desktop). The
+        # routes answer 409; offering the buttons would only produce errors.
+        return {
+            "deployment": "native",
+            "host_control": False,
+            "capabilities": {"update": False, "restart": False, "reboot": False},
+            "update_instructions": None,
+        }
     return {
         "deployment": "native",
+        "host_control": True,
         "capabilities": {
             "update": settings.get_update_script_path().exists(),
             "restart": _restart_mechanism_available(),
@@ -295,6 +307,7 @@ async def trigger_update():
     from app.services.config_service import config_service
 
     _reject_in_container("Updating from the UI")
+    require_host_control("Updating from the UI")
 
     update_script = settings.get_update_script_path()
 
@@ -722,6 +735,7 @@ async def stream_update_log(log_offset: int = 0):
 @router.post("/display/power/on")
 async def turn_display_on():
     """Turn display on."""
+    require_host_control("Turning the display on")
     try:
         await display_power_service.turn_display_on()
         return {"status": "success", "message": "Display turned on"}
@@ -732,6 +746,7 @@ async def turn_display_on():
 @router.post("/display/power/off")
 async def turn_display_off():
     """Turn display off."""
+    require_host_control("Turning the display off")
     try:
         await display_power_service.turn_display_off()
         return {"status": "success", "message": "Display turned off"}
@@ -752,6 +767,7 @@ async def get_display_state():
 @router.post("/display/timeout/configure")
 async def configure_display_timeout():
     """Apply display timeout settings immediately."""
+    require_host_control("Configuring the display timeout")
     try:
         await display_power_service.configure_display_timeout()
         return {"status": "success", "message": "Display timeout configured"}
@@ -768,6 +784,7 @@ async def reload_ui():
     This endpoint doesn't actually reload anything server-side,
     but can be used to trigger a client-side reload.
     """
+    require_host_control("Reloading the UI")
     return {
         "status": "success",
         "message": "UI reload signal sent. Clients should reload.",
@@ -781,6 +798,7 @@ async def restart_frontend():
     Uses a helper script with sudo permissions to restart the calvin-frontend service.
     """
     _reject_in_container("Restarting the frontend")
+    require_host_control("Restarting the frontend")
     try:
         if not _restart_mechanism_available():
             raise HTTPException(
@@ -815,6 +833,7 @@ async def restart_backend():
     network error even when the restart succeeds.
     """
     _reject_in_container("Restarting the backend")
+    require_host_control("Restarting the backend")
     try:
         if not _restart_mechanism_available():
             raise HTTPException(
@@ -853,6 +872,7 @@ async def reboot_system():
     """Reboot the Raspberry Pi."""
     # In a container this would target the host (e.g. the Unraid server), never the kiosk.
     _reject_in_container("Rebooting")
+    require_host_control("Rebooting")
     try:
         # Try multiple methods to reboot
         # Note: The backend service runs with NoNewPrivileges=true, so sudo might not work

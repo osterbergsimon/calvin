@@ -6,6 +6,17 @@ from unittest.mock import MagicMock, patch
 import pytest
 
 from app.api.routes import system as system_routes
+from app.config import settings
+
+
+@pytest.fixture(autouse=True)
+def _host_control_on():
+    """These tests exercise the real host-command paths, so host control is on.
+
+    The disabled path is covered in test_api_system_host_control.py.
+    """
+    with patch.object(settings, "host_control", True):
+        yield
 
 
 class _SyncThread:
@@ -231,6 +242,7 @@ class TestSystemUpdateEndpoints:
 
         class _StubSettings:
             deployment = "native"
+            host_control = True
             repo_dir = tmp_path
             system_path = original_settings.system_path
 
