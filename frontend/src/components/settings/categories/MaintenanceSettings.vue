@@ -23,6 +23,8 @@
       </SettingRow>
     </SettingsSection>
 
+    <BackupSettings />
+
     <SettingsSection id="maintenance-diagnostics" title="Diagnostics">
       <SettingRow
         label="Console logging"
@@ -86,6 +88,7 @@ import SelectPill from "@/components/ui/SelectPill.vue";
 import NumberStepper from "@/components/ui/NumberStepper.vue";
 import ConfirmModal from "@/components/settings/shared/ConfirmModal.vue";
 import UpdatesTab from "@/components/settings/tabs/system/UpdatesTab.vue";
+import BackupSettings from "@/components/settings/categories/BackupSettings.vue";
 
 defineProps({
   config: { type: Object, required: true },

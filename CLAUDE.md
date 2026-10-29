@@ -91,6 +91,7 @@ A plugin directory:
 - [docs/plugins/PLUGIN_PACKAGE_FORMAT.md](docs/plugins/PLUGIN_PACKAGE_FORMAT.md) — `plugin.json` schema
 - [docs/plugins/PLUGIN_PERSISTENCE_AND_RESTART.md](docs/plugins/PLUGIN_PERSISTENCE_AND_RESTART.md) — lifecycle
 - [docs/EVENT_SYSTEM.md](docs/EVENT_SYSTEM.md) — cross-plugin events
+- [docs/configuration/BACKUP_RESTORE.md](docs/configuration/BACKUP_RESTORE.md) — backup/restore, first-start seeding (`CALVIN_RESTORE_FROM`)
 - [docs/setup/QUICKSTART_DEVELOP.md](docs/setup/QUICKSTART_DEVELOP.md) — dev env
 - [docs/testing/BACKEND_TESTS.md](docs/testing/BACKEND_TESTS.md) — running tests
 - [calvin-plugins/CREATING_PLUGINS.md](../calvin-plugins/CREATING_PLUGINS.md) — plugin scaffold guide

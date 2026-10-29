@@ -46,6 +46,7 @@ New to Calvin? Get started quickly:
 ### Configuration
 - Remote configuration
 - Settings behavior
+- [Backup and restore](configuration/BACKUP_RESTORE.md)
 - System configuration
 
 ### Architecture

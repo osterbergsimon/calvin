@@ -294,6 +294,7 @@ def test_client(temp_db_path: Path, temp_image_dir: Path) -> Generator[TestClien
     from fastapi.middleware.cors import CORSMiddleware
 
     from app.api.routes import (
+        backup,
         calendar,
         config,
         health,
@@ -322,6 +323,7 @@ def test_client(temp_db_path: Path, temp_image_dir: Path) -> Generator[TestClien
     test_app.include_router(plugins.router, prefix="/api", tags=["plugins"])
     test_app.include_router(system.router, prefix="/api/system", tags=["system"])
     test_app.include_router(security.router, prefix="/api", tags=["security"])
+    test_app.include_router(backup.router, prefix="/api", tags=["backup"])
 
     @test_app.get("/")
     async def root():

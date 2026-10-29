@@ -14,7 +14,12 @@ export const settingsCategories = [
   { id: "plugins", label: "Plugins", icon: "🔌", subtitle: "Install · manage · themes" },
   { id: "device", label: "Device", icon: "🖥️", subtitle: "Power · keyboard · hardware" },
   { id: "kiosks", label: "Kiosks", icon: "📺", subtitle: "Per-device settings" },
-  { id: "maintenance", label: "Maintenance", icon: "⚙️", subtitle: "Updates · diagnostics" },
+  {
+    id: "maintenance",
+    label: "Maintenance",
+    icon: "⚙️",
+    subtitle: "Updates · backup · diagnostics",
+  },
   { id: "security", label: "Security", icon: "🔒", subtitle: "Allowed origins · network access" },
 ];
 
@@ -209,6 +214,15 @@ export const settingsDestinations = [
     tabKey: "settings_tab_maintenance",
     tab: "updates",
     keywords: ["updates", "git", "repository", "branch"],
+  },
+  {
+    id: "maintenance-backup",
+    label: "Backup and restore",
+    path: "Maintenance / Backup & restore",
+    category: "maintenance",
+    tabKey: "settings_tab_maintenance",
+    tab: "backup",
+    keywords: ["backup", "restore", "export", "import", "migrate", "seed", "copy settings"],
   },
   {
     id: "maintenance-diagnostics",
