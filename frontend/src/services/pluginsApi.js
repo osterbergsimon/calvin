@@ -196,8 +196,9 @@ export async function uninstallPlugin(pluginId, pluginType = null) {
 /**
  * Test plugin connection.
  */
-export async function testPlugin(pluginId, config = {}) {
-  const response = await api.post(`/plugins/${pluginId}/test`, config);
+export async function testPlugin(pluginId, config = {}, instanceId = undefined) {
+  const params = instanceId ? { instance_id: instanceId } : undefined;
+  const response = await api.post(`/plugins/${pluginId}/test`, config, { params });
   return response.data;
 }
 
