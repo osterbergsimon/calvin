@@ -3,7 +3,11 @@ Description=Calvin Dashboard Kiosk (remote backend)
 # The compositor is whatever the display-stack switch enabled (calvin-x.service
 # for X11, calvin-wayland.service for Wayland); it is deliberately not in Wants=
 # so an X11 unit can never be pulled into a Wayland session.
-After=network-online.target graphical.target calvin-x.service calvin-wayland.service
+# Do NOT add graphical.target to After=: this unit is WantedBy=multi-user.target,
+# and graphical.target is After=multi-user.target, so that pair is an ordering
+# cycle systemd breaks by deleting this job (the kiosk then never starts).
+# Wants= below still pulls the compositor in; After= orders us behind it.
+After=network-online.target calvin-x.service calvin-wayland.service
 Wants=network-online.target graphical.target
 
 [Service]
