@@ -75,6 +75,16 @@ body { margin: 0; background: #d9dee3; font-family: var(--font-ui); color: #1b24
 .osk--num .osk__row { width: 440px; flex: 1; }
 .small .k { font-size: 1.05rem; } .small .osk { gap: 6px; padding: 8px; } .small .osk__row { gap: 6px; }
 svg.i { width: 22px; height: 22px; stroke: currentColor; fill: none; stroke-width: 2; stroke-linecap: round; stroke-linejoin: round; }
+.srow { display:flex; align-items:center; justify-content:space-between; gap:1.5rem; min-height:4.5rem; padding:.75rem 1.25rem; }
+.srow + .srow { border-top:1px solid var(--line-soft); } .srow__label { font-weight:500; } .srow__desc { margin:.2rem 0 0; font-size:.85rem; color:var(--ink-2); max-width:44ch; }
+.seg { display:flex; padding:3px; gap:3px; background:var(--bg-0); border:1px solid var(--line); border-radius:var(--radius-md); }
+.seg span { min-height:40px; display:flex; align-items:center; padding:0 1rem; border-radius:8px; color:var(--ink-2); font-size:var(--fs-control); font-weight:600; }
+.seg .on { background:var(--focus); color:var(--focus-ink); }
+.chips { display:flex; gap:8px; flex-wrap:wrap; justify-content:flex-end; }
+.chip { min-height:44px; display:inline-flex; align-items:center; padding:0 14px; border-radius:999px; border:1px solid var(--line); font-size:var(--fs-control); font-weight:500; }
+.chip.on { background:color-mix(in srgb, var(--focus) 14%, var(--bg-2)); border-color:var(--focus); }
+.pill { min-height:44px; display:inline-flex; align-items:center; gap:10px; padding:0 16px; border:1px solid var(--line); border-radius:999px; background:var(--bg-2); font-weight:500; font-size:var(--fs-control); }
+.k--space small { color: var(--ink-3); font-size: var(--fs-sm); }
 </style>
 </head>
 <body>
@@ -149,6 +159,36 @@ svg.i { width: 22px; height: 22px; stroke: currentColor; fill: none; stroke-widt
     </div>
     <figcaption><b>K5 · Accents layer (åäö).</b> Nordic and common European letters. Shift gives the capitals. The layer stays on until you tap "abc".</figcaption>
   </figure>
+
+  <figure class="shot scroll">
+    <div class="frame kiosk" style="--osk-h: 300px">
+      <div class="topbar"><div><span class="wordmark">CAL<i>·</i>VIN</span><span class="location">Settings</span></div><button class="btn">Done</button></div>
+      <div class="above"><form class="card"><div class="field" style="margin:0"><label>Admin password</label><div class="input"><input type="password" value="smörgås" /><button type="button" class="show">Show</button></div></div></form></div>
+      <div class="osk" data-layout="sv"></div>
+    </div>
+    <figcaption><b>K6 · Svenska layout, with English under "Also switch to".</b> å, ö and ä sit on the main layout in their Swedish positions. The layout key shows the active layout's code, and each tap moves to the next chosen layout. The space bar names the active layout in <code>--ink-3</code>. With no extra layouts, the layout key and the space label are gone. The UI language never appears on either.</figcaption>
+  </figure>
+
+  <figure class="shot scroll">
+    <div class="frame kiosk" style="--osk-h: 0px">
+      <div class="topbar"><div><span class="wordmark">CAL<i>·</i>VIN</span><span class="location">Keyboard</span></div><button class="btn">Done</button></div>
+      <div class="shell">
+        <div class="rail"><div>Dashboard</div><div>Clock bar</div><div>Content</div><div>Plugins</div><div class="on">Device</div></div>
+        <div class="content">
+          <div class="eyebrow">Keyboard</div>
+          <div class="panel" style="padding:0">
+            <div class="srow"><div><div class="srow__label">On-screen keyboard</div><p class="srow__desc">Shows a keyboard on the screen when you tap a text field. Auto turns it on for touch screens.</p></div>
+              <div class="seg"><span class="on">Auto</span><span>Always</span><span>Off</span></div></div>
+            <div class="srow"><div><div class="srow__label">Keyboard layout</div><p class="srow__desc">The letters the on-screen keyboard uses. Separate from the language Calvin is shown in.</p></div>
+              <div class="pill">Svenska <span aria-hidden="true">▾</span></div></div>
+            <div class="srow"><div><div class="srow__label">Also switch to</div><p class="srow__desc">Adds a key to the keyboard that switches between these and Svenska.</p></div>
+              <div class="chips"><span class="chip on">English</span><span class="chip">Suomi</span><span class="chip">Norsk</span><span class="chip">Dansk</span><span class="chip">Deutsch</span><span class="chip">Français</span></div></div>
+          </div>
+        </div>
+      </div>
+    </div>
+    <figcaption><b>K7 · Device › Keyboard.</b> Built from the existing <code>SelectPill</code> (main layout) and <code>ChipMultiSelect</code> (extra layouts; the main layout is left out of the chips). The switching order is the main layout first, then the chips in list order. With no chips on, there is no layout key. The layout is independent of the app language: here the UI is English and the keyboard is Swedish.</figcaption>
+  </figure>
 </main>
 
 <script>
@@ -183,11 +223,17 @@ const L = {
     "{shift} ç õ œ ã ' ` ~ ^ ¨ {shift}",
     "{abc} {space} . , {hide}",
   ],
+  sv: [
+    "q w e r t y u i o p å {bksp}",
+    "a s d f g h j k l ö ä {enter}",
+    "{shift} z x c v b n m , . - {shift}",
+    "{numbers} {lang} {accents} {space:Svenska} {hide}",
+  ],
   numeric: ["1 2 3 {bksp}", "4 5 6 -", "7 8 9 .", "{hide} 0 , {enter:Done}"],
 };
 const FN = {
   bksp: ['k--fn k--w15', I.bksp, 'Backspace'], shift: ['k--fn k--w15', I.shift, 'Shift'], hide: ['k--fn k--w15', I.hide, 'Hide keyboard'],
-  numbers: ['k--fn k--w15', '?123'], abc: ['k--fn k--w15', 'abc'], accents: ['k--fn k--w15', 'åäö'],
+  numbers: ['k--fn k--w15', '?123'], lang: ['k--fn', 'SV'], abc: ['k--fn k--w15', 'abc'], accents: ['k--fn k--w15', 'åäö'],
   space: ['k--space', ''], enter: ['k--enter k--w2', 'Sign in'],
 };
 document.querySelectorAll('.osk').forEach(el => {
@@ -198,7 +244,7 @@ document.querySelectorAll('.osk').forEach(el => {
     row.split(' ').forEach((tok, c) => {
       const b = document.createElement('div'); b.className = 'k';
       const m = tok.match(/^\{(\w+)(?::(.+))?\}$/);
-      if (m) { const f = FN[m[1]]; b.className += ' ' + f[0]; b.innerHTML = m[2] || f[1];
+      if (m) { const f = FN[m[1]]; b.className += ' ' + f[0]; b.innerHTML = m[1] === 'space' && m[2] ? '<small>' + m[2] + '</small>' : (m[2] || f[1]);
         if (m[1] === 'enter' && name === 'numeric') b.className = 'k k--enter'; if (name === 'numeric') b.classList.remove('k--w15','k--w2'); }
       else b.textContent = name === 'accents' ? tok : tok;
       if (name === 'default' && r === 1 && c === 4) b.classList.add('k--pressed');

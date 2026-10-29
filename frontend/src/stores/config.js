@@ -89,6 +89,10 @@ export const useConfigStore = defineStore("config", () => {
   const touchControls = ref("auto"); // 'auto' (detect) | 'on' (force) | 'off' (hide) touch chrome
   const touchControlSize = ref("medium"); // 'small' | 'medium' | 'large' — region touch control size
   const onScreenKeyboard = ref("auto"); // 'auto' (touch ≥720px) | 'on' (always) | 'off' (never)
+  // On-screen keyboard letter layout. Independent of the UI language: null
+  // means "use the device's one-time navigator.language hint".
+  const oskLayout = ref(null); // 'en' | 'sv' | 'fi' | 'no' | 'da' | 'de' | 'fr' | null
+  const oskExtraLayouts = ref([]); // Extra layouts the layout key cycles through, in order
   const uiSize = ref("default"); // Global UI size: 'extra-compact' | 'compact' | 'default' | 'large' | 'extra-large'
   const consoleLogEnabled = ref(true); // Enable console logging (default: true for backwards compatibility)
   const consoleLogLevel = ref("info"); // Console log level: 'error' | 'warn' | 'info' | 'debug' (default: 'info')
@@ -173,6 +177,8 @@ export const useConfigStore = defineStore("config", () => {
     touchControls,
     touchControlSize,
     onScreenKeyboard,
+    oskLayout,
+    oskExtraLayouts,
     uiSize,
     consoleLogEnabled,
     consoleLogLevel,
@@ -593,6 +599,8 @@ export const useConfigStore = defineStore("config", () => {
     touchControls,
     touchControlSize,
     onScreenKeyboard,
+    oskLayout,
+    oskExtraLayouts,
     loading,
     error,
     stale,

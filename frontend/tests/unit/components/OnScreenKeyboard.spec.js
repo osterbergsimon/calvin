@@ -66,11 +66,31 @@ const focus = async element => {
 
 const waitForFrame = () => new Promise(resolve => setTimeout(resolve, 30));
 
+const setNavigatorLanguage = tag =>
+  Object.defineProperty(navigator, "language", { configurable: true, value: tag });
+
+// The layout key is a regular function key; the renderer rebuilds its buttons,
+// so query again after the extra tick the layout watcher needs.
+const pressLayoutKey = async () => {
+  await key("{layout}");
+  await nextTick();
+};
+
+const layoutKeyLabel = () => oskRoot().querySelector(".hg-button-layout")?.textContent.trim();
+const spaceLabel = () => oskRoot().querySelector(".hg-button-space")?.textContent.trim();
+const keyLabels = () =>
+  [...oskRoot().querySelectorAll(".hg-button")].map(button => button.textContent.trim());
+
 describe("OnScreenKeyboard", () => {
   beforeEach(() => {
     setActivePinia(createPinia());
     config = useConfigStore();
     config.onScreenKeyboard = "on";
+    config.oskLayout = null;
+    config.oskExtraLayouts = [];
+    window.localStorage.clear();
+    document.documentElement.removeAttribute("lang");
+    setNavigatorLanguage("en-US");
     setWidth(1024);
     setHeight(768);
     setTouchPoints(0);
@@ -84,6 +104,8 @@ describe("OnScreenKeyboard", () => {
     setWidth(1024);
     setHeight(768);
     setTouchPoints(0);
+    document.documentElement.removeAttribute("lang");
+    window.localStorage.clear();
     document.body.innerHTML = "";
   });
 
@@ -212,6 +234,197 @@ describe("OnScreenKeyboard", () => {
       expect(vmValue("layout")).toBe("symbols");
       await key("{abc}");
       expect(vmValue("layout")).toBe("url");
+    });
+  });
+
+  describe("letter layouts", () => {
+    it("puts å ö ä on the letter layer for sv, and Shift capitalises them", async () => {
+      config.oskLayout = "sv";
+      mountOsk();
+      const input = addInput();
+      await focus(input);
+
+      const labels = keyLabels();
+      expect(labels).toEqual(expect.arrayContaining(["å", "ö", "ä"]));
+
+      await key("{shift}");
+      await key("å");
+
+      expect(input.value).toBe("Å");
+    });
+
+    it("gives sv and fi the same letters, and de a QWERTZ layer", async () => {
+      config.oskLayout = "sv";
+      mountOsk();
+      await focus(addInput());
+      const sv = keyLabels();
+
+      wrapper.unmount();
+      wrapper = null;
+      document.body.innerHTML = "";
+      config.oskLayout = "fi";
+      mountOsk();
+      await focus(addInput());
+      expect(keyLabels()).toEqual(sv);
+
+      wrapper.unmount();
+      wrapper = null;
+      document.body.innerHTML = "";
+      config.oskLayout = "de";
+      mountOsk();
+      await focus(addInput());
+      const de = keyLabels();
+      expect(de.indexOf("z")).toBe(de.indexOf("t") + 1);
+      expect(de).toEqual(expect.arrayContaining(["ü", "ö", "ä", "ß"]));
+    });
+
+    it("has no layout key and no space label without extra layouts", async () => {
+      config.oskLayout = "sv";
+      mountOsk();
+      await focus(addInput());
+
+      expect(oskRoot().querySelector(".hg-button-layout")).toBeNull();
+      expect(spaceLabel()).toBe("");
+    });
+
+    it("cycles main → extras → main and labels the key with the layout code", async () => {
+      config.oskLayout = "sv";
+      config.oskExtraLayouts = ["en", "fi"];
+      mountOsk();
+      await focus(addInput());
+
+      expect(layoutKeyLabel()).toBe("SV");
+      expect(keyLabels()).toContain("å");
+
+      await pressLayoutKey();
+      expect(layoutKeyLabel()).toBe("EN");
+      expect(keyLabels()).not.toContain("å");
+
+      await pressLayoutKey();
+      expect(layoutKeyLabel()).toBe("FI");
+      expect(keyLabels()).toContain("å");
+
+      await pressLayoutKey();
+      expect(layoutKeyLabel()).toBe("SV");
+      expect(vmValue("activeLetterLayout")).toBe("sv");
+    });
+
+    it("names the active layout on the space bar and in the layout key's aria-label", async () => {
+      config.oskLayout = "sv";
+      config.oskExtraLayouts = ["en"];
+      mountOsk();
+      await focus(addInput());
+
+      expect(spaceLabel()).toBe("Svenska");
+      expect(oskRoot().querySelector(".hg-button-space .osk-space-name")).not.toBeNull();
+      expect(oskRoot().querySelector(".hg-button-layout").getAttribute("aria-label")).toBe(
+        "Switch keyboard layout, now Svenska"
+      );
+
+      await pressLayoutKey();
+
+      expect(spaceLabel()).toBe("English");
+      expect(oskRoot().querySelector(".hg-button-layout").getAttribute("aria-label")).toBe(
+        "Switch keyboard layout, now English"
+      );
+    });
+
+    it("keeps the active layout across hide and show, and remembers it on the device", async () => {
+      config.oskLayout = "sv";
+      config.oskExtraLayouts = ["en"];
+      mountOsk();
+      const first = addInput();
+      await focus(first);
+
+      await pressLayoutKey();
+      expect(layoutKeyLabel()).toBe("EN");
+      expect(window.localStorage.getItem("calvin-osk-layout")).toBe("en");
+
+      await key("{hide}");
+      expect(isShown()).toBe(false);
+
+      const second = addInput();
+      await focus(second);
+
+      expect(isShown()).toBe(true);
+      expect(layoutKeyLabel()).toBe("EN");
+      expect(keyLabels()).not.toContain("å");
+    });
+
+    it("falls back to the main layout when the active one is removed in Settings", async () => {
+      config.oskLayout = "sv";
+      config.oskExtraLayouts = ["en"];
+      mountOsk();
+      await focus(addInput());
+
+      await pressLayoutKey();
+      expect(vmValue("activeLetterLayout")).toBe("en");
+
+      config.oskExtraLayouts = [];
+      await nextTick();
+      await nextTick();
+
+      expect(vmValue("activeLetterLayout")).toBe("sv");
+      expect(oskRoot().querySelector(".hg-button-layout")).toBeNull();
+      expect(keyLabels()).toContain("å");
+    });
+
+    it("ignores a stored layout that is no longer valid", async () => {
+      window.localStorage.setItem("calvin-osk-layout", "xx");
+      config.oskLayout = "da";
+      mountOsk();
+      await focus(addInput());
+
+      expect(vmValue("activeLetterLayout")).toBe("da");
+      expect(keyLabels()).toEqual(expect.arrayContaining(["æ", "ø", "å"]));
+    });
+
+    it("resolves an unset layout once from navigator.language and caches it", async () => {
+      setNavigatorLanguage("sv-SE");
+      config.oskLayout = null;
+      mountOsk();
+      await focus(addInput());
+
+      expect(vmValue("activeLetterLayout")).toBe("sv");
+      expect(keyLabels()).toContain("å");
+      expect(window.localStorage.getItem("calvin-osk-layout-hint")).toBe("sv");
+    });
+
+    it("never follows the UI language or <html lang>", async () => {
+      // Owner requirement: an English UI with a Swedish keyboard.
+      setNavigatorLanguage("en-US");
+      document.documentElement.lang = "en";
+      config.oskLayout = "sv";
+      config.oskExtraLayouts = ["en"];
+      mountOsk();
+      await focus(addInput());
+
+      expect(vmValue("activeLetterLayout")).toBe("sv");
+      expect(keyLabels()).toContain("å");
+
+      document.documentElement.lang = "de";
+      await nextTick();
+      expect(vmValue("activeLetterLayout")).toBe("sv");
+      expect(layoutKeyLabel()).toBe("SV");
+
+      await pressLayoutKey();
+      expect(vmValue("activeLetterLayout")).toBe("en");
+
+      document.documentElement.setAttribute("lang", "fr");
+      await nextTick();
+      expect(vmValue("activeLetterLayout")).toBe("en");
+      expect(layoutKeyLabel()).toBe("EN");
+    });
+
+    it("keeps url and email fields on the active letter layer", async () => {
+      config.oskLayout = "de";
+      mountOsk();
+      await focus(addInput({ type: "url" }));
+
+      expect(vmValue("layout")).toBe("url");
+      const labels = keyLabels();
+      expect(labels).toEqual(expect.arrayContaining(["z", "ü", "ö", "ä"]));
+      expect(oskRoot().querySelector(".hg-button-space").getAttribute("aria-label")).toBe("Space");
     });
   });
 

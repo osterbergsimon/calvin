@@ -106,4 +106,132 @@ describe("DeviceSettings", () => {
     expect(reboot.exists()).toBe(true);
     expect(reboot.props("config")).toMatchObject({ rebootComboKey1: "KEY_1" });
   });
+
+  describe("on-screen keyboard layout rows (§7)", () => {
+    const mountSettings = (overrides = {}) =>
+      mount(DeviceSettings, {
+        props: {
+          config: { ...baseConfig, onScreenKeyboard: "auto", ...overrides },
+          version: null,
+          frontendVersion: null,
+        },
+        global: { stubs },
+      });
+
+    const layoutPill = wrapper =>
+      wrapper
+        .findAllComponents({ name: "SelectPill" })
+        .find(c => c.props("ariaLabel") === "Keyboard layout");
+    const extraChips = wrapper =>
+      wrapper
+        .findAllComponents({ name: "ChipMultiSelect" })
+        .find(c => c.props("ariaLabel") === "Also switch to");
+
+    beforeEach(() => {
+      window.localStorage.clear();
+      Object.defineProperty(navigator, "language", { configurable: true, value: "en-US" });
+    });
+
+    it("calls it a layout, not a language, and names the layouts in their own language", () => {
+      const wrapper = mountSettings();
+      const pill = layoutPill(wrapper);
+
+      expect(pill).toBeTruthy();
+      expect(wrapper.text()).toContain("Keyboard layout");
+      expect(wrapper.text()).toContain(
+        "The letters the on-screen keyboard uses. Separate from the language Calvin is shown in."
+      );
+      expect(pill.props("options").map(o => o.label)).toEqual([
+        "English",
+        "Svenska",
+        "Suomi",
+        "Norsk",
+        "Dansk",
+        "Deutsch",
+        "Français",
+      ]);
+    });
+
+    it("shows the browser's suggested layout, marked (suggested), while none is picked", () => {
+      Object.defineProperty(navigator, "language", { configurable: true, value: "sv-SE" });
+      const wrapper = mountSettings({ oskLayout: null });
+      const pill = layoutPill(wrapper);
+
+      expect(pill.props("modelValue")).toBe("sv");
+      expect(wrapper.text()).toContain("Svenska (suggested)");
+      expect(window.localStorage.getItem("calvin-osk-layout-hint")).toBe("sv");
+    });
+
+    it("drops (suggested) once a layout is saved", () => {
+      Object.defineProperty(navigator, "language", { configurable: true, value: "sv-SE" });
+      const wrapper = mountSettings({ oskLayout: "de" });
+      const pill = layoutPill(wrapper);
+
+      expect(pill.props("modelValue")).toBe("de");
+      expect(wrapper.text()).not.toContain("(suggested)");
+    });
+
+    it("saves the picked main layout and drops it from the extras", () => {
+      const wrapper = mountSettings({ oskLayout: "sv", oskExtraLayouts: ["en", "de"] });
+      layoutPill(wrapper).vm.$emit("update:modelValue", "de");
+
+      const saved = wrapper
+        .emitted("update:config")
+        .map(call => call[0])
+        .find(patch => "oskLayout" in patch);
+      expect(saved).toEqual({ oskLayout: "de", oskExtraLayouts: ["en"] });
+    });
+
+    it("offers every other layout under 'Also switch to', never the main one", () => {
+      const wrapper = mountSettings({ oskLayout: "sv", oskExtraLayouts: ["en"] });
+      const chips = extraChips(wrapper);
+
+      expect(wrapper.text()).toContain(
+        "Adds a key to the keyboard that switches between these and Svenska."
+      );
+      expect(chips.props("options").map(o => o.value)).toEqual([
+        "en",
+        "fi",
+        "no",
+        "da",
+        "de",
+        "fr",
+      ]);
+      expect(chips.props("modelValue")).toEqual(["en"]);
+    });
+
+    it("saves the chosen extra layouts", () => {
+      const wrapper = mountSettings({ oskLayout: "sv", oskExtraLayouts: [] });
+      extraChips(wrapper).vm.$emit("update:modelValue", ["en", "fi"]);
+
+      expect(
+        wrapper
+          .emitted("update:config")
+          .map(call => call[0])
+          .find(patch => "oskExtraLayouts" in patch)
+      ).toEqual({ oskExtraLayouts: ["en", "fi"] });
+    });
+
+    it("dims and disables both rows while the on-screen keyboard is off", () => {
+      const on = mountSettings({ onScreenKeyboard: "on", oskLayout: "sv" });
+      expect(on.find(".device-osk-layout").classes()).not.toContain("setting-row--muted");
+      expect(on.find(".device-osk-layout .device-control").attributes("inert")).toBeUndefined();
+      expect(on.find(".device-osk-extra .device-control").attributes("inert")).toBeUndefined();
+
+      const off = mountSettings({ onScreenKeyboard: "off", oskLayout: "sv" });
+      expect(off.find(".device-osk-layout").classes()).toContain("setting-row--muted");
+      expect(off.find(".device-osk-layout .device-control").attributes("inert")).toBe("");
+      expect(off.find(".device-osk-extra").classes()).toContain("setting-row--muted");
+      expect(off.find(".device-osk-extra .device-control").attributes("inert")).toBe("");
+    });
+
+    it("is unaffected by the UI language", () => {
+      document.documentElement.lang = "de";
+      const wrapper = mountSettings({ oskLayout: "sv" });
+
+      expect(layoutPill(wrapper).props("modelValue")).toBe("sv");
+      expect(wrapper.text()).not.toContain("(suggested)");
+      document.documentElement.removeAttribute("lang");
+    });
+  });
 });

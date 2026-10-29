@@ -192,12 +192,27 @@ export const settingsDestinations = [
   },
   {
     id: "device-keyboard",
-    label: "Keyboard type and mappings",
+    label: "Keyboard type, layout and mappings",
     path: "Device / Keyboard",
     category: "device",
     tabKey: "settings_tab_device",
     tab: "keyboard",
-    keywords: ["keyboard", "on-screen", "typing", "osk", "buttons", "mappings", "shortcuts"],
+    // "language" stays a search keyword only: people who think of keyboard
+    // layouts as languages still find it, but the setting is a layout.
+    keywords: [
+      "keyboard",
+      "on-screen",
+      "typing",
+      "osk",
+      "layout",
+      "keyboard layout",
+      "language",
+      "svenska",
+      "åäö",
+      "buttons",
+      "mappings",
+      "shortcuts",
+    ],
   },
   {
     id: "device-notifications",
