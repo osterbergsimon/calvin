@@ -62,6 +62,12 @@ Unraid pulls the new image and recreates the container. Everything in
 appdata stays, including installed plugins. Their Python packages are
 re-installed automatically when the container starts.
 
+The container never controls the Unraid host. Calvin's reboot, backend/frontend
+restart, update and display-power actions are refused inside Docker, and
+`CALVIN_HOST_CONTROL` does not override that; use the Docker tab above for
+updates and restarts. See
+[Host control](../configuration/HOST_CONTROL.md).
+
 To stay on a known-good build, change **Repository** to a pinned tag such
 as `ghcr.io/osterbergsimon/calvin:sha-1a2b3c4`. Every published build also
 gets a `sha-<commit>` tag; the list is at

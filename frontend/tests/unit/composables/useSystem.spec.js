@@ -442,4 +442,24 @@ describe("useSystem", () => {
       expect(system.updateMessageClass.value).toBe("error");
     });
   });
+
+  describe("host control message", () => {
+    it("shows the structured 409 message instead of [object Object]", async () => {
+      const message =
+        "Restarting the backend is disabled on this deployment. Set CALVIN_HOST_CONTROL=1 if Calvin owns this machine.";
+      const error = new Error("conflict");
+      error.response = {
+        status: 409,
+        data: { detail: { code: "host_control_disabled", message } },
+      };
+      systemApi.restartBackend.mockRejectedValue(error);
+
+      const system = useSystem();
+      await system.restartBackend();
+
+      expect(system.updateMessage.value).toBe(message);
+      expect(system.updateMessageClass.value).toBe("error");
+      expect(systemApi.getHealth).not.toHaveBeenCalled();
+    });
+  });
 });

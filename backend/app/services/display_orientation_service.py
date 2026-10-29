@@ -7,6 +7,7 @@ from pathlib import Path
 from loguru import logger
 
 from app.services.config_service import config_service
+from app.utils.host_control import host_control_enabled
 from app.utils.platform import has_x11, is_raspberry_pi, run_command
 
 # Loguru automatically includes module/function info in logs
@@ -167,6 +168,12 @@ class DisplayOrientationService:
         Returns:
             Dictionary with result info
         """
+        if not host_control_enabled():
+            logger.debug("CALVIN_HOST_CONTROL is off - not rotating the host display")
+            return {
+                "success": False,
+                "message": "Host control is disabled on this deployment - not rotating the display",
+            }
         if not await asyncio.to_thread(is_raspberry_pi):
             return {
                 "success": False,

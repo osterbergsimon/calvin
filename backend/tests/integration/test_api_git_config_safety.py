@@ -170,6 +170,7 @@ def test_update_refuses_stored_unsafe_git_branch(test_client, tmp_path, monkeypa
 
     class _StubSettings:
         deployment = "native"  # bare-metal install: the UI update route is allowed
+        host_control = True  # explicit: this test covers the real update path
         repo_dir = tmp_path
         system_path = original_settings.system_path
 
@@ -177,6 +178,8 @@ def test_update_refuses_stored_unsafe_git_branch(test_client, tmp_path, monkeypa
             return script_path
 
     monkeypatch.setattr(system_routes, "settings", _StubSettings())
+    # The guard reads the shared settings object; enable host control for this path.
+    monkeypatch.setattr("app.config.settings.host_control", True)
     loop = asyncio.new_event_loop()
     try:
         loop.run_until_complete(config_service.set_value("git_branch", "--upload-pack=x"))

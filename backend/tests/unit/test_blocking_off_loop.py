@@ -63,9 +63,12 @@ async def test_run_command_runs_off_the_event_loop():
 
 @pytest.mark.asyncio
 async def test_display_power_commands_do_not_block_the_loop():
+    from app.config import settings
+
     service = DisplayPowerService()
     threads: list[int] = []
     with (
+        patch.object(settings, "host_control", True),
         patch("app.services.display_power_service.is_raspberry_pi", return_value=True),
         patch("app.services.display_power_service.has_x11", return_value=False),
         patch("subprocess.run", side_effect=_slow_run(threads)),

@@ -48,6 +48,7 @@ New to Calvin? Get started quickly:
 - Settings behavior
 - [Backup and restore](configuration/BACKUP_RESTORE.md)
 - [Data directory (`CALVIN_DATA_DIR`)](configuration/DATA_DIR.md)
+- [Host control (`CALVIN_HOST_CONTROL`)](configuration/HOST_CONTROL.md)
 - System configuration
 
 ### Architecture

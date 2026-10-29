@@ -383,8 +383,8 @@ async def _start_schedulers():
     await calendar_scheduler.start()
     # Log message is now handled in scheduler.start()
 
-    await display_power_service.start()
-    logger.info("Display power scheduler started")
+    if await display_power_service.start():
+        logger.info("Display power scheduler started")
 
     # Start backend plugin scheduler (plugins will register their tasks on initialization)
     await backend_plugin_scheduler.start()
@@ -396,6 +396,14 @@ async def _start_schedulers():
 
 async def _sync_display_orientation():
     """Sync display orientation with config (on Raspberry Pi, if enabled)."""
+    from app.utils.host_control import host_control_enabled
+
+    if not host_control_enabled():
+        # A dev backend or container does not own the screen; xrandr would hit
+        # the developer's desktop instead (calvin-hhok).
+        logger.info("CALVIN_HOST_CONTROL is off - skipping startup display orientation sync")
+        return
+
     from app.utils.platform import has_x11
 
     if not await asyncio.to_thread(has_x11):

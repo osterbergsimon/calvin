@@ -119,6 +119,17 @@ class Settings(BaseSettings):
         validation_alias=AliasChoices("calvin_deployment", "deployment"),
     )
 
+    # May Calvin act on the machine it runs on (reboot, systemd restarts,
+    # xset/xrandr/vcgencmd)? Only true when Calvin owns the machine: a native
+    # Pi/kiosk install that is not a dev checkout. A developer desktop, a dev
+    # backend and a Docker container all default to off, so a stray Reboot
+    # click can never reboot the owner's PC. CALVIN_HOST_CONTROL=1 forces it on
+    # (and =0 forces it off) for deployments that don't match the heuristic.
+    host_control: bool = Field(
+        default=False,
+        validation_alias=AliasChoices("calvin_host_control", "host_control"),
+    )
+
     # System paths (for Raspberry Pi deployment)
     update_script_path: Path = Path("/usr/local/bin/update-calvin.sh")
     repo_dir: Path = Path("/home/calvin/calvin")
@@ -154,6 +165,25 @@ class Settings(BaseSettings):
             self.database_url = f"sqlite:///{self.data_dir / 'db' / 'calvin.db'}"
         elif self.database_url.startswith(("sqlite:///", "sqlite+aiosqlite:///")):
             self.database_url = self.database_url_absolute
+        return self
+
+    @model_validator(mode="after")
+    def _derive_host_control(self) -> "Settings":
+        """Default host_control from the deployment when CALVIN_HOST_CONTROL is unset.
+
+        Calvin may only reboot or otherwise drive the machine when it owns it:
+        a native (non-container) install on a Raspberry Pi that is not a dev
+        checkout. A desktop, a dev backend and a container all keep it off.
+        """
+        if "host_control" in self.model_fields_set:
+            return self
+        # Imported lazily: platform probes /proc and vcgencmd, and config is
+        # imported by almost everything.
+        from app.utils.platform import is_raspberry_pi
+
+        self.host_control = (
+            self.deployment == "native" and not self.is_dev_mode and is_raspberry_pi()
+        )
         return self
 
     @property

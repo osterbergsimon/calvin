@@ -5,6 +5,7 @@ from unittest.mock import patch
 import pytest
 
 from app.api.routes import system as system_routes
+from app.config import settings
 
 
 @pytest.mark.unit
@@ -30,6 +31,7 @@ class TestEnvironmentEndpoint:
 
     def test_reports_native_capabilities(self, test_client):
         with (
+            patch.object(settings, "host_control", True),
             patch("app.api.routes.system._in_container", return_value=False),
             patch("app.api.routes.system._restart_mechanism_available", return_value=True),
             patch("app.api.routes.system.settings") as mock_settings,
