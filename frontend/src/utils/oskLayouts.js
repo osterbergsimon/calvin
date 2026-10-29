@@ -75,8 +75,8 @@ export const OSK_LAYOUTS_BY_ID = {
 /** Option order of the layouts (Screen & keyboard › Keyboard, K7). */
 export const OSK_LAYOUT_IDS = ["en", "sv", "fi", "no", "da", "de", "fr"];
 
-const URL_BOTTOM_ROW = "{numbers} / : {space} . .com {hide}";
-const EMAIL_BOTTOM_ROW = "{numbers} @ {space} . .com {hide}";
+const URL_BOTTOM_ROW = "{numbers} {layout} / : {space} . .com {hide}";
+const EMAIL_BOTTOM_ROW = "{numbers} {layout} @ {space} . .com {hide}";
 
 /**
  * The third row of the url/email keyboards: the active layout's row-3 letters
@@ -119,13 +119,11 @@ export const oskLayoutOptions = () =>
 
 /**
  * The bottom row of the letter layer. `en` keeps its "-" and `fr` its ", ."
- * around the space bar; every layout gains `{layout}` while extra layouts are
- * set.
+ * around the space bar. `{layout}` is always present: the layout picker is the
+ * one place a wrong layout can be fixed while signed out (CLV-21).
  */
-const bottomRow = (layout, showLayoutKey) => {
-  const keys = ["{numbers}"];
-  if (showLayoutKey) keys.push("{layout}");
-  keys.push("{accents}");
+const bottomRow = layout => {
+  const keys = ["{numbers}", "{layout}", "{accents}"];
   if (layout === "fr") keys.push(",");
   keys.push("{space}");
   if (layout === "fr") keys.push(".");
@@ -140,12 +138,12 @@ const bottomRow = (layout, showLayoutKey) => {
  * replace the third row with its a–z letters plus "- _", and use their own
  * bottom row (spec §4).
  */
-export const buildOskLayouts = ({ layout, showLayoutKey = false } = {}) => {
+export const buildOskLayouts = ({ layout } = {}) => {
   const id = layoutOrDefault(layout);
   const rows = OSK_LAYOUTS_BY_ID[id].rows;
   const addressRows = [rows[0], rows[1], urlThirdRow(rows[2])];
   return {
-    default: [...rows, bottomRow(id, showLayoutKey)],
+    default: [...rows, bottomRow(id)],
     url: [...addressRows, URL_BOTTOM_ROW],
     email: [...addressRows, EMAIL_BOTTOM_ROW],
     ...SHARED_LAYERS,
@@ -198,8 +196,34 @@ export const readStoredOskLayout = () => {
   return isOskLayoutId(value) ? value : null;
 };
 
+/** Fired on window when the device's own layout choice changes. */
+export const OSK_LAYOUT_CHANGE_EVENT = "calvin-osk-layout-change";
+
+const notifyLayoutChange = () => {
+  try {
+    if (typeof window !== "undefined") {
+      window.dispatchEvent(new CustomEvent(OSK_LAYOUT_CHANGE_EVENT));
+    }
+  } catch {
+    // No CustomEvent (or a blocked window): callers still read storage.
+  }
+};
+
 export const storeOskLayout = value => {
-  if (isOskLayoutId(value)) writeStored(OSK_LAYOUT_STORAGE_KEY, value);
+  if (isOskLayoutId(value)) {
+    writeStored(OSK_LAYOUT_STORAGE_KEY, value);
+    notifyLayoutChange();
+  }
+};
+
+/** Forget the device's own choice, so the keyboard follows Settings again. */
+export const clearStoredOskLayout = () => {
+  try {
+    safeStorage()?.removeItem(OSK_LAYOUT_STORAGE_KEY);
+  } catch {
+    // Blocked storage: nothing to remove.
+  }
+  notifyLayoutChange();
 };
 
 /**

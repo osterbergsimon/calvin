@@ -80,6 +80,25 @@ const layoutKeyLabel = () => oskRoot().querySelector(".hg-button-layout")?.textC
 const spaceLabel = () => oskRoot().querySelector(".hg-button-space")?.textContent.trim();
 const keyLabels = () =>
   [...oskRoot().querySelectorAll(".hg-button")].map(button => button.textContent.trim());
+// Letter keys only: the layout key and the space-bar label are always present
+// now (CLV-21) and are compared separately.
+const letterLabels = () =>
+  [...oskRoot().querySelectorAll(".hg-button:not(.hg-button-layout):not(.hg-button-space)")].map(
+    button => button.textContent.trim()
+  );
+const spaceLabelButton = () => oskRoot().querySelector(".hg-button-space .osk-space-label");
+const picker = () => oskRoot().querySelector(".osk-picker");
+const pickerOptions = () => [...(picker()?.querySelectorAll(".osk-picker__option") ?? [])];
+const pickerLabels = () =>
+  pickerOptions().map(button => button.textContent.trim().replace(/\s+/g, " "));
+
+const tapLayoutKey = async () => {
+  const button = oskRoot().querySelector(".hg-button-layout");
+  button.dispatchEvent(new Event("pointerdown", { bubbles: true, cancelable: true }));
+  window.dispatchEvent(new Event("pointerup", { bubbles: true }));
+  await nextTick();
+  await nextTick();
+};
 
 describe("OnScreenKeyboard", () => {
   beforeEach(() => {
@@ -257,7 +276,7 @@ describe("OnScreenKeyboard", () => {
       config.oskLayout = "sv";
       mountOsk();
       await focus(addInput());
-      const sv = keyLabels();
+      const sv = letterLabels();
 
       wrapper.unmount();
       wrapper = null;
@@ -265,7 +284,7 @@ describe("OnScreenKeyboard", () => {
       config.oskLayout = "fi";
       mountOsk();
       await focus(addInput());
-      expect(keyLabels()).toEqual(sv);
+      expect(letterLabels()).toEqual(sv);
 
       wrapper.unmount();
       wrapper = null;
@@ -278,13 +297,28 @@ describe("OnScreenKeyboard", () => {
       expect(de).toEqual(expect.arrayContaining(["ü", "ö", "ä", "ß"]));
     });
 
-    it("has no layout key and no space label without extra layouts", async () => {
+    it("always shows the layout key and the space-bar label, even without extras", async () => {
       config.oskLayout = "sv";
       mountOsk();
       await focus(addInput());
 
-      expect(oskRoot().querySelector(".hg-button-layout")).toBeNull();
-      expect(spaceLabel()).toBe("");
+      expect(layoutKeyLabel()).toBe("SV");
+      expect(spaceLabel()).toBe("Svenska");
+      const layoutKey = oskRoot().querySelector(".hg-button-layout");
+      expect(layoutKey.getAttribute("aria-label")).toBe(
+        "Keyboard layout: Svenska. Opens the list."
+      );
+      expect(layoutKey.getAttribute("aria-haspopup")).toBe("true");
+    });
+
+    it("puts the layout key on url and email fields too", async () => {
+      config.oskLayout = "de";
+      mountOsk();
+      await focus(addInput({ type: "url" }));
+      expect(layoutKeyLabel()).toBe("DE");
+
+      await focus(addInput({ type: "email" }));
+      expect(layoutKeyLabel()).toBe("DE");
     });
 
     it("cycles main → extras → main and labels the key with the layout code", async () => {
@@ -351,7 +385,7 @@ describe("OnScreenKeyboard", () => {
       expect(keyLabels()).not.toContain("å");
     });
 
-    it("falls back to the main layout when the active one is removed in Settings", async () => {
+    it("keeps a device choice even when it leaves Settings (CLV-21 §5)", async () => {
       config.oskLayout = "sv";
       config.oskExtraLayouts = ["en"];
       mountOsk();
@@ -364,9 +398,25 @@ describe("OnScreenKeyboard", () => {
       await nextTick();
       await nextTick();
 
+      expect(vmValue("activeLetterLayout")).toBe("en");
+      expect(layoutKeyLabel()).toBe("EN");
+      expect(keyLabels()).not.toContain("å");
+    });
+
+    it("cycles from an off-list device choice to the main layout", async () => {
+      window.localStorage.setItem("calvin-osk-layout", "de");
+      config.oskLayout = "sv";
+      config.oskExtraLayouts = ["en"];
+      mountOsk();
+      await focus(addInput());
+
+      expect(vmValue("activeLetterLayout")).toBe("de");
+      expect(layoutKeyLabel()).toBe("DE");
+
+      await tapLayoutKey();
+
       expect(vmValue("activeLetterLayout")).toBe("sv");
-      expect(oskRoot().querySelector(".hg-button-layout")).toBeNull();
-      expect(keyLabels()).toContain("å");
+      expect(layoutKeyLabel()).toBe("SV");
     });
 
     it("ignores a stored layout that is no longer valid", async () => {
@@ -758,7 +808,212 @@ describe("OnScreenKeyboard", () => {
       expect(oskRoot().querySelector(".hg-button-hide").getAttribute("aria-label")).toBe(
         "Hide keyboard"
       );
-      expect(oskRoot().querySelector(".hg-button-space").textContent.trim()).toBe("");
+      expect(oskRoot().querySelector(".hg-button-space").textContent.trim()).toBe("English");
+      const spaceLabel = spaceLabelButton();
+      expect(spaceLabel.getAttribute("role")).toBe("button");
+      expect(spaceLabel.getAttribute("aria-label")).toBe("Change keyboard layout");
+    });
+  });
+
+  describe("layout picker (CLV-21)", () => {
+    const openPicker = async () => {
+      await tapLayoutKey();
+      return picker();
+    };
+    const chooseOption = async index => {
+      pickerOptions()[index].dispatchEvent(new MouseEvent("click", { bubbles: true }));
+      await nextTick();
+      await nextTick();
+    };
+
+    it("opens on a tap of the layout key when no extras are set", async () => {
+      config.oskLayout = "sv";
+      mountOsk();
+      await focus(addInput());
+
+      await tapLayoutKey();
+
+      expect(picker()).not.toBeNull();
+      expect(vmValue("pickerOpen")).toBe(true);
+      expect(vmValue("layout")).toBe("default");
+    });
+
+    it("cycles on a tap when extras are set, without opening the picker", async () => {
+      config.oskLayout = "sv";
+      config.oskExtraLayouts = ["en"];
+      mountOsk();
+      await focus(addInput());
+
+      await tapLayoutKey();
+
+      expect(picker()).toBeNull();
+      expect(vmValue("activeLetterLayout")).toBe("en");
+      expect(layoutKeyLabel()).toBe("EN");
+    });
+
+    it("opens on a 500ms long-press, with and without extras", async () => {
+      config.oskLayout = "sv";
+      config.oskExtraLayouts = ["en"];
+      mountOsk();
+      await focus(addInput());
+      vi.useFakeTimers();
+      try {
+        const button = oskRoot().querySelector(".hg-button-layout");
+        button.dispatchEvent(new Event("pointerdown", { bubbles: true, cancelable: true }));
+        vi.advanceTimersByTime(499);
+        expect(picker()).toBeNull();
+        expect(vmValue("activeLetterLayout")).toBe("sv");
+
+        vi.advanceTimersByTime(1);
+        await nextTick();
+        expect(picker()).not.toBeNull();
+        expect(vmValue("activeLetterLayout")).toBe("sv");
+        window.dispatchEvent(new Event("pointerup"));
+        await nextTick();
+        // The pointerup that ends a long press must not also cycle.
+        expect(picker()).not.toBeNull();
+        expect(vmValue("activeLetterLayout")).toBe("sv");
+      } finally {
+        vi.useRealTimers();
+      }
+    });
+
+    it("keeps the layout key and the space bar after a short tap", async () => {
+      config.oskLayout = "sv";
+      mountOsk();
+      await focus(addInput());
+
+      await tapLayoutKey();
+      await chooseOption(0);
+
+      expect(picker()).toBeNull();
+      expect(layoutKeyLabel()).toBe("SV");
+    });
+
+    it("always renders the space-bar label; the label opens the picker, the key types a space", async () => {
+      config.oskLayout = "sv";
+      mountOsk();
+      const input = addInput();
+      await focus(input);
+
+      expect(spaceLabel()).toBe("Svenska");
+      const label = spaceLabelButton();
+      expect(label).not.toBeNull();
+      label.dispatchEvent(new Event("pointerdown", { bubbles: true, cancelable: true }));
+      await nextTick();
+      expect(picker()).not.toBeNull();
+
+      oskRoot().querySelector(".osk-picker__abc").dispatchEvent(new MouseEvent("click"));
+      await nextTick();
+      expect(picker()).toBeNull();
+
+      const spaceKey = oskRoot().querySelector(".hg-button-space");
+      spaceKey.dispatchEvent(new MouseEvent("click", { bubbles: true }));
+      await nextTick();
+      expect(input.value).toBe(" ");
+    });
+
+    it("lists Default + the seven layouts in order and marks the active choice", async () => {
+      config.oskLayout = "sv";
+      mountOsk();
+      await focus(addInput());
+
+      await openPicker();
+
+      expect(pickerLabels()).toEqual([
+        "Default (Svenska)",
+        "English EN",
+        "Svenska SV",
+        "Suomi FI",
+        "Norsk NO",
+        "Dansk DA",
+        "Deutsch DE",
+        "Français FR",
+      ]);
+      const options = pickerOptions();
+      expect(options[0].getAttribute("aria-pressed")).toBe("true");
+      expect(options[2].getAttribute("aria-pressed")).toBe("false");
+    });
+
+    it("choosing writes the device key, marks it and returns to the letter layer", async () => {
+      config.oskLayout = "sv";
+      mountOsk();
+      const input = addInput();
+      await focus(input);
+      expect(document.activeElement).toBe(input);
+
+      await openPicker();
+      await chooseOption(2);
+
+      expect(window.localStorage.getItem("calvin-osk-layout")).toBe("sv");
+      expect(vmValue("pickerOpen")).toBe(false);
+      expect(vmValue("layout")).toBe("default");
+      expect(document.activeElement).toBe(input);
+
+      await openPicker();
+      expect(pickerOptions()[2].getAttribute("aria-pressed")).toBe("true");
+      expect(pickerOptions()[0].getAttribute("aria-pressed")).toBe("false");
+    });
+
+    it("Default removes the device choice so Settings applies again", async () => {
+      window.localStorage.setItem("calvin-osk-layout", "de");
+      config.oskLayout = "sv";
+      mountOsk();
+      await focus(addInput());
+
+      await openPicker();
+      expect(pickerOptions()[6].getAttribute("aria-pressed")).toBe("true");
+
+      await chooseOption(0);
+
+      expect(window.localStorage.getItem("calvin-osk-layout")).toBeNull();
+      expect(vmValue("activeLetterLayout")).toBe("sv");
+      expect(vmValue("pickerOpen")).toBe(false);
+    });
+
+    it("abc closes the picker without changing the layout", async () => {
+      window.localStorage.setItem("calvin-osk-layout", "de");
+      config.oskLayout = "sv";
+      mountOsk();
+      await focus(addInput());
+      await openPicker();
+
+      oskRoot().querySelector(".osk-picker__abc").dispatchEvent(new MouseEvent("click"));
+      await nextTick();
+
+      expect(vmValue("pickerOpen")).toBe(false);
+      expect(vmValue("activeLetterLayout")).toBe("de");
+      expect(window.localStorage.getItem("calvin-osk-layout")).toBe("de");
+    });
+
+    it("changes only the device, never server config (works signed out)", async () => {
+      config.oskLayout = "sv";
+      const updateConfig = vi.spyOn(config, "updateConfig");
+      mountOsk();
+      await focus(addInput({ type: "password" }));
+
+      await openPicker();
+      await chooseOption(1);
+
+      expect(updateConfig).not.toHaveBeenCalled();
+      expect(config.oskLayout).toBe("sv");
+      expect(window.localStorage.getItem("calvin-osk-layout")).toBe("en");
+    });
+
+    it("drops the option codes and shortens Default on a short panel", async () => {
+      config.oskLayout = "de";
+      setWidth(800);
+      setHeight(480);
+      mountOsk();
+      await focus(addInput());
+      // Height is measured by ResizeObserver, unavailable in jsdom; set the
+      // compact state the same way the renderer would.
+      wrapper.vm.setMeasuredHeight(216);
+      await nextTick();
+      await openPicker();
+
+      expect(oskRoot().classList.contains("osk--compact")).toBe(true);
+      expect(pickerLabels()[0]).toBe("Default (DE)");
     });
   });
 });
