@@ -1,0 +1,121 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>CLV-19 kiosk software mocks</title>
+<style>
+:root { --bg-0:#eef1f4; --bg-1:#fff; --bg-2:#fff; --line:#dde3e8; --line-soft:#e8edf1; --ink:#1b242b; --ink-2:#5d6b75; --ink-3:#93a0a9;
+  --focus:#e08a1e; --focus-ink:#fff; --ok:#2e9e6b; --warn:#c8860a; --err:#c0392b;
+  --font-ui:"IBM Plex Sans",system-ui,sans-serif; --font-data:"IBM Plex Mono",ui-monospace,monospace; --touch-target:2.75rem; }
+.dark { --bg-0:#0e1316; --bg-1:#151c21; --bg-2:#1d262d; --line:#27313a; --line-soft:#1e272e; --ink:#eaf0f3; --ink-2:#9aa7b0; --ink-3:#62707a; --focus:#f3b052; --focus-ink:#1a130a; --ok:#5bd0a0; --warn:#f3b052; --err:#ef6b5e; }
+* { box-sizing:border-box; }
+body { margin:0; background:#d9dee3; font-family:var(--font-ui); color:#1b242b; }
+.board { padding:32px 16px; max-width:1360px; margin:0 auto; }
+h1 { margin:0 0 4px; } .board > p { color:#5d6b75; margin:0 0 24px; }
+figure { margin:0 0 32px; } figcaption { font-size:.85rem; color:#5d6b75; margin-top:8px; max-width:1100px; }
+.row { display:flex; gap:24px; flex-wrap:wrap; align-items:flex-start; }
+.frame { background:var(--bg-0); color:var(--ink); border-radius:6px; box-shadow:0 2px 12px rgba(0,0,0,.18); padding:20px 28px; overflow:hidden; }
+.wide { width:900px; } .phone { width:390px; padding:16px; border-radius:24px; }
+.eyebrow { font-family:var(--font-data); font-size:.72rem; letter-spacing:.18em; text-transform:uppercase; color:var(--ink-3); margin:4px 4px 8px; }
+.panel { background:var(--bg-1); border:1px solid var(--line); border-radius:16px; overflow:hidden; margin-bottom:16px; }
+.srow { display:flex; align-items:center; justify-content:space-between; gap:1.5rem; min-height:4.5rem; padding:.75rem 1.25rem; }
+.srow + .srow, .srow + .cards { border-top:1px solid var(--line-soft); }
+.label { font-weight:500; } .desc { margin:.2rem 0 0; font-size:.85rem; color:var(--ink-2); }
+.phone .srow { flex-direction:column; align-items:stretch; gap:.75rem; }
+.btn { min-height:var(--touch-target); padding:0 1rem; border-radius:10px; border:1px solid var(--line); background:var(--bg-2); color:var(--ink); font:500 .875rem var(--font-ui); white-space:nowrap; }
+.btn--primary { background:var(--focus); border-color:var(--focus); color:var(--focus-ink); font-weight:600; }
+.btn:disabled { opacity:.55; }
+.cards { padding:12px 1.25rem 16px; display:flex; flex-direction:column; gap:10px; }
+.card { border:1px solid var(--line); border-radius:12px; padding:12px 14px; background:var(--bg-2); }
+.card__top { display:flex; justify-content:space-between; font-weight:600; }
+.on { color:var(--ok); font-weight:500; font-size:.9rem; } .off { color:var(--ink-3); font-weight:500; font-size:.9rem; }
+.meta { font-size:.85rem; color:var(--ink-2); margin-top:4px; }
+.v { font-family:var(--font-data); font-size:.82rem; }
+.warn { color:var(--warn); } .err { color:var(--err); }
+.updrow { display:flex; gap:10px; align-items:center; margin-top:10px; }
+.hint { font-size:.85rem; color:var(--ink-2); margin-top:6px; }
+</style>
+</head>
+<body>
+<main class="board">
+  <h1>CLV-19: kiosk software and System</h1>
+  <p>For <code>docs/design/2026-10-29-deployment-aware-system-kiosk-software.md</code>. Uses Calvin's real tokens; every element is an existing <code>SettingRow</code>, kiosk card or button style.</p>
+
+  <figure>
+    <div class="frame wide">
+      <div class="eyebrow">Kiosks</div>
+      <div class="panel">
+        <div class="srow"><div><div class="label">Kiosk software</div><p class="desc">1 of 3 kiosks can be updated to <span class="v">e4f5a6b</span>.</p></div><button class="btn btn--primary">Update all</button></div>
+        <div class="cards">
+          <div class="card"><div class="card__top"><span>kitchen</span><span class="on">● Online</span></div>
+            <div class="meta">kitchen-pi · seen just now</div>
+            <div class="meta">Kiosk software <span class="v">a1b2c3d</span> · <span class="v">e4f5a6b</span> available</div>
+            <div class="updrow"><button class="btn">Update</button></div></div>
+          <div class="card"><div class="card__top"><span>hallway</span><span class="on">● Online</span></div>
+            <div class="meta">hallway-pi · seen 1 min ago</div>
+            <div class="meta">Kiosk software <span class="v">e4f5a6b</span> · up to date</div></div>
+          <div class="card"><div class="card__top"><span>garage</span><span class="off">○ Offline</span></div>
+            <div class="meta">garage-pi3 · seen 2 days ago</div>
+            <div class="meta warn">Kiosk software <span class="v">0c9d8e7</span> · update needs a newer OS</div>
+            <div class="hint">Reinstall this kiosk with a current Raspberry Pi OS, then update.</div></div>
+        </div>
+      </div>
+    </div>
+    <figcaption><b>S1 · Kiosks, some kiosks behind.</b> The summary row sits above the cards. Each card gets a version line. The garage kiosk failed because its Python is too old, so its Update button is replaced by the reinstall hint, and it isn't counted in the summary or included in Update all.</figcaption>
+  </figure>
+
+  <div class="row">
+    <figure>
+      <div class="frame wide" style="width:640px">
+        <div class="eyebrow">Kiosks</div>
+        <div class="panel">
+          <div class="srow"><div><div class="label">Kiosk software</div><p class="desc">Updating 1 kiosk… It restarts its screen when done.</p></div><button class="btn btn--primary" disabled>Updating…</button></div>
+          <div class="cards">
+            <div class="card"><div class="card__top"><span>kitchen</span><span class="on">● Online</span></div>
+              <div class="meta">kitchen-pi · seen just now</div>
+              <div class="meta">Updating to <span class="v">e4f5a6b</span>…</div>
+              <div class="updrow"><button class="btn" disabled>Updating…</button></div></div>
+            <div class="card"><div class="card__top"><span>hallway</span><span class="on">● Online</span></div>
+              <div class="meta">hallway-pi · seen 1 min ago</div>
+              <div class="meta err">Kiosk software <span class="v">a1b2c3d</span> · last update failed, kept this version</div>
+              <div class="updrow"><button class="btn">Try again</button></div></div>
+          </div>
+        </div>
+      </div>
+      <figcaption><b>S2 · Updating and failed-with-rollback.</b> A rollback is a normal failure, not<br/>"needs OS update" (the old copy was wrong for this case).</figcaption>
+    </figure>
+
+    <figure>
+      <div class="frame phone dark">
+        <div class="eyebrow">Kiosks</div>
+        <div class="panel">
+          <div class="srow"><div><div class="label">Kiosk software</div><p class="desc">All kiosks are up to date (<span class="v">e4f5a6b</span>).</p></div></div>
+          <div class="cards">
+            <div class="card"><div class="card__top"><span>kitchen</span><span class="on">● Online</span></div>
+              <div class="meta">kitchen-pi · seen just now</div>
+              <div class="meta">Kiosk software <span class="v">e4f5a6b</span> · up to date</div></div>
+          </div>
+        </div>
+      </div>
+      <figcaption><b>S3 · Phone, Backlit, all up to date.</b><br/>No button while nothing needs doing.</figcaption>
+    </figure>
+  </div>
+
+  <figure>
+    <div class="frame wide">
+      <div class="eyebrow">Updates</div>
+      <div class="panel">
+        <div class="srow"><div><div class="label">How to update</div><p class="desc">Calvin runs in a Docker container, so updates and restarts happen on the host. …</p></div></div>
+        <div class="srow"><div><div class="label">Kiosk software</div><p class="desc">1 kiosk can be updated to <span class="v">e4f5a6b</span>.</p></div><button class="btn">Open Kiosks</button></div>
+      </div>
+      <div class="eyebrow">Restart</div>
+      <div class="panel">
+        <div class="srow"><div><div class="label">Reload UI</div><p class="desc">Reload the browser page.</p><p class="desc">To restart the server, restart the Calvin container from Docker (Unraid: Docker tab).</p></div><button class="btn">Reload UI</button></div>
+      </div>
+    </div>
+    <figcaption><b>S4 · System in a container (option A).</b> Updates gets a pointer to Kiosks only while a kiosk is behind. Restart keeps only Reload UI, plus a one-line pointer to Docker. On a native Pi with restart capability, the rows are "Restart Calvin server" and "Restart kiosk browser" (§3.3).</figcaption>
+  </figure>
+</main>
+</body>
+</html>
