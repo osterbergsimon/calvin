@@ -170,7 +170,7 @@ describe("WebServiceViewer", () => {
     const wrapper = mountViewer({ isFullscreen: false, serviceId: "deleted-service" });
 
     expect(wrapper.text()).toContain("Selected service is unavailable");
-    expect(wrapper.text()).toContain("Settings › Plugins › Service");
+    expect(wrapper.text()).toContain("Settings › Content › Web pages & services");
     expect(wrapper.find(".service-viewer-stub").exists()).toBe(false);
   });
 
@@ -229,7 +229,7 @@ describe("WebServiceViewer empty state (F4)", () => {
     const empty = w.findComponent({ name: "EmptyState" });
     expect(empty.exists()).toBe(true);
     expect(empty.props("settingId")).toBe("plugins-services");
-    expect(w.text()).toContain("Settings › Plugins › Service");
+    expect(w.text()).toContain("Settings › Content › Web pages & services");
     expect(w.find('[data-test="empty-state-action"]').text()).toBe("Add a web service");
     w.unmount();
   });
