@@ -194,7 +194,10 @@ plain sha256 integrity leaves open.
      (`KIOSK_SIGNING_KEY_PATH`), so it survives image updates
    - Source checkout: `./data/kiosk-signing.key` relative to the backend's working directory
 2. Pass it to provisioning:
-   - One command: `curl -fsSL <url>/api/kiosks/install.sh | sudo bash -s -- --signing-key-file <path>`.
+   - Over SSH: copy the key **and** `install-kiosk.sh` from the server, then run
+     `sudo bash install-kiosk.sh --backend-url <url> --signing-key-file <path>` (exact commands in
+     [KIOSK_INSTALL.md](KIOSK_INSTALL.md#option-a-install-over-ssh-on-a-running-pi)). Don't pass the
+     key to the `curl … | sudo bash` form: that script comes over plain HTTP.
    - Zero-touch: `bake-kiosk-firstrun.sh ... --signing-key-file <path>` (or `--signing-key <hex>`).
    - Manual: `setup-kiosk.sh --backend-url <url> --signing-key <hex>`.
 
@@ -267,5 +270,6 @@ triggered individually. Bulk update is tracked as `calvin-3d1`.
   domain) and the PSK is correct.
 - **Provisioning failed:** SSH in (if you baked a key) and read
   `journalctl -u calvin-kiosk-firstboot`. If the server was unreachable for the
-  whole 15-minute wait, the unit simply failed, and the fix below re-runs it. Fix, then
+  whole 15-minute wait, the unit fails and systemd retries it every minute
+  (`Restart=on-failure`) until the server answers. Fix, then
   `sudo rm /var/lib/calvin/firstboot.done && sudo systemctl start calvin-kiosk-firstboot`.

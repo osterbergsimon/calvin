@@ -16,6 +16,10 @@ SIG_KEY="0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef"
 cat > "$tmp/srv/setup-kiosk.sh" <<'EOF'
 #!/bin/bash
 [ -f "$(dirname "$0")/setup-common.sh" ] || { echo "no setup-common.sh beside me" >&2; exit 1; }
+# Run from its own dir, so setup-kiosk.sh's ./setup-common.sh lookup finds the verified copy.
+[ "$(pwd -P)" = "$(cd "$(dirname "$0")" && pwd -P)" ] || { echo "not run from its own dir" >&2; exit 1; }
+# Like a dpkg/debconf prompt: anything read here would be eaten from a piped installer.
+if IFS= read -r -t 2 stolen; then echo "STOLE $stolen" >> "$RUN_LOG"; fi
 echo "SETUP $*" >> "$RUN_LOG"
 EOF
 echo '# common' > "$tmp/srv/setup-common.sh"
@@ -85,6 +89,25 @@ grep -q '^http://tower.local:8000/api/kiosks/installer/setup-common.sh$' "$tmp/c
 grep -qw 'reboot' "$tmp/systemctl.log" || { echo "FAIL: no reboot"; exit 1; }
 echo "PASS install-unsigned-runs-setup-and-reboots"
 
+# --- 1b. Piped like `curl | sudo bash`: children cannot eat the script from stdin
+#     (guarded twice: the main() wrapper and setup-kiosk.sh </dev/null). ---
+reset
+cat "$tmp/served.sh" | bash -s >/dev/null  # a real pipe, like curl | bash
+if grep -q STOLE "$RUN_LOG"; then echo "FAIL: setup read the piped installer from stdin"; exit 1; fi
+grep -qw 'reboot' "$tmp/systemctl.log" || { echo "FAIL: piped install did not reach the reboot"; exit 1; }
+echo "PASS install-piped-stdin-isolated"
+
+# --- 1c. A truncated download runs nothing (the body is one function called last). ---
+reset
+head -c "$(( $(wc -c < "$tmp/served.sh") * 2 / 3 ))" "$tmp/served.sh" | bash -s >/dev/null 2>&1 || true
+[ ! -f "$RUN_LOG" ] && [ ! -f "$tmp/systemctl.log" ] || { echo "FAIL: a truncated installer ran"; exit 1; }
+echo "PASS install-truncated-runs-nothing"
+
+# --- 1d. A flag missing its value fails with a message. ---
+if err="$(bash "$tmp/served.sh" --backend-url 2>&1)"; then echo "FAIL: missing value accepted"; exit 1; fi
+echo "$err" | grep -q 'needs a value' || { echo "FAIL: unclear error: $err"; exit 1; }
+echo "PASS install-missing-value"
+
 # --- 2. --no-reboot skips the reboot. ---
 reset
 bash "$tmp/served.sh" --no-reboot >/dev/null
@@ -139,6 +162,7 @@ if MOCK_MANIFEST="$tmp/manifest.json" bash "$tmp/served.sh" --no-reboot \
     --signing-key "$SIG_KEY" 2>/dev/null; then
     echo "FAIL: unsigned manifest accepted with a key"; exit 1; fi
 [ ! -f "$RUN_LOG" ] || { echo "FAIL: setup ran with unsigned manifest"; exit 1; }
+[ ! -f "$tmp/signing.env" ] || { echo "FAIL: unverified key was stored"; exit 1; }
 echo "PASS install-signed-rejects-unsigned"
 
 # --- 9. Key signed by someone else => fail closed. ---
@@ -148,6 +172,7 @@ if MOCK_MANIFEST="$tmp/manifest-otherkey.json" bash "$tmp/served.sh" --no-reboot
     --signing-key "$SIG_KEY" 2>/dev/null; then
     echo "FAIL: wrong-key signature accepted"; exit 1; fi
 [ ! -f "$RUN_LOG" ] || { echo "FAIL: setup ran with forged manifest"; exit 1; }
+[ ! -f "$tmp/signing.env" ] || { echo "FAIL: key that failed verification was stored"; exit 1; }
 echo "PASS install-signed-rejects-forgery"
 
 # --- 10. A key already on the device (baked card) is used without a flag. ---

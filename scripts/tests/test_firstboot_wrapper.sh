@@ -61,4 +61,10 @@ bash "$WRAPPER"
 [ ! -f "$tmp/install.log" ] || { echo "FAIL: not idempotent"; exit 1; }
 echo "PASS firstboot-idempotent"
 
+# The unit retries a failed run (server down past the wait) instead of leaving a
+# handed-off Pi blank until someone power-cycles it.
+UNIT="$(dirname "$0")/../../deploy/systemd/calvin-kiosk-firstboot.service"
+grep -qx 'Restart=on-failure' "$UNIT" || { echo "FAIL: firstboot unit does not retry"; exit 1; }
+echo "PASS firstboot-unit-retries"
+
 echo "PASS"

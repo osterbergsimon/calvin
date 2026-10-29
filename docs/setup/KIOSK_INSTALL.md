@@ -43,36 +43,50 @@ survives container updates.
 You can skip the key. The kiosk still works, but then it trusts whatever answers at the
 server's address on your LAN.
 
-## Option A: one command on the Pi (simplest)
+## Option A: install over SSH on a running Pi
 
 1. **Flash.** In Raspberry Pi Imager, pick **Raspberry Pi OS Lite (64-bit)**. Using
    Imager's OS customisation is fine here: set a hostname (e.g. `kitchen`), a user,
-   Wi-Fi, and **enable SSH**.
-2. **Boot the Pi and copy the key onto it.** From your workstation, this pipes the key
-   from the server to the Pi over SSH on both legs:
+   Wi-Fi, and **enable SSH**. Boot the Pi.
+2. **Install**, using one of these two ways:
+
+   **Signed (recommended).** Run this from your workstation. It copies the key *and* the
+   installer from the server to the Pi over SSH, so nothing that touches the key comes
+   over plain HTTP:
 
    ```bash
-   ssh root@tower cat /mnt/user/appdata/calvin/kiosk-signing.key \
-     | ssh <user>@kitchen.local 'umask 077; cat > ~/calvin.key'
+   SERVER=tower PI=<user>@kitchen.local
+   ssh root@$SERVER cat /mnt/user/appdata/calvin/kiosk-signing.key \
+     | ssh $PI 'umask 077; cat > calvin.key'
+   ssh root@$SERVER docker exec Calvin cat /app/kiosk-bundle/deploy/kiosk-agent/install-kiosk.sh \
+     | ssh $PI 'cat > install-kiosk.sh'
+   ssh -t $PI "sudo bash install-kiosk.sh --backend-url http://$SERVER:8000 \
+     --signing-key-file calvin.key --no-reboot && rm calvin.key && sudo reboot"
    ```
 
-3. **Install.** On the Pi (`ssh <user>@kitchen.local`):
+   `Calvin` is the Unraid template's container name; with Docker compose it is
+   `calvin`, and the key path is the one from Step 0. You can also copy
+   `deploy/kiosk-agent/install-kiosk.sh` from a Calvin checkout. The installer stores
+   the key root-only in `/etc/default/calvin-kiosk-signing`, but only after the
+   server's signature has proved the key is correct.
+
+   **Quick (trusts your LAN).** On the Pi, run:
 
    ```bash
-   curl -fsSL http://tower:8000/api/kiosks/install.sh | sudo bash -s -- --signing-key-file ~/calvin.key
+   curl -fsSL http://tower:8000/api/kiosks/install.sh | sudo bash
    ```
 
-   Without a key, use `curl -fsSL http://tower:8000/api/kiosks/install.sh | sudo bash`.
+   **Do not add the signing key to this form.** The script arrives over plain HTTP, and
+   a tampered copy could steal the key.
 
-   This takes a few minutes, mostly package installs. When it finishes, the Pi reboots
-   by itself. Add `--no-reboot` to skip that.
-4. **Done.** After the reboot the Pi starts Chromium in kiosk mode on the dashboard.
-   Within a minute the Pi appears in **Settings → Kiosks** on the server. The installer
-   stored the key root-only in `/etc/default/calvin-kiosk-signing`, so delete the copy:
-   `rm ~/calvin.key`.
+   Either way, the install takes a few minutes, mostly package installs, and the Pi
+   then reboots.
+3. **Done.** After the reboot the Pi starts Chromium in kiosk mode on the dashboard.
+   Within a minute it appears in **Settings → Kiosks** on the server.
 
-Behind a reverse proxy, the installer uses the URL you fetched it from. If that is not
-the URL the Pi should use, pass `--backend-url http://<server>:8000`.
+The quick form bakes in the URL the server saw the request on. Behind a reverse proxy
+that can be an internal or `http://` address. If the Pi should use a different URL, add
+`-s -- --backend-url http://<server>:8000`.
 
 ## Option B: bake the SD card (no SSH, no typing on the Pi)
 
@@ -107,8 +121,8 @@ Details and troubleshooting: [KIOSK_PROVISIONING.md](KIOSK_PROVISIONING.md).
 ```text
 Pi                                         Calvin server
 ──                                         ─────────────
-install.sh (piped from the server,  ◀──── GET /api/kiosks/install.sh  (server URL baked in)
-  or baked onto the card)
+install-kiosk.sh (over SSH, piped  ◀──── GET /api/kiosks/install.sh  (server URL baked in)
+  from the server, or on the card)
   ├─ store key → /etc/default/calvin-kiosk-signing (0600)
   ├─ fetch manifest, verify HMAC     ◀──── GET /api/kiosks/agent/manifest (signed)
   ├─ fetch setup scripts, check sha  ◀──── GET /api/kiosks/installer/setup-{kiosk,common}.sh
@@ -120,10 +134,11 @@ install.sh (piped from the server,  ◀──── GET /api/kiosks/install.sh  
 reboot → Chromium shows Calvin; the agent polls /api/kiosks/<id>/config → listed in Settings → Kiosks
 ```
 
-**Trust boundary:** in Option A, the first `install.sh` comes over plain HTTP and runs as
-given, like any `curl | bash`. After that, with a key, every file is verified. In
-Option B, the installer comes from your own checkout on the card, so the whole chain
-is verified when a key is baked.
+**Trust boundary:** with a key, every file after the installer is verified against the
+server's signature: the setup scripts, the kiosk agent, and every later update. The
+installer itself must come over a trusted channel: SSH from the server (Option A,
+signed), or your own checkout (Option B). The quick `curl | bash` form trusts whatever
+answers on your LAN, so use it without a key.
 
 ## Updating a kiosk later
 

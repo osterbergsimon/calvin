@@ -5,7 +5,10 @@
 # baked in, so on the Pi:
 #
 #   curl -fsSL http://<server>:8000/api/kiosks/install.sh | sudo bash
-#   curl -fsSL http://<server>:8000/api/kiosks/install.sh | sudo bash -s -- --signing-key-file key.hex
+#
+# That copy arrives over plain HTTP, so don't pair it with the signing key (a
+# tampered copy could read the key). For a keyed install, fetch this file over
+# the same trusted channel as the key; see docs/setup/KIOSK_INSTALL.md.
 #
 # It downloads setup-kiosk.sh + setup-common.sh from the same server (never from
 # GitHub, so the kiosk always matches the server's version), checks them against
@@ -16,6 +19,9 @@
 # not baked in, so pass --backend-url.
 set -euo pipefail
 
+# Everything runs inside main(), called on the last line, so a truncated download
+# runs nothing.
+
 # Replaced by the server when it serves this file; stays a placeholder otherwise.
 SERVER_URL='@CALVIN_SERVER_URL@'
 case "$SERVER_URL" in @*) SERVER_URL="" ;; esac
@@ -24,6 +30,7 @@ SIGNING_ENV_FILE="${CALVIN_KIOSK_SIGNING_ENV_FILE:-/etc/default/calvin-kiosk-sig
 REBOOT_DELAY="${CALVIN_INSTALL_REBOOT_DELAY:-5}"
 SIGNING_KEY=""
 REBOOT=1
+work=""  # global: the EXIT trap runs after main() returns
 
 log() { printf '[calvin-install] %s\n' "$*"; }
 die() { printf '[calvin-install] ERROR: %s\n' "$*" >&2; exit 1; }
@@ -43,14 +50,22 @@ Options:
 EOF
 }
 
+need_value() { [ "$2" -ge 2 ] || die "$1 needs a value"; }
+
+read_key_file() {
+    [ -r "$1" ] || die "cannot read signing key file: $1"
+    tr -d '[:space:]' < "$1"
+}
+
+main() {
 while [ "$#" -gt 0 ]; do
     case "$1" in
-        --backend-url) SERVER_URL="${2:-}"; shift 2 ;;
+        --backend-url) need_value "$1" "$#"; SERVER_URL="$2"; shift 2 ;;
         --backend-url=*) SERVER_URL="${1#*=}"; shift ;;
-        --signing-key) SIGNING_KEY="${2:-}"; shift 2 ;;
+        --signing-key) need_value "$1" "$#"; SIGNING_KEY="$2"; shift 2 ;;
         --signing-key=*) SIGNING_KEY="${1#*=}"; shift ;;
-        --signing-key-file) SIGNING_KEY="$(tr -d '[:space:]' < "${2:-}")"; shift 2 ;;
-        --signing-key-file=*) SIGNING_KEY="$(tr -d '[:space:]' < "${1#*=}")"; shift ;;
+        --signing-key-file) need_value "$1" "$#"; SIGNING_KEY="$(read_key_file "$2")"; shift 2 ;;
+        --signing-key-file=*) SIGNING_KEY="$(read_key_file "${1#*=}")"; shift ;;
         --no-reboot) REBOOT=0; shift ;;
         -h|--help) usage; exit 0 ;;
         *) usage >&2; die "unknown argument: $1" ;;
@@ -65,18 +80,16 @@ for cmd in curl python3 sha256sum; do
     command -v "$cmd" >/dev/null 2>&1 || die "$cmd is required but not installed"
 done
 
+local store_key=0
 if [ -n "$SIGNING_KEY" ]; then
     printf '%s' "$SIGNING_KEY" | grep -qE '^[0-9a-fA-F]{64}$' \
         || die "signing key must be 64 hex characters (the content of kiosk-signing.key)"
-    # Root-only file; bootstrap + the updater read the key from here, so it never
-    # has to appear on a command line again.
-    install -m 0600 /dev/null "$SIGNING_ENV_FILE"
-    printf 'CALVIN_KIOSK_SIGNING_KEY=%s\n' "$SIGNING_KEY" > "$SIGNING_ENV_FILE"
-    log "signing key stored in $SIGNING_ENV_FILE"
+    store_key=1
 elif [ -f "$SIGNING_ENV_FILE" ]; then
     SIGNING_KEY="$(grep '^CALVIN_KIOSK_SIGNING_KEY=' "$SIGNING_ENV_FILE" | cut -d= -f2- || true)"
 fi
 
+local manifest installer_list name sha got
 log "server: $SERVER_URL"
 manifest="$(curl -fsSL "$SERVER_URL/api/kiosks/agent/manifest")" \
     || die "cannot reach $SERVER_URL/api/kiosks/agent/manifest (is the server running and reachable?)"
@@ -109,6 +122,14 @@ for f in installer:
 PY
 )" || die "manifest check failed (see above)"
 
+if [ "$store_key" = 1 ]; then
+    # Only a key the server's signature just proved is stored. Root-only file;
+    # bootstrap + the updater read it from here, never from a command line.
+    install -m 0600 /dev/null "$SIGNING_ENV_FILE"
+    printf 'CALVIN_KIOSK_SIGNING_KEY=%s\n' "$SIGNING_KEY" > "$SIGNING_ENV_FILE"
+    log "signing key verified and stored in $SIGNING_ENV_FILE"
+fi
+
 work="$(mktemp -d)"
 trap 'rm -rf "$work"' EXIT
 while read -r name sha; do
@@ -122,7 +143,10 @@ done <<< "$installer_list"
     || die "server manifest is missing setup-kiosk.sh or setup-common.sh"
 
 log "running setup-kiosk.sh (installs X, Chromium and the Calvin kiosk services)..."
-bash "$work/setup-kiosk.sh" --backend-url "$SERVER_URL"
+# From $work, so its ./setup-common.sh lookup finds the verified copy. stdin from
+# /dev/null: under `curl | bash` the rest of this script IS stdin, and a package
+# prompt reading it would swallow it.
+(cd "$work" && bash ./setup-kiosk.sh --backend-url "$SERVER_URL") </dev/null
 
 if [ "$REBOOT" = 1 ]; then
     log "done; rebooting into the kiosk in ${REBOOT_DELAY}s (Ctrl-C to cancel)"
@@ -131,3 +155,6 @@ if [ "$REBOOT" = 1 ]; then
 else
     log "done; reboot to start the kiosk: sudo reboot"
 fi
+}
+
+main "$@"

@@ -10,6 +10,15 @@ from fastapi.testclient import TestClient
 _REPO_ROOT = Path(__file__).parent.parent.parent.parent
 
 
+@pytest.fixture(autouse=True)
+def _bundle_from_repo_dir(monkeypatch):
+    """Tests steer the bundle via settings.repo_dir; an ambient KIOSK_BUNDLE_DIR
+    (e.g. running inside the Docker image) would silently take precedence."""
+    from app.services import kiosk_bundle
+
+    monkeypatch.setattr(kiosk_bundle.settings, "kiosk_bundle_dir", None)
+
+
 @pytest.mark.integration
 def test_kiosks_table_exists_and_lists_empty(test_client: TestClient):
     """The kiosks registry starts empty and is queryable (table created by migration)."""

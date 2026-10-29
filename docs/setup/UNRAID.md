@@ -41,12 +41,15 @@ Once Calvin is running on Unraid, turn a fresh Raspberry Pi OS Lite install
 into a kiosk with one command (the container serves the installer):
 
 ```bash
-curl -fsSL http://<unraid-host>:8000/api/kiosks/install.sh | sudo bash -s -- --signing-key-file ~/calvin.key
+curl -fsSL http://<unraid-host>:8000/api/kiosks/install.sh | sudo bash
 ```
 
-The signing key is `/mnt/user/appdata/calvin/kiosk-signing.key` on Unraid;
-copy it to the Pi over SSH first. Full walkthrough, plus a bake-the-SD-card
-option with no SSH: [KIOSK_INSTALL.md](KIOSK_INSTALL.md).
+For a **signed** kiosk, the signing key is
+`/mnt/user/appdata/calvin/kiosk-signing.key`. It is in Appdata, so it survives
+container updates. Copy the key and the installer to the Pi over SSH instead of
+using the line above.
+[KIOSK_INSTALL.md](KIOSK_INSTALL.md) has the exact commands, plus a
+bake-the-SD-card option with no SSH at all.
 
 Use a stable hostname or IP for `<unraid-host>` so the kiosk URL does not
 change after reboot.

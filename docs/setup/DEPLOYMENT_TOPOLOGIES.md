@@ -103,7 +103,7 @@ DHCP lease, or a DNS entry) so the kiosk URL doesn't drift.
 curl -fsSL http://homeserver.local:8000/api/kiosks/install.sh | sudo bash
 ```
 
-**Step-by-step guide, including the signing key and supported Pi models:
+**Step-by-step guide, including the signed (SSH) variant, the signing key, and supported Pi models:
 [KIOSK_INSTALL.md](KIOSK_INSTALL.md).** The installer downloads
 `setup-kiosk.sh` from the server and runs it. From a checkout,
 `sudo bash scripts/setup-kiosk.sh --backend-url http://homeserver.local:8000`
