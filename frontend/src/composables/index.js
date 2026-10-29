@@ -3,6 +3,8 @@
  */
 
 export { usePlugins } from "./usePlugins";
+export { usePhoneHandoff } from "./usePhoneHandoff";
+export { useSetupPrompt } from "./useSetupPrompt";
 export { useConfigForm } from "./useConfigForm";
 export { useSystem } from "./useSystem";
 export { useTheme } from "./useTheme";
