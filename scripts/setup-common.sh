@@ -624,23 +624,52 @@ read_env_value() {
 }
 
 # Configuration file creation
+# Upserts the keys setup owns; operator keys (WAIT_TIMEOUT, ...) are kept.
 create_update_config() {
     local git_repo="${1:-$DEFAULT_GIT_REPO}"
     local git_branch="${2:-$DEFAULT_GIT_BRANCH}"
     local repo_dir="${3:-$DEFAULT_CALVIN_DIR}"
     local calvin_mode="${4:-prod}"
-    
     local conf="${CALVIN_DEFAULT_DIR:-/etc/default}/calvin-update"
 
     log "Creating update configuration..."
     mkdir -p "$(dirname "${conf}")"
-    cat > "${conf}" << EOF
-GIT_REPO=${git_repo}
-GIT_BRANCH=${git_branch}
-REPO_DIR=${repo_dir}
-CALVIN_MODE=${calvin_mode}
-EOF
+    [ -f "${conf}" ] || install -m 0644 /dev/null "${conf}"
+    upsert_env_value "${conf}" GIT_REPO "${git_repo}"
+    upsert_env_value "${conf}" GIT_BRANCH "${git_branch}"
+    upsert_env_value "${conf}" REPO_DIR "${repo_dir}"
+    upsert_env_value "${conf}" CALVIN_MODE "${calvin_mode}"
     log "Update configuration saved to ${conf}"
+}
+
+# Root-only state dir for setup/updates (source snapshot, rollback copies).
+# Refuses a directory someone else owns or can write: the app user must not be
+# able to pre-create it and feed root its files.
+ensure_update_dir() {
+    local dir="${CALVIN_UPDATE_DIR:-/var/lib/calvin-update}"
+    (umask 077 && mkdir -p "${dir}")
+    if [ "$(stat -c %u "${dir}")" != "$(id -u)" ] || [ -n "$(find "${dir}" -maxdepth 0 -perm /022)" ]; then
+        error_exit "${dir} is not owned by $(id -un) or is writable by others; refusing to use it" 1
+    fi
+    chmod 0700 "${dir}"
+    echo "${dir}"
+}
+
+# Fresh shallow clone of <repo> <branch> into the root-only update dir; prints
+# its path. Host files (units, sudo helpers, the updater) are installed from
+# here, never from the checkout in calvin's home, which the app user can edit.
+prepare_source_snapshot() {
+    local repo="$1"
+    local branch="$2"
+    local dir src
+    # error_exit inside $(...) only ends the subshell: propagate it.
+    dir="$(ensure_update_dir)" || exit 1
+    src="${dir}/src"
+    rm -rf "${src}"
+    git clone -q --depth 1 --branch "${branch}" "${repo}" "${src}" 2>/dev/null \
+        || git clone -q --branch "${branch}" "${repo}" "${src}" \
+        || error_exit "Could not fetch ${repo} (${branch}) to install the host files from" 1
+    echo "${src}"
 }
 
 # Swap file management (for development on Pi 3B+)

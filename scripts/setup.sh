@@ -29,12 +29,10 @@ if [ -z "${_ENV_GIT_BRANCH}" ] && [ -f /etc/default/calvin-update ]; then
     fi
 fi
 
+# setup-common.sh from this script's own directory, never from the current
+# one (this runs as root, possibly from an untrusted working directory).
 COMMON_SCRIPT=""
-if [ -f "./setup-common.sh" ]; then
-    COMMON_SCRIPT="./setup-common.sh"
-fi
-
-if [ -z "${COMMON_SCRIPT}" ] && [ -n "${BASH_VERSION:-}" ]; then
+if [ -n "${BASH_VERSION:-}" ]; then
     _script_source="${BASH_SOURCE[0]:-}"
     _script_dir=""
     if [ -n "${_script_source}" ] && [ "${_script_source}" != "-" ]; then
@@ -98,6 +96,8 @@ CALVIN_DIR="${CALVIN_DIR:-$(read_env_value "${CALVIN_DEFAULT_DIR:-/etc/default}/
 CALVIN_DIR="${CALVIN_DIR:-$DEFAULT_CALVIN_DIR}"
 CALVIN_DATA_DIR="${CALVIN_DATA_DIR:-$(read_env_value "${CALVIN_ETC_DIR}/.env" CALVIN_DATA_DIR)}"
 CALVIN_DATA_DIR="${CALVIN_DATA_DIR:-/var/lib/calvin}"
+# Where host files are installed from (see resolve_source_dir).
+CALVIN_SOURCE_DIR="${CALVIN_SOURCE_DIR:-}"
 CALVIN_BIN_DIR="${CALVIN_BIN_DIR:-/usr/local/bin}"
 CALVIN_SYSTEMD_DIR="${CALVIN_SYSTEMD_DIR:-/etc/systemd/system}"
 CALVIN_KIOSK_ENV_FILE="${CALVIN_KIOSK_ENV_FILE:-${CALVIN_DEFAULT_DIR:-/etc/default}/calvin-kiosk}"
@@ -196,11 +196,16 @@ install_docker_runtime() {
         esac
         [ -n "${codename}" ] || error_exit "No VERSION_CODENAME in ${os_release}" 1
         arch="$(dpkg --print-architecture)"
+        install_system_packages ca-certificates curl
         # Docker does not publish every combination (e.g. no 32-bit raspbian
         # Trixie): fail with a pointer instead of an opaque apt error.
-        if ! curl -fsSL -o /dev/null "https://download.docker.com/linux/${repo_os}/dists/${codename}/Release"; then
-            error_exit "Docker publishes no packages for ${repo_os} ${codename} (${arch}). Use 64-bit Raspberry Pi OS (or Debian) Bookworm/Trixie." 1
-        fi
+        local release_url="https://download.docker.com/linux/${repo_os}/dists/${codename}/Release" http_code
+        http_code="$(curl -sSL -o /dev/null -w '%{http_code}' "${release_url}" || true)"
+        case "${http_code}" in
+            200) ;;
+            404) error_exit "Docker publishes no packages for ${repo_os} ${codename} (${arch}). Use 64-bit Raspberry Pi OS (or Debian) Bookworm/Trixie." 1 ;;
+            *) error_exit "Cannot reach download.docker.com (${release_url}: HTTP ${http_code:-none}); check the network and re-run" 1 ;;
+        esac
 
         # docker-ce conflicts with the distro packages an older setup installed.
         local conflicts=() pkg
@@ -214,7 +219,6 @@ install_docker_runtime() {
             apt_get remove -y -qq "${conflicts[@]}" || error_exit "Failed to remove ${conflicts[*]}" 1
         fi
 
-        install_system_packages ca-certificates curl
         mkdir -p "${keyrings}" "${sources}"
         curl -fsSL "https://download.docker.com/linux/${repo_os}/gpg" -o "${keyrings}/docker.asc" \
             || error_exit "Failed to download Docker's apt key" 1
@@ -293,10 +297,10 @@ calvin_port() {
 
 install_compose_config() {
     local mode="$1"
-    local source_compose="${CALVIN_DIR}/docker/docker-compose.yml"
+    local source_compose="${CALVIN_SOURCE_DIR}/docker/docker-compose.yml"
 
     if [ "${mode}" = "dev" ]; then
-        source_compose="${CALVIN_DIR}/docker/docker-compose.dev.yml"
+        source_compose="${CALVIN_SOURCE_DIR}/docker/docker-compose.dev.yml"
     fi
 
     # Production layout: both files live in /etc/calvin/. Compose
@@ -305,10 +309,9 @@ install_compose_config() {
     # no path rewriting needed.
     log "Installing ${mode} compose configuration..."
     mkdir -p "${CALVIN_ETC_DIR}"
-    install -m 0644 "${source_compose}" "${CALVIN_ETC_DIR}/docker-compose.yml"
 
     if [ ! -f "${CALVIN_ETC_DIR}/.env" ]; then
-        install -m 0640 "${CALVIN_DIR}/deploy/calvin.env.example" "${CALVIN_ETC_DIR}/.env"
+        install -m 0640 "${CALVIN_SOURCE_DIR}/deploy/calvin.env.example" "${CALVIN_ETC_DIR}/.env"
         chown "root:${CALVIN_USER}" "${CALVIN_ETC_DIR}/.env"
     fi
 
@@ -321,9 +324,15 @@ install_compose_config() {
         upsert_env_value "${CALVIN_ETC_DIR}/.env" CALVIN_REPO_DIR "${CALVIN_DIR}"
     fi
 
-    if ! compose -f "${CALVIN_ETC_DIR}/docker-compose.yml" config >/dev/null; then
-        error_exit "Installed Docker Compose configuration is invalid" 1
+    # Validate next to the .env (compose loads .env from the file's directory)
+    # before replacing the live file, so a bad file never lands.
+    local candidate="${CALVIN_ETC_DIR}/.docker-compose.yml.new"
+    install -m 0644 "${source_compose}" "${candidate}"
+    if ! compose -f "${candidate}" config >/dev/null; then
+        rm -f "${candidate}"
+        error_exit "New Docker Compose configuration is invalid; kept the installed one" 1
     fi
+    mv -f "${candidate}" "${CALVIN_ETC_DIR}/docker-compose.yml"
 }
 
 # P4: the screen on/off schedule needs vcgencmd/xset on the host; the container
@@ -333,17 +342,17 @@ install_display_agent() {
     local port="$1"
     log "Installing the display-power agent (backend http://localhost:${port})..."
     mkdir -p "${CALVIN_BIN_DIR}" "${CALVIN_SYSTEMD_DIR}" "$(dirname "${CALVIN_KIOSK_ENV_FILE}")"
-    install -m 0755 "${CALVIN_DIR}/deploy/kiosk-agent/calvin_display_agent.py" "${CALVIN_BIN_DIR}/calvin_display_agent.py"
-    install -m 0644 "${CALVIN_DIR}/deploy/systemd/calvin-display-agent.service" "${CALVIN_SYSTEMD_DIR}/calvin-display-agent.service"
+    install -m 0755 "${CALVIN_SOURCE_DIR}/deploy/kiosk-agent/calvin_display_agent.py" "${CALVIN_BIN_DIR}/calvin_display_agent.py"
+    install -m 0644 "${CALVIN_SOURCE_DIR}/deploy/systemd/calvin-display-agent.service" "${CALVIN_SYSTEMD_DIR}/calvin-display-agent.service"
     [ -f "${CALVIN_KIOSK_ENV_FILE}" ] || install -m 0644 /dev/null "${CALVIN_KIOSK_ENV_FILE}"
     upsert_env_value "${CALVIN_KIOSK_ENV_FILE}" CALVIN_BACKEND_URL "http://localhost:${port}"
     systemctl enable calvin-display-agent.service >/dev/null 2>&1 || log_warn "Could not enable calvin-display-agent.service"
 }
 
 install_helper_scripts() {
-    install_privileged_sudo_helper_script "${CALVIN_DIR}/scripts/update-calvin.sh" "${CALVIN_BIN_DIR}/update-calvin.sh"
-    install_privileged_sudo_helper_script "${CALVIN_DIR}/scripts/reboot-calvin.sh" "${CALVIN_BIN_DIR}/reboot-calvin.sh"
-    install_privileged_sudo_helper_script "${CALVIN_DIR}/scripts/restart-calvin-services.sh" "${CALVIN_BIN_DIR}/restart-calvin-services.sh"
+    install_privileged_sudo_helper_script "${CALVIN_SOURCE_DIR}/scripts/update-calvin.sh" "${CALVIN_BIN_DIR}/update-calvin.sh"
+    install_privileged_sudo_helper_script "${CALVIN_SOURCE_DIR}/scripts/reboot-calvin.sh" "${CALVIN_BIN_DIR}/reboot-calvin.sh"
+    install_privileged_sudo_helper_script "${CALVIN_SOURCE_DIR}/scripts/restart-calvin-services.sh" "${CALVIN_BIN_DIR}/restart-calvin-services.sh"
     # The sudoers rules name the canonical paths, not CALVIN_BIN_DIR.
     install_sudoers_fragment calvin-reboot "${CALVIN_USER} ALL=(root) NOPASSWD: /usr/local/bin/reboot-calvin.sh"
     install_sudoers_fragment calvin-restart "${CALVIN_USER} ALL=(root) NOPASSWD: /usr/local/bin/restart-calvin-services.sh"
@@ -370,9 +379,9 @@ systemd_available() {
 
 install_runtime_services() {
     log "Installing systemd services..."
-    install_systemd_service "${CALVIN_DIR}/deploy/systemd/calvin-app.service" "${CALVIN_DIR}"
-    install_systemd_service "${CALVIN_DIR}/deploy/systemd/calvin-x.service" "${CALVIN_DIR}"
-    install_systemd_service "${CALVIN_DIR}/deploy/systemd/calvin-kiosk.service" "${CALVIN_DIR}"
+    install_systemd_service "${CALVIN_SOURCE_DIR}/deploy/systemd/calvin-app.service" "${CALVIN_DIR}"
+    install_systemd_service "${CALVIN_SOURCE_DIR}/deploy/systemd/calvin-x.service" "${CALVIN_DIR}"
+    install_systemd_service "${CALVIN_SOURCE_DIR}/deploy/systemd/calvin-kiosk.service" "${CALVIN_DIR}"
 
     if systemd_available; then
         enable_systemd_service "calvin-app.service"
@@ -383,9 +392,26 @@ install_runtime_services() {
     fi
 }
 
-# Everything setup puts on the host outside the Docker volume, from the
-# checkout. Run on every setup and, via --refresh, on every update.
+# Host files run as or are trusted by root, so they are not installed from the
+# checkout in calvin's home (the app user can edit it) but from a fresh
+# root-only clone. update-calvin.sh passes its own clone as CALVIN_SOURCE_DIR;
+# the CI copy (CALVIN_SKIP_GIT_UPDATE) installs from the checkout itself.
+resolve_source_dir() {
+    if [ -n "${CALVIN_SOURCE_DIR}" ]; then
+        return 0
+    fi
+    if [ "${CALVIN_SKIP_GIT_UPDATE:-}" = "1" ] || [ "${CALVIN_SKIP_GIT_UPDATE:-}" = "true" ]; then
+        CALVIN_SOURCE_DIR="${CALVIN_DIR}"
+        return 0
+    fi
+    log "Fetching ${GIT_REPO} (${GIT_BRANCH}) into a root-only snapshot to install the host files from..."
+    CALVIN_SOURCE_DIR="$(prepare_source_snapshot "${GIT_REPO}" "${GIT_BRANCH}")" || exit 1
+}
+
+# Everything setup puts on the host outside the Docker volume. Run on every
+# setup and, via --refresh, on every update.
 refresh_host_files() {
+    resolve_source_dir
     install_compose_config "${SETUP_MODE}"
     local port
     port="$(calvin_port)"

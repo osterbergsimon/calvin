@@ -167,7 +167,7 @@ export function useConfigForm(initialConfig = {}) {
         calendarRefreshInterval:
           response.calendarRefreshInterval ?? response.calendar_refresh_interval ?? 15,
         gitRepoUrl: response.gitRepoUrl ?? response.git_repo_url ?? null,
-        gitBranch: response.gitBranch ?? response.git_branch ?? "main",
+        gitBranch: response.gitBranch ?? response.git_branch ?? "develop",
         version: response.version ?? null,
         frontendVersion: response.frontendVersion ?? response.frontend_version ?? null,
       };

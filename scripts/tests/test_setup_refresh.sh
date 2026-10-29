@@ -29,7 +29,7 @@ PATH="$B:$PATH"
 
 # shellcheck source=../setup.sh
 . "$HERE/../setup.sh" --source-only
-CALVIN_DIR="$REPO"; GIT_BRANCH=develop; SETUP_MODE=prod
+CALVIN_DIR="$REPO"; CALVIN_SOURCE_DIR="$REPO"; GIT_BRANCH=develop; SETUP_MODE=prod
 
 # An older install: stale compose file, .env with a custom port and :latest.
 mkdir -p "$CALVIN_ETC_DIR"

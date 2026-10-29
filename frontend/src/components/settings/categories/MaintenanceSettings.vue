@@ -90,7 +90,7 @@ import UpdatesTab from "@/components/settings/tabs/system/UpdatesTab.vue";
 defineProps({
   config: { type: Object, required: true },
   gitRepoUrl: { type: String, default: "" },
-  gitBranch: { type: String, default: "main" },
+  gitBranch: { type: String, default: "develop" },
 });
 const emit = defineEmits(["update:config", "update:gitRepoUrl", "update:gitBranch"]);
 

@@ -63,7 +63,7 @@
               :key="categoryRenderKey"
               :config="localConfig"
               :git-repo-url="localConfig && localConfig.gitRepoUrl"
-              :git-branch="(localConfig && localConfig.gitBranch) || 'main'"
+              :git-branch="(localConfig && localConfig.gitBranch) || 'develop'"
               @update:config="handleConfigUpdate"
               @update:git-repo-url="handleGitRepoUrlUpdate"
               @update:git-branch="handleGitBranchUpdate"

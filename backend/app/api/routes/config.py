@@ -505,7 +505,7 @@ async def build_global_config() -> dict:
     elif "git_repo_url" in config and "gitRepoUrl" not in config:
         config["gitRepoUrl"] = config["git_repo_url"]
     if "gitBranch" not in config and "git_branch" not in config:
-        config["gitBranch"] = "main"  # Default to main branch
+        config["gitBranch"] = "develop"  # main is release-only and far behind
     elif "git_branch" in config and "gitBranch" not in config:
         config["gitBranch"] = config["git_branch"]
     if "consoleLogEnabled" not in config and "console_log_enabled" not in config:

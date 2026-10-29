@@ -216,7 +216,7 @@ async def trigger_update():
 
     try:
         # Get git branch from config
-        git_branch = await config_service.get_value("git_branch", "main")
+        git_branch = await config_service.get_value("git_branch", "develop")
 
         # Ensure log directory exists
         log_dir = settings.repo_dir / "backend" / "logs"

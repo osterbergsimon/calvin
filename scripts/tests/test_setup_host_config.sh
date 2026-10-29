@@ -55,7 +55,7 @@ export CALVIN_BIN_DIR="$tmp/usr-local-bin" CALVIN_SYSTEMD_DIR="$tmp/systemd"
 export CALVIN_KIOSK_ENV_FILE="$tmp/calvin-kiosk"
 mkdir -p "$CALVIN_BIN_DIR" "$CALVIN_SYSTEMD_DIR"
 printf 'CALVIN_DISPLAY_ROTATION=left\n' > "$CALVIN_KIOSK_ENV_FILE"
-CALVIN_DIR="$REPO"
+CALVIN_DIR="$REPO"; CALVIN_SOURCE_DIR="$REPO"
 install_display_agent 8123 >/dev/null
 assert_mode "$CALVIN_BIN_DIR/calvin_display_agent.py" 755
 cmp -s "$REPO/deploy/kiosk-agent/calvin_display_agent.py" "$CALVIN_BIN_DIR/calvin_display_agent.py" || fail "agent not installed from the checkout"

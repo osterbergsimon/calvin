@@ -349,14 +349,18 @@ In production mode it:
 
 1. fast-forwards `/home/calvin/calvin` to `origin/<GIT_BRANCH>` (a checkout with
    local changes or local commits is left as it is, with a warning);
-2. re-installs the host files from the checkout with `setup.sh --refresh`
-   (compose file, systemd units, helper scripts and sudoers, X/openbox config,
-   display agent, and `update-calvin.sh` itself) — no apt, Docker or git;
+2. re-installs the host files with `setup.sh --refresh` (compose file, systemd
+   units, helper scripts and sudoers, X/openbox config, display agent, and
+   `update-calvin.sh` itself) — no apt or Docker. They come from a fresh clone of
+   `GIT_REPO`/`GIT_BRANCH` in the root-only `/var/lib/calvin-update`, never from
+   the checkout in calvin's home: that runs as root, and the app user can edit
+   the checkout. Local edits there are not installed as root;
 3. records the running image, pulls the configured tag and restarts Compose;
 4. waits for `http://localhost:$CALVIN_PORT/api/health`. If the new image does
-   not come up healthy it puts back the previous image and the previous
-   `/etc/calvin/docker-compose.yml` and `.env`, restarts on them, and exits with
-   an error. The state (including `previous_image`) is in
+   not come up (failed restart or health check) it puts back the previous image
+   and the previous `/etc/calvin/docker-compose.yml` and `.env`, restarts on them,
+   and exits with an error. A failed refresh or pull restores the host files and
+   restarts nothing. The state (including `previous_image`) is in
    `calvin-update-state.json` next to the update log.
 
 Development installs pull the configured git branch into `/home/calvin/calvin`

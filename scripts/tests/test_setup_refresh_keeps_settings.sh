@@ -21,7 +21,34 @@ assert_eq /srv/calvin-data "$CALVIN_DATA_DIR" "refresh would reset the data dir 
 assert_eq /opt/calvin "$CALVIN_DIR" "setup ignores the checkout recorded in calvin-update"
 pass "setup.sh keeps the installed data dir and checkout"
 
-# update-calvin.sh hands its REPO_DIR to the refresh.
-grep -q 'CALVIN_DIR="\$REPO_DIR" bash "\$SETUP_SCRIPT" --refresh' "$HERE/../update-calvin.sh" \
-    || fail "update-calvin.sh does not pass REPO_DIR to setup.sh --refresh"
-pass "update-calvin.sh refreshes from its own checkout"
+# Host files are installed from a root-owned clone of GIT_REPO/GIT_BRANCH, not
+# from the calvin-owned checkout (root must not install what the app user edits).
+export GIT_AUTHOR_NAME=t GIT_AUTHOR_EMAIL=t@t GIT_COMMITTER_NAME=t GIT_COMMITTER_EMAIL=t@t GIT_CONFIG_GLOBAL=/dev/null
+git init -q -b develop "$tmp/origin"; echo ok > "$tmp/origin/marker"
+git -C "$tmp/origin" add -A; git -C "$tmp/origin" commit -qm v1
+export CALVIN_UPDATE_DIR="$tmp/update-root"
+src="$(prepare_source_snapshot "$tmp/origin" develop)"
+assert_eq "$tmp/update-root/src" "$src"
+assert_eq ok "$(cat "$src/marker")"
+assert_mode "$tmp/update-root" 700
+pass "host files come from a root-only clone of the configured branch"
+
+# The state dir must not be one the app user could have pre-created.
+rm -rf "$tmp/update-root"; mkdir -m 0777 "$tmp/update-root"
+if (prepare_source_snapshot "$tmp/origin" develop) >/dev/null 2>&1; then
+    fail "used a world-writable update dir"
+fi
+pass "refuses an update dir others can write"
+
+# create_update_config keeps operator keys (it used to rewrite the file).
+printf 'WAIT_TIMEOUT=600\nGIT_BRANCH=old\n' > "$CALVIN_DEFAULT_DIR/calvin-update"
+create_update_config https://example/calvin.git develop /opt/calvin prod >/dev/null
+assert_contains "$CALVIN_DEFAULT_DIR/calvin-update" '^WAIT_TIMEOUT=600$' "operator key dropped"
+assert_contains "$CALVIN_DEFAULT_DIR/calvin-update" '^GIT_BRANCH=develop$'
+pass "create_update_config upserts"
+
+# setup.sh never sources a setup-common.sh from the current directory.
+mkdir -p "$tmp/cwd"; printf 'echo PLANTED; exit 7\n' > "$tmp/cwd/setup-common.sh"
+out="$(cd "$tmp/cwd" && bash "$HERE/../setup.sh" --help 2>&1)" || fail "setup.sh --help failed: $out"
+case "$out" in *PLANTED*) fail "setup.sh sourced ./setup-common.sh from the current directory";; esac
+pass "setup-common.sh comes from the script's own directory"

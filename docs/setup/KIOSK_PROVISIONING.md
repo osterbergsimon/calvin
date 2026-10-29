@@ -117,7 +117,9 @@ from the Calvin admin UI — no SSH, no re-flash.
    new bundle file therefore needs the updater that knows it: when a manifest
    brings both, the old updater installs the known files and re-runs the new
    updater for the rest. Units that should be enabled are re-enabled on every
-   run. No full repo checkout lives
+   run. This pinning is defence in depth only: the updater is itself a bundle
+   file and runs as root, so without a signing key a hostile server can still
+   ship its own updater. Only the manifest signature protects against that. No full repo checkout lives
    on the kiosk.
 
 4. **Verify, backup, atomic swap, restart.** For each changed file the updater:

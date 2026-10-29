@@ -20,7 +20,14 @@ make_stub "$B" docker "echo \"docker \$*\" >> '$tmp/calls.log'; [ \"\$1 \$2\" = 
 make_stub "$B" apt-get "echo \"apt-get \$*\" >> '$tmp/calls.log'; case \" \$* \" in *' docker-compose-plugin '*) touch '$tmp/compose-installed';; esac; exit 0"
 # dpkg: docker.io is installed (an old setup's leftover); --print-architecture -> arm64
 make_stub "$B" dpkg "case \"\$1\" in --print-architecture) echo arm64;; -s) [ \"\$2\" = docker.io ];; esac"
-make_stub "$B" curl "echo \"curl \$*\" >> '$tmp/calls.log'; case \"\$*\" in *raspbian/dists/trixie/*) exit 22;; esac; while [ \$# -gt 0 ]; do [ \"\$1\" = -o ] && echo KEY > \"\$2\"; shift; done"
+# curl only exists once ca-certificates/curl were "installed" (a bare
+# debian image has none); the Release probe answers 404 for raspbian trixie and
+# fails at the network level while $tmp/offline exists.
+make_stub "$B" curl "echo \"curl \$*\" >> '$tmp/calls.log'
+grep -q 'install .*curl' '$tmp/calls.log' || { echo 'curl: command not found' >&2; exit 127; }
+[ ! -f '$tmp/offline' ] || exit 6
+case \"\$*\" in *'%{http_code}'*) case \"\$*\" in *raspbian/dists/trixie/*) echo 404;; *) echo 200;; esac; exit 0;; esac
+while [ \$# -gt 0 ]; do [ \"\$1\" = -o ] && echo KEY > \"\$2\"; shift; done"
 make_stub "$B" systemctl "echo \"systemctl \$*\" >> '$tmp/calls.log'"
 make_stub "$B" usermod "echo \"usermod \$*\" >> '$tmp/calls.log'"
 make_stub "$B" gpasswd "echo \"gpasswd \$*\" >> '$tmp/calls.log'"
@@ -59,6 +66,13 @@ pass "32-bit Raspberry Pi OS uses the raspbian repo"
 if (run_case raspbian trixie); then fail "32-bit Trixie accepted"; fi
 grep -q '64-bit' "$tmp/run.out" || fail "32-bit Trixie error does not point to 64-bit Raspberry Pi OS: $(cat "$tmp/run.out")"
 pass "32-bit Trixie refused with a clear message"
+
+touch "$tmp/offline"
+if (run_case debian bookworm); then fail "offline install succeeded"; fi
+grep -qi 'reach' "$tmp/run.out" || fail "network failure reported as something else: $(cat "$tmp/run.out")"
+grep -q 'publishes no packages' "$tmp/run.out" && fail "network failure reported as an unsupported OS"
+rm -f "$tmp/offline"
+pass "network failure reported as such"
 
 if (run_case fedora 40) >/dev/null 2>&1; then fail "unsupported OS accepted"; fi
 pass "unsupported OS refused"

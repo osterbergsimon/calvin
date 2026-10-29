@@ -161,7 +161,7 @@ const {
   getBackendHealth,
 } = useSystem();
 
-const availableBranches = ref([props.gitBranch || "main"]);
+const availableBranches = ref([props.gitBranch || "develop"]);
 const localGitRepoUrl = ref(props.gitRepoUrl || "");
 const lastEmittedGitRepoUrl = ref(props.gitRepoUrl || "");
 const statusRefreshLoading = computed(
@@ -255,7 +255,7 @@ const refreshSystemStatus = async () => {
 const loadBranches = async () => {
   try {
     const branches = await getGitBranches();
-    availableBranches.value = branches.branches || [props.gitBranch || "main"];
+    availableBranches.value = branches.branches || [props.gitBranch || "develop"];
   } catch (error) {
     console.error("Failed to load branches:", error);
   }

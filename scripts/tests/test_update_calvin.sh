@@ -2,10 +2,15 @@
 # P3/P9: update-calvin.sh used to pull the image and nothing else: host files
 # (compose file, units, sudo helpers, the script itself) went stale, a failed
 # health check left the broken image running, and the health URL hard-coded
-# port 8000. Now it fast-forwards the checkout (never over local edits),
-# refreshes the host files via `setup.sh --refresh`, remembers the running
-# image, and rolls back to it (and to the old compose/.env) when the new one
-# does not become healthy on CALVIN_PORT.
+# port 8000. Now it:
+#   - fast-forwards the checkout (never over local edits),
+#   - refreshes the host files with setup.sh --refresh run from a fresh
+#     root-owned clone of GIT_REPO/GIT_BRANCH (never from the calvin-owned
+#     checkout: root must not run or install code the app user can edit),
+#   - keeps its rollback copies in a root-only state dir, cleared every run,
+#   - remembers the running image and rolls back image + compose/.env when the
+#     refresh, the pull, the restart or the health check (on CALVIN_PORT) fails,
+#     always ending with an error state.
 set -euo pipefail
 HERE="$(cd "$(dirname "$0")" && pwd)"
 SCRIPT="$HERE/../update-calvin.sh"
@@ -15,21 +20,26 @@ tmp="$(mktemp -d)"; trap 'rm -rf "$tmp"' EXIT
 export GIT_AUTHOR_NAME=t GIT_AUTHOR_EMAIL=t@t GIT_COMMITTER_NAME=t GIT_COMMITTER_EMAIL=t@t
 export GIT_CONFIG_GLOBAL=/dev/null
 
-# --- a checkout with an upstream commit waiting, and a local edit ---------
+# --- origin: its scripts/setup.sh is the trusted refresh ------------------------
 git init -q -b develop "$tmp/origin"
-echo v1 > "$tmp/origin/file"; git -C "$tmp/origin" add file; git -C "$tmp/origin" commit -qm v1
+mkdir -p "$tmp/origin/scripts"
+cat > "$tmp/origin/scripts/setup.sh" <<EOF
+echo "setup-from-origin \$* CALVIN_DIR=\${CALVIN_DIR:-} SRC=\${CALVIN_SOURCE_DIR:-} PWD=\$PWD" >> "$tmp/calls.log"
+[ ! -f "$tmp/refresh-fails" ] || { echo BROKEN-COMPOSE > "$tmp/etc/docker-compose.yml"; exit 1; }
+echo "NEW-COMPOSE" > "$tmp/etc/docker-compose.yml"
+EOF
+echo v1 > "$tmp/origin/file"; git -C "$tmp/origin" add -A; git -C "$tmp/origin" commit -qm v1
 git clone -q "$tmp/origin" "$tmp/repo"
 git -C "$tmp/origin" commit -qm v2 --allow-empty
 
-# --- host layout -----------------------------------------------------------
+# --- host layout ---------------------------------------------------------------
 mkdir -p "$tmp/etc" "$tmp/state"
-echo "OLD-COMPOSE" > "$tmp/etc/docker-compose.yml"
-printf 'CALVIN_PORT=8123\nCALVIN_IMAGE_TAG=develop\n' > "$tmp/etc/.env"
-printf 'CALVIN_MODE=prod\nREPO_DIR=%s\nGIT_BRANCH=develop\n' "$tmp/repo" > "$tmp/calvin-update"
-cat > "$tmp/setup.sh" <<EOF
-echo "setup \$*" >> "$tmp/calls.log"
-echo "NEW-COMPOSE" > "$tmp/etc/docker-compose.yml"
-EOF
+reset_host() {
+    echo "OLD-COMPOSE" > "$tmp/etc/docker-compose.yml"
+    printf 'CALVIN_PORT=8123\nCALVIN_IMAGE_TAG=develop\n' > "$tmp/etc/.env"
+    rm -f "$tmp/calls.log" "$tmp/unhealthy" "$tmp/rolled-back" "$tmp/refresh-fails" "$tmp/pull-fails" "$tmp/up-fails"
+}
+printf 'CALVIN_MODE=prod\nREPO_DIR=%s\nGIT_BRANCH=develop\nGIT_REPO=%s\n' "$tmp/repo" "$tmp/origin" > "$tmp/calvin-update"
 
 B="$tmp/bin"
 make_stub "$B" docker "echo \"docker \$*\" >> '$tmp/calls.log'
@@ -37,43 +47,64 @@ case \"\$*\" in
   'inspect --format {{.Image}} calvin') echo sha256:0ld1mage;;
   'inspect --format {{.Config.Image}} calvin') echo ghcr.io/osterbergsimon/calvin:develop;;
   'tag '*) touch '$tmp/rolled-back';;
-esac
-exit 0"
+  *' pull') [ ! -f '$tmp/pull-fails' ];;
+  *' up -d') [ ! -f '$tmp/up-fails' ] || [ -f '$tmp/rolled-back' ];;
+esac"
 # Health fails while \$tmp/unhealthy exists, unless the old image was put back.
 make_stub "$B" curl "echo \"curl \$*\" >> '$tmp/calls.log'
 [ ! -f '$tmp/unhealthy' ] || [ -f '$tmp/rolled-back' ]"
 PATH="$B:$PATH"
 
 export UPDATE_CONFIG="$tmp/calvin-update" COMPOSE_FILE="$tmp/etc/docker-compose.yml"
-export CALVIN_SETUP_SCRIPT="$tmp/setup.sh" CALVIN_REFRESH_HOST=1
+export CALVIN_REFRESH_HOST=1 CALVIN_UPDATE_DIR="$tmp/update-root"
 export UPDATE_STATE_FILE="$tmp/state/update-state.json" UPDATE_LOG_FILE="$tmp/state/update.log"
 export WAIT_TIMEOUT=1 HEALTH_POLL_SECS=0.1
+state() { grep -oE "\"$1\": \"[^\"]*\"" "$UPDATE_STATE_FILE" | cut -d'"' -f4; }
 
-# --- 1. healthy update --------------------------------------------------------
-echo "local edit" > "$tmp/repo/file"
+# --- 1. healthy update; a tampered checkout script is never run -----------------
+reset_host
+echo 'echo EVIL >> '"$tmp/calls.log" > "$tmp/repo/scripts/setup.sh"   # local edit by the app user
 bash "$SCRIPT" > "$tmp/out1" 2>&1 || fail "healthy update failed: $(cat "$tmp/out1")"
-assert_eq "local edit" "$(cat "$tmp/repo/file")" "update wiped a local edit in the checkout"
-assert_contains "$tmp/calls.log" '^setup --refresh' "host files not refreshed"
+assert_contains "$tmp/calls.log" "^setup-from-origin --refresh --mode prod CALVIN_DIR=$tmp/repo SRC=$tmp/update-root/src PWD=/$" "refresh not run from the root-owned origin clone"
+assert_not_contains "$tmp/calls.log" 'EVIL' "ran setup.sh from the app user's checkout as root"
+assert_eq 'echo EVIL >> '"$tmp/calls.log" "$(cat "$tmp/repo/scripts/setup.sh")" "update wiped a local edit in the checkout"
+assert_mode "$tmp/update-root" 700
 assert_contains "$tmp/calls.log" 'curl .*http://localhost:8123/api/health' "health check ignores CALVIN_PORT"
-assert_contains "$tmp/calls.log" 'docker compose -f .* pull'
-assert_contains "$UPDATE_STATE_FILE" '"status": "success"'
-assert_contains "$UPDATE_STATE_FILE" '"previous_image": "sha256:0ld1mage"' "previous image not recorded"
+assert_eq success "$(state status)"
+assert_eq sha256:0ld1mage "$(state previous_image)" "previous image not recorded"
 assert_not_contains "$tmp/calls.log" '^docker tag' "rolled back a healthy update"
-pass "healthy update: refresh, pull, health on CALVIN_PORT, previous image recorded"
+pass "healthy update: refresh from origin clone, health on CALVIN_PORT, previous image recorded"
 
-# --- 2. clean checkout is fast-forwarded --------------------------------------
-git -C "$tmp/repo" checkout -q -- file
+# --- 2. clean checkout is fast-forwarded ----------------------------------------
+git -C "$tmp/repo" checkout -q -- scripts/setup.sh
+reset_host
 bash "$SCRIPT" > "$tmp/out2" 2>&1 || fail "update failed: $(cat "$tmp/out2")"
 assert_eq "$(git -C "$tmp/origin" rev-parse HEAD)" "$(git -C "$tmp/repo" rev-parse HEAD)" "clean checkout not fast-forwarded"
+assert_eq "$(git -C "$tmp/origin" rev-parse --short HEAD)" "$(state new_commit_short)" "new commit not recorded"
 pass "clean checkout fast-forwarded"
 
-# --- 3. unhealthy update rolls back -------------------------------------------
-rm -f "$tmp/calls.log"; echo "OLD-COMPOSE" > "$tmp/etc/docker-compose.yml"
+# --- 3. failure modes: each one ends as an error with the old host files back ---
+expect_rollback() {  # name trigger-file expect-image-rollback(1/0)
+    reset_host; touch "$tmp/$2"
+    if bash "$SCRIPT" > "$tmp/out-$1" 2>&1; then fail "$1: update reported success"; fi
+    assert_eq OLD-COMPOSE "$(cat "$tmp/etc/docker-compose.yml")" "$1: compose file not restored"
+    assert_eq error "$(state status)" "$1: final state is not error: $(cat "$UPDATE_STATE_FILE")"
+    if [ "$3" = 1 ]; then
+        assert_contains "$tmp/calls.log" '^docker tag sha256:0ld1mage ghcr.io/osterbergsimon/calvin:develop$' "$1: previous image not restored"
+        assert_contains "$UPDATE_STATE_FILE" 'rolled back' "$1: state does not say it rolled back"
+    fi
+    pass "$1 -> rolled back, error state"
+}
+expect_rollback unhealthy unhealthy 1
+expect_rollback up-fails up-fails 1
+expect_rollback pull-fails pull-fails 0
+expect_rollback refresh-fails refresh-fails 0
+
+# --- 4. rollback copies never come from an earlier run --------------------------
+reset_host
+CALVIN_REFRESH_HOST=0 bash "$SCRIPT" > "$tmp/out4" 2>&1 || fail "no-refresh update failed"
+echo "OPERATOR-EDIT" > "$tmp/etc/docker-compose.yml"
 touch "$tmp/unhealthy"
-if bash "$SCRIPT" > "$tmp/out3" 2>&1; then fail "unhealthy update reported success"; fi
-assert_contains "$tmp/calls.log" '^docker tag sha256:0ld1mage ghcr.io/osterbergsimon/calvin:develop$' "previous image not restored"
-assert_eq "OLD-COMPOSE" "$(cat "$tmp/etc/docker-compose.yml")" "compose file not restored"
-[ "$(grep -c 'compose -f .* up -d' "$tmp/calls.log")" -ge 2 ] || fail "stack not restarted on the old image"
-assert_contains "$UPDATE_STATE_FILE" '"status": "error"'
-assert_contains "$UPDATE_STATE_FILE" 'rolled back' "state does not say it rolled back"
-pass "failed health check rolls back to the previous image and host files"
+CALVIN_REFRESH_HOST=0 bash "$SCRIPT" > "$tmp/out5" 2>&1 && fail "unhealthy update reported success"
+assert_eq OPERATOR-EDIT "$(cat "$tmp/etc/docker-compose.yml")" "restored a compose file saved by an earlier run"
+pass "rollback copies are per run"
