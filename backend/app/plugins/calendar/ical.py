@@ -12,12 +12,14 @@ from app.plugins.protocols import CalendarPlugin
 from app.utils.ical_parser import parse_ical_from_url
 
 _ICAL_INSTANCE_SCHEMA = {
+    # A private feed URL is a bearer credential: declared as a password so it
+    # is never sent back to the frontend (audit S5, calvin-ua2).
     "ical_url": {
-        "type": "string",
+        "type": "password",
         "description": "iCal feed URL",
         "default": "",
         "ui": {
-            "component": "input",
+            "component": "password",
             "placeholder": "https://example.com/calendar.ics",
             "validation": {
                 "required": True,

@@ -19,14 +19,31 @@ from app.plugins.loader import plugin_loader
 from app.plugins.manager import plugin_manager
 from app.plugins.registry.loader import load_plugin_types_for_single
 from app.plugins.utils.instance_manager import apply_plugin_config_update
+from app.plugins.utils.secrets import (
+    SecretEndpointChangedError,
+    check_secret_endpoint,
+    endpoint_keys_for_type,
+    keep_stored_secrets,
+    secret_keys_for_type,
+)
 from app.services.config_service import config_service
 from app.services.csp import get_sealed_mode
 from app.services.event_system import event_system
 from app.services.plugin_installer import plugin_installer
 from app.services.theme_installer import theme_installer
+from app.services.validation import validate_plugin_id
 
-from .config import normalize_plugin_config
+from .config import mask_sensitive_config, normalize_plugin_config
 from .themes import BUILTIN_THEMES, _unregister_theme_from_db
+
+
+def _require_valid_id(plugin_id: str) -> None:
+    """Reject an unsafe plugin/theme id with 400 before it reaches the filesystem."""
+    try:
+        validate_plugin_id(plugin_id)
+    except ValueError as e:
+        raise HTTPException(status_code=400, detail=str(e)) from e
+
 
 router = APIRouter()
 
@@ -332,6 +349,8 @@ async def install_plugin(
     """
     if not file.filename:
         raise HTTPException(status_code=400, detail="No file provided")
+    if plugin_id is not None:
+        _require_valid_id(plugin_id)
 
     # Save uploaded file to temporary location
     temp_path = None
@@ -423,6 +442,7 @@ async def get_installed_plugin(plugin_id: str):
     Returns:
         Plugin manifest
     """
+    _require_valid_id(plugin_id)
     manifest = plugin_installer.get_plugin_manifest(plugin_id)
     if not manifest:
         raise HTTPException(status_code=404, detail=f"Plugin {plugin_id} not found")
@@ -440,6 +460,7 @@ async def uninstall_plugin(plugin_id: str):
     Returns:
         Success message
     """
+    _require_valid_id(plugin_id)
     try:
         # Check if it's a theme by checking database
         db_type = await PluginTypeDB.objects.get_or_none(type_id=plugin_id)
@@ -626,6 +647,41 @@ async def get_plugin(plugin_id: str):
     return plugin_info
 
 
+async def _keep_stored_type_secrets(
+    plugin_id: str, config: dict[str, Any], instance_id: str | None = None
+) -> dict[str, Any]:
+    """
+    Fill secrets the settings form sent back blank or masked from what is stored.
+
+    Secrets are never sent to the frontend, so a blank one means "unchanged"
+    (audit S4). Stored values come from the type config and, when the update
+    targets an instance, from that instance. A stored secret is never reused
+    when the request changes the URL/host it authenticates against; that is a
+    400 asking the caller to re-enter it.
+    """
+    stored: dict[str, Any] = {}
+    stored_json = await config_service.get_value(f"plugin_{plugin_id}_config")
+    if stored_json:
+        try:
+            stored.update(json.loads(stored_json))
+        except json.JSONDecodeError:
+            pass
+    instance_id = instance_id or config.get("_instance_id")
+    if instance_id:
+        db_instance = await PluginDB.objects.get_or_none(id=instance_id, type_id=plugin_id)
+        if db_instance:
+            stored.update(db_instance.config or {})
+    known = {**stored, **config}
+    keys = secret_keys_for_type(plugin_id, known)
+    if not keys:
+        return config
+    try:
+        check_secret_endpoint(config, stored, keys, endpoint_keys_for_type(plugin_id, known))
+    except SecretEndpointChangedError as e:
+        raise HTTPException(status_code=400, detail=str(e)) from e
+    return keep_stored_secrets(config, stored, keys)
+
+
 async def _update_plugin_type(
     plugin_id: str,
     config: dict[str, Any],
@@ -644,7 +700,7 @@ async def _update_plugin_type(
     logger.debug(f"Updating plugin type {plugin_id} with config keys: {list(config.keys())}")
 
     # Clean config values - ensure all values are strings, not objects
-    cleaned_config = normalize_plugin_config(config)
+    cleaned_config = await _keep_stored_type_secrets(plugin_id, normalize_plugin_config(config))
     config = cleaned_config
 
     # Look up the registered plugin type first
@@ -751,7 +807,7 @@ async def _update_plugin_type(
         initial_schema = {**metadata_schema, **filtered_config}
         logger.debug(
             f"Creating new plugin type {plugin_id} with schema: {initial_schema}, "
-            f"config={config}, metadata_schema={metadata_schema}"
+            f"config={mask_sensitive_config(config)}, metadata_schema={metadata_schema}"
         )
         from app.utils.db_retry import retry_on_db_locked
 
@@ -783,7 +839,7 @@ async def _update_plugin_type(
             db_type.common_config_schema = updated_schema
             logger.debug(
                 f"Updated plugin {plugin_id} common_config_schema: "
-                f"old={current_schema}, new={updated_schema}, config={config}"
+                f"old={current_schema}, new={updated_schema}, config={mask_sensitive_config(config)}"
             )
         from app.utils.db_retry import retry_on_db_locked
 
@@ -1140,7 +1196,11 @@ async def geocode_location(plugin_id: str, request: dict[str, Any] = Body(...)):
 
 
 @router.post("/plugins/{plugin_id}/test")
-async def test_plugin(plugin_id: str, test_config: dict[str, Any] | None = Body(default=None)):
+async def test_plugin(
+    plugin_id: str,
+    test_config: dict[str, Any] | None = Body(default=None),
+    instance_id: str | None = None,
+):
     """
     Test plugin connection/configuration.
 
@@ -1149,6 +1209,8 @@ async def test_plugin(plugin_id: str, test_config: dict[str, Any] | None = Body(
     Args:
         plugin_id: Plugin type ID (e.g., 'imap', 'mealie')
         test_config: Optional config to use for testing (if not provided, uses saved config)
+        instance_id: Optional instance being edited; secrets left blank in
+            test_config are taken from its stored config
 
     Returns:
         Test result with success status and message
@@ -1159,7 +1221,9 @@ async def test_plugin(plugin_id: str, test_config: dict[str, Any] | None = Body(
 
     # Use provided test_config if available, otherwise get saved config
     if test_config:
-        config = normalize_plugin_config(test_config)
+        config = await _keep_stored_type_secrets(
+            plugin_id, normalize_plugin_config(test_config), instance_id
+        )
     else:
         # Get plugin config
         config_key = f"plugin_{plugin_id}_config"

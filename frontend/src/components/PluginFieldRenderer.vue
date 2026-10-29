@@ -133,6 +133,7 @@
       v-else-if="schema && typeof schema === 'object' && schema.type === 'password'"
       type="password"
       :value="fieldValue"
+      :placeholder="ui?.placeholder"
       class="form-input"
       @input="$emit('update', $event.target.value)"
     />

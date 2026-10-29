@@ -2,6 +2,7 @@
 
 import hashlib
 import os
+import uuid
 from pathlib import Path
 from typing import Any
 
@@ -243,6 +244,28 @@ class LocalImagePlugin(ImagePlugin):
         self._images = images
         return images
 
+    def _safe_upload_path(self, filename: str) -> Path:
+        """
+        Turn an untrusted upload filename into a new file path inside image_dir.
+
+        Keeps only the basename (either separator), falls back to a generated
+        name for empty/hidden names, never reuses an existing file, and asserts
+        the result is a direct child of image_dir (audit S3).
+        """
+        name = (filename or "").replace("\\", "/").rsplit("/", 1)[-1].strip()
+        if not name or name.startswith("."):
+            suffix = Path(name).suffix.lower()
+            suffix = suffix if suffix in self.supported_formats else ".jpg"
+            name = f"upload-{uuid.uuid4().hex[:12]}{suffix}"
+        file_path = self.image_dir / name
+        if file_path.exists():
+            file_path = (
+                self.image_dir / f"{file_path.stem}-{uuid.uuid4().hex[:8]}{file_path.suffix}"
+            )
+        if file_path.resolve().parent != self.image_dir.resolve():
+            raise ValueError(f"Upload filename escapes the image directory: {filename!r}")
+        return file_path
+
     async def upload_image(self, file_data: bytes, filename: str) -> dict[str, Any] | None:
         """
         Upload an image to the local filesystem.
@@ -257,9 +280,8 @@ class LocalImagePlugin(ImagePlugin):
         try:
             # Ensure image directory exists
             self.image_dir.mkdir(parents=True, exist_ok=True)
-            # Save file to image directory
-            file_path = self.image_dir / filename
-            with open(file_path, "wb") as f:
+            file_path = self._safe_upload_path(filename)
+            with open(file_path, "xb") as f:
                 f.write(file_data)
 
             # Rescan to include new image
