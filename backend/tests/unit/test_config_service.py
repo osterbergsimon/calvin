@@ -243,6 +243,57 @@ async def test_cache_functionality(test_db):
 
 @pytest.mark.asyncio
 @pytest.mark.unit
+async def test_set_value_is_an_upsert_not_read_then_create(test_db, monkeypatch):
+    """A stale read must not turn a write into a UNIQUE violation (audit R11).
+
+    Two concurrent writes of a new key both saw "no row", then both created —
+    one raised. The write is now a single INSERT ... ON CONFLICT DO UPDATE, so
+    it succeeds even when the lookup says the row is missing.
+    """
+    from app.models.db_models import ConfigDB
+
+    service = ConfigService()
+    await service.set_value("raced_key", "first")
+
+    async def always_missing(*args, **kwargs):
+        return None
+
+    monkeypatch.setattr(ConfigDB.objects, "get_or_none", always_missing)
+
+    await service.set_value("raced_key", "second")
+
+    assert await service.get_value("raced_key") == "second"
+
+
+@pytest.mark.asyncio
+@pytest.mark.unit
+async def test_set_value_retries_a_locked_database(test_db, monkeypatch):
+    """set_value retries instead of surfacing "database is locked" (audit R11)."""
+    from sqlalchemy.exc import OperationalError
+
+    import app.services.config_service as config_service_module
+
+    service = ConfigService()
+    real_write = config_service_module._execute_upsert
+    calls = 0
+
+    async def flaky_write(*args, **kwargs):
+        nonlocal calls
+        calls += 1
+        if calls == 1:
+            raise OperationalError("INSERT", {}, Exception("database is locked"))
+        return await real_write(*args, **kwargs)
+
+    monkeypatch.setattr(config_service_module, "_execute_upsert", flaky_write)
+
+    await service.set_value("locked_key", "value")
+
+    assert calls == 2
+    assert await service.get_value("locked_key") == "value"
+
+
+@pytest.mark.asyncio
+@pytest.mark.unit
 async def test_error_handling_missing_table(test_db):
     """Test that get_value handles missing table gracefully."""
     service = ConfigService()

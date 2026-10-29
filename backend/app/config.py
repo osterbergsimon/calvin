@@ -79,6 +79,11 @@ class Settings(BaseSettings):
     image_dir: Path = Path("images")
     # Remote image bytes cache (app.services.remote_image_cache)
     image_cache_dir: Path = Path("image_cache")
+    # Total size cap for that cache; least recently used images are evicted
+    # past it, so the cache can't slowly fill the SD card.
+    image_cache_max_mb: int = Field(default=500, ge=1)
+    # A single remote image larger than this is refused, not read into memory.
+    image_cache_max_item_mb: int = Field(default=25, ge=1)
 
     # Plugin Storage.
     # Deploy configs (docker compose, deploy/calvin.env.example) set the

@@ -277,10 +277,17 @@ async def load_plugin_instances() -> None:
                     try:
                         await plugin.initialize()
                         plugin.start()
-                    except Exception:
+                    except (Exception, SystemExit):
+                        # SystemExit: a plugin calling sys.exit() must not take
+                        # the whole startup down with it (audit R12).
                         logger.exception("Error initializing plugin {}", db_plugin.id)
                         plugin.stop()
-                except Exception:
+                        try:
+                            db_plugin.enabled = False
+                            await db_plugin.save_with_timestamp()
+                        except Exception:
+                            logger.exception("Error marking plugin {} disabled", db_plugin.id)
+                except (Exception, SystemExit):
                     logger.exception("Error configuring plugin {}", db_plugin.id)
                     # Only disable this specific plugin on error
                     try:

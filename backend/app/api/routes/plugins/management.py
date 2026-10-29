@@ -29,7 +29,7 @@ from app.plugins.utils.secrets import (
 from app.services.config_service import config_service
 from app.services.csp import get_sealed_mode
 from app.services.event_system import event_system
-from app.services.plugin_installer import plugin_installer
+from app.services.plugin_installer import plugin_installer, run_installer_op
 from app.services.theme_installer import theme_installer
 from app.services.validation import validate_plugin_id
 
@@ -362,7 +362,7 @@ async def install_plugin(
 
         # Install plugin
         try:
-            manifest = plugin_installer.install_plugin(temp_path, plugin_id)
+            manifest = await run_installer_op(plugin_installer.install_plugin, temp_path, plugin_id)
 
             # Reload plugins to include the newly installed one
             plugin_loader.load_installed_plugins()
@@ -376,7 +376,7 @@ async def install_plugin(
             if validation_errors:
                 # Roll back: remove the broken plugin so the user can fix and retry.
                 try:
-                    plugin_installer.uninstall_plugin(installed_id)
+                    await run_installer_op(plugin_installer.uninstall_plugin, installed_id)
                 except Exception as cleanup_exc:  # noqa: BLE001
                     logger.warning(
                         "Failed to roll back invalid plugin {} after validation errors: {}",
@@ -499,7 +499,7 @@ async def uninstall_plugin(plugin_id: str):
             }
         else:
             # Uninstall regular plugin
-            plugin_installer.uninstall_plugin(plugin_id)
+            await run_installer_op(plugin_installer.uninstall_plugin, plugin_id)
 
             # Stop and delete all instances of this plugin type
             db_instances = await PluginDB.objects.filter(type_id=plugin_id).all()

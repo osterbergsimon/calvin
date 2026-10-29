@@ -175,7 +175,9 @@ class PluginManager:
                                 "Error registering scheduled tasks for backend plugin {}",
                                 plugin.plugin_id,
                             )
-                except Exception:
+                except (Exception, SystemExit):
+                    # SystemExit: a plugin calling sys.exit() in initialize()
+                    # must not kill the process (audit R12).
                     logger.exception("Error initializing plugin {}", plugin.plugin_id)
                     # Plugin failed to initialize, so it's not running
                     plugin.stop()
@@ -288,7 +290,7 @@ class PluginManager:
                         )
 
             return True
-        except Exception:
+        except (Exception, SystemExit):
             logger.exception("Error starting plugin {}", plugin_id)
             plugin.stop()
             return False
