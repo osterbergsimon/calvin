@@ -194,7 +194,7 @@ rolled back to an older bundle will be adopted.
 ### Manifest signing (closing the LAN-MITM)
 
 The backend signs the bundle manifest with HMAC-SHA256 using a shared secret generated on first
-run at `./data/kiosk-signing.key` (mode `0600`; the path is logged the first time it is created).
+run at `<data dir>/kiosk-signing.key` (see [Data directory](../configuration/DATA_DIR.md); mode `0600`; the path is logged the first time it is created).
 When a kiosk has that secret baked, it verifies the manifest signature before trusting the
 manifest, the file hashes, or any downloaded file — closing the LAN man-in-the-middle gap that
 plain sha256 integrity leaves open.
@@ -205,8 +205,8 @@ plain sha256 integrity leaves open.
    creates it at startup and logs the path (`Kiosk manifest signing key: …`):
    - Unraid: `/mnt/user/appdata/calvin/kiosk-signing.key`
    - Docker: `/var/lib/calvin/kiosk-signing.key` in the container, which is the data volume
-     (`KIOSK_SIGNING_KEY_PATH`), so it survives image updates
-   - Source checkout: `./data/kiosk-signing.key` relative to the backend's working directory
+     (`CALVIN_DATA_DIR`), so it survives image updates
+   - Source checkout: `backend/data/kiosk-signing.key` (or `$CALVIN_DATA_DIR/kiosk-signing.key`)
 2. Pass it to provisioning:
    - Over SSH: copy the key **and** `install-kiosk.sh` from the server, then run
      `sudo bash install-kiosk.sh --backend-url <url> --signing-key-file <path>` (exact commands in
@@ -224,7 +224,7 @@ LAN-trust), or uses an unknown algorithm. A kiosk with **no** key baked keeps th
 LAN-trust behavior, so signing is opt-in per kiosk — but note the backend always signs, so a
 keyed kiosk requires a backend running this version or newer.
 
-**Key rotation:** delete `./data/kiosk-signing.key` on the server (a new one is generated on the
+**Key rotation:** delete `<data dir>/kiosk-signing.key` on the server (a new one is generated on the
 next manifest request) and re-bake / re-run `--signing-key` on each kiosk. There is no automatic
 rotation.
 

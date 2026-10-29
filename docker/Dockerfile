@@ -74,12 +74,9 @@ COPY --from=backend-builder /build/alembic.ini /app/alembic.ini
 # dependencies into the venv at runtime (the uv venv has no pip).
 COPY --from=backend-builder /usr/local/bin/uv /usr/local/bin/uv
 
-# Built-in themes ship with the image; the entrypoint copies them onto
-# the data volume on every start. /app/data points at the volume so the
-# backend's relative ./data/... paths (installed themes, caches)
-# persist across container recreation.
-COPY backend/data/themes/builtin.json /app/defaults/themes/builtin.json
-RUN ln -s /var/lib/calvin /app/data
+# Built-in themes ship with the code (read from <backend>/data/themes, not
+# the data dir). Everything the backend writes goes under CALVIN_DATA_DIR.
+COPY backend/data/themes/builtin.json /app/data/themes/builtin.json
 
 # Frontend dist — FastAPI serves /assets/* and falls back to index.html
 # for SPA routing. Backend's main.py probes ../frontend/dist relative
@@ -93,15 +90,13 @@ COPY deploy/kiosk-agent /app/kiosk-bundle/deploy/kiosk-agent
 COPY deploy/systemd /app/kiosk-bundle/deploy/systemd
 COPY scripts/setup-kiosk.sh scripts/setup-common.sh /app/kiosk-bundle/scripts/
 
-# Runtime data directory (overridable via CALVIN_DATA_DIR / volume mount)
-RUN mkdir -p /var/lib/calvin/db /var/lib/calvin/images /var/lib/calvin/plugins /app/logs
+# Runtime data directory: the root of every path the backend writes (DB,
+# images, plugins, themes, caches, logs, kiosk signing key, backups).
+# DATABASE_URL, IMAGE_DIR, PLUGIN_DIR, ... still override single paths.
+RUN mkdir -p /var/lib/calvin/db /var/lib/calvin/images /var/lib/calvin/plugins
 
 ENV CALVIN_DATA_DIR=/var/lib/calvin \
-    DATABASE_URL=sqlite:////var/lib/calvin/db/calvin.db \
-    IMAGE_DIR=/var/lib/calvin/images \
-    PLUGIN_DIR=/var/lib/calvin/plugins \
     KIOSK_BUNDLE_DIR=/app/kiosk-bundle \
-    KIOSK_SIGNING_KEY_PATH=/var/lib/calvin/kiosk-signing.key \
     CALVIN_PORT=8000 \
     CALVIN_DEPLOYMENT=docker \
     VIRTUAL_ENV=/app/.venv \
