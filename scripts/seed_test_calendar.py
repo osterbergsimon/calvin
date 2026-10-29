@@ -25,11 +25,13 @@ from __future__ import annotations
 
 import argparse
 import json
+import os
 import sys
 import urllib.error
 import urllib.request
 from datetime import date, datetime, timedelta
 from functools import partial
+from http.cookiejar import CookieJar
 from http.server import SimpleHTTPRequestHandler, ThreadingHTTPServer
 from pathlib import Path
 
@@ -196,13 +198,15 @@ def start_server(directory: Path, port: int) -> ThreadingHTTPServer:
 
 
 # ── API registration ────────────────────────────────────────────────────────
-def _request(method: str, url: str, payload: dict | None) -> tuple[int, str]:
+def _request(
+    opener: urllib.request.OpenerDirector, method: str, url: str, payload: dict | None
+) -> tuple[int, str]:
     data = json.dumps(payload).encode() if payload is not None else None
     req = urllib.request.Request(url, data=data, method=method)
     if data is not None:
         req.add_header("Content-Type", "application/json")
     try:
-        with urllib.request.urlopen(req, timeout=15) as resp:
+        with opener.open(req, timeout=15) as resp:
             return resp.status, resp.read().decode()
     except urllib.error.HTTPError as e:
         return e.code, e.read().decode()
@@ -210,7 +214,21 @@ def _request(method: str, url: str, payload: dict | None) -> tuple[int, str]:
         return 0, str(e)
 
 
-def register_source(api: str, ics_url: str) -> bool:
+def login(api: str, password: str, opener: urllib.request.OpenerDirector) -> bool:
+    """Log in with CALVIN_ADMIN_PASSWORD; the cookie jar carries the session."""
+    status, text = _request(opener, "POST", f"{api}/api/auth/login", {"password": password})
+    if status == 200:
+        print("✓ Logged in as admin (CALVIN_ADMIN_PASSWORD).")
+        return True
+    if status == 401 and "setup_required" in text:
+        print("✗ No admin password is configured yet. Open Settings in Calvin and choose one,")
+        print("  or start Calvin with CALVIN_ADMIN_PASSWORD set.")
+    else:
+        print(f"✗ Admin login failed ({status}): {text[:200]}")
+    return False
+
+
+def register_source(api: str, ics_url: str, opener: urllib.request.OpenerDirector) -> bool:
     payload = {
         "id": SOURCE_ID,
         "type": "ical",
@@ -220,13 +238,13 @@ def register_source(api: str, ics_url: str) -> bool:
         "color": SOURCE_COLOR,
         "show_time": True,
     }
-    status, text = _request("POST", f"{api}/api/calendar/sources", payload)
+    status, text = _request(opener, "POST", f"{api}/api/calendar/sources", payload)
     if status in (200, 201):
         print(f"✓ Registered calendar source '{SOURCE_ID}'.")
         return True
     # Already exists (or add rejected) → try updating in place.
     status_put, text_put = _request(
-        "PUT", f"{api}/api/calendar/sources/{SOURCE_ID}", payload
+        opener, "PUT", f"{api}/api/calendar/sources/{SOURCE_ID}", payload
     )
     if status_put == 200:
         print(f"✓ Updated existing calendar source '{SOURCE_ID}'.")
@@ -265,12 +283,23 @@ def main() -> int:
     print(f"✓ Serving iCal at {ics_url}")
 
     if not args.no_register:
-        register_source(args.api, ics_url)
+        opener = urllib.request.build_opener(urllib.request.HTTPCookieProcessor(CookieJar()))
+        password = os.environ.get("CALVIN_ADMIN_PASSWORD", "")
+        if password:
+            if not login(args.api, password, opener):
+                return 1
+        else:
+            print("! CALVIN_ADMIN_PASSWORD is not set — registering a source needs an admin session.")
+            print("  Set it to Calvin's admin password and re-run this script.")
+        register_source(args.api, ics_url, opener)
         # Nudge the backend to fetch fresh data now.
-        _request("POST", f"{args.api}/api/calendar/refresh", None)
+        _request(opener, "POST", f"{args.api}/api/calendar/refresh", None)
 
     print("\nLeave this running while you test the calendar. Press Ctrl+C to stop.")
-    print(f"Remove the source later: curl -X DELETE {args.api}/api/calendar/sources/{SOURCE_ID}")
+    print(
+        "Remove the source later from Settings, or with an admin session: "
+        f"DELETE {args.api}/api/calendar/sources/{SOURCE_ID}"
+    )
     try:
         import time
 
