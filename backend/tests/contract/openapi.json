@@ -4225,6 +4225,26 @@
         ]
       }
     },
+    "/api/system/environment": {
+      "get": {
+        "description": "Report the deployment and which host actions the UI can offer.",
+        "operationId": "get_environment_api_system_environment_get",
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            },
+            "description": "Successful Response"
+          }
+        },
+        "summary": "Get Environment",
+        "tags": [
+          "system"
+        ]
+      }
+    },
     "/api/system/reboot": {
       "post": {
         "description": "Reboot the Raspberry Pi.",

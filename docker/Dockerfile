@@ -103,6 +103,7 @@ ENV CALVIN_DATA_DIR=/var/lib/calvin \
     KIOSK_BUNDLE_DIR=/app/kiosk-bundle \
     KIOSK_SIGNING_KEY_PATH=/var/lib/calvin/kiosk-signing.key \
     CALVIN_PORT=8000 \
+    CALVIN_DEPLOYMENT=docker \
     VIRTUAL_ENV=/app/.venv \
     UV_CACHE_DIR=/tmp/uv-cache \
     PATH="/app/.venv/bin:$PATH"
@@ -116,7 +117,11 @@ COPY docker/entrypoint.sh /usr/local/bin/calvin-entrypoint
 
 EXPOSE 8000
 
-HEALTHCHECK --interval=30s --timeout=5s --start-period=15s --retries=3 \
+# Generous start period: the entrypoint re-installs plugin packages (and
+# fixes appdata ownership) before the server starts, which can take a
+# while on a fresh container. Failures during it don't count, and the
+# first success ends it, so a fast start is still reported healthy fast.
+HEALTHCHECK --interval=30s --timeout=5s --start-period=180s --retries=3 \
     CMD curl -fsS http://localhost:8000/api/health || exit 1
 
 ENTRYPOINT ["calvin-entrypoint"]

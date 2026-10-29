@@ -230,6 +230,7 @@ class TestSystemUpdateEndpoints:
         original_settings = system_routes.settings
 
         class _StubSettings:
+            deployment = "native"
             repo_dir = tmp_path
             system_path = original_settings.system_path
 
