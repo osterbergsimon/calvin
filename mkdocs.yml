@@ -91,6 +91,7 @@ nav:
     - configuration/REMOTE_CONFIG.md
     - configuration/SETTINGS_SAVE_BEHAVIOR.md
     - configuration/BACKUP_RESTORE.md
+    - configuration/DATA_DIR.md
   - Architecture:
     - EVENT_SYSTEM.md
     - IMAP_LOCAL_IMAGES_RELATIONSHIP.md

@@ -104,7 +104,7 @@ plugin).
 
 `/mnt/user/appdata/calvin/kiosk-signing.key` signs kiosk updates. It is
 the key that [manifest signing](KIOSK_PROVISIONING.md#manifest-signing-closing-the-lan-mitm)
-calls `./data/kiosk-signing.key`; read it with
+calls `<data dir>/kiosk-signing.key`; read it with
 `cat /mnt/user/appdata/calvin/kiosk-signing.key`. If you lose it, a new
 key is generated, and every kiosk that has the old key baked in must be
 given the new one.

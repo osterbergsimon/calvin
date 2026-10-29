@@ -26,13 +26,8 @@ SCHEDULE_KEYS = {
 
 
 def backup_dir() -> Path:
-    """BACKUP_DIR, else $CALVIN_DATA_DIR/backups, else <db dir>/../backups."""
-    if settings.backup_dir:
-        path = Path(settings.backup_dir)
-    elif os.environ.get("CALVIN_DATA_DIR"):
-        path = Path(os.environ["CALVIN_DATA_DIR"]) / "backups"
-    else:
-        path = settings.database_path.parent.parent / "backups"
+    """BACKUP_DIR, else <data dir>/backups (see app.config)."""
+    path = Path(settings.backup_dir)
     path.mkdir(parents=True, exist_ok=True)
     return path
 

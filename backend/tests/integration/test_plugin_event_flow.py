@@ -126,7 +126,7 @@ class MockEventLoggerPlugin(BackendPlugin):
 
 
 @pytest.mark.asyncio
-async def test_imap_download_triggers_image_processor():
+async def test_imap_download_triggers_image_processor(monkeypatch):
     """Test that IMAP downloading an image triggers ImageProcessor via events."""
     from app.plugins.image.local import LocalImagePlugin
 
@@ -135,13 +135,14 @@ async def test_imap_download_triggers_image_processor():
         image_dir = Path(temp_dir) / "images"
         image_dir.mkdir(parents=True, exist_ok=True)
 
-        # Create LocalImagePlugin
+        # Create LocalImagePlugin (IMAGE_DIR decides where it stores images)
+        monkeypatch.setenv("IMAGE_DIR", str(image_dir))
         local_plugin = LocalImagePlugin(
             plugin_id="local-images",
             name="Local Images",
             enabled=True,
         )
-        await local_plugin.configure({"image_dir": str(image_dir)})
+        await local_plugin.configure({})
         await local_plugin.initialize()
 
         # Create ImageProcessorPlugin
@@ -242,7 +243,7 @@ async def test_image_processor_emits_processed_event():
 
 
 @pytest.mark.asyncio
-async def test_full_event_chain_imap_to_processor_to_logger():
+async def test_full_event_chain_imap_to_processor_to_logger(monkeypatch):
     """Test full event chain: IMAP download → image_uploaded → image_processed."""
     from app.plugins.image.local import LocalImagePlugin
 
@@ -251,13 +252,14 @@ async def test_full_event_chain_imap_to_processor_to_logger():
         image_dir = Path(temp_dir) / "images"
         image_dir.mkdir(parents=True, exist_ok=True)
 
-        # Create LocalImagePlugin
+        # Create LocalImagePlugin (IMAGE_DIR decides where it stores images)
+        monkeypatch.setenv("IMAGE_DIR", str(image_dir))
         local_plugin = LocalImagePlugin(
             plugin_id="local-images",
             name="Local Images",
             enabled=True,
         )
-        await local_plugin.configure({"image_dir": str(image_dir)})
+        await local_plugin.configure({})
         await local_plugin.initialize()
 
         # Create ImageProcessorPlugin

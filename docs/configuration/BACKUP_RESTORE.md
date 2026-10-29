@@ -87,9 +87,9 @@ packages and secrets but not the signing key. Backups saved there before a
 restore (`pre-restore-*`) and by **Save a backup now** are never deleted
 automatically. The schedule is also available at `GET/PUT /api/backup/schedule`.
 
-The backup folder is, in order of preference: `BACKUP_DIR`;
-`$CALVIN_DATA_DIR/backups` (Docker/Unraid: `/var/lib/calvin/backups`); next to
-the database's data folder (dev: `backend/data/backups`).
+The backup folder is `BACKUP_DIR` if set, else `backups/` in the
+[data directory](DATA_DIR.md) (Docker/Unraid: `/var/lib/calvin/backups`;
+source checkout: `backend/data/backups`).
 
 ## Restoring
 

@@ -20,6 +20,9 @@ services:
     working_dir: /app/backend
     restart: unless-stopped
     environment:
+      # Container-side data root (the mount below), so nothing the backend
+      # writes lands in the bind-mounted checkout.
+      CALVIN_DATA_DIR: /var/lib/calvin
       DATABASE_URL: ${DATABASE_URL:-sqlite:////var/lib/calvin/db/calvin.db}
       IMAGE_DIR: ${IMAGE_DIR:-/var/lib/calvin/images}
       PLUGIN_DIR: ${PLUGIN_DIR:-/var/lib/calvin/plugins}

@@ -47,6 +47,7 @@ New to Calvin? Get started quickly:
 - Remote configuration
 - Settings behavior
 - [Backup and restore](configuration/BACKUP_RESTORE.md)
+- [Data directory (`CALVIN_DATA_DIR`)](configuration/DATA_DIR.md)
 - System configuration
 
 ### Architecture

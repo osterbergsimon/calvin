@@ -1,39 +1,23 @@
 """Theme helper functions for plugin management."""
 
 import json
-from pathlib import Path
 from typing import Any
 
 from loguru import logger
 
+from app.config import BACKEND_DIR
 from app.models.db_models import PluginTypeDB
 from app.plugins.base import PluginType
 
 
 def _load_builtin_themes() -> dict[str, Any]:
     """Load built-in themes from JSON file."""
-    # Path: backend/app/api/routes/plugins/themes.py -> backend/data/themes/builtin.json
-    # __file__ is at backend/app/api/routes/plugins/themes.py
-    # .parent = backend/app/api/routes/plugins/
-    # .parent.parent = backend/app/api/routes/
-    # .parent.parent.parent = backend/app/api/
-    # .parent.parent.parent.parent = backend/app/
-    # .parent.parent.parent.parent.parent = backend/
-    backend_dir = Path(__file__).parent.parent.parent.parent.parent
-    themes_file = backend_dir / "data" / "themes" / "builtin.json"
-
-    # Try alternative path if first doesn't work (for when running from different locations)
+    # Ships with the code (backend/data/themes/builtin.json), independent of
+    # the data dir where installed themes live.
+    themes_file = BACKEND_DIR / "data" / "themes" / "builtin.json"
     if not themes_file.exists():
-        # Try relative to current working directory
-        cwd_themes = Path.cwd() / "data" / "themes" / "builtin.json"
-        if cwd_themes.exists():
-            themes_file = cwd_themes
-        else:
-            logger.warning(
-                f"Built-in themes file not found at {themes_file} or {cwd_themes}, "
-                "using empty themes"
-            )
-            return {}
+        logger.warning(f"Built-in themes file not found at {themes_file}, using empty themes")
+        return {}
 
     try:
         with open(themes_file, encoding="utf-8") as f:

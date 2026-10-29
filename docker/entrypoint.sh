@@ -4,10 +4,8 @@
 # Runs as root, prepares the data volume, then drops to PUID:PGID (when
 # set) before exec'ing the server. Steps:
 #
-#   1. Make sure the data layout exists and refresh the image-owned
-#      built-in themes file. /app/data is a symlink to the data volume,
-#      so every relative ./data/... write the backend does (installed
-#      themes, caches) lands on the volume too.
+#   1. Make sure the data layout exists. The backend derives every path
+#      it writes from CALVIN_DATA_DIR, so all of it lands on the volume.
 #   2. Re-install plugin pip dependencies. Plugins live on the volume,
 #      but their packages go into the image's venv, which is replaced
 #      whenever the container is recreated (image update). Reading
@@ -19,7 +17,7 @@
 #      paths are touched.
 set -eu
 
-DATA_DIR=/var/lib/calvin
+DATA_DIR="${CALVIN_DATA_DIR:-/var/lib/calvin}"
 VENV=/app/.venv
 PUID="${PUID:-0}"
 PGID="${PGID:-0}"
@@ -27,7 +25,6 @@ PGID="${PGID:-0}"
 umask "${UMASK:-022}"
 
 mkdir -p "$DATA_DIR/db" "$DATA_DIR/images" "$DATA_DIR/plugins" "$DATA_DIR/themes"
-cp /app/defaults/themes/builtin.json "$DATA_DIR/themes/builtin.json"
 
 if [ "$(id -u)" = 0 ]; then
     PLUGIN_DIR="${PLUGIN_DIR:-$DATA_DIR/plugins}"
