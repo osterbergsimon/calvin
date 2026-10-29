@@ -95,7 +95,8 @@ beforeEach(() => {
   const applyDefaults = instance => {
     // Default config response - prevents errors when useTheme calls fetchConfig
     instance.get.mockImplementation(url => {
-      if (url === "/api/config" || url?.includes("/api/config")) {
+      // "/config" is the same route through the shared services/api.js client.
+      if (url === "/api/config" || url === "/config" || url?.includes("/api/config")) {
         return Promise.resolve({
           data: {
             orientation: "landscape",

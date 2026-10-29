@@ -76,7 +76,8 @@ async def register_plugin(
 
     await _save_plugin_to_db()
 
-    # Initialize plugin
+    # Initialize plugin, and mark an enabled one running: data routes (e.g.
+    # GET /plugins/{id}/data) refuse instances that aren't running.
     try:
         await plugin.initialize()
     except SystemExit as exc:
@@ -87,7 +88,6 @@ async def register_plugin(
         )
         plugin.stop()
         try:
-            from app.utils.db_retry import retry_on_db_locked
 
             @retry_on_db_locked(max_retries=3, initial_delay=0.1, max_delay=0.5)
             async def _disable_row() -> None:
@@ -99,6 +99,9 @@ async def register_plugin(
             await _disable_row()
         except Exception:
             logger.exception("Failed to mark plugin {} disabled", plugin_id)
+    else:
+        if plugin.enabled:
+            plugin.start()
 
     return plugin
 

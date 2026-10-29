@@ -5,16 +5,19 @@ import KeyboardTab from "@/components/settings/tabs/layout/KeyboardTab.vue";
 import KeyBindingBoard from "@/components/settings/tabs/layout/keyboard/KeyBindingBoard.vue";
 import ActionPicker from "@/components/settings/tabs/layout/keyboard/ActionPicker.vue";
 import { useKeyboardStore } from "@/stores/keyboard";
-import axios from "axios";
+import api from "@/services/api";
 
-vi.mock("axios");
+vi.mock("@/services/api", () => ({
+  default: { get: vi.fn(), post: vi.fn(), put: vi.fn(), delete: vi.fn() },
+  LONG_REQUEST_TIMEOUT: 600000,
+}));
 
 describe("KeyboardTab", () => {
   beforeEach(() => {
     setActivePinia(createPinia());
     vi.clearAllMocks();
-    axios.get.mockResolvedValue({ data: { mappings: { KEY_1: "generic_prev" } } });
-    axios.put.mockResolvedValue({ data: {} });
+    api.get.mockResolvedValue({ data: { mappings: { KEY_1: "generic_prev" } } });
+    api.put.mockResolvedValue({ data: {} });
   });
 
   it("loads mappings and renders the board", async () => {
@@ -34,7 +37,7 @@ describe("KeyboardTab", () => {
     expect(w.findComponent(ActionPicker).exists()).toBe(true);
     w.findComponent(ActionPicker).vm.$emit("select", "generic_next");
     await flushPromises();
-    expect(axios.put).toHaveBeenCalledWith("/api/keyboard/mappings/KEY_1", {
+    expect(api.put).toHaveBeenCalledWith("/keyboard/mappings/KEY_1", {
       action: "generic_next",
     });
     expect(store.mappings.KEY_1).toBe("generic_next");

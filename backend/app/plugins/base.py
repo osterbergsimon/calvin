@@ -63,6 +63,10 @@ class BasePlugin(ABC):
         self.enabled = enabled
         self.config: dict[str, Any] = {}
         self._running = False  # Runtime state: whether plugin is currently running
+        # Set when someone stops the instance on purpose (stop route); cleared on
+        # start. Lets data routes tell "stopped by the user" apart from "never
+        # came up" (e.g. initialize() failed at boot), which may be retried.
+        self.stopped_by_request = False
 
     @property
     @abstractmethod
@@ -220,6 +224,7 @@ class BasePlugin(ABC):
         if not self.enabled:
             raise RuntimeError(f"Cannot start disabled plugin {self.plugin_id}")
         self._running = True
+        self.stopped_by_request = False
 
     def stop(self) -> None:
         """

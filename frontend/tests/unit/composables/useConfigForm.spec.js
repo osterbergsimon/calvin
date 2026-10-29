@@ -162,7 +162,6 @@ describe("useConfigForm", () => {
     it("should update a single config value", async () => {
       const mockConfig = { orientation: "landscape" };
       configApi.getConfig.mockResolvedValue(mockConfig);
-      configApi.updateConfig.mockResolvedValue({});
       mockConfigStore.updateConfig.mockResolvedValue({});
 
       const form = useConfigForm();
@@ -171,9 +170,9 @@ describe("useConfigForm", () => {
       await form.updateConfigValue("orientation", "portrait");
 
       expect(form.localConfig.value.orientation).toBe("portrait");
-      expect(configApi.updateConfig).toHaveBeenCalledWith({
-        orientation: "portrait",
-      });
+      // One POST per save: the store sends it, configApi isn't called too (audit R9).
+      expect(configApi.updateConfig).not.toHaveBeenCalled();
+      expect(mockConfigStore.updateConfig).toHaveBeenCalledTimes(1);
       expect(mockConfigStore.updateConfig).toHaveBeenCalledWith({
         orientation: "portrait",
       });
@@ -187,7 +186,6 @@ describe("useConfigForm", () => {
     it("should set saving flag during update", async () => {
       const mockConfig = {};
       configApi.getConfig.mockResolvedValue(mockConfig);
-      configApi.updateConfig.mockResolvedValue({});
       mockConfigStore.updateConfig.mockResolvedValue({});
 
       const form = useConfigForm();
@@ -206,7 +204,7 @@ describe("useConfigForm", () => {
       const mockConfig = {};
       configApi.getConfig.mockResolvedValue(mockConfig);
       const error = new Error("Update failed");
-      configApi.updateConfig.mockRejectedValue(error);
+      mockConfigStore.updateConfig.mockRejectedValue(error);
 
       const form = useConfigForm();
       await form.loadConfig();
@@ -235,7 +233,7 @@ describe("useConfigForm", () => {
         },
         message: "Request failed",
       };
-      configApi.updateConfig.mockRejectedValue(error);
+      mockConfigStore.updateConfig.mockRejectedValue(error);
 
       const form = useConfigForm();
       await form.loadConfig();
@@ -250,7 +248,6 @@ describe("useConfigForm", () => {
     it("should update multiple config values", async () => {
       const mockConfig = {};
       configApi.getConfig.mockResolvedValue(mockConfig);
-      configApi.updateConfig.mockResolvedValue({});
       mockConfigStore.updateConfig.mockResolvedValue({});
 
       const form = useConfigForm();
@@ -265,7 +262,7 @@ describe("useConfigForm", () => {
 
       expect(form.localConfig.value.orientation).toBe("portrait");
       expect(form.localConfig.value.calendarSplit).toBe(75);
-      expect(configApi.updateConfig).toHaveBeenCalledWith(updates);
+      expect(configApi.updateConfig).not.toHaveBeenCalled();
       expect(mockConfigStore.updateConfig).toHaveBeenCalledWith(updates);
     });
 
@@ -275,7 +272,6 @@ describe("useConfigForm", () => {
         calendarSplit: 70,
       };
       configApi.getConfig.mockResolvedValue(mockConfig);
-      configApi.updateConfig.mockResolvedValue({});
       mockConfigStore.updateConfig.mockResolvedValue({});
 
       const form = useConfigForm();
@@ -296,7 +292,6 @@ describe("useConfigForm", () => {
         orientation: "landscape",
       };
       configApi.getConfig.mockResolvedValue(mockConfig);
-      configApi.updateConfig.mockResolvedValue({});
       mockConfigStore.updateConfig.mockResolvedValue({});
 
       const form = useConfigForm();
@@ -304,14 +299,13 @@ describe("useConfigForm", () => {
 
       await form.saveConfig();
 
-      expect(configApi.updateConfig).toHaveBeenCalledWith(form.localConfig.value);
+      expect(configApi.updateConfig).not.toHaveBeenCalled();
       expect(mockConfigStore.updateConfig).toHaveBeenCalledWith(form.localConfig.value);
     });
 
     it("should save specific updates", async () => {
       const mockConfig = {};
       configApi.getConfig.mockResolvedValue(mockConfig);
-      configApi.updateConfig.mockResolvedValue({});
       mockConfigStore.updateConfig.mockResolvedValue({});
 
       const form = useConfigForm();
@@ -321,7 +315,7 @@ describe("useConfigForm", () => {
 
       await form.saveConfig(updates);
 
-      expect(configApi.updateConfig).toHaveBeenCalledWith(updates);
+      expect(configApi.updateConfig).not.toHaveBeenCalled();
       expect(mockConfigStore.updateConfig).toHaveBeenCalledWith(updates);
     });
   });
