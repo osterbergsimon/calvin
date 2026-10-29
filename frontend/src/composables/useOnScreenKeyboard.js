@@ -1,4 +1,4 @@
-import { computed, inject, nextTick, onScopeDispose, ref, watch } from "vue";
+import { computed, inject, nextTick, onScopeDispose, readonly, ref, watch } from "vue";
 import { routeLocationKey } from "vue-router";
 import { useConfigStore } from "../stores/config";
 import { useTouchCapability } from "./useTouchCapability";
@@ -28,6 +28,18 @@ const HEIGHT_RATIO = 0.45;
 const SHIFT_LOCK_WINDOW_MS = 400;
 const SHIFT_UPPER = { ß: "ẞ" };
 const CASE_CHARS = "abcdefghijklmnopqrstuvwxyzåäöæøéèüñßáàâêëíïóôúçõœã";
+
+// Visibility is global (one keyboard, mounted once in App.vue), but the
+// composable itself keeps its listeners per caller. These refs let other
+// surfaces (the CLV-9 lock screen and sign-in dialog) react to the keyboard
+// without owning it: hide the phone hand-off while it is up, and measure the
+// space left for the card.
+const sharedVisible = ref(false);
+const sharedHeight = ref(0);
+
+export function useOskState() {
+  return { visible: readonly(sharedVisible), height: readonly(sharedHeight) };
+}
 
 export const OSK_LAYOUTS = {
   default: [
@@ -176,6 +188,8 @@ export function useOnScreenKeyboard() {
 
   const syncHeight = () => {
     height.value = visible.value ? currentHeight() : 0;
+    sharedVisible.value = visible.value;
+    sharedHeight.value = height.value;
     publishHeight();
   };
 
@@ -187,6 +201,7 @@ export function useOnScreenKeyboard() {
     if (!visible.value || !Number.isFinite(px) || px <= 0) return;
     if (Math.abs(px - height.value) < 0.5) return;
     height.value = px;
+    sharedHeight.value = px;
     publishHeight();
     scrollTargetIntoView(target.value);
   };
@@ -535,6 +550,8 @@ export function useOnScreenKeyboard() {
     visible.value = false;
     target.value = null;
     height.value = 0;
+    sharedVisible.value = false;
+    sharedHeight.value = 0;
     publishHeight();
   };
 

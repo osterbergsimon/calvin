@@ -5,11 +5,12 @@
       :section-label="sectionLabel"
       :save-state="saveStatus.state"
       :show-phone="isTouch"
+      :locked="!auth.authenticated"
       @done="onDone"
       @phone="phoneOpen = true"
     />
 
-    <template v-if="phoneOpen">
+    <template v-if="phoneOpen && auth.authenticated">
       <DialogScrim blur @dismiss="phoneOpen = false" />
       <div
         class="settings-phone dialog-above-osk dialog-above-osk--center"
@@ -24,7 +25,11 @@
       </div>
     </template>
 
-    <div class="settings-body">
+    <div v-if="!auth.authenticated" class="settings-lock-scale">
+      <AuthLockScreen />
+    </div>
+
+    <div v-else class="settings-body">
       <div class="settings-search-wrapper">
         <SettingsSearch @jump="onJump" />
       </div>
@@ -98,12 +103,14 @@ import { computed, ref, watch, onMounted, onUnmounted, nextTick, defineAsyncComp
 import { useRoute, useRouter } from "vue-router";
 import { useConfigForm } from "@/composables/useConfigForm";
 import { useModeStore } from "@/stores/mode";
+import { useAuthStore } from "@/stores/auth";
 import { resolveScrollView, pickActiveEyebrow } from "@/utils/settingsSectionSpy";
 import SettingsTopBar from "@/components/settings/shell/SettingsTopBar.vue";
 import SettingsSearch from "@/components/settings/shell/SettingsSearch.vue";
 import CategoryRail from "@/components/settings/shell/CategoryRail.vue";
 import DialogScrim from "@/components/ui/DialogScrim.vue";
 import PhoneSetupCard from "@/components/ui/PhoneSetupCard.vue";
+import AuthLockScreen from "@/components/settings/auth/AuthLockScreen.vue";
 import { useTouchCapability } from "@/composables/useTouchCapability";
 import {
   SETTINGS_CATEGORY_STORAGE_KEY,
@@ -140,6 +147,7 @@ const SecuritySettings = defineAsyncComponent(
 const router = useRouter();
 const route = useRoute();
 const modeStore = useModeStore();
+const auth = useAuthStore();
 
 const categories = settingsCategories;
 
@@ -343,6 +351,9 @@ const SECTION_BY_CATEGORY_TAB = {
     backup: "maintenance-backup",
     diagnostics: "maintenance-diagnostics",
   },
+  security: {
+    admin: "security-admin",
+  },
   plugins: {
     install: "plugins-install",
     installed: "plugins-installed",
@@ -444,7 +455,7 @@ const getFrontendVersionFromMeta = () => {
 
 // ── Lifecycle ─────────────────────────────────────────────────────────────────
 onMounted(async () => {
-  await loadConfig();
+  await Promise.all([loadConfig(), auth.fetchStatus()]);
   frontendVersion.value = getFrontendVersionFromMeta();
   version.value = localConfig.value?.version ?? null;
 
@@ -455,6 +466,19 @@ onMounted(async () => {
   // Arrived from a dashboard empty state or a phone QR code: show the section.
   scrollToDestination(initialRouteDestination);
 });
+
+// Signing in on the lock screen reveals the body: honour the deep link that was
+// kept in the URL while locked, and start the section observer now that the
+// sections exist.
+watch(
+  () => auth.authenticated,
+  async authenticated => {
+    if (!authenticated) return;
+    await nextTick();
+    if (MIGRATED_CATEGORIES.has(activeCategory.value)) setupSectionObserver();
+    scrollToDestination(getRouteSettingDestination() ?? initialRouteDestination);
+  }
+);
 
 onUnmounted(() => {
   unpinSection();
@@ -508,6 +532,14 @@ onUnmounted(() => {
   display: flex;
   flex-direction: column;
   gap: var(--space-4, 1.5rem);
+}
+
+/* The lock screen honours the Settings UI size too (CLV-9 §6). */
+.settings-lock-scale {
+  flex: 1;
+  min-height: 0;
+  display: flex;
+  zoom: var(--ui-scale);
 }
 
 .settings-search-wrapper {

@@ -1,5 +1,6 @@
 import axios from "axios";
 import { useConnectionStore } from "../stores/connection";
+import { useAuthStore } from "../stores/auth";
 import { logError } from "../utils/logger";
 
 export const API_BASE_URL = import.meta.env.VITE_API_URL || "/api";
@@ -17,6 +18,31 @@ export const SW_CACHE_HEADER = "x-calvin-sw-cache";
 const api = axios.create({
   baseURL: API_BASE_URL,
   timeout: DEFAULT_REQUEST_TIMEOUT,
+  // The admin session is an HttpOnly cookie. Same-origin requests send it
+  // automatically; in dev the Vite proxy keeps that same-origin, but a
+  // VITE_API_URL pointing at another port needs credentials.
+  withCredentials: true,
+});
+
+/**
+ * Open the in-place sign-in dialog for an admin-route 401 (CLV-9 §3).
+ *
+ * Both this instance and the default axios instance register this so a raw
+ * `axios.post("/api/system/reboot")` gets the same treatment as `api.post`.
+ * `/api/auth/*` 401s are form errors and the store ignores them.
+ */
+export function handleUnauthorized(error) {
+  if (error?.response?.status !== 401) return;
+  try {
+    useAuthStore().handleUnauthorized(error);
+  } catch (err) {
+    logError("[api]", "admin auth interceptor failed", err);
+  }
+}
+
+axios.interceptors.response.use(undefined, error => {
+  handleUnauthorized(error);
+  return Promise.reject(error);
 });
 
 // Request interceptor
@@ -86,6 +112,7 @@ api.interceptors.response.use(
       // HTTP error response
       if (error.response?.status === 401) {
         // Handle unauthorized
+        handleUnauthorized(error);
         logError("[api]", "Unauthorized");
       } else if (error.response?.status >= 500) {
         // A 5xx is one failing route (often a plugin's upstream), not proof the

@@ -18,6 +18,7 @@ import { showSystemRebootScheduled } from "../utils/systemNotifications";
 import { useSystem } from "../composables/useSystem";
 import { normalizeKeyCode } from "@/utils/keyCode";
 import { configUrl } from "@/utils/kioskId";
+import api from "@/services/api";
 
 const keyboardStore = useKeyboardStore();
 const configStore = useConfigStore();
@@ -66,16 +67,14 @@ const checkRebootCombo = () => {
 
 const triggerReboot = async () => {
   try {
-    const response = await fetch("/api/system/reboot", {
-      method: "POST",
-    });
-    if (response.ok) {
-      showSystemRebootScheduled(notificationsStore);
-    } else {
-      console.error("Failed to trigger reboot:", await response.text());
-    }
+    await api.post("/system/reboot");
+    showSystemRebootScheduled(notificationsStore);
   } catch (error) {
-    console.error("Error triggering reboot:", error);
+    // A 401 admin_required has already opened the in-place sign-in dialog via
+    // the shared client's interceptor (CLV-9 §7).
+    if (!error?.adminRequired) {
+      console.error("Failed to trigger reboot:", error);
+    }
   }
 };
 

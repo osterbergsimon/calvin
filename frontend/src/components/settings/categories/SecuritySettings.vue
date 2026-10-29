@@ -1,5 +1,7 @@
 <template>
   <div class="security-settings">
+    <AdminAccessSection />
+
     <SettingsSection id="security-sealed" title="Sealed mode">
       <SettingRow
         label="Sealed mode"
@@ -75,6 +77,7 @@ import { logError } from "@/utils/logger";
 import SettingsSection from "@/components/settings/shell/SettingsSection.vue";
 import SettingRow from "@/components/settings/shell/SettingRow.vue";
 import ToggleSwitch from "@/components/ui/ToggleSwitch.vue";
+import AdminAccessSection from "@/components/settings/categories/security/AdminAccessSection.vue";
 
 const store = useSecurityStore();
 const origins = ref([]);
@@ -227,43 +230,6 @@ async function save() {
   outline: none;
   border-color: var(--focus);
   box-shadow: 0 0 0 2px color-mix(in srgb, var(--focus) 20%, transparent);
-}
-
-.security-btn {
-  min-height: var(--touch-target);
-  padding: 0 1rem;
-  font-family: var(--font-ui);
-  font-size: var(--fs-control);
-  font-weight: 500;
-  color: var(--ink);
-  background: var(--bg-2);
-  border: 1px solid var(--line);
-  border-radius: var(--radius-md);
-  cursor: pointer;
-  transition:
-    border-color 0.2s,
-    background 0.2s,
-    filter 0.2s;
-}
-.security-btn:hover:not(:disabled) {
-  border-color: var(--focus);
-}
-.security-btn:focus-visible {
-  outline: 2px solid var(--focus);
-  outline-offset: 2px;
-}
-.security-btn:disabled {
-  opacity: 0.55;
-  cursor: not-allowed;
-}
-.security-btn--primary {
-  background: var(--focus);
-  color: var(--focus-ink);
-  border-color: var(--focus);
-  font-weight: 600;
-}
-.security-btn--primary:hover:not(:disabled) {
-  filter: brightness(1.08);
 }
 
 .security-origins__error {
