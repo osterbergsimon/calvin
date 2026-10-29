@@ -1,0 +1,20 @@
+<?xml version="1.0"?>
+<labwc_config>
+  <!-- Calvin kiosk display settings (Wayland). Installed by setup and refreshed
+       from the kiosk bundle on update; local edits are overwritten. -->
+  <core>
+    <!-- Do not re-enable an output the display agent turned off: a monitor that
+         fakes a hotplug would otherwise wake the panel at night. The autostart
+         script enables the output present at boot. -->
+    <autoEnableOutputs>no</autoEnableOutputs>
+  </core>
+
+  <keyboard>
+    <!-- Fired once at startup by autostart (wtype) to hide the pointer. There is
+         no idle-hide in labwc; the cursor reappears on pointer/touch input. -->
+    <keybind key="W-c">
+      <action name="HideCursor" />
+      <action name="WarpCursor" x="-1" y="-1" />
+    </keybind>
+  </keyboard>
+</labwc_config>
