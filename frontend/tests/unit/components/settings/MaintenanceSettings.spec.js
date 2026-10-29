@@ -1,5 +1,6 @@
 import { describe, it, expect, vi, beforeEach } from "vitest";
 import { mount } from "@vue/test-utils";
+import { createPinia, setActivePinia } from "pinia";
 
 import { ref } from "vue";
 import { flushPromises } from "@vue/test-utils";
@@ -19,6 +20,7 @@ const baseConfig = { consoleLogEnabled: true, consoleLogLevel: "info", configPol
 
 describe("MaintenanceSettings", () => {
   beforeEach(() => {
+    setActivePinia(createPinia());
     restartBackend.mockClear();
     restartFrontend.mockClear();
     environment.value = null;
@@ -39,10 +41,49 @@ describe("MaintenanceSettings", () => {
       props: { config: baseConfig, gitRepoUrl: "", gitBranch: "main" },
       global: { stubs },
     });
-    for (const id of ["maintenance-updates", "maintenance-system", "maintenance-diagnostics"]) {
+    for (const id of [
+      "maintenance-updates",
+      "device-hardware",
+      "maintenance-system",
+      "maintenance-diagnostics",
+    ]) {
       expect(wrapper.find(`#section-${id}`).exists()).toBe(true);
     }
     expect(wrapper.findComponent({ name: "BackupSettings" }).exists()).toBe(true);
+  });
+
+  it("puts Versions & status second and renames the restart section", () => {
+    const wrapper = mount(MaintenanceSettings, {
+      props: { config: baseConfig, gitRepoUrl: "", gitBranch: "main" },
+      global: { stubs },
+    });
+    expect(wrapper.findAll("section.settings-section").map(s => s.attributes("id"))).toEqual([
+      "section-maintenance-updates",
+      "section-device-hardware",
+      "section-maintenance-system",
+      "section-maintenance-diagnostics",
+    ]);
+    expect(wrapper.find("#section-device-hardware .settings-section__eyebrow").text()).toBe(
+      "Versions & status"
+    );
+    expect(wrapper.find("#section-maintenance-system .settings-section__eyebrow").text()).toBe(
+      "Restart"
+    );
+  });
+
+  it("renders the backend and frontend versions in Versions & status", () => {
+    const wrapper = mount(MaintenanceSettings, {
+      props: {
+        config: baseConfig,
+        gitRepoUrl: "",
+        version: "1.2.3",
+        frontendVersion: "4.5.6",
+      },
+      global: { stubs },
+    });
+    const hardware = wrapper.find("#section-device-hardware").text();
+    expect(hardware).toContain("1.2.3");
+    expect(hardware).toContain("4.5.6");
   });
 
   it("calls restartBackend after confirming Restart backend", async () => {

@@ -9,7 +9,15 @@
       />
     </SettingsSection>
 
-    <SettingsSection id="maintenance-system" title="System">
+    <SettingsSection id="device-hardware" title="Versions & status">
+      <SettingRow label="Backend version" :description="version || 'Unknown'" />
+      <SettingRow label="Frontend version" :description="frontendVersion || 'Unknown'" />
+      <SettingRow label="System status">
+        <span class="maint-status" :class="statusClass">{{ statusText }}</span>
+      </SettingRow>
+    </SettingsSection>
+
+    <SettingsSection id="maintenance-system" title="Restart">
       <!-- In Docker the container is restarted from the host (Unraid / compose).
            A native backend that does not own the machine (CALVIN_HOST_CONTROL
            off) refuses these too, so don't offer them. -->
@@ -88,6 +96,7 @@
 <script setup>
 import { computed, onMounted, reactive } from "vue";
 import { useSystem } from "@/composables";
+import { useConnectionStore } from "@/stores/connection";
 import SettingsSection from "@/components/settings/shell/SettingsSection.vue";
 import SettingRow from "@/components/settings/shell/SettingRow.vue";
 import ToggleSwitch from "@/components/ui/ToggleSwitch.vue";
@@ -101,10 +110,16 @@ defineProps({
   config: { type: Object, required: true },
   gitRepoUrl: { type: String, default: "" },
   gitBranch: { type: String, default: "develop" },
+  version: { type: String, default: null },
+  frontendVersion: { type: String, default: null },
 });
 const emit = defineEmits(["update:config", "update:gitRepoUrl", "update:gitBranch"]);
 
 const { restartBackend, restartFrontend, environment, loadEnvironment } = useSystem();
+const connectionStore = useConnectionStore();
+
+const statusText = computed(() => (connectionStore.isBackendOnline ? "● Online" : "○ Offline"));
+const statusClass = computed(() => (connectionStore.isBackendOnline ? "is-online" : "is-offline"));
 
 // A missing environment (request failed) keeps the actions visible; the
 // backend guard then answers with the real reason.
@@ -168,5 +183,15 @@ const reloadUi = () => {
 .maint-btn:focus-visible {
   outline: 2px solid var(--focus);
   outline-offset: 2px;
+}
+.maint-status {
+  font-family: var(--font-data);
+  font-weight: 600;
+}
+.maint-status.is-online {
+  color: var(--ok);
+}
+.maint-status.is-offline {
+  color: var(--err);
 }
 </style>

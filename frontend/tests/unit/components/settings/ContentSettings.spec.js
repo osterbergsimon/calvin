@@ -2,7 +2,12 @@ import { describe, it, expect } from "vitest";
 import { mount } from "@vue/test-utils";
 import ContentSettings from "@/components/settings/categories/ContentSettings.vue";
 
-const stubs = { CalendarSourcesTab: true, ImagesTab: true, ServicesTab: true };
+const stubs = {
+  CalendarSourcesTab: true,
+  ImagesTab: true,
+  ServicesTab: true,
+  AddWebPageButton: true,
+};
 const baseConfig = {
   photoRotationInterval: 30,
   imageDisplayMode: "smart",
@@ -31,6 +36,14 @@ describe("ContentSettings", () => {
     ]) {
       expect(wrapper.find(`#section-${id}`).exists()).toBe(true);
     }
+  });
+
+  it("renames content-services and puts Add a web page above the services list", () => {
+    const wrapper = mount(ContentSettings, { props: { config: baseConfig }, global: { stubs } });
+    const section = wrapper.find("#section-content-services");
+    expect(section.exists()).toBe(true);
+    expect(section.find(".settings-section__eyebrow").text()).toBe("Web pages & services");
+    expect(wrapper.findComponent({ name: "AddWebPageButton" }).exists()).toBe(true);
   });
 
   it("emits update:config when a weekend-day chip is toggled (calendar display)", () => {

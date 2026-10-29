@@ -1,5 +1,5 @@
 <template>
-  <div class="clock-bar-settings">
+  <div class="clock-bar-sections">
     <SettingsSection id="clock-bar-clock" title="Clock">
       <SettingRow label="Show date" description="Display the date alongside the time.">
         <ToggleSwitch
@@ -37,7 +37,7 @@
       </SettingRow>
     </SettingsSection>
 
-    <SettingsSection id="clock-bar-layout" title="Bar layout">
+    <SettingsSection id="clock-bar-layout" title="Clock bar layout">
       <SettingRow
         label="Horizontal layout"
         description="How time and date are arranged on the top and bottom bars."
@@ -108,7 +108,7 @@
       </SettingRow>
     </SettingsSection>
 
-    <SettingsSection id="clock-bar-items" title="Bar items">
+    <SettingsSection id="clock-bar-items" title="Clock bar items">
       <ClockBarItemsTab />
     </SettingsSection>
   </div>
@@ -127,7 +127,7 @@ const emit = defineEmits(["update:config"]);
 </script>
 
 <style scoped>
-.clock-bar-settings {
+.clock-bar-sections {
   display: flex;
   flex-direction: column;
   gap: 1.5rem;
