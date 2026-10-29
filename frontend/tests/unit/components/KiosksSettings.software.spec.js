@@ -28,8 +28,7 @@ function mountWith({ kiosks = [], availableVersion = AVAILABLE, fetchManifest } 
   });
   store.fetchOverrides = vi.fn(async () => ({}));
   store.fetchDeviceConfigVersion = vi.fn(async () => null);
-  store.fetchAvailableAgentVersion =
-    fetchManifest || vi.fn(async () => availableVersion);
+  store.fetchAvailableAgentVersion = fetchManifest || vi.fn(async () => availableVersion);
   store.triggerUpdate = vi.fn(async id => {
     const target = store.kiosks.find(k => k.id === id);
     if (target) target.agentUpdateRequested = true;
@@ -111,9 +110,7 @@ describe("KiosksSettings — kiosk software summary", () => {
       kiosks: [kiosk({ agentUpdateRequested: true })],
     });
     await flushPromises();
-    expect(summary(wrapper).text()).toBe(
-      "Updating 1 kiosk… It restarts its screen when done."
-    );
+    expect(summary(wrapper).text()).toBe("Updating 1 kiosk… It restarts its screen when done.");
     const btn = updateAll(wrapper);
     expect(btn.text()).toBe("Updating…");
     expect(btn.attributes("disabled")).toBeDefined();
@@ -200,9 +197,7 @@ describe("KiosksSettings — kiosk card software line", () => {
   it("shows Updating to the available version while requested", async () => {
     const { wrapper } = mountWith({ kiosks: [kiosk({ agentUpdateRequested: true })] });
     await flushPromises();
-    expect(wrapper.find('[data-test="kiosk-version-line"]').text()).toBe(
-      "Updating to e4f5a6b…"
-    );
+    expect(wrapper.find('[data-test="kiosk-version-line"]').text()).toBe("Updating to e4f5a6b…");
     const btn = wrapper.find('[data-test="kiosk-update-btn"]');
     expect(btn.text()).toBe("Updating…");
     expect(btn.attributes("disabled")).toBeDefined();
@@ -239,9 +234,7 @@ describe("KiosksSettings — kiosk card software line", () => {
     });
     await flushPromises();
     const line = wrapper.find('[data-test="kiosk-version-line"]');
-    expect(line.text()).toBe(
-      "Kiosk software a1b2c3d · last update failed, kept this version"
-    );
+    expect(line.text()).toBe("Kiosk software a1b2c3d · last update failed, kept this version");
     expect(line.classes()).toContain("is-err");
     expect(wrapper.find('[data-test="kiosk-update-btn"]').text()).toBe("Try again");
   });
