@@ -77,7 +77,28 @@ async def register_plugin(
     await _save_plugin_to_db()
 
     # Initialize plugin
-    await plugin.initialize()
+    try:
+        await plugin.initialize()
+    except SystemExit as exc:
+        # A plugin calling sys.exit() during initialize() must not take the
+        # process down; leave it registered but disabled (audit R12).
+        logger.opt(exception=exc).error(
+            "Plugin {} called sys.exit() during initialize(); marking it disabled", plugin_id
+        )
+        plugin.stop()
+        try:
+            from app.utils.db_retry import retry_on_db_locked
+
+            @retry_on_db_locked(max_retries=3, initial_delay=0.1, max_delay=0.5)
+            async def _disable_row() -> None:
+                db_plugin = await PluginDB.objects.get_or_none(id=plugin_id)
+                if db_plugin:
+                    db_plugin.enabled = False
+                    await db_plugin.save_with_timestamp()
+
+            await _disable_row()
+        except Exception:
+            logger.exception("Failed to mark plugin {} disabled", plugin_id)
 
     return plugin
 
