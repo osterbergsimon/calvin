@@ -144,6 +144,28 @@ describe("PluginsCategory after install (F5)", () => {
     expect(toast.message).toContain("Mealie installed and enabled");
   });
 
+  it("doesn't expand an empty card or promise setup for a plugin with nothing to set", async () => {
+    pluginsRef.value = [
+      {
+        id: "picsum",
+        type: "image",
+        name: "Picsum",
+        enabled: false,
+        supports_multiple_instances: false,
+      },
+    ];
+    mockInstallFromGitHub.mockResolvedValue(["picsum"]);
+    const wrapper = mount(PluginsCategory, { global: { stubs } });
+    await flushPromises();
+    wrapper.findComponent({ name: "PluginInstaller" }).vm.$emit("install", { path: "picsum" });
+    await flushPromises();
+
+    expect(mockTogglePlugin).toHaveBeenCalledWith("picsum", true);
+    expect(wrapper.findComponent({ name: "PluginManager" }).props("activeTab")).toBe("image");
+    expect(activeExpanded.value.picsum).toBeUndefined();
+    expect(useNotificationsStore().items.at(-1).message).toContain("ready to use");
+  });
+
   it("does nothing when the install failed", async () => {
     mockInstallFromGitHub.mockResolvedValue([]);
     const wrapper = mount(PluginsCategory, { global: { stubs } });

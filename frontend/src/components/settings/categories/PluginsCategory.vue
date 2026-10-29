@@ -222,6 +222,17 @@ const cancelPipInstall = () => {
   pendingInstallAction.value = null;
 };
 
+// Mirrors what PluginCard renders when expanded: global settings, actions,
+// custom sections or an instance list. A single-instance plugin with none of
+// these (e.g. Picsum) would expand into an empty box.
+const cardHasBody = plugin =>
+  Object.entries(plugin.common_config_schema || {}).some(
+    ([key, schema]) => !key.startsWith("_") && !schema?.ui?.hidden
+  ) ||
+  (plugin.ui_actions || []).length > 0 ||
+  (plugin.ui_sections || []).length > 0 ||
+  plugin.supports_multiple_instances !== false;
+
 // After an install (F5): a new plugin type lands disabled and on whatever tab
 // was open, so switch it on, jump to it and say what to do next.
 const afterInstall = async installedIds => {
@@ -251,8 +262,9 @@ const afterInstall = async installedIds => {
   }
 
   const first = installed[0];
+  const hasSetup = first.type !== "theme" && cardHasBody(first);
   activePluginTab.value = first.type;
-  if (first.type !== "theme") {
+  if (hasSetup) {
     expandedPlugins.value[first.id] = true;
     void Promise.resolve(loadPluginConfig(first.id)).catch(() => {});
   }
@@ -268,7 +280,9 @@ const afterInstall = async installedIds => {
     message:
       first.type === "theme"
         ? `${names} installed — pick it under Display › Appearance.`
-        : `${names} installed and enabled — finish its setup below.`,
+        : hasSetup
+          ? `${names} installed and enabled — finish its setup below.`
+          : `${names} installed and enabled — it's ready to use.`,
   });
 };
 
@@ -622,7 +636,7 @@ onMounted(async () => {
     activePluginTab.value = routeTab;
     // Open the first card on that tab so its "Add instance" is in view.
     const first = plugins.value.find(p => p.type === routeTab);
-    if (first && first.type !== "theme" && !expandedPlugins.value[first.id]) {
+    if (first && first.type !== "theme" && cardHasBody(first) && !expandedPlugins.value[first.id]) {
       handleToggleExpand(first.id);
     }
   } else if (plugins.value.length > 0) {

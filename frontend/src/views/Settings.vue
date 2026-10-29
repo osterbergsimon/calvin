@@ -198,7 +198,31 @@ function cancelObserverRetry() {
   }
 }
 
+// A deep link scrolls its section to the top, but a short section can't push the
+// next eyebrows past the midpoint, so the spy would name a later section. Keep
+// the header on the linked section until the user scrolls on their own.
+let pinnedEyebrow = null;
+const USER_SCROLL_EVENTS = ["wheel", "touchmove", "keydown", "pointerdown"];
+function unpinSection() {
+  pinnedEyebrow = null;
+  USER_SCROLL_EVENTS.forEach(e => window.removeEventListener(e, unpinSection, true));
+}
+function pinSection(sectionEl) {
+  const eyebrow = sectionEl.querySelector(".settings-section__eyebrow");
+  if (!eyebrow) return;
+  unpinSection();
+  pinnedEyebrow = eyebrow;
+  sectionLabel.value = eyebrow.textContent.trim();
+  USER_SCROLL_EVENTS.forEach(e =>
+    window.addEventListener(e, unpinSection, { capture: true, passive: true })
+  );
+}
+
 function computeActiveSection() {
+  if (pinnedEyebrow?.isConnected) {
+    sectionLabel.value = pinnedEyebrow.textContent.trim();
+    return;
+  }
   // Key off eyebrows, not ".settings-section": CollapsibleSection (used inside
   // embedded editors) also carries the .settings-section class but has no
   // eyebrow, so matching on .settings-section would land on those nested,
@@ -341,6 +365,7 @@ function scrollToDestination(destination, attempt = 0) {
   const el = document.getElementById("section-" + sectionId);
   if (el) {
     el.scrollIntoView({ behavior: "smooth", block: "start" });
+    pinSection(el);
   } else if (attempt < 20) {
     requestAnimationFrame(() => scrollToDestination(destination, attempt + 1));
   }
@@ -348,6 +373,7 @@ function scrollToDestination(destination, attempt = 0) {
 
 // ── Navigation helpers ────────────────────────────────────────────────────────
 const selectCategory = categoryId => {
+  unpinSection();
   activeCategory.value = categoryId;
   categoryRenderKey.value += 1;
   if (!route.query.setting) return;
@@ -431,6 +457,7 @@ onMounted(async () => {
 });
 
 onUnmounted(() => {
+  unpinSection();
   teardownSectionObserver();
 });
 </script>

@@ -54,6 +54,40 @@ describe("Settings ?setting= deep link (F3/F4)", () => {
   });
 });
 
+describe("Settings header after a deep link", () => {
+  beforeEach(() => {
+    setActivePinia(createPinia());
+    Element.prototype.scrollIntoView = vi.fn();
+  });
+
+  const section = (id, title) =>
+    `<section id="section-${id}"><div class="settings-section__eyebrow">${title}</div></section>`;
+  const contentStub = {
+    template: `<div>${section("content-photos", "Photos")}${section("content-images", "Image sources")}${section("content-services", "Services")}</div>`,
+  };
+
+  it("names the deep-linked section, not whichever short section follows it", async () => {
+    route.query = { setting: "content-images" };
+    const w = mount(Settings, {
+      global: { stubs: { ...stubs, ContentSettings: contentStub } },
+      attachTo: document.body,
+    });
+    await flushPromises();
+    await new Promise(r => requestAnimationFrame(r));
+    await flushPromises();
+
+    expect(w.find(".settings-topbar__location").text()).toBe("Image sources");
+
+    // A real user scroll hands the header back to the scroll-spy.
+    window.dispatchEvent(new Event("wheel"));
+    document.querySelector(".settings-content").dispatchEvent(new Event("scroll"));
+    await new Promise(r => requestAnimationFrame(r));
+    await flushPromises();
+    expect(w.find(".settings-topbar__location").text()).toBe("Photos");
+    w.unmount();
+  });
+});
+
 describe("Settings phone hand-off (F2)", () => {
   beforeEach(() => {
     setActivePinia(createPinia());
