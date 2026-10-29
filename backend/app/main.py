@@ -116,6 +116,7 @@ for sql_logger_name in (
 logger.info(f"Loguru logging configured with level: {log_level}")
 
 from fastapi import FastAPI, HTTPException, Request  # noqa: E402
+from fastapi.encoders import jsonable_encoder  # noqa: E402
 from fastapi.exceptions import RequestValidationError  # noqa: E402
 from fastapi.middleware.cors import CORSMiddleware  # noqa: E402
 from starlette.exceptions import HTTPException as StarletteHTTPException  # noqa: E402
@@ -504,49 +505,39 @@ async def fastapi_http_exception_handler(request: Request, exc: HTTPException):
 
 @app.exception_handler(RequestValidationError)
 async def validation_exception_handler(request: Request, exc: RequestValidationError):
-    """Handle request validation errors with detailed logging."""
-    errors = exc.errors()
-    # Try to get request body for logging, but don't fail if we can't read it
-    body_info = "N/A"
-    try:
-        if request.method in ("POST", "PUT", "PATCH"):
-            body = await request.body()
-            body_info = body.decode("utf-8", errors="replace")[:500]  # Limit length
-    except Exception:
-        pass  # Ignore errors reading body
+    """Handle request validation errors.
 
+    Only the location, type and message of each error are logged or returned:
+    the request body and each error's ``input``/``ctx`` can carry passwords,
+    and ``ctx`` may hold exception objects that aren't JSON-serialisable
+    (audit S9).
+    """
+    errors = [
+        {"type": e.get("type"), "loc": e.get("loc"), "msg": e.get("msg")} for e in exc.errors()
+    ]
     logger.error(
-        f"Validation error: {errors} | "
-        f"Path: {request.url.path} | Method: {request.method} | "
-        f"Body: {body_info}"
+        f"Validation error: {errors} | Path: {request.url.path} | Method: {request.method}"
     )
     return JSONResponse(
         status_code=422,
-        content={"detail": errors, "body": "Validation error"},
+        content={"detail": jsonable_encoder(errors), "body": "Validation error"},
     )
 
 
 @app.exception_handler(Exception)
 async def general_exception_handler(request: Request, exc: Exception):
     """Catch-all exception handler to log all unhandled errors."""
-    import traceback
-
-    # Log full exception details with stack trace
-    logger.error(
-        f"Unhandled exception: {type(exc).__name__}: {exc} | "
+    # Full details (which may include secrets from exception messages) go to
+    # the server log only; clients get a generic message (audit S9).
+    logger.opt(exception=exc).error(
+        f"Unhandled exception: {type(exc).__name__} | "
         f"Path: {request.url.path} | Method: {request.method} | "
         f"Client: {request.client.host if request.client else 'unknown'}"
-    )
-    logger.error(f"Full traceback:\n{traceback.format_exc()}")
-
-    # Include error details in response for debugging (only in development)
-    error_detail = (
-        str(exc) if settings.log_level.upper() in ("DEBUG", "INFO") else "Internal server error"
     )
 
     return JSONResponse(
         status_code=500,
-        content={"detail": error_detail, "type": type(exc).__name__},
+        content={"detail": "Internal server error", "type": type(exc).__name__},
     )
 
 

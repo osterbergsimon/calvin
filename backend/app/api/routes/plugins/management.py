@@ -27,7 +27,7 @@ from app.services.plugin_installer import plugin_installer
 from app.services.theme_installer import theme_installer
 from app.services.validation import validate_plugin_id
 
-from .config import normalize_plugin_config
+from .config import mask_sensitive_config, normalize_plugin_config
 from .themes import BUILTIN_THEMES, _unregister_theme_from_db
 
 
@@ -796,7 +796,7 @@ async def _update_plugin_type(
         initial_schema = {**metadata_schema, **filtered_config}
         logger.debug(
             f"Creating new plugin type {plugin_id} with schema: {initial_schema}, "
-            f"config={config}, metadata_schema={metadata_schema}"
+            f"config={mask_sensitive_config(config)}, metadata_schema={metadata_schema}"
         )
         from app.utils.db_retry import retry_on_db_locked
 
@@ -828,7 +828,7 @@ async def _update_plugin_type(
             db_type.common_config_schema = updated_schema
             logger.debug(
                 f"Updated plugin {plugin_id} common_config_schema: "
-                f"old={current_schema}, new={updated_schema}, config={config}"
+                f"old={current_schema}, new={updated_schema}, config={mask_sensitive_config(config)}"
             )
         from app.utils.db_retry import retry_on_db_locked
 
