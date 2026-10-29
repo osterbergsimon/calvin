@@ -1,10 +1,23 @@
 <template>
   <div class="kiosks">
     <SettingsSection id="kiosks-list" title="Kiosks">
-      <p v-if="kiosks.length === 0" class="kiosks__empty">
-        No kiosks have connected yet. A kiosk registers itself the first time it loads the
-        dashboard.
-      </p>
+      <div class="kiosks__intro">
+        <p v-if="kiosks.length === 0" class="kiosks__empty">
+          No kiosks have connected yet. A screen shows up here once it is set up as a kiosk: a
+          Raspberry Pi installed with the command under “Add kiosk”, or any browser that opens the
+          dashboard with <code>?kiosk=&lt;name&gt;</code> in its address.
+        </p>
+        <button
+          type="button"
+          class="kiosks__add"
+          data-test="add-kiosk-btn"
+          :aria-expanded="addOpen ? 'true' : 'false'"
+          @click="addOpen = !addOpen"
+        >
+          {{ addOpen ? "Hide instructions" : "+ Add kiosk" }}
+        </button>
+      </div>
+      <AddKioskPanel v-if="addOpen" />
       <div v-for="k in kiosks" :key="k.id" class="kiosk-row">
         <button
           type="button"
@@ -205,6 +218,7 @@ import SelectPill from "@/components/ui/SelectPill.vue";
 import KioskStatusHeader from "@/components/settings/shared/KioskStatusHeader.vue";
 import DisplayScheduleGrid from "@/components/settings/shared/DisplayScheduleGrid.vue";
 import CollapsibleSection from "@/components/settings/shared/CollapsibleSection.vue";
+import AddKioskPanel from "@/components/settings/shared/AddKioskPanel.vue";
 
 const store = useKiosksStore();
 const config = useConfigStore();
@@ -215,6 +229,8 @@ const savedMsg = ref("");
 const contentMsg = ref("");
 const desiredVersions = ref({});
 const hardwareOpen = ref(false);
+// Open by default on a fresh install, where adding a kiosk is the only next step.
+const addOpen = ref(false);
 const availableVersion = ref(null);
 
 function updateAvailable(k) {
@@ -446,6 +462,7 @@ async function select(id) {
 
 onMounted(async () => {
   await store.loadKiosks();
+  if (kiosks.value.length === 0) addOpen.value = true;
   // Fetch all versions concurrently, then commit ONCE — writing the map inside
   // each concurrent callback races (each spreads a stale base, last write wins,
   // dropping entries).
@@ -461,8 +478,29 @@ onMounted(async () => {
 </script>
 
 <style scoped>
+.kiosks__intro {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 1rem;
+  flex-wrap: wrap;
+  padding: 0.75rem 1.25rem;
+}
 .kiosks__empty {
-  opacity: 0.7;
+  flex: 1 1 20rem;
+  margin: 0;
+  opacity: 0.8;
+}
+.kiosks__add {
+  min-height: var(--touch-target);
+  padding: 0 1.1rem;
+  font-family: var(--font-ui);
+  font-weight: 600;
+  color: var(--focus-ink);
+  background: var(--focus);
+  border: 0;
+  border-radius: 10px;
+  cursor: pointer;
 }
 .kiosks__hint {
   opacity: 0.7;
