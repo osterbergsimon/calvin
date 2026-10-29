@@ -170,6 +170,11 @@ export default defineConfig({
   test: {
     globals: true,
     environment: "jsdom",
+    // Resolve CommonJS modules the way the Vite 8/Rolldown production build
+    // does: a default import of a CJS package is its module object, not the
+    // `.default` property. Vitest's default synthetic interop is more
+    // forgiving and hid CLV-18 ("SimpleKeyboard is not a constructor").
+    deps: { interopDefault: false },
     setupFiles: ["./tests/setup.js"],
     include: ["tests/**/*.spec.js", "tests/**/*.test.js"],
     exclude: ["tests/e2e/**/*", "node_modules/**/*"],
