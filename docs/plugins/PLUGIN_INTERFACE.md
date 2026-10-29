@@ -233,7 +233,7 @@ does all of this from the class:
 
 | Endpoint | Dispatches to |
 |---|---|
-| `GET /api/plugins/{instance_id}/data` | `instance.fetch(start_date, end_date)` (service plugins) |
+| `GET /api/plugins/{instance_id}/data` | `instance.fetch(start_date, end_date)` (service plugins); `409` when the instance is disabled or stopped (it is never restarted by this route) |
 | `POST /api/plugins/{type_id}/fetch` | `instance.fetch()` on each enabled instance of the type |
 | `POST /api/plugins/{type_id}/test` | `cls.test_connection(config)` |
 | `GET /api/plugins/{type_id}/scan?field=` | `cls.scan_options(field)` |

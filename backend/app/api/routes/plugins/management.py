@@ -802,8 +802,9 @@ async def _update_plugin_type(
     # Apply the config update to the plugin's instances
     try:
         await apply_plugin_config_update(plugin_id, cleaned_config.copy(), enabled, db_type)
-    except Exception:
+    except Exception as e:
         logger.exception("Config-update handling failed for plugin type {}", plugin_id)
+        raise HTTPException(status_code=500, detail=f"Failed to apply plugin config: {e}")
 
     # Emit plugin_enabled or plugin_disabled events if enabled status changed
     if enabled is not None and previous_enabled is not None and previous_enabled != enabled:
@@ -964,14 +965,13 @@ async def get_plugin_data(
             status_code=404, detail="Service plugin instance not found or not a service plugin"
         )
 
-    # Ensure plugin is initialized and running
+    # A disabled or stopped instance stays that way: a dashboard poll must not
+    # undo a manual stop by restarting it. Starting is the job of the
+    # enable/start routes.
+    if not db_plugin.enabled or not plugin_instance.enabled:
+        raise HTTPException(status_code=409, detail="Plugin instance is disabled")
     if not plugin_instance.is_running():
-        try:
-            await plugin_instance.initialize()
-            plugin_instance.start()
-        except Exception as e:
-            logger.exception("Error initializing plugin {}", plugin_id)
-            raise HTTPException(status_code=500, detail=f"Failed to initialize plugin: {str(e)}")
+        raise HTTPException(status_code=409, detail="Plugin instance is stopped")
 
     try:
         data = await plugin_instance.fetch(start_date=start_date, end_date=end_date)

@@ -757,25 +757,28 @@ class TestServicePluginDataAPI:
                 "items": [{"label": "ok"}],
             }
 
-    @pytest.mark.asyncio
-    async def test_get_plugin_data_uses_service_instance_method(self, test_client):
+    async def _register(self, plugin_id: str, *, enabled: bool = True, running: bool = True):
         from app.models.db_models import PluginDB
 
         plugin = self.MockServicePluginForAPI(
-            plugin_id="test-service-instance",
-            name="Test Service Instance",
-            enabled=True,
+            plugin_id=plugin_id, name="Test Service Instance", enabled=enabled
         )
         await plugin_manager.register(plugin)
-
+        if running:
+            plugin.start()
         db_plugin = await PluginDB.objects.create(
-            id="test-service-instance",
+            id=plugin_id,
             type_id="test-service",
             plugin_type="service",
             name="Test Service Instance",
-            enabled=True,
+            enabled=enabled,
             config={},
         )
+        return plugin, db_plugin
+
+    @pytest.mark.asyncio
+    async def test_get_plugin_data_uses_service_instance_method(self, test_client):
+        plugin, db_plugin = await self._register("test-service-instance")
 
         try:
             response = test_client.get(
@@ -783,18 +786,47 @@ class TestServicePluginDataAPI:
                 params={"start_date": "2026-01-01", "end_date": "2026-01-07"},
             )
 
-            if response.status_code == 404:
-                pytest.skip("Service data endpoint not available in test client")
-
             assert response.status_code == 200
             data = response.json()
             assert data["success"] is True
             assert data["start_date"] == "2026-01-01"
             assert data["end_date"] == "2026-01-07"
             assert data["items"] == [{"label": "ok"}]
-            assert plugin.initialize_calls == 1
+            # Serving data never (re)initializes the instance.
+            assert plugin.initialize_calls == 0
         finally:
             await plugin_manager.unregister("test-service-instance")
+            await db_plugin.delete()
+
+    @pytest.mark.asyncio
+    async def test_get_plugin_data_stopped_instance_is_409_and_stays_stopped(self, test_client):
+        """A dashboard poll must not undo a manual stop (audit R5)."""
+        plugin, db_plugin = await self._register("test-service-stopped", running=False)
+
+        try:
+            response = test_client.get("/api/plugins/test-service-stopped/data")
+
+            assert response.status_code == 409
+            assert plugin.is_running() is False
+            assert plugin.initialize_calls == 0
+        finally:
+            await plugin_manager.unregister("test-service-stopped")
+            await db_plugin.delete()
+
+    @pytest.mark.asyncio
+    async def test_get_plugin_data_disabled_instance_is_409(self, test_client):
+        plugin, db_plugin = await self._register(
+            "test-service-disabled", enabled=False, running=False
+        )
+
+        try:
+            response = test_client.get("/api/plugins/test-service-disabled/data")
+
+            assert response.status_code == 409
+            assert plugin.is_running() is False
+            assert plugin.initialize_calls == 0
+        finally:
+            await plugin_manager.unregister("test-service-disabled")
             await db_plugin.delete()
 
 

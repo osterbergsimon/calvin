@@ -365,9 +365,14 @@ async def create_plugin_instance(
         logger.exception("Instance creation failed for plugin type {}", plugin_id)
         raise HTTPException(status_code=500, detail=f"Failed to create instance: {e}")
 
+    if result and result.get("error"):
+        raise HTTPException(status_code=500, detail=f"Failed to create instance: {result['error']}")
     created_instance_id = result.get("instance_id") if result else None
     if not created_instance_id:
-        raise HTTPException(status_code=400, detail="Plugin did not create an instance")
+        raise HTTPException(
+            status_code=400,
+            detail="Plugin did not create an instance (check the required settings)",
+        )
 
     db_plugin = await PluginDB.objects.get_or_none(id=created_instance_id)
     if not db_plugin:
