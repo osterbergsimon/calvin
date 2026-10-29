@@ -28,6 +28,7 @@
       <PluginCard
         v-for="plugin in activePlugins"
         :key="plugin.id"
+        :data-plugin-id="plugin.id"
         :plugin="plugin"
         :instances="instances[plugin.id] || []"
         :expanded="expandedPlugins[plugin.id] || false"
