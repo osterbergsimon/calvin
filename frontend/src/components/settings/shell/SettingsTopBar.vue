@@ -8,12 +8,12 @@
     </div>
 
     <div class="settings-topbar__right">
-      <div class="settings-topbar__pill" :data-state="saveState">
+      <div v-if="!locked" class="settings-topbar__pill" :data-state="saveState">
         <span class="settings-topbar__dot" :class="dotClass" aria-hidden="true"></span>
         <span class="settings-topbar__pill-label">{{ pillLabel }}</span>
       </div>
       <button
-        v-if="showPhone"
+        v-if="showPhone && !locked"
         class="settings-topbar__phone"
         type="button"
         data-action="phone"
@@ -38,6 +38,8 @@ const props = defineProps({
   saveState: { type: String, required: true },
   // Touch screens: offer the phone hand-off (QR + LAN URL) — F2.
   showPhone: { type: Boolean, default: false },
+  // Locked Settings: only the wordmark, location and Done remain.
+  locked: { type: Boolean, default: false },
 });
 
 defineEmits(["done", "phone"]);

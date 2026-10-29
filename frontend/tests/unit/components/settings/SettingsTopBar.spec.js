@@ -27,4 +27,19 @@ describe("SettingsTopBar", () => {
     await w.get('[data-action="done"]').trigger("click");
     expect(w.emitted("done")).toHaveLength(1);
   });
+
+  it("hides the save pill and phone button while locked", () => {
+    const w = mount(SettingsTopBar, {
+      props: {
+        categoryLabel: "Display",
+        saveState: "idle",
+        showPhone: true,
+        locked: true,
+      },
+    });
+    expect(w.find(".settings-topbar__pill").exists()).toBe(false);
+    expect(w.find('[data-action="phone"]').exists()).toBe(false);
+    expect(w.get(".settings-topbar__location").text()).toBe("Display");
+    expect(w.get('[data-action="done"]').exists()).toBe(true);
+  });
 });

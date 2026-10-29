@@ -1,8 +1,12 @@
 <template>
   <div class="setting-row" :class="{ 'setting-row--stacked': stacked }">
     <div class="setting-row__info">
-      <div class="setting-row__label">{{ label }}</div>
-      <p v-if="description" class="setting-row__desc">{{ description }}</p>
+      <div class="setting-row__label">
+        <span v-if="statusDot" class="setting-row__dot" aria-hidden="true"></span>{{ label }}
+      </div>
+      <slot name="description">
+        <p v-if="description" class="setting-row__desc">{{ description }}</p>
+      </slot>
     </div>
     <div class="setting-row__control"><slot /></div>
   </div>
@@ -14,6 +18,8 @@ defineProps({
   // Stack the control full-width below the label instead of beside it.
   // Use for wide embedded editors that must not be sized by their own content.
   stacked: { type: Boolean, default: false },
+  // A small --ok dot before the label (e.g. "Signed in on this device").
+  statusDot: { type: Boolean, default: false },
 });
 </script>
 <style scoped>
@@ -36,6 +42,15 @@ defineProps({
   font-size: 1rem;
   font-weight: 500;
   color: var(--ink);
+}
+.setting-row__dot {
+  display: inline-block;
+  width: 8px;
+  height: 8px;
+  margin-right: 6px;
+  vertical-align: middle;
+  border-radius: 50%;
+  background: var(--ok);
 }
 .setting-row__desc {
   margin: 0.2rem 0 0;
