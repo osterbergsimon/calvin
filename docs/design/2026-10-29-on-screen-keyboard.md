@@ -118,7 +118,15 @@ fr  Français  a z e r t y u i o p {bksp}        / q s d f g h j k l m {enter}  
 Bottom row: `{numbers} {layout} {accents} {space} {hide}`. For `en` it is
 `{numbers} {layout} {accents} {space} - {hide}`, and for `fr` it is
 `{numbers} {layout} {accents} , {space} . {hide}`. `{layout}` is present only when extra layouts are set.
-The url and email layouts (above) use the active layout's first three rows, with their own bottom row.
+The url and email layouts use the active layout's **first two rows** unchanged. Their **third row** is the
+active layout's row-3 letters a–z only (accented letters and punctuation dropped), followed by `- _`, because
+hyphens and underscores are common in addresses. Their bottom row is their own (above):
+
+```
+en, sv, fi, no, da   {shift} z x c v b n m - _ {shift}
+de                   {shift} y x c v b n m - _ {shift}
+fr                   {shift} w x c v b n - _ {shift}
+```
 
 - **Layout key `{layout}`:** label = the active **layout's** code in capitals (**EN**, **SV**, **FI**, **NO**,
   **DA**, **DE**, **FR**), width 1×, function-key style. `aria-label` = **Switch keyboard layout, now {layout name}**.
