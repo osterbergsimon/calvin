@@ -779,12 +779,21 @@ onMounted(async () => {
 .kiosk-card__update {
   min-height: var(--touch-target);
   padding: 0 1rem;
-  border: 1px solid var(--accent-color, #6ea8fe);
-  border-radius: 6px;
-  background: transparent;
-  color: var(--accent-color, #6ea8fe);
+  font-family: var(--font-ui);
+  font-size: var(--fs-control);
+  font-weight: 500;
+  color: var(--ink);
+  background: var(--bg-2);
+  border: 1px solid var(--line);
+  border-radius: var(--radius-md);
   cursor: pointer;
-  font-size: 0.9em;
+}
+.kiosk-card__update:hover:not(:disabled) {
+  border-color: var(--focus);
+}
+.kiosk-card__update:focus-visible {
+  outline: 2px solid var(--focus);
+  outline-offset: 2px;
 }
 .kiosk-card__update:disabled {
   opacity: 0.5;
