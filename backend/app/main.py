@@ -1,5 +1,6 @@
 """Main FastAPI application entry point."""
 
+import asyncio
 import logging
 import os
 import sys
@@ -348,7 +349,7 @@ async def _sync_display_orientation():
     """Sync display orientation with config (on Raspberry Pi, if enabled)."""
     from app.utils.platform import has_x11
 
-    if not has_x11():
+    if not await asyncio.to_thread(has_x11):
         # Mode B (remote/display-less backend): the device-side display-agent owns
         # orientation. Skip the backend-local xrandr sync instead of failing on it.
         logger.debug(

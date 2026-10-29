@@ -19,7 +19,7 @@ from app.api.routes.plugins.themes import _register_theme_in_db
 from app.config import settings
 from app.plugins.loader import plugin_loader
 from app.plugins.registry.loader import load_plugin_types_for_single
-from app.services.plugin_installer import plugin_installer
+from app.services.plugin_installer import plugin_installer, run_installer_op
 from app.services.theme_installer import theme_installer
 
 router = APIRouter()
@@ -283,8 +283,8 @@ async def install_plugin_from_github(request: dict[str, Any] = Body(...)):
                 }
             elif plugin_path_check.exists():
                 # Install plugin
-                manifest = plugin_installer.install_plugin_from_repo(
-                    repo_root, plugin_path, plugin_id, force=force
+                manifest = await run_installer_op(
+                    plugin_installer.install_plugin_from_repo, repo_root, plugin_path, plugin_id, force=force
                 )
 
                 # Reload plugins to include the newly installed one
@@ -306,7 +306,7 @@ async def install_plugin_from_github(request: dict[str, Any] = Body(...)):
                 validation_errors = _validate_just_installed_plugin(installed_id)
                 if validation_errors:
                     try:
-                        plugin_installer.uninstall_plugin(installed_id)
+                        await run_installer_op(plugin_installer.uninstall_plugin, installed_id)
                     except Exception as cleanup_exc:  # noqa: BLE001
                         logger.warning(
                             f"Failed to roll back invalid plugin {installed_id} "
@@ -493,8 +493,8 @@ async def install_plugin_from_local(request: dict[str, Any] = Body(...)):
                 "requires_restart": False,
             }
         elif plugin_json_path.exists():
-            manifest = plugin_installer.install_plugin_from_repo(
-                repo_path, plugin_path, plugin_id, force=force
+            manifest = await run_installer_op(
+                plugin_installer.install_plugin_from_repo, repo_path, plugin_path, plugin_id, force=force
             )
             try:
                 plugin_loader.load_installed_plugins()
@@ -508,7 +508,7 @@ async def install_plugin_from_local(request: dict[str, Any] = Body(...)):
             validation_errors = _validate_just_installed_plugin(installed_id)
             if validation_errors:
                 try:
-                    plugin_installer.uninstall_plugin(installed_id)
+                    await run_installer_op(plugin_installer.uninstall_plugin, installed_id)
                 except Exception as cleanup_exc:  # noqa: BLE001
                     logger.warning(
                         f"Failed to roll back invalid plugin {installed_id} "

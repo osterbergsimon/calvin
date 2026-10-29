@@ -1,5 +1,6 @@
 """Configuration endpoints."""
 
+import asyncio
 import re
 import subprocess
 from pathlib import Path
@@ -573,7 +574,7 @@ async def build_global_config() -> dict:
         config["calendarRefreshInterval"] = config["calendar_refresh_interval"]
 
     # Add backend version (git commit short hash)
-    config["version"] = get_git_version()
+    config["version"] = await asyncio.to_thread(get_git_version)
 
     # Add frontend version (from built HTML)
     config["frontendVersion"] = get_frontend_version()
@@ -785,7 +786,6 @@ async def get_git_branches(repo_url: str | None = None):
     Returns:
         List of branch names
     """
-    import asyncio
     import os
 
     # Get repo URL from parameter, config, or default
