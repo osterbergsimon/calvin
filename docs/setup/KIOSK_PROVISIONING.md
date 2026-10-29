@@ -254,9 +254,11 @@ verification for the current HMAC scheme is unchanged until it lands.
 The bundle manifest carries `"min_python": "3.9"`. The updater checks the
 kiosk's Python version before downloading anything; if the device Python is
 below 3.9 the update is aborted with a `python-too-old` status and the current
-agent is left in place. This surfaces in the backend's `agentUpdateStatus` field
-as `"device python < 3.9; keeping current agent"` — the kiosk will need an OS
-upgrade before the agent can be updated.
+agent is left in place. The agent reports the updater's status and message on
+its next config poll, so the backend's `agentUpdateStatus` is `"error"` and its
+`agentUpdateMessage` is `"device python < 3.9; keeping current agent"` — the
+kiosk will need an OS upgrade before the agent can be updated, and the Kiosks
+list marks it "update needs a newer OS".
 
 The display-agent itself enforces the same floor at startup and exits
 immediately if it runs on Python older than 3.9.
