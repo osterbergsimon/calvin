@@ -127,8 +127,10 @@ install-kiosk.sh (over SSH, piped  ◀──── GET /api/kiosks/install.sh  (
   ├─ fetch manifest, verify HMAC     ◀──── GET /api/kiosks/agent/manifest (signed)
   ├─ fetch setup scripts, check sha  ◀──── GET /api/kiosks/installer/setup-{kiosk,common}.sh
   └─ setup-kiosk.sh
-       ├─ apt: X, openbox, Chromium, sudo
-       ├─ /etc/default/calvin-kiosk (server URL, kiosk id, hostname; other keys kept)
+       ├─ apt: X, openbox, Chromium, sudo (+ labwc, wlr-randr, wlopm
+       │       when --display-stack wayland)
+       ├─ /etc/default/calvin-kiosk (server URL, kiosk id, hostname,
+       │                            display stack; other keys kept)
        └─ update-kiosk.sh --bootstrap ◀─── GET /api/kiosks/agent/files/*  (verified)
             └─ display agent + calvin-x / calvin-kiosk-remote / calvin-display-agent units
 reboot → Chromium shows Calvin; the agent polls /api/kiosks/<id>/config → listed in Settings → Kiosks
@@ -139,6 +141,92 @@ server's signature: the setup scripts, the kiosk agent, and every later update. 
 installer itself must come over a trusted channel: SSH from the server (Option A,
 signed), or your own checkout (Option B). The quick `curl | bash` form trusts whatever
 answers on your LAN, so use it without a key.
+
+## Display stack (Wayland, opt-in)
+
+A kiosk normally runs **X11 + openbox**. You can install it on **Wayland + labwc**
+instead, which is what Raspberry Pi OS itself now defaults to. This is a **phase-1,
+opt-in pilot**: `auto` still means X11 everywhere, FULL (all-in-one) installs are
+unchanged, and it is **experimental on a Pi 3B+**. Real-hardware testing is tracked in
+bead `calvin-8by7`; see the design notes in
+[../research/2026-10-29-kiosk-wayland.md](../research/2026-10-29-kiosk-wayland.md).
+
+Both stacks stay installed, so switching is a re-run of the installer — **not** a
+re-flash. Your server URL, kiosk id, hostname, signing key and display settings are
+kept.
+
+### Choose Wayland on a fresh install
+
+Add `--display-stack wayland` to the installer:
+
+```bash
+curl -fsSL http://tower:8000/api/kiosks/install.sh \
+  | sudo bash -s -- --display-stack wayland
+```
+
+For a signed install, add the flag to the SSH form from Option A:
+
+```bash
+ssh -t $PI "sudo bash install-kiosk.sh --backend-url http://$SERVER:8000 \
+  --signing-key-file calvin.key --display-stack wayland --no-reboot \
+  && rm calvin.key && sudo reboot"
+```
+
+Wayland installs `labwc`, `wlr-randr`, `wlopm` and `wtype` **in addition to** the X11
+packages, writes `~/.config/labwc/autostart` and `rc.xml`, and enables
+`calvin-wayland.service` instead of `calvin-x.service`. Chromium runs with the same
+kiosk flags plus `--ozone-platform=wayland`.
+
+### Switch an existing kiosk
+
+Re-run the installer on the Pi with the other stack. Everything else is preserved:
+
+```bash
+# X11 -> Wayland
+curl -fsSL http://tower:8000/api/kiosks/install.sh -o /tmp/install-kiosk.sh
+sudo bash /tmp/install-kiosk.sh --display-stack wayland
+
+# X11 -> Wayland, from a server checkout over SSH (signed installs use the stored key)
+ssh -t $PI "sudo bash /tmp/install-kiosk.sh --display-stack wayland"
+```
+
+The installer disables `calvin-x.service`, enables `calvin-wayland.service`, rewrites
+`/etc/default/calvin-kiosk-display` for the new session, and reboots. Re-running it
+twice is harmless.
+
+### Roll back to X11
+
+The same command with `x11` — both package sets are still on the Pi:
+
+```bash
+sudo bash /tmp/install-kiosk.sh --display-stack x11
+```
+
+### Choosing without a flag
+
+The stack also comes from `CALVIN_DISPLAY_STACK` in `/etc/default/calvin-kiosk`
+(`auto`, `x11`, `wayland`), and from an exported `CALVIN_DISPLAY_STACK` when you run
+the installer. Precedence: `--display-stack` flag, then the environment, then the
+config file, then `auto`. In phase 1 `auto` is always X11. A re-run of the installer
+with no flag keeps whatever the config file says.
+
+### Known limitations in phase 1
+
+- **Pi 3B/3B+:** still experimental. The 1 GB RAM / VideoCore IV margin is the open
+  question (`calvin-8by7`); X11 remains the safe choice there.
+- **Cursor:** labwc has no idle-hide. `rc.xml` binds `HideCursor` + `WarpCursor` and
+  the autostart fires it once; the pointer reappears on pointer/touch input.
+- **Rotation:** the agent uses `wlr-randr --transform`, which counts counter-clockwise
+  (`left` -> `90`, `inverted` -> `180`, `right` -> `270`). Verify it on the panel.
+- **Panel power:** `wlopm --off/--on`, with `wlr-randr --on` as the wake fallback. A
+  monitor that fakes a hotplug can still wake; `autoEnableOutputs` is off in `rc.xml`.
+- **Fullscreen/mode:** output names differ (`HDMI-1` -> `HDMI-A-1`); the agent accepts
+  both and auto-detects the first connected output.
+- **Remote update:** a bundle update installs the Wayland unit and labwc config but
+  never switches the stack or enables the other compositor. Switching is always an
+  explicit installer run.
+- FULL installs (`scripts/setup.sh`) and the backend display services are unchanged in
+  phase 1; they follow in phase 2/3.
 
 ## Updating a kiosk later
 
