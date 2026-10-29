@@ -122,7 +122,7 @@
         label="Keyboard layout"
         description="The letters the on-screen keyboard uses. Separate from the language Calvin is shown in."
       >
-        <div class="device-control" :inert="oskOff ? '' : undefined">
+        <div class="device-control device-osk-control" :inert="oskOff ? '' : undefined">
           <SelectPill
             :model-value="mainLayout"
             :options="layoutOptions"
@@ -130,6 +130,12 @@
             aria-label="Keyboard layout"
             @update:model-value="onLayoutChange"
           />
+          <p v-if="deviceLayout" class="device-osk-device">
+            This screen uses {{ oskLayoutName(deviceLayout) }}, chosen on the keyboard.
+            <button type="button" class="device-osk-use-default" @click="useDefaultLayout">
+              Use default
+            </button>
+          </p>
         </div>
       </SettingRow>
       <SettingRow
@@ -190,7 +196,7 @@
 </template>
 
 <script setup>
-import { computed } from "vue";
+import { computed, onMounted, onUnmounted, ref } from "vue";
 import { useSystem } from "@/composables";
 import SettingsSection from "@/components/settings/shell/SettingsSection.vue";
 import SettingRow from "@/components/settings/shell/SettingRow.vue";
@@ -203,9 +209,12 @@ import KeyboardTab from "@/components/settings/tabs/layout/KeyboardTab.vue";
 import RebootCombo from "@/components/settings/tabs/layout/keyboard/RebootCombo.vue";
 import ChipMultiSelect from "@/components/ui/ChipMultiSelect.vue";
 import {
+  OSK_LAYOUT_CHANGE_EVENT,
+  clearStoredOskLayout,
   normalizeOskExtraLayouts,
   oskLayoutName,
   oskLayoutOptions,
+  readStoredOskLayout,
   resolveOskMainLayout,
 } from "@/utils/oskLayouts";
 
@@ -245,6 +254,19 @@ const onLayoutChange = value => {
     oskExtraLayouts: extraLayouts.value.filter(id => id !== value),
   });
 };
+
+// A layout picked on the keyboard is a device choice, not server config
+// (CLV-21 §5). Show it here so its origin is clear, with a way back.
+const deviceLayout = ref(readStoredOskLayout());
+const refreshDeviceLayout = () => {
+  deviceLayout.value = readStoredOskLayout();
+};
+const useDefaultLayout = () => {
+  clearStoredOskLayout();
+  refreshDeviceLayout();
+};
+onMounted(() => window.addEventListener(OSK_LAYOUT_CHANGE_EVENT, refreshDeviceLayout));
+onUnmounted(() => window.removeEventListener(OSK_LAYOUT_CHANGE_EVENT, refreshDeviceLayout));
 
 const timezoneOptions = [
   { value: "system", label: "System default" },
@@ -291,6 +313,35 @@ const onTurnOff = async () => {
 .device-control {
   display: flex;
   justify-content: flex-end;
+}
+.device-osk-control {
+  flex-direction: column;
+  align-items: flex-end;
+  gap: 0.35rem;
+}
+/* A layout picked on the keyboard, under the Settings default. */
+.device-osk-device {
+  max-width: 24rem;
+  margin: 0;
+  color: var(--ink-2);
+  font-size: var(--fs-sm);
+  line-height: 1.4;
+  text-align: right;
+}
+.device-osk-use-default {
+  padding: 0;
+  background: none;
+  border: none;
+  color: var(--ink);
+  font-family: var(--font-ui);
+  font-size: var(--fs-sm);
+  font-weight: 500;
+  text-decoration: underline;
+  cursor: pointer;
+}
+.device-osk-use-default:focus-visible {
+  outline: 2px solid var(--focus);
+  outline-offset: 2px;
 }
 /* Rows 2 and 3 of the keyboard section while the on-screen keyboard is Off. */
 .setting-row--muted {
