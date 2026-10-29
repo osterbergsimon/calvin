@@ -3,10 +3,25 @@ import os
 from datetime import datetime, time
 from types import SimpleNamespace
 
+import pytest
+
 _MOD = os.path.join(os.path.dirname(__file__), "calvin_display_agent.py")
 _spec = importlib.util.spec_from_file_location("calvin_display_agent", _MOD)
 agent = importlib.util.module_from_spec(_spec)
 _spec.loader.exec_module(agent)
+
+
+@pytest.fixture(autouse=True)
+def _no_session_env(monkeypatch):
+    """Default every test to X11.
+
+    The agent auto-detects Wayland from the session environment, and this suite
+    may run inside a Wayland desktop session; scrub those keys so the X11 tests
+    exercise the X11 branch. Wayland tests pass an explicit env dict.
+    """
+    for key in ("CALVIN_DISPLAY_STACK", "XDG_SESSION_TYPE", "WAYLAND_DISPLAY"):
+        monkeypatch.delenv(key, raising=False)
+    monkeypatch.delenv("XDG_RUNTIME_DIR", raising=False)
 
 
 def _sched(on="06:00", off="22:00", days=range(7), enabled=True):
@@ -693,3 +708,196 @@ def test_last_failed_version_returns_none_on_success(tmp_path):
 
 def test_last_failed_version_returns_none_when_missing(tmp_path):
     assert agent.last_failed_version(str(tmp_path)) is None
+
+
+# --- display stack detection (phase 1: opt-in Wayland) ------------------------
+
+
+def test_display_stack_explicit_setting_wins_over_session():
+    env = {"CALVIN_DISPLAY_STACK": "x11", "XDG_SESSION_TYPE": "wayland",
+           "WAYLAND_DISPLAY": "wayland-0"}
+    assert agent.display_stack(env) == "x11"
+    env["CALVIN_DISPLAY_STACK"] = "wayland"
+    env["XDG_SESSION_TYPE"] = "x11"
+    assert agent.display_stack(env) == "wayland"
+
+
+def test_display_stack_detects_wayland_session():
+    assert agent.display_stack(
+        {"XDG_SESSION_TYPE": "wayland", "WAYLAND_DISPLAY": "wayland-0"}
+    ) == "wayland"
+
+
+def test_display_stack_ignores_stale_wayland_display_on_x11():
+    # XWayland sets WAYLAND_DISPLAY-less X11 sessions; a stale variable alone is
+    # not proof of a Wayland session.
+    assert agent.display_stack({"WAYLAND_DISPLAY": "wayland-0"}) == "x11"
+    assert agent.display_stack({"XDG_SESSION_TYPE": "wayland"}) == "x11"
+    assert agent.display_stack({}) == "x11"
+
+
+def test_wayland_env_defaults_from_uid():
+    e = agent.wayland_env({})
+    assert e["XDG_RUNTIME_DIR"] == f"/run/user/{os.getuid()}"
+    assert e["WAYLAND_DISPLAY"] == "wayland-0"
+
+
+def test_wayland_env_honours_session_values():
+    e = agent.wayland_env(
+        {"XDG_RUNTIME_DIR": "/run/user/1000", "WAYLAND_DISPLAY": "wayland-1"}
+    )
+    assert e == {"XDG_RUNTIME_DIR": "/run/user/1000", "WAYLAND_DISPLAY": "wayland-1"}
+
+
+_WLR_RANDR_TEXT = """\
+HDMI-A-1 "Dell Inc. DELL U2419H 0000"
+  Make: Dell Inc.
+  Model: DELL U2419H
+  Enabled: no
+  Modes:
+    1920x1080 px, 60.000000 Hz (preferred, current)
+"""
+
+
+def _fake_tool(monkeypatch, outputs, log=None):
+    def fake_run(cmd, **kw):
+        if log is not None:
+            log.append((cmd, kw.get("env")))
+        if cmd[0] == "wlr-randr" and len(cmd) == 1:
+            return SimpleNamespace(returncode=0, stdout=outputs, stderr="")
+        return SimpleNamespace(returncode=0, stdout="", stderr="")
+
+    monkeypatch.setattr(agent.subprocess, "run", fake_run)
+
+
+def test_detect_primary_wayland_output_parses_wlr_randr(monkeypatch):
+    _fake_tool(monkeypatch, _WLR_RANDR_TEXT)
+    assert agent.detect_primary_wayland_output({}) == "HDMI-A-1"
+
+
+def test_detect_primary_wayland_output_prefers_hdmi(monkeypatch):
+    _fake_tool(monkeypatch, "DSI-1 \"panel\"\nHDMI-A-2 \"tv\"\n")
+    assert agent.detect_primary_wayland_output({}) == "HDMI-A-2"
+    _fake_tool(monkeypatch, "DSI-1 \"panel\"\n")
+    assert agent.detect_primary_wayland_output({}) == "DSI-1"
+
+
+def test_detect_primary_wayland_output_none_when_tool_missing(monkeypatch):
+    def fake_run(cmd, **kw):
+        raise FileNotFoundError("no wlr-randr")
+
+    monkeypatch.setattr(agent.subprocess, "run", fake_run)
+    assert agent.detect_primary_wayland_output({}) is None
+
+
+def test_resolve_wayland_output_accepts_x11_name(monkeypatch):
+    _fake_tool(monkeypatch, _WLR_RANDR_TEXT)
+    assert agent.resolve_wayland_output("HDMI-1", {}) == "HDMI-A-1"
+    assert agent.resolve_wayland_output("HDMI-A-1", {}) == "HDMI-A-1"
+
+
+def test_resolve_wayland_output_autodetects_when_unset(monkeypatch):
+    _fake_tool(monkeypatch, _WLR_RANDR_TEXT)
+    assert agent.resolve_wayland_output(None, {}) == "HDMI-A-1"
+
+
+def test_resolve_wayland_output_keeps_unknown_name(monkeypatch):
+    _fake_tool(monkeypatch, _WLR_RANDR_TEXT)
+    assert agent.resolve_wayland_output("DP-1", {}) == "DP-1"
+
+
+def test_apply_on_wayland_uses_wlopm(monkeypatch):
+    calls = []
+    _fake_tool(monkeypatch, _WLR_RANDR_TEXT, calls)
+    assert agent.apply_on_wayland(False, {}) == "wlopm"
+    cmds = [c for c, _ in calls]
+    assert ["wlopm", "--off", "HDMI-A-1"] in cmds
+    assert not any(c[0] in ("xset", "vcgencmd") for c in cmds)
+    env = next(e for c, e in calls if c[0] == "wlopm")
+    assert env["XDG_RUNTIME_DIR"] == f"/run/user/{os.getuid()}"
+    assert env["WAYLAND_DISPLAY"] == "wayland-0"
+
+
+def test_apply_on_wayland_wake_falls_back_to_wlr_randr(monkeypatch):
+    def fake_run(cmd, **kw):
+        if cmd[0] == "wlr-randr" and len(cmd) == 1:
+            return SimpleNamespace(returncode=0, stdout=_WLR_RANDR_TEXT, stderr="")
+        if cmd[0] == "wlopm":
+            return SimpleNamespace(returncode=1, stdout="", stderr="no output")
+        return SimpleNamespace(returncode=0, stdout="", stderr="")
+
+    monkeypatch.setattr(agent.subprocess, "run", fake_run)
+    assert agent.apply_on_wayland(True, {}) == "wlr-randr"
+
+
+def test_apply_on_wayland_off_does_not_use_wlr_randr_fallback(monkeypatch):
+    def fake_run(cmd, **kw):
+        if cmd[0] == "wlr-randr" and len(cmd) == 1:
+            return SimpleNamespace(returncode=0, stdout=_WLR_RANDR_TEXT, stderr="")
+        return SimpleNamespace(returncode=1, stdout="", stderr="")
+
+    monkeypatch.setattr(agent.subprocess, "run", fake_run)
+    assert agent.apply_on_wayland(False, {}) == "none"
+
+
+def test_apply_on_dispatches_on_stack(monkeypatch):
+    monkeypatch.setenv("CALVIN_DISPLAY_STACK", "wayland")
+    monkeypatch.setattr(agent, "apply_on_wayland", lambda on, env=None: "wlopm")
+    assert agent.apply_on(False) == "wlopm"
+
+
+def test_apply_rotation_wayland_maps_to_wlr_transform(monkeypatch):
+    for rotation, transform in (
+        ("normal", "normal"),
+        ("left", "90"),
+        ("inverted", "180"),
+        ("right", "270"),
+    ):
+        calls = []
+        _fake_tool(monkeypatch, _WLR_RANDR_TEXT, calls)
+        assert agent.apply_rotation_wayland(rotation, None, {}) == "HDMI-A-1"
+        assert ["wlr-randr", "--output", "HDMI-A-1", "--transform", transform] in [
+            c for c, _ in calls
+        ]
+
+
+def test_apply_rotation_wayland_ignores_invalid(monkeypatch):
+    calls = []
+    _fake_tool(monkeypatch, _WLR_RANDR_TEXT, calls)
+    assert agent.apply_rotation_wayland("sideways", None, {}) is None
+    assert calls == []
+
+
+def test_apply_rotation_dispatches_on_stack(monkeypatch):
+    monkeypatch.setenv("CALVIN_DISPLAY_STACK", "wayland")
+    monkeypatch.setattr(
+        agent, "apply_rotation_wayland", lambda r, o=None, env=None: "WAY"
+    )
+    assert agent.apply_rotation("left") == "WAY"
+
+
+def test_apply_mode_wayland_sets_mode_with_rate(monkeypatch):
+    calls = []
+    _fake_tool(monkeypatch, _WLR_RANDR_TEXT, calls)
+    argv = agent.apply_mode_wayland("HDMI-1", "1920x1080@60", {})
+    assert argv == [
+        "wlr-randr", "--output", "HDMI-A-1", "--mode", "1920x1080@60Hz"
+    ]
+    assert [c for c, _ in calls][-1] == argv
+
+
+def test_apply_mode_wayland_plain_mode(monkeypatch):
+    _fake_tool(monkeypatch, _WLR_RANDR_TEXT)
+    assert agent.apply_mode_wayland(None, "1280x720", {}) == [
+        "wlr-randr", "--output", "HDMI-A-1", "--mode", "1280x720"
+    ]
+
+
+def test_apply_mode_dispatches_on_stack(monkeypatch):
+    monkeypatch.setenv("CALVIN_DISPLAY_STACK", "wayland")
+    monkeypatch.setattr(
+        agent, "apply_mode_wayland", lambda o, r, env=None: ["wlr-randr"]
+    )
+    assert agent.apply_mode("HDMI-1", "1920x1080") == ["wlr-randr"]
+    # Neither configured: no-op on both stacks.
+    assert agent.apply_mode(None, None) is None

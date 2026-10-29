@@ -19,6 +19,10 @@ set -euo pipefail
 _CALVIN_SOURCE_ONLY=0
 BACKEND_URL=""
 SIGNING_KEY=""
+# --display-stack <x11|wayland>; empty means "environment, then env file, then
+# auto" (phase 1: auto is X11).
+DISPLAY_STACK_ARG=""
+DISPLAY_STACK=""
 for _arg in "$@"; do
     if [ "$_arg" = "--source-only" ]; then
         _CALVIN_SOURCE_ONLY=1
@@ -76,6 +80,7 @@ compute_default_kiosk_id() {
 # Upserts only the keys setup owns: the rotation/output/resolution settings
 # operators keep in this file (DEPLOYMENT_TOPOLOGIES) survive a re-run.
 install_kiosk_config() {
+    local stack="${1:-x11}"
     local env_file="${CALVIN_KIOSK_ENV_FILE:-/etc/default/calvin-kiosk}"
     log "Updating ${env_file}..."
     # An operator-set CALVIN_KIOSK_ID / CALVIN_KIOSK_HOSTNAME wins over defaults.
@@ -90,11 +95,30 @@ install_kiosk_config() {
     upsert_env_value "$env_file" CALVIN_KIOSK_ID "${existing_id:-$(compute_default_kiosk_id)}"
     upsert_env_value "$env_file" CALVIN_KIOSK_HOSTNAME \
         "${existing_host:-$(compute_default_kiosk_hostname)}"
+    # The display stack is setup-owned: a re-run with --display-stack switches it.
+    upsert_env_value "$env_file" CALVIN_DISPLAY_STACK "${stack}"
+}
+
+# Which stack to install: --display-stack wins, then the environment, then the
+# value already in /etc/default/calvin-kiosk, then auto (phase 1: x11).
+requested_display_stack() {
+    if [ -n "${DISPLAY_STACK_ARG}" ]; then
+        resolve_display_stack "${DISPLAY_STACK_ARG}"
+        return
+    fi
+    if [ -n "${CALVIN_DISPLAY_STACK:-}" ]; then
+        resolve_display_stack "${CALVIN_DISPLAY_STACK}"
+        return
+    fi
+    local env_file existing
+    env_file="${CALVIN_KIOSK_ENV_FILE:-/etc/default/calvin-kiosk}"
+    existing="$(read_env_value "$env_file" CALVIN_DISPLAY_STACK)"
+    resolve_display_stack "${existing:-auto}"
 }
 
 usage() {
     cat <<EOF
-Usage: setup-kiosk.sh --backend-url <URL>
+Usage: setup-kiosk.sh --backend-url <URL> [--display-stack x11|wayland]
 
 Sets up a Raspberry Pi as a dumb kiosk pointed at a remote Calvin
 backend. Installs X, openbox, and Chromium, then enables a systemd
@@ -107,6 +131,9 @@ Required:
 Options:
   --signing-key-file <FILE>  File holding the server's kiosk-signing.key (hex)
   --signing-key <HEX>        Same, inline (visible in ps and shell history)
+  --display-stack <STACK>    x11 (default) or wayland (labwc, experimental).
+                             Both stacks stay installed: re-run with the other
+                             value to switch an existing kiosk in place.
 EOF
 }
 
@@ -121,6 +148,8 @@ parse_args() {
                 BACKEND_URL="${1#*=}"
                 shift
                 ;;
+            --display-stack) DISPLAY_STACK_ARG="${2:-}"; shift 2 ;;
+            --display-stack=*) DISPLAY_STACK_ARG="${1#*=}"; shift ;;
             --signing-key) SIGNING_KEY="${2:-}"; shift 2 ;;
             --signing-key=*) SIGNING_KEY="${1#*=}"; shift ;;
             --signing-key-file) SIGNING_KEY="$(tr -d '[:space:]' < "${2:-}")"; shift 2 ;;
@@ -232,7 +261,11 @@ install_kiosk_services() {
 start_kiosk_services() {
     log "Starting kiosk services..."
     if systemd_available; then
-        start_systemd_service "calvin-x.service"
+        if [ "${DISPLAY_STACK}" = "wayland" ]; then
+            start_systemd_service "calvin-wayland.service"
+        else
+            start_systemd_service "calvin-x.service"
+        fi
         sleep 3
         start_systemd_service "calvin-kiosk-remote.service"
         start_systemd_service "calvin-display-agent.service"
@@ -245,11 +278,15 @@ main() {
     parse_args "$@"
     require_fixed_calvin_user
 
+    # Resolve before touching packages: everything below depends on the stack.
+    DISPLAY_STACK="$(requested_display_stack)" || exit 1
+
     log "=========================================="
     log "Calvin Raspberry Pi Kiosk Setup"
     log "=========================================="
     log "Backend URL: ${BACKEND_URL}"
     log "User:        ${CALVIN_USER}"
+    log "Display:     ${DISPLAY_STACK}"
     log ""
 
     check_root
@@ -264,9 +301,16 @@ main() {
     # sudo: the display agent triggers remote updates via the sudoers fragment
     # below (present on Raspberry Pi OS, absent on minimal Debian images).
     install_system_packages "${CALVIN_KIOSK_PACKAGES[@]}"
+    # Wayland packages are additive: the X11 set above stays installed so
+    # switching back is a service switch, not a reimage.
+    mapfile -t _wayland_pkgs < <(display_stack_packages "${DISPLAY_STACK}")
+    if [ "${#_wayland_pkgs[@]}" -gt 0 ]; then
+        log "Installing ${DISPLAY_STACK} display packages: ${_wayland_pkgs[*]}"
+        install_system_packages "${_wayland_pkgs[@]}"
+    fi
     configure_unattended_upgrades
 
-    install_kiosk_config
+    install_kiosk_config "${DISPLAY_STACK}"
     install_signing_key "${SIGNING_KEY}"
     log "Bootstrapping kiosk bundle via update-kiosk.sh --bootstrap from ${BACKEND_URL}..."
     bootstrap_kiosk "${BACKEND_URL}"
@@ -278,6 +322,8 @@ main() {
     # autostart only needs to launch openbox itself plus the usual
     # screensaver/cursor tweaks.
     configure_openbox_autostart "${CALVIN_USER}" "${BACKEND_URL}" "false"
+    # Session env + labwc config + exactly one enabled compositor unit.
+    apply_display_stack "${DISPLAY_STACK}" "${CALVIN_USER}"
 
     install_kiosk_services
     start_kiosk_services
@@ -287,12 +333,18 @@ main() {
     log "Calvin Kiosk Setup Complete!"
     log "=========================================="
     log "Backend URL:    ${BACKEND_URL}"
+    log "Display stack:  ${DISPLAY_STACK}"
     log "Config file:    /etc/default/calvin-kiosk"
-    log "Systemd units:  calvin-x.service, calvin-kiosk-remote.service, calvin-display-agent.service"
+    log "Systemd units:  calvin-wayland.service or calvin-x.service,"
+    log "                calvin-kiosk-remote.service, calvin-display-agent.service"
     log ""
     log "To change the backend URL later:"
     log "  sudo nano /etc/default/calvin-kiosk"
     log "  sudo systemctl restart calvin-kiosk-remote.service"
+    log ""
+    log "To switch display stack later (re-runs the installer in place):"
+    log "  sudo bash install-kiosk.sh --backend-url ${BACKEND_URL} --display-stack wayland"
+    log "  sudo bash install-kiosk.sh --backend-url ${BACKEND_URL} --display-stack x11"
     log ""
     log "Reboot to start the kiosk:"
     log "  sudo reboot"

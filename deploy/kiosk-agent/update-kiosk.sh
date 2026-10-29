@@ -19,6 +19,8 @@ PYTHON="${CALVIN_PYTHON:-python3}"
 STATE_DIR="${CALVIN_AGENT_STATE_DIR:-/var/lib/calvin}"
 SYSTEMD_DIR="${CALVIN_SYSTEMD_DIR:-/etc/systemd/system}"
 BIN_DIR="${CALVIN_BIN_DIR:-/usr/local/bin}"
+LABWC_DIR="${CALVIN_LABWC_DIR:-/home/calvin/.config/labwc}"
+DISPLAY_ENV_FILE="${CALVIN_KIOSK_DISPLAY_ENV_FILE:-/etc/default/calvin-kiosk-display}"
 READY_MARKER="${CALVIN_AGENT_READY_MARKER:-/run/calvin/agent-ready}"
 HEALTH_TIMEOUT="${CALVIN_UPDATE_HEALTH_TIMEOUT:-30}"
 BACKUP_DIR="${STATE_DIR}/agent-backup"
@@ -29,10 +31,63 @@ BASE="${CALVIN_BACKEND_URL%/}"
 
 log() { printf '[update-kiosk] %s\n' "$*"; }
 
+# Display stack of THIS kiosk (x11|wayland). Phase 1: anything but an explicit
+# wayland is X11, matching resolve_display_stack in scripts/setup-common.sh.
+display_stack() {
+  local stack="${CALVIN_DISPLAY_STACK:-}"
+  case "$stack" in
+    wayland) echo wayland ;;
+    *) echo x11 ;;
+  esac
+}
+
+# The compositor that is NOT the configured stack must never be re-enabled by an
+# update: exactly one compositor unit owns tty1.
+unit_suppressed() {  # $1 = unit name
+  case "$1" in
+    calvin-x.service) [ "$(display_stack)" = wayland ] ;;
+    calvin-wayland.service) [ "$(display_stack)" = x11 ] ;;
+    *) return 1 ;;
+  esac
+}
+
+# Session env file the kiosk/display-agent units read (DISPLAY/XAUTHORITY on X11,
+# XDG_SESSION_TYPE/WAYLAND_DISPLAY/XDG_RUNTIME_DIR on Wayland). Older kiosks do
+# not have it yet and these units require it, so create the current stack's file
+# before anything is swapped. Never overwrite: setup owns the content.
+ensure_display_env() {
+  [ -f "$DISPLAY_ENV_FILE" ] && return 0
+  local uid
+  uid="$(id -u calvin 2>/dev/null || echo 1000)"
+  mkdir -p "$(dirname "$DISPLAY_ENV_FILE")"
+  if [ "$(display_stack)" = wayland ]; then
+    cat > "$DISPLAY_ENV_FILE" <<EOF
+# Calvin kiosk display session (stack: wayland). Created by update-kiosk.sh;
+# re-run the kiosk installer to change stacks.
+XDG_SESSION_TYPE=wayland
+WAYLAND_DISPLAY=wayland-0
+XDG_RUNTIME_DIR=/run/user/${uid}
+CALVIN_CHROMIUM_DISPLAY_FLAGS=--ozone-platform=wayland
+EOF
+  else
+    cat > "$DISPLAY_ENV_FILE" <<EOF
+# Calvin kiosk display session (stack: x11). Created by update-kiosk.sh;
+# re-run the kiosk installer to change stacks.
+DISPLAY=:0
+XAUTHORITY=/home/calvin/.Xauthority
+CALVIN_CHROMIUM_DISPLAY_FLAGS=
+EOF
+  fi
+  chmod 0644 "$DISPLAY_ENV_FILE"
+  log "created ${DISPLAY_ENV_FILE} for the $(display_stack) stack"
+}
+
+ensure_display_env
+
 path_allowed() {  # $1 = absolute target path
   case "$1" in
     *..*) return 1 ;;                         # no traversal
-    "$BIN_DIR"/*|"$SYSTEMD_DIR"/*) return 0 ;;
+    "$BIN_DIR"/*|"$SYSTEMD_DIR"/*|"$LABWC_DIR"/*) return 0 ;;
     *) return 1 ;;
   esac
 }
@@ -45,11 +100,13 @@ path_allowed() {  # $1 = absolute target path
 pinned_entry() {  # $1 = name -> "<dir> <mode>"
   case "$1" in
     calvin_display_agent.py|update-kiosk.sh) echo "$BIN_DIR 0755" ;;
-    calvin-display-agent.service|calvin-kiosk-remote.service|calvin-x.service|calvin-kiosk-update.service) echo "$SYSTEMD_DIR 0644" ;;
+    calvin-display-agent.service|calvin-kiosk-remote.service|calvin-x.service|calvin-kiosk-update.service|calvin-wayland.service) echo "$SYSTEMD_DIR 0644" ;;
+    autostart) echo "$LABWC_DIR 0755" ;;
+    rc.xml) echo "$LABWC_DIR 0644" ;;
     *) return 1 ;;
   esac
 }
-KNOWN_UNITS=" calvin-display-agent.service calvin-kiosk-remote.service calvin-x.service calvin-kiosk-update.service "
+KNOWN_UNITS=" calvin-display-agent.service calvin-kiosk-remote.service calvin-x.service calvin-wayland.service calvin-kiosk-update.service "
 
 name_allowed() {  # $1 = manifest file name; must be a bare filename (calvin-10n)
   case "$1" in
@@ -275,6 +332,7 @@ reenable_units() {
   local u
   for u in "${ENABLE_WANTED[@]:-}"; do
     [ -n "$u" ] || continue
+    if unit_suppressed "$u"; then continue; fi   # the other display stack's compositor
     [[ " ${NEW_ENABLE_UNITS[*]:-} " == *" $u "* ]] && continue
     "$SYSTEMCTL" is-enabled --quiet "$u" 2>/dev/null && continue
     "$SYSTEMCTL" enable "$u" || { log "enable failed: $u"; continue; }
@@ -313,13 +371,23 @@ done
 write_state running swap "applying ${version}"
 for i in "${!CHANGED_NAME[@]}"; do
   t="${CHANGED_TARGET[$i]}"; s="$STAGE/${CHANGED_NAME[$i]}"
+  mkdir -p "$(dirname "$t")"   # e.g. /home/calvin/.config/labwc on an X11 kiosk
   install -m "${CHANGED_MODE[$i]}" "$s" "$t"    # replace via new inode (safe over a running script) + mode
 done
 [ "$unit_changed" = 1 ] && "$SYSTEMCTL" daemon-reload || true
 
-restart_all() { for u in "${!RESTART_UNITS[@]}"; do "$SYSTEMCTL" restart "$u"; done; }
-enable_units() { for u in "$@"; do "$SYSTEMCTL" enable "$u" || log "enable failed: $u"; done; }
-start_units()  { for u in "$@"; do "$SYSTEMCTL" start  "$u" || log "start failed: $u";  done; }
+# Restart changed units, except the other display stack's compositor: restarting
+# calvin-x.service on a Wayland kiosk would stop labwc (they Conflict), and the
+# converse would drop the X session.
+restart_all() {
+  local u
+  for u in "${!RESTART_UNITS[@]}"; do
+    if unit_suppressed "$u"; then log "not restarting $u (other display stack)"; continue; fi
+    "$SYSTEMCTL" restart "$u"
+  done
+}
+enable_units() { for u in "$@"; do unit_suppressed "$u" && continue; "$SYSTEMCTL" enable "$u" || log "enable failed: $u"; done; }
+start_units()  { for u in "$@"; do unit_suppressed "$u" && continue; "$SYSTEMCTL" start  "$u" || log "start failed: $u";  done; }
 
 if [ "$BOOTSTRAP" = 1 ]; then
   # First-boot install: enable boot units; no restart, health, rollback, or decommission.
