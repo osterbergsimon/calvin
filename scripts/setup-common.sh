@@ -649,7 +649,8 @@ ensure_update_dir() {
     local dir="${CALVIN_UPDATE_DIR:-/var/lib/calvin-update}"
     (umask 077 && mkdir -p "${dir}")
     if [ "$(stat -c %u "${dir}")" != "$(id -u)" ] || [ -n "$(find "${dir}" -maxdepth 0 -perm /022)" ]; then
-        error_exit "${dir} is not owned by $(id -un) or is writable by others; refusing to use it" 1
+        # >&2: callers capture stdout with $(...), so the reason must not land there.
+        error_exit "${dir} is not owned by $(id -un) or is writable by others; refusing to use it" 1 >&2
     fi
     chmod 0700 "${dir}"
     echo "${dir}"
@@ -668,7 +669,7 @@ prepare_source_snapshot() {
     rm -rf "${src}"
     git clone -q --depth 1 --branch "${branch}" "${repo}" "${src}" 2>/dev/null \
         || git clone -q --branch "${branch}" "${repo}" "${src}" \
-        || error_exit "Could not fetch ${repo} (${branch}) to install the host files from" 1
+        || error_exit "Could not fetch ${repo} (${branch}) to install the host files from (root clones it: use an https URL)" 1 >&2
     echo "${src}"
 }
 

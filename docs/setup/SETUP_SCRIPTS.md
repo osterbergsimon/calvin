@@ -363,6 +363,12 @@ In production mode it:
    restarts nothing. The state (including `previous_image`) is in
    `calvin-update-state.json` next to the update log.
 
+Root does that clone, so `GIT_REPO` must be readable without the calvin user's
+credentials (an `https://` URL). Hosts set up before this behaviour existed run
+an older `update-calvin.sh` that does not refresh anything: re-run setup once
+(`curl -fsSL https://raw.githubusercontent.com/osterbergsimon/calvin/develop/scripts/setup.sh | sudo bash`),
+and later updates refresh themselves.
+
 Development installs pull the configured git branch into `/home/calvin/calvin`
 with `--autostash`, refresh the host files the same way, then recreate the dev
 Compose containers so dependency changes are picked up.

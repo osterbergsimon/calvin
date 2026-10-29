@@ -208,8 +208,8 @@ wait_for_health() {
   return 1
 }
 
-# Fast-forward only. Local edits or commits are left alone (with a warning):
-# the host files then come from the checkout as it is.
+# Fast-forward only, for the operator's convenience. Local edits or commits are
+# left alone (with a warning); host files never come from this checkout.
 update_checkout() {
   [[ -d "$REPO_DIR/.git" ]] || return 0
   UPDATE_PHASE="pulling_code"
