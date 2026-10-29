@@ -344,6 +344,10 @@ const SECTION_BY_CATEGORY_TAB = {
     backup: "maintenance-backup",
     diagnostics: "maintenance-diagnostics",
   },
+  kiosks: {
+    // "Kiosk software" is a row inside the Kiosks list, not a tab.
+    software: "kiosks-list",
+  },
   security: {
     admin: "security-admin",
   },
@@ -354,15 +358,23 @@ const SECTION_BY_CATEGORY_TAB = {
 };
 const MIGRATED_CATEGORIES = new Set(Object.keys(SECTION_BY_CATEGORY_TAB));
 
-function sectionFor(category, tab) {
-  return SECTION_BY_CATEGORY_TAB[category]?.[tab] ?? null;
+function sectionFor(destination) {
+  // A destination can name a section directly (Kiosks has no tabs).
+  return (
+    destination.section ?? SECTION_BY_CATEGORY_TAB[destination.category]?.[destination.tab] ?? null
+  );
 }
 
 // Scroll a ?setting= destination's section into view. Category components are
 // async, so retry for a few frames until the section exists.
 function scrollToDestination(destination, attempt = 0) {
-  if (!destination?.tab || !MIGRATED_CATEGORIES.has(destination.category)) return;
-  const sectionId = sectionFor(destination.category, destination.tab);
+  if (
+    (!destination?.tab && !destination?.section) ||
+    !MIGRATED_CATEGORIES.has(destination.category)
+  ) {
+    return;
+  }
+  const sectionId = sectionFor(destination);
   if (!sectionId) return;
   const el = document.getElementById("section-" + sectionId);
   if (el) {

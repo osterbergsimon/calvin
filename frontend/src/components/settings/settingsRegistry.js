@@ -227,6 +227,14 @@ export const settingsDestinations = [
     keywords: ["kiosk", "add kiosk", "install", "raspberry pi", "screen", "device", "qr"],
   },
   {
+    id: "kiosks-software",
+    label: "Update kiosk software",
+    path: "Kiosks / Kiosk software",
+    category: "kiosks",
+    section: "kiosks-list",
+    keywords: ["kiosk", "agent", "update", "software", "version", "bundle", "fleet"],
+  },
+  {
     id: "device-power",
     label: "Power, display schedule, and timeout",
     path: "Screen & keyboard / Screen power",
@@ -309,7 +317,7 @@ export const settingsDestinations = [
     category: "maintenance",
     tabKey: "settings_tab_maintenance",
     tab: "updates",
-    keywords: ["updates", "git", "repository", "branch", "maintenance"],
+    keywords: ["updates", "git", "repository", "branch", "maintenance", "kiosk update", "agent"],
   },
   {
     id: "maintenance-backup",

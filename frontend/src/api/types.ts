@@ -3774,6 +3774,7 @@ export interface operations {
         khost?: string | null;
         kagent?: string | null;
         kstat?: string | null;
+        kmsg?: string | null;
       };
       header?: never;
       path: {

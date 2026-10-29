@@ -18,6 +18,56 @@
         </button>
       </div>
       <AddKioskPanel v-if="addOpen" />
+      <SettingRow
+        v-if="agentKiosks.length > 0"
+        class="kiosk-software"
+        label="Kiosk software"
+        data-test="kiosk-software-summary"
+      >
+        <template #description>
+          <p class="kiosk-software__desc" data-test="kiosk-software-state">
+            <template v-if="manifestChecking">Checking for updates…</template>
+            <template v-else-if="availableVersion == null">
+              Couldn't check for kiosk updates. The kiosks keep working.
+            </template>
+            <template v-else-if="updatingKiosks.length > 0">{{ updatingCopy }}</template>
+            <template v-else-if="blocked.length > 0 && behind.length === 0">
+              No kiosk can be updated right now.
+              {{ blocked.length }} {{ blocked.length === 1 ? "needs" : "need" }} a newer OS first.
+            </template>
+            <template v-else-if="behind.length === 0">
+              All kiosks are up to date (<span class="kiosk-software__v">{{
+                shortVersion(availableVersion)
+              }}</span
+              >).
+            </template>
+            <template v-else>
+              {{ behindCopy }}
+              <span class="kiosk-software__v">{{ shortVersion(availableVersion) }}</span
+              >.
+            </template>
+          </p>
+        </template>
+        <button
+          v-if="manifestChecking === false && availableVersion == null"
+          type="button"
+          class="kiosk-software__btn"
+          data-test="kiosk-software-retry"
+          @click="checkManifest"
+        >
+          Try again
+        </button>
+        <button
+          v-else-if="behind.length > 0"
+          type="button"
+          class="kiosk-software__btn kiosk-software__btn--primary"
+          data-test="kiosk-software-update-all"
+          :disabled="updatingKiosks.length > 0"
+          @click="updateAll"
+        >
+          {{ updatingKiosks.length > 0 ? "Updating…" : "Update all" }}
+        </button>
+      </SettingRow>
       <div v-for="k in kiosks" :key="k.id" class="kiosk-row">
         <button
           type="button"
@@ -44,23 +94,55 @@
           <span class="kiosk-card__meta"
             >{{ k.hostname }} · seen {{ relativeTime(k.lastSeen) }}</span
           >
+          <span
+            v-if="k.agentVersion != null"
+            class="kiosk-card__software"
+            :class="softwareClass(k)"
+            data-test="kiosk-version-line"
+          >
+            <template v-if="k.agentUpdateRequested">
+              Updating to
+              <span class="kiosk-card__v">{{ shortVersion(availableVersion) }}</span
+              >…
+            </template>
+            <template v-else-if="isUpdateBlocked(k)">
+              Kiosk software <span class="kiosk-card__v">{{ shortVersion(k.agentVersion) }}</span> ·
+              update needs a newer OS
+            </template>
+            <template v-else-if="hasUpdateError(k)">
+              Kiosk software <span class="kiosk-card__v">{{ shortVersion(k.agentVersion) }}</span> ·
+              last update failed, kept this version
+            </template>
+            <template v-else-if="availableVersion == null">
+              Kiosk software
+              <span class="kiosk-card__v">{{ shortVersion(k.agentVersion) }}</span>
+            </template>
+            <template v-else-if="!isVersionBehind(k, availableVersion)">
+              Kiosk software <span class="kiosk-card__v">{{ shortVersion(k.agentVersion) }}</span> ·
+              up to date
+            </template>
+            <template v-else>
+              Kiosk software <span class="kiosk-card__v">{{ shortVersion(k.agentVersion) }}</span> ·
+              <span class="kiosk-card__v">{{ shortVersion(availableVersion) }}</span> available
+            </template>
+          </span>
         </button>
-        <div v-if="updateAvailable(k) || k.agentUpdateRequested" class="kiosk-card__update-row">
+        <div v-if="showUpdateRow(k)" class="kiosk-card__update-row">
           <button
-            v-if="updateAvailable(k) || k.agentUpdateRequested"
+            v-if="k.agentUpdateRequested || showUpdateButton(k)"
             type="button"
             class="kiosk-card__update"
             data-test="kiosk-update-btn"
             :disabled="k.agentUpdateRequested"
             @click.stop="onUpdate(k.id)"
           >
-            {{ k.agentUpdateRequested ? "Updating…" : "Update" }}
+            <template v-if="k.agentUpdateRequested">Updating…</template>
+            <template v-else-if="hasUpdateError(k)">Try again</template>
+            <template v-else>Update</template>
           </button>
-          <span
-            v-if="k.agentUpdateStatus && k.agentUpdateStatus.startsWith('error')"
-            class="kiosk-card__update-error"
-            >needs OS update</span
-          >
+          <span v-if="isUpdateBlocked(k)" class="kiosk-card__reinstall">
+            Reinstall this kiosk with a current Raspberry Pi OS, then update.
+          </span>
         </div>
       </div>
     </SettingsSection>
@@ -209,6 +291,15 @@
 import { ref, computed, onMounted } from "vue";
 import { useKiosksStore } from "@/stores/kiosks";
 import { useConfigStore } from "@/stores/config";
+import { useNotificationsStore } from "@/stores/notifications";
+import {
+  hasUpdateError,
+  isUpdateBlocked,
+  isVersionBehind,
+  kiosksBehind,
+  kiosksBlocked,
+  shortVersion,
+} from "@/utils/kioskSoftware";
 import SettingsSection from "@/components/settings/shell/SettingsSection.vue";
 import SettingRow from "@/components/settings/shell/SettingRow.vue";
 import SegmentedControl from "@/components/ui/SegmentedControl.vue";
@@ -222,6 +313,7 @@ import AddKioskPanel from "@/components/settings/shared/AddKioskPanel.vue";
 
 const store = useKiosksStore();
 const config = useConfigStore();
+const notifications = useNotificationsStore();
 const kiosks = computed(() => store.kiosks);
 const selectedId = ref(null);
 const overrides = ref({});
@@ -232,17 +324,66 @@ const hardwareOpen = ref(false);
 // Open by default on a fresh install, where adding a kiosk is the only next step.
 const addOpen = ref(false);
 const availableVersion = ref(null);
+const manifestChecking = ref(true);
 
-function updateAvailable(k) {
-  return (
-    availableVersion.value != null &&
-    k.agentVersion != null &&
-    k.agentVersion !== availableVersion.value
-  );
+// Browser-only kiosks have no agent; the software rows ignore them entirely.
+const agentKiosks = computed(() => kiosks.value.filter(k => k.agentVersion != null));
+const behind = computed(() => kiosksBehind(agentKiosks.value, availableVersion.value));
+const blocked = computed(() => kiosksBlocked(agentKiosks.value, availableVersion.value));
+const updatingKiosks = computed(() => agentKiosks.value.filter(k => k.agentUpdateRequested));
+
+const behindCopy = computed(() =>
+  behind.value.length === 1
+    ? "1 kiosk can be updated to"
+    : `${behind.value.length} of ${agentKiosks.value.length} kiosks can be updated to`
+);
+const updatingCopy = computed(() =>
+  updatingKiosks.value.length === 1
+    ? "Updating 1 kiosk… It restarts its screen when done."
+    : `Updating ${updatingKiosks.value.length} kiosks… They restart their screen when done.`
+);
+
+function showUpdateButton(k) {
+  return isVersionBehind(k, availableVersion.value) && !isUpdateBlocked(k);
+}
+
+function showUpdateRow(k) {
+  return k.agentUpdateRequested || isUpdateBlocked(k) || hasUpdateError(k) || showUpdateButton(k);
+}
+
+function softwareClass(k) {
+  if (isUpdateBlocked(k)) return "is-warn";
+  if (hasUpdateError(k)) return "is-err";
+  return "";
+}
+
+async function checkManifest() {
+  manifestChecking.value = true;
+  try {
+    availableVersion.value = await store.fetchAvailableAgentVersion();
+  } finally {
+    manifestChecking.value = false;
+  }
 }
 
 async function onUpdate(id) {
   await store.triggerUpdate(id);
+}
+
+async function updateAll() {
+  // Offline kiosks get the request too: the flag waits for their next poll.
+  const ids = behind.value.map(k => k.id);
+  const results = await Promise.allSettled(ids.map(id => store.triggerUpdate(id)));
+  results.forEach((result, index) => {
+    if (result.status === "rejected") {
+      notifications.notify({
+        severity: "error",
+        eyebrow: "Kiosks",
+        message: `Couldn't start the update on ${ids[index]}.`,
+      });
+    }
+  });
+  await store.loadKiosks();
 }
 
 const ONLINE_WINDOW_MS = 120000; // 2 minutes
@@ -466,14 +607,13 @@ onMounted(async () => {
   // Fetch all versions concurrently, then commit ONCE — writing the map inside
   // each concurrent callback races (each spreads a stale base, last write wins,
   // dropping entries).
-  const [entries, agentVersion] = await Promise.all([
+  const [entries] = await Promise.all([
     Promise.all(kiosks.value.map(async k => [k.id, await store.fetchDeviceConfigVersion(k.id)])),
-    store.fetchAvailableAgentVersion(),
+    checkManifest(),
   ]);
   const next = { ...desiredVersions.value };
   for (const [id, v] of entries) if (v) next[id] = v;
   desiredVersions.value = next;
-  availableVersion.value = agentVersion;
 });
 </script>
 
@@ -549,6 +689,62 @@ onMounted(async () => {
   font-size: 0.85em;
   opacity: 0.7;
 }
+.kiosk-card__software {
+  grid-column: 1 / -1;
+  font-size: var(--fs-sm);
+  color: var(--ink-2);
+}
+.kiosk-card__software.is-warn {
+  color: var(--warn);
+}
+.kiosk-card__software.is-err {
+  color: var(--err);
+}
+.kiosk-card__v {
+  font-family: var(--font-data);
+}
+.kiosk-card__reinstall {
+  font-size: var(--fs-sm);
+  color: var(--ink-2);
+}
+/* Kiosk software summary row (CLV-19). */
+.kiosk-software__desc {
+  margin: 0.2rem 0 0;
+  font-size: 0.85rem;
+  line-height: 1.4;
+  color: var(--ink-2);
+}
+.kiosk-software__v {
+  font-family: var(--font-data);
+}
+.kiosk-software__btn {
+  min-height: var(--touch-target);
+  padding: 0 1rem;
+  font-family: var(--font-ui);
+  font-size: 0.95rem;
+  font-weight: 500;
+  color: var(--ink);
+  background: var(--bg-2);
+  border: 1px solid var(--line);
+  border-radius: 10px;
+  cursor: pointer;
+}
+.kiosk-software__btn:hover:not(:disabled) {
+  border-color: var(--focus);
+}
+.kiosk-software__btn--primary {
+  color: var(--focus-ink);
+  background: var(--focus);
+  border-color: var(--focus);
+  font-weight: 600;
+}
+.kiosk-software__btn--primary:hover:not(:disabled) {
+  filter: brightness(1.08);
+}
+.kiosk-software__btn:disabled {
+  opacity: 0.55;
+  cursor: not-allowed;
+}
 .kiosks__reset {
   margin-top: 8px;
   padding: 6px 14px;
@@ -581,21 +777,31 @@ onMounted(async () => {
   padding: 4px 12px 6px;
 }
 .kiosk-card__update {
-  padding: 4px 12px;
+  min-height: var(--touch-target);
+  padding: 0 1rem;
   border: 1px solid var(--accent-color, #6ea8fe);
   border-radius: 6px;
   background: transparent;
   color: var(--accent-color, #6ea8fe);
   cursor: pointer;
-  font-size: 0.85em;
+  font-size: 0.9em;
 }
 .kiosk-card__update:disabled {
   opacity: 0.5;
   cursor: default;
 }
-.kiosk-card__update-error {
-  font-size: 0.8em;
-  opacity: 0.7;
-  color: var(--warn);
+/* The summary row stacks its control full-width on phone-sized screens. */
+@media (max-width: 480px) {
+  .kiosk-software {
+    flex-direction: column;
+    align-items: stretch;
+    gap: 0.75rem;
+  }
+  .kiosk-software :deep(.setting-row__control) {
+    width: 100%;
+  }
+  .kiosk-software__btn {
+    width: 100%;
+  }
 }
 </style>

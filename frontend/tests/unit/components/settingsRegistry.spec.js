@@ -48,6 +48,7 @@ describe("settings registry", () => {
       "plugins",
       "plugins-services",
       "kiosks",
+      "kiosks-software",
       "device-power",
       "device-keyboard",
       "device-notifications",
@@ -144,6 +145,19 @@ describe("settings registry", () => {
     ]);
     expect(filterSettingsDestinations("content sources").map(item => item.id)).toContain(
       "content-services"
+    );
+  });
+
+  it("resolves kiosk software to the Kiosks category and section", () => {
+    expect(getSettingDestinationById("kiosks-software")).toMatchObject({
+      label: "Update kiosk software",
+      path: "Kiosks / Kiosk software",
+      category: "kiosks",
+      section: "kiosks-list",
+    });
+    expect(filterSettingsDestinations("fleet").map(item => item.id)).toContain("kiosks-software");
+    expect(filterSettingsDestinations("kiosk update").map(item => item.id)).toContain(
+      "maintenance-updates"
     );
   });
 
