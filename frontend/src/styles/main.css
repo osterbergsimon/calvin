@@ -27,6 +27,10 @@ body {
 }
 #app .dialog-above-osk--center {
   top: calc((100dvh - var(--osk-height, 0px)) / 2);
+  /* A centred panel sets top AND translateY(-50%) itself. Inheriting the
+     overlay's bottom offset would give it both top and bottom, stretching it
+     from mid-screen to the keyboard whatever its content. */
+  bottom: auto;
 }
 
 /* ==========================================================================
