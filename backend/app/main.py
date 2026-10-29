@@ -427,7 +427,7 @@ async def _sync_display_orientation():
 
 
 # Theme sync removed - themes are loaded from filesystem on-demand
-# No database storage needed for themes (see ORMAR_MIGRATION_PLAN.md Part 7)
+# No database storage needed for themes.
 
 
 async def _shutdown_services():

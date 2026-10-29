@@ -140,22 +140,6 @@ export function clearCachedData(key) {
 }
 
 /**
- * Clear all cache entries (for debugging/cleanup).
- */
-export function clearAllCache() {
-  const keysToRemove = [];
-
-  for (let i = 0; i < localStorage.length; i++) {
-    const key = localStorage.key(i);
-    if (key && (key.startsWith(CACHE_PREFIX) || key.startsWith(CACHE_TIMESTAMP_PREFIX))) {
-      keysToRemove.push(key);
-    }
-  }
-
-  keysToRemove.forEach(key => localStorage.removeItem(key));
-}
-
-/**
  * Clear old cache entries to free up space.
  * Removes entries older than 24 hours.
  */
@@ -179,36 +163,4 @@ function clearOldCacheEntries() {
 
   keysToRemove.forEach(key => localStorage.removeItem(key));
   console.log(`[Cache] Cleared ${keysToRemove.length / 2} old cache entries`);
-}
-
-/**
- * Get cache statistics (for debugging).
- */
-export function getCacheStats() {
-  const stats = {
-    totalEntries: 0,
-    totalSize: 0,
-    entries: [],
-  };
-
-  for (let i = 0; i < localStorage.length; i++) {
-    const key = localStorage.key(i);
-    if (key && key.startsWith(CACHE_PREFIX)) {
-      const data = localStorage.getItem(key);
-      const timestampKey = key.replace(CACHE_PREFIX, CACHE_TIMESTAMP_PREFIX);
-      const timestamp = localStorage.getItem(timestampKey);
-
-      stats.totalEntries++;
-      stats.totalSize +=
-        key.length + (data?.length || 0) + (timestampKey.length + (timestamp?.length || 0));
-
-      stats.entries.push({
-        key: key.replace(CACHE_PREFIX, ""),
-        size: data?.length || 0,
-        age: timestamp ? Date.now() - parseInt(timestamp, 10) : null,
-      });
-    }
-  }
-
-  return stats;
 }
