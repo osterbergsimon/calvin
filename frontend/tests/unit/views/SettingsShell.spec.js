@@ -19,6 +19,17 @@ vi.mock("@/composables/useConfigForm", () => ({
 }));
 
 import Settings from "@/views/Settings.vue";
+import api from "@/services/api";
+import { useAuthStore } from "@/stores/auth";
+
+function signInAsAdmin() {
+  useAuthStore().applyStatus({ configured: true, authenticated: true });
+  api.get.mockImplementation(url =>
+    url === "/auth/status"
+      ? Promise.resolve({ data: { configured: true, authenticated: true } })
+      : Promise.resolve({ data: {} })
+  );
+}
 
 const stubs = {
   SettingsTopBar: { template: '<div class="topbar-stub" />' },
@@ -39,6 +50,7 @@ const stubs = {
 describe("Settings shell", () => {
   beforeEach(() => {
     setActivePinia(createPinia());
+    signInAsAdmin();
     push.mockClear();
     sessionStorage.clear();
   });
@@ -75,5 +87,19 @@ describe("Settings shell", () => {
     const w = mount(Settings, { global: { stubs } });
     expect(w.find(".content-settings-stub").exists()).toBe(true);
     expect(w.find(".display-stub").exists()).toBe(false);
+  });
+
+  it("replaces the settings body with the auth lock screen while locked", () => {
+    useAuthStore().applyStatus({ configured: true, authenticated: false });
+    api.get.mockImplementation(url =>
+      url === "/auth/status"
+        ? Promise.resolve({ data: { configured: true, authenticated: false } })
+        : Promise.resolve({ data: {} })
+    );
+    const w = mount(Settings, { global: { stubs } });
+    expect(w.find(".search-stub").exists()).toBe(false);
+    expect(w.find(".rail-stub").exists()).toBe(false);
+    expect(w.find("[data-test='auth-card']").exists()).toBe(true);
+    expect(w.text()).toContain("Sign in to Settings");
   });
 });
