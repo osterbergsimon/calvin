@@ -11,6 +11,7 @@ vi.mock("@/composables/useKeyboardActions", () => ({
 }));
 vi.mock("vue-router", () => ({
   useRoute: () => ({ path: "/" }),
+  useRouter: () => ({ push: vi.fn() }),
 }));
 
 import Dashboard from "@/views/Dashboard.vue";

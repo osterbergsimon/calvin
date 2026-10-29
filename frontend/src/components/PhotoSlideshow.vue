@@ -65,6 +65,9 @@
             help="Upload photos in Settings › Content › Image sources."
             action-label="Add photos"
             setting-id="content-images"
+            :setup="setupEmpty"
+            :region-key="regionId || ''"
+            :phone-hint="setupEmpty ? null : false"
           />
         </div>
         <div v-else class="photo-container">
@@ -123,9 +126,18 @@ const props = defineProps({
     type: Array,
     default: () => [],
   },
+  // Dashboard leaf region id (CLV-20 setup prompt); null in fullscreen.
+  regionId: {
+    type: String,
+    default: null,
+  },
 });
 
 const imagesStore = useImagesStore();
+
+// Only a real "nothing configured" is setup-empty (CLV-20); an offline error
+// is its own state and must not trigger the setup prompt.
+const setupEmpty = computed(() => !imagesStore.error);
 
 const sourceKey = computed(() =>
   [

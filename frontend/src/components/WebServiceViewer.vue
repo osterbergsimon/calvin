@@ -37,6 +37,9 @@
           :help="emptyState.helpText"
           :action-label="emptyState.actionLabel"
           :setting-id="emptyState.settingId"
+          :setup="Boolean(emptyState.setup)"
+          :region-key="regionId || ''"
+          :phone-hint="emptyState.setup ? null : false"
         />
       </DashboardPanel>
 
@@ -173,11 +176,13 @@ const emptyState = computed(() => {
   if (services.value.length === 0) {
     return {
       className: "no-services",
-      message: "No web services yet",
+      message: "No web pages yet",
       helpText:
         "Add a web page or dashboard with the built-in Iframe plugin in Settings › Content › Web pages & services.",
-      actionLabel: "Add a web service",
-      settingId: "plugins-services",
+      actionLabel: "Add a web page",
+      settingId: "content-services",
+      // Offline/stale data is not "nothing configured" (CLV-20).
+      setup: !webServicesStore.error && !webServicesStore.stale,
     };
   }
   if (serviceUnavailable.value) {

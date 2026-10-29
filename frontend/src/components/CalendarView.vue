@@ -85,6 +85,9 @@
             help="Add an iCal, Google or Proton calendar link in Settings › Content › Calendars."
             action-label="Add a calendar"
             setting-id="content-calendars"
+            :setup="setupEmpty"
+            :region-key="regionId || ''"
+            :phone-hint="setupEmpty ? null : false"
           />
         </div>
         <div
@@ -520,6 +523,9 @@ const sourcesChecked = ref(false);
 const noSources = computed(
   () => sourcesChecked.value && !loading.value && calendarStore.sources.length === 0
 );
+// Only a real "nothing configured" is setup-empty (CLV-20): an offline or
+// stale cache is its own state and must not trigger the setup prompt.
+const setupEmpty = computed(() => noSources.value && !calendarStore.error && !calendarStore.stale);
 const selectedEvent = computed(() => calendarStore.selectedEvent);
 
 const calendarView = ref(null);

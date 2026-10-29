@@ -1,9 +1,13 @@
 <template>
-  <div class="phone-setup" :class="{ 'phone-setup--compact': compact }" data-test="phone-setup">
+  <div
+    class="phone-setup"
+    :class="{ 'phone-setup--compact': compact, 'phone-setup--stacked': stacked }"
+    data-test="phone-setup"
+  >
     <img v-if="qr" class="phone-setup__qr" :src="qr" :alt="`QR code for ${link}`" />
     <div class="phone-setup__text">
       <p class="phone-setup__title">{{ title }}</p>
-      <p class="phone-setup__hint">{{ hint }}</p>
+      <p v-if="hint" class="phone-setup__hint">{{ hint }}</p>
       <code v-if="link" class="phone-setup__url" data-test="phone-setup-url">{{ link }}</code>
     </div>
   </div>
@@ -28,6 +32,8 @@ const props = defineProps({
     default: "Typing is easier there — scan the code or open this address on the same network.",
   },
   compact: { type: Boolean, default: false },
+  // CLV-20: QR above the text, no border/background — the welcome card's column.
+  stacked: { type: Boolean, default: false },
 });
 
 const serverUrl = ref("");
@@ -37,18 +43,23 @@ const link = computed(
   () => props.url || (serverUrl.value ? settingsLink(serverUrl.value, props.settingId) : "")
 );
 
+const qrWidth = computed(() => {
+  if (props.stacked) return props.compact ? 132 : 180;
+  return props.compact ? 132 : 200;
+});
+
 const renderQr = async value => {
   if (!value) {
     qr.value = "";
     return;
   }
   try {
-    qr.value = await QRCode.toDataURL(value, { margin: 1, width: props.compact ? 132 : 200 });
+    qr.value = await QRCode.toDataURL(value, { margin: 1, width: qrWidth.value });
   } catch {
     qr.value = "";
   }
 };
-watch(link, renderQr, { immediate: true });
+watch([link, qrWidth], ([value]) => renderQr(value), { immediate: true });
 
 onMounted(async () => {
   if (!props.url) serverUrl.value = await resolveServerUrl();
@@ -82,6 +93,24 @@ onMounted(async () => {
   width: 132px;
   height: 132px;
 }
+/* Embedded in the CLV-20 welcome card: QR above the text, no chrome of its own. */
+.phone-setup--stacked {
+  flex-direction: column;
+  align-items: flex-start;
+  gap: var(--space-sm);
+  padding: 0;
+  background: transparent;
+  border: 0;
+  border-radius: 0;
+}
+.phone-setup--stacked .phone-setup__qr {
+  width: 180px;
+  height: 180px;
+}
+.phone-setup--stacked.phone-setup--compact .phone-setup__qr {
+  width: 132px;
+  height: 132px;
+}
 .phone-setup__text {
   min-width: 0;
 }
@@ -101,6 +130,9 @@ onMounted(async () => {
   font-size: 0.85rem;
   overflow-wrap: anywhere;
   color: var(--ink);
+}
+.phone-setup--stacked .phone-setup__url {
+  font-size: 0.78rem;
 }
 @media (max-width: 480px) {
   .phone-setup {
