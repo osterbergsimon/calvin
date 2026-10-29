@@ -65,3 +65,20 @@ def test_repo_install_rejects_traversal_plugin_id_override(test_client, endpoint
     # local/install is 403 outside dev mode; either way nothing is touched.
     assert response.status_code in (400, 403)
     assert (tmp_path / "plugins").is_dir()
+
+
+def test_static_asset_route_rejects_dotdot_plugin_id(
+    test_client, tmp_path, temp_plugins_dir, monkeypatch
+):
+    """plugins_dir/../frontend must not be served as a plugin's assets."""
+    from app.config import settings
+
+    monkeypatch.setattr(settings, "plugins_dir", temp_plugins_dir)
+    outside = tmp_path / "frontend"
+    outside.mkdir()
+    (outside / "leak.js").write_text("secret")
+
+    response = test_client.get("/api/plugins/%2E%2E/static/leak.js")
+
+    assert response.status_code in (400, 404)
+    assert "secret" not in response.text

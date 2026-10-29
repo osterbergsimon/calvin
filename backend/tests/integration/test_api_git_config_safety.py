@@ -35,7 +35,6 @@ BAD_BRANCHES = [
     "feature/",
     "main.lock",
     "has space",
-    "",
 ]
 
 
@@ -134,3 +133,57 @@ def test_config_writes_valid_git_settings(test_client, update_file):
     assert "GIT_BRANCH=feature/x-1.2\n" in text
     assert "GIT_REPO=https://github.com/me/calvin.git\n" in text
     assert "CALVIN_MODE=prod\n" in text
+
+
+@pytest.mark.parametrize(
+    "payload",
+    [
+        {"git_branch": "--upload-pack=touch /tmp/pwned"},
+        {"git_repo_url": "file:///etc"},
+    ],
+)
+def test_config_rejects_unsafe_snake_case_git_keys(test_client, payload):
+    """ConfigUpdate allows extra keys; the snake_case aliases must not bypass validation."""
+    response = test_client.post("/api/config", json=payload)
+
+    assert response.status_code == 422
+
+
+@pytest.mark.parametrize("payload", [{"gitBranch": ""}, {"gitRepoUrl": ""}])
+def test_config_allows_empty_git_settings(test_client, update_file, payload):
+    """Empty means "use the update script's default", as before."""
+    response = test_client.post("/api/config", json=payload)
+
+    assert response.status_code == 200
+
+
+def test_update_refuses_stored_unsafe_git_branch(test_client, tmp_path, monkeypatch):
+    """A value stored before validation existed must not reach update-calvin.sh."""
+    import asyncio
+
+    import app.api.routes.system as system_routes
+    from app.services.config_service import config_service
+
+    script_path = tmp_path / "update.sh"
+    script_path.write_text("#!/bin/bash\n")
+    original_settings = system_routes.settings
+
+    class _StubSettings:
+        repo_dir = tmp_path
+        system_path = original_settings.system_path
+
+        def get_update_script_path(self):
+            return script_path
+
+    monkeypatch.setattr(system_routes, "settings", _StubSettings())
+    loop = asyncio.new_event_loop()
+    try:
+        loop.run_until_complete(config_service.set_value("git_branch", "--upload-pack=x"))
+    finally:
+        loop.close()
+
+    with patch("subprocess.Popen") as mock_popen:
+        response = test_client.post("/api/system/update")
+
+    assert response.status_code == 400
+    mock_popen.assert_not_called()

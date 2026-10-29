@@ -17,6 +17,7 @@ from loguru import logger
 
 from app.config import settings
 from app.services.display_power_service import display_power_service
+from app.utils.git_refs import validate_git_branch
 
 router = APIRouter()
 
@@ -215,8 +216,16 @@ async def trigger_update():
         )
 
     try:
-        # Get git branch from config
-        git_branch = await config_service.get_value("git_branch", "main")
+        # Get git branch from config. It reaches git and the update script, and
+        # may predate validation (audit S7), so check it again here.
+        git_branch = await config_service.get_value("git_branch", "main") or "main"
+        try:
+            validate_git_branch(git_branch)
+        except ValueError as exc:
+            raise HTTPException(
+                status_code=400,
+                detail="The configured update branch is invalid; set it again in Settings",
+            ) from exc
 
         # Ensure log directory exists
         log_dir = settings.repo_dir / "backend" / "logs"

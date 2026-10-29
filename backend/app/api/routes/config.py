@@ -7,11 +7,12 @@ from typing import Any
 
 from fastapi import APIRouter, HTTPException
 from loguru import logger
-from pydantic import BaseModel, ConfigDict, field_validator
+from pydantic import BaseModel, ConfigDict, field_validator, model_validator
 
 from app.config import settings
 from app.services.config_service import config_service
 from app.services.display_orientation_service import display_orientation_service
+from app.utils.git_refs import validate_git_branch, validate_git_repo_url
 
 router = APIRouter()
 
@@ -91,31 +92,6 @@ def get_frontend_version() -> str | None:
 # validated first (audit S7, calvin-ua2).
 CALVIN_UPDATE_FILE = Path("/etc/default/calvin-update")
 
-# https only, no userinfo/query/fragment, no shell metacharacters or whitespace.
-_GIT_REPO_URL_RE = re.compile(r"https://[A-Za-z0-9.-]+(:[0-9]{1,5})?(/[A-Za-z0-9._~%+/-]*)?")
-# A conservative subset of git's ref-name rules.
-_GIT_BRANCH_RE = re.compile(r"[A-Za-z0-9_][A-Za-z0-9._/-]{0,199}")
-
-
-def validate_git_repo_url(url: str) -> str:
-    """Accept only a plain https:// git URL; raise ValueError otherwise."""
-    if not isinstance(url, str) or not _GIT_REPO_URL_RE.fullmatch(url):
-        raise ValueError("Repository URL must be a plain https:// URL")
-    return url
-
-
-def validate_git_branch(branch: str) -> str:
-    """Accept only a safe git branch name; raise ValueError otherwise."""
-    if (
-        not isinstance(branch, str)
-        or not _GIT_BRANCH_RE.fullmatch(branch)
-        or ".." in branch
-        or "//" in branch
-        or branch.endswith(("/", ".", ".lock"))
-    ):
-        raise ValueError("Invalid branch name")
-    return branch
-
 
 def _write_update_setting(key: str, value: str | None) -> None:
     """Set KEY=value in the update script's config file, if it exists."""
@@ -189,6 +165,18 @@ class ConfigUpdate(BaseModel):
         None  # Git repository URL for updates (default: 'https://github.com/osterbergsimon/calvin.git')
     )
     gitBranch: str | None = None  # Git branch to use for updates (default: 'main')
+
+    @model_validator(mode="before")
+    @classmethod
+    def _check_snake_case_git_keys(cls, data: Any) -> Any:
+        # extra="allow" would otherwise let git_branch/git_repo_url (the stored
+        # names, read by the update route) through unvalidated.
+        if isinstance(data, dict):
+            if data.get("git_branch") is not None:
+                validate_git_branch(data["git_branch"])
+            if data.get("git_repo_url") is not None:
+                validate_git_repo_url(data["git_repo_url"])
+        return data
 
     @field_validator("gitRepoUrl")
     @classmethod
