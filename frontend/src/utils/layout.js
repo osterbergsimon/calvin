@@ -4,11 +4,11 @@
 
 import { CARD_SIZE_KEYS } from "../styles/cardSizeScale.js";
 
-export const DASHBOARD_REGION_KINDS = ["calendar", "photos", "service"];
+const DASHBOARD_REGION_KINDS = ["calendar", "photos", "service"];
 export const MAX_TOP_REGIONS = 8;
 export const MAX_SPLIT_DEPTH = 3;
 
-export const DASHBOARD_LAYOUT_PRESETS = {
+const DASHBOARD_LAYOUT_PRESETS = {
   single: {
     label: "Single Region",
     regions: [{ id: "region-1", kind: "calendar", instanceIds: [], size: 100 }],
@@ -39,22 +39,7 @@ export const DASHBOARD_LAYOUT_PRESETS = {
   },
 };
 
-export const DEFAULT_DASHBOARD_SCREEN_ID = "screen-home";
-
-export function createDefaultDashboardScreens() {
-  return normalizeDashboardScreens({
-    version: 2,
-    activeScreenId: DEFAULT_DASHBOARD_SCREEN_ID,
-    screens: [
-      {
-        id: DEFAULT_DASHBOARD_SCREEN_ID,
-        name: "Home",
-        layout: createDashboardLayoutFromPreset("split_two"),
-        activeRegionId: "region-1",
-      },
-    ],
-  });
-}
+const DEFAULT_DASHBOARD_SCREEN_ID = "screen-home";
 
 export function createDashboardScreenFromPreset(preset, existingScreen = null) {
   const id = existingScreen?.id || createScreenId();
@@ -222,7 +207,7 @@ export function normalizeDashboardScreen(screen) {
   };
 }
 
-export const CLOCK_BAR_PERIMETER_POSITIONS = ["top", "bottom", "left", "right"];
+const CLOCK_BAR_PERIMETER_POSITIONS = ["top", "bottom", "left", "right"];
 
 /**
  * Normalize a per-screen clock bar override. Returns `null` if no fields are
@@ -427,7 +412,7 @@ export function getContainerAtPath(layout, containerPath) {
   return node?.split?.regions ?? null;
 }
 
-export function updateContainerAtPath(layout, containerPath, fn) {
+function updateContainerAtPath(layout, containerPath, fn) {
   const clone = JSON.parse(JSON.stringify(layout));
   if (!Array.isArray(containerPath) || containerPath.length === 0) {
     clone.regions = fn(clone.regions);
@@ -683,7 +668,7 @@ function createScreenId() {
   return `screen-${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 8)}`;
 }
 
-export function createLegacyDashboardLayout(config = {}) {
+function createLegacyDashboardLayout(config = {}) {
   const calendarSize = clampRegionSize(config.calendarSplit ?? 70);
   const secondaryKind = config.lastSideViewMode === "web_services" ? "service" : "photos";
 
@@ -739,7 +724,7 @@ export function normalizeDashboardLayout(layout, legacyConfig = {}) {
   });
 }
 
-export function normalizeDirection(direction) {
+function normalizeDirection(direction) {
   return direction === "row" || direction === "column" ? direction : null;
 }
 

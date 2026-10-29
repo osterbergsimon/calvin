@@ -25,9 +25,6 @@ class TestPluginConfigEndpoints:
         """Test getting config for non-existent plugin type."""
         response = test_client.get("/api/plugins/nonexistent-plugin/config")
 
-        if response.status_code == 404:
-            pytest.skip("Plugin config route not available in test client")
-
         assert response.status_code == 404
         assert "not found" in response.json()["detail"].lower()
 

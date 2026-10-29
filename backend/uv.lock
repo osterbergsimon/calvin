@@ -191,9 +191,6 @@ docs = [
     { name = "mkdocs-material" },
     { name = "pymdown-extensions" },
 ]
-linux = [
-    { name = "evdev" },
-]
 
 [package.dev-dependencies]
 dev = [
@@ -219,7 +216,6 @@ requires-dist = [
     { name = "apscheduler", specifier = ">=3.10.4" },
     { name = "bandit", marker = "extra == 'dev'", specifier = ">=1.7.5" },
     { name = "databases", specifier = ">=0.9.0" },
-    { name = "evdev", marker = "extra == 'linux'", specifier = ">=1.6.1" },
     { name = "factory-boy", marker = "extra == 'dev'", specifier = ">=3.3.0" },
     { name = "faker", marker = "extra == 'dev'", specifier = ">=20.0.0" },
     { name = "fastapi", specifier = ">=0.104.1" },
@@ -253,7 +249,7 @@ requires-dist = [
     { name = "uvicorn", extras = ["standard"], specifier = ">=0.24.0" },
     { name = "websockets", specifier = ">=12.0" },
 ]
-provides-extras = ["linux", "dev", "docs"]
+provides-extras = ["dev", "docs"]
 
 [package.metadata.requires-dev]
 dev = [
@@ -467,12 +463,6 @@ name = "docopt"
 version = "0.6.2"
 source = { registry = "https://pypi.org/simple" }
 sdist = { url = "https://files.pythonhosted.org/packages/a2/55/8f8cab2afd404cf578136ef2cc5dfb50baa1761b68c9da1fb1e4eed343c9/docopt-0.6.2.tar.gz", hash = "sha256:49b3a825280bd66b3aa83585ef59c4a8c82f2c8a522dbe754a8bc8d08c85c491", size = 25901, upload-time = "2014-06-16T11:18:57.406Z" }
-
-[[package]]
-name = "evdev"
-version = "1.9.2"
-source = { registry = "https://pypi.org/simple" }
-sdist = { url = "https://files.pythonhosted.org/packages/63/fe/a17c106a1f4061ce83f04d14bcedcfb2c38c7793ea56bfb906a6fadae8cb/evdev-1.9.2.tar.gz", hash = "sha256:5d3278892ce1f92a74d6bf888cc8525d9f68af85dbe336c95d1c87fb8f423069", size = 33301, upload-time = "2025-05-01T19:53:47.69Z" }
 
 [[package]]
 name = "factory-boy"

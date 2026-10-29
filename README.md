@@ -129,8 +129,8 @@ Linux contributors have the same targets; NixOS users can `nix-shell` for a
 pinned toolchain.
 
 **Keyboard support** is browser-side: `KeyboardHandler.vue` listens for DOM
-`keydown` events. The backend `evdev` helper is legacy code and is not part of
-the running app, so no kernel headers or `--extra linux` install are needed.
+`keydown` events; there is no backend hardware-keyboard (`evdev`) path, so no
+kernel headers or `--extra linux` install are needed.
 
 ## 📁 Project Structure
 

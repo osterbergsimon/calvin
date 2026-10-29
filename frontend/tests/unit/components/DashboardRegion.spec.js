@@ -1,5 +1,5 @@
 import { describe, it, expect } from "vitest";
-import { mount } from "@vue/test-utils";
+import { mount, flushPromises } from "@vue/test-utils";
 import DashboardRegion from "../../../src/components/DashboardRegion.vue";
 
 const threeLevel = {
@@ -27,11 +27,15 @@ const threeLevel = {
 };
 
 describe("DashboardRegion recursion", () => {
-  it("renders a nested DashboardRegion for a split child", () => {
+  it("renders a nested DashboardRegion for a split child", async () => {
     const wrapper = mount(DashboardRegion, {
       props: { region: threeLevel, photoRotationInterval: 5, parentDirection: "row" },
       global: { stubs: { CalendarView: true, PhotoSlideshow: true, WebServiceViewer: true } },
     });
+    // DashboardRegion's leaves are defineAsyncComponent(): let the lazy imports
+    // resolve before the test ends, otherwise they can land after the test
+    // environment is torn down (vitest reports that as an unhandled rejection).
+    await flushPromises();
     // One root + one per split node (r1, r1-b) => 2 DashboardRegion instances with a split class,
     // and leaf DashboardRegion instances for r1-a, r1-b-a, r1-b-b.
     const all = wrapper.findAllComponents(DashboardRegion);
@@ -43,6 +47,7 @@ describe("DashboardRegion recursion", () => {
       props: { region: threeLevel, photoRotationInterval: 5, parentDirection: "row" },
       global: { stubs: { CalendarView: true, PhotoSlideshow: true, WebServiceViewer: true } },
     });
+    await flushPromises();
     const leaf = wrapper
       .findAllComponents(DashboardRegion)
       .find(c => c.props("region").id === "r1-b-a");
@@ -53,7 +58,7 @@ describe("DashboardRegion recursion", () => {
     expect(events.every(e => e[0] === "r1-b-a")).toBe(true);
   });
 
-  it("lights the branch containing the active leaf", () => {
+  it("lights the branch containing the active leaf", async () => {
     const wrapper = mount(DashboardRegion, {
       props: {
         region: threeLevel,
@@ -64,6 +69,7 @@ describe("DashboardRegion recursion", () => {
       },
       global: { stubs: { CalendarView: true, PhotoSlideshow: true, WebServiceViewer: true } },
     });
+    await flushPromises();
     const byId = id =>
       wrapper.findAllComponents(DashboardRegion).find(c => c.props("region").id === id);
     expect(byId("r1-b").classes()).toContain("dashboard-subregion--lit");

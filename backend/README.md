@@ -30,8 +30,8 @@ uv sync --extra dev
 uv run uvicorn app.main:app --reload --host 0.0.0.0 --port 8000
 ```
 
-Keyboard input is handled in the browser, so no `evdev`/`--extra linux`
-install or kernel headers are needed on either platform.
+Keyboard input is handled in the browser; there is no `evdev` dependency, so
+no kernel headers are needed on either platform.
 
 ## Development
 

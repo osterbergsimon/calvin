@@ -582,11 +582,8 @@ class TestBackendPluginAPI:
     @pytest.mark.asyncio
     async def test_run_backend_plugin_task_not_backend_plugin(self, test_client):
         """Test running task for non-backend plugin (should return 400)."""
-        # Try with a non-backend plugin (local is an image plugin)
-        response = test_client.post("/api/plugins/local/backend/run-task")
-
-        if response.status_code == 404:
-            pytest.skip("Backend plugin endpoint not available in test client")
+        # The seeded local-images instance is an image plugin, not a backend one.
+        response = test_client.post("/api/plugins/local-images/backend/run-task")
 
         assert response.status_code == 400
         assert "not a backend plugin" in response.json()["detail"].lower()
@@ -694,10 +691,8 @@ class TestBackendPluginAPI:
     @pytest.mark.asyncio
     async def test_get_backend_plugin_status_not_backend(self, test_client):
         """Test getting status for non-backend plugin (should return 400)."""
-        response = test_client.get("/api/plugins/local/backend/status")
-
-        if response.status_code == 404:
-            pytest.skip("Backend plugin endpoint not available in test client")
+        # The seeded local-images instance is an image plugin, not a backend one.
+        response = test_client.get("/api/plugins/local-images/backend/status")
 
         assert response.status_code == 400
         assert "not a backend plugin" in response.json()["detail"].lower()

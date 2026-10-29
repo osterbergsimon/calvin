@@ -27,7 +27,3 @@ const weatherIcons = {
 export function weatherIconPath(iconId) {
   return weatherIcons[iconId] || mdiWeatherCloudy;
 }
-
-export function isKnownWeatherIcon(iconId) {
-  return Boolean(weatherIcons[iconId]);
-}

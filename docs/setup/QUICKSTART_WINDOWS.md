@@ -31,22 +31,14 @@ $env:Path = [System.Environment]::GetEnvironmentVariable("Path","Machine") + ";"
 
 Verify: `uv --version`
 
-## Important Note: evdev (Keyboard Support)
+## Important Note: Keyboard Support
 
-The `evdev` package is **Linux-only** and won't install on Windows. This is **normal and expected**:
+Keyboard input is handled by the browser: `KeyboardHandler.vue` listens for DOM
+`keydown` events, so it works the same on Windows, Linux and the Pi. There is
+no hardware/`evdev` path in the backend, so nothing extra needs installing on
+either platform.
 
-### Development on Windows
-- ✅ Backend will run fine on Windows for development
-- ✅ All features work except keyboard input
-- ✅ Keyboard features are automatically disabled on Windows
-- ✅ Perfect for developing and testing all other features
-
-### Production on Raspberry Pi (Linux)
-- ✅ Full keyboard support will work on Raspberry Pi (Linux)
-- ✅ Install with: `uv sync --extra linux` on Raspberry Pi
-- ✅ All features including keyboard input will be available
-
-**You don't need WSL** - develop on Windows, deploy to Raspberry Pi. The backend automatically handles platform differences.
+**You don't need WSL** - develop on Windows, deploy to Raspberry Pi.
 
 ## Step 3: Run Setup Script
 

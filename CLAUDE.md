@@ -8,7 +8,7 @@ Calvin is a self-hosted Raspberry Pi dashboard (calendars, photos, web services)
 
 - **Backend:** FastAPI + uvicorn, Python 3.12+, `uv` package manager, Ormar ORM + Alembic (SQLite), APScheduler, Loguru (unified via `InterceptHandler`), declarative class-discovery plugin loader.
 - **Frontend:** Vue 3 Composition API, Vite, Pinia stores, Vue Router. Built to `frontend/dist/` and served by FastAPI at `/`. API lives at `/api/*`.
-- **Platforms:** develop on Windows/Linux, deploy on Raspberry Pi. **Live keyboard input is browser-side** — `frontend/src/components/KeyboardHandler.vue` listens for DOM `keydown`. The backend `evdev` handler (`backend/app/utils/keyboard.py`, mock on Windows) exists but its `read_events()` read-loop is **not currently wired into the running app** (test-only). Don't assume backend hardware events.
+- **Platforms:** develop on Windows/Linux, deploy on Raspberry Pi. **Keyboard input is browser-side** — `frontend/src/components/KeyboardHandler.vue` listens for DOM `keydown`. There is no backend hardware-keyboard path: the old `evdev` helper was removed, so don't look for backend key events.
 
 Entry points: [backend/app/main.py](backend/app/main.py) (lifespan → DB init → plugin load → schedulers), [frontend/src/main.js](frontend/src/main.js).
 
@@ -65,7 +65,7 @@ A plugin directory:
 - **`uv pip` flag order:** `uv pip install --python <path> <pkg>` — `--python` goes *after* `install`, not before. (commit 4d73ca2)
 - **SQLite "database is locked"** under plugin install concurrency → use `retry_on_db_locked` with exponential backoff.
 - **Schema renderer kind typos fail at load time, not silently.** If you add a renderer to [rendererRegistry.js](frontend/src/components/plugins/rendererRegistry.js), also add the kind to `SUPPORTED_DISPLAY_KINDS` in [definitions.py](backend/app/plugins/definitions.py) — otherwise plugins using it are rejected at install. The kind-sync test (`backend/tests/unit/test_display_kind_sync.py`) enforces this.
-- **Keyboard input is browser-DOM, not backend evdev.** The live path is `KeyboardHandler.vue` (`window` `keydown`). The backend `evdev` `read_events()` loop is dead code (test-only, no supervisor/hot-plug) — don't wire it up expecting it to already work, and don't trust "uses evdev" as the active path.
+- **Keyboard input is browser-DOM only.** The live path is `KeyboardHandler.vue` (`window` `keydown`). The backend `evdev` helper was deleted (it was never wired into the app); don't reintroduce a Python key listener — add key handling in the browser.
 
 ## Quick map
 

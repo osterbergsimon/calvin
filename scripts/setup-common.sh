@@ -284,7 +284,7 @@ ensure_git_repo() {
 install_backend_deps() {
     local calvin_dir="${1:-$DEFAULT_CALVIN_DIR}"
     local user="${2:-$DEFAULT_CALVIN_USER}"
-    local extras="${3:-linux}"  # Default to linux extra (for evdev)
+    local extras="${3:-}"  # Optional comma-separated extras (e.g. "dev")
     local use_venv="${4:-false}"  # Use venv instead of UV (for dev on Pi 3B+)
     
     log "Installing backend dependencies (extras: ${extras})..."
@@ -300,7 +300,11 @@ install_backend_deps() {
             fi
             source .venv/bin/activate
             pip install --upgrade pip
-            pip install .[${extras}]
+            if [ -n "${extras}" ]; then
+                pip install ".[${extras}]"
+            else
+                pip install .
+            fi
 BACKEND_INSTALL_VENV_EOF
     else
         log "Using UV for backend installation..."
@@ -309,10 +313,12 @@ BACKEND_INSTALL_VENV_EOF
             cd ${calvin_dir}/backend
             # Convert comma-separated extras to multiple --extra flags for UV
             UV_EXTRAS=""
-            IFS=',' read -ra EXTRA_ARRAY <<< "${extras}"
-            for extra in "\${EXTRA_ARRAY[@]}"; do
-                UV_EXTRAS="\${UV_EXTRAS} --extra \${extra}"
-            done
+            if [ -n "${extras}" ]; then
+                IFS=',' read -ra EXTRA_ARRAY <<< "${extras}"
+                for extra in "\${EXTRA_ARRAY[@]}"; do
+                    UV_EXTRAS="\${UV_EXTRAS} --extra \${extra}"
+                done
+            fi
             if [ -f uv.lock ]; then
                 uv sync --frozen \${UV_EXTRAS} || uv sync \${UV_EXTRAS}
             else

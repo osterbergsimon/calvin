@@ -30,12 +30,7 @@ dependencies = [
     "databases>=0.9.0",
 ]
 
-# Platform-specific dependencies
-# evdev is Linux-only, so we make it optional
 [project.optional-dependencies]
-linux = [
-    "evdev>=1.6.1",
-]
 dev = [
     "pytest>=7.4.0",
     "pytest-asyncio>=0.21.0",
@@ -125,17 +120,14 @@ module = [
     "app.services.display_power_service",
     "app.services.event_system",
     "app.services.keyboard_mapping_service",
-    "app.services.keyboard_service",
     "app.services.plugin_calendar_service",
     "app.services.plugin_image_service",
     "app.services.plugin_installer",
     "app.services.scheduler",
     "app.services.theme_installer",
     "app.services.validation.package_validator",
-    "app.services.weather_cache",
     "app.utils.db_retry",
     "app.utils.ical_parser",
-    "app.utils.keyboard",
 ]
 ignore_errors = true
 
