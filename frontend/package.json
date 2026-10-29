@@ -17,6 +17,7 @@
     "lint": "eslint .",
     "type-check": "npm run lint",
     "format": "prettier --write \"src/**/*.{js,jsx,vue,json,css}\"",
+    "format:check": "prettier --check \"src/**/*.{js,jsx,vue,json,css}\"",
     "gen:api": "openapi-typescript ../backend/tests/contract/openapi.json -o src/api/types.ts && prettier --write src/api/types.ts"
   },
   "dependencies": {
