@@ -3,6 +3,8 @@
 #
 # Writes firstrun.sh + a cmdline.txt hook onto the card's boot partition so the
 # Pi self-provisions into a Calvin kiosk on first boot: no SSH, no per-Pi typing.
+# The kiosk installer (deploy/kiosk-agent/install-kiosk.sh) is baked onto the card;
+# on boot 2 it pulls everything else from the Calvin server — nothing from GitHub.
 # Flash a CLEAN Raspberry Pi OS Bookworm image (do NOT use Imager's OS
 # customization — it writes its own firstrun.sh and would collide).
 set -euo pipefail
@@ -12,15 +14,11 @@ for _arg in "$@"; do
     [ "$_arg" = "--source-only" ] && _CALVIN_SOURCE_ONLY=1
 done
 
-DEFAULT_GIT_REPO="https://github.com/osterbergsimon/calvin.git"
-DEFAULT_GIT_BRANCH="main"
-
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]:-$0}")" && pwd)"
 REPO_ROOT="$(cd "${SCRIPT_DIR}/.." && pwd)"
 
 BACKEND_URL=""; WIFI_SSID=""; WIFI_PSK=""; WIFI_COUNTRY=""
 HOSTNAME_ARG=""; SSH_PUBKEY_FILE=""; BOOT_DIR=""; SIGNING_KEY=""
-GIT_REPO="${GIT_REPO:-$DEFAULT_GIT_REPO}"; GIT_BRANCH="${GIT_BRANCH:-$DEFAULT_GIT_BRANCH}"
 
 usage() {
     cat <<EOF
@@ -37,11 +35,9 @@ Options:
   --wifi-psk <PSK>      Wifi passphrase
   --wifi-country <CC>   Wifi regulatory domain, e.g. SE (required with wifi)
   --ssh-pubkey <FILE>   Public key to install for the calvin user
-  --git-repo <URL>      Override Calvin repo (default: $DEFAULT_GIT_REPO)
-  --git-branch <NAME>   Override branch (default: $DEFAULT_GIT_BRANCH)
-  --signing-key <HEX>   Out-of-band 0600 manifest signing secret (hex)
+  --signing-key <HEX>   The server's kiosk-signing.key (hex), read out-of-band
   --signing-key-file <FILE>
-                        Read signing secret from a 0600 file
+                        Read the signing key from a file (preferred)
 EOF
 }
 
@@ -49,7 +45,6 @@ parse_args() {
     # Reset flag-driven globals so repeated calls (and tests) don't accumulate.
     BACKEND_URL=""; WIFI_SSID=""; WIFI_PSK=""; WIFI_COUNTRY=""
     HOSTNAME_ARG=""; SSH_PUBKEY_FILE=""; BOOT_DIR=""; SIGNING_KEY=""
-    GIT_REPO="${DEFAULT_GIT_REPO}"; GIT_BRANCH="${DEFAULT_GIT_BRANCH}"
     while [ "$#" -gt 0 ]; do
         case "$1" in
             --backend-url) BACKEND_URL="${2:-}"; shift 2 ;;
@@ -66,14 +61,10 @@ parse_args() {
             --wifi-country=*) WIFI_COUNTRY="${1#*=}"; shift ;;
             --ssh-pubkey) SSH_PUBKEY_FILE="${2:-}"; shift 2 ;;
             --ssh-pubkey=*) SSH_PUBKEY_FILE="${1#*=}"; shift ;;
-            --git-repo) GIT_REPO="${2:-}"; shift 2 ;;
-            --git-repo=*) GIT_REPO="${1#*=}"; shift ;;
-            --git-branch) GIT_BRANCH="${2:-}"; shift 2 ;;
-            --git-branch=*) GIT_BRANCH="${1#*=}"; shift ;;
             --signing-key) SIGNING_KEY="${2:-}"; shift 2 ;;
             --signing-key=*) SIGNING_KEY="${1#*=}"; shift ;;
-            --signing-key-file) SIGNING_KEY="$(cat "${2:-}")"; shift 2 ;;
-            --signing-key-file=*) SIGNING_KEY="$(cat "${1#*=}")"; shift ;;
+            --signing-key-file) SIGNING_KEY="$(tr -d '[:space:]' < "${2:-}")"; shift 2 ;;
+            --signing-key-file=*) SIGNING_KEY="$(tr -d '[:space:]' < "${1#*=}")"; shift ;;
             --source-only) shift ;;
             -h|--help) usage; exit 0 ;;
             *) echo "Unknown argument: $1" >&2; usage >&2; exit 1 ;;
@@ -92,19 +83,16 @@ validate_args() {
         echo "Error: --boot-dir does not look like a boot partition (no cmdline.txt): ${BOOT_DIR}" >&2; return 1; fi
     if [ -n "${WIFI_SSID}" ] && [ -z "${WIFI_COUNTRY}" ]; then
         echo "Error: --wifi-country is required when --wifi-ssid is set" >&2; return 1; fi
+    if [ -n "${SSH_PUBKEY_FILE}" ] && grep -q "'" "${SSH_PUBKEY_FILE}"; then
+        echo "Error: --ssh-pubkey file must not contain a single quote (edit its comment)" >&2; return 1; fi
+    if [ -n "${SIGNING_KEY}" ] && ! printf '%s' "${SIGNING_KEY}" | grep -qE '^[0-9a-fA-F]{64}$'; then
+        echo "Error: signing key must be 64 hex characters (the content of kiosk-signing.key)" >&2; return 1; fi
     return 0
 }
 
-derive_raw_setup_url() {
-    local repo="$1" branch="$2" owner name
-    owner="$(echo "${repo}" | sed -E 's|.*github\.com[:/]([^/]+)/([^/]+)$|\1|')"
-    name="$(echo "${repo}" | sed -E 's|.*github\.com[:/]([^/]+)/([^/]+)$|\2|' | sed 's|\.git$||')"
-    printf 'https://raw.githubusercontent.com/%s/%s/%s/scripts/setup-kiosk.sh\n' "${owner}" "${name}" "${branch}"
-}
-
 emit_firstrun() {
-    local setup_url wrapper_src unit_src
-    setup_url="$(derive_raw_setup_url "${GIT_REPO}" "${GIT_BRANCH}")"
+    local installer_src wrapper_src unit_src
+    installer_src="$(cat "${REPO_ROOT}/deploy/kiosk-agent/install-kiosk.sh")"
     wrapper_src="$(cat "${REPO_ROOT}/deploy/kiosk-agent/calvin-kiosk-firstboot.sh")"
     unit_src="$(cat "${REPO_ROOT}/deploy/systemd/calvin-kiosk-firstboot.service")"
 
@@ -131,7 +119,6 @@ FIRSTRUN_EOF
     emit_var WIFI_PSK        "${WIFI_PSK}"
     emit_var WIFI_COUNTRY    "${WIFI_COUNTRY}"
     emit_var BACKEND_URL     "${BACKEND_URL}"
-    emit_var SETUP_KIOSK_URL "${setup_url}"
     emit_var SSH_PUBKEY      "${pubkey}"
     emit_var SIGNING_KEY     "${SIGNING_KEY}"
 
@@ -174,8 +161,9 @@ systemctl enable ssh >/dev/null 2>&1 || true
 touch "${ENV_FILE}"; chmod 644 "${ENV_FILE}"
 {
     echo "CALVIN_BACKEND_URL=${BACKEND_URL}"
-    echo "CALVIN_SETUP_KIOSK_URL=${SETUP_KIOSK_URL}"
-    [ -n "${SSH_PUBKEY}" ] && echo "CALVIN_KIOSK_SSH_PUBKEY=${SSH_PUBKEY}"
+    # Single-quoted: the key has spaces, and this file is both sourced by bash
+    # and read as a systemd EnvironmentFile (bake rejects keys containing ').
+    [ -n "${SSH_PUBKEY}" ] && echo "CALVIN_KIOSK_SSH_PUBKEY='${SSH_PUBKEY}'"
 } > "${ENV_FILE}"
 
 # 4b. Seed the root-only manifest signing key (calvin-5vw), if one was baked.
@@ -185,7 +173,15 @@ if [ -n "${SIGNING_KEY}" ]; then
     echo "CALVIN_KIOSK_SIGNING_KEY=${SIGNING_KEY}" > "${SIGNING_ENV_FILE}"
 fi
 
-# 5. Install the boot-2 wrapper + oneshot service.
+# 5. Install the kiosk installer, the boot-2 wrapper and its oneshot service.
+cat > /usr/local/bin/calvin-kiosk-install.sh <<'INSTALLER_EOF'
+FIRSTRUN_EOF
+
+    printf '%s\n' "${installer_src}"
+    cat <<'FIRSTRUN_EOF'
+INSTALLER_EOF
+chmod 755 /usr/local/bin/calvin-kiosk-install.sh
+
 cat > /usr/local/bin/calvin-kiosk-firstboot.sh <<'WRAPPER_EOF'
 FIRSTRUN_EOF
 
@@ -202,8 +198,11 @@ FIRSTRUN_EOF
 UNIT_EOF
 systemctl enable calvin-kiosk-firstboot.service >/dev/null 2>&1 || true
 
-# 6. Remove our own first-boot hook so this never runs again, then reboot.
+# 6. Remove our own first-boot hook so this never runs again, delete this file
+#    (it holds the wifi PSK and signing key on the world-readable FAT partition;
+#    bash keeps the open file readable), then reboot.
 sed -i 's| systemd.run=[^ ]*||g; s| systemd.run_success_action=[^ ]*||g; s| systemd.unit=[^ ]*||g' "${BOOT_CMDLINE}" || true
+rm -f /boot/firmware/firstrun.sh
 reboot
 FIRSTRUN_EOF
 }

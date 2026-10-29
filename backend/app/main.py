@@ -390,6 +390,21 @@ async def _shutdown_services():
     logger.info("Plugins cleaned up")
 
 
+def _ensure_kiosk_signing_key():
+    """Create the kiosk manifest signing key at startup (best-effort).
+
+    Provisioning a signed kiosk needs this key out-of-band, so it must exist before
+    the first kiosk ever contacts the server.
+    """
+    from app.services import kiosk_bundle
+
+    try:
+        path = kiosk_bundle.ensure_signing_key()
+        logger.info(f"Kiosk manifest signing key: {path.resolve()}")
+    except Exception as e:
+        logger.warning(f"Could not create kiosk signing key: {e}")
+
+
 @asynccontextmanager
 async def lifespan(app: FastAPI):
     """Lifespan context manager for startup/shutdown."""
@@ -414,6 +429,7 @@ async def lifespan(app: FastAPI):
         logger.info("Schedulers started")
         await _sync_display_orientation()
         logger.info("Display orientation synced")
+        _ensure_kiosk_signing_key()
         # Themes are loaded from filesystem on-demand - no database sync needed
         logger.info("Application startup complete - ready to serve requests")
     except Exception as e:
