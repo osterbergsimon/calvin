@@ -12,7 +12,7 @@ the Pi, and nothing comes from GitHub, so the kiosk always matches the server's 
 | | Supported | Notes |
 |---|---|---|
 | **Pi model** | Raspberry Pi 5, Pi 4 (2 GB+), Pi 400 | Recommended. |
-| | Pi 3B / 3B+ | Works, but Chromium is slow. |
+| | Pi 3B / 3B+ | Works, but Chromium is slow. Runs without the GPU path; see [Pi 3 and GPU](#pi-3-and-gpu). |
 | | Pi Zero 2 W, older Pis | Not recommended (512 MB RAM is too little for Chromium). |
 | **OS** | **Raspberry Pi OS Lite (64-bit), Bookworm** (Debian 12) | The tested target. |
 | | Raspberry Pi OS Lite 32-bit, Bookworm | Should work; 64-bit is preferred. |
@@ -141,6 +141,45 @@ server's signature: the setup scripts, the kiosk agent, and every later update. 
 installer itself must come over a trusted channel: SSH from the server (Option A,
 signed), or your own checkout (Option B). The quick `curl | bash` form trusts whatever
 answers on your LAN, so use it without a key.
+
+## Pi 3 and GPU
+
+Pi 3-class boards (Broadcom **VC4**, OpenGL ES 2.0 through Mesa) cannot run
+Chromium's GPU path: the dashboard's renderer crashes within seconds with
+**"Aw, Snap! error 11"** and the tab reloads forever. `--disable-gpu` makes the
+same page load and stay up, so the installer adds that flag on those boards — and
+only there. Pi 4/5 have a working GPU path and keep it.
+
+| Board (`/proc/device-tree/model`) | `CALVIN_CHROMIUM_GPU=auto` (the default) |
+|---|---|
+| Raspberry Pi 3 / 3B / 3B+, Zero 2 W, Compute Module 3 | `--disable-gpu` |
+| Raspberry Pi 4, Pi 5, Compute Module 4/5 | GPU path on, no extra flag |
+| anything else (unknown board, no device tree) | GPU path on, no extra flag |
+
+The flag lands in `CALVIN_CHROMIUM_DISPLAY_FLAGS` in
+`/etc/default/calvin-kiosk-display`, which `calvin-kiosk-remote.service` passes to
+Chromium, so it applies to both stacks (Wayland keeps `--ozone-platform=wayland`
+and the GPU flag follows it). The installer and a kiosk **Update** recompute that
+line from the board instead of appending to it, so re-running never duplicates it.
+
+### Override it
+
+Set `CALVIN_CHROMIUM_GPU` in the file the other kiosk settings live in:
+
+```bash
+sudo nano /etc/default/calvin-kiosk
+# CALVIN_CHROMIUM_GPU=auto   # default: decide from the board
+# CALVIN_CHROMIUM_GPU=on     # never add --disable-gpu
+# CALVIN_CHROMIUM_GPU=off    # always add --disable-gpu
+sudo systemctl restart calvin-kiosk-remote
+```
+
+The installer and the updater read it on their next run; an exported
+`CALVIN_CHROMIUM_GPU` at install time wins over the file. Use `off` on a board
+that is not detected and still crashes, and `on` only to test a newer
+Chromium/Mesa that may have fixed it. Narrower flags that keep compositing (for
+example `--disable-gpu-rasterization`) are being measured on hardware in bead
+`calvin-8by7`.
 
 ## Display stack (Wayland, opt-in)
 
