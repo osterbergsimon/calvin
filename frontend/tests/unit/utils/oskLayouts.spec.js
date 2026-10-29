@@ -6,11 +6,13 @@
 import { describe, it, expect, beforeEach, afterEach, vi } from "vitest";
 import {
   DEFAULT_OSK_LAYOUT,
+  OSK_LAYOUT_CHANGE_EVENT,
   OSK_LAYOUT_HINT_STORAGE_KEY,
   OSK_LAYOUT_IDS,
   OSK_LAYOUT_STORAGE_KEY,
   OSK_LAYOUTS_BY_ID,
   buildOskLayouts,
+  clearStoredOskLayout,
   isOskLayoutId,
   layoutFromLanguageTag,
   layoutSwitchOrder,
@@ -103,9 +105,9 @@ describe("oskLayouts", () => {
 
   describe("buildOskLayouts", () => {
     it("uses the active layout's letter rows for the default layer", () => {
-      const layouts = buildOskLayouts({ layout: "sv", showLayoutKey: false });
+      const layouts = buildOskLayouts({ layout: "sv" });
       expect(layouts.default.slice(0, 3)).toEqual(rowsOf("sv"));
-      expect(layouts.default[3]).toBe("{numbers} {accents} {space} {hide}");
+      expect(layouts.default[3]).toBe("{numbers} {layout} {accents} {space} {hide}");
     });
 
     it("keeps the shared symbols, accents and numeric layers whatever the layout", () => {
@@ -117,34 +119,38 @@ describe("oskLayouts", () => {
       expect(en.symbols[0]).toBe("1 2 3 4 5 6 7 8 9 0 {bksp}");
     });
 
-    it("adds the layout key only when extra layouts are set", () => {
-      expect(buildOskLayouts({ layout: "sv" }).default[3]).not.toContain("{layout}");
-      expect(buildOskLayouts({ layout: "sv", showLayoutKey: true }).default[3]).toBe(
+    it("always includes the layout key, even without extra layouts (CLV-21)", () => {
+      expect(buildOskLayouts({ layout: "sv" }).default[3]).toBe(
         "{numbers} {layout} {accents} {space} {hide}"
       );
+      for (const id of OSK_LAYOUT_IDS) {
+        expect(buildOskLayouts({ layout: id }).default[3]).toContain("{layout}");
+      }
     });
 
     it("keeps the en and fr bottom rows' extra keys", () => {
       expect(buildOskLayouts({ layout: "en" }).default[3]).toBe(
-        "{numbers} {accents} {space} - {hide}"
-      );
-      expect(buildOskLayouts({ layout: "en", showLayoutKey: true }).default[3]).toBe(
         "{numbers} {layout} {accents} {space} - {hide}"
       );
       expect(buildOskLayouts({ layout: "fr" }).default[3]).toBe(
-        "{numbers} {accents} , {space} . {hide}"
-      );
-      expect(buildOskLayouts({ layout: "fr", showLayoutKey: true }).default[3]).toBe(
         "{numbers} {layout} {accents} , {space} . {hide}"
       );
     });
 
     it("builds url and email from the active layout's first two rows and their own bottom row", () => {
-      const layouts = buildOskLayouts({ layout: "de", showLayoutKey: true });
+      const layouts = buildOskLayouts({ layout: "de" });
       expect(layouts.url.slice(0, 2)).toEqual(rowsOf("de").slice(0, 2));
-      expect(layouts.url[3]).toBe("{numbers} / : {space} . .com {hide}");
+      expect(layouts.url[3]).toBe("{numbers} {layout} / : {space} . .com {hide}");
       expect(layouts.email.slice(0, 2)).toEqual(rowsOf("de").slice(0, 2));
-      expect(layouts.email[3]).toBe("{numbers} @ {space} . .com {hide}");
+      expect(layouts.email[3]).toBe("{numbers} {layout} @ {space} . .com {hide}");
+    });
+
+    it("puts the layout key after {numbers} on the url and email rows", () => {
+      for (const id of OSK_LAYOUT_IDS) {
+        const layouts = buildOskLayouts({ layout: id });
+        expect(layouts.url[3]).toBe("{numbers} {layout} / : {space} . .com {hide}");
+        expect(layouts.email[3]).toBe("{numbers} {layout} @ {space} . .com {hide}");
+      }
     });
 
     it("gives every layout the spec's url and email third row (a–z letters then - _)", () => {
@@ -232,6 +238,20 @@ describe("oskLayouts", () => {
       storeOskLayout("no");
       expect(readStoredOskLayout()).toBe("no");
       expect(window.localStorage.getItem(OSK_LAYOUT_STORAGE_KEY)).toBe("no");
+    });
+
+    it("clears the device choice and announces the change", () => {
+      const listener = vi.fn();
+      window.addEventListener(OSK_LAYOUT_CHANGE_EVENT, listener);
+      storeOskLayout("no");
+      expect(readStoredOskLayout()).toBe("no");
+
+      clearStoredOskLayout();
+
+      expect(readStoredOskLayout()).toBeNull();
+      expect(window.localStorage.getItem(OSK_LAYOUT_STORAGE_KEY)).toBeNull();
+      expect(listener).toHaveBeenCalledTimes(2);
+      window.removeEventListener(OSK_LAYOUT_CHANGE_EVENT, listener);
     });
 
     it("never throws when localStorage is unavailable", () => {
