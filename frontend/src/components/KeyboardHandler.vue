@@ -14,7 +14,8 @@ import { usePhotoFrameMode } from "../composables/usePhotoFrameMode";
 import { useConfigStore } from "../stores/config";
 import { useNotificationsStore } from "../stores/notifications";
 import NotificationSystem from "./NotificationSystem.vue";
-import { showSystemRebootScheduled } from "../utils/systemNotifications";
+import { showSystemRebootFailed, showSystemRebootScheduled } from "../utils/systemNotifications";
+import { detailMessage } from "../utils/apiErrors";
 import { useSystem } from "../composables/useSystem";
 import { normalizeKeyCode } from "@/utils/keyCode";
 import { configUrl } from "@/utils/kioskId";
@@ -71,10 +72,20 @@ const triggerReboot = async () => {
     });
     if (response.ok) {
       showSystemRebootScheduled(notificationsStore);
-    } else {
-      console.error("Failed to trigger reboot:", await response.text());
+      return;
     }
+    // A refused reboot (e.g. 409 host_control_disabled) carries the reason the
+    // user needs; a generic "failed" would hide it.
+    let body = null;
+    try {
+      body = await response.json();
+    } catch {
+      // Non-JSON error body; fall back to the generic message.
+    }
+    showSystemRebootFailed(notificationsStore, detailMessage(body?.detail, ""));
+    console.error("Failed to trigger reboot:", body?.detail ?? response.statusText);
   } catch (error) {
+    showSystemRebootFailed(notificationsStore, "");
     console.error("Error triggering reboot:", error);
   }
 };
