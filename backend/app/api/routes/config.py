@@ -1,5 +1,6 @@
 """Configuration endpoints."""
 
+import asyncio
 import re
 import subprocess
 from pathlib import Path
@@ -7,7 +8,7 @@ from typing import Any
 
 from fastapi import APIRouter, HTTPException
 from loguru import logger
-from pydantic import BaseModel, ConfigDict, field_validator, model_validator
+from pydantic import BaseModel, ConfigDict, Field, field_validator, model_validator
 
 from app.config import settings
 from app.services.config_service import config_service
@@ -189,9 +190,9 @@ class ConfigUpdate(BaseModel):
         return None if value is None else validate_git_branch(value)
 
     configPollInterval: int | None = None  # Config polling interval in seconds (default: 30)
-    calendarRefreshInterval: int | None = (
-        None  # Calendar cache refresh interval in minutes (default: 15)
-    )
+    # Calendar cache refresh interval in minutes (default: 15). Must never be
+    # 0 or negative: that used to schedule one refresh per second (audit R4).
+    calendarRefreshInterval: int | None = Field(None, ge=1)
     clockBarVerticalLayout: str | None = None  # Vertical bar layout
     clockBarVerticalFontSize: int | None = None
     clockBarVerticalDateFontSize: int | None = None
@@ -573,7 +574,7 @@ async def build_global_config() -> dict:
         config["calendarRefreshInterval"] = config["calendar_refresh_interval"]
 
     # Add backend version (git commit short hash)
-    config["version"] = get_git_version()
+    config["version"] = await asyncio.to_thread(get_git_version)
 
     # Add frontend version (from built HTML)
     config["frontendVersion"] = get_frontend_version()
@@ -785,7 +786,6 @@ async def get_git_branches(repo_url: str | None = None):
     Returns:
         List of branch names
     """
-    import asyncio
     import os
 
     # Get repo URL from parameter, config, or default

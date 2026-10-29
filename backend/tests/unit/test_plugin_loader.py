@@ -263,3 +263,113 @@ class TestPluginLoader:
                 # Verify built-in packages are loaded
                 assert mock_load_package.call_count == 3
                 assert mock_load_installed.called
+
+
+_EXITING_PLUGIN_PY = '''"""A plugin that kills its own import with sys.exit()."""
+import sys
+
+sys.exit(7)
+'''
+
+_SHADOWING_PLUGIN_PY = '''"""A plugin shipping modules named like stdlib/app modules."""
+import json
+
+from app.plugins.definitions import PluginMetadata
+from app.plugins.protocols import ServicePlugin
+
+
+class ShadowingPlugin(ServicePlugin):
+    metadata = PluginMetadata(
+        type_id="test_shadow",
+        name="Shadowing Plugin",
+    )
+    # The real stdlib module, not the plugin's bundled json.py.
+    encoded = json.dumps({"ok": True})
+
+    async def fetch(self, start_date=None, end_date=None):
+        return {"ok": True}
+'''
+
+
+@pytest.mark.unit
+class TestPluginLoaderIsolation:
+    """A plugin must not take down startup or shadow host modules (audit R12)."""
+
+    def _write_plugin_dir(self, tmp_path, plugin_id, plugin_py):
+        plugin_dir = tmp_path / plugin_id
+        plugin_dir.mkdir()
+        (plugin_dir / "plugin.py").write_text(plugin_py)
+        (plugin_dir / "plugin.json").write_text(
+            json.dumps(
+                {
+                    "id": plugin_id,
+                    "name": "Test",
+                    "version": "1.0.0",
+                    "type": "service",
+                    "api_version": CURRENT_PLUGIN_API_VERSION,
+                }
+            )
+        )
+        return plugin_dir
+
+    @patch("app.plugins.loader.plugin_installer")
+    def test_import_calling_sys_exit_is_a_load_error(
+        self, mock_installer, plugin_loader_instance, tmp_path
+    ):
+        """sys.exit() during import used to escape `except Exception` and kill startup."""
+        exiting_dir = self._write_plugin_dir(tmp_path, "test_exiting", _EXITING_PLUGIN_PY)
+        ok_manifest, ok_dir = None, None
+        ok_dir = tmp_path / "test_after_exit"
+        ok_dir.mkdir()
+        (ok_dir / "plugin.py").write_text(_FIXTURE_PLUGIN_PY.format(type_id="test_after_exit"))
+        ok_manifest = {
+            "id": "test_after_exit",
+            "name": "After",
+            "version": "1.0.0",
+            "type": "service",
+            "api_version": CURRENT_PLUGIN_API_VERSION,
+        }
+        (ok_dir / "plugin.json").write_text(json.dumps(ok_manifest))
+
+        manifests = [
+            {"id": "test_exiting", "api_version": CURRENT_PLUGIN_API_VERSION},
+            ok_manifest,
+        ]
+        mock_installer.get_installed_plugins.return_value = manifests
+        mock_installer.get_plugin_path.side_effect = lambda pid: {
+            "test_exiting": exiting_dir,
+            "test_after_exit": ok_dir,
+        }[pid]
+
+        plugin_loader_instance.load_installed_plugins()
+
+        assert plugin_loader_instance.get_plugin_class("test_exiting") is None
+        assert "SystemExit" in (plugin_loader_instance.get_load_error("test_exiting") or "")
+        assert "installed_plugin_test_exiting" not in sys.modules
+        # The next plugin still loads: one bad plugin doesn't stop the others.
+        assert plugin_loader_instance.get_plugin_class("test_after_exit") is not None
+
+    @patch("app.plugins.loader.plugin_installer")
+    def test_plugin_dir_is_not_left_on_sys_path(
+        self, mock_installer, plugin_loader_instance, tmp_path
+    ):
+        """A plugin shipping json.py/app.py must not shadow the real modules."""
+        import app as app_package
+
+        plugin_dir = self._write_plugin_dir(tmp_path, "test_shadow", _SHADOWING_PLUGIN_PY)
+        (plugin_dir / "json.py").write_text('raise RuntimeError("plugin json.py was imported")\n')
+        (plugin_dir / "app.py").write_text('raise RuntimeError("plugin app.py was imported")\n')
+
+        mock_installer.get_installed_plugins.return_value = [
+            {"id": "test_shadow", "api_version": CURRENT_PLUGIN_API_VERSION}
+        ]
+        mock_installer.get_plugin_path.return_value = plugin_dir
+
+        plugin_loader_instance.load_installed_plugins()
+
+        assert str(plugin_dir) not in sys.path
+        assert "json" in sys.modules and not sys.modules["json"].__file__.startswith(
+            str(plugin_dir)
+        )
+        assert sys.modules["app"] is app_package
+        assert plugin_loader_instance.get_plugin_class("test_shadow") is not None

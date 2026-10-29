@@ -9,6 +9,10 @@ from app.config import settings
 # SQL logger configuration (CALVIN_SQL_ECHO) lives in app.main alongside the
 # rest of the loguru/InterceptHandler bridge.
 
+# How long SQLite waits for a lock before raising "database is locked".
+SQLITE_BUSY_TIMEOUT_SECONDS = 5.0
+SQLITE_BUSY_TIMEOUT_MS = int(SQLITE_BUSY_TIMEOUT_SECONDS * 1000)
+
 
 def _database_dialect(database: databases.Database):
     return getattr(getattr(database, "_backend", None), "_dialect", None)
@@ -25,8 +29,16 @@ def ensure_database_dialect(database: databases.Database) -> databases.Database:
 
 
 def create_database(url: str) -> databases.Database:
-    """Create a Database instance with Ormar compatibility shims applied."""
+    """Create a Database instance with Ormar compatibility shims applied.
 
+    The SQLite backend opens a fresh aiosqlite connection per transaction, so
+    `PRAGMA busy_timeout` on the first connection only ever applied to that one
+    connection (audit R11). The driver-level `timeout` argument applies to every
+    connection the pool opens.
+    """
+
+    if "sqlite" in url:
+        return ensure_database_dialect(databases.Database(url, timeout=SQLITE_BUSY_TIMEOUT_SECONDS))
     return ensure_database_dialect(databases.Database(url))
 
 
@@ -50,7 +62,7 @@ async def connect_db():
     try:
         await database.execute("PRAGMA journal_mode=WAL")
         # Set busy timeout to handle temporary locks (wait up to 5 seconds)
-        await database.execute("PRAGMA busy_timeout=5000")
+        await database.execute(f"PRAGMA busy_timeout={SQLITE_BUSY_TIMEOUT_MS}")
         # Set synchronous mode to NORMAL for better performance (WAL mode makes this safe)
         await database.execute("PRAGMA synchronous=NORMAL")
     except Exception as e:
@@ -83,7 +95,7 @@ async def init_db():
     # Enable WAL mode on sync engine as well (for table creation)
     with sync_engine.connect() as conn:
         conn.execute("PRAGMA journal_mode=WAL")
-        conn.execute("PRAGMA busy_timeout=5000")
+        conn.execute(f"PRAGMA busy_timeout={SQLITE_BUSY_TIMEOUT_MS}")
         conn.execute("PRAGMA synchronous=NORMAL")
         conn.commit()
 

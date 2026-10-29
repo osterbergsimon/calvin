@@ -448,3 +448,44 @@ class TestPluginRegistry:
         assert db_type.name == "New Name"
         assert db_type.description == "Updated description"
         assert db_type.version == "2.0.0"
+
+
+@pytest.mark.unit
+@pytest.mark.asyncio
+class TestLoadPluginInstances:
+    """A plugin that exits during initialize() must not kill startup (audit R12)."""
+
+    async def test_sys_exit_in_initialize_marks_the_plugin_disabled(self, test_db, monkeypatch):
+        from app.models.db_models import PluginDB
+        from app.plugins.registry import loader as registry_loader
+
+        await PluginDB.objects.delete(id="exiting-instance")
+        db_plugin = await PluginDB.objects.create(
+            id="exiting-instance",
+            type_id="local",
+            plugin_type="image",
+            name="Exiting",
+            enabled=True,
+            config={},
+        )
+
+        plugin = MagicMock()
+        plugin.plugin_id = "exiting-instance"
+        plugin.enabled = True
+        plugin.configure = AsyncMock()
+        plugin.initialize = AsyncMock(side_effect=SystemExit(1))
+        plugin.start = MagicMock()
+        plugin.stop = MagicMock()
+
+        monkeypatch.setattr(
+            registry_loader.plugin_loader, "create_plugin_instance", lambda **_: plugin
+        )
+        monkeypatch.setattr(registry_loader.instance_manager, "get_plugin", lambda _id: None)
+        monkeypatch.setattr(registry_loader.instance_manager, "register", AsyncMock())
+
+        await registry_loader.load_plugin_instances()
+
+        plugin.stop.assert_called()
+        stored = await PluginDB.objects.get(id="exiting-instance")
+        assert stored.enabled is False
+        await db_plugin.delete()

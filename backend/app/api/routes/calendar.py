@@ -11,6 +11,7 @@ from app.models.calendar import (
     CalendarSource,
     CalendarSourcesResponse,
 )
+from app.models.db_models import PluginDB
 from app.plugins.calendar.google import _normalize_google_calendar_url
 from app.plugins.utils.secrets import (
     SecretEndpointChangedError,
@@ -20,9 +21,17 @@ from app.plugins.utils.secrets import (
     redact_secrets,
 )
 from app.services import plugin_calendar_service
+from app.utils.db_retry import retry_on_db_locked
 
 # Loguru automatically includes module/function info in logs
 router = APIRouter()
+
+
+@retry_on_db_locked(max_retries=5, initial_delay=0.1, max_delay=1.0)
+async def _save_calendar_source(db_plugin: PluginDB) -> None:
+    """Persist a calendar source, retrying while SQLite holds a write lock (R11)."""
+    await db_plugin.save_with_timestamp()
+
 
 # Calendar source fields that are credentials (a private ICS URL is a bearer token).
 CALENDAR_SECRET_KEYS = ("ical_url", "api_key")
@@ -403,7 +412,7 @@ async def update_calendar_source(source_id: str, source: CalendarSource):
         )
     )
     db_plugin.config = config
-    await db_plugin.save_with_timestamp()
+    await _save_calendar_source(db_plugin)
 
     # Handle instance creation/removal based on enabled status
     existing_plugin = plugin_manager.get_plugin(source_id)

@@ -19,6 +19,7 @@ from loguru import logger
 from app.config import settings
 from app.services.display_power_service import display_power_service
 from app.utils.git_refs import validate_git_branch
+from app.utils.platform import run_command
 
 router = APIRouter()
 
@@ -475,7 +476,7 @@ async def get_update_status():
                 try:
                     repo_path = settings.repo_dir
                     if (repo_path / ".git").exists():
-                        result = subprocess.run(
+                        result = await run_command(
                             ["git", "rev-parse", new_commit_short],
                             cwd=str(repo_path),
                             capture_output=True,
@@ -860,7 +861,7 @@ async def reboot_system():
 
         # Method 1: systemctl reboot (might work without sudo)
         try:
-            result = subprocess.run(
+            result = await run_command(
                 ["systemctl", "reboot"],
                 capture_output=True,
                 timeout=5,
@@ -882,7 +883,7 @@ async def reboot_system():
         # This might work if polkit rules are configured
         if not reboot_attempted:
             try:
-                result = subprocess.run(
+                result = await run_command(
                     [
                         "dbus-send",
                         "--system",

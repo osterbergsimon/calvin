@@ -815,3 +815,51 @@ class TestApplyPluginConfigUpdate:
                 assert result is not None
                 assert result.get("instance_created") is True
                 assert result["instance_id"] == expected_id
+
+    async def test_update_retries_a_locked_save(
+        self, monkeypatch, manager_config, mock_db_type, mock_plugin, test_db
+    ):
+        """A "database is locked" write is retried, not surfaced (audit R11)."""
+        from sqlalchemy.exc import OperationalError
+
+        import app.plugins.utils.instance_manager as instance_manager_module
+        from app.models.db_models import PluginDB
+
+        await PluginDB.objects.delete(id="test-instance")
+        await PluginDB.objects.create(
+            id="test-instance",
+            type_id="test_plugin",
+            plugin_type="service",
+            name="Existing",
+            enabled=True,
+        )
+
+        real_save = PluginDB.save_with_timestamp
+        calls = 0
+
+        async def flaky_save(self):
+            nonlocal calls
+            calls += 1
+            if calls == 1:
+                raise OperationalError("UPDATE", {}, Exception("database is locked"))
+            return await real_save(self)
+
+        monkeypatch.setattr(PluginDB, "save_with_timestamp", flaky_save)
+        monkeypatch.setattr(
+            instance_manager_module.plugin_manager,
+            "get_plugin",
+            MagicMock(return_value=mock_plugin),
+        )
+        mock_db_type.save_with_timestamp = AsyncMock()
+
+        result = await handle_plugin_config_update_generic(
+            type_id="test_plugin",
+            config={"count": 30, "_instance_id": "test-instance"},
+            enabled=True,
+            db_type=mock_db_type,
+            manager_config=manager_config,
+        )
+
+        assert result is not None
+        assert result.get("instance_updated") is True
+        assert calls == 2

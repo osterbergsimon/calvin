@@ -104,12 +104,13 @@ class PluginCalendarService:
             self._cache.clear()
             logger.debug("Cleared entire calendar cache ({} entries)", cache_size)
 
-    async def preload_months(self, months_to_preload: int = 1) -> None:
+    async def preload_months(self, months_to_preload: int = 1, cache: dict | None = None) -> None:
         """
         Preload events for current month and adjacent months.
 
         Args:
             months_to_preload: Number of months before/after current month to preload
+            cache: Optional cache dict to fill instead of the live one
         """
         now = datetime.now(UTC)
         current_year = now.year
@@ -136,10 +137,23 @@ class PluginCalendarService:
                     end_date = datetime(year, month + 1, 1, tzinfo=UTC) - timedelta(days=1)
                 end_date = end_date.replace(hour=23, minute=59, second=59, microsecond=999999)
 
-                await self.get_events(start_date, end_date)
+                await self.get_events(start_date, end_date, cache=cache)
                 logger.debug("Preloaded events for {}-{:02d}", year, month)
             except Exception as e:
                 logger.warning("Failed to preload events for {}-{:02d}: {}", year, month, e)
+
+    async def reload_cache(self, months_to_preload: int = 1) -> None:
+        """Rebuild the preloaded months and swap the result in atomically.
+
+        The new cache is built in a separate dict, so readers keep using the
+        current one while the (possibly slow) refresh runs. Clearing first, as
+        the scheduler used to do, left the calendar empty for the whole reload
+        (audit R4).
+        """
+        new_cache: dict = {}
+        await self.preload_months(months_to_preload=months_to_preload, cache=new_cache)
+        self._cache = new_cache
+        logger.debug("Swapped calendar cache in ({} entries)", len(new_cache))
 
     async def get_events(
         self,
@@ -147,6 +161,7 @@ class PluginCalendarService:
         end_date: datetime,
         source_ids: list[str] | None = None,
         refresh: bool = False,
+        cache: dict | None = None,
     ) -> list[CalendarEvent]:
         """
         Get calendar events for a date range from all enabled calendar plugins.
@@ -159,10 +174,13 @@ class PluginCalendarService:
             end_date: End date for events (timezone-aware or naive)
             source_ids: Optional list of source IDs to filter by
             refresh: If True, skip cache lookup and force fresh fetch
+            cache: Optional cache dict to read/write instead of the live one
+                (used to build a replacement cache before swapping it in)
 
         Returns:
             List of calendar events (all timezone-aware)
         """
+        cache = self._cache if cache is None else cache
         # Normalize dates to UTC
         start_date = _normalize_datetime_for_comparison(start_date)
         end_date = _normalize_datetime_for_comparison(end_date)
@@ -176,7 +194,7 @@ class PluginCalendarService:
             start_date_only,
             end_date_only,
             source_ids,
-            len(self._cache),
+            len(cache),
             refresh,
         )
 
@@ -207,8 +225,8 @@ class PluginCalendarService:
 
                 # First, check for exact match (fastest)
                 exact_cache_key = f"{plugin.plugin_id}:{start_date_only}:{end_date_only}"
-                if exact_cache_key in self._cache:
-                    data = self._cache[exact_cache_key]
+                if exact_cache_key in cache:
+                    data = cache[exact_cache_key]
                     # Ensure both datetimes are timezone-aware for comparison
                     now = datetime.now(UTC)
                     if now.tzinfo is None:
@@ -239,7 +257,7 @@ class PluginCalendarService:
                 if not cached_data:
                     best_cover_days = None
 
-                    for key, data in list(self._cache.items()):
+                    for key, data in list(cache.items()):
                         if not key.startswith(f"{plugin.plugin_id}:"):
                             continue
 
@@ -258,7 +276,7 @@ class PluginCalendarService:
                                 key[:100],
                                 cache_age.total_seconds(),
                             )
-                            del self._cache[key]
+                            del cache[key]
                             continue
 
                         # Parse simple date-only format: "{plugin_id}:YYYY-MM-DD:YYYY-MM-DD"
@@ -331,7 +349,7 @@ class PluginCalendarService:
                 now = datetime.now(UTC)
                 if now.tzinfo is None:
                     now = now.replace(tzinfo=UTC)
-                self._cache[cache_key] = {
+                cache[cache_key] = {
                     "events": plugin_events,
                     "timestamp": now,
                 }

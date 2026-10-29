@@ -1,10 +1,13 @@
 """Plugin installation service for managing installed plugins."""
 
+import asyncio
 import json
 import shutil
 import subprocess
 import sys
+import threading
 import zipfile
+from collections.abc import Callable
 from pathlib import Path
 from typing import Any
 
@@ -683,3 +686,22 @@ class PluginInstaller:
 
 # Global plugin installer instance
 plugin_installer = PluginInstaller()
+
+# Serialises installer operations: they move plugin directories and run pip,
+# and two concurrent installs must not interleave.
+_installer_lock = threading.Lock()
+
+
+async def run_installer_op[T](func: Callable[..., T], /, *args: Any, **kwargs: Any) -> T:
+    """Run a blocking installer operation in a worker thread, one at a time.
+
+    Install and uninstall shell out to pip (up to 120 s per package). Called inline
+    from an ``async def`` route they would freeze the event loop, and with it every
+    other request, kiosk poll and SSE stream.
+    """
+
+    def _locked() -> T:
+        with _installer_lock:
+            return func(*args, **kwargs)
+
+    return await asyncio.to_thread(_locked)

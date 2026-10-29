@@ -8,6 +8,7 @@ from loguru import logger
 from app.config import BACKEND_DIR
 from app.models.db_models import PluginTypeDB
 from app.plugins.base import PluginType
+from app.utils.db_retry import retry_on_db_locked
 
 
 def _load_builtin_themes() -> dict[str, Any]:
@@ -35,6 +36,7 @@ def _load_builtin_themes() -> dict[str, Any]:
 BUILTIN_THEMES = _load_builtin_themes()
 
 
+@retry_on_db_locked(max_retries=5, initial_delay=0.1, max_delay=1.0)
 async def _register_theme_in_db(manifest: dict[str, Any]) -> None:
     """
     Register a theme in PluginTypeDB (like other plugins).
@@ -70,6 +72,7 @@ async def _register_theme_in_db(manifest: dict[str, Any]) -> None:
         await db_type.save_with_timestamp()
 
 
+@retry_on_db_locked(max_retries=5, initial_delay=0.1, max_delay=1.0)
 async def _unregister_theme_from_db(theme_id: str) -> None:
     """
     Remove a theme from PluginTypeDB.

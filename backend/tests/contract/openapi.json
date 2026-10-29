@@ -385,6 +385,7 @@
           "calendarRefreshInterval": {
             "anyOf": [
               {
+                "minimum": 1.0,
                 "type": "integer"
               },
               {
@@ -2119,7 +2120,7 @@
     },
     "/api/health": {
       "get": {
-        "description": "Basic health check endpoint.",
+        "description": "Basic health check endpoint.\n\nContains a cheap database query so a container health check (and the kiosk\nboot wait) sees a broken database instead of a constant \"healthy\" (audit D14).",
         "operationId": "health_check_api_health_get",
         "responses": {
           "200": {
