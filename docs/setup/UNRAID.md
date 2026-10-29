@@ -12,6 +12,7 @@ at it as kiosk-only displays.
 | Port | `8000` (UI and API on the same port) |
 | Data | `/mnt/user/appdata/calvin` → `/var/lib/calvin` (database, images, plugins, themes, kiosk signing key) |
 | Runs as | `PUID=99` / `PGID=100` (Unraid's `nobody:users`) |
+| Timezone | the Unraid server's (Settings → Date and Time); Unraid passes `TZ` to every container itself, so the template has no `TZ` field |
 
 ## Install
 
