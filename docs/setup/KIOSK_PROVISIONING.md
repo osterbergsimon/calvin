@@ -4,14 +4,20 @@ Prepare a Raspberry Pi card once so a non-technical person can plug in
 power and reach a running Calvin kiosk — no SSH, no typing on the Pi.
 
 This is for **Mode B** (remote backend + kiosk Pi). See
-[DEPLOYMENT_TOPOLOGIES.md](DEPLOYMENT_TOPOLOGIES.md).
+[DEPLOYMENT_TOPOLOGIES.md](DEPLOYMENT_TOPOLOGIES.md). For the short version
+(including the one-command install over SSH), start with
+[KIOSK_INSTALL.md](KIOSK_INSTALL.md).
 
 ## What you need
 
 - A Raspberry Pi and an SD card / SSD.
 - Raspberry Pi Imager.
-- The Calvin repo checked out on your workstation (Linux/macOS).
+- The Calvin repo checked out on your workstation (Linux/macOS); `develop` is fine.
+  Only the bake script and the installer it embeds come from this checkout. The
+  Pi gets everything else from your Calvin server, never from GitHub.
 - Your backend URL, e.g. `http://homeserver.local:8000`.
+- Recommended: the server's signing key (see
+  [KIOSK_INSTALL.md](KIOSK_INSTALL.md#step-0-get-the-signing-key-from-the-server-recommended)).
 
 ## Step 1 — Flash a CLEAN image
 
@@ -32,12 +38,14 @@ sudo bash scripts/bake-kiosk-firstrun.sh \
   --hostname kitchen \
   --wifi-ssid HomeNet --wifi-psk 's3cret' --wifi-country SE \
   --ssh-pubkey ~/.ssh/id_ed25519.pub \
+  --signing-key-file calvin.key \
   --boot-dir /media/$USER/bootfs
 ```
 
 Only `--backend-url` and `--boot-dir` are required. Omit `--wifi-*` if the
 Pi is on Ethernet. `--ssh-pubkey` installs a recovery key for the `calvin`
-user. `--git-branch develop` targets a non-default branch.
+user. The old `--git-repo`/`--git-branch` flags are gone because nothing is
+fetched from GitHub any more.
 
 Eject the card.
 
@@ -45,9 +53,14 @@ Eject the card.
 
 Put the card in the Pi and power on. It self-provisions unattended:
 
-1. **Boot 1** — sets hostname + wifi + SSH, seeds config, reboots.
-2. **Boot 2** — once online, runs `setup-kiosk.sh` (installs X, openbox,
-   Chromium, the Calvin services), reboots.
+1. **Boot 1** sets hostname, wifi and SSH, seeds config and the signing key,
+   installs the kiosk installer (`/usr/local/bin/calvin-kiosk-install.sh`),
+   deletes `firstrun.sh` from the boot partition (it held the wifi PSK and key),
+   and reboots.
+2. **Boot 2** waits up to 15 minutes for the server's `/api/health`, then
+   runs the installer. The installer fetches `setup-kiosk.sh` from the server
+   (verified against the signed manifest when a key is baked), installs X,
+   openbox, Chromium and the Calvin services, and reboots.
 3. **Boot 3** — Chromium opens the dashboard.
 
 First provisioning takes several minutes (package installs). Watch progress
@@ -174,12 +187,15 @@ plain sha256 integrity leaves open.
 
 **Enable it on a kiosk (out-of-band — never over the LAN):**
 
-1. On the server, read the secret over your existing trusted access:
-   ```bash
-   cat ./data/kiosk-signing.key
-   ```
+1. On the server, read the secret over your existing trusted access. The server
+   creates it at startup and logs the path (`Kiosk manifest signing key: …`):
+   - Unraid: `/mnt/user/appdata/calvin/kiosk-signing.key`
+   - Docker: `/var/lib/calvin/kiosk-signing.key` in the container, which is the data volume
+     (`KIOSK_SIGNING_KEY_PATH`), so it survives image updates
+   - Source checkout: `./data/kiosk-signing.key` relative to the backend's working directory
 2. Pass it to provisioning:
-   - Zero-touch: `bake-kiosk-firstrun.sh ... --signing-key <hex>` (or `--signing-key-file <path>`).
+   - One command: `curl -fsSL <url>/api/kiosks/install.sh | sudo bash -s -- --signing-key-file <path>`.
+   - Zero-touch: `bake-kiosk-firstrun.sh ... --signing-key-file <path>` (or `--signing-key <hex>`).
    - Manual: `setup-kiosk.sh --backend-url <url> --signing-key <hex>`.
 
    The key is written to a dedicated root-only file `/etc/default/calvin-kiosk-signing` (mode
@@ -214,6 +230,13 @@ immediately if it runs on Python older than 3.9.
 
 ### Initial install
 
+The one-command installer (`deploy/kiosk-agent/install-kiosk.sh`, served at
+`/api/kiosks/install.sh` with the server URL baked in, and baked onto the card by
+`bake-kiosk-firstrun.sh`) downloads `setup-kiosk.sh` + `setup-common.sh` from
+`/api/kiosks/installer/*`. It checks them against the `installer` hashes in the signed
+manifest, then runs `setup-kiosk.sh`. Those hashes are signed but are not part of the
+bundle `version`, so editing a setup script never flags kiosks for an agent update.
+
 `setup-kiosk.sh` calls `bootstrap_kiosk` (in `scripts/setup-common.sh`), which fetches
 `update-kiosk.sh` from the backend, verifies it against the manifest, and runs it with
 `--bootstrap`. `--bootstrap` installs the whole bundle (agent, units, updater), enables the
@@ -243,5 +266,6 @@ triggered individually. Bulk update is tracked as `calvin-3d1`.
 - **Wifi doesn't connect:** check `--wifi-country` was set (regulatory
   domain) and the PSK is correct.
 - **Provisioning failed:** SSH in (if you baked a key) and read
-  `journalctl -u calvin-kiosk-firstboot`. Fix, then
+  `journalctl -u calvin-kiosk-firstboot`. If the server was unreachable for the
+  whole 15-minute wait, the unit simply failed, and the fix below re-runs it. Fix, then
   `sudo rm /var/lib/calvin/firstboot.done && sudo systemctl start calvin-kiosk-firstboot`.

@@ -222,7 +222,7 @@ done <<< "$files_tsv"
 
 for u in "${NEW_ENABLE_UNITS[@]:-}"; do [ -n "$u" ] && unset 'RESTART_UNITS[$u]'; done
 
-while IFS=$'\t' read -r rname rtarget renable; do
+while IFS=$'\t' read -r rname rtarget _renable; do
   [ -n "$rname" ] || continue
   case "$ALL_NAMES" in *" $rname "*) : ;; *) DROPPED_TARGETS+=("$rtarget") ;; esac
 done < <(read_receipt_tsv)

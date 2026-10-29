@@ -1,0 +1,133 @@
+#!/usr/bin/env bash
+# Calvin — one-command kiosk installer for a fresh Raspberry Pi OS.
+#
+# The Calvin server serves this file at /api/kiosks/install.sh with its own URL
+# baked in, so on the Pi:
+#
+#   curl -fsSL http://<server>:8000/api/kiosks/install.sh | sudo bash
+#   curl -fsSL http://<server>:8000/api/kiosks/install.sh | sudo bash -s -- --signing-key-file key.hex
+#
+# It downloads setup-kiosk.sh + setup-common.sh from the same server (never from
+# GitHub, so the kiosk always matches the server's version), checks them against
+# the bundle manifest (HMAC-verified when a signing key is given or already on the
+# device), runs setup-kiosk.sh, and reboots into the kiosk.
+#
+# Run from a checkout (or baked onto a card by bake-kiosk-firstrun.sh) the URL is
+# not baked in, so pass --backend-url.
+set -euo pipefail
+
+# Replaced by the server when it serves this file; stays a placeholder otherwise.
+SERVER_URL='@CALVIN_SERVER_URL@'
+case "$SERVER_URL" in @*) SERVER_URL="" ;; esac
+
+SIGNING_ENV_FILE="${CALVIN_KIOSK_SIGNING_ENV_FILE:-/etc/default/calvin-kiosk-signing}"
+REBOOT_DELAY="${CALVIN_INSTALL_REBOOT_DELAY:-5}"
+SIGNING_KEY=""
+REBOOT=1
+
+log() { printf '[calvin-install] %s\n' "$*"; }
+die() { printf '[calvin-install] ERROR: %s\n' "$*" >&2; exit 1; }
+
+usage() {
+    cat <<EOF
+Usage: install-kiosk.sh [options]
+
+Turns this Raspberry Pi into a Calvin kiosk for a Calvin server.
+
+Options:
+  --backend-url <URL>        Calvin server (default: the server this script came from${SERVER_URL:+, $SERVER_URL})
+  --signing-key-file <FILE>  File holding the server's kiosk-signing.key (hex)
+  --signing-key <HEX>        Same, inline (ends up in shell history; prefer the file)
+  --no-reboot                Do not reboot when done
+  -h, --help                 Show this help
+EOF
+}
+
+while [ "$#" -gt 0 ]; do
+    case "$1" in
+        --backend-url) SERVER_URL="${2:-}"; shift 2 ;;
+        --backend-url=*) SERVER_URL="${1#*=}"; shift ;;
+        --signing-key) SIGNING_KEY="${2:-}"; shift 2 ;;
+        --signing-key=*) SIGNING_KEY="${1#*=}"; shift ;;
+        --signing-key-file) SIGNING_KEY="$(tr -d '[:space:]' < "${2:-}")"; shift 2 ;;
+        --signing-key-file=*) SIGNING_KEY="$(tr -d '[:space:]' < "${1#*=}")"; shift ;;
+        --no-reboot) REBOOT=0; shift ;;
+        -h|--help) usage; exit 0 ;;
+        *) usage >&2; die "unknown argument: $1" ;;
+    esac
+done
+
+SERVER_URL="${SERVER_URL%/}"
+[ -n "$SERVER_URL" ] || die "no server URL; pass --backend-url http://<server>:8000"
+case "$SERVER_URL" in http://*|https://*) ;; *) die "--backend-url must start with http:// or https://" ;; esac
+[ "$(id -u)" -eq 0 ] || die "run as root: curl -fsSL $SERVER_URL/api/kiosks/install.sh | sudo bash"
+for cmd in curl python3 sha256sum; do
+    command -v "$cmd" >/dev/null 2>&1 || die "$cmd is required but not installed"
+done
+
+if [ -n "$SIGNING_KEY" ]; then
+    printf '%s' "$SIGNING_KEY" | grep -qE '^[0-9a-fA-F]{64}$' \
+        || die "signing key must be 64 hex characters (the content of kiosk-signing.key)"
+    # Root-only file; bootstrap + the updater read the key from here, so it never
+    # has to appear on a command line again.
+    install -m 0600 /dev/null "$SIGNING_ENV_FILE"
+    printf 'CALVIN_KIOSK_SIGNING_KEY=%s\n' "$SIGNING_KEY" > "$SIGNING_ENV_FILE"
+    log "signing key stored in $SIGNING_ENV_FILE"
+elif [ -f "$SIGNING_ENV_FILE" ]; then
+    SIGNING_KEY="$(grep '^CALVIN_KIOSK_SIGNING_KEY=' "$SIGNING_ENV_FILE" | cut -d= -f2- || true)"
+fi
+
+log "server: $SERVER_URL"
+manifest="$(curl -fsSL "$SERVER_URL/api/kiosks/agent/manifest")" \
+    || die "cannot reach $SERVER_URL/api/kiosks/agent/manifest (is the server running and reachable?)"
+
+# Verify the signature (when keyed) and print "<name> <sha256>" per installer file.
+installer_list="$(MANIFEST_JSON="$manifest" CALVIN_KIOSK_SIGNING_KEY="$SIGNING_KEY" python3 - <<'PY'
+import hashlib, hmac, json, os, sys
+def fail(msg):
+    sys.stderr.write(msg + "\n")
+    sys.exit(1)
+try:
+    m = json.loads(os.environ["MANIFEST_JSON"])
+except Exception:
+    fail("manifest is not valid JSON")
+key = os.environ.get("CALVIN_KIOSK_SIGNING_KEY", "")
+sig = m.pop("signature", None)
+alg = m.pop("sig_alg", None)
+if key:
+    if sig is None or alg != "hmac-sha256":
+        fail("manifest signature missing or unsupported; refusing (signing key is set)")
+    canon = json.dumps(m, sort_keys=True, separators=(",", ":")).encode()
+    tag = hmac.new(bytes.fromhex(key), canon, hashlib.sha256).hexdigest()
+    if not hmac.compare_digest(tag, str(sig)):
+        fail("manifest signature invalid; wrong signing key or tampered response")
+installer = m.get("installer")
+if not installer:
+    fail("server manifest lists no installer files; update the Calvin server first")
+for f in installer:
+    print(f["name"], f["sha256"])
+PY
+)" || die "manifest check failed (see above)"
+
+work="$(mktemp -d)"
+trap 'rm -rf "$work"' EXIT
+while read -r name sha; do
+    case "$name" in setup-kiosk.sh|setup-common.sh) ;; *) continue ;; esac
+    curl -fsSL "$SERVER_URL/api/kiosks/installer/$name" -o "$work/$name" \
+        || die "download failed: $name"
+    got="$(sha256sum "$work/$name" | cut -d' ' -f1)"
+    [ "$got" = "$sha" ] || die "checksum mismatch for $name; refusing to run it"
+done <<< "$installer_list"
+[ -f "$work/setup-kiosk.sh" ] && [ -f "$work/setup-common.sh" ] \
+    || die "server manifest is missing setup-kiosk.sh or setup-common.sh"
+
+log "running setup-kiosk.sh (installs X, Chromium and the Calvin kiosk services)..."
+bash "$work/setup-kiosk.sh" --backend-url "$SERVER_URL"
+
+if [ "$REBOOT" = 1 ]; then
+    log "done; rebooting into the kiosk in ${REBOOT_DELAY}s (Ctrl-C to cancel)"
+    sleep "$REBOOT_DELAY"
+    systemctl reboot
+else
+    log "done; reboot to start the kiosk: sudo reboot"
+fi
