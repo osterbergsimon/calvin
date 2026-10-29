@@ -30,10 +30,10 @@
     "@mdi/js": "^7.4.47",
     "@tanstack/vue-query": "^5.91.0",
     "@vueuse/core": "^10.7.0",
-    "axios": "^1.6.0",
+    "axios": "~1.20.0",
     "pinia": "^2.1.7",
     "qrcode": "^1.5.4",
-    "vue": "^3.4.0",
+    "vue": "^3.5.44",
     "vue-router": "^4.2.5",
     "vuedraggable": "^4.1.0"
   },
