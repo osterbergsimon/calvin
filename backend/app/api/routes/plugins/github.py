@@ -12,6 +12,7 @@ from fastapi import APIRouter, Body, HTTPException
 from loguru import logger
 
 from app.api.routes.plugins.management import (
+    _check_plugin_in_child,
     _require_valid_id,
     _validate_just_installed_plugin,
 )
@@ -291,6 +292,10 @@ async def install_plugin_from_github(request: dict[str, Any] = Body(...)):
                     force=force,
                 )
 
+                # Validate in a child interpreter before the server imports it.
+                installed_id = manifest["id"]
+                await _check_plugin_in_child(installed_id)
+
                 # Reload plugins to include the newly installed one
                 # Wrap in try-except to handle loading errors gracefully
                 try:
@@ -306,7 +311,6 @@ async def install_plugin_from_github(request: dict[str, Any] = Body(...)):
 
                 # Surface metadata validation failures immediately. See
                 # _validate_just_installed_plugin for details.
-                installed_id = manifest["id"]
                 validation_errors = _validate_just_installed_plugin(installed_id)
                 if validation_errors:
                     try:
@@ -504,6 +508,11 @@ async def install_plugin_from_local(request: dict[str, Any] = Body(...)):
                 plugin_id,
                 force=force,
             )
+
+            # Validate in a child interpreter before the server imports it.
+            installed_id = manifest["id"]
+            await _check_plugin_in_child(installed_id)
+
             try:
                 plugin_loader.load_installed_plugins()
             except Exception as load_error:
@@ -512,7 +521,6 @@ async def install_plugin_from_local(request: dict[str, Any] = Body(...)):
                     "It will be available after server restart."
                 )
 
-            installed_id = manifest["id"]
             validation_errors = _validate_just_installed_plugin(installed_id)
             if validation_errors:
                 try:

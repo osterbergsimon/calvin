@@ -109,4 +109,9 @@ either.
   the theme. That is deliberate: display state is writable without a password,
   but code, secrets and backups are not.
 - One password, no usernames, roles or multiple admins.
-- Installed plugins run in the server process, as before.
+- Installed plugins run in the server process, as before. An upload is first
+  imported once in a short-lived child interpreter
+  (`python -I -m app.plugins.check_plugin`), so a plugin that crashes, calls
+  `sys.exit()` or hangs at import is rejected without the server importing it.
+  The child runs as the same user: that is a "don't load rejected code into the
+  server" guard, not a sandbox.
