@@ -16,7 +16,7 @@ if [ -n "${_SCRIPT_DIR}" ] && [ -f "${_SCRIPT_DIR}/setup.sh" ]; then
     exec bash "${_SCRIPT_DIR}/setup.sh" --mode dev "$@"
 fi
 
-GIT_BRANCH="${_ENV_GIT_BRANCH:-${GIT_BRANCH:-main}}"
+GIT_BRANCH="${_ENV_GIT_BRANCH:-${GIT_BRANCH:-develop}}"
 repo_owner=$(echo "${_ENV_GIT_REPO}" | sed -E 's|.*github\.com[:/]([^/]+)/([^/]+)(\.git)?$|\1|')
 repo_name=$(echo "${_ENV_GIT_REPO}" | sed -E 's|.*github\.com[:/]([^/]+)/([^/]+)(\.git)?$|\2|' | sed 's|\.git$||')
 

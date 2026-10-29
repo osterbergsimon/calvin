@@ -11,7 +11,9 @@ EnvironmentFile=/etc/default/calvin-kiosk
 Environment="DISPLAY=:0"
 Environment="HOME=/home/calvin"
 Environment="XAUTHORITY=/home/calvin/.Xauthority"
-ExecStartPre=/bin/bash -c 'timeout=240; elapsed=0; until curl -sf "${CALVIN_BACKEND_URL%/}/api/health" > /dev/null 2>&1; do if [ $elapsed -ge $timeout ]; then echo "Calvin backend at ${CALVIN_BACKEND_URL} not ready after $timeout seconds"; exit 1; fi; sleep 1; elapsed=$((elapsed+1)); done'
+# Shell-side expansions are written $${...} (and % as %%): systemd expands
+# ${...} itself and turns e.g. ${CALVIN_BACKEND_URL%/} into an empty string.
+ExecStartPre=/bin/bash -c 'timeout=240; elapsed=0; until curl -sf "$${CALVIN_BACKEND_URL%%/}/api/health" > /dev/null 2>&1; do if [ $elapsed -ge $timeout ]; then echo "Calvin backend at ${CALVIN_BACKEND_URL} not ready after $timeout seconds"; exit 1; fi; sleep 1; elapsed=$((elapsed+1)); done'
 ExecStartPre=/bin/bash -c 'timeout=60; elapsed=0; until [ -S /tmp/.X11-unix/X0 ] || pgrep -x Xorg > /dev/null 2>&1; do if [ $elapsed -ge $timeout ]; then echo "X server not available after $timeout seconds"; exit 1; fi; sleep 1; elapsed=$((elapsed+1)); done'
 ExecStartPre=/bin/sleep 2
 ExecStartPre=/bin/bash -c 'pkill -u calvin chromium || pkill -u calvin chromium-browser || true'
@@ -19,8 +21,8 @@ ExecStartPre=/bin/sleep 1
 ExecStartPre=/bin/bash -c 'rm -rf /home/calvin/.cache/chromium/Default/Cache/* "/home/calvin/.cache/chromium/Default/Code Cache"/* 2>/dev/null || true'
 ExecStart=/bin/bash -c 'q=""; \
     [ -n "${CALVIN_KIOSK_ID:-}" ] && q="kiosk=${CALVIN_KIOSK_ID}"; \
-    [ -n "${CALVIN_KIOSK_HOSTNAME:-}" ] && q="${q:+${q}&}khost=${CALVIN_KIOSK_HOSTNAME}"; \
-    url="${CALVIN_BACKEND_URL%/}/${q:+?${q}}"; \
+    [ -n "${CALVIN_KIOSK_HOSTNAME:-}" ] && q="$${q:+$${q}&}khost=${CALVIN_KIOSK_HOSTNAME}"; \
+    url="$${CALVIN_BACKEND_URL%%/}/$${q:+?$${q}}"; \
     /usr/bin/chromium \
     --kiosk \
     --noerrdialogs \
@@ -44,8 +46,6 @@ ExecStart=/bin/bash -c 'q=""; \
     --no-first-run \
     --no-default-browser-check \
     --no-pings \
-    --no-sandbox \
-    --no-zygote \
     --use-mock-keychain \
     --force-device-scale-factor=1 \
     --disable-lcd-text \

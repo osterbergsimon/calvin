@@ -96,12 +96,12 @@ class TestLocalImagePlugin:
             # Should update image_dir if IMAGE_DIR changed
             assert local_plugin.image_dir == new_image_dir
 
-    async def test_configure_with_image_dir_config_key(self, local_plugin, temp_image_dir):
-        """Test configuring an explicit image_dir via config."""
-        custom_dir = temp_image_dir / "custom"
-        await local_plugin.configure({"image_dir": str(custom_dir)})
-        assert local_plugin.image_dir == custom_dir
-        assert local_plugin.image_dir.exists()
+    async def test_configure_image_dir_config_key_does_not_override_setting(
+        self, local_plugin, temp_image_dir
+    ):
+        """IMAGE_DIR (the setting) wins over an image_dir stored in the instance config."""
+        await local_plugin.configure({"image_dir": str(temp_image_dir / "custom")})
+        assert local_plugin.image_dir == temp_image_dir.resolve()
 
     async def test_scan_images_empty(self, local_plugin):
         """Test scanning images from empty directory."""
@@ -189,6 +189,30 @@ class TestLocalConfigUpdate:
                 assert db_plugin is not None
                 assert db_plugin.type_id == "local"
                 assert db_plugin.config == {}  # Empty config
+
+
+class TestImageDirSetting:
+    """The IMAGE_DIR / data-dir setting decides where images live."""
+
+    async def test_legacy_relative_image_dir_in_config_is_ignored(
+        self, local_plugin, temp_image_dir
+    ):
+        # Older installs stored this cwd-relative path in the instance config.
+        await local_plugin.configure(
+            {"image_dir": "./data/images", "thumbnail_dir": "./data/images/thumbnails"}
+        )
+        assert local_plugin.image_dir == temp_image_dir.resolve()
+        assert local_plugin.thumbnail_dir == temp_image_dir.resolve() / "thumbnails"
+
+    async def test_defaults_to_settings_image_dir(self, monkeypatch, tmp_path):
+        from app.config import settings
+
+        monkeypatch.delenv("IMAGE_DIR", raising=False)
+        monkeypatch.setattr(settings, "image_dir", tmp_path / "pics")
+        plugin = LocalImagePlugin(plugin_id="local-images", name="Local Images")
+        await plugin.configure({})
+        assert plugin.image_dir == tmp_path / "pics"
+        assert (tmp_path / "pics" / "thumbnails").is_dir()
 
 
 class TestUploadFilenameSafety:

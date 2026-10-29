@@ -162,7 +162,7 @@ const props = defineProps({
   },
   gitBranch: {
     type: String,
-    default: "main",
+    default: "develop",
   },
 });
 
@@ -186,7 +186,7 @@ const {
 // In Docker the git updater, branch list and update-script status don't apply.
 const isContainer = computed(() => environment.value?.deployment === "docker");
 
-const availableBranches = ref([props.gitBranch || "main"]);
+const availableBranches = ref([props.gitBranch || "develop"]);
 const localGitRepoUrl = ref(props.gitRepoUrl || "");
 const lastEmittedGitRepoUrl = ref(props.gitRepoUrl || "");
 const statusRefreshLoading = computed(
@@ -284,7 +284,7 @@ const refreshSystemStatus = async () => {
 const loadBranches = async () => {
   try {
     const branches = await getGitBranches();
-    availableBranches.value = branches.branches || [props.gitBranch || "main"];
+    availableBranches.value = branches.branches || [props.gitBranch || "develop"];
   } catch (error) {
     console.error("Failed to load branches:", error);
   }

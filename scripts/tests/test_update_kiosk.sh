@@ -81,14 +81,14 @@ chmod +x "$tmp/bin/systemctl"
 sed 's/"3.99"/"3.9"/' "$tmp/srv/manifest.json" > "$tmp/srv/m2"; mv "$tmp/srv/m2" "$tmp/srv/manifest.json"
 echo 'print("OLD")' > "$tmp/local/calvin_display_agent.py"
 # Add a brand-new file to the bundle (no prior install) to prove rollback removes it
-NEW_CONFIG="$tmp/local/calvin_new_config.py"
-printf 'NEW_CONFIG=True\n' > "$tmp/srv/calvin_new_config.py"
-NEW_CONFIG_SHA="$(sha256sum "$tmp/srv/calvin_new_config.py" | cut -d' ' -f1)"
+NEW_CONFIG="$tmp/systemd/calvin-kiosk-update.service"
+printf '[Service]\nType=oneshot\n' > "$tmp/srv/calvin-kiosk-update.service"
+NEW_CONFIG_SHA="$(sha256sum "$tmp/srv/calvin-kiosk-update.service" | cut -d' ' -f1)"
 python3 - "$tmp/srv/manifest.json" "$NEW_CONFIG_SHA" "$NEW_CONFIG" <<'PY'
 import json, sys
 path, sha, target = sys.argv[1:4]
 m = json.load(open(path))
-m["files"].append({"name":"calvin_new_config.py","sha256":sha,"mode":"0644","target_path":target,"restart_unit":"calvin-display-agent.service"})
+m["files"].append({"name":"calvin-kiosk-update.service","sha256":sha,"mode":"0644","target_path":target,"restart_unit":"calvin-display-agent.service"})
 json.dump(m, open(path,"w"))
 PY
 # Patch mock curl to serve the new file too
@@ -97,7 +97,7 @@ cat > "$tmp/bin/curl" <<EOF
 for a in "\$@"; do case "\$a" in
   */agent/manifest) cat "$tmp/srv/manifest.json"; exit 0;;
   */agent/files/calvin_display_agent.py) cat "$tmp/srv/calvin_display_agent.py"; exit 0;;
-  */agent/files/calvin_new_config.py) cat "$tmp/srv/calvin_new_config.py"; exit 0;;
+  */agent/files/calvin-kiosk-update.service) cat "$tmp/srv/calvin-kiosk-update.service"; exit 0;;
 esac; done
 exit 22
 EOF
@@ -301,19 +301,19 @@ echo "PASS receipt-and-atomic-writes"
 
 # --- ixk: a brand-new enable:true unit is enabled + started post-health, not restarted ---
 mkdir -p "$tmp/state_ixk"
-NEWUNIT="$tmp/systemd/calvin-foo.service"
+NEWUNIT="$tmp/systemd/calvin-kiosk-remote.service"
 rm -f "$NEWUNIT"                                   # not installed before => "new"
 printf 'import sys\nsys.exit(0)\n' > "$tmp/srv/calvin_display_agent.py"
 IXK_AGENT_SHA="$(sha256sum "$tmp/srv/calvin_display_agent.py" | cut -d' ' -f1)"
 echo 'print("OLD")' > "$tmp/local/calvin_display_agent.py"   # agent changes => health runs
-printf '[Unit]\nDescription=foo\n' > "$tmp/srv/calvin-foo.service"
-IXK_UNIT_SHA="$(sha256sum "$tmp/srv/calvin-foo.service" | cut -d' ' -f1)"
+printf '[Unit]\nDescription=foo\n' > "$tmp/srv/calvin-kiosk-remote.service"
+IXK_UNIT_SHA="$(sha256sum "$tmp/srv/calvin-kiosk-remote.service" | cut -d' ' -f1)"
 cat > "$tmp/srv/manifest.json" <<EOF
 {"version":"ixk0000000000000","min_python":"3.9","files":[
  {"name":"calvin_display_agent.py","sha256":"$IXK_AGENT_SHA","mode":"0755",
   "target_path":"$tmp/local/calvin_display_agent.py","restart_unit":"calvin-display-agent.service","enable":false},
- {"name":"calvin-foo.service","sha256":"$IXK_UNIT_SHA","mode":"0644",
-  "target_path":"$NEWUNIT","restart_unit":"calvin-foo.service","enable":true}]}
+ {"name":"calvin-kiosk-remote.service","sha256":"$IXK_UNIT_SHA","mode":"0644",
+  "target_path":"$NEWUNIT","restart_unit":"calvin-kiosk-remote.service","enable":true}]}
 EOF
 cat > "$tmp/bin/systemctl" <<EOF
 #!/usr/bin/env bash
@@ -328,16 +328,16 @@ cat > "$tmp/bin/curl" <<EOF
 for a in "\$@"; do case "\$a" in
   */agent/manifest) cat "$tmp/srv/manifest.json"; exit 0;;
   */agent/files/calvin_display_agent.py) cat "$tmp/srv/calvin_display_agent.py"; exit 0;;
-  */agent/files/calvin-foo.service) cat "$tmp/srv/calvin-foo.service"; exit 0;;
+  */agent/files/calvin-kiosk-remote.service) cat "$tmp/srv/calvin-kiosk-remote.service"; exit 0;;
 esac; done
 exit 22
 EOF
 chmod +x "$tmp/bin/curl"
 rm -f "$tmp/systemctl.log"
 CALVIN_AGENT_STATE_DIR="$tmp/state_ixk" bash "$SCRIPT" || { echo "FAIL ixk: exited non-zero"; exit 1; }
-grep -q 'enable calvin-foo.service' "$tmp/systemctl.log" || { echo "FAIL ixk: new unit not enabled"; exit 1; }
-grep -q 'start calvin-foo.service'  "$tmp/systemctl.log" || { echo "FAIL ixk: new unit not started"; exit 1; }
-! grep -q 'restart calvin-foo.service' "$tmp/systemctl.log" || { echo "FAIL ixk: new unit should not be restarted"; exit 1; }
+grep -q 'enable calvin-kiosk-remote.service' "$tmp/systemctl.log" || { echo "FAIL ixk: new unit not enabled"; exit 1; }
+grep -q 'start calvin-kiosk-remote.service'  "$tmp/systemctl.log" || { echo "FAIL ixk: new unit not started"; exit 1; }
+! grep -q 'restart calvin-kiosk-remote.service' "$tmp/systemctl.log" || { echo "FAIL ixk: new unit should not be restarted"; exit 1; }
 grep -q "\[Unit\]" "$NEWUNIT" || { echo "FAIL ixk: new unit file not installed"; exit 1; }
 echo "PASS ixk-enable-new-unit"
 

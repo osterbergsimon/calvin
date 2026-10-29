@@ -91,15 +91,15 @@ GitHub → Packages → `calvin` → Package settings → Change visibility.
 `entrypoint.sh` runs as root, then drops to `PUID:PGID` (default `0:0`,
 root; Unraid uses `99:100`). On every start it:
 
-- creates the data layout under `/var/lib/calvin` and refreshes the
-  built-in themes file;
+- creates the data layout under `/var/lib/calvin` (`CALVIN_DATA_DIR`);
 - re-installs the pip packages that installed plugins declare
   (`dependencies.packages`), because the venv lives in the image and is
   replaced when the container is recreated;
 - chowns the data volume and the venv to `PUID:PGID` where they differ,
   so live plugin installs work as the unprivileged user.
 
-`/app/data` is a symlink to `/var/lib/calvin`, so everything the backend
-writes under a relative `./data/...` path (installed themes, caches) is
-persisted on the volume. The kiosk signing key is put there explicitly
-(`KIOSK_SIGNING_KEY_PATH=/var/lib/calvin/kiosk-signing.key`).
+The image sets `CALVIN_DATA_DIR=/var/lib/calvin`, and the backend derives
+every path it writes from it (database, images, plugins, installed themes,
+caches, logs, the kiosk signing key, backups), so all of it persists on the
+volume. `DATABASE_URL`, `IMAGE_DIR`, `PLUGIN_DIR`, ... still override a
+single path. See [Data directory](../docs/configuration/DATA_DIR.md).

@@ -43,8 +43,10 @@ sudo bash scripts/bake-kiosk-firstrun.sh \
 ```
 
 Only `--backend-url` and `--boot-dir` are required. Omit `--wifi-*` if the
-Pi is on Ethernet. `--ssh-pubkey` installs a recovery key for the `calvin`
-user. The old `--git-repo`/`--git-branch` flags are gone because nothing is
+Pi is on Ethernet. `--ssh-pubkey` creates a recovery admin user,
+`calvin-admin` (rename with `--admin-user`), with key-only SSH login and
+passwordless sudo; without it the kiosk has no admin login. `calvin`, which runs
+Chromium, gets no SSH key and no sudo. The old `--git-repo`/`--git-branch` flags are gone because nothing is
 fetched from GitHub any more.
 
 Eject the card.
@@ -53,7 +55,9 @@ Eject the card.
 
 Put the card in the Pi and power on. It self-provisions unattended:
 
-1. **Boot 1** sets hostname, wifi and SSH, seeds config and the signing key,
+1. **Boot 1** sets hostname, wifi and SSH, creates the admin user (if a key was
+   baked), turns off the interactive first-user wizard (`userconfig.service`),
+   seeds config and the signing key,
    installs the kiosk installer (`/usr/local/bin/calvin-kiosk-install.sh`),
    deletes `firstrun.sh` from the boot partition (it held the wifi PSK and key),
    and reboots.
@@ -63,8 +67,10 @@ Put the card in the Pi and power on. It self-provisions unattended:
    openbox, Chromium and the Calvin services, and reboots.
 3. **Boot 3** — Chromium opens the dashboard.
 
-First provisioning takes several minutes (package installs). Watch progress
-over SSH if you baked a key: `journalctl -u calvin-kiosk-firstboot -f`.
+First provisioning takes several minutes (package installs). Boot 2 prints its
+progress on the screen (tty1): waiting for the server, installing, or the
+error and that it will retry. Over SSH: `ssh calvin-admin@<kiosk>` then
+`journalctl -u calvin-kiosk-firstboot -f`.
 
 ## After provisioning
 
@@ -104,8 +110,16 @@ from the Calvin admin UI — no SSH, no re-flash.
    `GET /api/kiosks/agent/files/{name}`. The bundle source is the **local
    Calvin server**, not GitHub — no internet access required on the kiosk.
 
-   The bundle is ~6 files: the display-agent script, three systemd units, the
-   updater itself, and the oneshot service unit. No full repo checkout lives
+   The bundle is 6 files: the display-agent script, three systemd units, the
+   updater itself, and the oneshot service unit. The updater only installs these
+   six, each at its fixed path and mode (0755 scripts, 0644 units), and only
+   restarts or enables their units; anything else in a manifest is refused. A
+   new bundle file therefore needs the updater that knows it: when a manifest
+   brings both, the old updater installs the known files and re-runs the new
+   updater for the rest. Units that should be enabled are re-enabled on every
+   run. This pinning is defence in depth only: the updater is itself a bundle
+   file and runs as root, so without a signing key a hostile server can still
+   ship its own updater. Only the manifest signature protects against that. No full repo checkout lives
    on the kiosk.
 
 4. **Verify, backup, atomic swap, restart.** For each changed file the updater:
@@ -180,7 +194,7 @@ rolled back to an older bundle will be adopted.
 ### Manifest signing (closing the LAN-MITM)
 
 The backend signs the bundle manifest with HMAC-SHA256 using a shared secret generated on first
-run at `./data/kiosk-signing.key` (mode `0600`; the path is logged the first time it is created).
+run at `<data dir>/kiosk-signing.key` (see [Data directory](../configuration/DATA_DIR.md); mode `0600`; the path is logged the first time it is created).
 When a kiosk has that secret baked, it verifies the manifest signature before trusting the
 manifest, the file hashes, or any downloaded file — closing the LAN man-in-the-middle gap that
 plain sha256 integrity leaves open.
@@ -191,8 +205,8 @@ plain sha256 integrity leaves open.
    creates it at startup and logs the path (`Kiosk manifest signing key: …`):
    - Unraid: `/mnt/user/appdata/calvin/kiosk-signing.key`
    - Docker: `/var/lib/calvin/kiosk-signing.key` in the container, which is the data volume
-     (`KIOSK_SIGNING_KEY_PATH`), so it survives image updates
-   - Source checkout: `./data/kiosk-signing.key` relative to the backend's working directory
+     (`CALVIN_DATA_DIR`), so it survives image updates
+   - Source checkout: `backend/data/kiosk-signing.key` (or `$CALVIN_DATA_DIR/kiosk-signing.key`)
 2. Pass it to provisioning:
    - Over SSH: copy the key **and** `install-kiosk.sh` from the server, then run
      `sudo bash install-kiosk.sh --backend-url <url> --signing-key-file <path>` (exact commands in
@@ -210,7 +224,7 @@ LAN-trust), or uses an unknown algorithm. A kiosk with **no** key baked keeps th
 LAN-trust behavior, so signing is opt-in per kiosk — but note the backend always signs, so a
 keyed kiosk requires a backend running this version or newer.
 
-**Key rotation:** delete `./data/kiosk-signing.key` on the server (a new one is generated on the
+**Key rotation:** delete `<data dir>/kiosk-signing.key` on the server (a new one is generated on the
 next manifest request) and re-bake / re-run `--signing-key` on each kiosk. There is no automatic
 rotation.
 
@@ -268,7 +282,8 @@ triggered individually. Bulk update is tracked as `calvin-3d1`.
   `systemd.run=/boot/firmware/firstrun.sh`.
 - **Wifi doesn't connect:** check `--wifi-country` was set (regulatory
   domain) and the PSK is correct.
-- **Provisioning failed:** SSH in (if you baked a key) and read
+- **Provisioning failed:** the screen shows the last status. SSH in as the
+  admin user (if you baked a key) and read
   `journalctl -u calvin-kiosk-firstboot`. If the server was unreachable for the
   whole 15-minute wait, the unit fails and systemd retries it every minute
   (`Restart=on-failure`) until the server answers. Fix, then

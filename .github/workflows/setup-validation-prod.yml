@@ -9,6 +9,7 @@ on:
       - 'scripts/setup-common.sh'
       - 'scripts/update-calvin.sh'
       - 'scripts/restart-calvin-services.sh'
+      - 'scripts/ci/**'
       - 'deploy/systemd/**'
       - 'docker/docker-compose.yml'
       - 'deploy/calvin.env.example'
@@ -20,6 +21,7 @@ on:
       - 'scripts/setup-common.sh'
       - 'scripts/update-calvin.sh'
       - 'scripts/restart-calvin-services.sh'
+      - 'scripts/ci/**'
       - 'deploy/systemd/**'
       - 'docker/docker-compose.yml'
       - 'deploy/calvin.env.example'
@@ -63,6 +65,27 @@ jobs:
           # canonical setup.sh while the docker-in-docker e2e job
           # below only exercises --mode prod.
           grep -q "exec bash.*setup.sh.*--mode dev" scripts/setup-dev.sh
+
+  # P2: a fresh Raspberry Pi OS is Debian Bookworm/Trixie arm64 underneath.
+  # Install Docker CE + the compose plugin the way setup.sh does, and check
+  # every kiosk package exists, on native arm64 runners.
+  pi-os-docker-smoke:
+    name: Pi OS smoke (${{ matrix.suite }} arm64)
+    runs-on: ubuntu-24.04-arm
+    timeout-minutes: 20
+    strategy:
+      fail-fast: false
+      matrix:
+        suite: [bookworm, trixie]
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Install Docker CE in debian:${{ matrix.suite }}
+        run: |
+          docker run --rm -v "$PWD:/calvin:ro" "debian:${{ matrix.suite }}" \
+            bash /calvin/scripts/ci/pi-os-smoke.sh
 
   test-production-setup:
     name: Test setup.sh --mode prod
