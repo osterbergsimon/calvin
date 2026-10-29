@@ -93,6 +93,31 @@ async def get_agent_file(name: str):
     return Response(content=data, media_type="application/octet-stream")
 
 
+@router.get("/kiosks/install.sh")
+async def get_install_script(request: Request):
+    """One-command kiosk installer with this server's URL baked in.
+
+    Usage on a fresh Pi: ``curl -fsSL http://<server>:8000/api/kiosks/install.sh | sudo bash``
+    """
+    try:
+        script = kiosk_bundle.render_install_script(str(request.base_url))
+    except OSError as exc:
+        raise HTTPException(
+            status_code=503, detail="Kiosk installer unavailable on server"
+        ) from exc
+    return Response(content=script, media_type="text/x-shellscript")
+
+
+@router.get("/kiosks/installer/{name}")
+async def get_installer_file(name: str):
+    """Serve one allowlisted setup script for the installer. 404 for anything else."""
+    try:
+        data = kiosk_bundle.read_installer_file(name)
+    except (KeyError, FileNotFoundError):
+        raise HTTPException(status_code=404, detail="Unknown installer file")
+    return Response(content=data, media_type="text/x-shellscript")
+
+
 @router.get("/kiosks/{kiosk_id}/config")
 async def get_kiosk_config(
     kiosk_id: str,
