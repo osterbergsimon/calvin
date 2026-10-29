@@ -26,6 +26,9 @@ services:
       IMAGE_DIR: ${IMAGE_DIR:-/var/lib/calvin/images}
       PLUGIN_DIR: ${PLUGIN_DIR:-/var/lib/calvin/plugins}
       CORS_ORIGINS: ${CORS_ORIGINS:-http://localhost:8000}
+      # Address phones and new kiosks use to reach this server (QR codes, the
+      # "Add kiosk" command). The container only sees its own IP — set it.
+      PUBLIC_URL: ${PUBLIC_URL:-}
     ports:
       - "${CALVIN_PORT:-8000}:8000"
     volumes:

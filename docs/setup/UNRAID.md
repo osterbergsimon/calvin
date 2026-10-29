@@ -21,7 +21,12 @@ In Unraid:
    `/mnt/user/appdata/calvin`.
 4. Keep the default port `8000`, or change it if that port is already in
    use.
-5. Start the container.
+5. Set **Public URL** to the address phones and new kiosks should use, for
+   example `http://192.168.1.10:8000` (the Unraid server's LAN IP and the port
+   above). The container can't detect it itself; without it, the
+   "set up from your phone" QR codes and the **Add kiosk** install command
+   show the container's internal IP whenever Calvin is opened via `localhost`.
+6. Start the container.
 
 Calvin should be available at:
 
