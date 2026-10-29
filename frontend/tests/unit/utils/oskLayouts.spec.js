@@ -6,10 +6,11 @@
 import { describe, it, expect, beforeEach, afterEach, vi } from "vitest";
 import {
   DEFAULT_OSK_LAYOUT,
+  OSK_DEVICE_LAYOUT_STORAGE_KEY,
   OSK_LAYOUT_CHANGE_EVENT,
   OSK_LAYOUT_HINT_STORAGE_KEY,
   OSK_LAYOUT_IDS,
-  OSK_LAYOUT_STORAGE_KEY,
+  OSK_LEGACY_LAYOUT_STORAGE_KEY,
   OSK_LAYOUTS_BY_ID,
   buildOskLayouts,
   clearStoredOskLayout,
@@ -233,11 +234,29 @@ describe("oskLayouts", () => {
   });
 
   describe("per-device persistence", () => {
-    it("stores and reads the active layout", () => {
+    it("stores and reads the active layout under the device key", () => {
       expect(readStoredOskLayout()).toBeNull();
       storeOskLayout("no");
       expect(readStoredOskLayout()).toBe("no");
-      expect(window.localStorage.getItem(OSK_LAYOUT_STORAGE_KEY)).toBe("no");
+      expect(window.localStorage.getItem(OSK_DEVICE_LAYOUT_STORAGE_KEY)).toBe("no");
+      expect(window.localStorage.getItem(OSK_LEGACY_LAYOUT_STORAGE_KEY)).toBeNull();
+    });
+
+    it("ignores and removes the legacy auto-written key (CLV-21 migration)", () => {
+      // Older builds wrote this on every device, so it is not a device choice.
+      window.localStorage.setItem(OSK_LEGACY_LAYOUT_STORAGE_KEY, "de");
+
+      expect(readStoredOskLayout()).toBeNull();
+      expect(window.localStorage.getItem(OSK_LEGACY_LAYOUT_STORAGE_KEY)).toBeNull();
+    });
+
+    it("keeps a real device choice and still drops the legacy key", () => {
+      window.localStorage.setItem(OSK_LEGACY_LAYOUT_STORAGE_KEY, "de");
+      window.localStorage.setItem(OSK_DEVICE_LAYOUT_STORAGE_KEY, "fr");
+
+      expect(readStoredOskLayout()).toBe("fr");
+      expect(window.localStorage.getItem(OSK_LEGACY_LAYOUT_STORAGE_KEY)).toBeNull();
+      expect(window.localStorage.getItem(OSK_DEVICE_LAYOUT_STORAGE_KEY)).toBe("fr");
     });
 
     it("clears the device choice and announces the change", () => {
@@ -249,7 +268,7 @@ describe("oskLayouts", () => {
       clearStoredOskLayout();
 
       expect(readStoredOskLayout()).toBeNull();
-      expect(window.localStorage.getItem(OSK_LAYOUT_STORAGE_KEY)).toBeNull();
+      expect(window.localStorage.getItem(OSK_DEVICE_LAYOUT_STORAGE_KEY)).toBeNull();
       expect(listener).toHaveBeenCalledTimes(2);
       window.removeEventListener(OSK_LAYOUT_CHANGE_EVENT, listener);
     });

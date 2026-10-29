@@ -372,7 +372,7 @@ describe("OnScreenKeyboard", () => {
 
       await pressLayoutKey();
       expect(layoutKeyLabel()).toBe("EN");
-      expect(window.localStorage.getItem("calvin-osk-layout")).toBe("en");
+      expect(window.localStorage.getItem("calvin-osk-device-layout")).toBe("en");
 
       await key("{hide}");
       expect(isShown()).toBe(false);
@@ -404,7 +404,7 @@ describe("OnScreenKeyboard", () => {
     });
 
     it("cycles from an off-list device choice to the main layout", async () => {
-      window.localStorage.setItem("calvin-osk-layout", "de");
+      window.localStorage.setItem("calvin-osk-device-layout", "de");
       config.oskLayout = "sv";
       config.oskExtraLayouts = ["en"];
       mountOsk();
@@ -420,13 +420,29 @@ describe("OnScreenKeyboard", () => {
     });
 
     it("ignores a stored layout that is no longer valid", async () => {
-      window.localStorage.setItem("calvin-osk-layout", "xx");
+      window.localStorage.setItem("calvin-osk-device-layout", "xx");
       config.oskLayout = "da";
       mountOsk();
       await focus(addInput());
 
       expect(vmValue("activeLetterLayout")).toBe("da");
       expect(keyLabels()).toEqual(expect.arrayContaining(["æ", "ø", "å"]));
+    });
+
+    it("ignores and removes the legacy auto-written key, so upgrades follow Settings", async () => {
+      // r132's immediate watcher wrote this on every device.
+      window.localStorage.setItem("calvin-osk-layout", "de");
+      config.oskLayout = "sv";
+      mountOsk();
+      await focus(addInput());
+
+      expect(vmValue("activeLetterLayout")).toBe("sv");
+      expect(keyLabels()).toContain("å");
+      expect(vmValue("deviceLayout")).toBeNull();
+      expect(window.localStorage.getItem("calvin-osk-layout")).toBeNull();
+
+      await tapLayoutKey();
+      expect(pickerOptions()[0].getAttribute("aria-pressed")).toBe("true");
     });
 
     it("resolves an unset layout once from navigator.language and caches it", async () => {
@@ -945,7 +961,7 @@ describe("OnScreenKeyboard", () => {
       await openPicker();
       await chooseOption(2);
 
-      expect(window.localStorage.getItem("calvin-osk-layout")).toBe("sv");
+      expect(window.localStorage.getItem("calvin-osk-device-layout")).toBe("sv");
       expect(vmValue("pickerOpen")).toBe(false);
       expect(vmValue("layout")).toBe("default");
       expect(document.activeElement).toBe(input);
@@ -956,7 +972,7 @@ describe("OnScreenKeyboard", () => {
     });
 
     it("Default removes the device choice so Settings applies again", async () => {
-      window.localStorage.setItem("calvin-osk-layout", "de");
+      window.localStorage.setItem("calvin-osk-device-layout", "de");
       config.oskLayout = "sv";
       mountOsk();
       await focus(addInput());
@@ -966,13 +982,13 @@ describe("OnScreenKeyboard", () => {
 
       await chooseOption(0);
 
-      expect(window.localStorage.getItem("calvin-osk-layout")).toBeNull();
+      expect(window.localStorage.getItem("calvin-osk-device-layout")).toBeNull();
       expect(vmValue("activeLetterLayout")).toBe("sv");
       expect(vmValue("pickerOpen")).toBe(false);
     });
 
     it("abc closes the picker without changing the layout", async () => {
-      window.localStorage.setItem("calvin-osk-layout", "de");
+      window.localStorage.setItem("calvin-osk-device-layout", "de");
       config.oskLayout = "sv";
       mountOsk();
       await focus(addInput());
@@ -983,7 +999,7 @@ describe("OnScreenKeyboard", () => {
 
       expect(vmValue("pickerOpen")).toBe(false);
       expect(vmValue("activeLetterLayout")).toBe("de");
-      expect(window.localStorage.getItem("calvin-osk-layout")).toBe("de");
+      expect(window.localStorage.getItem("calvin-osk-device-layout")).toBe("de");
     });
 
     it("changes only the device, never server config (works signed out)", async () => {
@@ -997,7 +1013,7 @@ describe("OnScreenKeyboard", () => {
 
       expect(updateConfig).not.toHaveBeenCalled();
       expect(config.oskLayout).toBe("sv");
-      expect(window.localStorage.getItem("calvin-osk-layout")).toBe("en");
+      expect(window.localStorage.getItem("calvin-osk-device-layout")).toBe("en");
     });
 
     it("drops the option codes and shortens Default on a short panel", async () => {

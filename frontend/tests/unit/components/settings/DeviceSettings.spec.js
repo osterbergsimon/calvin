@@ -234,7 +234,7 @@ describe("DeviceSettings", () => {
     });
 
     it("shows a layout chosen on the keyboard and can go back to the default", async () => {
-      window.localStorage.setItem("calvin-osk-layout", "de");
+      window.localStorage.setItem("calvin-osk-device-layout", "de");
       const wrapper = mountSettings({ oskLayout: "sv" });
 
       expect(wrapper.find(".device-osk-device").exists()).toBe(true);
@@ -242,7 +242,7 @@ describe("DeviceSettings", () => {
 
       await wrapper.find(".device-osk-use-default").trigger("click");
 
-      expect(window.localStorage.getItem("calvin-osk-layout")).toBeNull();
+      expect(window.localStorage.getItem("calvin-osk-device-layout")).toBeNull();
       expect(wrapper.find(".device-osk-device").exists()).toBe(false);
       expect(wrapper.text()).not.toContain("chosen on the keyboard");
     });
@@ -254,11 +254,20 @@ describe("DeviceSettings", () => {
       expect(wrapper.text()).not.toContain("chosen on the keyboard");
     });
 
+    it("ignores and removes the legacy auto-written key", () => {
+      window.localStorage.setItem("calvin-osk-layout", "de");
+      const wrapper = mountSettings({ oskLayout: "sv" });
+
+      expect(wrapper.find(".device-osk-device").exists()).toBe(false);
+      expect(wrapper.text()).not.toContain("chosen on the keyboard");
+      expect(window.localStorage.getItem("calvin-osk-layout")).toBeNull();
+    });
+
     it("updates the line when the keyboard changes the choice while Settings is open", async () => {
       const wrapper = mountSettings({ oskLayout: "sv" });
       expect(wrapper.find(".device-osk-device").exists()).toBe(false);
 
-      window.localStorage.setItem("calvin-osk-layout", "fr");
+      window.localStorage.setItem("calvin-osk-device-layout", "fr");
       window.dispatchEvent(new CustomEvent("calvin-osk-layout-change"));
       await nextTick();
 
