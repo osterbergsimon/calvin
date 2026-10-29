@@ -1022,6 +1022,19 @@ LABWC_RC_EOF
     log "labwc autostart configured"
 }
 
+# Warn (do not fail) when Wayland is requested on a release this phase has not
+# been validated on: Bookworm ships older labwc and no wlopm, so the display agent's
+# panel power would not work there.
+warn_unvalidated_wayland_os() {
+    [ "${1:-x11}" = "wayland" ] || return 0
+    local codename=""
+    codename="$( . /etc/os-release 2>/dev/null; printf '%s' "${VERSION_CODENAME:-}" )"
+    case "${codename}" in
+        ""|trixie) return 0 ;;
+    esac
+    log_warn "Wayland is validated on Trixie only (this is ${codename}); labwc/wlopm behave differently on older releases"
+}
+
 # Enable exactly one compositor unit and leave the other installed-but-disabled,
 # so switching stacks is one re-run of the installer in either direction.
 enable_display_stack_units() {
@@ -1055,6 +1068,7 @@ apply_display_stack() {
 
     configure_display_session "${stack}" "${user}"
     if [ "${stack}" = "wayland" ]; then
+        warn_unvalidated_wayland_os "${stack}"
         configure_labwc_autostart "${user}"
     fi
     enable_display_stack_units "${stack}"

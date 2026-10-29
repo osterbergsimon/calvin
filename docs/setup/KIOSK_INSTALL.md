@@ -212,6 +212,9 @@ with no flag keeps whatever the config file says.
 
 ### Known limitations in phase 1
 
+- **OS:** validated on **Raspberry Pi OS Trixie (Lite, 64-bit)** only. Bookworm
+  ships an older labwc and no `wlopm`, so the installer warns and panel power will
+  not work there.
 - **Pi 3B/3B+:** still experimental. The 1 GB RAM / VideoCore IV margin is the open
   question (`calvin-8by7`); X11 remains the safe choice there.
 - **Cursor:** labwc has no idle-hide. `rc.xml` binds `HideCursor` + `WarpCursor` and
