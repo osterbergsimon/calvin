@@ -40,6 +40,14 @@ if ! command -v upsert_env_value >/dev/null 2>&1; then
         fi
     }
 fi
+if ! command -v read_env_value >/dev/null 2>&1; then
+    # Read KEY's value (empty if missing), like setup-common.sh.
+    read_env_value() {
+        local file="$1" key="$2"
+        [ -f "$file" ] || return 0
+        grep "^${key}=" "$file" 2>/dev/null | tail -n 1 | cut -d= -f2- | tr -d "\"'" || true
+    }
+fi
 
 # Call the function under test.
 install_kiosk_config

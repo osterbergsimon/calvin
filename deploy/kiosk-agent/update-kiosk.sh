@@ -6,6 +6,9 @@
 set -euo pipefail
 
 ENV_FILE="${CALVIN_KIOSK_ENV_FILE:-/etc/default/calvin-kiosk}"
+# An exported CALVIN_CHROMIUM_GPU outranks the config file, which is sourced next
+# and would otherwise replace it (same precedence as setup-common.sh).
+CALVIN_CHROMIUM_GPU_ENV="${CALVIN_CHROMIUM_GPU:-}"
 # shellcheck disable=SC1090
 [ -f "$ENV_FILE" ] && . "$ENV_FILE"
 SIGNING_ENV_FILE="${CALVIN_KIOSK_SIGNING_ENV_FILE:-/etc/default/calvin-kiosk-signing}"
@@ -54,11 +57,57 @@ unit_suppressed() {  # $1 = unit name
 # Session env file the kiosk/display-agent units read (DISPLAY/XAUTHORITY on X11,
 # XDG_SESSION_TYPE/WAYLAND_DISPLAY/XDG_RUNTIME_DIR on Wayland). Older kiosks do
 # not have it yet and these units require it, so create the current stack's file
-# before anything is swapped. Never overwrite: setup owns the content.
+# before anything is swapped. setup owns the content: an existing file is only
+# touched for the Chromium flags line (sync_chromium_display_flags below).
+#
+# Chromium's GPU path (calvin-scuh): VC4-class boards (Pi 3 family, Zero 2 W, CM3)
+# crash the renderer under Chromium's GPU process ("Aw, Snap! error 11"), so they
+# get --disable-gpu. CALVIN_CHROMIUM_GPU=auto|on|off (environment, then
+# /etc/default/calvin-kiosk) overrides the board detection.
+calvin_board_model() {
+  local file="${CALVIN_DEVICE_TREE_MODEL:-/proc/device-tree/model}"
+  [ -r "$file" ] || return 0
+  tr -d '\000' < "$file" | sed -e 's/[[:space:]]*$//'
+}
+
+board_is_vc4_class() {
+  case "${1:-}" in
+    *"Raspberry Pi 3"*|*"Raspberry Pi Zero 2"*|*"Compute Module 3"*) return 0 ;;
+    *) return 1 ;;
+  esac
+}
+
+# auto|on|off. A bad value must not brick the update path, so warn and keep the
+# default (auto) instead of failing the update.
+chromium_gpu_setting() {
+  local requested="${CALVIN_CHROMIUM_GPU_ENV:-${CALVIN_CHROMIUM_GPU:-auto}}"
+  case "$requested" in
+    auto|on|off) printf '%s\n' "$requested" ;;
+    *)
+      log "ignoring invalid CALVIN_CHROMIUM_GPU=${requested} (expected auto, on or off); using auto" >&2
+      printf 'auto\n'
+      ;;
+  esac
+}
+
+chromium_display_flags() {  # $1 = stack
+  local stack="$1" disable_gpu=0
+  local -a flags=()
+  case "$(chromium_gpu_setting)" in
+    off) disable_gpu=1 ;;
+    auto) board_is_vc4_class "$(calvin_board_model)" && disable_gpu=1 ;;
+  esac
+  [ "$stack" = "wayland" ] && flags+=(--ozone-platform=wayland)
+  [ "$disable_gpu" = 1 ] && flags+=(--disable-gpu)
+  local IFS=' '
+  printf '%s\n' "${flags[*]:-}"
+}
+
 ensure_display_env() {
   [ -f "$DISPLAY_ENV_FILE" ] && return 0
-  local uid
+  local uid flags
   uid="$(id -u calvin 2>/dev/null || echo 1000)"
+  flags="$(chromium_display_flags "$(display_stack)")"
   mkdir -p "$(dirname "$DISPLAY_ENV_FILE")"
   if [ "$(display_stack)" = wayland ]; then
     cat > "$DISPLAY_ENV_FILE" <<EOF
@@ -67,7 +116,7 @@ ensure_display_env() {
 XDG_SESSION_TYPE=wayland
 WAYLAND_DISPLAY=wayland-0
 XDG_RUNTIME_DIR=/run/user/${uid}
-CALVIN_CHROMIUM_DISPLAY_FLAGS=--ozone-platform=wayland
+CALVIN_CHROMIUM_DISPLAY_FLAGS=${flags}
 EOF
   else
     cat > "$DISPLAY_ENV_FILE" <<EOF
@@ -75,7 +124,7 @@ EOF
 # re-run the kiosk installer to change stacks.
 DISPLAY=:0
 XAUTHORITY=/home/calvin/.Xauthority
-CALVIN_CHROMIUM_DISPLAY_FLAGS=
+CALVIN_CHROMIUM_DISPLAY_FLAGS=${flags}
 EOF
   fi
   chmod 0644 "$DISPLAY_ENV_FILE"
@@ -83,6 +132,52 @@ EOF
 }
 
 ensure_display_env
+
+# Set KEY=VALUE in a .env-style file in place, adding the line when missing and
+# leaving every other line (operator settings, comments) alone.
+set_env_line() {  # $1 = file, $2 = key, $3 = value
+  local file="$1" tmp
+  tmp="$(mktemp)"
+  UPSERT_KEY="$2" UPSERT_VALUE="$3" awk '
+    BEGIN { k = ENVIRON["UPSERT_KEY"]; v = ENVIRON["UPSERT_VALUE"]; done = 0 }
+    index($0, k "=") == 1 { if (!done) print k "=" v; done = 1; next }
+    { print }
+    END { if (!done) print k "=" v }
+  ' "$file" > "$tmp"
+  cat "$tmp" > "$file"   # rewrite in place: keeps owner and mode
+  rm -f "$tmp"
+}
+
+current_display_flags() {
+  local line
+  line="$(grep -m1 '^CALVIN_CHROMIUM_DISPLAY_FLAGS=' "$DISPLAY_ENV_FILE" 2>/dev/null || true)"
+  printf '%s' "${line#CALVIN_CHROMIUM_DISPLAY_FLAGS=}"
+}
+
+# The flag depends on the board and the setting, not on the bundle: recompute it
+# on every run, including one that changes nothing else. Returns 0 when the line
+# changed, so the caller restarts the kiosk unit to apply it now.
+sync_chromium_display_flags() {
+  local want
+  [ -f "$DISPLAY_ENV_FILE" ] || return 1
+  want="$(chromium_display_flags "$(display_stack)")"
+  [ "$(current_display_flags)" = "$want" ] && return 1
+  set_env_line "$DISPLAY_ENV_FILE" CALVIN_CHROMIUM_DISPLAY_FLAGS "$want"
+  log "set CALVIN_CHROMIUM_DISPLAY_FLAGS='${want}' in ${DISPLAY_ENV_FILE}"
+  return 0
+}
+
+FLAGS_CHANGED=0
+if sync_chromium_display_flags; then FLAGS_CHANGED=1; fi
+
+restart_kiosk_for_flags() {
+  [ "$FLAGS_CHANGED" = 1 ] || return 0
+  [ -f "$SYSTEMD_DIR/calvin-kiosk-remote.service" ] || return 0
+  # restart_all() already covers a changed unit file.
+  [ -z "${RESTART_UNITS[calvin-kiosk-remote.service]:-}" ] || return 0
+  "$SYSTEMCTL" restart calvin-kiosk-remote.service \
+    || log "restart failed: calvin-kiosk-remote.service"
+}
 
 path_allowed() {  # $1 = absolute target path
   case "$1" in
@@ -356,6 +451,7 @@ done < <(read_receipt_tsv)
 
 if [ "${#CHANGED_NAME[@]}" -eq 0 ] && [ "${#DROPPED_TARGETS[@]}" -eq 0 ]; then
   reenable_units
+  restart_kiosk_for_flags
   write_state success noop "already at ${version}" "$version"
   write_version "$version"
   write_receipt
@@ -424,6 +520,8 @@ decommission_drops() {
   [ "$removed_unit" = 1 ] && "$SYSTEMCTL" daemon-reload || true
 }
 restart_all
+# A recomputed Chromium flag only takes effect when the kiosk unit restarts.
+restart_kiosk_for_flags
 
 # --- health check (only meaningful when the agent was among the restarts) ---
 agent_restarted=0; [ -n "${RESTART_UNITS[calvin-display-agent.service]:-}" ] && agent_restarted=1

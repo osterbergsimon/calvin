@@ -97,6 +97,12 @@ install_kiosk_config() {
         "${existing_host:-$(compute_default_kiosk_hostname)}"
     # The display stack is setup-owned: a re-run with --display-stack switches it.
     upsert_env_value "$env_file" CALVIN_DISPLAY_STACK "${stack}"
+    # Chromium's GPU path is operator-visible but defaults to auto (see
+    # chromium_display_flags in setup-common.sh). Only seed it: an existing value,
+    # including one set by hand, wins on every re-run.
+    if [ -z "$(read_env_value "$env_file" CALVIN_CHROMIUM_GPU)" ]; then
+        upsert_env_value "$env_file" CALVIN_CHROMIUM_GPU "auto"
+    fi
 }
 
 # Which stack to install: --display-stack wins, then the environment, then the

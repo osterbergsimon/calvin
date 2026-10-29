@@ -929,18 +929,89 @@ display_stack_packages() {
     esac
 }
 
+# Chromium's GPU path (calvin-scuh)
+# ---------------------------------------------------------------------------
+# VC4-class boards (Pi 3 family, Zero 2 W, CM3) expose OpenGL ES 2.0 through
+# Mesa's vc4 driver. Chromium's GPU process segfaults there within seconds
+# ("Aw, Snap! error 11"), so the renderer never stays up; --disable-gpu makes
+# the same dashboard load reliably. Pi 4/5 have a usable GPU path and keep it.
+# CALVIN_CHROMIUM_GPU=auto|on|off: the environment wins over /etc/default/calvin-kiosk,
+# then `auto` decides from the board. `on` never adds the flag, `off` always does.
+# The device-tree model path is overridable so tests can fake a board.
+calvin_device_tree_model_file() {
+    printf '%s\n' "${CALVIN_DEVICE_TREE_MODEL:-/proc/device-tree/model}"
+}
+
+# The board's model string, e.g. "Raspberry Pi 3 Model B Plus Rev 1.3". Empty on
+# a non-Pi host or when the file is missing/empty. The real file is NUL-terminated.
+calvin_board_model() {
+    local file
+    file="$(calvin_device_tree_model_file)"
+    [ -r "${file}" ] || return 0
+    tr -d '\000' < "${file}" | sed -e 's/[[:space:]]*$//'
+}
+
+board_is_vc4_class() {
+    case "${1:-}" in
+        *"Raspberry Pi 3"*|*"Raspberry Pi Zero 2"*|*"Compute Module 3"*) return 0 ;;
+        *) return 1 ;;
+    esac
+}
+
+# Echo the resolved setting (auto|on|off). An invalid value is a setup error, not
+# a silent fallback: a typo must not decide whether the dashboard stays up.
+resolve_chromium_gpu() {
+    local env_file="${CALVIN_KIOSK_ENV_FILE:-/etc/default/calvin-kiosk}"
+    local requested="${CALVIN_CHROMIUM_GPU:-}"
+    if [ -z "${requested}" ]; then
+        requested="$(read_env_value "${env_file}" CALVIN_CHROMIUM_GPU)"
+    fi
+    requested="${requested:-auto}"
+    case "${requested}" in
+        auto|on|off) printf '%s\n' "${requested}" ;;
+        *)
+            echo "Invalid CALVIN_CHROMIUM_GPU: ${requested} (expected auto, on or off)" >&2
+            return 1
+            ;;
+    esac
+}
+
+# The stack's Chromium flags, in the order the kiosk unit passes them. $2/$3 let
+# a caller stand in for the setting and the board model; empty means resolve them.
+chromium_display_flags() {
+    local stack="${1:-x11}"
+    local gpu="${2:-}"
+    local model="${3:-}"
+    local disable_gpu=0
+    local -a flags=()
+
+    if [ -z "${gpu}" ]; then gpu="$(resolve_chromium_gpu)" || return 1; fi
+    [ -n "${model}" ] || model="$(calvin_board_model)"
+    case "${gpu}" in
+        off) disable_gpu=1 ;;
+        auto) board_is_vc4_class "${model}" && disable_gpu=1 ;;
+    esac
+
+    [ "${stack}" = "wayland" ] && flags+=("--ozone-platform=wayland")
+    [ "${disable_gpu}" = 1 ] && flags+=("--disable-gpu")
+    local IFS=' '
+    printf '%s\n' "${flags[*]:-}"
+}
+
 # Write the session environment for the stack. X11 keeps DISPLAY/XAUTHORITY;
 # Wayland needs the three variables Chromium and wlroots clients read, and has no
-# X authority file at all. CALVIN_CHROMIUM_DISPLAY_FLAGS carries the one
-# stack-specific Chromium flag (--ozone-platform=wayland) so the kiosk unit keeps
-# a single, unchanged flag list.
+# X authority file at all. CALVIN_CHROMIUM_DISPLAY_FLAGS carries the stack flag
+# (--ozone-platform=wayland) plus --disable-gpu on VC4-class boards, so the kiosk
+# unit keeps a single, unchanged flag list. The file is rewritten whole, so a
+# re-run replaces the flags instead of appending them again.
 configure_display_session() {
     local stack="$1"
     local user="${2:-$DEFAULT_CALVIN_USER}"
     local home="${CALVIN_HOME_OVERRIDE:-/home}/${user}"
-    local file uid
+    local file uid flags
     file="$(calvin_display_env_file)"
     uid="$(id -u "${user}" 2>/dev/null || echo 1000)"
+    flags="$(chromium_display_flags "${stack}")" || return 1
 
     log "Configuring ${stack} session environment (${file})..."
     mkdir -p "$(dirname "${file}")"
@@ -952,14 +1023,14 @@ configure_display_session() {
 XDG_SESSION_TYPE=wayland
 WAYLAND_DISPLAY=wayland-0
 XDG_RUNTIME_DIR=/run/user/${uid}
-CALVIN_CHROMIUM_DISPLAY_FLAGS=--ozone-platform=wayland
+CALVIN_CHROMIUM_DISPLAY_FLAGS=${flags}
 WAYLAND_ENV_EOF
     else
         cat > "${file}" <<X11_ENV_EOF
 # Calvin kiosk display session (stack: x11). Written by setup-kiosk.sh.
 DISPLAY=:0
 XAUTHORITY=${home}/.Xauthority
-CALVIN_CHROMIUM_DISPLAY_FLAGS=
+CALVIN_CHROMIUM_DISPLAY_FLAGS=${flags}
 X11_ENV_EOF
     fi
     chmod 0644 "${file}"
