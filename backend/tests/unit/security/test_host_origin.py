@@ -57,6 +57,16 @@ def test_origin_same_host_port():
     assert origin_allowed("http://192.168.1.10:8080", None, "192.168.1.10:8080", []) is True
 
 
+def test_origin_bare_host_uses_origin_scheme_default_port():
+    # A Host without a port means the Origin scheme's default: 80 for http,
+    # 443 for https. Any other port on the same hostname is a different origin.
+    assert origin_allowed("http://calvin.local", None, "calvin.local", []) is True
+    assert origin_allowed("https://calvin.local", None, "calvin.local", []) is True
+    assert origin_allowed("http://calvin.local:80", None, "calvin.local", []) is True
+    assert origin_allowed("http://calvin.local:9999", None, "calvin.local", []) is False
+    assert origin_allowed("https://calvin.local:9999", None, "calvin.local", []) is False
+
+
 def test_origin_ipv6_same_host_port():
     assert origin_allowed("http://[fe80::1]:8000", None, "[fe80::1]:8000", []) is True
 

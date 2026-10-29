@@ -122,13 +122,15 @@ def origin_allowed(
     if not origin_host:
         return False
     origin_port = origin_parts.port
+    default_port = _DEFAULT_PORTS.get(origin_parts.scheme.lower())
     if origin_port is None:
-        origin_port = _DEFAULT_PORTS.get(origin_parts.scheme.lower())
+        origin_port = default_port
 
     host_name, host_port = _split_host_port(host_header or "")
-    if origin_host == host_name and (
-        host_port is None or origin_port is None or host_port == origin_port
-    ):
+    # A Host without a port means the Origin scheme's default port; any other
+    # explicit port on the same hostname is a different origin.
+    effective_host_port = host_port if host_port is not None else default_port
+    if origin_host == host_name and origin_port == effective_host_port:
         return True
 
     origin_key = _origin_key(origin)
