@@ -14,7 +14,7 @@ vi.mock("@/composables", () => ({
 
 import MaintenanceSettings from "@/components/settings/categories/MaintenanceSettings.vue";
 
-const stubs = { UpdatesTab: true };
+const stubs = { UpdatesTab: true, BackupSettings: true };
 const baseConfig = { consoleLogEnabled: true, consoleLogLevel: "info", configPollInterval: 30 };
 
 describe("MaintenanceSettings", () => {
@@ -26,7 +26,7 @@ describe("MaintenanceSettings", () => {
     loadEnvironment.mockResolvedValue(null);
   });
 
-  it("renders the three sections", () => {
+  it("renders its sections and the backup & restore block", () => {
     const wrapper = mount(MaintenanceSettings, {
       props: { config: baseConfig, gitRepoUrl: "", gitBranch: "main" },
       global: { stubs },
@@ -34,6 +34,7 @@ describe("MaintenanceSettings", () => {
     for (const id of ["maintenance-updates", "maintenance-system", "maintenance-diagnostics"]) {
       expect(wrapper.find(`#section-${id}`).exists()).toBe(true);
     }
+    expect(wrapper.findComponent({ name: "BackupSettings" }).exists()).toBe(true);
   });
 
   it("calls restartBackend after confirming Restart backend", async () => {
