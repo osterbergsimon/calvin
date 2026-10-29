@@ -87,12 +87,17 @@ fi
 
 GIT_REPO="${_ENV_GIT_REPO:-${GIT_REPO:-$DEFAULT_GIT_REPO}}"
 GIT_BRANCH="${_ENV_GIT_BRANCH:-${GIT_BRANCH:-$DEFAULT_GIT_BRANCH}}"
-CALVIN_DIR="${CALVIN_DIR:-$DEFAULT_CALVIN_DIR}"
 CALVIN_USER="${CALVIN_USER:-$DEFAULT_CALVIN_USER}"
 LOG_FILE="${LOG_FILE:-$DEFAULT_LOG_FILE}"
-CALVIN_DATA_DIR="${CALVIN_DATA_DIR:-/var/lib/calvin}"
 # Install locations; overridable so tests can run against a temp dir.
 CALVIN_ETC_DIR="${CALVIN_ETC_DIR:-/etc/calvin}"
+# A re-run or refresh keeps what the host was installed with: the checkout
+# recorded for updates and the data dir in .env (resetting it to the default
+# would make the data look lost).
+CALVIN_DIR="${CALVIN_DIR:-$(read_env_value "${CALVIN_DEFAULT_DIR:-/etc/default}/calvin-update" REPO_DIR)}"
+CALVIN_DIR="${CALVIN_DIR:-$DEFAULT_CALVIN_DIR}"
+CALVIN_DATA_DIR="${CALVIN_DATA_DIR:-$(read_env_value "${CALVIN_ETC_DIR}/.env" CALVIN_DATA_DIR)}"
+CALVIN_DATA_DIR="${CALVIN_DATA_DIR:-/var/lib/calvin}"
 CALVIN_BIN_DIR="${CALVIN_BIN_DIR:-/usr/local/bin}"
 CALVIN_SYSTEMD_DIR="${CALVIN_SYSTEMD_DIR:-/etc/systemd/system}"
 CALVIN_KIOSK_ENV_FILE="${CALVIN_KIOSK_ENV_FILE:-${CALVIN_DEFAULT_DIR:-/etc/default}/calvin-kiosk}"

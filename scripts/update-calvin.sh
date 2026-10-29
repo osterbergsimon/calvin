@@ -243,7 +243,7 @@ refresh_host_files() {
   mkdir -p "$ROLLBACK_DIR"
   cp -p "$COMPOSE_FILE" "$ROLLBACK_DIR/docker-compose.yml"
   [[ -f "$ENV_FILE" ]] && cp -p "$ENV_FILE" "$ROLLBACK_DIR/.env"
-  bash "$SETUP_SCRIPT" --refresh --mode "$CALVIN_MODE" || fail_update "Refreshing host files failed (setup.sh --refresh)"
+  CALVIN_DIR="$REPO_DIR" bash "$SETUP_SCRIPT" --refresh --mode "$CALVIN_MODE" || fail_update "Refreshing host files failed (setup.sh --refresh)"
 }
 
 record_previous_image() {
