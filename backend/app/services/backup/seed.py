@@ -60,10 +60,15 @@ async def restore_on_start() -> str:
     except Exception:
         logger.exception(f"Restore on start from {path} failed; starting with the current setup")
         return "failed"
-    await config_service.set_value(SEED_MARKER_KEY, digest)
     for warning in result["warnings"]:
         logger.warning(f"Restore on start: {warning}")
     for error in result["errors"]:
         logger.error(f"Restore on start: {error}")
+    if result["errors"]:
+        # Not marked as applied, so the next start tries again (e.g. a plugin
+        # whose dependencies could not be downloaded yet).
+        logger.warning(f"Restore on start: {path} applied with errors; will retry next start")
+        return "failed"
+    await config_service.set_value(SEED_MARKER_KEY, digest)
     logger.info(f"Restore on start: applied {path} ({mode})")
     return "restored"

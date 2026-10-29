@@ -40,11 +40,12 @@ plain text: store it like a password.** Backups that Calvin writes to its own
 backup folder are readable only by the Calvin user (`0600`).
 
 Turn off **Include passwords and API keys** (or pass `--no-secrets` /
-`include_secrets=false`) to blank them. On restore, a source that needs one
-of those values is restored **switched off**, with its other settings intact,
-and listed under "needs credentials"; enter the password in Settings and
-switch it on. In merge mode a blank value never overwrites a password the
-server already has.
+`include_secrets=false`) to blank them. On restore, a blanked value is taken
+from the server's current settings when it has one, so a blank never
+overwrites a password the server already has (sources and plugin-level
+settings alike). A source still missing one is restored **switched off**, with
+its other settings intact, and listed under "needs credentials"; enter the
+password in Settings and switch it on.
 
 A setting counts as secret when its name contains `password`, `api_key`,
 `api_token`, `token`, `secret`, `access_token` or `refresh_token`, or when the
@@ -125,9 +126,9 @@ deletes one.
 5. **Result.** What was done, sources that need credentials, warnings and
    errors. Reload the UI to see everything.
 
-A source whose plugin is neither installed nor in the backup is skipped with a
-warning; its screen region stays and works again once the plugin is
-installed. Restore is not one database transaction: if something goes wrong
+A source whose plugin is neither installed nor in the backup (or whose plugin
+failed to install) is kept **switched off** with its settings, with a warning;
+install the plugin and switch the source on again. Its screen region stays. Restore is not one database transaction: if something goes wrong
 part-way, restore the `pre-restore-*` file to go back.
 
 ### From Settings
@@ -177,8 +178,11 @@ loaded and before defaults are filled in:
 
 Each file is applied **once**: Calvin remembers its checksum, so the variable
 can stay set and the file can live on a read-only mount; restarts do not undo
-your later changes. Put a different file there to seed again. A broken seed
-file is logged and Calvin starts with its current setup.
+your later changes. Put a different file there to seed again. A file that is
+rejected is logged and Calvin starts with its current setup. If the restore
+ran but reported errors (for example a plugin whose dependencies could not be
+downloaded), it is not marked as applied and is tried again on the next
+start.
 
 Docker/Unraid example:
 

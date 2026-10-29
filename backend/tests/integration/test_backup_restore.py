@@ -479,3 +479,77 @@ def test_theme_package_round_trip(test_client, tmp_path):
     assert (theme_installer.themes_dir / "dusk_theme" / "theme.json").exists()
     types = {t["type_id"] for t in _doc(_export(test_client))["data"]["plugin_types"]}
     assert "dusk_theme" in types
+
+
+def test_merge_without_secrets_keeps_existing_secrets(test_client, tmp_path):
+    created = _populate(test_client, tmp_path)
+    from app.services.config_service import config_service
+
+    _run(config_service.set_value(f"plugin_{PLUGIN_ID}_config", json.dumps({"api_key": "type-k"})))
+    no_secrets = _export(test_client, include_secrets="false")
+
+    r = _restore(test_client, no_secrets, mode="merge")
+    assert r.status_code == 200, r.text
+    assert r.json()["needs_credentials"] == []
+    row = _run(PluginDB.objects.get_or_none(id=created[PLUGIN_ID]))
+    assert row.enabled is True
+    assert row.config["api_token"] == "s3cret-token"
+    stored = _run(config_service.get_value(f"plugin_{PLUGIN_ID}_config"))
+    assert json.loads(stored)["api_key"] == "type-k"
+
+
+def test_plugin_type_state_comes_from_backup(test_client, tmp_path):
+    _populate(test_client, tmp_path)
+    from app.models.db_models import PluginTypeDB
+
+    async def _switch_type_off():
+        row = await PluginTypeDB.objects.get(type_id="iframe")
+        row.enabled = False
+        await row.update()
+
+    _run(_switch_type_off())  # type off while its instance stays on
+    original = _export(test_client)
+    types = {t["type_id"]: t["enabled"] for t in _doc(original)["data"]["plugin_types"]}
+    assert types["iframe"] is False
+
+    assert _restore(test_client, original, mode="merge").status_code == 200
+    after = {t["type_id"]: t["enabled"] for t in _doc(_export(test_client))["data"]["plugin_types"]}
+    assert after == types
+
+
+def test_unavailable_plugin_instance_is_kept_disabled(test_client, tmp_path):
+    created = _populate(test_client, tmp_path)
+    doc = _doc(_export(test_client, include_packages="false"))
+    _tear_down_to_fresh(test_client, created)
+
+    r = test_client.post(
+        "/api/backup/restore",
+        files={"file": ("b.json", json.dumps(doc).encode(), "application/json")},
+        data={"mode": "replace"},
+    )
+    assert r.status_code == 200, r.text
+    assert created[PLUGIN_ID] in r.json()["instances"]["skipped"]
+    row = _run(PluginDB.objects.get_or_none(id=created[PLUGIN_ID]))
+    assert row is not None and row.enabled is False
+    assert row.config["api_token"] == "s3cret-token"
+
+
+def test_damaged_zip_is_rejected_without_leaking_temp_dirs(test_client, tmp_path, monkeypatch):
+    import tempfile
+
+    monkeypatch.setattr(tempfile, "tempdir", str(tmp_path / "tmp"))
+    (tmp_path / "tmp").mkdir()
+    _populate(test_client, tmp_path)
+    good = bytearray(_export(test_client))
+    # Corrupt the stored plugin.py bytes so its CRC check fails on extract.
+    marker = good.find(b"packages/plugins/")
+    good[marker + 200 : marker + 260] = b"\0" * 60
+    r = _restore(test_client, bytes(good))
+    assert r.status_code == 400
+    assert list((tmp_path / "tmp").iterdir()) == []
+
+    bad_key = io.BytesIO()
+    with zipfile.ZipFile(bad_key, "w") as zf:
+        zf.writestr("backup.json", json.dumps(_doc(_export(test_client))))
+        zf.writestr("signing-key", b"\xff\xfe")
+    assert _restore(test_client, bad_key.getvalue()).status_code == 400

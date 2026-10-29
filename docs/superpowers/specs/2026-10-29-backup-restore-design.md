@@ -164,14 +164,18 @@ Steps, in order:
    2. Config rows (replace: delete rows not in the backup), keyboard map,
       plugin type rows (enabled + `display_order`), kiosks. All DB writes go
       through `retry_on_db_locked`.
-   3. Instances: in replace mode, existing instances not in the backup are
+   3. Instances (plugin type rows are written after them, because updating a
+      running instance through the instance manager also sets its type's
+      enabled flag): in replace mode, existing instances not in the backup are
       stopped, unregistered and deleted (as the delete endpoint does). Each
       backup instance goes through the instance manager:
       `apply_plugin_config_update(type_id, {**config, "_instance_id": id,
       "_instance_name": name, "_instance_enabled": enabled}, None, db_type)`,
       which creates or updates and starts it. Its `display_order` is then
-      set on the row. If the type is not loadable, the instance is skipped
-      and reported. If the plugin's validation rejects the config (usually a
+      set on the row. If the type is not loadable, the instance is kept as a
+      disabled row and reported. Secrets stripped from the backup are filled
+      from the target's current values; an instance still missing one is
+      restored disabled and listed as needing credentials. If the plugin's validation rejects the config (usually a
       stripped secret), the row is written **disabled** with the same id,
       so the layout keeps pointing at it and the user only fills in the
       missing field.

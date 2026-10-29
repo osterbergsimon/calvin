@@ -85,3 +85,11 @@ def test_strip_secrets_by_name_and_schema():
     assert stripped == {"host": "x", "pin": "", "api_key": "", "nested": {"refresh_token": ""}}
     assert sorted(fields) == ["api_key", "nested.refresh_token", "pin"]
     assert config["pin"] == "1234"  # input untouched
+
+
+@pytest.mark.unit
+def test_strip_secrets_inside_lists():
+    config = {"accounts": [{"user": "a", "password": "p"}], "tags": ["x"]}
+    stripped, fields = strip_secrets(config)
+    assert stripped == {"accounts": [{"user": "a", "password": ""}], "tags": ["x"]}
+    assert fields == ["accounts.0.password"]

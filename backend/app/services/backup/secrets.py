@@ -1,4 +1,4 @@
-"""Find and strip secret values in plugin configs."""
+"""Find, strip and refill secret values in plugin configs."""
 
 from typing import Any
 
@@ -16,10 +16,23 @@ def is_secret_key(key: str, schema: dict[str, Any] | None = None) -> bool:
     return any(s in lowered for s in _SENSITIVE)
 
 
+def _strip_value(value: Any, prefix: str) -> tuple[Any, list[str]]:
+    if isinstance(value, dict):
+        return strip_secrets(value, None, prefix)
+    if isinstance(value, list):
+        items, fields = [], []
+        for i, item in enumerate(value):
+            clean, nested = _strip_value(item, f"{prefix}{i}.")
+            items.append(clean)
+            fields.extend(nested)
+        return items, fields
+    return value, []
+
+
 def strip_secrets(
     config: dict[str, Any], schema: dict[str, Any] | None = None, _prefix: str = ""
 ) -> tuple[dict[str, Any], list[str]]:
-    """Return a copy of ``config`` with secret values blanked, and the dotted field names."""
+    """Return a copy of ``config`` with secret values blanked, and their dotted paths."""
     stripped: dict[str, Any] = {}
     fields: list[str] = []
     for key, value in config.items():
@@ -27,9 +40,47 @@ def strip_secrets(
             stripped[key] = ""
             if value not in (None, ""):
                 fields.append(f"{_prefix}{key}")
-        elif isinstance(value, dict):
-            stripped[key], nested = strip_secrets(value, None, f"{_prefix}{key}.")
-            fields.extend(nested)
         else:
-            stripped[key] = value
+            stripped[key], nested = _strip_value(value, f"{_prefix}{key}.")
+            fields.extend(nested)
     return stripped, fields
+
+
+def _step(container: Any, part: str) -> Any:
+    if isinstance(container, dict):
+        return container.get(part)
+    if isinstance(container, list) and part.isdigit() and int(part) < len(container):
+        return container[int(part)]
+    return None
+
+
+def refill_secrets(
+    config: dict[str, Any], current: dict[str, Any] | None, paths: set[str]
+) -> tuple[dict[str, Any], set[str]]:
+    """Put the values at ``paths`` back from ``current`` where it has them.
+
+    Returns the refilled config (a copy) and the paths still without a value.
+    """
+    import copy
+
+    config = copy.deepcopy(config)
+    missing: set[str] = set()
+    for path in paths:
+        parts = path.split(".")
+        value: Any = current or {}
+        for part in parts:
+            value = _step(value, part)
+        target: Any = config
+        for part in parts[:-1]:
+            target = _step(target, part)
+        if value in (None, "") or target is None:
+            missing.add(path)
+            continue
+        last = parts[-1]
+        if isinstance(target, dict):
+            target[last] = value
+        elif isinstance(target, list) and last.isdigit() and int(last) < len(target):
+            target[int(last)] = value
+        else:
+            missing.add(path)
+    return config, missing

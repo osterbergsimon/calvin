@@ -25,6 +25,7 @@ from .exporter import (
     THEME_PACKAGES,
 )
 from .format import BackupDocument, BackupError, PluginInstanceRow, load_document
+from .secrets import refill_secrets
 
 MODES = ("replace", "merge")
 MAX_UNCOMPRESSED_BYTES = 512 * 1024 * 1024
@@ -96,18 +97,24 @@ def read_backup(data: bytes) -> LoadedBackup:
                 raise BackupError("Backup file is damaged: backup.json is not valid JSON.") from exc
             loaded = LoadedBackup(document=load_document(raw))
             if SIGNING_KEY_NAME in names:
-                key = zf.read(SIGNING_KEY_NAME).decode().strip()
                 try:
+                    key = zf.read(SIGNING_KEY_NAME).decode().strip()
                     if len(bytes.fromhex(key)) != 32:
                         raise ValueError
-                except ValueError as exc:
+                except ValueError as exc:  # includes UnicodeDecodeError
                     raise BackupError("Backup file is damaged: invalid kiosk signing key.") from exc
                 loaded.signing_key = key
             packages = [m for m in members if m.filename.startswith("packages/")]
             if packages:
                 loaded.workdir = Path(tempfile.mkdtemp(prefix="calvin-restore-"))
-                for member in packages:
-                    zf.extract(member, loaded.workdir)
+                try:
+                    for member in packages:
+                        zf.extract(member, loaded.workdir)
+                except (zipfile.BadZipFile, OSError) as exc:
+                    loaded.cleanup()
+                    raise BackupError(
+                        f"Backup file is damaged: {member.filename} cannot be extracted."
+                    ) from exc
     except zipfile.BadZipFile as exc:
         raise BackupError("Backup file is damaged: not a readable zip.") from exc
 
@@ -173,7 +180,7 @@ async def plan_restore(loaded: LoadedBackup, mode: str = "replace") -> dict[str,
         else:
             create.append(inst.id)
     for skipped in skip:
-        warnings.append(f"Instance {skipped['id']} will be skipped: {skipped['reason']}.")
+        warnings.append(f"Instance {skipped['id']} will be kept switched off: {skipped['reason']}.")
     remove = sorted(set(existing) - backup_ids) if mode == "replace" else []
 
     current_config = {
@@ -286,13 +293,27 @@ async def _install_packages(loaded: LoadedBackup, plan: dict[str, Any], out: _Ou
 @retry_on_db_locked(max_retries=5)
 async def _restore_config(doc: BackupDocument, mode: str) -> None:
     rows = {c.key: c for c in doc.data.config if not c.key.startswith(LOCAL_CONFIG_PREFIX)}
+    stripped: dict[str, set[str]] = {}
+    for secret in doc.stripped_secrets:
+        if secret.scope == "type_config":
+            stripped.setdefault(f"plugin_{secret.id}_config", set()).add(secret.field)
     for existing in await ConfigDB.objects.all():
         wanted = rows.pop(existing.key, None)
         if wanted is None:
             if mode == "replace" and not existing.key.startswith(LOCAL_CONFIG_PREFIX):
                 await existing.delete()
             continue
-        existing.value = wanted.value
+        value = wanted.value
+        if existing.key in stripped and value and existing.value:
+            # A secret left out of the backup never blanks the one already here.
+            try:
+                refilled, _ = refill_secrets(
+                    json.loads(value), json.loads(existing.value), stripped[existing.key]
+                )
+                value = json.dumps(refilled)
+            except (TypeError, ValueError, AttributeError):
+                pass
+        existing.value = value
         existing.value_type = wanted.value_type
         await existing.update()
     for row in rows.values():
@@ -419,25 +440,28 @@ async def _restore_instances(
             stripped.setdefault(secret.id, set()).add(secret.field)
 
     for inst in doc.data.plugin_instances:
-        if plugin_loader.get_plugin_class(inst.type_id) is None:
-            out.skipped.append(inst.id)
-            out.warnings.append(
-                f"Instance {inst.id} skipped: plugin {inst.type_id} is not available."
-            )
-            continue
-
         existing = await PluginDB.objects.get_or_none(id=inst.id)
-        config = dict(inst.config)
         if existing and existing.type_id != inst.type_id:
             await _stop_and_unregister(inst.id)
             await _delete_instance_row(inst.id)
             existing = None
-        if existing and inst.id in stripped:
-            # A secret left out of the backup never blanks the one already here.
-            current = existing.config or {}
-            for name in stripped[inst.id]:
-                if "." not in name and current.get(name):
-                    config[name] = current[name]
+
+        # A secret left out of the backup never blanks the one already here;
+        # one we cannot fill keeps the instance off until it is entered.
+        config, missing = refill_secrets(
+            inst.config, existing.config if existing else None, stripped.get(inst.id, set())
+        )
+        if missing:
+            out.needs_credentials.append(inst.id)
+
+        if plugin_loader.get_plugin_class(inst.type_id) is None:
+            # Keep it, off, so installing the plugin later brings it back.
+            await _write_disabled_row(inst, config)
+            out.skipped.append(inst.id)
+            out.warnings.append(
+                f"Instance {inst.id} was kept switched off: plugin {inst.type_id} is not available."
+            )
+            continue
 
         db_type = await PluginTypeDB.objects.get_or_none(type_id=inst.type_id)
         try:
@@ -447,7 +471,7 @@ async def _restore_instances(
                     **config,
                     "_instance_id": inst.id,
                     "_instance_name": inst.name,
-                    "_instance_enabled": inst.enabled,
+                    "_instance_enabled": inst.enabled and not missing,
                 },
                 None,
                 db_type,
@@ -467,15 +491,12 @@ async def _restore_instances(
             (out.updated if existing else out.created).append(restored_id)
             continue
 
-        # Config rejected by the plugin (typically a secret left out of the
-        # backup) or the instance failed to start: keep it, disabled, under
-        # the same id so the layout still points at it.
+        # Config rejected by the plugin or the instance failed to start: keep
+        # it, disabled, under the same id so the layout still points at it.
         await _stop_and_unregister(inst.id)
         await _write_disabled_row(inst, config)
         (out.updated if existing else out.created).append(inst.id)
-        if inst.id in stripped:
-            out.needs_credentials.append(inst.id)
-        else:
+        if not missing:
             reason = (result or {}).get("error") or "its settings did not pass validation"
             out.warnings.append(f"Instance {inst.id} was restored disabled: {reason}.")
 
@@ -515,8 +536,10 @@ async def apply_restore(
         await _install_packages(loaded, plan, out)
         await _restore_config(doc, mode)
         await _restore_keyboard(doc, mode)
-        await _restore_plugin_types(doc, out)
         await _restore_instances(doc, plan, mode, out)
+        # After instances: updating a running instance through the instance
+        # manager also writes its type's enabled flag.
+        await _restore_plugin_types(doc, out)
         await _restore_kiosks(doc)
 
         if loaded.signing_key and restore_signing_key:
