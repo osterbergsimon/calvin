@@ -75,7 +75,9 @@
               @click="addService"
             >
               <span class="picker-option-label">＋ Add a web service…</span>
-              <span class="picker-option-type">Web pages and dashboards, from Plugins › Service</span>
+              <span class="picker-option-type"
+                >Web pages and dashboards, from Plugins › Service</span
+              >
             </button>
           </div>
         </div>

@@ -21,6 +21,7 @@ const pluginsRef = vi.hoisted(() => ({ value: [], __v_isRef: true }));
 const activeExpanded = vi.hoisted(() => ({ value: {}, __v_isRef: true }));
 const requiresRestart = vi.hoisted(() => ({ value: false, __v_isRef: true }));
 const mockInstallFromGitHub = vi.hoisted(() => vi.fn());
+const mockEnumerate = vi.hoisted(() => vi.fn());
 const mockTogglePlugin = vi.hoisted(() => vi.fn(() => Promise.resolve()));
 const routeRef = vi.hoisted(() => ({ query: {} }));
 
@@ -49,7 +50,7 @@ vi.mock("@/composables", () => ({
     pluginFetchStatus: { value: null, __v_isRef: true },
     loadPlugins: mockLoadPlugins,
     installPluginFromZip: vi.fn(),
-    enumeratePluginsFromGitHub: vi.fn(),
+    enumeratePluginsFromGitHub: mockEnumerate,
     installPluginFromGitHub: mockInstallFromGitHub,
     installPluginsFromGitHub: vi.fn(),
     enumeratePluginsFromLocal: vi.fn(),
@@ -158,5 +159,14 @@ describe("PluginsCategory after install (F5)", () => {
     const wrapper = mount(PluginsCategory, { global: { stubs } });
     await flushPromises();
     expect(wrapper.findComponent({ name: "PluginManager" }).props("activeTab")).toBe("service");
+  });
+
+  it("lists the configured repository's catalog on open (F8)", async () => {
+    mount(PluginsCategory, { global: { stubs } });
+    await flushPromises();
+    expect(mockEnumerate).toHaveBeenCalledWith(
+      "https://github.com/osterbergsimon/calvin-plugins",
+      "main"
+    );
   });
 });

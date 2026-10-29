@@ -22,7 +22,7 @@
       <p v-if="activeTab === 'theme' && showThemeInfo" class="pm-note">
         Themes install just like plugins — list a repository above, then install any theme that
         appears. Built-in themes (Light, Dark, Ocean, Forest, Sunset) are always available under
-        Display → Theme.
+        Display › Appearance › Theme.
       </p>
 
       <PluginCard

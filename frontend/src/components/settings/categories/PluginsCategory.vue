@@ -632,6 +632,12 @@ onMounted(async () => {
   if (!githubRepoUrl.value && configStore.pluginRepositoryUrl) {
     githubRepoUrl.value = configStore.pluginRepositoryUrl;
   }
+
+  // Show the catalog straight away instead of behind "List plugins" (F8). The
+  // list is module state in usePlugins, so this runs once per page load.
+  if (githubRepoUrl.value && availablePlugins.value.length === 0 && !enumeratingPlugins.value) {
+    void enumeratePluginsFromGitHub(githubRepoUrl.value, githubBranch.value || "main");
+  }
 });
 </script>
 
