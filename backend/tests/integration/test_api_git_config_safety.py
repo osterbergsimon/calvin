@@ -169,6 +169,7 @@ def test_update_refuses_stored_unsafe_git_branch(test_client, tmp_path, monkeypa
     original_settings = system_routes.settings
 
     class _StubSettings:
+        deployment = "native"  # bare-metal install: the UI update route is allowed
         repo_dir = tmp_path
         system_path = original_settings.system_path
 
