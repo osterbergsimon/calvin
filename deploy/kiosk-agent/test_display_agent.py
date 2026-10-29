@@ -631,6 +631,34 @@ def test_config_url_appends_agent_report():
     assert "kagent=v9" in url and "kstat=ok" in url and "khost=pi" in url
 
 
+def test_config_url_appends_update_message():
+    url = agent._config_url(
+        "http://s:8000", "k1", "pi", kstat="error", kmsg="device python < 3.9"
+    )
+    assert "kstat=error" in url
+    assert "kmsg=device%20python%20%3C%203.9" in url
+
+
+def test_update_report_reads_updater_state(tmp_path):
+    (tmp_path / "agent-update-state.json").write_text(
+        '{"status": "error", "phase": "python-too-old", '
+        '"message": "device python < 3.9; keeping current agent"}'
+    )
+    assert agent.update_report(str(tmp_path)) == (
+        "error",
+        "device python < 3.9; keeping current agent",
+    )
+
+
+def test_update_report_missing_state_is_ok(tmp_path):
+    assert agent.update_report(str(tmp_path)) == ("ok", None)
+
+
+def test_update_report_ignores_unknown_status(tmp_path):
+    (tmp_path / "agent-update-state.json").write_text('{"status": "weird", "message": "x"}')
+    assert agent.update_report(str(tmp_path)) == ("ok", None)
+
+
 def test_check_python_below_floor_exits(monkeypatch):
     monkeypatch.setattr(agent.sys, "version_info", (3, 8, 0))
     import pytest
