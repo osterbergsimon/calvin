@@ -449,3 +449,33 @@ def test_hand_written_minimal_seed_restores(test_client):
     assert r.status_code == 200, r.text
     assert r.json()["instances"]["created"] == ["ical-family"]
     assert plugin_manager.get_plugin("ical-family") is not None
+
+
+def test_theme_package_round_trip(test_client, tmp_path):
+    from app.api.routes.plugins.themes import _register_theme_in_db
+
+    src = tmp_path / "dusk_theme"
+    src.mkdir()
+    manifest = {
+        "id": "dusk_theme",
+        "name": "Dusk",
+        "version": "1.0.0",
+        "variables": {"bg-primary": "#101010", "text-primary": "#eeeeee"},
+    }
+    (src / "theme.json").write_text(json.dumps(manifest))
+    installed = theme_installer.install_theme(src)
+    _run(_register_theme_in_db(installed))
+
+    original = _export(test_client)
+    doc = _doc(original)
+    assert [t["id"] for t in doc["packages"]["themes"]] == ["dusk_theme"]
+
+    assert test_client.delete("/api/plugins/installed/dusk_theme").status_code == 200
+    assert not (theme_installer.themes_dir / "dusk_theme").exists()
+
+    r = _restore(test_client, original, mode="replace")
+    assert r.status_code == 200, r.text
+    assert "dusk_theme" in r.json()["installed"]
+    assert (theme_installer.themes_dir / "dusk_theme" / "theme.json").exists()
+    types = {t["type_id"] for t in _doc(_export(test_client))["data"]["plugin_types"]}
+    assert "dusk_theme" in types
