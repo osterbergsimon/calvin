@@ -369,6 +369,39 @@ class TestPluginRegistry:
 
     @pytest.mark.asyncio
     @patch("app.plugins.registry.loader.plugin_loader")
+    async def test_load_plugin_types_builtin_enabled_on_first_boot(
+        self,
+        mock_plugin_loader,
+        plugin_registry_instance,
+        test_db,
+    ):
+        """Built-in types (shipped in app.plugins) start enabled on a fresh DB (calvin-0y6)."""
+        from app.plugins.service.iframe import IframeServicePlugin as IframePlugin
+
+        mock_plugin_loader.get_plugin_types.return_value = [
+            IframePlugin.metadata.model_copy(
+                update={"plugin_class": IframePlugin, "plugin_type": PluginType.SERVICE}
+            )
+        ]
+
+        from app.models.db_models import PluginTypeDB
+        from app.plugins.registry.loader import load_plugin_types
+
+        await PluginTypeDB.objects.filter(type_id="iframe").delete()
+        await load_plugin_types()
+
+        db_type = await PluginTypeDB.objects.get(type_id="iframe")
+        assert db_type.enabled is True
+
+        # A user's later choice to disable it survives the next boot.
+        db_type.enabled = False
+        await db_type.update()
+        await load_plugin_types()
+        db_type = await PluginTypeDB.objects.get(type_id="iframe")
+        assert db_type.enabled is False
+
+    @pytest.mark.asyncio
+    @patch("app.plugins.registry.loader.plugin_loader")
     async def test_load_plugin_types_update_existing(
         self,
         mock_plugin_loader,

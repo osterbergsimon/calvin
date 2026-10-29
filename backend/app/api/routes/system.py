@@ -5,13 +5,14 @@ import json
 import os
 import re
 import shutil
+import socket
 import subprocess
 import threading
 import time
 from pathlib import Path
 from typing import Any
 
-from fastapi import APIRouter, HTTPException
+from fastapi import APIRouter, HTTPException, Request
 from fastapi.responses import StreamingResponse
 from loguru import logger
 
@@ -196,6 +197,50 @@ def _state_to_update_status(state: dict[str, Any], state_file: Path) -> dict[str
             data[key] = state.get(key)
 
     return data
+
+
+def _primary_ip() -> str | None:
+    """The address of the interface that carries the default route (no packet sent)."""
+    sock = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
+    try:
+        sock.connect(("10.255.255.255", 1))
+        return sock.getsockname()[0]
+    except OSError:
+        return None
+    finally:
+        sock.close()
+
+
+def _detect_lan_ips() -> list[str]:
+    """Non-loopback IPv4 addresses of this host, primary interface first."""
+    ips: list[str] = []
+    primary = _primary_ip()
+    if primary:
+        ips.append(primary)
+    try:
+        _, _, host_ips = socket.gethostbyname_ex(socket.gethostname())
+    except OSError:
+        host_ips = []
+    for ip in host_ips:
+        if ip not in ips:
+            ips.append(ip)
+    return [ip for ip in ips if not ip.startswith("127.")]
+
+
+@router.get("/network")
+async def get_network_info(request: Request):
+    """How a phone or a new kiosk can reach this server (first-run setup hand-off).
+
+    ``public_url`` (the PUBLIC_URL setting) is authoritative when set; otherwise
+    ``lan_urls`` lists the detected LAN addresses on the port this request used.
+    """
+    port = request.url.port or settings.api_port
+    return {
+        "public_url": settings.public_url.rstrip("/") or None,
+        "lan_urls": [f"http://{ip}:{port}" for ip in _detect_lan_ips()],
+        "hostname": socket.gethostname(),
+        "port": port,
+    }
 
 
 @router.post("/update")
