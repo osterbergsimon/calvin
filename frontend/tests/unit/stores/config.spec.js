@@ -97,6 +97,31 @@ describe("Config Store", () => {
     expect(store.consoleLogLevel).toBe("debug");
   });
 
+  it("hydrates the on-screen keyboard layout keys and drops invalid values", async () => {
+    api.get.mockResolvedValue({
+      data: {
+        oskLayout: "sv",
+        oskExtraLayouts: ["en", "xx", "fi"],
+      },
+    });
+
+    const store = useConfigStore();
+    await store.fetchConfig();
+
+    expect(store.oskLayout).toBe("sv");
+    expect(store.oskExtraLayouts).toEqual(["en", "fi"]);
+  });
+
+  it("leaves the keyboard layout unset when the config has no answer", async () => {
+    api.get.mockResolvedValue({ data: { oskLayout: "xx" } });
+
+    const store = useConfigStore();
+    await store.fetchConfig();
+
+    expect(store.oskLayout).toBeNull();
+    expect(store.oskExtraLayouts).toEqual([]);
+  });
+
   it("should normalize dashboard layout and screens through the config registry", async () => {
     api.get.mockResolvedValue({
       data: {
