@@ -2,14 +2,60 @@
 // with ?kiosk=<id> (and, once re-provisioned, &khost=<pi-hostname>); the
 // frontend reads them here and threads them onto API calls so the server can
 // register the kiosk (and, later, serve per-kiosk config).
+//
+// The query string only survives until the first in-app navigation (Settings →
+// Done pushes "/" without it), so the values are captured into sessionStorage
+// the first time they are seen and read back from there afterwards. A new
+// ?kiosk= in the URL always wins over the stored value.
 
-export function getKioskId() {
+const KIOSK_ID_KEY = "calvin_kiosk_id";
+const KIOSK_HOST_KEY = "calvin_kiosk_host";
+
+function readParam(name) {
   try {
-    const id = new URLSearchParams(window.location.search).get("kiosk");
-    return id && id.trim() ? id.trim() : null;
+    const value = new URLSearchParams(window.location.search).get(name);
+    return value && value.trim() ? value.trim() : null;
   } catch {
     return null;
   }
+}
+
+function readStored(key) {
+  try {
+    return sessionStorage.getItem(key);
+  } catch {
+    return null;
+  }
+}
+
+function store(key, value) {
+  try {
+    sessionStorage.setItem(key, value);
+  } catch {
+    // Storage blocked (private mode etc.) — the URL param still works for this load.
+  }
+}
+
+// Read a URL param, persisting it for later navigations; fall back to the stored copy.
+function captured(param, key) {
+  const fromUrl = readParam(param);
+  if (fromUrl) {
+    store(key, fromUrl);
+    return fromUrl;
+  }
+  return readStored(key);
+}
+
+// Call once at boot (main.js) so the identity is stored before any route change.
+export function captureKioskIdentity() {
+  captured("kiosk", KIOSK_ID_KEY);
+  captured("khost", KIOSK_HOST_KEY);
+}
+
+export function getKioskId() {
+  // khost travels with the id, so capture it whenever the id is read too.
+  captured("khost", KIOSK_HOST_KEY);
+  return captured("kiosk", KIOSK_ID_KEY);
 }
 
 // The kiosk's OWN hostname. In Mode B (remote backend) window.location.hostname
@@ -17,13 +63,7 @@ export function getKioskId() {
 // passes its real hostname via ?khost=. Fall back to window.location.hostname
 // only for kiosks that predate the khost param (backward compat).
 export function getKioskHost() {
-  try {
-    const host = new URLSearchParams(window.location.search).get("khost");
-    if (host && host.trim()) return host.trim();
-  } catch {
-    // ignore and fall through to the location-based default
-  }
-  return window.location.hostname || "";
+  return captured("khost", KIOSK_HOST_KEY) || window.location.hostname || "";
 }
 
 export function configUrl() {

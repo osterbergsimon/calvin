@@ -11,6 +11,10 @@ import { initLogger, logError, logInfo } from "./utils/logger";
 import { useConfigStore } from "./stores/config";
 import { useTypeTheme } from "./composables/useTypeTheme";
 import { useUiScale } from "./composables/useUiScale";
+import { captureKioskIdentity } from "./utils/kioskId";
+
+// Store ?kiosk=/&khost= before the router can drop them on the first navigation (F1).
+captureKioskIdentity();
 
 // Apply the persisted typeface before mount so the dashboard boots with the
 // saved font instead of the default (previously only applied on opening Settings).

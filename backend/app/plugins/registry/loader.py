@@ -6,6 +6,16 @@ from app.models.db_models import PluginDB, PluginTypeDB
 from app.plugins.loader import plugin_loader
 from app.plugins.manager import plugin_manager as instance_manager
 
+# Built-in plugin classes live under this package; installed plugins load as
+# ``installed_plugin_<id>`` modules instead.
+_BUILTIN_MODULE_PREFIX = "app.plugins."
+
+
+def _is_builtin(type_info) -> bool:
+    """True when the type ships with Calvin itself (not installed from a repo)."""
+    module = getattr(type_info.plugin_class, "__module__", "") or ""
+    return module.startswith(_BUILTIN_MODULE_PREFIX)
+
 
 async def load_plugin_types() -> None:
     """Load plugin types from database or register defaults."""
@@ -47,7 +57,11 @@ async def load_plugin_types() -> None:
                         description=type_info.description,
                         version=type_info.version,
                         common_config_schema=type_info.common_config_schema,
-                        enabled=False,  # Default to disabled - user must explicitly enable
+                        # First boot (calvin-0y6): built-in types start enabled so the
+                        # default Local Images source and Iframe services work out of
+                        # the box; installed plugins stay off until the user opts in.
+                        # Only the initial row is seeded — a later user toggle sticks.
+                        enabled=_is_builtin(type_info),
                         error_message=None,  # Clear any previous errors
                     )
                 else:

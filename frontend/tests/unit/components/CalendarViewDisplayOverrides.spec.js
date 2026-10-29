@@ -1,7 +1,10 @@
 import { describe, it, expect, beforeEach, vi } from "vitest";
 import { mount } from "@vue/test-utils";
 import { setActivePinia, createPinia } from "pinia";
-vi.mock("vue-router", () => ({ useRoute: () => ({ path: "/" }) }));
+vi.mock("vue-router", () => ({
+  useRoute: () => ({ path: "/" }),
+  useRouter: () => ({ push: vi.fn() }),
+}));
 import CalendarView from "@/components/CalendarView.vue";
 import { useConfigStore } from "@/stores/config";
 import { useCalendarStore } from "@/stores/calendar";

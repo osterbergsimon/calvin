@@ -26,6 +26,9 @@ services:
       IMAGE_DIR: ${IMAGE_DIR:-/var/lib/calvin/images}
       PLUGIN_DIR: ${PLUGIN_DIR:-/var/lib/calvin/plugins}
       CORS_ORIGINS: ${CORS_ORIGINS:-http://localhost:8000}
+      # Address phones and new kiosks use to reach this server (QR codes, the
+      # "Add kiosk" command). The container only sees its own IP — set it.
+      PUBLIC_URL: ${PUBLIC_URL:-}
       # Owner of the files under CALVIN_DATA_DIR. 0/0 runs as root;
       # Unraid's appdata convention is 99/100 (nobody:users).
       PUID: ${PUID:-0}

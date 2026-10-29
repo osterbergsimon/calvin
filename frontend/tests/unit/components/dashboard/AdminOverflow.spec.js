@@ -35,14 +35,39 @@ describe("AdminOverflow", () => {
     w.unmount();
   });
 
-  it("Hide controls toggles the UI and closes the menu", async () => {
+  it("Hide controls asks first, naming the scope and the reveal corner (F7)", async () => {
     const store = useConfigStore();
-    const spy = vi.spyOn(store, "toggleUI");
+    store.hotCornerPosition = "top-right";
+    const spy = vi.spyOn(store, "toggleUI").mockResolvedValue();
     const w = mount(AdminOverflow, { attachTo: document.body });
     await w.get(".admin-overflow__trigger").trigger("click");
     await w.get('[data-admin="hide-ui"]').trigger("click");
-    expect(spy).toHaveBeenCalled();
+
     expect(w.find(".admin-overflow__menu").exists()).toBe(false);
+    expect(spy).not.toHaveBeenCalled();
+    const text = document.body.textContent;
+    expect(text).toContain("every screen");
+    expect(text).toContain("press and hold the top right corner");
+    w.unmount();
+  });
+
+  it("confirming the dialog hides the controls; cancelling does not", async () => {
+    const store = useConfigStore();
+    const spy = vi.spyOn(store, "toggleUI").mockResolvedValue();
+    const w = mount(AdminOverflow, { attachTo: document.body });
+    const modal = () => w.findComponent({ name: "ConfirmModal" });
+
+    await w.get(".admin-overflow__trigger").trigger("click");
+    await w.get('[data-admin="hide-ui"]').trigger("click");
+    modal().vm.$emit("cancel");
+    await w.vm.$nextTick();
+    expect(spy).not.toHaveBeenCalled();
+    expect(modal().props("show")).toBe(false);
+
+    await w.get(".admin-overflow__trigger").trigger("click");
+    await w.get('[data-admin="hide-ui"]').trigger("click");
+    modal().vm.$emit("confirm");
+    expect(spy).toHaveBeenCalledTimes(1);
     w.unmount();
   });
 

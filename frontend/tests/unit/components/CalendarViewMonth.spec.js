@@ -1,7 +1,10 @@
 import { describe, it, expect, beforeEach, vi } from "vitest";
-import { mount } from "@vue/test-utils";
+import { mount, flushPromises } from "@vue/test-utils";
 import { setActivePinia, createPinia } from "pinia";
-vi.mock("vue-router", () => ({ useRoute: () => ({ path: "/" }) }));
+vi.mock("vue-router", () => ({
+  useRoute: () => ({ path: "/" }),
+  useRouter: () => ({ push: vi.fn() }),
+}));
 import CalendarView from "@/components/CalendarView.vue";
 import { useConfigStore } from "@/stores/config";
 import { useCalendarStore } from "@/stores/calendar";
@@ -92,5 +95,39 @@ describe("CalendarView month view — header + out-of-month dimming", () => {
     expect(w.find(".calendar-header__label").text()).toBe("July 2026");
     // The appended weeks (August) are outside the month, so dimmed.
     expect(w.vm.calendarDays.some(d => d.date.getMonth() === 7 && d.otherMonth)).toBe(true);
+  });
+});
+
+describe("CalendarView first-run empty state (F4)", () => {
+  beforeEach(() => {
+    setActivePinia(createPinia());
+    const cal = useCalendarStore();
+    cal.fetchEvents = vi.fn().mockResolvedValue({ events: [] });
+    cal.events = [];
+    cal.loading = false;
+    useConfigStore().showUI = true;
+  });
+
+  it("says there are no calendars and links to adding one once sources load empty", async () => {
+    const cal = useCalendarStore();
+    cal.sources = [];
+    cal.fetchSources = vi.fn().mockResolvedValue({ sources: [] });
+    const w = mountCalendar({ mode: "month", rolling: false, weeks: 6, days: 7 });
+    await flushPromises();
+
+    const empty = w.findComponent({ name: "EmptyState" });
+    expect(empty.exists()).toBe(true);
+    expect(empty.props("settingId")).toBe("content-calendars");
+    expect(w.text()).toContain("Settings › Content Sources › Calendars");
+  });
+
+  it("shows no empty state when a calendar source exists", async () => {
+    const cal = useCalendarStore();
+    cal.sources = [{ id: "ical-1", name: "Family", enabled: true }];
+    cal.fetchSources = vi.fn().mockResolvedValue({ sources: cal.sources });
+    const w = mountCalendar({ mode: "month", rolling: false, weeks: 6, days: 7 });
+    await flushPromises();
+
+    expect(w.findComponent({ name: "EmptyState" }).exists()).toBe(false);
   });
 });

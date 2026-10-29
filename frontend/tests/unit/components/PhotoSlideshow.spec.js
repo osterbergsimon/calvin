@@ -80,8 +80,21 @@ describe("PhotoSlideshow", () => {
       const wrapper = createWrapper();
 
       expect(wrapper.find(".photo-placeholder").exists()).toBe(true);
-      expect(wrapper.find(".photo-placeholder").text()).toContain("No images available");
-      expect(wrapper.find(".photo-info").text()).toContain("data/images");
+      expect(wrapper.find(".photo-placeholder").text()).toContain("No photos yet");
+      // Points at the real place to add photos, not a server directory (F3)
+      expect(wrapper.find(".photo-placeholder").text()).toContain(
+        "Settings › Content Sources › Image sources"
+      );
+      expect(wrapper.find(".photo-placeholder").text()).not.toContain("data/images");
+    });
+
+    it("the empty state's button deep-links to photo upload", () => {
+      imagesStore.loading = false;
+      imagesStore.currentImage = null;
+      const wrapper = createWrapper();
+      const empty = wrapper.findComponent({ name: "EmptyState" });
+      expect(empty.props("settingId")).toBe("content-images");
+      expect(wrapper.find('[data-test="empty-state-action"]').text()).toBe("Add photos");
     });
 
     it("should display image when available", () => {

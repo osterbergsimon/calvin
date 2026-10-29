@@ -17,7 +17,11 @@ One row per plugin type, mirrored from the loader's registry by
 - `plugin_type` — family (`calendar`, `image`, `service`, `backend`, `theme`)
 - `name`, `description`, `version` — from `PluginMetadata`
 - `common_config_schema` — merged with any user-set values (user values win)
-- `enabled` — new types default to **disabled**; the user enables them
+- `enabled` — whether the type is available (its instances can run and it is offered in
+  pickers). Seeded once, when the row is first created: **built-in** types (shipped under
+  `app/plugins/`) start **enabled** so a fresh install works out of the box; **installed**
+  plugins start disabled and the Plugins screen switches them on right after install. After
+  that the user's toggle sticks across restarts. Each instance also has its own `enabled`.
 - `error_message` — set when the type failed to load, cleared on success
 
 ### 2. Plugin instances (`plugins` table)

@@ -3,7 +3,10 @@ import { mount } from "@vue/test-utils";
 import { setActivePinia, createPinia } from "pinia";
 import { ref } from "vue";
 
-vi.mock("vue-router", () => ({ useRoute: () => ({ path: "/" }) }));
+vi.mock("vue-router", () => ({
+  useRoute: () => ({ path: "/" }),
+  useRouter: () => ({ push: vi.fn() }),
+}));
 vi.mock("@/composables/useKeyboardActions", () => ({
   useKeyboardActions: () => ({ handleAction: vi.fn() }),
 }));

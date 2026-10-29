@@ -78,6 +78,15 @@
             <div class="loading-text">Loading events...</div>
           </div>
         </div>
+        <!-- First run: no calendar sources yet → say so and link to the fix (F4) -->
+        <div v-if="noSources" class="calendar-empty-overlay">
+          <EmptyState
+            message="No calendars yet"
+            help="Add an iCal, Google or Proton calendar link in Settings › Content Sources › Calendars."
+            action-label="Add a calendar"
+            setting-id="content-calendars"
+          />
+        </div>
         <div
           class="calendar-grid"
           :class="{
@@ -253,6 +262,7 @@ import CalendarTimedEvent from "./CalendarTimedEvent.vue";
 import { buildMonthWeeks } from "../composables/useMonthLayout";
 import DashboardPanel from "./DashboardPanel.vue";
 import IconButton from "./ui/IconButton.vue";
+import EmptyState from "./ui/EmptyState.vue";
 import CalendarViewOptions from "./dashboard/CalendarViewOptions.vue";
 import { useTouchCapability } from "@/composables/useTouchCapability";
 
@@ -476,6 +486,7 @@ const handleVisibilityChange = () => {
 // Load calendar sources on mount
 onMounted(async () => {
   await calendarStore.fetchSources();
+  sourcesChecked.value = true;
 
   // Update today's date every minute to refresh the calendar
   // This ensures the "today" highlight updates automatically
@@ -503,6 +514,12 @@ watch(calendarRefreshIntervalMinutes, () => {
 const currentDate = computed(() => calendarStore.currentDate);
 const events = computed(() => calendarStore.getEventsForSource(props.sourceIds));
 const loading = computed(() => calendarStore.loading);
+// Only claim "no calendars" once the sources request has answered, so the
+// overlay never flashes over a grid that is about to fill.
+const sourcesChecked = ref(false);
+const noSources = computed(
+  () => sourcesChecked.value && !loading.value && calendarStore.sources.length === 0
+);
 const selectedEvent = computed(() => calendarStore.selectedEvent);
 
 const calendarView = ref(null);
@@ -1335,6 +1352,9 @@ onActivated(() => {
    Lives inside the content (not the panel chrome) so it stays visible even
    when the dashboard UI chrome is hidden. */
 .calendar-header {
+  /* Stays above the first-run empty overlay so month navigation still works. */
+  position: relative;
+  z-index: 91;
   display: flex;
   align-items: center;
   justify-content: space-between;
@@ -1441,6 +1461,25 @@ onActivated(() => {
 
 .btn-close-fullscreen:hover {
   transform: scale(1.1);
+}
+
+.calendar-empty-overlay {
+  position: absolute;
+  inset: 0;
+  z-index: 90;
+  background: color-mix(in srgb, var(--bg-1) 88%, transparent);
+}
+
+/* Touch screens: header controls get a full 44px target (F8). The chrome scale
+   sizes them to the label (28px at "medium"), which is too small for a finger. */
+@media (any-pointer: coarse) {
+  .calendar-header__controls {
+    --icon-size: max(var(--region-rail-h, 1.75rem), var(--touch-target, 2.75rem));
+  }
+  .calendar-header__view-switch,
+  .calendar-header__today {
+    height: max(var(--region-rail-h, 1.75rem), var(--touch-target, 2.75rem));
+  }
 }
 
 .loading-overlay {

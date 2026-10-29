@@ -12,6 +12,16 @@
         <span class="settings-topbar__dot" :class="dotClass" aria-hidden="true"></span>
         <span class="settings-topbar__pill-label">{{ pillLabel }}</span>
       </div>
+      <button
+        v-if="showPhone"
+        class="settings-topbar__phone"
+        type="button"
+        data-action="phone"
+        aria-label="Continue setup on your phone"
+        @click="$emit('phone')"
+      >
+        📱 Use your phone
+      </button>
       <button class="settings-topbar__done" type="button" data-action="done" @click="$emit('done')">
         Done
       </button>
@@ -26,9 +36,11 @@ const props = defineProps({
   categoryLabel: { type: String, required: true },
   sectionLabel: { type: String, default: "" },
   saveState: { type: String, required: true },
+  // Touch screens: offer the phone hand-off (QR + LAN URL) — F2.
+  showPhone: { type: Boolean, default: false },
 });
 
-defineEmits(["done"]);
+defineEmits(["done", "phone"]);
 
 const locationLabel = computed(() => props.sectionLabel || props.categoryLabel);
 
@@ -153,6 +165,31 @@ const dotClass = computed(() => {
   font-weight: 600;
   cursor: pointer;
   transition: opacity 0.15s;
+}
+
+.settings-topbar__phone {
+  padding: 6px 12px;
+  font-family: inherit;
+  font-size: 0.875rem;
+  font-weight: 600;
+  color: var(--ink);
+  background: var(--bg-0);
+  border: 1px solid var(--line);
+  border-radius: 6px;
+  cursor: pointer;
+}
+
+.settings-topbar__phone:focus-visible {
+  outline: 2px solid var(--focus);
+  outline-offset: 2px;
+}
+
+/* 44px touch targets on touch screens (F8); the 48px bar still fits them. */
+@media (any-pointer: coarse) {
+  .settings-topbar__done,
+  .settings-topbar__phone {
+    min-height: var(--touch-target, 2.75rem);
+  }
 }
 
 .settings-topbar__done:hover {

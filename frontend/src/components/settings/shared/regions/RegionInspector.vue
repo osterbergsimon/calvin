@@ -65,6 +65,20 @@
               </span>
             </button>
             <p v-if="filtered.length === 0" class="picker-empty">No matches</p>
+            <!-- F4: with no services yet the menu only offers Calendar/Photos;
+                 say where web services come from instead of hiding them. -->
+            <button
+              v-if="!hasServices"
+              type="button"
+              class="picker-option picker-option--add"
+              data-test="picker-add-service"
+              @click="addService"
+            >
+              <span class="picker-option-label">＋ Add a web service…</span>
+              <span class="picker-option-type"
+                >Web pages and dashboards, from Plugins › Service</span
+              >
+            </button>
           </div>
         </div>
 
@@ -201,6 +215,7 @@
 
 <script setup>
 import { computed, ref } from "vue";
+import { useRouter } from "vue-router";
 import SegmentedControl from "@/components/ui/SegmentedControl.vue";
 import ToggleSwitch from "@/components/ui/ToggleSwitch.vue";
 import NumberStepper from "@/components/ui/NumberStepper.vue";
@@ -226,8 +241,15 @@ const emit = defineEmits([
   "deselect",
 ]);
 
+const router = useRouter();
 const pickerOpen = ref(false);
 const search = ref("");
+const hasServices = computed(() => props.componentOptions.some(o => o.kind === "service"));
+// Leaves the region editor for the Service plugins tab (Settings re-routes on ?setting=).
+const addService = () => {
+  pickerOpen.value = false;
+  router?.replace({ path: "/settings", query: { setting: "plugins-services" } });
+};
 const filtered = computed(() => filterComponentOptions(props.componentOptions, search.value));
 const choose = opt => {
   emit("set-component", opt);
@@ -398,6 +420,15 @@ const canRemove = computed(() => {
 .picker-option-type {
   font-size: var(--fs-micro);
   color: var(--ink-3);
+}
+.picker-option--add {
+  margin-top: var(--space-2xs);
+  border-top: 1px solid var(--line-soft);
+  border-radius: 0 0 var(--radius-sm) var(--radius-sm);
+}
+.picker-option--add .picker-option-label {
+  color: var(--focus);
+  font-weight: 600;
 }
 .picker-empty {
   padding: 0.5rem;

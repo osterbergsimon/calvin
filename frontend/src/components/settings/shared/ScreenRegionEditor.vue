@@ -139,7 +139,7 @@
                     @dragstart="beginClockDrag"
                     @dragend="endClockDrag"
                   >
-                    <span class="sre-clock-grip" aria-hidden="true">⠿</span> 12:45 · Tue
+                    <span class="sre-clock-grip" aria-hidden="true">⠿</span> {{ previewClock }}
                   </div>
 
                   <div
@@ -171,7 +171,7 @@
                         @dragstart="beginClockDrag"
                         @dragend="endClockDrag"
                       >
-                        <span class="sre-clock-grip" aria-hidden="true">⠿</span> 12:45
+                        <span class="sre-clock-grip" aria-hidden="true">⠿</span> {{ previewTime }}
                       </div>
 
                       <RegionNode
@@ -211,7 +211,7 @@
                     @dragstart="beginClockDrag"
                     @dragend="endClockDrag"
                   >
-                    <span class="sre-clock-grip" aria-hidden="true">⠿</span> 12:45 · Tue
+                    <span class="sre-clock-grip" aria-hidden="true">⠿</span> {{ previewClock }}
                   </div>
                 </div>
               </div>
@@ -272,6 +272,7 @@ import { computed, onMounted, onUnmounted, ref, watch } from "vue";
 import { useWebServicesStore } from "@/stores/webServices";
 import { useCalendarStore } from "@/stores/calendar";
 import { useKiosksStore } from "@/stores/kiosks";
+import { useConfigStore } from "@/stores/config";
 import { usePlugins } from "@/composables";
 import { buildComponentOptions } from "@/utils/componentPicker";
 import DialogScrim from "@/components/ui/DialogScrim.vue";
@@ -668,14 +669,34 @@ const setPreviewKiosk = id => (previewKioskId.value = id);
 /* keep selection valid when screen changes */
 watch(activeScreenId, () => (selectedRegionId.value = null));
 
+// The clock-bar stand-in shows the real time in the dashboard's format, not a
+// frozen sample (F8). Minute resolution is plenty for a preview.
+const configStore = useConfigStore();
+const now = ref(new Date());
+let clockTimer = null;
+const previewTime = computed(() =>
+  now.value.toLocaleTimeString([], {
+    hour: "2-digit",
+    minute: "2-digit",
+    hour12: configStore.timeFormat === "12h",
+  })
+);
+const previewClock = computed(
+  () => `${previewTime.value} · ${now.value.toLocaleDateString([], { weekday: "short" })}`
+);
+
 onMounted(async () => {
+  clockTimer = setInterval(() => (now.value = new Date()), 30000);
   if (webServicesStore.services.length === 0 && !webServicesStore.loading)
     webServicesStore.fetchServices();
   if (calendarStore.sources.length === 0 && !calendarStore.loading) calendarStore.fetchSources();
   if (plugins.value.length === 0 && !loadingPlugins.value) loadPlugins();
   if (kiosksStore.kiosks.length === 0) kiosksStore.loadKiosks();
 });
-onUnmounted(() => window.removeEventListener("pointermove", onResizeMove));
+onUnmounted(() => {
+  window.removeEventListener("pointermove", onResizeMove);
+  clearInterval(clockTimer);
+});
 </script>
 
 <style scoped>

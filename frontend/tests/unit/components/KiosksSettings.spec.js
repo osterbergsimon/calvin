@@ -31,6 +31,25 @@ describe("KiosksSettings — list", () => {
     const w = mountWithKiosks([]);
     await flushPromises();
     expect(w.text()).toContain("No kiosks have connected yet");
+    // F6: the copy must not claim any dashboard load registers a kiosk
+    expect(w.text()).not.toContain("registers itself the first time it loads the dashboard");
+    expect(w.text()).toContain("?kiosk=<name>");
+  });
+
+  it("opens the Add kiosk instructions on a fresh install (F6)", async () => {
+    const w = mountWithKiosks([]);
+    await flushPromises();
+    expect(w.find('[data-test="add-kiosk-panel"]').exists()).toBe(true);
+  });
+
+  it("keeps Add kiosk collapsed behind a button once kiosks exist (F6)", async () => {
+    const w = mountWithKiosks([
+      { id: "kitchen-1", hostname: "pi", lastSeen: new Date().toISOString() },
+    ]);
+    await flushPromises();
+    expect(w.find('[data-test="add-kiosk-panel"]').exists()).toBe(false);
+    await w.find('[data-test="add-kiosk-btn"]').trigger("click");
+    expect(w.find('[data-test="add-kiosk-panel"]').exists()).toBe(true);
   });
 
   it("renders a card per kiosk with id and hostname", async () => {

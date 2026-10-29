@@ -157,6 +157,7 @@
                   : `Installed: v${plugin._installedVersion || "?"}`
               }}
             </span>
+            <p v-if="plugin.description" class="plugin-desc-inline">{{ plugin.description }}</p>
           </div>
           <div class="plugin-actions">
             <button
@@ -294,6 +295,7 @@
             <span v-if="plugin._installed" class="plugin-installed-badge">
               Installed: v{{ plugin._installedVersion || "?" }}
             </span>
+            <p v-if="plugin.description" class="plugin-desc-inline">{{ plugin.description }}</p>
           </div>
           <div class="plugin-actions">
             <button
@@ -441,13 +443,20 @@ const selectedPluginIds = ref(new Set());
 const searchQuery = ref("");
 const activeTypeTab = ref("all");
 
+// The plugin repo ships fixtures for its own test suite ("test" keyword); end
+// users shouldn't be offered them, developers in dev mode still are (F8).
+const isTestPlugin = p => (p.keywords || p.manifest?.keywords || []).includes("test");
+const catalogPlugins = computed(() =>
+  props.devMode ? props.availablePlugins : props.availablePlugins.filter(p => !isTestPlugin(p))
+);
+
 // Filter plugins by search query
 const filteredPlugins = computed(() => {
   if (!searchQuery.value.trim()) {
-    return props.availablePlugins;
+    return catalogPlugins.value;
   }
   const query = searchQuery.value.toLowerCase();
-  return props.availablePlugins.filter(
+  return catalogPlugins.value.filter(
     p =>
       (p.name || "").toLowerCase().includes(query) ||
       (p.id || "").toLowerCase().includes(query) ||
@@ -876,6 +885,12 @@ watch(searchQuery, () => {
   flex: 1;
   min-width: 0;
   flex-wrap: wrap;
+}
+.plugin-desc-inline {
+  flex-basis: 100%;
+  margin: 0;
+  font-size: 0.85rem;
+  color: var(--ink-2);
 }
 .plugin-info-inline strong {
   font-family: var(--font-ui);

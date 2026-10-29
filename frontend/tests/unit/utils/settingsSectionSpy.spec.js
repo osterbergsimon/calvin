@@ -22,6 +22,14 @@ describe("pickActiveEyebrow", () => {
     expect(pickActiveEyebrow([500, 700, 900], { top: 0, height: 800, atBottom: false })).toBe(0);
   });
 
+  it("reads the first section while unscrolled, even if it is short (F8)", () => {
+    // Display opens with a short Layout section: the regions eyebrow (350) is already
+    // above the midpoint, but nothing has been scrolled yet.
+    expect(
+      pickActiveEyebrow([100, 350, 600], { top: 0, height: 800, atBottom: false, atTop: true })
+    ).toBe(0);
+  });
+
   it("pins the last eyebrow when at the bottom (so the final short section is reachable)", () => {
     // even though by midpoint it'd pick index 0, atBottom wins
     expect(pickActiveEyebrow([100, 780, 790], { top: 0, height: 800, atBottom: true })).toBe(2);
@@ -38,6 +46,7 @@ describe("resolveScrollView", () => {
     expect(view.top).toBe(120);
     expect(view.height).toBe(800);
     expect(view.atBottom).toBe(false);
+    expect(view.atTop).toBe(true);
   });
 
   it("reports atBottom only when the pane is genuinely scrolled to the end", () => {
@@ -47,6 +56,7 @@ describe("resolveScrollView", () => {
       doc: { scrollHeight: 900 },
     });
     expect(view.atBottom).toBe(true);
+    expect(view.atTop).toBe(false);
   });
 
   it("does NOT report atBottom for a short category that fits without scrolling (bug calvin-f41)", () => {

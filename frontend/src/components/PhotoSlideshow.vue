@@ -60,8 +60,12 @@
           <p>Loading images...</p>
         </div>
         <div v-else-if="!currentImageUrl" class="photo-placeholder">
-          <p>No images available</p>
-          <p class="photo-info">Add images to <code>data/images</code> directory</p>
+          <EmptyState
+            message="No photos yet"
+            help="Upload photos in Settings › Content Sources › Image sources."
+            action-label="Add photos"
+            setting-id="content-images"
+          />
         </div>
         <div v-else class="photo-container">
           <img
@@ -86,6 +90,7 @@ import { useImagesStore } from "../stores/images";
 import { useConfigStore } from "../stores/config";
 import DashboardPanel from "./DashboardPanel.vue";
 import IconButton from "@/components/ui/IconButton.vue";
+import EmptyState from "@/components/ui/EmptyState.vue";
 import { useKeyboardActions } from "@/composables/useKeyboardActions";
 import { useTouchCapability } from "@/composables/useTouchCapability";
 
@@ -316,24 +321,8 @@ watch(sourceKey, async () => {
 }
 
 .photo-placeholder {
-  text-align: center;
-  color: var(--ink-2);
-}
-
-.photo-placeholder p {
-  margin: 0.5rem 0;
-}
-
-.photo-placeholder code {
-  background: rgba(255, 255, 255, 0.1);
-  padding: 0.25rem 0.5rem;
-  border-radius: 4px;
-  font-family: monospace;
-}
-
-.photo-info {
-  font-size: 0.9rem;
-  font-style: italic;
+  width: 100%;
+  height: 100%;
 }
 
 .photo-container {

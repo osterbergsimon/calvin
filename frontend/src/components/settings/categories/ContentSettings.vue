@@ -154,6 +154,7 @@
     </SettingsSection>
 
     <SettingsSection id="content-images" title="Image sources">
+      <PhotoUpload />
       <ImagesTab />
     </SettingsSection>
 
@@ -173,6 +174,7 @@ import ChipMultiSelect from "@/components/ui/ChipMultiSelect.vue";
 import NumberStepper from "@/components/ui/NumberStepper.vue";
 import CalendarSourcesTab from "@/components/settings/tabs/content/CalendarSourcesTab.vue";
 import ImagesTab from "@/components/settings/tabs/content/ImagesTab.vue";
+import PhotoUpload from "@/components/settings/tabs/content/PhotoUpload.vue";
 import ServicesTab from "@/components/settings/tabs/content/ServicesTab.vue";
 
 defineProps({ config: { type: Object, required: true } });
