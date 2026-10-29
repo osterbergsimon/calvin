@@ -40,7 +40,9 @@ function signInAsAdmin() {
 const stubs = {
   SettingsSearch: true,
   CategoryRail: true,
-  DisplaySettings: true,
+  DashboardSettings: true,
+  DeviceSettings: true,
+  MaintenanceSettings: true,
   ContentSettings: {
     template: '<div><section id="section-content-images" class="images-section" /></div>',
   },
@@ -62,6 +64,79 @@ describe("Settings ?setting= deep link (F3/F4)", () => {
     const section = document.getElementById("section-content-images");
     expect(section).not.toBeNull();
     expect(section.scrollIntoView).toHaveBeenCalled();
+    w.unmount();
+  });
+});
+
+const section = (id, title) =>
+  `<section id="section-${id}"><div class="settings-section__eyebrow">${title}</div></section>`;
+
+describe("Settings ?setting= deep links after the category reorg", () => {
+  beforeEach(() => {
+    setActivePinia(createPinia());
+    signInAsAdmin();
+    Element.prototype.scrollIntoView = vi.fn();
+  });
+
+  const activeCategory = w => w.findComponent({ name: "CategoryRail" }).props("activeId");
+
+  it("opens Screen & keyboard and scrolls to Keyboard for device-reboot", async () => {
+    route.query = { setting: "device-reboot" };
+    const w = mount(Settings, {
+      global: {
+        stubs: {
+          ...stubs,
+          DeviceSettings: {
+            template: `<div>${section("device-keyboard", "Keyboard")}</div>`,
+          },
+        },
+      },
+      attachTo: document.body,
+    });
+    await flushPromises();
+
+    expect(activeCategory(w)).toBe("device");
+    expect(document.getElementById("section-device-keyboard").scrollIntoView).toHaveBeenCalled();
+    w.unmount();
+  });
+
+  it("opens System › Versions & status for device-hardware", async () => {
+    route.query = { setting: "device-hardware" };
+    const w = mount(Settings, {
+      global: {
+        stubs: {
+          ...stubs,
+          MaintenanceSettings: {
+            template: `<div>${section("device-hardware", "Versions & status")}</div>`,
+          },
+        },
+      },
+      attachTo: document.body,
+    });
+    await flushPromises();
+
+    expect(activeCategory(w)).toBe("maintenance");
+    expect(document.getElementById("section-device-hardware").scrollIntoView).toHaveBeenCalled();
+    w.unmount();
+  });
+
+  it("opens Dashboard for clock-bar-items", async () => {
+    route.query = { setting: "clock-bar-items" };
+    const w = mount(Settings, {
+      global: {
+        stubs: {
+          ...stubs,
+          DashboardSettings: {
+            template: `<div>${section("clock-bar-items", "Clock bar items")}</div>`,
+          },
+        },
+      },
+      attachTo: document.body,
+    });
+    await flushPromises();
+
+    expect(activeCategory(w)).toBe("dashboard");
+    expect(document.getElementById("section-clock-bar-items").scrollIntoView).toHaveBeenCalled();
     w.unmount();
   });
 });

@@ -1,40 +1,5 @@
 <template>
-  <div class="display-settings">
-    <!-- LAYOUT -->
-    <SettingsSection id="layout" title="Layout">
-      <SettingRow
-        label="Orientation"
-        description="Physical screen orientation. Per-screen region direction is set under Screens & regions."
-      >
-        <SegmentedControl
-          :model-value="config.orientation"
-          :options="[
-            { value: 'landscape', label: 'Landscape' },
-            { value: 'portrait', label: 'Portrait' },
-          ]"
-          aria-label="Orientation"
-          @update:model-value="v => emit('update:config', { orientation: v })"
-        />
-      </SettingRow>
-      <SettingRow label="Flip 180°" description="Rotate the display a half-turn.">
-        <ToggleSwitch
-          :model-value="config.orientationFlipped"
-          aria-label="Flip 180°"
-          @update:model-value="v => emit('update:config', { orientationFlipped: v })"
-        />
-      </SettingRow>
-      <SettingRow
-        label="Apply display rotation"
-        description="Apply the orientation setting to the OS display output."
-      >
-        <ToggleSwitch
-          :model-value="config.applyDisplayRotation"
-          aria-label="Apply display rotation"
-          @update:model-value="v => emit('update:config', { applyDisplayRotation: v })"
-        />
-      </SettingRow>
-    </SettingsSection>
-
+  <div class="dashboard-settings">
     <!-- DASHBOARD SCREENS / REGIONS -->
     <SettingsSection id="regions" title="Screens & regions">
       <div class="regions-launch">
@@ -55,6 +20,9 @@
         @close="editorOpen = false"
       />
     </SettingsSection>
+
+    <!-- CLOCK BAR (moved from the retired Clock Bar category) -->
+    <ClockBarSections :config="config" @update:config="patch => emit('update:config', patch)" />
 
     <!-- APPEARANCE -->
     <SettingsSection id="appearance" title="Appearance">
@@ -131,8 +99,8 @@
       </SettingRow>
     </SettingsSection>
 
-    <!-- KIOSK & WALL -->
-    <SettingsSection id="kiosk-touch" title="Kiosk & wall">
+    <!-- TOUCH & CONTROLS -->
+    <SettingsSection id="kiosk-touch" title="Touch & controls">
       <!-- Enter the wall state -->
       <SettingRow
         label="Hide controls in kiosk mode"
@@ -297,6 +265,7 @@ import RangeSlider from "@/components/ui/RangeSlider.vue";
 import ThemePicker from "@/components/settings/shell/ThemePicker.vue";
 import TypefacePicker from "@/components/settings/shell/TypefacePicker.vue";
 import ScreenRegionEditor from "@/components/settings/shared/ScreenRegionEditor.vue";
+import ClockBarSections from "@/components/settings/categories/ClockBarSections.vue";
 import { UI_SIZE_OPTIONS } from "@/styles/uiScale";
 import { computed, ref } from "vue";
 import { normalizeDashboardScreens } from "@/utils/layout";
@@ -321,7 +290,7 @@ const screenSummary = computed(() => {
 </script>
 
 <style scoped>
-.display-settings {
+.dashboard-settings {
   width: 100%;
 }
 
