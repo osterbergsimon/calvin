@@ -26,7 +26,6 @@
         :aria-pressed="revealed ? 'true' : 'false'"
         :aria-controls="fieldId"
         :aria-label="revealed ? 'Hide password' : 'Show password'"
-        :disabled="disabled"
         @mousedown.prevent
         @click="$emit('update:revealed', !revealed)"
       >

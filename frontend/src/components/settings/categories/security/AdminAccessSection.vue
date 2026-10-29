@@ -161,7 +161,7 @@ const onResize = () => {
 };
 onMounted(() => window.addEventListener("resize", onResize));
 onUnmounted(() => window.removeEventListener("resize", onResize));
-const isPhone = computed(() => width.value < 720);
+const isPhone = computed(() => width.value < 480);
 
 async function signOut() {
   signingOut.value = true;
@@ -248,12 +248,12 @@ async function submit() {
 </script>
 
 <style scoped>
-@media (max-width: 719px) {
+@media (max-width: 479px) {
   .admin-access--form-open :deep(.setting-row__desc) {
     display: none;
   }
 }
-@media (max-width: 719px) {
+@media (max-width: 479px) {
   .admin-access :deep(.setting-row) {
     flex-direction: column;
     align-items: stretch;

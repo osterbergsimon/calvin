@@ -117,6 +117,7 @@ describe("AuthLockScreen", () => {
 
     expect(wrapper.text()).toContain("Too many wrong passwords. Try again in 0:03.");
     expect(wrapper.get("#auth-signin-password").attributes("disabled")).toBeDefined();
+    expect(wrapper.get(".password-field__toggle").attributes("disabled")).toBeUndefined();
 
     vi.advanceTimersByTime(3000);
     await nextTick();
