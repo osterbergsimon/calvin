@@ -105,9 +105,10 @@ curl -fsSL https://raw.githubusercontent.com/<you>/calvin/<branch>/scripts/setup
   | sudo GIT_REPO=https://github.com/<you>/calvin.git GIT_BRANCH=<branch> bash
 ```
 
-The default branch is `develop` (`main` is release-only). The Docker image tag
-follows the branch: `main` runs `:latest`, any other branch `:develop`. Pin a
-specific image the same way with `CALVIN_IMAGE_TAG=<tag>`.
+The default branch is `develop`. `main` is release-only and cannot be deployed
+(setup uses `develop` instead, also on hosts that still record `main`). Every
+branch runs the `:develop` image; pin another one the same way with
+`CALVIN_IMAGE_TAG=<tag>`.
 
 **What the Setup Scripts Do:**
 - Install kiosk dependencies, plus Docker CE and the Docker Compose plugin from download.docker.com (Raspberry Pi OS Bookworm/Trixie ship no compose v2)

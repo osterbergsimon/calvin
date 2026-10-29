@@ -48,9 +48,10 @@ curl -fsSL https://raw.githubusercontent.com/<you>/calvin/<branch>/scripts/setup
   | sudo GIT_REPO=https://github.com/<you>/calvin.git GIT_BRANCH=<branch> bash
 ```
 
-The default branch is `develop` (`main` is release-only). The Docker image tag
-follows the branch: `main` runs `:latest`, any other branch `:develop`. Pin a
-specific image the same way with `CALVIN_IMAGE_TAG=<tag>`.
+The default branch is `develop`. `main` is release-only and cannot be deployed
+(setup uses `develop` instead, also on hosts that still record `main`). Every
+branch runs the `:develop` image; pin another one the same way with
+`CALVIN_IMAGE_TAG=<tag>`.
 
 **What Happens:**
 1. System packages are updated
@@ -187,10 +188,10 @@ All scripts support environment variables for customization:
 | Variable | Description | Default |
 |----------|-------------|---------|
 | `GIT_REPO` | Git repository URL | `https://github.com/osterbergsimon/calvin.git` |
-| `GIT_BRANCH` | Git branch to use | `develop` (`main` is release-only) |
+| `GIT_BRANCH` | Git branch to use | `develop` (`main` is release-only and replaced by `develop`) |
 | `CALVIN_DIR` | Installation directory | `/home/calvin/calvin` (Linux) |
 | `CALVIN_DATA_DIR` | Data volume on the host | `/var/lib/calvin` |
-| `CALVIN_IMAGE_TAG` | Pin the runtime image (otherwise follows the branch: `main` → `latest`, else `develop`; a pin already in `/etc/calvin/.env` is kept) | — |
+| `CALVIN_IMAGE_TAG` | Pin the runtime image (otherwise `develop`; `:latest` is not published yet; a pin already in `/etc/calvin/.env` is kept) | — |
 | `LOG_FILE` | Log file path | `/var/log/calvin-setup.log` (Linux) |
 
 Pass them after `sudo` (`sudo GIT_BRANCH=x bash setup.sh`). The service user is

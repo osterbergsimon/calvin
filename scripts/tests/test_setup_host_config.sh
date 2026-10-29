@@ -2,8 +2,8 @@
 # setup.sh host configuration:
 #   P6  data dirs get 0750 and lose world access (chmod -R 755 made the DB
 #       world-readable)
-#   P8  the image tag follows the branch (main -> latest, else develop) without
-#       overriding an operator's pin; CALVIN_IMAGE_TAG=latest left by an old
+#   P8  the image tag is :develop (no :latest is published; main is
+#       release-only) without overriding an operator's pin; CALVIN_IMAGE_TAG=latest left by an old
 #       .env is migrated (calvin-u1r)
 #   P4  the display agent is installed on all-in-one Pis too, pointed at
 #       localhost:CALVIN_PORT, and keeps operator settings in its env file
@@ -32,7 +32,7 @@ assert_mode "$CALVIN_DATA_DIR/db/calvin.db" 640
 pass "data dirs 0750, no world access to the DB"
 
 # --- P8: image tag follows the branch -------------------------------------
-assert_eq latest "$(image_tag_for_branch main)"
+assert_eq develop "$(image_tag_for_branch main)"
 assert_eq develop "$(image_tag_for_branch develop)"
 assert_eq develop "$(image_tag_for_branch feature/x)"
 
@@ -44,7 +44,7 @@ tag_after() {  # initial-line branch -> resulting CALVIN_IMAGE_TAG
 }
 assert_eq develop "$(tag_after 'CALVIN_IMAGE_TAG=latest' develop)" "stale :latest not migrated to :develop"
 assert_eq develop "$(tag_after '# no tag' develop)"
-assert_eq latest "$(tag_after 'CALVIN_IMAGE_TAG=develop' main)"
+assert_eq develop "$(tag_after 'CALVIN_IMAGE_TAG=develop' main)" "main switched to the unpublished :latest"
 assert_eq v1.2.3 "$(tag_after 'CALVIN_IMAGE_TAG=v1.2.3' develop)" "an operator pin was overwritten"
 assert_eq sha-abc1234 "$(CALVIN_IMAGE_TAG=sha-abc1234 tag_after 'CALVIN_IMAGE_TAG=v1.2.3' develop)" "explicit CALVIN_IMAGE_TAG ignored"
 assert_contains "$env_file" '^CALVIN_PORT=8000$'

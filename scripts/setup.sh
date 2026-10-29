@@ -18,15 +18,25 @@ done
 _ENV_GIT_BRANCH="${GIT_BRANCH:-}"
 _ENV_GIT_REPO="${GIT_REPO:-}"
 
-if [ -z "${_ENV_GIT_BRANCH}" ] && [ -f /etc/default/calvin-update ]; then
-    _CONFIG_BRANCH=$(grep "^GIT_BRANCH=" /etc/default/calvin-update 2>/dev/null | cut -d'=' -f2- | tr -d '"' | tr -d "'" || echo "")
-    _CONFIG_REPO=$(grep "^GIT_REPO=" /etc/default/calvin-update 2>/dev/null | cut -d'=' -f2- | tr -d '"' | tr -d "'" || echo "")
+_UPDATE_CONF="${CALVIN_DEFAULT_DIR:-/etc/default}/calvin-update"
+if [ -z "${_ENV_GIT_BRANCH}" ] && [ -f "${_UPDATE_CONF}" ]; then
+    _CONFIG_BRANCH=$(grep "^GIT_BRANCH=" "${_UPDATE_CONF}" 2>/dev/null | cut -d'=' -f2- | tr -d '"' | tr -d "'" || echo "")
+    _CONFIG_REPO=$(grep "^GIT_REPO=" "${_UPDATE_CONF}" 2>/dev/null | cut -d'=' -f2- | tr -d '"' | tr -d "'" || echo "")
     if [ -n "${_CONFIG_BRANCH}" ]; then
         _ENV_GIT_BRANCH="${_CONFIG_BRANCH}"
     fi
     if [ -n "${_CONFIG_REPO}" ]; then
         _ENV_GIT_REPO="${_CONFIG_REPO}"
     fi
+fi
+
+# main is release-only: it lacks the compose file and units this script
+# installs, and no :latest image is published. Hosts set up before develop
+# became the default still record it, so it is replaced before anything
+# (setup-common.sh included) is fetched from it.
+if [ "${_ENV_GIT_BRANCH}" = "main" ]; then
+    echo "Note: GIT_BRANCH=main is release-only and cannot be deployed; using develop." >&2
+    _ENV_GIT_BRANCH="develop"
 fi
 
 # setup-common.sh from this script's own directory, never from the current
@@ -257,14 +267,11 @@ create_runtime_data_dirs() {
     chmod -R o-rwx "${CALVIN_DATA_DIR}"
 }
 
-# main is release-only (:latest is published from v* tags); everything else
-# deploys the :develop image.
+# Every deployable branch runs the :develop image (:latest is only published
+# from v* release tags, and there are none yet). Pin another tag with
+# CALVIN_IMAGE_TAG.
 image_tag_for_branch() {
-    if [ "$1" = "main" ]; then
-        echo latest
-    else
-        echo develop
-    fi
+    echo develop
 }
 
 # Keep CALVIN_IMAGE_TAG in step with the branch. latest/develop/empty are the

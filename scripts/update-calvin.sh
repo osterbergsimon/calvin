@@ -23,6 +23,12 @@ fi
 CALVIN_MODE="${CALVIN_MODE:-prod}"
 REPO_DIR="${REPO_DIR:-/home/calvin/calvin}"
 GIT_BRANCH="${GIT_BRANCH:-develop}"
+# main is release-only (no compose file or units, no :latest image) but was the
+# default before develop; hosts set up then still record it.
+if [[ "$GIT_BRANCH" == "main" ]]; then
+  echo "Note: GIT_BRANCH=main is release-only and cannot be deployed; updating from develop." >&2
+  GIT_BRANCH="develop"
+fi
 WAIT_TIMEOUT="${WAIT_TIMEOUT:-180}"
 HEALTH_POLL_SECS="${HEALTH_POLL_SECS:-2}"
 ENV_FILE="${CALVIN_ENV_FILE:-$(dirname "$COMPOSE_FILE")/.env}"

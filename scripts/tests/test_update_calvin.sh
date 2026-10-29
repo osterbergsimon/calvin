@@ -108,3 +108,15 @@ touch "$tmp/unhealthy"
 CALVIN_REFRESH_HOST=0 bash "$SCRIPT" > "$tmp/out5" 2>&1 && fail "unhealthy update reported success"
 assert_eq OPERATOR-EDIT "$(cat "$tmp/etc/docker-compose.yml")" "restored a compose file saved by an earlier run"
 pass "rollback copies are per run"
+
+# --- 5. a host that still records the retired default GIT_BRANCH=main ----------
+# main is release-only (no compose file or units, no :latest image): update
+# from develop instead of failing to fetch or installing main's files.
+reset_host
+sed -i 's/^GIT_BRANCH=develop$/GIT_BRANCH=main/' "$tmp/calvin-update"
+bash "$SCRIPT" > "$tmp/out6" 2>&1 || fail "update with recorded main failed: $(cat "$tmp/out6")"
+assert_contains "$tmp/calls.log" '^setup-from-origin --refresh' "host files not refreshed from develop"
+assert_contains "$tmp/out6" 'release-only' "no note that main was replaced"
+assert_eq develop "$(state branch)"
+sed -i 's/^GIT_BRANCH=main$/GIT_BRANCH=develop/' "$tmp/calvin-update"
+pass "recorded main updates from develop"
