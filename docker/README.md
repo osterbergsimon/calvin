@@ -64,7 +64,7 @@ If you'd rather run the toolchain natively, see `docs/setup/QUICKSTART_DEVELOP.m
 
 - On push to `main`: tagged `latest`
 - On semver tag: tagged `vX.Y.Z`, `vX.Y`
-- Nightly from `develop`: tagged `develop`, `nightly`
+- On push to `develop`: tagged `develop`
 - On PR: build only (amd64), no push, used as a smoke test
 
 Multi-arch (`linux/amd64`, `linux/arm64`, `linux/arm/v7`) on every push
