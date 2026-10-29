@@ -9,7 +9,7 @@
 
 ## 1. Context
 
-Calvin is a self-hosted **wall appliance**, not a webpage. Its interaction model is *modal + region-based*: the user switches modes (calendar / photos / web services / settings), cycles "screens," moves an **active-region** highlight between panels, then acts within the focused region (next/prev, expand/collapse, refresh, fullscreen). See [`useKeyboardActions.js`](../../frontend/src/composables/useKeyboardActions.js) for the full action vocabulary and [`stores/mode.js`](../../frontend/src/stores/mode.js) for modes.
+Calvin is a self-hosted **wall appliance**, not a webpage. Its interaction model is *modal + region-based*: the user switches modes (calendar / photos / web services / settings), cycles "screens," moves an **active-region** highlight between panels, then acts within the focused region (next/prev, expand/collapse, refresh, fullscreen). See [`useKeyboardActions.js`](https://github.com/osterbergsimon/calvin/blob/develop/frontend/src/composables/useKeyboardActions.js) for the full action vocabulary and [`stores/mode.js`](https://github.com/osterbergsimon/calvin/blob/develop/frontend/src/stores/mode.js) for modes.
 
 It runs in two display contexts:
 
@@ -46,7 +46,7 @@ The current UI is generic Material (blue `#2196f3`, emoji icons, system font, cr
 
 ## 4. Identity is structural (because color *and* type are themeable)
 
-Calvin already themes color ([`useTheme.js`](../../frontend/src/composables/useTheme.js) applies a theme's variable map via `root.style.setProperty('--key', value)` and toggles `.dark`/`.light` on `<html>`). We are extending themes to **also own type**. Therefore the identity cannot ride on a signature color or a signature font — it lives in the **bones**:
+Calvin already themes color ([`useTheme.js`](https://github.com/osterbergsimon/calvin/blob/develop/frontend/src/composables/useTheme.js) applies a theme's variable map via `root.style.setProperty('--key', value)` and toggles `.dark`/`.light` on `<html>`). We are extending themes to **also own type**. Therefore the identity cannot ride on a signature color or a signature font — it lives in the **bones**:
 
 - the **focus-light** primitive,
 - the **spatial rhythm** (spacing, radius, panel surfaces),
@@ -57,7 +57,7 @@ Calvin already themes color ([`useTheme.js`](../../frontend/src/composables/useT
 
 Two layers, both applied as CSS custom properties on `<html>` (consistent with `useTheme.js`).
 
-**Color tokens (semantic, themeable).** Extend the existing set in [`theme.css`](../../frontend/src/styles/theme.css). New/clarified semantic tokens used by the redesign:
+**Color tokens (semantic, themeable).** Extend the existing set in [`theme.css`](https://github.com/osterbergsimon/calvin/blob/develop/frontend/src/styles/theme.css). New/clarified semantic tokens used by the redesign:
 
 ```
 --bg-0      page background

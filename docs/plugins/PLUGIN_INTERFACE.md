@@ -9,13 +9,13 @@ hooks — Pluggy and the hook system are gone.
 
 Authoritative code:
 
-- [definitions.py](../../backend/app/plugins/definitions.py) — `PluginMetadata`, kind sets, `CURRENT_PLUGIN_API_VERSION`
-- [base.py](../../backend/app/plugins/base.py) — `BasePlugin`
-- [protocols.py](../../backend/app/plugins/protocols.py) — the four family protocols
-- [loader.py](../../backend/app/plugins/loader.py) — class discovery and the type registry
-- [instance_manager.py](../../backend/app/plugins/utils/instance_manager.py) — host-side config-update flow
+- [definitions.py](https://github.com/osterbergsimon/calvin/blob/develop/backend/app/plugins/definitions.py) — `PluginMetadata`, kind sets, `CURRENT_PLUGIN_API_VERSION`
+- [base.py](https://github.com/osterbergsimon/calvin/blob/develop/backend/app/plugins/base.py) — `BasePlugin`
+- [protocols.py](https://github.com/osterbergsimon/calvin/blob/develop/backend/app/plugins/protocols.py) — the four family protocols
+- [loader.py](https://github.com/osterbergsimon/calvin/blob/develop/backend/app/plugins/loader.py) — class discovery and the type registry
+- [instance_manager.py](https://github.com/osterbergsimon/calvin/blob/develop/backend/app/plugins/utils/instance_manager.py) — host-side config-update flow
 
-Author-facing walkthrough: [`calvin-plugins/CREATING_PLUGINS.md`](../../../calvin-plugins/CREATING_PLUGINS.md).
+Author-facing walkthrough: [`calvin-plugins/CREATING_PLUGINS.md`](https://github.com/osterbergsimon/calvin-plugins/blob/main/CREATING_PLUGINS.md).
 
 ## PluginMetadata
 
@@ -24,7 +24,7 @@ Declared as a class attribute; validated by Pydantic at class-definition time
 
 | Field | Type / default | Meaning |
 |---|---|---|
-| `type_id` | `str`, required | Unique plugin type id. Must equal `plugin.json` `id` for installed plugins. |
+| `type_id` | `str`, required | Unique plugin type id. Keep it equal to `plugin.json` `id`: the `calvin-plugins` validator checks this, though the host itself does not cross-check. |
 | `name` | `str`, required | Human-readable name. |
 | `description` | `str \| None` | One-line description. |
 | `version` | `str = "1.0.0"` | Release label (not a contract signal — that's `api_version` in `plugin.json`). |
@@ -110,7 +110,7 @@ Each `instance_config_schema` entry is a field dict in one canonical shape:
   `normalize_config`, and for numeric fields `to_float(None)` yields `0.0`; a
   spurious default can make an empty config look valid (see calvin-8p0).
 
-**Authoring helpers** ([`app/plugins/sdk/schema.py`](../../backend/app/plugins/sdk/schema.py))
+**Authoring helpers** ([`app/plugins/sdk/schema.py`](https://github.com/osterbergsimon/calvin/blob/develop/backend/app/plugins/sdk/schema.py))
 build this shape so plugins don't hand-roll nested dicts. `text_field()`,
 `password_field()`, `url_field()`, `number_field()`, `select_field()`,
 `toggle_field()` — mix freely with raw dicts:
@@ -218,7 +218,7 @@ does all of this from the class:
   `cls(plugin_id=..., name=..., enabled=...)`; callers then apply config via
   `await instance.configure(config)`.
 - **Config update** — `apply_plugin_config_update` in
-  [instance_manager.py](../../backend/app/plugins/utils/instance_manager.py)
+  [instance_manager.py](https://github.com/osterbergsimon/calvin/blob/develop/backend/app/plugins/utils/instance_manager.py)
   builds an `InstanceManagerConfig` from `metadata`
   (multiplicity, fixed id, default name) plus the class's `normalize_config`,
   `validate_config`, `instance_id_for`, and `prepare_instance_config`, and
@@ -226,7 +226,7 @@ does all of this from the class:
   configure the live instance, start/stop as needed).
 - **Config values are bare scalars.** The API normalizes legacy
   `{value}`/`{default}` wrappers once at the write boundary
-  ([routes/plugins/config.py](../../backend/app/api/routes/plugins/config.py));
+  ([routes/plugins/config.py](https://github.com/osterbergsimon/calvin/blob/develop/backend/app/api/routes/plugins/config.py));
   the DB stores plain values; `self.config` holds plain values.
 
 ### HTTP surface per plugin method

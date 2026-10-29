@@ -45,16 +45,23 @@ and waits for `/api/health`.
 ## Development
 
 ```bash
-cp deploy/calvin.env.example docker/.env       # one-time
-docker compose -f docker/docker-compose.dev.yml up
+make install    # one-time: copies docker/dev.env.example to docker/.env
+make dev        # docker compose -p calvin-dev-<checkout> -f docker/docker-compose.dev.yml up
 ```
 
 - Backend on `http://localhost:8000` (uvicorn `--reload`)
 - Frontend on `http://localhost:5173` (Vite dev server, proxies `/api`
   to the backend)
 
-State lives in `./.calvin-dev-data/` by default — override with
-`CALVIN_DATA_DIR` in your environment.
+State lives in `docker/.calvin-dev-data/` by default. Don't copy the
+production `deploy/calvin.env.example` here: it sets
+`CALVIN_DATA_DIR=/var/lib/calvin`, which would mount a real install's
+data directory into the dev stack.
+
+Each checkout or worktree gets its own compose project (there is no fixed
+`container_name`), so two of them can run at once: give the second one
+other host ports with `CALVIN_PORT` and `CALVIN_FRONTEND_PORT` in its
+`docker/.env`.
 
 If you'd rather run the toolchain natively, see `docs/setup/QUICKSTART_DEVELOP.md`.
 

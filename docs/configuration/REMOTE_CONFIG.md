@@ -2,169 +2,138 @@
 
 ## Problem
 
-By default, when you edit settings on your development machine, the frontend connects to your local backend (`localhost:8000`), which saves settings to your local database. The remote dashboard machine has its own separate backend and database, so changes made on your dev machine don't appear on the remote dashboard.
+By default the frontend calls `/api` on the same origin that served it. When
+you run `npm run dev` on your laptop, that means the **local** backend, so
+settings you edit are written to the laptop's database instead of the remote
+dashboard's.
 
 ## Solution
 
-Configure the frontend on your development machine to connect to the remote dashboard's backend API instead of the local one.
+Point the frontend at the remote backend, either with the Vite dev proxy or
+with an absolute API URL.
 
-## Configuration Steps
+### Option 1: Dev proxy (`VITE_API_PROXY_TARGET`)
 
-### Option 1: Environment Variable (Recommended)
-
-1. **Create a `.env` file** in the `frontend/` directory:
+The Vite dev server proxies `/api/*` to `http://127.0.0.1:8000` by default.
+Point it at the remote dashboard instead:
 
 ```bash
 cd frontend
-cp .env.example .env
+VITE_API_PROXY_TARGET=http://192.168.1.100:8000 npm run dev
 ```
 
-2. **Edit `.env`** and set the remote dashboard's API URL:
+To keep the setting, create `frontend/.env.local` (Vite loads it
+automatically; there is no checked-in `frontend/.env.example`):
 
 ```env
-# Replace with your remote dashboard's IP address or hostname
+# frontend/.env.local
+VITE_API_PROXY_TARGET=http://192.168.1.100:8000
+```
+
+The browser keeps calling same-origin `/api`, so no CORS configuration is
+needed.
+
+### Option 2: Absolute API URL (`VITE_API_URL`)
+
+Set `VITE_API_URL` when the browser should call the remote backend directly.
+It must include the `/api` suffix:
+
+```env
+# frontend/.env.local
 VITE_API_URL=http://192.168.1.100:8000/api
 ```
 
-Replace `192.168.1.100` with your remote dashboard's IP address or hostname.
+This applies to `npm run dev`, `npm run build`, and the packaged frontend.
+Restart the dev server (or rebuild) after changing it.
 
-3. **Restart the frontend development server**:
-
-```bash
-# Stop the current server (Ctrl+C), then restart
-npm run dev
-```
-
-### Option 2: Command Line Environment Variable
-
-Set the environment variable when starting the dev server:
-
-**Windows (PowerShell):**
-```powershell
-$env:VITE_API_URL="http://192.168.1.100:8000/api"; npm run dev
-```
-
-**Windows (CMD):**
-```cmd
-set VITE_API_URL=http://192.168.1.100:8000/api && npm run dev
-```
-
-**Linux/Mac:**
-```bash
-VITE_API_URL=http://192.168.1.100:8000/api npm run dev
-```
-
-### Option 3: Build with Remote API
-
-If you're building the frontend for production:
+### Option 3: Build with a remote API
 
 ```bash
+cd frontend
 VITE_API_URL=http://192.168.1.100:8000/api npm run build
 ```
 
-## Finding Your Remote Dashboard's IP Address
+The production Docker image serves the frontend from the backend, so the
+relative default (`/api`) is the usual choice there.
 
-### On the Remote Dashboard (Raspberry Pi):
+## CORS
+
+Cross-origin browser calls (`VITE_API_URL`) need the backend to allow the
+frontend origin. CORS is **not** hard-coded in `main.py`; it comes from two
+settings read from the environment (`backend/app/config.py`):
+
+- **`CORS_ORIGINS`** — comma-separated list of allowed origins. Default:
+  `http://localhost:5173,http://localhost:8000`.
+- **`CORS_ALLOW_ALL`** — set to `true` to allow every origin (development
+  only; never on a network you don't control).
+
+Example for a dev machine at `192.168.1.50:5173`:
 
 ```bash
-# Get IP address
-hostname -I
+# backend/.env or docker/.env
+CORS_ORIGINS=http://localhost:5173,http://localhost:8000,http://192.168.1.50:5173
+```
 
-# Or
+Restart the backend after changing it. If you point the frontend at the
+backend's own origin (or use the dev proxy), leave CORS alone.
+
+## Finding Your Remote Dashboard's IP Address
+
+On the remote dashboard (Raspberry Pi):
+
+```bash
+hostname -I
+# or
 ip addr show | grep "inet " | grep -v 127.0.0.1
 ```
 
-### From Your Development Machine:
-
-1. **Check your router's admin panel** for connected devices
-2. **Use network scanning tools** like `nmap`:
-   ```bash
-   nmap -sn 192.168.1.0/24
-   ```
-3. **Check the dashboard's display** - some setups show the IP on startup
+From your development machine, check your router's client list or scan the
+LAN (`nmap -sn 192.168.1.0/24`).
 
 ## Verifying the Connection
 
-1. **Start the frontend** with the remote API URL configured
-2. **Open the browser console** (F12)
-3. **Check network requests** - API calls should go to your remote dashboard's IP
-4. **Make a settings change** and verify it appears on the remote dashboard
+1. Start the frontend with the remote target configured.
+2. Open the browser console (F12) → Network.
+3. Confirm `/api/...` requests go to the remote host (via the proxy or the
+   absolute URL).
+4. Change a setting and confirm it appears on the remote dashboard.
 
 ## Troubleshooting
 
-### CORS Errors
+### CORS errors
 
-If you see CORS errors in the browser console, you need to allow your dev machine's IP in the backend CORS settings.
+- Set `CORS_ORIGINS` on the **backend** to include the exact frontend origin
+  (scheme, host, and port), then restart it.
+- For a quick local check only, `CORS_ALLOW_ALL=true`.
+- Prefer the dev proxy (`VITE_API_PROXY_TARGET`) to avoid CORS entirely.
 
-**Edit `backend/app/main.py`** and add your dev machine's IP to the allowed origins:
+### Connection refused
 
-```python
-app.add_middleware(
-    CORSMiddleware,
-    allow_origins=[
-        "http://localhost:5173",
-        "http://localhost:8000",
-        "http://192.168.1.50:5173",  # Add your dev machine's IP
-    ],
-    allow_credentials=True,
-    allow_methods=["*"],
-    allow_headers=["*"],
-)
-```
+- Check the backend: `curl http://192.168.1.100:8000/api/health`.
+- Check firewall rules and that the backend binds an interface reachable from
+  your machine.
+- Verify the IP and port.
 
-Or, for development, you can allow all origins (not recommended for production):
+### Settings still not syncing
 
-```python
-allow_origins=["*"],
-```
-
-### Connection Refused
-
-- **Check the remote backend is running**: `curl http://192.168.1.100:8000/api/health`
-- **Check firewall settings** on the remote machine
-- **Verify the IP address** is correct
-- **Check the port** (default is 8000)
-
-### Settings Still Not Syncing
-
-- **Verify the API URL** is correct in your `.env` file
-- **Restart the frontend dev server** after changing `.env`
-- **Check browser console** for API errors
-- **Verify you're editing settings** on the correct frontend instance
+- Confirm the URL in `frontend/.env.local` and restart `npm run dev`.
+- Check the browser console for API errors.
+- Make sure you are editing the frontend instance pointed at the remote
+  backend.
 
 ## Architecture Overview
 
 ```
 ┌─────────────────┐         ┌──────────────────┐
-│  Dev Machine    │         │ Remote Dashboard  │
-│                 │         │   (Raspberry Pi)  │
-│  Frontend       │────────▶│   Backend API     │
-│  (Browser)      │         │   (Port 8000)     │
-│                 │         │                   │
-│  Local Backend  │         │   SQLite DB       │
-│  (Not Used)     │         │   (calvin.db)     │
+│  Dev Machine    │         │ Remote Dashboard │
+│  Frontend       │────────▶│ Backend API      │
+│  (Browser)      │         │ (Port 8000)      │
+│                 │         │ SQLite DB        │
 └─────────────────┘         └──────────────────┘
 ```
 
-When configured correctly:
-- Frontend on dev machine → connects to → Remote backend API
-- Settings saved → stored in → Remote database
-- Changes appear → on → Remote dashboard display
-
 ## Switching Back to Local Development
 
-To switch back to local development:
-
-1. **Remove or comment out** `VITE_API_URL` in `.env`:
-   ```env
-   # VITE_API_URL=http://192.168.1.100:8000/api
-   ```
-
-2. **Or set it to local**:
-   ```env
-   VITE_API_URL=http://localhost:8000/api
-   ```
-
-3. **Restart the frontend dev server**
-
-
+Remove `VITE_API_URL` / `VITE_API_PROXY_TARGET` from `frontend/.env.local`
+(or delete the file) and restart the dev server. The frontend then uses the
+same-origin `/api` path and the local backend.

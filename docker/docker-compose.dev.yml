@@ -9,14 +9,17 @@
 # repo path into the .env file so the same compose can run from
 # /etc/calvin/.
 #
-# Usage from the repo:
-#   cp deploy/calvin.env.example docker/.env       # one-time
-#   docker compose -f docker/docker-compose.dev.yml up
+# Usage from the repo (the Makefile wraps these):
+#   cp docker/dev.env.example docker/.env          # one-time (make install)
+#   docker compose -p calvin-dev-<checkout> -f docker/docker-compose.dev.yml up
+#
+# Several checkouts/worktrees can run side by side: there is no fixed
+# container_name, `make dev` passes a per-checkout project name, and the
+# host ports come from CALVIN_PORT / CALVIN_FRONTEND_PORT in docker/.env.
 
 services:
   calvin-backend:
     image: python:3.12-slim
-    container_name: calvin-backend-dev
     working_dir: /app/backend
     restart: unless-stopped
     environment:
@@ -26,7 +29,7 @@ services:
       DATABASE_URL: ${DATABASE_URL:-sqlite:////var/lib/calvin/db/calvin.db}
       IMAGE_DIR: ${IMAGE_DIR:-/var/lib/calvin/images}
       PLUGIN_DIR: ${PLUGIN_DIR:-/var/lib/calvin/plugins}
-      CORS_ORIGINS: ${CORS_ORIGINS:-http://localhost:5173,http://localhost:8000}
+      CORS_ORIGINS: ${CORS_ORIGINS:-http://localhost:${CALVIN_FRONTEND_PORT:-5173},http://localhost:${CALVIN_PORT:-8000}}
       CALVIN_MODE: dev
       REPO_DIR: /app
       UPDATE_SCRIPT_PATH: /app/scripts/update-calvin.sh
@@ -46,11 +49,10 @@ services:
 
   calvin-frontend:
     image: node:22-alpine
-    container_name: calvin-frontend-dev
     working_dir: /app/frontend
     restart: unless-stopped
     ports:
-      - "5173:5173"
+      - "${CALVIN_FRONTEND_PORT:-5173}:5173"
     environment:
       VITE_API_PROXY_TARGET: http://calvin-backend:8000
     volumes:

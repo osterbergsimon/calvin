@@ -10,11 +10,11 @@ from the plugin's own directory.
 `type: "api"` display schemas, and per-plugin frontend builds. Installing a
 plugin never triggers a frontend rebuild.
 
-Dispatch: [SchemaRenderer.vue](../../frontend/src/components/plugins/SchemaRenderer.vue)
+Dispatch: [SchemaRenderer.vue](https://github.com/osterbergsimon/calvin/blob/develop/frontend/src/components/plugins/SchemaRenderer.vue)
 looks up `schema.kind` in
-[rendererRegistry.js](../../frontend/src/components/plugins/rendererRegistry.js).
+[rendererRegistry.js](https://github.com/osterbergsimon/calvin/blob/develop/frontend/src/components/plugins/rendererRegistry.js).
 The kind list must match `SUPPORTED_DISPLAY_KINDS` in
-[definitions.py](../../backend/app/plugins/definitions.py) — the backend
+[definitions.py](https://github.com/osterbergsimon/calvin/blob/develop/backend/app/plugins/definitions.py) — the backend
 rejects unknown kinds at plugin load, and
 `backend/tests/unit/test_display_kind_sync.py` fails the build if the two
 lists drift.
@@ -25,20 +25,20 @@ All renderers share the same binding vocabulary:
 
 - **JSON paths** — any `<key>_path` field is a JSONPath-lite expression
   resolved against the payload from `GET /api/plugins/{instance_id}/data`
-  ([jsonPath.js](../../frontend/src/utils/jsonPath.js)). Supported syntax:
+  ([jsonPath.js](https://github.com/osterbergsimon/calvin/blob/develop/frontend/src/utils/jsonPath.js)). Supported syntax:
   `$`, `$.foo`, `$.foo.bar`, `$.items[0].name`. Missing paths yield
   `undefined` (the renderer omits the element).
 - **Literals** — the same key without `_path` (e.g. `label` vs `label_path`)
   is a literal value. The `_path` variant wins when both are set.
 - **Formatters** — `<key>_format` names a built-in formatter applied to the
-  resolved value ([formatters.js](../../frontend/src/utils/formatters.js)):
+  resolved value ([formatters.js](https://github.com/osterbergsimon/calvin/blob/develop/frontend/src/utils/formatters.js)):
   `weekday-short`, `weekday-long`, `date`, `time-12h`, `time-24h`, `percent`,
   `percent-raw`, `bytes`, `round-1`, `capitalize`.
 - **`data_path`** — scopes the payload before per-item binding; an array
   yields one item per element.
 - **`poll_interval_ms`** — number on the schema; the frontend re-fetches the
   data endpoint on that interval
-  ([useSchemaData.js](../../frontend/src/composables/useSchemaData.js)).
+  ([useSchemaData.js](https://github.com/osterbergsimon/calvin/blob/develop/frontend/src/composables/useSchemaData.js)).
 
 ## Shell fields (every kind)
 
@@ -49,18 +49,18 @@ padding, clipping, and scroll boundary. Renderers draw body content only.
 - `title` — literal fallback. Final fallback: the instance name.
 - `panel_variant` — `default` | `dense` | `media` | `iframe`. Controls panel
   chrome. Defaults to `iframe` for `kind: "iframe"`, else `default`
-  (see [ServiceViewer.vue](../../frontend/src/components/service/ServiceViewer.vue)).
+  (see [ServiceViewer.vue](https://github.com/osterbergsimon/calvin/blob/develop/frontend/src/components/service/ServiceViewer.vue)).
 
 ## Renderer kinds and their schema fields
 
 Renderers live in
-[frontend/src/components/plugins/renderers/](../../frontend/src/components/plugins/renderers/).
+[frontend/src/components/plugins/renderers/](https://github.com/osterbergsimon/calvin/tree/develop/frontend/src/components/plugins/renderers).
 Each row below lists the renderer-specific keys (every value key also accepts
 its `_path` / `_format` variants as described above).
 
 ### `status` — readouts (label over value)
 
-One renderer, three layouts ([Status.vue](../../frontend/src/components/plugins/renderers/Status.vue)):
+One renderer, three layouts ([Status.vue](https://github.com/osterbergsimon/calvin/blob/develop/frontend/src/components/plugins/renderers/Status.vue)):
 
 ```python
 display_schema={
@@ -81,7 +81,7 @@ the wall means "needs attention"; don't mark everything.
 
 ### `card-grid` — cards with titled item lists
 
-[CardGrid.vue](../../frontend/src/components/plugins/renderers/CardGrid.vue)
+[CardGrid.vue](https://github.com/osterbergsimon/calvin/blob/develop/frontend/src/components/plugins/renderers/CardGrid.vue)
 
 ```python
 display_schema={
@@ -108,7 +108,7 @@ are not honored. The same field applies in `item-list`.
 
 ### `item-list` — timestamped feed/log
 
-[ItemList.vue](../../frontend/src/components/plugins/renderers/ItemList.vue)
+[ItemList.vue](https://github.com/osterbergsimon/calvin/blob/develop/frontend/src/components/plugins/renderers/ItemList.vue)
 
 ```python
 display_schema={
@@ -123,7 +123,7 @@ display_schema={
 
 ### `iframe` — embedded web page
 
-[IframeRenderer.vue](../../frontend/src/components/plugins/renderers/IframeRenderer.vue)
+[IframeRenderer.vue](https://github.com/osterbergsimon/calvin/blob/develop/frontend/src/components/plugins/renderers/IframeRenderer.vue)
 
 - `url` (literal) or `url_path`. Pair with `panel_variant: "iframe"`.
 - Sites that refuse embedding (X-Frame-Options/CSP) get a built-in error
@@ -131,7 +131,7 @@ display_schema={
 
 ### `image-with-caption` — full-bleed image + caption overlay
 
-[ImageWithCaption.vue](../../frontend/src/components/plugins/renderers/ImageWithCaption.vue)
+[ImageWithCaption.vue](https://github.com/osterbergsimon/calvin/blob/develop/frontend/src/components/plugins/renderers/ImageWithCaption.vue)
 
 - `image_url` / `image_url_path`
 - `title` / `title_path` / `title_format`
@@ -141,7 +141,7 @@ display_schema={
 
 ### `metric-dashboard` — grid of big metric tiles
 
-[MetricDashboard.vue](../../frontend/src/components/plugins/renderers/MetricDashboard.vue)
+[MetricDashboard.vue](https://github.com/osterbergsimon/calvin/blob/develop/frontend/src/components/plugins/renderers/MetricDashboard.vue)
 
 ```python
 display_schema={
@@ -158,7 +158,7 @@ display_schema={
 
 ### `weather-forecast` — current conditions + daily forecast
 
-[WeatherForecast.vue](../../frontend/src/components/plugins/renderers/WeatherForecast.vue)
+[WeatherForecast.vue](https://github.com/osterbergsimon/calvin/blob/develop/frontend/src/components/plugins/renderers/WeatherForecast.vue)
 
 - `current_path` (default `$.current`), `forecast_path` (default `$.forecast`)
 - `current`: `icon`, `temperature`, `description`, `feels_like`, `humidity`,
@@ -170,7 +170,7 @@ display_schema={
 
 ### `web-component` — the escape hatch
 
-[WebComponentHost.vue](../../frontend/src/components/plugins/WebComponentHost.vue)
+[WebComponentHost.vue](https://github.com/osterbergsimon/calvin/blob/develop/frontend/src/components/plugins/WebComponentHost.vue)
 
 ```python
 display_schema={
@@ -192,8 +192,8 @@ Host behavior:
 4. Removes the stylesheet link on unmount.
 
 The module must be **pre-built** browser JS shipped in the plugin's
-`frontend/` directory (list it in `files.include`). No `.vue` sources, no
-build step on the host.
+`frontend/` directory. The host serves whatever is present there; it does not
+read `files.include`. No `.vue` sources, no build step on the host.
 
 **Theming across shadow DOM:** CSS custom properties inherit into shadow
 roots. Style with the shell's semantic tokens — `--ink`, `--ink-2`, `--ink-3`,
@@ -213,7 +213,7 @@ so kiosk-safe handling applies; direct navigation can strand a wall display.
 
 `statusbar_schema` puts a compact item in the clock bar, rendered by the same
 dispatch with `context="statusbar"`
-([PluginStatusbarItems.vue](../../frontend/src/components/PluginStatusbarItems.vue)).
+([PluginStatusbarItems.vue](https://github.com/osterbergsimon/calvin/blob/develop/frontend/src/components/PluginStatusbarItems.vue)).
 Its kind namespace is intentionally small — **`SUPPORTED_STATUSBAR_KINDS = {"status"}`**:
 a statusbar item is a strip, not a panel, so it can't declare an iframe or
 grid. In the statusbar, `status` defaults to `layout: "row"` (inline cells
@@ -232,7 +232,7 @@ statusbar_schema={
 
 The shared visual identity of every plugin surface — "instrument readouts on
 an appliance" — defined in the plugin-surface section of
-[frontend/src/styles/main.css](../../frontend/src/styles/main.css) and
+[frontend/src/styles/main.css](https://github.com/osterbergsimon/calvin/blob/develop/frontend/src/styles/main.css) and
 derived entirely from the shell's semantic tokens. Built-in renderers use
 these classes; web components should too.
 
@@ -313,11 +313,11 @@ Example web-component body:
 ## Adding a new renderer kind (host development)
 
 1. Add the component under
-   [renderers/](../../frontend/src/components/plugins/renderers/).
+   [renderers/](https://github.com/osterbergsimon/calvin/tree/develop/frontend/src/components/plugins/renderers).
 2. Register it in
-   [rendererRegistry.js](../../frontend/src/components/plugins/rendererRegistry.js).
+   [rendererRegistry.js](https://github.com/osterbergsimon/calvin/blob/develop/frontend/src/components/plugins/rendererRegistry.js).
 3. Add the kind to `SUPPORTED_DISPLAY_KINDS` in
-   [definitions.py](../../backend/app/plugins/definitions.py).
+   [definitions.py](https://github.com/osterbergsimon/calvin/blob/develop/backend/app/plugins/definitions.py).
 
 The kind-sync test enforces that all three stay together.
 

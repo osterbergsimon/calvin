@@ -4,7 +4,7 @@ This guide will help you get started with development on Windows using the `deve
 
 ## Prerequisites
 
-- **Python 3.11+** - Download from https://www.python.org/downloads/
+- **Python 3.12+** - Download from https://www.python.org/downloads/
 - **Node.js 20+** - Download LTS from https://nodejs.org/
 - **Git** - Download from https://git-scm.com/download/win
 - **UV** - Will be installed automatically by the setup script
@@ -32,8 +32,8 @@ git pull origin develop
 ```
 
 This will:
-- Check all prerequisites (Python, Node.js, UV)
-- Switch to `develop` branch automatically
+- Check all prerequisites (Python 3.12+, Node.js 20+, UV)
+- Warn if you are not on `develop` (it never switches branches for you)
 - Install backend dependencies (with dev extras)
 - Install frontend dependencies
 
@@ -45,7 +45,7 @@ This will:
 .\make.ps1 dev
 ```
 
-This will start both backend and frontend in separate PowerShell windows.
+This runs the Docker Compose dev stack (backend with hot reload and the Vite dev server) and streams its logs. Docker must be running.
 
 **Option B: Manual Start**
 
@@ -107,12 +107,13 @@ git checkout develop
 
 ## Important Notes
 
-### Keyboard Support (evdev)
+### Keyboard Support
 
-- **Windows**: Keyboard input is disabled (normal for development)
-- **Raspberry Pi**: Full keyboard support will work on Linux
-- The backend automatically handles platform differences
-- You don't need WSL - develop on Windows, deploy to Raspberry Pi
+- Keyboard input is handled by the browser (`KeyboardHandler.vue` listens for
+  DOM `keydown` events), so it works the same on Windows, Linux, and the Pi.
+- You don't need WSL: develop on Windows, deploy to Raspberry Pi.
+- The backend `evdev` helper is legacy test-only code and is not part of the
+  running app.
 
 ### Hot Reload
 

@@ -1,12 +1,12 @@
 site_name: Calvin Documentation
 site_description: Documentation for Calvin - A lightweight DAKBoard alternative
 site_author: Calvin Contributors
-site_url: https://calvin.readthedocs.io/
+site_url: https://osterbergsimon.github.io/calvin/
 
 # Repository
 repo_name: osterbergsimon/calvin
 repo_url: https://github.com/osterbergsimon/calvin
-edit_uri: edit/main/docs/
+edit_uri: edit/develop/docs/
 
 # Documentation directory
 docs_dir: docs
@@ -71,11 +71,15 @@ nav:
   - Home: index.md
   - Getting Started:
     - setup/GETTING_STARTED.md
+    - setup/DEPLOYMENT_TOPOLOGIES.md
+    - setup/SETUP_SCRIPTS.md
+    - setup/SETUP_LINUX.md
+    - setup/KIOSK_INSTALL.md
+    - setup/KIOSK_PROVISIONING.md
+    - setup/UNRAID.md
     - setup/QUICKSTART_DEVELOP.md
     - setup/QUICKSTART_WINDOWS.md
-    - setup/SETUP_SCRIPTS.md
     - setup/SETUP_WINDOWS.md
-    - setup/SETUP_LINUX.md
     - setup/SETUP_PRE_COMMIT.md
     - setup/POLKIT_SERVICE_RESTART.md
   - Plugins:

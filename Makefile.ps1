@@ -5,7 +5,12 @@ param(
     [string]$Target = "help"
 )
 
-$ComposeDev = @("compose", "-f", "docker/docker-compose.dev.yml")
+# One compose project per checkout so several worktrees can run the dev stack
+# at once (set CALVIN_PORT / CALVIN_FRONTEND_PORT in docker/.env for ports).
+$DevProject = if ($env:DEV_PROJECT) { $env:DEV_PROJECT } else {
+    "calvin-dev-" + ((Split-Path -Leaf $PSScriptRoot).ToLower() -replace '[^a-z0-9_-]', '-')
+}
+$ComposeDev = @("compose", "-p", $DevProject, "-f", "docker/docker-compose.dev.yml")
 $ComposeProd = @("compose", "-f", "docker/docker-compose.yml")
 
 function Show-Help {
@@ -31,9 +36,9 @@ function Show-Help {
 
 function Install-Dependencies {
     $envFile = Join-Path $PSScriptRoot "docker\.env"
-    $exampleFile = Join-Path $PSScriptRoot "deploy\calvin.env.example"
+    $exampleFile = Join-Path $PSScriptRoot "docker\dev.env.example"
     if (-not (Test-Path $envFile)) {
-        Write-Host "Creating docker/.env from deploy/calvin.env.example..." -ForegroundColor Yellow
+        Write-Host "Creating docker/.env from docker/dev.env.example..." -ForegroundColor Yellow
         Copy-Item $exampleFile $envFile
     } else {
         Write-Host "docker/.env already exists - leaving it alone" -ForegroundColor Gray
@@ -43,8 +48,7 @@ function Install-Dependencies {
 
 function Start-Dev {
     Write-Host "Starting dev stack via docker compose..." -ForegroundColor Yellow
-    Write-Host "Backend:  http://localhost:8000" -ForegroundColor Cyan
-    Write-Host "Frontend: http://localhost:5173" -ForegroundColor Cyan
+    Write-Host "Project:  $DevProject (ports from docker/.env, default 8000 / 5173)" -ForegroundColor Cyan
     & docker @ComposeDev up
 }
 

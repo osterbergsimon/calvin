@@ -26,7 +26,6 @@ dependencies = [
     "pytz>=2023.3", # For timezone support in display schedule
     "alembic>=1.13.0", # For database migrations
     "loguru>=0.7.0", # For better logging (simpler and more reliable than standard logging)
-    "pre-commit>=4.3.0",
     "ormar>=0.21.0",
     "databases>=0.9.0",
 ]
@@ -187,9 +186,20 @@ exclude_lines = [
 ]
 
 [dependency-groups]
+# Installed by a plain `uv sync`. Keep this list in step with the `dev`
+# extra below so either invocation brings the same tooling.
 dev = [
     "httpx>=0.28.1",
     "pytest>=8.4.2",
     "pytest-asyncio>=1.2.0",
+    "pytest-cov>=4.1.0",
+    "pytest-mock>=3.12.0",
+    "pytest-watch>=4.2.0",
+    "faker>=20.0.0",
+    "factory-boy>=3.3.0",
+    "ruff>=0.1.6",
+    "mypy>=1.7.0",
+    "bandit>=1.7.5",
+    "pre-commit>=4.3.0",
 ]
 

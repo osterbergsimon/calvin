@@ -176,7 +176,7 @@ sudo systemctl status calvin-kiosk-remote # Mode B
 ## Related docs
 
 - [Deployment Topologies](DEPLOYMENT_TOPOLOGIES.md) — Mode A vs Mode B.
-- [SETUP_LINUX.md](SETUP_LINUX.md) — full Pi production walkthrough.
+- [SETUP_LINUX.md](SETUP_LINUX.md) — native Linux development guide, plus the Pi production quick start.
 - [SETUP_WINDOWS.md](SETUP_WINDOWS.md) — native Windows tooling setup.
 - [SETUP_SCRIPTS.md](SETUP_SCRIPTS.md) — setup-script reference.
 - [QUICKSTART_DEVELOP.md](QUICKSTART_DEVELOP.md) — terse dev setup.
