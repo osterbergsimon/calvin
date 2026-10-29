@@ -8,7 +8,7 @@ from typing import Any
 
 from fastapi import APIRouter, HTTPException
 from loguru import logger
-from pydantic import BaseModel, ConfigDict, field_validator, model_validator
+from pydantic import BaseModel, ConfigDict, Field, field_validator, model_validator
 
 from app.config import settings
 from app.services.config_service import config_service
@@ -190,9 +190,9 @@ class ConfigUpdate(BaseModel):
         return None if value is None else validate_git_branch(value)
 
     configPollInterval: int | None = None  # Config polling interval in seconds (default: 30)
-    calendarRefreshInterval: int | None = (
-        None  # Calendar cache refresh interval in minutes (default: 15)
-    )
+    # Calendar cache refresh interval in minutes (default: 15). Must never be
+    # 0 or negative: that used to schedule one refresh per second (audit R4).
+    calendarRefreshInterval: int | None = Field(None, ge=1)
     clockBarVerticalLayout: str | None = None  # Vertical bar layout
     clockBarVerticalFontSize: int | None = None
     clockBarVerticalDateFontSize: int | None = None

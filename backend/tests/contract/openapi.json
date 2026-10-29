@@ -385,6 +385,7 @@
           "calendarRefreshInterval": {
             "anyOf": [
               {
+                "minimum": 1.0,
                 "type": "integer"
               },
               {
