@@ -11,7 +11,12 @@ import databases
 from loguru import logger
 
 from app.config import BACKEND_DIR
-from app.database import create_database, ensure_database_dialect, metadata
+from app.database import (
+    SQLITE_BUSY_TIMEOUT_MS,
+    create_database,
+    ensure_database_dialect,
+    metadata,
+)
 
 
 async def initialize_database(
@@ -49,7 +54,7 @@ async def initialize_database(
             # Enable WAL mode for better concurrency
             try:
                 await database.execute("PRAGMA journal_mode=WAL")
-                await database.execute("PRAGMA busy_timeout=5000")
+                await database.execute(f"PRAGMA busy_timeout={SQLITE_BUSY_TIMEOUT_MS}")
                 await database.execute("PRAGMA synchronous=NORMAL")
             except Exception as e:
                 logger.warning(f"Failed to configure SQLite PRAGMA settings during init: {e}")

@@ -4,6 +4,28 @@ import json
 from typing import Any
 
 from app.models.db_models import ConfigDB
+from app.utils.db_retry import retry_on_db_locked
+
+
+async def _execute_upsert(key: str, value: str | None, value_type: str) -> None:
+    """Write one config row with a single atomic upsert statement.
+
+    The old read-then-create pair raced: two concurrent writes of a new key
+    both saw "no row" and one lost with a UNIQUE violation (audit R11).
+    """
+    await ConfigDB.ormar_config.database.execute(
+        "INSERT INTO config (key, value, value_type) "
+        "VALUES (:key, :value, :value_type) "
+        "ON CONFLICT(key) DO UPDATE SET "
+        "value = excluded.value, value_type = excluded.value_type",
+        {"key": key, "value": value, "value_type": value_type},
+    )
+
+
+@retry_on_db_locked(max_retries=5, initial_delay=0.1, max_delay=1.0)
+async def _upsert_config_row(key: str, value: str | None, value_type: str) -> None:
+    """Upsert one config row, retrying while SQLite holds a write lock."""
+    await _execute_upsert(key, value, value_type)
 
 
 class ConfigService:
@@ -64,14 +86,7 @@ class ConfigService:
 
         serialized_value = self._serialize_value(value, value_type)
 
-        item = await ConfigDB.objects.get_or_none(key=key)
-
-        if item:
-            item.value = serialized_value
-            item.value_type = value_type
-            await item.update()
-        else:
-            await ConfigDB.objects.create(key=key, value=serialized_value, value_type=value_type)
+        await _upsert_config_row(key, serialized_value, value_type)
 
         # Update cache
         self._cache[key] = value

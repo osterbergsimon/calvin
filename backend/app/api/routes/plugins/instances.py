@@ -21,6 +21,20 @@ from app.plugins.utils.secrets import (
     secret_keys_for_type,
 )
 from app.services.event_system import event_system
+from app.utils.db_retry import retry_on_db_locked
+
+
+@retry_on_db_locked(max_retries=5, initial_delay=0.1, max_delay=1.0)
+async def _save_instance(db_plugin: PluginDB) -> None:
+    """Persist an instance row, retrying while SQLite holds a write lock (R11)."""
+    await db_plugin.save_with_timestamp()
+
+
+@retry_on_db_locked(max_retries=5, initial_delay=0.1, max_delay=1.0)
+async def _delete_instance(db_plugin: PluginDB) -> None:
+    """Delete an instance row, retrying while SQLite holds a write lock (R11)."""
+    await db_plugin.delete()
+
 
 router = APIRouter()
 
@@ -332,7 +346,7 @@ async def delete_plugin_instance(instance_id: str):
         await plugin_manager.unregister(instance_id)
 
     type_id = db_plugin.type_id
-    await db_plugin.delete()
+    await _delete_instance(db_plugin)
 
     try:
         await event_system.emit_event(
@@ -455,7 +469,7 @@ async def update_plugin_instance(instance_id: str, instance_data: dict[str, Any]
     if "name" in instance_data:
         db_plugin.name = instance_data["name"]
 
-    await db_plugin.save_with_timestamp()
+    await _save_instance(db_plugin)
 
     # Update plugin instance in memory if it exists
     plugin = plugin_manager.get_plugin(instance_id)
@@ -623,7 +637,7 @@ async def update_plugin_instances_order(
     for db_plugin in db_plugins:
         if db_plugin.id in instance_orders:
             db_plugin.display_order = instance_orders[db_plugin.id]
-            await db_plugin.save_with_timestamp()
+            await _save_instance(db_plugin)
             updated_count += 1
 
     if updated_count > 0:

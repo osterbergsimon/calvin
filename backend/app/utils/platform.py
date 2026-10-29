@@ -72,4 +72,4 @@ async def run_command(cmd: list[str], **kwargs) -> subprocess.CompletedProcess:
     Async routes and services must not call ``subprocess.run`` directly: it blocks
     the event loop, freezing every other request (kiosk polls, SSE) until it returns.
     """
-    return await asyncio.to_thread(subprocess.run, cmd, **kwargs)
+    return await asyncio.to_thread(lambda: subprocess.run(cmd, **kwargs))

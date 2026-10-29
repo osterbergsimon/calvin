@@ -424,19 +424,27 @@ async def handle_plugin_config_update_generic(
                     "warning": f"DB updated but registration failed: {str(e)}",
                 }
 
-        # Update in database
+        # Update in database. This is the write that runs while other plugin
+        # operations hold the SQLite write lock, so it retries (audit R11).
         db_instance.config = instance_config
         db_instance.enabled = final_enabled
-        await db_instance.save_with_timestamp()
-        if db_type and hasattr(db_type, "save_with_timestamp"):
-            # Only update if it's a real Ormar model (not a mock in tests)
-            try:
-                db_type.enabled = final_enabled
-                await db_type.save_with_timestamp()
-            except (AttributeError, TypeError):
-                # Fallback for mocks or if save_with_timestamp doesn't exist
-                if hasattr(db_type, "update"):
+
+        from app.utils.db_retry import retry_on_db_locked
+
+        @retry_on_db_locked(max_retries=5, initial_delay=0.1, max_delay=1.0)
+        async def _persist_update() -> None:
+            await db_instance.save_with_timestamp()
+            if db_type and hasattr(db_type, "save_with_timestamp"):
+                # Only update if it's a real Ormar model (not a mock in tests)
+                try:
                     db_type.enabled = final_enabled
-                    await db_type.update()
+                    await db_type.save_with_timestamp()
+                except (AttributeError, TypeError):
+                    # Fallback for mocks or if save_with_timestamp doesn't exist
+                    if hasattr(db_type, "update"):
+                        db_type.enabled = final_enabled
+                        await db_type.update()
+
+        await _persist_update()
 
         return result
