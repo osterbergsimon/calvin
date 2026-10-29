@@ -55,6 +55,26 @@ def test_manifest_enable_flags(tmp_path):
     assert enable["calvin-kiosk-update.service"] is False
 
 
+def test_wayland_bundle_files_never_switch_the_stack(tmp_path):
+    # A bundle update must not enable the Wayland compositor (or the labwc config)
+    # behind setup's back: exactly one compositor unit is enabled, and only
+    # setup-kiosk.sh --display-stack decides which.
+    _seed(tmp_path)
+    m = kiosk_bundle.build_manifest(tmp_path)
+    by_name = {f["name"]: f for f in m["files"]}
+    for name in ("calvin-wayland.service", "autostart", "rc.xml"):
+        assert name in by_name, name
+        assert by_name[name]["enable"] is False, name
+        assert by_name[name]["restart_unit"] is None, name
+    assert by_name["calvin-wayland.service"]["target_path"] == (
+        "/etc/systemd/system/calvin-wayland.service"
+    )
+    assert by_name["autostart"]["target_path"] == ("/home/calvin/.config/labwc/autostart")
+    assert by_name["autostart"]["mode"] == "0755"
+    assert by_name["rc.xml"]["target_path"] == "/home/calvin/.config/labwc/rc.xml"
+    assert by_name["rc.xml"]["mode"] == "0644"
+
+
 def test_enable_does_not_change_version(tmp_path):
     # The version hash must depend on file contents only, not the enable field.
     import hashlib
