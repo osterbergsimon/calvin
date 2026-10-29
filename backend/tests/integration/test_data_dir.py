@@ -71,6 +71,11 @@ if sys.argv[1] == "gallery":
 
 png = bytes.fromhex(sys.argv[1])
 with TestClient(app) as client:
+    # Admin routes need a session (CLV-9).
+    from app.security.admin_auth import COOKIE_NAME, get_admin_store
+    store = get_admin_store()
+    store.set_password("test-admin-password")
+    client.cookies.set(COOKIE_NAME, store.issue_cookie())
     r = client.post(
         "/api/images/upload", files={"file": ("photo.png", io.BytesIO(png), "image/png")}
     )

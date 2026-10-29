@@ -9,6 +9,7 @@ from pathlib import Path
 import databases
 import pytest
 import pytest_asyncio
+from fastapi import Depends
 from fastapi.testclient import TestClient
 
 # Import all models so Ormar registers their tables with metadata.
@@ -20,6 +21,8 @@ from app.models.db_models import (  # noqa: F401
     PluginDB,
     PluginTypeDB,
 )
+from app.security.install import install_security
+from app.security.route_policy import enforce_route_policy
 
 from ._support.db import (
     assert_models_registered,
@@ -207,11 +210,23 @@ async def _seed_test_data(test_database: databases.Database) -> None:
 
 
 @pytest.fixture
-def test_client(temp_db_path: Path, temp_image_dir: Path) -> Generator[TestClient, None, None]:
-    """Create a TestClient bound to a fresh SQLite file with seeded test data."""
+def test_client(
+    request: pytest.FixtureRequest, temp_db_path: Path, temp_image_dir: Path, tmp_path: Path
+) -> Generator[TestClient, None, None]:
+    """Create a TestClient bound to a fresh SQLite file with seeded test data.
+
+    The admin store is configured with a known password and, unless the test is
+    marked ``no_admin_login``, the client is logged in before it is yielded.
+    """
     import os
 
     import app.config
+    from app.security.admin_auth import COOKIE_NAME, get_admin_store
+
+    original_admin_auth_path = app.config.settings.admin_auth_path
+    app.config.settings.admin_auth_path = tmp_path / "admin-auth.json"
+    admin_store = get_admin_store()
+    admin_store.set_password("test-admin-password")
 
     original_image_dir = os.environ.get("IMAGE_DIR")
     os.environ["IMAGE_DIR"] = str(temp_image_dir.resolve())
@@ -306,7 +321,10 @@ def test_client(temp_db_path: Path, temp_image_dir: Path) -> Generator[TestClien
         system,
     )
 
-    test_app = FastAPI(title="Calvin Test API")
+    test_app = FastAPI(
+        title="Calvin Test API",
+        dependencies=[Depends(enforce_route_policy)],
+    )
     test_app.add_middleware(
         CORSMiddleware,
         allow_origins=["*"],
@@ -324,6 +342,7 @@ def test_client(temp_db_path: Path, temp_image_dir: Path) -> Generator[TestClien
     test_app.include_router(system.router, prefix="/api/system", tags=["system"])
     test_app.include_router(security.router, prefix="/api", tags=["security"])
     test_app.include_router(backup.router, prefix="/api", tags=["backup"])
+    install_security(test_app)
 
     @test_app.get("/")
     async def root():
@@ -333,6 +352,8 @@ def test_client(temp_db_path: Path, temp_image_dir: Path) -> Generator[TestClien
     assert_required_tables(test_db_path_abs, retries=5)
 
     with TestClient(test_app) as client:
+        if request.node.get_closest_marker("no_admin_login") is None:
+            client.cookies.set(COOKIE_NAME, admin_store.issue_cookie())
         yield client
 
     # Cleanup: unregister plugins so the singleton plugin_manager doesn't
@@ -384,6 +405,7 @@ def test_client(temp_db_path: Path, temp_image_dir: Path) -> Generator[TestClien
         pass
 
     app.config.settings.database_url = original_db_url
+    app.config.settings.admin_auth_path = original_admin_auth_path
     db_module.database = original_database
     update_ormar_models_database(original_database)
 

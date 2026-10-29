@@ -116,7 +116,7 @@ for sql_logger_name in (
 
 logger.info(f"Loguru logging configured with level: {log_level}")
 
-from fastapi import FastAPI, HTTPException, Request  # noqa: E402
+from fastapi import Depends, FastAPI, HTTPException, Request  # noqa: E402
 from fastapi.encoders import jsonable_encoder  # noqa: E402
 from fastapi.exceptions import RequestValidationError  # noqa: E402
 from fastapi.middleware.cors import CORSMiddleware  # noqa: E402
@@ -134,6 +134,8 @@ from app.api.routes import (  # noqa: E402
     security,
     system,
 )
+from app.security.install import apply_startup_admin_password, install_security  # noqa: E402
+from app.security.route_policy import enforce_route_policy  # noqa: E402
 from app.services.scheduler import calendar_scheduler  # noqa: E402
 
 # Plugin classes are auto-discovered by the loader when modules are imported
@@ -486,6 +488,8 @@ async def lifespan(app: FastAPI):
         logger.info("Database connected")
         await _initialize_database()
         logger.info("Database initialized")
+        # CALVIN_ADMIN_PASSWORD always wins, before anything that could serve.
+        apply_startup_admin_password()
         await _initialize_plugins()
         logger.info("Plugins initialized")
         await _restore_on_start()
@@ -522,6 +526,7 @@ app = FastAPI(
     description="Lightweight DAKBoard alternative for Raspberry Pi",
     version="0.1.0",
     lifespan=lifespan,
+    dependencies=[Depends(enforce_route_policy)],
 )
 
 # CORS middleware
@@ -544,6 +549,10 @@ app.add_middleware(
 from app.middleware.security_headers import SecurityHeadersMiddleware  # noqa: E402
 
 app.add_middleware(SecurityHeadersMiddleware)
+
+# Admin auth: the app-level dependency is registered above; this adds the auth
+# router and Host/Origin middleware (CLV-9).
+install_security(app)
 
 
 # Dev-only HTTP request logging — enable with CALVIN_DEV_LOG_HTTP=1
