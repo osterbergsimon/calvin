@@ -10,6 +10,15 @@ from fastapi.testclient import TestClient
 _REPO_ROOT = Path(__file__).parent.parent.parent.parent
 
 
+@pytest.fixture(autouse=True)
+def _bundle_from_repo_dir(monkeypatch):
+    """Tests steer the bundle via settings.repo_dir; an ambient KIOSK_BUNDLE_DIR
+    (e.g. running inside the Docker image) would silently take precedence."""
+    from app.services import kiosk_bundle
+
+    monkeypatch.setattr(kiosk_bundle.settings, "kiosk_bundle_dir", None)
+
+
 @pytest.mark.integration
 def test_kiosks_table_exists_and_lists_empty(test_client: TestClient):
     """The kiosks registry starts empty and is queryable (table created by migration)."""
@@ -205,3 +214,37 @@ def test_config_reports_available_version_and_flag(test_client: TestClient):
 @pytest.mark.integration
 def test_post_update_unknown_kiosk_404(test_client: TestClient):
     assert test_client.post("/api/kiosks/never-seen/update").status_code == 404
+
+
+@pytest.mark.integration
+def test_install_script_served_with_server_url(test_client: TestClient):
+    from app.services import kiosk_bundle
+
+    with patch.object(kiosk_bundle.settings, "repo_dir", _REPO_ROOT):
+        r = test_client.get("/api/kiosks/install.sh")
+    assert r.status_code == 200
+    assert r.text.startswith("#!")
+    assert "SERVER_URL='http://testserver'" in r.text
+    assert "@CALVIN_SERVER_URL@" not in r.text
+
+
+@pytest.mark.integration
+def test_installer_files_served_and_allowlisted(test_client: TestClient):
+    from app.services import kiosk_bundle
+
+    with patch.object(kiosk_bundle.settings, "repo_dir", _REPO_ROOT):
+        r = test_client.get("/api/kiosks/installer/setup-kiosk.sh")
+        assert r.status_code == 200
+        assert r.content == (_REPO_ROOT / "scripts" / "setup-kiosk.sh").read_bytes()
+        assert test_client.get("/api/kiosks/installer/setup-common.sh").status_code == 200
+        assert test_client.get("/api/kiosks/installer/setup.sh").status_code == 404
+        assert test_client.get("/api/kiosks/installer/..%2Fsetup.sh").status_code == 404
+
+
+@pytest.mark.integration
+def test_install_script_503_on_broken_checkout(test_client: TestClient):
+    from app.services import kiosk_bundle
+
+    with patch.object(kiosk_bundle.settings, "repo_dir", Path("/nonexistent-checkout")):
+        r = test_client.get("/api/kiosks/install.sh")
+    assert r.status_code == 503

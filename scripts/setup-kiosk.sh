@@ -112,14 +112,15 @@ if [ -z "${COMMON_SCRIPT}" ] && [ -n "${BASH_VERSION:-}" ]; then
 fi
 
 if [ -n "${COMMON_SCRIPT}" ] && [ -f "${COMMON_SCRIPT}" ]; then
+    # shellcheck source=setup-common.sh
     . "${COMMON_SCRIPT}"
 else
     echo "Downloading setup-common.sh from GitHub..." >&2
     TEMP_DIR="$(mktemp -d)"
-    trap "rm -rf '${TEMP_DIR}'" EXIT 2>/dev/null || true
+    trap 'rm -rf "${TEMP_DIR}"' EXIT 2>/dev/null || true
 
     GIT_REPO="${_ENV_GIT_REPO:-${GIT_REPO:-https://github.com/osterbergsimon/calvin.git}}"
-    GIT_BRANCH="${_ENV_GIT_BRANCH:-${GIT_BRANCH:-main}}"
+    GIT_BRANCH="${_ENV_GIT_BRANCH:-${GIT_BRANCH:-develop}}"
     repo_owner=$(echo "${GIT_REPO}" | sed -E 's|.*github\.com[:/]([^/]+)/([^/]+)(\.git)?$|\1|')
     repo_name=$(echo "${GIT_REPO}" | sed -E 's|.*github\.com[:/]([^/]+)/([^/]+)(\.git)?$|\2|' | sed 's|\.git$||')
 
@@ -144,6 +145,7 @@ else
         exit 1
     fi
 
+    # shellcheck source=setup-common.sh
     . "${TEMP_DIR}/setup-common.sh"
 fi
 
@@ -260,8 +262,11 @@ main() {
     update_system_packages
 
     log "Installing kiosk dependencies..."
+    # sudo: the display agent triggers remote updates via the sudoers fragment
+    # below (present on Raspberry Pi OS, absent on minimal Debian images).
     install_system_packages \
         curl \
+        sudo \
         xserver-xorg \
         xinit \
         openbox \

@@ -25,9 +25,10 @@ New to Calvin? Get started quickly:
 4. **[Setup Scripts](setup/SETUP_SCRIPTS.md)** - Automated setup scripts for production and development
 5. **[Production Setup](setup/SETUP_LINUX.md)** - Install Calvin on Raspberry Pi or Linux
 6. **[Deployment Topologies](setup/DEPLOYMENT_TOPOLOGIES.md)** - All-in-one Pi vs. remote backend + kiosk Pi
-7. **[Kiosk Provisioning & Self-Update](setup/KIOSK_PROVISIONING.md)** - Zero-touch Pi provisioning and admin-triggered display-agent updates from the server
-8. **[Unraid Deployment](setup/UNRAID.md)** - Run the backend as an Unraid Docker app
-9. **[Plugin Development](plugins/PLUGIN_DEVELOPMENT_GUIDE.md)** - Create your first plugin
+7. **[Install a Kiosk Pi](setup/KIOSK_INSTALL.md)**: fresh SD card to Calvin kiosk with one command (Mode B)
+8. **[Kiosk Provisioning & Self-Update](setup/KIOSK_PROVISIONING.md)** - Zero-touch Pi provisioning and admin-triggered display-agent updates from the server
+9. **[Unraid Deployment](setup/UNRAID.md)** - Run the backend as an Unraid Docker app
+10. **[Plugin Development](plugins/PLUGIN_DEVELOPMENT_GUIDE.md)** - Create your first plugin
 
 ## Documentation Structure
 

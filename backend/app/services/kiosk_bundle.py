@@ -1,6 +1,7 @@
 """Kiosk update bundle — the small file-set a kiosk needs, served from the checkout."""
 
 import hashlib
+import re
 from dataclasses import dataclass
 from pathlib import Path
 
@@ -70,9 +71,25 @@ BUNDLE_FILES: list[BundleFile] = [
 
 _BY_NAME = {bf.name: bf for bf in BUNDLE_FILES}
 
+# Setup scripts the one-command installer (GET /api/kiosks/install.sh) downloads.
+# They are served and hashed in the signed manifest, but are NOT bundle files:
+# never installed by the updater and not part of the bundle version.
+INSTALLER_FILES: dict[str, str] = {
+    "setup-kiosk.sh": "scripts/setup-kiosk.sh",
+    "setup-common.sh": "scripts/setup-common.sh",
+}
+
+INSTALL_SCRIPT_PATH = "deploy/kiosk-agent/install-kiosk.sh"
+_SERVER_URL_PLACEHOLDER = "@CALVIN_SERVER_URL@"
+# Baked into a bash single-quoted string; the value comes from the request's Host
+# header, so allow only plain URL characters (no quotes, $, backticks, spaces).
+_SAFE_URL_RE = re.compile(r"https?://[A-Za-z0-9.\-\[\]:]+(/[A-Za-z0-9._~/\-]*)?")
+
 
 def _root(root: Path | None) -> Path:
-    return root if root is not None else settings.repo_dir
+    if root is not None:
+        return root
+    return settings.kiosk_bundle_dir or settings.repo_dir
 
 
 def _sha256(path: Path) -> str:
@@ -83,6 +100,27 @@ def read_bundle_file(name: str, root: Path | None = None) -> bytes:
     """Raw bytes for a bundle file. KeyError for any name not in the allowlist."""
     bf = _BY_NAME[name]  # KeyError => unknown/hostile name; never touches the filesystem
     return (_root(root) / bf.repo_path).read_bytes()
+
+
+def read_installer_file(name: str, root: Path | None = None) -> bytes:
+    """Raw bytes for an installer script. KeyError for any name not in the allowlist."""
+    rel = INSTALLER_FILES[name]
+    return (_root(root) / rel).read_bytes()
+
+
+def render_install_script(server_url: str, root: Path | None = None) -> str:
+    """The kiosk installer with this server's URL baked in (empty if the URL is unsafe)."""
+    url = server_url.rstrip("/")
+    if not _SAFE_URL_RE.fullmatch(url):
+        url = ""  # installer then insists on --backend-url
+    template = (_root(root) / INSTALL_SCRIPT_PATH).read_text()
+    return template.replace(_SERVER_URL_PLACEHOLDER, url)
+
+
+def ensure_signing_key() -> Path:
+    """Create the manifest signing key up front so it can be read before any kiosk exists."""
+    kiosk_signing.load_or_create_key(settings.kiosk_signing_key_path)
+    return settings.kiosk_signing_key_path
 
 
 def build_manifest(root: Path | None = None) -> dict:
@@ -99,7 +137,15 @@ def build_manifest(root: Path | None = None) -> dict:
                 "enable": bf.enable,
             }
         )
-    return {"version": _version_from(files), "min_python": MIN_PYTHON, "files": files}
+    installer = [
+        {"name": name, "sha256": _sha256(r / rel)} for name, rel in INSTALLER_FILES.items()
+    ]
+    return {
+        "version": _version_from(files),
+        "min_python": MIN_PYTHON,
+        "files": files,
+        "installer": installer,
+    }
 
 
 def build_signed_manifest(root: Path | None = None) -> dict:
@@ -115,4 +161,6 @@ def _version_from(files: list[dict]) -> str:
 
 
 def bundle_version(root: Path | None = None) -> str:
-    return str(build_manifest(root)["version"])
+    r = _root(root)
+    files = [{"name": bf.name, "sha256": _sha256(r / bf.repo_path)} for bf in BUNDLE_FILES]
+    return _version_from(files)

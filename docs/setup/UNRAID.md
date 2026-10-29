@@ -37,13 +37,19 @@ http://<unraid-host>:8000/api/health
 
 ## Raspberry Pi Kiosk
 
-Once Calvin is running on Unraid, configure the Pi as a kiosk-only
-display:
+Once Calvin is running on Unraid, turn a fresh Raspberry Pi OS Lite install
+into a kiosk with one command (the container serves the installer):
 
 ```bash
-sudo bash scripts/setup-kiosk.sh --backend-url http://<unraid-host>:8000
-sudo reboot
+curl -fsSL http://<unraid-host>:8000/api/kiosks/install.sh | sudo bash
 ```
+
+For a **signed** kiosk, the signing key is
+`/mnt/user/appdata/calvin/kiosk-signing.key`. It is in Appdata, so it survives
+container updates. Copy the key and the installer to the Pi over SSH instead of
+using the line above.
+[KIOSK_INSTALL.md](KIOSK_INSTALL.md) has the exact commands, plus a
+bake-the-SD-card option with no SSH at all.
 
 Use a stable hostname or IP for `<unraid-host>` so the kiosk URL does not
 change after reboot.
@@ -59,8 +65,8 @@ The template maps:
 /mnt/user/appdata/calvin -> /var/lib/calvin
 ```
 
-That directory contains the SQLite database, image storage, and installed
-plugins. Back it up with the rest of your Unraid appdata.
+That directory contains the SQLite database, image storage, installed
+plugins, and `kiosk-signing.key` (the kiosk manifest signing key). Back it up with the rest of your Unraid appdata.
 
 ## Security
 

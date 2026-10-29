@@ -1,8 +1,8 @@
 #!/usr/bin/env bash
-# Verifies bake-kiosk-firstrun.sh argument validation and URL derivation.
+# Verifies bake-kiosk-firstrun.sh argument validation.
 set -euo pipefail
 
-# shellcheck disable=SC1090
+# shellcheck source=../bake-kiosk-firstrun.sh
 source "$(dirname "$0")/../bake-kiosk-firstrun.sh" --source-only 2>/dev/null || true
 
 tmp="$(mktemp -d)"; trap 'rm -rf "$tmp"' EXIT
@@ -28,9 +28,16 @@ if ( parse_args --backend-url http://h:8000 --boot-dir "$tmp/nope"; validate_arg
 if ( parse_args --backend-url http://h:8000 --boot-dir "$tmp" --wifi-ssid Net; validate_args ) 2>/dev/null; then
     echo "FAIL: wifi without country accepted"; exit 1; fi
 
-# URL derivation from a .git repo.
-got="$(derive_raw_setup_url https://github.com/osterbergsimon/calvin.git develop)"
-want="https://raw.githubusercontent.com/osterbergsimon/calvin/develop/scripts/setup-kiosk.sh"
-[ "$got" = "$want" ] || { echo "FAIL: bad raw url: $got"; exit 1; }
+# --flag=value form is accepted too.
+( parse_args --backend-url=http://h:8000 --boot-dir="$tmp"; validate_args ) \
+    || { echo "FAIL: --flag=value form rejected"; exit 1; }
+
+# Malformed signing key => reject at bake time, not on the Pi.
+if ( parse_args --backend-url http://h:8000 --boot-dir "$tmp" --signing-key nothex; validate_args ) 2>/dev/null; then
+    echo "FAIL: malformed signing key accepted"; exit 1; fi
+
+# The GitHub source flags are gone: everything now comes from the Calvin server.
+if ( parse_args --backend-url http://h:8000 --boot-dir "$tmp" --git-branch develop ) 2>/dev/null; then
+    echo "FAIL: retired --git-branch still accepted"; exit 1; fi
 
 echo "PASS"

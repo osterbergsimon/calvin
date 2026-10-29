@@ -8,6 +8,10 @@ ConditionPathExists=!/var/lib/calvin/firstboot.done
 Type=oneshot
 ExecStart=/usr/local/bin/calvin-kiosk-firstboot.sh
 RemainAfterExit=yes
+# Server still unreachable after the wrapper's wait: try again (oneshot restart
+# needs systemd >= 244; Bookworm ships 252). The sentinel stops it once done.
+Restart=on-failure
+RestartSec=60
 StandardOutput=journal
 StandardError=journal
 SyslogIdentifier=calvin-kiosk-firstboot

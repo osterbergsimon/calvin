@@ -97,13 +97,17 @@ curl http://<server-host>:8000/api/health
 Pin the server to a stable hostname (mDNS `homeserver.local`, a static
 DHCP lease, or a DNS entry) so the kiosk URL doesn't drift.
 
-**2. Pi.** Run the kiosk-only setup:
+**2. Pi.** On a fresh Raspberry Pi OS Lite, run the installer the server serves:
 
 ```bash
-sudo bash scripts/setup-kiosk.sh --backend-url http://homeserver.local:8000
+curl -fsSL http://homeserver.local:8000/api/kiosks/install.sh | sudo bash
 ```
 
-The script installs `xserver-xorg`, `openbox`, `chromium`, and friends;
+**Step-by-step guide, including the signed (SSH) variant, the signing key, and supported Pi models:
+[KIOSK_INSTALL.md](KIOSK_INSTALL.md).** The installer downloads
+`setup-kiosk.sh` from the server and runs it. From a checkout,
+`sudo bash scripts/setup-kiosk.sh --backend-url http://homeserver.local:8000`
+does the same. `setup-kiosk.sh` installs `xserver-xorg`, `openbox`, `chromium`, and friends;
 writes `/etc/default/calvin-kiosk` with the backend URL; and enables
 two systemd units:
 
@@ -111,12 +115,11 @@ two systemd units:
 - `calvin-kiosk-remote.service` — waits for the backend to answer,
   then launches Chromium in kiosk mode against `CALVIN_BACKEND_URL`.
 
-Reboot. Chromium opens to the dashboard.
+The installer reboots when it finishes, and Chromium opens to the dashboard.
 
-> **Zero-touch alternative:** instead of SSHing in to run `setup-kiosk.sh`
-> by hand, you can bake the backend URL + wifi into the card before first
-> boot so the Pi self-provisions. See
-> [KIOSK_PROVISIONING.md](KIOSK_PROVISIONING.md).
+> **Zero-touch alternative:** instead of SSHing in, you can bake the
+> backend URL + wifi into the card before first boot so the Pi
+> self-provisions. See [KIOSK_INSTALL.md](KIOSK_INSTALL.md#option-b-bake-the-sd-card-no-ssh-no-typing-on-the-pi).
 
 ### Screen scheduling on a Mode-B kiosk
 
