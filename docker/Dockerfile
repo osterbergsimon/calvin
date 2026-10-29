@@ -74,6 +74,13 @@ COPY backend/data/themes/builtin.json /app/data/themes/builtin.json
 # to /app/, so put the dist there.
 COPY --from=frontend-builder /build/dist /frontend/dist
 
+# Kiosk bundle + one-command installer, served to Raspberry Pi kiosks at
+# /api/kiosks/{install.sh,installer/*,agent/*} when this image is the server for
+# kiosk-only Pis (Mode B, e.g. Unraid). Same deploy/ + scripts/ layout as a checkout.
+COPY deploy/kiosk-agent /app/kiosk-bundle/deploy/kiosk-agent
+COPY deploy/systemd /app/kiosk-bundle/deploy/systemd
+COPY scripts/setup-kiosk.sh scripts/setup-common.sh /app/kiosk-bundle/scripts/
+
 # Runtime data directory (overridable via CALVIN_DATA_DIR / volume mount)
 RUN mkdir -p /var/lib/calvin/db /var/lib/calvin/images /var/lib/calvin/plugins /app/logs
 
@@ -81,6 +88,8 @@ ENV CALVIN_DATA_DIR=/var/lib/calvin \
     DATABASE_URL=sqlite:////var/lib/calvin/db/calvin.db \
     IMAGE_DIR=/var/lib/calvin/images \
     PLUGIN_DIR=/var/lib/calvin/plugins \
+    KIOSK_BUNDLE_DIR=/app/kiosk-bundle \
+    KIOSK_SIGNING_KEY_PATH=/var/lib/calvin/kiosk-signing.key \
     CALVIN_PORT=8000 \
     VIRTUAL_ENV=/app/.venv \
     PATH="/app/.venv/bin:$PATH"
