@@ -112,8 +112,8 @@ git checkout develop
 - Keyboard input is handled by the browser (`KeyboardHandler.vue` listens for
   DOM `keydown` events), so it works the same on Windows, Linux, and the Pi.
 - You don't need WSL: develop on Windows, deploy to Raspberry Pi.
-- The backend `evdev` helper is legacy test-only code and is not part of the
-  running app.
+- There is no backend hardware-keyboard path: the old `evdev` helper has been
+  removed.
 
 ### Hot Reload
 
