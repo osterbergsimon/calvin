@@ -1,8 +1,8 @@
 <template>
   <div class="settings-page">
     <SettingsTopBar
-      :category-label="activeCategoryLabel"
-      :section-label="sectionLabel"
+      :category-label="auth.authenticated ? activeCategoryLabel : 'Settings'"
+      :section-label="auth.authenticated ? sectionLabel : ''"
       :save-state="saveStatus.state"
       :show-phone="isTouch"
       :locked="!auth.authenticated"
