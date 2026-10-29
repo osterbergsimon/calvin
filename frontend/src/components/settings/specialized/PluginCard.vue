@@ -116,7 +116,7 @@
 
     <p v-else-if="isCalendarProvider" class="pc-provider-note">
       This provider is available when adding a calendar source. Source name, URL, color, ordering,
-      and event-time display live under Content Sources / Calendars.
+      and event-time display live under Content / Calendars.
     </p>
 
     <!-- Disabled note -->
@@ -264,7 +264,7 @@ const statusSummary = computed(() => {
   if (isCalendarProvider.value) {
     const n = props.instances.length;
     if (n === 0) return "Available for new calendar sources";
-    return `${n} source${n === 1 ? "" : "s"} managed in Content Sources`;
+    return `${n} source${n === 1 ? "" : "s"} managed in Content`;
   }
   if (!props.plugin.enabled) return "Disabled";
   if (props.plugin.type === "theme") return "Theme";

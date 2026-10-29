@@ -76,7 +76,7 @@
             >
               <span class="picker-option-label">＋ Add a web service…</span>
               <span class="picker-option-type"
-                >Web pages and dashboards, from Plugins › Service</span
+                >Web pages and dashboards, from Content › Web pages &amp; services</span
               >
             </button>
           </div>

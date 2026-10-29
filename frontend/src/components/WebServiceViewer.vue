@@ -175,7 +175,7 @@ const emptyState = computed(() => {
       className: "no-services",
       message: "No web services yet",
       helpText:
-        "Add a web page or dashboard with the built-in Iframe plugin in Settings › Plugins › Service.",
+        "Add a web page or dashboard with the built-in Iframe plugin in Settings › Content › Web pages & services.",
       actionLabel: "Add a web service",
       settingId: "plugins-services",
     };
@@ -184,7 +184,8 @@ const emptyState = computed(() => {
     return {
       className: "no-services",
       message: "Selected service is unavailable",
-      helpText: "It may have been removed or disabled in Settings › Plugins › Service.",
+      helpText:
+        "It may have been removed or disabled in Settings › Content › Web pages & services.",
       actionLabel: "Open service settings",
       settingId: "plugins-services",
     };

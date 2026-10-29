@@ -1,22 +1,31 @@
 export const SETTINGS_CATEGORY_STORAGE_KEY = "settings_active_category";
 
-export const defaultSettingsCategoryId = "dashboard";
+export const defaultSettingsCategoryId = "content";
 
 export const settingsCategories = [
-  { id: "dashboard", label: "Display", icon: "📐", subtitle: "Layout · appearance · regions" },
-  { id: "clock-bar", label: "Clock Bar", icon: "🕐", subtitle: "Time · weather · status tiles" },
   {
     id: "content",
-    label: "Content Sources",
+    label: "Content",
     icon: "📦",
-    subtitle: "Calendars · photos · services",
+    subtitle: "Calendars · photos · web pages",
   },
-  { id: "plugins", label: "Plugins", icon: "🔌", subtitle: "Install · manage · themes" },
-  { id: "device", label: "Device", icon: "🖥️", subtitle: "Power · keyboard · hardware" },
+  {
+    id: "dashboard",
+    label: "Dashboard",
+    icon: "📐",
+    subtitle: "Screens · clock bar · theme · touch",
+  },
+  {
+    id: "device",
+    label: "Screen & keyboard",
+    icon: "🖥️",
+    subtitle: "Orientation · power · keyboard",
+  },
   { id: "kiosks", label: "Kiosks", icon: "📺", subtitle: "Per-device settings" },
+  { id: "plugins", label: "Plugins", icon: "🔌", subtitle: "Install · manage" },
   {
     id: "maintenance",
-    label: "Maintenance",
+    label: "System",
     icon: "⚙️",
     subtitle: "Updates · backup · diagnostics",
   },
@@ -28,20 +37,26 @@ export const settingsCategories = [
   },
 ];
 
+// A retired category still resolves, so a stored session value or an old link
+// never falls back to the default. Clock Bar is now part of Dashboard.
+export const settingsCategoryAliases = {
+  "clock-bar": "dashboard",
+};
+
 export const settingsDestinations = [
   {
     id: "dashboard-layout",
-    label: "Layout",
-    path: "Display / Layout",
-    category: "dashboard",
-    tabKey: "settings_tab_dashboard",
+    label: "Screen orientation",
+    path: "Screen & keyboard / Screen orientation",
+    category: "device",
+    tabKey: "settings_tab_device",
     tab: "layout",
     keywords: ["display", "orientation", "flip", "rotation", "landscape", "portrait"],
   },
   {
     id: "dashboard-regions",
     label: "Screens and regions",
-    path: "Display / Screens & regions",
+    path: "Dashboard / Screens & regions",
     category: "dashboard",
     tabKey: "settings_tab_dashboard",
     tab: "regions",
@@ -52,6 +67,7 @@ export const settingsDestinations = [
       "split",
       "multi-screen",
       "dashboard",
+      "display",
       "primary region",
       "activate screen",
     ],
@@ -59,16 +75,16 @@ export const settingsDestinations = [
   {
     id: "dashboard-ui",
     label: "Appearance",
-    path: "Display / Appearance",
+    path: "Dashboard / Appearance",
     category: "dashboard",
     tabKey: "settings_tab_dashboard",
     tab: "appearance",
-    keywords: ["ui", "theme", "appearance", "typeface", "font", "dark mode"],
+    keywords: ["ui", "display", "theme", "appearance", "typeface", "font", "dark mode"],
   },
   {
     id: "dashboard-kiosk",
-    label: "Kiosk and wall",
-    path: "Display / Kiosk & wall",
+    label: "Touch and controls",
+    path: "Dashboard / Touch & controls",
     category: "dashboard",
     tabKey: "settings_tab_dashboard",
     tab: "kiosk-touch",
@@ -89,35 +105,53 @@ export const settingsDestinations = [
   },
   {
     id: "clock-bar-appearance",
-    label: "Clock and status bar",
-    path: "Clock Bar / Clock",
-    category: "clock-bar",
-    tabKey: "settings_tab_clock_bar",
-    tab: "appearance",
-    keywords: ["clock", "status bar", "date", "seconds", "weather", "font", "logo", "position"],
+    label: "Clock",
+    path: "Dashboard / Clock",
+    category: "dashboard",
+    tabKey: "settings_tab_dashboard",
+    tab: "clock",
+    keywords: [
+      "clock",
+      "clock bar",
+      "status bar",
+      "date",
+      "seconds",
+      "weather",
+      "font",
+      "logo",
+      "position",
+    ],
   },
   {
     id: "clock-bar-items",
-    label: "Status bar plugin tiles",
-    path: "Clock Bar / Bar Items",
-    category: "clock-bar",
-    tabKey: "settings_tab_clock_bar",
+    label: "Clock bar items",
+    path: "Dashboard / Clock bar items",
+    category: "dashboard",
+    tabKey: "settings_tab_dashboard",
     tab: "bar-items",
-    keywords: ["status bar", "tiles", "items", "components", "plugins", "weather tile"],
+    keywords: [
+      "clock bar",
+      "status bar",
+      "tiles",
+      "items",
+      "components",
+      "plugins",
+      "weather tile",
+    ],
   },
   {
     id: "content-calendars",
     label: "Calendar sources and refresh",
-    path: "Content Sources / Calendars",
+    path: "Content / Calendars",
     category: "content",
     tabKey: "settings_tab_content_sources",
     tab: "calendars",
-    keywords: ["calendar", "ical", "google", "source", "refresh"],
+    keywords: ["calendar", "ical", "google", "source", "refresh", "content sources"],
   },
   {
     id: "content-calendar-display",
     label: "Calendar display",
-    path: "Content Sources / Calendar display",
+    path: "Content / Calendar display",
     category: "content",
     tabKey: "settings_tab_content_sources",
     tab: "calendar-display",
@@ -130,34 +164,44 @@ export const settingsDestinations = [
       "holidays",
       "events",
       "view",
+      "content sources",
     ],
   },
   {
     id: "content-photos",
     label: "Photo slideshow behavior",
-    path: "Content Sources / Photos",
+    path: "Content / Photos",
     category: "content",
     tabKey: "settings_tab_content_sources",
     tab: "photos",
-    keywords: ["photos", "slideshow", "photo frame", "random", "image mode"],
+    keywords: ["photos", "slideshow", "photo frame", "random", "image mode", "content sources"],
   },
   {
     id: "content-images",
     label: "Upload photos and order image sources",
-    path: "Content Sources / Image sources",
+    path: "Content / Image sources",
     category: "content",
     tabKey: "settings_tab_content_sources",
     tab: "images",
-    keywords: ["image", "photos", "upload", "add", "ordering", "sources", "plugins"],
+    keywords: [
+      "image",
+      "photos",
+      "upload",
+      "add",
+      "ordering",
+      "sources",
+      "plugins",
+      "content sources",
+    ],
   },
   {
     id: "content-services",
-    label: "Service source ordering",
-    path: "Content Sources / Services",
+    label: "Web pages and services",
+    path: "Content / Web pages & services",
     category: "content",
     tabKey: "settings_tab_content_sources",
-    tab: "services",
-    keywords: ["services", "web services", "ordering"],
+    tab: "content-services",
+    keywords: ["services", "web services", "web pages", "ordering", "content sources"],
   },
   {
     id: "plugins",
@@ -168,11 +212,12 @@ export const settingsDestinations = [
   },
   {
     id: "plugins-services",
-    label: "Add a web service (web page, dashboard)",
-    path: "Plugins / Service",
-    category: "plugins",
-    tab: "service",
-    keywords: ["services", "web services", "iframe", "web page", "add", "url"],
+    label: "Add a web page",
+    path: "Content / Web pages & services",
+    category: "content",
+    tabKey: "settings_tab_content_sources",
+    tab: "content-services",
+    keywords: ["services", "web services", "web page", "iframe", "add", "url", "content sources"],
   },
   {
     id: "kiosks",
@@ -184,7 +229,7 @@ export const settingsDestinations = [
   {
     id: "device-power",
     label: "Power, display schedule, and timeout",
-    path: "Device / Display Power",
+    path: "Screen & keyboard / Screen power",
     category: "device",
     tabKey: "settings_tab_device",
     tab: "power",
@@ -193,7 +238,7 @@ export const settingsDestinations = [
   {
     id: "device-keyboard",
     label: "Keyboard type, layout and mappings",
-    path: "Device / Keyboard",
+    path: "Screen & keyboard / Keyboard",
     category: "device",
     tabKey: "settings_tab_device",
     tab: "keyboard",
@@ -216,17 +261,24 @@ export const settingsDestinations = [
   },
   {
     id: "device-notifications",
-    label: "Notifications",
-    path: "Device / Notifications",
+    label: "Key-press feedback",
+    path: "Screen & keyboard / Key-press feedback",
     category: "device",
     tabKey: "settings_tab_device",
     tab: "notifications",
-    keywords: ["notifications", "keyboard feedback", "mode indicator", "auto-hide"],
+    keywords: [
+      "notifications",
+      "key-press",
+      "key press",
+      "keyboard feedback",
+      "mode indicator",
+      "auto-hide",
+    ],
   },
   {
     id: "device-reboot",
     label: "Reboot button combo",
-    path: "Device / Reboot Combo",
+    path: "Screen & keyboard / Keyboard",
     category: "device",
     tabKey: "settings_tab_device",
     tab: "reboot",
@@ -235,11 +287,11 @@ export const settingsDestinations = [
   {
     id: "device-hardware",
     label: "Hardware and version status",
-    path: "Device / Hardware",
-    category: "device",
-    tabKey: "settings_tab_device",
+    path: "System / Versions & status",
+    category: "maintenance",
+    tabKey: "settings_tab_maintenance",
     tab: "hardware",
-    keywords: ["hardware", "version", "status", "backend", "frontend"],
+    keywords: ["hardware", "device", "version", "versions", "status", "backend", "frontend"],
   },
   {
     id: "security-admin",
@@ -253,34 +305,49 @@ export const settingsDestinations = [
   {
     id: "maintenance-updates",
     label: "Software updates",
-    path: "Maintenance / Updates",
+    path: "System / Updates",
     category: "maintenance",
     tabKey: "settings_tab_maintenance",
     tab: "updates",
-    keywords: ["updates", "git", "repository", "branch"],
+    keywords: ["updates", "git", "repository", "branch", "maintenance"],
   },
   {
     id: "maintenance-backup",
     label: "Backup and restore",
-    path: "Maintenance / Backup & restore",
+    path: "System / Backup & restore",
     category: "maintenance",
     tabKey: "settings_tab_maintenance",
     tab: "backup",
-    keywords: ["backup", "restore", "export", "import", "migrate", "seed", "copy settings"],
+    keywords: [
+      "backup",
+      "restore",
+      "export",
+      "import",
+      "migrate",
+      "seed",
+      "copy settings",
+      "maintenance",
+    ],
   },
   {
     id: "maintenance-diagnostics",
     label: "Diagnostics and console logging",
-    path: "Maintenance / Diagnostics",
+    path: "System / Diagnostics",
     category: "maintenance",
     tabKey: "settings_tab_maintenance",
     tab: "diagnostics",
-    keywords: ["diagnostics", "debug", "logs", "polling", "console"],
+    keywords: ["diagnostics", "debug", "logs", "polling", "console", "maintenance"],
   },
 ];
 
+export const normalizeSettingsCategoryId = categoryId => {
+  if (typeof categoryId !== "string") return null;
+  const resolved = settingsCategoryAliases[categoryId] ?? categoryId;
+  return settingsCategories.some(category => category.id === resolved) ? resolved : null;
+};
+
 export const isKnownSettingsCategory = categoryId =>
-  settingsCategories.some(category => category.id === categoryId);
+  normalizeSettingsCategoryId(categoryId) !== null;
 
 export const getSettingDestinationById = destinationId =>
   settingsDestinations.find(destination => destination.id === destinationId);

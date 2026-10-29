@@ -83,7 +83,7 @@ describe("PhotoSlideshow", () => {
       expect(wrapper.find(".photo-placeholder").text()).toContain("No photos yet");
       // Points at the real place to add photos, not a server directory (F3)
       expect(wrapper.find(".photo-placeholder").text()).toContain(
-        "Settings › Content Sources › Image sources"
+        "Settings › Content › Image sources"
       );
       expect(wrapper.find(".photo-placeholder").text()).not.toContain("data/images");
     });

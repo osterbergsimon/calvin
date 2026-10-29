@@ -1,7 +1,41 @@
 <!-- frontend/src/components/settings/categories/DeviceSettings.vue -->
 <template>
   <div class="device-settings">
-    <SettingsSection id="device-power" title="Display power">
+    <SettingsSection id="layout" title="Screen orientation">
+      <SettingRow
+        label="Orientation"
+        description="Physical screen orientation. Per-screen region direction is set under Screens & regions."
+      >
+        <SegmentedControl
+          :model-value="config.orientation"
+          :options="[
+            { value: 'landscape', label: 'Landscape' },
+            { value: 'portrait', label: 'Portrait' },
+          ]"
+          aria-label="Orientation"
+          @update:model-value="v => emit('update:config', { orientation: v })"
+        />
+      </SettingRow>
+      <SettingRow label="Flip 180°" description="Rotate the display a half-turn.">
+        <ToggleSwitch
+          :model-value="config.orientationFlipped"
+          aria-label="Flip 180°"
+          @update:model-value="v => emit('update:config', { orientationFlipped: v })"
+        />
+      </SettingRow>
+      <SettingRow
+        label="Apply display rotation"
+        description="Apply the orientation setting to the OS display output."
+      >
+        <ToggleSwitch
+          :model-value="config.applyDisplayRotation"
+          aria-label="Apply display rotation"
+          @update:model-value="v => emit('update:config', { applyDisplayRotation: v })"
+        />
+      </SettingRow>
+    </SettingsSection>
+
+    <SettingsSection id="device-power" title="Screen power">
       <SettingRow
         label="Power schedule"
         description="Automatically turn the display off and on at set times."
@@ -117,7 +151,7 @@
       <RebootCombo :config="config" @update:config="patch => emit('update:config', patch)" />
     </SettingsSection>
 
-    <SettingsSection id="device-notifications" title="Notifications">
+    <SettingsSection id="device-notifications" title="Key-press feedback">
       <SettingRow
         label="Enable feedback"
         description="Show a visual indicator when keyboard shortcuts are activated."
@@ -152,21 +186,12 @@
         />
       </SettingRow>
     </SettingsSection>
-
-    <SettingsSection id="device-hardware" title="Hardware">
-      <SettingRow label="Backend version" :description="version || 'Unknown'" />
-      <SettingRow label="Frontend version" :description="frontendVersion || 'Unknown'" />
-      <SettingRow label="System status">
-        <span class="device-status" :class="statusClass">{{ statusText }}</span>
-      </SettingRow>
-    </SettingsSection>
   </div>
 </template>
 
 <script setup>
 import { computed } from "vue";
 import { useSystem } from "@/composables";
-import { useConnectionStore } from "@/stores/connection";
 import SettingsSection from "@/components/settings/shell/SettingsSection.vue";
 import SettingRow from "@/components/settings/shell/SettingRow.vue";
 import ToggleSwitch from "@/components/ui/ToggleSwitch.vue";
@@ -186,13 +211,10 @@ import {
 
 const props = defineProps({
   config: { type: Object, required: true },
-  version: { type: String, default: null },
-  frontendVersion: { type: String, default: null },
 });
 const emit = defineEmits(["update:config"]);
 
 const { turnDisplayOn, turnDisplayOff } = useSystem();
-const connectionStore = useConnectionStore();
 
 // --- On-screen keyboard layout (spec §7, K7) -------------------------------
 // The keyboard layout is its own setting. It is never derived from, and never
@@ -239,9 +261,6 @@ const timezoneOptions = [
   { value: "Asia/Shanghai", label: "Shanghai (CST)" },
   { value: "Australia/Sydney", label: "Sydney (AEDT/AEST)" },
 ];
-
-const statusText = computed(() => (connectionStore.isBackendOnline ? "● Online" : "○ Offline"));
-const statusClass = computed(() => (connectionStore.isBackendOnline ? "is-online" : "is-offline"));
 
 const onTurnOn = async () => {
   try {
@@ -295,15 +314,5 @@ const onTurnOff = async () => {
 .device-btn:focus-visible {
   outline: 2px solid var(--focus);
   outline-offset: 2px;
-}
-.device-status {
-  font-family: var(--font-data);
-  font-weight: 600;
-}
-.device-status.is-online {
-  color: var(--ok);
-}
-.device-status.is-offline {
-  color: var(--err);
 }
 </style>

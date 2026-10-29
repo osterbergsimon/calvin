@@ -158,7 +158,10 @@
       <ImagesTab />
     </SettingsSection>
 
-    <SettingsSection id="content-services" title="Services">
+    <SettingsSection id="content-services" title="Web pages & services">
+      <div class="content-services-actions">
+        <AddWebPageButton />
+      </div>
       <ServicesTab />
     </SettingsSection>
   </div>
@@ -176,6 +179,7 @@ import CalendarSourcesTab from "@/components/settings/tabs/content/CalendarSourc
 import ImagesTab from "@/components/settings/tabs/content/ImagesTab.vue";
 import PhotoUpload from "@/components/settings/tabs/content/PhotoUpload.vue";
 import ServicesTab from "@/components/settings/tabs/content/ServicesTab.vue";
+import AddWebPageButton from "@/components/settings/specialized/AddWebPageButton.vue";
 
 defineProps({ config: { type: Object, required: true } });
 const emit = defineEmits(["update:config"]);
@@ -186,5 +190,10 @@ const emit = defineEmits(["update:config"]);
   display: flex;
   flex-direction: column;
   gap: 1.5rem;
+}
+.content-services-actions {
+  display: flex;
+  justify-content: flex-end;
+  padding: 0.875rem 1rem 0;
 }
 </style>

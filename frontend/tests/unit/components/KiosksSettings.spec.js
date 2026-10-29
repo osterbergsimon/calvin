@@ -262,7 +262,7 @@ describe("KiosksSettings — content editor", () => {
     const oneScreen = { version: 2, activeScreenId: "a", screens: [{ id: "a", name: "Home" }] };
     const { w } = await selectContent(one, {}, oneScreen);
     expect(w.findComponent(ChipMultiSelect).exists()).toBe(false);
-    expect(w.text()).toContain("Add more screens in Display");
+    expect(w.text()).toContain("Add more screens in Dashboard");
   });
 
   it("shows offline content copy after saving to an offline kiosk", async () => {

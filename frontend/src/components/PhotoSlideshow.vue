@@ -62,7 +62,7 @@
         <div v-else-if="!currentImageUrl" class="photo-placeholder">
           <EmptyState
             message="No photos yet"
-            help="Upload photos in Settings › Content Sources › Image sources."
+            help="Upload photos in Settings › Content › Image sources."
             action-label="Add photos"
             setting-id="content-images"
           />

@@ -52,14 +52,8 @@
               {{ error }}
             </div>
 
-            <DisplaySettings
+            <DashboardSettings
               v-if="activeCategory === 'dashboard' && localConfig"
-              :key="categoryRenderKey"
-              :config="localConfig"
-              @update:config="handleConfigUpdate"
-            />
-            <ClockBarSettings
-              v-if="activeCategory === 'clock-bar' && localConfig"
               :key="categoryRenderKey"
               :config="localConfig"
               @update:config="handleConfigUpdate"
@@ -75,8 +69,6 @@
               v-if="activeCategory === 'device' && localConfig"
               :key="categoryRenderKey"
               :config="localConfig"
-              :version="version"
-              :frontend-version="frontendVersion"
               @update:config="handleConfigUpdate"
             />
             <KiosksSettings v-if="activeCategory === 'kiosks'" :key="categoryRenderKey" />
@@ -86,6 +78,8 @@
               :config="localConfig"
               :git-repo-url="localConfig && localConfig.gitRepoUrl"
               :git-branch="(localConfig && localConfig.gitBranch) || 'develop'"
+              :version="version"
+              :frontend-version="frontendVersion"
               @update:config="handleConfigUpdate"
               @update:git-repo-url="handleGitRepoUrlUpdate"
               @update:git-branch="handleGitBranchUpdate"
@@ -116,17 +110,14 @@ import {
   SETTINGS_CATEGORY_STORAGE_KEY,
   defaultSettingsCategoryId,
   getSettingDestinationById,
-  isKnownSettingsCategory,
+  normalizeSettingsCategoryId,
   settingsCategories,
 } from "@/components/settings/settingsRegistry";
 import ContentSettings from "@/components/settings/categories/ContentSettings.vue";
 
 // Lazy-load category components for better code splitting
-const DisplaySettings = defineAsyncComponent(
-  () => import("@/components/settings/categories/DisplaySettings.vue")
-);
-const ClockBarSettings = defineAsyncComponent(
-  () => import("@/components/settings/categories/ClockBarSettings.vue")
+const DashboardSettings = defineAsyncComponent(
+  () => import("@/components/settings/categories/DashboardSettings.vue")
 );
 const PluginsCategory = defineAsyncComponent(
   () => import("@/components/settings/categories/PluginsCategory.vue")
@@ -181,7 +172,7 @@ if (
 const getInitialCategory = () => {
   if (initialRouteDestination) return initialRouteDestination.category;
   const storedCategory = sessionStorage.getItem(SETTINGS_CATEGORY_STORAGE_KEY);
-  return isKnownSettingsCategory(storedCategory) ? storedCategory : defaultSettingsCategoryId;
+  return normalizeSettingsCategoryId(storedCategory) ?? defaultSettingsCategoryId;
 };
 
 const activeCategory = ref(getInitialCategory());
@@ -323,14 +314,11 @@ watch(activeCategory, async () => {
 // ── (category, tab) → section-id for migrated categories ────────────────────
 const SECTION_BY_CATEGORY_TAB = {
   dashboard: {
-    layout: "layout",
     regions: "regions",
+    clock: "clock-bar-clock",
+    "bar-items": "clock-bar-items",
     appearance: "appearance",
     "kiosk-touch": "kiosk-touch",
-  },
-  "clock-bar": {
-    appearance: "clock-bar-clock",
-    "bar-items": "clock-bar-items",
   },
   content: {
     calendars: "content-calendars",
@@ -338,16 +326,21 @@ const SECTION_BY_CATEGORY_TAB = {
     photos: "content-photos",
     images: "content-images",
     services: "content-services",
+    // "Add a web page" (plugins-services) lands on the services section.
+    "content-services": "content-services",
   },
   device: {
+    layout: "layout",
     power: "device-power",
     keyboard: "device-keyboard",
     notifications: "device-notifications",
-    reboot: "device-reboot",
-    hardware: "device-hardware",
+    // The reboot combo is folded into the Keyboard section.
+    reboot: "device-keyboard",
   },
   maintenance: {
     updates: "maintenance-updates",
+    hardware: "device-hardware",
+    system: "maintenance-system",
     backup: "maintenance-backup",
     diagnostics: "maintenance-diagnostics",
   },
@@ -357,8 +350,6 @@ const SECTION_BY_CATEGORY_TAB = {
   plugins: {
     install: "plugins-install",
     installed: "plugins-installed",
-    // Plugin-type tabs (plugins-services deep link) live in the installed list.
-    service: "plugins-installed",
   },
 };
 const MIGRATED_CATEGORIES = new Set(Object.keys(SECTION_BY_CATEGORY_TAB));

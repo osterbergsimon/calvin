@@ -37,10 +37,9 @@ const stubs = {
   CategoryRail: {
     props: ["categories", "activeId"],
     emits: ["select"],
-    template: "<div class=\"rail-stub\" @click=\"$emit('select', 'clock-bar')\" />",
+    template: "<div class=\"rail-stub\" @click=\"$emit('select', 'dashboard')\" />",
   },
-  DisplaySettings: { template: '<div class="display-stub" />' },
-  ClockBarSettings: { template: '<div class="clockbar-settings-stub" />' },
+  DashboardSettings: { template: '<div class="dashboard-stub" />' },
   ContentSettings: { template: '<div class="content-settings-stub" />' },
   DeviceSettings: { template: '<div class="device-settings-stub" />' },
   MaintenanceSettings: { template: '<div class="maintenance-settings-stub" />' },
@@ -55,38 +54,45 @@ describe("Settings shell", () => {
     sessionStorage.clear();
   });
 
-  it("renders DisplaySettings for the default (dashboard) category", () => {
+  it("renders ContentSettings for the default category", () => {
     const w = mount(Settings, { global: { stubs } });
-    expect(w.find(".display-stub").exists()).toBe(true);
+    expect(w.find(".content-settings-stub").exists()).toBe(true);
   });
 
-  it("renders ClockBarSettings for the clock-bar category", async () => {
+  it("renders DashboardSettings for the dashboard category", async () => {
     const w = mount(Settings, { global: { stubs } });
     await w.find(".rail-stub").trigger("click");
     await flushPromises();
-    expect(w.find(".clockbar-settings-stub").exists()).toBe(true);
-    expect(w.find(".display-stub").exists()).toBe(false);
+    expect(w.find(".dashboard-stub").exists()).toBe(true);
+    expect(w.find(".content-settings-stub").exists()).toBe(false);
   });
 
   it("renders DeviceSettings for the device category", () => {
     sessionStorage.setItem("settings_active_category", "device");
     const w = mount(Settings, { global: { stubs } });
     expect(w.find(".device-settings-stub").exists()).toBe(true);
-    expect(w.find(".display-stub").exists()).toBe(false);
+    expect(w.find(".content-settings-stub").exists()).toBe(false);
   });
 
   it("renders MaintenanceSettings for the maintenance category", () => {
     sessionStorage.setItem("settings_active_category", "maintenance");
     const w = mount(Settings, { global: { stubs } });
     expect(w.find(".maintenance-settings-stub").exists()).toBe(true);
-    expect(w.find(".display-stub").exists()).toBe(false);
+    expect(w.find(".content-settings-stub").exists()).toBe(false);
   });
 
   it("renders ContentSettings for the content category", () => {
     sessionStorage.setItem("settings_active_category", "content");
     const w = mount(Settings, { global: { stubs } });
     expect(w.find(".content-settings-stub").exists()).toBe(true);
-    expect(w.find(".display-stub").exists()).toBe(false);
+    expect(w.find(".dashboard-stub").exists()).toBe(false);
+  });
+
+  it("resolves a stored retired clock-bar category to dashboard", () => {
+    sessionStorage.setItem("settings_active_category", "clock-bar");
+    const w = mount(Settings, { global: { stubs } });
+    expect(w.find(".dashboard-stub").exists()).toBe(true);
+    expect(w.find(".content-settings-stub").exists()).toBe(false);
   });
 
   it("replaces the settings body with the auth lock screen while locked", () => {

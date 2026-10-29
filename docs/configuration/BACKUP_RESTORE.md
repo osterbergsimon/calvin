@@ -66,7 +66,7 @@ backup should not take over production's key by accident.
 
 ## Making a backup
 
-- **Settings:** Maintenance → Backup → **Download backup**.
+- **Settings:** System → Backup → **Download backup**.
 - **API:** `GET /api/backup/export` (query `include_packages`, `include_secrets`,
   `include_signing_key`) returns the zip.
 - **Command line** (works while Calvin runs), from `backend/`:
@@ -81,7 +81,7 @@ backup should not take over production's key by accident.
 
 ### Automatic backups
 
-Maintenance → Automatic backups saves a backup to the backup folder every N
+System → Automatic backups saves a backup to the backup folder every N
 hours and keeps the newest N (default: every 24 hours, keep 7). They include
 packages and secrets but not the signing key. Backups saved there before a
 restore (`pre-restore-*`) and by **Save a backup now** are never deleted
@@ -133,7 +133,7 @@ part-way, restore the `pre-restore-*` file to go back.
 
 ### From Settings
 
-Maintenance → Restore → choose the file → check the preview → pick Replace or
+System → Restore → choose the file → check the preview → pick Replace or
 Merge → **Restore this backup** → **Reload Calvin**.
 
 ### From the API

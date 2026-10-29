@@ -26,7 +26,7 @@ const mountEmpty = async (props = {}) => {
   const wrapper = mount(EmptyState, {
     props: {
       message: "No calendars yet",
-      help: "Add one in Settings › Content Sources › Calendars.",
+      help: "Add one in Settings › Content › Calendars.",
       actionLabel: "Add a calendar",
       settingId: "content-calendars",
       ...props,
@@ -45,7 +45,7 @@ describe("EmptyState (F3/F4)", () => {
   it("renders the message, the path and the action", async () => {
     const { wrapper } = await mountEmpty();
     expect(wrapper.text()).toContain("No calendars yet");
-    expect(wrapper.text()).toContain("Settings › Content Sources › Calendars");
+    expect(wrapper.text()).toContain("Settings › Content › Calendars");
     expect(wrapper.find('[data-test="empty-state-action"]').text()).toBe("Add a calendar");
   });
 

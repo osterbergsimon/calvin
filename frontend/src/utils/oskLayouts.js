@@ -72,7 +72,7 @@ export const OSK_LAYOUTS_BY_ID = {
   },
 };
 
-/** Option order of the layouts (Device › Keyboard, K7). */
+/** Option order of the layouts (Screen & keyboard › Keyboard, K7). */
 export const OSK_LAYOUT_IDS = ["en", "sv", "fi", "no", "da", "de", "fr"];
 
 const URL_BOTTOM_ROW = "{numbers} / : {space} . .com {hide}";

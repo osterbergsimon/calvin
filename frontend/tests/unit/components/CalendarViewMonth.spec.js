@@ -118,7 +118,7 @@ describe("CalendarView first-run empty state (F4)", () => {
     const empty = w.findComponent({ name: "EmptyState" });
     expect(empty.exists()).toBe(true);
     expect(empty.props("settingId")).toBe("content-calendars");
-    expect(w.text()).toContain("Settings › Content Sources › Calendars");
+    expect(w.text()).toContain("Settings › Content › Calendars");
   });
 
   it("shows no empty state when a calendar source exists", async () => {

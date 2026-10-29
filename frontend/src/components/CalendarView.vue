@@ -82,7 +82,7 @@
         <div v-if="noSources" class="calendar-empty-overlay">
           <EmptyState
             message="No calendars yet"
-            help="Add an iCal, Google or Proton calendar link in Settings › Content Sources › Calendars."
+            help="Add an iCal, Google or Proton calendar link in Settings › Content › Calendars."
             action-label="Add a calendar"
             setting-id="content-calendars"
           />

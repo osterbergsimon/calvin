@@ -126,7 +126,6 @@ import { useSystem } from "@/composables";
 import { useConfigStore } from "@/stores/config";
 import { useImagesStore } from "@/stores/images";
 import { useNotificationsStore } from "@/stores/notifications";
-import { getSettingDestinationById } from "@/components/settings/settingsRegistry";
 import * as pluginsApi from "@/services/pluginsApi";
 import * as calendarApi from "@/services/calendarApi";
 import SettingsSection from "@/components/settings/shell/SettingsSection.vue";
@@ -279,7 +278,7 @@ const afterInstall = async installedIds => {
     eyebrow: "Plugin installed",
     message:
       first.type === "theme"
-        ? `${names} installed — pick it under Display › Appearance.`
+        ? `${names} installed — pick it under Dashboard › Appearance.`
         : hasSetup
           ? `${names} installed and enabled — finish its setup below.`
           : `${names} installed and enabled — it's ready to use.`,
@@ -627,19 +626,9 @@ onMounted(async () => {
   await loadPlugins();
   await imagesStore.fetchImages();
 
-  // A ?setting= deep link that names a plugin-type tab (e.g. plugins-services
-  // from an empty Services region) opens that tab; otherwise the first non-empty.
-  const routeSetting = route?.query?.setting;
-  const routeTab =
-    typeof routeSetting === "string" ? getSettingDestinationById(routeSetting)?.tab : null;
-  if (routeTab) {
-    activePluginTab.value = routeTab;
-    // Open the first card on that tab so its "Add instance" is in view.
-    const first = plugins.value.find(p => p.type === routeTab);
-    if (first && first.type !== "theme" && cardHasBody(first) && !expandedPlugins.value[first.id]) {
-      handleToggleExpand(first.id);
-    }
-  } else if (plugins.value.length > 0) {
+  // No plugin destination names a tab any more (plugins-services moved to
+  // Content), so open the first plugin type that has an installed plugin.
+  if (plugins.value.length > 0) {
     const types = ["calendar", "image", "service", "backend", "theme"];
     const firstType = types.find(type => plugins.value.some(p => p.type === type));
     if (firstType) {
