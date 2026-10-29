@@ -24,6 +24,145 @@ export interface paths {
     patch?: never;
     trace?: never;
   };
+  "/api/backup/export": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    /**
+     * Export
+     * @description Download a backup of this install as a zip.
+     */
+    get: operations["export_api_backup_export_get"];
+    put?: never;
+    post?: never;
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  "/api/backup/files": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    /**
+     * List Files
+     * @description Backups stored in the backup dir (automatic, pre-restore, manual).
+     */
+    get: operations["list_files_api_backup_files_get"];
+    put?: never;
+    /**
+     * Create File
+     * @description Write a backup to the backup dir now.
+     */
+    post: operations["create_file_api_backup_files_post"];
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  "/api/backup/files/{name}": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    /** Download File */
+    get: operations["download_file_api_backup_files__name__get"];
+    put?: never;
+    post?: never;
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  "/api/backup/files/{name}/restore": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    get?: never;
+    put?: never;
+    /**
+     * Restore File
+     * @description Preview (dry_run) or restore a backup stored in the backup dir.
+     */
+    post: operations["restore_file_api_backup_files__name__restore_post"];
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  "/api/backup/preview": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    get?: never;
+    put?: never;
+    /**
+     * Preview
+     * @description Validate an uploaded backup and describe what restoring it would do.
+     */
+    post: operations["preview_api_backup_preview_post"];
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  "/api/backup/restore": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    get?: never;
+    put?: never;
+    /**
+     * Restore
+     * @description Restore an uploaded backup.
+     */
+    post: operations["restore_api_backup_restore_post"];
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  "/api/backup/schedule": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    /** Get Schedule */
+    get: operations["get_schedule_api_backup_schedule_get"];
+    /** Put Schedule */
+    put: operations["put_schedule_api_backup_schedule_put"];
+    post?: never;
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
   "/api/calendar/events": {
     parameters: {
       query?: never;
@@ -1686,6 +1825,24 @@ export interface components {
       /** Origins */
       origins: string[];
     };
+    /** BackupSchedule */
+    BackupSchedule: {
+      /**
+       * Enabled
+       * @default false
+       */
+      enabled: boolean;
+      /**
+       * Interval Hours
+       * @default 24
+       */
+      interval_hours: number;
+      /**
+       * Retention
+       * @default 7
+       */
+      retention: number;
+    };
     /** Body_inspect_plugin_api_plugins_inspect_post */
     Body_inspect_plugin_api_plugins_inspect_post: {
       /**
@@ -1701,6 +1858,55 @@ export interface components {
        * Format: binary
        */
       file: string;
+    };
+    /** Body_preview_api_backup_preview_post */
+    Body_preview_api_backup_preview_post: {
+      /**
+       * File
+       * Format: binary
+       */
+      file: string;
+      /**
+       * Mode
+       * @default replace
+       */
+      mode: string;
+    };
+    /** Body_restore_api_backup_restore_post */
+    Body_restore_api_backup_restore_post: {
+      /**
+       * File
+       * Format: binary
+       */
+      file: string;
+      /**
+       * Mode
+       * @default replace
+       */
+      mode: string;
+      /**
+       * Restore Signing Key
+       * @default false
+       */
+      restore_signing_key: boolean;
+    };
+    /** Body_restore_file_api_backup_files__name__restore_post */
+    Body_restore_file_api_backup_files__name__restore_post: {
+      /**
+       * Dry Run
+       * @default false
+       */
+      dry_run: boolean;
+      /**
+       * Mode
+       * @default replace
+       */
+      mode: string;
+      /**
+       * Restore Signing Key
+       * @default false
+       */
+      restore_signing_key: boolean;
     };
     /** Body_upload_image_api_images_upload_post */
     Body_upload_image_api_images_upload_post: {
@@ -2123,6 +2329,264 @@ export interface operations {
         };
         content: {
           "application/json": unknown;
+        };
+      };
+    };
+  };
+  export_api_backup_export_get: {
+    parameters: {
+      query?: {
+        include_packages?: boolean;
+        include_secrets?: boolean;
+        include_signing_key?: boolean;
+      };
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    requestBody?: never;
+    responses: {
+      /** @description Successful Response */
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": unknown;
+        };
+      };
+      /** @description Validation Error */
+      422: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["HTTPValidationError"];
+        };
+      };
+    };
+  };
+  list_files_api_backup_files_get: {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    requestBody?: never;
+    responses: {
+      /** @description Successful Response */
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": unknown;
+        };
+      };
+    };
+  };
+  create_file_api_backup_files_post: {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    requestBody?: never;
+    responses: {
+      /** @description Successful Response */
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": unknown;
+        };
+      };
+    };
+  };
+  download_file_api_backup_files__name__get: {
+    parameters: {
+      query?: never;
+      header?: never;
+      path: {
+        name: string;
+      };
+      cookie?: never;
+    };
+    requestBody?: never;
+    responses: {
+      /** @description Successful Response */
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": unknown;
+        };
+      };
+      /** @description Validation Error */
+      422: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["HTTPValidationError"];
+        };
+      };
+    };
+  };
+  restore_file_api_backup_files__name__restore_post: {
+    parameters: {
+      query?: never;
+      header?: never;
+      path: {
+        name: string;
+      };
+      cookie?: never;
+    };
+    requestBody?: {
+      content: {
+        "application/x-www-form-urlencoded": components["schemas"]["Body_restore_file_api_backup_files__name__restore_post"];
+      };
+    };
+    responses: {
+      /** @description Successful Response */
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": unknown;
+        };
+      };
+      /** @description Validation Error */
+      422: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["HTTPValidationError"];
+        };
+      };
+    };
+  };
+  preview_api_backup_preview_post: {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    requestBody: {
+      content: {
+        "multipart/form-data": components["schemas"]["Body_preview_api_backup_preview_post"];
+      };
+    };
+    responses: {
+      /** @description Successful Response */
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": unknown;
+        };
+      };
+      /** @description Validation Error */
+      422: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["HTTPValidationError"];
+        };
+      };
+    };
+  };
+  restore_api_backup_restore_post: {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    requestBody: {
+      content: {
+        "multipart/form-data": components["schemas"]["Body_restore_api_backup_restore_post"];
+      };
+    };
+    responses: {
+      /** @description Successful Response */
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": unknown;
+        };
+      };
+      /** @description Validation Error */
+      422: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["HTTPValidationError"];
+        };
+      };
+    };
+  };
+  get_schedule_api_backup_schedule_get: {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    requestBody?: never;
+    responses: {
+      /** @description Successful Response */
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["BackupSchedule"];
+        };
+      };
+    };
+  };
+  put_schedule_api_backup_schedule_put: {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    requestBody: {
+      content: {
+        "application/json": components["schemas"]["BackupSchedule"];
+      };
+    };
+    responses: {
+      /** @description Successful Response */
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["BackupSchedule"];
+        };
+      };
+      /** @description Validation Error */
+      422: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["HTTPValidationError"];
         };
       };
     };

@@ -316,6 +316,7 @@ const SECTION_BY_CATEGORY_TAB = {
   },
   maintenance: {
     updates: "maintenance-updates",
+    backup: "maintenance-backup",
     diagnostics: "maintenance-diagnostics",
   },
   plugins: {

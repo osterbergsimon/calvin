@@ -31,6 +31,7 @@ Configuration and settings documentation.
 
 - **[Remote Configuration](./configuration/REMOTE_CONFIG.md)** - Configure frontend to connect to remote backend
 - **[Settings Save Behavior](./configuration/SETTINGS_SAVE_BEHAVIOR.md)** - How settings are saved and persisted
+- **[Backup and Restore](./configuration/BACKUP_RESTORE.md)** - Back up a Calvin setup and restore it on a fresh install
 
 ### 🧪 [Testing](./testing/)
 Testing documentation and coverage information.
