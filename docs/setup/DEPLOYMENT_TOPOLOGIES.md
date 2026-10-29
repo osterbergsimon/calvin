@@ -176,9 +176,10 @@ old backend-side `display_orientation_service`, which cannot reach a remote kios
 The small Python display-agent and its systemd units that `setup-kiosk.sh`
 installs can be updated remotely without re-running setup or SSHing into the Pi.
 
-**Flow:** Settings → Kiosks → click **Update** → the backend sets a
-per-kiosk `agentUpdateRequested` flag → the kiosk picks it up on its next
-config poll → it fires the root oneshot `calvin-kiosk-update.service` →
+**Flow:** Settings → Kiosks → Kiosk software → **Update all** (or **Update** on
+one kiosk) → the backend sets a per-kiosk `agentUpdateRequested` flag → the
+kiosk picks it up on its next config poll → it fires the root oneshot
+`calvin-kiosk-update.service` →
 `update-kiosk.sh` fetches the bundle from
 `${CALVIN_BACKEND_URL}/api/kiosks/agent/*`, verifies sha256 (+ `py_compile`
 for Python files), backs up the current files, atomic-swaps only changed files,
@@ -189,6 +190,13 @@ The **bundle source is the local Calvin server** — the kiosk needs no internet
 access and carries no full repo checkout. Six files make up the bundle: the
 display-agent script, three systemd units, the updater script, and the oneshot
 update service unit.
+
+The Kiosks list summarises the fleet in a **Kiosk software** row: how many
+kiosks can be updated to the available bundle, with **Update all** in one click.
+Each kiosk card shows its running version and the outcome of its last update; a
+kiosk whose OS/Python is too old is marked "update needs a newer OS" and is
+never included in **Update all**. While at least one kiosk is behind, System ›
+Updates shows a pointer to that row.
 
 **`min_python` floor:** the manifest carries `"min_python": "3.9"`. If the
 kiosk's Python is below 3.9 the update is aborted (status: "device python <
