@@ -2,9 +2,12 @@
 import { describe, it, expect, beforeEach, vi } from "vitest";
 import { setActivePinia, createPinia } from "pinia";
 import { useKeyboardStore } from "@/stores/keyboard";
-import axios from "axios";
+import api from "@/services/api";
 
-vi.mock("axios");
+vi.mock("@/services/api", () => ({
+  default: { get: vi.fn(), post: vi.fn(), put: vi.fn(), delete: vi.fn() },
+  LONG_REQUEST_TIMEOUT: 600000,
+}));
 
 describe("Keyboard Store", () => {
   beforeEach(() => {
@@ -19,29 +22,29 @@ describe("Keyboard Store", () => {
   });
 
   it("fetchMappings stores the flat map", async () => {
-    axios.get.mockResolvedValue({ data: { mappings: { KEY_1: "generic_prev" } } });
+    api.get.mockResolvedValue({ data: { mappings: { KEY_1: "generic_prev" } } });
     const store = useKeyboardStore();
     await store.fetchMappings();
     expect(store.mappings).toEqual({ KEY_1: "generic_prev" });
-    expect(axios.get).toHaveBeenCalledWith("/api/keyboard/mappings");
+    expect(api.get).toHaveBeenCalledWith("/keyboard/mappings");
   });
 
   it("setMapping PUTs a single key and updates local state", async () => {
-    axios.put.mockResolvedValue({ data: {} });
+    api.put.mockResolvedValue({ data: {} });
     const store = useKeyboardStore();
     await store.setMapping("KEY_2", "generic_next");
-    expect(axios.put).toHaveBeenCalledWith("/api/keyboard/mappings/KEY_2", {
+    expect(api.put).toHaveBeenCalledWith("/keyboard/mappings/KEY_2", {
       action: "generic_next",
     });
     expect(store.mappings.KEY_2).toBe("generic_next");
   });
 
   it("removeMapping DELETEs a key and drops it locally", async () => {
-    axios.delete.mockResolvedValue({ data: {} });
+    api.delete.mockResolvedValue({ data: {} });
     const store = useKeyboardStore();
     store.mappings.KEY_2 = "generic_next";
     await store.removeMapping("KEY_2");
-    expect(axios.delete).toHaveBeenCalledWith("/api/keyboard/mappings/KEY_2");
+    expect(api.delete).toHaveBeenCalledWith("/keyboard/mappings/KEY_2");
     expect(store.mappings.KEY_2).toBeUndefined();
   });
 

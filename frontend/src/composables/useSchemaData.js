@@ -7,8 +7,8 @@
  * know how it was fetched.
  */
 import { useQuery } from "@tanstack/vue-query";
-import axios from "axios";
 import { computed, unref } from "vue";
+import api from "@/services/api";
 
 export function useSchemaData(serviceId, schema, enabled = true) {
   const id = computed(() => unref(serviceId));
@@ -19,14 +19,14 @@ export function useSchemaData(serviceId, schema, enabled = true) {
   });
   const endpoint = computed(() => {
     const sid = id.value;
-    return sid ? `/api/plugins/${sid}/data` : null;
+    return sid ? `/plugins/${sid}/data` : null;
   });
 
   const query = useQuery({
     queryKey: ["plugin-data", id],
     queryFn: async () => {
       if (!endpoint.value) return null;
-      const response = await axios.get(endpoint.value);
+      const response = await api.get(endpoint.value);
       return response.data;
     },
     enabled: computed(() => isEnabled.value && Boolean(endpoint.value)),

@@ -1,7 +1,7 @@
 import { defineStore } from "pinia";
 import { ref } from "vue";
-import axios from "axios";
-import { getCachedData, setCachedData } from "../utils/cache";
+import api from "../services/api";
+import { fetchWithCache, setCachedData } from "../utils/cache";
 import { useConnectionStore } from "./connection";
 import { logDebug, logError, logInfo } from "../utils/logger";
 
@@ -19,6 +19,9 @@ export const useCalendarStore = defineStore("calendar", () => {
   const loading = ref(false);
   const backgroundRefreshing = ref(false);
   const error = ref(null);
+  // True while the shown sources/events came from the offline cache instead of
+  // the backend (offline, or the request failed).
+  const stale = ref(false);
   const currentDate = ref(new Date());
   const selectedEvent = ref(null); // Currently selected/expanded event
   const selectedDate = ref(null); // The actual date that was selected (for multi-day events)
@@ -33,45 +36,27 @@ export const useCalendarStore = defineStore("calendar", () => {
     const cacheKey = "calendar_sources";
     const cacheTTL = 60 * 60 * 1000; // 1 hour
 
-    // Try to load from cache first if offline
-    if (!connectionStore.isFullyOnline()) {
-      const cachedSources = getCachedData(cacheKey, cacheTTL);
-      if (cachedSources) {
+    try {
+      const result = await fetchWithCache(
+        cacheKey,
+        cacheTTL,
+        async () => {
+          const response = await api.get("/calendar/sources");
+          /** @type {CalendarSourcesResponse} */
+          return response.data;
+        },
+        { preferCache: !connectionStore.isFullyOnline() }
+      );
+      if (result.fromCache) {
         logInfo(
           "[Calendar]",
-          `Using cached sources (${cachedSources.sources?.length || 0} sources)`
+          `Using ${result.stale ? "stale " : ""}cached sources (${result.data?.sources?.length || 0} sources)`
         );
-        sources.value = cachedSources.sources || [];
-        loading.value = false;
-        return cachedSources;
       }
-    }
-
-    try {
-      const response = await axios.get("/api/calendar/sources");
-      /** @type {CalendarSourcesResponse} */
-      const responseData = response.data;
-      sources.value = responseData.sources || [];
-
-      // Cache the response
-      setCachedData(cacheKey, responseData);
-
-      return responseData;
+      sources.value = result.data?.sources || [];
+      stale.value = result.stale;
+      return result.data;
     } catch (err) {
-      // If online but request failed, try cache
-      if (connectionStore.isFullyOnline()) {
-        const cachedSources = getCachedData(cacheKey, cacheTTL);
-        if (cachedSources) {
-          logInfo(
-            "[Calendar]",
-            `Request failed, using cached sources (${cachedSources.sources?.length || 0} sources)`
-          );
-          sources.value = cachedSources.sources || [];
-          loading.value = false;
-          return cachedSources;
-        }
-      }
-
       error.value = err.message;
       logError("[Calendar]", "Failed to fetch calendar sources:", err);
       throw err;
@@ -82,7 +67,7 @@ export const useCalendarStore = defineStore("calendar", () => {
 
   const updateSource = async (sourceId, updates) => {
     try {
-      const response = await axios.put(`/api/calendar/sources/${sourceId}`, updates);
+      const response = await api.put(`/calendar/sources/${sourceId}`, updates);
       // Update local sources
       const index = sources.value.findIndex(s => s.id === sourceId);
       if (index !== -1) {
@@ -144,73 +129,56 @@ export const useCalendarStore = defineStore("calendar", () => {
     const cacheKey = `calendar_events_${sourceKey}_${startDate?.toISOString()}_${endDate?.toISOString()}`;
     const cacheTTL = 30 * 60 * 1000; // 30 minutes
 
-    // Try to load from cache first if offline
-    if (!connectionStore.isFullyOnline()) {
-      const cachedEvents = getCachedData(cacheKey, cacheTTL);
-      if (cachedEvents) {
-        logInfo("[Calendar]", `Using cached events (${cachedEvents.events?.length || 0} events)`);
-        eventsBySourceKey.value[sourceKey] = cachedEvents.events || [];
-        if (sourceKey === "__all__") events.value = cachedEvents.events || [];
-        loading.value = false;
-        return cachedEvents;
-      }
-    }
-
     try {
-      const params = {
-        start_date: startDate?.toISOString(),
-        end_date: endDate?.toISOString(),
-      };
-      if (normalizedSourceIds.length > 0) {
-        params.source_ids = normalizedSourceIds.join(",");
-      }
-
-      // Add refresh parameter if provided (for cache busting)
-      if (refreshParam) {
-        // Parse refresh param - could be a query string or boolean
-        if (typeof refreshParam === "string" && refreshParam.includes("refresh=")) {
-          // Extract refresh value from query string
-          const refreshMatch = refreshParam.match(/refresh=([^&]*)/);
-          if (refreshMatch) {
-            params.refresh = true;
+      const result = await fetchWithCache(
+        cacheKey,
+        cacheTTL,
+        async () => {
+          const params = {
+            start_date: startDate?.toISOString(),
+            end_date: endDate?.toISOString(),
+          };
+          if (normalizedSourceIds.length > 0) {
+            params.source_ids = normalizedSourceIds.join(",");
           }
-        } else if (refreshParam === true || refreshParam === "true") {
-          params.refresh = true;
-        }
-      }
 
-      const response = await axios.get("/api/calendar/events", { params });
-      /** @type {CalendarEventsResponse} */
-      const responseData = response.data;
-      eventsBySourceKey.value[sourceKey] = responseData.events || [];
+          // Add refresh parameter if provided (for cache busting)
+          if (refreshParam) {
+            // Parse refresh param - could be a query string or boolean
+            if (typeof refreshParam === "string" && refreshParam.includes("refresh=")) {
+              // Extract refresh value from query string
+              const refreshMatch = refreshParam.match(/refresh=([^&]*)/);
+              if (refreshMatch) {
+                params.refresh = true;
+              }
+            } else if (refreshParam === true || refreshParam === "true") {
+              params.refresh = true;
+            }
+          }
+
+          const response = await api.get("/calendar/events", { params });
+          /** @type {CalendarEventsResponse} */
+          return response.data;
+        },
+        { preferCache: !connectionStore.isFullyOnline() }
+      );
+      const responseData = result.data;
+      eventsBySourceKey.value[sourceKey] = responseData?.events || [];
       if (sourceKey === "__all__") {
-        events.value = responseData.events || [];
+        events.value = responseData?.events || [];
       }
+      stale.value = result.stale;
 
-      // Cache the response
-      setCachedData(cacheKey, responseData);
-
-      logDebug("[Calendar]", `Fetched ${responseData.events?.length || 0} events from API`);
-      if (responseData.events?.length > 0) {
-        logDebug("[Calendar]", "Sample event:", responseData.events[0]);
+      if (result.fromCache) {
+        logInfo(
+          "[Calendar]",
+          `Using ${result.stale ? "stale " : ""}cached events (${responseData?.events?.length || 0} events)`
+        );
+      } else {
+        logDebug("[Calendar]", `Fetched ${responseData?.events?.length || 0} events from API`);
       }
       return responseData;
     } catch (err) {
-      // If online but request failed, try cache
-      if (connectionStore.isFullyOnline()) {
-        const cachedEvents = getCachedData(cacheKey, cacheTTL);
-        if (cachedEvents) {
-          logInfo(
-            "[Calendar]",
-            `Request failed, using cached events (${cachedEvents.events?.length || 0} events)`
-          );
-          eventsBySourceKey.value[sourceKey] = cachedEvents.events || [];
-          if (sourceKey === "__all__") events.value = cachedEvents.events || [];
-          loading.value = false;
-          return cachedEvents;
-        }
-      }
-
       error.value = err.message;
       logError("[Calendar]", "Failed to fetch events:", err);
       throw err;
@@ -409,7 +377,7 @@ export const useCalendarStore = defineStore("calendar", () => {
     /** Manually refresh calendar cache and reload events. */
     try {
       // Call the backend refresh endpoint to clear cache and reload
-      await axios.post("/api/calendar/refresh");
+      await api.post("/calendar/refresh");
 
       // Reload events for the current view
       // Calculate the date range based on current date (same logic as CalendarView.loadEvents)
@@ -444,6 +412,7 @@ export const useCalendarStore = defineStore("calendar", () => {
     loading,
     backgroundRefreshing,
     error,
+    stale,
     currentDate,
     selectedEvent,
     selectedDate,

@@ -45,7 +45,7 @@ A plugin directory:
 
 ## Conventions
 
-**State (frontend):** one Pinia store per domain (`config`, `webServices`, `calendar`, `images`, `themes`, `keyboard`, `mode`, `connection`). Stores expose refs + async actions. Network calls try the API first and fall back to localStorage cache with TTL (see [utils/cache.js](frontend/src/utils/cache.js) and [stores/webServices.js](frontend/src/stores/webServices.js)).
+**State (frontend):** one Pinia store per domain (`config`, `webServices`, `calendar`, `images`, `themes`, `keyboard`, `mode`, `connection`). Stores expose refs + async actions. Network calls go through the shared client [services/api.js](frontend/src/services/api.js) (base URL, timeouts; don't import raw `axios` in stores), try the API first and fall back to the localStorage cache: `fetchWithCache` in [utils/cache.js](frontend/src/utils/cache.js) writes only on full success and, when the backend is unreachable, serves even expired entries flagged `stale` (see [stores/webServices.js](frontend/src/stores/webServices.js)). The service worker ([public/sw.js](frontend/public/sw.js)) is network-first for pages and API calls and never handles `/api/health`, `/api/system/*`, SSE or full-size images.
 
 **Routing:** FastAPI routers per domain under `backend/app/api/routes/`. The backend serves `index.html` for all non-`/api` paths (SPA). Frontend uses Vue Router + `useModeStore` to switch between calendar/photos/services/settings.
 

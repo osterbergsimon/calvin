@@ -51,11 +51,25 @@ initLogger(() => useConfigStore());
 
 // Register service worker for offline caching and performance
 if ("serviceWorker" in navigator && import.meta.env.PROD) {
+  // A new deploy installs a new worker (it activates at once). Reload when it
+  // takes over a page an older worker served, so a kiosk that never navigates
+  // still moves onto the new UI. No reload on the very first install.
+  const hadController = Boolean(navigator.serviceWorker.controller);
+  let reloading = false;
+  navigator.serviceWorker.addEventListener("controllerchange", () => {
+    if (!hadController || reloading) return;
+    reloading = true;
+    window.location.reload();
+  });
+
   window.addEventListener("load", () => {
     navigator.serviceWorker
-      .register("/sw.js")
+      // Always revalidate sw.js itself, never take it from the HTTP cache.
+      .register("/sw.js", { updateViaCache: "none" })
       .then(registration => {
         logInfo("[main]", "Service Worker registered:", registration);
+        // Kiosks stay on one page for days: check for a new deploy hourly.
+        setInterval(() => registration.update().catch(() => {}), 60 * 60 * 1000);
       })
       .catch(error => {
         logError("[main]", "Service Worker registration failed:", error);

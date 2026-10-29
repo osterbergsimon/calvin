@@ -1,6 +1,6 @@
 import { defineStore } from "pinia";
 import { ref } from "vue";
-import axios from "axios";
+import api from "@/services/api";
 import { getCachedData, setCachedData } from "@/utils/cache";
 import { logError } from "@/utils/logger";
 
@@ -12,19 +12,19 @@ export const useKiosksStore = defineStore("kiosks", () => {
 
   async function loadKiosks() {
     try {
-      const response = await axios.get("/api/kiosks");
+      const response = await api.get("/kiosks");
       kiosks.value = response.data?.kiosks ?? [];
       setCachedData(CACHE_KEY, kiosks.value);
     } catch (err) {
       logError("[kiosks]", "Failed to load kiosks, using cache:", err);
-      const cached = getCachedData(CACHE_KEY, CACHE_TTL);
+      const cached = getCachedData(CACHE_KEY, CACHE_TTL, { allowStale: true });
       if (cached) kiosks.value = cached;
     }
   }
 
   async function fetchOverrides(id) {
     try {
-      const response = await axios.get(`/api/kiosks/${encodeURIComponent(id)}/overrides`);
+      const response = await api.get(`/kiosks/${encodeURIComponent(id)}/overrides`);
       return response.data?.overrides ?? {};
     } catch (err) {
       if (err?.response?.status === 404) return {}; // known-seen kiosk with no overrides yet
@@ -33,12 +33,12 @@ export const useKiosksStore = defineStore("kiosks", () => {
   }
 
   async function saveOverrides(id, overrides) {
-    await axios.put(`/api/kiosks/${encodeURIComponent(id)}/overrides`, { overrides });
+    await api.put(`/kiosks/${encodeURIComponent(id)}/overrides`, { overrides });
   }
 
   async function fetchDeviceConfigVersion(id) {
     try {
-      const response = await axios.get(`/api/kiosks/${encodeURIComponent(id)}/config`);
+      const response = await api.get(`/kiosks/${encodeURIComponent(id)}/config`);
       return response.data?.deviceConfigVersion ?? null;
     } catch {
       return null; // fail-open — caller degrades to "Not yet reported"
@@ -46,13 +46,13 @@ export const useKiosksStore = defineStore("kiosks", () => {
   }
 
   async function triggerUpdate(id) {
-    await axios.post(`/api/kiosks/${encodeURIComponent(id)}/update`);
+    await api.post(`/kiosks/${encodeURIComponent(id)}/update`);
     await loadKiosks();
   }
 
   async function fetchAvailableAgentVersion() {
     try {
-      const response = await axios.get("/api/kiosks/agent/manifest");
+      const response = await api.get("/kiosks/agent/manifest");
       return response.data?.version ?? null;
     } catch {
       return null; // fail-open — caller degrades gracefully

@@ -3,10 +3,12 @@
 import { describe, it, expect, beforeEach, vi } from "vitest";
 import { setActivePinia, createPinia } from "pinia";
 import { useThemesStore } from "@/stores/themes";
-import axios from "axios";
+import api from "@/services/api";
 
-// Mock axios
-vi.mock("axios");
+vi.mock("@/services/api", () => ({
+  default: { get: vi.fn(), post: vi.fn(), put: vi.fn(), delete: vi.fn() },
+  LONG_REQUEST_TIMEOUT: 600000,
+}));
 
 // Mock logger
 vi.mock("@/utils/logger", () => ({
@@ -47,7 +49,7 @@ describe("Themes Store", () => {
       const mockTheme1 = { id: "theme1", name: "Theme 1", variables: {} };
       const mockTheme2 = { id: "theme2", name: "Theme 2", variables: {} };
 
-      axios.get
+      api.get
         .mockResolvedValueOnce({ data: mockPlugins })
         .mockResolvedValueOnce({ data: mockTheme1 })
         .mockResolvedValueOnce({ data: mockTheme2 });
@@ -55,9 +57,9 @@ describe("Themes Store", () => {
       const store = useThemesStore();
       await store.fetchThemes();
 
-      expect(axios.get).toHaveBeenCalledWith("/api/plugins?plugin_type=theme");
-      expect(axios.get).toHaveBeenCalledWith("/api/plugins/theme1");
-      expect(axios.get).toHaveBeenCalledWith("/api/plugins/theme2");
+      expect(api.get).toHaveBeenCalledWith("/plugins?plugin_type=theme");
+      expect(api.get).toHaveBeenCalledWith("/plugins/theme1");
+      expect(api.get).toHaveBeenCalledWith("/plugins/theme2");
       expect(store.themes.length).toBe(2);
       expect(store.loading).toBe(false);
       expect(store.error).toBe(null);
@@ -68,7 +70,7 @@ describe("Themes Store", () => {
         plugins: [{ id: "theme1", name: "Theme 1", type: "theme" }],
       };
 
-      axios.get
+      api.get
         .mockResolvedValueOnce({ data: mockPlugins })
         .mockRejectedValueOnce(new Error("Theme not found"));
 
@@ -85,7 +87,7 @@ describe("Themes Store", () => {
 
     it("should handle API errors", async () => {
       const error = new Error("Network error");
-      axios.get.mockRejectedValue(error);
+      api.get.mockRejectedValue(error);
 
       const store = useThemesStore();
 
@@ -106,12 +108,12 @@ describe("Themes Store", () => {
         ],
       };
 
-      axios.get.mockResolvedValue({ data: mockResponse });
+      api.get.mockResolvedValue({ data: mockResponse });
 
       const store = useThemesStore();
       const result = await store.fetchInstalledThemes();
 
-      expect(axios.get).toHaveBeenCalledWith("/api/plugins/installed");
+      expect(api.get).toHaveBeenCalledWith("/plugins/installed");
       expect(store.loading).toBe(false);
       // The endpoint has no `themes` key — read `plugins` and filter (calvin-8lr).
       expect(result).toEqual([
@@ -123,7 +125,7 @@ describe("Themes Store", () => {
 
     it("should handle API errors", async () => {
       const error = new Error("Network error");
-      axios.get.mockRejectedValue(error);
+      api.get.mockRejectedValue(error);
 
       const store = useThemesStore();
 
@@ -137,18 +139,18 @@ describe("Themes Store", () => {
   describe("getTheme", () => {
     it("should get a specific theme by ID", async () => {
       const mockTheme = { id: "theme1", name: "Theme 1", variables: {} };
-      axios.get.mockResolvedValue({ data: mockTheme });
+      api.get.mockResolvedValue({ data: mockTheme });
 
       const store = useThemesStore();
       const result = await store.getTheme("theme1");
 
-      expect(axios.get).toHaveBeenCalledWith("/api/plugins/theme1");
+      expect(api.get).toHaveBeenCalledWith("/plugins/theme1");
       expect(result).toEqual(mockTheme);
     });
 
     it("should handle API errors", async () => {
       const error = new Error("Theme not found");
-      axios.get.mockRejectedValue(error);
+      api.get.mockRejectedValue(error);
 
       const store = useThemesStore();
 
@@ -168,18 +170,16 @@ describe("Themes Store", () => {
         },
       };
 
-      axios.post.mockResolvedValue(mockResponse);
-      axios.get
+      api.post.mockResolvedValue(mockResponse);
+      api.get
         .mockResolvedValueOnce({ data: { plugins: [] } })
         .mockResolvedValueOnce({ data: { plugins: [] } });
 
       const store = useThemesStore();
       await store.installTheme(file);
 
-      expect(axios.post).toHaveBeenCalledWith("/api/plugins/install", expect.any(FormData), {
-        headers: {
-          "Content-Type": "multipart/form-data",
-        },
+      expect(api.post).toHaveBeenCalledWith("/plugins/install", expect.any(FormData), {
+        timeout: 600000,
       });
       expect(store.loading).toBe(false);
       expect(store.error).toBe(null);
@@ -191,7 +191,7 @@ describe("Themes Store", () => {
         type: "application/zip",
       });
       const error = new Error("Installation failed");
-      axios.post.mockRejectedValue(error);
+      api.post.mockRejectedValue(error);
 
       const store = useThemesStore();
 
@@ -210,8 +210,8 @@ describe("Themes Store", () => {
         },
       };
 
-      axios.post.mockResolvedValue(mockResponse);
-      axios.get
+      api.post.mockResolvedValue(mockResponse);
+      api.get
         .mockResolvedValueOnce({ data: { plugins: [] } })
         .mockResolvedValueOnce({ data: { plugins: [] } });
 
@@ -219,11 +219,15 @@ describe("Themes Store", () => {
       await store.installThemeFromGitHub("https://github.com/user/repo", "theme.json", "main");
 
       // The handler requires plugin_path (not theme_path) or it 400s (calvin-8lr).
-      expect(axios.post).toHaveBeenCalledWith("/api/plugins/github/install", {
-        repo_url: "https://github.com/user/repo",
-        plugin_path: "theme.json",
-        branch: "main",
-      });
+      expect(api.post).toHaveBeenCalledWith(
+        "/plugins/github/install",
+        {
+          repo_url: "https://github.com/user/repo",
+          plugin_path: "theme.json",
+          branch: "main",
+        },
+        { timeout: 600000 }
+      );
       expect(store.loading).toBe(false);
       expect(store.error).toBe(null);
       expect(logInfo).toHaveBeenCalled();
@@ -236,24 +240,28 @@ describe("Themes Store", () => {
         },
       };
 
-      axios.post.mockResolvedValue(mockResponse);
-      axios.get
+      api.post.mockResolvedValue(mockResponse);
+      api.get
         .mockResolvedValueOnce({ data: { plugins: [] } })
         .mockResolvedValueOnce({ data: { plugins: [] } });
 
       const store = useThemesStore();
       await store.installThemeFromGitHub("https://github.com/user/repo", "theme.json");
 
-      expect(axios.post).toHaveBeenCalledWith("/api/plugins/github/install", {
-        repo_url: "https://github.com/user/repo",
-        plugin_path: "theme.json",
-        branch: "main",
-      });
+      expect(api.post).toHaveBeenCalledWith(
+        "/plugins/github/install",
+        {
+          repo_url: "https://github.com/user/repo",
+          plugin_path: "theme.json",
+          branch: "main",
+        },
+        { timeout: 600000 }
+      );
     });
 
     it("should handle installation errors", async () => {
       const error = new Error("GitHub installation failed");
-      axios.post.mockRejectedValue(error);
+      api.post.mockRejectedValue(error);
 
       const store = useThemesStore();
 
@@ -277,15 +285,19 @@ describe("Themes Store", () => {
         },
       };
 
-      axios.post.mockResolvedValue(mockResponse);
+      api.post.mockResolvedValue(mockResponse);
 
       const store = useThemesStore();
       const result = await store.enumerateThemesFromGitHub("https://github.com/user/repo", "main");
 
-      expect(axios.post).toHaveBeenCalledWith("/api/plugins/github/enumerate", {
-        repo_url: "https://github.com/user/repo",
-        branch: "main",
-      });
+      expect(api.post).toHaveBeenCalledWith(
+        "/plugins/github/enumerate",
+        {
+          repo_url: "https://github.com/user/repo",
+          branch: "main",
+        },
+        { timeout: 600000 }
+      );
       // The function returns response.data, not the full response
       expect(result).toEqual(mockResponse.data);
       expect(store.loading).toBe(false);
@@ -294,7 +306,7 @@ describe("Themes Store", () => {
     it("should return empty array when no themes in response", async () => {
       const mockResponse = { data: {} };
 
-      axios.post.mockResolvedValue(mockResponse);
+      api.post.mockResolvedValue(mockResponse);
 
       const store = useThemesStore();
       const result = await store.enumerateThemesFromGitHub("https://github.com/user/repo");
@@ -304,7 +316,7 @@ describe("Themes Store", () => {
 
     it("should handle API errors", async () => {
       const error = new Error("Network error");
-      axios.post.mockRejectedValue(error);
+      api.post.mockRejectedValue(error);
 
       const store = useThemesStore();
 
@@ -319,15 +331,15 @@ describe("Themes Store", () => {
 
   describe("uninstallTheme", () => {
     it("should uninstall a theme", async () => {
-      axios.delete.mockResolvedValue({ data: { success: true } });
-      axios.get
+      api.delete.mockResolvedValue({ data: { success: true } });
+      api.get
         .mockResolvedValueOnce({ data: { plugins: [] } })
         .mockResolvedValueOnce({ data: { plugins: [] } });
 
       const store = useThemesStore();
       const result = await store.uninstallTheme("theme1");
 
-      expect(axios.delete).toHaveBeenCalledWith("/api/plugins/installed/theme1");
+      expect(api.delete).toHaveBeenCalledWith("/plugins/installed/theme1");
       expect(result).toEqual({ success: true });
       expect(store.loading).toBe(false);
       expect(logInfo).toHaveBeenCalled();
@@ -335,7 +347,7 @@ describe("Themes Store", () => {
 
     it("should handle uninstall errors", async () => {
       const error = new Error("Uninstall failed");
-      axios.delete.mockRejectedValue(error);
+      api.delete.mockRejectedValue(error);
 
       const store = useThemesStore();
 

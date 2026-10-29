@@ -2,7 +2,7 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 import { ref } from "vue";
 import { useSchemaData } from "@/composables/useSchemaData";
 
-vi.mock("axios", () => ({
+vi.mock("@/services/api", () => ({
   default: {
     get: vi.fn(),
   },
