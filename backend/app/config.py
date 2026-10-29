@@ -23,6 +23,7 @@ _DATA_PATHS = (
     "themes_dir",
     "kiosk_signing_key_path",
     "backup_dir",
+    "admin_auth_path",
 )
 
 
@@ -134,6 +135,18 @@ class Settings(BaseSettings):
 
     # Backups (calvin-8gx)
     backup_dir: Path = Path("backups")
+
+    # Admin auth (CLV-9). The secret file sits next to the kiosk signing key,
+    # never in the DB or a backup. CALVIN_ADMIN_PASSWORD always wins on start.
+    admin_auth_path: Path = Path("admin-auth.json")
+    admin_password: str = Field(
+        default="",
+        validation_alias=AliasChoices("calvin_admin_password", "admin_password"),
+    )
+    allowed_hosts: str = Field(
+        default="",
+        validation_alias=AliasChoices("calvin_allowed_hosts", "allowed_hosts"),
+    )
 
     @model_validator(mode="after")
     def _derive_paths(self) -> "Settings":
