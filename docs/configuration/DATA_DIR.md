@@ -29,6 +29,11 @@ is taken relative to the `backend/` directory, not the working directory, so
 older `.env` files with `./data/...` paths keep pointing where they used to.
 An empty value (`CALVIN_DATA_DIR=`, `BACKUP_DIR=`, ...) counts as unset.
 
+`image_cache/` is bounded so it can't slowly fill an SD card. Past
+`IMAGE_CACHE_MAX_MB` (default 500) the least recently viewed images are
+evicted, and a single remote image larger than `IMAGE_CACHE_MAX_ITEM_MB`
+(default 25) is refused instead of being read into memory.
+
 ## Upgrading when the data dir moves
 
 Before `CALVIN_DATA_DIR` was read, everything without its own variable was
