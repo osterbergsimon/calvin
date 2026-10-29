@@ -107,6 +107,9 @@
               />
             </template>
 
+            <!-- CLV-20: one welcome card while every content region is empty -->
+            <SetupWelcomeCard />
+
             <!-- Drag-to-resize handles (only when the layout is unlocked) -->
             <div
               v-for="handle in resizeHandles"
@@ -156,9 +159,19 @@
 </template>
 
 <script setup>
-import { onMounted, onUnmounted, computed, ref, watch, defineAsyncComponent, provide } from "vue";
+import {
+  onMounted,
+  onUnmounted,
+  onBeforeUnmount,
+  computed,
+  ref,
+  watch,
+  defineAsyncComponent,
+  provide,
+} from "vue";
 import LayoutManager from "../components/LayoutManager.vue";
 import DashboardRegion from "../components/DashboardRegion.vue";
+import SetupWelcomeCard from "../components/dashboard/SetupWelcomeCard.vue";
 import MinimalUIOverlay from "../components/MinimalUIOverlay.vue";
 import ClockBarHorizontal from "../components/ClockBarHorizontal.vue";
 import ClockBarVertical from "../components/ClockBarVertical.vue";
@@ -175,6 +188,7 @@ import { useProgressStore } from "../stores/progress";
 import { useRoute } from "vue-router";
 import { useKeyboardActions } from "../composables/useKeyboardActions";
 import { useHotCornerReveal } from "../composables/useHotCornerReveal";
+import { useSetupPrompt } from "../composables/useSetupPrompt";
 import {
   getActiveDashboardScreen,
   getClockBarPlacementGap,
@@ -182,6 +196,7 @@ import {
   getLayoutDirection,
   getNodeAtPath,
   getRegionAxisStyle,
+  getLeafRegions,
   normalizeDashboardScreens,
   applyDragSizesById,
   resizeAdjacentRegions,
@@ -226,6 +241,48 @@ const barVisible = computed(() => configStore.shouldShowUI || configStore.clockB
 
 const dashboardScreens = computed(() => configStore.effectiveDashboardScreens);
 const activeScreen = computed(() => getActiveDashboardScreen(dashboardScreens.value));
+
+// CLV-20: the ordered content regions of the active screen drive the single
+// setup prompt. EmptyState instances report which of them are setup-empty.
+const setupPrompt = useSetupPrompt();
+const setupContentRegions = computed(() =>
+  getLeafRegions(activeScreen.value?.layout)
+    .filter(region => ["calendar", "photos", "service"].includes(region.kind))
+    .map(region => ({ key: region.id, kind: region.kind }))
+);
+
+// A screen change resets the prompt; give the async region components time to
+// mount and report before treating an empty report list as "all configured".
+let settleTimer = null;
+const settleSetupPrompt = () => {
+  if (settleTimer) clearTimeout(settleTimer);
+  settleTimer = setTimeout(() => setupPrompt.markSettled(), 600);
+};
+watch(
+  setupContentRegions,
+  regions => {
+    setupPrompt.setContentRegions(regions);
+    settleSetupPrompt();
+  },
+  { immediate: true }
+);
+
+// Fullscreen swaps the dashboard view out (v-if in the template), so its
+// regions stop reporting for a while. Do not mistake that for configuration.
+watch(
+  () => modeStore.isFullscreen,
+  isFullscreen => {
+    if (isFullscreen) {
+      setupPrompt.detach();
+      if (settleTimer) {
+        clearTimeout(settleTimer);
+        settleTimer = null;
+      }
+    } else {
+      settleSetupPrompt();
+    }
+  }
+);
 
 const effectiveClockBar = computed(() =>
   resolveClockBarForScreen(
@@ -521,12 +578,23 @@ watch(
 onMounted(async () => {
   await configStore.fetchConfig();
   startConfigPolling();
+  settleSetupPrompt();
+});
+
+onBeforeUnmount(() => {
+  // Children clear their setup reports while unmounting; do not read that as
+  // "everything got configured" and drop the per-device dismissal.
+  setupPrompt.detach();
 });
 
 onUnmounted(() => {
   if (configPollInterval) {
     clearInterval(configPollInterval);
     configPollInterval = null;
+  }
+  if (settleTimer) {
+    clearTimeout(settleTimer);
+    settleTimer = null;
   }
   // Drop any in-flight drag listeners and re-lock the layout on the way out so
   // it never stays editable behind the user's back.

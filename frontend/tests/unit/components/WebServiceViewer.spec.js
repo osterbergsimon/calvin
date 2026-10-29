@@ -215,7 +215,7 @@ describe("WebServiceViewer control consolidation", () => {
 });
 
 describe("WebServiceViewer empty state (F4)", () => {
-  it("links an empty Services region to adding a web service", async () => {
+  it("links an empty Services region to adding a web page", async () => {
     setActivePinia(createPinia());
     const store = useWebServicesStore();
     store.fetchServices = vi.fn().mockResolvedValue();
@@ -228,9 +228,9 @@ describe("WebServiceViewer empty state (F4)", () => {
 
     const empty = w.findComponent({ name: "EmptyState" });
     expect(empty.exists()).toBe(true);
-    expect(empty.props("settingId")).toBe("plugins-services");
+    expect(empty.props("settingId")).toBe("content-services");
     expect(w.text()).toContain("Settings › Content › Web pages & services");
-    expect(w.find('[data-test="empty-state-action"]').text()).toBe("Add a web service");
+    expect(w.find('[data-test="empty-state-action"]').text()).toBe("Add a web page");
     w.unmount();
   });
 });

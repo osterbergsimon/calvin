@@ -54,6 +54,7 @@
         :auto-rotate="true"
         :rotation-interval="photoRotationInterval * 1000"
         :source-ids="region.instanceIds || []"
+        :region-id="region.id"
         :focused="isFocused(region.id)"
         :dim="isDim(region.id)"
       />
