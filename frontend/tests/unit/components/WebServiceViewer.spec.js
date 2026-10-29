@@ -170,7 +170,7 @@ describe("WebServiceViewer", () => {
     const wrapper = mountViewer({ isFullscreen: false, serviceId: "deleted-service" });
 
     expect(wrapper.text()).toContain("Selected service is unavailable");
-    expect(wrapper.text()).toContain("Choose another service in Settings");
+    expect(wrapper.text()).toContain("Settings › Plugins › Service");
     expect(wrapper.find(".service-viewer-stub").exists()).toBe(false);
   });
 
@@ -211,5 +211,26 @@ describe("WebServiceViewer control consolidation", () => {
   it("still shows the Enter Fullscreen control with a pointer present", () => {
     const w = mount2({ isFullscreen: false, serviceId: "b", focused: true });
     expect(w.find('[title="Enter Fullscreen"]').exists()).toBe(true);
+  });
+});
+
+describe("WebServiceViewer empty state (F4)", () => {
+  it("links an empty Services region to adding a web service", async () => {
+    setActivePinia(createPinia());
+    const store = useWebServicesStore();
+    store.fetchServices = vi.fn().mockResolvedValue();
+    store.services = [];
+    store.loading = false;
+    useConfigStore().touchControls = "off";
+
+    const w = mount(WebServiceViewer, { props: { regionId: "svc-1", view: {} } });
+    await w.vm.$nextTick();
+
+    const empty = w.findComponent({ name: "EmptyState" });
+    expect(empty.exists()).toBe(true);
+    expect(empty.props("settingId")).toBe("plugins-services");
+    expect(w.text()).toContain("Settings › Plugins › Service");
+    expect(w.find('[data-test="empty-state-action"]').text()).toBe("Add a web service");
+    w.unmount();
   });
 });

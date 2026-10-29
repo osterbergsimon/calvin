@@ -119,12 +119,14 @@
 </template>
 
 <script setup>
-import { ref, computed, onMounted } from "vue";
+import { ref, computed, onMounted, nextTick } from "vue";
 import { useRoute, useRouter } from "vue-router";
 import { usePlugins } from "@/composables";
 import { useSystem } from "@/composables";
 import { useConfigStore } from "@/stores/config";
 import { useImagesStore } from "@/stores/images";
+import { useNotificationsStore } from "@/stores/notifications";
+import { getSettingDestinationById } from "@/components/settings/settingsRegistry";
 import * as pluginsApi from "@/services/pluginsApi";
 import * as calendarApi from "@/services/calendarApi";
 import SettingsSection from "@/components/settings/shell/SettingsSection.vue";
@@ -177,6 +179,7 @@ const {
 const { restartBackend } = useSystem();
 const configStore = useConfigStore();
 const imagesStore = useImagesStore();
+const notificationsStore = useNotificationsStore();
 const route = useRoute();
 const router = useRouter();
 
@@ -219,19 +222,85 @@ const cancelPipInstall = () => {
   pendingInstallAction.value = null;
 };
 
+// Mirrors what PluginCard renders when expanded: global settings, actions,
+// custom sections or an instance list. A single-instance plugin with none of
+// these (e.g. Picsum) would expand into an empty box.
+const cardHasBody = plugin =>
+  Object.entries(plugin.common_config_schema || {}).some(
+    ([key, schema]) => !key.startsWith("_") && !schema?.ui?.hidden
+  ) ||
+  (plugin.ui_actions || []).length > 0 ||
+  (plugin.ui_sections || []).length > 0 ||
+  plugin.supports_multiple_instances !== false;
+
+// After an install (F5): a new plugin type lands disabled and on whatever tab
+// was open, so switch it on, jump to it and say what to do next.
+const afterInstall = async installedIds => {
+  const installed = (installedIds || [])
+    .map(id => plugins.value.find(p => p.id === id))
+    .filter(Boolean);
+  if (installed.length === 0) {
+    if (installedIds?.length && pluginRequiresRestart.value) {
+      notificationsStore.notify({
+        severity: "info",
+        eyebrow: "Plugins",
+        message: "Plugin installed — restart the backend to finish setting it up.",
+      });
+    }
+    return;
+  }
+
+  for (const plugin of installed) {
+    // Themes have no on/off switch; everything else becomes usable straight away.
+    if (plugin.type !== "theme" && !plugin.enabled) {
+      try {
+        await togglePlugin(plugin.id, true);
+      } catch (error) {
+        console.error(`Failed to enable plugin ${plugin.id}:`, error);
+      }
+    }
+  }
+
+  const first = installed[0];
+  const hasSetup = first.type !== "theme" && cardHasBody(first);
+  activePluginTab.value = first.type;
+  if (hasSetup) {
+    expandedPlugins.value[first.id] = true;
+    void Promise.resolve(loadPluginConfig(first.id)).catch(() => {});
+  }
+  await nextTick();
+  document
+    .querySelector(`[data-plugin-id="${CSS.escape(first.id)}"]`)
+    ?.scrollIntoView({ behavior: "smooth", block: "start" });
+
+  const names = installed.map(p => p.name || p.id).join(", ");
+  notificationsStore.notify({
+    severity: "success",
+    eyebrow: "Plugin installed",
+    message:
+      first.type === "theme"
+        ? `${names} installed — pick it under Display › Appearance.`
+        : hasSetup
+          ? `${names} installed and enabled — finish its setup below.`
+          : `${names} installed and enabled — it's ready to use.`,
+  });
+};
+
 // Handlers
 const handleZipSelect = async file => {
   try {
     const result = await pluginsApi.inspectPluginZip(file);
     const deps = result.manifest?.dependencies?.packages ?? [];
     if (deps.length > 0) {
-      triggerPipWarning(deps, result.manifest?.name ?? file.name, () => installPluginFromZip(file));
+      triggerPipWarning(deps, result.manifest?.name ?? file.name, async () =>
+        afterInstall(await installPluginFromZip(file))
+      );
       return;
     }
   } catch {
     // Inspection failed — let the install endpoint surface the real error
   }
-  await installPluginFromZip(file);
+  await afterInstall(await installPluginFromZip(file));
 };
 
 const handleListPlugins = async ({ repoUrl, branch, source, localPath }) => {
@@ -251,7 +320,8 @@ const handleListPlugins = async ({ repoUrl, branch, source, localPath }) => {
 const handleInstall = async ({ path, repoUrl, branch, force }) => {
   const plugin = availablePlugins.value.find(p => p.path === path);
   const deps = plugin?.manifest?.dependencies?.packages ?? [];
-  const doInstall = () => installPluginFromGitHub(repoUrl, path, branch, force);
+  const doInstall = async () =>
+    afterInstall(await installPluginFromGitHub(repoUrl, path, branch, force));
   if (deps.length > 0) {
     triggerPipWarning(deps, plugin?.name ?? path, doInstall);
     return;
@@ -262,7 +332,8 @@ const handleInstall = async ({ path, repoUrl, branch, force }) => {
 const handleForceUpdate = async ({ path, repoUrl, branch }) => {
   const plugin = availablePlugins.value.find(p => p.path === path);
   const deps = plugin?.manifest?.dependencies?.packages ?? [];
-  const doInstall = () => installPluginFromGitHub(repoUrl, path, branch, true);
+  const doInstall = async () =>
+    afterInstall(await installPluginFromGitHub(repoUrl, path, branch, true));
   if (deps.length > 0) {
     triggerPipWarning(deps, plugin?.name ?? path, doInstall);
     return;
@@ -281,7 +352,8 @@ const handleInstallSelected = async ({ plugins: pluginsToInstall, repoUrl, branc
       names.push(p?.name ?? id);
     }
   }
-  const doInstall = () => installPluginsFromGitHub(pluginsToInstall, repoUrl, branch);
+  const doInstall = async () =>
+    afterInstall(await installPluginsFromGitHub(pluginsToInstall, repoUrl, branch));
   if (allDeps.length > 0) {
     triggerPipWarning(allDeps, names.join(", "), doInstall);
     return;
@@ -292,7 +364,7 @@ const handleInstallSelected = async ({ plugins: pluginsToInstall, repoUrl, branc
 const handleInstallLocal = async ({ path, localPath, force }) => {
   const plugin = availablePlugins.value.find(p => p.path === path);
   const deps = plugin?.manifest?.dependencies?.packages ?? [];
-  const doInstall = () => installPluginFromLocal(localPath, path, force);
+  const doInstall = async () => afterInstall(await installPluginFromLocal(localPath, path, force));
   if (deps.length > 0) {
     triggerPipWarning(deps, plugin?.name ?? path, doInstall);
     return;
@@ -309,7 +381,8 @@ const handleInstallSelectedLocal = async ({ plugins: pluginsToInstall, localPath
     if (deps.length > 0) allDeps.push(...deps);
     names.push(p?.name ?? id);
   }
-  const doInstall = () => installPluginsFromLocal(pluginsToInstall, localPath);
+  const doInstall = async () =>
+    afterInstall(await installPluginsFromLocal(pluginsToInstall, localPath));
   if (allDeps.length > 0) {
     triggerPipWarning(allDeps, names.join(", "), doInstall);
     return;
@@ -554,8 +627,19 @@ onMounted(async () => {
   await loadPlugins();
   await imagesStore.fetchImages();
 
-  // Set initial active tab
-  if (plugins.value.length > 0) {
+  // A ?setting= deep link that names a plugin-type tab (e.g. plugins-services
+  // from an empty Services region) opens that tab; otherwise the first non-empty.
+  const routeSetting = route?.query?.setting;
+  const routeTab =
+    typeof routeSetting === "string" ? getSettingDestinationById(routeSetting)?.tab : null;
+  if (routeTab) {
+    activePluginTab.value = routeTab;
+    // Open the first card on that tab so its "Add instance" is in view.
+    const first = plugins.value.find(p => p.type === routeTab);
+    if (first && first.type !== "theme" && cardHasBody(first) && !expandedPlugins.value[first.id]) {
+      handleToggleExpand(first.id);
+    }
+  } else if (plugins.value.length > 0) {
     const types = ["calendar", "image", "service", "backend", "theme"];
     const firstType = types.find(type => plugins.value.some(p => p.type === type));
     if (firstType) {
@@ -566,6 +650,12 @@ onMounted(async () => {
   // Prefill the GitHub install field with the configured repo when empty.
   if (!githubRepoUrl.value && configStore.pluginRepositoryUrl) {
     githubRepoUrl.value = configStore.pluginRepositoryUrl;
+  }
+
+  // Show the catalog straight away instead of behind "List plugins" (F8). The
+  // list is module state in usePlugins, so this runs once per page load.
+  if (githubRepoUrl.value && availablePlugins.value.length === 0 && !enumeratingPlugins.value) {
+    void enumeratePluginsFromGitHub(githubRepoUrl.value, githubBranch.value || "main");
   }
 });
 </script>

@@ -1,18 +1,32 @@
 name: Build and Push Docker Image
 
+# Publishes ghcr.io/<owner>/calvin. develop is the deploy branch:
+#   push to develop  -> :develop + :sha-<commit>   (what Unraid / Pi run)
+#   push of a v* tag -> :X.Y.Z + :X.Y + :latest + :sha-<commit>
+#   pull request     -> amd64 build only, nothing pushed
+#   manual dispatch  -> build; push :sha-<commit> (and :develop when run
+#                       on develop) only if push_image is ticked
+#
+# There is deliberately no schedule trigger: GitHub runs schedules only
+# from the default branch (main), so a nightly defined on develop never
+# fires, and it disables a scheduled workflow after 60 days without
+# commits on main (release-only), which would also stop this workflow
+# gating PRs. :develop is built on every push to develop instead.
+
 on:
   push:
     branches:
-      - main
+      - develop
     tags:
       - 'v*'
+    paths-ignore:
+      - 'docs/**'
+      - '**/*.md'
+      - 'mkdocs.yml'
   pull_request:
     branches:
       - main
       - develop
-  schedule:
-    # Nightly multi-arch image from develop at 03:00 UTC
-    - cron: '0 3 * * *'
   workflow_dispatch:
     inputs:
       push_image:
@@ -21,9 +35,15 @@ on:
         default: false
         type: boolean
 
+concurrency:
+  group: docker-${{ github.ref }}
+  # A newer push to develop supersedes a running develop build.
+  cancel-in-progress: true
+
 env:
   REGISTRY: ghcr.io
   IMAGE_NAME: ${{ github.repository }}
+  PUBLISH: ${{ (github.event_name == 'push' && (github.ref == 'refs/heads/develop' || startsWith(github.ref, 'refs/tags/v'))) || (github.event_name == 'workflow_dispatch' && inputs.push_image) }}
 
 jobs:
   build:
@@ -36,15 +56,16 @@ jobs:
     steps:
       - name: Checkout code
         uses: actions/checkout@v4
-        with:
-          # On schedule events, github.ref is the default branch (main); we want develop.
-          ref: ${{ github.event_name == 'schedule' && 'develop' || github.ref }}
+
+      - name: Set up QEMU
+        if: env.PUBLISH == 'true'
+        uses: docker/setup-qemu-action@v3
 
       - name: Set up Docker Buildx
         uses: docker/setup-buildx-action@v3
 
       - name: Log in to Container Registry
-        if: github.event_name != 'pull_request' && (github.ref == 'refs/heads/main' || github.event_name == 'schedule' || startsWith(github.ref, 'refs/tags/') || github.event.inputs.push_image == 'true')
+        if: env.PUBLISH == 'true'
         uses: docker/login-action@v3
         with:
           registry: ${{ env.REGISTRY }}
@@ -56,29 +77,43 @@ jobs:
         uses: docker/metadata-action@v5
         with:
           images: ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}
+          flavor: |
+            latest=false
           tags: |
-            type=ref,event=branch
+            type=raw,value=develop,enable=${{ github.ref == 'refs/heads/develop' }}
+            type=sha,prefix=sha-,format=short
             type=ref,event=pr
             type=semver,pattern={{version}}
             type=semver,pattern={{major}}.{{minor}}
-            type=raw,value=latest,enable=${{ github.event_name == 'push' && github.ref == 'refs/heads/main' }}
-            type=raw,value=develop,enable=${{ github.event_name == 'schedule' }}
-            type=raw,value=nightly,enable=${{ github.event_name == 'schedule' }}
+            type=raw,value=latest,enable=${{ startsWith(github.ref, 'refs/tags/v') }}
 
       - name: Build and push runtime image
         id: build
-        uses: docker/build-push-action@v5
+        uses: docker/build-push-action@v6
         with:
           context: .
           file: docker/Dockerfile
           build-args: |
             VITE_API_URL=/api
-          # Multi-arch only when pushing; PR validation builds amd64 only to stay fast.
-          platforms: ${{ github.event_name == 'pull_request' && 'linux/amd64' || 'linux/amd64,linux/arm64,linux/arm/v7' }}
-          push: ${{ github.event_name != 'pull_request' && (github.ref == 'refs/heads/main' || github.event_name == 'schedule' || startsWith(github.ref, 'refs/tags/') || github.event.inputs.push_image == 'true') }}
+          # Multi-arch only when pushing: amd64 for Unraid / servers, arm64
+          # and arm/v7 for all-in-one Pis. PR builds stay amd64-only.
+          platforms: ${{ env.PUBLISH == 'true' && 'linux/amd64,linux/arm64,linux/arm/v7' || 'linux/amd64' }}
+          push: ${{ env.PUBLISH == 'true' }}
           tags: ${{ steps.meta.outputs.tags }}
+          labels: ${{ steps.meta.outputs.labels }}
           cache-from: type=gha
           cache-to: type=gha,mode=max
 
-      - name: Image digest
-        run: echo "Runtime image pushed with digest ${{ steps.build.outputs.digest }}"
+      - name: Summary
+        env:
+          TAGS: ${{ steps.meta.outputs.tags }}
+          DIGEST: ${{ steps.build.outputs.digest }}
+        run: |
+          {
+            echo "### Calvin image"
+            echo "Published: $PUBLISH"
+            echo '```'
+            echo "$TAGS"
+            echo '```'
+            echo "Digest: \`$DIGEST\`"
+          } >> "$GITHUB_STEP_SUMMARY"

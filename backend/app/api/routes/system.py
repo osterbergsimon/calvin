@@ -5,18 +5,20 @@ import json
 import os
 import re
 import shutil
+import socket
 import subprocess
 import threading
 import time
 from pathlib import Path
 from typing import Any
 
-from fastapi import APIRouter, HTTPException
+from fastapi import APIRouter, HTTPException, Request
 from fastapi.responses import StreamingResponse
 from loguru import logger
 
 from app.config import settings
 from app.services.display_power_service import display_power_service
+from app.utils.git_refs import validate_git_branch
 
 router = APIRouter()
 
@@ -25,6 +27,27 @@ _RESTART_HELPER = Path("/usr/local/bin/restart-calvin-services.sh")
 # Delay before running `systemctl restart calvin-backend` so the HTTP response is sent first;
 # otherwise the client sees a network error even when restart succeeds.
 _BACKEND_RESTART_DELAY_SEC = 0.75
+
+# Shown wherever a host action is unavailable because Calvin runs in Docker.
+CONTAINER_UPDATE_INSTRUCTIONS = (
+    "Calvin runs in a Docker container, so updates and restarts happen on the host. "
+    "Unraid: Docker tab → Check for Updates → apply update. "
+    "Docker Compose: docker compose pull && docker compose up -d."
+)
+
+
+def _in_container() -> bool:
+    """True when running from the published Docker image (CALVIN_DEPLOYMENT=docker)."""
+    return settings.deployment == "docker"
+
+
+def _reject_in_container(action: str) -> None:
+    """Refuse a host-level action in a container instead of failing obscurely."""
+    if _in_container():
+        raise HTTPException(
+            status_code=409,
+            detail=f"{action} is not available in a container. {CONTAINER_UPDATE_INSTRUCTIONS}",
+        )
 
 
 def _restart_mechanism_available() -> bool:
@@ -198,6 +221,70 @@ def _state_to_update_status(state: dict[str, Any], state_file: Path) -> dict[str
     return data
 
 
+def _primary_ip() -> str | None:
+    """The address of the interface that carries the default route (no packet sent)."""
+    sock = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
+    try:
+        sock.connect(("10.255.255.255", 1))
+        return str(sock.getsockname()[0])
+    except OSError:
+        return None
+    finally:
+        sock.close()
+
+
+def _detect_lan_ips() -> list[str]:
+    """Non-loopback IPv4 addresses of this host, primary interface first."""
+    ips: list[str] = []
+    primary = _primary_ip()
+    if primary:
+        ips.append(primary)
+    try:
+        _, _, host_ips = socket.gethostbyname_ex(socket.gethostname())
+    except OSError:
+        host_ips = []
+    for ip in host_ips:
+        if ip not in ips:
+            ips.append(ip)
+    return [ip for ip in ips if not ip.startswith("127.")]
+
+
+@router.get("/network")
+async def get_network_info(request: Request):
+    """How a phone or a new kiosk can reach this server (first-run setup hand-off).
+
+    ``public_url`` (the PUBLIC_URL setting) is authoritative when set; otherwise
+    ``lan_urls`` lists the detected LAN addresses on the port this request used.
+    """
+    port = request.url.port or settings.api_port
+    return {
+        "public_url": settings.public_url.rstrip("/") or None,
+        "lan_urls": [f"http://{ip}:{port}" for ip in _detect_lan_ips()],
+        "hostname": socket.gethostname(),
+        "port": port,
+    }
+
+
+@router.get("/environment")
+async def get_environment():
+    """Report the deployment and which host actions the UI can offer."""
+    if _in_container():
+        return {
+            "deployment": "docker",
+            "capabilities": {"update": False, "restart": False, "reboot": False},
+            "update_instructions": CONTAINER_UPDATE_INSTRUCTIONS,
+        }
+    return {
+        "deployment": "native",
+        "capabilities": {
+            "update": settings.get_update_script_path().exists(),
+            "restart": _restart_mechanism_available(),
+            "reboot": True,
+        },
+        "update_instructions": None,
+    }
+
+
 @router.post("/update")
 async def trigger_update():
     """
@@ -205,6 +292,8 @@ async def trigger_update():
     Runs the update script asynchronously and returns immediately.
     """
     from app.services.config_service import config_service
+
+    _reject_in_container("Updating from the UI")
 
     update_script = settings.get_update_script_path()
 
@@ -215,8 +304,16 @@ async def trigger_update():
         )
 
     try:
-        # Get git branch from config
-        git_branch = await config_service.get_value("git_branch", "develop")
+        # Get git branch from config. It reaches git and the update script, and
+        # may predate validation (audit S7), so check it again here.
+        git_branch = await config_service.get_value("git_branch", "develop") or "develop"
+        try:
+            validate_git_branch(git_branch)
+        except ValueError as exc:
+            raise HTTPException(
+                status_code=400,
+                detail="The configured update branch is invalid; set it again in Settings",
+            ) from exc
 
         # Ensure log directory exists
         log_dir = settings.repo_dir / "backend" / "logs"
@@ -682,6 +779,7 @@ async def restart_frontend():
     Restart the frontend service.
     Uses a helper script with sudo permissions to restart the calvin-frontend service.
     """
+    _reject_in_container("Restarting the frontend")
     try:
         if not _restart_mechanism_available():
             raise HTTPException(
@@ -715,6 +813,7 @@ async def restart_backend():
     can return HTTP 200 before systemd stops it; otherwise clients typically see a
     network error even when the restart succeeds.
     """
+    _reject_in_container("Restarting the backend")
     try:
         if not _restart_mechanism_available():
             raise HTTPException(
@@ -751,6 +850,8 @@ async def restart_backend():
 @router.post("/reboot")
 async def reboot_system():
     """Reboot the Raspberry Pi."""
+    # In a container this would target the host (e.g. the Unraid server), never the kiosk.
+    _reject_in_container("Rebooting")
     try:
         # Try multiple methods to reboot
         # Note: The backend service runs with NoNewPrivileges=true, so sudo might not work

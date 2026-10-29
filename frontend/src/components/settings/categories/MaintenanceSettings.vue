@@ -10,18 +10,25 @@
     </SettingsSection>
 
     <SettingsSection id="maintenance-system" title="System">
-      <SettingRow label="Restart backend" description="Restart the backend API server.">
-        <button type="button" class="maint-btn" @click="askRestartBackend">Restart backend</button>
-      </SettingRow>
-      <SettingRow label="Restart frontend" description="Restart the frontend service.">
-        <button type="button" class="maint-btn" @click="askRestartFrontend">
-          Restart frontend
-        </button>
-      </SettingRow>
+      <!-- In Docker the container is restarted from the host (Unraid / compose). -->
+      <template v-if="!isContainer">
+        <SettingRow label="Restart backend" description="Restart the backend API server.">
+          <button type="button" class="maint-btn" @click="askRestartBackend">
+            Restart backend
+          </button>
+        </SettingRow>
+        <SettingRow label="Restart frontend" description="Restart the frontend service.">
+          <button type="button" class="maint-btn" @click="askRestartFrontend">
+            Restart frontend
+          </button>
+        </SettingRow>
+      </template>
       <SettingRow label="Reload UI" description="Reload the browser page.">
         <button type="button" class="maint-btn" @click="reloadUi">Reload UI</button>
       </SettingRow>
     </SettingsSection>
+
+    <BackupSettings />
 
     <SettingsSection id="maintenance-diagnostics" title="Diagnostics">
       <SettingRow
@@ -77,7 +84,7 @@
 </template>
 
 <script setup>
-import { reactive } from "vue";
+import { computed, onMounted, reactive } from "vue";
 import { useSystem } from "@/composables";
 import SettingsSection from "@/components/settings/shell/SettingsSection.vue";
 import SettingRow from "@/components/settings/shell/SettingRow.vue";
@@ -86,6 +93,7 @@ import SelectPill from "@/components/ui/SelectPill.vue";
 import NumberStepper from "@/components/ui/NumberStepper.vue";
 import ConfirmModal from "@/components/settings/shared/ConfirmModal.vue";
 import UpdatesTab from "@/components/settings/tabs/system/UpdatesTab.vue";
+import BackupSettings from "@/components/settings/categories/BackupSettings.vue";
 
 defineProps({
   config: { type: Object, required: true },
@@ -94,7 +102,10 @@ defineProps({
 });
 const emit = defineEmits(["update:config", "update:gitRepoUrl", "update:gitBranch"]);
 
-const { restartBackend, restartFrontend } = useSystem();
+const { restartBackend, restartFrontend, environment, loadEnvironment } = useSystem();
+
+const isContainer = computed(() => environment.value?.deployment === "docker");
+onMounted(loadEnvironment);
 
 const confirm = reactive({ show: false, title: "", message: "", action: null });
 

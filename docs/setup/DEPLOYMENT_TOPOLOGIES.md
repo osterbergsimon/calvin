@@ -75,9 +75,9 @@ the frontend. The Pi is genuinely "dumb."
 ### What moves to the server
 
 - The backend Docker container (or whatever you use to run it).
-- `/var/lib/calvin/` — SQLite database, photos, plugin install dirs.
-- The frontend rebuild that runs after a plugin install (the server
-  has more headroom than a Pi 3).
+- `/var/lib/calvin/` — SQLite database, photos, plugin install dirs,
+  kiosk signing key.
+- Plugin installs, including their pip dependencies (live, no rebuild).
 
 ### Setup
 
@@ -88,7 +88,7 @@ the same Docker compose used in Mode A:
 
 ```bash
 # On the server (any Linux box with Docker):
-git clone https://github.com/osterbergsimon/calvin.git
+git clone -b develop https://github.com/osterbergsimon/calvin.git
 cd calvin
 cp deploy/calvin.env.example docker/.env
 # Edit docker/.env — set CALVIN_PORT, DATABASE_URL, etc. as needed.
@@ -259,6 +259,16 @@ the backend (e.g. hacking on the frontend from a laptop while pointing
 at the home server). For that case the backend already exposes
 `CORS_ORIGINS` and `CORS_ALLOW_ALL` env vars — see
 [backend/app/config.py](../../backend/app/config.py).
+
+### Public URL (phone setup and Add kiosk)
+
+Settings shows the server's address as a QR code ("set up from your phone"),
+and **Kiosks › Add kiosk** prints `curl -fsSL <server>/api/kiosks/install.sh | sudo bash`.
+The address comes from `PUBLIC_URL` when set, otherwise from the browser's own
+address, falling back to the LAN IP the backend detects for itself. That last
+guess is wrong in Docker (it sees the container IP), so on Docker/Unraid set
+`PUBLIC_URL=http://<server-lan-ip>:8000` in `.env` (passed through by
+`docker/docker-compose.yml`) or the template's **Public URL** field.
 
 ### Security note
 

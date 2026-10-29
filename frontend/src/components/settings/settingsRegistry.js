@@ -14,7 +14,12 @@ export const settingsCategories = [
   { id: "plugins", label: "Plugins", icon: "🔌", subtitle: "Install · manage · themes" },
   { id: "device", label: "Device", icon: "🖥️", subtitle: "Power · keyboard · hardware" },
   { id: "kiosks", label: "Kiosks", icon: "📺", subtitle: "Per-device settings" },
-  { id: "maintenance", label: "Maintenance", icon: "⚙️", subtitle: "Updates · diagnostics" },
+  {
+    id: "maintenance",
+    label: "Maintenance",
+    icon: "⚙️",
+    subtitle: "Updates · backup · diagnostics",
+  },
   { id: "security", label: "Security", icon: "🔒", subtitle: "Allowed origins · network access" },
 ];
 
@@ -133,12 +138,12 @@ export const settingsDestinations = [
   },
   {
     id: "content-images",
-    label: "Image source ordering",
-    path: "Content Sources / Image Sources",
+    label: "Upload photos and order image sources",
+    path: "Content Sources / Image sources",
     category: "content",
     tabKey: "settings_tab_content_sources",
     tab: "images",
-    keywords: ["image", "ordering", "sources", "plugins"],
+    keywords: ["image", "photos", "upload", "add", "ordering", "sources", "plugins"],
   },
   {
     id: "content-services",
@@ -155,6 +160,21 @@ export const settingsDestinations = [
     path: "Plugins",
     category: "plugins",
     keywords: ["plugins", "install", "github", "zip", "themes", "instances"],
+  },
+  {
+    id: "plugins-services",
+    label: "Add a web service (web page, dashboard)",
+    path: "Plugins / Service",
+    category: "plugins",
+    tab: "service",
+    keywords: ["services", "web services", "iframe", "web page", "add", "url"],
+  },
+  {
+    id: "kiosks",
+    label: "Add and manage kiosks",
+    path: "Kiosks",
+    category: "kiosks",
+    keywords: ["kiosk", "add kiosk", "install", "raspberry pi", "screen", "device", "qr"],
   },
   {
     id: "device-power",
@@ -209,6 +229,15 @@ export const settingsDestinations = [
     tabKey: "settings_tab_maintenance",
     tab: "updates",
     keywords: ["updates", "git", "repository", "branch"],
+  },
+  {
+    id: "maintenance-backup",
+    label: "Backup and restore",
+    path: "Maintenance / Backup & restore",
+    category: "maintenance",
+    tabKey: "settings_tab_maintenance",
+    tab: "backup",
+    keywords: ["backup", "restore", "export", "import", "migrate", "seed", "copy settings"],
   },
   {
     id: "maintenance-diagnostics",

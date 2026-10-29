@@ -17,6 +17,31 @@
         "title": "AllowedOriginsBody",
         "type": "object"
       },
+      "BackupSchedule": {
+        "properties": {
+          "enabled": {
+            "default": false,
+            "title": "Enabled",
+            "type": "boolean"
+          },
+          "interval_hours": {
+            "default": 24,
+            "maximum": 720.0,
+            "minimum": 1.0,
+            "title": "Interval Hours",
+            "type": "integer"
+          },
+          "retention": {
+            "default": 7,
+            "maximum": 365.0,
+            "minimum": 1.0,
+            "title": "Retention",
+            "type": "integer"
+          }
+        },
+        "title": "BackupSchedule",
+        "type": "object"
+      },
       "Body_inspect_plugin_api_plugins_inspect_post": {
         "properties": {
           "file": {
@@ -43,6 +68,70 @@
           "file"
         ],
         "title": "Body_install_plugin_api_plugins_install_post",
+        "type": "object"
+      },
+      "Body_preview_api_backup_preview_post": {
+        "properties": {
+          "file": {
+            "format": "binary",
+            "title": "File",
+            "type": "string"
+          },
+          "mode": {
+            "default": "replace",
+            "title": "Mode",
+            "type": "string"
+          }
+        },
+        "required": [
+          "file"
+        ],
+        "title": "Body_preview_api_backup_preview_post",
+        "type": "object"
+      },
+      "Body_restore_api_backup_restore_post": {
+        "properties": {
+          "file": {
+            "format": "binary",
+            "title": "File",
+            "type": "string"
+          },
+          "mode": {
+            "default": "replace",
+            "title": "Mode",
+            "type": "string"
+          },
+          "restore_signing_key": {
+            "default": false,
+            "title": "Restore Signing Key",
+            "type": "boolean"
+          }
+        },
+        "required": [
+          "file"
+        ],
+        "title": "Body_restore_api_backup_restore_post",
+        "type": "object"
+      },
+      "Body_restore_file_api_backup_files__name__restore_post": {
+        "properties": {
+          "dry_run": {
+            "default": false,
+            "title": "Dry Run",
+            "type": "boolean"
+          },
+          "mode": {
+            "default": "replace",
+            "title": "Mode",
+            "type": "string"
+          },
+          "restore_signing_key": {
+            "default": false,
+            "title": "Restore Signing Key",
+            "type": "boolean"
+          }
+        },
+        "title": "Body_restore_file_api_backup_files__name__restore_post",
         "type": "object"
       },
       "Body_upload_image_api_images_upload_post": {
@@ -195,6 +284,13 @@
             "default": true,
             "title": "Enabled",
             "type": "boolean"
+          },
+          "has_value": {
+            "additionalProperties": {
+              "type": "boolean"
+            },
+            "title": "Has Value",
+            "type": "object"
           },
           "ical_url": {
             "anyOf": [
@@ -1012,6 +1108,14 @@
             "title": "Enabled",
             "type": "boolean"
           },
+          "has_value": {
+            "additionalProperties": {
+              "type": "boolean"
+            },
+            "default": {},
+            "title": "Has Value",
+            "type": "object"
+          },
           "id": {
             "title": "Id",
             "type": "string"
@@ -1224,6 +1328,336 @@
           }
         },
         "summary": "Root"
+      }
+    },
+    "/api/backup/export": {
+      "get": {
+        "description": "Download a backup of this install as a zip.",
+        "operationId": "export_api_backup_export_get",
+        "parameters": [
+          {
+            "in": "query",
+            "name": "include_packages",
+            "required": false,
+            "schema": {
+              "default": true,
+              "title": "Include Packages",
+              "type": "boolean"
+            }
+          },
+          {
+            "in": "query",
+            "name": "include_secrets",
+            "required": false,
+            "schema": {
+              "default": true,
+              "title": "Include Secrets",
+              "type": "boolean"
+            }
+          },
+          {
+            "in": "query",
+            "name": "include_signing_key",
+            "required": false,
+            "schema": {
+              "default": false,
+              "title": "Include Signing Key",
+              "type": "boolean"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Export",
+        "tags": [
+          "backup"
+        ]
+      }
+    },
+    "/api/backup/files": {
+      "get": {
+        "description": "Backups stored in the backup dir (automatic, pre-restore, manual).",
+        "operationId": "list_files_api_backup_files_get",
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            },
+            "description": "Successful Response"
+          }
+        },
+        "summary": "List Files",
+        "tags": [
+          "backup"
+        ]
+      },
+      "post": {
+        "description": "Write a backup to the backup dir now.",
+        "operationId": "create_file_api_backup_files_post",
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            },
+            "description": "Successful Response"
+          }
+        },
+        "summary": "Create File",
+        "tags": [
+          "backup"
+        ]
+      }
+    },
+    "/api/backup/files/{name}": {
+      "get": {
+        "operationId": "download_file_api_backup_files__name__get",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "name",
+            "required": true,
+            "schema": {
+              "title": "Name",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Download File",
+        "tags": [
+          "backup"
+        ]
+      }
+    },
+    "/api/backup/files/{name}/restore": {
+      "post": {
+        "description": "Preview (dry_run) or restore a backup stored in the backup dir.",
+        "operationId": "restore_file_api_backup_files__name__restore_post",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "name",
+            "required": true,
+            "schema": {
+              "title": "Name",
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/x-www-form-urlencoded": {
+              "schema": {
+                "$ref": "#/components/schemas/Body_restore_file_api_backup_files__name__restore_post"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Restore File",
+        "tags": [
+          "backup"
+        ]
+      }
+    },
+    "/api/backup/preview": {
+      "post": {
+        "description": "Validate an uploaded backup and describe what restoring it would do.",
+        "operationId": "preview_api_backup_preview_post",
+        "requestBody": {
+          "content": {
+            "multipart/form-data": {
+              "schema": {
+                "$ref": "#/components/schemas/Body_preview_api_backup_preview_post"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Preview",
+        "tags": [
+          "backup"
+        ]
+      }
+    },
+    "/api/backup/restore": {
+      "post": {
+        "description": "Restore an uploaded backup.",
+        "operationId": "restore_api_backup_restore_post",
+        "requestBody": {
+          "content": {
+            "multipart/form-data": {
+              "schema": {
+                "$ref": "#/components/schemas/Body_restore_api_backup_restore_post"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Restore",
+        "tags": [
+          "backup"
+        ]
+      }
+    },
+    "/api/backup/schedule": {
+      "get": {
+        "operationId": "get_schedule_api_backup_schedule_get",
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/BackupSchedule"
+                }
+              }
+            },
+            "description": "Successful Response"
+          }
+        },
+        "summary": "Get Schedule",
+        "tags": [
+          "backup"
+        ]
+      },
+      "put": {
+        "operationId": "put_schedule_api_backup_schedule_put",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/BackupSchedule"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/BackupSchedule"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Put Schedule",
+        "tags": [
+          "backup"
+        ]
       }
     },
     "/api/calendar/events": {
@@ -3972,7 +4406,7 @@
     },
     "/api/plugins/{plugin_id}/test": {
       "post": {
-        "description": "Test plugin connection/configuration.\n\nDispatches to the plugin class's test_connection() classmethod.\n\nArgs:\n    plugin_id: Plugin type ID (e.g., 'imap', 'mealie')\n    test_config: Optional config to use for testing (if not provided, uses saved config)\n\nReturns:\n    Test result with success status and message",
+        "description": "Test plugin connection/configuration.\n\nDispatches to the plugin class's test_connection() classmethod.\n\nArgs:\n    plugin_id: Plugin type ID (e.g., 'imap', 'mealie')\n    test_config: Optional config to use for testing (if not provided, uses saved config)\n    instance_id: Optional instance being edited; secrets left blank in\n        test_config are taken from its stored config\n\nReturns:\n    Test result with success status and message",
         "operationId": "test_plugin_api_plugins__plugin_id__test_post",
         "parameters": [
           {
@@ -3982,6 +4416,22 @@
             "schema": {
               "title": "Plugin Id",
               "type": "string"
+            }
+          },
+          {
+            "in": "query",
+            "name": "instance_id",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Instance Id"
             }
           }
         ],
@@ -4220,6 +4670,46 @@
           }
         },
         "summary": "Configure Display Timeout",
+        "tags": [
+          "system"
+        ]
+      }
+    },
+    "/api/system/environment": {
+      "get": {
+        "description": "Report the deployment and which host actions the UI can offer.",
+        "operationId": "get_environment_api_system_environment_get",
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            },
+            "description": "Successful Response"
+          }
+        },
+        "summary": "Get Environment",
+        "tags": [
+          "system"
+        ]
+      }
+    },
+    "/api/system/network": {
+      "get": {
+        "description": "How a phone or a new kiosk can reach this server (first-run setup hand-off).\n\n``public_url`` (the PUBLIC_URL setting) is authoritative when set; otherwise\n``lan_urls`` lists the detected LAN addresses on the port this request used.",
+        "operationId": "get_network_info_api_system_network_get",
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            },
+            "description": "Successful Response"
+          }
+        },
+        "summary": "Get Network Info",
         "tags": [
           "system"
         ]

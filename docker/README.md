@@ -60,12 +60,46 @@ If you'd rather run the toolchain natively, see `docs/setup/QUICKSTART_DEVELOP.m
 
 ## CI / Publishing
 
-`.github/workflows/docker-build.yml` builds and pushes the runtime image:
+`.github/workflows/docker-build.yml` builds and pushes the runtime image
+to `ghcr.io/osterbergsimon/calvin`. `develop` is the deploy branch;
+`main` is release-only and not part of the deploy path.
 
-- On push to `main`: tagged `latest`
-- On semver tag: tagged `vX.Y.Z`, `vX.Y`
-- Nightly from `develop`: tagged `develop`, `nightly`
-- On PR: build only (amd64), no push, used as a smoke test
+| Trigger | Tags pushed | Platforms |
+|---|---|---|
+| Push to `develop` (docs-only pushes skipped) | `develop`, `sha-<commit>` | amd64, arm64, arm/v7 |
+| Push of a `v*` tag | `X.Y.Z`, `X.Y`, `latest`, `sha-<commit>` | amd64, arm64, arm/v7 |
+| Pull request | nothing (build-only smoke test) | amd64 |
+| Manual run with *Push image* ticked | `sha-<commit>` (+ `develop` when run on develop) | amd64, arm64, arm/v7 |
 
-Multi-arch (`linux/amd64`, `linux/arm64`, `linux/arm/v7`) on every push
-that publishes; PR builds stay amd64-only to keep validation fast.
+Servers (Unraid, the Pi compose default) run `:develop`. A merge to
+`develop` publishes a new `:develop` about 20 minutes later; servers pick
+it up on their next pull (`docker compose pull && docker compose up -d`,
+or *Check for Updates* on Unraid). Pin a `sha-<commit>` tag to freeze a
+deploy.
+
+There is no scheduled build: GitHub runs `schedule` triggers only from
+the default branch (`main`), so a nightly defined on `develop` never
+fires, and it disables scheduled workflows after 60 days without commits
+on `main`, which would also stop this workflow gating PRs.
+
+The package must be **public** so Unraid and Pis can pull it without a
+login. It already is; if it is ever recreated, set it again under
+GitHub → Packages → `calvin` → Package settings → Change visibility.
+
+## Container runtime
+
+`entrypoint.sh` runs as root, then drops to `PUID:PGID` (default `0:0`,
+root; Unraid uses `99:100`). On every start it:
+
+- creates the data layout under `/var/lib/calvin` and refreshes the
+  built-in themes file;
+- re-installs the pip packages that installed plugins declare
+  (`dependencies.packages`), because the venv lives in the image and is
+  replaced when the container is recreated;
+- chowns the data volume and the venv to `PUID:PGID` where they differ,
+  so live plugin installs work as the unprivileged user.
+
+`/app/data` is a symlink to `/var/lib/calvin`, so everything the backend
+writes under a relative `./data/...` path (installed themes, caches) is
+persisted on the volume. The kiosk signing key is put there explicitly
+(`KIOSK_SIGNING_KEY_PATH=/var/lib/calvin/kiosk-signing.key`).

@@ -15,6 +15,11 @@ const updateMessageClass = ref("");
 const backendHealth = ref(null);
 const backendHealthLoading = ref(false);
 const backendHealthCheckedAt = ref(null);
+// Deployment info from /system/environment, fetched once per page load.
+// null until loaded, or when the request failed (callers then fall back to
+// the native UI so nothing is hidden by mistake).
+const environment = ref(null);
+let _environmentRequest = null;
 
 let _clearMsgTimer = null;
 
@@ -32,6 +37,23 @@ const _cancelMessageClear = () => {
     clearTimeout(_clearMsgTimer);
     _clearMsgTimer = null;
   }
+};
+
+const loadEnvironment = () => {
+  if (!_environmentRequest) {
+    _environmentRequest = systemApi
+      .getSystemEnvironment()
+      .then(data => {
+        environment.value = data;
+        return data;
+      })
+      .catch(error => {
+        _environmentRequest = null;
+        console.error("Failed to load system environment:", error);
+        return null;
+      });
+  }
+  return _environmentRequest;
 };
 
 export function useSystem() {
@@ -380,7 +402,9 @@ export function useSystem() {
     backendHealth,
     backendHealthLoading,
     backendHealthCheckedAt,
+    environment,
     // Methods
+    loadEnvironment,
     turnDisplayOn,
     turnDisplayOff,
     configureDisplayTimeout,
