@@ -30,7 +30,11 @@ describe("KeyboardHandler reboot combo (CLV-9 §7)", () => {
       "fetch",
       vi.fn().mockResolvedValue({
         ok: true,
-        json: async () => ({ rebootComboKey1: "KEY_1", rebootComboKey2: "KEY_7", rebootComboDuration: 1 }),
+        json: async () => ({
+          rebootComboKey1: "KEY_1",
+          rebootComboKey2: "KEY_7",
+          rebootComboDuration: 1,
+        }),
       })
     );
 
@@ -57,7 +61,11 @@ describe("KeyboardHandler reboot combo (CLV-9 §7)", () => {
       "fetch",
       vi.fn().mockResolvedValue({
         ok: true,
-        json: async () => ({ rebootComboKey1: "KEY_1", rebootComboKey2: "KEY_7", rebootComboDuration: 1 }),
+        json: async () => ({
+          rebootComboKey1: "KEY_1",
+          rebootComboKey2: "KEY_7",
+          rebootComboDuration: 1,
+        }),
       })
     );
     const rejected = Object.assign(new Error("unauthorized"), { adminRequired: true });

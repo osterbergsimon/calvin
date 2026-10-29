@@ -1,12 +1,7 @@
 import { describe, it, expect, beforeEach, vi } from "vitest";
 import { setActivePinia, createPinia } from "pinia";
 import api from "@/services/api";
-import {
-  actionForUrl,
-  authErrorCode,
-  retryAfterSeconds,
-  useAuthStore,
-} from "@/stores/auth";
+import { actionForUrl, authErrorCode, retryAfterSeconds, useAuthStore } from "@/stores/auth";
 
 function httpError(status, detail, options = {}) {
   return {
@@ -201,7 +196,9 @@ describe("auth store", () => {
   });
 
   it("reads Retry-After from the header, then the body, then falls back to 60", () => {
-    expect(retryAfterSeconds(httpError(429, { retry_after: 12 }, { headers: { "retry-after": "47" } }))).toBe(47);
+    expect(
+      retryAfterSeconds(httpError(429, { retry_after: 12 }, { headers: { "retry-after": "47" } }))
+    ).toBe(47);
     expect(retryAfterSeconds(httpError(429, { retry_after: 12 }))).toBe(12);
     expect(retryAfterSeconds(httpError(429, {}))).toBe(60);
   });
