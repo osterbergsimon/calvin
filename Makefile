@@ -1,6 +1,10 @@
 .PHONY: help install dev dev-logs dev-logs-read dev-down test test-watch test-watch-frontend lint format type-check build clean doctor
 
-COMPOSE_DEV := docker compose -f docker/docker-compose.dev.yml
+# One compose project per checkout, so several worktrees can run `make dev`
+# at once (set CALVIN_PORT / CALVIN_FRONTEND_PORT in docker/.env to avoid
+# port clashes). Override with `make dev DEV_PROJECT=...`.
+DEV_PROJECT ?= calvin-dev-$(shell basename "$(CURDIR)" | tr 'A-Z' 'a-z' | tr -c 'a-z0-9_\n-' '-')
+COMPOSE_DEV := docker compose -p $(DEV_PROJECT) -f docker/docker-compose.dev.yml
 COMPOSE_PROD := docker compose -f docker/docker-compose.yml
 
 help:
@@ -23,8 +27,8 @@ help:
 
 install:
 	@if [ ! -f docker/.env ]; then \
-		echo "Creating docker/.env from deploy/calvin.env.example..."; \
-		cp deploy/calvin.env.example docker/.env; \
+		echo "Creating docker/.env from docker/dev.env.example..."; \
+		cp docker/dev.env.example docker/.env; \
 	else \
 		echo "docker/.env already exists — leaving it alone"; \
 	fi
@@ -32,8 +36,7 @@ install:
 
 dev:
 	@echo "Starting dev stack via docker compose..."
-	@echo "Backend:  http://localhost:8000"
-	@echo "Frontend: http://localhost:5173"
+	@echo "Project:  $(DEV_PROJECT) (ports from docker/.env, default 8000 / 5173)"
 	$(COMPOSE_DEV) up
 
 dev-logs:
@@ -96,7 +99,7 @@ test-watch:
 	cd backend && uv run ptw -- -m "unit and not slow"
 
 test-watch-frontend:
-	cd frontend && npm run test -- --watch
+	cd frontend && npm run test:watch
 
 doctor:
 	@echo "Calvin dev-environment doctor"
