@@ -79,8 +79,10 @@ def endpoint_keys(schema: dict[str, Any] | None, config: dict[str, Any] | None =
     for key, entry in (schema or {}).items():
         if not isinstance(entry, dict):
             continue
-        ui = entry.get("ui") if isinstance(entry.get("ui"), dict) else {}
-        validation = ui.get("validation") if isinstance(ui.get("validation"), dict) else {}
+        ui = entry.get("ui")
+        ui = ui if isinstance(ui, dict) else {}
+        validation = ui.get("validation")
+        validation = validation if isinstance(validation, dict) else {}
         if _ENDPOINT_KEY_RE.search(key) or "url" in (entry.get("type"), validation.get("type")):
             keys.add(key)
     return keys
