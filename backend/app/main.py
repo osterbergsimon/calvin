@@ -121,6 +121,7 @@ from fastapi.middleware.cors import CORSMiddleware  # noqa: E402
 from starlette.exceptions import HTTPException as StarletteHTTPException  # noqa: E402
 
 from app.api.routes import (  # noqa: E402
+    backup,
     calendar,
     config,
     health,
@@ -319,6 +320,19 @@ async def _initialize_default_config():
         await config_service.set_value("display_schedule", json.dumps(default_schedule))
 
 
+async def _restore_on_start():
+    """Seed a fresh install from CALVIN_RESTORE_FROM or <backup dir>/restore-on-start.*.
+
+    Runs after plugins load and before defaults, so defaults only fill what
+    the backup does not set. Never raises (see app.services.backup.seed).
+    """
+    from app.services.backup.seed import restore_on_start
+
+    outcome = await restore_on_start()
+    if outcome != "none":
+        logger.info(f"Restore on start: {outcome}")
+
+
 async def _start_schedulers():
     """Start background schedulers."""
     from app.services.backend_scheduler import backend_plugin_scheduler
@@ -332,6 +346,10 @@ async def _start_schedulers():
 
     # Start backend plugin scheduler (plugins will register their tasks on initialization)
     await backend_plugin_scheduler.start()
+
+    from app.services.backup.store import auto_backup_scheduler
+
+    await auto_backup_scheduler.start()
 
 
 async def _sync_display_orientation():
@@ -385,6 +403,10 @@ async def _shutdown_services():
     # Stop backend plugin scheduler (cleanup scheduled tasks)
     backend_plugin_scheduler.stop()
 
+    from app.services.backup.store import auto_backup_scheduler
+
+    auto_backup_scheduler.stop()
+
     await plugin_manager.cleanup_all()
     logger.info("Plugins cleaned up")
 
@@ -418,6 +440,7 @@ async def lifespan(app: FastAPI):
         logger.info("Database initialized")
         await _initialize_plugins()
         logger.info("Plugins initialized")
+        await _restore_on_start()
         await _initialize_keyboard_mappings()
         logger.info("Keyboard mappings initialized")
         await _initialize_image_service()
@@ -576,6 +599,7 @@ app.include_router(images.router, prefix="/api", tags=["images"])
 app.include_router(plugins.router, prefix="/api", tags=["plugins"])
 app.include_router(system.router, prefix="/api/system", tags=["system"])
 app.include_router(security.router, prefix="/api", tags=["security"])
+app.include_router(backup.router, prefix="/api", tags=["backup"])
 
 # Serve static files from frontend dist directory
 # Get the project root (parent of backend directory)

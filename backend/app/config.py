@@ -84,6 +84,10 @@ class Settings(BaseSettings):
     # Unset = repo_dir (a Pi/source checkout); the Docker image sets it explicitly.
     kiosk_bundle_dir: Path | None = None
 
+    # Backups (calvin-8gx). Unset: $CALVIN_DATA_DIR/backups, else next to the
+    # DB's data dir (see app.services.backup.store.backup_dir).
+    backup_dir: Path | None = None
+
     @property
     def is_dev_mode(self) -> bool:
         """Check if running in development mode by looking for .dev marker file."""
