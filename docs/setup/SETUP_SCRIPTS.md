@@ -135,7 +135,7 @@ After reboot:
 ```
 
 **What Happens:**
-1. Checks for Python 3.11+, Node.js 20+, Git
+1. Checks for Python 3.12+, Node.js 20+, Git
 2. Installs UV if not present
 3. Switches to develop branch (if Git available)
 4. Installs backend dependencies with dev extras
@@ -288,7 +288,7 @@ The scripts have been refactored with the following improvements:
    ```
 
 2. **Verify prerequisites:**
-   - Python 3.11+ installed
+   - Python 3.12+ installed
    - Node.js 20+ installed
    - Git installed
    - Root/sudo access (for Linux scripts)

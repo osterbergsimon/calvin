@@ -814,7 +814,7 @@ over SSH if you baked a key: `journalctl -u calvin-kiosk-firstboot -f`.
 
 The kiosk behaves exactly like one set up by hand with `setup-kiosk.sh`:
 stable `CALVIN_KIOSK_ID`, display-power agent, rotation via
-`/etc/default/calvin-kiosk`. See the [kiosk identity](DEPLOYMENT_TOPOLOGIES.md#kiosk-identity)
+`/etc/default/calvin-kiosk`. See the [kiosk identity](../../setup/DEPLOYMENT_TOPOLOGIES.md#kiosk-identity)
 section to rename it.
 
 ## Troubleshooting
@@ -839,7 +839,7 @@ section, immediately after the `**2. Pi.**` paragraph that shows
 > **Zero-touch alternative:** instead of SSHing in to run `setup-kiosk.sh`
 > by hand, you can bake the backend URL + wifi into the card before first
 > boot so the Pi self-provisions. See
-> [KIOSK_PROVISIONING.md](KIOSK_PROVISIONING.md).
+> [KIOSK_PROVISIONING.md](../../setup/KIOSK_PROVISIONING.md).
 ```
 
 - [ ] **Step 3: Add an entry to `SETUP_SCRIPTS.md`**
@@ -863,7 +863,7 @@ sudo bash scripts/bake-kiosk-firstrun.sh \
   --boot-dir /media/$USER/bootfs
 ```
 
-Full walkthrough: [KIOSK_PROVISIONING.md](KIOSK_PROVISIONING.md).
+Full walkthrough: [KIOSK_PROVISIONING.md](../../setup/KIOSK_PROVISIONING.md).
 ```
 
 - [ ] **Step 4: Update the tests README**

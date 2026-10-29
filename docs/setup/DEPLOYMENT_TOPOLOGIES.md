@@ -115,12 +115,19 @@ curl -fsSL http://homeserver.local:8000/api/kiosks/install.sh | sudo bash
 `setup-kiosk.sh` from the server and runs it. From a checkout,
 `sudo bash scripts/setup-kiosk.sh --backend-url http://homeserver.local:8000`
 does the same. `setup-kiosk.sh` installs `xserver-xorg`, `openbox`, `chromium`, and friends;
-writes `/etc/default/calvin-kiosk` with the backend URL; and enables
-two systemd units:
+writes `/etc/default/calvin-kiosk` with the backend URL; and installs the
+kiosk bundle:
 
 - `calvin-x.service` — starts the X server on tty1.
 - `calvin-kiosk-remote.service` — waits for the backend to answer,
   then launches Chromium in kiosk mode against `CALVIN_BACKEND_URL`.
+- `calvin-display-agent.service` — applies rotation/resolution and the
+  screen on/off schedule (see below).
+- `calvin-kiosk-update.service` — a root oneshot used by the remote
+  display-agent update flow.
+
+The update bundle installed by `update-kiosk.sh --bootstrap` also includes the
+first-boot helper where the image uses it.
 
 The installer reboots when it finishes, and Chromium opens to the dashboard.
 
@@ -247,6 +254,8 @@ clears the per-kiosk selection.
 ```bash
 sudo nano /etc/default/calvin-kiosk
 sudo systemctl restart calvin-kiosk-remote.service
+# The display agent reads the same file for rotation/schedule:
+sudo systemctl restart calvin-display-agent.service
 ```
 
 ### CORS
@@ -258,7 +267,7 @@ CORS only matters if you run `npm run dev` on a different host than
 the backend (e.g. hacking on the frontend from a laptop while pointing
 at the home server). For that case the backend already exposes
 `CORS_ORIGINS` and `CORS_ALLOW_ALL` env vars — see
-[backend/app/config.py](../../backend/app/config.py).
+[backend/app/config.py](https://github.com/osterbergsimon/calvin/blob/develop/backend/app/config.py).
 
 ### Public URL (phone setup and Add kiosk)
 

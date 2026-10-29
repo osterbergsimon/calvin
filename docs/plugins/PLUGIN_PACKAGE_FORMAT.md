@@ -2,8 +2,8 @@
 
 The official format for installable Calvin plugins under **plugin contract
 1.0**. Enforced by
-[plugin_installer.py](../../backend/app/services/plugin_installer.py) and
-[manifest_validator.py](../../backend/app/services/validation/manifest_validator.py).
+[plugin_installer.py](https://github.com/osterbergsimon/calvin/blob/develop/backend/app/services/plugin_installer.py) and
+[manifest_validator.py](https://github.com/osterbergsimon/calvin/blob/develop/backend/app/services/validation/manifest_validator.py).
 
 ## Versioning: `api_version`
 
@@ -12,7 +12,7 @@ The **one** contract version signal is `api_version` in `plugin.json`:
 - Integer, **required** — a manifest without it is rejected (never
   default-filled).
 - Must equal the host's `CURRENT_PLUGIN_API_VERSION`
-  ([definitions.py](../../backend/app/plugins/definitions.py)), currently `1`.
+  ([definitions.py](https://github.com/osterbergsimon/calvin/blob/develop/backend/app/plugins/definitions.py)), currently `1`.
   Newer → "update Calvin"; older → "update the plugin".
 - Checked at install **and** at every startup load — an installed plugin whose
   `api_version` no longer matches is skipped with a load error instead of
@@ -111,13 +111,17 @@ regenerates this file — don't edit it by hand there.
 
 - **`api_version`** (int, required): plugin contract version — see above.
 - **`id`** (string, required): unique plugin identifier (lowercase; letters,
-  numbers, underscores, hyphens). Must equal the class's
-  `metadata.type_id`.
+  numbers, underscores, hyphens; 1-64 chars). The host installs under this id
+  and does **not** cross-check it against the class's `metadata.type_id`. The
+  `calvin-plugins` validator and the scaffold expect the two to be equal —
+  keep them in sync so instances, static assets, and settings resolve.
 - **`name`** (string, required): human-readable name.
 - **`version`** (string, required): semantic version; used for
   upgrade/downgrade checks at install.
 - **`type`** (string, required): one of `calendar`, `image`, `service`,
-  `backend`. Must match the family base class the plugin subclasses.
+  `backend`. The host rejects other values but does not verify that the class
+  subclasses the matching family; the `calvin-plugins` validator does. Declare
+  the type that matches your base class.
 
 ### Optional metadata fields
 
@@ -165,9 +169,12 @@ regenerates this file — don't edit it by hand there.
 }
 ```
 
-- `include` / `exclude` (arrays of glob patterns): which files belong in the
-  installable package. `__pycache__`, `.git`, `.gitignore` are always skipped
-  when installing from a directory.
+- `include` / `exclude` (arrays of glob patterns): **descriptive only today.**
+  The host validates that they are arrays and then ignores the patterns.
+  Directory installs copy everything except `__pycache__`, `.git` and
+  `.gitignore`; zip installs extract the archive as-is. Keep tests, docs, and
+  caches out of the directory you package rather than relying on `exclude`.
+  The `calvin-plugins` validator understands the globs.
 
 ### Requirements
 

@@ -18,7 +18,7 @@ See the [Development Setup Guide](setup/QUICKSTART_DEVELOP.md) for detailed inst
 
 ### Backend (Python)
 
-- Use **Python 3.11+**
+- Use **Python 3.12+**
 - Follow **PEP 8** style guidelines
 - Use **ruff** for linting and formatting
 - Run `uv run ruff check .` and `uv run ruff format .` before committing

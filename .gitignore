@@ -56,6 +56,9 @@ dist-ssr/
 .env.test
 .env.production
 
+# Dev-compose data dir (docker/docker-compose.dev.yml)
+.calvin-dev-data/
+
 # IDE
 .vscode/*
 !.vscode/launch.json

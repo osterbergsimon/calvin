@@ -11,7 +11,7 @@ Two database tables:
 ### 1. Plugin types (`plugin_types` table)
 
 One row per plugin type, mirrored from the loader's registry by
-[registry/loader.py](../../backend/app/plugins/registry/loader.py):
+[registry/loader.py](https://github.com/osterbergsimon/calvin/blob/develop/backend/app/plugins/registry/loader.py):
 
 - `type_id` — unique identifier (e.g. `google`, `local`, `mealie`)
 - `plugin_type` — family (`calendar`, `image`, `service`, `backend`, `theme`)
@@ -85,7 +85,7 @@ installed are uninstalled before the partial directory is cleaned up.
 
 ## Startup
 
-On server startup ([main.py](../../backend/app/main.py) lifespan):
+On server startup ([main.py](https://github.com/osterbergsimon/calvin/blob/develop/backend/app/main.py) lifespan):
 
 1. `initialize_database()` runs first.
 2. The loader imports built-in plugin packages and all installed plugins from

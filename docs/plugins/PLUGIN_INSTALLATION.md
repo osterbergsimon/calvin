@@ -109,7 +109,7 @@ class MyServicePlugin(ServicePlugin):
 The host discovers the class, generates the settings form from
 `instance_config_schema`, and constructs instances itself — see
 [PLUGIN_INTERFACE.md](PLUGIN_INTERFACE.md) and the authoring guide
-[`calvin-plugins/CREATING_PLUGINS.md`](../../../calvin-plugins/CREATING_PLUGINS.md).
+[`calvin-plugins/CREATING_PLUGINS.md`](https://github.com/osterbergsimon/calvin-plugins/tree/main/CREATING_PLUGINS.md).
 
 ## Plugin Display UI
 
@@ -144,10 +144,12 @@ Install from a GitHub repository:
 
 ```bash
 # 1. Enumerate available plugins
-curl "http://localhost:8000/api/plugins/enumerate-from-github?repo_url=https://github.com/user/repo&branch=main"
+curl -X POST "http://localhost:8000/api/plugins/github/enumerate" \
+  -H "Content-Type: application/json" \
+  -d '{"repo_url": "https://github.com/user/repo", "branch": "main"}'
 
 # 2. Install one
-curl -X POST "http://localhost:8000/api/plugins/install-from-github" \
+curl -X POST "http://localhost:8000/api/plugins/github/install" \
   -H "Content-Type: application/json" \
   -d '{"repo_url": "https://github.com/user/repo", "plugin_path": "plugin-directory", "branch": "main"}'
 ```
@@ -213,5 +215,5 @@ Installed plugins are also loaded on application startup:
 
 ## Examples
 
-Reference plugin: [`mealie/`](../../../calvin-plugins/mealie) in
+Reference plugin: [`mealie/`](https://github.com/osterbergsimon/calvin-plugins/tree/main/mealie) in
 `calvin-plugins`. Built-in plugins: `backend/app/plugins/{calendar,image,service}/`.

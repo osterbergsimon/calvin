@@ -2,51 +2,55 @@
 
 ## How Settings Are Saved
 
-### Automatic Save on Change
-**Most settings save immediately** when changed:
-- Inputs have `@change="saveConfig"` which calls `saveConfig()` immediately
-- This sends a POST request to `/api/config` with all current settings
-- Examples: orientation, keyboard type, display settings, etc.
+Calvin saves settings **per field**. There is no "Save All Settings" button;
+changing a control writes the changed keys immediately.
 
-### Manual Save Button
-**"Save All Settings" button** exists for:
-- Batch saving (saves config + keyboard mappings together)
-- Ensuring everything is saved at once
-- User peace of mind
+### Per-field saves
 
-### What Gets Saved When
+The settings form (`useConfigForm.js`) exposes `updateConfigValue(key, value)`,
+which sends the changed key to `POST /api/config` as soon as the control
+changes. `updateConfig(updates)` does the same for a group of keys (for
+example a segmented control that edits several related values together).
 
-1. **Individual Settings** (via `@change`):
-   - Orientation, keyboard type, display settings
-   - Calendar view mode, time format
-   - Theme settings, display schedule
-   - **Saves immediately** when changed
+What this means in practice:
 
-2. **Keyboard Mappings**:
-   - Saved separately via `saveKeyboardMappings()`
-   - Called by "Save All Settings" button
-   - Can also be saved individually (if needed)
+- Orientation, theme, display schedule, clock-bar options, calendar view,
+  time format, refresh intervals, and similar settings are persisted as you
+  change them.
+- A short "saved" indicator appears, and errors are shown in the settings
+  header if the request fails.
+- Navigating away without pressing anything cannot lose a change that was
+  already sent.
 
-3. **Plugin Settings**:
-   - Each plugin has its own "Save" button
-   - Saves plugin-specific configuration
-   - Independent of main settings
+### Keyboard mappings
 
-4. **Plugin Instances**:
-   - Saved when "Save" is clicked in instance modal
-   - Creates or updates plugin instances
+Keyboard bindings are saved through their own endpoint when you apply them in
+**Settings → Keyboard**; they are independent of the general config form.
+
+### Plugin settings
+
+Plugin **type** settings and plugin **instance** settings each have their own
+save action in their respective settings panels. They are not part of the
+general config POST.
+
+### Plugin instances
+
+Creating or editing an instance in the instance modal saves that instance
+when you press **Save**. Instance data is stored separately from the global
+config.
 
 ## Summary
 
-- ✅ **Settings save automatically** when changed (no need to click save)
-- ✅ **"Save All Settings" button** ensures everything is saved together
-- ✅ **Plugin settings** have their own save buttons
-- ✅ **No data loss** - changes are persisted immediately
+- ✅ Settings save automatically, per field, when changed
+- ✅ There is no "Save All Settings" button
+- ✅ Keyboard mappings, plugin settings, and instances have their own save
+  actions
+- ✅ Errors surface in the settings UI; a failed save does not silently
+  succeed
 
 ## User Experience
 
-Users can:
-1. Change settings and they save automatically
-2. Use "Save All Settings" to ensure everything is saved
-3. See immediate feedback when settings are applied
-
+Users can change a setting and see it applied immediately. The repository's
+config store is updated alongside the backend so a reload shows the same
+values. If a save fails, the settings header reports the error instead of
+pretending the change was stored.
