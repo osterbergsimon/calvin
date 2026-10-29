@@ -14,6 +14,7 @@ from app.config import settings
 from app.services.config_service import config_service
 from app.services.display_orientation_service import display_orientation_service
 from app.utils.git_refs import validate_git_branch, validate_git_repo_url
+from app.utils.host_control import host_control_enabled
 
 router = APIRouter()
 
@@ -733,31 +734,37 @@ async def update_config(config_update: ConfigUpdate):
         or "orientation_flipped" in update_dict
         or "apply_display_rotation" in update_dict
     ):
-        try:
-            # Get the final config values (after update)
-            config = await config_service.get_config()
-            apply_rotation = config.get("apply_display_rotation", True) or config.get(
-                "applyDisplayRotation", True
-            )
-
-            # Only apply physical rotation if enabled
-            if apply_rotation:
-                orientation = config.get("orientation", "landscape")
-                flipped = config.get("orientation_flipped", False) or config.get(
-                    "orientationFlipped", False
+        if not host_control_enabled():
+            # Saving the setting is fine; rotating a desktop's screen is not.
+            logger.info("CALVIN_HOST_CONTROL is off - saved rotation without applying it")
+        else:
+            try:
+                # Get the final config values (after update)
+                config = await config_service.get_config()
+                apply_rotation = config.get("apply_display_rotation", True) or config.get(
+                    "applyDisplayRotation", True
                 )
 
-                # Apply display rotation on RPi
-                result = await display_orientation_service.apply_orientation(orientation, flipped)
-                if result.get("success"):
-                    print(f"Display orientation applied: {result.get('message')}")
+                # Only apply physical rotation if enabled
+                if apply_rotation:
+                    orientation = config.get("orientation", "landscape")
+                    flipped = config.get("orientation_flipped", False) or config.get(
+                        "orientationFlipped", False
+                    )
+
+                    # Apply display rotation on RPi
+                    result = await display_orientation_service.apply_orientation(
+                        orientation, flipped
+                    )
+                    if result.get("success"):
+                        print(f"Display orientation applied: {result.get('message')}")
+                    else:
+                        print(f"Display orientation update failed: {result.get('message')}")
                 else:
-                    print(f"Display orientation update failed: {result.get('message')}")
-            else:
-                print("Display rotation is disabled - only UI layout will change")
-        except Exception as e:
-            # Don't fail the config update if orientation application fails
-            print(f"Warning: Failed to apply display orientation: {e}")
+                    print("Display rotation is disabled - only UI layout will change")
+            except Exception as e:
+                # Don't fail the config update if orientation application fails
+                print(f"Warning: Failed to apply display orientation: {e}")
 
     # Return updated config
     return await get_config()

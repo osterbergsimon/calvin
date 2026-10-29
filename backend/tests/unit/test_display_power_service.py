@@ -5,7 +5,15 @@ from unittest.mock import AsyncMock, MagicMock, patch
 
 import pytest
 
+from app.config import settings
 from app.services.display_power_service import DisplayPowerService
+
+
+@pytest.fixture(autouse=True)
+def _host_control_on():
+    """Most tests exercise the real vcgencmd/xset path; host control is explicitly on."""
+    with patch.object(settings, "host_control", True):
+        yield
 
 
 @pytest.fixture
@@ -428,3 +436,51 @@ class TestDisplayPowerService:
 
             # Should turn display on (day not in schedule)
             mock_turn_on.assert_called_once()
+
+
+class TestHostControlGuard:
+    """The display scheduler and its commands stay off a machine Calvin doesn't own."""
+
+    @pytest.mark.asyncio
+    async def test_start_skipped_when_host_control_disabled(self, display_service):
+        with (
+            patch.object(settings, "host_control", False),
+            patch.object(
+                display_service, "configure_display_timeout", new_callable=AsyncMock
+            ) as configure,
+        ):
+            await display_service.start()
+
+        assert display_service._running is False
+        assert display_service._task is None
+        configure.assert_not_called()
+
+    @pytest.mark.asyncio
+    async def test_turn_display_on_does_not_run_commands_when_disabled(self, display_service):
+        with (
+            patch.object(settings, "host_control", False),
+            patch("subprocess.run") as run,
+        ):
+            await display_service.turn_display_on()
+
+        run.assert_not_called()
+
+    @pytest.mark.asyncio
+    async def test_turn_display_off_does_not_run_commands_when_disabled(self, display_service):
+        with (
+            patch.object(settings, "host_control", False),
+            patch("subprocess.run") as run,
+        ):
+            await display_service.turn_display_off()
+
+        run.assert_not_called()
+
+    @pytest.mark.asyncio
+    async def test_configure_timeout_does_not_run_commands_when_disabled(self, display_service):
+        with (
+            patch.object(settings, "host_control", False),
+            patch("subprocess.run") as run,
+        ):
+            await display_service.configure_display_timeout()
+
+        run.assert_not_called()
