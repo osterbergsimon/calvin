@@ -345,8 +345,6 @@ async def install_plugin(
         raise HTTPException(status_code=400, detail="No file provided")
     if plugin_id is not None:
         _require_valid_id(plugin_id)
-    if plugin_id is not None:
-        _require_valid_id(plugin_id)
 
     # Save uploaded file to temporary location
     temp_path = None
