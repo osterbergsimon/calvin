@@ -80,6 +80,9 @@ class Settings(BaseSettings):
     repo_dir: Path = Path("/home/calvin/calvin")
     system_path: str = "/home/calvin/.local/bin:/usr/local/bin:/usr/bin:/bin"
     kiosk_signing_key_path: Path = Path("./data/kiosk-signing.key")
+    # Where the kiosk bundle + installer scripts live (deploy/, scripts/ layout).
+    # Unset = repo_dir (a Pi/source checkout); the Docker image sets it explicitly.
+    kiosk_bundle_dir: Path | None = None
 
     # Backups (calvin-8gx). Unset: $CALVIN_DATA_DIR/backups, else next to the
     # DB's data dir (see app.services.backup.store.backup_dir).

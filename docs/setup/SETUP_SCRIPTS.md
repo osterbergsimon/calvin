@@ -180,10 +180,16 @@ sudo bash scripts/bake-kiosk-firstrun.sh \
   --backend-url http://homeserver.local:8000 \
   --wifi-ssid HomeNet --wifi-psk 's3cret' --wifi-country SE \
   --hostname kitchen \
+  --signing-key-file calvin.key \
   --boot-dir /media/$USER/bootfs
 ```
 
-Full walkthrough: [KIOSK_PROVISIONING.md](KIOSK_PROVISIONING.md).
+The card gets the kiosk installer (`deploy/kiosk-agent/install-kiosk.sh`); on boot 2
+it pulls the rest from the Calvin server. Without a card, the same installer runs as
+`curl -fsSL http://<server>:8000/api/kiosks/install.sh | sudo bash`.
+
+Full walkthrough: [KIOSK_INSTALL.md](KIOSK_INSTALL.md) and
+[KIOSK_PROVISIONING.md](KIOSK_PROVISIONING.md).
 
 ## Script Configuration
 
