@@ -22,6 +22,7 @@ makes no difference.
 | `logs/` | Backend log directory | `LOG_DIR` |
 | `backups/` | Saved and automatic backups | `BACKUP_DIR` |
 | `kiosk-signing.key` | Kiosk manifest signing key | `KIOSK_SIGNING_KEY_PATH` |
+| `admin-auth.json` | Admin password hash and session-signing secret (mode `0600`) | `ADMIN_AUTH_PATH` |
 
 An override wins over the data dir for that one path; everything else stays
 under the data dir. A relative value (for `CALVIN_DATA_DIR` or an override)

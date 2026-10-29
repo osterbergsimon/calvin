@@ -156,6 +156,7 @@ markers = [
     "integration: Integration tests",
     "e2e: End-to-end tests",
     "slow: Slow running tests",
+    "no_admin_login: Do not log the test client in (admin auth tests)",
 ]
 
 [tool.coverage.run]
