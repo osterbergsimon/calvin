@@ -29,6 +29,13 @@ sudo bash scripts/setup.sh --mode prod
 
 See [SETUP_LINUX.md](SETUP_LINUX.md) for the full walkthrough.
 
+The screen on/off schedule needs `vcgencmd`/`xset` on the host, which the
+container does not have, so setup also installs the same
+`calvin-display-agent.service` the kiosk Pis use, pointed at
+`http://localhost:$CALVIN_PORT` (it reads the global config; it does not show up
+under Settings → Kiosks). Rotation and output settings go in
+`/etc/default/calvin-kiosk` exactly as on a kiosk Pi.
+
 ## Mode B — Remote backend + kiosk Pi
 
 The backend (and its data) live on a home server. One or more Pis run

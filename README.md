@@ -80,55 +80,49 @@ git checkout develop
 **Production Setup (One Command):**
 
 ```bash
-wget -O- https://raw.githubusercontent.com/osterbergsimon/calvin/main/scripts/setup.sh | sudo bash
+wget -O- https://raw.githubusercontent.com/osterbergsimon/calvin/develop/scripts/setup.sh | sudo bash
 ```
 
 **Development Setup (with hot reload):**
 
 ```bash
-wget -O- https://raw.githubusercontent.com/osterbergsimon/calvin/main/scripts/setup.sh | sudo bash -s -- --mode dev
+wget -O- https://raw.githubusercontent.com/osterbergsimon/calvin/develop/scripts/setup.sh | sudo bash -s -- --mode dev
 ```
 
 **Using curl:**
 
 ```bash
-curl -fsSL https://raw.githubusercontent.com/osterbergsimon/calvin/main/scripts/setup.sh | sudo bash
-curl -fsSL https://raw.githubusercontent.com/osterbergsimon/calvin/main/scripts/setup.sh | sudo bash -s -- --mode dev
+curl -fsSL https://raw.githubusercontent.com/osterbergsimon/calvin/develop/scripts/setup.sh | sudo bash
+curl -fsSL https://raw.githubusercontent.com/osterbergsimon/calvin/develop/scripts/setup.sh | sudo bash -s -- --mode dev
 ```
 
-**Using a Different Branch:**
+**Using another branch or a fork:** put the variables *after* `sudo` so they
+reach the script (`sudo` drops your environment, and `VAR=x curl ...` only sets
+them for `curl`):
 
 ```bash
-# Production setup with develop branch
-export GIT_BRANCH=develop
-wget -O- https://raw.githubusercontent.com/osterbergsimon/calvin/main/scripts/setup.sh | sudo -E bash
-
-# Development setup with develop branch
-export GIT_BRANCH=develop
-curl -fsSL https://raw.githubusercontent.com/osterbergsimon/calvin/main/scripts/setup.sh | sudo -E bash -s -- --mode dev
+curl -fsSL https://raw.githubusercontent.com/<you>/calvin/<branch>/scripts/setup.sh \
+  | sudo GIT_REPO=https://github.com/<you>/calvin.git GIT_BRANCH=<branch> bash
 ```
 
-> **Note:** Use `sudo -E` to preserve environment variables. Without `-E`, `sudo` will not pass `GIT_BRANCH` or `GIT_REPO` to the script, and it will default to the `main` branch.
-> 
-> **Important:** Export the variable first (`export GIT_BRANCH=develop`) rather than setting it inline (`GIT_BRANCH=develop wget ...`), as inline assignments don't propagate through pipes to `sudo`.
-
-**Using a Fork or Different Repository:**
-
-```bash
-export GIT_REPO=https://github.com/yourusername/calvin.git
-export GIT_BRANCH=your-branch
-wget -O- ... | sudo -E bash
-```
+The default branch is `develop` (`main` is release-only). The Docker image tag
+follows the branch: `main` runs `:latest`, any other branch `:develop`. Pin a
+specific image the same way with `CALVIN_IMAGE_TAG=<tag>`.
 
 **What the Setup Scripts Do:**
-- Install kiosk dependencies, Docker, and the Docker Compose plugin
+- Install kiosk dependencies, plus Docker CE and the Docker Compose plugin from download.docker.com (Raspberry Pi OS Bookworm/Trixie ship no compose v2)
 - Create `calvin` user if needed
 - Clone the Calvin repository (from the specified branch)
 - Install a compose configuration under `/etc/calvin`
 - Store runtime data under `/var/lib/calvin`
 - Set up `calvin-app.service`, `calvin-x.service`, and `calvin-kiosk.service`
 - Configure display and kiosk mode
+- Install the display-power agent (screen on/off schedule) and enable unattended-upgrades
 - Verify installation and provide next steps
+
+Re-running setup is safe: it never resets local edits in the checkout, and
+`sudo update-calvin.sh` refreshes the host files, pulls the new image, and rolls
+back to the previous one if it does not come up healthy.
 
 **For detailed information about the setup scripts, see [Setup Scripts Documentation](docs/setup/SETUP_SCRIPTS.md)**
 

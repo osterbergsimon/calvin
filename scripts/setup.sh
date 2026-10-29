@@ -7,6 +7,14 @@
 
 set -euo pipefail
 
+# Tests source this file for its functions without running setup.
+_CALVIN_SOURCE_ONLY=0
+for _arg in "$@"; do
+    if [ "$_arg" = "--source-only" ]; then
+        _CALVIN_SOURCE_ONLY=1
+    fi
+done
+
 _ENV_GIT_BRANCH="${GIT_BRANCH:-}"
 _ENV_GIT_REPO="${GIT_REPO:-}"
 
@@ -38,14 +46,16 @@ if [ -z "${COMMON_SCRIPT}" ] && [ -n "${BASH_VERSION:-}" ]; then
 fi
 
 if [ -n "${COMMON_SCRIPT}" ] && [ -f "${COMMON_SCRIPT}" ]; then
+    # shellcheck source=setup-common.sh
     . "${COMMON_SCRIPT}"
 else
     echo "Downloading setup-common.sh from GitHub..." >&2
     TEMP_DIR="$(mktemp -d)"
-    trap "rm -rf '${TEMP_DIR}'" EXIT 2>/dev/null || true
+    trap 'rm -rf "${TEMP_DIR}"' EXIT 2>/dev/null || true
 
     GIT_REPO="${_ENV_GIT_REPO:-${GIT_REPO:-https://github.com/osterbergsimon/calvin.git}}"
-    GIT_BRANCH="${_ENV_GIT_BRANCH:-${GIT_BRANCH:-main}}"
+    # Never main: it is release-only and far behind develop.
+    GIT_BRANCH="${_ENV_GIT_BRANCH:-${GIT_BRANCH:-develop}}"
     repo_owner=$(echo "${GIT_REPO}" | sed -E 's|.*github\.com[:/]([^/]+)/([^/]+)(\.git)?$|\1|')
     repo_name=$(echo "${GIT_REPO}" | sed -E 's|.*github\.com[:/]([^/]+)/([^/]+)(\.git)?$|\2|' | sed 's|\.git$||')
 
@@ -70,8 +80,10 @@ else
         exit 1
     fi
 
+    # shellcheck source=setup-common.sh
     . "${TEMP_DIR}/setup-common.sh"
 fi
+
 
 GIT_REPO="${_ENV_GIT_REPO:-${GIT_REPO:-$DEFAULT_GIT_REPO}}"
 GIT_BRANCH="${_ENV_GIT_BRANCH:-${GIT_BRANCH:-$DEFAULT_GIT_BRANCH}}"
@@ -79,15 +91,29 @@ CALVIN_DIR="${CALVIN_DIR:-$DEFAULT_CALVIN_DIR}"
 CALVIN_USER="${CALVIN_USER:-$DEFAULT_CALVIN_USER}"
 LOG_FILE="${LOG_FILE:-$DEFAULT_LOG_FILE}"
 CALVIN_DATA_DIR="${CALVIN_DATA_DIR:-/var/lib/calvin}"
-SETUP_MODE="prod"
+# Install locations; overridable so tests can run against a temp dir.
+CALVIN_ETC_DIR="${CALVIN_ETC_DIR:-/etc/calvin}"
+CALVIN_BIN_DIR="${CALVIN_BIN_DIR:-/usr/local/bin}"
+CALVIN_SYSTEMD_DIR="${CALVIN_SYSTEMD_DIR:-/etc/systemd/system}"
+CALVIN_KIOSK_ENV_FILE="${CALVIN_KIOSK_ENV_FILE:-${CALVIN_DEFAULT_DIR:-/etc/default}/calvin-kiosk}"
+SETUP_MODE=""
+REFRESH_ONLY=0
 
 usage() {
-    cat <<EOF
-Usage: setup.sh [--mode prod|dev]
+    cat <<USAGE
+Usage: setup.sh [--mode prod|dev] [--refresh]
+
+  --mode prod|dev  prod (default) runs the published image; dev runs the
+                   hot-reload compose stack from the checkout.
+  --refresh        Only re-install the host files from the checkout (compose
+                   file, systemd units, helper scripts, sudoers, X/openbox
+                   config, display agent). No apt, Docker or git. update-calvin.sh
+                   runs this on every update.
 
 Environment overrides:
-  GIT_REPO, GIT_BRANCH, CALVIN_DIR, CALVIN_USER, CALVIN_DATA_DIR
-EOF
+  GIT_REPO, GIT_BRANCH, CALVIN_DIR, CALVIN_DATA_DIR, CALVIN_IMAGE_TAG
+  (pass them through sudo: sudo GIT_BRANCH=develop bash setup.sh)
+USAGE
 }
 
 parse_args() {
@@ -99,6 +125,13 @@ parse_args() {
                 ;;
             --mode=*)
                 SETUP_MODE="${1#*=}"
+                shift
+                ;;
+            --refresh)
+                REFRESH_ONLY=1
+                shift
+                ;;
+            --source-only)
                 shift
                 ;;
             -h|--help)
@@ -113,6 +146,11 @@ parse_args() {
         esac
     done
 
+    # A refresh keeps the mode the host was set up with.
+    if [ -z "${SETUP_MODE}" ]; then
+        SETUP_MODE="$(read_env_value "${CALVIN_DEFAULT_DIR:-/etc/default}/calvin-update" CALVIN_MODE)"
+        SETUP_MODE="${SETUP_MODE:-prod}"
+    fi
     if [ "${SETUP_MODE}" != "prod" ] && [ "${SETUP_MODE}" != "dev" ]; then
         echo "Invalid mode: ${SETUP_MODE}. Expected prod or dev." >&2
         exit 1
@@ -129,36 +167,123 @@ compose() {
     fi
 }
 
+# Docker Engine + the compose plugin from Docker's own apt repo. Debian and
+# Raspberry Pi OS (Bookworm, Trixie) ship docker.io but no compose v2 plugin, so
+# the distro packages cannot run calvin-app.service. Left alone when a working
+# `docker compose` is already there.
 install_docker_runtime() {
-    log "Installing Docker runtime..."
-    install_system_packages docker.io
+    if docker compose version >/dev/null 2>&1; then
+        log "Docker with the compose plugin is already installed"
+    else
+        log "Installing Docker CE + compose plugin from download.docker.com..."
+        local os_release="${CALVIN_OS_RELEASE:-/etc/os-release}"
+        local keyrings="${CALVIN_APT_KEYRINGS_DIR:-/etc/apt/keyrings}"
+        local sources="${CALVIN_APT_SOURCES_DIR:-/etc/apt/sources.list.d}"
+        local os_id codename repo_os arch
+        # shellcheck disable=SC1090
+        os_id="$(. "${os_release}" && echo "${ID:-}")"
+        # shellcheck disable=SC1090
+        codename="$(. "${os_release}" && echo "${VERSION_CODENAME:-}")"
+        case "${os_id}" in
+            debian|ubuntu) repo_os="${os_id}" ;;
+            raspbian) repo_os="raspbian" ;;  # 32-bit Raspberry Pi OS (armhf)
+            *) error_exit "Unsupported OS '${os_id}': install Docker with the compose plugin yourself, then re-run" 1 ;;
+        esac
+        [ -n "${codename}" ] || error_exit "No VERSION_CODENAME in ${os_release}" 1
+        arch="$(dpkg --print-architecture)"
+        # Docker does not publish every combination (e.g. no 32-bit raspbian
+        # Trixie): fail with a pointer instead of an opaque apt error.
+        if ! curl -fsSL -o /dev/null "https://download.docker.com/linux/${repo_os}/dists/${codename}/Release"; then
+            error_exit "Docker publishes no packages for ${repo_os} ${codename} (${arch}). Use 64-bit Raspberry Pi OS (or Debian) Bookworm/Trixie." 1
+        fi
 
-    if ! docker compose version >/dev/null 2>&1; then
-        install_system_packages docker-compose-plugin
+        # docker-ce conflicts with the distro packages an older setup installed.
+        local conflicts=() pkg
+        for pkg in docker.io docker-doc docker-compose docker-compose-v2 podman-docker containerd runc; do
+            if dpkg -s "${pkg}" >/dev/null 2>&1; then
+                conflicts+=("${pkg}")
+            fi
+        done
+        if [ "${#conflicts[@]}" -gt 0 ]; then
+            log "Removing distro Docker packages: ${conflicts[*]}"
+            apt_get remove -y -qq "${conflicts[@]}" || error_exit "Failed to remove ${conflicts[*]}" 1
+        fi
+
+        install_system_packages ca-certificates curl
+        mkdir -p "${keyrings}" "${sources}"
+        curl -fsSL "https://download.docker.com/linux/${repo_os}/gpg" -o "${keyrings}/docker.asc" \
+            || error_exit "Failed to download Docker's apt key" 1
+        chmod a+r "${keyrings}/docker.asc"
+        printf 'deb [arch=%s signed-by=%s] https://download.docker.com/linux/%s %s stable\n' \
+            "${arch}" "${keyrings}/docker.asc" "${repo_os}" "${codename}" > "${sources}/docker.list"
+        apt_get update -qq || error_exit "Failed to update package lists (Docker repo for ${repo_os} ${codename})" 1
+        install_system_packages docker-ce docker-ce-cli containerd.io docker-buildx-plugin docker-compose-plugin
     fi
 
-    if ! docker compose version >/dev/null 2>&1; then
-        install_system_packages docker-compose-v2
-    fi
+    systemctl enable docker >/dev/null 2>&1 || log_warn "Failed to enable docker.service"
+    systemctl start docker >/dev/null 2>&1 || log_warn "Failed to start docker.service"
 
-    systemctl enable docker || log_warn "Failed to enable docker.service"
-    systemctl start docker || log_warn "Failed to start docker.service"
-    usermod -aG docker "${CALVIN_USER}" || log_warn "Failed to add ${CALVIN_USER} to docker group"
+    # The docker group is root-equivalent and calvin runs Chromium; root
+    # (calvin-app.service, update-calvin.sh) is what drives Docker.
+    if id -nG "${CALVIN_USER}" 2>/dev/null | tr ' ' '\n' | grep -qx docker; then
+        log "Removing ${CALVIN_USER} from the docker group"
+        gpasswd -d "${CALVIN_USER}" docker >/dev/null || log_warn "Failed to remove ${CALVIN_USER} from the docker group"
+    fi
 
     if ! compose version >/dev/null 2>&1; then
         error_exit "Docker Compose is not available after installation" 1
     fi
 }
 
+# The container runs as root, so nothing but root and calvin needs access;
+# an older setup's `chmod -R 755` made the DB world-readable.
 create_runtime_data_dirs() {
     log "Creating Calvin runtime data directories under ${CALVIN_DATA_DIR}..."
-    mkdir -p \
-        "${CALVIN_DATA_DIR}/db" \
-        "${CALVIN_DATA_DIR}/images" \
-        "${CALVIN_DATA_DIR}/plugins" \
-        "${CALVIN_DATA_DIR}/logs"
-    chown -R "${CALVIN_USER}:${CALVIN_USER}" "${CALVIN_DATA_DIR}"
-    chmod -R 755 "${CALVIN_DATA_DIR}"
+    local d
+    for d in "" /db /images /plugins /logs; do
+        mkdir -p "${CALVIN_DATA_DIR}${d}"
+        chown "${CALVIN_USER}:${CALVIN_USER}" "${CALVIN_DATA_DIR}${d}"
+        chmod 0750 "${CALVIN_DATA_DIR}${d}"
+    done
+    chmod -R o-rwx "${CALVIN_DATA_DIR}"
+}
+
+# main is release-only (:latest is published from v* tags); everything else
+# deploys the :develop image.
+image_tag_for_branch() {
+    if [ "$1" = "main" ]; then
+        echo latest
+    else
+        echo develop
+    fi
+}
+
+# Keep CALVIN_IMAGE_TAG in step with the branch. latest/develop/empty are the
+# values setup manages; any other value is an operator pin and is kept. An
+# explicit CALVIN_IMAGE_TAG in setup's environment always wins.
+sync_image_tag() {
+    local env_file="$1"
+    local branch="$2"
+    local current wanted
+    current="$(read_env_value "${env_file}" CALVIN_IMAGE_TAG)"
+    if [ -n "${CALVIN_IMAGE_TAG:-}" ]; then
+        wanted="${CALVIN_IMAGE_TAG}"
+    else
+        case "${current}" in
+            ""|latest|develop) wanted="$(image_tag_for_branch "${branch}")" ;;
+            *) log "Keeping pinned image tag ${current}"; return 0 ;;
+        esac
+    fi
+    if [ "${current}" != "${wanted}" ]; then
+        log "Image tag: ${current:-<unset>} -> ${wanted}"
+        upsert_env_value "${env_file}" CALVIN_IMAGE_TAG "${wanted}"
+    fi
+}
+
+calvin_port() {
+    local port
+    port="$(read_env_value "${CALVIN_ETC_DIR}/.env" CALVIN_PORT)"
+    echo "${port:-8000}"
 }
 
 install_compose_config() {
@@ -174,24 +299,49 @@ install_compose_config() {
     # `-f /etc/calvin/docker-compose.yml` — no env_file directive,
     # no path rewriting needed.
     log "Installing ${mode} compose configuration..."
-    mkdir -p /etc/calvin
-    install -m 0644 "${source_compose}" /etc/calvin/docker-compose.yml
+    mkdir -p "${CALVIN_ETC_DIR}"
+    install -m 0644 "${source_compose}" "${CALVIN_ETC_DIR}/docker-compose.yml"
 
-    if [ ! -f /etc/calvin/.env ]; then
-        install -g "${CALVIN_USER}" -m 0640 "${CALVIN_DIR}/deploy/calvin.env.example" /etc/calvin/.env
+    if [ ! -f "${CALVIN_ETC_DIR}/.env" ]; then
+        install -m 0640 "${CALVIN_DIR}/deploy/calvin.env.example" "${CALVIN_ETC_DIR}/.env"
+        chown "root:${CALVIN_USER}" "${CALVIN_ETC_DIR}/.env"
     fi
 
-    upsert_env_value /etc/calvin/.env CALVIN_DATA_DIR "${CALVIN_DATA_DIR}"
+    upsert_env_value "${CALVIN_ETC_DIR}/.env" CALVIN_DATA_DIR "${CALVIN_DATA_DIR}"
+    sync_image_tag "${CALVIN_ETC_DIR}/.env" "${GIT_BRANCH}"
     if [ "${mode}" = "dev" ]; then
         # Dev compose bind-mounts the source tree at /app. Point it at
         # the actual checkout so the compose file can run from
         # /etc/calvin/ instead of the repo's docker/ dir.
-        upsert_env_value /etc/calvin/.env CALVIN_REPO_DIR "${CALVIN_DIR}"
+        upsert_env_value "${CALVIN_ETC_DIR}/.env" CALVIN_REPO_DIR "${CALVIN_DIR}"
     fi
 
-    if ! compose -f /etc/calvin/docker-compose.yml config >/dev/null; then
+    if ! compose -f "${CALVIN_ETC_DIR}/docker-compose.yml" config >/dev/null; then
         error_exit "Installed Docker Compose configuration is invalid" 1
     fi
+}
+
+# P4: the screen on/off schedule needs vcgencmd/xset on the host; the container
+# has neither. Same agent as on remote kiosks, pointed at the local server. No
+# CALVIN_KIOSK_ID: it reads the global config instead of registering as a kiosk.
+install_display_agent() {
+    local port="$1"
+    log "Installing the display-power agent (backend http://localhost:${port})..."
+    mkdir -p "${CALVIN_BIN_DIR}" "${CALVIN_SYSTEMD_DIR}" "$(dirname "${CALVIN_KIOSK_ENV_FILE}")"
+    install -m 0755 "${CALVIN_DIR}/deploy/kiosk-agent/calvin_display_agent.py" "${CALVIN_BIN_DIR}/calvin_display_agent.py"
+    install -m 0644 "${CALVIN_DIR}/deploy/systemd/calvin-display-agent.service" "${CALVIN_SYSTEMD_DIR}/calvin-display-agent.service"
+    [ -f "${CALVIN_KIOSK_ENV_FILE}" ] || install -m 0644 /dev/null "${CALVIN_KIOSK_ENV_FILE}"
+    upsert_env_value "${CALVIN_KIOSK_ENV_FILE}" CALVIN_BACKEND_URL "http://localhost:${port}"
+    systemctl enable calvin-display-agent.service >/dev/null 2>&1 || log_warn "Could not enable calvin-display-agent.service"
+}
+
+install_helper_scripts() {
+    install_privileged_sudo_helper_script "${CALVIN_DIR}/scripts/update-calvin.sh" "${CALVIN_BIN_DIR}/update-calvin.sh"
+    install_privileged_sudo_helper_script "${CALVIN_DIR}/scripts/reboot-calvin.sh" "${CALVIN_BIN_DIR}/reboot-calvin.sh"
+    install_privileged_sudo_helper_script "${CALVIN_DIR}/scripts/restart-calvin-services.sh" "${CALVIN_BIN_DIR}/restart-calvin-services.sh"
+    # The sudoers rules name the canonical paths, not CALVIN_BIN_DIR.
+    install_sudoers_fragment calvin-reboot "${CALVIN_USER} ALL=(root) NOPASSWD: /usr/local/bin/reboot-calvin.sh"
+    install_sudoers_fragment calvin-restart "${CALVIN_USER} ALL=(root) NOPASSWD: /usr/local/bin/restart-calvin-services.sh"
 }
 
 disable_legacy_services() {
@@ -204,7 +354,7 @@ disable_legacy_services() {
             systemctl stop "${service}" 2>/dev/null || true
             systemctl disable "${service}" 2>/dev/null || true
         fi
-        rm -f "/etc/systemd/system/${service}"
+        rm -f "${CALVIN_SYSTEMD_DIR}/${service}"
     done
     systemctl daemon-reload 2>/dev/null || true
 }
@@ -228,6 +378,23 @@ install_runtime_services() {
     fi
 }
 
+# Everything setup puts on the host outside the Docker volume, from the
+# checkout. Run on every setup and, via --refresh, on every update.
+refresh_host_files() {
+    install_compose_config "${SETUP_MODE}"
+    local port
+    port="$(calvin_port)"
+
+    install_helper_scripts
+    configure_polkit_reboot "${CALVIN_USER}"
+    create_update_config "${GIT_REPO}" "${GIT_BRANCH}" "${CALVIN_DIR}" "${SETUP_MODE}"
+    configure_display "${CALVIN_USER}"
+    configure_openbox_autostart "${CALVIN_USER}" "http://localhost:${port}" "false"
+    install_display_agent "${port}"
+    install_runtime_services
+    systemctl daemon-reload >/dev/null 2>&1 || log_warn "systemctl daemon-reload failed"
+}
+
 start_runtime_services() {
     log "Starting Calvin runtime services..."
     if systemd_available; then
@@ -235,9 +402,10 @@ start_runtime_services() {
         start_systemd_service "calvin-x.service"
         sleep 3
         start_systemd_service "calvin-kiosk.service"
+        systemctl restart calvin-display-agent.service || log_warn "Could not start calvin-display-agent.service"
     else
         log_warn "systemd is not running; starting Docker Compose stack directly"
-        compose -f /etc/calvin/docker-compose.yml up -d
+        compose -f "${CALVIN_ETC_DIR}/docker-compose.yml" up -d
     fi
 }
 
@@ -245,10 +413,10 @@ verify_compose_runtime() {
     log "Verifying Docker Compose runtime..."
     verify_directory "${CALVIN_DIR}"
     verify_directory "${CALVIN_DATA_DIR}"
-    verify_file "/etc/calvin/docker-compose.yml"
-    verify_file "/etc/calvin/.env"
+    verify_file "${CALVIN_ETC_DIR}/docker-compose.yml"
+    verify_file "${CALVIN_ETC_DIR}/.env"
 
-    if ! compose -f /etc/calvin/docker-compose.yml ps >/dev/null; then
+    if ! compose -f "${CALVIN_ETC_DIR}/docker-compose.yml" ps >/dev/null; then
         log_warn "Docker Compose stack is not queryable yet"
     fi
 
@@ -257,6 +425,20 @@ verify_compose_runtime() {
 
 main() {
     parse_args "$@"
+    require_fixed_calvin_user
+    check_root
+    mkdir -p "$(dirname "${LOG_FILE}")"
+
+    if [ "${REFRESH_ONLY}" = 1 ]; then
+        log "Refreshing Calvin host files from ${CALVIN_DIR} (mode ${SETUP_MODE})..."
+        verify_directory "${CALVIN_DIR}"
+        refresh_host_files
+        if systemd_available; then
+            systemctl try-restart calvin-display-agent.service || true
+        fi
+        log "Host files refreshed"
+        return 0
+    fi
 
     log "=========================================="
     log "Calvin Raspberry Pi Setup"
@@ -269,63 +451,31 @@ main() {
     log "User: ${CALVIN_USER}"
     log ""
 
-    check_root
-    mkdir -p "$(dirname "${LOG_FILE}")"
-
     ensure_user_exists "${CALVIN_USER}"
     update_system_packages
 
     log "Installing kiosk and system dependencies..."
-    install_system_packages \
-        curl \
-        git \
-        xserver-xorg \
-        xinit \
-        openbox \
-        chromium \
-        unclutter \
-        xdotool \
-        x11-xserver-utils \
-        cron
+    install_system_packages git cron "${CALVIN_KIOSK_PACKAGES[@]}"
 
     install_docker_runtime
+    configure_unattended_upgrades
     ensure_git_repo "${GIT_REPO}" "${GIT_BRANCH}" "${CALVIN_DIR}" "${CALVIN_USER}"
     create_runtime_data_dirs
-    install_compose_config "${SETUP_MODE}"
-
-    install_script "${CALVIN_DIR}/scripts/update-calvin.sh" "/usr/local/bin/update-calvin.sh" "${CALVIN_USER}"
-
-    if [ -f "${CALVIN_DIR}/scripts/reboot-calvin.sh" ]; then
-        install_privileged_sudo_helper_script "${CALVIN_DIR}/scripts/reboot-calvin.sh" "/usr/local/bin/reboot-calvin.sh"
-        log "Configuring sudoers for reboot script..."
-        echo "${CALVIN_USER} ALL=(root) NOPASSWD: /usr/local/bin/reboot-calvin.sh" > /etc/sudoers.d/calvin-reboot
-        chmod 0440 /etc/sudoers.d/calvin-reboot
-    fi
-
-    if [ -f "${CALVIN_DIR}/scripts/restart-calvin-services.sh" ]; then
-        install_privileged_sudo_helper_script "${CALVIN_DIR}/scripts/restart-calvin-services.sh" "/usr/local/bin/restart-calvin-services.sh"
-        log "Configuring sudoers for restart script..."
-        echo "${CALVIN_USER} ALL=(root) NOPASSWD: /usr/local/bin/restart-calvin-services.sh" > /etc/sudoers.d/calvin-restart
-        chmod 0440 /etc/sudoers.d/calvin-restart
-    fi
-
-    configure_polkit_reboot "${CALVIN_USER}"
-    create_update_config "${GIT_REPO}" "${GIT_BRANCH}" "${CALVIN_DIR}" "${SETUP_MODE}"
-    configure_display "${CALVIN_USER}"
-    configure_openbox_autostart "${CALVIN_USER}" "http://localhost:8000" "false"
+    refresh_host_files
 
     disable_legacy_services
-    install_runtime_services
     start_runtime_services
     verify_compose_runtime
 
+    local port
+    port="$(calvin_port)"
     log ""
     log "=========================================="
     log "Calvin Raspberry Pi Setup Complete!"
     log "=========================================="
     log "Mode: ${SETUP_MODE}"
-    log "Compose file: /etc/calvin/docker-compose.yml"
-    log "Environment file: /etc/calvin/.env"
+    log "Compose file: ${CALVIN_ETC_DIR}/docker-compose.yml"
+    log "Environment file: ${CALVIN_ETC_DIR}/.env"
     log "Data directory: ${CALVIN_DATA_DIR}"
     log ""
     log "IMPORTANT: Reboot to start X and the dashboard:"
@@ -334,11 +484,14 @@ main() {
     log "After reboot:"
     log "  - Docker Compose starts Calvin via calvin-app.service"
     log "  - Kiosk mode starts via calvin-kiosk.service"
-    log "  - Dashboard is available at http://localhost:8000"
+    log "  - Dashboard is available at http://localhost:${port}"
     log ""
     log "To update Calvin in the future:"
-    log "  update-calvin.sh"
+    log "  sudo update-calvin.sh"
     log ""
 }
+
+# Sourced for testing: stop before running main.
+[ "${_CALVIN_SOURCE_ONLY}" = "1" ] && return 0 2>/dev/null || true
 
 main "$@"

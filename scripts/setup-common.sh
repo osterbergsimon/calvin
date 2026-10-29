@@ -14,7 +14,8 @@ readonly NC='\033[0m' # No Color
 
 # Default configuration
 readonly DEFAULT_GIT_REPO="https://github.com/osterbergsimon/calvin.git"
-readonly DEFAULT_GIT_BRANCH="main"
+# main is release-only and far behind; develop is the deploy branch.
+readonly DEFAULT_GIT_BRANCH="develop"
 readonly DEFAULT_CALVIN_DIR="/home/calvin/calvin"
 readonly DEFAULT_CALVIN_USER="calvin"
 readonly DEFAULT_LOG_FILE="/var/log/calvin-setup.log"
@@ -81,6 +82,14 @@ verify_file() {
     fi
 }
 
+# The systemd units, sudoers fragments and kiosk bundle all hard-code the
+# `calvin` user, so it is not configurable.
+require_fixed_calvin_user() {
+    if [ "${CALVIN_USER:-$DEFAULT_CALVIN_USER}" != "${DEFAULT_CALVIN_USER}" ]; then
+        error_exit "CALVIN_USER must be ${DEFAULT_CALVIN_USER} (the systemd units and sudoers rules hard-code it); unset CALVIN_USER" 1
+    fi
+}
+
 # User management
 ensure_user_exists() {
     local username="${1:-$DEFAULT_CALVIN_USER}"
@@ -100,17 +109,43 @@ ensure_user_exists() {
 }
 
 # System package management
+# Never prompt (a piped `curl | sudo bash` has no terminal), and keep locally
+# modified config files on upgrade.
+apt_get() {
+    DEBIAN_FRONTEND=noninteractive apt-get \
+        -o Dpkg::Options::=--force-confdef \
+        -o Dpkg::Options::=--force-confold \
+        "$@"
+}
+
+# apt is all-or-nothing: one bad package means none were installed, so a failure
+# here must stop setup rather than carry on without X or Chromium.
 update_system_packages() {
     log "Updating system packages..."
-    apt-get update -qq || error_exit "Failed to update package list" 1
-    apt-get upgrade -y -qq || log_warn "Some packages failed to upgrade (non-fatal)"
+    apt_get update -qq || error_exit "Failed to update package list" 1
+    apt_get upgrade -y -qq || error_exit "Failed to upgrade system packages (see apt output above)" 1
 }
 
 install_system_packages() {
     local packages=("$@")
     log "Installing system packages: ${packages[*]}"
-    apt-get install -y -qq "${packages[@]}" || log_warn "Some packages may have failed to install (non-fatal)"
+    apt_get install -y -qq "${packages[@]}" || error_exit "Failed to install: ${packages[*]} (see apt output above)" 1
 }
+
+# X + Chromium kiosk packages, shared by setup.sh, setup-kiosk.sh and the CI
+# package-availability smoke test.
+# shellcheck disable=SC2034  # used by the scripts that source this file
+CALVIN_KIOSK_PACKAGES=(
+    curl
+    sudo
+    xserver-xorg
+    xinit
+    openbox
+    chromium
+    unclutter
+    xdotool
+    x11-xserver-utils
+)
 
 # UV installation and management
 get_uv_path() {
@@ -128,7 +163,7 @@ ensure_uv_installed() {
     fi
     
     log "Installing UV for user ${user}..."
-    sudo -u "${user}" bash << 'UV_INSTALL_EOF'
+    if ! sudo -u "${user}" bash << 'UV_INSTALL_EOF'
         export PATH="$HOME/.local/bin:$HOME/.cargo/bin:$PATH"
         if ! command -v uv &> /dev/null; then
             curl -LsSf https://astral.sh/uv/install.sh | sh || exit 1
@@ -139,8 +174,11 @@ ensure_uv_installed() {
         command -v uv &> /dev/null || { echo "ERROR: UV installation failed" >&2; exit 1; }
         uv --version
 UV_INSTALL_EOF
-    
-    if [ $? -ne 0 ] || ! sudo -u "${user}" bash -c 'export PATH="$HOME/.local/bin:$HOME/.cargo/bin:$PATH" && uv --version &> /dev/null'; then
+    then
+        error_exit "Failed to install UV for user ${user}" 1
+    fi
+
+    if ! sudo -u "${user}" bash -c 'export PATH="$HOME/.local/bin:$HOME/.cargo/bin:$PATH" && uv --version &> /dev/null'; then
         error_exit "Failed to install or verify UV for user ${user}" 1
     fi
     
@@ -164,7 +202,7 @@ ensure_nodejs_installed() {
     fi
     
     log "Installing Node.js ${min_version}.x..."
-    curl -fsSL https://deb.nodesource.com/setup_${min_version}.x | bash - || error_exit "Failed to setup Node.js repository" 1
+    curl -fsSL "https://deb.nodesource.com/setup_${min_version}.x" | bash - || error_exit "Failed to setup Node.js repository" 1
     apt-get install -y -qq nodejs || error_exit "Failed to install Node.js" 1
     
     if ! command -v node &> /dev/null; then
@@ -175,6 +213,9 @@ ensure_nodejs_installed() {
 }
 
 # Git repository management
+# Non-destructive: clones when missing, otherwise only fast-forwards. A dirty
+# tree, local commits or another branch checked out are left alone with a
+# warning (the docs tell users to edit their checkout; never wipe that).
 ensure_git_repo() {
     local repo_url="${1:-$DEFAULT_GIT_REPO}"
     local branch="${2:-$DEFAULT_GIT_BRANCH}"
@@ -188,28 +229,42 @@ ensure_git_repo() {
         fi
         return 0
     fi
-    
+
     log "Setting up Git repository: ${repo_url} (branch: ${branch})"
-    
+
     if [ ! -d "${target_dir}" ]; then
         log "Cloning repository to ${target_dir}..."
-        sudo -u "${user}" git clone "${repo_url}" "${target_dir}" || error_exit "Failed to clone repository" 1
-        cd "${target_dir}"
-        sudo -u "${user}" git checkout "${branch}" || error_exit "Failed to checkout branch ${branch}" 1
-    else
-        log "Repository directory exists, updating..."
-        cd "${target_dir}"
-        sudo -u "${user}" git fetch origin || error_exit "Failed to fetch from origin" 1
-        sudo -u "${user}" git reset --hard "origin/${branch}" || error_exit "Failed to reset to origin/${branch}" 1
+        sudo -u "${user}" git clone --branch "${branch}" "${repo_url}" "${target_dir}" \
+            || error_exit "Failed to clone ${repo_url} (branch ${branch})" 1
+        log "Repository setup complete"
+        return 0
     fi
-    
-    # Verify we're on the correct branch
+
+    local g=(sudo -u "${user}" git -C "${target_dir}")
+    log "Repository directory exists, updating (fast-forward only)..."
+    "${g[@]}" fetch origin "${branch}" || error_exit "Failed to fetch ${branch} from origin" 1
+
+    if [ -n "$("${g[@]}" status --porcelain --untracked-files=no)" ]; then
+        log_warn "${target_dir} has local changes; leaving it as it is (commit or stash them, then re-run to update)"
+        return 0
+    fi
+
     local current_branch
-    current_branch=$(sudo -u "${user}" git rev-parse --abbrev-ref HEAD)
+    current_branch="$("${g[@]}" rev-parse --abbrev-ref HEAD)"
     if [ "${current_branch}" != "${branch}" ]; then
-        log_warn "Current branch is ${current_branch}, expected ${branch}"
+        if "${g[@]}" show-ref --verify --quiet "refs/heads/${branch}"; then
+            "${g[@]}" checkout -q "${branch}" || error_exit "Failed to check out ${branch}" 1
+        else
+            "${g[@]}" checkout -q -b "${branch}" --track "origin/${branch}" \
+                || error_exit "Failed to check out ${branch}" 1
+        fi
     fi
-    
+
+    if ! "${g[@]}" merge -q --ff-only "origin/${branch}"; then
+        log_warn "${target_dir} has local commits not on origin/${branch}; leaving them alone (rebase them to update)"
+        return 0
+    fi
+
     log "Repository setup complete"
 }
 
@@ -226,7 +281,7 @@ install_backend_deps() {
     
     if [ "${use_venv}" = "true" ]; then
         log "Using venv for backend installation (development mode)..."
-        sudo -u "${user}" bash << BACKEND_INSTALL_VENV_EOF
+        sudo -u "${user}" bash << BACKEND_INSTALL_VENV_EOF || error_exit "Backend dependency installation failed" 1
             cd ${calvin_dir}/backend
             if [ ! -d .venv ]; then
                 python3 -m venv .venv
@@ -237,7 +292,7 @@ install_backend_deps() {
 BACKEND_INSTALL_VENV_EOF
     else
         log "Using UV for backend installation..."
-        sudo -u "${user}" bash << BACKEND_INSTALL_UV_EOF
+        sudo -u "${user}" bash << BACKEND_INSTALL_UV_EOF || error_exit "Backend dependency installation failed" 1
             export PATH="/home/${user}/.local/bin:/home/${user}/.cargo/bin:\$PATH"
             cd ${calvin_dir}/backend
             # Convert comma-separated extras to multiple --extra flags for UV
@@ -252,10 +307,6 @@ BACKEND_INSTALL_VENV_EOF
                 uv sync \${UV_EXTRAS}
             fi
 BACKEND_INSTALL_UV_EOF
-    fi
-    
-    if [ $? -ne 0 ]; then
-        error_exit "Backend dependency installation failed" 1
     fi
     
     log "Backend dependencies installed successfully"
@@ -435,7 +486,7 @@ install_systemd_service() {
     
     local service_name
     service_name=$(basename "${service_file}")
-    local target_file="/etc/systemd/system/${service_name}"
+    local target_file="${CALVIN_SYSTEMD_DIR:-/etc/systemd/system}/${service_name}"
     
     if [ -f "${target_file}" ]; then
         log "Overwriting existing systemd service: ${service_name}"
@@ -443,7 +494,8 @@ install_systemd_service() {
         log "Installing systemd service: ${service_name}"
     fi
     
-    cp "${service_file}" "${target_file}" || error_exit "Failed to copy service file" 1
+    mkdir -p "$(dirname "${target_file}")"
+    install -m 0644 "${service_file}" "${target_file}" || error_exit "Failed to copy service file" 1
     # systemctl daemon-reload may fail in CI environments without systemd, but file is still installed
     if ! systemctl daemon-reload 2>/dev/null; then
         log_warn "systemctl daemon-reload failed (non-fatal, may be running in CI environment without systemd)"
@@ -464,25 +516,10 @@ start_systemd_service() {
 }
 
 # Script installation
-install_script() {
-    local script_path="${1}"
-    local target_path="${2}"
-    local user="${3:-$DEFAULT_CALVIN_USER}"
-    
-    if [ ! -f "${script_path}" ]; then
-        log_warn "Script file does not exist: ${script_path}, skipping installation"
-        return 0
-    fi
-    
-    log "Installing script: $(basename "${script_path}")"
-    cp "${script_path}" "${target_path}" || error_exit "Failed to copy script" 1
-    chmod +x "${target_path}" || error_exit "Failed to make script executable" 1
-    chown "${user}:${user}" "${target_path}" || error_exit "Failed to set script ownership" 1
-    log "Script installed: ${target_path}"
-}
-
-# Scripts listed in sudoers as NOPASSWD for the Calvin user must NOT be owned by that
-# user (or the app could edit them and escalate via sudo). Installed root:root 0755.
+# Scripts run as root (directly or via a sudoers NOPASSWD rule) must NOT be owned
+# by the Calvin user, or the app could edit them and escalate. Installed
+# root:root 0755 through `install`, which writes a new inode, so replacing a
+# script that is running right now (update-calvin.sh refreshing itself) is safe.
 install_privileged_sudo_helper_script() {
     local script_path="${1}"
     local target_path="${2}"
@@ -492,11 +529,39 @@ install_privileged_sudo_helper_script() {
         return 0
     fi
 
-    log "Installing privileged sudo helper (root-owned, not writable by app user): $(basename "${script_path}")"
-    cp "${script_path}" "${target_path}" || error_exit "Failed to copy script" 1
-    chown root:root "${target_path}" || error_exit "Failed to set script ownership" 1
-    chmod 0755 "${target_path}" || error_exit "Failed to set script permissions" 1
+    log "Installing root-owned script (not writable by the app user): $(basename "${script_path}")"
+    mkdir -p "$(dirname "${target_path}")"
+    install -m 0755 "${script_path}" "${target_path}" || error_exit "Failed to install ${target_path}" 1
+    if [ "$(id -u)" -eq 0 ]; then
+        chown root:root "${target_path}" || error_exit "Failed to set script ownership" 1
+    fi
     log "Script installed: ${target_path} (root:root 0755)"
+}
+
+# Install /etc/sudoers.d/<name> only after `visudo -c` accepts it: a broken
+# fragment disables sudo for everyone. Names with '.' or '~' are silently
+# skipped by #includedir, so they are refused.
+install_sudoers_fragment() {
+    local name="$1"
+    local content="$2"
+    local dir="${CALVIN_SUDOERS_DIR:-/etc/sudoers.d}"
+    local visudo="${CALVIN_VISUDO:-visudo}"
+
+    case "${name}" in
+        ''|*.*|*~*|*/*) error_exit "Invalid sudoers fragment name: ${name}" 1 ;;
+    esac
+
+    local tmp
+    tmp="$(mktemp)"
+    printf '%s\n' "${content}" > "${tmp}"
+    if ! "${visudo}" -c -q -f "${tmp}" >/dev/null; then
+        rm -f "${tmp}"
+        error_exit "sudoers fragment ${name} failed visudo -c; not installed" 1
+    fi
+    mkdir -p "${dir}"
+    install -m 0440 "${tmp}" "${dir}/${name}" || { rm -f "${tmp}"; error_exit "Failed to install ${dir}/${name}" 1; }
+    rm -f "${tmp}"
+    log "Installed sudoers fragment ${dir}/${name}"
 }
 
 # Install a single authorized SSH public key for a user, idempotently.
@@ -524,8 +589,9 @@ install_authorized_key() {
 }
 
 # Idempotent KEY=VALUE upsert in a `.env`-style file. Adds the line if
-# missing, replaces it if present. Skips quoting — values must already
-# be in shell-friendly form.
+# missing, replaces it if present, and leaves every other line alone. Skips
+# quoting — values must already be in shell-friendly form. awk (not sed) so a
+# value containing |, & or \ is written literally.
 upsert_env_value() {
     local file="$1"
     local key="$2"
@@ -536,14 +602,25 @@ upsert_env_value() {
         return
     fi
 
-    if grep -q "^${key}=" "${file}"; then
-        # Use a sed delimiter unlikely to collide with paths.
-        sed -i "s|^${key}=.*|${key}=${value}|" "${file}"
-    else
-        # Ensure file ends with a newline before appending.
-        [ -z "$(tail -c 1 "${file}" 2>/dev/null)" ] || printf '\n' >> "${file}"
-        printf '%s=%s\n' "${key}" "${value}" >> "${file}"
-    fi
+    local tmp
+    tmp="$(mktemp)"
+    UPSERT_KEY="${key}" UPSERT_VALUE="${value}" awk '
+        BEGIN { k = ENVIRON["UPSERT_KEY"]; v = ENVIRON["UPSERT_VALUE"]; done = 0 }
+        index($0, k "=") == 1 { if (!done) print k "=" v; done = 1; next }
+        { print }
+        END { if (!done) print k "=" v }
+    ' "${file}" > "${tmp}"
+    # Rewrite in place: keeps the file's owner and mode.
+    cat "${tmp}" > "${file}"
+    rm -f "${tmp}"
+}
+
+# Value of KEY in a `.env`-style file (empty if missing). Never sources it.
+read_env_value() {
+    local file="$1"
+    local key="$2"
+    [ -f "${file}" ] || return 0
+    grep "^${key}=" "${file}" 2>/dev/null | tail -n 1 | cut -d= -f2- | tr -d "\"'" || true
 }
 
 # Configuration file creation
@@ -553,14 +630,17 @@ create_update_config() {
     local repo_dir="${3:-$DEFAULT_CALVIN_DIR}"
     local calvin_mode="${4:-prod}"
     
+    local conf="${CALVIN_DEFAULT_DIR:-/etc/default}/calvin-update"
+
     log "Creating update configuration..."
-    cat > /etc/default/calvin-update << EOF
+    mkdir -p "$(dirname "${conf}")"
+    cat > "${conf}" << EOF
 GIT_REPO=${git_repo}
 GIT_BRANCH=${git_branch}
 REPO_DIR=${repo_dir}
 CALVIN_MODE=${calvin_mode}
 EOF
-    log "Update configuration saved to /etc/default/calvin-update"
+    log "Update configuration saved to ${conf}"
 }
 
 # Swap file management (for development on Pi 3B+)
@@ -574,7 +654,7 @@ setup_swap_file() {
         current_size=$(stat -f%z "${swap_file}" 2>/dev/null || stat -c%s "${swap_file}" 2>/dev/null || echo "0")
         local current_size_gb=$((current_size / 1024 / 1024 / 1024))
         local desired_size_gb
-        desired_size_gb=$(echo "${swap_size}" | sed 's/G//')
+        desired_size_gb="${swap_size//G/}"
         
         if [ "${current_size_gb}" -lt "${desired_size_gb}" ]; then
             log "Swap file is ${current_size_gb}GB, enlarging to ${swap_size}..."
@@ -596,7 +676,7 @@ setup_swap_file() {
     
     log "Creating ${swap_size} swap file (this may take a few minutes)..."
     local desired_size_gb
-    desired_size_gb=$(echo "${swap_size}" | sed 's/G//')
+    desired_size_gb="${swap_size//G/}"
     fallocate -l "${swap_size}" "${swap_file}" 2>/dev/null || dd if=/dev/zero of="${swap_file}" bs=1M count=$((desired_size_gb * 1024)) status=progress
     chmod 600 "${swap_file}"
     mkswap "${swap_file}"
@@ -609,9 +689,11 @@ setup_swap_file() {
 configure_polkit_reboot() {
     local user="${1:-$DEFAULT_CALVIN_USER}"
     
+    local rules_dir="${CALVIN_POLKIT_DIR:-/etc/polkit-1/rules.d}"
+
     log "Configuring polkit for reboot..."
-    mkdir -p /etc/polkit-1/rules.d
-    cat > /etc/polkit-1/rules.d/50-calvin-reboot.rules << POLKIT_EOF
+    mkdir -p "${rules_dir}"
+    cat > "${rules_dir}/50-calvin-reboot.rules" << POLKIT_EOF
 polkit.addRule(function(action, subject) {
     if (action.id == "org.freedesktop.login1.reboot" ||
         action.id == "org.freedesktop.login1.reboot-multiple-sessions" ||
@@ -623,17 +705,21 @@ polkit.addRule(function(action, subject) {
     }
 });
 POLKIT_EOF
-    chmod 644 /etc/polkit-1/rules.d/50-calvin-reboot.rules
+    chmod 644 "${rules_dir}/50-calvin-reboot.rules"
     log "Polkit reboot rules configured"
 }
 
 # Display configuration
+# calvin-x.service is the only thing that starts X on tty1. Older setups also
+# added getty autologin + `exec startx` in .bash_profile, which raced the unit
+# for :0; those copies are removed here (only when they are the ones setup wrote).
 configure_display() {
     local user="${1:-$DEFAULT_CALVIN_USER}"
-    local user_home="/home/${user}"
-    
+    local user_home="${CALVIN_HOME_OVERRIDE:-/home}/${user}"
+    local systemd_dir="${CALVIN_SYSTEMD_DIR:-/etc/systemd/system}"
+
     log "Configuring display settings..."
-    
+
     # .xprofile
     cat > "${user_home}/.xprofile" << 'XPROFILE_EOF'
 #!/bin/bash
@@ -643,38 +729,64 @@ xset s noblank
 XPROFILE_EOF
     chmod +x "${user_home}/.xprofile"
     chown "${user}:${user}" "${user_home}/.xprofile"
-    
-    # .xinitrc
+
+    # .xinitrc (what startx in calvin-x.service runs)
     cat > "${user_home}/.xinitrc" << 'EOF'
 #!/bin/sh
 exec openbox-session
 EOF
     chmod +x "${user_home}/.xinitrc"
     chown "${user}:${user}" "${user_home}/.xinitrc"
-    
-    # Auto-login
-    mkdir -p /etc/systemd/system/getty@tty1.service.d
-    cat > /etc/systemd/system/getty@tty1.service.d/autologin.conf << EOF
-[Service]
-ExecStart=
-ExecStart=-/sbin/agetty --autologin ${user} --noclear %I \$TERM
-EOF
-    
-    # .bash_profile (auto-start X)
-    cat > "${user_home}/.bash_profile" << 'EOF'
-if [ -z "$DISPLAY" ] && [ -n "$XDG_VTNR" ] && [ "$XDG_VTNR" -eq 1 ]; then
+
+    local autologin="${systemd_dir}/getty@tty1.service.d/autologin.conf"
+    if [ -f "${autologin}" ] && grep -q -- "--autologin ${user} " "${autologin}"; then
+        log "Removing the old ${user} tty1 autologin (calvin-x.service starts X now)"
+        rm -f "${autologin}"
+        rmdir "$(dirname "${autologin}")" 2>/dev/null || true
+    fi
+    local profile="${user_home}/.bash_profile"
+    local old_profile
+    # shellcheck disable=SC2016  # literal file content, not an expansion
+    old_profile='if [ -z "$DISPLAY" ] && [ -n "$XDG_VTNR" ] && [ "$XDG_VTNR" -eq 1 ]; then
     exec startx
-fi
-EOF
-    chown "${user}:${user}" "${user_home}/.bash_profile"
-    
+fi'
+    if [ -f "${profile}" ] && [ "$(cat "${profile}")" = "${old_profile}" ]; then
+        rm -f "${profile}"
+    fi
+
+    # calvin-x.service declares Conflicts=getty@tty1.service; keep getty from
+    # being started for tty1 at boot as well (other VTs still get a login).
+    systemctl disable getty@tty1.service >/dev/null 2>&1 || true
+
     log "Display configuration complete"
+}
+
+# Automatic security updates for the OS and Chromium (P9). Debian's defaults
+# cover Debian + Debian-Security; Raspberry Pi OS ships Chromium from its own
+# archive, so add that (and the 32-bit Raspbian archive) explicitly.
+configure_unattended_upgrades() {
+    local conf_dir="${CALVIN_APT_CONF_DIR:-/etc/apt/apt.conf.d}"
+    log "Enabling unattended-upgrades..."
+    install_system_packages unattended-upgrades
+    mkdir -p "${conf_dir}"
+    cat > "${conf_dir}/20auto-upgrades" <<'EOF'
+APT::Periodic::Update-Package-Lists "1";
+APT::Periodic::Unattended-Upgrade "1";
+EOF
+    cat > "${conf_dir}/52calvin-unattended-upgrades" <<'EOF'
+// Written by Calvin setup: also keep Raspberry Pi OS packages (Chromium,
+// firmware, kernel) up to date, not only Debian's.
+Unattended-Upgrade::Origins-Pattern {
+        "origin=Raspberry Pi Foundation,codename=${distro_codename},label=Raspberry Pi Foundation";
+        "origin=Raspbian,codename=${distro_codename},label=Raspbian";
+};
+EOF
 }
 
 # Openbox autostart configuration
 configure_openbox_autostart() {
     local user="${1:-$DEFAULT_CALVIN_USER}"
-    local user_home="/home/${user}"
+    local user_home="${CALVIN_HOME_OVERRIDE:-/home}/${user}"
     local frontend_url="${2:-http://localhost:8000}"  # Default to production
     local start_chromium="${3:-true}"  # Whether to start Chromium (default true for backward compatibility)
     
@@ -686,7 +798,7 @@ configure_openbox_autostart() {
         echo "#!/bin/bash"
         if [ "${start_chromium}" = "true" ]; then
             echo "# Wait for backend to be ready"
-            echo "while ! curl -s http://localhost:8000/api/health > /dev/null; do"
+            echo "while ! curl -s ${frontend_url%/}/api/health > /dev/null; do"
             echo "    sleep 1"
             echo "done"
             echo ""
