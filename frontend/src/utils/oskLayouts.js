@@ -13,7 +13,14 @@
  */
 
 export const DEFAULT_OSK_LAYOUT = "en";
-export const OSK_LAYOUT_STORAGE_KEY = "calvin-osk-layout";
+/** A layout explicitly picked on the keyboard on this device. */
+export const OSK_DEVICE_LAYOUT_STORAGE_KEY = "calvin-osk-device-layout";
+/**
+ * Legacy key (CLV-21). Older builds wrote it on EVERY device from a watcher,
+ * so it cannot be told apart from a real device choice. Read it never; remove
+ * it so an upgrade doesn't pin every kiosk to its old Settings layout.
+ */
+export const OSK_LEGACY_LAYOUT_STORAGE_KEY = "calvin-osk-layout";
 export const OSK_LAYOUT_HINT_STORAGE_KEY = "calvin-osk-layout-hint";
 
 const SV_ROWS = [
@@ -190,9 +197,22 @@ const writeStored = (key, value) => {
   }
 };
 
-/** The layout the keyboard last used on this device. */
+const removeStored = key => {
+  try {
+    safeStorage()?.removeItem(key);
+  } catch {
+    // Blocked storage: nothing to remove.
+  }
+};
+
+/**
+ * The layout explicitly picked on this device, or null when the keyboard
+ * follows Settings. Reading also drops the legacy auto-written key so an
+ * upgraded device is never pinned to it (CLV-21 migration).
+ */
 export const readStoredOskLayout = () => {
-  const value = readStored(OSK_LAYOUT_STORAGE_KEY);
+  removeStored(OSK_LEGACY_LAYOUT_STORAGE_KEY);
+  const value = readStored(OSK_DEVICE_LAYOUT_STORAGE_KEY);
   return isOskLayoutId(value) ? value : null;
 };
 
@@ -211,18 +231,15 @@ const notifyLayoutChange = () => {
 
 export const storeOskLayout = value => {
   if (isOskLayoutId(value)) {
-    writeStored(OSK_LAYOUT_STORAGE_KEY, value);
+    writeStored(OSK_DEVICE_LAYOUT_STORAGE_KEY, value);
     notifyLayoutChange();
   }
 };
 
 /** Forget the device's own choice, so the keyboard follows Settings again. */
 export const clearStoredOskLayout = () => {
-  try {
-    safeStorage()?.removeItem(OSK_LAYOUT_STORAGE_KEY);
-  } catch {
-    // Blocked storage: nothing to remove.
-  }
+  removeStored(OSK_DEVICE_LAYOUT_STORAGE_KEY);
+  removeStored(OSK_LEGACY_LAYOUT_STORAGE_KEY);
   notifyLayoutChange();
 };
 
