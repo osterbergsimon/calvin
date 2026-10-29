@@ -119,6 +119,7 @@ export function useConfigForm(initialConfig = {}) {
           response.displayTimeoutEnabled ?? response.display_timeout_enabled ?? false,
         displayTimeout: response.displayTimeout ?? response.display_timeout ?? 0,
         // Keyboard
+        onScreenKeyboard: response.onScreenKeyboard ?? response.on_screen_keyboard ?? "auto",
         keyboardFeedbackEnabled:
           response.keyboardFeedbackEnabled ?? response.keyboard_feedback_enabled ?? true,
         keyboardFeedbackMode:

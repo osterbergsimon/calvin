@@ -1,5 +1,5 @@
 <template>
-  <div v-if="show" class="modal-overlay" @click.self="handleClose">
+  <div v-if="show" class="modal-overlay dialog-above-osk" @click.self="handleClose">
     <div class="modal-content instance-modal">
       <div class="modal-header">
         <h3>

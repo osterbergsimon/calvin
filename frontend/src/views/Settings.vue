@@ -12,7 +12,7 @@
     <template v-if="phoneOpen">
       <DialogScrim blur @dismiss="phoneOpen = false" />
       <div
-        class="settings-phone"
+        class="settings-phone dialog-above-osk dialog-above-osk--center"
         role="dialog"
         aria-modal="true"
         aria-label="Set up from your phone"
@@ -527,6 +527,8 @@ onUnmounted(() => {
   min-width: 0;
   min-height: 0;
   overflow-y: auto;
+  /* Keep the focused field reachable above the on-screen keyboard. */
+  padding-bottom: var(--osk-height, 0px);
 }
 
 /* Global "Settings UI size": scales the whole settings content (text, every
