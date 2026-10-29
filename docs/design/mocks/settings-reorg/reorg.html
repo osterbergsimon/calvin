@@ -1,0 +1,85 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>Settings reorg mock</title>
+<link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500&family=IBM+Plex+Sans+Condensed:wght@600&family=IBM+Plex+Sans:wght@400;500;600&display=swap" rel="stylesheet" />
+<style>
+:root { --bg-0:#eef1f4; --bg-1:#fff; --bg-2:#fff; --line:#dde3e8; --line-soft:#e8edf1; --ink:#1b242b; --ink-2:#5d6b75; --ink-3:#93a0a9; --focus:#e08a1e;
+  --font-ui:"IBM Plex Sans",system-ui,sans-serif; --font-data:"IBM Plex Mono",ui-monospace,monospace; --font-display:"IBM Plex Sans Condensed",system-ui,sans-serif; }
+* { box-sizing:border-box; }
+body { margin:0; background:#d9dee3; font-family:var(--font-ui); color:var(--ink); }
+.board { padding:32px 16px; max-width:1360px; margin:0 auto; }
+h1 { font-family:var(--font-display); margin:0 0 4px; } .board > p { color:var(--ink-2); margin:0 0 24px; max-width:72ch; }
+.shot { margin:0; } .scroll { overflow-x:auto; } figcaption { font-size:.85rem; color:var(--ink-2); margin-top:8px; max-width:1280px; }
+.frame { width:1280px; height:720px; background:var(--bg-1); border-radius:6px; box-shadow:0 2px 12px rgba(0,0,0,.18); overflow:hidden; display:grid; grid-template-columns:1fr 1fr; }
+.col { padding:28px 32px; border-right:1px solid var(--line); background:var(--bg-0); }
+.col:last-child { border-right:0; }
+.col h2 { margin:0 0 14px; font-size:1rem; font-weight:600; }
+.wrap { display:grid; grid-template-columns:220px 1fr; gap:20px; }
+.rail { display:flex; flex-direction:column; gap:4px; }
+.tile { padding:10px 14px; background:var(--bg-1); border:1px solid var(--line); border-radius:8px; }
+.tile b { display:block; font-weight:500; font-size:.875rem; } .tile span { font-size:.75rem; color:var(--ink-3); }
+.tile.on { border:2px solid var(--focus); box-shadow:0 0 0 3px color-mix(in srgb, var(--focus) 18%, transparent); }
+.tile.gone { opacity:.45; text-decoration:line-through; }
+.secs { font-size:.85rem; }
+.secs div { padding:7px 10px; border-left:3px solid var(--line); margin-bottom:5px; background:var(--bg-1); border-radius:0 6px 6px 0; }
+.secs .moved { border-left-color:var(--focus); }
+.secs small { display:block; color:var(--ink-3); font-family:var(--font-data); font-size:.7rem; }
+.eyebrow { font-family:var(--font-data); font-size:.72rem; letter-spacing:.18em; text-transform:uppercase; color:var(--ink-3); margin:0 0 8px; }
+</style>
+</head>
+<body>
+<main class="board">
+  <h1>Settings categories: before → after</h1>
+  <p>For <code>docs/design/2026-10-29-settings-categories-reorg.md</code>. Left: today's 8 categories. Right: the 7 new ones, with Dashboard open to show its sections. Orange marks a section that moved in from another category.</p>
+  <figure class="shot scroll">
+    <div class="frame">
+      <div class="col">
+        <h2>Today</h2>
+        <div class="rail" style="width:220px">
+          <div class="tile"><b>Display</b><span>Layout · appearance · regions</span></div>
+          <div class="tile gone"><b>Clock Bar</b><span>Time · weather · status tiles</span></div>
+          <div class="tile"><b>Content Sources</b><span>Calendars · photos · services</span></div>
+          <div class="tile"><b>Plugins</b><span>Install · manage · themes</span></div>
+          <div class="tile"><b>Device</b><span>Power · keyboard · hardware</span></div>
+          <div class="tile"><b>Kiosks</b><span>Per-device settings</span></div>
+          <div class="tile"><b>Maintenance</b><span>Updates · backup · diagnostics</span></div>
+          <div class="tile"><b>Security</b><span>Admin password · allowed origins · network access</span></div>
+        </div>
+      </div>
+      <div class="col">
+        <h2>After</h2>
+        <div class="wrap">
+          <div class="rail">
+            <div class="tile"><b>Content</b><span>Calendars · photos · web pages</span></div>
+            <div class="tile on"><b>Dashboard</b><span>Screens · clock bar · theme · touch</span></div>
+            <div class="tile"><b>Screen &amp; keyboard</b><span>Orientation · power · keyboard</span></div>
+            <div class="tile"><b>Kiosks</b><span>Per-device settings</span></div>
+            <div class="tile"><b>Plugins</b><span>Install · manage</span></div>
+            <div class="tile"><b>System</b><span>Updates · backup · diagnostics</span></div>
+            <div class="tile"><b>Security</b><span>Admin password · allowed origins · network access</span></div>
+          </div>
+          <div class="secs">
+            <p class="eyebrow">Dashboard sections</p>
+            <div>Screens &amp; regions<small>regions</small></div>
+            <div class="moved">Clock<small>clock-bar-clock · from Clock Bar</small></div>
+            <div class="moved">Clock bar layout<small>clock-bar-layout · from Clock Bar</small></div>
+            <div class="moved">Clock bar items<small>clock-bar-items · from Clock Bar</small></div>
+            <div>Appearance<small>appearance</small></div>
+            <div>Touch &amp; controls<small>kiosk-touch · was "Kiosk &amp; wall"</small></div>
+            <p class="eyebrow" style="margin-top:14px">Moved elsewhere</p>
+            <div class="moved">Screen orientation → Screen &amp; keyboard<small>layout · from Display</small></div>
+            <div class="moved">Web pages &amp; services + Add a web page → Content<small>content-services · add flow from Plugins</small></div>
+            <div class="moved">Versions &amp; status → System<small>device-hardware · from Device</small></div>
+            <div class="moved">Key-press feedback (was Notifications)<small>device-notifications · stays in Screen &amp; keyboard</small></div>
+          </div>
+        </div>
+      </div>
+    </div>
+    <figcaption><b>R1.</b> The rail drops to 7 tiles (about 560px tall, down from about 650px). Section ids never change, so deep links and search keep working.</figcaption>
+  </figure>
+</main>
+</body>
+</html>
