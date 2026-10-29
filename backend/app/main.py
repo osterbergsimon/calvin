@@ -230,6 +230,55 @@ async def _initialize_image_service():
     logger.info(f"Plugin image service initialized: {plugin_image_count} images found")
 
 
+# Warm-up work that makes network calls with long timeouts (image scan, calendar
+# preload) runs after startup instead of blocking it, so /api/health answers
+# immediately (audit R8). The set keeps a reference to each running task; a
+# task removed from it would be a candidate for garbage collection mid-flight.
+_startup_tasks: set[asyncio.Task] = set()
+
+
+def _track_startup_task(name: str, coro) -> asyncio.Task:
+    """Run a coroutine as a tracked background task and log any failure."""
+    task = asyncio.create_task(coro, name=name)
+    _startup_tasks.add(task)
+
+    def _on_done(done: asyncio.Task) -> None:
+        _startup_tasks.discard(done)
+        if done.cancelled():
+            return
+        exc = done.exception()
+        if exc is not None:
+            logger.opt(exception=exc).error("Startup warm-up task {} failed: {}", name, exc)
+
+    task.add_done_callback(_on_done)
+    return task
+
+
+async def _warm_up_calendar() -> None:
+    """Preload the current and adjacent months into the calendar cache."""
+    from app.services import plugin_calendar_service
+
+    await plugin_calendar_service.preload_months(months_to_preload=1)
+    logger.info("Calendar months preloaded")
+
+
+def _start_warmup_tasks() -> list[asyncio.Task]:
+    """Start the post-startup cache warm-ups and return their tasks."""
+    return [
+        _track_startup_task("startup-image-scan", _initialize_image_service()),
+        _track_startup_task("startup-calendar-preload", _warm_up_calendar()),
+    ]
+
+
+async def _cancel_startup_tasks() -> None:
+    """Cancel warm-up tasks still running at shutdown."""
+    pending = [task for task in _startup_tasks if not task.done()]
+    for task in pending:
+        task.cancel()
+    if pending:
+        await asyncio.gather(*pending, return_exceptions=True)
+
+
 async def _set_default_config_if_missing(config_service, key: str, default_value):
     """Set config value if it doesn't exist."""
     current = await config_service.get_value(key)
@@ -387,6 +436,8 @@ async def _shutdown_services():
     from app.services.backend_scheduler import backend_plugin_scheduler
     from app.services.display_power_service import display_power_service
 
+    await _cancel_startup_tasks()
+
     await display_power_service.stop()
     logger.info("Display power scheduler stopped")
 
@@ -440,8 +491,6 @@ async def lifespan(app: FastAPI):
         await _restore_on_start()
         await _initialize_keyboard_mappings()
         logger.info("Keyboard mappings initialized")
-        await _initialize_image_service()
-        logger.info("Image service initialized")
         await _initialize_default_config()
         logger.info("Default config initialized")
         await _start_schedulers()
@@ -449,6 +498,10 @@ async def lifespan(app: FastAPI):
         await _sync_display_orientation()
         logger.info("Display orientation synced")
         _ensure_kiosk_signing_key()
+        # Image scan and calendar preload make slow network calls; run them
+        # after startup so the app answers /api/health immediately (audit R8).
+        warmup_tasks = _start_warmup_tasks()
+        logger.info(f"Started {len(warmup_tasks)} background warm-up task(s)")
         # Themes are loaded from filesystem on-demand - no database sync needed
         logger.info("Application startup complete - ready to serve requests")
     except Exception as e:
