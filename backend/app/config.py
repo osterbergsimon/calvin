@@ -75,6 +75,14 @@ class Settings(BaseSettings):
         False  # Allow all origins (development only, not recommended for production)
     )
 
+    # How the backend is deployed: "native" (host install with update/restart
+    # scripts) or "docker" (set by docker/Dockerfile). In a container the host
+    # actions — update script, systemd restarts, reboot — don't apply.
+    deployment: str = Field(
+        default="native",
+        validation_alias=AliasChoices("calvin_deployment", "deployment"),
+    )
+
     # System paths (for Raspberry Pi deployment)
     update_script_path: Path = Path("/usr/local/bin/update-calvin.sh")
     repo_dir: Path = Path("/home/calvin/calvin")
@@ -83,6 +91,10 @@ class Settings(BaseSettings):
     # Where the kiosk bundle + installer scripts live (deploy/, scripts/ layout).
     # Unset = repo_dir (a Pi/source checkout); the Docker image sets it explicitly.
     kiosk_bundle_dir: Path | None = None
+
+    # Backups (calvin-8gx). Unset: $CALVIN_DATA_DIR/backups, else next to the
+    # DB's data dir (see app.services.backup.store.backup_dir).
+    backup_dir: Path | None = None
 
     @property
     def is_dev_mode(self) -> bool:

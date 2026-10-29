@@ -1,52 +1,68 @@
 <template>
-  <SettingRow label="Repository" description="GitHub repository to pull updates from." stacked>
-    <input
-      v-model="localGitRepoUrl"
-      class="field-input"
-      type="text"
-      placeholder="https://github.com/user/repo.git"
-      aria-label="Git repository URL"
-      @change="handleGitRepoChange"
-      @blur="handleGitRepoChange"
-    />
-  </SettingRow>
-
-  <SettingRow label="Branch" description="Which branch to track." stacked>
-    <select
-      class="field-select"
-      :value="gitBranch"
-      aria-label="Git branch"
-      @change="handleGitBranchChange"
-    >
-      <option v-for="branch in availableBranches" :key="branch" :value="branch">
-        {{ branch }}
-      </option>
-    </select>
-  </SettingRow>
-
   <SettingRow
-    label="Install updates"
-    description="Pull and apply the latest version from the selected branch."
+    v-if="isContainer"
+    label="How to update"
+    description="Calvin runs in a Docker container, so it is updated from the host by pulling a new image."
+    stacked
   >
-    <div class="update-actions">
-      <button
-        type="button"
-        class="update-btn"
-        :disabled="statusRefreshLoading"
-        @click="refreshSystemStatus"
-      >
-        {{ statusRefreshLoading ? "Checking…" : "Check status" }}
-      </button>
-      <button
-        type="button"
-        class="update-btn update-btn--primary"
-        :disabled="updating"
-        @click="handleTriggerUpdate"
-      >
-        {{ updating ? "Updating…" : "Update now" }}
-      </button>
-    </div>
+    <dl class="update-detail">
+      <dt>Unraid</dt>
+      <dd>Docker tab → <strong>Check for Updates</strong> → apply update on Calvin.</dd>
+      <dt>Compose</dt>
+      <dd><code class="update-cmd">docker compose pull &amp;&amp; docker compose up -d</code></dd>
+    </dl>
   </SettingRow>
+
+  <template v-else>
+    <SettingRow label="Repository" description="GitHub repository to pull updates from." stacked>
+      <input
+        v-model="localGitRepoUrl"
+        class="field-input"
+        type="text"
+        placeholder="https://github.com/user/repo.git"
+        aria-label="Git repository URL"
+        @change="handleGitRepoChange"
+        @blur="handleGitRepoChange"
+      />
+    </SettingRow>
+
+    <SettingRow label="Branch" description="Which branch to track." stacked>
+      <select
+        class="field-select"
+        :value="gitBranch"
+        aria-label="Git branch"
+        @change="handleGitBranchChange"
+      >
+        <option v-for="branch in availableBranches" :key="branch" :value="branch">
+          {{ branch }}
+        </option>
+      </select>
+    </SettingRow>
+
+    <SettingRow
+      label="Install updates"
+      description="Pull and apply the latest version from the selected branch."
+    >
+      <div class="update-actions">
+        <button
+          type="button"
+          class="update-btn"
+          :disabled="statusRefreshLoading"
+          @click="refreshSystemStatus"
+        >
+          {{ statusRefreshLoading ? "Checking…" : "Check status" }}
+        </button>
+        <button
+          type="button"
+          class="update-btn update-btn--primary"
+          :disabled="updating"
+          @click="handleTriggerUpdate"
+        >
+          {{ updating ? "Updating…" : "Update now" }}
+        </button>
+      </div>
+    </SettingRow>
+  </template>
 
   <SettingRow label="Status" description="Live backend and updater state." stacked>
     <div class="update-readout">
@@ -62,7 +78,7 @@
           {{ formatDateTime(backendHealthCheckedAt) }}
         </span>
       </div>
-      <div class="readout-line">
+      <div v-if="!isContainer" class="readout-line">
         <span class="readout-lamp" :class="`readout-lamp--${updateLampState}`" aria-hidden="true" />
         <span class="readout-key">Update state</span>
         <span class="readout-val">{{ updateStatusLabel }}</span>
@@ -79,7 +95,11 @@
     </div>
   </SettingRow>
 
-  <SettingRow v-if="updateStatus && hasUpdateDetails" label="Update details" stacked>
+  <SettingRow
+    v-if="!isContainer && updateStatus && hasUpdateDetails"
+    label="Update details"
+    stacked
+  >
     <dl class="update-detail">
       <template v-if="updateStatus.message">
         <dt>Message</dt>
@@ -124,7 +144,7 @@
     </dl>
   </SettingRow>
 
-  <SettingRow v-if="updateStatus?.last_log" label="Latest log output" stacked>
+  <SettingRow v-if="!isContainer && updateStatus?.last_log" label="Latest log output" stacked>
     <pre class="update-log">{{ updateStatus.last_log }}</pre>
   </SettingRow>
 </template>
@@ -156,10 +176,15 @@ const {
   backendHealth,
   backendHealthLoading,
   backendHealthCheckedAt,
+  environment,
+  loadEnvironment,
   triggerUpdate,
   getUpdateStatus,
   getBackendHealth,
 } = useSystem();
+
+// In Docker the git updater, branch list and update-script status don't apply.
+const isContainer = computed(() => environment.value?.deployment === "docker");
 
 const availableBranches = ref([props.gitBranch || "main"]);
 const localGitRepoUrl = ref(props.gitRepoUrl || "");
@@ -249,6 +274,10 @@ const handleTriggerUpdate = async () => {
 };
 
 const refreshSystemStatus = async () => {
+  if (isContainer.value) {
+    await getBackendHealth();
+    return;
+  }
   await Promise.allSettled([getBackendHealth(), getUpdateStatus()]);
 };
 
@@ -261,8 +290,9 @@ const loadBranches = async () => {
   }
 };
 
-onMounted(() => {
-  loadBranches();
+onMounted(async () => {
+  await loadEnvironment();
+  if (!isContainer.value) loadBranches();
   refreshSystemStatus();
 });
 
@@ -271,7 +301,7 @@ watch(
   repoUrl => {
     localGitRepoUrl.value = repoUrl || "";
     lastEmittedGitRepoUrl.value = repoUrl || "";
-    if (repoUrl) {
+    if (repoUrl && !isContainer.value) {
       loadBranches();
     }
   }
@@ -444,6 +474,11 @@ watch(
   font-family: var(--font-ui);
   font-size: var(--fs-sm);
   color: var(--ink);
+  overflow-wrap: anywhere;
+}
+.update-cmd {
+  font-family: var(--font-data);
+  font-size: var(--fs-xs);
   overflow-wrap: anywhere;
 }
 .update-detail__err {
