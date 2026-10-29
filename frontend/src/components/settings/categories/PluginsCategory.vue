@@ -620,6 +620,11 @@ onMounted(async () => {
     typeof routeSetting === "string" ? getSettingDestinationById(routeSetting)?.tab : null;
   if (routeTab) {
     activePluginTab.value = routeTab;
+    // Open the first card on that tab so its "Add instance" is in view.
+    const first = plugins.value.find(p => p.type === routeTab);
+    if (first && first.type !== "theme" && !expandedPlugins.value[first.id]) {
+      handleToggleExpand(first.id);
+    }
   } else if (plugins.value.length > 0) {
     const types = ["calendar", "image", "service", "backend", "theme"];
     const firstType = types.find(type => plugins.value.some(p => p.type === type));

@@ -1352,6 +1352,9 @@ onActivated(() => {
    Lives inside the content (not the panel chrome) so it stays visible even
    when the dashboard UI chrome is hidden. */
 .calendar-header {
+  /* Stays above the first-run empty overlay so month navigation still works. */
+  position: relative;
+  z-index: 91;
   display: flex;
   align-items: center;
   justify-content: space-between;

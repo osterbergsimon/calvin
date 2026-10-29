@@ -159,6 +159,8 @@ describe("PluginsCategory after install (F5)", () => {
     const wrapper = mount(PluginsCategory, { global: { stubs } });
     await flushPromises();
     expect(wrapper.findComponent({ name: "PluginManager" }).props("activeTab")).toBe("service");
+    // ...and opens its first card so "Add instance" is visible
+    expect(activeExpanded.value.mealie).toBe(true);
   });
 
   it("lists the configured repository's catalog on open (F8)", async () => {
