@@ -210,8 +210,8 @@ Maintenance → new **Backup & restore** section:
 
 ### Headless
 
-- **CLI:** `uv run python -m app.backup export [--out FILE] [--no-packages] [--no-secrets] [--include-signing-key]`
-  and `uv run python -m app.backup restore FILE [--mode replace|merge] [--dry-run] [--restore-signing-key]`.
+- **CLI:** `uv run python -m app.services.backup export [--out FILE] [--no-packages] [--no-secrets] [--include-signing-key]`
+  and `uv run python -m app.services.backup restore FILE [--mode replace|merge] [--dry-run] [--restore-signing-key]`.
   The CLI opens the DB and loads plugins the way the server does. Export is
   safe while the server runs; restore should run with the server stopped
   (otherwise use the API).

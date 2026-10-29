@@ -421,3 +421,31 @@ def test_auto_backup_prunes_to_retention(test_client, tmp_path):
     _run(store.write_backup(kind="auto", retention=1))
     assert manual.exists()
     assert len(list(settings.backup_dir.glob("auto-*.zip"))) == 1
+
+
+def test_hand_written_minimal_seed_restores(test_client):
+    """The smallest seed shown in docs/configuration/BACKUP_RESTORE.md works."""
+    seed = {
+        "format": "calvin-backup",
+        "format_version": 1,
+        "data": {
+            "config": [{"key": "time_format", "value": "24h", "value_type": "string"}],
+            "plugin_instances": [
+                {
+                    "id": "ical-family",
+                    "type_id": "ical",
+                    "name": "Family",
+                    "enabled": True,
+                    "config": {"ical_url": "https://example.com/family.ics"},
+                }
+            ],
+        },
+    }
+    r = test_client.post(
+        "/api/backup/restore",
+        files={"file": ("seed.json", json.dumps(seed).encode(), "application/json")},
+        data={"mode": "merge"},
+    )
+    assert r.status_code == 200, r.text
+    assert r.json()["instances"]["created"] == ["ical-family"]
+    assert plugin_manager.get_plugin("ical-family") is not None
