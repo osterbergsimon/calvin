@@ -148,6 +148,9 @@ bandit-report.json
 .worktrees/
 
 # Beads / Dolt files (added by bd init)
+# The whole .beads/ dir stays local by policy: it holds the live Dolt DB and a
+# passive issues.jsonl export. A tracked export gets re-imported on pull and
+# reverts closed issues, so never track it.
+.beads/
 .dolt/
 .beads-credential-key
-.beads/proxieddb/
