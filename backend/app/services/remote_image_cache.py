@@ -13,6 +13,7 @@ import httpx
 from loguru import logger
 
 from app.config import settings
+from app.utils.redact import redact_url
 
 _DEFAULT_TTL_DAYS = 7
 _STALE_SERVE_STATUS_CODES = {429, 500, 502, 503, 504}
@@ -49,7 +50,7 @@ class RemoteImageCache:
         path = self._cache_path(url)
 
         if path.exists() and self._is_fresh(path):
-            logger.debug("Remote image cache hit: {}", url)
+            logger.debug("Remote image cache hit: {}", redact_url(url))
             return path.read_bytes()
 
         try:
@@ -60,24 +61,32 @@ class RemoteImageCache:
 
             path.parent.mkdir(parents=True, exist_ok=True)
             path.write_bytes(data)
-            logger.debug("Remote image cached ({} bytes): {}", len(data), url)
+            logger.debug("Remote image cached ({} bytes): {}", len(data), redact_url(url))
             return data
 
         except httpx.HTTPStatusError as e:
             status = e.response.status_code
             if status in _STALE_SERVE_STATUS_CODES and path.exists():
                 logger.warning(
-                    "HTTP {} fetching remote image — serving stale cache: {}", status, url
+                    "HTTP {} fetching remote image — serving stale cache: {}",
+                    status,
+                    redact_url(url),
                 )
                 return path.read_bytes()
-            logger.error("HTTP {} fetching remote image: {}", status, url)
+            logger.error("HTTP {} fetching remote image: {}", status, redact_url(url))
             return None
 
         except httpx.HTTPError as e:
             if path.exists():
-                logger.warning("Network error fetching remote image — serving stale cache: {}", url)
+                logger.warning(
+                    "Network error fetching remote image — serving stale cache: {}",
+                    redact_url(url),
+                )
                 return path.read_bytes()
-            logger.error("Network error fetching remote image {}: {}", url, e)
+            # httpx messages can embed the full URL, so log only the error type.
+            logger.error(
+                "Network error fetching remote image {}: {}", redact_url(url), type(e).__name__
+            )
             return None
 
 
