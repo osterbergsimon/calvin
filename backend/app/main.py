@@ -202,8 +202,8 @@ async def _initialize_plugins():
         plugin_id="local-images",
         name="Local Images",
         config={
-            "image_dir": "./data/images",
-            "thumbnail_dir": "./data/images/thumbnails",
+            "image_dir": str(settings.image_dir),
+            "thumbnail_dir": str(settings.image_dir / "thumbnails"),
         },
     )
 

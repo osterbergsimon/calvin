@@ -138,12 +138,12 @@ export const settingsDestinations = [
   },
   {
     id: "content-images",
-    label: "Image source ordering",
-    path: "Content Sources / Image Sources",
+    label: "Upload photos and order image sources",
+    path: "Content Sources / Image sources",
     category: "content",
     tabKey: "settings_tab_content_sources",
     tab: "images",
-    keywords: ["image", "ordering", "sources", "plugins"],
+    keywords: ["image", "photos", "upload", "add", "ordering", "sources", "plugins"],
   },
   {
     id: "content-services",
@@ -160,6 +160,21 @@ export const settingsDestinations = [
     path: "Plugins",
     category: "plugins",
     keywords: ["plugins", "install", "github", "zip", "themes", "instances"],
+  },
+  {
+    id: "plugins-services",
+    label: "Add a web service (web page, dashboard)",
+    path: "Plugins / Service",
+    category: "plugins",
+    tab: "service",
+    keywords: ["services", "web services", "iframe", "web page", "add", "url"],
+  },
+  {
+    id: "kiosks",
+    label: "Add and manage kiosks",
+    path: "Kiosks",
+    category: "kiosks",
+    keywords: ["kiosk", "add kiosk", "install", "raspberry pi", "screen", "device", "qr"],
   },
   {
     id: "device-power",

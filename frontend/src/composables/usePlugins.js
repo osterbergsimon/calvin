@@ -168,12 +168,14 @@ export function usePlugins() {
       }
 
       await loadPlugins();
+      return response.manifest?.id ? [response.manifest.id] : [];
     } catch (error) {
       pluginInstallError.value =
         error.response?.data?.detail || error.message || "Failed to install plugin";
       setTimeout(() => {
         pluginInstallError.value = "";
       }, 10000);
+      return [];
     } finally {
       installingPlugin.value = false;
     }
@@ -287,6 +289,7 @@ export function usePlugins() {
           pluginInstallSuccess.value = "";
         }, 5000);
       }
+      return [installedId];
     } catch (error) {
       const errorDetail = error.response?.data?.detail || error.message || "";
       if (errorDetail.includes("older than") || errorDetail.includes("version")) {
@@ -297,6 +300,7 @@ export function usePlugins() {
       setTimeout(() => {
         pluginInstallError.value = "";
       }, 10000);
+      return [];
     } finally {
       installingPlugin.value = false;
     }
@@ -400,6 +404,7 @@ export function usePlugins() {
     } finally {
       installingPlugin.value = false;
     }
+    return results.success.map(s => s.response?.manifest?.id || s.id);
   };
 
   // Enumerate plugins from a local path (dev mode only)
@@ -492,12 +497,14 @@ export function usePlugins() {
           pluginInstallSuccess.value = "";
         }, 5000);
       }
+      return [installedId];
     } catch (error) {
       pluginInstallError.value =
         error.response?.data?.detail || error.message || "Failed to install plugin from local path";
       setTimeout(() => {
         pluginInstallError.value = "";
       }, 10000);
+      return [];
     } finally {
       installingPlugin.value = false;
     }
@@ -575,6 +582,7 @@ export function usePlugins() {
     } finally {
       installingPlugin.value = false;
     }
+    return results.success.map(s => s.response?.manifest?.id || s.id);
   };
 
   // Uninstall plugin

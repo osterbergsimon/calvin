@@ -26,11 +26,18 @@
         :dim="dim"
       >
         <template #actions> </template>
-        <div :class="emptyState.className">
-          <div v-if="emptyState.loading" class="spinner" />
+        <div v-if="emptyState.loading" :class="emptyState.className">
+          <div class="spinner" />
           <p>{{ emptyState.message }}</p>
-          <p v-if="emptyState.helpText" class="help-text">{{ emptyState.helpText }}</p>
         </div>
+        <EmptyState
+          v-else
+          :class="emptyState.className"
+          :message="emptyState.message"
+          :help="emptyState.helpText"
+          :action-label="emptyState.actionLabel"
+          :setting-id="emptyState.settingId"
+        />
       </DashboardPanel>
 
       <!-- Service Content (uses ServiceViewer for routing) -->
@@ -99,6 +106,7 @@ import { useWebServicesStore } from "../stores/webServices";
 import { useModeStore } from "../stores/mode";
 import DashboardPanel from "./DashboardPanel.vue";
 import IconButton from "@/components/ui/IconButton.vue";
+import EmptyState from "@/components/ui/EmptyState.vue";
 import ServiceViewer from "./service/ServiceViewer.vue";
 import ServiceRegionViewOptions from "./dashboard/ServiceRegionViewOptions.vue";
 import { useTouchCapability } from "@/composables/useTouchCapability";
@@ -165,15 +173,20 @@ const emptyState = computed(() => {
   if (services.value.length === 0) {
     return {
       className: "no-services",
-      message: "No web services configured",
-      helpText: "Add web services in Settings",
+      message: "No web services yet",
+      helpText:
+        "Add a web page or dashboard with the built-in Iframe plugin in Settings › Plugins › Service.",
+      actionLabel: "Add a web service",
+      settingId: "plugins-services",
     };
   }
   if (serviceUnavailable.value) {
     return {
       className: "no-services",
       message: "Selected service is unavailable",
-      helpText: "Choose another service in Settings",
+      helpText: "It may have been removed or disabled in Settings › Plugins › Service.",
+      actionLabel: "Open service settings",
+      settingId: "plugins-services",
     };
   }
   return null;
@@ -338,11 +351,6 @@ onUnmounted(() => {
   100% {
     transform: rotate(360deg);
   }
-}
-
-.help-text {
-  font-size: 0.9rem;
-  font-style: italic;
 }
 
 .service-container {

@@ -48,6 +48,18 @@
         Hide controls
       </button>
     </div>
+    <!-- F7: hiding is global (every screen) and the way back is a hidden
+         long-press, so say both before doing it. -->
+    <Teleport to="body">
+      <ConfirmModal
+        :show="confirmHide"
+        title="Hide controls?"
+        :message="hideMessage"
+        confirm-text="Hide controls"
+        @confirm="onConfirmHide"
+        @cancel="confirmHide = false"
+      />
+    </Teleport>
   </div>
 </template>
 
@@ -57,6 +69,8 @@ import { useRouter } from "vue-router";
 import { useConfigStore } from "../../stores/config";
 import { useModeStore } from "../../stores/mode";
 import { getActiveDashboardScreen } from "../../utils/layout";
+import { normalizeHotCornerPosition } from "../../utils/hotCorner";
+import ConfirmModal from "../settings/shared/ConfirmModal.vue";
 
 const configStore = useConfigStore();
 const modeStore = useModeStore();
@@ -107,9 +121,28 @@ const onSettings = () => {
   router.push("/settings");
   close();
 };
+const confirmHide = ref(false);
+const hideMessage = computed(() => {
+  const corner = normalizeHotCornerPosition(configStore.hotCornerPosition).replace("-", " ");
+  const seconds = Math.max(0.1, Number(configStore.hotCornerLongPressMs) / 1000 || 0.5);
+  return (
+    "This hides the clock-bar buttons and menus on every screen showing this dashboard, " +
+    `not only this one. To bring them back, press and hold the ${corner} corner of the ` +
+    `screen for ${seconds} s.`
+  );
+});
 const onHideUi = () => {
-  configStore.toggleUI();
   close();
+  // Bringing controls back needs no confirmation.
+  if (!configStore.shouldShowUI) {
+    configStore.toggleUI();
+    return;
+  }
+  confirmHide.value = true;
+};
+const onConfirmHide = () => {
+  confirmHide.value = false;
+  configStore.toggleUI();
 };
 const onToggleLock = () => {
   configStore.toggleRegionsLock();
