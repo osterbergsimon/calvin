@@ -2,7 +2,7 @@
 
 Status: ready to build as its **own issue**. It goes with CLV-9 (admin auth) and should land with it or just
 after, because CLV-9's kiosk lock screen uses it. Mockups: [mocks/osk/osk.html](mocks/osk/osk.html), with
-PNGs in [mocks/osk/png/](mocks/osk/png/) (`k1.png` … `k5.png`). Real theme tokens. Where this doc and the
+PNGs in [mocks/osk/png/](mocks/osk/png/) (`k1.png` … `k7.png`). Real theme tokens. Where this doc and the
 mock disagree, this doc wins.
 
 ## 1. Why, and why this approach
@@ -14,6 +14,9 @@ and no keyboard.
   Pi's own keyboard, squeekboard, is Wayland-only, and even there Chromium often doesn't show it
   automatically. The X11 keyboards (onboard, matchbox-keyboard) are unreliable with Chromium. All of them
   would mean changes to the Pi image, and Calvin couldn't control them.
+- **Still true after the Wayland research** (`docs/research/2026-10-29-kiosk-wayland.md` on develop,
+  calvin-98dq): that plan moves Pi 4/5 to Wayland + labwc and keeps Pi 3 on X11. So the fleet will run both
+  stacks, and only an in-app keyboard behaves the same on both.
 - **Chosen: an in-app keyboard built on [`simple-keyboard`](https://github.com/hodgef/simple-keyboard)**
   (MIT, framework-agnostic, actively maintained, currently 3.8.x). Pin an exact version that is at least
   two weeks old. Use it **only as the renderer** (layouts, layers, key events). Calvin owns when it shows,
@@ -92,6 +95,42 @@ numeric (type=number, or inputmode=numeric/decimal), 4×4 grid, 440px wide, cent
 {hide} 0 , {enter}
 ```
 
+### Keyboard layouts (the letter layer)
+
+**The keyboard layout is independent of the app language.** It is its own setting. It never follows,
+reads or changes the language Calvin's UI is shown in, and changing the UI language never touches it. The
+owner's own setup is an English UI with a Swedish keyboard, and that must take zero extra effort.
+Everywhere in UI copy and code it is called a **layout** (`oskLayout`), never a "language".
+
+Only the letter layer (and its Shift capitals) changes with the layout. The symbols, accents and numeric
+layers are shared. Each layout keeps its letters where people expect them:
+
+```
+en  English   q w e r t y u i o p {bksp}        / a s d f g h j k l {enter}     / {shift} z x c v b n m , . {shift}
+sv  Svenska   q w e r t y u i o p å {bksp}      / a s d f g h j k l ö ä {enter} / {shift} z x c v b n m , . - {shift}
+fi  Suomi     same as sv
+no  Norsk     q w e r t y u i o p å {bksp}      / a s d f g h j k l ø æ {enter} / {shift} z x c v b n m , . - {shift}
+da  Dansk     q w e r t y u i o p å {bksp}      / a s d f g h j k l æ ø {enter} / {shift} z x c v b n m , . - {shift}
+de  Deutsch   q w e r t z u i o p ü {bksp}      / a s d f g h j k l ö ä {enter} / {shift} y x c v b n m , . ß {shift}
+fr  Français  a z e r t y u i o p {bksp}        / q s d f g h j k l m {enter}   / {shift} w x c v b n é è ç à {shift}
+```
+
+Bottom row: `{numbers} {layout} {accents} {space} {hide}`. For `en` it is
+`{numbers} {layout} {accents} {space} - {hide}`, and for `fr` it is
+`{numbers} {layout} {accents} , {space} . {hide}`. `{layout}` is present only when extra layouts are set.
+The url and email layouts (above) use the active layout's first three rows, with their own bottom row.
+
+- **Layout key `{layout}`:** label = the active **layout's** code in capitals (**EN**, **SV**, **FI**, **NO**,
+  **DA**, **DE**, **FR**), width 1×, function-key style. `aria-label` = **Switch keyboard layout, now {layout name}**.
+  Each tap moves to the next layout in the order: main layout, then the extra layouts in list order.
+  While more than one layout is set, the space bar shows the active **layout's** name (`--ink-3`, `--fs-sm`,
+  as in K6). Neither ever shows the UI language.
+- The active layout survives hiding and showing. It is remembered per device in `localStorage`
+  (`calvin-osk-layout`, wrapped in try/catch) and resets to the main layout if that entry stops being valid
+  (for example, when the layout was removed from Settings).
+
+### Keys
+
 - **Shift** is one-shot: tap, type one capital, back to lowercase. Tapping Shift twice within 400ms locks
   caps until Shift is tapped again. Shift keys show `k--on` while active. Letter keys show capitals while
   Shift is active.
@@ -160,14 +199,38 @@ Don't use simple-keyboard's internal input buffer (it loses the caret on mid-str
   carries the submit label.
 - In the sign-in dialog the phone half is hidden and the dialog shrinks to its narrow form.
 
-## 7. Setting
+## 7. Settings (Device › Keyboard, K7)
 
-Device › Keyboard gets a new first row (`SettingRow` + existing `SegmentedControl`):
-- Label **On-screen keyboard**
-- Description **Shows a keyboard on the screen when you tap a text field. Auto turns it on for touch screens.**
-- Options **Auto** / **Always** / **Off** → `'auto'` / `'on'` / `'off'`.
+Three new rows at the top of the Keyboard section, all `SettingRow`s built from existing primitives:
 
-Add registry keywords: keyboard, on-screen, typing, osk.
+1. **On-screen keyboard** (`SegmentedControl`), config `onScreenKeyboard`: `'auto'` (default) / `'on'` / `'off'`.
+   - Description **Shows a keyboard on the screen when you tap a text field. Auto turns it on for touch screens.**
+   - Options **Auto** / **Always** / **Off**.
+2. **Keyboard layout** (`SelectPill`), config `oskLayout`: unset (default) | `en` | `sv` | `fi` | `no` | `da` |
+   `de` | `fr`.
+   - Description **The letters the on-screen keyboard uses. Separate from the language Calvin is shown in.**
+   - Options **English**, **Svenska**, **Suomi**, **Norsk**, **Dansk**, **Deutsch**, **Français**, each named
+     in its own language, never translated.
+   - **Default (unset): a one-time browser hint, never the UI language.** The first time a device needs a
+     layout, map `navigator.language` once (`sv*` → sv, `fi*` → fi, `nb*`/`nn*`/`no*` → no, `da*` → da,
+     `de*` → de, `fr*` → fr, anything else → en) and cache the result in `localStorage`
+     (`calvin-osk-layout-hint`), so it doesn't change later on that device. While unset, the pill shows that
+     layout with the suffix **(suggested)**, for example "Svenska (suggested)". Once someone picks a layout,
+     `oskLayout` is saved and the hint is never used again. Calvin's UI language setting, if one is ever
+     added, is **never** an input here.
+3. **Also switch to** (`ChipMultiSelect`), config `oskExtraLayouts`: `string[]`, default `[]`.
+   - Description **Adds a key to the keyboard that switches between these and {main layout name}.**
+   - Options: every layout except the current main one. When the main layout changes, drop it from the
+     extras.
+   - The chips save in list order, and that list order is the switching order, so the existing component
+     works unchanged.
+- Rows 2 and 3 are dimmed and disabled while row 1 is **Off**. Settings remain editable from a phone either way.
+- These are ordinary config keys, global like the other Device settings. Per-kiosk overrides are out of scope.
+
+Add registry keywords: keyboard, on-screen, typing, osk, layout, keyboard layout, language, svenska, åäö. ("language" stays a search keyword only, so people who think of it that way still find it.)
+
+**Not covered here:** the layout of a *physical* USB keyboard plugged into a kiosk. That is an OS setting
+(xkb, through the display agent) and would be its own issue.
 
 ## 8. Accessibility
 
@@ -193,3 +256,8 @@ Add registry keywords: keyboard, on-screen, typing, osk.
 - A trusted physical keydown hides it. Blur to body hides it after rAF. Moving focus between two fields
   keeps it visible.
 - `--osk-height` is set on show and reset to `0px` on hide.
+- Layout: `sv` puts å/ö/ä on the letter layer; Shift capitalises them. `{layout}` is absent with no extras,
+  and with extras it cycles main → extras → main. The key and space-bar labels show the layout code and name.
+  Unset `oskLayout` resolves once from `navigator.language` and caches it. Changing the UI language (or
+  `document.documentElement.lang`) never changes the layout. Removing the active layout from Settings falls
+  back to the main layout.
