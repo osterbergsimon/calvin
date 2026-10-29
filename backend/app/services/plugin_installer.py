@@ -13,9 +13,11 @@ from loguru import logger
 from app.config import settings
 from app.plugins.definitions import CURRENT_PLUGIN_API_VERSION
 from app.services.validation import (
+    resolve_child_dir,
     validate_directory_structure,
     validate_manifest_api_version,
     validate_manifest_required_fields,
+    validate_plugin_id,
     validate_plugin_optional_fields,
     validate_plugin_type,
     validate_zip_structure,
@@ -53,8 +55,11 @@ class PluginInstaller:
 
         Returns:
             Path to plugin directory
+
+        Raises:
+            ValueError: If the id is invalid or would escape the plugins dir
         """
-        return self.plugins_dir / plugin_id
+        return resolve_child_dir(self.plugins_dir, plugin_id)
 
     def validate_plugin_package(self, plugin_path: Path) -> dict[str, Any]:
         """
@@ -86,6 +91,7 @@ class PluginInstaller:
         # Validate plugin-specific fields
         required_fields = ["id", "name", "version", "type"]
         validate_manifest_required_fields(manifest, required_fields, "plugin.json")
+        validate_plugin_id(manifest["id"])
         validate_plugin_type(manifest["type"])
         validate_manifest_api_version(
             manifest, CURRENT_PLUGIN_API_VERSION, manifest_type="plugin.json"
@@ -117,6 +123,7 @@ class PluginInstaller:
         # Validate plugin-specific fields
         required_fields = ["id", "name", "version", "type"]
         validate_manifest_required_fields(manifest, required_fields, "plugin.json")
+        validate_plugin_id(manifest["id"])
         validate_plugin_type(manifest["type"])
         validate_manifest_api_version(
             manifest, CURRENT_PLUGIN_API_VERSION, manifest_type="plugin.json"
@@ -429,6 +436,12 @@ class PluginInstaller:
         plugin_path = self.get_plugin_path(plugin_id)
         if not plugin_path.exists():
             raise ValueError(f"Plugin {plugin_id} is not installed")
+        # Only ever delete a dir Calvin installed (it writes plugin.json last).
+        if not (plugin_path / "plugin.json").is_file():
+            raise ValueError(
+                f"Plugin directory for {plugin_id} has no plugin.json and was not installed "
+                "by Calvin; remove it by hand"
+            )
 
         # Remove pip packages this plugin installed, but keep any that another
         # installed plugin still declares — avoids breaking a sibling's deps
@@ -484,7 +497,10 @@ class PluginInstaller:
         Returns:
             Plugin manifest dictionary or None if not found
         """
-        plugin_path = self.get_plugin_path(plugin_id)
+        try:
+            plugin_path = self.get_plugin_path(plugin_id)
+        except ValueError:
+            return None
         manifest_path = plugin_path / "plugin.json"
 
         if not manifest_path.exists():
@@ -647,14 +663,19 @@ class PluginInstaller:
                     self.uninstall_plugin(install_id)
                 else:
                     raise ValueError(f"Plugin {install_id} is already installed")
-            else:
-                # Plugin directory exists but is invalid/corrupted (no manifest)
-                # Remove it and allow reinstallation
+            elif force:
+                # No plugin.json: a crashed install's leftover, or not ours at
+                # all. Only remove it when the user explicitly forces (audit S1);
+                # get_plugin_path already confined it to the plugins dir.
                 logger.warning(
-                    f"Found corrupted/invalid plugin directory for {install_id}, "
-                    "removing and allowing reinstallation"
+                    f"Removing plugin directory without plugin.json for {install_id} (force)"
                 )
                 shutil.rmtree(plugin_path)
+            else:
+                raise ValueError(
+                    f"Plugin directory for {install_id} exists but has no plugin.json; "
+                    "remove it or reinstall with force"
+                )
 
         # Install from directory
         return self.install_plugin(plugin_dir, install_id, check_version=True, force=False)

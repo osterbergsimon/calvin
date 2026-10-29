@@ -385,10 +385,16 @@ class TestPluginInstallFromRepo:
         manifest_result = plugin_installer.get_plugin_manifest(plugin_id)
         assert manifest_result is None, "Corrupted plugin should not have a valid manifest"
 
-        # Should clean up corrupted directory and allow installation
-        # The cleanup happens in install_plugin_from_repo when it detects the manifest is None
+        # Without force the leftover is never deleted (audit S1, calvin-ua2)
+        with pytest.raises(ValueError, match="no plugin.json"):
+            plugin_installer.install_plugin_from_repo(
+                corrupted_plugin_repo, "plugin1", plugin_id=plugin_id
+            )
+        assert (plugin_path / "some_file.txt").exists()
+
+        # With force the (contained, valid-id) leftover is cleaned up and reinstalled
         manifest = plugin_installer.install_plugin_from_repo(
-            corrupted_plugin_repo, "plugin1", plugin_id=plugin_id
+            corrupted_plugin_repo, "plugin1", plugin_id=plugin_id, force=True
         )
 
         # Verify plugin was installed successfully

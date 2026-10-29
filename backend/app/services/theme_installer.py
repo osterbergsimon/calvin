@@ -9,8 +9,10 @@ from typing import Any
 from loguru import logger
 
 from app.services.validation import (
+    resolve_child_dir,
     validate_directory_structure,
     validate_manifest_required_fields,
+    validate_plugin_id,
     validate_theme_variables,
     validate_zip_structure,
 )
@@ -38,8 +40,11 @@ class ThemeInstaller:
 
         Returns:
             Path to theme directory
+
+        Raises:
+            ValueError: If the id is invalid or would escape the themes dir
         """
-        return self.themes_dir / theme_id
+        return resolve_child_dir(self.themes_dir, theme_id)
 
     def _is_safe_path(self, path: str, base_path: Path) -> bool:
         """
@@ -83,6 +88,7 @@ class ThemeInstaller:
         """
         # Validate required fields
         validate_manifest_required_fields(manifest, REQUIRED_THEME_FIELDS, "theme.json")
+        validate_plugin_id(manifest["id"])
 
         # Validate variables structure
         validate_theme_variables(manifest["variables"])
@@ -176,7 +182,7 @@ class ThemeInstaller:
             if force:
                 # Uninstall existing theme
                 logger.info(f"Force installing theme {install_id}, removing existing installation")
-                shutil.rmtree(theme_path)
+                self.uninstall_theme(install_id)
             else:
                 # Check version if requested
                 if check_version:
@@ -304,6 +310,12 @@ class ThemeInstaller:
         theme_path = self.get_theme_path(theme_id)
         if not theme_path.exists():
             raise ValueError(f"Theme {theme_id} is not installed")
+        # Only ever delete a dir Calvin installed (it always writes theme.json).
+        if not (theme_path / "theme.json").is_file():
+            raise ValueError(
+                f"Theme directory for {theme_id} has no theme.json and was not installed "
+                "by Calvin; remove it by hand"
+            )
 
         # Remove theme directory
         shutil.rmtree(theme_path)
@@ -351,7 +363,10 @@ class ThemeInstaller:
         Returns:
             Theme manifest dictionary or None if not found
         """
-        theme_path = self.get_theme_path(theme_id)
+        try:
+            theme_path = self.get_theme_path(theme_id)
+        except ValueError:
+            return None
         manifest_path = theme_path / "theme.json"
 
         if not manifest_path.exists():

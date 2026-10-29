@@ -24,9 +24,19 @@ from app.services.csp import get_sealed_mode
 from app.services.event_system import event_system
 from app.services.plugin_installer import plugin_installer
 from app.services.theme_installer import theme_installer
+from app.services.validation import validate_plugin_id
 
 from .config import normalize_plugin_config
 from .themes import BUILTIN_THEMES, _unregister_theme_from_db
+
+
+def _require_valid_id(plugin_id: str) -> None:
+    """Reject an unsafe plugin/theme id with 400 before it reaches the filesystem."""
+    try:
+        validate_plugin_id(plugin_id)
+    except ValueError as e:
+        raise HTTPException(status_code=400, detail=str(e)) from e
+
 
 router = APIRouter()
 
@@ -332,6 +342,10 @@ async def install_plugin(
     """
     if not file.filename:
         raise HTTPException(status_code=400, detail="No file provided")
+    if plugin_id is not None:
+        _require_valid_id(plugin_id)
+    if plugin_id is not None:
+        _require_valid_id(plugin_id)
 
     # Save uploaded file to temporary location
     temp_path = None
@@ -423,6 +437,7 @@ async def get_installed_plugin(plugin_id: str):
     Returns:
         Plugin manifest
     """
+    _require_valid_id(plugin_id)
     manifest = plugin_installer.get_plugin_manifest(plugin_id)
     if not manifest:
         raise HTTPException(status_code=404, detail=f"Plugin {plugin_id} not found")
@@ -440,6 +455,7 @@ async def uninstall_plugin(plugin_id: str):
     Returns:
         Success message
     """
+    _require_valid_id(plugin_id)
     try:
         # Check if it's a theme by checking database
         db_type = await PluginTypeDB.objects.get_or_none(type_id=plugin_id)
