@@ -133,7 +133,8 @@ install_system_packages() {
 }
 
 # X + Chromium kiosk packages, shared by setup.sh, setup-kiosk.sh and the CI
-# package-availability smoke test.
+# package-availability smoke test. This is the X11 stack and stays installed even
+# on a Wayland kiosk, so switching back is a unit switch rather than a reimage.
 # shellcheck disable=SC2034  # used by the scripts that source this file
 CALVIN_KIOSK_PACKAGES=(
     curl
@@ -145,6 +146,17 @@ CALVIN_KIOSK_PACKAGES=(
     unclutter
     xdotool
     x11-xserver-utils
+)
+
+# Extra packages for the opt-in Wayland stack (phase 1, SPLIT kiosks). Chromium
+# comes from the shared list above. swayidle is only needed for idle blanking,
+# which Calvin does not use: the schedule drives wlopm directly.
+# shellcheck disable=SC2034  # used by the scripts that source this file
+CALVIN_WAYLAND_PACKAGES=(
+    labwc
+    wlr-randr
+    wlopm
+    wtype
 )
 
 # UV installation and management
@@ -875,6 +887,200 @@ configure_openbox_autostart() {
     chown -R "${user}:${user}" "${user_home}/.config"
     
     log "Openbox autostart configured"
+}
+
+# Display stack selection (phase 1: Wayland is opt-in, X11 stays the default)
+# ---------------------------------------------------------------------------
+# CALVIN_DISPLAY_STACK (environment, then /etc/default/calvin-kiosk) or the
+# installer's --display-stack flag picks the stack. In phase 1, `auto` means
+# X11 on every model: the Pi 3B+ pilot is tracked in bead calvin-8by7 and Pi 4/5
+# become the auto target in phase 2 (docs/research/2026-10-29-kiosk-wayland.md).
+
+# Session env file shared by calvin-kiosk-remote.service and
+# calvin-display-agent.service, so one file selects the stack for both instead of
+# duplicating the units.
+calvin_display_env_file() {
+    printf '%s\n' "${CALVIN_KIOSK_DISPLAY_ENV_FILE:-/etc/default/calvin-kiosk-display}"
+}
+
+# Echo the stack to use: x11 or wayland. $1 is the explicit --display-stack value
+# (empty when not given); otherwise the environment, then `auto` (-> x11).
+resolve_display_stack() {
+    local requested="${1:-${CALVIN_DISPLAY_STACK:-auto}}"
+    case "${requested}" in
+        x11|wayland)
+            printf '%s\n' "${requested}"
+            ;;
+        auto|"")
+            printf 'x11\n'
+            ;;
+        *)
+            echo "Invalid display stack: ${requested} (expected auto, x11 or wayland)" >&2
+            return 1
+            ;;
+    esac
+}
+
+# Extra packages a stack needs; X11's CALVIN_KIOSK_PACKAGES are always installed.
+display_stack_packages() {
+    case "${1:-x11}" in
+        wayland) printf '%s\n' "${CALVIN_WAYLAND_PACKAGES[@]}" ;;
+        *) return 0 ;;
+    esac
+}
+
+# Write the session environment for the stack. X11 keeps DISPLAY/XAUTHORITY;
+# Wayland needs the three variables Chromium and wlroots clients read, and has no
+# X authority file at all. CALVIN_CHROMIUM_DISPLAY_FLAGS carries the one
+# stack-specific Chromium flag (--ozone-platform=wayland) so the kiosk unit keeps
+# a single, unchanged flag list.
+configure_display_session() {
+    local stack="$1"
+    local user="${2:-$DEFAULT_CALVIN_USER}"
+    local home="${CALVIN_HOME_OVERRIDE:-/home}/${user}"
+    local file uid
+    file="$(calvin_display_env_file)"
+    uid="$(id -u "${user}" 2>/dev/null || echo 1000)"
+
+    log "Configuring ${stack} session environment (${file})..."
+    mkdir -p "$(dirname "${file}")"
+    if [ "${stack}" = "wayland" ]; then
+        cat > "${file}" <<WAYLAND_ENV_EOF
+# Calvin kiosk display session (stack: wayland). Written by setup-kiosk.sh.
+# Sets the environment calvin-kiosk-remote.service and calvin-display-agent.service
+# need to reach the labwc session; there is no X authority file on Wayland.
+XDG_SESSION_TYPE=wayland
+WAYLAND_DISPLAY=wayland-0
+XDG_RUNTIME_DIR=/run/user/${uid}
+CALVIN_CHROMIUM_DISPLAY_FLAGS=--ozone-platform=wayland
+WAYLAND_ENV_EOF
+    else
+        cat > "${file}" <<X11_ENV_EOF
+# Calvin kiosk display session (stack: x11). Written by setup-kiosk.sh.
+DISPLAY=:0
+XAUTHORITY=${home}/.Xauthority
+CALVIN_CHROMIUM_DISPLAY_FLAGS=
+X11_ENV_EOF
+    fi
+    chmod 0644 "${file}"
+}
+
+# labwc autostart + rc.xml for the Wayland session. The autostart is the same
+# file the kiosk bundle ships (deploy/kiosk-agent/labwc/autostart), so a bundle
+# update and a setup run cannot drift apart; scripts/tests checks they match.
+configure_labwc_autostart() {
+    local user="${1:-$DEFAULT_CALVIN_USER}"
+    local user_home="${CALVIN_HOME_OVERRIDE:-/home}/${user}"
+    local dir="${user_home}/.config/labwc"
+
+    log "Configuring labwc (Wayland) autostart..."
+    mkdir -p "${dir}"
+    cat > "${dir}/autostart" <<'LABWC_AUTOSTART_EOF'
+#!/bin/sh
+# Calvin kiosk - labwc autostart (Wayland session).
+#
+# Chromium is NOT started here: calvin-kiosk-remote.service starts it with the
+# session environment and its own restart policy. This script only prepares the
+# output and hides the pointer.
+
+# rc.xml sets <autoEnableOutputs>no</autoEnableOutputs> so a scheduled
+# `wlopm --off` is not undone by a monitor that fakes a hotplug. Enable the
+# display that is present at boot instead.
+out="$(wlr-randr 2>/dev/null | grep -E '^[^[:space:]]' | head -n 1 | awk '{print $1}')"
+if [ -n "$out" ]; then
+    wlr-randr --output "$out" --on >/dev/null 2>&1 || true
+fi
+
+# labwc has no idle cursor hiding; rc.xml binds W-c to HideCursor+WarpCursor and
+# this fires it once through a virtual keyboard (labwc's documented workaround).
+if command -v wtype >/dev/null 2>&1; then
+    wtype -M logo -k c >/dev/null 2>&1 || true
+fi
+
+exit 0
+LABWC_AUTOSTART_EOF
+    cat > "${dir}/rc.xml" <<'LABWC_RC_EOF'
+<?xml version="1.0"?>
+<labwc_config>
+  <!-- Calvin kiosk display settings (Wayland). Installed by setup and refreshed
+       from the kiosk bundle on update; local edits are overwritten. -->
+  <core>
+    <!-- Do not re-enable an output the display agent turned off: a monitor that
+         fakes a hotplug would otherwise wake the panel at night. The autostart
+         script enables the output present at boot. -->
+    <autoEnableOutputs>no</autoEnableOutputs>
+  </core>
+
+  <keyboard>
+    <!-- Fired once at startup by autostart (wtype) to hide the pointer. There is
+         no idle-hide in labwc; the cursor reappears on pointer/touch input. -->
+    <keybind key="W-c">
+      <action name="HideCursor" />
+      <action name="WarpCursor" x="-1" y="-1" />
+    </keybind>
+  </keyboard>
+</labwc_config>
+LABWC_RC_EOF
+    chmod 0755 "${dir}/autostart"
+    chmod 0644 "${dir}/rc.xml"
+    chown -R "${user}:${user}" "${dir}" 2>/dev/null || true
+
+    log "labwc autostart configured"
+}
+
+# Warn (do not fail) when Wayland is requested on a release this phase has not
+# been validated on: Bookworm ships older labwc and no wlopm, so the display agent's
+# panel power would not work there.
+warn_unvalidated_wayland_os() {
+    [ "${1:-x11}" = "wayland" ] || return 0
+    local codename=""
+    # Read, don't source: sourcing /etc/os-release inside a command substitution
+    # makes shellcheck think VERSION_CODENAME changes in a subshell in setup.sh.
+    codename="$(grep -m1 '^VERSION_CODENAME=' /etc/os-release 2>/dev/null \
+        | cut -d= -f2- | tr -d '\"' || true)"
+    case "${codename}" in
+        ""|trixie) return 0 ;;
+    esac
+    log_warn "Wayland is validated on Trixie only (this is ${codename}); labwc/wlopm behave differently on older releases"
+}
+
+# Enable exactly one compositor unit and leave the other installed-but-disabled,
+# so switching stacks is one re-run of the installer in either direction.
+enable_display_stack_units() {
+    local stack="$1"
+    local want drop
+    if [ "${stack}" = "wayland" ]; then
+        want="calvin-wayland.service"; drop="calvin-x.service"
+    else
+        want="calvin-x.service"; drop="calvin-wayland.service"
+    fi
+
+    if ! command -v systemctl >/dev/null 2>&1; then
+        log_warn "systemctl not found; enable ${want} / disable ${drop} by hand"
+        return 0
+    fi
+
+    log "Display stack ${stack}: enabling ${want}, disabling ${drop}"
+    systemctl disable "${drop}" >/dev/null 2>&1 || true
+    systemctl enable "${want}" || error_exit "Failed to enable ${want}" 1
+    # The old compositor still owns tty1 until the next boot; install-kiosk.sh
+    # reboots, and the switch is only complete once exactly one is enabled.
+    log "Reboot to start ${want}"
+}
+
+# Apply the stack everywhere setup owns it: session env, compositor autostart,
+# and which compositor unit is enabled. Safe to run repeatedly in either
+# direction (switching a kiosk X11 <-> Wayland in place).
+apply_display_stack() {
+    local stack="$1"
+    local user="${2:-$DEFAULT_CALVIN_USER}"
+
+    configure_display_session "${stack}" "${user}"
+    if [ "${stack}" = "wayland" ]; then
+        warn_unvalidated_wayland_os "${stack}"
+        configure_labwc_autostart "${user}"
+    fi
+    enable_display_stack_units "${stack}"
 }
 
 # Verification functions
