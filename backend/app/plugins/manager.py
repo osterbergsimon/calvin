@@ -310,6 +310,10 @@ class PluginManager:
             return False
 
         try:
+            # Reaching here is a deliberate stop, even when the instance is
+            # already down (e.g. initialize() failed at boot): the data route
+            # must not retry it afterwards.
+            plugin.stopped_by_request = True
             if plugin.is_running():
                 # Unregister scheduled tasks if backend plugin
                 if isinstance(plugin, BackendPlugin):

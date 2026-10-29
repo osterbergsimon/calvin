@@ -1021,13 +1021,21 @@ async def get_plugin_data(
             status_code=404, detail="Service plugin instance not found or not a service plugin"
         )
 
-    # A disabled or stopped instance stays that way: a dashboard poll must not
-    # undo a manual stop by restarting it. Starting is the job of the
-    # enable/start routes.
+    # A disabled or deliberately stopped instance stays that way: a dashboard
+    # poll must not undo a manual stop by restarting it.
     if not db_plugin.enabled or not plugin_instance.enabled:
         raise HTTPException(status_code=409, detail="Plugin instance is disabled")
     if not plugin_instance.is_running():
-        raise HTTPException(status_code=409, detail="Plugin instance is stopped")
+        if plugin_instance.stopped_by_request:
+            raise HTTPException(status_code=409, detail="Plugin instance is stopped")
+        # Enabled but never came up (e.g. initialize() failed at boot because
+        # the network wasn't up yet): retry, so it recovers on its own.
+        try:
+            await plugin_instance.initialize()
+            plugin_instance.start()
+        except Exception as e:
+            logger.exception("Error initializing plugin {}", plugin_id)
+            raise HTTPException(status_code=503, detail=f"Plugin instance failed to start: {e}")
 
     try:
         data = await plugin_instance.fetch(start_date=start_date, end_date=end_date)

@@ -741,9 +741,15 @@ class TestServicePluginDataAPI:
         def __init__(self, plugin_id: str, name: str, enabled: bool = True):
             super().__init__(plugin_id, name, enabled)
             self.initialize_calls = 0
+            # Number of upcoming initialize() calls that should fail, to model
+            # a boot where the network (or another dependency) isn't up yet.
+            self.fail_initialize_times = 0
 
         async def initialize(self) -> None:
             self.initialize_calls += 1
+            if self.fail_initialize_times:
+                self.fail_initialize_times -= 1
+                raise RuntimeError("dependency not available yet")
 
         async def fetch(
             self,
@@ -801,7 +807,8 @@ class TestServicePluginDataAPI:
     @pytest.mark.asyncio
     async def test_get_plugin_data_stopped_instance_is_409_and_stays_stopped(self, test_client):
         """A dashboard poll must not undo a manual stop (audit R5)."""
-        plugin, db_plugin = await self._register("test-service-stopped", running=False)
+        plugin, db_plugin = await self._register("test-service-stopped")
+        assert await plugin_manager.stop_plugin("test-service-stopped") is True
 
         try:
             response = test_client.get("/api/plugins/test-service-stopped/data")
@@ -811,6 +818,98 @@ class TestServicePluginDataAPI:
             assert plugin.initialize_calls == 0
         finally:
             await plugin_manager.unregister("test-service-stopped")
+            await db_plugin.delete()
+
+    @pytest.mark.asyncio
+    async def test_get_plugin_data_retries_instance_that_never_started(self, test_client):
+        """An enabled instance whose boot initialize() failed recovers on the next poll."""
+        plugin, db_plugin = await self._register("test-service-boot-failed", running=False)
+
+        try:
+            response = test_client.get("/api/plugins/test-service-boot-failed/data")
+
+            assert response.status_code == 200
+            assert plugin.is_running() is True
+            assert plugin.stopped_by_request is False
+            assert plugin.initialize_calls == 1
+        finally:
+            await plugin_manager.unregister("test-service-boot-failed")
+            await db_plugin.delete()
+
+    @pytest.mark.asyncio
+    async def test_get_plugin_data_recovers_after_boot_initialize_raised(self, test_client):
+        """A Pi that boots without a network recovers without a manual restart."""
+        plugin, db_plugin = await self._register("test-service-boot-raised", running=False)
+        plugin.fail_initialize_times = 1
+
+        try:
+            # The boot loader's attempt fails, leaving the instance enabled but
+            # not running (the failure this finding is about).
+            with pytest.raises(RuntimeError):
+                await plugin.initialize()
+            assert plugin.is_running() is False
+
+            response = test_client.get("/api/plugins/test-service-boot-raised/data")
+
+            assert response.status_code == 200
+            assert plugin.is_running() is True
+            assert plugin.stopped_by_request is False
+            assert plugin.initialize_calls == 2
+        finally:
+            await plugin_manager.unregister("test-service-boot-raised")
+            await db_plugin.delete()
+
+    @pytest.mark.asyncio
+    async def test_get_plugin_data_returns_503_when_retry_still_fails(self, test_client):
+        """A retry that fails again reports unreachable, not a false success."""
+        plugin, db_plugin = await self._register("test-service-never-starts", running=False)
+        plugin.fail_initialize_times = 99
+
+        try:
+            response = test_client.get("/api/plugins/test-service-never-starts/data")
+
+            assert response.status_code == 503
+            assert plugin.is_running() is False
+            assert plugin.initialize_calls == 1
+        finally:
+            await plugin_manager.unregister("test-service-never-starts")
+            await db_plugin.delete()
+
+    @pytest.mark.asyncio
+    async def test_stopping_instance_that_never_started_keeps_it_stopped(self, test_client):
+        """Stopping a boot-failed instance is deliberate: the next poll must not revive it."""
+        plugin, db_plugin = await self._register("test-service-stop-unstarted", running=False)
+
+        try:
+            response = test_client.post("/api/plugins/instances/test-service-stop-unstarted/stop")
+            assert response.status_code == 200
+            assert plugin.stopped_by_request is True
+
+            response = test_client.get("/api/plugins/test-service-stop-unstarted/data")
+
+            assert response.status_code == 409
+            assert plugin.is_running() is False
+            assert plugin.initialize_calls == 0
+        finally:
+            await plugin_manager.unregister("test-service-stop-unstarted")
+            await db_plugin.delete()
+
+    @pytest.mark.asyncio
+    async def test_get_plugin_data_restarted_after_stop_serves_again(self, test_client):
+        plugin, db_plugin = await self._register("test-service-restarted")
+        assert await plugin_manager.stop_plugin("test-service-restarted") is True
+        assert plugin.stopped_by_request is True
+        assert await plugin_manager.start_plugin("test-service-restarted") is True
+        # Starting clears the deliberate-stop marker, or the instance would stay
+        # stuck returning 409 after a stop/start cycle.
+        assert plugin.stopped_by_request is False
+
+        try:
+            response = test_client.get("/api/plugins/test-service-restarted/data")
+
+            assert response.status_code == 200
+        finally:
+            await plugin_manager.unregister("test-service-restarted")
             await db_plugin.delete()
 
     @pytest.mark.asyncio
