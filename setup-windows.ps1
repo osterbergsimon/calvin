@@ -5,7 +5,7 @@ $ErrorActionPreference = "Stop"
 
 # Configuration
 $ScriptName = "Calvin Dashboard - Windows Setup"
-$RequiredPythonVersion = "3.11"
+$RequiredPythonVersion = "3.12"
 $RequiredNodeVersion = "20"
 
 # Color output functions
@@ -92,7 +92,7 @@ function Invoke-SafeCommand {
 function Test-Version {
     param(
         [string]$VersionString,
-        [int]$MinMajor,
+        [string]$MinVersion,
         [string]$ToolName
     )
     
@@ -100,15 +100,15 @@ function Test-Version {
         return $false
     }
     
-    $versionMatch = $VersionString -match "(\d+)\.(\d+)"
-    if ($versionMatch) {
-        $major = [int]$matches[1]
-        if ($major -ge $MinMajor) {
+    if ($VersionString -match "(\d+)\.(\d+)") {
+        $found = [version]"$($matches[1]).$($matches[2])"
+        $required = if ($MinVersion -match "\.") { [version]$MinVersion } else { [version]"$MinVersion.0" }
+        if ($found -ge $required) {
             return $true
         }
     }
     
-    Write-Error-Custom "$ToolName version $MinMajor+ required, found: $VersionString"
+    Write-Error-Custom "$ToolName version $MinVersion+ required, found: $VersionString"
     return $false
 }
 
@@ -126,43 +126,9 @@ function Initialize-GitRepository {
         if ($LASTEXITCODE -eq 0) {
             Write-Info "Current branch: $currentBranch"
             
-            # Fetch latest changes
-            Write-Info "Fetching latest changes from remote..."
-            git fetch origin develop 2>&1 | Out-Null
-            
-            # Check if develop branch exists locally
-            $developExists = git show-ref --verify --quiet refs/heads/develop 2>&1
-            if ($LASTEXITCODE -ne 0) {
-                Write-Info "Creating develop branch from origin/develop..."
-                git checkout -b develop origin/develop 2>&1 | Out-Null
-                if ($LASTEXITCODE -eq 0) {
-                    Write-Success "Switched to develop branch"
-                }
-                else {
-                    Write-Warning "Could not create develop branch. Continuing with current branch."
-                }
-            }
-            elseif ($currentBranch -ne "develop") {
-                Write-Info "Switching to develop branch..."
-                git checkout develop 2>&1 | Out-Null
-                if ($LASTEXITCODE -eq 0) {
-                    Write-Success "Switched to develop branch"
-                    git pull origin develop 2>&1 | Out-Null
-                }
-                else {
-                    Write-Warning "Could not switch to develop branch. Continuing with current branch."
-                }
-            }
-            else {
-                # Already on develop, pull latest
-                Write-Info "Pulling latest changes from develop..."
-                git pull origin develop 2>&1 | Out-Null
-                if ($LASTEXITCODE -eq 0) {
-                    Write-Success "Up to date with develop"
-                }
-                else {
-                    Write-Warning "Could not pull latest changes. Continuing anyway."
-                }
+            # Only report: never switch branches or pull on the contributor's behalf.
+            if ($currentBranch -ne "develop") {
+                Write-Warning "You are on '$currentBranch'. Development happens on 'develop'; run 'git switch develop' if you meant to work there."
             }
         }
     }
@@ -237,7 +203,6 @@ function Test-Prerequisites {
 # Install backend dependencies
 function Install-BackendDependencies {
     Write-Step "Installing Backend Dependencies"
-    Write-Info "Note: evdev (keyboard support) is Linux-only and will be skipped on Windows"
     
     $backendDir = Join-Path $PSScriptRoot "backend"
     if (-not (Test-Path $backendDir)) {
