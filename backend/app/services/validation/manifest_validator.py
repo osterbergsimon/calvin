@@ -1,7 +1,55 @@
 """Manifest validation utilities."""
 
+import re
 from pathlib import Path
 from typing import Any
+
+# Plugin and theme ids name a directory under the data dir, so they must be a
+# single safe path segment (audit S1, calvin-ua2). ``fullmatch`` (not ``$``) so a
+# trailing newline is rejected too.
+PLUGIN_ID_PATTERN = re.compile(r"[a-z0-9][a-z0-9_-]{0,63}")
+
+
+def validate_plugin_id(plugin_id: Any) -> str:
+    """
+    Validate a plugin or theme id against ``PLUGIN_ID_PATTERN``.
+
+    Args:
+        plugin_id: Id from a manifest, request body or URL path
+
+    Returns:
+        The id, unchanged
+
+    Raises:
+        ValueError: If the id is not a lowercase slug of 1-64 characters
+    """
+    if not isinstance(plugin_id, str) or not PLUGIN_ID_PATTERN.fullmatch(plugin_id):
+        raise ValueError(
+            f"Invalid id {plugin_id!r}: use 1-64 lowercase letters, digits, '_' or '-', "
+            "starting with a letter or digit"
+        )
+    return plugin_id
+
+
+def resolve_child_dir(base_dir: Path, child_id: str) -> Path:
+    """
+    Return ``base_dir / child_id`` after validating the id and asserting the
+    resolved path is a direct child of ``base_dir``.
+
+    Raises:
+        ValueError: If the id is invalid or the path escapes ``base_dir``
+    """
+    validate_plugin_id(child_id)
+    path = base_dir / child_id
+    try:
+        # A symlinked child (a dev checkout linked into data/plugins) is the
+        # admin's own choice; rmtree refuses symlinks anyway.
+        contained = path.is_symlink() or path.resolve().parent == base_dir.resolve()
+    except (ValueError, OSError):
+        contained = False
+    if not contained:
+        raise ValueError(f"Invalid id {child_id!r}: path escapes {base_dir}")
+    return path
 
 
 def validate_manifest_required_fields(

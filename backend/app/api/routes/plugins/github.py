@@ -11,7 +11,10 @@ import httpx
 from fastapi import APIRouter, Body, HTTPException
 from loguru import logger
 
-from app.api.routes.plugins.management import _validate_just_installed_plugin
+from app.api.routes.plugins.management import (
+    _require_valid_id,
+    _validate_just_installed_plugin,
+)
 from app.api.routes.plugins.themes import _register_theme_in_db
 from app.config import settings
 from app.plugins.loader import plugin_loader
@@ -176,6 +179,8 @@ async def install_plugin_from_github(request: dict[str, Any] = Body(...)):
     branch = request.get("branch")
     plugin_id = request.get("plugin_id")
     force = request.get("force", False)
+    if plugin_id is not None:
+        _require_valid_id(plugin_id)
 
     if not repo_url:
         raise HTTPException(status_code=400, detail="repo_url is required")
@@ -458,6 +463,8 @@ async def install_plugin_from_local(request: dict[str, Any] = Body(...)):
     plugin_path = request.get("plugin_path")
     plugin_id = request.get("plugin_id")
     force = request.get("force", False)
+    if plugin_id is not None:
+        _require_valid_id(plugin_id)
 
     if not local_path:
         raise HTTPException(status_code=400, detail="local_path is required")

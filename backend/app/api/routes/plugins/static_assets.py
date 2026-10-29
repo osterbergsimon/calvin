@@ -4,12 +4,17 @@ from fastapi import APIRouter, HTTPException
 from fastapi.responses import FileResponse
 
 from app.config import settings
+from app.services.validation import validate_plugin_id
 
 router = APIRouter()
 
 
 @router.get("/plugins/{plugin_id}/static/{asset_path:path}")
 async def get_plugin_static_asset(plugin_id: str, asset_path: str) -> FileResponse:
+    try:
+        validate_plugin_id(plugin_id)
+    except ValueError as exc:
+        raise HTTPException(status_code=400, detail="Invalid plugin id") from exc
     plugin_root = (settings.plugins_dir / plugin_id / "frontend").resolve()
     if not plugin_root.is_dir():
         raise HTTPException(status_code=404, detail="Plugin frontend assets not found")

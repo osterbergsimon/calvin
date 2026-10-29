@@ -152,7 +152,11 @@ class PluginLoader:
 
         for plugin_manifest in installed_plugins:
             plugin_id = plugin_manifest["id"]
-            plugin_path = plugin_installer.get_plugin_path(plugin_id)
+            try:
+                plugin_path = plugin_installer.get_plugin_path(plugin_id)
+            except ValueError as e:
+                logger.warning("Skipping installed plugin with unsafe id: {}", e)
+                continue
             plugin_py = plugin_path / "plugin.py"
 
             if not plugin_py.exists():

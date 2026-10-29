@@ -59,52 +59,28 @@ def normalize_plugin_config_for_frontend(config: dict[str, Any] | None) -> dict[
     return normalized
 
 
-def mask_sensitive_config(
-    config: dict[str, Any], mask_for_frontend: bool = False
-) -> dict[str, Any]:
+def mask_sensitive_config(config: dict[str, Any]) -> dict[str, Any]:
     """
-    Mask sensitive configuration fields.
+    Mask sensitive configuration fields for logging.
+
+    Matches by key name (generous on purpose: it only affects log output) and
+    shows none of the secret's characters. Responses to the frontend use
+    ``app.plugins.utils.secrets.redact_secrets`` instead.
 
     Args:
         config: Configuration dictionary
-        mask_for_frontend: If True, mask all sensitive fields. If False, only mask in logs.
 
     Returns:
         Configuration dictionary with sensitive fields masked
     """
     masked: dict[str, Any] = {}
     for key, value in config.items():
-        # Check if this key should be masked
-        should_mask = key.lower() in [f.lower() for f in SENSITIVE_FIELDS] or any(
-            f.lower() in key.lower() for f in SENSITIVE_FIELDS
-        )
-
-        if should_mask:
-            if mask_for_frontend:
-                # For frontend, always mask
-                if value:
-                    # Mask the value, showing only first and last character if length > 2
-                    if len(str(value)) > 2:
-                        masked[key] = f"{str(value)[0]}***{str(value)[-1]}"
-                    else:
-                        masked[key] = "***"
-                else:
-                    masked[key] = ""
-            else:
-                # For logs, mask but keep structure
-                if value:
-                    # Mask the value, showing only first and last character if length > 2
-                    if len(str(value)) > 2:
-                        masked[key] = f"{str(value)[0]}***{str(value)[-1]}"
-                    else:
-                        masked[key] = "***"
-                else:
-                    masked[key] = ""
+        if any(f.lower() in key.lower() for f in SENSITIVE_FIELDS):
+            masked[key] = "***" if value else ""
+        elif isinstance(value, dict):
+            masked[key] = mask_sensitive_config(value)
         else:
-            if isinstance(value, dict):
-                masked[key] = mask_sensitive_config(value, mask_for_frontend)
-            else:
-                masked[key] = value
+            masked[key] = value
     return masked
 
 
@@ -176,5 +152,8 @@ async def get_plugin_config(plugin_id: str):
         logger.debug(f"Could not load schema from database for {plugin_id}: {e}")
         # Continue with config_service values only
 
-    # Mask sensitive fields before returning
-    return mask_sensitive_config(config, mask_for_frontend=True)
+    # Never send secret values to the frontend (audit S4): blank them.
+    from app.plugins.utils.secrets import redact_secrets, secret_keys_for_type
+
+    redacted, _ = redact_secrets(config, secret_keys_for_type(plugin_id, config))
+    return redacted

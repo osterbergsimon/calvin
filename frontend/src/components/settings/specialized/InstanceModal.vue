@@ -43,7 +43,7 @@
               <PluginFieldRenderer
                 :plugin-id="currentPlugin.id"
                 :field-key="key"
-                :schema="schema"
+                :schema="fieldSchema(key, schema)"
                 :value="getFormValue(key, schema)"
                 @update="updateFormValue(key, $event)"
               />
@@ -202,6 +202,16 @@ const configValueOrDefault = (value, schema = {}) => {
   if (value !== undefined) return value;
   if (schema.default !== undefined) return schema.default;
   return schema.type === "boolean" ? false : "";
+};
+
+// Secret values never come back from the API: an edited instance carries ""
+// plus has_value[key]. Say a value is saved; a blank field keeps it on save.
+const fieldSchema = (key, schema) => {
+  if (!editingInstance.value?.has_value?.[key]) return schema;
+  return {
+    ...schema,
+    ui: { ...(schema.ui || {}), placeholder: "Saved — leave blank to keep" },
+  };
 };
 
 // Computed property for test action check
@@ -449,7 +459,8 @@ const handleTest = async () => {
       }
     }
 
-    const response = await pluginsApi.testPlugin(pluginId, testConfig);
+    // When editing, blank secrets are filled server-side from the stored instance.
+    const response = await pluginsApi.testPlugin(pluginId, testConfig, editingInstance.value?.id);
 
     testStatus.value = {
       success: response.success,

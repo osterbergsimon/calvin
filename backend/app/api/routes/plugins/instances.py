@@ -8,11 +8,18 @@ from fastapi import APIRouter, Body, HTTPException
 from loguru import logger
 from pydantic import BaseModel
 
-from app.api.routes.plugins.config import mask_sensitive_config
 from app.models.db_models import PluginDB, PluginTypeDB
 from app.plugins.loader import plugin_loader
 from app.plugins.manager import plugin_manager
 from app.plugins.utils.instance_manager import apply_plugin_config_update
+from app.plugins.utils.secrets import (
+    SecretEndpointChangedError,
+    check_secret_endpoint,
+    drop_unchanged_secrets,
+    endpoint_keys_for_type,
+    redact_secrets,
+    secret_keys_for_type,
+)
 from app.services.event_system import event_system
 
 router = APIRouter()
@@ -24,6 +31,8 @@ class PluginInstanceResponse(BaseModel):
     enabled: bool
     running: bool
     config: dict[str, Any]
+    # Secret keys -> whether a value is stored; their config values are always "".
+    has_value: dict[str, bool] = {}
     display_order: int
 
 
@@ -104,12 +113,16 @@ def _serialize_instance_config(config: dict[str, Any]) -> dict[str, Any]:
 
 def _build_instance_response(db_plugin: PluginDB, running: bool) -> PluginInstanceResponse:
     serialized_config = _serialize_instance_config(db_plugin.config or {})
+    config, has_value = redact_secrets(
+        serialized_config, secret_keys_for_type(db_plugin.type_id, serialized_config)
+    )
     return PluginInstanceResponse(
         id=db_plugin.id,
         name=db_plugin.name,
         enabled=db_plugin.enabled,
         running=running,
-        config=mask_sensitive_config(serialized_config, mask_for_frontend=True),
+        config=config,
+        has_value=has_value,
         display_order=db_plugin.display_order or 0,
     )
 
@@ -416,6 +429,22 @@ async def update_plugin_instance(instance_id: str, instance_data: dict[str, Any]
         config = instance_data["config"]
         # Merge with existing config if it's a partial update
         if isinstance(config, dict):
+            # Secrets come back blank (or legacy-masked) from the edit form;
+            # those mean "unchanged" and must not overwrite the stored value.
+            stored_config = dict(db_plugin.config or {})
+            known = {**stored_config, **config}
+            secrets = secret_keys_for_type(db_plugin.type_id, known)
+            # ...unless the endpoint they authenticate against changes.
+            try:
+                check_secret_endpoint(
+                    config,
+                    stored_config,
+                    secrets,
+                    endpoint_keys_for_type(db_plugin.type_id, known),
+                )
+            except SecretEndpointChangedError as e:
+                raise HTTPException(status_code=400, detail=str(e)) from e
+            config = drop_unchanged_secrets(config, secrets)
             # Ormar JSON fields detect changes automatically
             existing_config = dict(db_plugin.config or {})
             existing_config.update(config)

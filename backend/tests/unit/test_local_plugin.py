@@ -189,3 +189,71 @@ class TestLocalConfigUpdate:
                 assert db_plugin is not None
                 assert db_plugin.type_id == "local"
                 assert db_plugin.config == {}  # Empty config
+
+
+class TestUploadFilenameSafety:
+    """Upload filenames are untrusted (audit S3, calvin-ua2)."""
+
+    @pytest.fixture
+    def temp_image_dir(self, tmp_path):
+        # A fresh parent per test, so "nothing escaped to the parent" can't
+        # be confused by files other runs left in the shared temp dir.
+        image_dir = tmp_path / "images"
+        image_dir.mkdir()
+        return image_dir
+
+    @pytest.mark.parametrize(
+        "filename",
+        ["../escaped.png", "../../escaped.png", "sub/../../escaped.png", "..\\escaped.png"],
+    )
+    async def test_upload_traversal_name_stays_in_image_dir(
+        self, local_plugin, temp_image_dir, filename
+    ):
+        await local_plugin.upload_image(b"\x89PNG data", filename)
+
+        assert not (temp_image_dir.parent / "escaped.png").exists()
+        written = [p for p in temp_image_dir.iterdir() if p.is_file()]
+        assert len(written) == 1
+        assert written[0].parent == temp_image_dir
+        assert written[0].suffix == ".png"
+
+    async def test_upload_absolute_path_stays_in_image_dir(
+        self, local_plugin, temp_image_dir, tmp_path
+    ):
+        target = tmp_path / "abs_escaped.png"
+
+        await local_plugin.upload_image(b"\x89PNG data", str(target))
+
+        assert not target.exists()
+        assert [p.name for p in temp_image_dir.iterdir() if p.is_file()] == ["abs_escaped.png"]
+
+    @pytest.mark.parametrize("filename", ["..", ".", "", "/", ".png"])
+    async def test_upload_degenerate_name_gets_generated_name(
+        self, local_plugin, temp_image_dir, filename
+    ):
+        await local_plugin.upload_image(b"\x89PNG data", filename)
+
+        written = [p for p in temp_image_dir.iterdir() if p.is_file()]
+        assert len(written) == 1
+        assert written[0].parent == temp_image_dir
+        assert not written[0].name.startswith(".")
+
+    async def test_upload_does_not_overwrite_existing_image(self, local_plugin, temp_image_dir):
+        existing = temp_image_dir / "photo.png"
+        existing.write_bytes(b"original")
+
+        await local_plugin.upload_image(b"\x89PNG new", "photo.png")
+
+        assert existing.read_bytes() == b"original"
+        assert len([p for p in temp_image_dir.iterdir() if p.is_file()]) == 2
+
+    @pytest.mark.parametrize(
+        ("filename", "suffix"), [(".hidden.png", ".png"), (".x.webp", ".webp"), ("..", ".jpg")]
+    )
+    async def test_generated_name_keeps_image_extension(
+        self, local_plugin, temp_image_dir, filename, suffix
+    ):
+        await local_plugin.upload_image(b"\x89PNG data", filename)
+
+        (written,) = [p for p in temp_image_dir.iterdir() if p.is_file()]
+        assert written.suffix == suffix

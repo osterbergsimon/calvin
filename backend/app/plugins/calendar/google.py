@@ -84,12 +84,14 @@ class GoogleCalendarPlugin(CalendarPlugin):
         # Same calendar URL -> same instance
         instance_identity=["ical_url"],
         instance_config_schema={
+            # The secret-address iCal URL is a bearer credential: a password
+            # field, so it is never sent back to the frontend (audit S5).
             "ical_url": {
-                "type": "string",
+                "type": "password",
                 "description": "Google Calendar iCal URL or share URL",
                 "default": "",
                 "ui": {
-                    "component": "input",
+                    "component": "password",
                     "placeholder": "https://calendar.google.com/calendar/ical/...",
                     "validation": {
                         "required": True,
