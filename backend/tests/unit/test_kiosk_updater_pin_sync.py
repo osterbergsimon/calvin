@@ -13,7 +13,11 @@ from pathlib import Path
 from app.services.kiosk_bundle import BUNDLE_FILES
 
 UPDATER_PATH = Path(__file__).resolve().parents[3] / "deploy" / "kiosk-agent" / "update-kiosk.sh"
-DIRS = {"$BIN_DIR": "/usr/local/bin", "$SYSTEMD_DIR": "/etc/systemd/system"}
+DIRS = {
+    "$BIN_DIR": "/usr/local/bin",
+    "$SYSTEMD_DIR": "/etc/systemd/system",
+    "$LABWC_DIR": "/home/calvin/.config/labwc",
+}
 
 
 def _pinned_table() -> dict[str, tuple[str, str]]:

@@ -53,6 +53,33 @@ BUNDLE_FILES: list[BundleFile] = [
         "calvin-x.service",
         enable=True,
     ),
+    # Opt-in Wayland compositor. Never enabled by the bundle (enable=False): setup
+    # enables exactly one of calvin-x/calvin-wayland, and the updater must not
+    # re-enable the other behind its back. Not restarted on update either - a
+    # compositor restart drops the session, so a changed unit applies at reboot.
+    BundleFile(
+        "calvin-wayland.service",
+        "deploy/systemd/calvin-wayland.service",
+        "/etc/systemd/system/calvin-wayland.service",
+        "0644",
+        None,
+    ),
+    # labwc session config. setup-kiosk.sh writes the same bytes, so a kiosk that
+    # switches stacks later gets the bundle's copy; backend tests pin them equal.
+    BundleFile(
+        "autostart",
+        "deploy/kiosk-agent/labwc/autostart",
+        "/home/calvin/.config/labwc/autostart",
+        "0755",
+        None,
+    ),
+    BundleFile(
+        "rc.xml",
+        "deploy/kiosk-agent/labwc/rc.xml",
+        "/home/calvin/.config/labwc/rc.xml",
+        "0644",
+        None,
+    ),
     BundleFile(
         "update-kiosk.sh",
         "deploy/kiosk-agent/update-kiosk.sh",

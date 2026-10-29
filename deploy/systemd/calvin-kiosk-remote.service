@@ -1,20 +1,25 @@
 [Unit]
 Description=Calvin Dashboard Kiosk (remote backend)
-After=network-online.target calvin-x.service
-Wants=network-online.target graphical.target calvin-x.service
+# The compositor is whatever the display-stack switch enabled (calvin-x.service
+# for X11, calvin-wayland.service for Wayland); it is deliberately not in Wants=
+# so an X11 unit can never be pulled into a Wayland session.
+After=network-online.target graphical.target calvin-x.service calvin-wayland.service
+Wants=network-online.target graphical.target
 
 [Service]
 Type=simple
 User=calvin
 Group=calvin
 EnvironmentFile=/etc/default/calvin-kiosk
-Environment="DISPLAY=:0"
+# Session variables for the enabled stack: DISPLAY/XAUTHORITY on X11,
+# XDG_SESSION_TYPE/WAYLAND_DISPLAY/XDG_RUNTIME_DIR on Wayland. Written by setup;
+# the updater recreates it on older kiosks before installing these units.
+EnvironmentFile=/etc/default/calvin-kiosk-display
 Environment="HOME=/home/calvin"
-Environment="XAUTHORITY=/home/calvin/.Xauthority"
 # Shell-side expansions are written $${...} (and % as %%): systemd expands
 # ${...} itself and turns e.g. ${CALVIN_BACKEND_URL%/} into an empty string.
 ExecStartPre=/bin/bash -c 'timeout=240; elapsed=0; until curl -sf "$${CALVIN_BACKEND_URL%%/}/api/health" > /dev/null 2>&1; do if [ $elapsed -ge $timeout ]; then echo "Calvin backend at ${CALVIN_BACKEND_URL} not ready after $timeout seconds"; exit 1; fi; sleep 1; elapsed=$((elapsed+1)); done'
-ExecStartPre=/bin/bash -c 'timeout=60; elapsed=0; until [ -S /tmp/.X11-unix/X0 ] || pgrep -x Xorg > /dev/null 2>&1; do if [ $elapsed -ge $timeout ]; then echo "X server not available after $timeout seconds"; exit 1; fi; sleep 1; elapsed=$((elapsed+1)); done'
+ExecStartPre=/bin/bash -c 'timeout=60; elapsed=0; until [ -S /tmp/.X11-unix/X0 ] || pgrep -x Xorg > /dev/null 2>&1 || { [ -n "$${WAYLAND_DISPLAY:-}" ] && [ -S "$${XDG_RUNTIME_DIR:-/run/user/1000}/$${WAYLAND_DISPLAY}" ]; }; do if [ $elapsed -ge $timeout ]; then echo "display server not available after $timeout seconds"; exit 1; fi; sleep 1; elapsed=$((elapsed+1)); done'
 ExecStartPre=/bin/sleep 2
 ExecStartPre=/bin/bash -c 'pkill -u calvin chromium || pkill -u calvin chromium-browser || true'
 ExecStartPre=/bin/sleep 1
@@ -24,6 +29,7 @@ ExecStart=/bin/bash -c 'q=""; \
     [ -n "${CALVIN_KIOSK_HOSTNAME:-}" ] && q="$${q:+$${q}&}khost=${CALVIN_KIOSK_HOSTNAME}"; \
     url="$${CALVIN_BACKEND_URL%%/}/$${q:+?$${q}}"; \
     /usr/bin/chromium \
+    $${CALVIN_CHROMIUM_DISPLAY_FLAGS:-} \
     --kiosk \
     --noerrdialogs \
     --disable-infobars \

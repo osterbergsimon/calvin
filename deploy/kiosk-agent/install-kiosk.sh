@@ -30,6 +30,7 @@ SIGNING_ENV_FILE="${CALVIN_KIOSK_SIGNING_ENV_FILE:-/etc/default/calvin-kiosk-sig
 REBOOT_DELAY="${CALVIN_INSTALL_REBOOT_DELAY:-5}"
 SIGNING_KEY=""
 REBOOT=1
+DISPLAY_STACK=""  # empty = let setup-kiosk.sh decide (env / existing config / auto)
 work=""  # global: the EXIT trap runs after main() returns
 
 log() { printf '[calvin-install] %s\n' "$*"; }
@@ -45,6 +46,9 @@ Options:
   --backend-url <URL>        Calvin server (default: the server this script came from${SERVER_URL:+, $SERVER_URL})
   --signing-key-file <FILE>  File holding the server's kiosk-signing.key (hex)
   --signing-key <HEX>        Same, inline (ends up in shell history; prefer the file)
+  --display-stack <STACK>    x11 (default) or wayland (labwc, experimental).
+                             Re-run with the other value to switch an existing
+                             kiosk in place; both stacks stay installed.
   --no-reboot                Do not reboot when done
   -h, --help                 Show this help
 EOF
@@ -66,6 +70,8 @@ while [ "$#" -gt 0 ]; do
         --signing-key=*) SIGNING_KEY="${1#*=}"; shift ;;
         --signing-key-file) need_value "$1" "$#"; SIGNING_KEY="$(read_key_file "$2")"; shift 2 ;;
         --signing-key-file=*) SIGNING_KEY="$(read_key_file "${1#*=}")"; shift ;;
+        --display-stack) need_value "$1" "$#"; DISPLAY_STACK="$2"; shift 2 ;;
+        --display-stack=*) DISPLAY_STACK="${1#*=}"; shift ;;
         --no-reboot) REBOOT=0; shift ;;
         -h|--help) usage; exit 0 ;;
         *) usage >&2; die "unknown argument: $1" ;;
@@ -75,6 +81,10 @@ done
 SERVER_URL="${SERVER_URL%/}"
 [ -n "$SERVER_URL" ] || die "no server URL; pass --backend-url http://<server>:8000"
 case "$SERVER_URL" in http://*|https://*) ;; *) die "--backend-url must start with http:// or https://" ;; esac
+case "$DISPLAY_STACK" in
+    ""|x11|wayland) ;;
+    *) die "--display-stack must be x11 or wayland (got: $DISPLAY_STACK)" ;;
+esac
 [ "$(id -u)" -eq 0 ] || die "run as root: curl -fsSL $SERVER_URL/api/kiosks/install.sh | sudo bash"
 for cmd in curl python3 sha256sum; do
     command -v "$cmd" >/dev/null 2>&1 || die "$cmd is required but not installed"
@@ -142,11 +152,13 @@ done <<< "$installer_list"
 [ -f "$work/setup-kiosk.sh" ] && [ -f "$work/setup-common.sh" ] \
     || die "server manifest is missing setup-kiosk.sh or setup-common.sh"
 
-log "running setup-kiosk.sh (installs X, Chromium and the Calvin kiosk services)..."
+log "running setup-kiosk.sh (installs the display stack, Chromium and the Calvin kiosk services)..."
 # From $work, so its ./setup-common.sh lookup finds the verified copy. stdin from
 # /dev/null: under `curl | bash` the rest of this script IS stdin, and a package
 # prompt reading it would swallow it.
-(cd "$work" && bash ./setup-kiosk.sh --backend-url "$SERVER_URL") </dev/null
+local setup_args=(--backend-url "$SERVER_URL")
+[ -n "$DISPLAY_STACK" ] && setup_args+=(--display-stack "$DISPLAY_STACK")
+(cd "$work" && bash ./setup-kiosk.sh "${setup_args[@]}") </dev/null
 
 if [ "$REBOOT" = 1 ]; then
     log "done; rebooting into the kiosk in ${REBOOT_DELAY}s (Ctrl-C to cancel)"
