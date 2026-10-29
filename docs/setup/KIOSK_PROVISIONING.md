@@ -43,8 +43,10 @@ sudo bash scripts/bake-kiosk-firstrun.sh \
 ```
 
 Only `--backend-url` and `--boot-dir` are required. Omit `--wifi-*` if the
-Pi is on Ethernet. `--ssh-pubkey` installs a recovery key for the `calvin`
-user. The old `--git-repo`/`--git-branch` flags are gone because nothing is
+Pi is on Ethernet. `--ssh-pubkey` creates a recovery admin user,
+`calvin-admin` (rename with `--admin-user`), with key-only SSH login and
+passwordless sudo; without it the kiosk has no admin login. `calvin`, which runs
+Chromium, gets no SSH key and no sudo. The old `--git-repo`/`--git-branch` flags are gone because nothing is
 fetched from GitHub any more.
 
 Eject the card.
@@ -53,7 +55,9 @@ Eject the card.
 
 Put the card in the Pi and power on. It self-provisions unattended:
 
-1. **Boot 1** sets hostname, wifi and SSH, seeds config and the signing key,
+1. **Boot 1** sets hostname, wifi and SSH, creates the admin user (if a key was
+   baked), turns off the interactive first-user wizard (`userconfig.service`),
+   seeds config and the signing key,
    installs the kiosk installer (`/usr/local/bin/calvin-kiosk-install.sh`),
    deletes `firstrun.sh` from the boot partition (it held the wifi PSK and key),
    and reboots.
@@ -63,8 +67,10 @@ Put the card in the Pi and power on. It self-provisions unattended:
    openbox, Chromium and the Calvin services, and reboots.
 3. **Boot 3** — Chromium opens the dashboard.
 
-First provisioning takes several minutes (package installs). Watch progress
-over SSH if you baked a key: `journalctl -u calvin-kiosk-firstboot -f`.
+First provisioning takes several minutes (package installs). Boot 2 prints its
+progress on the screen (tty1): waiting for the server, installing, or the
+error and that it will retry. Over SSH: `ssh calvin-admin@<kiosk>` then
+`journalctl -u calvin-kiosk-firstboot -f`.
 
 ## After provisioning
 
@@ -104,8 +110,14 @@ from the Calvin admin UI — no SSH, no re-flash.
    `GET /api/kiosks/agent/files/{name}`. The bundle source is the **local
    Calvin server**, not GitHub — no internet access required on the kiosk.
 
-   The bundle is ~6 files: the display-agent script, three systemd units, the
-   updater itself, and the oneshot service unit. No full repo checkout lives
+   The bundle is 6 files: the display-agent script, three systemd units, the
+   updater itself, and the oneshot service unit. The updater only installs these
+   six, each at its fixed path and mode (0755 scripts, 0644 units), and only
+   restarts or enables their units; anything else in a manifest is refused. A
+   new bundle file therefore needs the updater that knows it: when a manifest
+   brings both, the old updater installs the known files and re-runs the new
+   updater for the rest. Units that should be enabled are re-enabled on every
+   run. No full repo checkout lives
    on the kiosk.
 
 4. **Verify, backup, atomic swap, restart.** For each changed file the updater:
@@ -268,7 +280,8 @@ triggered individually. Bulk update is tracked as `calvin-3d1`.
   `systemd.run=/boot/firmware/firstrun.sh`.
 - **Wifi doesn't connect:** check `--wifi-country` was set (regulatory
   domain) and the PSK is correct.
-- **Provisioning failed:** SSH in (if you baked a key) and read
+- **Provisioning failed:** the screen shows the last status. SSH in as the
+  admin user (if you baked a key) and read
   `journalctl -u calvin-kiosk-firstboot`. If the server was unreachable for the
   whole 15-minute wait, the unit fails and systemd retries it every minute
   (`Restart=on-failure`) until the server answers. Fix, then
