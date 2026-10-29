@@ -32,34 +32,32 @@ This shared approach reduces code duplication and makes the scripts more maintai
 **Usage:**
 
 ```bash
-# Standard installation (main branch)
-wget -O- https://raw.githubusercontent.com/osterbergsimon/calvin/main/scripts/setup.sh | sudo bash
+# Standard installation (develop branch)
+wget -O- https://raw.githubusercontent.com/osterbergsimon/calvin/develop/scripts/setup.sh | sudo bash
 
 # Or using curl
-curl -fsSL https://raw.githubusercontent.com/osterbergsimon/calvin/main/scripts/setup.sh | sudo bash
+curl -fsSL https://raw.githubusercontent.com/osterbergsimon/calvin/develop/scripts/setup.sh | sudo bash
 ```
 
-**Using a Different Branch:**
+**Using another branch or a fork:** put the variables *after* `sudo` so they
+reach the script (`sudo` drops your environment, and `VAR=x curl ...` only sets
+them for `curl`):
 
 ```bash
-export GIT_BRANCH=develop
-wget -O- https://raw.githubusercontent.com/osterbergsimon/calvin/main/scripts/setup.sh | sudo -E bash
+curl -fsSL https://raw.githubusercontent.com/<you>/calvin/<branch>/scripts/setup.sh \
+  | sudo GIT_REPO=https://github.com/<you>/calvin.git GIT_BRANCH=<branch> bash
 ```
 
-> **Note:** Use `sudo -E` to preserve environment variables. Without `-E`, `sudo` will not pass `GIT_BRANCH` or `GIT_REPO` to the script, and it will default to the `main` branch.
-> 
-> **Important:** Export the variable first (`export GIT_BRANCH=develop`) rather than setting it inline (`GIT_BRANCH=develop wget ...`), as inline assignments don't propagate through pipes to `sudo`.
-
-**Using a Fork or Custom Repository:**
-
-```bash
-GIT_REPO=https://github.com/yourusername/calvin.git GIT_BRANCH=your-branch \
-  wget -O- https://raw.githubusercontent.com/osterbergsimon/calvin/main/scripts/setup.sh | sudo bash
-```
+The default branch is `develop`. `main` is release-only and cannot be deployed
+(setup uses `develop` instead, also on hosts that still record `main`). Every
+branch runs the `:develop` image; pin another one the same way with
+`CALVIN_IMAGE_TAG=<tag>`.
 
 **What Happens:**
 1. System packages are updated
-2. Kiosk packages, Docker, and Docker Compose are installed
+2. Kiosk packages are installed, plus Docker CE and the compose plugin from
+   download.docker.com (the Debian/Raspberry Pi OS `docker.io` has no compose v2;
+   an existing working `docker compose` is left alone). Any apt failure stops setup.
 3. Repository is cloned/updated to `/home/calvin/calvin`
 4. Compose configuration is installed under `/etc/calvin`
 5. Runtime data directories are created under `/var/lib/calvin`
@@ -89,22 +87,14 @@ After reboot, the dashboard will automatically start and be available at `http:/
 
 ```bash
 # Standard development installation
-wget -O- https://raw.githubusercontent.com/osterbergsimon/calvin/main/scripts/setup.sh | sudo bash -s -- --mode dev
+wget -O- https://raw.githubusercontent.com/osterbergsimon/calvin/develop/scripts/setup.sh | sudo bash -s -- --mode dev
 
 # Or using curl
-curl -fsSL https://raw.githubusercontent.com/osterbergsimon/calvin/main/scripts/setup.sh | sudo bash -s -- --mode dev
+curl -fsSL https://raw.githubusercontent.com/osterbergsimon/calvin/develop/scripts/setup.sh | sudo bash -s -- --mode dev
 ```
 
-**Using a Different Branch:**
-
-```bash
-export GIT_BRANCH=develop
-curl -fsSL https://raw.githubusercontent.com/osterbergsimon/calvin/main/scripts/setup.sh | sudo -E bash -s -- --mode dev
-```
-
-> **Note:** Use `sudo -E` to preserve environment variables. Without `-E`, `sudo` will not pass `GIT_BRANCH` or `GIT_REPO` to the script, and it will default to the `main` branch.
-> 
-> **Important:** Export the variable first (`export GIT_BRANCH=develop`) rather than setting it inline (`GIT_BRANCH=develop curl ...`), as inline assignments don't propagate through pipes to `sudo`.
+**Using another branch or a fork:** as for production, pass the variables
+after `sudo`: `... | sudo GIT_BRANCH=<branch> bash -s -- --mode dev`.
 
 **What Happens:**
 1. Same base setup as production
@@ -198,10 +188,20 @@ All scripts support environment variables for customization:
 | Variable | Description | Default |
 |----------|-------------|---------|
 | `GIT_REPO` | Git repository URL | `https://github.com/osterbergsimon/calvin.git` |
-| `GIT_BRANCH` | Git branch to use | `main` |
+| `GIT_BRANCH` | Git branch to use | `develop` (`main` is release-only and replaced by `develop`) |
 | `CALVIN_DIR` | Installation directory | `/home/calvin/calvin` (Linux) |
-| `CALVIN_USER` | User to run services | `calvin` (Linux) |
+| `CALVIN_DATA_DIR` | Data volume on the host | `/var/lib/calvin` |
+| `CALVIN_IMAGE_TAG` | Pin the runtime image (otherwise `develop`; `:latest` is not published yet; a pin already in `/etc/calvin/.env` is kept) | — |
 | `LOG_FILE` | Log file path | `/var/log/calvin-setup.log` (Linux) |
+
+Pass them after `sudo` (`sudo GIT_BRANCH=x bash setup.sh`). The service user is
+always `calvin`: the systemd units, sudoers rules and kiosk bundle hard-code it,
+so setup refuses a different `CALVIN_USER`.
+
+Baked kiosk cards (`bake-kiosk-firstrun.sh --ssh-pubkey`) get a separate admin
+user for recovery (`calvin-admin` by default, `--admin-user` to rename it):
+key-only SSH login and passwordless sudo. `calvin` itself has no password, no
+sudo, and is not in the `docker` group.
 
 ## Testing the Scripts
 
@@ -225,7 +225,12 @@ npm install -g bats
 ```bash
 cd scripts
 bats tests/
+for t in tests/test_*.sh; do bash "$t" || echo "FAILED: $t"; done
 ```
+
+CI also runs shellcheck on every script and a Docker-CE install smoke test in
+`debian:bookworm` and `debian:trixie` arm64 containers
+(`scripts/ci/pi-os-smoke.sh`).
 
 Or use the Makefile:
 ```bash
@@ -337,16 +342,40 @@ For repository-based usage (most common), the scripts work correctly as they're 
 
 ## Updating After Setup
 
-After initial setup, use the update script:
-
 ```bash
-update-calvin.sh
+sudo update-calvin.sh
 ```
 
-Production installs pull the configured runtime image tag and restart Compose.
+In production mode it:
+
+1. fast-forwards `/home/calvin/calvin` to `origin/<GIT_BRANCH>` (a checkout with
+   local changes or local commits is left as it is, with a warning);
+2. re-installs the host files with `setup.sh --refresh` (compose file, systemd
+   units, helper scripts and sudoers, X/openbox config, display agent, and
+   `update-calvin.sh` itself) — no apt or Docker. They come from a fresh clone of
+   `GIT_REPO`/`GIT_BRANCH` in the root-only `/var/lib/calvin-update`, never from
+   the checkout in calvin's home: that runs as root, and the app user can edit
+   the checkout. Local edits there are not installed as root;
+3. records the running image, pulls the configured tag and restarts Compose;
+4. waits for `http://localhost:$CALVIN_PORT/api/health`. If the new image does
+   not come up (failed restart or health check) it puts back the previous image
+   and the previous `/etc/calvin/docker-compose.yml` and `.env`, restarts on them,
+   and exits with an error. A failed refresh or pull restores the host files and
+   restarts nothing. The state (including `previous_image`) is in
+   `calvin-update-state.json` next to the update log.
+
+Root does that clone, so `GIT_REPO` must be readable without the calvin user's
+credentials (an `https://` URL). Hosts set up before this behaviour existed run
+an older `update-calvin.sh` that does not refresh anything: re-run setup once
+(`curl -fsSL https://raw.githubusercontent.com/osterbergsimon/calvin/develop/scripts/setup.sh | sudo bash`),
+and later updates refresh themselves.
+
 Development installs pull the configured git branch into `/home/calvin/calvin`
-with `--autostash`, then recreate the dev Compose containers so dependency
-changes are picked up.
+with `--autostash`, refresh the host files the same way, then recreate the dev
+Compose containers so dependency changes are picked up.
+
+OS and Chromium security updates are installed by `unattended-upgrades`, which
+setup enables (Debian, Debian-Security and the Raspberry Pi archive).
 
 ### Kiosk Pis (Mode B)
 

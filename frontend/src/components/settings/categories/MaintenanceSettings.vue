@@ -98,7 +98,7 @@ import BackupSettings from "@/components/settings/categories/BackupSettings.vue"
 defineProps({
   config: { type: Object, required: true },
   gitRepoUrl: { type: String, default: "" },
-  gitBranch: { type: String, default: "main" },
+  gitBranch: { type: String, default: "develop" },
 });
 const emit = defineEmits(["update:config", "update:gitRepoUrl", "update:gitBranch"]);
 

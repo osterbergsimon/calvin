@@ -86,7 +86,7 @@ comparison and the security caveats.
 kiosk browser. Easiest to set up. From the Pi:
 
 ```bash
-curl -fsSL https://raw.githubusercontent.com/osterbergsimon/calvin/main/scripts/setup.sh | sudo bash
+curl -fsSL https://raw.githubusercontent.com/osterbergsimon/calvin/develop/scripts/setup.sh | sudo bash
 sudo reboot
 ```
 
@@ -94,8 +94,9 @@ The script installs Docker, the kiosk dependencies, the published
 runtime image, and three systemd units. The dashboard comes up at
 `http://localhost:8000` after reboot.
 
-Use `GIT_BRANCH=develop` (with `sudo -E`) to track the develop branch,
-or `--mode dev` for a hot-reload Pi. Details in
+This installs the `develop` branch (`main` is release-only). Pass
+`GIT_BRANCH=<branch>` after `sudo` (`... | sudo GIT_BRANCH=<branch> bash`) to
+track another one, or `--mode dev` for a hot-reload Pi. Details in
 [SETUP_LINUX.md](SETUP_LINUX.md).
 
 **Mode B — Remote backend + kiosk Pi.** A home server runs the
