@@ -82,6 +82,10 @@ beforeEach(() => {
   // Reset mocks but keep default implementations
   vi.clearAllMocks();
 
+  // The kiosk id (and Settings tab hints) persist in sessionStorage; start each
+  // test from a clean tab so one test's ?kiosk= can't leak into the next.
+  sessionStorage.clear();
+
   // Provide a fresh Pinia instance so components that use stores (e.g.
   // useTouchCapability → useConfigStore) can mount without errors.
   // Tests that need specific store state create their own via setActivePinia().

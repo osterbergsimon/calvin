@@ -4664,6 +4664,26 @@
         ]
       }
     },
+    "/api/system/network": {
+      "get": {
+        "description": "How a phone or a new kiosk can reach this server (first-run setup hand-off).\n\n``public_url`` (the PUBLIC_URL setting) is authoritative when set; otherwise\n``lan_urls`` lists the detected LAN addresses on the port this request used.",
+        "operationId": "get_network_info_api_system_network_get",
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            },
+            "description": "Successful Response"
+          }
+        },
+        "summary": "Get Network Info",
+        "tags": [
+          "system"
+        ]
+      }
+    },
     "/api/system/reboot": {
       "post": {
         "description": "Reboot the Raspberry Pi.",

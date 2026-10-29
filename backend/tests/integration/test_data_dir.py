@@ -108,7 +108,7 @@ def _seed_legacy_local_images(db: Path) -> None:
     with sqlite3.connect(db) as conn:
         conn.execute("UPDATE plugin_types SET enabled = 1 WHERE type_id = 'local'")
         conn.execute(
-            "INSERT INTO plugins (id, type_id, plugin_type, name, enabled, config,"
+            "INSERT OR REPLACE INTO plugins (id, type_id, plugin_type, name, enabled, config,"
             " display_order, created_at, updated_at)"
             " VALUES ('local-images', 'local', 'image', 'Local Images', 1, ?, 0, ?, ?)",
             (json.dumps(LEGACY_LOCAL_CONFIG), now, now),

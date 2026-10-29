@@ -17,6 +17,7 @@ import NotificationSystem from "./NotificationSystem.vue";
 import { showSystemRebootScheduled } from "../utils/systemNotifications";
 import { useSystem } from "../composables/useSystem";
 import { normalizeKeyCode } from "@/utils/keyCode";
+import { configUrl } from "@/utils/kioskId";
 
 const keyboardStore = useKeyboardStore();
 const configStore = useConfigStore();
@@ -135,8 +136,8 @@ const onKeyUp = event => {
 const loadKeyboardConfig = async () => {
   try {
     await keyboardStore.fetchMappings();
-    // Load reboot-combo settings from config API
-    const response = await fetch("/api/config");
+    // Load reboot-combo settings from config API (the kiosk's effective config on a kiosk)
+    const response = await fetch(configUrl());
     if (response.ok) {
       const config = await response.json();
       // Load reboot combo settings

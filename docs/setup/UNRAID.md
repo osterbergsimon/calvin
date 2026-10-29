@@ -30,6 +30,11 @@ at it as kiosk-only displays.
 4. Leave the defaults unless you need to change them:
    - **WebUI Port** `8000`. Change this if port 8000 is already taken.
    - **Appdata** `/mnt/user/appdata/calvin`.
+   - **Public URL**: the address phones and new kiosks should use, for
+     example `http://192.168.1.10:8000` (the Unraid server's LAN IP and the
+     WebUI port). The container can't detect it itself; without it, the
+     "set up from your phone" QR codes and the **Add kiosk** install command
+     show the container's internal IP whenever Calvin is opened via `localhost`.
    - Advanced view: `PUID` `99` and `PGID` `100`. The paths and the
      database URL normally stay as they are; keep the plugin directory
      inside `/var/lib/calvin`.
