@@ -1,5 +1,5 @@
 import { describe, it, expect } from "vitest";
-import { getKioskId, configUrl } from "@/utils/kioskId";
+import { getKioskId, configUrl, captureKioskIdentity } from "@/utils/kioskId";
 
 function setLocation(search) {
   Object.defineProperty(window, "location", {
@@ -10,6 +10,36 @@ function setLocation(search) {
 
 describe("getKioskId", () => {
   it("returns null when no kiosk param is present", () => {
+    setLocation("");
+    expect(getKioskId()).toBeNull();
+  });
+});
+
+describe("kiosk identity survives navigation (F1)", () => {
+  it("keeps the kiosk id after the URL loses its query string", () => {
+    setLocation("?kiosk=kitchen&khost=pi-k");
+    expect(getKioskId()).toBe("kitchen");
+    // Settings → Done pushes "/" without the query string
+    setLocation("");
+    expect(getKioskId()).toBe("kitchen");
+    expect(configUrl()).toBe("/api/kiosks/kitchen/config?khost=pi-k");
+  });
+
+  it("captures the id at boot via captureKioskIdentity", () => {
+    setLocation("?kiosk=hall");
+    captureKioskIdentity();
+    setLocation("");
+    expect(getKioskId()).toBe("hall");
+  });
+
+  it("a new ?kiosk= in the URL replaces the stored id", () => {
+    setLocation("?kiosk=old");
+    getKioskId();
+    setLocation("?kiosk=new");
+    expect(getKioskId()).toBe("new");
+  });
+
+  it("is a plain browser (null) when no id was ever given", () => {
     setLocation("");
     expect(getKioskId()).toBeNull();
   });

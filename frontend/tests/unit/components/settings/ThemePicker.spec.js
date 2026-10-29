@@ -35,4 +35,16 @@ describe("ThemePicker", () => {
     expect(w.find(".theme-picker__popover").exists()).toBe(false); // closes after select
     w.unmount();
   });
+
+  it("names the built-in palette when no theme is selected (F8)", async () => {
+    const w = mount(ThemePicker, { props: { selectedThemeId: null }, global: { stubs } });
+    await flushPromises();
+    expect(w.get(".theme-picker__label").text()).toBe("Calvin default");
+  });
+
+  it("shows the selected theme's name", async () => {
+    const w = mount(ThemePicker, { props: { selectedThemeId: "midnight" }, global: { stubs } });
+    await flushPromises();
+    expect(w.get(".theme-picker__label").text()).toBe("Midnight");
+  });
 });

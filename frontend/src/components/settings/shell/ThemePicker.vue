@@ -55,9 +55,13 @@ const loading = ref(false);
 // placed with fixed viewport coords.
 const { popoverStyle, place, reposition } = usePopoverPlacement();
 
+// No selected theme means Calvin's own palette (light/dark per the Mode below) —
+// name it rather than showing a bare "Theme" on a fresh install (F8).
+const DEFAULT_THEME_LABEL = "Calvin default";
 const selectedThemeName = computed(() => {
-  if (!props.selectedThemeId || themes.value.length === 0) return "Theme";
-  return themes.value.find(t => t.id === props.selectedThemeId)?.name ?? "Theme";
+  if (!props.selectedThemeId) return DEFAULT_THEME_LABEL;
+  if (loading.value && themes.value.length === 0) return "Loading themes…";
+  return themes.value.find(t => t.id === props.selectedThemeId)?.name ?? DEFAULT_THEME_LABEL;
 });
 
 const loadThemes = async () => {

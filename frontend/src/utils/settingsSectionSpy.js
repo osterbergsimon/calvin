@@ -10,7 +10,7 @@
  * actually scrollable rather than assuming the pane.
  *
  * @param {{container: ?{scrollHeight:number,clientHeight:number,scrollTop:number,getBoundingClientRect:Function}, win: {innerHeight:number,scrollY:number}, doc: {scrollHeight:number}}} sources
- * @returns {{top:number, height:number, atBottom:boolean}}
+ * @returns {{top:number, height:number, atBottom:boolean, atTop:boolean}}
  */
 export function resolveScrollView({ container, win, doc }) {
   const paneScrolls = !!container && container.scrollHeight - container.clientHeight > 1;
@@ -20,6 +20,7 @@ export function resolveScrollView({ container, win, doc }) {
       top: container.getBoundingClientRect().top,
       height: container.clientHeight,
       atBottom: container.scrollTop + container.clientHeight >= container.scrollHeight - 4,
+      atTop: container.scrollTop <= 4,
     };
   }
 
@@ -29,6 +30,7 @@ export function resolveScrollView({ container, win, doc }) {
     top: 0,
     height: win.innerHeight,
     atBottom: windowScrolls && win.scrollY + win.innerHeight >= doc.scrollHeight - 4,
+    atTop: !windowScrolls || win.scrollY <= 4,
   };
 }
 
@@ -36,11 +38,16 @@ export function resolveScrollView({ container, win, doc }) {
  * Pick the active section index from eyebrow positions and the viewport.
  *
  * @param {number[]} eyebrowTops viewport-relative top (px) of each eyebrow, in DOM order
- * @param {{top:number, height:number, atBottom:boolean}} view
+ * @param {{top:number, height:number, atBottom:boolean, atTop?:boolean}} view
  * @returns {number} index into eyebrowTops, or -1 when there are no eyebrows
  */
-export function pickActiveEyebrow(eyebrowTops, { top, height, atBottom }) {
+export function pickActiveEyebrow(eyebrowTops, { top, height, atBottom, atTop = false }) {
   if (!eyebrowTops.length) return -1;
+
+  // Unscrolled, the first section is what the user is looking at — even when it
+  // is short enough that the next eyebrow already sits above the midpoint (the
+  // header used to read "Screens & regions" on opening Display; F8).
+  if (atTop) return 0;
 
   // At the bottom, trailing short sections can't scroll any higher — pin the
   // last so the final section is always reachable. (Only true when the view
