@@ -33,6 +33,7 @@
     "axios": "^1.6.0",
     "pinia": "^2.1.7",
     "qrcode": "^1.5.4",
+    "simple-keyboard": "3.8.194",
     "vue": "^3.4.0",
     "vue-router": "^4.2.5",
     "vuedraggable": "^4.1.0"
