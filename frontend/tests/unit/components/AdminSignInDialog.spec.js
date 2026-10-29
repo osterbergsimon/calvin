@@ -71,6 +71,26 @@ describe("AdminSignInDialog", () => {
     );
   });
 
+  it("offers a Show toggle that reveals the password (mock B1)", async () => {
+    const auth = useAuthStore();
+    auth.requestSignIn({ action: actionForUrl("/api/system/reboot") });
+
+    const wrapper = mountDialog();
+    const input = wrapper.get("#admin-signin-dialog-password");
+    const toggle = wrapper.get('button[aria-controls="admin-signin-dialog-password"]');
+    await input.setValue("correct horse");
+
+    expect(toggle.text()).toBe("Show");
+    expect(toggle.attributes("aria-label")).toBe("Show password");
+    expect(input.attributes("type")).toBe("password");
+
+    await toggle.trigger("click");
+
+    expect(input.attributes("type")).toBe("text");
+    expect(toggle.text()).toBe("Hide");
+    expect(toggle.attributes("aria-label")).toBe("Hide password");
+  });
+
   it("shows the wrong-password error and keeps the value", async () => {
     const auth = useAuthStore();
     auth.requestSignIn({ action: actionForUrl("/api/system/update") });
