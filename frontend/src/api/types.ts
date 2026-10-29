@@ -358,6 +358,9 @@ export interface paths {
     /**
      * Health Check
      * @description Basic health check endpoint.
+     *
+     *     Contains a cheap database query so a container health check (and the kiosk
+     *     boot wait) sees a broken database instead of a constant "healthy" (audit D14).
      */
     get: operations["health_check_api_health_get"];
     put?: never;
