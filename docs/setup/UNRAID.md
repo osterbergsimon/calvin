@@ -15,22 +15,23 @@ at it as kiosk-only displays.
 
 ## Install
 
-1. In the Unraid web UI, open **Docker** and scroll to the bottom.
-2. Fetch the template once from a terminal on the Unraid box
-   (**Terminal** icon in the top bar):
+1. Fetch the template once from a terminal on the Unraid box
+   (**Terminal** icon in the top bar of the web UI):
 
    ```bash
    wget -O /boot/config/plugins/dockerMan/templates-user/my-Calvin.xml \
      https://raw.githubusercontent.com/osterbergsimon/calvin/develop/deploy/unraid/calvin.xml
    ```
 
-3. Back in **Docker**, click **Add Container**, then pick **Calvin** from the
+2. Open the **Docker** tab.
+3. Click **Add Container** at the bottom, then pick **Calvin** from the
    **Template** dropdown (under *User templates*).
 4. Leave the defaults unless you need to change them:
    - **WebUI Port** `8000`. Change this if port 8000 is already taken.
    - **Appdata** `/mnt/user/appdata/calvin`.
    - Advanced view: `PUID` `99` and `PGID` `100`. The paths and the
-     database URL normally stay as they are.
+     database URL normally stay as they are; keep the plugin directory
+     inside `/var/lib/calvin`.
 5. Click **Apply**. Unraid pulls the image and starts the container.
 
 Open Calvin at:

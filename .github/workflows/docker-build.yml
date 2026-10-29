@@ -102,12 +102,15 @@ jobs:
           cache-to: type=gha,mode=max
 
       - name: Summary
+        env:
+          TAGS: ${{ steps.meta.outputs.tags }}
+          DIGEST: ${{ steps.build.outputs.digest }}
         run: |
           {
             echo "### Calvin image"
-            echo "Published: ${{ env.PUBLISH }}"
+            echo "Published: $PUBLISH"
             echo '```'
-            echo "${{ steps.meta.outputs.tags }}"
+            echo "$TAGS"
             echo '```'
-            echo "Digest: \`${{ steps.build.outputs.digest }}\`"
+            echo "Digest: \`$DIGEST\`"
           } >> "$GITHUB_STEP_SUMMARY"
