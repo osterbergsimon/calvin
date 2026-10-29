@@ -31,24 +31,8 @@ def _route_index(app) -> set[tuple[str, str]]:
 
 
 def _policy_route_index() -> set[tuple[str, str]]:
-    """Templates the policy tables may name.
-
-    While Task 3 runs before Task 4 the auth router does not exist yet; once it
-    does, its routes are checked like every other route.
-    """
-    index = _route_index(main_app)
-    try:
-        from app.api.routes import auth
-    except ImportError:
-        # Task 3 precedes Task 4: the auth router does not exist yet, so its
-        # allowlist entries cannot be checked until it lands.
-        index.update(entry for entry in PUBLIC_WRITES if entry[1].startswith("/api/auth/"))
-        return index
-    for route in auth.router.routes:
-        if isinstance(route, APIRoute):
-            for method in route.methods:
-                index.add((method.upper(), f"/api{route.path}"))
-    return index
+    """Templates the policy tables may name."""
+    return _route_index(main_app)
 
 
 def _error_code(response) -> str | None:

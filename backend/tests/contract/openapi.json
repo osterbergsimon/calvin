@@ -353,6 +353,24 @@
         "title": "CalendarSourcesResponse",
         "type": "object"
       },
+      "ChangePasswordBody": {
+        "properties": {
+          "current": {
+            "title": "Current",
+            "type": "string"
+          },
+          "new": {
+            "title": "New",
+            "type": "string"
+          }
+        },
+        "required": [
+          "current",
+          "new"
+        ],
+        "title": "ChangePasswordBody",
+        "type": "object"
+      },
       "ConfigUpdate": {
         "additionalProperties": true,
         "description": "Configuration update model.",
@@ -938,6 +956,19 @@
         "title": "OverridesBody",
         "type": "object"
       },
+      "PasswordBody": {
+        "properties": {
+          "password": {
+            "title": "Password",
+            "type": "string"
+          }
+        },
+        "required": [
+          "password"
+        ],
+        "title": "PasswordBody",
+        "type": "object"
+      },
       "PluginDeleteResponse": {
         "properties": {
           "message": {
@@ -1329,6 +1360,166 @@
           }
         },
         "summary": "Root"
+      }
+    },
+    "/api/auth/login": {
+      "post": {
+        "description": "Verify the password; only wrong passwords count toward the rate limit.",
+        "operationId": "auth_login_api_auth_login_post",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/PasswordBody"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Auth Login",
+        "tags": [
+          "auth"
+        ]
+      }
+    },
+    "/api/auth/logout": {
+      "post": {
+        "description": "Clear the cookie. The stateless cookie needs no server-side session.",
+        "operationId": "auth_logout_api_auth_logout_post",
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            },
+            "description": "Successful Response"
+          }
+        },
+        "summary": "Auth Logout",
+        "tags": [
+          "auth"
+        ]
+      }
+    },
+    "/api/auth/password": {
+      "post": {
+        "description": "Change the password; the generation bump signs every other session out.",
+        "operationId": "auth_change_password_api_auth_password_post",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ChangePasswordBody"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Auth Change Password",
+        "tags": [
+          "auth"
+        ]
+      }
+    },
+    "/api/auth/setup": {
+      "post": {
+        "description": "First-run claim: only while no password is configured.",
+        "operationId": "auth_setup_api_auth_setup_post",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/PasswordBody"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Auth Setup",
+        "tags": [
+          "auth"
+        ]
+      }
+    },
+    "/api/auth/status": {
+      "get": {
+        "description": "Whether an admin password exists and whether this client has a session.",
+        "operationId": "auth_status_api_auth_status_get",
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            },
+            "description": "Successful Response"
+          }
+        },
+        "summary": "Auth Status",
+        "tags": [
+          "auth"
+        ]
       }
     },
     "/api/backup/export": {

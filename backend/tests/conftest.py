@@ -221,7 +221,7 @@ def test_client(
     import os
 
     import app.config
-    from app.security.admin_auth import COOKIE_NAME, get_admin_store
+    from app.security.admin_auth import get_admin_store
 
     original_admin_auth_path = app.config.settings.admin_auth_path
     app.config.settings.admin_auth_path = tmp_path / "admin-auth.json"
@@ -353,7 +353,8 @@ def test_client(
 
     with TestClient(test_app) as client:
         if request.node.get_closest_marker("no_admin_login") is None:
-            client.cookies.set(COOKIE_NAME, admin_store.issue_cookie())
+            response = client.post("/api/auth/login", json={"password": "test-admin-password"})
+            assert response.status_code == 200, response.text
         yield client
 
     # Cleanup: unregister plugins so the singleton plugin_manager doesn't

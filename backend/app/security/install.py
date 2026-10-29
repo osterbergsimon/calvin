@@ -25,4 +25,7 @@ def apply_startup_admin_password() -> None:
 
 def install_security(app: FastAPI) -> None:
     """Install the admin-auth pieces on ``app``."""
-    # Auth router (Task 4) and Host/Origin middleware (Task 5) attach here.
+    from app.api.routes.auth import router as auth_router
+
+    app.include_router(auth_router, prefix="/api", tags=["auth"])
+    # Host/Origin middleware is added in Task 5.
