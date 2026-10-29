@@ -141,17 +141,10 @@ from app.services.scheduler import calendar_scheduler  # noqa: E402
 
 async def _initialize_database():
     """Initialize database and run migrations."""
-    from pathlib import Path
-
     from app.database import database
     from app.utils.db_init import initialize_database
 
-    # Extract database path from settings
-    db_path_str = settings.database_url.replace("sqlite:///", "")
-    db_path = Path(db_path_str) if db_path_str.startswith("/") else Path(db_path_str).resolve()
-
-    # Use the unified initialization function
-    await initialize_database(db_path, database=database, run_migrations=True)
+    await initialize_database(settings.database_path, database=database, run_migrations=True)
     logger.info("Database initialized and migrations completed")
 
 
@@ -193,17 +186,15 @@ async def _initialize_plugins():
     await plugin_registry.load_plugins_from_db()
     logger.info("Loaded plugins from database")
 
-    # Auto-create default instances for image plugins if enabled and no instance exists
-    # Local images plugin
+    # Auto-create default instances for image plugins if enabled and no instance exists.
+    # Local images store under settings.image_dir (IMAGE_DIR / data dir), so the
+    # instance config carries no path of its own.
     await _create_default_plugin_instance(
         plugin_registry,
         type_id="local",
         plugin_id="local-images",
         name="Local Images",
-        config={
-            "image_dir": "./data/images",
-            "thumbnail_dir": "./data/images/thumbnails",
-        },
+        config={},
     )
 
 

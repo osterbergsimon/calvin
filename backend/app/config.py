@@ -3,8 +3,29 @@
 from pathlib import Path
 
 from loguru import logger
-from pydantic import AliasChoices, Field
+from pydantic import AliasChoices, Field, model_validator
 from pydantic_settings import BaseSettings, SettingsConfigDict
+
+# backend/ — where alembic.ini, the shipped built-in themes and (by default)
+# the data dir live. Derived from this file, never from the working dir.
+BACKEND_DIR = Path(__file__).resolve().parent.parent
+
+# Path settings that default to <data_dir>/<default> unless set explicitly.
+_DATA_PATHS = (
+    "log_dir",
+    "image_dir",
+    "image_cache_dir",
+    "plugins_dir",
+    "themes_dir",
+    "kiosk_signing_key_path",
+    "backup_dir",
+)
+
+
+def resolve_path(path: Path) -> Path:
+    """Absolute path; relative ones are taken from the backend dir, not the cwd."""
+    path = Path(path).expanduser()
+    return path if path.is_absolute() else (BACKEND_DIR / path).resolve()
 
 
 class Settings(BaseSettings):
@@ -18,9 +39,20 @@ class Settings(BaseSettings):
     api_host: str = "0.0.0.0"  # nosec B104 - intentional: Pi serves the LAN
     api_port: int = 8000
 
-    # Database
-    # Use absolute path to avoid path resolution issues
-    database_url: str = "sqlite:///./data/db/calvin.db"
+    # Data directory: the root of everything Calvin writes (DB, images,
+    # plugins, themes, caches, logs, kiosk signing key, backups). Read from
+    # CALVIN_DATA_DIR; the default is backend/data of this checkout, so a
+    # dev or bare-metal install never depends on the working directory.
+    # Each path below can still be overridden on its own (DATABASE_URL,
+    # IMAGE_DIR, PLUGIN_DIR, ...); unset ones derive from data_dir. Relative
+    # values resolve against the backend dir (the historical working dir).
+    data_dir: Path = Field(
+        default=BACKEND_DIR / "data",
+        validation_alias=AliasChoices("calvin_data_dir", "data_dir"),
+    )
+
+    # Database (default: sqlite:///<data_dir>/db/calvin.db)
+    database_url: str = ""
 
     @property
     def database_path(self) -> Path:
@@ -28,16 +60,7 @@ class Settings(BaseSettings):
         db_path_str = self.database_url.replace("sqlite:///", "").replace(
             "sqlite+aiosqlite:///", ""
         )
-        # Remove leading ./ if present
-        if db_path_str.startswith("./"):
-            db_path_str = db_path_str[2:]
-        # If path starts with /, it's already absolute
-        if db_path_str.startswith("/"):
-            return Path(db_path_str)
-        # Otherwise resolve relative to backend directory
-        # Find backend directory (where this config file is located)
-        backend_dir = Path(__file__).parent.parent
-        return (backend_dir / db_path_str).resolve()
+        return resolve_path(Path(db_path_str))
 
     @property
     def database_url_absolute(self) -> str:
@@ -46,11 +69,12 @@ class Settings(BaseSettings):
 
     # Logging
     log_level: str = "INFO"
-    log_dir: Path = Path("./logs")
+    log_dir: Path = Path("logs")
 
     # Image Storage
-    image_dir: Path = Path("./data/images")
-    image_cache_dir: Path = Path("./data/cache/images")
+    image_dir: Path = Path("images")
+    # Remote image bytes cache (app.services.remote_image_cache)
+    image_cache_dir: Path = Path("image_cache")
 
     # Plugin Storage.
     # Deploy configs (docker compose, deploy/calvin.env.example) set the
@@ -59,9 +83,12 @@ class Settings(BaseSettings):
     # installs fall back to ./data/plugins inside the bind-mounted repo,
     # creating root-owned dirs that break a host-run backend. (calvin-0ds)
     plugins_dir: Path = Field(
-        default=Path("./data/plugins"),
+        default=Path("plugins"),
         validation_alias=AliasChoices("plugins_dir", "plugin_dir"),
     )
+
+    # Installed (uploaded) themes. Built-in themes ship with the code.
+    themes_dir: Path = Path("themes")
 
     # Photo Frame Mode
     photo_frame_enabled: bool = False
@@ -87,14 +114,31 @@ class Settings(BaseSettings):
     update_script_path: Path = Path("/usr/local/bin/update-calvin.sh")
     repo_dir: Path = Path("/home/calvin/calvin")
     system_path: str = "/home/calvin/.local/bin:/usr/local/bin:/usr/bin:/bin"
-    kiosk_signing_key_path: Path = Path("./data/kiosk-signing.key")
+    kiosk_signing_key_path: Path = Path("kiosk-signing.key")
     # Where the kiosk bundle + installer scripts live (deploy/, scripts/ layout).
     # Unset = repo_dir (a Pi/source checkout); the Docker image sets it explicitly.
     kiosk_bundle_dir: Path | None = None
 
-    # Backups (calvin-8gx). Unset: $CALVIN_DATA_DIR/backups, else next to the
-    # DB's data dir (see app.services.backup.store.backup_dir).
-    backup_dir: Path | None = None
+    # Backups (calvin-8gx)
+    backup_dir: Path = Path("backups")
+
+    @model_validator(mode="after")
+    def _derive_paths(self) -> "Settings":
+        """Anchor unset paths under data_dir and make every path absolute."""
+        self.data_dir = resolve_path(self.data_dir)
+        defaults = type(self).model_fields
+        for name in _DATA_PATHS:
+            value = getattr(self, name)
+            # An empty env value (BACKUP_DIR=) parses as "." and counts as unset.
+            if name not in self.model_fields_set or value == Path("."):
+                setattr(self, name, self.data_dir / defaults[name].default)
+            else:
+                setattr(self, name, resolve_path(value))
+        if not self.database_url:
+            self.database_url = f"sqlite:///{self.data_dir / 'db' / 'calvin.db'}"
+        elif self.database_url.startswith(("sqlite:///", "sqlite+aiosqlite:///")):
+            self.database_url = self.database_url_absolute
+        return self
 
     @property
     def is_dev_mode(self) -> bool:
@@ -137,6 +181,7 @@ class Settings(BaseSettings):
         self.image_dir.mkdir(parents=True, exist_ok=True)
         self.image_cache_dir.mkdir(parents=True, exist_ok=True)
         self.plugins_dir.mkdir(parents=True, exist_ok=True)
+        self.themes_dir.mkdir(parents=True, exist_ok=True)
         # Extract database path and ensure directory exists
         # Use the database_path property to get absolute path
         db_path = self.database_path

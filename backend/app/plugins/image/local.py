@@ -8,16 +8,21 @@ from typing import Any
 from loguru import logger
 from PIL import Image, ImageOps
 
+from app.config import resolve_path, settings
 from app.plugins.definitions import PluginMetadata
 from app.plugins.protocols import ImagePlugin
 
 
 def _default_image_dir() -> Path:
-    """Resolve the image directory: IMAGE_DIR env var or ./data/images."""
+    """Resolve the image directory: IMAGE_DIR env var, else settings.image_dir.
+
+    The env var is re-read so a change made after startup (tests do this)
+    still applies; relative values resolve like every other path setting.
+    """
     image_dir_str = os.getenv("IMAGE_DIR")
     if image_dir_str:
-        return Path(image_dir_str).resolve()
-    return Path("./data/images").resolve()
+        return resolve_path(Path(image_dir_str))
+    return settings.image_dir
 
 
 class LocalImagePlugin(ImagePlugin):
@@ -26,7 +31,7 @@ class LocalImagePlugin(ImagePlugin):
     metadata = PluginMetadata(
         type_id="local",
         name="Local Images",
-        description="Upload and store images on the server. Images are stored in ./data/images",
+        description="Upload and store images on the server. Images are stored in Calvin's data directory",
         default_instance_name="Local Images",
         supports_multiple_instances=False,
         fixed_instance_id="local-images",
@@ -76,20 +81,16 @@ class LocalImagePlugin(ImagePlugin):
         """
         await super().configure(config)
 
-        # IMAGE_DIR environment variable takes precedence when set
-        current_image_dir = os.getenv("IMAGE_DIR")
-        if current_image_dir:
-            new_image_dir = Path(current_image_dir).resolve()
-            if self.image_dir.resolve() != new_image_dir:
-                logger.info(
-                    f"[Local Images] IMAGE_DIR changed from {self.image_dir} "
-                    f"to {new_image_dir}, updating plugin"
-                )
-                self._set_image_dir(new_image_dir)
-
-        image_dir_str = str(self.config.get("image_dir") or "")
-        if image_dir_str.strip():
-            self._set_image_dir(Path(image_dir_str))
+        # The IMAGE_DIR / data-dir setting always decides where images live.
+        # Older installs stored image_dir/thumbnail_dir (a cwd-relative
+        # "./data/images") in this instance's config; those keys are ignored.
+        new_image_dir = _default_image_dir()
+        if self.image_dir != new_image_dir:
+            logger.info(
+                f"[Local Images] image dir changed from {self.image_dir} "
+                f"to {new_image_dir}, updating plugin"
+            )
+            self._set_image_dir(new_image_dir)
 
     async def get_images(self) -> list[dict[str, Any]]:
         """

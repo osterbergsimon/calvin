@@ -12,16 +12,17 @@ from pathlib import Path
 import httpx
 from loguru import logger
 
-_CACHE_DIR = Path("data/image_cache")
+from app.config import settings
+
 _DEFAULT_TTL_DAYS = 7
 _STALE_SERVE_STATUS_CODES = {429, 500, 502, 503, 504}
 
 
 class RemoteImageCache:
-    def __init__(self, cache_dir: Path = _CACHE_DIR, ttl_days: int = _DEFAULT_TTL_DAYS):
-        self.cache_dir = cache_dir
+    def __init__(self, cache_dir: Path | None = None, ttl_days: int = _DEFAULT_TTL_DAYS):
+        self.cache_dir = cache_dir or settings.image_cache_dir
         self.ttl_days = ttl_days
-        cache_dir.mkdir(parents=True, exist_ok=True)
+        self.cache_dir.mkdir(parents=True, exist_ok=True)
 
     def _cache_path(self, url: str) -> Path:
         url_hash = hashlib.sha256(url.encode()).hexdigest()

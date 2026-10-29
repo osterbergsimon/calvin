@@ -53,6 +53,8 @@ A plugin directory:
 
 **Logging:** `loguru` on the backend (via `InterceptHandler` — don't use stdlib `logging` directly). `logDebug`/`logError` from [utils/logger.js](frontend/src/utils/logger.js) on the frontend.
 
+**Writable paths:** take them from `settings` (`data_dir`, `image_dir`, `plugins_dir`, `themes_dir`, …), which all derive from `CALVIN_DATA_DIR` — never a relative `Path("data/...")`, which depends on the working directory. Shipped files resolve from `app.config.BACKEND_DIR`. See [docs/configuration/DATA_DIR.md](docs/configuration/DATA_DIR.md).
+
 **Database writes:** wrap with `retry_on_db_locked` — SQLite locks under concurrent plugin ops. Always `await initialize_database()` before loading plugins.
 
 **Adding a feature to an existing plugin:** extend `instance_config_schema` → the form updates itself → read the new key from `self.config` in the plugin. No frontend form edits needed for plain inputs.
