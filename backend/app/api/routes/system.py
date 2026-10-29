@@ -204,7 +204,7 @@ def _primary_ip() -> str | None:
     sock = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
     try:
         sock.connect(("10.255.255.255", 1))
-        return sock.getsockname()[0]
+        return str(sock.getsockname()[0])
     except OSError:
         return None
     finally:

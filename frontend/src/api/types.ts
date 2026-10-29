@@ -1504,6 +1504,29 @@ export interface paths {
     patch?: never;
     trace?: never;
   };
+  "/api/system/network": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    /**
+     * Get Network Info
+     * @description How a phone or a new kiosk can reach this server (first-run setup hand-off).
+     *
+     *     ``public_url`` (the PUBLIC_URL setting) is authoritative when set; otherwise
+     *     ``lan_urls`` lists the detected LAN addresses on the port this request used.
+     */
+    get: operations["get_network_info_api_system_network_get"];
+    put?: never;
+    post?: never;
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
   "/api/system/reboot": {
     parameters: {
       query?: never;
@@ -4271,6 +4294,26 @@ export interface operations {
     };
   };
   configure_display_timeout_api_system_display_timeout_configure_post: {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    requestBody?: never;
+    responses: {
+      /** @description Successful Response */
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": unknown;
+        };
+      };
+    };
+  };
+  get_network_info_api_system_network_get: {
     parameters: {
       query?: never;
       header?: never;
