@@ -1,26 +1,25 @@
 /** Tests for calendar store. */
 
-import { describe, it, expect, beforeEach, vi } from "vitest";
+import { describe, it, expect, beforeEach, afterEach, vi } from "vitest";
 import { setActivePinia, createPinia } from "pinia";
 import { useCalendarStore } from "@/stores/calendar";
 import { useConnectionStore } from "@/stores/connection";
-import axios from "axios";
+import api from "@/services/api";
 
-// Mock axios
-vi.mock("axios");
+vi.mock("@/services/api", () => ({
+  default: { get: vi.fn(), post: vi.fn(), put: vi.fn(), delete: vi.fn() },
+}));
 
 // Mock connection store
 vi.mock("@/stores/connection", () => ({
   useConnectionStore: vi.fn(),
 }));
 
-// Mock cache utilities
-vi.mock("@/utils/cache", () => ({
-  getCachedData: vi.fn(),
-  setCachedData: vi.fn(),
-}));
-
+// The real localStorage-backed cache, cleared before every test.
 import { getCachedData, setCachedData } from "@/utils/cache";
+
+const eventsCacheKey = (start, end) =>
+  `calendar_events___all___${start.toISOString()}_${end.toISOString()}`;
 
 describe("Calendar Store", () => {
   let mockConnectionStore;
@@ -29,6 +28,7 @@ describe("Calendar Store", () => {
     // Create a fresh pinia instance for each test
     setActivePinia(createPinia());
     vi.clearAllMocks();
+    localStorage.clear();
 
     // Mock connection store
     mockConnectionStore = {
@@ -62,17 +62,17 @@ describe("Calendar Store", () => {
         ],
       };
 
-      axios.get.mockResolvedValue({ data: mockSources });
+      api.get.mockResolvedValue({ data: mockSources });
       mockConnectionStore.isFullyOnline.mockReturnValue(true);
 
       const store = useCalendarStore();
       await store.fetchSources();
 
-      expect(axios.get).toHaveBeenCalledWith("/api/calendar/sources");
+      expect(api.get).toHaveBeenCalledWith("/calendar/sources");
       expect(store.sources).toEqual(mockSources.sources);
       expect(store.loading).toBe(false);
       expect(store.error).toBe(null);
-      expect(setCachedData).toHaveBeenCalledWith("calendar_sources", mockSources);
+      expect(getCachedData("calendar_sources")).toEqual(mockSources);
     });
 
     it("should use cached sources when offline", async () => {
@@ -81,12 +81,12 @@ describe("Calendar Store", () => {
       };
 
       mockConnectionStore.isFullyOnline.mockReturnValue(false);
-      getCachedData.mockReturnValue(mockCachedSources);
+      setCachedData("calendar_sources", mockCachedSources);
 
       const store = useCalendarStore();
       await store.fetchSources();
 
-      expect(axios.get).not.toHaveBeenCalled();
+      expect(api.get).not.toHaveBeenCalled();
       expect(store.sources).toEqual(mockCachedSources.sources);
       expect(store.loading).toBe(false);
     });
@@ -96,9 +96,9 @@ describe("Calendar Store", () => {
         sources: [{ id: "1", name: "Cached Calendar", color: "#000000" }],
       };
 
-      axios.get.mockRejectedValue(new Error("Network error"));
+      api.get.mockRejectedValue(new Error("Network error"));
       mockConnectionStore.isFullyOnline.mockReturnValue(true);
-      getCachedData.mockReturnValue(mockCachedSources);
+      setCachedData("calendar_sources", mockCachedSources);
 
       const store = useCalendarStore();
       await store.fetchSources();
@@ -109,9 +109,8 @@ describe("Calendar Store", () => {
 
     it("should handle API errors when no cache available", async () => {
       const error = new Error("Network error");
-      axios.get.mockRejectedValue(error);
+      api.get.mockRejectedValue(error);
       mockConnectionStore.isFullyOnline.mockReturnValue(true);
-      getCachedData.mockReturnValue(null);
 
       const store = useCalendarStore();
 
@@ -134,11 +133,11 @@ describe("Calendar Store", () => {
         name: "Updated Source",
         color: "#ff0000",
       };
-      axios.put.mockResolvedValue({ data: updatedSource });
+      api.put.mockResolvedValue({ data: updatedSource });
 
       const result = await store.updateSource("1", { name: "Updated Source" });
 
-      expect(axios.put).toHaveBeenCalledWith("/api/calendar/sources/1", {
+      expect(api.put).toHaveBeenCalledWith("/calendar/sources/1", {
         name: "Updated Source",
       });
       expect(store.sources[0]).toEqual(updatedSource);
@@ -150,18 +149,18 @@ describe("Calendar Store", () => {
       store.sources = [{ id: "1", name: "Source 1", color: "#000000" }];
 
       const updatedSource = { id: "1", name: "Source 1", color: "#ff0000" };
-      axios.put.mockResolvedValue({ data: updatedSource });
+      api.put.mockResolvedValue({ data: updatedSource });
 
       await store.updateSource("1", { color: "#ff0000" });
 
-      expect(setCachedData).toHaveBeenCalledWith("calendar_sources", {
+      expect(getCachedData("calendar_sources")).toEqual({
         sources: [updatedSource],
       });
     });
 
     it("should handle errors when updating source", async () => {
       const error = new Error("Update failed");
-      axios.put.mockRejectedValue(error);
+      api.put.mockRejectedValue(error);
 
       const store = useCalendarStore();
 
@@ -233,13 +232,13 @@ describe("Calendar Store", () => {
         ],
       };
 
-      axios.get.mockResolvedValue({ data: mockEvents });
+      api.get.mockResolvedValue({ data: mockEvents });
       mockConnectionStore.isFullyOnline.mockReturnValue(true);
 
       const store = useCalendarStore();
       await store.fetchEvents(startDate, endDate);
 
-      expect(axios.get).toHaveBeenCalledWith("/api/calendar/events", {
+      expect(api.get).toHaveBeenCalledWith("/calendar/events", {
         params: {
           start_date: startDate.toISOString(),
           end_date: endDate.toISOString(),
@@ -255,13 +254,13 @@ describe("Calendar Store", () => {
       const endDate = new Date("2024-01-31");
       const mockEvents = { events: [] };
 
-      axios.get.mockResolvedValue({ data: mockEvents });
+      api.get.mockResolvedValue({ data: mockEvents });
       mockConnectionStore.isFullyOnline.mockReturnValue(true);
 
       const store = useCalendarStore();
       await store.fetchEvents(startDate, endDate, true);
 
-      expect(axios.get).toHaveBeenCalledWith("/api/calendar/events", {
+      expect(api.get).toHaveBeenCalledWith("/calendar/events", {
         params: {
           start_date: startDate.toISOString(),
           end_date: endDate.toISOString(),
@@ -275,13 +274,13 @@ describe("Calendar Store", () => {
       const endDate = new Date("2024-01-31");
       const mockEvents = { events: [] };
 
-      axios.get.mockResolvedValue({ data: mockEvents });
+      api.get.mockResolvedValue({ data: mockEvents });
       mockConnectionStore.isFullyOnline.mockReturnValue(true);
 
       const store = useCalendarStore();
       await store.fetchEvents(startDate, endDate, false, false, ["family", "personal"]);
 
-      expect(axios.get).toHaveBeenCalledWith("/api/calendar/events", {
+      expect(api.get).toHaveBeenCalledWith("/calendar/events", {
         params: {
           start_date: startDate.toISOString(),
           end_date: endDate.toISOString(),
@@ -299,12 +298,12 @@ describe("Calendar Store", () => {
       };
 
       mockConnectionStore.isFullyOnline.mockReturnValue(false);
-      getCachedData.mockReturnValue(mockCachedEvents);
+      setCachedData(eventsCacheKey(startDate, endDate), mockCachedEvents);
 
       const store = useCalendarStore();
       await store.fetchEvents(startDate, endDate);
 
-      expect(axios.get).not.toHaveBeenCalled();
+      expect(api.get).not.toHaveBeenCalled();
       expect(store.events).toEqual(mockCachedEvents.events);
       expect(store.loading).toBe(false);
     });
@@ -314,15 +313,77 @@ describe("Calendar Store", () => {
       const endDate = new Date("2024-01-31");
       const error = new Error("Network error");
 
-      axios.get.mockRejectedValue(error);
+      api.get.mockRejectedValue(error);
       mockConnectionStore.isFullyOnline.mockReturnValue(true);
-      getCachedData.mockReturnValue(null);
 
       const store = useCalendarStore();
 
       await expect(store.fetchEvents(startDate, endDate)).rejects.toThrow("Network error");
       expect(store.error).toBe("Network error");
       expect(store.loading).toBe(false);
+    });
+  });
+
+  describe("offline cache (audit R7)", () => {
+    const startDate = new Date("2024-01-01");
+    const endDate = new Date("2024-01-31");
+    const cachedEvents = { events: [{ id: "1", title: "Cached", start: "2024-01-15T10:00:00Z" }] };
+
+    afterEach(() => {
+      vi.useRealTimers();
+    });
+
+    const seedExpired = () => {
+      vi.useFakeTimers();
+      setCachedData(eventsCacheKey(startDate, endDate), cachedEvents);
+      // Well past the 30 minute TTL.
+      vi.setSystemTime(Date.now() + 6 * 60 * 60 * 1000);
+    };
+
+    it("serves expired events flagged stale when offline, instead of nothing", async () => {
+      seedExpired();
+      mockConnectionStore.isFullyOnline.mockReturnValue(false);
+
+      const store = useCalendarStore();
+      await store.fetchEvents(startDate, endDate);
+
+      expect(api.get).not.toHaveBeenCalled();
+      expect(store.events).toEqual(cachedEvents.events);
+      expect(store.stale).toBe(true);
+      // Reading an expired entry doesn't delete it.
+      expect(getCachedData(eventsCacheKey(startDate, endDate), 1, { allowStale: true })).toEqual(
+        cachedEvents
+      );
+    });
+
+    it("serves expired events flagged stale when the request fails while 'online'", async () => {
+      seedExpired();
+      // The api interceptor may already have flipped the store offline by the
+      // time the catch runs; the fallback must not depend on that.
+      mockConnectionStore.isFullyOnline.mockReturnValue(true);
+      api.get.mockRejectedValue(new Error("timeout of 10000ms exceeded"));
+
+      const store = useCalendarStore();
+      await store.fetchEvents(startDate, endDate);
+
+      expect(store.events).toEqual(cachedEvents.events);
+      expect(store.stale).toBe(true);
+      expect(store.error).toBe(null);
+    });
+
+    it("clears the stale flag after a successful fetch", async () => {
+      seedExpired();
+      mockConnectionStore.isFullyOnline.mockReturnValue(false);
+      const store = useCalendarStore();
+      await store.fetchEvents(startDate, endDate);
+      expect(store.stale).toBe(true);
+
+      mockConnectionStore.isFullyOnline.mockReturnValue(true);
+      api.get.mockResolvedValue({ data: { events: [] } });
+      await store.fetchEvents(startDate, endDate);
+
+      expect(store.stale).toBe(false);
+      expect(store.events).toEqual([]);
     });
   });
 

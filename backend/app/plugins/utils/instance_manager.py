@@ -395,6 +395,8 @@ async def handle_plugin_config_update_generic(
 
                     await plugin_manager.register(plugin)
                     await plugin.initialize()
+                    if final_enabled:
+                        plugin.start()
 
                     result = {
                         "instance_created": True,  # Treat as creation since it wasn't in manager

@@ -1,6 +1,6 @@
 import { defineStore } from "pinia";
 import { ref, computed } from "vue";
-import axios from "axios";
+import api, { LONG_REQUEST_TIMEOUT } from "../services/api";
 import { logError, logInfo } from "../utils/logger";
 
 export const useThemesStore = defineStore("themes", () => {
@@ -17,13 +17,13 @@ export const useThemesStore = defineStore("themes", () => {
     loading.value = true;
     error.value = null;
     try {
-      const response = await axios.get("/api/plugins?plugin_type=theme");
+      const response = await api.get("/plugins?plugin_type=theme");
       // Get full theme details (with variables) for each theme
       const themesList = response.data.plugins || [];
       const themesWithDetails = [];
       for (const theme of themesList) {
         try {
-          const themeDetail = await axios.get(`/api/plugins/${theme.id}`);
+          const themeDetail = await api.get(`/plugins/${theme.id}`);
           themesWithDetails.push(themeDetail.data);
         } catch {
           themesWithDetails.push(theme);
@@ -47,7 +47,7 @@ export const useThemesStore = defineStore("themes", () => {
     loading.value = true;
     error.value = null;
     try {
-      const response = await axios.get("/api/plugins/installed");
+      const response = await api.get("/plugins/installed");
       // The endpoint returns { plugins: [...] } (no `themes` key) — filter that.
       installedThemes.value = (response.data.plugins || []).filter(p => p.type === "theme");
       return installedThemes.value;
@@ -65,7 +65,7 @@ export const useThemesStore = defineStore("themes", () => {
    */
   const getTheme = async themeId => {
     try {
-      const response = await axios.get(`/api/plugins/${themeId}`);
+      const response = await api.get(`/plugins/${themeId}`);
       return response.data;
     } catch (err) {
       logError("[ThemesStore]", `Failed to fetch theme ${themeId}:`, err);
@@ -83,10 +83,8 @@ export const useThemesStore = defineStore("themes", () => {
       const formData = new FormData();
       formData.append("file", file);
 
-      const response = await axios.post("/api/plugins/install", formData, {
-        headers: {
-          "Content-Type": "multipart/form-data",
-        },
+      const response = await api.post("/plugins/install", formData, {
+        timeout: LONG_REQUEST_TIMEOUT,
       });
 
       // Refresh themes list
@@ -111,12 +109,16 @@ export const useThemesStore = defineStore("themes", () => {
     loading.value = true;
     error.value = null;
     try {
-      const response = await axios.post("/api/plugins/github/install", {
-        repo_url: repoUrl,
-        // The handler requires `plugin_path` (themes install through the plugin path).
-        plugin_path: themePath,
-        branch: branch,
-      });
+      const response = await api.post(
+        "/plugins/github/install",
+        {
+          repo_url: repoUrl,
+          // The handler requires `plugin_path` (themes install through the plugin path).
+          plugin_path: themePath,
+          branch: branch,
+        },
+        { timeout: LONG_REQUEST_TIMEOUT }
+      );
 
       // Refresh themes list
       await fetchThemes();
@@ -140,10 +142,14 @@ export const useThemesStore = defineStore("themes", () => {
     loading.value = true;
     error.value = null;
     try {
-      const response = await axios.post("/api/plugins/github/enumerate", {
-        repo_url: repoUrl,
-        branch: branch,
-      });
+      const response = await api.post(
+        "/plugins/github/enumerate",
+        {
+          repo_url: repoUrl,
+          branch: branch,
+        },
+        { timeout: LONG_REQUEST_TIMEOUT }
+      );
       // Extract themes from response (plugins API returns both plugins and themes)
       if (response.data.themes) {
         return response.data;
@@ -166,7 +172,7 @@ export const useThemesStore = defineStore("themes", () => {
     loading.value = true;
     error.value = null;
     try {
-      await axios.delete(`/api/plugins/installed/${themeId}`);
+      await api.delete(`/plugins/installed/${themeId}`);
 
       // Refresh themes list
       await fetchThemes();
