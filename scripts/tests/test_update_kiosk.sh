@@ -607,6 +607,21 @@ if CALVIN_AGENT_STATE_DIR="$tmp/state_al1b" bash "$SCRIPT"; then echo "FAIL a0c-
 [ ! -e "$tmp/evil/pwned2" ] || { echo "FAIL a0c-traversal: wrote traversal target"; exit 1; }
 echo "PASS a0c-traversal-rejected"
 
+# ===== calvin-10n: manifest file name must be a bare filename =====
+# --- name contains ../ -> abort before download, nothing written outside STAGE ---
+mkdir -p "$tmp/state_10n"
+cat > "$tmp/srv/manifest.json" <<EOF
+{"version":"n10a000000000000","min_python":"3.9","files":[
+ {"name":"../../evil/pwned3","sha256":"$EVIL_SHA","mode":"0644",
+  "target_path":"$tmp/local/pwned3","restart_unit":"","enable":false}]}
+EOF
+if CALVIN_AGENT_STATE_DIR="$tmp/state_10n" bash "$SCRIPT"; then
+  echo "FAIL 10n-name: should abort on a ../ file name"; exit 1; fi
+[ ! -e "$tmp/evil/pwned3" ] || { echo "FAIL 10n-name: wrote outside STAGE"; exit 1; }
+grep -q 'file name not allowed' "$tmp/state_10n/agent-update-state.json" || {
+  echo "FAIL 10n-name: no 'file name not allowed' state"; exit 1; }
+echo "PASS 10n-manifest-name-rejected"
+
 # --- decommission target outside allowlist -> skipped, file kept ---
 mkdir -p "$tmp/state_al2"
 KEEP="$tmp/evil/keepme"; printf 'KEEP\n' > "$KEEP"
