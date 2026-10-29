@@ -326,7 +326,7 @@ Match the file's existing formatting (table row vs. bullet) for the other option
 
 Where the doc enumerates optional keys / notes what does NOT go in `plugin.json`, add:
 
-> `browser_origins` is declared in `PluginMetadata` (plugin.py), **not** in `plugin.json` — see [PLUGIN_INTERFACE.md](PLUGIN_INTERFACE.md). It is the plugin's declaration of the fixed external origins its frontend may reach; it extends the kiosk CSP for enabled plugins.
+> `browser_origins` is declared in `PluginMetadata` (plugin.py), **not** in `plugin.json` — see [PLUGIN_INTERFACE.md](../../plugins/PLUGIN_INTERFACE.md). It is the plugin's declaration of the fixed external origins its frontend may reach; it extends the kiosk CSP for enabled plugins.
 
 - [ ] **Step 3: Commit**
 

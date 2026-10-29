@@ -31,7 +31,7 @@ A plugin directory:
 **Contract (backend)** — plugin contract 1.0 (`api_version: 1`):
 - One class, declared once: a `CalendarPlugin`/`ImagePlugin`/`ServicePlugin`/`BackendPlugin` subclass with a `metadata = PluginMetadata(...)` attribute ([definitions.py](backend/app/plugins/definitions.py)). The loader ([loader.py](backend/app/plugins/loader.py)) discovers the class — no module-level hooks, no Pluggy, no `get_plugin_metadata()`.
 - Config is declared once in `metadata.instance_config_schema`: it drives the auto-generated settings form (`PluginFieldRenderer`), normalization into `self.config` (via `configure()`), and required-field validation. Never take config in `__init__`; the host constructs `cls(plugin_id, name, enabled)` then awaits `configure(config)`. Config values are bare scalars.
-- Data verbs: `fetch(start_date, end_date)` (service/backend, serves `/api/plugins/{id}/data`), `fetch_events()` (calendar), `get_images()` et al. (image). Optional classmethods: `validate_config`, `test_connection`, `scan_options`, `instance_id_for`.
+- Data verbs: `fetch(...)` (`ServicePlugin` serves it at `GET /api/plugins/{instance_id}/data`; `BackendPlugin` runs it via `POST /api/plugins/{type_id}/fetch`), `fetch_events()` (calendar), `get_images()` et al. (image). Optional classmethods: `validate_config`, `test_connection`, `scan_options`, `instance_id_for`.
 - Instance CRUD is host-side: `apply_plugin_config_update` in [app/plugins/utils/instance_manager.py](backend/app/plugins/utils/instance_manager.py) derives everything from `metadata` + the class hooks. Plugins implement no config-update handler.
 - `dependencies.packages` in `plugin.json` is the only dep mechanism (pip-installed at plugin install, rollback on failure). `format_version`/`protocol_version`/`python_dependencies` are retired. Install is live — no restart.
 
@@ -45,7 +45,7 @@ A plugin directory:
 
 ## Conventions
 
-**State (frontend):** one Pinia store per domain (`config`, `webServices`, `calendar`, `images`, `themes`, `keyboard`, `mode`, `connection`). Stores expose refs + async actions. Network calls try the API first and fall back to localStorage cache with TTL (see [utils/cache.js](frontend/src/utils/cache.js) and [stores/webServices.js](frontend/src/stores/webServices.js)).
+**State (frontend):** one Pinia store per domain (`config`, `webServices`, `calendar`, `images`, `themes`, `keyboard`, `mode`, `connection`, `kiosks`, `notifications`, `progress`, `security`). Stores expose refs + async actions. Network calls try the API first and fall back to localStorage cache with TTL (see [utils/cache.js](frontend/src/utils/cache.js) and [stores/webServices.js](frontend/src/stores/webServices.js)).
 
 **Routing:** FastAPI routers per domain under `backend/app/api/routes/`. The backend serves `index.html` for all non-`/api` paths (SPA). Frontend uses Vue Router + `useModeStore` to switch between calendar/photos/services/settings.
 

@@ -1,6 +1,6 @@
 [Unit]
 Description=Calvin Kiosk Display-Power Agent (remote backend)
-After=network-online.target calvin-frontend.service calvin-kiosk-remote.service
+After=network-online.target calvin-kiosk-remote.service
 Wants=network-online.target
 
 [Service]

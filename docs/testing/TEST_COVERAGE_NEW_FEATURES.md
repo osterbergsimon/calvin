@@ -58,12 +58,12 @@ We use a **hybrid approach** for testing GitHub plugin installation:
 **Purpose**: Integration tests for GitHub plugin API endpoints
 
 **Test Classes**:
-- `TestGitHubPluginEnumeration`: Tests `/api/plugins/enumerate-from-github` endpoint
+- `TestGitHubPluginEnumeration`: Tests `/api/plugins/github/enumerate` endpoint
   - Successful enumeration
   - Branch fallback (main → master)
   - Error handling (not found, invalid URL)
 
-- `TestGitHubPluginInstallation`: Tests `/api/plugins/install-from-github` endpoint
+- `TestGitHubPluginInstallation`: Tests `/api/plugins/github/install` endpoint
   - Successful installation
   - Branch fallback during installation
   - Missing parameters validation
@@ -121,7 +121,7 @@ We use a **hybrid approach** for testing GitHub plugin installation:
 - ✅ Network error handling
 - ✅ Graceful skipping when unavailable
 
-**Note**: These tests are marked `@pytest.mark.e2e` and `@pytest.mark.slow` and skip by default. See `backend/tests/e2e/TEST_REPO_SETUP.md` for setup instructions.
+**Note**: These tests are marked `@pytest.mark.e2e` and `@pytest.mark.slow` and skip by default. See [E2E Test Repository Setup](../testing/E2E_TEST_REPO_SETUP.md) for setup instructions.
 
 ## Updated Test Files
 
