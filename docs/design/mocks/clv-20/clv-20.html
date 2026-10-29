@@ -1,0 +1,154 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>One phone-setup prompt</title>
+<style>
+:root { --bg-0:#eef1f4; --bg-1:#fff; --bg-2:#fff; --line:#dde3e8; --line-soft:#e8edf1; --ink:#1b242b; --ink-2:#5d6b75; --ink-3:#93a0a9;
+  --focus:#e08a1e; --focus-ink:#fff; --ok:#2e9e6b; --shadow-hover:rgba(0,0,0,.15);
+  --font-ui:"IBM Plex Sans",system-ui,sans-serif; --font-display:"IBM Plex Sans Condensed",system-ui,sans-serif; --font-data:"IBM Plex Mono",ui-monospace,monospace; --touch-target:2.75rem; }
+.dark { --bg-0:#0e1316; --bg-1:#151c21; --bg-2:#1d262d; --line:#27313a; --line-soft:#1e272e; --ink:#eaf0f3; --ink-2:#9aa7b0; --ink-3:#62707a; --focus:#f3b052; --focus-ink:#1a130a; --ok:#5bd0a0; --shadow-hover:rgba(0,0,0,.4); }
+* { box-sizing:border-box; }
+body { margin:0; background:#d9dee3; font-family:var(--font-ui); color:#1b242b; }
+.board { padding:32px 16px; max-width:1360px; margin:0 auto; }
+h1 { margin:0 0 4px; } .board > p { color:#5d6b75; margin:0 0 24px; max-width:75ch; }
+figure { margin:0 0 32px; } figcaption { font-size:.85rem; color:#5d6b75; margin-top:8px; max-width:1280px; }
+.scroll { overflow-x:auto; } .row { display:flex; gap:24px; flex-wrap:wrap; align-items:flex-start; }
+.frame { position:relative; background:var(--bg-0); color:var(--ink); border-radius:6px; box-shadow:0 2px 12px rgba(0,0,0,.18); overflow:hidden; display:grid; grid-template-rows:56px 1fr; }
+.kiosk { width:1280px; height:720px; } .small { width:800px; height:480px; grid-template-rows:44px 1fr; } .phone { width:390px; height:780px; border-radius:24px; }
+.bar { display:flex; align-items:center; justify-content:space-between; padding:0 20px; background:var(--bg-1); border-bottom:1px solid var(--line); font-family:var(--font-display); font-size:1.5rem; font-weight:600; }
+.bar span:last-child { font-size:1.2rem; color:var(--ink-3); }
+.regions { display:grid; grid-template-columns:2fr 1fr; gap:12px; padding:12px; min-height:0; }
+.regions.three { grid-template-columns:2fr 1fr; grid-template-rows:1fr 1fr; }
+.regions.three .r:first-child { grid-row:span 2; }
+.phone .regions { grid-template-columns:1fr; grid-template-rows:1fr 1fr; }
+.r { background:var(--bg-1); border:1px solid var(--line); border-radius:12px; display:flex; align-items:center; justify-content:center; min-height:0; overflow:hidden; }
+.es { display:flex; flex-direction:column; align-items:center; gap:8px; max-width:34rem; padding:16px; text-align:center; }
+.es b { font-size:1.15rem; } .es p { margin:0; color:var(--ink-2); }
+.es .quiet { color:var(--ink-3); font-weight:500; font-size:1rem; }
+.btn { min-height:var(--touch-target); padding:0 1.1rem; border-radius:10px; border:1px solid var(--line); background:var(--bg-2); color:var(--ink); font:500 .9rem var(--font-ui); white-space:nowrap; }
+.btn--primary { background:var(--focus); border-color:var(--focus); color:var(--focus-ink); font-weight:600; }
+.btn--ghost { border-color:transparent; background:transparent; color:var(--ink-2); }
+.cal { width:100%; height:100%; padding:14px 16px; font-size:.85rem; }
+.cal h3 { margin:0 0 10px; font-family:var(--font-display); font-size:1.2rem; }
+.ev { padding:8px 10px; border-radius:8px; background:color-mix(in srgb, var(--focus) 10%, var(--bg-1)); border-left:3px solid var(--focus); margin-bottom:8px; }
+/* phone-setup card (existing PhoneSetupCard) */
+.ps { display:flex; align-items:center; gap:14px; padding:12px; text-align:left; background:var(--bg-2); border:1px solid var(--line); border-radius:12px; margin-top:8px; }
+.ps img { width:132px; height:132px; border-radius:8px; background:#fff; flex:none; }
+.ps p { margin:0; } .ps .t { font-weight:600; margin-bottom:4px; } .ps .h { font-size:.9rem; color:var(--ink-2); margin-bottom:6px; }
+.ps code { font-family:var(--font-data); font-size:.8rem; overflow-wrap:anywhere; }
+/* the welcome card */
+.welcome { position:absolute; left:50%; top:calc(56px + (100% - 56px) / 2); transform:translate(-50%,-50%); width:min(46rem, calc(100% - 32px));
+  background:var(--bg-1); border:1px solid var(--line); border-radius:16px; box-shadow:0 18px 50px -16px var(--shadow-hover); padding:1.75rem;
+  display:grid; grid-template-columns:1fr auto; gap:28px; }
+.small .welcome { top:calc(44px + (100% - 44px) / 2); padding:1.1rem 1.25rem; gap:18px; width:calc(100% - 24px); }
+.phone .welcome { grid-template-columns:1fr; top:auto; bottom:16px; transform:translateX(-50%); padding:1.25rem; }
+.welcome h2 { margin:0 0 6px; font-size:1.25rem; } .welcome .lead { margin:0 0 14px; color:var(--ink-2); font-size:.95rem; }
+.small .welcome h2 { font-size:1.1rem; } .small .welcome .lead { margin-bottom:8px; }
+.list { list-style:none; margin:0; padding:0; border:1px solid var(--line); border-radius:12px; overflow:hidden; }
+.list li { display:flex; align-items:center; justify-content:space-between; gap:12px; min-height:3.5rem; padding:6px 8px 6px 14px; }
+.small .list li { min-height:3rem; }
+.list li + li { border-top:1px solid var(--line-soft); }
+.list b { font-weight:500; } .list small { display:block; color:var(--ink-3); font-size:.8rem; }
+.done { color:var(--ok); font-size:.85rem; font-weight:500; }
+.foot { display:flex; justify-content:flex-start; margin-top:10px; }
+.side { display:flex; flex-direction:column; align-items:flex-start; width:15rem; }
+.side img { width:180px; height:180px; border-radius:8px; background:#fff; }
+.small .side { width:12.5rem; } .small .side img { width:132px; height:132px; }
+.side .t { font-weight:600; margin:10px 0 4px; } .side .h { font-size:.85rem; color:var(--ink-2); margin:0 0 6px; }
+.side code { font-family:var(--font-data); font-size:.78rem; overflow-wrap:anywhere; }
+.side .auth { font-size:.8rem; color:var(--ink-2); margin-top:8px; border-top:1px solid var(--line-soft); padding-top:8px; }
+</style>
+</head>
+<body>
+<main class="board">
+  <h1>CLV-20: one phone-setup prompt</h1>
+  <p>For <code>docs/design/2026-10-29-one-phone-setup-prompt.md</code>. Real Paper and Backlit tokens. The welcome card reuses the existing PhoneSetupCard content and button styles. Nothing here is a new visual language.</p>
+
+  <figure class="scroll">
+    <div class="frame kiosk">
+      <div class="bar"><span>14:32</span><span>⋯</span></div>
+      <div class="regions three">
+        <div class="r"><div class="es"><span class="quiet">No calendars yet</span></div></div>
+        <div class="r"><div class="es"><span class="quiet">No photos yet</span></div></div>
+        <div class="r"><div class="es"><span class="quiet">No web pages yet</span></div></div>
+      </div>
+      <section class="welcome" role="region" aria-label="Set up Calvin">
+        <div>
+          <h2>Let's set up Calvin</h2>
+          <p class="lead">Add what this screen shows. Typing is easier on your phone.</p>
+          <ul class="list">
+            <li><span><b>Calendars</b><small>Not added yet</small></span><button class="btn">Add here</button></li>
+            <li><span><b>Photos</b><small>Not added yet</small></span><button class="btn">Add here</button></li>
+            <li><span><b>Web pages</b><small>Not added yet</small></span><button class="btn">Add here</button></li>
+          </ul>
+          <div class="foot"><button class="btn btn--ghost">Not now</button></div>
+        </div>
+        <div class="side">
+          <img src="qr-settings.svg" alt="QR code for http://calvin.local:8000/settings" />
+          <p class="t">Set it up from your phone</p>
+          <p class="h">Scan the code or open this address on the same network.</p>
+          <code>http://calvin.local:8000/settings</code>
+          <p class="auth">Your phone asks you to choose an admin password first.</p>
+        </div>
+      </section>
+    </div>
+    <figcaption><b>P1 · First run on a touch kiosk.</b> Every content region is empty, so one welcome card owns the phone hand-off. The regions behind it show only their one-line "what's missing" in <code>--ink-3</code>: no button, no QR. There is no scrim, so the dashboard stays visible and the clock bar and ⋯ menu stay usable. The admin-password line shows only while no password is set.</figcaption>
+  </figure>
+
+  <figure class="scroll">
+    <div class="frame kiosk">
+      <div class="bar"><span>14:32</span><span>⋯</span></div>
+      <div class="regions three">
+        <div class="r"><div class="cal"><h3>Today</h3><div class="ev">09:00 Dentist</div><div class="ev">16:30 Football practice</div><div class="ev">19:00 Dinner with grandma</div></div></div>
+        <div class="r"><div class="es"><b>No photos yet</b><p>Upload photos in Settings › Content › Image sources.</p><button class="btn btn--primary">Add photos</button>
+          <div class="ps"><img src="qr-images.svg" alt="" /><div><p class="t">Set it up from your phone</p><p class="h">Typing is easier there.</p><code>…/settings?setting=content-images</code></div></div></div></div>
+        <div class="r"><div class="cal"><h3>Home Assistant</h3><div class="ev" style="border-left-color:var(--ink-3);background:var(--bg-0)">Living room 21.5 °C</div><div class="ev" style="border-left-color:var(--ink-3);background:var(--bg-0)">Front door locked</div></div></div>
+      </div>
+    </div>
+    <figcaption><b>P2 · Later, one source missing.</b> Other regions have content, so there's no welcome card. The empty region keeps its normal empty state (message, help, button) and is the one place on this screen with a QR. Because only photos are missing, the QR deep-links to <code>?setting=content-images</code>. With two or more regions empty, the QR still appears only once, in the largest empty region, and points at <code>/settings</code> (Content). The other empty regions show message, help and button only.</figcaption>
+  </figure>
+
+  <div class="row">
+    <figure>
+      <div class="frame small dark">
+        <div class="bar" style="font-size:1.2rem"><span>14:32</span><span>⋯</span></div>
+        <div class="regions"><div class="r"><div class="es"><span class="quiet">No calendars yet</span></div></div><div class="r"><div class="es"><span class="quiet">No photos yet</span></div></div></div>
+        <section class="welcome">
+          <div>
+            <h2>Let's set up Calvin</h2>
+            <ul class="list">
+              <li><span><b>Calendars</b></span><button class="btn">Add here</button></li>
+              <li><span><b>Photos</b></span><button class="btn">Add here</button></li>
+            </ul>
+            <div class="foot"><button class="btn btn--ghost">Not now</button></div>
+          </div>
+          <div class="side"><img src="qr-settings.svg" alt="" /><p class="t">Or use your phone</p><code>calvin.local:8000/settings</code></div>
+        </section>
+      </div>
+      <figcaption><b>P3 · 800×480 kiosk, Backlit.</b> When the card would be taller than the area:<br/>the lead, the "Not added yet" lines and the hint text drop, and the QR shrinks to 132px.</figcaption>
+    </figure>
+
+    <figure>
+      <div class="frame phone">
+        <div class="bar" style="font-size:1.2rem"><span>14:32</span><span>⋯</span></div>
+        <div class="regions"><div class="r"><div class="es"><span class="quiet">No calendars yet</span></div></div><div class="r"><div class="es"><span class="quiet">No photos yet</span></div></div></div>
+        <section class="welcome">
+          <div>
+            <h2>Let's set up Calvin</h2>
+            <p class="lead">Add what this screen shows.</p>
+            <ul class="list">
+              <li><span><b>Calendars</b><small>Not added yet</small></span><button class="btn btn--primary">Add</button></li>
+              <li><span><b>Photos</b><small>Not added yet</small></span><button class="btn">Add</button></li>
+            </ul>
+            <div class="foot"><button class="btn btn--ghost">Not now</button></div>
+          </div>
+        </section>
+      </div>
+      <figcaption><b>P4 · On a phone or laptop.</b> No QR: you're already<br/>on a device that can type. The card docks at the bottom.<br/>The buttons say "Add".</figcaption>
+    </figure>
+  </div>
+</main>
+</body>
+</html>
