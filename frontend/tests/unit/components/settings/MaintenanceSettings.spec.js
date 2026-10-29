@@ -14,6 +14,8 @@ vi.mock("@/composables", () => ({
 }));
 
 import MaintenanceSettings from "@/components/settings/categories/MaintenanceSettings.vue";
+import ConfirmModal from "@/components/settings/shared/ConfirmModal.vue";
+import KioskSoftwarePointer from "@/components/settings/shared/KioskSoftwarePointer.vue";
 
 const stubs = { UpdatesTab: true, BackupSettings: true };
 const baseConfig = { consoleLogEnabled: true, consoleLogLevel: "info", configPollInterval: 30 };
@@ -86,24 +88,43 @@ describe("MaintenanceSettings", () => {
     expect(hardware).toContain("4.5.6");
   });
 
-  it("calls restartBackend after confirming Restart backend", async () => {
+  it("calls restartBackend after confirming Restart Calvin server", async () => {
+    environment.value = null;
     const wrapper = mount(MaintenanceSettings, {
       props: { config: baseConfig, gitRepoUrl: "", gitBranch: "main" },
       global: { stubs },
     });
-    const btn = wrapper.findAll("button").find(b => b.text() === "Restart backend");
+    const btn = wrapper.findAll("button").find(b => b.text() === "Restart server");
     await btn.trigger("click");
-    // ConfirmModal is real; find its confirm button and click it
-    const confirmBtn = wrapper
-      .findAll("button")
-      .find(
-        b =>
-          /restart/i.test(b.text()) &&
-          b.text() !== "Restart backend" &&
-          b.text() !== "Restart frontend"
-      );
-    await confirmBtn.trigger("click");
+
+    const confirm = wrapper.findComponent(ConfirmModal);
+    expect(confirm.props("title")).toBe("Restart the Calvin server?");
+    expect(confirm.props("message")).toBe(
+      "Settings and screens lose connection for about 15 seconds."
+    );
+    expect(confirm.props("confirmText")).toBe("Restart server");
+
+    await confirm.findAll("button").at(-1).trigger("click");
     expect(restartBackend).toHaveBeenCalled();
+  });
+
+  it("confirms the kiosk browser restart with its honest copy", async () => {
+    environment.value = null;
+    const wrapper = mount(MaintenanceSettings, {
+      props: { config: baseConfig, gitRepoUrl: "", gitBranch: "main" },
+      global: { stubs },
+    });
+    const row = wrapper.find('[data-test="restart-frontend"]');
+    expect(row.text()).toBe("Restart browser");
+    await row.trigger("click");
+
+    const confirm = wrapper.findComponent(ConfirmModal);
+    expect(confirm.props("title")).toBe("Restart the kiosk browser?");
+    expect(confirm.props("message")).toBe("The screen goes blank for a few seconds.");
+    expect(confirm.props("confirmText")).toBe("Restart browser");
+
+    await confirm.findAll("button").at(-1).trigger("click");
+    expect(restartFrontend).toHaveBeenCalled();
   });
 
   it("shows the log level only when console logging is on", () => {
@@ -127,10 +148,11 @@ describe("MaintenanceSettings", () => {
     expect(off.text()).not.toContain("Log level");
   });
 
-  it("hides the restart actions in a Docker container", async () => {
+  it("hides the restart actions and points to Docker in a container", async () => {
     loadEnvironment.mockImplementation(() => {
       environment.value = {
         deployment: "docker",
+        host_control: false,
         capabilities: { update: false, restart: false, reboot: false },
         update_instructions: "docker compose pull && docker compose up -d",
       };
@@ -142,9 +164,12 @@ describe("MaintenanceSettings", () => {
     });
     await flushPromises();
 
-    expect(wrapper.text()).not.toContain("Restart backend");
-    expect(wrapper.text()).not.toContain("Restart frontend");
-    expect(wrapper.text()).toContain("Reload UI");
+    expect(wrapper.find('[data-test="restart-backend"]').exists()).toBe(false);
+    expect(wrapper.find('[data-test="restart-frontend"]').exists()).toBe(false);
+    expect(wrapper.find('[data-test="reload-ui"]').exists()).toBe(true);
+    expect(wrapper.find('[data-test="docker-restart-hint"]').text()).toBe(
+      "To restart the server, restart the Calvin container from Docker (Unraid: Docker tab)."
+    );
   });
 
   it("hides the restart actions when the backend does not control the host", async () => {
@@ -163,8 +188,57 @@ describe("MaintenanceSettings", () => {
     });
     await flushPromises();
 
-    expect(wrapper.text()).not.toContain("Restart backend");
-    expect(wrapper.text()).not.toContain("Restart frontend");
+    expect(wrapper.find('[data-test="restart-backend"]').exists()).toBe(false);
+    expect(wrapper.find('[data-test="restart-frontend"]').exists()).toBe(false);
+    expect(wrapper.find('[data-test="docker-restart-hint"]').exists()).toBe(false);
+  });
+
+  it("hides the restart actions when a native host lacks the restart helper", async () => {
+    loadEnvironment.mockImplementation(() => {
+      environment.value = {
+        deployment: "native",
+        host_control: true,
+        capabilities: { update: true, restart: false, reboot: true },
+        update_instructions: null,
+      };
+      return Promise.resolve(environment.value);
+    });
+    const wrapper = mount(MaintenanceSettings, {
+      props: { config: baseConfig, gitRepoUrl: "", gitBranch: "main" },
+      global: { stubs },
+    });
+    await flushPromises();
+
+    expect(wrapper.find('[data-test="restart-backend"]').exists()).toBe(false);
+    expect(wrapper.find('[data-test="restart-frontend"]').exists()).toBe(false);
+  });
+
+  it("shows both restart rows when the environment reports restart capability", async () => {
+    loadEnvironment.mockImplementation(() => {
+      environment.value = {
+        deployment: "native",
+        host_control: true,
+        capabilities: { update: true, restart: true, reboot: true },
+        update_instructions: null,
+      };
+      return Promise.resolve(environment.value);
+    });
+    const wrapper = mount(MaintenanceSettings, {
+      props: { config: baseConfig, gitRepoUrl: "", gitBranch: "main" },
+      global: { stubs },
+    });
+    await flushPromises();
+
+    const backend = wrapper.find('[data-test="restart-backend"]');
+    expect(backend.text()).toBe("Restart server");
+    expect(wrapper.text()).toContain("Restart kiosk browser");
+    expect(wrapper.text()).toContain(
+      "Restarts the browser on this Pi's screen. The server keeps running."
+    );
+    expect(wrapper.text()).toContain(
+      "Restarts Calvin. Screens reconnect on their own in about 15 seconds."
+    );
+    expect(wrapper.find('[data-test="docker-restart-hint"]').exists()).toBe(false);
   });
 
   it("keeps the restart actions when the environment can't be loaded", async () => {
@@ -174,6 +248,17 @@ describe("MaintenanceSettings", () => {
     });
     await flushPromises();
 
-    expect(wrapper.text()).toContain("Restart backend");
+    expect(wrapper.find('[data-test="restart-backend"]').exists()).toBe(true);
+    expect(wrapper.find('[data-test="restart-frontend"]').exists()).toBe(true);
+  });
+
+  it("renders the kiosk software pointer in the Updates section", async () => {
+    const wrapper = mount(MaintenanceSettings, {
+      props: { config: baseConfig, gitRepoUrl: "", gitBranch: "main" },
+      global: { stubs },
+    });
+    await flushPromises();
+    const updates = wrapper.find("#section-maintenance-updates");
+    expect(updates.findComponent(KioskSoftwarePointer).exists()).toBe(true);
   });
 });
