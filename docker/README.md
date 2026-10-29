@@ -79,7 +79,8 @@ deploy.
 
 There is no scheduled build: GitHub runs `schedule` triggers only from
 the default branch (`main`), so a nightly defined on `develop` never
-fires.
+fires, and it disables scheduled workflows after 60 days without commits
+on `main`, which would also stop this workflow gating PRs.
 
 The package must be **public** so Unraid and Pis can pull it without a
 login. It already is; if it is ever recreated, set it again under

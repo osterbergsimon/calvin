@@ -7,8 +7,11 @@ name: Build and Push Docker Image
 #   manual dispatch  -> build; push :sha-<commit> (and :develop when run
 #                       on develop) only if push_image is ticked
 #
-# There is deliberately no schedule trigger: GitHub runs schedules from
-# the default branch (main), so a nightly defined on develop never fires.
+# There is deliberately no schedule trigger: GitHub runs schedules only
+# from the default branch (main), so a nightly defined on develop never
+# fires, and it disables a scheduled workflow after 60 days without
+# commits on main (release-only), which would also stop this workflow
+# gating PRs. :develop is built on every push to develop instead.
 
 on:
   push:
