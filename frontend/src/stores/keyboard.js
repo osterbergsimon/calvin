@@ -1,6 +1,6 @@
 import { defineStore } from "pinia";
 import { ref } from "vue";
-import axios from "axios";
+import api from "@/services/api";
 import { logError } from "@/utils/logger";
 
 export const useKeyboardStore = defineStore("keyboard", () => {
@@ -16,7 +16,7 @@ export const useKeyboardStore = defineStore("keyboard", () => {
     loading.value = true;
     error.value = null;
     try {
-      const response = await axios.get("/api/keyboard/mappings");
+      const response = await api.get("/keyboard/mappings");
       mappings.value = response.data.mappings || {};
       available.value = true;
       return response.data;
@@ -31,19 +31,19 @@ export const useKeyboardStore = defineStore("keyboard", () => {
   };
 
   const setMapping = async (key, action) => {
-    await axios.put(`/api/keyboard/mappings/${key}`, { action });
+    await api.put(`/keyboard/mappings/${key}`, { action });
     mappings.value = { ...mappings.value, [key]: action };
   };
 
   const removeMapping = async key => {
-    await axios.delete(`/api/keyboard/mappings/${key}`);
+    await api.delete(`/keyboard/mappings/${key}`);
     const next = { ...mappings.value };
     delete next[key];
     mappings.value = next;
   };
 
   const updateMappings = async map => {
-    await axios.post("/api/keyboard/mappings", { mappings: map });
+    await api.post("/keyboard/mappings", { mappings: map });
     mappings.value = { ...map };
   };
 

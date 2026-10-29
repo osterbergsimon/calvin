@@ -1,7 +1,8 @@
 import { defineStore } from "pinia";
 import { ref, computed, nextTick } from "vue";
-import axios from "axios";
-import { logError } from "../utils/logger";
+import api from "../services/api";
+import { getCachedData, setCachedData } from "../utils/cache";
+import { logError, logInfo } from "../utils/logger";
 import {
   cycleActiveDashboardRegion,
   cycleDashboardScreen,
@@ -12,7 +13,11 @@ import {
   setRegionView,
 } from "../utils/layout";
 import { applyConfigPayload, createDefaultDisplaySchedule } from "./configRegistry";
-import { configUrl, getKioskId } from "@/utils/kioskId";
+import { configPath, getKioskId } from "@/utils/kioskId";
+
+// The config is what a kiosk boots from, so its offline copy is kept for a day
+// and served (flagged stale) even after that when the backend is unreachable.
+const CONFIG_CACHE_TTL = 24 * 60 * 60 * 1000;
 
 export const useConfigStore = defineStore("config", () => {
   const orientation = ref("landscape"); // 'landscape' | 'portrait'
@@ -91,6 +96,11 @@ export const useConfigStore = defineStore("config", () => {
   const pluginRepositoryUrl = ref("https://github.com/osterbergsimon/calvin-plugins"); // Default plugin repo for the GitHub install flow
   const loading = ref(false);
   const error = ref(null);
+  // True while the applied config came from the offline cache.
+  const stale = ref(false);
+  // Set after the first successful load: from then on the in-memory config is
+  // newer than the cached copy, so a failed poll keeps it instead.
+  let loadedFromServer = false;
   // Latches true once the initial config load has settled. Consumers use this
   // to ignore the boot-time hydration, where refs flip from their defaults to
   // the persisted values (e.g. showUI true->false) and would otherwise look
@@ -200,16 +210,33 @@ export const useConfigStore = defineStore("config", () => {
   const fetchConfig = async () => {
     loading.value = true;
     error.value = null;
-    try {
-      const response = await axios.get(configUrl());
-      applyConfigPayload(response.data, configRefs, { useDefaults: true });
+    const path = configPath();
+    const cacheKey = `config_${path}`;
+    const applyFetched = data => {
+      applyConfigPayload(data, configRefs, { useDefaults: true });
       if (getKioskId()) {
-        availableScreens.value = response.data?.availableScreens ?? null;
-        defaultScreenId.value = response.data?.defaultScreenId ?? null;
+        availableScreens.value = data?.availableScreens ?? null;
+        defaultScreenId.value = data?.defaultScreenId ?? null;
         seedKioskActiveScreen();
       }
+    };
+    try {
+      const response = await api.get(path);
+      applyFetched(response.data);
+      setCachedData(cacheKey, response.data);
+      loadedFromServer = true;
+      stale.value = false;
       return response.data;
     } catch (err) {
+      if (!loadedFromServer) {
+        const cached = getCachedData(cacheKey, CONFIG_CACHE_TTL, { allowStale: true });
+        if (cached) {
+          logInfo("[ConfigStore]", "Backend unreachable, using cached config");
+          applyFetched(cached);
+          stale.value = true;
+          return cached;
+        }
+      }
       error.value = err.message;
       logError("[ConfigStore]", "Failed to fetch config:", err);
     } finally {
@@ -229,7 +256,7 @@ export const useConfigStore = defineStore("config", () => {
     loading.value = true;
     error.value = null;
     try {
-      const response = await axios.post("/api/config", config);
+      const response = await api.post("/config", config);
       applyConfigPayload(config, configRefs);
       applyConfigPayload(response.data || {}, configRefs);
       return response.data;
@@ -565,6 +592,7 @@ export const useConfigStore = defineStore("config", () => {
     touchControlSize,
     loading,
     error,
+    stale,
     hydrated,
     calendarWidth,
     photosWidth,

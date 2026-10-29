@@ -1,6 +1,6 @@
 import { defineStore } from "pinia";
 import { ref, computed } from "vue";
-import axios from "axios";
+import api, { LONG_REQUEST_TIMEOUT } from "../services/api";
 import { getCachedData, setCachedData } from "../utils/cache";
 
 // Persist the wall-display feed so a kiosk refresh/reboot during a backend
@@ -39,12 +39,12 @@ export const useImagesStore = defineStore("images", () => {
 
   const getWithSources = (url, sourceIds) => {
     const config = sourceParams(sourceIds);
-    return config ? axios.get(url, config) : axios.get(url);
+    return config ? api.get(url, config) : api.get(url);
   };
 
   const postWithSources = (url, sourceIds) => {
     const config = sourceParams(sourceIds);
-    return config ? axios.post(url, null, config) : axios.post(url);
+    return config ? api.post(url, null, config) : api.post(url);
   };
 
   const fetchImages = async (sourceIds = []) => {
@@ -52,7 +52,7 @@ export const useImagesStore = defineStore("images", () => {
     error.value = null;
     const sourceKey = getSourceKey(sourceIds);
     try {
-      const response = await getWithSources("/api/images/list", sourceIds);
+      const response = await getWithSources("/images/list", sourceIds);
       imagesBySourceKey.value[sourceKey] = response.data.images || [];
       if (sourceKey === "__all__") {
         images.value = response.data.images || [];
@@ -70,7 +70,7 @@ export const useImagesStore = defineStore("images", () => {
       console.error("Failed to fetch images:", err);
       // Serve the last-known feed so the wall display survives a backend outage.
       if (sourceKey === "__all__") {
-        const cached = getCachedData(IMAGES_CACHE_KEY, IMAGE_CACHE_TTL);
+        const cached = getCachedData(IMAGES_CACHE_KEY, IMAGE_CACHE_TTL, { allowStale: true });
         if (cached && cached.length) {
           images.value = cached;
           imagesBySourceKey.value[sourceKey] = cached;
@@ -86,7 +86,7 @@ export const useImagesStore = defineStore("images", () => {
   const fetchCurrentImage = async (sourceIds = []) => {
     const sourceKey = getSourceKey(sourceIds);
     try {
-      const response = await getWithSources("/api/images/current", sourceIds);
+      const response = await getWithSources("/images/current", sourceIds);
       currentImagesBySourceKey.value[sourceKey] = response.data.image;
       if (sourceKey === "__all__") {
         currentImage.value = response.data.image;
@@ -97,7 +97,9 @@ export const useImagesStore = defineStore("images", () => {
       console.error("Failed to fetch current image:", err);
       // Fall back to the last-known image so the frame isn't blank during an outage.
       if (sourceKey === "__all__") {
-        const cached = getCachedData(CURRENT_IMAGE_CACHE_KEY, IMAGE_CACHE_TTL);
+        const cached = getCachedData(CURRENT_IMAGE_CACHE_KEY, IMAGE_CACHE_TTL, {
+          allowStale: true,
+        });
         if (cached) {
           currentImagesBySourceKey.value[sourceKey] = cached;
           currentImage.value = cached;
@@ -111,7 +113,7 @@ export const useImagesStore = defineStore("images", () => {
   const nextImage = async (sourceIds = []) => {
     const sourceKey = getSourceKey(sourceIds);
     try {
-      const response = await postWithSources("/api/images/next", sourceIds);
+      const response = await postWithSources("/images/next", sourceIds);
       currentImagesBySourceKey.value[sourceKey] = response.data.image;
       if (sourceKey === "__all__") currentImage.value = response.data.image;
       return response.data;
@@ -124,7 +126,7 @@ export const useImagesStore = defineStore("images", () => {
   const previousImage = async (sourceIds = []) => {
     const sourceKey = getSourceKey(sourceIds);
     try {
-      const response = await postWithSources("/api/images/previous", sourceIds);
+      const response = await postWithSources("/images/previous", sourceIds);
       currentImagesBySourceKey.value[sourceKey] = response.data.image;
       if (sourceKey === "__all__") currentImage.value = response.data.image;
       return response.data;
@@ -170,7 +172,9 @@ export const useImagesStore = defineStore("images", () => {
       const formData = new FormData();
       formData.append("file", file);
       // Don't set Content-Type header - let axios set it automatically with boundary
-      const response = await axios.post("/api/images/upload", formData);
+      const response = await api.post("/images/upload", formData, {
+        timeout: LONG_REQUEST_TIMEOUT,
+      });
       // Refresh images list
       await fetchImages();
       return response.data;
@@ -187,7 +191,7 @@ export const useImagesStore = defineStore("images", () => {
     loading.value = true;
     error.value = null;
     try {
-      const response = await axios.delete(`/api/images/${imageId}`);
+      const response = await api.delete(`/images/${imageId}`);
       // Refresh images list
       await fetchImages();
       // If we deleted the current image, fetch a new one

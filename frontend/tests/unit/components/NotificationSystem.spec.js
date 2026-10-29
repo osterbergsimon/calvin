@@ -7,12 +7,15 @@
 import { describe, it, expect, beforeEach, afterEach, vi } from "vitest";
 import { mount } from "@vue/test-utils";
 import { setActivePinia, createPinia } from "pinia";
-import axios from "axios";
+import api from "@/services/api";
 import NotificationSystem from "@/components/NotificationSystem.vue";
 import { useConfigStore } from "@/stores/config";
 import { useModeStore } from "@/stores/mode";
 
-vi.mock("axios");
+vi.mock("@/services/api", () => ({
+  default: { get: vi.fn(), post: vi.fn(), put: vi.fn(), delete: vi.fn() },
+  LONG_REQUEST_TIMEOUT: 600000,
+}));
 
 describe("NotificationSystem (input-echo HUD)", () => {
   let configStore;
@@ -254,7 +257,7 @@ describe("NotificationSystem (input-echo HUD)", () => {
       // The initial config load resolves with a kiosk config (showUI:false).
       // That true->false settle must NOT be echoed as a user mode change —
       // otherwise a stale "Calendar Mode" HUD flashes on every reload.
-      axios.get.mockResolvedValue({ data: { showUI: false } });
+      api.get.mockResolvedValue({ data: { showUI: false } });
       await configStore.fetchConfig();
       await wrapper.vm.$nextTick();
       vi.advanceTimersByTime(100);

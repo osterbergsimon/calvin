@@ -1,11 +1,11 @@
 import { defineStore } from "pinia";
-import axios from "axios";
+import api from "@/services/api";
 import { logError } from "@/utils/logger";
 
 export const useSecurityStore = defineStore("security", () => {
   async function fetchAllowedOrigins() {
     try {
-      const response = await axios.get("/api/security/allowed-origins");
+      const response = await api.get("/security/allowed-origins");
       return response.data?.origins ?? [];
     } catch (err) {
       logError("[security]", "Failed to fetch allowed origins:", err);
@@ -14,12 +14,12 @@ export const useSecurityStore = defineStore("security", () => {
   }
 
   async function saveAllowedOrigins(origins) {
-    await axios.put("/api/security/allowed-origins", { origins });
+    await api.put("/security/allowed-origins", { origins });
   }
 
   async function fetchSealedMode() {
     try {
-      const response = await axios.get("/api/security/sealed-mode");
+      const response = await api.get("/security/sealed-mode");
       return response.data?.sealed_mode ?? false;
     } catch (err) {
       logError("[security]", "Failed to fetch sealed mode:", err);
@@ -28,7 +28,7 @@ export const useSecurityStore = defineStore("security", () => {
   }
 
   async function saveSealedMode(sealedMode) {
-    await axios.put("/api/security/sealed-mode", { sealed_mode: sealedMode });
+    await api.put("/security/sealed-mode", { sealed_mode: sealedMode });
   }
 
   return { fetchAllowedOrigins, saveAllowedOrigins, fetchSealedMode, saveSealedMode };

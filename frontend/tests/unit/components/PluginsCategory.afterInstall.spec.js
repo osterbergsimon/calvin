@@ -1,11 +1,14 @@
 import { describe, it, expect, vi, beforeEach } from "vitest";
 import { mount, flushPromises } from "@vue/test-utils";
 import { setActivePinia, createPinia } from "pinia";
-import axios from "axios";
+import api from "@/services/api";
 import PluginsCategory from "@/components/settings/categories/PluginsCategory.vue";
 import { useNotificationsStore } from "@/stores/notifications";
 
-vi.mock("axios");
+vi.mock("@/services/api", () => ({
+  default: { get: vi.fn(), post: vi.fn(), put: vi.fn(), delete: vi.fn() },
+  LONG_REQUEST_TIMEOUT: 600000,
+}));
 
 vi.mock("vue-router", () => ({
   useRoute: () => routeRef,
@@ -110,7 +113,7 @@ describe("PluginsCategory after install (F5)", () => {
       { id: "mealie", type: "service", name: "Mealie", enabled: false },
     ];
     Element.prototype.scrollIntoView = vi.fn();
-    axios.post.mockResolvedValue({ data: {} });
+    api.post.mockResolvedValue({ data: {} });
   });
 
   const installMealie = async () => {

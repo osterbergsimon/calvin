@@ -197,7 +197,7 @@ export function useConfigForm(initialConfig = {}) {
 
     try {
       const configToSave = updates || localConfig.value;
-      await configApi.updateConfig(configToSave);
+      // The store POSTs to the backend and applies the result; one request per save.
       await configStore.updateConfig(configToSave);
       lastSavedKeys.value = updates ? Object.keys(updates) : [];
       saveSuccess.value = true;

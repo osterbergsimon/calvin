@@ -17,7 +17,7 @@ export const useConnectionStore = defineStore("connection", () => {
       const controller = new AbortController();
       const timeoutId = setTimeout(() => controller.abort(), 3000); // 3 second timeout
 
-      const response = await fetch("/api/health", {
+      const response = await fetch(`${import.meta.env.VITE_API_URL || "/api"}/health`, {
         method: "GET",
         signal: controller.signal,
         cache: "no-cache",

@@ -1,9 +1,12 @@
 import { describe, it, expect, beforeEach, vi } from "vitest";
 import { setActivePinia, createPinia } from "pinia";
-import axios from "axios";
+import api from "@/services/api";
 import { useKiosksStore } from "@/stores/kiosks";
 
-vi.mock("axios");
+vi.mock("@/services/api", () => ({
+  default: { get: vi.fn(), post: vi.fn(), put: vi.fn(), delete: vi.fn() },
+  LONG_REQUEST_TIMEOUT: 600000,
+}));
 
 describe("kiosks store", () => {
   beforeEach(() => {
@@ -13,7 +16,7 @@ describe("kiosks store", () => {
   });
 
   it("loadKiosks populates the list", async () => {
-    axios.get.mockResolvedValue({
+    api.get.mockResolvedValue({
       data: {
         kiosks: [
           { id: "k1", hostname: "pi", lastSeen: "2026-07-12T00:00:00Z", lastAppliedVersion: null },
@@ -23,32 +26,48 @@ describe("kiosks store", () => {
     const store = useKiosksStore();
     await store.loadKiosks();
     expect(store.kiosks.map(k => k.id)).toEqual(["k1"]);
-    expect(axios.get).toHaveBeenCalledWith("/api/kiosks");
+    expect(api.get).toHaveBeenCalledWith("/kiosks");
   });
 
   it("loadKiosks falls back to cache on network error", async () => {
-    axios.get.mockResolvedValueOnce({ data: { kiosks: [{ id: "k1" }] } });
+    api.get.mockResolvedValueOnce({ data: { kiosks: [{ id: "k1" }] } });
     const store = useKiosksStore();
     await store.loadKiosks(); // seeds cache
-    axios.get.mockRejectedValueOnce(new Error("offline"));
+    api.get.mockRejectedValueOnce(new Error("offline"));
     store.kiosks = [];
     await store.loadKiosks(); // falls back
     expect(store.kiosks.map(k => k.id)).toEqual(["k1"]);
   });
 
+  it("loadKiosks serves expired cache when the request fails", async () => {
+    vi.useFakeTimers();
+    try {
+      api.get.mockResolvedValueOnce({ data: { kiosks: [{ id: "k1" }] } });
+      const store = useKiosksStore();
+      await store.loadKiosks(); // seeds cache
+      vi.advanceTimersByTime(60 * 60 * 1000); // well past the 5 minute TTL
+      api.get.mockRejectedValueOnce(new Error("offline"));
+      store.kiosks = [];
+      await store.loadKiosks();
+      expect(store.kiosks.map(k => k.id)).toEqual(["k1"]);
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+
   it("fetchOverrides returns the layer, maps 404 to empty", async () => {
     const store = useKiosksStore();
-    axios.get.mockResolvedValueOnce({ data: { id: "k1", overrides: { orientation: "portrait" } } });
+    api.get.mockResolvedValueOnce({ data: { id: "k1", overrides: { orientation: "portrait" } } });
     expect(await store.fetchOverrides("k1")).toEqual({ orientation: "portrait" });
-    axios.get.mockRejectedValueOnce({ response: { status: 404 } });
+    api.get.mockRejectedValueOnce({ response: { status: 404 } });
     expect(await store.fetchOverrides("ghost")).toEqual({});
   });
 
   it("saveOverrides PUTs the layer with an encoded id", async () => {
-    axios.put.mockResolvedValue({ data: {} });
+    api.put.mockResolvedValue({ data: {} });
     const store = useKiosksStore();
     await store.saveOverrides("a b", { orientation: "portrait" });
-    expect(axios.put).toHaveBeenCalledWith("/api/kiosks/a%20b/overrides", {
+    expect(api.put).toHaveBeenCalledWith("/kiosks/a%20b/overrides", {
       overrides: { orientation: "portrait" },
     });
   });
@@ -61,30 +80,30 @@ describe("kiosks store — fetchDeviceConfigVersion", () => {
   });
 
   it("returns deviceConfigVersion from GET /config", async () => {
-    vi.spyOn(axios, "get").mockResolvedValue({ data: { deviceConfigVersion: "9f2a" } });
+    vi.spyOn(api, "get").mockResolvedValue({ data: { deviceConfigVersion: "9f2a" } });
     const store = useKiosksStore();
     const v = await store.fetchDeviceConfigVersion("k1");
     expect(v).toBe("9f2a");
-    expect(axios.get).toHaveBeenCalledWith("/api/kiosks/k1/config");
+    expect(api.get).toHaveBeenCalledWith("/kiosks/k1/config");
   });
 
   it("returns null when the request fails", async () => {
-    vi.spyOn(axios, "get").mockRejectedValue(new Error("network"));
+    vi.spyOn(api, "get").mockRejectedValue(new Error("network"));
     const store = useKiosksStore();
     expect(await store.fetchDeviceConfigVersion("k1")).toBeNull();
   });
 
   it("returns null when the field is missing", async () => {
-    vi.spyOn(axios, "get").mockResolvedValue({ data: {} });
+    vi.spyOn(api, "get").mockResolvedValue({ data: {} });
     const store = useKiosksStore();
     expect(await store.fetchDeviceConfigVersion("k1")).toBeNull();
   });
 
   it("url-encodes the id", async () => {
-    vi.spyOn(axios, "get").mockResolvedValue({ data: { deviceConfigVersion: "x" } });
+    vi.spyOn(api, "get").mockResolvedValue({ data: { deviceConfigVersion: "x" } });
     const store = useKiosksStore();
     await store.fetchDeviceConfigVersion("a/b");
-    expect(axios.get).toHaveBeenCalledWith("/api/kiosks/a%2Fb/config");
+    expect(api.get).toHaveBeenCalledWith("/kiosks/a%2Fb/config");
   });
 });
 
@@ -95,19 +114,19 @@ describe("kiosks store — triggerUpdate", () => {
   });
 
   it("POSTs the update and refreshes the list", async () => {
-    axios.post.mockResolvedValue({ data: { id: "k1", requested: true } });
-    axios.get.mockResolvedValue({ data: { kiosks: [] } });
+    api.post.mockResolvedValue({ data: { id: "k1", requested: true } });
+    api.get.mockResolvedValue({ data: { kiosks: [] } });
     const store = useKiosksStore();
     await store.triggerUpdate("k1");
-    expect(axios.post).toHaveBeenCalledWith("/api/kiosks/k1/update");
-    expect(axios.get).toHaveBeenCalledWith("/api/kiosks");
+    expect(api.post).toHaveBeenCalledWith("/kiosks/k1/update");
+    expect(api.get).toHaveBeenCalledWith("/kiosks");
   });
 
   it("url-encodes the id in the POST path", async () => {
-    axios.post.mockResolvedValue({ data: {} });
-    axios.get.mockResolvedValue({ data: { kiosks: [] } });
+    api.post.mockResolvedValue({ data: {} });
+    api.get.mockResolvedValue({ data: { kiosks: [] } });
     const store = useKiosksStore();
     await store.triggerUpdate("a/b");
-    expect(axios.post).toHaveBeenCalledWith("/api/kiosks/a%2Fb/update");
+    expect(api.post).toHaveBeenCalledWith("/kiosks/a%2Fb/update");
   });
 });

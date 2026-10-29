@@ -3,16 +3,18 @@
 import { describe, it, expect, beforeEach, vi } from "vitest";
 import { setActivePinia, createPinia } from "pinia";
 import { useConfigStore } from "@/stores/config";
-import axios from "axios";
+import api from "@/services/api";
 
-// Mock axios
-vi.mock("axios");
+vi.mock("@/services/api", () => ({
+  default: { get: vi.fn(), post: vi.fn(), put: vi.fn(), delete: vi.fn() },
+}));
 
 describe("Config Store", () => {
   beforeEach(() => {
     // Create a fresh pinia instance for each test
     setActivePinia(createPinia());
     vi.clearAllMocks();
+    localStorage.clear();
   });
 
   it("should initialize with default values", () => {
@@ -62,12 +64,12 @@ describe("Config Store", () => {
       showUI: false,
     };
 
-    axios.get.mockResolvedValue({ data: mockConfig });
+    api.get.mockResolvedValue({ data: mockConfig });
 
     const store = useConfigStore();
     await store.fetchConfig();
 
-    expect(axios.get).toHaveBeenCalledWith("/api/config");
+    expect(api.get).toHaveBeenCalledWith("/config");
     expect(store.orientation).toBe("portrait");
     expect(store.calendarSplit).toBe(75);
     expect(store.showUI).toBe(false);
@@ -75,7 +77,7 @@ describe("Config Store", () => {
 
   it("should hydrate snake_case aliases and parse JSON schedule values", async () => {
     const schedule = [{ day: 0, enabled: false, onTime: "07:30", offTime: "21:00" }];
-    axios.get.mockResolvedValue({
+    api.get.mockResolvedValue({
       data: {
         apply_display_rotation: false,
         calendar_refresh_interval: 5,
@@ -96,7 +98,7 @@ describe("Config Store", () => {
   });
 
   it("should normalize dashboard layout and screens through the config registry", async () => {
-    axios.get.mockResolvedValue({
+    api.get.mockResolvedValue({
       data: {
         calendar_split: 60,
         last_side_view_mode: "web_services",
@@ -151,7 +153,7 @@ describe("Config Store", () => {
   });
 
   it("should apply defaults for missing values after fetch", async () => {
-    axios.get.mockResolvedValue({ data: { orientation: "portrait" } });
+    api.get.mockResolvedValue({ data: { orientation: "portrait" } });
 
     const store = useConfigStore();
     store.setLastSideViewMode("web_services");
@@ -174,18 +176,18 @@ describe("Config Store", () => {
       showUI: true,
     };
 
-    axios.post.mockResolvedValue({ data: mockResponse });
+    api.post.mockResolvedValue({ data: mockResponse });
 
     const store = useConfigStore();
     await store.updateConfig(updateData);
 
-    expect(axios.post).toHaveBeenCalledWith("/api/config", updateData);
+    expect(api.post).toHaveBeenCalledWith("/config", updateData);
     expect(store.orientation).toBe("landscape");
     expect(store.calendarSplit).toBe(72);
   });
 
   it("should update all registered config fields from camelCase or snake_case payloads", async () => {
-    axios.post.mockResolvedValue({ data: { show_ui: true, clock_bar_padding: 12 } });
+    api.post.mockResolvedValue({ data: { show_ui: true, clock_bar_padding: 12 } });
 
     const store = useConfigStore();
     await store.updateConfig({
@@ -205,7 +207,7 @@ describe("Config Store", () => {
 
   it("should handle API errors gracefully", async () => {
     const error = new Error("Network error");
-    axios.get.mockRejectedValue(error);
+    api.get.mockRejectedValue(error);
 
     const store = useConfigStore();
     await store.fetchConfig();
@@ -298,7 +300,7 @@ describe("config store — region writes target the effective screen (dd9.8)", (
   beforeEach(() => {
     setActivePinia(createPinia());
     vi.clearAllMocks();
-    axios.post.mockResolvedValue({ data: {} });
+    api.post.mockResolvedValue({ data: {} });
   });
 
   it("kiosk mode: cycleActiveDashboardRegionBy cycles the kiosk-active screen, not global", async () => {
@@ -345,7 +347,7 @@ describe("config store — switch actions branch on kiosk mode", () => {
     setActivePinia(createPinia());
     // Reset call counts then set up resolved value so Mode A tests don't throw.
     vi.clearAllMocks();
-    axios.post.mockResolvedValue({ data: {} });
+    api.post.mockResolvedValue({ data: {} });
   });
 
   it("kiosk mode: activate updates local id, no updateConfig network call", async () => {
@@ -356,7 +358,7 @@ describe("config store — switch actions branch on kiosk mode", () => {
     await store.activateDashboardScreen("c");
     expect(store.kioskActiveScreenId).toBe("c");
     // Spy on real network layer — vacuous store-proxy spy replaced with genuine guard.
-    expect(axios.post).not.toHaveBeenCalled();
+    expect(api.post).not.toHaveBeenCalled();
   });
 
   it("kiosk mode: cycle updates local id among available, no updateConfig", async () => {
@@ -368,7 +370,7 @@ describe("config store — switch actions branch on kiosk mode", () => {
     await store.cycleDashboardScreenBy(1);
     expect(store.kioskActiveScreenId).toBe("c"); // next available after "a" is "c"
     // Spy on real network layer — vacuous store-proxy spy replaced with genuine guard.
-    expect(axios.post).not.toHaveBeenCalled();
+    expect(api.post).not.toHaveBeenCalled();
   });
 
   it("Mode A: activate still persists via updateConfig (regression)", async () => {
@@ -376,20 +378,72 @@ describe("config store — switch actions branch on kiosk mode", () => {
     const store = useConfigStore();
     store.dashboardScreens = SCREENS;
     // Note: in Pinia setup stores, internal calls go via closure (not the proxy),
-    // so we spy on axios.post instead of store.updateConfig to verify persistence.
-    const spy = vi.spyOn(axios, "post");
+    // so we spy on api.post instead of store.updateConfig to verify persistence.
+    const spy = vi.spyOn(api, "post");
     await store.activateDashboardScreen("c");
     expect(spy).toHaveBeenCalled();
   });
 
-  it("Mode A: cycleDashboardScreenBy persists via axios.post (global path)", async () => {
+  it("Mode A: cycleDashboardScreenBy persists via api.post (global path)", async () => {
     setSearch("");
     const store = useConfigStore();
     store.dashboardScreens = SCREENS;
     // In Pinia setup stores, internal calls go via closure (not the proxy), so spy on
-    // axios.post directly — a store.updateConfig spy is vacuous for the same reason as above.
-    const spy = vi.spyOn(axios, "post");
+    // api.post directly — a store.updateConfig spy is vacuous for the same reason as above.
+    const spy = vi.spyOn(api, "post");
     await store.cycleDashboardScreenBy(1);
     expect(spy).toHaveBeenCalled();
+  });
+});
+
+describe("config store — offline cache (audit R7)", () => {
+  beforeEach(() => {
+    setActivePinia(createPinia());
+    vi.clearAllMocks();
+    localStorage.clear();
+    vi.useRealTimers();
+  });
+
+  it("serves the cached config, flagged stale, when the backend is unreachable at boot", async () => {
+    api.get.mockResolvedValueOnce({ data: { orientation: "portrait", calendarSplit: 60 } });
+    await useConfigStore().fetchConfig();
+
+    // A reload while the backend is down, long after the cache's TTL.
+    setActivePinia(createPinia());
+    vi.useFakeTimers();
+    vi.setSystemTime(Date.now() + 3 * 24 * 60 * 60 * 1000);
+    api.get.mockRejectedValueOnce(new Error("Network Error"));
+    const store = useConfigStore();
+    await store.fetchConfig();
+    vi.useRealTimers();
+
+    expect(store.orientation).toBe("portrait");
+    expect(store.calendarSplit).toBe(60);
+    expect(store.stale).toBe(true);
+    expect(store.error).toBe(null);
+  });
+
+  it("keeps the live config when a later poll fails", async () => {
+    api.get.mockResolvedValueOnce({ data: { orientation: "portrait" } });
+    const store = useConfigStore();
+    await store.fetchConfig();
+    await store.updateConfig({ orientation: "landscape" });
+
+    api.get.mockRejectedValueOnce(new Error("Network Error"));
+    await store.fetchConfig();
+
+    // The cached copy is older than the in-memory change: it must not win.
+    expect(store.orientation).toBe("landscape");
+    expect(store.stale).toBe(false);
+    expect(store.error).toBe("Network Error");
+  });
+
+  it("reports the error when there is nothing cached", async () => {
+    api.get.mockRejectedValueOnce(new Error("Network Error"));
+    const store = useConfigStore();
+    await store.fetchConfig();
+
+    expect(store.error).toBe("Network Error");
+    expect(store.stale).toBe(false);
   });
 });

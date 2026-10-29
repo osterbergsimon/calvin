@@ -7,36 +7,93 @@ const CACHE_PREFIX = "calvin_cache_";
 const CACHE_TIMESTAMP_PREFIX = "calvin_cache_ts_";
 
 /**
- * Get cached data if it exists and is not expired.
+ * Read a cache entry without deleting it, expired or not.
+ *
+ * Expired entries are kept on purpose: an offline kiosk reload after the TTL
+ * should still show the last known data (flagged stale) rather than nothing.
  *
  * @param {string} key - Cache key
  * @param {number} ttl - Time to live in milliseconds (default: 1 hour)
- * @returns {any|null} Cached data or null if expired/not found
+ * @returns {{data: any, age: number, stale: boolean}|null} Entry or null if not found
  */
-export function getCachedData(key, ttl = 60 * 60 * 1000) {
+export function getCachedEntry(key, ttl = 60 * 60 * 1000) {
   try {
-    const cacheKey = `${CACHE_PREFIX}${key}`;
-    const timestampKey = `${CACHE_TIMESTAMP_PREFIX}${key}`;
-
-    const cachedData = localStorage.getItem(cacheKey);
-    const cachedTimestamp = localStorage.getItem(timestampKey);
+    const cachedData = localStorage.getItem(`${CACHE_PREFIX}${key}`);
+    const cachedTimestamp = localStorage.getItem(`${CACHE_TIMESTAMP_PREFIX}${key}`);
 
     if (!cachedData || !cachedTimestamp) {
       return null;
     }
 
     const age = Date.now() - parseInt(cachedTimestamp, 10);
-    if (age > ttl) {
-      // Cache expired, remove it
-      localStorage.removeItem(cacheKey);
-      localStorage.removeItem(timestampKey);
-      return null;
-    }
-
-    return JSON.parse(cachedData);
+    return { data: JSON.parse(cachedData), age, stale: !(age <= ttl) };
   } catch (error) {
     console.error(`[Cache] Error reading cache for key ${key}:`, error);
     return null;
+  }
+}
+
+/**
+ * Get cached data if it exists and is not expired.
+ *
+ * @param {string} key - Cache key
+ * @param {number} ttl - Time to live in milliseconds (default: 1 hour)
+ * @param {{allowStale?: boolean}} [options] - allowStale also returns expired data
+ * @returns {any|null} Cached data or null if expired/not found
+ */
+export function getCachedData(key, ttl = 60 * 60 * 1000, { allowStale = false } = {}) {
+  const entry = getCachedEntry(key, ttl);
+  if (!entry || (entry.stale && !allowStale)) {
+    return null;
+  }
+  return entry.data;
+}
+
+/**
+ * Fetch through `request`, falling back to the offline cache.
+ *
+ * - When `preferCache` is set (the app knows it is offline) a cached entry is
+ *   served without touching the network. `stale` is true whenever the data
+ *   did not just come from the backend, however young the entry is.
+ * - Otherwise the request runs; its result is cached only when
+ *   `shouldCache(data)` agrees, so a partial result never overwrites a good one.
+ * - When the request fails, any cached entry is served, expired ones included,
+ *   and flagged stale; the entry is left as it is. With no cache the error is
+ *   rethrown. A response the service worker replayed from its cache arrives
+ *   here as such a failure (services/api.js rejects it), so it is never
+ *   mistaken for fresh data or written back with a new timestamp.
+ *
+ * @param {string} key - Cache key
+ * @param {number} ttl - Time to live in milliseconds
+ * @param {() => Promise<any>} request - Loads fresh data
+ * @param {{preferCache?: boolean, shouldCache?: (data: any) => boolean}} [options]
+ * @returns {Promise<{data: any, fromCache: boolean, stale: boolean}>}
+ */
+export async function fetchWithCache(
+  key,
+  ttl,
+  request,
+  { preferCache = false, shouldCache = () => true } = {}
+) {
+  if (preferCache) {
+    const entry = getCachedEntry(key, ttl);
+    if (entry) {
+      return { data: entry.data, fromCache: true, stale: true };
+    }
+  }
+
+  try {
+    const data = await request();
+    if (shouldCache(data)) {
+      setCachedData(key, data);
+    }
+    return { data, fromCache: false, stale: false };
+  } catch (error) {
+    const entry = getCachedEntry(key, ttl);
+    if (entry) {
+      return { data: entry.data, fromCache: true, stale: true };
+    }
+    throw error;
   }
 }
 

@@ -3,7 +3,8 @@ import vue from "@vitejs/plugin-vue";
 import { fileURLToPath, URL } from "node:url";
 import { execSync } from "child_process";
 import { join, dirname } from "path";
-import { existsSync } from "fs";
+import { existsSync, readFileSync, writeFileSync } from "fs";
+import { createHash } from "crypto";
 
 // Get git version (commit short hash) for frontend version
 function getGitVersion() {
@@ -52,10 +53,38 @@ function getGitVersion() {
 
 const frontendVersion = getGitVersion();
 
+// Stamp public/sw.js (copied verbatim into dist/) with a hash of this build's
+// output file names. Those names carry content hashes, so every deploy that
+// changes the UI gets new service-worker cache names and the browser sees a
+// changed sw.js, which makes it install the new worker and drop old caches.
+function serviceWorkerBuildId() {
+  let buildId = null;
+  let outDir = "dist";
+  return {
+    name: "calvin-sw-build-id",
+    apply: "build",
+    configResolved(config) {
+      outDir = config.build.outDir;
+      if (!outDir.startsWith("/")) outDir = join(config.root, outDir);
+    },
+    generateBundle(_options, bundle) {
+      const names = Object.keys(bundle).sort().join("\n");
+      buildId = createHash("sha256").update(names).digest("hex").slice(0, 12);
+    },
+    closeBundle() {
+      const swPath = join(outDir, "sw.js");
+      if (!buildId || !existsSync(swPath)) return;
+      const source = readFileSync(swPath, "utf-8");
+      writeFileSync(swPath, source.replaceAll("__CALVIN_BUILD_ID__", buildId));
+    },
+  };
+}
+
 // https://vitejs.dev/config/
 export default defineConfig({
   plugins: [
     vue(),
+    serviceWorkerBuildId(),
     {
       name: "inject-build-timestamp",
       transformIndexHtml(html) {

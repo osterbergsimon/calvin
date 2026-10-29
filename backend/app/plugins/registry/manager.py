@@ -76,8 +76,11 @@ async def register_plugin(
 
     await _save_plugin_to_db()
 
-    # Initialize plugin
+    # Initialize plugin, and mark an enabled one running: data routes (e.g.
+    # GET /plugins/{id}/data) refuse instances that aren't running.
     await plugin.initialize()
+    if plugin.enabled:
+        plugin.start()
 
     return plugin
 
