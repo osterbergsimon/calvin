@@ -136,6 +136,7 @@ export function useOnScreenKeyboard() {
   const { isTouch } = useTouchCapability();
 
   const visible = ref(false);
+  const viewportWidth = ref(typeof window !== "undefined" ? window.innerWidth : 0);
   const target = ref(null);
   const layout = ref("default");
   // The letter layout to return to from the symbols/accents layers.
@@ -159,7 +160,7 @@ export function useOnScreenKeyboard() {
     if (value === "on") return true;
     if (value === "off") return false;
     if (typeof window === "undefined") return false;
-    return isTouch.value && window.innerWidth >= MIN_AUTO_WIDTH;
+    return isTouch.value && viewportWidth.value >= MIN_AUTO_WIDTH;
   });
 
   const currentHeight = () => {
@@ -489,6 +490,7 @@ export function useOnScreenKeyboard() {
   };
 
   const onResize = () => {
+    viewportWidth.value = window.innerWidth;
     if (!visible.value) return;
     syncHeight();
     scrollTargetIntoView(target.value);
@@ -500,6 +502,7 @@ export function useOnScreenKeyboard() {
   const start = () => {
     if (started || typeof document === "undefined") return;
     started = true;
+    viewportWidth.value = window.innerWidth;
     height.value = 0;
     publishHeight();
     document.addEventListener("focusin", onFocusIn);

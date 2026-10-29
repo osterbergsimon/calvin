@@ -147,6 +147,23 @@ describe("OnScreenKeyboard", () => {
       expect(isShown()).toBe(true);
     });
 
+    it("hides an auto-mode keyboard if the viewport shrinks under 720px", async () => {
+      config.onScreenKeyboard = "auto";
+      setTouchPoints(5);
+      setWidth(800);
+      mountOsk();
+      const input = addInput();
+      await focus(input);
+      expect(isShown()).toBe(true);
+
+      setWidth(600);
+      window.dispatchEvent(new Event("resize"));
+      await nextTick();
+      await nextTick();
+
+      expect(isShown()).toBe(false);
+    });
+
     it("never shows when the setting is off", async () => {
       config.onScreenKeyboard = "off";
       setTouchPoints(5);
