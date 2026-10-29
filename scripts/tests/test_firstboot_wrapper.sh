@@ -30,6 +30,9 @@ export CALVIN_KIOSK_INSTALLER="$tmp/installer.sh"
 export CALVIN_FIRSTBOOT_SENTINEL="$tmp/firstboot.done"
 export CALVIN_KIOSK_ENV_FILE="$tmp/calvin-kiosk"
 export CALVIN_FIRSTBOOT_POLL_SECS=0
+# K6: status goes to the screen too (tty1 on the Pi).
+export CALVIN_FIRSTBOOT_CONSOLE="$tmp/console"
+: > "$CALVIN_FIRSTBOOT_CONSOLE"
 cat > "$CALVIN_KIOSK_ENV_FILE" <<EOF
 CALVIN_BACKEND_URL=http://homeserver.local:8000
 EOF
@@ -40,6 +43,9 @@ if MOCK_SERVER_DOWN=1 CALVIN_FIRSTBOOT_WAIT_SECS=0 bash "$WRAPPER" 2>/dev/null; 
 [ ! -f "$tmp/install.log" ] || { echo "FAIL: installed with the server down"; exit 1; }
 [ ! -f "$CALVIN_FIRSTBOOT_SENTINEL" ] || { echo "FAIL: sentinel written on failure"; exit 1; }
 [ ! -f "$tmp/systemctl.log" ] || { echo "FAIL: rebooted on failure"; exit 1; }
+grep -q 'Waiting for the Calvin server at http://homeserver.local:8000' "$tmp/console" \
+    || { echo "FAIL: no on-screen waiting status"; cat "$tmp/console" 2>/dev/null; exit 1; }
+grep -qi 'retry' "$tmp/console" || { echo "FAIL: screen does not say it will retry"; exit 1; }
 echo "PASS firstboot-waits-for-server"
 rm -f "$tmp/curl.log"
 
@@ -53,6 +59,7 @@ grep -qx 'INSTALL --backend-url http://homeserver.local:8000 --no-reboot' "$tmp/
 grep -q "disable calvin-kiosk-firstboot.service" "$tmp/systemctl.log" \
     || { echo "FAIL: firstboot unit not disabled"; exit 1; }
 grep -qw "reboot" "$tmp/systemctl.log" || { echo "FAIL: no reboot requested"; exit 1; }
+grep -q 'Installing' "$tmp/console" || { echo "FAIL: no on-screen install status"; exit 1; }
 echo "PASS firstboot-runs-installer"
 
 # Second run: sentinel present => no new install, exits 0.

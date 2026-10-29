@@ -17,6 +17,8 @@ set -euo pipefail
 
 # Allow tests to source this file for its functions without executing setup.
 _CALVIN_SOURCE_ONLY=0
+BACKEND_URL=""
+SIGNING_KEY=""
 for _arg in "$@"; do
     if [ "$_arg" = "--source-only" ]; then
         _CALVIN_SOURCE_ONLY=1
@@ -71,21 +73,81 @@ compute_default_kiosk_id() {
     printf '%s-%s\n' "$host" "$suffix"
 }
 
+# Upserts only the keys setup owns: the rotation/output/resolution settings
+# operators keep in this file (DEPLOYMENT_TOPOLOGIES) survive a re-run.
 install_kiosk_config() {
     local env_file="${CALVIN_KIOSK_ENV_FILE:-/etc/default/calvin-kiosk}"
-    log "Writing ${env_file}..."
-    # Preserve operator-set CALVIN_KIOSK_ID / CALVIN_KIOSK_HOSTNAME across file
-    # recreation (same pattern for both — an operator override wins over defaults).
+    log "Updating ${env_file}..."
+    # An operator-set CALVIN_KIOSK_ID / CALVIN_KIOSK_HOSTNAME wins over defaults.
     local existing_id="" existing_host=""
     if [ -f "$env_file" ]; then
         existing_id="$(grep '^CALVIN_KIOSK_ID=' "$env_file" | cut -d= -f2- || true)"
         existing_host="$(grep '^CALVIN_KIOSK_HOSTNAME=' "$env_file" | cut -d= -f2- || true)"
+    else
+        install -m 0644 /dev/null "$env_file"
     fi
-    install -m 0644 /dev/null "$env_file"
     upsert_env_value "$env_file" CALVIN_BACKEND_URL "${BACKEND_URL}"
     upsert_env_value "$env_file" CALVIN_KIOSK_ID "${existing_id:-$(compute_default_kiosk_id)}"
     upsert_env_value "$env_file" CALVIN_KIOSK_HOSTNAME \
         "${existing_host:-$(compute_default_kiosk_hostname)}"
+}
+
+usage() {
+    cat <<EOF
+Usage: setup-kiosk.sh --backend-url <URL>
+
+Sets up a Raspberry Pi as a dumb kiosk pointed at a remote Calvin
+backend. Installs X, openbox, and Chromium, then enables a systemd
+unit that opens the dashboard URL on boot.
+
+Required:
+  --backend-url <URL>   Where the Calvin backend lives, e.g.
+                        http://homeserver.local:8000
+
+Options:
+  --signing-key-file <FILE>  File holding the server's kiosk-signing.key (hex)
+  --signing-key <HEX>        Same, inline (visible in ps and shell history)
+EOF
+}
+
+parse_args() {
+    while [ "$#" -gt 0 ]; do
+        case "$1" in
+            --backend-url)
+                BACKEND_URL="${2:-}"
+                shift 2
+                ;;
+            --backend-url=*)
+                BACKEND_URL="${1#*=}"
+                shift
+                ;;
+            --signing-key) SIGNING_KEY="${2:-}"; shift 2 ;;
+            --signing-key=*) SIGNING_KEY="${1#*=}"; shift ;;
+            --signing-key-file) SIGNING_KEY="$(tr -d '[:space:]' < "${2:-}")"; shift 2 ;;
+            --signing-key-file=*) SIGNING_KEY="$(tr -d '[:space:]' < "${1#*=}")"; shift ;;
+            --source-only) shift ;;
+            -h|--help)
+                usage
+                exit 0
+                ;;
+            *)
+                echo "Unknown argument: $1" >&2
+                usage >&2
+                exit 1
+                ;;
+        esac
+    done
+
+    if [ -z "${BACKEND_URL}" ]; then
+        echo "Error: --backend-url is required" >&2
+        usage >&2
+        exit 1
+    fi
+
+    if ! echo "${BACKEND_URL}" | grep -qE '^https?://'; then
+        echo "Error: --backend-url must start with http:// or https:// (got: ${BACKEND_URL})" >&2
+        exit 1
+    fi
 }
 
 # When sourced for testing, stop here — it only halts execution when the file is
@@ -153,65 +215,6 @@ GIT_REPO="${_ENV_GIT_REPO:-${GIT_REPO:-$DEFAULT_GIT_REPO}}"
 GIT_BRANCH="${_ENV_GIT_BRANCH:-${GIT_BRANCH:-$DEFAULT_GIT_BRANCH}}"
 CALVIN_USER="${CALVIN_USER:-$DEFAULT_CALVIN_USER}"
 LOG_FILE="${LOG_FILE:-$DEFAULT_LOG_FILE}"
-BACKEND_URL=""
-SIGNING_KEY=""
-
-usage() {
-    cat <<EOF
-Usage: setup-kiosk.sh --backend-url <URL>
-
-Sets up a Raspberry Pi as a dumb kiosk pointed at a remote Calvin
-backend. Installs X, openbox, and Chromium, then enables a systemd
-unit that opens the dashboard URL on boot.
-
-Required:
-  --backend-url <URL>   Where the Calvin backend lives, e.g.
-                        http://homeserver.local:8000
-
-Options:
-  --signing-key <HEX>   Out-of-band 0600 manifest signing secret (hex)
-
-Environment overrides:
-  GIT_REPO, GIT_BRANCH, CALVIN_USER
-EOF
-}
-
-parse_args() {
-    while [ "$#" -gt 0 ]; do
-        case "$1" in
-            --backend-url)
-                BACKEND_URL="${2:-}"
-                shift 2
-                ;;
-            --backend-url=*)
-                BACKEND_URL="${1#*=}"
-                shift
-                ;;
-            --signing-key) SIGNING_KEY="${2:-}"; shift 2 ;;
-            --signing-key=*) SIGNING_KEY="${1#*=}"; shift ;;
-            -h|--help)
-                usage
-                exit 0
-                ;;
-            *)
-                echo "Unknown argument: $1" >&2
-                usage >&2
-                exit 1
-                ;;
-        esac
-    done
-
-    if [ -z "${BACKEND_URL}" ]; then
-        echo "Error: --backend-url is required" >&2
-        usage >&2
-        exit 1
-    fi
-
-    if ! echo "${BACKEND_URL}" | grep -qE '^https?://'; then
-        echo "Error: --backend-url must start with http:// or https:// (got: ${BACKEND_URL})" >&2
-        exit 1
-    fi
-}
 
 systemd_available() {
     [ -d /run/systemd/system ] && systemctl list-unit-files >/dev/null 2>&1
@@ -240,6 +243,7 @@ start_kiosk_services() {
 
 main() {
     parse_args "$@"
+    require_fixed_calvin_user
 
     log "=========================================="
     log "Calvin Raspberry Pi Kiosk Setup"
@@ -251,38 +255,23 @@ main() {
     check_root
     mkdir -p "$(dirname "${LOG_FILE}")"
 
+    # (A baked --ssh-pubkey goes to the admin user firstrun.sh creates on boot 1,
+    # not to calvin: calvin runs Chromium and has no sudo.)
     ensure_user_exists "${CALVIN_USER}"
-    # A baked SSH key (from firstrun seeding) makes the kiosk reachable for
-    # recovery; CALVIN_KIOSK_SSH_PUBKEY is read from /etc/default/calvin-kiosk.
-    if [ -f /etc/default/calvin-kiosk ]; then
-        # shellcheck disable=SC1091
-        . /etc/default/calvin-kiosk
-    fi
-    install_authorized_key "${CALVIN_USER}" "${CALVIN_KIOSK_SSH_PUBKEY:-}"
     update_system_packages
 
     log "Installing kiosk dependencies..."
     # sudo: the display agent triggers remote updates via the sudoers fragment
     # below (present on Raspberry Pi OS, absent on minimal Debian images).
-    install_system_packages \
-        curl \
-        sudo \
-        xserver-xorg \
-        xinit \
-        openbox \
-        chromium \
-        unclutter \
-        xdotool \
-        x11-xserver-utils
+    install_system_packages "${CALVIN_KIOSK_PACKAGES[@]}"
+    configure_unattended_upgrades
 
     install_kiosk_config
     install_signing_key "${SIGNING_KEY}"
     log "Bootstrapping kiosk bundle via update-kiosk.sh --bootstrap from ${BACKEND_URL}..."
     bootstrap_kiosk "${BACKEND_URL}"
-    log "Installing sudoers fragment..."
-    install -m 0440 /dev/stdin /etc/sudoers.d/calvin-kiosk-update <<'SUDOERS'
-calvin ALL=(root) NOPASSWD: /bin/systemctl start --no-block calvin-kiosk-update.service
-SUDOERS
+    install_sudoers_fragment calvin-kiosk-update \
+        "${CALVIN_USER} ALL=(root) NOPASSWD: /bin/systemctl start --no-block calvin-kiosk-update.service"
 
     configure_display "${CALVIN_USER}"
     # Chromium is managed by calvin-kiosk-remote.service; openbox

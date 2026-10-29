@@ -5,6 +5,8 @@ on:
     branches: [main, develop]
     paths:
       - 'scripts/**'
+      - 'deploy/kiosk-agent/**'
+      - 'deploy/systemd/**'
       - 'backend/pyproject.toml'
       - 'backend/uv.lock'
       - 'frontend/package.json'
@@ -13,6 +15,8 @@ on:
     branches: [main, develop]
     paths:
       - 'scripts/**'
+      - 'deploy/kiosk-agent/**'
+      - 'deploy/systemd/**'
       - 'backend/pyproject.toml'
       - 'backend/uv.lock'
       - 'frontend/package.json'
@@ -32,11 +36,18 @@ jobs:
       - name: Check bash script syntax
         run: |
           echo "Checking bash script syntax..."
-          find scripts -name "*.sh" -type f | while read script; do
+          find scripts deploy/kiosk-agent -name "*.sh" -type f | while read script; do
             echo "Checking $script..."
             bash -n "$script" || exit 1
           done
           echo "All bash scripts have valid syntax ✓"
+
+      - name: ShellCheck
+        run: |
+          # ubuntu-latest ships shellcheck. -x follows `. setup-common.sh` etc.
+          shellcheck --version
+          find scripts deploy/kiosk-agent -name "*.sh" -type f -print0 \
+            | xargs -0 shellcheck -x -P SCRIPTDIR
       
       - name: Check script permissions
         run: |

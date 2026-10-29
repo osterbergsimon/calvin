@@ -1,4 +1,5 @@
 #!/usr/bin/env bash
+# shellcheck disable=SC2031  # the (subshell) blocks only read $tmp
 set -euo pipefail
 here="$(dirname "$0")"
 tmp="$(mktemp -d)"; trap 'rm -rf "$tmp"' EXIT

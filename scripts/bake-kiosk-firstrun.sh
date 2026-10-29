@@ -19,6 +19,7 @@ REPO_ROOT="$(cd "${SCRIPT_DIR}/.." && pwd)"
 
 BACKEND_URL=""; WIFI_SSID=""; WIFI_PSK=""; WIFI_COUNTRY=""
 HOSTNAME_ARG=""; SSH_PUBKEY_FILE=""; BOOT_DIR=""; SIGNING_KEY=""
+ADMIN_USER="calvin-admin"
 
 usage() {
     cat <<EOF
@@ -34,7 +35,10 @@ Options:
   --wifi-ssid <SSID>    Wifi network name (requires --wifi-country)
   --wifi-psk <PSK>      Wifi passphrase
   --wifi-country <CC>   Wifi regulatory domain, e.g. SE (required with wifi)
-  --ssh-pubkey <FILE>   Public key to install for the calvin user
+  --ssh-pubkey <FILE>   Public key for SSH recovery access. Installed for the
+                        admin user (passwordless sudo, key-only login), not
+                        for calvin. Without it the kiosk has no admin login.
+  --admin-user <NAME>   Name of that admin user (default: calvin-admin)
   --signing-key <HEX>   The server's kiosk-signing.key (hex), read out-of-band
   --signing-key-file <FILE>
                         Read the signing key from a file (preferred)
@@ -45,6 +49,7 @@ parse_args() {
     # Reset flag-driven globals so repeated calls (and tests) don't accumulate.
     BACKEND_URL=""; WIFI_SSID=""; WIFI_PSK=""; WIFI_COUNTRY=""
     HOSTNAME_ARG=""; SSH_PUBKEY_FILE=""; BOOT_DIR=""; SIGNING_KEY=""
+    ADMIN_USER="calvin-admin"
     while [ "$#" -gt 0 ]; do
         case "$1" in
             --backend-url) BACKEND_URL="${2:-}"; shift 2 ;;
@@ -61,6 +66,8 @@ parse_args() {
             --wifi-country=*) WIFI_COUNTRY="${1#*=}"; shift ;;
             --ssh-pubkey) SSH_PUBKEY_FILE="${2:-}"; shift 2 ;;
             --ssh-pubkey=*) SSH_PUBKEY_FILE="${1#*=}"; shift ;;
+            --admin-user) ADMIN_USER="${2:-}"; shift 2 ;;
+            --admin-user=*) ADMIN_USER="${1#*=}"; shift ;;
             --signing-key) SIGNING_KEY="${2:-}"; shift 2 ;;
             --signing-key=*) SIGNING_KEY="${1#*=}"; shift ;;
             --signing-key-file) SIGNING_KEY="$(tr -d '[:space:]' < "${2:-}")"; shift 2 ;;
@@ -85,6 +92,9 @@ validate_args() {
         echo "Error: --wifi-country is required when --wifi-ssid is set" >&2; return 1; fi
     if [ -n "${SSH_PUBKEY_FILE}" ] && grep -q "'" "${SSH_PUBKEY_FILE}"; then
         echo "Error: --ssh-pubkey file must not contain a single quote (edit its comment)" >&2; return 1; fi
+    if ! printf '%s' "${ADMIN_USER}" | grep -qE '^[a-z_][a-z0-9_-]{0,31}$' \
+        || [ "${ADMIN_USER}" = calvin ] || [ "${ADMIN_USER}" = root ]; then
+        echo "Error: --admin-user must be a lowercase user name other than calvin or root (got: ${ADMIN_USER})" >&2; return 1; fi
     if [ -n "${SIGNING_KEY}" ] && ! printf '%s' "${SIGNING_KEY}" | grep -qE '^[0-9a-fA-F]{64}$'; then
         echo "Error: signing key must be 64 hex characters (the content of kiosk-signing.key)" >&2; return 1; fi
     return 0
@@ -107,6 +117,9 @@ emit_firstrun() {
 set -euo pipefail
 BOOT_CMDLINE=/boot/firmware/cmdline.txt
 ENV_FILE=/etc/default/calvin-kiosk
+HOME_ROOT=/home
+SUDOERS_DIR=/etc/sudoers.d
+SSHD_CONF_DIR=/etc/ssh/sshd_config.d
 FIRSTRUN_EOF
 
     # --- baked values: printf '%q' produces bash-safe assignments that survive
@@ -121,6 +134,7 @@ FIRSTRUN_EOF
     emit_var BACKEND_URL     "${BACKEND_URL}"
     emit_var SSH_PUBKEY      "${pubkey}"
     emit_var SIGNING_KEY     "${SIGNING_KEY}"
+    emit_var ADMIN_USER      "${ADMIN_USER}"
 
     cat <<'FIRSTRUN_EOF'
 
@@ -157,14 +171,34 @@ fi
 # 3. SSH on for recovery.
 systemctl enable ssh >/dev/null 2>&1 || true
 
+# 3b. Recovery admin: the baked key gets a sudo-capable user (key-only login,
+#     passwordless sudo, as RPi OS's own default user had). calvin runs Chromium
+#     and gets neither. Without a key nobody could log in, so no user then.
+if [ -n "${SSH_PUBKEY}" ]; then
+    id "${ADMIN_USER}" >/dev/null 2>&1 || useradd -m -s /bin/bash -G sudo "${ADMIN_USER}"
+    usermod -aG sudo "${ADMIN_USER}" || true
+    passwd -l "${ADMIN_USER}" >/dev/null 2>&1 || true
+    install -d -m 700 "${HOME_ROOT}/${ADMIN_USER}/.ssh"
+    printf '%s\n' "${SSH_PUBKEY}" > "${HOME_ROOT}/${ADMIN_USER}/.ssh/authorized_keys"
+    chmod 600 "${HOME_ROOT}/${ADMIN_USER}/.ssh/authorized_keys"
+    chown -R "${ADMIN_USER}:${ADMIN_USER}" "${HOME_ROOT}/${ADMIN_USER}/.ssh"
+    # Name without a dot: sudo's #includedir skips such files, so the .tmp is inert.
+    printf '%s ALL=(ALL) NOPASSWD: ALL\n' "${ADMIN_USER}" > "${SUDOERS_DIR}/010_calvin-admin.tmp"
+    chmod 0440 "${SUDOERS_DIR}/010_calvin-admin.tmp"
+    if visudo -c -q -f "${SUDOERS_DIR}/010_calvin-admin.tmp" >/dev/null 2>&1; then
+        mv "${SUDOERS_DIR}/010_calvin-admin.tmp" "${SUDOERS_DIR}/010_calvin-admin"
+    else
+        rm -f "${SUDOERS_DIR}/010_calvin-admin.tmp"
+    fi
+fi
+# 3c. No interactive first-user wizard on boot 2 (Imager customization is not
+#     used, so userconfig would grab tty1 and wait for a keyboard).
+systemctl disable userconfig.service >/dev/null 2>&1 || true
+rm -f "${SSHD_CONF_DIR}/rename_user.conf"
+
 # 4. Seed /etc/default/calvin-kiosk for the boot-2 provisioning service.
 touch "${ENV_FILE}"; chmod 644 "${ENV_FILE}"
-{
-    echo "CALVIN_BACKEND_URL=${BACKEND_URL}"
-    # Single-quoted: the key has spaces, and this file is both sourced by bash
-    # and read as a systemd EnvironmentFile (bake rejects keys containing ').
-    [ -n "${SSH_PUBKEY}" ] && echo "CALVIN_KIOSK_SSH_PUBKEY='${SSH_PUBKEY}'"
-} > "${ENV_FILE}"
+echo "CALVIN_BACKEND_URL=${BACKEND_URL}" > "${ENV_FILE}"
 
 # 4b. Seed the root-only manifest signing key (calvin-5vw), if one was baked.
 if [ -n "${SIGNING_KEY}" ]; then
@@ -230,6 +264,11 @@ main() {
     echo "Baked kiosk firstrun into ${BOOT_DIR}."
     echo "Backend: ${BACKEND_URL}"
     [ -n "${HOSTNAME_ARG}" ] && echo "Hostname: ${HOSTNAME_ARG}"
+    if [ -n "${SSH_PUBKEY_FILE}" ]; then
+        echo "Recovery: ssh ${ADMIN_USER}@<kiosk> (passwordless sudo)"
+    else
+        echo "Note: no --ssh-pubkey, so the kiosk has no admin login for recovery."
+    fi
     echo "Eject the card, boot the Pi, and wait — it self-provisions (2 reboots)."
 }
 

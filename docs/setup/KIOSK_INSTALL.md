@@ -109,10 +109,10 @@ checkout on your workstation (Linux/macOS); the `develop` branch is fine.
    ```
 
    Omit `--wifi-*` on Ethernet. `--ssh-pubkey` is optional and gives you recovery
-   access as the `calvin` user.
+   access as `calvin-admin` (key-only, passwordless sudo; `--admin-user` renames it).
 3. Put the card in the Pi and power on. It reboots twice by itself and comes up on the
    dashboard. Boot 1 applies the hostname, Wi-Fi and SSH. Boot 2 waits for the server,
-   then installs. Boot 3 is the kiosk.
+   then installs, showing its progress on the screen. Boot 3 is the kiosk.
 
 Details and troubleshooting: [KIOSK_PROVISIONING.md](KIOSK_PROVISIONING.md).
 
@@ -128,7 +128,7 @@ install-kiosk.sh (over SSH, piped  ◀──── GET /api/kiosks/install.sh  (
   ├─ fetch setup scripts, check sha  ◀──── GET /api/kiosks/installer/setup-{kiosk,common}.sh
   └─ setup-kiosk.sh
        ├─ apt: X, openbox, Chromium, sudo
-       ├─ /etc/default/calvin-kiosk (server URL, kiosk id, hostname)
+       ├─ /etc/default/calvin-kiosk (server URL, kiosk id, hostname; other keys kept)
        └─ update-kiosk.sh --bootstrap ◀─── GET /api/kiosks/agent/files/*  (verified)
             └─ display agent + calvin-x / calvin-kiosk-remote / calvin-display-agent units
 reboot → Chromium shows Calvin; the agent polls /api/kiosks/<id>/config → listed in Settings → Kiosks
@@ -157,7 +157,7 @@ Calvin version, update the server container; the kiosk follows when you press Up
 - **"server manifest lists no installer files":** the server is older than this installer.
   Update the server container.
 - **Install log:** `/var/log/calvin-setup.log`. For a baked card, run
-  `journalctl -u calvin-kiosk-firstboot` (SSH in with the baked key).
+  `journalctl -u calvin-kiosk-firstboot` (`ssh calvin-admin@<kiosk>` with the baked key).
 - **Kiosk missing from Settings → Kiosks:** `systemctl status calvin-display-agent` on the Pi.
 - **Wrong server later:** edit `CALVIN_BACKEND_URL` in `/etc/default/calvin-kiosk`, then
   `sudo systemctl restart calvin-kiosk-remote calvin-display-agent`.

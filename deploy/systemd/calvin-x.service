@@ -1,12 +1,18 @@
 [Unit]
 Description=Calvin X Server
-After=network.target getty@tty1.service
-Before=calvin-kiosk.service
+# The only thing that starts X on tty1: takes tty1 over from getty (setup also
+# disables getty@tty1 and removes the old autologin + startx-from-.bash_profile).
+After=systemd-user-sessions.service network.target getty@tty1.service
+Conflicts=getty@tty1.service
+Before=calvin-kiosk.service calvin-kiosk-remote.service
 
 [Service]
 Type=simple
 User=calvin
 Group=calvin
+# A logind session on tty1 lets Xorg run rootless (no Xwrapper/legacy setuid).
+PAMName=login
+UtmpIdentifier=tty1
 StandardInput=tty
 StandardOutput=tty
 StandardError=tty
@@ -19,4 +25,3 @@ RestartSec=10
 
 [Install]
 WantedBy=graphical.target
-

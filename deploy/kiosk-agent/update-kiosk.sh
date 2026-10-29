@@ -37,6 +37,20 @@ path_allowed() {  # $1 = absolute target path
   esac
 }
 
+# The bundle's files, pinned (K7): each may only go to its own path with its own
+# mode, and only these units may be restarted or enabled. Keep in sync with
+# BUNDLE_FILES in backend/app/services/kiosk_bundle.py (a backend test checks).
+# A manifest naming a file not listed here is refused, unless it also ships a
+# newer update-kiosk.sh, which is then re-run to install the rest.
+pinned_entry() {  # $1 = name -> "<dir> <mode>"
+  case "$1" in
+    calvin_display_agent.py|update-kiosk.sh) echo "$BIN_DIR 0755" ;;
+    calvin-display-agent.service|calvin-kiosk-remote.service|calvin-x.service|calvin-kiosk-update.service) echo "$SYSTEMD_DIR 0644" ;;
+    *) return 1 ;;
+  esac
+}
+KNOWN_UNITS=" calvin-display-agent.service calvin-kiosk-remote.service calvin-x.service calvin-kiosk-update.service "
+
 name_allowed() {  # $1 = manifest file name; must be a bare filename (calvin-10n)
   case "$1" in
     ''|.|..|*/*|*..*) return 1 ;;             # no empty, dot-dirs, slashes, traversal
@@ -182,6 +196,7 @@ declare -a CHANGED_TARGET=() CHANGED_MODE=() CHANGED_NAME=()
 declare -A RESTART_UNITS=()
 declare -a NEW_ENABLE_UNITS=()
 declare -a DROPPED_TARGETS=()
+declare -a ENABLE_WANTED=() UNKNOWN_NAMES=()
 unit_changed=0
 
 installed_sha() { [ -f "$1" ] && sha256sum "$1" | cut -d' ' -f1 || echo ""; }
@@ -195,6 +210,24 @@ while IFS=$'\t' read -r name sha mode target unit enable; do
   if ! path_allowed "$target"; then
     write_state error verify "target path not allowed: $target" "$version"
     log "target path not allowed: $target"; exit 1
+  fi
+  if ! pinned="$(pinned_entry "$name")"; then
+    UNKNOWN_NAMES+=("$name"); continue   # decided after the loop
+  fi
+  if [ "$target" != "${pinned% *}/$name" ]; then
+    write_state error verify "target path not allowed: $target" "$version"
+    log "target path not allowed for $name: $target"; exit 1
+  fi
+  if [ "$mode" != "${pinned#* }" ]; then
+    write_state error verify "mode $mode not allowed for $name" "$version"
+    log "mode $mode not allowed for $name"; exit 1
+  fi
+  if [ -n "$unit" ] && [ "${KNOWN_UNITS#* "$unit" }" = "$KNOWN_UNITS" ]; then
+    write_state error verify "restart unit not allowed: $unit" "$version"
+    log "restart unit not allowed: $unit"; exit 1
+  fi
+  if [ "$enable" = "1" ]; then
+    case "$target" in "$SYSTEMD_DIR"/*.service) ENABLE_WANTED+=("$name");; esac
   fi
   old="$(installed_sha "$target")"
   if [ "$old" = "$sha" ]; then continue; fi   # unchanged
@@ -222,12 +255,49 @@ done <<< "$files_tsv"
 
 for u in "${NEW_ENABLE_UNITS[@]:-}"; do [ -n "$u" ] && unset 'RESTART_UNITS[$u]'; done
 
+# Files this updater does not know: fine only when the manifest also brings a
+# newer updater (which may know them); it is re-run at the end. Otherwise refuse
+# before anything is touched.
+REEXEC=0
+if [ "${#UNKNOWN_NAMES[@]}" -gt 0 ]; then
+  if [ -z "${CALVIN_UPDATE_REEXEC:-}" ] && [[ " ${CHANGED_NAME[*]:-} " == *" update-kiosk.sh "* ]]; then
+    REEXEC=1
+    log "manifest has files this updater does not know (${UNKNOWN_NAMES[*]}); the new updater will install them"
+  else
+    write_state error verify "not a bundle file: ${UNKNOWN_NAMES[*]}" "$version"
+    log "not a bundle file: ${UNKNOWN_NAMES[*]}"; exit 1
+  fi
+fi
+
+# Units that should be enabled but are not (e.g. an enable that failed on an
+# earlier run). Units installed fresh by this run are handled separately.
+reenable_units() {
+  local u
+  for u in "${ENABLE_WANTED[@]:-}"; do
+    [ -n "$u" ] || continue
+    [[ " ${NEW_ENABLE_UNITS[*]:-} " == *" $u "* ]] && continue
+    "$SYSTEMCTL" is-enabled --quiet "$u" 2>/dev/null && continue
+    "$SYSTEMCTL" enable "$u" || { log "enable failed: $u"; continue; }
+    if [ "$BOOTSTRAP" != 1 ]; then "$SYSTEMCTL" start "$u" || log "start failed: $u"; fi
+  done
+}
+
+# Hand over to the newly installed updater for the files only it knows.
+reexec_new_updater() {
+  rm -rf "$STAGE"; trap - EXIT
+  local args=()
+  [ "$BOOTSTRAP" = 1 ] && args=(--bootstrap)
+  log "re-running the new updater"
+  CALVIN_UPDATE_REEXEC=1 exec bash "$BIN_DIR/update-kiosk.sh" "${args[@]}"
+}
+
 while IFS=$'\t' read -r rname rtarget _renable; do
   [ -n "$rname" ] || continue
   case "$ALL_NAMES" in *" $rname "*) : ;; *) DROPPED_TARGETS+=("$rtarget") ;; esac
 done < <(read_receipt_tsv)
 
 if [ "${#CHANGED_NAME[@]}" -eq 0 ] && [ "${#DROPPED_TARGETS[@]}" -eq 0 ]; then
+  reenable_units
   write_state success noop "already at ${version}" "$version"
   write_version "$version"
   write_receipt
@@ -256,6 +326,8 @@ if [ "$BOOTSTRAP" = 1 ]; then
   if [ "${#NEW_ENABLE_UNITS[@]}" -gt 0 ]; then
     enable_units "${NEW_ENABLE_UNITS[@]}"
   fi
+  reenable_units
+  [ "$REEXEC" = 1 ] && reexec_new_updater
   write_version "$version"
   write_receipt
   write_state success bootstrap "installed ${version}" "$version"
@@ -319,9 +391,13 @@ if [ "${#NEW_ENABLE_UNITS[@]}" -gt 0 ]; then
   start_units "${NEW_ENABLE_UNITS[@]}"
 fi
 
+reenable_units
+
 if [ "${#DROPPED_TARGETS[@]}" -gt 0 ]; then
   decommission_drops
 fi
+
+[ "$REEXEC" = 1 ] && reexec_new_updater
 
 write_version "$version"
 write_receipt

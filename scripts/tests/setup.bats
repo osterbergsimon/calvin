@@ -12,7 +12,7 @@ teardown() {
 }
 
 @test "setup.sh script exists and is executable" {
-    local script_dir="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
+    local script_dir="$(cd "${BATS_TEST_DIRNAME}/.." && pwd)"
     local setup_script="${script_dir}/setup.sh"
     
     assert_file_exists "${setup_script}"
@@ -22,7 +22,7 @@ teardown() {
 }
 
 @test "setup.sh has correct shebang" {
-    local script_dir="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
+    local script_dir="$(cd "${BATS_TEST_DIRNAME}/.." && pwd)"
     local setup_script="${script_dir}/setup.sh"
     
     run head -n 1 "${setup_script}"
@@ -31,7 +31,7 @@ teardown() {
 }
 
 @test "setup.sh sources setup-common.sh correctly" {
-    local script_dir="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
+    local script_dir="$(cd "${BATS_TEST_DIRNAME}/.." && pwd)"
     local setup_script="${script_dir}/setup.sh"
     
     # Check that the script attempts to source setup-common.sh
@@ -40,7 +40,7 @@ teardown() {
 }
 
 @test "setup.sh has main function structure" {
-    local script_dir="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
+    local script_dir="$(cd "${BATS_TEST_DIRNAME}/.." && pwd)"
     local setup_script="${script_dir}/setup.sh"
     
     # Check that the script has a main function or calls main
@@ -49,7 +49,7 @@ teardown() {
 }
 
 @test "setup.sh uses set -euo pipefail for strict error handling" {
-    local script_dir="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
+    local script_dir="$(cd "${BATS_TEST_DIRNAME}/.." && pwd)"
     local setup_script="${script_dir}/setup.sh"
     
     run grep -q "set -euo pipefail" "${setup_script}"
@@ -57,7 +57,7 @@ teardown() {
 }
 
 @test "setup.sh has configuration variables" {
-    local script_dir="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
+    local script_dir="$(cd "${BATS_TEST_DIRNAME}/.." && pwd)"
     local setup_script="${script_dir}/setup.sh"
     
     # Check for configuration variables
@@ -72,7 +72,7 @@ teardown() {
 }
 
 @test "setup.sh calls setup-common functions" {
-    local script_dir="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
+    local script_dir="$(cd "${BATS_TEST_DIRNAME}/.." && pwd)"
     local setup_script="${script_dir}/setup.sh"
     
     # Check that it calls common functions
@@ -87,7 +87,7 @@ teardown() {
 }
 
 @test "setup.sh supports prod and dev modes" {
-    local script_dir="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
+    local script_dir="$(cd "${BATS_TEST_DIRNAME}/.." && pwd)"
     local setup_script="${script_dir}/setup.sh"
 
     run grep -q -- "--mode prod|dev" "${setup_script}"
@@ -95,7 +95,7 @@ teardown() {
 }
 
 @test "setup-dev.sh delegates to setup.sh dev mode" {
-    local script_dir="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
+    local script_dir="$(cd "${BATS_TEST_DIRNAME}/.." && pwd)"
     local setup_dev_script="${script_dir}/setup-dev.sh"
 
     assert_file_exists "${setup_dev_script}"
@@ -105,7 +105,7 @@ teardown() {
 }
 
 @test "setup.sh installs compose runtime services" {
-    local script_dir="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
+    local script_dir="$(cd "${BATS_TEST_DIRNAME}/.." && pwd)"
     local setup_script="${script_dir}/setup.sh"
 
     run grep -q "calvin-app.service" "${setup_script}"
@@ -116,7 +116,7 @@ teardown() {
 }
 
 @test "setup.sh includes verification step" {
-    local script_dir="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
+    local script_dir="$(cd "${BATS_TEST_DIRNAME}/.." && pwd)"
     local setup_script="${script_dir}/setup.sh"
     
     # Check for verification
