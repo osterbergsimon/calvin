@@ -124,15 +124,17 @@ scope.run(() => {
     { immediate: true, flush: "sync" }
   );
 
-  // "Not now" is per device but not forever: once the device sees a fully
-  // configured screen, clear it so a future empty screen greets again. Only
-  // after the first settle, so the empty report list on first paint cannot
-  // erase a dismissal before the regions have reported.
-  watch([mode, settled], ([currentMode, isSettled]) => {
-    if (currentMode === "none" && isSettled && contentRegions.value.length > 0) {
-      clearDismissed();
-    }
-  });
+  // "Not now" is per device but not forever: clear it only on an observed
+  // transition from "something missing" to "nothing missing" after the screen
+  // settled — i.e. someone filled the last gap. A first settle before the
+  // regions report (slow kiosk) must never wipe the dismissal.
+  watch(
+    () => missing.value.length,
+    (count, previous) => {
+      if (count === 0 && previous > 0 && settled.value) clearDismissed();
+    },
+    { flush: "sync" }
+  );
 });
 
 /** Ordered content regions of the active screen: [{ key, kind }]. */
@@ -148,9 +150,11 @@ function setContentRegions(regions) {
   if (signature === contentSignature.value) return;
 
   contentSignature.value = signature;
-  contentRegions.value = next;
-  welcomeOpen.value = false;
+  // Settle flag first: the array swap drops the missing count to zero and must
+  // not look like "the last gap got filled".
   settled.value = false;
+  welcomeOpen.value = false;
+  contentRegions.value = next;
   for (const key of Object.keys(reports)) delete reports[key];
 }
 
@@ -192,10 +196,10 @@ function clearDismissed() {
 
 /** Test-only: reset the shared state between specs. */
 export function _resetSetupPromptForTests() {
+  settled.value = false;
   contentRegions.value = [];
   contentSignature.value = "";
   welcomeOpen.value = false;
-  settled.value = false;
   for (const key of Object.keys(reports)) delete reports[key];
   dismissed.value = readDismissedFlag();
 }

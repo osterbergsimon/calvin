@@ -129,6 +129,22 @@ describe("useSetupPrompt (CLV-20)", () => {
     expect(localStorage.getItem(SETUP_WELCOME_DISMISSED_KEY)).toBe("1");
   });
 
+  it("does not clear the dismissal when the first settle beats the regions", async () => {
+    // Slow kiosk: the 600ms timer marks the screen settled while its regions
+    // (and their data) have not reported yet. That is not "someone filled the
+    // last gap", so "Not now" must survive and the card must not come back.
+    localStorage.setItem(SETUP_WELCOME_DISMISSED_KEY, "1");
+    _resetSetupPromptForTests();
+    prompt.setContentRegions(REGIONS);
+
+    prompt.markSettled();
+    await nextTick();
+    expect(localStorage.getItem(SETUP_WELCOME_DISMISSED_KEY)).toBe("1");
+
+    reportAll();
+    expect(prompt.mode.value).toBe("gaps");
+  });
+
   it("keeps the dismissal when leaving the dashboard clears the reports", async () => {
     reportAll();
     prompt.dismissWelcome();

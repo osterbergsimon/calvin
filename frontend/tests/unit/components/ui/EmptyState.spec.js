@@ -138,6 +138,8 @@ describe("EmptyState setup prompt (CLV-20)", () => {
 
     expect(cal.find('[data-test="phone-setup"]').exists()).toBe(false);
     expect(photos.find('[data-test="phone-setup"]').exists()).toBe(true);
+    // Spec §4.2: the gaps-mode hand-off uses the shortened hint.
+    expect(photos.find('[data-test="phone-setup"]').text()).toContain("Typing is easier there.");
     // Two gaps: the phone opens Settings' landing page, not one guess.
     expect(photos.find('[data-test="phone-setup-url"]').text()).toBe(
       "http://192.168.1.20:8000/settings"

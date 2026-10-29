@@ -23,6 +23,7 @@
           class="empty-state__phone"
           compact
           :setting-id="phoneSettingId"
+          :hint="usesPrompt ? 'Typing is easier there.' : undefined"
         />
       </template>
     </div>
