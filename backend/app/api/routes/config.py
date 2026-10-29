@@ -6,11 +6,13 @@ import subprocess
 from pathlib import Path
 from typing import Any
 
-from fastapi import APIRouter, HTTPException
+from fastapi import APIRouter, HTTPException, Request
 from loguru import logger
 from pydantic import BaseModel, ConfigDict, Field, field_validator, model_validator
 
 from app.config import settings
+from app.security.admin_auth import get_admin_store
+from app.security.route_policy import CONFIG_DISPLAY_KEYS, admin_error, is_admin
 from app.services.config_service import config_service
 from app.services.display_orientation_service import display_orientation_service
 from app.utils.git_refs import validate_git_branch, validate_git_repo_url
@@ -592,9 +594,14 @@ async def get_config():
 
 
 @router.post("/config")
-async def update_config(config_update: ConfigUpdate):
+async def update_config(config_update: ConfigUpdate, request: Request):
     """Update configuration."""
     update_dict = config_update.model_dump(exclude_unset=True)
+
+    # Without an admin session the dashboard may only change display state.
+    # A mixed request is rejected as a whole (design §3).
+    if not is_admin(request) and not update_dict.keys() <= CONFIG_DISPLAY_KEYS:
+        raise admin_error(get_admin_store().is_configured())
 
     # Convert camelCase to snake_case for storage
     if "orientationFlipped" in update_dict:

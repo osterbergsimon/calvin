@@ -1,0 +1,112 @@
+# Admin authentication
+
+Calvin asks for one admin password before anything that changes the server or
+reveals a secret. Viewing the dashboard, and the touch interactions people use
+on a kiosk (next photo, switch screen, calendar view, theme), stay open.
+
+## First run
+
+On a fresh install — or after upgrading from a version without admin auth — open
+**Settings**. Calvin shows one card: choose an admin password. It can be any
+characters, at least 8. Whoever does this first claims the install, and is
+logged in immediately; the browser keeps that session for up to 400 days.
+
+Kiosks never see this card: they do not open Settings.
+
+If you want no window in which another LAN device could claim the install, set
+[`CALVIN_ADMIN_PASSWORD`](#calvin_admin_password) before the first start.
+
+## `CALVIN_ADMIN_PASSWORD`
+
+Set this environment variable (Unraid field, Docker Compose, systemd
+`Environment=`, or `.env`) to the password you want. On every start Calvin
+compares it with the stored password:
+
+- **different** → it replaces the stored password and signs every other session
+  out;
+- **same** → nothing changes, so a restart does not log anyone out.
+
+An empty or unset value leaves the stored password alone. The value must be at
+least 8 characters.
+
+## Forgot the password
+
+Either:
+
+- delete `<data dir>/admin-auth.json` (override the path with `ADMIN_AUTH_PATH`)
+  and restart, then choose a new password in Settings; or
+- set `CALVIN_ADMIN_PASSWORD` to a new value and restart.
+
+Deleting the file also discards the session-signing secret, so every old cookie
+becomes invalid. The file is never in the database, a backup, or
+`GET /api/config`; see [Data directory](DATA_DIR.md).
+
+## Sessions
+
+- Cookie `calvin_admin`: `HttpOnly`, `SameSite=Strict`, `Path=/`,
+  `Max-Age=34560000` (400 days, the browser cap).
+- Stateless value `issued_at.generation.HMAC`, signed with a server secret kept
+  in `admin-auth.json` (mode `0600`, next to the kiosk signing key).
+- Changing the password bumps the generation, so every other browser is signed
+  out. Sign out just clears the cookie.
+- Login failures are limited per peer IP: 5 within 60 seconds → `429`, then a
+  60-second cooldown that doubles on each further lockout, capped at 15 minutes.
+  The counter is in memory and resets on restart. `X-Forwarded-*` is not trusted;
+  behind a proxy everyone shares one bucket.
+
+## Host and Origin checks
+
+**Host (DNS rebinding).** Calvin accepts the normal LAN ways of reaching it:
+
+- IP literals (IPv4 and IPv6), `localhost`, `*.localhost`
+- single-label names such as `calvin` or `raspberrypi`
+- `.local`, `.lan`, `.home`, `.home.arpa`, `.internal`, `.localdomain`
+- the host in `PUBLIC_URL`
+- anything listed in `CALVIN_ALLOWED_HOSTS` (comma-separated, case-insensitive;
+  `*` turns the check off)
+
+Anything else — `evil.example`, or a name that merely ends in an allowed suffix
+like `calvin.local.evil.example` — gets `400` with a plain-text message naming
+`CALVIN_ALLOWED_HOSTS` and `PUBLIC_URL`. Set `PUBLIC_URL` when you reach Calvin
+through a real domain, or list the name in `CALVIN_ALLOWED_HOSTS`.
+
+**Origin (cross-site writes).** Every unsafe request (`POST`/`PUT`/`PATCH`/
+`DELETE`) under `/api` must come from the same host and port as the request's
+`Host` header, or from an origin listed in `CORS_ORIGINS`. The scheme is
+ignored, so a TLS proxy in front still matches. Requests with no `Origin` (curl,
+the kiosk agent) pass; `Sec-Fetch-Site: cross-site` without an `Origin` is
+rejected. A refusal is `403 {"detail":{"code":"cross_origin"}}`.
+`CORS_ALLOW_ALL` (development only) skips this check.
+
+## What needs the admin password
+
+| Tier | Routes |
+|---|---|
+| **Public read** | dashboard data and kiosk delivery — `GET /api/config`, `/api/calendar/*`, `/api/images/*`, `/api/plugins*` (except the two admin reads below), `/api/kiosks/*`, `/api/keyboard/*`, `/api/security/*`, `/api/system/*` (except `update/stream`) |
+| **Viewer write** (same-origin, no login) | `POST /api/images/next`, `POST /api/images/previous`, `POST /api/calendar/refresh`, `POST /api/plugins/{id}/fetch`, `POST /api/system/display/power/on`, `POST /api/system/display/power/off`, `POST /api/config` (display keys only) |
+| **Admin** | every other write, plus `GET /api/backup/*`, `GET /api/config/git/branches`, `GET /api/plugins/{id}/scan`, `GET /api/plugins/local/suggest`, `GET /api/system/update/stream` |
+
+The write policy is default-deny: every `POST`/`PUT`/`PATCH`/`DELETE` needs
+admin unless its route is on the short viewer-write list above, so new routes are
+protected without anyone remembering to add them. Plugins cannot add routes.
+
+`POST /api/config` accepts these keys without admin, because the dashboard itself
+writes them: `dashboardScreens`, `regionsLocked`, `showUI`, `themeMode`,
+`selectedTheme`, `darkModeStart`, `darkModeEnd`, `lastSideViewMode`. A request
+that mixes one of them with anything else (for example `gitBranch`) is rejected
+as a whole.
+
+An unauthenticated admin request answers
+`401 {"detail":{"code":"admin_required"}}`. Before a password exists it answers
+`401 {"detail":{"code":"setup_required"}}`. Kiosk dashboards should never see
+either.
+
+## Limits
+
+- Calvin is normally served over plain HTTP on the LAN; TLS remains a reverse
+  proxy job.
+- Anyone on the LAN can still rearrange the dashboard, switch screens and change
+  the theme. That is deliberate: display state is writable without a password,
+  but code, secrets and backups are not.
+- One password, no usernames, roles or multiple admins.
+- Installed plugins run in the server process, as before.

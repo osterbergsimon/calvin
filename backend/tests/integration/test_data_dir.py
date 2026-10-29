@@ -71,6 +71,9 @@ if sys.argv[1] == "gallery":
 
 png = bytes.fromhex(sys.argv[1])
 with TestClient(app) as client:
+    # Admin routes need a session; first run: claim the password (CLV-9).
+    r = client.post("/api/auth/setup", json={"password": "test-admin-password"})
+    assert r.status_code == 200, r.text
     r = client.post(
         "/api/images/upload", files={"file": ("photo.png", io.BytesIO(png), "image/png")}
     )
