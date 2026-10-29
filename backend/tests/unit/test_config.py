@@ -18,6 +18,8 @@ PATH_ENV_VARS = (
     "THEMES_DIR",
     "KIOSK_SIGNING_KEY_PATH",
     "BACKUP_DIR",
+    "CALVIN_HOST_CONTROL",
+    "CALVIN_DEPLOYMENT",
 )
 
 
@@ -123,3 +125,48 @@ def test_empty_calvin_data_dir_uses_default(monkeypatch):
     s = Settings(_env_file=None)
     assert s.data_dir == BACKEND_DIR / "data"
     assert s.database_path == BACKEND_DIR / "data" / "db" / "calvin.db"
+
+
+# --- CALVIN_HOST_CONTROL default rule (calvin-hhok) -------------------------
+# Host actions (reboot, systemd restarts, xrandr/xset) are only safe when
+# Calvin owns the machine: a native Pi/kiosk install that is not a dev checkout.
+# Containers and developer desktops must default to off.
+
+
+def _settings_for_host(monkeypatch, *, pi: bool, dev: bool, deployment: str = "native"):
+    monkeypatch.setattr(Settings, "is_dev_mode", property(lambda self: dev))
+    monkeypatch.setattr("app.utils.platform.is_raspberry_pi", lambda: pi)
+    monkeypatch.setenv("CALVIN_DEPLOYMENT", deployment)
+    return Settings(_env_file=None)
+
+
+def test_host_control_on_by_default_for_native_pi(monkeypatch):
+    s = _settings_for_host(monkeypatch, pi=True, dev=False)
+    assert s.host_control is True
+
+
+def test_host_control_off_by_default_on_a_desktop(monkeypatch):
+    s = _settings_for_host(monkeypatch, pi=False, dev=False)
+    assert s.host_control is False
+
+
+def test_host_control_off_by_default_in_dev_mode(monkeypatch):
+    s = _settings_for_host(monkeypatch, pi=True, dev=True)
+    assert s.host_control is False
+
+
+def test_host_control_off_by_default_in_a_container(monkeypatch):
+    s = _settings_for_host(monkeypatch, pi=True, dev=False, deployment="docker")
+    assert s.host_control is False
+
+
+def test_host_control_env_can_enable_anywhere(monkeypatch):
+    monkeypatch.setenv("CALVIN_HOST_CONTROL", "1")
+    s = _settings_for_host(monkeypatch, pi=False, dev=True, deployment="docker")
+    assert s.host_control is True
+
+
+def test_host_control_env_can_disable_a_pi(monkeypatch):
+    monkeypatch.setenv("CALVIN_HOST_CONTROL", "0")
+    s = _settings_for_host(monkeypatch, pi=True, dev=False)
+    assert s.host_control is False

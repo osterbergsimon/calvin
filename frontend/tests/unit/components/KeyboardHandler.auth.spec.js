@@ -88,4 +88,45 @@ describe("KeyboardHandler reboot combo (CLV-9 §7)", () => {
     release("Digit7");
     wrapper.unmount();
   });
+
+  it("surfaces the server's reason when the host refuses the reboot", async () => {
+    vi.useFakeTimers();
+    vi.stubGlobal(
+      "fetch",
+      vi.fn().mockResolvedValue({
+        ok: true,
+        json: async () => ({
+          rebootComboKey1: "KEY_1",
+          rebootComboKey2: "KEY_7",
+          rebootComboDuration: 1,
+        }),
+      })
+    );
+    const message = "Calvin does not own this machine.";
+    api.post.mockRejectedValueOnce({
+      response: {
+        status: 409,
+        data: { detail: { code: "host_control_disabled", message } },
+      },
+      config: { url: "/system/reboot" },
+    });
+
+    const notifications = useNotificationsStore();
+    const wrapper = mount(KeyboardHandler, {
+      global: { stubs: { NotificationSystem: true } },
+    });
+    await flushPromises();
+
+    press("Digit1");
+    press("Digit7");
+    vi.advanceTimersByTime(300);
+    await flushPromises();
+
+    expect(notifications.items.map(item => item.message)).toContain(message);
+    expect(notifications.items.some(item => item.message.includes("rebooting"))).toBe(false);
+
+    release("Digit1");
+    release("Digit7");
+    wrapper.unmount();
+  });
 });

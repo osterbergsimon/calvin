@@ -136,6 +136,12 @@ beforeEach(() => {
 expect.extend(matchers);
 
 // Cleanup after each test
-afterEach(() => {
+afterEach(async () => {
   cleanup();
+  // Components load leaves through defineAsyncComponent(). If a test ends before
+  // those chunks are fetched, the import lands after the jsdom environment is
+  // torn down and vitest fails the run with "EnvironmentTeardownError ... after
+  // the environment was torn down". Let every pending dynamic import settle
+  // while the environment is still alive.
+  await vi.dynamicImportSettled();
 });

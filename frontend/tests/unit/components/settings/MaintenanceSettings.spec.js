@@ -106,6 +106,26 @@ describe("MaintenanceSettings", () => {
     expect(wrapper.text()).toContain("Reload UI");
   });
 
+  it("hides the restart actions when the backend does not control the host", async () => {
+    loadEnvironment.mockImplementation(() => {
+      environment.value = {
+        deployment: "native",
+        host_control: false,
+        capabilities: { update: false, restart: false, reboot: false },
+        update_instructions: null,
+      };
+      return Promise.resolve(environment.value);
+    });
+    const wrapper = mount(MaintenanceSettings, {
+      props: { config: baseConfig, gitRepoUrl: "", gitBranch: "main" },
+      global: { stubs },
+    });
+    await flushPromises();
+
+    expect(wrapper.text()).not.toContain("Restart backend");
+    expect(wrapper.text()).not.toContain("Restart frontend");
+  });
+
   it("keeps the restart actions when the environment can't be loaded", async () => {
     const wrapper = mount(MaintenanceSettings, {
       props: { config: baseConfig, gitRepoUrl: "", gitBranch: "main" },

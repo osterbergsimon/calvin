@@ -41,18 +41,12 @@ class TestPluginInstanceEndpoints:
         """Test starting a non-existent plugin instance."""
         response = test_client.post("/api/plugins/instances/nonexistent-instance/start")
 
-        if response.status_code == 404:
-            pytest.skip("Plugin instance start route not available in test client")
-
         assert response.status_code == 404
         assert "not found" in response.json()["detail"].lower()
 
     def test_stop_plugin_instance_not_found(self, test_client: TestClient):
         """Test stopping a non-existent plugin instance."""
         response = test_client.post("/api/plugins/instances/nonexistent-instance/stop")
-
-        if response.status_code == 404:
-            pytest.skip("Plugin instance stop route not available in test client")
 
         assert response.status_code == 404
         assert "not found" in response.json()["detail"].lower()

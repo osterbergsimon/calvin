@@ -17,6 +17,7 @@
     "lint": "eslint .",
     "type-check": "npm run lint",
     "format": "prettier --write \"src/**/*.{js,jsx,vue,json,css}\"",
+    "format:check": "prettier --check \"src/**/*.{js,jsx,vue,json,css}\"",
     "gen:api": "openapi-typescript ../backend/tests/contract/openapi.json -o src/api/types.ts && prettier --write src/api/types.ts"
   },
   "dependencies": {
@@ -30,11 +31,11 @@
     "@mdi/js": "^7.4.47",
     "@tanstack/vue-query": "^5.91.0",
     "@vueuse/core": "^10.7.0",
-    "axios": "^1.6.0",
+    "axios": "~1.20.0",
     "pinia": "^2.1.7",
     "qrcode": "^1.5.4",
     "simple-keyboard": "3.8.194",
-    "vue": "^3.4.0",
+    "vue": "^3.5.44",
     "vue-router": "^4.2.5",
     "vuedraggable": "^4.1.0"
   },
@@ -43,9 +44,9 @@
     "@playwright/test": "^1.57.0",
     "@testing-library/jest-dom": "^6.1.0",
     "@testing-library/vue": "^8.0.0",
-    "@vitejs/plugin-vue": "^5.0.0",
-    "@vitest/coverage-v8": "^1.0.0",
-    "@vitest/ui": "^1.0.0",
+    "@vitejs/plugin-vue": "^6.0.10",
+    "@vitest/coverage-v8": "^5.0.5",
+    "@vitest/ui": "^5.0.5",
     "@vue/test-utils": "^2.4.0",
     "eslint": "^9.0.0",
     "eslint-plugin-vue": "^9.0.0",
@@ -53,7 +54,7 @@
     "jsdom": "^23.2.0",
     "openapi-typescript": "^7.13.0",
     "prettier": "^3.1.0",
-    "vite": "^5.0.0",
-    "vitest": "^1.0.0"
+    "vite": "8.3.4",
+    "vitest": "^5.0.5"
   }
 }
