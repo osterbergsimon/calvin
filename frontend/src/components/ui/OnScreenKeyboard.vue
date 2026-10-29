@@ -2,6 +2,7 @@
 <template>
   <Teleport to="body">
     <div
+      v-if="!failed"
       ref="panel"
       class="osk calvin-osk"
       :class="{
@@ -22,8 +23,14 @@
 
 <script setup>
 import { computed, nextTick, onMounted, onUnmounted, ref, watch } from "vue";
-import SimpleKeyboard from "simple-keyboard";
+// Named import: simple-keyboard is published as a CommonJS UMD bundle whose
+// module.exports is `{ SimpleKeyboard, default }`. Under Vite 8/Rolldown the
+// default-import interop hands back that whole object, so `new SimpleKeyboard()`
+// throws "SimpleKeyboard is not a constructor" and takes app.mount() down with
+// it. The named export is the constructor in both the CJS and ESM builds.
+import { SimpleKeyboard } from "simple-keyboard";
 import { OSK_CASE_CHARS, useOnScreenKeyboard } from "@/composables/useOnScreenKeyboard";
+import { logError } from "@/utils/logger";
 
 const ICONS = {
   bksp: '<svg class="osk-ic" aria-hidden="true" viewBox="0 0 24 24"><path d="M21 5H9l-6 7 6 7h12z"/><path d="M17 9l-6 6M11 9l6 6"/></svg>',
@@ -41,6 +48,10 @@ const SHIFTED_LABELS = Object.fromEntries(
 const osk = useOnScreenKeyboard();
 const panel = ref(null);
 const host = ref(null);
+// Set when the renderer cannot be constructed. The keyboard is an optional
+// touch affordance: if it fails, render nothing and let the rest of the app
+// (connection checks, routing, setup cards) keep running.
+const failed = ref(false);
 let keyboard = null;
 let repeatDelay = null;
 let repeatInterval = null;
@@ -126,20 +137,28 @@ const applyLayout = () => {
 };
 
 onMounted(() => {
-  keyboard = new SimpleKeyboard(host.value, {
-    layout: osk.layouts.value,
-    layoutName: osk.layout.value,
-    theme: "calvin-osk",
-    display: display.value,
-    buttonTheme: buttonTheme.value,
-    buttonAttributes: buttonAttributes.value,
-    preventMouseDownDefault: true,
-    disableButtonHold: true,
-    disableCaretPositioning: true,
-    useButtonTag: true,
-    debug: false,
-    onKeyPress: button => osk.handleKeyPress(button),
-  });
+  try {
+    keyboard = new SimpleKeyboard(host.value, {
+      layout: osk.layouts.value,
+      layoutName: osk.layout.value,
+      theme: "calvin-osk",
+      display: display.value,
+      buttonTheme: buttonTheme.value,
+      buttonAttributes: buttonAttributes.value,
+      preventMouseDownDefault: true,
+      disableButtonHold: true,
+      disableCaretPositioning: true,
+      useButtonTag: true,
+      debug: false,
+      onKeyPress: button => osk.handleKeyPress(button),
+    });
+  } catch (error) {
+    // A broken keyboard renderer must never abort app.mount(): that would skip
+    // every later mounted hook, including App.vue's connectionStore.initialize().
+    failed.value = true;
+    logError("[OnScreenKeyboard]", "Failed to initialise the on-screen keyboard:", error);
+    return;
+  }
   osk.start();
   if (typeof ResizeObserver === "function" && panel.value) {
     resizeObserver = new ResizeObserver(measureHeight);
