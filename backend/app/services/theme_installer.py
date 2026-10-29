@@ -8,6 +8,7 @@ from typing import Any
 
 from loguru import logger
 
+from app.config import settings
 from app.services.validation import (
     resolve_child_dir,
     validate_directory_structure,
@@ -26,9 +27,7 @@ class ThemeInstaller:
 
     def __init__(self):
         """Initialize theme installer."""
-        # Theme installation directory (from config)
-        backend_dir = Path(__file__).parent.parent.parent
-        self.themes_dir = backend_dir / "data" / "themes"
+        self.themes_dir = settings.themes_dir
         self.themes_dir.mkdir(parents=True, exist_ok=True)
 
     def get_theme_path(self, theme_id: str) -> Path:
