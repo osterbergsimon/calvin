@@ -173,12 +173,12 @@ On Linux, full keyboard support is available via `evdev`:
 
 Production:
 ```bash
-wget -O- https://raw.githubusercontent.com/osterbergsimon/calvin/main/scripts/setup.sh | sudo bash
+wget -O- https://raw.githubusercontent.com/osterbergsimon/calvin/develop/scripts/setup.sh | sudo bash
 ```
 
 Development (with hot reload):
 ```bash
-wget -O- https://raw.githubusercontent.com/osterbergsimon/calvin/main/scripts/setup.sh | sudo bash -s -- --mode dev
+wget -O- https://raw.githubusercontent.com/osterbergsimon/calvin/develop/scripts/setup.sh | sudo bash -s -- --mode dev
 ```
 
 The setup script handles the complete setup automatically. See [Setup Scripts Documentation](SETUP_SCRIPTS.md) for more information.

@@ -312,3 +312,15 @@ class TestConfigGitBranches:
 
             # Should handle error gracefully
             assert response.status_code in [200, 400, 500]
+
+
+@pytest.mark.integration
+def test_get_config_defaults_git_branch_to_develop(test_client: TestClient):
+    """main is release-only and far behind; a fresh config must not steer updates there.
+
+    Saving settings writes gitBranch into /etc/default/calvin-update, and the Pi
+    update path maps main to the :latest image (audit P1/P8).
+    """
+    response = test_client.get("/api/config")
+    assert response.status_code == 200
+    assert response.json()["gitBranch"] == "develop"

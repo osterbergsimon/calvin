@@ -307,7 +307,7 @@ async def trigger_update():
     try:
         # Get git branch from config. It reaches git and the update script, and
         # may predate validation (audit S7), so check it again here.
-        git_branch = await config_service.get_value("git_branch", "main") or "main"
+        git_branch = await config_service.get_value("git_branch", "develop") or "develop"
         try:
             validate_git_branch(git_branch)
         except ValueError as exc:

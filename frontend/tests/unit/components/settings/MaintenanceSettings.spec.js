@@ -26,6 +26,14 @@ describe("MaintenanceSettings", () => {
     loadEnvironment.mockResolvedValue(null);
   });
 
+  it("defaults the update branch to develop, not the release-only main", () => {
+    const wrapper = mount(MaintenanceSettings, {
+      props: { config: baseConfig, gitRepoUrl: "" },
+      global: { stubs },
+    });
+    expect(wrapper.findComponent({ name: "UpdatesTab" }).props("gitBranch")).toBe("develop");
+  });
+
   it("renders its sections and the backup & restore block", () => {
     const wrapper = mount(MaintenanceSettings, {
       props: { config: baseConfig, gitRepoUrl: "", gitBranch: "main" },
