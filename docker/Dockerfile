@@ -10,7 +10,9 @@
 # container, no nginx, no plugin install rebuild path.
 
 # ---------- 1. Frontend ----------
-FROM node:22-alpine AS frontend-builder
+# The dist is architecture-independent: build it once on the build host
+# instead of under QEMU for every target platform.
+FROM --platform=$BUILDPLATFORM node:22-alpine AS frontend-builder
 
 WORKDIR /build
 
@@ -67,7 +69,17 @@ COPY --from=backend-builder /build/.venv /app/.venv
 COPY --from=backend-builder /build/app /app/app
 COPY --from=backend-builder /build/alembic /app/alembic
 COPY --from=backend-builder /build/alembic.ini /app/alembic.ini
-COPY backend/data/themes/builtin.json /app/data/themes/builtin.json
+
+# uv is what the plugin installer uses to pip-install plugin
+# dependencies into the venv at runtime (the uv venv has no pip).
+COPY --from=backend-builder /usr/local/bin/uv /usr/local/bin/uv
+
+# Built-in themes ship with the image; the entrypoint copies them onto
+# the data volume on every start. /app/data points at the volume so the
+# backend's relative ./data/... paths (installed themes, caches)
+# persist across container recreation.
+COPY backend/data/themes/builtin.json /app/defaults/themes/builtin.json
+RUN ln -s /var/lib/calvin /app/data
 
 # Frontend dist — FastAPI serves /assets/* and falls back to index.html
 # for SPA routing. Backend's main.py probes ../frontend/dist relative
@@ -91,12 +103,26 @@ ENV CALVIN_DATA_DIR=/var/lib/calvin \
     KIOSK_BUNDLE_DIR=/app/kiosk-bundle \
     KIOSK_SIGNING_KEY_PATH=/var/lib/calvin/kiosk-signing.key \
     CALVIN_PORT=8000 \
+    CALVIN_DEPLOYMENT=docker \
     VIRTUAL_ENV=/app/.venv \
+    UV_CACHE_DIR=/tmp/uv-cache \
     PATH="/app/.venv/bin:$PATH"
+
+# Unraid convention: set PUID=99 / PGID=100 (nobody:users). The default
+# 0/0 keeps the server running as root, as before.
+ENV PUID=0 \
+    PGID=0
+
+COPY docker/entrypoint.sh /usr/local/bin/calvin-entrypoint
 
 EXPOSE 8000
 
-HEALTHCHECK --interval=30s --timeout=5s --start-period=15s --retries=3 \
+# Generous start period: the entrypoint re-installs plugin packages (and
+# fixes appdata ownership) before the server starts, which can take a
+# while on a fresh container. Failures during it don't count, and the
+# first success ends it, so a fast start is still reported healthy fast.
+HEALTHCHECK --interval=30s --timeout=5s --start-period=180s --retries=3 \
     CMD curl -fsS http://localhost:8000/api/health || exit 1
 
+ENTRYPOINT ["calvin-entrypoint"]
 CMD ["python", "-m", "uvicorn", "app.main:app", "--host", "0.0.0.0", "--port", "8000"]

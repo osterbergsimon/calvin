@@ -127,7 +127,7 @@ jobs:
           EXPOSE 8000
           CMD ["python3", "/server.py"]
           DOCKERFILE
-          docker build -q -t ghcr.io/osterbergsimon/calvin:latest /tmp/calvin-ci-image
+          docker build -q -t ghcr.io/osterbergsimon/calvin:develop /tmp/calvin-ci-image
 
           bash scripts/setup.sh --mode prod
 
