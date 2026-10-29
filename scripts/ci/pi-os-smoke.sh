@@ -30,6 +30,18 @@ docker compose version
 echo "== kiosk packages resolve: ${CALVIN_KIOSK_PACKAGES[*]} git cron unattended-upgrades"
 apt-get install -s -qq "${CALVIN_KIOSK_PACKAGES[@]}" git cron unattended-upgrades >/dev/null
 
+# Opt-in Wayland stack (phase 1). Trixie only: Bookworm ships older labwc and no
+# wlopm, which this support depends on (docs/research/2026-10-29-kiosk-wayland.md §8).
+case "${VERSION_CODENAME}" in
+    trixie)
+        echo "== wayland kiosk packages resolve: ${CALVIN_WAYLAND_PACKAGES[*]}"
+        apt-get install -s -qq "${CALVIN_WAYLAND_PACKAGES[@]}" >/dev/null
+        ;;
+    *)
+        echo "== skipping the wayland package check on ${VERSION_CODENAME}"
+        ;;
+esac
+
 echo "== compose file validates"
 mkdir -p /tmp/calvin-etc
 cp "${REPO}/docker/docker-compose.yml" /tmp/calvin-etc/docker-compose.yml

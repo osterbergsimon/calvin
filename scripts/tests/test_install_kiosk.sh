@@ -190,4 +190,17 @@ if bash "$tmp/served.sh" --no-reboot --signing-key 'nothex' 2>/dev/null; then
 [ ! -f "$tmp/signing.env" ] || { echo "FAIL: malformed key written"; exit 1; }
 echo "PASS install-rejects-malformed-key"
 
+# --- 12. --display-stack is forwarded verbatim; a bad value is refused. ---
+reset
+bash "$tmp/served.sh" --no-reboot --display-stack wayland >/dev/null
+grep -qx 'SETUP --backend-url http://tower.local:8000 --display-stack wayland' "$RUN_LOG" \
+    || { echo "FAIL: --display-stack not forwarded to setup-kiosk.sh"; cat "$RUN_LOG"; exit 1; }
+echo "PASS install-forwards-display-stack"
+
+reset
+if bash "$tmp/served.sh" --no-reboot --display-stack cage 2>/dev/null; then
+    echo "FAIL: invalid --display-stack accepted"; exit 1; fi
+[ ! -f "$RUN_LOG" ] || { echo "FAIL: setup ran with an invalid display stack"; exit 1; }
+echo "PASS install-rejects-invalid-display-stack"
+
 echo "PASS"

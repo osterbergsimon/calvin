@@ -115,10 +115,15 @@ def seconds_to_next_boundary(cfg, now):
     return int((min(candidates) - now).total_seconds())
 
 
-def apply_on(on):
-    """Power the panel on/off using BOTH vcgencmd and xset (belt-and-suspenders:
-    vcgencmd is a no-op under some KMS drivers, xset needs DPMS). Returns a
-    '+'-joined list of the methods that appeared to work, or 'none'."""
+def apply_on(on, env=None):
+    """Power the panel on/off the way this kiosk's display stack does.
+
+    X11 uses BOTH vcgencmd and xset (belt-and-suspenders: vcgencmd is a no-op under
+    some KMS drivers, xset needs DPMS). Wayland has neither: wlopm speaks
+    wlr-output-power-management, and wlr-randr --on is the wake fallback.
+    Returns a '+'-joined list of the methods that appeared to work, or 'none'."""
+    if display_stack(env) == "wayland":
+        return apply_on_wayland(on, env)
     val = "1" if on else "0"
     methods = []
     try:
@@ -290,6 +295,139 @@ VALID_ROTATIONS = ("normal", "left", "right", "inverted")
 _RESOLUTION_RE = re.compile(r"^(\d+x\d+)(?:@(\d+(?:\.\d+)?))?$")
 
 
+# --- display stack -----------------------------------------------------------
+# Phase 1 (docs/research/2026-10-29-kiosk-wayland.md §7.2 step 1): Wayland is
+# opt-in. CALVIN_DISPLAY_STACK is authoritative; otherwise the session env says
+# which compositor this agent is attached to. Never infer from WAYLAND_DISPLAY
+# alone: an X11 session can host XWayland, and a failed Wayland session can leave
+# a stale variable behind.
+WAYLAND_DISPLAY_DEFAULT = "wayland-0"
+DISPLAY_STACKS = ("x11", "wayland")
+
+
+def display_stack(env=None):
+    """'x11' or 'wayland' for this kiosk."""
+    if env is None:
+        env = os.environ
+    requested = str(env.get("CALVIN_DISPLAY_STACK", "")).strip().lower()
+    if requested in DISPLAY_STACKS:
+        return requested
+    if (
+        str(env.get("XDG_SESSION_TYPE", "")).strip().lower() == "wayland"
+        and str(env.get("WAYLAND_DISPLAY", "")).strip()
+    ):
+        return "wayland"
+    return "x11"
+
+
+def wayland_env(env=None):
+    """The two variables wlr-randr/wlopm need to reach the compositor."""
+    if env is None:
+        env = os.environ
+    runtime = str(env.get("XDG_RUNTIME_DIR", "")).strip() or f"/run/user/{os.getuid()}"
+    display = str(env.get("WAYLAND_DISPLAY", "")).strip() or WAYLAND_DISPLAY_DEFAULT
+    return {"XDG_RUNTIME_DIR": runtime, "WAYLAND_DISPLAY": display}
+
+
+def _run(argv, env, timeout=10):
+    """Run a command; None instead of raising when it is missing or hangs."""
+    try:
+        return subprocess.run(
+            argv, env=env, capture_output=True, text=True, timeout=timeout
+        )
+    except (FileNotFoundError, subprocess.SubprocessError):
+        return None
+
+
+def _wayland_output_names(env=None):
+    """Output names from `wlr-randr`: one line per output, properties indented."""
+    r = _run(["wlr-randr"], dict(os.environ, **wayland_env(env)))
+    if r is None or r.returncode != 0:
+        return []
+    names = []
+    for line in r.stdout.splitlines():
+        if not line or line[0].isspace():
+            continue  # property of the output above
+        parts = line.split()
+        if parts:
+            names.append(parts[0])
+    return names
+
+
+def detect_primary_wayland_output(env=None):
+    """First connected Wayland output, preferring an HDMI one, or None."""
+    names = _wayland_output_names(env)
+    if not names:
+        return None
+    for name in names:
+        # Accept both spellings: HDMI-A-1 (Wayland) and HDMI-1 (xrandr/older config).
+        if name.startswith("HDMI"):
+            return name
+    return names[0]
+
+
+def resolve_wayland_output(requested, env=None):
+    """Map an X11 output name onto its Wayland equivalent (HDMI-1 -> HDMI-A-1).
+
+    Existing installs carry CALVIN_DISPLAY_OUTPUT=HDMI-1, which wlr-randr does not
+    know; accept either spelling, and fall back to the first connected output.
+    """
+    requested = (requested or "").strip()
+    if not requested:
+        return detect_primary_wayland_output(env)
+    names = _wayland_output_names(env)
+    if requested in names or not names:
+        return requested
+    m = re.match(r"^(HDMI)-(\d+)$", requested)
+    if m and f"{m.group(1)}-A-{m.group(2)}" in names:
+        return f"{m.group(1)}-A-{m.group(2)}"
+    m = re.match(r"^(HDMI)-A-(\d+)$", requested)
+    if m and f"{m.group(1)}-{m.group(2)}" in names:
+        return f"{m.group(1)}-{m.group(2)}"
+    return requested
+
+
+def apply_on_wayland(on, env=None):
+    """Power the panel with wlopm (wlr-output-power-management).
+
+    vcgencmd is a legacy Pi 3/4 fallback and xset cannot touch a Wayland output,
+    so neither is used here. wlopm --on can fail after a display hotplug;
+    `wlr-randr --output … --on` is the documented wake fallback.
+    """
+    out = detect_primary_wayland_output(env)
+    if not out:
+        log("no connected Wayland output found; cannot power the panel")
+        return "none"
+    e = dict(os.environ, **wayland_env(env))
+    action = "--on" if on else "--off"
+    methods = []
+    r = _run(["wlopm", action, out], e)
+    if r is not None and r.returncode == 0:
+        methods.append("wlopm")
+    if on and not methods:
+        r = _run(["wlr-randr", "--output", out, "--on"], e)
+        if r is not None and r.returncode == 0:
+            methods.append("wlr-randr")
+    return "+".join(methods) if methods else "none"
+
+
+# Calvin's rotation values are the xrandr names; wlroots transforms turn
+# counter-clockwise and are numeric (§7.4 of the research doc):
+#   normal -> normal, left (90 CCW) -> 90, inverted -> 180, right (90 CW) -> 270.
+# The numeric spellings are accepted too, so CALVIN_DISPLAY_ROTATION can be set in
+# either vocabulary.
+WLR_TRANSFORMS = {
+    "normal": "normal",
+    "left": "90",
+    "right": "270",
+    "inverted": "180",
+    "90": "90",
+    "180": "180",
+    "270": "270",
+    "flipped": "flipped",
+}
+
+
 def detect_primary_output():
     """Return the first connected xrandr output name, or None."""
     try:
@@ -310,13 +448,15 @@ def detect_primary_output():
     return None
 
 
-def apply_rotation(rotation, output=None):
-    """Rotate the display once via xrandr (device-local physical setting).
+def apply_rotation(rotation, output=None, env=None):
+    """Rotate the display once (device-local physical setting).
 
-    rotation is an xrandr value: normal | left | right | inverted. Returns the
-    output name applied, or None if skipped/failed. This is a one-shot startup
-    action, not part of the schedule loop.
+    rotation is an xrandr value: normal | left | right | inverted. Wayland maps it
+    to the wlr transform (§7.4). Returns the output name applied, or None if
+    skipped/failed. This is a one-shot startup action, not part of the schedule loop.
     """
+    if display_stack(env) == "wayland":
+        return apply_rotation_wayland(rotation, output, env)
     if rotation not in VALID_ROTATIONS:
         log(
             f"ignoring invalid rotation {rotation!r} (expected one of {VALID_ROTATIONS})"
@@ -344,6 +484,30 @@ def apply_rotation(rotation, output=None):
     return None
 
 
+def apply_rotation_wayland(rotation, output=None, env=None):
+    """Rotate the display once via `wlr-randr --transform` (one-shot, like X11)."""
+    transform = WLR_TRANSFORMS.get(str(rotation))
+    if transform is None:
+        log(
+            f"ignoring invalid rotation {rotation!r} (expected one of {VALID_ROTATIONS})"
+        )
+        return None
+    out = resolve_wayland_output(output, env)
+    if not out:
+        log("no connected display output found; cannot apply rotation")
+        return None
+    r = _run(
+        ["wlr-randr", "--output", out, "--transform", transform],
+        dict(os.environ, **wayland_env(env)),
+    )
+    if r is not None and r.returncode == 0:
+        log(f"rotation applied: {out} -> {transform} (wlr transform)")
+        return out
+    detail = (r.stderr.strip() if r is not None else "wlr-randr not available") or ""
+    log(f"rotation failed: {detail}")
+    return None
+
+
 def _parse_resolution(resolution):
     """Parse 'WxH' or 'WxH@RATE' into (mode, rate_or_None). Return None if malformed."""
     m = _RESOLUTION_RE.match(resolution.strip())
@@ -352,13 +516,13 @@ def _parse_resolution(resolution):
     return m.group(1), m.group(2)
 
 
-def apply_mode(output, resolution):
-    """Select the primary output and optionally set its mode via xrandr.
+def apply_mode(output, resolution, env=None):
+    """Select the output and optionally set its mode.
 
-    output: an explicitly-configured xrandr output name (env/server), or None.
+    output: an explicitly-configured output name (env/server), or None.
     resolution: 'WxH' or 'WxH@RATE', or None.
-    Does nothing when neither is configured. A configured output is marked --primary.
-    Returns the argv applied, or None if skipped/failed. Never raises.
+    Does nothing when neither is configured. A configured output is marked --primary
+    on X11. Returns the argv applied, or None if skipped/failed. Never raises.
     """
     if output is not None:
         output = str(output).strip() or None
@@ -366,6 +530,8 @@ def apply_mode(output, resolution):
         resolution = str(resolution).strip() or None
     if not output and not resolution:
         return None
+    if display_stack(env) == "wayland":
+        return apply_mode_wayland(output, resolution, env)
     out = output or detect_primary_output()
     if not out:
         log("no connected display output found; cannot set output/mode")
@@ -397,6 +563,31 @@ def apply_mode(output, resolution):
         log(f"output/mode applied: {' '.join(argv[1:])}")
         return argv
     log(f"output/mode apply failed (xrandr rc={r.returncode}): {r.stderr.strip()}")
+    return None
+
+
+def apply_mode_wayland(output, resolution, env=None):
+    """Set output/mode with `wlr-randr --output … --mode WxH[@RATE Hz]`."""
+    out = resolve_wayland_output(output, env)
+    if not out:
+        log("no connected display output found; cannot set output/mode")
+        return None
+    argv = ["wlr-randr", "--output", out]
+    if resolution:
+        parsed = _parse_resolution(resolution)
+        if parsed is None:
+            log(
+                f"ignoring invalid resolution {resolution!r} (expected WxH or WxH@RATE)"
+            )
+        else:
+            mode, rate = parsed
+            argv += ["--mode", f"{mode}@{rate}Hz" if rate else mode]
+    r = _run(argv, dict(os.environ, **wayland_env(env)))
+    if r is not None and r.returncode == 0:
+        log(f"output/mode applied: {' '.join(argv[1:])}")
+        return argv
+    detail = (r.stderr.strip() if r is not None else "wlr-randr not available") or ""
+    log(f"output/mode apply failed: {detail}")
     return None
 
 
@@ -465,7 +656,7 @@ def main():
     refresh = int(
         os.environ.get("CALVIN_DISPLAY_REFRESH_SECONDS", DEFAULT_REFRESH_SECONDS)
     )
-    log(f"starting: backend={backend} refresh={refresh}s")
+    log(f"starting: backend={backend} refresh={refresh}s stack={display_stack()}")
     run(backend, refresh)
 
 

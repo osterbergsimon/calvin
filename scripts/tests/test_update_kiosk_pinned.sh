@@ -40,6 +40,7 @@ chmod +x "$tmp/bin/curl" "$tmp/bin/systemctl"
 export CALVIN_BACKEND_URL="http://server.local:8000"
 export CALVIN_CURL="$tmp/bin/curl" CALVIN_SYSTEMCTL="$tmp/bin/systemctl"
 export CALVIN_SYSTEMD_DIR="$tmp/systemd" CALVIN_BIN_DIR="$tmp/local"
+export CALVIN_KIOSK_DISPLAY_ENV_FILE="$tmp/calvin-kiosk-display"
 export CALVIN_AGENT_READY_MARKER="$tmp/run/agent-ready" CALVIN_UPDATE_HEALTH_TIMEOUT=4
 
 sha() { sha256sum "$1" | cut -d' ' -f1; }

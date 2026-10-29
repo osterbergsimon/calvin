@@ -45,6 +45,7 @@ chmod +x "$tmp/bin/curl" "$tmp/bin/systemctl"
 export CALVIN_BACKEND_URL="http://server.local:8000"
 export CALVIN_CURL="$tmp/bin/curl" CALVIN_SYSTEMCTL="$tmp/bin/systemctl"
 export CALVIN_AGENT_STATE_DIR="$tmp/state" CALVIN_SYSTEMD_DIR="$tmp/systemd"
+export CALVIN_KIOSK_DISPLAY_ENV_FILE="$tmp/calvin-kiosk-display"
 export CALVIN_BIN_DIR="$tmp/local"
 export CALVIN_AGENT_READY_MARKER="$tmp/run/agent-ready"
 export CALVIN_UPDATE_HEALTH_TIMEOUT=4
