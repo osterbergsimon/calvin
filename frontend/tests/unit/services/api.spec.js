@@ -3,7 +3,12 @@
 import { describe, it, expect, beforeEach, vi } from "vitest";
 import { setActivePinia, createPinia } from "pinia";
 import axios from "axios";
-import api, { DEFAULT_REQUEST_TIMEOUT, SW_CACHE_HEADER } from "@/services/api";
+import api, {
+  DEFAULT_REQUEST_TIMEOUT,
+  SW_CACHE_HEADER,
+  ServiceWorkerReplayError,
+  isServiceWorkerReplay,
+} from "@/services/api";
 import { useConnectionStore } from "@/stores/connection";
 
 // axios is mocked globally (tests/setup.js): grab the interceptors api.js
@@ -34,11 +39,15 @@ describe("services/api", () => {
     expect(connection.isBackendOnline).toBe(true);
   });
 
-  it("does not mark the backend online for a response the service worker replayed", () => {
-    connection.isBackendOnline = false;
+  it("rejects a response the service worker replayed instead of treating it as success", async () => {
+    connection.isBackendOnline = true;
+    const replayed = { status: 200, data: { v: 1 }, headers: { [SW_CACHE_HEADER]: "1" } };
 
-    onFulfilled({ status: 200, headers: { [SW_CACHE_HEADER]: "1" } });
+    const error = await onFulfilled(replayed).catch(e => e);
 
+    expect(error).toBeInstanceOf(ServiceWorkerReplayError);
+    expect(isServiceWorkerReplay(error)).toBe(true);
+    expect(error.response.data).toEqual({ v: 1 });
     expect(connection.isBackendOnline).toBe(false);
   });
 

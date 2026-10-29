@@ -8,7 +8,7 @@
  */
 import { useQuery } from "@tanstack/vue-query";
 import { computed, unref } from "vue";
-import api from "@/services/api";
+import api, { isServiceWorkerReplay } from "@/services/api";
 
 export function useSchemaData(serviceId, schema, enabled = true) {
   const id = computed(() => unref(serviceId));
@@ -26,8 +26,14 @@ export function useSchemaData(serviceId, schema, enabled = true) {
     queryKey: ["plugin-data", id],
     queryFn: async () => {
       if (!endpoint.value) return null;
-      const response = await api.get(endpoint.value);
-      return response.data;
+      try {
+        const response = await api.get(endpoint.value);
+        return response.data;
+      } catch (err) {
+        // Offline: the service worker's last good payload beats a blank tile.
+        if (isServiceWorkerReplay(err)) return err.response.data;
+        throw err;
+      }
     },
     enabled: computed(() => isEnabled.value && Boolean(endpoint.value)),
     staleTime: 5 * 60 * 1000,

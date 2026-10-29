@@ -34,13 +34,32 @@ api.interceptors.request.use(
   }
 );
 
+/**
+ * Rejection for an API response the service worker replayed from its cache.
+ *
+ * The worker only replays when the network request failed, so this is an
+ * offline signal, not a fresh success: callers take their offline path (the
+ * stores serve their own cached copy flagged stale and never rewrite it).
+ * `response` still holds the replayed payload for callers that want it.
+ */
+export class ServiceWorkerReplayError extends Error {
+  constructor(response) {
+    super("Backend unreachable: response replayed from the offline cache");
+    this.name = "ServiceWorkerReplayError";
+    this.serviceWorkerReplay = true;
+    this.response = response;
+  }
+}
+
+export const isServiceWorkerReplay = error => Boolean(error?.serviceWorkerReplay);
+
 // Response interceptor
 api.interceptors.response.use(
   response => {
-    // A response the service worker replayed from its cache says nothing about
-    // the backend being reachable, so only real responses mark it online.
     if (response.headers?.[SW_CACHE_HEADER]) {
-      return response;
+      // The network request failed and the worker answered from its cache.
+      useConnectionStore().isBackendOnline = false;
+      return Promise.reject(new ServiceWorkerReplayError(response));
     }
     const connectionStore = useConnectionStore();
     if (!connectionStore.isBackendOnline) {

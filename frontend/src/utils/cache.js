@@ -53,11 +53,15 @@ export function getCachedData(key, ttl = 60 * 60 * 1000, { allowStale = false } 
  * Fetch through `request`, falling back to the offline cache.
  *
  * - When `preferCache` is set (the app knows it is offline) a cached entry is
- *   served without touching the network, fresh or stale.
+ *   served without touching the network. `stale` is true whenever the data
+ *   did not just come from the backend, however young the entry is.
  * - Otherwise the request runs; its result is cached only when
  *   `shouldCache(data)` agrees, so a partial result never overwrites a good one.
  * - When the request fails, any cached entry is served, expired ones included,
- *   and flagged stale. With no cache the error is rethrown.
+ *   and flagged stale; the entry is left as it is. With no cache the error is
+ *   rethrown. A response the service worker replayed from its cache arrives
+ *   here as such a failure (services/api.js rejects it), so it is never
+ *   mistaken for fresh data or written back with a new timestamp.
  *
  * @param {string} key - Cache key
  * @param {number} ttl - Time to live in milliseconds
@@ -74,7 +78,7 @@ export async function fetchWithCache(
   if (preferCache) {
     const entry = getCachedEntry(key, ttl);
     if (entry) {
-      return { data: entry.data, fromCache: true, stale: entry.stale };
+      return { data: entry.data, fromCache: true, stale: true };
     }
   }
 

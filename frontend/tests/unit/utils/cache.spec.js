@@ -95,6 +95,14 @@ describe("offline cache", () => {
       expect(result).toEqual({ data: { v: "cached" }, fromCache: true, stale: true });
     });
 
+    it("flags even a fresh entry stale when served offline (it isn't live data)", async () => {
+      setCachedData("k", { v: "cached" });
+
+      const result = await fetchWithCache("k", TTL, vi.fn(), { preferCache: true });
+
+      expect(result).toEqual({ data: { v: "cached" }, fromCache: true, stale: true });
+    });
+
     it("still tries the network with preferCache when nothing is cached", async () => {
       const result = await fetchWithCache("k", TTL, async () => "live", { preferCache: true });
 
