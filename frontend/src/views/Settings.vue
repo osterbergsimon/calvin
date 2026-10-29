@@ -4,8 +4,25 @@
       :category-label="activeCategoryLabel"
       :section-label="sectionLabel"
       :save-state="saveStatus.state"
+      :show-phone="isTouch"
       @done="onDone"
+      @phone="phoneOpen = true"
     />
+
+    <template v-if="phoneOpen">
+      <DialogScrim blur @dismiss="phoneOpen = false" />
+      <div
+        class="settings-phone"
+        role="dialog"
+        aria-modal="true"
+        aria-label="Set up from your phone"
+      >
+        <PhoneSetupCard :setting-id="phoneSettingId" />
+        <button type="button" class="settings-phone__close" @click="phoneOpen = false">
+          Close
+        </button>
+      </div>
+    </template>
 
     <div class="settings-body">
       <div class="settings-search-wrapper">
@@ -85,6 +102,9 @@ import { resolveScrollView, pickActiveEyebrow } from "@/utils/settingsSectionSpy
 import SettingsTopBar from "@/components/settings/shell/SettingsTopBar.vue";
 import SettingsSearch from "@/components/settings/shell/SettingsSearch.vue";
 import CategoryRail from "@/components/settings/shell/CategoryRail.vue";
+import DialogScrim from "@/components/ui/DialogScrim.vue";
+import PhoneSetupCard from "@/components/ui/PhoneSetupCard.vue";
+import { useTouchCapability } from "@/composables/useTouchCapability";
 import {
   SETTINGS_CATEGORY_STORAGE_KEY,
   defaultSettingsCategoryId,
@@ -122,6 +142,14 @@ const route = useRoute();
 const modeStore = useModeStore();
 
 const categories = settingsCategories;
+
+// ── Phone hand-off (F2) ─────────────────────────────────────────────────────
+// A touch kiosk has no keyboard; offer the same settings page on a phone.
+const { isTouch } = useTouchCapability();
+const phoneOpen = ref(false);
+const phoneSettingId = computed(() =>
+  typeof route.query.setting === "string" ? route.query.setting : null
+);
 
 // ── Config ────────────────────────────────────────────────────────────────────
 const { localConfig, loadConfig, updateConfig, error, saveStatus } = useConfigForm();
@@ -293,12 +321,28 @@ const SECTION_BY_CATEGORY_TAB = {
   plugins: {
     install: "plugins-install",
     installed: "plugins-installed",
+    // Plugin-type tabs (plugins-services deep link) live in the installed list.
+    service: "plugins-installed",
   },
 };
 const MIGRATED_CATEGORIES = new Set(Object.keys(SECTION_BY_CATEGORY_TAB));
 
 function sectionFor(category, tab) {
   return SECTION_BY_CATEGORY_TAB[category]?.[tab] ?? null;
+}
+
+// Scroll a ?setting= destination's section into view. Category components are
+// async, so retry for a few frames until the section exists.
+function scrollToDestination(destination, attempt = 0) {
+  if (!destination?.tab || !MIGRATED_CATEGORIES.has(destination.category)) return;
+  const sectionId = sectionFor(destination.category, destination.tab);
+  if (!sectionId) return;
+  const el = document.getElementById("section-" + sectionId);
+  if (el) {
+    el.scrollIntoView({ behavior: "smooth", block: "start" });
+  } else if (attempt < 20) {
+    requestAnimationFrame(() => scrollToDestination(destination, attempt + 1));
+  }
 }
 
 // ── Navigation helpers ────────────────────────────────────────────────────────
@@ -320,14 +364,8 @@ const onJump = async destination => {
   categoryRenderKey.value += 1;
   router.replace({ query: { ...route.query, setting: destination.id } });
 
-  if (MIGRATED_CATEGORIES.has(destination.category) && destination.tab) {
-    await nextTick();
-    const sectionId = sectionFor(destination.category, destination.tab);
-    if (sectionId) {
-      const el = document.getElementById("section-" + sectionId);
-      if (el) el.scrollIntoView({ behavior: "smooth" });
-    }
-  }
+  await nextTick();
+  scrollToDestination(destination);
 };
 
 const onDone = () => {
@@ -346,6 +384,7 @@ watch(
     }
     activeCategory.value = destination.category;
     categoryRenderKey.value += 1;
+    nextTick(() => scrollToDestination(destination));
   }
 );
 
@@ -386,6 +425,8 @@ onMounted(async () => {
     await nextTick();
     setupSectionObserver();
   }
+  // Arrived from a dashboard empty state or a phone QR code: show the section.
+  scrollToDestination(initialRouteDestination);
 });
 
 onUnmounted(() => {
@@ -394,6 +435,34 @@ onUnmounted(() => {
 </script>
 
 <style scoped>
+.settings-phone {
+  position: fixed;
+  top: 50%;
+  left: 50%;
+  z-index: 1000;
+  transform: translate(-50%, -50%);
+  width: min(32rem, calc(100vw - 32px));
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-lg);
+  padding: var(--space-xl);
+  background: var(--bg-1);
+  border: 1px solid var(--line);
+  border-radius: 14px;
+  box-shadow: 0 18px 50px -16px var(--shadow-hover);
+}
+.settings-phone__close {
+  align-self: flex-end;
+  min-height: var(--touch-target);
+  padding: 0 1.25rem;
+  font-family: var(--font-ui);
+  font-weight: 600;
+  color: var(--focus-ink);
+  background: var(--focus);
+  border: 0;
+  border-radius: 10px;
+  cursor: pointer;
+}
 .settings-page {
   height: 100dvh;
   overflow: hidden;
