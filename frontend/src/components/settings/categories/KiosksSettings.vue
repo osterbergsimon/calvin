@@ -74,7 +74,7 @@
     />
     <SettingsSection v-if="selectedId" id="kiosks-content" :title="`${selectedId} — Content`">
       <p v-if="!hasEnoughScreens" class="kiosks__hint">
-        Add more screens in Display › Screens & regions to assign different content per kiosk.
+        Add more screens in Dashboard › Screens & regions to assign different content per kiosk.
       </p>
       <template v-else>
         <SettingRow

@@ -35,7 +35,7 @@ export const useWebServicesStore = defineStore("webServices", () => {
   // that partial list out of the offline cache.
   const loadServices = async () => {
     // Only service-type plugins are inspected here, so statusbar_schema is currently
-    // surfaced (in the bar and in Clock Bar settings) only for service plugins. Other
+    // surfaced (in the bar and in Dashboard › Clock) only for service plugins. Other
     // plugin types may declare statusbar_schema in their metadata but won't render or
     // appear in the toggle UI until this fetch is broadened.
     const response = await api.get("/plugins", {

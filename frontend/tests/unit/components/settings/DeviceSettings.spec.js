@@ -10,6 +10,9 @@ vi.mock("@/composables", () => ({
 
 const stubs = { DisplayScheduleGrid: true, KeyboardTab: true, RebootCombo: true };
 const baseConfig = {
+  orientation: "landscape",
+  orientationFlipped: false,
+  applyDisplayRotation: true,
   displayScheduleEnabled: false,
   displaySchedule: [],
   timezone: null,
@@ -27,27 +30,58 @@ const baseConfig = {
 describe("DeviceSettings", () => {
   beforeEach(() => setActivePinia(createPinia()));
 
-  it("renders the device sections; the reboot combo is folded into Keyboard (calvin-…)", () => {
+  it("renders Screen & keyboard sections; hardware moved to System", () => {
     const wrapper = mount(DeviceSettings, {
-      props: { config: baseConfig, version: "1.2.3", frontendVersion: "4.5.6" },
+      props: { config: baseConfig },
       global: { stubs },
     });
-    for (const id of [
-      "device-power",
-      "device-keyboard",
-      "device-notifications",
-      "device-hardware",
-    ]) {
+    for (const id of ["layout", "device-power", "device-keyboard", "device-notifications"]) {
       expect(wrapper.find(`#section-${id}`).exists()).toBe(true);
     }
+    // version numbers now live under System › Versions & status
+    expect(wrapper.find("#section-device-hardware").exists()).toBe(false);
     // the standalone reboot section is gone; RebootCombo now lives in Keyboard
     expect(wrapper.find("#section-device-reboot").exists()).toBe(false);
     expect(wrapper.findComponent({ name: "RebootCombo" }).exists()).toBe(true);
   });
 
+  it("orders the sections Screen orientation, Screen power, Keyboard, Key-press feedback", () => {
+    const wrapper = mount(DeviceSettings, {
+      props: { config: baseConfig },
+      global: { stubs },
+    });
+    expect(wrapper.findAll("section.settings-section").map(s => s.attributes("id"))).toEqual([
+      "section-layout",
+      "section-device-power",
+      "section-device-keyboard",
+      "section-device-notifications",
+    ]);
+    expect(wrapper.find("#section-layout .settings-section__eyebrow").text()).toBe(
+      "Screen orientation"
+    );
+    expect(wrapper.find("#section-device-power .settings-section__eyebrow").text()).toBe(
+      "Screen power"
+    );
+    expect(wrapper.find("#section-device-notifications .settings-section__eyebrow").text()).toBe(
+      "Key-press feedback"
+    );
+  });
+
+  it("emits orientation changes from the moved Screen orientation section", () => {
+    const wrapper = mount(DeviceSettings, {
+      props: { config: baseConfig },
+      global: { stubs },
+    });
+    const orientation = wrapper
+      .findAllComponents({ name: "SegmentedControl" })
+      .find(c => c.props("ariaLabel") === "Orientation");
+    orientation.vm.$emit("update:modelValue", "portrait");
+    expect(wrapper.emitted("update:config").some(c => c[0].orientation === "portrait")).toBe(true);
+  });
+
   it("emits update:config when keyboard feedback is toggled (notifications)", () => {
     const wrapper = mount(DeviceSettings, {
-      props: { config: baseConfig, version: null, frontendVersion: null },
+      props: { config: baseConfig },
       global: { stubs },
     });
     const toggles = wrapper.findAllComponents({ name: "ToggleSwitch" });
@@ -61,8 +95,6 @@ describe("DeviceSettings", () => {
     const wrapper = mount(DeviceSettings, {
       props: {
         config: { ...baseConfig, onScreenKeyboard: "auto" },
-        version: null,
-        frontendVersion: null,
       },
       global: { stubs },
     });
@@ -81,25 +113,15 @@ describe("DeviceSettings", () => {
     const wrapper = mount(DeviceSettings, {
       props: {
         config: { ...baseConfig, displayTimeoutEnabled: true },
-        version: null,
-        frontendVersion: null,
       },
       global: { stubs },
     });
     expect(wrapper.text()).toContain("Timeout");
   });
 
-  it("renders the backend version in Hardware", () => {
-    const wrapper = mount(DeviceSettings, {
-      props: { config: baseConfig, version: "1.2.3", frontendVersion: "4.5.6" },
-      global: { stubs },
-    });
-    expect(wrapper.text()).toContain("1.2.3");
-  });
-
   it("passes config through to the folded-in RebootCombo", () => {
     const wrapper = mount(DeviceSettings, {
-      props: { config: baseConfig, version: null, frontendVersion: null },
+      props: { config: baseConfig },
       global: { stubs },
     });
     const reboot = wrapper.findComponent({ name: "RebootCombo" });
@@ -112,8 +134,6 @@ describe("DeviceSettings", () => {
       mount(DeviceSettings, {
         props: {
           config: { ...baseConfig, onScreenKeyboard: "auto", ...overrides },
-          version: null,
-          frontendVersion: null,
         },
         global: { stubs },
       });
