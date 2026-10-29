@@ -19,6 +19,7 @@ from app.plugins.loader import plugin_loader
 from app.plugins.manager import plugin_manager
 from app.plugins.registry.loader import load_plugin_types_for_single
 from app.plugins.utils.instance_manager import apply_plugin_config_update
+from app.plugins.utils.secrets import keep_stored_secrets, secret_keys_for_type
 from app.services.config_service import config_service
 from app.services.csp import get_sealed_mode
 from app.services.event_system import event_system
@@ -642,6 +643,34 @@ async def get_plugin(plugin_id: str):
     return plugin_info
 
 
+async def _keep_stored_type_secrets(
+    plugin_id: str, config: dict[str, Any], instance_id: str | None = None
+) -> dict[str, Any]:
+    """
+    Fill secrets the settings form sent back blank or masked from what is stored.
+
+    Secrets are never sent to the frontend, so a blank one means "unchanged"
+    (audit S4). Stored values come from the type config and, when the update
+    targets an instance, from that instance.
+    """
+    keys = secret_keys_for_type(plugin_id, config)
+    if not keys:
+        return config
+    stored: dict[str, Any] = {}
+    stored_json = await config_service.get_value(f"plugin_{plugin_id}_config")
+    if stored_json:
+        try:
+            stored.update(json.loads(stored_json))
+        except json.JSONDecodeError:
+            pass
+    instance_id = instance_id or config.get("_instance_id")
+    if instance_id:
+        db_instance = await PluginDB.objects.get_or_none(id=instance_id, type_id=plugin_id)
+        if db_instance:
+            stored.update(db_instance.config or {})
+    return keep_stored_secrets(config, stored, keys)
+
+
 async def _update_plugin_type(
     plugin_id: str,
     config: dict[str, Any],
@@ -660,7 +689,7 @@ async def _update_plugin_type(
     logger.debug(f"Updating plugin type {plugin_id} with config keys: {list(config.keys())}")
 
     # Clean config values - ensure all values are strings, not objects
-    cleaned_config = normalize_plugin_config(config)
+    cleaned_config = await _keep_stored_type_secrets(plugin_id, normalize_plugin_config(config))
     config = cleaned_config
 
     # Look up the registered plugin type first
@@ -1156,7 +1185,11 @@ async def geocode_location(plugin_id: str, request: dict[str, Any] = Body(...)):
 
 
 @router.post("/plugins/{plugin_id}/test")
-async def test_plugin(plugin_id: str, test_config: dict[str, Any] | None = Body(default=None)):
+async def test_plugin(
+    plugin_id: str,
+    test_config: dict[str, Any] | None = Body(default=None),
+    instance_id: str | None = None,
+):
     """
     Test plugin connection/configuration.
 
@@ -1165,6 +1198,8 @@ async def test_plugin(plugin_id: str, test_config: dict[str, Any] | None = Body(
     Args:
         plugin_id: Plugin type ID (e.g., 'imap', 'mealie')
         test_config: Optional config to use for testing (if not provided, uses saved config)
+        instance_id: Optional instance being edited; secrets left blank in
+            test_config are taken from its stored config
 
     Returns:
         Test result with success status and message
@@ -1175,7 +1210,9 @@ async def test_plugin(plugin_id: str, test_config: dict[str, Any] | None = Body(
 
     # Use provided test_config if available, otherwise get saved config
     if test_config:
-        config = normalize_plugin_config(test_config)
+        config = await _keep_stored_type_secrets(
+            plugin_id, normalize_plugin_config(test_config), instance_id
+        )
     else:
         # Get plugin config
         config_key = f"plugin_{plugin_id}_config"

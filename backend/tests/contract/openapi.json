@@ -196,6 +196,13 @@
             "title": "Enabled",
             "type": "boolean"
           },
+          "has_value": {
+            "additionalProperties": {
+              "type": "boolean"
+            },
+            "title": "Has Value",
+            "type": "object"
+          },
           "ical_url": {
             "anyOf": [
               {
@@ -1011,6 +1018,14 @@
           "enabled": {
             "title": "Enabled",
             "type": "boolean"
+          },
+          "has_value": {
+            "additionalProperties": {
+              "type": "boolean"
+            },
+            "default": {},
+            "title": "Has Value",
+            "type": "object"
           },
           "id": {
             "title": "Id",
@@ -3911,7 +3926,7 @@
     },
     "/api/plugins/{plugin_id}/test": {
       "post": {
-        "description": "Test plugin connection/configuration.\n\nDispatches to the plugin class's test_connection() classmethod.\n\nArgs:\n    plugin_id: Plugin type ID (e.g., 'imap', 'mealie')\n    test_config: Optional config to use for testing (if not provided, uses saved config)\n\nReturns:\n    Test result with success status and message",
+        "description": "Test plugin connection/configuration.\n\nDispatches to the plugin class's test_connection() classmethod.\n\nArgs:\n    plugin_id: Plugin type ID (e.g., 'imap', 'mealie')\n    test_config: Optional config to use for testing (if not provided, uses saved config)\n    instance_id: Optional instance being edited; secrets left blank in\n        test_config are taken from its stored config\n\nReturns:\n    Test result with success status and message",
         "operationId": "test_plugin_api_plugins__plugin_id__test_post",
         "parameters": [
           {
@@ -3921,6 +3936,22 @@
             "schema": {
               "title": "Plugin Id",
               "type": "string"
+            }
+          },
+          {
+            "in": "query",
+            "name": "instance_id",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Instance Id"
             }
           }
         ],

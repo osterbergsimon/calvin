@@ -176,5 +176,8 @@ async def get_plugin_config(plugin_id: str):
         logger.debug(f"Could not load schema from database for {plugin_id}: {e}")
         # Continue with config_service values only
 
-    # Mask sensitive fields before returning
-    return mask_sensitive_config(config, mask_for_frontend=True)
+    # Never send secret values to the frontend (audit S4): blank them.
+    from app.plugins.utils.secrets import redact_secrets, secret_keys_for_type
+
+    redacted, _ = redact_secrets(config, secret_keys_for_type(plugin_id, config))
+    return redacted

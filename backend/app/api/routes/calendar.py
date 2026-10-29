@@ -12,10 +12,14 @@ from app.models.calendar import (
     CalendarSourcesResponse,
 )
 from app.plugins.calendar.google import _normalize_google_calendar_url
+from app.plugins.utils.secrets import drop_unchanged_secrets, is_unchanged_secret, redact_secrets
 from app.services import plugin_calendar_service
 
 # Loguru automatically includes module/function info in logs
 router = APIRouter()
+
+# Calendar source fields that are credentials (a private ICS URL is a bearer token).
+CALENDAR_SECRET_KEYS = ("ical_url", "api_key")
 
 
 def normalize_datetime(dt: datetime | None) -> datetime | None:
@@ -228,21 +232,26 @@ async def get_calendar_sources():
             if s.get("type") in enabled_plugin_types or s.get("type") in legacy_types
         ]
 
-        # Convert to CalendarSource models for response
-        source_models = [
-            CalendarSourceModel(
-                id=s["id"],
-                type=s["type"],
-                name=s["name"],
-                enabled=s["enabled"],
-                running=s.get("running", False),  # Include running state
-                ical_url=s.get("ical_url"),
-                api_key=s.get("api_key"),
-                color=s.get("color"),
-                show_time=s.get("show_time", True),
+        # Convert to CalendarSource models for response. Feed URLs and API keys
+        # are credentials: never returned, only flagged in has_value (audit S5).
+        source_models = []
+        for s in filtered_sources:
+            secrets, has_value = redact_secrets(
+                {k: s.get(k) for k in CALENDAR_SECRET_KEYS}, set(CALENDAR_SECRET_KEYS)
             )
-            for s in filtered_sources
-        ]
+            source_models.append(
+                CalendarSourceModel(
+                    id=s["id"],
+                    type=s["type"],
+                    name=s["name"],
+                    enabled=s["enabled"],
+                    running=s.get("running", False),  # Include running state
+                    **secrets,
+                    has_value=has_value,
+                    color=s.get("color"),
+                    show_time=s.get("show_time", True),
+                )
+            )
         return CalendarSourcesResponse(sources=source_models, total=len(source_models))
     except Exception as e:
         import traceback
@@ -353,7 +362,8 @@ async def update_calendar_source(source_id: str, source: CalendarSource):
     # color, show_time, etc.).
     db_plugin = await PluginDB.objects.get_or_none(id=source_id)
     existing_url = (db_plugin.config or {}).get("ical_url") if db_plugin else None
-    url_changed = source.ical_url is not None and source.ical_url != existing_url
+    # The sources list never returns ical_url/api_key, so blank means unchanged.
+    url_changed = not is_unchanged_secret(source.ical_url) and source.ical_url != existing_url
     if url_changed:
         await validate_calendar_url(source.ical_url, source.type)
 
@@ -365,12 +375,15 @@ async def update_calendar_source(source_id: str, source: CalendarSource):
     db_plugin.enabled = source.enabled
     config = db_plugin.config or {}
     config.update(
-        {
-            "ical_url": source.ical_url,
-            "api_key": source.api_key,
-            "color": source.color,
-            "show_time": source.show_time,
-        }
+        drop_unchanged_secrets(
+            {
+                "ical_url": source.ical_url,
+                "api_key": source.api_key,
+                "color": source.color,
+                "show_time": source.show_time,
+            },
+            set(CALENDAR_SECRET_KEYS),
+        )
     )
     db_plugin.config = config
     await db_plugin.save_with_timestamp()

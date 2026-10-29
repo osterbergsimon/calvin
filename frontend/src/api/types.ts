@@ -1323,6 +1323,8 @@ export interface paths {
      *     Args:
      *         plugin_id: Plugin type ID (e.g., 'imap', 'mealie')
      *         test_config: Optional config to use for testing (if not provided, uses saved config)
+     *         instance_id: Optional instance being edited; secrets left blank in
+     *             test_config are taken from its stored config
      *
      *     Returns:
      *         Test result with success status and message
@@ -1715,6 +1717,10 @@ export interface components {
        * @default true
        */
       enabled: boolean;
+      /** Has Value */
+      has_value?: {
+        [key: string]: boolean;
+      };
       /** Ical Url */
       ical_url?: string | null;
       /** Id */
@@ -1959,6 +1965,13 @@ export interface components {
       display_order: number;
       /** Enabled */
       enabled: boolean;
+      /**
+       * Has Value
+       * @default {}
+       */
+      has_value: {
+        [key: string]: boolean;
+      };
       /** Id */
       id: string;
       /** Name */
@@ -3976,7 +3989,9 @@ export interface operations {
   };
   test_plugin_api_plugins__plugin_id__test_post: {
     parameters: {
-      query?: never;
+      query?: {
+        instance_id?: string | null;
+      };
       header?: never;
       path: {
         plugin_id: string;
