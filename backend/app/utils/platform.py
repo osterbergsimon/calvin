@@ -73,4 +73,3 @@ async def run_command(cmd: list[str], **kwargs) -> subprocess.CompletedProcess:
     the event loop, freezing every other request (kiosk polls, SSE) until it returns.
     """
     return await asyncio.to_thread(subprocess.run, cmd, **kwargs)
-

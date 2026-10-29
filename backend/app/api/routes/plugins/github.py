@@ -284,7 +284,11 @@ async def install_plugin_from_github(request: dict[str, Any] = Body(...)):
             elif plugin_path_check.exists():
                 # Install plugin
                 manifest = await run_installer_op(
-                    plugin_installer.install_plugin_from_repo, repo_root, plugin_path, plugin_id, force=force
+                    plugin_installer.install_plugin_from_repo,
+                    repo_root,
+                    plugin_path,
+                    plugin_id,
+                    force=force,
                 )
 
                 # Reload plugins to include the newly installed one
@@ -494,7 +498,11 @@ async def install_plugin_from_local(request: dict[str, Any] = Body(...)):
             }
         elif plugin_json_path.exists():
             manifest = await run_installer_op(
-                plugin_installer.install_plugin_from_repo, repo_path, plugin_path, plugin_id, force=force
+                plugin_installer.install_plugin_from_repo,
+                repo_path,
+                plugin_path,
+                plugin_id,
+                force=force,
             )
             try:
                 plugin_loader.load_installed_plugins()
