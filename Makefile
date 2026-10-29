@@ -16,7 +16,7 @@ help:
 	@echo "  make dev-down       - Stop dev stack"
 	@echo "  make doctor         - Check docker + dev env"
 	@echo "  make test           - Run all tests (native)"
-	@echo "  make test-watch     - Re-run backend unit tests on file change"
+	@echo "  make test-watch     - Re-run backend tests (all but slow) on file change"
 	@echo "  make test-watch-frontend - Re-run frontend tests on file change"
 	@echo "  make test-scripts   - Test setup scripts (requires bats)"
 	@echo "  make lint           - Run linters (native)"
@@ -96,7 +96,7 @@ clean:
 	find . -type f -name "*.pyc" -delete
 
 test-watch:
-	cd backend && uv run ptw -- -m "unit and not slow"
+	cd backend && uv run ptw -- -m "not slow"
 
 test-watch-frontend:
 	cd frontend && npm run test:watch
