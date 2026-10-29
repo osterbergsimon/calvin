@@ -421,10 +421,14 @@ def _ensure_kiosk_signing_key():
 async def lifespan(app: FastAPI):
     """Lifespan context manager for startup/shutdown."""
     from app.database import connect_db, disconnect_db
+    from app.utils.legacy_data import migrate_legacy_data
 
     # Startup
     try:
         logger.info("Starting application lifecycle...")
+        # Before the DB opens and the kiosk key is created: an install whose
+        # data root moved off <backend>/data gets its old files copied over.
+        migrate_legacy_data(settings)
         await connect_db()
         logger.info("Database connected")
         await _initialize_database()

@@ -27,8 +27,27 @@ An override wins over the data dir for that one path; everything else stays
 under the data dir. A relative value (for `CALVIN_DATA_DIR` or an override)
 is taken relative to the `backend/` directory, not the working directory, so
 older `.env` files with `./data/...` paths keep pointing where they used to.
+An empty value (`CALVIN_DATA_DIR=`, `BACKUP_DIR=`, ...) counts as unset.
 
-Not in the data dir:
+## Upgrading when the data dir moves
+
+Before `CALVIN_DATA_DIR` was read, everything without its own variable was
+written to `backend/data` of the checkout. The dev compose stack
+(`setup.sh --mode dev`) is the common case: its database was on the volume,
+but uploads, installed themes and the kiosk signing key were in the
+bind-mounted checkout.
+
+On the first start with a data dir other than `backend/data`, the backend
+copies what it finds there (database, uploads, plugins, installed themes,
+caches, backups, kiosk signing key) to where the settings now put it. It
+never overwrites a file that already exists, skips the old database when
+one is already in place, and leaves the originals where they were. It then
+writes `.legacy-data-migrated` in the data dir and does not look again, so
+files you delete later are not brought back. The log says how many files
+were copied.
+
+## Not in the data dir
+
 
 - the built-in themes (`backend/data/themes/builtin.json`), which ship with
   the code;

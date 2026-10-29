@@ -115,3 +115,11 @@ def test_empty_override_counts_as_unset(monkeypatch, tmp_path):
     s = Settings(_env_file=None)
     assert s.backup_dir == tmp_path / "backups"
     assert s.database_path == tmp_path / "db" / "calvin.db"
+
+
+def test_empty_calvin_data_dir_uses_default(monkeypatch):
+    # CALVIN_DATA_DIR= (set but blank) must not move the root to backend/.
+    monkeypatch.setenv("CALVIN_DATA_DIR", "")
+    s = Settings(_env_file=None)
+    assert s.data_dir == BACKEND_DIR / "data"
+    assert s.database_path == BACKEND_DIR / "data" / "db" / "calvin.db"

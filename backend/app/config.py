@@ -10,6 +10,10 @@ from pydantic_settings import BaseSettings, SettingsConfigDict
 # the data dir live. Derived from this file, never from the working dir.
 BACKEND_DIR = Path(__file__).resolve().parent.parent
 
+# Default data dir, and where every install wrote before CALVIN_DATA_DIR
+# was read (app.utils.legacy_data migrates it when the root moves).
+LEGACY_DATA_DIR = BACKEND_DIR / "data"
+
 # Path settings that default to <data_dir>/<default> unless set explicitly.
 _DATA_PATHS = (
     "log_dir",
@@ -47,7 +51,7 @@ class Settings(BaseSettings):
     # IMAGE_DIR, PLUGIN_DIR, ...); unset ones derive from data_dir. Relative
     # values resolve against the backend dir (the historical working dir).
     data_dir: Path = Field(
-        default=BACKEND_DIR / "data",
+        default=LEGACY_DATA_DIR,
         validation_alias=AliasChoices("calvin_data_dir", "data_dir"),
     )
 
@@ -125,6 +129,9 @@ class Settings(BaseSettings):
     @model_validator(mode="after")
     def _derive_paths(self) -> "Settings":
         """Anchor unset paths under data_dir and make every path absolute."""
+        # An empty CALVIN_DATA_DIR= parses as "." and counts as unset too.
+        if self.data_dir == Path("."):
+            self.data_dir = LEGACY_DATA_DIR
         self.data_dir = resolve_path(self.data_dir)
         defaults = type(self).model_fields
         for name in _DATA_PATHS:

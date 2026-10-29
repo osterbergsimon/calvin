@@ -5,6 +5,9 @@ from an unrelated working directory with only CALVIN_DATA_DIR set, then
 exercised through every path that writes to disk. Between the first start
 and the second, the DB is given what an older install stored for the Local
 Images instance: a cwd-relative image_dir that must no longer win.
+
+The old checkout data dir (<backend>/data) is replaced by a temp dir via
+CALVIN_TEST_LEGACY_DIR, so the developer's real one is never read.
 """
 
 import io
@@ -37,8 +40,12 @@ OVERRIDES = (
 )
 
 SCRIPT = r"""
-import io, json, sys
+import io, json, os, sys
+from pathlib import Path
 from fastapi.testclient import TestClient
+
+import app.utils.legacy_data as legacy_data
+legacy_data.LEGACY_DATA_DIR = Path(os.environ["CALVIN_TEST_LEGACY_DIR"])
 
 from app.main import app
 from app.config import settings
@@ -50,6 +57,16 @@ from app.services.theme_installer import theme_installer
 if sys.argv[1] == "init":
     with TestClient(app) as client:
         assert client.get("/api/health").status_code == 200
+    sys.exit(0)
+
+if sys.argv[1] == "gallery":
+    with TestClient(app) as client:
+        images = client.get("/api/images/list").json()
+    print(json.dumps({
+        "images": json.dumps(images),
+        "key": settings.kiosk_signing_key_path.read_text().strip(),
+        "themes": [t.get("id") for t in theme_installer.get_installed_themes()],
+    }))
     sys.exit(0)
 
 png = bytes.fromhex(sys.argv[1])
@@ -98,14 +115,11 @@ def _seed_legacy_local_images(db: Path) -> None:
         )
 
 
-def test_app_writes_only_under_data_dir(tmp_path):
-    data_dir = tmp_path / "data"
-    cwd = tmp_path / "elsewhere"
-    cwd.mkdir()
+def _runner(data_dir: Path, cwd: Path, legacy_dir: Path):
     env = {k: v for k, v in os.environ.items() if k not in OVERRIDES}
     env["CALVIN_DATA_DIR"] = str(data_dir)
+    env["CALVIN_TEST_LEGACY_DIR"] = str(legacy_dir)
     env["PYTHONPATH"] = str(BACKEND_DIR)
-    backend_data_before = _tree(BACKEND_DIR / "data")
 
     def run(arg: str) -> subprocess.CompletedProcess:
         proc = subprocess.run(
@@ -118,6 +132,16 @@ def test_app_writes_only_under_data_dir(tmp_path):
         )
         assert proc.returncode == 0, proc.stderr[-4000:]
         return proc
+
+    return run
+
+
+def test_app_writes_only_under_data_dir(tmp_path):
+    data_dir = tmp_path / "data"
+    cwd = tmp_path / "elsewhere"
+    cwd.mkdir()
+    backend_data_before = _tree(BACKEND_DIR / "data")
+    run = _runner(data_dir, cwd, tmp_path / "no-legacy-data")
 
     run("init")
     _seed_legacy_local_images(data_dir / "db" / "calvin.db")
@@ -139,3 +163,35 @@ def test_app_writes_only_under_data_dir(tmp_path):
     assert any(f.startswith("backups/calvin-backup-") for f in files)
     for d in ("logs", "themes"):
         assert (data_dir / d).is_dir()
+
+
+def test_dev_compose_upgrade_keeps_checkout_data(tmp_path):
+    """Old dev compose: DB on the volume, but uploads (stored ./data/images),
+    installed themes and the kiosk key in the bind-mounted checkout."""
+    volume = tmp_path / "volume"
+    checkout_data = tmp_path / "checkout" / "backend" / "data"
+    cwd = tmp_path / "checkout" / "backend"
+    cwd.mkdir(parents=True)
+    run = _runner(volume, cwd, checkout_data)
+
+    run("init")  # the DB the old version had on the volume
+    (volume / "kiosk-signing.key").unlink()  # old version kept it in the checkout
+    (volume / ".legacy-data-migrated").unlink(missing_ok=True)
+    _seed_legacy_local_images(volume / "db" / "calvin.db")
+    (checkout_data / "images").mkdir(parents=True)
+    (checkout_data / "images" / "old-upload.png").write_bytes(_png())
+    theme = checkout_data / "themes" / "dusk_theme"
+    theme.mkdir(parents=True)
+    (theme / "theme.json").write_text(
+        json.dumps({"id": "dusk_theme", "name": "Dusk", "version": "1.0.0", "variables": {}})
+    )
+    (checkout_data / "kiosk-signing.key").write_text("ab" * 32)
+
+    reported = json.loads(run("gallery").stdout.strip().splitlines()[-1])
+
+    assert "old-upload" in reported["images"]
+    assert reported["key"] == "ab" * 32
+    assert "dusk_theme" in reported["themes"]
+    assert (volume / "images" / "old-upload.png").is_file()
+    # The checkout copy is left alone.
+    assert (checkout_data / "images" / "old-upload.png").is_file()
