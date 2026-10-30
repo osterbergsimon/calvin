@@ -373,3 +373,99 @@ class TestPluginLoaderIsolation:
         )
         assert sys.modules["app"] is app_package
         assert plugin_loader_instance.get_plugin_class("test_shadow") is not None
+
+
+@pytest.mark.unit
+class TestMalformedManifest:
+    """A malformed plugin.json is skipped loudly instead of aborting startup (CLV-23)."""
+
+    @staticmethod
+    def _write_plugin_dir(tmp_path, name):
+        plugin_dir = tmp_path / name
+        plugin_dir.mkdir()
+        (plugin_dir / "plugin.py").write_text(_FIXTURE_PLUGIN_PY.format(type_id=name))
+        return plugin_dir
+
+    @staticmethod
+    def _capture_error_logs():
+        from loguru import logger
+
+        messages: list[str] = []
+        sink_id = logger.add(lambda message: messages.append(str(message)), level="ERROR")
+        return messages, sink_id, logger
+
+    @patch("app.plugins.loader.plugin_installer")
+    def test_manifest_without_id_is_skipped_and_recorded(
+        self, mock_installer, plugin_loader_instance, tmp_path
+    ):
+        """A manifest missing `id` must not raise KeyError out of startup."""
+        bad_dir = self._write_plugin_dir(tmp_path, "bad_missing_id")
+        bad_manifest = {
+            "name": "Bad",
+            "version": "1.0.0",
+            "type": "service",
+            "api_version": CURRENT_PLUGIN_API_VERSION,
+            "_installed_path": str(bad_dir),
+        }
+        good_dir = self._write_plugin_dir(tmp_path, "test_after_missing_id")
+        good_manifest = {
+            "id": "test_after_missing_id",
+            "name": "Good",
+            "version": "1.0.0",
+            "type": "service",
+            "api_version": CURRENT_PLUGIN_API_VERSION,
+        }
+        mock_installer.get_installed_plugins.return_value = [bad_manifest, good_manifest]
+        mock_installer.get_plugin_path.return_value = good_dir
+
+        logs, sink_id, logger = self._capture_error_logs()
+        try:
+            plugin_loader_instance.load_installed_plugins()
+        finally:
+            logger.remove(sink_id)
+
+        error = plugin_loader_instance.get_load_error("bad_missing_id")
+        assert error is not None and "id" in error
+        assert any("bad_missing_id" in message for message in logs)
+        # The next plugin still loads: one bad manifest doesn't stop the others.
+        assert plugin_loader_instance.get_plugin_class("test_after_missing_id") is not None
+
+    @pytest.mark.parametrize("bad_id", [None, "", 123, "../escape", ["not-a-slug"]])
+    @patch("app.plugins.loader.plugin_installer")
+    def test_manifest_with_invalid_id_is_skipped_and_recorded(
+        self, mock_installer, plugin_loader_instance, tmp_path, bad_id
+    ):
+        """A non-string/unsafe `id` is recorded as a load error, not just warned about."""
+        bad_dir = self._write_plugin_dir(tmp_path, "bad_invalid_id")
+        manifest = {
+            "id": bad_id,
+            "name": "Bad",
+            "version": "1.0.0",
+            "type": "service",
+            "api_version": CURRENT_PLUGIN_API_VERSION,
+            "_installed_path": str(bad_dir),
+        }
+        mock_installer.get_installed_plugins.return_value = [manifest]
+
+        logs, sink_id, logger = self._capture_error_logs()
+        try:
+            plugin_loader_instance.load_installed_plugins()
+        finally:
+            logger.remove(sink_id)
+
+        error = plugin_loader_instance.get_load_error("bad_invalid_id")
+        assert error is not None and "id" in error
+        assert any("bad_invalid_id" in message for message in logs)
+        assert plugin_loader_instance.get_plugin_types() == []
+
+    @pytest.mark.parametrize("bad_manifest", [["not", "an", "object"], "not-an-object", None])
+    @patch("app.plugins.loader.plugin_installer")
+    def test_non_object_manifest_is_skipped(
+        self, mock_installer, plugin_loader_instance, bad_manifest
+    ):
+        """A manifest that is not a JSON object is skipped instead of raising TypeError."""
+        mock_installer.get_installed_plugins.return_value = [bad_manifest]
+
+        plugin_loader_instance.load_installed_plugins()
+
+        assert plugin_loader_instance.get_plugin_types() == []

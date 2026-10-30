@@ -482,6 +482,13 @@ class PluginInstaller:
             try:
                 with open(manifest_path, encoding="utf-8") as f:
                     manifest = json.load(f)
+                if not isinstance(manifest, dict):
+                    logger.warning(
+                        "Error reading plugin manifest for {}: expected a JSON object, got {}",
+                        plugin_dir.name,
+                        type(manifest).__name__,
+                    )
+                    continue
                 manifest["_installed_path"] = str(plugin_dir)
                 plugins.append(manifest)
             except (json.JSONDecodeError, OSError, ValueError) as e:
