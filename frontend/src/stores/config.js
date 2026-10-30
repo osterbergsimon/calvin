@@ -13,11 +13,15 @@ import {
   setRegionView,
 } from "../utils/layout";
 import { applyConfigPayload, createDefaultDisplaySchedule } from "./configRegistry";
-import { configPath, getKioskId } from "@/utils/kioskId";
+import { configPath, getKioskId, withViewport } from "@/utils/kioskId";
 
 // The config is what a kiosk boots from, so its offline copy is kept for a day
 // and served (flagged stale) even after that when the backend is unreachable.
 const CONFIG_CACHE_TTL = 24 * 60 * 60 * 1000;
+
+// Only one store instance reports a viewport in the app; rebinding replaces the
+// previous listener instead of stacking another one.
+let viewportResizeHandler = null;
 
 export const useConfigStore = defineStore("config", () => {
   const orientation = ref("landscape"); // 'landscape' | 'portrait'
@@ -215,10 +219,26 @@ export const useConfigStore = defineStore("config", () => {
   const calendarWidth = computed(() => `${calendarSplit.value}%`);
   const photosWidth = computed(() => `${100 - calendarSplit.value}%`);
 
+  // Kiosks report their viewport on load and, debounced, on resize so the
+  // editor's preview follows the real screen shape (CLV-36).
+  let viewportTimer = null;
+  let viewportBound = false;
+  const bindViewportReporting = () => {
+    if (viewportBound || !getKioskId()) return;
+    viewportBound = true;
+    if (viewportResizeHandler) window.removeEventListener("resize", viewportResizeHandler);
+    viewportResizeHandler = () => {
+      clearTimeout(viewportTimer);
+      viewportTimer = setTimeout(() => fetchConfig(), 2000);
+    };
+    window.addEventListener("resize", viewportResizeHandler);
+  };
+
   const fetchConfig = async () => {
     loading.value = true;
     error.value = null;
-    const path = configPath();
+    bindViewportReporting();
+    const path = withViewport(configPath());
     const cacheKey = `config_${path}`;
     const applyFetched = data => {
       applyConfigPayload(data, configRefs, { useDefaults: true });

@@ -1,5 +1,5 @@
 import { describe, it, expect } from "vitest";
-import { getKioskId, configUrl, captureKioskIdentity } from "@/utils/kioskId";
+import { getKioskId, configUrl, captureKioskIdentity, withViewport } from "@/utils/kioskId";
 
 function setLocation(search) {
   Object.defineProperty(window, "location", {
@@ -59,6 +59,17 @@ describe("configUrl", () => {
   it("falls back to location.hostname for khost when the param is absent", () => {
     setLocation("?kiosk=kitchen-3f9a2c"); // window.location.hostname is set by setLocation
     expect(configUrl()).toBe("/api/kiosks/kitchen-3f9a2c/config?khost=pi-kitchen");
+  });
+
+  it("appends the screen's viewport for a kiosk, and only for a kiosk", () => {
+    setLocation("");
+    expect(withViewport("/config")).toBe("/config");
+    setLocation("?kiosk=kitchen&khost=pi-k");
+    Object.defineProperty(window, "innerWidth", { value: 1080, configurable: true });
+    Object.defineProperty(window, "innerHeight", { value: 1920, configurable: true });
+    expect(withViewport("/kiosks/kitchen/config?khost=pi-k")).toBe(
+      "/kiosks/kitchen/config?khost=pi-k&vw=1080&vh=1920"
+    );
   });
 
   it("percent-encodes special characters in kiosk id and khost", () => {

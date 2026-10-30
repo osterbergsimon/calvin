@@ -1,16 +1,16 @@
 <template>
   <div class="ins">
-    <div class="ins-mode"><span class="chip screen">Screen</span> settings</div>
+    <div class="ins-mode"><span class="chip screen">Page</span> settings</div>
 
     <section class="ins-group">
-      <h3 class="ins-h">Screen</h3>
+      <h3 class="ins-h">Page</h3>
       <label class="ins-field">
         <span class="ins-label">Name</span>
         <input
           class="ins-input"
           type="text"
           :value="screen.name"
-          aria-label="Screen name"
+          aria-label="Page name"
           @change="$emit('rename', $event.target.value)"
         />
       </label>
@@ -45,7 +45,7 @@
           @update:model-value="$emit('toggle-direction')"
         />
         <p class="ins-help">
-          How this screen’s regions are cut — independent of the physical orientation.
+          How this page’s regions are cut — independent of the physical orientation.
         </p>
       </div>
     </section>
@@ -55,7 +55,7 @@
       <div class="switch-row">
         <div>
           <div class="s-label">Show clock bar</div>
-          <div class="s-help">A slim time strip on this screen</div>
+          <div class="s-help">A slim time strip on this page</div>
         </div>
         <ToggleSwitch
           :model-value="clock.enabled"
@@ -82,7 +82,7 @@
     </section>
 
     <section class="ins-group">
-      <h3 class="ins-h">This screen</h3>
+      <h3 class="ins-h">This page</h3>
       <p class="ins-empty">
         Select a region in the preview to set what it shows and how big it is.
       </p>
@@ -97,7 +97,7 @@
           :disabled="!canDelete"
           @click="$emit('delete')"
         >
-          Delete screen
+          Delete page
         </button>
       </div>
     </section>
