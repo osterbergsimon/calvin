@@ -120,20 +120,19 @@ describe("KiosksSettings — orientation editor", () => {
     expect(w.text()).toContain("Only this screen");
   });
 
-  it("Reset to global removes only the orientation keys", async () => {
+  it("Use the shared setting on Orientation removes only that key", async () => {
     const { w, store } = await selectFirst(one, {
       orientation: "portrait",
       availableScreens: ["a"],
     });
-    await w.find("[data-test='reset-orientation']").trigger("click");
+    await w.find("[data-test='reset-orientation-row']").trigger("click");
     await flushPromises();
     expect(store.saveOverrides).toHaveBeenCalledWith("k1", { availableScreens: ["a"] });
   });
 
-  it("Reset to global button is disabled when there is no orientation override", async () => {
+  it("offers no Use the shared setting link while the row inherits", async () => {
     const { w } = await selectFirst(one, {});
-    const btn = w.find("[data-test='reset-orientation']");
-    expect(btn.attributes("disabled")).toBeDefined();
+    expect(w.find("[data-test='reset-orientation-row']").exists()).toBe(false);
   });
 
   it("shows save-failure copy and no success copy when saveOverrides rejects", async () => {
@@ -245,7 +244,7 @@ describe("KiosksSettings — content editor", () => {
     w.findComponent(ChipMultiSelect).vm.$emit("update:modelValue", []);
     await flushPromises();
     expect(store.saveOverrides).not.toHaveBeenCalled();
-    expect(w.text()).toContain("Pick at least one screen");
+    expect(w.text()).toContain("Pick at least one page");
   });
 
   it("dropping the default's screen from the set clears defaultScreenId", async () => {
@@ -334,21 +333,28 @@ describe("KiosksSettings — content editor", () => {
     });
   });
 
-  it("Reset content to global removes only the content keys", async () => {
+  it("Use the shared setting on Pages shown removes only availableScreens", async () => {
     const { w, store } = await selectContent(one, {
       orientation: "portrait",
+      defaultScreenId: "a",
       availableScreens: ["a"],
+    });
+    await w.find("[data-test='reset-screens-shown']").trigger("click");
+    await flushPromises();
+    expect(store.saveOverrides).toHaveBeenCalledWith("k1", {
+      orientation: "portrait",
       defaultScreenId: "a",
     });
-    await w.find("[data-test='reset-content']").trigger("click");
-    await flushPromises();
-    expect(store.saveOverrides).toHaveBeenCalledWith("k1", { orientation: "portrait" });
   });
 
-  it("Reset content button is disabled when there is no content override", async () => {
-    const { w } = await selectContent(one, { orientation: "portrait" });
-    const btn = w.find("[data-test='reset-content']");
-    expect(btn.attributes("disabled")).toBeDefined();
+  it("Use the shared setting on Start page removes only defaultScreenId", async () => {
+    const { w, store } = await selectContent(one, {
+      orientation: "portrait",
+      defaultScreenId: "a",
+    });
+    await w.find("[data-test='reset-default-screen']").trigger("click");
+    await flushPromises();
+    expect(store.saveOverrides).toHaveBeenCalledWith("k1", { orientation: "portrait" });
   });
 });
 
@@ -462,20 +468,24 @@ describe("KiosksSettings — schedule editor", () => {
     });
   });
 
-  it("Reset schedule removes only the schedule keys", async () => {
+  it("Use the shared setting on the schedule removes only the schedule keys", async () => {
     const { w, store } = await selectFirst({
       orientation: "portrait",
-      displayScheduleEnabled: false,
+      displayScheduleEnabled: true,
       displaySchedule: [{ day: 0, enabled: false, onTime: "07:00", offTime: "23:00" }],
     });
-    await w.find("[data-test='reset-schedule']").trigger("click");
+    await w.find("[data-test='reset-schedule-enabled']").trigger("click");
     await flushPromises();
-    expect(store.saveOverrides).toHaveBeenCalledWith("k1", { orientation: "portrait" });
+    expect(store.saveOverrides).toHaveBeenCalledWith("k1", {
+      orientation: "portrait",
+      displaySchedule: [{ day: 0, enabled: false, onTime: "07:00", offTime: "23:00" }],
+    });
   });
 
-  it("Reset schedule is disabled when there is no schedule override", async () => {
-    const { w } = await selectFirst({});
-    expect(w.find("[data-test='reset-schedule']").attributes("disabled")).toBeDefined();
+  it("has no section-wide Reset to global button left", async () => {
+    const { w } = await selectFirst({ orientation: "portrait" });
+    expect(w.text()).not.toContain("Reset");
+    expect(w.text()).not.toContain("global");
   });
 
   it("shows save-failure copy when saveOverrides rejects", async () => {
@@ -583,7 +593,8 @@ describe("KiosksSettings — detail order and hardware drawer", () => {
     expect(drawer.exists()).toBe(true);
     expect(drawer.get("section").classes()).not.toContain("expanded");
     // orientation controls are still present (v-show keeps them mounted)
-    expect(w.find("[data-test='reset-orientation']").exists()).toBe(true);
+    expect(w.find("[data-test='reset-orientation-row']").exists()).toBe(false);
+    expect(w.findComponent({ name: "SegmentedControl" }).exists()).toBe(true);
   });
 
   it("re-collapses the drawer when switching kiosks", async () => {

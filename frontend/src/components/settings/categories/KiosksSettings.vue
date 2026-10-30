@@ -193,15 +193,6 @@
             @update:model-value="setDefault"
           />
         </SettingRow>
-        <button
-          type="button"
-          class="kiosks__reset"
-          data-test="reset-content"
-          :disabled="!contentOverridden"
-          @click="resetContent"
-        >
-          Reset content to global
-        </button>
         <p v-if="contentMsg" class="kiosks__saved" role="status" aria-live="polite">
           {{ contentMsg }}
         </p>
@@ -236,15 +227,6 @@
         </template>
         <DisplayScheduleGrid :model-value="effSchedule || []" @update:model-value="setSchedule" />
       </SettingRow>
-      <button
-        type="button"
-        class="kiosks__reset"
-        data-test="reset-schedule"
-        :disabled="!anyScheduleOverridden"
-        @click="resetSchedule"
-      >
-        Reset schedule to global
-      </button>
       <p v-if="scheduleMsg" class="kiosks__saved" role="status" aria-live="polite">
         {{ scheduleMsg }}
       </p>
@@ -298,15 +280,6 @@
           @update:model-value="setApply"
         />
       </SettingRow>
-      <button
-        type="button"
-        class="kiosks__reset"
-        data-test="reset-orientation"
-        :disabled="!orientationOverridden && !flipOverridden && !applyOverridden"
-        @click="resetOrientation"
-      >
-        Reset to global
-      </button>
       <p v-if="savedMsg" class="kiosks__saved" role="status" aria-live="polite">{{ savedMsg }}</p>
     </CollapsibleSection>
     <CollapsibleSection
@@ -449,8 +422,6 @@ async function updateAll() {
 
 const ONLINE_WINDOW_MS = 120000; // 2 minutes
 
-const ORI_KEYS = ["orientation", "orientationFlipped", "applyDisplayRotation"];
-
 const orientationOverridden = computed(() => "orientation" in overrides.value);
 const flipOverridden = computed(() => "orientationFlipped" in overrides.value);
 const applyOverridden = computed(() => "applyDisplayRotation" in overrides.value);
@@ -466,8 +437,6 @@ const effApply = computed(() =>
     ? overrides.value.applyDisplayRotation
     : (config.applyDisplayRotation ?? true)
 );
-
-const CONTENT_KEYS = ["availableScreens", "defaultScreenId"];
 
 const screenCatalog = computed(() => config.dashboardScreens?.screens ?? []);
 const screenOptions = computed(() =>
@@ -512,14 +481,6 @@ function setDefault(id) {
   persistContent({ ...overrides.value, defaultScreenId: id });
 }
 
-const contentOverridden = computed(() => availableOverridden.value || defaultOverridden.value);
-
-function resetContent() {
-  const next = { ...overrides.value };
-  for (const k of CONTENT_KEYS) delete next[k];
-  persistContent(next);
-}
-
 function resetAvailable() {
   // Back to every screen. Drop a default that was only valid while some
   // screens were hidden.
@@ -539,7 +500,7 @@ function resetDefaultScreen() {
 
 function setAvailable(ids) {
   if (ids.length === 0) {
-    contentMsg.value = "Pick at least one screen, or Reset to show all.";
+    contentMsg.value = "Pick at least one page.";
     return;
   }
   const next = { ...overrides.value };
@@ -612,12 +573,6 @@ function setApply(value) {
   persist({ ...overrides.value, applyDisplayRotation: value });
 }
 
-function resetOrientation() {
-  const next = { ...overrides.value };
-  for (const k of ORI_KEYS) delete next[k];
-  persist(next);
-}
-
 // One row back to the shared value (the row's "Use the shared setting").
 function resetOrientationRow() {
   const next = { ...overrides.value };
@@ -669,14 +624,10 @@ function useSharedOsk() {
   persistKeyboard(next);
 }
 
-const SCHED_KEYS = ["displayScheduleEnabled", "displaySchedule"];
 const scheduleMsg = ref("");
 
 const scheduleEnabledOverridden = computed(() => "displayScheduleEnabled" in overrides.value);
 const scheduleOverridden = computed(() => "displaySchedule" in overrides.value);
-const anyScheduleOverridden = computed(
-  () => scheduleEnabledOverridden.value || scheduleOverridden.value
-);
 const effScheduleEnabled = computed(() =>
   scheduleEnabledOverridden.value
     ? overrides.value.displayScheduleEnabled
@@ -709,11 +660,6 @@ function setScheduleEnabled(value) {
 }
 function setSchedule(value) {
   persistSchedule({ ...overrides.value, displaySchedule: value });
-}
-function resetSchedule() {
-  const next = { ...overrides.value };
-  for (const k of SCHED_KEYS) delete next[k];
-  persistSchedule(next);
 }
 function resetScheduleEnabled() {
   const next = { ...overrides.value };
@@ -885,20 +831,6 @@ onMounted(async () => {
 .kiosk-software__btn:disabled {
   opacity: 0.55;
   cursor: not-allowed;
-}
-.kiosks__reset {
-  margin-top: 8px;
-  padding: 6px 14px;
-  border: 1px solid var(--border-color, rgba(255, 255, 255, 0.12));
-  border-radius: 6px;
-  background: transparent;
-  color: inherit;
-  cursor: pointer;
-  font-size: 0.9em;
-}
-.kiosks__reset:disabled {
-  opacity: 0.4;
-  cursor: default;
 }
 .kiosks__saved {
   margin-top: 8px;

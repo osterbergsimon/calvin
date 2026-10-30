@@ -13,7 +13,7 @@ export const settingsCategories = [
     id: "dashboard",
     label: "Dashboard",
     icon: "📐",
-    subtitle: "Screens · clock bar · theme · touch",
+    subtitle: "Pages · clock bar · theme · touch",
   },
   {
     id: "device",
@@ -33,7 +33,7 @@ export const settingsCategories = [
     id: "security",
     label: "Security",
     icon: "🔒",
-    subtitle: "Admin password · allowed origins · network access",
+    subtitle: "Admin password · allowed sites",
   },
 ];
 
