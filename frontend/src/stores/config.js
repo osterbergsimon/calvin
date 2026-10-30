@@ -104,6 +104,10 @@ export const useConfigStore = defineStore("config", () => {
   const configPollInterval = ref(30); // Config polling interval in seconds (default: 30)
   const devMode = ref(false); // Whether the backend is running in dev mode (backend/.dev marker file)
   const pluginRepositoryUrl = ref("https://github.com/osterbergsimon/calvin-plugins"); // Default plugin repo for the GitHub install flow
+  // The official add-on catalog the Content provider picker may install from
+  // (CLV-45). Separate from pluginRepositoryUrl above: that one is the user's
+  // "another GitHub repository" field and must never reach a one-click install.
+  const pluginCatalogRepo = ref("https://github.com/osterbergsimon/calvin-plugins");
   const loading = ref(false);
   const error = ref(null);
   // True while the applied config came from the offline cache.
@@ -190,6 +194,7 @@ export const useConfigStore = defineStore("config", () => {
     configPollInterval,
     devMode,
     pluginRepositoryUrl,
+    pluginCatalogRepo,
   };
 
   const setOrientation = newOrientation => {
@@ -637,6 +642,7 @@ export const useConfigStore = defineStore("config", () => {
     configPollInterval,
     devMode,
     pluginRepositoryUrl,
+    pluginCatalogRepo,
     displayName,
     focusLightMode,
     focusLightDimOthers,

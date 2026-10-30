@@ -8,11 +8,8 @@
     <div v-if="loading" class="state-message">Loading installed plugins&hellip;</div>
 
     <div v-else-if="barCapableServices.length === 0" class="state-message empty-state">
-      <p>No installed plugins expose a clock bar tile.</p>
-      <p>
-        Install a plugin that ships a status bar item to add tiles here. Manage installs in the
-        <strong>Plugins</strong> category.
-      </p>
+      <p>No clock bar info yet.</p>
+      <button type="button" class="btn-add" @click="addClockBarInfo">Add clock bar info</button>
     </div>
 
     <template v-else>
@@ -63,12 +60,14 @@
 
 <script setup>
 import { computed, onMounted, ref } from "vue";
+import { useRouter } from "vue-router";
 import { useWebServicesStore } from "@/stores/webServices";
 import * as pluginsApi from "@/services/pluginsApi";
 import { logError } from "@/utils/logger";
 import SchemaStatusbarItem from "@/components/plugins/SchemaStatusbarItem.vue";
 
 const webServicesStore = useWebServicesStore();
+const router = useRouter();
 
 const loading = ref(false);
 const pendingId = ref(null);
@@ -115,6 +114,11 @@ async function toggle(service, nextValue) {
   }
 }
 
+// Adding clock-bar info happens in Content (§3.5): this list stays the
+// show/hide and order control and links there for adding.
+const addClockBarInfo = () =>
+  router.push({ path: "/settings", query: { setting: "content-clock-bar", add: "clock" } });
+
 onMounted(async () => {
   if (webServicesStore.services.length === 0) {
     loading.value = true;
@@ -155,7 +159,25 @@ onMounted(async () => {
 }
 
 .empty-state p {
-  margin: 0 0 0.5rem;
+  margin: 0 0 0.75rem;
+}
+
+.btn-add {
+  min-height: var(--touch-target);
+  padding: 0.5rem 1rem;
+  background: var(--focus);
+  color: var(--focus-ink);
+  border: 0;
+  border-radius: var(--radius-md);
+  font-family: var(--font-ui);
+  font-size: 0.9rem;
+  font-weight: 600;
+  cursor: pointer;
+}
+
+.btn-add:focus-visible {
+  outline: 2px solid var(--focus);
+  outline-offset: 2px;
 }
 
 .items-list {
@@ -168,8 +190,7 @@ onMounted(async () => {
 }
 
 .item-row {
-  display: grid;
-  grid-template-columns: minmax(80px, auto) 1fr auto;
+  display: flex;
   gap: 1rem;
   align-items: center;
   padding: 0.75rem 1rem;
@@ -182,7 +203,18 @@ onMounted(async () => {
 .preview {
   display: flex;
   align-items: center;
+  min-width: 80px;
   min-height: 32px;
+}
+
+/* A tile with no live preview yet leaves no empty slot (CLV-45 review). */
+.preview:empty {
+  display: none;
+}
+
+.meta {
+  flex: 1;
+  min-width: 0;
 }
 
 .meta .title {

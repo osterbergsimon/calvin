@@ -46,6 +46,15 @@
 
       <div class="pc-actions">
         <button
+          v-if="showUpdate"
+          type="button"
+          class="pc-btn pc-btn--update"
+          :disabled="updating"
+          @click="$emit('update', plugin.id)"
+        >
+          {{ updating ? "Updating…" : `Update to v${latestVersion}` }}
+        </button>
+        <button
           v-if="hasSettings && plugin.enabled"
           type="button"
           class="pc-btn"
@@ -121,6 +130,7 @@
 import { computed } from "vue";
 import ToggleSwitch from "@/components/ui/ToggleSwitch.vue";
 import { pluginKindLabel } from "@/utils/pluginKind";
+import { isNewerVersion } from "@/utils/pluginVersions";
 import PluginFieldRenderer from "../../PluginFieldRenderer.vue";
 import PluginActions from "../../PluginActions.vue";
 import PluginSections from "../../PluginSections.vue";
@@ -182,6 +192,15 @@ const props = defineProps({
     type: String,
     default: "",
   },
+  // Catalog version when the official catalog has a newer release (§3.3).
+  latestVersion: {
+    type: String,
+    default: "",
+  },
+  updating: {
+    type: Boolean,
+    default: false,
+  },
 });
 
 const emit = defineEmits([
@@ -196,11 +215,16 @@ const emit = defineEmits([
   "used-by",
   "add-source",
   "open-appearance",
+  "update",
   "upload",
   "delete-image",
 ]);
 
 const kindLabel = computed(() => pluginKindLabel(props.plugin));
+
+// Only a genuinely newer catalog version offers Update; an equal or older one
+// (a downgrade) does not.
+const showUpdate = computed(() => isNewerVersion(props.latestVersion, props.plugin.version));
 
 const isTheme = computed(() => props.plugin.type === "theme");
 const isBackground = computed(() => props.plugin.type === "backend");
@@ -370,6 +394,20 @@ const handleCustomAction = action => emit("custom-action", props.plugin.id, acti
 .pc-btn--danger:hover {
   border-color: var(--err);
   background: color-mix(in srgb, var(--err) 10%, transparent);
+}
+.pc-btn--update {
+  background: var(--focus);
+  color: var(--focus-ink);
+  border-color: var(--focus);
+  font-weight: 600;
+}
+.pc-btn--update:hover {
+  background: color-mix(in srgb, var(--focus), black 12%);
+  border-color: var(--focus);
+}
+.pc-btn--update:disabled {
+  opacity: 0.6;
+  cursor: progress;
 }
 .pc-chevron {
   font-size: 1.1rem;
