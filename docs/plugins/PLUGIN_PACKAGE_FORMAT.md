@@ -147,10 +147,12 @@ regenerates this file — don't edit it by hand there.
 ```
 
 - **`dependencies.packages`** (list of strings): pip requirement strings —
-  **the only dependency mechanism**. The installer pip-installs each one into
-  the host's venv at plugin install (resolving `uv`, a venv `pip`, or
-  `python -m pip`, in that order). A failed or timed-out install (120 s per
-  package) **rolls the whole plugin back**.
+  **the only dependency mechanism**. The installer pip-installs each one at
+  plugin install into the persistent target on the data volume
+  (`<data dir>/python/<major>.<minor>/site-packages`, so it survives a
+  container image update), resolving `uv`, a venv `pip`, or `python -m pip`,
+  in that order. A failed or timed-out install (120 s per package) **rolls the
+  whole plugin back**.
 - Shape is validated at install: must be a list of non-empty strings.
 
 **Retired dependency keys** (no effect on the host; rejected by the

@@ -20,6 +20,7 @@ from loguru import logger
 
 from app.config import BACKEND_DIR, settings
 from app.services.plugin_installer import plugin_installer
+from app.services.plugin_packages import plugin_packages_dir
 
 CHECK_MODULE = "app.plugins.check_plugin"
 DEFAULT_TIMEOUT = 60.0
@@ -29,9 +30,15 @@ DEFAULT_TIMEOUT = 60.0
 # runtime image the venv is an editable install whose .pth points at a build
 # directory that does not exist at runtime, so `import app` would otherwise
 # only resolve through the process cwd — and `-m` would never find it.
+#
+# The plugin dependency target (calvin-26c) is appended — not prepended — so
+# the child resolves the same packages the server would: the interpreter's own
+# site-packages still win on conflicts.
 CHILD_BOOTSTRAP = (
-    "import runpy, sys; "
+    "import os, runpy, sys; "
     "sys.path.insert(0, sys.argv[1]); "
+    "plugin_packages = sys.argv[2]; "
+    "sys.path.append(plugin_packages) if os.path.isdir(plugin_packages) else None; "
     f"runpy.run_module({CHECK_MODULE!r}, run_name='__main__', alter_sys=True)"
 )
 
@@ -73,6 +80,8 @@ def _child_command(plugin_dir: Path) -> list[str]:
     The plugin dir travels as the last argument; the bootstrap inserts
     ``BACKEND_DIR`` ahead of whatever the interpreter's install provides, so the
     check works no matter how the backend was installed or where it is run from.
+    The persistent plugin dependency target follows the backend dir, so the
+    child can import a plugin's packages installed on the data volume.
     """
     return [
         sys.executable,
@@ -80,6 +89,7 @@ def _child_command(plugin_dir: Path) -> list[str]:
         "-c",
         CHILD_BOOTSTRAP,
         str(BACKEND_DIR),
+        str(plugin_packages_dir()),
         str(plugin_dir),
     ]
 

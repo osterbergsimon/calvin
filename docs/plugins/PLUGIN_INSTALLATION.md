@@ -64,7 +64,10 @@ Key points (details in the package format spec):
   or newer version — are rejected with a message saying whether to update the
   plugin or update Calvin.
 - **`dependencies.packages`** is the only dependency mechanism: a list of pip
-  requirement strings, installed into the host venv during install.
+  requirement strings, installed during install into the data dir's persistent
+  per-Python-version target (`<data dir>/python/<major>.<minor>/site-packages`),
+  which survives image updates. That target is searched *after* the
+  interpreter's own packages, so a plugin can never shadow a core dependency.
 - Retired keys (`format_version`, `protocol_version`, `python_dependencies`,
   `dependencies.python`, `dependencies.calvin`) do nothing; the plugin-repo
   validator rejects them.
