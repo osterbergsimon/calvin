@@ -128,18 +128,61 @@ Dashboard › Clock bar items stays the place to show, hide and order tiles. Its
 (opens §3.2 for that kind, in Content). **Show plugin info** (the audit row) is removed: each tile already has its
 own toggle in Clock bar items, so the global switch only duplicates them.
 
+### 3.6 Service sources: placed, not merged
+
+Calendars and photos are **feeds**: every source merges into any calendar or photos region. A service source (web
+page, Mealie, Home Assistant…) is **placed**: it only shows once it's put in a region (`service:{id}` in the page
+editor). So adding one isn't enough on its own, and Content has to say where each one is placed.
+
+- **Where it shows**, on each Web pages & apps row, after the summary:
+  - **On Home, Week** (page names, linking to the editor on that page);
+  - or **Not on any page yet** + text button **Put it on a page**.
+- **Put it on a page** opens Pages & regions on the active page in *place mode*:
+  - a banner **Choose a region for Recipes**;
+  - tapping a region sets its content to this source (an empty region directly; a filled one asks **Replace
+    {current} with Recipes?**);
+  - **Cancel** leaves it unplaced.
+- **After adding** a service source, the new row is highlighted and shows **Put it on a page** as a `.btn--primary`,
+  so the next step is obvious.
+- **Clock-bar-only sources** (a plugin with `statusbar_schema` and no `display_schema`) need no placing. On add,
+  their tile is switched on in Clock bar items, and the row says **In the clock bar** or **Hidden from the clock bar**
+  (with a link to Clock bar items).
+- **A service with both** a page and a tile: the row shows both, e.g. **On Home · in the clock bar**.
+- **Background plugins** (`backend`) have no sources. Their settings stay on their card in Plugins, which says
+  **Works in the background. No sources to add.**
+- **Remove** on a placed source warns: **Remove Recipes? It's on Home and Week; those regions become empty.**
+
+### 3.7 Installing from the picker (decision D)
+
+Installing and *managing* add-ons stays in Plugins: updates, uninstall, turning off, other repositories, local path.
+*Discovering* an add-on is bridged into the picker, because "I want photos from Immich" shouldn't end at "go to
+another category":
+
+- The provider picker (§3.2) gets a second group, **From the Calvin catalog**. It lists catalog plugins of that
+  kind that aren't installed: name, description, **Install**.
+- **Install** asks once: **Install Immich? It adds an add-on to your Calvin server. You can remove it in Plugins.**
+  (**Install** / **Cancel**). It then shows progress in the tile (**Installing…**), and on success continues straight
+  into that plugin's add form. On failure the tile shows the error and **See details in Plugins ›**.
+- Only the official catalog appears here. Other GitHub repositories and local paths are Plugins only: installing
+  third-party code should be a deliberate visit.
+- If the catalog can't be reached, the group is simply absent; **Get more in Plugins ›** stays.
+
 ## 4. Owner decisions
+
+Approved 2026-10-30: A, B and C. D is proposed.
 
 - **A. Sources live only in Content** (Plugins shows "Used by n sources" links, not the lists). Recommended.
 - **B. Calendars use the shared add/edit flow** (retire the custom form). Recommended: one flow to learn and maintain.
 - **C. Remove "Show plugin info"** in favour of the per-tile toggles. Recommended.
+- **D. Install official-catalog plugins from the Content picker** (§3.7); management stays in Plugins. Recommended.
 
 ## 5. Phasing
 
 1. **Bug + words** (no decision needed): fix `AddWebPageButton` to open the provider picker (or the iframe plugin
    when it's the only one); "Instance Name" → "Name"; plain kind chips; the restart notice check.
-2. **Content owns sources** (A, B): `SourceList` + the provider picker in all four sections; Plugins cards slimmed.
-3. **Install catalog-first** and the clock bar change (C).
+2. **Content owns sources** (A, B): `SourceList` + the provider picker in all four sections, placement lines and
+   place mode (§3.6); Plugins cards slimmed.
+3. **Install catalog-first**, the clock bar change (C) and, if approved, catalog install from the picker (D, §3.7).
 
 ## 6. Data needed
 
@@ -172,4 +215,6 @@ own toggle in Clock bar items, so the global switch only duplicates them.
   - "Used by n sources" links to the Content section with highlight;
   - the turn-off and uninstall confirms include the source count;
   - themes link to Appearance.
+- Service placement: rows show the page names or **Put it on a page**; place mode sets the region content, asks before
+  replacing, and Cancel changes nothing; a clock-bar-only add switches its tile on; Remove warns with the page names.
 - Words: no "Instance", raw type badge or "statusbar" text in Settings.
