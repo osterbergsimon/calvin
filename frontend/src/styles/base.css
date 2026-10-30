@@ -12,7 +12,7 @@
 ):focus-visible {
   outline: 2px solid var(--focus);
   outline-offset: 2px;
-  border-radius: 4px;
+  border-radius: var(--radius-xs);
 }
 
 /* Strip the browser's native number-input spinner chrome app-wide. The up/down

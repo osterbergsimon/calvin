@@ -29,7 +29,7 @@ const stateClass = computed(() => {
 .focus-panel {
   background: var(--bg-1);
   border: 1px solid var(--line);
-  border-radius: 4px;
+  border-radius: var(--radius-xs);
   transition:
     transform 0.35s cubic-bezier(0.2, 0.7, 0.2, 1),
     box-shadow 0.35s,

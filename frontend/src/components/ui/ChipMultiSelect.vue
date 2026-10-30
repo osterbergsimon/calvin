@@ -47,12 +47,12 @@ const toggle = v => {
 }
 .chip {
   font-family: var(--font-ui);
-  font-size: 14px;
+  font-size: var(--fs-control);
   font-weight: 500;
   color: var(--ink-2);
   background: var(--bg-2);
   border: 1px solid var(--line);
-  border-radius: 11px;
+  border-radius: var(--radius-lg);
   padding: 0 14px;
   min-height: 44px;
   cursor: pointer;

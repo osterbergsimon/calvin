@@ -288,11 +288,11 @@ onUnmounted(() => {
 .pill__swatch {
   width: 1rem; /* 16px */
   height: 1rem;
-  border-radius: 0.3125rem; /* 5px */
+  border-radius: var(--radius-xs);
 }
 .pill__cv {
   color: var(--ink-3);
-  font-size: 0.75rem; /* 12px */
+  font-size: var(--fs-2xs); /* 12px */
 }
 .pill__panel {
   /* position/coords come from :style (fixed, teleported to <body> to escape the

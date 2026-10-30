@@ -63,7 +63,7 @@ defineEmits(["select-screen"]);
 .screen-dot:focus-visible {
   outline: 2px solid var(--focus);
   outline-offset: 2px;
-  border-radius: 11px;
+  border-radius: var(--radius-lg);
 }
 @media (prefers-reduced-motion: reduce) {
   .screen-dot__pip {
