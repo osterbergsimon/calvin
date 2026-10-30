@@ -6,12 +6,17 @@ panel on/off to match. Mirrors backend display_power_service semantics. Pure
 Python 3 stdlib — no third-party deps (the kiosk Pi has no venv).
 """
 
+import base64
+import hashlib
 import json
 import os
 import re
+import signal
 import socket
+import struct
 import subprocess
 import sys
+import threading
 import time as time_module
 import urllib.parse
 import urllib.request
@@ -638,6 +643,552 @@ def apply_device_physical(
         applier(rotation, output)
 
 
+# --- kiosk crash-page recovery (CLV-25) --------------------------------------
+# A renderer crash ("Aw, Snap!") leaves the browser process alive, so systemd's
+# Restart=always never fires and the kiosk sits on the crash page until someone
+# reloads it. Nothing in the page can recover itself. The agent therefore probes
+# Chromium's remote-debugging endpoint on localhost (the kiosk unit passes
+# --remote-debugging-port, bound to 127.0.0.1) and restarts the kiosk unit when
+# the page stops answering. The probe talks to Chromium, never to X11 or Wayland,
+# so it covers both display stacks unchanged.
+KIOSK_UNITS = ("calvin-kiosk-remote.service", "calvin-kiosk.service")
+PAGE_OK = "ok"
+PAGE_DEAD = "dead"
+PAGE_UNREACHABLE = "unreachable"
+WATCHDOG_DEFAULT_PORT = 9222
+WATCHDOG_DEFAULT_SECONDS = 30
+WATCHDOG_DEFAULT_FAILURES = 3
+WATCHDOG_DEFAULT_COOLDOWN = 300
+WATCHDOG_WARMUP_SECONDS = 120
+WATCHDOG_TIMEOUT = 10
+WS_GUID = "258EAFA5-E914-47DA-95CA-C5AB0DC85B11"
+WS_OPCODE_TEXT = 0x1
+WS_OPCODE_CLOSE = 0x8
+
+
+def _int_or(raw, default):
+    try:
+        return int(str(raw).strip())
+    except (TypeError, ValueError):
+        return default
+
+
+def kiosk_watchdog_config(env=None):
+    """Crash-recovery settings from the environment, with safe bounds."""
+    if env is None:
+        env = os.environ
+    port = _int_or(env.get("CALVIN_KIOSK_CDP_PORT"), WATCHDOG_DEFAULT_PORT)
+    if not 1 <= port <= 65535:
+        port = WATCHDOG_DEFAULT_PORT
+    enabled = str(env.get("CALVIN_KIOSK_WATCHDOG", "1")).strip().lower()
+    return {
+        "enabled": enabled not in ("0", "off", "false", "no"),
+        "port": port,
+        "interval": max(
+            5,
+            _int_or(
+                env.get("CALVIN_KIOSK_WATCHDOG_SECONDS"), WATCHDOG_DEFAULT_SECONDS
+            ),
+        ),
+        "failures": max(
+            1,
+            _int_or(
+                env.get("CALVIN_KIOSK_WATCHDOG_FAILURES"), WATCHDOG_DEFAULT_FAILURES
+            ),
+        ),
+        "cooldown": max(
+            0,
+            _int_or(
+                env.get("CALVIN_KIOSK_WATCHDOG_COOLDOWN"), WATCHDOG_DEFAULT_COOLDOWN
+            ),
+        ),
+    }
+
+
+# -- CDP client: the subset of the DevTools protocol a health probe needs ------
+# Chromium's HTTP endpoint lists targets but keeps a crashed tab listed, so only
+# a round-trip over the page target's WebSocket proves the renderer is alive.
+def ws_accept_key(key):
+    """Sec-WebSocket-Accept for a client key (RFC 6455 handshake check)."""
+    return base64.b64encode(
+        hashlib.sha1((key + WS_GUID).encode()).digest()
+    ).decode()
+
+
+def ws_encode_text(payload, mask=None):
+    """A masked client text frame (clients MUST mask; frames stay small here)."""
+    if mask is None:
+        mask = os.urandom(4)
+    length = len(payload)
+    frame = bytearray([0x80 | WS_OPCODE_TEXT])  # FIN + text
+    if length < 126:
+        frame.append(0x80 | length)
+    elif length < 65536:
+        frame.append(0x80 | 126)
+        frame += struct.pack("!H", length)
+    else:
+        frame.append(0x80 | 127)
+        frame += struct.pack("!Q", length)
+    frame += mask
+    frame += bytes(b ^ mask[i % 4] for i, b in enumerate(payload))
+    return bytes(frame)
+
+
+class _WSReader:
+    """Buffered reader over a recv() callable (a socket in production)."""
+
+    def __init__(self, recv):
+        self._recv = recv
+        self._buffer = b""
+
+    def exact(self, count):
+        while len(self._buffer) < count:
+            chunk = self._recv(max(1, count - len(self._buffer)))
+            if not chunk:
+                raise EOFError("websocket stream closed")
+            self._buffer += chunk
+        out, self._buffer = self._buffer[:count], self._buffer[count:]
+        return out
+
+    def until(self, marker, limit=65536):
+        while marker not in self._buffer:
+            if len(self._buffer) > limit:
+                raise ValueError("websocket handshake response too large")
+            chunk = self._recv(4096)
+            if not chunk:
+                raise EOFError("websocket closed during the handshake")
+            self._buffer += chunk
+        end = self._buffer.index(marker) + len(marker)
+        out, self._buffer = self._buffer[:end], self._buffer[end:]
+        return out
+
+
+def ws_read_frame(reader):
+    """(opcode, payload) of the next WebSocket frame."""
+    first, second = reader.exact(2)
+    opcode = first & 0x0F
+    length = second & 0x7F
+    if length == 126:
+        length = struct.unpack("!H", reader.exact(2))[0]
+    elif length == 127:
+        length = struct.unpack("!Q", reader.exact(8))[0]
+    mask = reader.exact(4) if second & 0x80 else None
+    payload = reader.exact(length) if length else b""
+    if mask:
+        payload = bytes(b ^ mask[i % 4] for i, b in enumerate(payload))
+    return opcode, payload
+
+
+def _default_connect(host, port, timeout):
+    return socket.create_connection((host, port), timeout=timeout)
+
+
+def cdp_eval(ws_url, expression="1+1", timeout=WATCHDOG_TIMEOUT, connect=None, key=None):
+    """True when the page answers a trivial Runtime.evaluate. Never raises."""
+    if connect is None:
+        connect = _default_connect
+    if key is None:
+        key = base64.b64encode(os.urandom(16)).decode()
+    parts = urllib.parse.urlsplit(ws_url)
+    host = parts.hostname or "127.0.0.1"
+    port = parts.port or 80
+    path = parts.path or "/"
+    if parts.query:
+        path = f"{path}?{parts.query}"
+    sock = None
+    try:
+        sock = connect(host, port, timeout)
+        sock.settimeout(timeout)
+        sock.sendall(
+            (
+                f"GET {path} HTTP/1.1\r\n"
+                f"Host: {host}:{port}\r\n"
+                "Upgrade: websocket\r\n"
+                "Connection: Upgrade\r\n"
+                f"Sec-WebSocket-Key: {key}\r\n"
+                "Sec-WebSocket-Version: 13\r\n\r\n"
+            ).encode()
+        )
+        reader = _WSReader(sock.recv)
+        head = reader.until(b"\r\n\r\n").decode("latin-1")
+        if not head.startswith("HTTP/1.1 101") or ws_accept_key(key) not in head:
+            return False
+        sock.sendall(
+            ws_encode_text(
+                json.dumps(
+                    {
+                        "id": 1,
+                        "method": "Runtime.evaluate",
+                        "params": {
+                            "expression": expression,
+                            "returnByValue": True,
+                        },
+                    }
+                ).encode()
+            )
+        )
+        while True:
+            opcode, payload = ws_read_frame(reader)
+            if opcode == WS_OPCODE_CLOSE:
+                return False
+            if opcode != WS_OPCODE_TEXT:
+                continue  # ping/pong: the probe is short-lived, no pong needed
+            try:
+                reply = json.loads(payload.decode("utf-8"))
+            except ValueError:
+                continue
+            if not isinstance(reply, dict) or reply.get("id") != 1:
+                continue
+            return "error" not in reply and "result" in reply
+    except (OSError, EOFError, ValueError):
+        return False
+    finally:
+        if sock is not None:
+            try:
+                sock.close()
+            except OSError:
+                pass
+
+
+def _http_json(url, timeout):
+    with urllib.request.urlopen(url, timeout=timeout) as response:
+        return json.load(response)
+
+
+def cdp_page_target(port, timeout=WATCHDOG_TIMEOUT, fetch=None):
+    """webSocketDebuggerUrl of the first page target, or None."""
+    if fetch is None:
+        fetch = _http_json
+    targets = fetch(f"http://127.0.0.1:{port}/json/list", timeout)
+    if not isinstance(targets, list):
+        return None
+    for target in targets:
+        if isinstance(target, dict) and target.get("type") == "page":
+            ws_url = target.get("webSocketDebuggerUrl")
+            if ws_url:
+                return ws_url
+    return None
+
+
+def probe_page(port, timeout=WATCHDOG_TIMEOUT, fetch=None, evaluate=None):
+    """PAGE_OK | PAGE_DEAD | PAGE_UNREACHABLE for the kiosk's Chromium page.
+
+    PAGE_UNREACHABLE means nothing answered on the debugging port, i.e. the
+    browser is gone (systemd's job) or this unit has no port: never act on it.
+    """
+    if evaluate is None:
+        evaluate = cdp_eval
+    try:
+        ws_url = cdp_page_target(port, timeout, fetch=fetch)
+    except (OSError, ValueError):
+        return PAGE_UNREACHABLE
+    if not ws_url:
+        return PAGE_DEAD
+    try:
+        return PAGE_OK if evaluate(ws_url, timeout) else PAGE_DEAD
+    except (OSError, EOFError, ValueError):
+        return PAGE_DEAD
+
+
+# -- the unit to restart ------------------------------------------------------
+def _systemctl_show(argv):
+    return subprocess.run(argv, capture_output=True, text=True, timeout=10)
+
+
+def _unit_fields(unit, run):
+    """Run `systemctl show` for a unit and return its key=value properties."""
+    try:
+        result = run(
+            [
+                "systemctl",
+                "show",
+                "-p",
+                "ActiveState",
+                "-p",
+                "MainPID",
+                "-p",
+                "ActiveEnterTimestampMonotonic",
+                unit,
+            ]
+        )
+    except (FileNotFoundError, subprocess.SubprocessError):
+        return None
+    if getattr(result, "returncode", 1) != 0:
+        return None
+    fields = {}
+    for line in (getattr(result, "stdout", "") or "").splitlines():
+        key, _, value = line.partition("=")
+        if key.strip():
+            fields[key.strip()] = value.strip()
+    return fields
+
+
+def kiosk_unit_state(unit, run=None, monotonic=None):
+    """{unit, active, main_pid, uptime_seconds} from systemd (read-only show)."""
+    if run is None:
+        run = _systemctl_show
+    if monotonic is None:
+        monotonic = time_module.monotonic
+    idle = {"unit": unit, "active": False, "main_pid": 0, "uptime_seconds": None}
+    fields = _unit_fields(unit, run)
+    if not fields:
+        return idle
+    active = fields.get("ActiveState") == "active"
+    try:
+        main_pid = int(fields.get("MainPID") or 0)
+    except ValueError:
+        main_pid = 0
+    try:
+        entered = float(fields.get("ActiveEnterTimestampMonotonic") or 0) / 1_000_000
+    except ValueError:
+        entered = 0.0
+    uptime = None if entered <= 0 else max(0.0, monotonic() - entered)
+    return {
+        "unit": unit,
+        "active": active,
+        "main_pid": main_pid if active else 0,
+        "uptime_seconds": uptime,
+    }
+
+
+def watched_kiosk_unit(units=KIOSK_UNITS, state=None):
+    """State of the running kiosk unit (remote first, then all-in-one), or None."""
+    if state is None:
+        state = kiosk_unit_state
+    for unit in units:
+        info = state(unit)
+        if info.get("active"):
+            return info
+    return None
+
+
+def _read_text(path):
+    with open(path) as f:
+        return f.read()
+
+
+def pid_in_unit(pid, unit, read=None):
+    """True when /proc/<pid>/cgroup says the process belongs to `unit`."""
+    if read is None:
+        read = _read_text
+    try:
+        return unit in read(f"/proc/{pid}/cgroup")
+    except OSError:
+        return False
+
+
+def pid_alive(pid, read=None):
+    """False once the process is gone or already dead (a zombie still answers 0)."""
+    if read is None:
+        read = _read_text
+    try:
+        stat = read(f"/proc/{pid}/stat")
+    except OSError:
+        return False
+    try:
+        # "pid (comm) STATE ..." - comm may itself contain spaces and parens.
+        state = stat[stat.rindex(")") + 2]
+    except (ValueError, IndexError):
+        return True
+    return state not in ("Z", "X")
+
+
+def restart_kiosk_unit(
+    unit,
+    *,
+    state=None,
+    in_unit=None,
+    kill=None,
+    killpg=None,
+    getpgid=None,
+    alive=None,
+    sleep=time_module.sleep,
+    grace_seconds=10.0,
+):
+    """Restart `unit` by signalling its process tree; systemd starts it again.
+
+    The agent runs as the kiosk user, which owns Chromium, so no privilege
+    escalation is needed. systemd gives every unit its own process group: signal
+    that group (the browser plus its children), and only fall back to the single
+    PID when systemd did not make the unit a group leader. Returns True when a
+    signal was delivered, i.e. Restart=always will bring a fresh browser up.
+    """
+    if state is None:
+        state = kiosk_unit_state
+    if in_unit is None:
+        in_unit = pid_in_unit
+    if kill is None:
+        kill = os.kill
+    if killpg is None:
+        killpg = os.killpg
+    if getpgid is None:
+        getpgid = os.getpgid
+    if alive is None:
+        alive = pid_alive
+    info = state(unit)
+    pid = int(info.get("main_pid") or 0)
+    if not info.get("active") or pid <= 0:
+        log(f"watchdog: {unit} is not running; leaving it to systemd")
+        return False
+    if not in_unit(pid, unit):
+        log(f"watchdog: pid {pid} is not in {unit}; refusing to signal it")
+        return False
+    try:
+        pgid = getpgid(pid)
+    except OSError:
+        pgid = pid
+    grouped = pgid == pid
+
+    def send(sig):
+        if grouped:
+            killpg(pgid, sig)
+        else:
+            kill(pid, sig)
+
+    log(f"watchdog: restarting {unit} (pid {pid}, {'group' if grouped else 'pid'})")
+    try:
+        send(signal.SIGTERM)
+    except OSError as e:
+        log(f"watchdog: could not signal {unit}: {e}")
+        return False
+    for _ in range(max(1, int(grace_seconds * 2))):
+        if not alive(pid):
+            return True
+        sleep(0.5)
+    log(f"watchdog: {unit} ignored SIGTERM for {grace_seconds:.0f}s; sending SIGKILL")
+    try:
+        send(signal.SIGKILL)
+    except OSError as e:
+        log(f"watchdog: could not SIGKILL {unit}: {e}")
+        return False
+    return True
+
+
+# -- the decision and the loop ------------------------------------------------
+def new_watchdog_state():
+    return {"failures": 0, "last_restart": None}
+
+
+def watchdog_step(
+    state,
+    health,
+    unit_state,
+    *,
+    restart,
+    now,
+    failures_needed=WATCHDOG_DEFAULT_FAILURES,
+    cooldown=WATCHDOG_DEFAULT_COOLDOWN,
+    warmup=WATCHDOG_WARMUP_SECONDS,
+):
+    """Turn one probe into one decision. Mutates `state`, returns the action."""
+    if health == PAGE_OK:
+        state["failures"] = 0
+        return "ok"
+    if health == PAGE_UNREACHABLE:
+        # Nothing on the debugging port: the browser is gone (systemd restarts
+        # it) or this kiosk's unit has no port. Either way, not our call.
+        state["failures"] = 0
+        return "unreachable"
+    if unit_state is None or not unit_state.get("active"):
+        state["failures"] = 0
+        return "idle"
+    uptime = unit_state.get("uptime_seconds")
+    if uptime is not None and uptime < warmup:
+        state["failures"] = 0
+        return "warmup"
+    state["failures"] = min(state["failures"] + 1, failures_needed)
+    if state["failures"] < failures_needed:
+        return "waiting"
+    last = state.get("last_restart")
+    if last is not None and now - last < cooldown:
+        return "cooldown"
+    unit = unit_state.get("unit", KIOSK_UNITS[0])
+    state["last_restart"] = now
+    state["failures"] = 0
+    ok = False
+    try:
+        ok = bool(restart(unit))
+    except Exception as e:
+        log(f"watchdog: restarting {unit} failed ({e})")
+    if ok:
+        log(f"watchdog: {unit} restarted because the page stopped answering")
+        return "restarted"
+    return "restart-failed"
+
+
+def run_watchdog(
+    port,
+    interval,
+    *,
+    failures_needed=WATCHDOG_DEFAULT_FAILURES,
+    cooldown=WATCHDOG_DEFAULT_COOLDOWN,
+    probe=None,
+    state=None,
+    restart=None,
+    sleep=time_module.sleep,
+    clock=None,
+    iterations=None,
+    watchdog_state=None,
+):
+    """Probe the page every `interval` seconds; stop after `iterations` (None=∞)."""
+    if probe is None:
+
+        def probe():
+            return probe_page(port)
+
+    if state is None:
+        state = kiosk_unit_state
+    if restart is None:
+        restart = restart_kiosk_unit
+    if clock is None:
+        clock = time_module.monotonic
+    wd = new_watchdog_state() if watchdog_state is None else watchdog_state
+    idle_logged = False
+    n = 0
+    while iterations is None or n < iterations:
+        n += 1
+        try:
+            health = probe()
+            unit_state = None if health == PAGE_OK else watched_kiosk_unit(state=state)
+            action = watchdog_step(
+                wd,
+                health,
+                unit_state,
+                restart=restart,
+                now=clock(),
+                failures_needed=failures_needed,
+                cooldown=cooldown,
+            )
+            if action == "unreachable" and not idle_logged:
+                idle_logged = True
+                log(
+                    f"watchdog: no DevTools endpoint on 127.0.0.1:{port}; "
+                    "crash recovery is idle until the page answers"
+                )
+            elif action == "ok":
+                idle_logged = False
+            if action == "waiting" and wd["failures"] == 1:
+                log("watchdog: the page is not answering; watching before a restart")
+        except Exception as e:  # a probe must never end the agent
+            log(f"watchdog: probe failed ({e})")
+        sleep(interval)
+
+
+def start_watchdog(port, interval, *, thread_factory=None, **kwargs):
+    """Run run_watchdog in a daemon thread so the config loop keeps its cadence."""
+    if thread_factory is None:
+        thread_factory = threading.Thread
+    thread = thread_factory(
+        target=run_watchdog,
+        args=(port, interval),
+        kwargs=kwargs,
+        daemon=True,
+        name="calvin-kiosk-watchdog",
+    )
+    thread.start()
+    return thread
+
+
 def main():
     check_python()
     backend = os.environ.get("CALVIN_BACKEND_URL", "").strip()
@@ -657,6 +1208,20 @@ def main():
         os.environ.get("CALVIN_DISPLAY_REFRESH_SECONDS", DEFAULT_REFRESH_SECONDS)
     )
     log(f"starting: backend={backend} refresh={refresh}s stack={display_stack()}")
+    watchdog = kiosk_watchdog_config()
+    if watchdog["enabled"]:
+        log(
+            "watchdog: probing chromium at "
+            f"127.0.0.1:{watchdog['port']} every {watchdog['interval']}s"
+        )
+        start_watchdog(
+            watchdog["port"],
+            watchdog["interval"],
+            failures_needed=watchdog["failures"],
+            cooldown=watchdog["cooldown"],
+        )
+    else:
+        log("watchdog: disabled (CALVIN_KIOSK_WATCHDOG)")
     run(backend, refresh)
 
 
