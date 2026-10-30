@@ -356,6 +356,38 @@ install_display_agent() {
     systemctl enable calvin-display-agent.service >/dev/null 2>&1 || log_warn "Could not enable calvin-display-agent.service"
 }
 
+# Session env for the FULL kiosk (calvin-x.service + calvin-kiosk.service).
+# calvin-kiosk.service reads it like calvin-kiosk-remote.service does, so the
+# board-dependent Chromium flags from setup-common.sh apply here too: VC4-class
+# boards (Pi 3/3B+, Zero 2 W, CM3) crash Chromium's renderer ("Aw, Snap! error
+# 11") unless --disable-gpu is passed. Refresh only owns this file; the operator
+# settings live in calvin-kiosk.
+configure_kiosk_display_session() {
+    log "Configuring the kiosk display session..."
+    local before after env_file
+    env_file="$(calvin_display_env_file)"
+    before="$(read_env_value "${env_file}" CALVIN_CHROMIUM_DISPLAY_FLAGS)"
+    mkdir -p "$(dirname "${CALVIN_KIOSK_ENV_FILE}")"
+    [ -f "${CALVIN_KIOSK_ENV_FILE}" ] || install -m 0644 /dev/null "${CALVIN_KIOSK_ENV_FILE}"
+    # Operator-visible override (auto|on|off, see chromium_display_flags). Only
+    # seed it: a value set by hand, or by an earlier run, wins.
+    if [ -z "$(read_env_value "${CALVIN_KIOSK_ENV_FILE}" CALVIN_CHROMIUM_GPU)" ]; then
+        upsert_env_value "${CALVIN_KIOSK_ENV_FILE}" CALVIN_CHROMIUM_GPU "auto"
+    fi
+    # Mode A is X11-only (calvin-x.service), so no --ozone-platform flag; the GPU
+    # flag still follows the board and CALVIN_CHROMIUM_GPU.
+    configure_display_session x11 "${CALVIN_USER}" || return 1
+
+    # A recomputed flag only takes effect when Chromium restarts, so an update
+    # fixes a running Pi 3 now instead of at the next reboot. try-restart leaves
+    # a stopped kiosk alone; on a first install the unit is not there yet.
+    after="$(read_env_value "${env_file}" CALVIN_CHROMIUM_DISPLAY_FLAGS)"
+    if [ "${before}" != "${after}" ] && [ -f "${CALVIN_SYSTEMD_DIR}/calvin-kiosk.service" ]; then
+        log "Chromium flags changed; restarting calvin-kiosk.service"
+        systemctl try-restart calvin-kiosk.service || log_warn "Could not restart calvin-kiosk.service"
+    fi
+}
+
 install_helper_scripts() {
     install_privileged_sudo_helper_script "${CALVIN_SOURCE_DIR}/scripts/update-calvin.sh" "${CALVIN_BIN_DIR}/update-calvin.sh"
     install_privileged_sudo_helper_script "${CALVIN_SOURCE_DIR}/scripts/reboot-calvin.sh" "${CALVIN_BIN_DIR}/reboot-calvin.sh"
@@ -429,6 +461,7 @@ refresh_host_files() {
     configure_display "${CALVIN_USER}"
     configure_openbox_autostart "${CALVIN_USER}" "http://localhost:${port}" "false"
     install_display_agent "${port}"
+    configure_kiosk_display_session
     install_runtime_services
     systemctl daemon-reload >/dev/null 2>&1 || log_warn "systemctl daemon-reload failed"
 }

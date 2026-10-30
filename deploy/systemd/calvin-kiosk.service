@@ -10,6 +10,13 @@ User=calvin
 Group=calvin
 # CALVIN_PORT (host port of the Calvin container); missing file -> 8000.
 EnvironmentFile=-/etc/calvin/.env
+# Session env (DISPLAY/XAUTHORITY plus CALVIN_CHROMIUM_DISPLAY_FLAGS), the same
+# file calvin-kiosk-remote.service and calvin-display-agent.service read. Written
+# by setup.sh from the board detection in setup-common.sh: VC4-class boards
+# (Pi 3/3B+, Zero 2 W, CM3) get --disable-gpu, because Chromium's GPU path
+# crashes the renderer there ("Aw, Snap! error 11"). Optional, so a kiosk unit
+# upgraded before the file exists still starts.
+EnvironmentFile=-/etc/default/calvin-kiosk-display
 Environment="DISPLAY=:0"
 Environment="HOME=/home/calvin"
 Environment="XAUTHORITY=/home/calvin/.Xauthority"
@@ -22,6 +29,7 @@ ExecStartPre=/bin/bash -c 'pkill -u calvin chromium || pkill -u calvin chromium-
 ExecStartPre=/bin/sleep 1
 ExecStartPre=/bin/bash -c 'rm -rf /home/calvin/.cache/chromium/Default/Cache/* "/home/calvin/.cache/chromium/Default/Code Cache"/* 2>/dev/null || true'
 ExecStart=/bin/bash -c 'exec /usr/bin/chromium \
+    $${CALVIN_CHROMIUM_DISPLAY_FLAGS:-} \
     --kiosk \
     --noerrdialogs \
     --disable-infobars \

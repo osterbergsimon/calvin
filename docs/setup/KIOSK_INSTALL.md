@@ -147,8 +147,10 @@ answers on your LAN, so use it without a key.
 Pi 3-class boards (Broadcom **VC4**, OpenGL ES 2.0 through Mesa) cannot run
 Chromium's GPU path: the dashboard's renderer crashes within seconds with
 **"Aw, Snap! error 11"** and the tab reloads forever. `--disable-gpu` makes the
-same page load and stay up, so the installer adds that flag on those boards — and
-only there. Pi 4/5 have a working GPU path and keep it.
+same page load and stay up, so the installers add that flag on those boards — and
+only there. Pi 4/5 have a working GPU path and keep it. This covers both
+deployment shapes: the remote kiosk installer (`setup-kiosk.sh`) and the
+all-in-one install (`setup.sh`).
 
 | Board (`/proc/device-tree/model`) | `CALVIN_CHROMIUM_GPU=auto` (the default) |
 |---|---|
@@ -157,10 +159,13 @@ only there. Pi 4/5 have a working GPU path and keep it.
 | anything else (unknown board, no device tree) | GPU path on, no extra flag |
 
 The flag lands in `CALVIN_CHROMIUM_DISPLAY_FLAGS` in
-`/etc/default/calvin-kiosk-display`, which `calvin-kiosk-remote.service` passes to
-Chromium, so it applies to both stacks (Wayland keeps `--ozone-platform=wayland`
-and the GPU flag follows it). The installer and a kiosk **Update** recompute that
-line from the board instead of appending to it, so re-running never duplicates it.
+`/etc/default/calvin-kiosk-display`, which both kiosk units pass to Chromium
+(`calvin-kiosk-remote.service` on a kiosk, `calvin-kiosk.service` on an
+all-in-one install), so it applies to both stacks (Wayland keeps
+`--ozone-platform=wayland` and the GPU flag follows it). The installer and an
+update (a kiosk **Update** on a remote kiosk, `update-calvin.sh` on an all-in-one
+install) recompute that line from the board instead of appending to it, so
+re-running never duplicates it.
 
 ### Override it
 
@@ -171,7 +176,7 @@ sudo nano /etc/default/calvin-kiosk
 # CALVIN_CHROMIUM_GPU=auto   # default: decide from the board
 # CALVIN_CHROMIUM_GPU=on     # never add --disable-gpu
 # CALVIN_CHROMIUM_GPU=off    # always add --disable-gpu
-sudo systemctl restart calvin-kiosk-remote
+sudo systemctl restart calvin-kiosk-remote   # or calvin-kiosk on an all-in-one install
 ```
 
 The installer and the updater read it on their next run; an exported
