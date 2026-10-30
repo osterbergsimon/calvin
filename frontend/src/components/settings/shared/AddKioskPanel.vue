@@ -116,7 +116,7 @@ onMounted(async () => {
 }
 .add-kiosk__desc {
   margin: 0;
-  font-size: 0.9rem;
+  font-size: var(--fs-md);
   color: var(--ink-2);
 }
 .add-kiosk__cmd-row {
@@ -129,13 +129,13 @@ onMounted(async () => {
   min-width: 0;
   padding: 0.6rem 0.75rem;
   font-family: var(--font-data);
-  font-size: 0.85rem;
+  font-size: var(--fs-sm);
   overflow-wrap: anywhere;
   user-select: all;
   color: var(--ink);
   background: var(--bg-0);
   border: 1px solid var(--line);
-  border-radius: 8px;
+  border-radius: var(--radius-sm);
 }
 .add-kiosk__copy {
   min-height: var(--touch-target);
@@ -145,7 +145,7 @@ onMounted(async () => {
   color: var(--ink);
   background: var(--bg-2);
   border: 1px solid var(--line);
-  border-radius: 8px;
+  border-radius: var(--radius-sm);
   cursor: pointer;
 }
 .add-kiosk__name {
@@ -153,17 +153,17 @@ onMounted(async () => {
   flex-direction: column;
   gap: var(--space-3xs);
   max-width: 20rem;
-  font-size: 0.85rem;
+  font-size: var(--fs-sm);
   color: var(--ink-2);
 }
 .add-kiosk__name input {
   min-height: var(--touch-target);
   padding: 0 0.75rem;
   font: inherit;
-  font-size: 1rem;
+  font-size: var(--fs-base);
   color: var(--ink);
   background: var(--bg-2);
   border: 1px solid var(--line);
-  border-radius: 8px;
+  border-radius: var(--radius-sm);
 }
 </style>

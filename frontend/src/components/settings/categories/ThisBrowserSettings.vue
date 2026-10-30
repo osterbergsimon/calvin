@@ -179,7 +179,7 @@ const resetUiSize = async () => {
 /* Slot content is in this component's scope, not SettingRow's. */
 .setting-row__desc {
   margin: 0.2rem 0 0;
-  font-size: 0.85rem;
+  font-size: var(--fs-sm);
   line-height: 1.4;
   color: var(--ink-2);
 }

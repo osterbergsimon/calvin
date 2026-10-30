@@ -87,24 +87,30 @@ const dotClass = computed(() => {
   display: flex;
   align-items: center;
   gap: 16px;
+  /* Must be allowed to shrink: the right cluster (save state, phone hand-off,
+     Done) is fixed-width, and without this a 390px phone ran 39px wide
+     (CLV-66). The location label already carries an ellipsis. */
+  min-width: 0;
+  flex-shrink: 1;
 }
 
 .settings-topbar__wordmark {
   font-family: var(--font-display);
-  font-size: 1rem;
+  font-size: var(--fs-base);
   font-weight: 700;
   letter-spacing: 0.08em;
   color: var(--ink);
   user-select: none;
+  flex-shrink: 0;
 }
 
 .settings-topbar__wordmark-dot {
-  color: var(--focus);
+  color: var(--focus-text);
 }
 
 .settings-topbar__location {
   font-family: var(--font-ui);
-  font-size: 1rem;
+  font-size: var(--fs-base);
   font-weight: 500;
   color: var(--ink);
   padding-left: 16px;
@@ -127,13 +133,13 @@ const dotClass = computed(() => {
   align-items: center;
   gap: 6px;
   padding: 4px 10px;
-  border-radius: 20px;
+  border-radius: var(--radius-2xl);
   background: var(--bg-0);
   border: 1px solid var(--line);
 }
 
 .settings-topbar__pill-label {
-  font-size: 0.8125rem;
+  font-size: var(--fs-xs);
   color: var(--ink-2);
 }
 
@@ -160,10 +166,10 @@ const dotClass = computed(() => {
   background: var(--focus);
   color: var(--focus-ink);
   border: none;
-  border-radius: 6px;
+  border-radius: var(--radius-xs);
   padding: 6px 16px;
   font-family: inherit;
-  font-size: 0.875rem;
+  font-size: var(--fs-control);
   font-weight: 600;
   cursor: pointer;
   transition: opacity 0.15s;
@@ -172,12 +178,12 @@ const dotClass = computed(() => {
 .settings-topbar__phone {
   padding: 6px 12px;
   font-family: inherit;
-  font-size: 0.875rem;
+  font-size: var(--fs-control);
   font-weight: 600;
   color: var(--ink);
   background: var(--bg-0);
   border: 1px solid var(--line);
-  border-radius: 6px;
+  border-radius: var(--radius-xs);
   cursor: pointer;
 }
 
@@ -191,6 +197,14 @@ const dotClass = computed(() => {
   .settings-topbar__done,
   .settings-topbar__phone {
     min-height: var(--touch-target, 2.75rem);
+  }
+}
+
+/* You are already on the phone: the hand-off lives on a touch kiosk, and the
+   button only squeezes the bar on a 390px screen. */
+@media (max-width: 600px) {
+  .settings-topbar__phone {
+    display: none;
   }
 }
 

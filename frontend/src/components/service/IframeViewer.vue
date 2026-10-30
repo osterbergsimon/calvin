@@ -153,8 +153,8 @@ onUnmounted(() => {
 
 .error-content h3 {
   margin: 0 0 1rem 0;
-  color: var(--err);
-  font-size: 1.5rem;
+  color: var(--err-text);
+  font-size: var(--fs-2xl);
 }
 
 .error-content p {
@@ -164,7 +164,7 @@ onUnmounted(() => {
 
 .service-url {
   font-family: monospace;
-  font-size: 0.9rem;
+  font-size: var(--fs-md);
   word-break: break-all;
   color: var(--ink);
   background: var(--bg-2);
@@ -184,7 +184,7 @@ onUnmounted(() => {
 .btn-retry {
   padding: 0.75rem 1.5rem;
   border-radius: var(--radius-sm);
-  font-size: 1rem;
+  font-size: var(--fs-base);
   cursor: pointer;
   transition: all 0.2s;
 }

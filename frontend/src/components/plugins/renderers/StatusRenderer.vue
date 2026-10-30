@@ -165,7 +165,7 @@ function readoutClass(item) {
 
 .status__cell-label {
   font-family: var(--font-ui);
-  font-size: 0.7rem;
+  font-size: var(--fs-micro);
   font-weight: 600;
   letter-spacing: 0.09em;
   text-transform: uppercase;
@@ -237,13 +237,13 @@ function readoutClass(item) {
 .status--warn .status__cell-label,
 .status--warn .status__cell-value,
 .status--warn .status__line-value {
-  color: var(--warn);
+  color: var(--warn-text);
 }
 
 .status--error,
 .status--error .status__cell-label,
 .status--error .status__cell-value,
 .status--error .status__line-value {
-  color: var(--err);
+  color: var(--err-text);
 }
 </style>

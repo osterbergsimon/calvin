@@ -305,7 +305,7 @@ onMounted(async () => {
   min-height: 0;
   padding: 2px;
   border: 1px solid var(--line);
-  border-radius: 6px;
+  border-radius: var(--radius-xs);
   background: none;
   cursor: pointer;
   flex-shrink: 0;
@@ -323,7 +323,7 @@ onMounted(async () => {
   gap: 0.35rem;
   margin-top: 0.1rem;
   font-family: var(--font-ui);
-  font-size: 0.8rem;
+  font-size: var(--fs-xs);
   color: var(--ink-2);
   cursor: pointer;
   white-space: nowrap;
@@ -332,7 +332,7 @@ onMounted(async () => {
   width: 0.9rem;
   height: 0.9rem;
   margin: 0;
-  accent-color: var(--focus);
+  accent-color: var(--focus-text);
   cursor: pointer;
 }
 .cal-show-times input:focus-visible {
@@ -343,6 +343,7 @@ onMounted(async () => {
 .cal-refresh {
   display: flex;
   align-items: center;
+  flex-wrap: wrap;
   gap: 0.75rem;
 }
 .cal-refresh-btn {
@@ -351,8 +352,8 @@ onMounted(async () => {
   background: var(--bg-2);
   color: var(--ink);
   border: 1px solid var(--line);
-  border-radius: 6px;
-  font-size: 0.875rem;
+  border-radius: var(--radius-xs);
+  font-size: var(--fs-control);
   font-family: var(--font-ui);
   font-weight: 500;
   cursor: pointer;
@@ -367,7 +368,7 @@ onMounted(async () => {
   outline-offset: 2px;
 }
 .cal-refresh-status {
-  font-size: 0.8rem;
+  font-size: var(--fs-xs);
   color: var(--ink-2);
   font-family: var(--font-ui);
 }

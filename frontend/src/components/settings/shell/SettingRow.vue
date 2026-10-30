@@ -26,9 +26,11 @@ defineProps({
 <style scoped>
 .setting-row {
   display: flex;
+  flex-wrap: wrap;
   align-items: center;
   justify-content: space-between;
   gap: 1.5rem;
+  row-gap: 0.75rem;
   min-height: 4.5rem; /* 72px */
   padding: 0.75rem 1.25rem;
 }
@@ -40,7 +42,7 @@ defineProps({
 }
 .setting-row__label {
   font-family: var(--font-ui);
-  font-size: 1rem;
+  font-size: var(--fs-base);
   font-weight: 500;
   color: var(--ink);
 }
@@ -55,12 +57,17 @@ defineProps({
 }
 .setting-row__desc {
   margin: 0.2rem 0 0;
-  font-size: 0.85rem;
+  font-size: var(--fs-sm);
   line-height: 1.4;
   color: var(--ink-2);
 }
 .setting-row__control {
-  flex-shrink: 0;
+  /* A control with intrinsic width (a row of chips, a stepper) must be allowed
+     to shrink on a phone: flex-shrink: 0 sized it to max-content and pushed the
+     whole settings page 55px wider than a 390px screen (CLV-66). */
+  flex-shrink: 1;
+  min-width: 0;
+  max-width: 100%;
 }
 
 .setting-row--stacked {

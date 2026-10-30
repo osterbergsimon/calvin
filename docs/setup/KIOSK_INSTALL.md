@@ -91,7 +91,8 @@ that can be an internal or `http://` address. If the Pi should use a different U
 ## Option B: bake the SD card (no SSH, no typing on the Pi)
 
 Use this for several Pis, or for a Pi you hand to someone else. You need a Calvin
-checkout on your workstation (Linux/macOS); the `develop` branch is fine.
+checkout on your workstation (Linux/macOS) at the release you run on the server
+(a `vX.Y.Z` tag; `develop` is fine for testing).
 
 1. Flash **Raspberry Pi OS Lite (64-bit)** with Imager and **do not** use Imager's OS
    customisation (it writes a competing first-boot hook).
@@ -115,6 +116,35 @@ checkout on your workstation (Linux/macOS); the `develop` branch is fine.
    then installs, showing its progress on the screen. Boot 3 is the kiosk.
 
 Details and troubleshooting: [KIOSK_PROVISIONING.md](KIOSK_PROVISIONING.md).
+
+## Pin a release
+
+A kiosk installs the software its **server** serves, so the way to pin a kiosk
+to a release is to run the server on that release (see
+[SETUP_SCRIPTS.md](SETUP_SCRIPTS.md#installing-a-release-versus-develop)). The
+Pi then matches the backend exactly, and **Settings → Screens → Update** moves
+with the server.
+
+The install scripts themselves also accept a release tag, which is what you
+want when the card is baked from a checkout or `setup-kiosk.sh` is fetched
+directly:
+
+```bash
+# Kiosk-only install from a release tag (the fallback common script is
+# fetched from the same tag)
+curl -fsSL https://raw.githubusercontent.com/osterbergsimon/calvin/v0.1.0/scripts/setup-kiosk.sh \
+  | sudo GIT_BRANCH=v0.1.0 bash -s -- --backend-url http://tower:8000
+
+# Bake a card from a release checkout
+git clone --branch v0.1.0 https://github.com/osterbergsimon/calvin.git
+cd calvin
+sudo bash scripts/bake-kiosk-firstrun.sh --backend-url http://tower:8000 ...
+```
+
+`GIT_BRANCH=v0.1.0` pins the scripts and the checkout the server side uses; it
+never selects an image for the Pi (a kiosk runs Chromium, not Calvin). The
+server container's image tag (`CALVIN_IMAGE_TAG`) is the version that matters,
+and `setup.sh` sets it from the same tag.
 
 ## What the install does
 

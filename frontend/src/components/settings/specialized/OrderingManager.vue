@@ -234,7 +234,7 @@ const handleInstanceDragEnd = pluginId => {
 
 .order-number {
   font-weight: 600;
-  color: var(--focus);
+  color: var(--focus-text);
   min-width: 1.5rem;
   text-align: center;
   font-family: var(--font-data);
@@ -350,11 +350,11 @@ const handleInstanceDragEnd = pluginId => {
 }
 
 .running-indicator.running {
-  color: var(--ok);
+  color: var(--ok-text);
 }
 
 .running-indicator.stopped {
-  color: var(--err);
+  color: var(--err-text);
 }
 
 .instance-name {

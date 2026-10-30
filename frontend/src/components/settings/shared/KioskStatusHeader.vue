@@ -46,7 +46,7 @@ const config = computed(() => {
   padding: 10px 12px;
   margin-bottom: 12px;
   border: 1px solid var(--line);
-  border-radius: 16px;
+  border-radius: var(--radius-2xl);
   background: var(--bg-1);
 }
 .kiosk-status__id {
@@ -56,19 +56,19 @@ const config = computed(() => {
   font-size: 0.85em;
 }
 .kiosk-status__presence.is-online {
-  color: var(--ok);
+  color: var(--ok-text);
 }
 .kiosk-status__presence.is-offline {
-  color: var(--ink-3, rgba(255, 255, 255, 0.45));
+  color: var(--ink-3);
 }
 .kiosk-status__config {
   font-size: 0.85em;
   opacity: 0.85;
 }
 .kiosk-status__config.is-pending {
-  color: var(--warn);
+  color: var(--warn-text);
 }
 .kiosk-status__config.is-applied {
-  color: var(--ok);
+  color: var(--ok-text);
 }
 </style>

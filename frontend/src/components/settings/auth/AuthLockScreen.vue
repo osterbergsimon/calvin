@@ -413,7 +413,7 @@ async function submitLogin() {
 .auth-lock__checking {
   margin: auto;
   font-family: var(--font-ui);
-  font-size: 0.95rem;
+  font-size: var(--fs-md);
   color: var(--ink-2);
 }
 .auth-lock__checking.is-hidden {
@@ -433,7 +433,7 @@ async function submitLogin() {
   text-align: left;
   background: var(--bg-1);
   border: 1px solid var(--line);
-  border-radius: 16px;
+  border-radius: var(--radius-2xl);
 }
 .auth-card__icon {
   width: 44px;
@@ -443,7 +443,7 @@ async function submitLogin() {
   place-items: center;
   border-radius: 50%;
   background: color-mix(in srgb, var(--focus) 14%, transparent);
-  color: var(--focus);
+  color: var(--focus-text);
 }
 .auth-card__title {
   margin: 0 0 6px;
@@ -455,7 +455,7 @@ async function submitLogin() {
 }
 .auth-card__lead {
   margin: 0 0 20px;
-  font-size: 0.95rem;
+  font-size: var(--fs-md);
   line-height: 1.45;
   color: var(--ink-2);
 }
@@ -516,7 +516,7 @@ async function submitLogin() {
   font-size: 0.85em;
   color: var(--ink);
   background: var(--bg-0);
-  border-radius: 4px;
+  border-radius: var(--radius-xs);
 }
 
 .auth-btn {
@@ -553,7 +553,7 @@ async function submitLogin() {
   width: 100%;
   height: var(--control-height);
   margin-top: 4px;
-  font-size: 1rem;
+  font-size: var(--fs-base);
 }
 
 .auth-banner {

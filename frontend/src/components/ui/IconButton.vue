@@ -67,7 +67,7 @@ defineProps({
 .icon-btn--sm {
   min-width: 1.75rem;
   height: 1.75rem;
-  font-size: 1.05rem;
+  font-size: var(--fs-lg);
 }
 .icon-btn--md {
   min-width: var(--touch-target);
@@ -77,7 +77,7 @@ defineProps({
 .icon-btn--lg {
   min-width: var(--control-height);
   height: var(--control-height);
-  font-size: 1.5rem;
+  font-size: var(--fs-2xl);
 }
 /* Escape-hatch size: consumer supplies --icon-size / --icon-font (set on the
    button or any ancestor, inherited through the cascade). Used by the
@@ -88,7 +88,7 @@ defineProps({
 .icon-btn--custom {
   min-width: var(--icon-size, 1.75rem);
   height: var(--icon-size, 1.75rem);
-  font-size: var(--icon-font, 1.05rem);
+  font-size: var(--icon-font, var(--fs-lg));
 }
 
 /* shapes */
@@ -128,7 +128,7 @@ defineProps({
 .icon-btn--danger {
   background: var(--bg-2);
   border-color: var(--line);
-  color: var(--err);
+  color: var(--err-text);
 }
 .icon-btn--danger:hover {
   border-color: var(--err);
@@ -136,7 +136,7 @@ defineProps({
 
 /* lit/toggled modifier — intended for default & ghost toggles */
 .icon-btn--active {
-  color: var(--focus);
+  color: var(--focus-text);
   border-color: var(--focus-edge);
 }
 

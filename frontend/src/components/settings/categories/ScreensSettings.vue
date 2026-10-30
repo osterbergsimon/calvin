@@ -1417,7 +1417,7 @@ onUnmounted(() => {
   font-weight: 500;
 }
 .screen-card__status.is-online {
-  color: var(--ok);
+  color: var(--ok-text);
 }
 .screen-card__status.is-offline {
   color: var(--ink-3);
@@ -1427,10 +1427,10 @@ onUnmounted(() => {
   color: var(--ink-2);
 }
 .screen-card__software.is-warn {
-  color: var(--warn);
+  color: var(--warn-text);
 }
 .screen-card__software.is-err {
-  color: var(--err);
+  color: var(--err-text);
 }
 .screen-card__v,
 .kiosk-software__v,

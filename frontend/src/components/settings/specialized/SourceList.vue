@@ -223,12 +223,12 @@ onBeforeUnmount(() => {
   min-height: var(--touch-target);
   padding: 0 1.25rem;
   font-family: var(--font-ui);
-  font-size: 0.95rem;
+  font-size: var(--fs-md);
   font-weight: 600;
   color: var(--focus-ink);
   background: var(--focus);
   border: 0;
-  border-radius: 10px;
+  border-radius: var(--radius-md);
   cursor: pointer;
 }
 .sl-add:hover:not(:disabled) {
@@ -248,7 +248,7 @@ onBeforeUnmount(() => {
   padding: 1.5rem 1rem;
   text-align: center;
   font-family: var(--font-ui);
-  font-size: 0.9rem;
+  font-size: var(--fs-md);
   color: var(--ink-3);
 }
 
@@ -267,7 +267,7 @@ onBeforeUnmount(() => {
   padding: 0.5rem 0.75rem;
   background: var(--bg-2);
   border: 1px solid var(--line);
-  border-radius: 8px;
+  border-radius: var(--radius-sm);
   flex-wrap: wrap;
   transition:
     border-color 0.15s,
@@ -283,7 +283,7 @@ onBeforeUnmount(() => {
 
 .sl-grip {
   color: var(--ink-3);
-  font-size: 1rem;
+  font-size: var(--fs-base);
   line-height: 1;
   cursor: grab;
   user-select: none;
@@ -317,7 +317,7 @@ onBeforeUnmount(() => {
 }
 .sl-name {
   font-family: var(--font-ui);
-  font-size: 0.95rem;
+  font-size: var(--fs-md);
   font-weight: 500;
   color: var(--ink);
   overflow: hidden;
@@ -326,14 +326,14 @@ onBeforeUnmount(() => {
 }
 .sl-provider {
   font-family: var(--font-ui);
-  font-size: 0.8rem;
+  font-size: var(--fs-xs);
   color: var(--ink-3);
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
 }
 .sl-provider--err {
-  color: var(--err);
+  color: var(--err-text);
 }
 
 .sl-action {
@@ -342,9 +342,9 @@ onBeforeUnmount(() => {
   background: transparent;
   color: var(--ink-2);
   border: 1px solid var(--line);
-  border-radius: 6px;
+  border-radius: var(--radius-xs);
   font-family: var(--font-ui);
-  font-size: 0.8rem;
+  font-size: var(--fs-xs);
   font-weight: 500;
   cursor: pointer;
   transition:
@@ -373,8 +373,8 @@ onBeforeUnmount(() => {
   background: transparent;
   color: var(--ink-2);
   border: 1px solid transparent;
-  border-radius: 6px;
-  font-size: 1.1rem;
+  border-radius: var(--radius-xs);
+  font-size: var(--fs-lg);
   line-height: 1;
   cursor: pointer;
 }
@@ -395,18 +395,18 @@ onBeforeUnmount(() => {
   padding: 0.25rem;
   background: var(--bg-1);
   border: 1px solid var(--line);
-  border-radius: 8px;
+  border-radius: var(--radius-sm);
   box-shadow: 0 6px 18px var(--shadow);
 }
 .sl-menu-item {
   width: 100%;
   padding: 0.5rem 0.75rem;
   background: transparent;
-  color: var(--err);
+  color: var(--err-text);
   border: 0;
-  border-radius: 6px;
+  border-radius: var(--radius-xs);
   font-family: var(--font-ui);
-  font-size: 0.9rem;
+  font-size: var(--fs-md);
   text-align: left;
   cursor: pointer;
 }

@@ -91,7 +91,7 @@ onBeforeUnmount(() => {
   min-width: 240px;
   background: var(--bg-2);
   border: 1px solid var(--line);
-  border-radius: 14px;
+  border-radius: var(--radius-2xl);
   box-shadow: 0 12px 40px var(--shadow);
 }
 .link-overlay__close {
@@ -101,14 +101,14 @@ onBeforeUnmount(() => {
   border: 0;
   background: transparent;
   color: var(--ink-2);
-  font-size: 1.4rem;
+  font-size: var(--fs-2xl);
   line-height: 1;
   cursor: pointer;
 }
 .link-overlay__host {
   margin: 0;
   font-family: var(--font-data);
-  font-size: 0.8rem;
+  font-size: var(--fs-xs);
   color: var(--ink-2);
   word-break: break-all;
   text-align: center;
@@ -117,22 +117,22 @@ onBeforeUnmount(() => {
   width: 200px;
   height: 200px;
   image-rendering: pixelated;
-  background: #fff;
-  border-radius: 8px;
+  background: var(--qr-surface);
+  border-radius: var(--radius-sm);
 }
 .link-overlay__hint {
   margin: 0;
-  font-size: 0.75rem;
+  font-size: var(--fs-2xs);
   color: var(--ink-3);
 }
 .link-overlay__open {
   margin-top: 0.25rem;
   padding: 0.45rem 1.1rem;
   border: 1px solid var(--focus-edge);
-  border-radius: 8px;
+  border-radius: var(--radius-sm);
   background: var(--focus);
   color: var(--focus-ink);
-  font-size: 0.9rem;
+  font-size: var(--fs-md);
   cursor: pointer;
 }
 .link-overlay__open:focus-visible {

@@ -149,14 +149,22 @@ without kernel input access. Bindings are configured in Settings → Keyboard.
 
 **Quick Setup for Raspberry Pi:**
 
-Production:
+Stable release (recommended; replace `v0.1.0` with the latest tag from
+<https://github.com/osterbergsimon/calvin/releases>):
 ```bash
-wget -O- https://raw.githubusercontent.com/osterbergsimon/calvin/develop/scripts/setup.sh | sudo bash
+curl -fsSL https://raw.githubusercontent.com/osterbergsimon/calvin/v0.1.0/scripts/setup.sh \
+  | sudo GIT_BRANCH=v0.1.0 bash
+```
+
+Testers (tracks `develop`, publishes `:develop` on every push; the only option
+before the first release):
+```bash
+curl -fsSL https://raw.githubusercontent.com/osterbergsimon/calvin/develop/scripts/setup.sh | sudo bash
 ```
 
 Development (with hot reload):
 ```bash
-wget -O- https://raw.githubusercontent.com/osterbergsimon/calvin/develop/scripts/setup.sh | sudo bash -s -- --mode dev
+curl -fsSL https://raw.githubusercontent.com/osterbergsimon/calvin/develop/scripts/setup.sh | sudo bash -s -- --mode dev
 ```
 
-The setup script handles the complete setup automatically. See [Setup Scripts Documentation](SETUP_SCRIPTS.md) for more information.
+The setup script handles the complete setup automatically. See [Setup Scripts Documentation](SETUP_SCRIPTS.md) for more information, and [RELEASING.md](../RELEASING.md) for what a release contains.

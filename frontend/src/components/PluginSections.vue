@@ -54,7 +54,7 @@
             {{ section.title || "Manage Images" }}
             <span v-if="imageCount !== undefined"> ({{ imageCount }})</span>
           </h4>
-          <span style="font-size: 0.9rem; color: var(--ink-2)">
+          <span style="font-size: var(--fs-md); color: var(--ink-2)">
             {{ expandedSections[section.id] ? "▼" : "▶" }}
           </span>
         </div>
@@ -258,7 +258,7 @@ const formatFileSize = bytes => {
   width: 100%;
   height: 100%;
   object-fit: cover;
-  border-radius: 4px;
+  border-radius: var(--radius-xs);
 }
 
 .image-info {
@@ -269,7 +269,7 @@ const formatFileSize = bytes => {
 }
 
 .image-details {
-  font-size: 0.875rem;
+  font-size: var(--fs-control);
   color: var(--ink-2);
 }
 
@@ -281,11 +281,11 @@ const formatFileSize = bytes => {
 
 .btn-upload {
   background: var(--focus);
-  color: #fff;
+  color: var(--focus-ink);
   border: none;
-  border-radius: 4px;
+  border-radius: var(--radius-xs);
   padding: 0.75rem 1.5rem;
-  font-size: 0.9rem;
+  font-size: var(--fs-md);
   cursor: pointer;
   transition: all 0.2s ease;
   font-weight: 500;
@@ -304,11 +304,11 @@ const formatFileSize = bytes => {
 
 .btn-remove {
   background: var(--err);
-  color: #fff;
+  color: var(--err-ink);
   border: none;
-  border-radius: 4px;
+  border-radius: var(--radius-xs);
   padding: 0.5rem 1rem;
-  font-size: 0.875rem;
+  font-size: var(--fs-control);
   cursor: pointer;
   transition: all 0.2s ease;
 }
@@ -320,39 +320,39 @@ const formatFileSize = bytes => {
 
 .btn-remove-disabled {
   color: var(--ink-2);
-  font-size: 0.875rem;
+  font-size: var(--fs-control);
   padding: 0.5rem 1rem;
   opacity: 0.6;
   user-select: none;
 }
 
 .success-message {
-  background: var(--accent-success, #10b981);
-  color: #fff;
+  background: var(--accent-success, var(--ok));
+  color: var(--ok-ink);
   padding: 0.75rem 1rem;
-  border-radius: 4px;
+  border-radius: var(--radius-xs);
   margin-top: 0.5rem;
-  font-size: 0.875rem;
+  font-size: var(--fs-control);
 }
 
 .error-message {
   background: var(--err);
-  color: #fff;
+  color: var(--err-ink);
   padding: 0.75rem 1rem;
-  border-radius: 4px;
+  border-radius: var(--radius-xs);
   margin-top: 0.5rem;
-  font-size: 0.875rem;
+  font-size: var(--fs-control);
 }
 
 .help-text {
-  font-size: 0.875rem;
+  font-size: var(--fs-control);
   color: var(--ink-2);
   margin-top: 0.5rem;
   display: block;
 }
 
 .config-section-title {
-  font-size: 1rem;
+  font-size: var(--fs-base);
   font-weight: 600;
   margin-bottom: 1rem;
   color: var(--ink);

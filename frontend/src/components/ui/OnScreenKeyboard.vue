@@ -468,7 +468,7 @@ defineExpose({
   cursor: pointer;
 }
 .osk--compact :deep(.hg-button) {
-  font-size: 1.05rem;
+  font-size: var(--fs-lg);
 }
 
 :deep(.hg-button.hg-functionBtn) {
@@ -480,14 +480,14 @@ defineExpose({
   font-weight: 500;
 }
 .osk--compact :deep(.hg-button.hg-functionBtn) {
-  font-size: 0.85rem;
+  font-size: var(--fs-sm);
 }
 
 :deep(.hg-button.hg-button-space) {
   flex-grow: 6;
   background: var(--bg-2);
   color: var(--ink);
-  font-size: 1.25rem;
+  font-size: var(--fs-xl);
   font-weight: 400;
 }
 
@@ -505,7 +505,7 @@ defineExpose({
   min-width: 44px;
   min-height: 32px;
   padding: 0 8px;
-  border-radius: 6px;
+  border-radius: var(--radius-xs);
   cursor: pointer;
 }
 :deep(.osk-space-name) {

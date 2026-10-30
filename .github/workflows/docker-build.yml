@@ -3,6 +3,9 @@ name: Build and Push Docker Image
 # Publishes ghcr.io/<owner>/calvin. develop is the deploy branch:
 #   push to develop  -> :develop + :sha-<commit>   (what Unraid / Pi run)
 #   push of a v* tag -> :X.Y.Z + :X.Y + :latest + :sha-<commit>
+#   release please   -> release-please.yml dispatches this workflow at the new
+#                       tag with push_image=true, because a tag created with
+#                       GITHUB_TOKEN does not fire the push trigger below.
 #   pull request     -> amd64 build, nothing pushed. When the PR touches
 #                       anything that can change the image (backend deps,
 #                       docker/, this workflow) it ALSO builds arm64 and
