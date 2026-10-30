@@ -1,7 +1,7 @@
 """Integration tests for IMAP plugin migration from ImagePlugin to BackendPlugin."""
 
 import json
-from datetime import datetime
+from datetime import UTC, datetime
 
 import databases
 import pytest
@@ -39,8 +39,8 @@ class TestImapMigration:
                 "id": test_plugin_id,
                 "enabled": True,
                 "config": json.dumps(test_config),
-                "created_at": datetime.utcnow(),
-                "updated_at": datetime.utcnow(),
+                "created_at": datetime.now(UTC),
+                "updated_at": datetime.now(UTC),
             },
         )
 
@@ -58,8 +58,8 @@ class TestImapMigration:
             """,
             {
                 "enabled": True,
-                "created_at": datetime.utcnow(),
-                "updated_at": datetime.utcnow(),
+                "created_at": datetime.now(UTC),
+                "updated_at": datetime.now(UTC),
             },
         )
 
@@ -106,8 +106,8 @@ class TestImapMigration:
                 "id": test_plugin_id,
                 "enabled": True,
                 "config": json.dumps(test_config),
-                "created_at": datetime.utcnow(),
-                "updated_at": datetime.utcnow(),
+                "created_at": datetime.now(UTC),
+                "updated_at": datetime.now(UTC),
             },
         )
 
@@ -148,8 +148,8 @@ class TestImapMigration:
                 "id": test_plugin_id,
                 "enabled": True,
                 "config": json.dumps(test_config),
-                "created_at": datetime.utcnow(),
-                "updated_at": datetime.utcnow(),
+                "created_at": datetime.now(UTC),
+                "updated_at": datetime.now(UTC),
             },
         )
 

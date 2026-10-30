@@ -22,6 +22,7 @@ from app.plugins.utils.secrets import (
 )
 from app.services import plugin_calendar_service
 from app.utils.db_retry import retry_on_db_locked
+from app.utils.errors import internal_error
 
 # Loguru automatically includes module/function info in logs
 router = APIRouter()
@@ -269,10 +270,11 @@ async def get_calendar_sources():
             )
         return CalendarSourcesResponse(sources=source_models, total=len(source_models))
     except Exception as e:
-        import traceback
-
-        traceback.print_exc()
-        raise HTTPException(status_code=500, detail=f"Error fetching calendar sources: {str(e)}")
+        raise internal_error(
+            "calendar_sources_failed",
+            "Could not load calendar sources. Check the server logs for details.",
+            error=e,
+        ) from e
 
 
 @router.post("/calendar/sources", response_model=CalendarSource)
