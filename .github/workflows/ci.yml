@@ -61,6 +61,54 @@ jobs:
           name: backend-coverage
           fail_ci_if_error: false
 
+  plugin-contracts:
+    name: calvin-plugins Contract Tests
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Checkout calvin-plugins
+        uses: actions/checkout@v4
+        with:
+          repository: osterbergsimon/calvin-plugins
+          path: calvin-plugins
+
+      - name: Verify calvin-plugins checkout
+        env:
+          CALVIN_PLUGINS_DIR: ${{ github.workspace }}/calvin-plugins
+        run: |
+          if [ ! -d "$CALVIN_PLUGINS_DIR" ]; then
+            echo "::error::calvin-plugins checkout missing at $CALVIN_PLUGINS_DIR"
+            exit 1
+          fi
+          if ! compgen -G "$CALVIN_PLUGINS_DIR/*/plugin.py" > /dev/null; then
+            echo "::error::no plugin.py found under $CALVIN_PLUGINS_DIR"
+            exit 1
+          fi
+
+      - name: Install UV
+        uses: astral-sh/setup-uv@v3
+        with:
+          version: "latest"
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: Install backend dependencies
+        working-directory: ./backend
+        run: uv sync --extra dev
+
+      # CALVIN_PLUGINS_DIR is set on purpose: the test fails (rather than
+      # skipping) when the configured checkout is not there.
+      - name: Run plugin contract tests
+        working-directory: ./backend
+        env:
+          CALVIN_PLUGINS_DIR: ${{ github.workspace }}/calvin-plugins
+        run: uv run pytest tests/integration/test_calvin_plugins_contracts.py
+
   frontend:
     name: Frontend Tests & Lint
     runs-on: ubuntu-latest
@@ -90,6 +138,10 @@ jobs:
       - name: Run Prettier check
         working-directory: ./frontend
         run: npx prettier --check "src/**/*.{js,jsx,vue,json,css}"
+
+      - name: Run TypeScript type check
+        working-directory: ./frontend
+        run: npm run type-check
       
       - name: Verify generated API types are up to date
         working-directory: ./frontend
