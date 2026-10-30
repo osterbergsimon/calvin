@@ -1,6 +1,6 @@
 # Chips and tags — screenshots
 
-Before/after captures for [the chips and tags spec](../../2026-10-30-chips-and-tags.md),
+Before/after captures for [the chips and tags spec](../../../2026-10-30-chips-and-tags.md),
 taken against a mocked backend (no owner data) at 1360×900.
 
 | File | What it shows |
