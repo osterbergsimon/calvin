@@ -302,8 +302,13 @@
               <strong>{{ plugin.name || plugin.id }}</strong>
               <Tag class="plugin-type-badge-small">{{ pluginKindLabel(plugin) }}</Tag>
               <span v-if="plugin.version" class="plugin-version-small">v{{ plugin.version }}</span>
-              <Tag v-if="plugin._installed" tone="ok" class="plugin-installed-badge">
-                Installed: v{{ plugin._installedVersion || "?" }}
+              <Tag
+                v-if="plugin._installed"
+                tone="ok"
+                class="plugin-installed-badge"
+                :title="`Installed: v${plugin._installedVersion || '?'}`"
+              >
+                Installed
               </Tag>
               <p v-if="plugin.description" class="plugin-desc-inline">{{ plugin.description }}</p>
             </div>
