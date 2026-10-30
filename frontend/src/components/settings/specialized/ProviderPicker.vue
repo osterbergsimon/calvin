@@ -23,6 +23,9 @@
           </button>
         </li>
       </ul>
+      <p v-if="providers.length === 0" class="pp-empty">
+        No add-ons of this kind are installed yet.
+      </p>
       <button v-if="moreLabel" type="button" class="pp-more" @click="$emit('more')">
         {{ moreLabel }}
       </button>
@@ -196,6 +199,14 @@ const choose = provider => {
   color: var(--ink);
   font-size: 0.8rem;
   font-weight: 600;
+}
+
+.pp-empty {
+  margin: 0;
+  padding: 0 1.5rem 1rem;
+  font-family: var(--font-ui);
+  font-size: 0.9rem;
+  color: var(--ink-3);
 }
 
 .pp-more {
