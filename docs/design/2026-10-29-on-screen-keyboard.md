@@ -117,7 +117,9 @@ fr  Français  a z e r t y u i o p {bksp}        / q s d f g h j k l m {enter}  
 
 Bottom row: `{numbers} {layout} {accents} {space} {hide}`. For `en` it is
 `{numbers} {layout} {accents} {space} - {hide}`, and for `fr` it is
-`{numbers} {layout} {accents} , {space} . {hide}`. `{layout}` is present only when extra layouts are set.
+`{numbers} {layout} {accents} , {space} . {hide}`. **Amended by
+[CLV-21](2026-10-29-keyboard-layout-picker.md):** `{layout}` and the space-bar layout name are always
+present, and the key opens a layout picker.
 The url and email layouts use the active layout's **first two rows** unchanged. Their **third row** is the
 active layout's row-3 letters a–z only (accented letters and punctuation dropped), followed by `- _`, because
 hyphens and underscores are common in addresses. Their bottom row is their own (above):
@@ -131,11 +133,14 @@ fr                   {shift} w x c v b n - _ {shift}
 - **Layout key `{layout}`:** label = the active **layout's** code in capitals (**EN**, **SV**, **FI**, **NO**,
   **DA**, **DE**, **FR**), width 1×, function-key style. `aria-label` = **Switch keyboard layout, now {layout name}**.
   Each tap moves to the next layout in the order: main layout, then the extra layouts in list order.
-  While more than one layout is set, the space bar shows the active **layout's** name (`--ink-3`, `--fs-sm`,
-  as in K6). Neither ever shows the UI language.
-- The active layout survives hiding and showing. It is remembered per device in `localStorage`
-  (`calvin-osk-layout`, wrapped in try/catch) and resets to the main layout if that entry stops being valid
-  (for example, when the layout was removed from Settings).
+  **Amended by [CLV-21](2026-10-29-keyboard-layout-picker.md):** without extras a tap opens the layout
+  picker instead, and a long-press always does. The space bar always shows the active **layout's** name
+  (`--ink-3`, `--fs-sm`, as in K6); its label opens the picker. Neither ever shows the UI language.
+- The active layout survives hiding and showing. An explicit choice is remembered per device in
+  `localStorage` (`calvin-osk-device-layout`, wrapped in try/catch) and resets to the main layout if that
+  entry stops being valid. **Amended by [CLV-21](2026-10-29-keyboard-layout-picker.md):** a device choice is
+  honoured even when it isn't the main or an extra layout, and the legacy `calvin-osk-layout` key is removed
+  on load because older builds wrote it on every device.
 
 ### Keys
 

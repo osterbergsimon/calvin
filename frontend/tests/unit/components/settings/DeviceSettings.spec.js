@@ -1,6 +1,7 @@
 // frontend/tests/unit/components/settings/DeviceSettings.spec.js
 import { describe, it, expect, vi, beforeEach } from "vitest";
 import { mount } from "@vue/test-utils";
+import { nextTick } from "vue";
 import { createPinia, setActivePinia } from "pinia";
 import DeviceSettings from "@/components/settings/categories/DeviceSettings.vue";
 
@@ -230,6 +231,47 @@ describe("DeviceSettings", () => {
           .map(call => call[0])
           .find(patch => "oskExtraLayouts" in patch)
       ).toEqual({ oskExtraLayouts: ["en", "fi"] });
+    });
+
+    it("shows a layout chosen on the keyboard and can go back to the default", async () => {
+      window.localStorage.setItem("calvin-osk-device-layout", "de");
+      const wrapper = mountSettings({ oskLayout: "sv" });
+
+      expect(wrapper.find(".device-osk-device").exists()).toBe(true);
+      expect(wrapper.text()).toContain("This screen uses Deutsch, chosen on the keyboard.");
+
+      await wrapper.find(".device-osk-use-default").trigger("click");
+
+      expect(window.localStorage.getItem("calvin-osk-device-layout")).toBeNull();
+      expect(wrapper.find(".device-osk-device").exists()).toBe(false);
+      expect(wrapper.text()).not.toContain("chosen on the keyboard");
+    });
+
+    it("hides that line when the device has no choice of its own", () => {
+      const wrapper = mountSettings({ oskLayout: "sv" });
+
+      expect(wrapper.find(".device-osk-device").exists()).toBe(false);
+      expect(wrapper.text()).not.toContain("chosen on the keyboard");
+    });
+
+    it("ignores and removes the legacy auto-written key", () => {
+      window.localStorage.setItem("calvin-osk-layout", "de");
+      const wrapper = mountSettings({ oskLayout: "sv" });
+
+      expect(wrapper.find(".device-osk-device").exists()).toBe(false);
+      expect(wrapper.text()).not.toContain("chosen on the keyboard");
+      expect(window.localStorage.getItem("calvin-osk-layout")).toBeNull();
+    });
+
+    it("updates the line when the keyboard changes the choice while Settings is open", async () => {
+      const wrapper = mountSettings({ oskLayout: "sv" });
+      expect(wrapper.find(".device-osk-device").exists()).toBe(false);
+
+      window.localStorage.setItem("calvin-osk-device-layout", "fr");
+      window.dispatchEvent(new CustomEvent("calvin-osk-layout-change"));
+      await nextTick();
+
+      expect(wrapper.text()).toContain("This screen uses Français, chosen on the keyboard.");
     });
 
     it("dims and disables both rows while the on-screen keyboard is off", () => {
