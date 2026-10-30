@@ -16,8 +16,12 @@
       <ScreenRegionEditor
         :config="config"
         :open="editorOpen"
+        :place-source="placement"
+        :initial-page-id="initialPageId"
         @update:config="patch => emit('update:config', patch)"
-        @close="editorOpen = false"
+        @close="closeEditor"
+        @placed="handlePlaced"
+        @place-cancel="clearPlacement"
       />
     </SettingsSection>
 
@@ -269,10 +273,12 @@ import ScreenRegionEditor from "@/components/settings/shared/ScreenRegionEditor.
 import ClockBarSections from "@/components/settings/categories/ClockBarSections.vue";
 import KeyboardTab from "@/components/settings/tabs/layout/KeyboardTab.vue";
 import { UI_SIZE_OPTIONS } from "@/styles/uiScale";
-import { computed, ref } from "vue";
+import { computed, ref, watch } from "vue";
+import { useRoute } from "vue-router";
 import { normalizeDashboardScreens } from "@/utils/layout";
 import { useScreenSetting } from "@/composables/useScreenSetting";
 import { useUiScale } from "@/composables/useUiScale";
+import { usePlacementRequest } from "@/composables/usePlacementRequest";
 
 const props = defineProps({
   config: { type: Object, required: true },
@@ -285,6 +291,33 @@ const emit = defineEmits(["update:config"]);
 const ROOM_NAME_DESCRIPTION = 'Shown in the clock bar, e.g. "Kitchen".';
 
 const editorOpen = ref(false);
+const route = useRoute();
+const { placement, clearPlacement } = usePlacementRequest();
+
+// A placement link names the page the source already shows on; open the editor
+// on that page.
+const initialPageId = computed(() =>
+  typeof route?.query?.page === "string" ? route.query.page : null
+);
+
+// "Put it on a page" arrives from Content: open the editor straight into place
+// mode instead of making the user hunt for the button.
+watch(
+  () => placement.value,
+  next => {
+    if (next) editorOpen.value = true;
+  },
+  { immediate: true }
+);
+
+const closeEditor = () => {
+  editorOpen.value = false;
+  clearPlacement();
+};
+
+const handlePlaced = () => {
+  clearPlacement();
+};
 const screenSummary = computed(() => {
   const screens = normalizeDashboardScreens(props.config.dashboardScreens).screens;
   const regionCount = screens.reduce((sum, s) => {

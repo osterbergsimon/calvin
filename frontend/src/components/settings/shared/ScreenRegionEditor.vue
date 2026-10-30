@@ -88,6 +88,20 @@
         </div>
 
         <!-- Body: stage + rail -->
+        <div v-if="placeSource" class="sre-place" data-test="place-banner">
+          <span class="sre-place__text"
+            >Choose a region for <strong>{{ placeSource.name }}</strong></span
+          >
+          <button
+            type="button"
+            class="sre-place__cancel"
+            data-test="place-cancel"
+            @click="$emit('place-cancel')"
+          >
+            Cancel
+          </button>
+        </div>
+
         <div class="sre-body">
           <!-- STAGE -->
           <div class="sre-stage">
@@ -296,6 +310,15 @@
         </div>
       </div>
     </div>
+
+    <ConfirmModal
+      :show="!!replaceTarget"
+      title="Replace what's in this region?"
+      :message="replaceMessage"
+      confirm-text="Replace"
+      @confirm="confirmReplace"
+      @cancel="replaceTarget = null"
+    />
   </teleport>
 </template>
 
@@ -312,6 +335,8 @@ import IconButton from "@/components/ui/IconButton.vue";
 import SegmentedControl from "@/components/ui/SegmentedControl.vue";
 import SelectPill from "@/components/ui/SelectPill.vue";
 import { getKioskId } from "@/utils/kioskId";
+import ConfirmModal from "@/components/settings/shared/ConfirmModal.vue";
+import { findPlaceableRegion, placeServiceInRegion } from "@/utils/placement";
 import ScreenInspector from "./regions/ScreenInspector.vue";
 import RegionInspector from "./regions/RegionInspector.vue";
 import RegionNode from "./regions/RegionNode.vue";
@@ -348,8 +373,13 @@ const props = defineProps({
   // A screen to preview when the editor opens ("Edit pages" on a screen). A
   // kiosk preselects itself; otherwise the editor starts on Any browser.
   initialPreviewKiosk: { type: String, default: null },
+  // A source to place (§3.6): the stage becomes a chooser and choosing a region
+  // sets its content to this service instead of selecting the region.
+  placeSource: { type: Object, default: null },
+  // Open on this page (a placement link names the page it lives on).
+  initialPageId: { type: String, default: null },
 });
-const emit = defineEmits(["update:config", "close"]);
+const emit = defineEmits(["update:config", "close", "placed", "place-cancel"]);
 
 const ANY_BROWSER = "__global";
 const webServicesStore = useWebServicesStore();
@@ -517,6 +547,12 @@ const selectionContext = computed(() => {
   };
 });
 const selectRegion = id => {
+  // Place mode turns the stage into a chooser: a tap fills the region rather
+  // than opening the inspector.
+  if (props.placeSource) {
+    handlePlaceTap(id);
+    return;
+  }
   selectedRegionId.value = selectedRegionId.value === id ? null : id;
 };
 const selectScreen = id => {
@@ -559,6 +595,62 @@ const patchActiveScreen = patch => {
   next.screens[activeIndex.value] = { ...next.screens[activeIndex.value], ...patch };
   emitScreens(next);
 };
+
+/* --- place a service source (§3.6) --- */
+const replaceTarget = ref(null);
+
+const replaceMessage = computed(() => {
+  const target = replaceTarget.value;
+  const name = props.placeSource?.name || "this source";
+  return target ? `Replace ${target.current} with ${name}?` : "";
+});
+
+const describeRegion = region => {
+  if (region?.kind === "service") {
+    return webServicesStore.getServiceById(region.serviceId)?.name || "another app";
+  }
+  if (region?.kind === "photos") return "Photos";
+  return "Calendar";
+};
+
+const commitPlacement = regionId => {
+  if (!props.placeSource) return;
+  const next = placeServiceInRegion(
+    configValue.value.dashboardScreens,
+    props.placeSource.id,
+    regionId
+  );
+  emit("update:config", { dashboardScreens: next });
+  replaceTarget.value = null;
+  emit("placed", props.placeSource.id);
+};
+
+// Declared as a function so selectRegion (defined above) can call it.
+function handlePlaceTap(regionId) {
+  const found = findPlaceableRegion(configValue.value, regionId);
+  if (!found) return;
+  const region = found.region;
+  const hasContent =
+    region.kind === "service" ? !!region.serviceId : (region.instanceIds || []).length > 0;
+  if (hasContent) {
+    replaceTarget.value = { regionId, current: describeRegion(region) };
+    return;
+  }
+  commitPlacement(regionId);
+}
+
+const confirmReplace = () => {
+  if (replaceTarget.value) commitPlacement(replaceTarget.value.regionId);
+};
+
+// A placement link names the page the source is on: open the editor there.
+watch(
+  () => props.open,
+  open => {
+    if (open && props.initialPageId) selectScreen(props.initialPageId);
+    if (!open) replaceTarget.value = null;
+  }
+);
 
 /* --- screen ops --- */
 const addScreen = () => {
@@ -1008,6 +1100,36 @@ onUnmounted(() => {
   display: grid;
   grid-template-columns: 1fr 340px;
   min-height: 0;
+}
+
+/* Place mode banner: the stage is a chooser while this is up. */
+.sre-place {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 1rem;
+  padding: 0.7rem 1.25rem;
+  background: color-mix(in srgb, var(--focus) 14%, var(--bg-1));
+  border-top: 1px solid var(--focus-edge, var(--line));
+  border-bottom: 1px solid var(--focus-edge, var(--line));
+  font-family: var(--font-ui);
+  font-size: 0.95rem;
+  color: var(--ink);
+}
+.sre-place__cancel {
+  min-height: var(--touch-target);
+  padding: 0 1rem;
+  background: var(--bg-1);
+  color: var(--ink);
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  font-family: var(--font-ui);
+  font-weight: 600;
+  cursor: pointer;
+}
+.sre-place__cancel:focus-visible {
+  outline: 2px solid var(--focus);
+  outline-offset: 2px;
 }
 .sre-stage {
   position: relative;
