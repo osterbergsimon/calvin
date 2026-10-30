@@ -119,6 +119,21 @@ describe("ScreensSettings — screen list", () => {
     expect(wrapper.find("[data-test='add-kiosk-panel']").exists()).toBe(true);
   });
 
+  it("puts + Add a screen in the Screens header as a secondary button", async () => {
+    const { wrapper } = mountScreens();
+    await flushPromises();
+    const head = wrapper.find("#section-screens-list .settings-section__head");
+    expect(head.exists()).toBe(true);
+    expect(head.find(".settings-section__eyebrow").text()).toBe("Screens");
+    const btn = head.find("[data-test='add-screen-btn']");
+    expect(btn.exists()).toBe(true);
+    expect(btn.text()).toBe("+ Add a screen");
+    // Secondary, not the filled primary style used by Edit pages.
+    expect(btn.classes()).toContain("screens__add");
+    expect(btn.classes()).not.toContain("screens__add--primary");
+    expect(wrapper.findAll("[data-test='add-screen-btn']")).toHaveLength(1);
+  });
+
   it("puts the All screens card first, with the shared summary", async () => {
     const { wrapper } = mountScreens({
       cfg: config({ orientation: "portrait", onScreenKeyboard: "on" }),
@@ -293,6 +308,15 @@ describe("ScreensSettings — one screen's page", () => {
     const header = wrapper.findComponent(KioskStatusHeader);
     expect(header.exists()).toBe(true);
     expect(header.props("kioskId")).toBe("Hallway");
+    // The name lives in the status header; the Name section is titled "Name"
+    // instead of repeating it (design lead nit on #165).
+    expect(wrapper.find("#section-screen-name .settings-section__eyebrow").text()).toBe("Name");
+    expect(
+      wrapper
+        .find("[data-test='screens-detail']")
+        .text()
+        .match(/Hallway/g)
+    ).toHaveLength(1);
   });
 
   it("says Same as all screens on inherited rows", async () => {
