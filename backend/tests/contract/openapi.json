@@ -2437,6 +2437,21 @@
         ]
       }
     },
+    "/api/demo/calendar.ics": {
+      "get": {
+        "description": "The seeded sample calendar feed (404 until ``app.demo seed`` runs).",
+        "operationId": "demo_calendar_api_demo_calendar_ics_get",
+        "responses": {
+          "200": {
+            "description": "Successful Response"
+          }
+        },
+        "summary": "Demo Calendar",
+        "tags": [
+          "demo"
+        ]
+      }
+    },
     "/api/health": {
       "get": {
         "description": "Basic health check endpoint.\n\nContains a cheap database query so a container health check (and the kiosk\nboot wait) sees a broken database instead of a constant \"healthy\" (audit D14).",
