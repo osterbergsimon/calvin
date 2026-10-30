@@ -48,6 +48,33 @@
           </button>
         </SettingRow>
       </template>
+      <!-- "Screen now" left Screens (Default-is-a-screen §3): it drives the
+           server's own display, so it belongs with the other host actions and
+           only where Calvin controls the host. -->
+      <SettingRow
+        v-if="displayControlAvailable"
+        label="This server's screen"
+        data-test="server-display-row"
+      >
+        <div class="maint-display-actions">
+          <button
+            type="button"
+            class="maint-btn"
+            data-test="server-display-off"
+            @click="onDisplayOff"
+          >
+            Turn off
+          </button>
+          <button
+            type="button"
+            class="maint-btn"
+            data-test="server-display-on"
+            @click="onDisplayOn"
+          >
+            Turn on
+          </button>
+        </div>
+      </SettingRow>
       <SettingRow label="Reload this screen" data-test="reload-ui">
         <template #description>
           <p v-if="isContainer" class="maint-hint" data-test="docker-restart-hint">
@@ -148,7 +175,14 @@ const props = defineProps({
 });
 const emit = defineEmits(["update:config", "update:gitRepoUrl", "update:gitBranch"]);
 
-const { restartBackend, restartFrontend, environment, loadEnvironment } = useSystem();
+const {
+  restartBackend,
+  restartFrontend,
+  environment,
+  loadEnvironment,
+  turnDisplayOn,
+  turnDisplayOff,
+} = useSystem();
 const connectionStore = useConnectionStore();
 
 // One version row: the server's version, plus the screen's own bundle only when
@@ -171,6 +205,24 @@ const restartAvailable = computed(() => {
   return env.capabilities?.restart === true;
 });
 const isContainer = computed(() => environment.value?.deployment === "docker");
+// The server's own display can be turned off and on only where Calvin owns the
+// host (native, host control). A container or a dev backend reports no reboot
+// capability, and its display is not ours to switch.
+const displayControlAvailable = computed(() => environment.value?.capabilities?.reboot === true);
+const onDisplayOn = async () => {
+  try {
+    await turnDisplayOn?.();
+  } catch (e) {
+    console.error("Failed to turn the display on:", e);
+  }
+};
+const onDisplayOff = async () => {
+  try {
+    await turnDisplayOff?.();
+  } catch (e) {
+    console.error("Failed to turn the display off:", e);
+  }
+};
 onMounted(loadEnvironment);
 
 const confirm = reactive({
@@ -248,6 +300,10 @@ const reloadUi = () => {
 .maint-version {
   font-family: var(--font-data);
   color: var(--ink);
+}
+.maint-display-actions {
+  display: flex;
+  gap: 0.5rem;
 }
 .maint-hint {
   margin: 0.2rem 0 0;

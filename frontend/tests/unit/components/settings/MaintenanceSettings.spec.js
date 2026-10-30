@@ -7,10 +7,19 @@ import { flushPromises } from "@vue/test-utils";
 
 const restartBackend = vi.fn();
 const restartFrontend = vi.fn();
+const turnDisplayOn = vi.fn();
+const turnDisplayOff = vi.fn();
 const environment = ref(null);
 const loadEnvironment = vi.fn(() => Promise.resolve(null));
 vi.mock("@/composables", () => ({
-  useSystem: () => ({ restartBackend, restartFrontend, environment, loadEnvironment }),
+  useSystem: () => ({
+    restartBackend,
+    restartFrontend,
+    turnDisplayOn,
+    turnDisplayOff,
+    environment,
+    loadEnvironment,
+  }),
 }));
 
 import MaintenanceSettings from "@/components/settings/categories/MaintenanceSettings.vue";
@@ -27,6 +36,8 @@ describe("MaintenanceSettings", () => {
     setActivePinia(createPinia());
     restartBackend.mockClear();
     restartFrontend.mockClear();
+    turnDisplayOn.mockClear();
+    turnDisplayOff.mockClear();
     environment.value = null;
     loadEnvironment.mockReset();
     loadEnvironment.mockResolvedValue(null);
@@ -346,5 +357,75 @@ describe("System copy (§3.4) and the Advanced disclosure (§4)", () => {
     await flushPromises();
     expect(w.findComponent({ name: "UpdateSourceRows" }).exists()).toBe(false);
     expect(row(w, "Check for setting changes every")).toBeTruthy();
+  });
+});
+
+// Default-is-a-screen §3: "Screen now" moved here as This server's screen.
+describe("MaintenanceSettings — This server's screen", () => {
+  beforeEach(() => {
+    setActivePinia(createPinia());
+    environment.value = null;
+    loadEnvironment.mockReset();
+    loadEnvironment.mockResolvedValue(null);
+    turnDisplayOn.mockClear();
+    turnDisplayOff.mockClear();
+  });
+
+  const mountWith = env => {
+    environment.value = env;
+    return mount(MaintenanceSettings, {
+      props: { config: baseConfig, gitRepoUrl: "", gitBranch: "develop" },
+      global: { stubs },
+    });
+  };
+
+  it("is hidden without host control", () => {
+    const w = mountWith({
+      deployment: "native",
+      host_control: false,
+      capabilities: { update: false, restart: false, reboot: false },
+    });
+    expect(w.find("[data-test='server-display-row']").exists()).toBe(false);
+  });
+
+  it("is hidden in a container", () => {
+    const w = mountWith({
+      deployment: "docker",
+      host_control: false,
+      capabilities: { update: false, restart: false, reboot: false },
+    });
+    expect(w.find("[data-test='server-display-row']").exists()).toBe(false);
+  });
+
+  it("appears with host control, in the Restart section", async () => {
+    const w = mountWith({
+      deployment: "native",
+      host_control: true,
+      capabilities: { update: true, restart: true, reboot: true },
+    });
+    const row = w.find("[data-test='server-display-row']");
+    expect(row.exists()).toBe(true);
+    expect(row.text()).toContain("This server's screen");
+    expect(w.find("#section-maintenance-system [data-test='server-display-row']").exists()).toBe(
+      true
+    );
+
+    await w.find("[data-test='server-display-off']").trigger("click");
+    await flushPromises();
+    expect(turnDisplayOff).toHaveBeenCalled();
+
+    await w.find("[data-test='server-display-on']").trigger("click");
+    await flushPromises();
+    expect(turnDisplayOn).toHaveBeenCalled();
+  });
+
+  it("keeps the Screen now words out of Screens' Default page", () => {
+    const w = mountWith({
+      deployment: "native",
+      host_control: true,
+      capabilities: { update: true, restart: true, reboot: true },
+    });
+    expect(w.text()).toContain("Turn off");
+    expect(w.text()).toContain("Turn on");
   });
 });
