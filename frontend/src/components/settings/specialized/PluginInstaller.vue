@@ -136,7 +136,7 @@
           <div class="plugin-info-inline">
             <strong>{{ plugin.name || plugin.id }}</strong>
             <span class="plugin-type-badge-small" :class="`type-${plugin.type}`">
-              {{ plugin.type }}
+              {{ pluginKindLabel(plugin) }}
             </span>
             <span v-if="plugin.version" class="plugin-version-small"> v{{ plugin.version }} </span>
             <span
@@ -289,7 +289,7 @@
           <div class="plugin-info-inline">
             <strong>{{ plugin.name || plugin.id }}</strong>
             <span class="plugin-type-badge-small" :class="`type-${plugin.type}`">{{
-              plugin.type
+              pluginKindLabel(plugin)
             }}</span>
             <span v-if="plugin.version" class="plugin-version-small">v{{ plugin.version }}</span>
             <span v-if="plugin._installed" class="plugin-installed-badge">
@@ -332,27 +332,6 @@
         ℹ️ Branch switched from 'main' to 'master' (main branch not found)
       </div>
     </div>
-
-    <!-- Restart Required Notice -->
-    <div v-if="requiresRestart" class="restart-notice">
-      <div class="restart-notice-content">
-        <strong>⚠️ Server Restart Required</strong>
-        <p>
-          The plugin has been installed but won't appear in the UI until the backend server is
-          restarted. This is because plugin types are registered in the database during server
-          startup.
-        </p>
-        <div class="restart-actions">
-          <button type="button" class="btn-primary" @click="handleRestart">
-            Restart backend now
-          </button>
-          <span class="restart-alternative">
-            Or restart manually via SSH:
-            <code>sudo systemctl restart calvin-backend</code>
-          </span>
-        </div>
-      </div>
-    </div>
   </div>
 </template>
 
@@ -361,6 +340,7 @@ import { ref, computed, watch } from "vue";
 import TabNavigation from "../shared/TabNavigation.vue";
 import SegmentedControl from "@/components/ui/SegmentedControl.vue";
 import * as pluginsApi from "@/services/pluginsApi";
+import { pluginKindLabel } from "@/utils/pluginKind";
 
 const props = defineProps({
   installing: {
@@ -395,10 +375,6 @@ const props = defineProps({
     type: String,
     default: "",
   },
-  requiresRestart: {
-    type: Boolean,
-    default: false,
-  },
   branchSwitched: {
     type: Boolean,
     default: false,
@@ -411,6 +387,11 @@ const props = defineProps({
     type: Boolean,
     default: false,
   },
+  // Arrived from a Content picker's "Get more in Plugins ›": open on that kind.
+  initialType: {
+    type: String,
+    default: "all",
+  },
 });
 
 const emit = defineEmits([
@@ -420,7 +401,6 @@ const emit = defineEmits([
   "install-selected",
   "install-local",
   "install-selected-local",
-  "restart",
   "update:repoUrl",
   "update:branch",
   "force-update",
@@ -442,6 +422,19 @@ const detecting = ref(false);
 const selectedPluginIds = ref(new Set());
 const searchQuery = ref("");
 const activeTypeTab = ref("all");
+
+// A Content picker's "Get more" link hands over a kind; show the repository
+// list with that filter already applied instead of the zip drop zone.
+watch(
+  () => props.initialType,
+  type => {
+    if (type && type !== "all") {
+      activeTypeTab.value = type;
+      installMethod.value = "github";
+    }
+  },
+  { immediate: true }
+);
 
 // The plugin repo ships fixtures for its own test suite ("test" keyword); end
 // users shouldn't be offered them, developers in dev mode still are (F8).
@@ -639,10 +632,6 @@ const handleForceUpdate = pluginPath => {
     branch: props.branch,
     force: true,
   });
-};
-
-const handleRestart = () => {
-  emit("restart");
 };
 
 const handleRepoUrlInput = event => {
@@ -984,46 +973,5 @@ watch(searchQuery, () => {
   border-radius: var(--radius-sm);
   color: var(--ok);
   font-size: 0.875rem;
-}
-
-.restart-notice {
-  margin-top: 1rem;
-  padding: 1rem;
-  background: color-mix(in srgb, var(--warn) 10%, transparent);
-  border: 1px solid color-mix(in srgb, var(--warn) 30%, transparent);
-  border-radius: var(--radius-sm);
-}
-.restart-notice-content {
-  display: flex;
-  flex-direction: column;
-  gap: 0.75rem;
-}
-.restart-notice-content strong {
-  color: var(--warn);
-  font-size: 1rem;
-}
-.restart-notice-content p {
-  margin: 0;
-  color: var(--warn);
-  font-size: 0.875rem;
-}
-.restart-actions {
-  display: flex;
-  flex-direction: column;
-  gap: 0.5rem;
-}
-.btn-primary {
-  align-self: flex-start;
-}
-.restart-alternative {
-  font-size: 0.875rem;
-  color: var(--ink-2);
-}
-.restart-alternative code {
-  background: var(--bg-2);
-  padding: 0.25rem 0.5rem;
-  border-radius: var(--radius-xs);
-  font-family: var(--font-data);
-  font-size: 0.85rem;
 }
 </style>

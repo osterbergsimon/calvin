@@ -1,7 +1,7 @@
 <template>
   <SettingRow
     label="Add photos"
-    :description="`Upload JPG, PNG, WebP or GIF files to the built-in Local Images source. ${countLabel}`"
+    :description="`Upload JPG, PNG, WebP or GIF files into Local photos. ${countLabel}`"
   >
     <input
       ref="fileInput"
@@ -65,6 +65,12 @@ const onFiles = async event => {
     ? { kind: "error", text: `Uploaded ${ok} of ${files.length}. ${failed.join("; ")}` }
     : { kind: "ok", text: `Uploaded ${ok} ${ok === 1 ? "photo" : "photos"}.` };
 };
+
+// The photo picker's "Upload from this device" tile opens this row's picker,
+// so there is still exactly one upload path.
+const openFilePicker = () => fileInput.value?.click();
+
+defineExpose({ openFilePicker });
 
 onMounted(() => {
   if (!imagesStore.images?.length) void imagesStore.fetchImages();

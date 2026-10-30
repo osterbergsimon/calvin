@@ -1,6 +1,6 @@
 /**
- * Unit tests for the shell-native PluginManager (calvin-svo).
- * Tabs are a SegmentedControl; backend + theme are always offered.
+ * Unit tests for the shell-native PluginManager (calvin-svo, CLV-44).
+ * Filters are the same plain kinds as the chips, with All first (§3.3).
  */
 
 import { describe, it, expect, beforeEach } from "vitest";
@@ -15,49 +15,55 @@ const mountManager = props =>
     global: { stubs: { PluginCard: true } },
   });
 
+const filterValues = wrapper =>
+  wrapper
+    .findComponent(SegmentedControl)
+    .props("options")
+    .map(o => o.value);
+
 describe("PluginManager", () => {
   beforeEach(() => {
     setActivePinia(createPinia());
   });
 
-  describe("Tabs", () => {
-    it("always offers backend + theme tabs even with no such plugins installed", () => {
+  describe("Filters", () => {
+    it("starts with All and then only the kinds that are installed", () => {
       const wrapper = mountManager({
         plugins: [
           { id: "local", name: "Local Images", type: "image", enabled: true },
           { id: "weather", name: "Weather", type: "service", enabled: true },
         ],
-        activeTab: "image",
+        activeTab: "all",
       });
-      const values = wrapper
-        .findComponent(SegmentedControl)
-        .props("options")
-        .map(o => o.value);
-      expect(values).toContain("backend");
-      expect(values).toContain("theme");
+      expect(filterValues(wrapper)).toEqual(["all", "image", "service"]);
     });
 
-    it("offers a type tab once a plugin of that type is installed", () => {
+    it("labels a clock-bar-only service as its own kind", () => {
       const wrapper = mountManager({
         plugins: [
-          { id: "ical", name: "iCal", type: "calendar", enabled: true },
-          { id: "local", name: "Local", type: "image", enabled: true },
+          {
+            id: "weather",
+            name: "Weather",
+            type: "service",
+            enabled: true,
+            statusbar_schema: { kind: "status" },
+          },
         ],
-        activeTab: "calendar",
+        activeTab: "all",
       });
-      const values = wrapper
-        .findComponent(SegmentedControl)
-        .props("options")
-        .map(o => o.value);
-      expect(values).toEqual(expect.arrayContaining(["calendar", "image", "backend", "theme"]));
-      // service has no plugins and is not always-on → absent
-      expect(values).not.toContain("service");
+      expect(filterValues(wrapper)).toEqual(["all", "clock"]);
+      expect(
+        wrapper
+          .findComponent(SegmentedControl)
+          .props("options")
+          .find(o => o.value === "clock").label
+      ).toBe("Clock bar");
     });
 
     it("relays tab changes from the SegmentedControl", async () => {
       const wrapper = mountManager({
         plugins: [{ id: "imap", name: "IMAP", type: "backend", enabled: true }],
-        activeTab: "image",
+        activeTab: "all",
       });
       wrapper.findComponent(SegmentedControl).vm.$emit("update:modelValue", "backend");
       await wrapper.vm.$nextTick();
@@ -66,7 +72,7 @@ describe("PluginManager", () => {
   });
 
   describe("List + states", () => {
-    it("filters cards to the active tab", () => {
+    it("filters cards to the active kind", () => {
       const wrapper = mountManager({
         plugins: [
           { id: "imap", name: "IMAP", type: "backend", enabled: true },
@@ -78,22 +84,33 @@ describe("PluginManager", () => {
       expect(wrapper.findAllComponents({ name: "PluginCard" })).toHaveLength(1);
     });
 
-    it("shows a type-specific empty message when no plugins match", () => {
+    it("shows All cards on the All filter", () => {
+      const wrapper = mountManager({
+        plugins: [
+          { id: "imap", name: "IMAP", type: "backend", enabled: true },
+          { id: "local", name: "Local", type: "image", enabled: true },
+        ],
+        activeTab: "all",
+      });
+      expect(wrapper.findAllComponents({ name: "PluginCard" })).toHaveLength(2);
+    });
+
+    it("shows an empty message when no add-ons of that kind are installed", () => {
       const wrapper = mountManager({
         plugins: [{ id: "local", name: "Local", type: "image", enabled: true }],
         activeTab: "backend",
       });
       const status = wrapper.find(".pm-status");
       expect(status.exists()).toBe(true);
-      expect(status.text().toLowerCase()).toContain("backend");
+      expect(status.text().toLowerCase()).toContain("kind");
     });
 
     it("shows the loading state while loading", () => {
-      const wrapper = mountManager({ plugins: [], activeTab: "calendar", loading: true });
+      const wrapper = mountManager({ plugins: [], activeTab: "all", loading: true });
       expect(wrapper.find(".pm-status").text().toLowerCase()).toContain("loading");
     });
 
-    it("shows the theme install hint only on the theme tab when requested", () => {
+    it("shows the theme install hint only on the theme filter when requested", () => {
       const wrapper = mountManager({
         plugins: [{ id: "ocean", name: "Ocean", type: "theme", enabled: true, _installed: true }],
         activeTab: "theme",

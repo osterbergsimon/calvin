@@ -110,7 +110,13 @@ describe("PluginsCategory after install (F5)", () => {
     requiresRestart.value = false;
     pluginsRef.value = [
       { id: "ical", type: "calendar", name: "iCal", enabled: true },
-      { id: "mealie", type: "service", name: "Mealie", enabled: false },
+      {
+        id: "mealie",
+        type: "service",
+        name: "Mealie",
+        enabled: false,
+        common_config_schema: { server: { type: "string" } },
+      },
     ];
     Element.prototype.scrollIntoView = vi.fn();
     api.post.mockResolvedValue({ data: {} });
@@ -134,7 +140,7 @@ describe("PluginsCategory after install (F5)", () => {
     expect(mockTogglePlugin).toHaveBeenCalledWith("mealie", true);
   });
 
-  it("jumps to the plugin's type tab and expands it", async () => {
+  it("jumps to the plugin's kind filter and expands a plugin with setup", async () => {
     const wrapper = await installMealie();
     expect(wrapper.findComponent({ name: "PluginManager" }).props("activeTab")).toBe("service");
     expect(activeExpanded.value.mealie).toBe(true);
@@ -166,7 +172,9 @@ describe("PluginsCategory after install (F5)", () => {
     expect(mockTogglePlugin).toHaveBeenCalledWith("picsum", true);
     expect(wrapper.findComponent({ name: "PluginManager" }).props("activeTab")).toBe("image");
     expect(activeExpanded.value.picsum).toBeUndefined();
-    expect(useNotificationsStore().items.at(-1).message).toContain("ready to use");
+    expect(useNotificationsStore().items.at(-1).message).toContain(
+      "add a source from Content when you need it"
+    );
   });
 
   it("does nothing when the install failed", async () => {
