@@ -22,6 +22,25 @@ for unit in calvin-kiosk.service calvin-kiosk-remote.service; do
 done
 pass "both kiosk units expose DevTools on loopback only"
 
+# Chromium 136+ (Trixie ships 156) ignores the debugging port when Chromium runs
+# with the DEFAULT profile, so the kiosk needs its own: otherwise the watchdog
+# never sees the port and recovery silently does nothing. Both units must use the
+# same profile, and the start-up cache cleanup must follow it (the cache lives in
+# the profile, not under ~/.cache/chromium).
+PROFILE=/home/calvin/.config/calvin-kiosk-chromium
+for unit in calvin-kiosk.service calvin-kiosk-remote.service; do
+    f="$REPO/deploy/systemd/$unit"
+    assert_contains "$f" "--user-data-dir=${PROFILE} " \
+        "$unit runs Chromium's default profile, so Chromium >=136 ignores the DevTools port"
+    assert_contains "$f" "${PROFILE}/Default/Cache/\*" \
+        "$unit does not clear the kiosk profile's cache"
+    assert_contains "$f" "${PROFILE}/Default/Code Cache" \
+        "$unit does not clear the kiosk profile's code cache"
+    assert_not_contains "$f" '\.cache/chromium' \
+        "$unit still clears the old default-profile cache"
+done
+pass "both kiosk units run the dedicated kiosk profile and clear its caches"
+
 # The unit and the agent must agree on the port name, or the watchdog probes a
 # port nothing listens on and never fires.
 for unit in calvin-kiosk.service calvin-kiosk-remote.service; do
