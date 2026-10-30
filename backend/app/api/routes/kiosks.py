@@ -16,6 +16,7 @@ from app.services.kiosk_registry import (
     merge_overrides,
     set_overrides,
 )
+from app.utils.errors import internal_error
 from app.utils.public_url import public_base_url
 
 router = APIRouter()
@@ -81,7 +82,12 @@ async def get_agent_manifest():
     except OSError as exc:
         # Broken/incomplete server checkout (missing bundle file): degrade like the
         # config poll does instead of a 500 stack (calvin-exe).
-        raise HTTPException(status_code=503, detail="Kiosk bundle unavailable on server") from exc
+        raise internal_error(
+            "kiosk_bundle_unavailable",
+            "The kiosk bundle is unavailable on this server.",
+            status_code=503,
+            error=exc,
+        ) from exc
 
 
 @router.get("/kiosks/agent/files/{name}")
@@ -103,8 +109,11 @@ async def get_install_script(request: Request):
     try:
         script = kiosk_bundle.render_install_script(public_base_url(request))
     except OSError as exc:
-        raise HTTPException(
-            status_code=503, detail="Kiosk installer unavailable on server"
+        raise internal_error(
+            "kiosk_installer_unavailable",
+            "The kiosk installer is unavailable on this server.",
+            status_code=503,
+            error=exc,
         ) from exc
     return Response(content=script, media_type="text/x-shellscript")
 

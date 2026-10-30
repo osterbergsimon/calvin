@@ -41,23 +41,29 @@ class TestErrorResponse:
 
             assert isinstance(error, HTTPException)
             assert error.status_code == 500
-            assert error.detail == "Database connection failed"
-            mock_logger.error.assert_called_once_with("Database connection failed")
+            assert error.detail == {
+                "code": "internal_error",
+                "message": "Database connection failed",
+            }
+            mock_logger.error.assert_called_once()
 
     def test_internal_error_with_exception(self):
-        """Test internal_error with exception."""
+        """Test internal_error with exception: coded body, traceback logged only."""
         test_exception = ValueError("Invalid value")
         with patch("app.utils.errors.logger") as mock_logger:
-            error = ErrorResponse.internal_error("Processing failed", test_exception)
+            error = ErrorResponse.internal_error(
+                "Processing failed", test_exception, code="processing_failed"
+            )
 
             assert isinstance(error, HTTPException)
             assert error.status_code == 500
-            assert error.detail == "Processing failed"
-            # logger.exception() is used when exception is provided
-            mock_logger.exception.assert_called_once()
-            # Check that the message includes the exception
-            call_args = mock_logger.exception.call_args
-            assert "Processing failed" in call_args[0][0]
+            assert error.detail == {
+                "code": "processing_failed",
+                "message": "Processing failed",
+            }
+            assert "Invalid value" not in str(error.detail)
+            mock_logger.opt.assert_called_once()
+            assert mock_logger.opt.call_args.kwargs["exception"] is test_exception
 
     def test_validation_error(self):
         """Test validation_error."""
@@ -104,41 +110,42 @@ class TestHandleServiceError:
     """Test handle_service_error function."""
 
     def test_handle_value_error(self):
-        """Test handling ValueError."""
+        """Test handling ValueError: caller input may explain itself."""
         error = ValueError("Invalid input")
         with patch("app.utils.errors.logger") as mock_logger:
             result = handle_service_error("Creating user", error)
 
             assert isinstance(result, HTTPException)
             assert result.status_code == 400
-            assert "Creating user failed" in result.detail
-            assert "Invalid input" in result.detail
+            assert result.detail == "Invalid input"
             # handle_service_error uses logger.exception()
             mock_logger.exception.assert_called_once()
 
     def test_handle_file_not_found_error(self):
-        """Test handling FileNotFoundError."""
+        """Test handling FileNotFoundError: no leaked message."""
         error = FileNotFoundError("File not found: test.txt")
         with patch("app.utils.errors.logger") as mock_logger:
             result = handle_service_error("Loading file", error)
 
             assert isinstance(result, HTTPException)
             assert result.status_code == 404
-            assert "Resource not found" in result.detail
+            assert result.detail == "Resource not found"
             # handle_service_error uses logger.exception()
             mock_logger.exception.assert_called_once()
 
     def test_handle_generic_error(self):
-        """Test handling generic exception."""
+        """Test handling generic exception: coded 500, no exception text."""
         error = RuntimeError("Unexpected error")
         with patch("app.utils.errors.logger") as mock_logger:
             result = handle_service_error("Processing data", error)
 
             assert isinstance(result, HTTPException)
             assert result.status_code == 500
-            assert "Processing data failed" in result.detail
+            assert result.detail["code"] == "service_failed"
+            assert "Unexpected error" not in str(result.detail)
             # handle_service_error logs once, ErrorResponse.internal_error logs once
-            assert mock_logger.exception.call_count == 2
+            assert mock_logger.exception.call_count == 1
+            assert mock_logger.opt.call_count == 1
 
     def test_handle_error_with_default_message(self):
         """Test handling error with default message."""
@@ -148,9 +155,10 @@ class TestHandleServiceError:
 
             assert isinstance(result, HTTPException)
             assert result.status_code == 500
-            assert "Default error message" in result.detail
-            # handle_service_error logs once, ErrorResponse.internal_error logs once
-            assert mock_logger.exception.call_count == 2
+            assert result.detail["code"] == "service_failed"
+            assert result.detail["message"].startswith("Operation failed")
+            assert mock_logger.exception.call_count == 1
+            assert mock_logger.opt.call_count == 1
 
     def test_handle_error_with_empty_string(self):
         """Test handling error with empty string message."""
@@ -160,9 +168,9 @@ class TestHandleServiceError:
 
             assert isinstance(result, HTTPException)
             assert result.status_code == 500
-            assert "An error occurred" in result.detail
-            # handle_service_error logs once, ErrorResponse.internal_error logs once
-            assert mock_logger.exception.call_count == 2
+            assert result.detail["code"] == "service_failed"
+            assert mock_logger.exception.call_count == 1
+            assert mock_logger.opt.call_count == 1
 
     def test_handle_error_logs_exception_info(self):
         """Test that exception info is logged."""

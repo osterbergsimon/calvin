@@ -18,6 +18,7 @@ from loguru import logger
 
 from app.config import settings
 from app.services.display_power_service import display_power_service
+from app.utils.errors import internal_error
 from app.utils.git_refs import validate_git_branch
 from app.utils.host_control import host_control_enabled, require_host_control
 from app.utils.platform import run_command
@@ -423,7 +424,11 @@ async def trigger_update():
                 ),
                 encoding="utf-8",
             )
-            raise HTTPException(status_code=500, detail=error_msg)
+            logger.error(error_msg)
+            raise internal_error(
+                "update_start_failed",
+                "The update script exited immediately. Check the update log for details.",
+            )
 
         return {
             "status": "started",
@@ -436,7 +441,11 @@ async def trigger_update():
     except HTTPException:
         raise
     except Exception as e:
-        raise HTTPException(status_code=500, detail=f"Failed to start update process: {str(e)}")
+        raise internal_error(
+            "update_start_failed",
+            "Could not start the update process. Check the server logs for details.",
+            error=e,
+        ) from e
 
 
 @router.get("/update/status")
@@ -643,7 +652,10 @@ async def get_update_status():
             "backend_restarted": has_backend_restarted,
         }
     except Exception as e:
-        data = _empty_update_status("error", f"Failed to read update log: {str(e)}")
+        logger.opt(exception=e).error("Failed to read the update log")
+        data = _empty_update_status(
+            "error", "Failed to read the update log. Check the server logs for details."
+        )
         data["last_log"] = ""
         return data
 
@@ -698,7 +710,10 @@ async def stream_update_log(log_offset: int = 0):
                             if stream_status in {"complete", "error"}:
                                 return
                 except Exception as e:
-                    yield f"data: {json.dumps({'type': 'log', 'line': f'[state stream error: {e}]'})}\n\n"
+                    logger.opt(exception=e).error("Update state stream failed")
+                    yield (
+                        f"data: {json.dumps({'type': 'log', 'line': '[state stream error: see server logs]'})}\n\n"
+                    )
 
             log_file = _find_update_log()
             if log_file:
@@ -724,7 +739,10 @@ async def stream_update_log(log_offset: int = 0):
                             yield f"data: {json.dumps({'type': 'status', 'status': 'complete'})}\n\n"
                             return
                 except Exception as e:
-                    yield f"data: {json.dumps({'type': 'log', 'line': f'[stream error: {e}]'})}\n\n"
+                    logger.opt(exception=e).error("Update log stream failed")
+                    yield (
+                        f"data: {json.dumps({'type': 'log', 'line': '[stream error: see server logs]'})}\n\n"
+                    )
 
             if has_started and (time.time() - last_activity) > inactivity_timeout_sec:
                 yield f"data: {json.dumps({'type': 'status', 'status': 'error', 'message': 'Update appears to have stalled or failed. Check logs.'})}\n\n"
@@ -753,7 +771,11 @@ async def turn_display_on():
         await display_power_service.turn_display_on()
         return {"status": "success", "message": "Display turned on"}
     except Exception as e:
-        raise HTTPException(status_code=500, detail=f"Failed to turn display on: {str(e)}")
+        raise internal_error(
+            "display_power_on_failed",
+            "Could not turn the display on. Check the server logs for details.",
+            error=e,
+        ) from e
 
 
 @router.post("/display/power/off")
@@ -764,7 +786,11 @@ async def turn_display_off():
         await display_power_service.turn_display_off()
         return {"status": "success", "message": "Display turned off"}
     except Exception as e:
-        raise HTTPException(status_code=500, detail=f"Failed to turn display off: {str(e)}")
+        raise internal_error(
+            "display_power_off_failed",
+            "Could not turn the display off. Check the server logs for details.",
+            error=e,
+        ) from e
 
 
 @router.get("/display/power/state")
@@ -774,7 +800,11 @@ async def get_display_state():
         state = await display_power_service.get_display_state()
         return state
     except Exception as e:
-        raise HTTPException(status_code=500, detail=f"Failed to get display state: {str(e)}")
+        raise internal_error(
+            "display_state_failed",
+            "Could not read the display state. Check the server logs for details.",
+            error=e,
+        ) from e
 
 
 @router.post("/display/timeout/configure")
@@ -785,9 +815,11 @@ async def configure_display_timeout():
         await display_power_service.configure_display_timeout()
         return {"status": "success", "message": "Display timeout configured"}
     except Exception as e:
-        raise HTTPException(
-            status_code=500, detail=f"Failed to configure display timeout: {str(e)}"
-        )
+        raise internal_error(
+            "display_timeout_failed",
+            "Could not configure the display timeout. Check the server logs for details.",
+            error=e,
+        ) from e
 
 
 @router.post("/reload-ui")
@@ -814,12 +846,10 @@ async def restart_frontend():
     require_host_control("Restarting the frontend")
     try:
         if not _restart_mechanism_available():
-            raise HTTPException(
-                status_code=500,
-                detail=(
-                    "No restart method available (missing /usr/local/bin/restart-calvin-services.sh "
-                    "and systemctl not found)."
-                ),
+            raise internal_error(
+                "restart_unavailable",
+                "No restart method is available on this system (missing "
+                "/usr/local/bin/restart-calvin-services.sh and systemctl).",
             )
         threading.Thread(
             target=lambda: _attempt_restart_calvin_service("frontend"), daemon=True
@@ -831,8 +861,11 @@ async def restart_frontend():
     except HTTPException:
         raise
     except Exception as e:
-        logger.exception("Frontend restart error")
-        raise HTTPException(status_code=500, detail=f"Failed to restart frontend service: {str(e)}")
+        raise internal_error(
+            "frontend_restart_failed",
+            "Could not restart the frontend service. Check the server logs for details.",
+            error=e,
+        ) from e
 
 
 @router.post("/restart-backend")
@@ -849,12 +882,10 @@ async def restart_backend():
     require_host_control("Restarting the backend")
     try:
         if not _restart_mechanism_available():
-            raise HTTPException(
-                status_code=500,
-                detail=(
-                    "No restart method available (missing /usr/local/bin/restart-calvin-services.sh "
-                    "and systemctl not found)."
-                ),
+            raise internal_error(
+                "restart_unavailable",
+                "No restart method is available on this system (missing "
+                "/usr/local/bin/restart-calvin-services.sh and systemctl).",
             )
 
         def _run_restart() -> None:
@@ -876,8 +907,11 @@ async def restart_backend():
     except HTTPException:
         raise
     except Exception as e:
-        logger.exception("Backend restart error")
-        raise HTTPException(status_code=500, detail=f"Failed to restart backend service: {str(e)}")
+        raise internal_error(
+            "backend_restart_failed",
+            "Could not restart the backend service. Check the server logs for details.",
+            error=e,
+        ) from e
 
 
 @router.post("/reboot")
@@ -954,9 +988,15 @@ async def reboot_system():
                 "Check logs for details."
             )
             logger.error(error_detail)
-            raise HTTPException(status_code=500, detail=error_detail)
+            raise internal_error(
+                "reboot_failed",
+                "No reboot method worked. Check the polkit rules and the server logs.",
+            )
     except HTTPException:
         raise
     except Exception as e:
-        logger.exception("Reboot error")
-        raise HTTPException(status_code=500, detail=f"Failed to reboot system: {str(e)}")
+        raise internal_error(
+            "reboot_failed",
+            "Could not reboot the system. Check the server logs for details.",
+            error=e,
+        ) from e

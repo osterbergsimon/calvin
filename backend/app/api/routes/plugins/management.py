@@ -33,6 +33,7 @@ from app.services.event_system import event_system
 from app.services.plugin_installer import plugin_installer, run_installer_op
 from app.services.theme_installer import theme_installer
 from app.services.validation import validate_plugin_id
+from app.utils.errors import internal_error
 
 from .config import mask_sensitive_config, normalize_plugin_config
 from .themes import BUILTIN_THEMES, _unregister_theme_from_db
@@ -328,7 +329,11 @@ async def get_installed_plugins():
         result = plugins + themes
         return {"plugins": result, "total": len(result)}
     except Exception as e:
-        raise HTTPException(status_code=500, detail=f"Failed to get installed plugins: {str(e)}")
+        raise internal_error(
+            "plugin_list_failed",
+            "Could not list installed plugins. Check the server logs for details.",
+            error=e,
+        ) from e
 
 
 @router.post("/plugins/inspect", response_model=PluginManifestEnvelope)
@@ -452,7 +457,11 @@ async def install_plugin(
         except ValueError as e:
             raise HTTPException(status_code=400, detail=str(e))
         except Exception as e:
-            raise HTTPException(status_code=500, detail=f"Failed to install plugin: {str(e)}")
+            raise internal_error(
+                "plugin_install_failed",
+                "Could not install the plugin. Check the server logs for details.",
+                error=e,
+            ) from e
     finally:
         # Clean up temp file
         if temp_path and temp_path.exists():
@@ -591,9 +600,19 @@ async def uninstall_plugin(plugin_id: str):
                 "message": f"Plugin {plugin_id} uninstalled successfully",
             }
     except ValueError as e:
-        raise HTTPException(status_code=404, detail=str(e))
+        raise internal_error(
+            "plugin_not_uninstallable",
+            "Could not uninstall this plugin: it is not installed by Calvin or cannot be "
+            "removed automatically.",
+            status_code=404,
+            error=e,
+        ) from e
     except Exception as e:
-        raise HTTPException(status_code=500, detail=f"Failed to uninstall plugin: {str(e)}")
+        raise internal_error(
+            "plugin_uninstall_failed",
+            "Could not uninstall the plugin. Check the server logs for details.",
+            error=e,
+        ) from e
 
 
 @router.get("/plugins/{plugin_id}")
@@ -891,8 +910,11 @@ async def _update_plugin_type(
     try:
         await apply_plugin_config_update(plugin_id, cleaned_config.copy(), enabled, db_type)
     except Exception as e:
-        logger.exception("Config-update handling failed for plugin type {}", plugin_id)
-        raise HTTPException(status_code=500, detail=f"Failed to apply plugin config: {e}")
+        raise internal_error(
+            "plugin_config_apply_failed",
+            "Could not apply the plugin configuration. Check the server logs for details.",
+            error=e,
+        ) from e
 
     # Emit plugin_enabled or plugin_disabled events if enabled status changed
     if enabled is not None and previous_enabled is not None and previous_enabled != enabled:
@@ -973,8 +995,14 @@ async def fetch_plugin(plugin_id: str):
         try:
             result = await instance.fetch()
         except Exception as e:
-            logger.exception("Error fetching from instance {}", db_instance.id)
-            results.append({"success": False, "message": str(e)})
+            logger.opt(exception=e).error("Error fetching from instance {}", db_instance.id)
+            results.append(
+                {
+                    "success": False,
+                    "code": "plugin_fetch_failed",
+                    "message": "Could not fetch from this plugin. Check the server logs.",
+                }
+            )
             continue
         if result is not None:
             results.append(result)
@@ -1073,18 +1101,23 @@ async def get_plugin_data(
                     await plugin_instance.initialize()
                     plugin_instance.start()
                 except Exception as e:
-                    logger.exception("Error initializing plugin {}", plugin_id)
-                    raise HTTPException(
-                        status_code=503, detail=f"Plugin instance failed to start: {e}"
-                    )
+                    raise internal_error(
+                        "plugin_start_failed",
+                        "The plugin instance could not start. Check the server logs for details.",
+                        status_code=503,
+                        error=e,
+                    ) from e
 
     try:
         data = await plugin_instance.fetch(start_date=start_date, end_date=end_date)
         if data is not None:
             return data
     except Exception as e:
-        logger.exception("Error calling fetch for {}", plugin_id)
-        raise HTTPException(status_code=500, detail=f"Failed to fetch plugin data: {str(e)}")
+        raise internal_error(
+            "plugin_data_fetch_failed",
+            "Could not fetch data from the plugin. Check the server logs for details.",
+            error=e,
+        ) from e
 
     # If plugin returned None, it doesn't support data fetching
     raise HTTPException(
@@ -1228,19 +1261,28 @@ async def geocode_location(plugin_id: str, request: dict[str, Any] = Body(...)):
             }
 
     except httpx.HTTPStatusError as e:
+        logger.warning("Geocoding service returned HTTP {}", e.response.status_code)
         return {
             "success": False,
-            "message": f"Geocoding service error: {e.response.status_code}",
+            "code": "geocode_service_error",
+            "message": (
+                f"The geocoding service answered with HTTP {e.response.status_code}. "
+                "Try again later."
+            ),
         }
     except httpx.HTTPError as e:
+        logger.opt(exception=e).warning("Geocoding request failed for {}", location)
         return {
             "success": False,
-            "message": f"Network error: {str(e)}",
+            "code": "geocode_network_error",
+            "message": "Could not reach the geocoding service. Check the server logs.",
         }
     except Exception as e:
+        logger.opt(exception=e).error("Geocoding failed for {}", location)
         return {
             "success": False,
-            "message": f"Error: {str(e)}",
+            "code": "geocode_failed",
+            "message": "Could not look up that location. Check the server logs.",
         }
 
 
@@ -1351,10 +1393,11 @@ async def run_backend_plugin_task(plugin_id: str):
             "message": f"Plugin '{plugin_id}' does not support scheduled tasks",
         }
     except Exception as e:
-        logger.exception("Error running task for backend plugin {}", plugin_id)
+        logger.opt(exception=e).error("Error running task for backend plugin {}", plugin_id)
         return {
             "success": False,
-            "message": f"Error running task: {str(e)}",
+            "code": "plugin_task_failed",
+            "message": "Could not run the plugin task. Check the server logs for details.",
         }
 
 

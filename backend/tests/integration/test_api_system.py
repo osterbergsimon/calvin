@@ -98,7 +98,9 @@ class TestSystemRestartEndpoints:
             pytest.skip("Restart backend route not available in test client")
 
         assert response.status_code == 500
-        assert "restart method" in response.json()["detail"].lower()
+        detail = response.json()["detail"]
+        assert detail["code"] == "restart_unavailable"
+        assert "restart method" in detail["message"].lower()
 
     @patch("app.api.routes.system.threading.Thread", _SyncThread)
     @patch("app.api.routes.system.time.sleep")
@@ -382,7 +384,8 @@ class TestSystemDisplayPowerEndpoints:
             pytest.skip("Display power route not available in test client")
 
         assert response.status_code == 500
-        assert "failed" in response.json()["detail"].lower()
+        assert response.json()["detail"]["code"] == "display_power_on_failed"
+        assert "Display control failed" not in response.text
 
     @patch("app.api.routes.system.display_power_service.get_display_state")
     def test_get_display_state_error(self, mock_get_state, test_client):
@@ -395,7 +398,8 @@ class TestSystemDisplayPowerEndpoints:
             pytest.skip("Display power route not available in test client")
 
         assert response.status_code == 500
-        assert "failed" in response.json()["detail"].lower()
+        assert response.json()["detail"]["code"] == "display_state_failed"
+        assert "State check failed" not in response.text
 
 
 @pytest.mark.integration
