@@ -39,7 +39,9 @@ test("phone: connection pill explains an unreachable server and recovers", async
   const popover = page.locator('[data-test="connection-popover"]');
   await expect(popover).toBeVisible();
   await expect(popover.getByRole("heading", { name: "Can't reach Calvin" })).toBeVisible();
-  await expectPhoneLayout(page, "connection popover", { scope: '[data-test="connection-popover"]' });
+  await expectPhoneLayout(page, "connection popover", {
+    scope: '[data-test="connection-popover"]',
+  });
 
   // Still down: the popover says so instead of pretending it worked.
   await page.locator('[data-test="connection-try-now"]').click();
@@ -75,9 +77,7 @@ test("phone: an offline phone says so without a server check", async ({ page, co
   await expectPhoneLayout(page, "offline dashboard");
 
   await pill.click();
-  await expect(
-    page.getByRole("heading", { name: "This screen is offline" })
-  ).toBeVisible();
+  await expect(page.getByRole("heading", { name: "This screen is offline" })).toBeVisible();
   await expectPhoneLayout(page, "offline popover", {
     scope: '[data-test="connection-popover"]',
   });

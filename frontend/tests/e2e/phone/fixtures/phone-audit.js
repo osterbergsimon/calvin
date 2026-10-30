@@ -98,7 +98,11 @@ async function collectProblems(page, scope) {
         if (rect.width <= 0 || rect.height <= 0) return false;
         // Clipped away by a scrolling/collapsing ancestor (a collapsed sheet,
         // the category rail): it cannot be seen or tapped.
-        for (let node = el.parentElement; node && node !== document.body; node = node.parentElement) {
+        for (
+          let node = el.parentElement;
+          node && node !== document.body;
+          node = node.parentElement
+        ) {
           const s = getComputedStyle(node);
           if (s.overflowX === "visible" && s.overflowY === "visible") continue;
           const nr = node.getBoundingClientRect();
@@ -115,9 +119,7 @@ async function collectProblems(page, scope) {
       };
 
       const dialogs = [
-        ...document.querySelectorAll(
-          '[aria-modal="true"], [role="dialog"], .pill__panel'
-        ),
+        ...document.querySelectorAll('[aria-modal="true"], [role="dialog"], .pill__panel'),
       ].filter(isVisible);
       const scopeEl = scopeSelector
         ? document.querySelector(scopeSelector)
@@ -136,7 +138,11 @@ async function collectProblems(page, scope) {
       }
 
       const inHorizontalScroller = el => {
-        for (let node = el.parentElement; node && node !== document.body; node = node.parentElement) {
+        for (
+          let node = el.parentElement;
+          node && node !== document.body;
+          node = node.parentElement
+        ) {
           const overflow = getComputedStyle(node).overflowX;
           if (overflow === "auto" || overflow === "scroll") return true;
         }
@@ -216,9 +222,7 @@ async function collectProblems(page, scope) {
           hit.contains(el) ||
           (labelWrap && (labelWrap === hit || labelWrap.contains(hit)));
         if (!reachable) {
-          problems.push(
-            `control covered by ${describeElement(hit)}: ${describeElement(el)}`
-          );
+          problems.push(`control covered by ${describeElement(hit)}: ${describeElement(el)}`);
         }
       }
 
@@ -235,7 +239,11 @@ async function collectProblems(page, scope) {
 
       return problems;
     },
-    { textSelectors: TEXT_SELECTORS, interactiveSelectors: INTERACTIVE_SELECTORS, scopeSelector: scope }
+    {
+      textSelectors: TEXT_SELECTORS,
+      interactiveSelectors: INTERACTIVE_SELECTORS,
+      scopeSelector: scope,
+    }
   );
 }
 
