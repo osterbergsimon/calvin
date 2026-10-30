@@ -111,7 +111,19 @@ def _attempt_restart_calvin_service(service: str) -> bool:
     return False
 
 
+def _update_status_dir() -> Path:
+    """Root-owned dir the host updater writes its status to (calvin-1g25).
+
+    It lives outside calvin's checkout so the app user cannot plant a symlink
+    for root to write through. CALVIN_UPDATE_STATUS_DIR follows the updater's
+    own override. Older installs still have the files in the checkout, which
+    the fallbacks below keep reading.
+    """
+    return Path(os.environ.get("CALVIN_UPDATE_STATUS_DIR", "/var/lib/calvin-update-status"))
+
+
 _UPDATE_LOG_LOCATIONS = [
+    lambda: _update_status_dir() / "calvin-update.log",
     lambda: settings.repo_dir / "backend" / "logs" / "calvin-update.log",
     lambda: settings.repo_dir.parent / "calvin-update.log",
     lambda: Path("/tmp/calvin-update.log"),  # nosec B108 - read-only fallback for log discovery
@@ -128,6 +140,7 @@ _COMMIT_KEYS = {
 }
 
 _UPDATE_STATE_LOCATIONS = [
+    lambda: _update_status_dir() / "calvin-update-state.json",
     lambda: settings.repo_dir / "backend" / "logs" / "calvin-update-state.json",
     lambda: settings.repo_dir.parent / "calvin-update-state.json",
     lambda: Path("/tmp/calvin-update-state.json"),  # nosec B108 - read-only fallback
