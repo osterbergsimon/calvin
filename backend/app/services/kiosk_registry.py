@@ -4,13 +4,14 @@ import hashlib
 import json
 import re
 import sqlite3
-from datetime import UTC, datetime
+from datetime import datetime
 
 from loguru import logger
 from sqlalchemy.exc import IntegrityError as SAIntegrityError
 
 from app.models.db_models import KioskDB
 from app.utils.db_retry import retry_on_db_locked
+from app.utils.utc import as_utc, utcnow
 
 # Shape allowlist for kiosk ids. Covers the default `<hostname>-<6hex>` ids and
 # friendly operator-chosen names like `kitchen`. Anything else (whitespace,
@@ -93,7 +94,7 @@ async def record_kiosk(
         agent_message = agent_message[:255]
     viewport = _normalized_viewport(viewport)
 
-    now = datetime.utcnow()
+    now = utcnow()
     existing = await KioskDB.objects.get_or_none(id=kiosk_id)
     if existing is None:
         try:
@@ -148,17 +149,14 @@ async def record_kiosk(
 def _to_utc_iso(dt: datetime | None) -> str | None:
     """Serialize a stored last_seen as an explicit-UTC ISO string.
 
-    last_seen is written with a naive UTC value (``datetime.utcnow``) and read
-    back naive from SQLite. Stamping ``tzinfo=UTC`` makes the ISO string carry
-    a ``+00:00`` offset so a JS client (``Date.parse``) cannot misread a
-    tz-less string as local time and show a just-seen kiosk as stale
-    (calvin-dd9.16).
+    Values are stored as naive UTC text and the model reads them back aware
+    (see :mod:`app.utils.utc`). The ISO string keeps the ``+00:00`` offset so
+    a JS client (``Date.parse``) cannot misread a tz-less string as local time
+    and show a just-seen kiosk as stale (calvin-dd9.16).
     """
     if dt is None:
         return None
-    if dt.tzinfo is None:
-        dt = dt.replace(tzinfo=UTC)
-    return dt.isoformat()
+    return as_utc(dt).isoformat()
 
 
 async def list_kiosks() -> list[dict]:
@@ -236,7 +234,7 @@ async def set_overrides(kiosk_id: str, overrides: dict) -> None:
     if not kiosk_id or not _KIOSK_ID_RE.fullmatch(kiosk_id):
         logger.warning(f"Refusing to set overrides for malformed kiosk_id: {kiosk_id!r}")
         return
-    now = datetime.utcnow()
+    now = utcnow()
     existing = await KioskDB.objects.get_or_none(id=kiosk_id)
     if existing is None:
         try:
