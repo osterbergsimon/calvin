@@ -11,6 +11,7 @@ import {
   applyDragSizesById,
   canSplitAtPath,
   clampCalendarView,
+  clampPhotosView,
   clampServiceView,
   computeClockBarModeUpdate,
   computeClockBarPositionUpdate,
@@ -770,6 +771,28 @@ describe("calendar region view", () => {
     expect(screens.screens[0].layout.regions[0].view).toBeUndefined();
   });
 
+  it("keeps a photos region's fit and maps the retired crop to fill", () => {
+    const screens = normalizeDashboardScreens(
+      screenWith({
+        id: "region-1",
+        kind: "photos",
+        instanceIds: [],
+        size: 100,
+        view: { fit: "crop" },
+      })
+    );
+    expect(screens.screens[0].layout.regions[0].view).toEqual({ fit: "fill" });
+  });
+
+  it("clampPhotosView accepts the four fit options and drops unknown values", () => {
+    expect(clampPhotosView({ fit: "smart" })).toEqual({ fit: "smart" });
+    expect(clampPhotosView({ fit: "fit" })).toEqual({ fit: "fit" });
+    expect(clampPhotosView({ fit: "fill" })).toEqual({ fit: "fill" });
+    expect(clampPhotosView({ fit: "center" })).toEqual({ fit: "center" });
+    expect(clampPhotosView({ fit: "crop" })).toEqual({ fit: "fill" });
+    expect(clampPhotosView({ fit: "nonsense" })).toEqual({});
+  });
+
   it("clampCalendarView coerces bad values to the valid range", () => {
     expect(
       clampCalendarView({ mode: "bogus", rolling: 1, weeks: 0, days: 50, extraWeeks: -3 })
@@ -861,6 +884,15 @@ describe("calendar region view", () => {
     });
     const next = setRegionView(screens, "r1-a", { mode: "day" });
     expect(next.screens[0].layout.regions[0].split.regions[0].view.mode).toBe("day");
+  });
+
+  it("setRegionView writes a photos region's fit", () => {
+    const screens = normalizeDashboardScreens(
+      screenWith({ id: "r1", kind: "photos", instanceIds: [], size: 100 })
+    );
+    const next = setRegionView(screens, "r1", { fit: "fit" });
+    expect(next.screens[0].layout.regions[0].view).toEqual({ fit: "fit" });
+    expect(screens.screens[0].layout.regions[0].view).toBeUndefined();
   });
 });
 

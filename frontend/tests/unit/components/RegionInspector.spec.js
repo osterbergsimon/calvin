@@ -17,6 +17,7 @@ const mountWith = (region, context, screenRegions) =>
         SegmentedControl: true,
         ToggleSwitch: true,
         NumberStepper: true,
+        SelectPill: true,
       },
     },
   });
@@ -79,5 +80,61 @@ describe("RegionInspector split toggle", () => {
     const t = toggleText(w);
     expect(t.some(x => x.includes("Split region"))).toBe(false);
     expect(t.some(x => x.includes("Unsplit"))).toBe(false);
+  });
+});
+
+describe("RegionInspector display settings (CLV-49)", () => {
+  const context = { depth: 1, isSub: false, canSplit: false, canAddSub: false, splitDir: "row" };
+  const calendar = (view = {}) => ({
+    id: "r1",
+    kind: "calendar",
+    size: 100,
+    instanceIds: [],
+    view: { mode: "month", rolling: true, weeks: 4, ...view },
+  });
+
+  it("writes week numbers to the region's view", async () => {
+    const w = mountWith(calendar(), context);
+    const toggle = w
+      .findAllComponents({ name: "ToggleSwitch" })
+      .find(c => c.props("ariaLabel") === "Week numbers");
+    expect(toggle).toBeTruthy();
+    toggle.vm.$emit("update:modelValue", true);
+    expect(w.emitted("patch-view")[0][0]).toEqual({ weekNumbers: true });
+  });
+
+  it("offers Auto and the fixed events-per-day values, writing null for Auto", async () => {
+    const w = mountWith(calendar(), context);
+    const pill = w
+      .findAllComponents({ name: "SelectPill" })
+      .find(c => c.props("ariaLabel") === "Events per day");
+    expect(pill.props("options").map(o => o.label)).toEqual(["Auto", "1", "2", "3", "4", "6", "8"]);
+    pill.vm.$emit("update:modelValue", "6");
+    expect(w.emitted("patch-view")[0][0]).toEqual({ maxVisibleEvents: 6 });
+    pill.vm.$emit("update:modelValue", "auto");
+    expect(w.emitted("patch-view")[1][0]).toEqual({ maxVisibleEvents: undefined });
+  });
+
+  it("shows Auto when the region has no events-per-day value", () => {
+    const w = mountWith(calendar({ maxVisibleEvents: undefined }), context);
+    const pill = w
+      .findAllComponents({ name: "SelectPill" })
+      .find(c => c.props("ariaLabel") === "Events per day");
+    expect(pill.props("modelValue")).toBe("auto");
+  });
+
+  it("offers the four photo fit options and writes the region's fit", async () => {
+    const w = mountWith({ id: "r1", kind: "photos", size: 100, instanceIds: [] }, context);
+    const pill = w
+      .findAllComponents({ name: "SelectPill" })
+      .find(c => c.props("ariaLabel") === "Fit photos");
+    expect(pill.props("options").map(o => o.label)).toEqual([
+      "Smart",
+      "Whole photo",
+      "Fill",
+      "Centre",
+    ]);
+    pill.vm.$emit("update:modelValue", "fit");
+    expect(w.emitted("patch-view")[0][0]).toEqual({ fit: "fit" });
   });
 });
