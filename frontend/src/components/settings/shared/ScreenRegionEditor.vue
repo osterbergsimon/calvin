@@ -182,7 +182,8 @@
                       @keydown.enter.prevent="selectClockBar"
                       @keydown.space.prevent="selectClockBar"
                     >
-                      <span class="sre-clock-grip" aria-hidden="true">⠿</span> {{ previewClock }}
+                      <span v-if="clockDraggable" class="sre-clock-grip" aria-hidden="true">⠿</span>
+                      {{ previewClock }}
                     </div>
 
                     <div
@@ -225,7 +226,10 @@
                           @keydown.enter.prevent="selectClockBar"
                           @keydown.space.prevent="selectClockBar"
                         >
-                          <span class="sre-clock-grip" aria-hidden="true">⠿</span> {{ previewTime }}
+                          <span v-if="clockDraggable" class="sre-clock-grip" aria-hidden="true"
+                            >⠿</span
+                          >
+                          {{ previewTime }}
                         </div>
 
                         <RegionNode
@@ -235,6 +239,7 @@
                           :selected-id="selectedRegionId"
                           :layout-dir="layoutDir"
                           :coarse="coarsePointer"
+                          :narrow="deviceNarrow"
                           @select="selectRegion"
                           @resize="onNodeResize"
                         />
@@ -272,7 +277,8 @@
                       @keydown.enter.prevent="selectClockBar"
                       @keydown.space.prevent="selectClockBar"
                     >
-                      <span class="sre-clock-grip" aria-hidden="true">⠿</span> {{ previewClock }}
+                      <span v-if="clockDraggable" class="sre-clock-grip" aria-hidden="true">⠿</span>
+                      {{ previewClock }}
                     </div>
                   </div>
                 </div>

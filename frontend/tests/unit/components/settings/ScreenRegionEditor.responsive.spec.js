@@ -181,11 +181,33 @@ describe("ScreenRegionEditor device fit", () => {
     expect(Math.max(width, height)).toBeGreaterThanOrEqual(200);
   });
 
-  it("shrinks region labels under 320px", async () => {
+  it("shrinks region labels and drops the icon and size badge under 320px", async () => {
     const w = await mountEditor();
     await resize(w, ".sre-modal", 390, 844);
     await resize(w, ".sre-stage", 300, 600);
     expect(w.find(".sre-device").classes()).toContain("is-narrow");
+    expect(w.findAll(".sre-region-name").length).toBeGreaterThan(0);
+    expect(w.findAll(".sre-region-emoji")).toHaveLength(0);
+    expect(w.findAll(".sre-region-size")).toHaveLength(0);
+  });
+
+  it("keeps the region icon and size badge when the device has room", async () => {
+    const w = await mountEditor();
+    await resize(w, ".sre-modal", 1280, 720);
+    await resize(w, ".sre-stage", 1280, 700);
+    expect(w.find(".sre-device").classes()).not.toContain("is-narrow");
+    expect(w.findAll(".sre-region-emoji").length).toBeGreaterThan(0);
+    expect(w.findAll(".sre-region-size").length).toBeGreaterThan(0);
+  });
+
+  it("hides the icon and % badge when the open phone sheet leaves a narrow device", async () => {
+    const w = await mountEditor();
+    await resize(w, ".sre-modal", 390, 844);
+    // The stage left above an open 65% inspector sheet.
+    await resize(w, ".sre-stage", 390, 204);
+    expect(w.find(".sre-device").classes()).toContain("is-narrow");
+    expect(w.findAll(".sre-region-emoji")).toHaveLength(0);
+    expect(w.findAll(".sre-region-size")).toHaveLength(0);
   });
 });
 
@@ -278,15 +300,23 @@ describe("ScreenRegionEditor touch behaviour", () => {
     const bar = w.find(".sre-clockbar");
     expect(bar.attributes("draggable")).toBe("false");
     expect(bar.attributes("title")).toBe("Tap to change the clock bar");
+    expect(w.find(".sre-clock-grip").exists()).toBe(false);
 
     await bar.trigger("dragstart");
     expect(w.findAll(".sre-drop").length).toBe(0);
+  });
+
+  it("keeps the clock grip when the bar is draggable", async () => {
+    const w = await mountEditor();
+    expect(w.find(".sre-clockbar").attributes("draggable")).toBe("true");
+    expect(w.find(".sre-clock-grip").exists()).toBe(true);
   });
 
   it("is not draggable in Compact either", async () => {
     const w = await mountEditor();
     await resize(w, ".sre-modal", 800, 480);
     expect(w.find(".sre-clockbar").attributes("draggable")).toBe("false");
+    expect(w.find(".sre-clock-grip").exists()).toBe(false);
   });
 
   it("a tap selects the clock bar and Position moves it", async () => {
