@@ -169,7 +169,7 @@ another category":
 
 ## 4. Owner decisions
 
-Approved 2026-10-30: A, B and C. D is proposed.
+Approved 2026-10-30: A, B, C and D.
 
 - **A. Sources live only in Content** (Plugins shows "Used by n sources" links, not the lists). Recommended.
 - **B. Calendars use the shared add/edit flow** (retire the custom form). Recommended: one flow to learn and maintain.
@@ -182,7 +182,7 @@ Approved 2026-10-30: A, B and C. D is proposed.
    when it's the only one); "Instance Name" → "Name"; plain kind chips; the restart notice check.
 2. **Content owns sources** (A, B): `SourceList` + the provider picker in all four sections, placement lines and
    place mode (§3.6); Plugins cards slimmed.
-3. **Install catalog-first**, the clock bar change (C) and, if approved, catalog install from the picker (D, §3.7).
+3. **Install catalog-first**, the clock bar change (C) and catalog install from the picker (D, §3.7).
 
 ## 6. Data needed
 
