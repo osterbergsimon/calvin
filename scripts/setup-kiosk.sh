@@ -19,7 +19,7 @@ set -euo pipefail
 _CALVIN_SOURCE_ONLY=0
 BACKEND_URL=""
 SIGNING_KEY=""
-# --display-stack <x11|wayland>; empty means "environment, then env file, then
+# --display-stack <x11|wayland|cog>; empty means "environment, then env file, then
 # auto" (phase 1: auto is X11).
 DISPLAY_STACK_ARG=""
 DISPLAY_STACK=""
@@ -124,7 +124,7 @@ requested_display_stack() {
 
 usage() {
     cat <<EOF
-Usage: setup-kiosk.sh --backend-url <URL> [--display-stack x11|wayland]
+Usage: setup-kiosk.sh --backend-url <URL> [--display-stack x11|wayland|cog]
 
 Sets up a Raspberry Pi as a dumb kiosk pointed at a remote Calvin
 backend. Installs X, openbox, and Chromium, then enables a systemd
@@ -137,8 +137,9 @@ Required:
 Options:
   --signing-key-file <FILE>  File holding the server's kiosk-signing.key (hex)
   --signing-key <HEX>        Same, inline (visible in ps and shell history)
-  --display-stack <STACK>    x11 (default) or wayland (labwc, experimental).
-                             Both stacks stay installed: re-run with the other
+  --display-stack <STACK>    x11 (default), wayland (labwc) or cog (WPE WebKit
+                             on DRM/KMS, recommended for Pi 3-class boards).
+                             All stacks stay installed: re-run with another
                              value to switch an existing kiosk in place.
 EOF
 }
@@ -267,13 +268,18 @@ install_kiosk_services() {
 start_kiosk_services() {
     log "Starting kiosk services..."
     if systemd_available; then
-        if [ "${DISPLAY_STACK}" = "wayland" ]; then
-            start_systemd_service "calvin-wayland.service"
+        if [ "${DISPLAY_STACK}" = "cog" ]; then
+            # cog IS the browser on this stack: Chromium is not started at all.
+            start_systemd_service "calvin-cog.service"
         else
-            start_systemd_service "calvin-x.service"
+            if [ "${DISPLAY_STACK}" = "wayland" ]; then
+                start_systemd_service "calvin-wayland.service"
+            else
+                start_systemd_service "calvin-x.service"
+            fi
+            sleep 3
+            start_systemd_service "calvin-kiosk-remote.service"
         fi
-        sleep 3
-        start_systemd_service "calvin-kiosk-remote.service"
         start_systemd_service "calvin-display-agent.service"
     else
         log_warn "systemd is not running; skipped service start"
@@ -322,6 +328,11 @@ main() {
     bootstrap_kiosk "${BACKEND_URL}"
     install_sudoers_fragment calvin-kiosk-update \
         "${CALVIN_USER} ALL=(root) NOPASSWD: /bin/systemctl start --no-block calvin-kiosk-update.service"
+    # The cog stack's panel power/rotation needs root (DRM master, /sys fb blank,
+    # unit restart). The agent may run only this validated helper, only for its
+    # three verbs. Harmless on X11/Wayland; kept so a stack switch needs no reinstall.
+    install_sudoers_fragment calvin-kiosk-cog \
+        "${CALVIN_USER} ALL=(root) NOPASSWD: /usr/local/bin/calvin-cog-panel.sh on, /usr/local/bin/calvin-cog-panel.sh off, /usr/local/bin/calvin-cog-panel.sh rotate *"
 
     configure_display "${CALVIN_USER}"
     # Chromium is managed by calvin-kiosk-remote.service; openbox
@@ -341,7 +352,7 @@ main() {
     log "Backend URL:    ${BACKEND_URL}"
     log "Display stack:  ${DISPLAY_STACK}"
     log "Config file:    /etc/default/calvin-kiosk"
-    log "Systemd units:  calvin-wayland.service or calvin-x.service,"
+    log "Systemd units:  calvin-x.service, calvin-wayland.service or calvin-cog.service,"
     log "                calvin-kiosk-remote.service, calvin-display-agent.service"
     log ""
     log "To change the backend URL later:"
@@ -350,6 +361,7 @@ main() {
     log ""
     log "To switch display stack later (re-runs the installer in place):"
     log "  sudo bash install-kiosk.sh --backend-url ${BACKEND_URL} --display-stack wayland"
+    log "  sudo bash install-kiosk.sh --backend-url ${BACKEND_URL} --display-stack cog"
     log "  sudo bash install-kiosk.sh --backend-url ${BACKEND_URL} --display-stack x11"
     log ""
     log "Reboot to start the kiosk:"

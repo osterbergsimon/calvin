@@ -100,7 +100,7 @@ pass "disabled unit re-enabled on an otherwise no-op run"
 
 # --- new file + a newer updater that knows it: applied in two passes ---
 printf 'EXTRA\n' > "$tmp/srv/calvin-extra.py"
-sed 's/calvin_display_agent.py|update-kiosk.sh)/calvin_display_agent.py|update-kiosk.sh|calvin-extra.py)/' "$SCRIPT" > "$tmp/srv/update-kiosk.sh"
+sed 's/calvin-cog-panel.sh)/calvin-cog-panel.sh|calvin-extra.py)/' "$SCRIPT" > "$tmp/srv/update-kiosk.sh"
 grep -q 'calvin-extra.py' "$tmp/srv/update-kiosk.sh" || fail "test could not build the newer updater (pinned table format changed?)"
 cp "$SCRIPT" "$tmp/local/update-kiosk.sh"
 manifest twopass00000000 \

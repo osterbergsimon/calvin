@@ -75,6 +75,24 @@ def test_wayland_bundle_files_never_switch_the_stack(tmp_path):
     assert by_name["rc.xml"]["mode"] == "0644"
 
 
+def test_cog_bundle_files_never_switch_the_stack(tmp_path):
+    # Same rule for the third stack: the bundle ships calvin-cog.service and the
+    # root panel helper, but only setup-kiosk.sh --display-stack enables cog, and
+    # a bundle update must not restart a running display.
+    _seed(tmp_path)
+    m = kiosk_bundle.build_manifest(tmp_path)
+    by_name = {f["name"]: f for f in m["files"]}
+    for name in ("calvin-cog.service", "calvin-cog-panel.sh"):
+        assert name in by_name, name
+        assert by_name[name]["enable"] is False, name
+        assert by_name[name]["restart_unit"] is None, name
+    assert by_name["calvin-cog.service"]["target_path"] == (
+        "/etc/systemd/system/calvin-cog.service"
+    )
+    assert by_name["calvin-cog-panel.sh"]["target_path"] == ("/usr/local/bin/calvin-cog-panel.sh")
+    assert by_name["calvin-cog-panel.sh"]["mode"] == "0755"
+
+
 def test_enable_does_not_change_version(tmp_path):
     # The version hash must depend on file contents only, not the enable field.
     import hashlib

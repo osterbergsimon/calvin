@@ -198,6 +198,12 @@ grep -qx 'SETUP --backend-url http://tower.local:8000 --display-stack wayland' "
 echo "PASS install-forwards-display-stack"
 
 reset
+bash "$tmp/served.sh" --no-reboot --display-stack cog >/dev/null
+grep -qx 'SETUP --backend-url http://tower.local:8000 --display-stack cog' "$RUN_LOG" \
+    || { echo "FAIL: --display-stack cog not forwarded to setup-kiosk.sh"; cat "$RUN_LOG"; exit 1; }
+echo "PASS install-forwards-cog-display-stack"
+
+reset
 if bash "$tmp/served.sh" --no-reboot --display-stack cage 2>/dev/null; then
     echo "FAIL: invalid --display-stack accepted"; exit 1; fi
 [ ! -f "$RUN_LOG" ] || { echo "FAIL: setup ran with an invalid display stack"; exit 1; }
