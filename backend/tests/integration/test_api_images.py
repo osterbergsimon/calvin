@@ -1,5 +1,6 @@
 """Integration tests for image API endpoints."""
 
+from datetime import UTC
 from pathlib import Path
 
 import pytest
@@ -45,8 +46,8 @@ class TestImageAPI:
                         name="Local Images",
                         enabled=True,
                         display_order=0,
-                        created_at=datetime.utcnow(),
-                        updated_at=datetime.utcnow(),
+                        created_at=datetime.now(UTC),
+                        updated_at=datetime.now(UTC),
                     )
                 elif not instance.enabled:
                     # Instance exists but is disabled, enable it

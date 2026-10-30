@@ -3,6 +3,38 @@
 from fastapi import HTTPException
 from loguru import logger
 
+# Generic fallback text for server faults: never derived from the exception.
+GENERIC_INTERNAL_ERROR = "Something went wrong on the server. Check the server logs for details."
+
+
+def internal_error(
+    code: str,
+    message: str = GENERIC_INTERNAL_ERROR,
+    *,
+    status_code: int = 500,
+    error: BaseException | None = None,
+) -> HTTPException:
+    """Log a server fault and return a generic, coded error body.
+
+    The exception (and its traceback) goes to the server log only. Clients get
+    ``{"code": <stable slug>, "message": <user-facing text>}`` so they can branch
+    on the code without parsing prose, and nothing internal leaks (audit S9).
+
+    Args:
+        code: Stable snake_case code, e.g. ``plugin_install_failed``.
+        message: User-facing text. Must not include exception text.
+        status_code: HTTP status; 500 unless the failure is a 502/503-style fault.
+        error: The caught exception, logged with its traceback.
+    """
+    if error is not None:
+        logger.opt(exception=error).error(f"{code}: {message}")
+    else:
+        logger.error(f"{code}: {message}")
+    return HTTPException(
+        status_code=status_code,
+        detail={"code": code, "message": message},
+    )
+
 
 class ErrorResponse:
     """Standardized error response helper."""
@@ -38,22 +70,26 @@ class ErrorResponse:
         return HTTPException(status_code=400, detail=message)
 
     @staticmethod
-    def internal_error(message: str, error: Exception | None = None) -> HTTPException:
+    def internal_error(
+        message: str,
+        error: Exception | None = None,
+        *,
+        code: str = "internal_error",
+        status_code: int = 500,
+    ) -> HTTPException:
         """
-        Create a 500 Internal Server Error.
+        Create a coded 500 Internal Server Error without leaking the exception.
 
         Args:
             message: User-friendly error message
             error: Optional exception for logging
+            code: Stable error code returned to the client
+            status_code: HTTP status code
 
         Returns:
-            HTTPException with 500 status
+            HTTPException with a ``{"code", "message"}`` detail
         """
-        if error:
-            logger.exception(f"{message}: {error}")
-        else:
-            logger.error(message)
-        return HTTPException(status_code=500, detail=message)
+        return internal_error(code, message, status_code=status_code, error=error)
 
     @staticmethod
     def validation_error(field: str, message: str) -> HTTPException:
@@ -114,10 +150,16 @@ def handle_service_error(
     error_message = str(error) if str(error) else (default_message or "An error occurred")
     logger.exception(f"Error during {operation}: {error}")
 
-    # Determine status code based on error type
+    # Determine status code based on error type. A ValueError is the caller's own
+    # input (4xx) and may explain itself; anything else is a server fault and
+    # must not leak exception text.
     if isinstance(error, ValueError):
-        return ErrorResponse.bad_request(f"{operation} failed: {error_message}")
+        return ErrorResponse.bad_request(error_message)
     elif isinstance(error, FileNotFoundError):
-        return ErrorResponse.not_found("Resource", error_message)
+        return ErrorResponse.not_found("Resource")
     else:
-        return ErrorResponse.internal_error(f"{operation} failed: {error_message}", error)
+        return ErrorResponse.internal_error(
+            f"{operation} failed. Check the server logs for details.",
+            error,
+            code="service_failed",
+        )

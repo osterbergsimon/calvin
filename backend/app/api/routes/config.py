@@ -15,6 +15,7 @@ from app.security.admin_auth import get_admin_store
 from app.security.route_policy import CONFIG_DISPLAY_KEYS, admin_error, is_admin
 from app.services.config_service import config_service
 from app.services.display_orientation_service import display_orientation_service
+from app.utils.errors import internal_error
 from app.utils.git_refs import validate_git_branch, validate_git_repo_url
 from app.utils.host_control import host_control_enabled
 
@@ -872,8 +873,15 @@ async def get_git_branches(repo_url: str | None = None):
         raise
     except subprocess.TimeoutExpired:
         raise HTTPException(status_code=408, detail="Request timeout while fetching branches")
-    except FileNotFoundError:
-        raise HTTPException(status_code=500, detail="Git is not installed on this system")
-    except Exception:
-        logger.exception("Failed to fetch branches for {}", repo_url)
-        raise HTTPException(status_code=500, detail="Failed to fetch branches")
+    except FileNotFoundError as e:
+        raise internal_error(
+            "git_not_installed",
+            "Git is not installed on this system, so branches cannot be listed.",
+            error=e,
+        ) from e
+    except Exception as e:
+        raise internal_error(
+            "git_branches_failed",
+            "Could not fetch the branch list. Check the server logs for details.",
+            error=e,
+        ) from e
