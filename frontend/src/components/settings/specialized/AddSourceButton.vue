@@ -72,8 +72,8 @@ const {
   plugins,
   loadPlugins,
   togglePlugin,
-  availablePlugins,
-  enumeratePluginsFromGitHub,
+  catalogPlugins,
+  enumerateCatalogPlugins,
   installPluginFromGitHub,
   pluginInstallError,
 } = usePlugins();
@@ -173,15 +173,17 @@ const ensureCatalog = async () => {
   const repo = catalogRepo.value;
   // No catalog (or a configured non-official one) means no group: the footer's
   // "Get more in Plugins ›" stays the only way to browse other repositories.
-  if (!repo || typeof enumeratePluginsFromGitHub !== "function") {
+  if (!repo || typeof enumerateCatalogPlugins !== "function") {
     catalogLoaded.value = true;
     return;
   }
   catalogLoading.value = true;
   try {
-    await enumeratePluginsFromGitHub(repo, "main");
-    // An unreachable catalog leaves availablePlugins empty: the group is absent.
-    catalogItems.value = (availablePlugins?.value || []).filter(item => !item._installed);
+    // Enumerated into usePlugins' catalog list, so the Plugins section gets the
+    // same result without a second GitHub round-trip.
+    await enumerateCatalogPlugins(repo, "main");
+    // An unreachable catalog leaves the list empty: the group is absent.
+    catalogItems.value = (catalogPlugins?.value || []).filter(item => !item._installed);
   } catch {
     catalogItems.value = [];
   } finally {
