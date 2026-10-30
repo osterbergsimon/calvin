@@ -233,6 +233,10 @@ async def get_plugins(
                 "supports_multiple_instances": type_info.supports_multiple_instances,
                 # Human-readable label for a single instance (e.g. "Location", "Device")
                 "instance_label": type_info.instance_label,
+                # Display metadata, so the settings UI can tell a web page from a
+                # card/clock-bar plugin without a request per plugin.
+                "display_schema": type_info.display_schema,
+                "statusbar_schema": type_info.statusbar_schema,
             }
 
             # Include error message if plugin is broken
