@@ -766,6 +766,26 @@ POLKIT_EOF
     log "Polkit reboot rules configured"
 }
 
+# Write a file into another user's home as root without following a symlink
+# the app user planted at that name (calvin-1g25). A fixed-name `cat >` opened
+# the symlink; `install -T` unlinks the destination and creates a fresh inode
+# owned by the target user. The content comes from a private root temp file
+# that the app user cannot replace.
+install_user_file() {  # dest mode owner ; content on stdin
+    local dest="$1" mode="$2" owner="$3"
+    local src opts=() rc=0
+    src="$(mktemp)" || return 1
+    cat > "$src"
+    chmod "$mode" "$src"
+    opts=(-T -m "$mode")
+    if [ "$(id -u)" -eq 0 ] && id -u "$owner" >/dev/null 2>&1; then
+        opts+=(-o "$owner" -g "$owner")
+    fi
+    install "${opts[@]}" "$src" "$dest" || rc=$?
+    rm -f "$src"
+    return "$rc"
+}
+
 # Display configuration
 # calvin-x.service is the only thing that starts X on tty1. Older setups also
 # added getty autologin + `exec startx` in .bash_profile, which raced the unit
@@ -778,22 +798,18 @@ configure_display() {
     log "Configuring display settings..."
 
     # .xprofile
-    cat > "${user_home}/.xprofile" << 'XPROFILE_EOF'
+    install_user_file "${user_home}/.xprofile" 0755 "$user" << 'XPROFILE_EOF'
 #!/bin/bash
 xset s off
 xset -dpms
 xset s noblank
 XPROFILE_EOF
-    chmod +x "${user_home}/.xprofile"
-    chown "${user}:${user}" "${user_home}/.xprofile"
 
     # .xinitrc (what startx in calvin-x.service runs)
-    cat > "${user_home}/.xinitrc" << 'EOF'
+    install_user_file "${user_home}/.xinitrc" 0755 "$user" << 'EOF'
 #!/bin/sh
 exec openbox-session
 EOF
-    chmod +x "${user_home}/.xinitrc"
-    chown "${user}:${user}" "${user_home}/.xinitrc"
 
     local autologin="${systemd_dir}/getty@tty1.service.d/autologin.conf"
     if [ -f "${autologin}" ] && grep -q -- "--autologin ${user} " "${autologin}"; then

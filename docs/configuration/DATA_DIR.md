@@ -60,8 +60,10 @@ were copied.
 - `alembic.ini` and the migrations, found next to the `app` package; the
   backend refuses to start if `alembic.ini` is missing rather than run on an
   un-migrated database;
-- the host updater's log (`<repo>/backend/logs/calvin-update.log`), which is
-  shared with `scripts/update-calvin.sh` and only used on native installs.
+- the host updater's log and state (`/var/lib/calvin-update-status/`), which
+  `scripts/update-calvin.sh` writes as root and only native installs use. Older
+  installs kept them in `<repo>/backend/logs/`, which the backend still reads
+  as a fallback.
 
 ## Local Images
 
