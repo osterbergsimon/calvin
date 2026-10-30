@@ -3,7 +3,7 @@
 Status: spec. Mockup: [mocks/clv-27/clv-27.html](mocks/clv-27/clv-27.html), PNGs `mocks/clv-27/png/k1.png` (K1) and
 `k2.png` (K2 + K3). Frontend only, using the existing kiosk overrides API (no backend or agent change). Amends the on-screen
 keyboard spec ([2026-10-29-on-screen-keyboard.md](2026-10-29-on-screen-keyboard.md) §3) and uses the
-**This screen** scope from the settings audit ([2026-10-30-settings-copy-audit.md](2026-10-30-settings-copy-audit.md) §2).
+**This screen** scope from the settings audit (`docs/design/2026-10-30-settings-copy-audit.md` §2, PR #150).
 
 ## 1. Decision
 
