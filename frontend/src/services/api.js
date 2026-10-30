@@ -89,7 +89,7 @@ api.interceptors.response.use(
     }
     const connectionStore = useConnectionStore();
     if (!connectionStore.isBackendOnline) {
-      connectionStore.isBackendOnline = true;
+      connectionStore.markBackendReachable?.();
     }
     return response;
   },
