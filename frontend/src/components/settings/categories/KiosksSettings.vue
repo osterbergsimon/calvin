@@ -154,42 +154,45 @@
       :applied-version="selectedKiosk()?.lastAppliedVersion ?? null"
       :desired-version="desiredVersions[selectedId] ?? null"
     />
-    <SettingsSection v-if="selectedId" id="kiosks-content" :title="`${selectedId} — Content`">
+    <SettingsSection
+      v-if="selectedId"
+      id="kiosks-content"
+      :title="`${selectedKioskName} · Content`"
+    >
       <p v-if="!hasEnoughScreens" class="kiosks__hint">
-        Add more screens in Dashboard › Screens & regions to assign different content per kiosk.
+        Add more pages in Dashboard › Pages & regions to assign different content per kiosk.
       </p>
       <template v-else>
-        <SettingRow
-          label="Screens shown"
-          :description="availableOverridden ? '‹set for this kiosk›' : '‹inherited from global›'"
-        >
+        <SettingRow label="Pages shown">
+          <template #description>
+            <KioskScope
+              :overridden="availableOverridden"
+              reset-test="reset-screens-shown"
+              @reset="resetAvailable"
+            />
+          </template>
           <ChipMultiSelect
             :model-value="effAvailable"
-            aria-label="Screens shown"
+            aria-label="Pages shown"
             :options="screenOptions"
             @update:model-value="setAvailable"
           />
         </SettingRow>
-        <SettingRow
-          label="Default screen"
-          :description="defaultOverridden ? '‹set for this kiosk›' : '‹inherited from global›'"
-        >
+        <SettingRow label="Start page">
+          <template #description>
+            <KioskScope
+              :overridden="defaultOverridden"
+              reset-test="reset-default-screen"
+              @reset="resetDefaultScreen"
+            />
+          </template>
           <SelectPill
             :model-value="effDefault"
-            aria-label="Default screen"
+            aria-label="Start page"
             :options="availableOptions"
             @update:model-value="setDefault"
           />
         </SettingRow>
-        <button
-          type="button"
-          class="kiosks__reset"
-          data-test="reset-content"
-          :disabled="!contentOverridden"
-          @click="resetContent"
-        >
-          Reset content to global
-        </button>
         <p v-if="contentMsg" class="kiosks__saved" role="status" aria-live="polite">
           {{ contentMsg }}
         </p>
@@ -198,36 +201,32 @@
     <SettingsSection
       v-if="selectedId"
       id="kiosks-schedule"
-      :title="`${selectedId} — Display schedule`"
+      :title="`${selectedKioskName} · Screen on/off schedule`"
     >
-      <SettingRow
-        label="Power schedule"
-        :description="
-          scheduleEnabledOverridden ? '‹set for this kiosk›' : '‹inherited from global›'
-        "
-      >
+      <SettingRow label="Screen on/off schedule">
+        <template #description>
+          <KioskScope
+            :overridden="scheduleEnabledOverridden"
+            reset-test="reset-schedule-enabled"
+            @reset="resetScheduleEnabled"
+          />
+        </template>
         <ToggleSwitch
           :model-value="effScheduleEnabled"
           aria-label="Power schedule"
           @update:model-value="setScheduleEnabled"
         />
       </SettingRow>
-      <SettingRow
-        v-if="effScheduleEnabled"
-        label="Daily schedule"
-        :description="scheduleOverridden ? '‹set for this kiosk›' : '‹inherited from global›'"
-      >
+      <SettingRow v-if="effScheduleEnabled" label="Daily schedule">
+        <template #description>
+          <KioskScope
+            :overridden="scheduleOverridden"
+            reset-test="reset-daily-schedule"
+            @reset="resetDailySchedule"
+          />
+        </template>
         <DisplayScheduleGrid :model-value="effSchedule || []" @update:model-value="setSchedule" />
       </SettingRow>
-      <button
-        type="button"
-        class="kiosks__reset"
-        data-test="reset-schedule"
-        :disabled="!anyScheduleOverridden"
-        @click="resetSchedule"
-      >
-        Reset schedule to global
-      </button>
       <p v-if="scheduleMsg" class="kiosks__saved" role="status" aria-live="polite">
         {{ scheduleMsg }}
       </p>
@@ -239,10 +238,14 @@
       :expanded="hardwareOpen"
       @update:expanded="hardwareOpen = $event"
     >
-      <SettingRow
-        label="Orientation"
-        :description="orientationOverridden ? '‹set for this kiosk›' : '‹inherited from global›'"
-      >
+      <SettingRow label="Orientation">
+        <template #description>
+          <KioskScope
+            :overridden="orientationOverridden"
+            reset-test="reset-orientation-row"
+            @reset="resetOrientationRow"
+          />
+        </template>
         <SegmentedControl
           :model-value="effOrientation"
           aria-label="Orientation"
@@ -253,35 +256,30 @@
           @update:model-value="setOrientation"
         />
       </SettingRow>
-      <SettingRow
-        label="Flip 180°"
-        :description="flipOverridden ? '‹set for this kiosk›' : '‹inherited from global›'"
-      >
+      <SettingRow label="Upside down">
+        <template #description>
+          <KioskScope :overridden="flipOverridden" reset-test="reset-flip" @reset="resetFlip" />
+        </template>
         <ToggleSwitch
           :model-value="effFlipped"
-          aria-label="Flip 180 degrees"
+          aria-label="Upside down"
           @update:model-value="setFlipped"
         />
       </SettingRow>
-      <SettingRow
-        label="Apply rotation"
-        :description="applyOverridden ? '‹set for this kiosk›' : '‹inherited from global›'"
-      >
+      <SettingRow label="Rotate the screen output">
+        <template #description>
+          <KioskScope
+            :overridden="applyOverridden"
+            reset-test="reset-apply-rotation"
+            @reset="resetApply"
+          />
+        </template>
         <ToggleSwitch
           :model-value="effApply"
-          aria-label="Apply rotation"
+          aria-label="Rotate the screen output"
           @update:model-value="setApply"
         />
       </SettingRow>
-      <button
-        type="button"
-        class="kiosks__reset"
-        data-test="reset-orientation"
-        :disabled="!orientationOverridden && !flipOverridden && !applyOverridden"
-        @click="resetOrientation"
-      >
-        Reset to global
-      </button>
       <p v-if="savedMsg" class="kiosks__saved" role="status" aria-live="polite">{{ savedMsg }}</p>
     </CollapsibleSection>
     <CollapsibleSection
@@ -291,31 +289,24 @@
       :expanded="touchKeyboardOpen"
       @update:expanded="touchKeyboardOpen = $event"
     >
-      <SettingRow
-        label="On-screen keyboard"
-        :description="oskOverridden ? 'Only this kiosk' : 'Same as all screens'"
-      >
-        <div class="kiosks-osk">
-          <button
-            v-if="oskOverridden"
-            type="button"
-            class="kiosks__link"
-            data-test="osk-use-shared"
-            @click="useSharedOsk"
-          >
-            Use the shared setting
-          </button>
-          <SegmentedControl
-            :model-value="effOsk"
-            aria-label="On-screen keyboard"
-            :options="[
-              { value: 'auto', label: 'Auto' },
-              { value: 'on', label: 'On' },
-              { value: 'off', label: 'Off' },
-            ]"
-            @update:model-value="setOsk"
+      <SettingRow label="On-screen keyboard">
+        <template #description>
+          <KioskScope
+            :overridden="oskOverridden"
+            reset-test="osk-use-shared"
+            @reset="useSharedOsk"
           />
-        </div>
+        </template>
+        <SegmentedControl
+          :model-value="effOsk"
+          aria-label="On-screen keyboard"
+          :options="[
+            { value: 'auto', label: 'Auto' },
+            { value: 'on', label: 'Always' },
+            { value: 'off', label: 'Never' },
+          ]"
+          @update:model-value="setOsk"
+        />
       </SettingRow>
       <p v-if="keyboardMsg" class="kiosks__saved" role="status" aria-live="polite">
         {{ keyboardMsg }}
@@ -347,12 +338,16 @@ import KioskStatusHeader from "@/components/settings/shared/KioskStatusHeader.vu
 import DisplayScheduleGrid from "@/components/settings/shared/DisplayScheduleGrid.vue";
 import CollapsibleSection from "@/components/settings/shared/CollapsibleSection.vue";
 import AddKioskPanel from "@/components/settings/shared/AddKioskPanel.vue";
+import KioskScope from "@/components/settings/shared/KioskScope.vue";
 
 const store = useKiosksStore();
 const config = useConfigStore();
 const notifications = useNotificationsStore();
 const kiosks = computed(() => store.kiosks);
 const selectedId = ref(null);
+// Section titles use the screen's own name once one is set, else the install id
+// (screens-and-kiosks setup §3.3/§7). The name is the displayName override.
+const selectedKioskName = computed(() => overrides.value.displayName || selectedId.value);
 const overrides = ref({});
 const savedMsg = ref("");
 const contentMsg = ref("");
@@ -427,8 +422,6 @@ async function updateAll() {
 
 const ONLINE_WINDOW_MS = 120000; // 2 minutes
 
-const ORI_KEYS = ["orientation", "orientationFlipped", "applyDisplayRotation"];
-
 const orientationOverridden = computed(() => "orientation" in overrides.value);
 const flipOverridden = computed(() => "orientationFlipped" in overrides.value);
 const applyOverridden = computed(() => "applyDisplayRotation" in overrides.value);
@@ -444,8 +437,6 @@ const effApply = computed(() =>
     ? overrides.value.applyDisplayRotation
     : (config.applyDisplayRotation ?? true)
 );
-
-const CONTENT_KEYS = ["availableScreens", "defaultScreenId"];
 
 const screenCatalog = computed(() => config.dashboardScreens?.screens ?? []);
 const screenOptions = computed(() =>
@@ -490,17 +481,26 @@ function setDefault(id) {
   persistContent({ ...overrides.value, defaultScreenId: id });
 }
 
-const contentOverridden = computed(() => availableOverridden.value || defaultOverridden.value);
-
-function resetContent() {
+function resetAvailable() {
+  // Back to every screen. Drop a default that was only valid while some
+  // screens were hidden.
   const next = { ...overrides.value };
-  for (const k of CONTENT_KEYS) delete next[k];
+  delete next.availableScreens;
+  if ("defaultScreenId" in next && !screenCatalog.value.some(s => s.id === next.defaultScreenId)) {
+    delete next.defaultScreenId;
+  }
+  persistContent(next);
+}
+
+function resetDefaultScreen() {
+  const next = { ...overrides.value };
+  delete next.defaultScreenId;
   persistContent(next);
 }
 
 function setAvailable(ids) {
   if (ids.length === 0) {
-    contentMsg.value = "Pick at least one screen, or Reset to show all.";
+    contentMsg.value = "Pick at least one page.";
     return;
   }
   const next = { ...overrides.value };
@@ -573,9 +573,20 @@ function setApply(value) {
   persist({ ...overrides.value, applyDisplayRotation: value });
 }
 
-function resetOrientation() {
+// One row back to the shared value (the row's "Use the shared setting").
+function resetOrientationRow() {
   const next = { ...overrides.value };
-  for (const k of ORI_KEYS) delete next[k];
+  delete next.orientation;
+  persist(next);
+}
+function resetFlip() {
+  const next = { ...overrides.value };
+  delete next.orientationFlipped;
+  persist(next);
+}
+function resetApply() {
+  const next = { ...overrides.value };
+  delete next.applyDisplayRotation;
   persist(next);
 }
 
@@ -613,14 +624,10 @@ function useSharedOsk() {
   persistKeyboard(next);
 }
 
-const SCHED_KEYS = ["displayScheduleEnabled", "displaySchedule"];
 const scheduleMsg = ref("");
 
 const scheduleEnabledOverridden = computed(() => "displayScheduleEnabled" in overrides.value);
 const scheduleOverridden = computed(() => "displaySchedule" in overrides.value);
-const anyScheduleOverridden = computed(
-  () => scheduleEnabledOverridden.value || scheduleOverridden.value
-);
 const effScheduleEnabled = computed(() =>
   scheduleEnabledOverridden.value
     ? overrides.value.displayScheduleEnabled
@@ -654,9 +661,14 @@ function setScheduleEnabled(value) {
 function setSchedule(value) {
   persistSchedule({ ...overrides.value, displaySchedule: value });
 }
-function resetSchedule() {
+function resetScheduleEnabled() {
   const next = { ...overrides.value };
-  for (const k of SCHED_KEYS) delete next[k];
+  delete next.displayScheduleEnabled;
+  persistSchedule(next);
+}
+function resetDailySchedule() {
+  const next = { ...overrides.value };
+  delete next.displaySchedule;
   persistSchedule(next);
 }
 
@@ -819,20 +831,6 @@ onMounted(async () => {
 .kiosk-software__btn:disabled {
   opacity: 0.55;
   cursor: not-allowed;
-}
-.kiosks__reset {
-  margin-top: 8px;
-  padding: 6px 14px;
-  border: 1px solid var(--border-color, rgba(255, 255, 255, 0.12));
-  border-radius: 6px;
-  background: transparent;
-  color: inherit;
-  cursor: pointer;
-  font-size: 0.9em;
-}
-.kiosks__reset:disabled {
-  opacity: 0.4;
-  cursor: default;
 }
 .kiosks__saved {
   margin-top: 8px;

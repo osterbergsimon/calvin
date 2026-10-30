@@ -108,17 +108,15 @@
   <p v-else class="cst-empty">No calendar sources yet. Add one above.</p>
 
   <!-- Refresh row -->
-  <SettingRow
-    label="Refresh interval"
-    description="How often to refresh calendar data (5–120 minutes)."
-  >
+  <SettingRow label="Check for new events every">
     <div class="cst-refresh-controls">
       <NumberStepper
         :model-value="config.calendarRefreshInterval || 15"
         :min="5"
         :max="120"
         :step="5"
-        aria-label="Calendar refresh interval in minutes"
+        unit=" min"
+        aria-label="Check for new events every, in minutes"
         @update:model-value="v => emit('update:config', { calendarRefreshInterval: v })"
       />
       <button
