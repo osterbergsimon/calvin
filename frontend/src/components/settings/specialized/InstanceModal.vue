@@ -141,6 +141,7 @@ import PluginFieldRenderer from "@/components/PluginFieldRenderer.vue";
 import IconButton from "@/components/ui/IconButton.vue";
 import * as pluginsApi from "@/services/pluginsApi";
 import { useCalendarStore } from "@/stores/calendar";
+import { errorDetailMessage } from "@/utils/apiErrors";
 
 // Plain words: the form adds a source, never an "instance". The plugin's own
 // instance_label wins, then the kind's noun.
@@ -422,7 +423,7 @@ const handleGeocode = async () => {
     console.error("Failed to geocode location:", err);
     geocodeStatus.value = {
       success: false,
-      message: err.response?.data?.detail || err.message || "Failed to geocode location",
+      message: errorDetailMessage(err, "Failed to geocode location"),
     };
   } finally {
     geocoding.value = false;
@@ -485,7 +486,7 @@ const handleTest = async () => {
     console.error("Failed to test instance connection:", err);
     testStatus.value = {
       success: false,
-      message: err.response?.data?.detail || err.message || "Failed to test connection",
+      message: errorDetailMessage(err, "Failed to test connection"),
     };
   } finally {
     testing.value = false;
@@ -591,7 +592,7 @@ const handleSave = async () => {
     handleClose();
   } catch (err) {
     console.error("Failed to save instance:", err);
-    error.value = err.response?.data?.detail || err.message || "Failed to save instance";
+    error.value = errorDetailMessage(err, "Failed to save instance");
   } finally {
     saving.value = false;
   }
