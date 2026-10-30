@@ -12,12 +12,7 @@
     <!-- LIST: every screen, then the shared settings below it -->
     <div class="screens__list" data-test="screens-list">
       <SettingsSection id="screens-list" title="Screens">
-        <div class="screens__intro">
-          <p v-if="kiosks.length === 0" class="screens__empty" data-test="screens-empty">
-            No screens have connected yet. A screen shows up here once it is set up as a kiosk: a
-            Raspberry Pi installed with the command under “Add a screen”, or any browser that opens
-            the dashboard with <code>?kiosk=&lt;name&gt;</code> in its address.
-          </p>
+        <template #action>
           <button
             type="button"
             class="screens__add"
@@ -27,7 +22,16 @@
           >
             {{ addOpen ? "Hide instructions" : "+ Add a screen" }}
           </button>
-        </div>
+        </template>
+        <p
+          v-if="kiosks.length === 0"
+          class="screens__empty screens__intro"
+          data-test="screens-empty"
+        >
+          No screens have connected yet. A screen shows up here once it is set up as a kiosk: a
+          Raspberry Pi installed with the command under “Add a screen”, or any browser that opens
+          the dashboard with <code>?kiosk=&lt;name&gt;</code> in its address.
+        </p>
         <AddKioskPanel v-if="addOpen" />
         <SettingRow
           v-if="agentKiosks.length > 0"
@@ -199,7 +203,7 @@
           :desired-version="desiredVersions[selectedId] ?? null"
         />
 
-        <SettingsSection id="screen-name" :title="nameFor(selectedKiosk)">
+        <SettingsSection id="screen-name" title="Name">
           <SettingRow label="Name" description="Shown in this screen's clock bar.">
             <input
               class="screen-name-input"
@@ -1117,11 +1121,6 @@ onUnmounted(() => {
   min-width: 0;
 }
 .screens__intro {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: 1rem;
-  flex-wrap: wrap;
   padding: 0.75rem 1.25rem;
 }
 .screens__empty {
@@ -1129,16 +1128,26 @@ onUnmounted(() => {
   margin: 0;
   opacity: 0.8;
 }
+/* Secondary .btn (mock S1), right-aligned in the Screens section header. */
 .screens__add {
+  flex: none;
   min-height: var(--touch-target);
-  padding: 0 1.1rem;
+  padding: 0 1rem;
   font-family: var(--font-ui);
-  font-weight: 600;
-  color: var(--focus-ink);
-  background: var(--focus);
-  border: 0;
+  font-size: 0.95rem;
+  font-weight: 500;
+  color: var(--ink);
+  background: var(--bg-2);
+  border: 1px solid var(--line);
   border-radius: 10px;
   cursor: pointer;
+}
+.screens__add:hover {
+  border-color: var(--focus);
+}
+.screens__add:focus-visible {
+  outline: 2px solid var(--focus);
+  outline-offset: 2px;
 }
 .screens__cards {
   display: grid;
