@@ -120,3 +120,20 @@ assert_contains "$tmp/out6" 'release-only' "no note that main was replaced"
 assert_eq develop "$(state branch)"
 sed -i 's/^GIT_BRANCH=main$/GIT_BRANCH=develop/' "$tmp/calvin-update"
 pass "recorded main updates from develop"
+
+# --- 6. a host pinned to a release tag -----------------------------------------
+# A tag never moves: the updater refreshes the host files from that tag and
+# leaves the checkout at it instead of trying to merge origin/<tag>.
+git -C "$tmp/origin" tag v0.1.0
+git -C "$tmp/repo" fetch -q origin
+git -C "$tmp/repo" checkout -q --detach refs/tags/v0.1.0
+reset_host
+sed -i 's/^GIT_BRANCH=develop$/GIT_BRANCH=v0.1.0/' "$tmp/calvin-update"
+bash "$SCRIPT" > "$tmp/out7" 2>&1 || fail "update of a tag install failed: $(cat "$tmp/out7")"
+assert_contains "$tmp/out7" 'release tag' "no note that the ref is a release tag"
+assert_contains "$tmp/calls.log" '^setup-from-origin --refresh --mode prod' "host files not refreshed from the tag"
+assert_eq v0.1.0 "$(git -C "$tmp/repo" describe --tags --exact-match)" "the checkout left its tag"
+assert_eq success "$(state status)"
+sed -i 's/^GIT_BRANCH=v0.1.0$/GIT_BRANCH=develop/' "$tmp/calvin-update"
+git -C "$tmp/repo" checkout -q develop
+pass "tag installs update from their tag"

@@ -56,6 +56,17 @@ BACKEND_RESTARTED="false"
 PREVIOUS_IMAGE=""
 PREVIOUS_IMAGE_REF=""
 
+# A vX.Y.Z ref is a release tag (release-please), not a branch: it never moves,
+# so it is checked out again instead of being fast-forwarded. Kept in step with
+# is_release_tag in setup-common.sh, which this script does not source (it runs
+# before the checkout it guards).
+is_release_tag() {
+  case "${1:-}" in
+    v[0-9]*.[0-9]*.[0-9]*) return 0 ;;
+    *) return 1 ;;
+  esac
+}
+
 json_escape() {
   local s="$1"
   # shellcheck disable=SC1003  # these are literal backslash escapes
@@ -221,6 +232,10 @@ update_checkout() {
   UPDATE_PHASE="pulling_code"
   write_update_state "running" "$UPDATE_PHASE" "Updating the host checkout"
   echo "==> Updating checkout $REPO_DIR ($GIT_BRANCH, fast-forward only)"
+  if is_release_tag "$GIT_BRANCH"; then
+    echo "==> $GIT_BRANCH is a release tag; leaving the checkout at the pinned tag"
+    return 0
+  fi
   if [[ -n "$(repo_git status --porcelain --untracked-files=no)" ]]; then
     echo "WARNING: $REPO_DIR has local changes; not updating it" >&2
     return 0
@@ -339,9 +354,14 @@ if compose_is_dev; then
   UPDATE_PHASE="pulling_code"
   write_update_state "running" "$UPDATE_PHASE" "Pulling latest code"
   echo "==> Pulling latest code"
-  repo_git fetch origin "$GIT_BRANCH"
-  repo_git checkout "$GIT_BRANCH"
-  repo_git pull --ff-only --autostash origin "$GIT_BRANCH"
+  if is_release_tag "$GIT_BRANCH"; then
+    repo_git fetch -q origin "$GIT_BRANCH"
+    repo_git -c advice.detachedHead=false checkout -q --detach "refs/tags/$GIT_BRANCH"
+  else
+    repo_git fetch origin "$GIT_BRANCH"
+    repo_git checkout "$GIT_BRANCH"
+    repo_git pull --ff-only --autostash origin "$GIT_BRANCH"
+  fi
   capture_new_commit
   if should_refresh_host; then
     prepare_update_dir
