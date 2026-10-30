@@ -172,11 +172,11 @@ async def _seed_pages(manifest: dict[str, Any]) -> dict[str, Any]:
     if user_screens:
         return {"created": False, "reason": "the user already has pages"}
 
-    # First seed that touches pages: remember what was there so clear can undo it.
+    # First seed that touches pages: remember that the key was ours to remove.
+    # Nothing user-made is in this list (we returned above otherwise), so clear
+    # can drop the key and let Calvin's built-in default apply.
     if "dashboard_screens" not in manifest["config"]:
-        manifest["config"]["dashboard_screens"] = {
-            "previous": screens_config if screens else None,
-        }
+        manifest["config"]["dashboard_screens"] = {"previous": None}
 
     active = screens_config.get("activeScreenId")
     if active not in DEMO_SCREEN_IDS:
