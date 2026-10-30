@@ -186,6 +186,58 @@ Chromium/Mesa that may have fixed it. Narrower flags that keep compositing (for
 example `--disable-gpu-rasterization`) are being measured on hardware in bead
 `calvin-8by7`.
 
+### Crash-page recovery
+
+The GPU flag removes the common cause, but a renderer can still die (memory
+pressure, an OOM kill). When only the renderer dies, Chromium's browser process
+stays up, so the kiosk unit's `Restart=always` never fires and the screen keeps
+showing "Aw, Snap!". Nothing inside that page can reload itself.
+
+`calvin-display-agent.service` (already installed on every kiosk) therefore acts
+as a watchdog: every 30 s it asks Chromium, over the Chrome DevTools Protocol on
+`127.0.0.1:9222`, whether the dashboard page answers a trivial script. After
+three consecutive failures it restarts the kiosk unit — the browser start-up
+path the kiosk already has: a fresh browser, a fresh page, the same backend.
+This is display-stack independent (it talks to Chromium, not to X11 or Wayland),
+so it covers both.
+
+Chromium runs with its **own profile**, not the account's default one:
+`--user-data-dir=/home/calvin/.config/calvin-kiosk-chromium`. That is required —
+Chromium 136 and later (Raspberry Pi OS Trixie ships 156) ignore the debugging
+port when it runs on the default profile, which would silently disable recovery.
+The profile holds only Chromium state and its cache (the unit clears `Cache` and
+`Code Cache` there at start-up); Calvin's own data comes from the server. FULL
+(all-in-one) installs are covered too: `calvin-kiosk.service` passes the same
+flags, and the same agent watches it.
+
+It fails safe. If nothing that is Chromium answers on the port — recovery
+disabled, an older unit file without the flag, or a Chromium that ignores it —
+the agent logs `crash recovery is idle` once and restarts nothing, and it only
+restarts after the port has answered *and* reported a dead page. Repeated
+restarts back off (300 s, 600 s, 1200 s …) up to
+`CALVIN_KIOSK_WATCHDOG_BACKOFF_MAX`, and a healthy page resets that.
+
+```bash
+journalctl -u calvin-display-agent -f            # watchdog lines
+curl -s http://127.0.0.1:9222/json/list          # what the agent probes
+```
+
+The debugging port is loopback-only (`--remote-debugging-address=127.0.0.1`) and
+exists only for this probe. Settings live in `/etc/default/calvin-kiosk`:
+
+| Setting | Default | Meaning |
+|---|---|---|
+| `CALVIN_KIOSK_WATCHDOG` | `1` | `0`/`off` turns recovery off (the browser is then left alone) |
+| `CALVIN_KIOSK_CDP_PORT` | `9222` | loopback DevTools port; the unit and the agent must agree |
+| `CALVIN_KIOSK_WATCHDOG_SECONDS` | `30` | seconds between probes (minimum 5) |
+| `CALVIN_KIOSK_WATCHDOG_FAILURES` | `3` | consecutive failed probes before a restart |
+| `CALVIN_KIOSK_WATCHDOG_COOLDOWN` | `300` | seconds before the first, and after a recovered, restart |
+| `CALVIN_KIOSK_WATCHDOG_BACKOFF_MAX` | `3600` | cap for the doubling wait between repeated restarts |
+
+`sudo systemctl restart calvin-display-agent` applies a change. Two guards keep
+the watchdog out of the way: it never touches a unit that is not running (systemd
+owns that case) or one that started less than two minutes ago.
+
 ## Display stack (Wayland, opt-in)
 
 A kiosk normally runs **X11 + openbox**. You can install it on **Wayland + labwc**

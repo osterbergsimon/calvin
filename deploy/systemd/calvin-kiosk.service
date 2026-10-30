@@ -27,11 +27,19 @@ ExecStartPre=/bin/bash -c 'timeout=60; elapsed=0; until [ -S /tmp/.X11-unix/X0 ]
 ExecStartPre=/bin/sleep 2
 ExecStartPre=/bin/bash -c 'pkill -u calvin chromium || pkill -u calvin chromium-browser || true'
 ExecStartPre=/bin/sleep 1
-ExecStartPre=/bin/bash -c 'rm -rf /home/calvin/.cache/chromium/Default/Cache/* "/home/calvin/.cache/chromium/Default/Code Cache"/* 2>/dev/null || true'
+# The kiosk's own Chromium profile (--user-data-dir below): its cache lives under
+# that directory, not in the shared Chromium cache.
+ExecStartPre=/bin/bash -c 'rm -rf /home/calvin/.config/calvin-kiosk-chromium/Default/Cache/* "/home/calvin/.config/calvin-kiosk-chromium/Default/Code Cache"/* 2>/dev/null || true'
+# --user-data-dir: a dedicated profile. Chromium 136+ ignores the DevTools port
+# below on the default profile, and the display agent needs that port to recover
+# from a renderer crash ("Aw, Snap!").
 ExecStart=/bin/bash -c 'exec /usr/bin/chromium \
     $${CALVIN_CHROMIUM_DISPLAY_FLAGS:-} \
     --kiosk \
     --noerrdialogs \
+    --remote-debugging-port=${CALVIN_KIOSK_CDP_PORT:-9222} \
+    --remote-debugging-address=127.0.0.1 \
+    --user-data-dir=/home/calvin/.config/calvin-kiosk-chromium \
     --disable-infobars \
     --autoplay-policy=no-user-gesture-required \
     --disable-features=TranslateUI \
