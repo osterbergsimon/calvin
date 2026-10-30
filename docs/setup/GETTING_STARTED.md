@@ -134,6 +134,28 @@ later without SSH or re-flashing: click **Update** on the kiosk in Settings →
 Screens, and it pulls a verified bundle from the server on its next poll. See
 [Kiosk agent self-update](KIOSK_PROVISIONING.md#kiosk-agent-self-update).
 
+## First sign-in
+
+A fresh install has no admin password. Open **Settings** and Calvin asks for a
+one-time **setup code** together with the password you want. The code is in the
+server log, and in `setup-code.txt` in the data directory:
+
+```bash
+# Docker / Compose
+docker logs calvin | grep "Calvin setup code"
+
+# Unraid (Docker tab → Calvin → Logs works too)
+docker logs calvin | grep "Calvin setup code"
+
+# Pi all-in-one
+sudo journalctl -u calvin-app -n 100 | grep "Calvin setup code"
+```
+
+A kiosk that reaches Calvin over loopback (`http://localhost:8000`) shows the
+code on its own setup screen. Once a password exists the code stops working.
+For a headless install you can choose the code up front with
+`CALVIN_SETUP_CODE`; see [Admin authentication](../configuration/ADMIN_AUTH.md#first-run).
+
 ## Verifying it works
 
 After `make dev` (or after a Pi reboot), check:
