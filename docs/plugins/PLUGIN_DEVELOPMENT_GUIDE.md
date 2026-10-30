@@ -91,6 +91,39 @@ service plugin with connection testing, per-instance identity
 (`instance_identity=["mealie_url"]`), payload shaping for `card-grid`, and a
 contract-shaped test suite.
 
+## Bundled Modules and Imports
+
+A plugin may ship helper modules next to `plugin.py`. Import them **at the top
+level of `plugin.py`** (module scope, at import time):
+
+```python
+"""plugin.py"""
+from helper import shape_payload  # bundled helper.py, imported while loading
+```
+
+The host puts the plugin directory on `sys.path` only while `plugin.py`
+executes — see `import_plugin_module()` in
+[loader.py](https://github.com/osterbergsimon/calvin/blob/develop/backend/app/plugins/loader.py).
+The path entry is removed as soon as loading finishes, so a bundled module can
+never shadow stdlib or host modules for later imports.
+
+Two consequences:
+
+- **No lazy imports of bundled modules.** A `from helper import ...` inside
+  `fetch()`, `initialize()`, or any other runtime method runs after the path
+  entry is gone and raises `ModuleNotFoundError` at request time, not at
+  install time. Import at the top of `plugin.py` instead (importing it there
+  caches it in `sys.modules` for the plugin's lifetime).
+- **relative imports do not work.** `plugin.py` is loaded as a standalone
+  module, not a package, so `from . import helper` fails. Use plain absolute
+  imports of the bundled module's name.
+
+Give bundled modules distinctive names. While `plugin.py` executes, the plugin
+directory is first on `sys.path`, so a file named `json.py`, `app.py`, or
+`logging.py` would shadow the stdlib/host module of that name for the plugin's
+own imports. Keep bundled-module names plugin-specific (e.g.
+`mealie_payload.py`).
+
 ## Plugin Types
 
 The `PluginType` enum in [base.py](https://github.com/osterbergsimon/calvin/blob/develop/backend/app/plugins/base.py) defines
@@ -256,6 +289,13 @@ drift.
 - JSON paths (`$.foo.bar`, `$.items[0].name`) must match payload keys exactly.
 - For `panel_variant: "media"`/`"iframe"`, the region shell already draws the
   header — the renderer body should not.
+
+### Plugin fails at runtime with ModuleNotFoundError for a bundled module
+
+The import is probably inside a method instead of at the top of `plugin.py`.
+The host puts the plugin directory on `sys.path` only while `plugin.py`
+executes, so lazy imports of bundled modules fail at request time. Move the
+import to module scope — see [Bundled Modules and Imports](#bundled-modules-and-imports).
 
 ### "database is locked"
 
