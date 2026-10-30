@@ -161,14 +161,14 @@ const onToggleLock = () => {
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  font-size: 1.25rem;
+  font-size: var(--fs-xl);
   /* Discreet by default: just the glyph, no chrome. A muted resting colour and a
      hover-only surface keep it from competing with the clock, while the full
      46px hit target and focus ring stay intact. */
   color: var(--ink-3);
   background: transparent;
   border: 0;
-  border-radius: 11px;
+  border-radius: var(--radius-lg);
   cursor: pointer;
   transition:
     color 0.15s ease,
@@ -196,7 +196,7 @@ const onToggleLock = () => {
   padding: 0.4rem;
   background: var(--bg-1);
   border: 1px solid var(--line);
-  border-radius: 12px;
+  border-radius: var(--radius-xl);
   box-shadow: 0 18px 50px -16px var(--focus-glow);
 }
 .admin-overflow__menu--up {
@@ -212,11 +212,11 @@ const onToggleLock = () => {
   text-align: left;
   padding: 0 0.85rem;
   font-family: var(--font-ui);
-  font-size: 0.95rem;
+  font-size: var(--fs-md);
   color: var(--ink);
   background: transparent;
   border: 0;
-  border-radius: 9px;
+  border-radius: var(--radius-md);
   cursor: pointer;
 }
 .admin-overflow__item:hover {

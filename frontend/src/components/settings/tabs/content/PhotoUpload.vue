@@ -86,12 +86,12 @@ onMounted(() => {
   min-height: var(--touch-target);
   padding: 0 1.1rem;
   font-family: var(--font-ui);
-  font-size: 0.95rem;
+  font-size: var(--fs-md);
   font-weight: 600;
   color: var(--focus-ink);
   background: var(--focus);
   border: 0;
-  border-radius: 10px;
+  border-radius: var(--radius-md);
   cursor: pointer;
 }
 .photo-upload__btn:disabled {
@@ -105,12 +105,12 @@ onMounted(() => {
 .photo-upload__status {
   margin: 0;
   padding: 0 1.25rem 0.75rem;
-  font-size: 0.9rem;
+  font-size: var(--fs-md);
 }
 .photo-upload__status.is-ok {
-  color: var(--ok);
+  color: var(--ok-text);
 }
 .photo-upload__status.is-error {
-  color: var(--err);
+  color: var(--err-text);
 }
 </style>

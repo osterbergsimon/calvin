@@ -19,21 +19,21 @@
     <span
       v-if="saveStatus"
       :class="saveStatus.success ? 'success-message' : 'error-message'"
-      style="margin-left: 0.5rem; padding: 0.5rem 1rem; border-radius: 4px"
+      style="margin-left: 0.5rem; padding: 0.5rem 1rem; border-radius: var(--radius-xs)"
     >
       {{ saveStatus.message }}
     </span>
     <span
       v-if="testStatus"
       :class="testStatus.success ? 'success-message' : 'error-message'"
-      style="margin-left: 0.5rem; padding: 0.5rem 1rem; border-radius: 4px"
+      style="margin-left: 0.5rem; padding: 0.5rem 1rem; border-radius: var(--radius-xs)"
     >
       {{ testStatus.message }}
     </span>
     <span
       v-if="fetchStatus"
       :class="fetchStatus.success ? 'success-message' : 'error-message'"
-      style="margin-left: 0.5rem; padding: 0.5rem 1rem; border-radius: 4px"
+      style="margin-left: 0.5rem; padding: 0.5rem 1rem; border-radius: var(--radius-xs)"
     >
       {{ fetchStatus.message }}
     </span>
@@ -147,11 +147,11 @@ const handleAction = _action => {
 
 .btn-primary {
   background: var(--focus);
-  color: #fff;
+  color: var(--focus-ink);
   border: none;
-  border-radius: 4px;
+  border-radius: var(--radius-xs);
   padding: 0.75rem 1.5rem;
-  font-size: 0.9rem;
+  font-size: var(--fs-md);
   cursor: pointer;
   transition: all 0.2s ease;
   font-weight: 500;
@@ -171,9 +171,9 @@ const handleAction = _action => {
   background: var(--bg-0);
   color: var(--ink);
   border: 1px solid var(--line);
-  border-radius: 4px;
+  border-radius: var(--radius-xs);
   padding: 0.75rem 1.5rem;
-  font-size: 0.9rem;
+  font-size: var(--fs-md);
   cursor: pointer;
   transition: all 0.2s ease;
 }
@@ -189,18 +189,18 @@ const handleAction = _action => {
 }
 
 .success-message {
-  background: var(--accent-success, #10b981);
-  color: #fff;
+  background: var(--accent-success, var(--ok));
+  color: var(--ok-ink);
   padding: 0.5rem 1rem;
-  border-radius: 4px;
-  font-size: 0.875rem;
+  border-radius: var(--radius-xs);
+  font-size: var(--fs-control);
 }
 
 .error-message {
   background: var(--err);
-  color: #fff;
+  color: var(--err-ink);
   padding: 0.5rem 1rem;
-  border-radius: 4px;
-  font-size: 0.875rem;
+  border-radius: var(--radius-xs);
+  font-size: var(--fs-control);
 }
 </style>

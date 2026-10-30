@@ -85,7 +85,7 @@ const captureNewKey = async () => {
 }
 .kb-msg--err {
   background: color-mix(in srgb, var(--err) 12%, var(--bg-1));
-  color: var(--err);
+  color: var(--err-text);
   border: 1px solid var(--err);
 }
 .kb-picker-overlay {

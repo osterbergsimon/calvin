@@ -150,7 +150,7 @@
         :href="ui.help_link"
         target="_blank"
         rel="noopener noreferrer"
-        style="color: var(--focus); text-decoration: underline"
+        style="color: var(--focus-text); text-decoration: underline"
       >
         {{ ui.help_link }}
       </a>
@@ -262,9 +262,9 @@ async function runScan() {
   background: var(--bg-0);
   color: var(--ink);
   border: 1px solid var(--line);
-  border-radius: 4px;
+  border-radius: var(--radius-xs);
   padding: 0.75rem 1.5rem;
-  font-size: 0.9rem;
+  font-size: var(--fs-md);
   cursor: pointer;
   transition: all 0.2s ease;
   white-space: nowrap;
@@ -284,10 +284,10 @@ async function runScan() {
   width: 100%;
   padding: 0.75rem;
   border: 1px solid var(--line);
-  border-radius: 4px;
+  border-radius: var(--radius-xs);
   background: var(--bg-2);
   color: var(--ink);
-  font-size: 0.9rem;
+  font-size: var(--fs-md);
   transition: border-color 0.2s ease;
 }
 
@@ -301,14 +301,14 @@ async function runScan() {
 }
 
 .help-text {
-  font-size: 0.875rem;
+  font-size: var(--fs-control);
   color: var(--ink-2);
   margin-top: 0.5rem;
   display: block;
 }
 
 .help-text a {
-  color: var(--focus);
+  color: var(--focus-text);
   text-decoration: underline;
 }
 
@@ -328,7 +328,7 @@ async function runScan() {
 
 .checkbox-text {
   color: var(--ink);
-  font-size: 0.9rem;
+  font-size: var(--fs-md);
 }
 
 .scan-select-row {
@@ -344,7 +344,7 @@ async function runScan() {
 .scan-error {
   display: block;
   margin-top: 0.4rem;
-  font-size: 0.8rem;
-  color: var(--color-error, #e05555);
+  font-size: var(--fs-xs);
+  color: var(--color-error, var(--err-text));
 }
 </style>

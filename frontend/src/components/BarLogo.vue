@@ -17,7 +17,7 @@ defineProps({
    same on the dashboard bar and in Settings. */
 .bar-logo {
   font-family: var(--font-display);
-  font-size: 1rem;
+  font-size: var(--fs-base);
   font-weight: 700;
   letter-spacing: 0.08em;
   color: var(--ink);
@@ -27,7 +27,7 @@ defineProps({
 }
 
 .bar-logo__dot {
-  color: var(--focus);
+  color: var(--focus-text);
 }
 
 .bar-logo--vertical {
