@@ -71,11 +71,17 @@ If you'd rather run the toolchain natively, see `docs/setup/QUICKSTART_DEVELOP.m
 to `ghcr.io/osterbergsimon/calvin`. `develop` is the deploy branch;
 `main` is release-only and not part of the deploy path.
 
+PR builds are amd64-only to stay fast, except when the PR touches the image
+inputs (backend dependencies, `docker/`, or this workflow): then arm64 and
+arm/v7 are built under QEMU too, so an architecture-specific failure (a
+dependency without an armv7 wheel, say) fails the PR instead of the
+post-merge `:develop` build.
+
 | Trigger | Tags pushed | Platforms |
 |---|---|---|
 | Push to `develop` (docs-only pushes skipped) | `develop`, `sha-<commit>` | amd64, arm64, arm/v7 |
 | Push of a `v*` tag | `X.Y.Z`, `X.Y`, `latest`, `sha-<commit>` | amd64, arm64, arm/v7 |
-| Pull request | nothing (build-only smoke test) | amd64 |
+| Pull request | nothing (build + smoke test) | amd64; also arm64, arm/v7 when the PR touches `backend/pyproject.toml`, `backend/uv.lock`, `docker/**` or the workflow |
 | Manual run with *Push image* ticked | `sha-<commit>` (+ `develop` when run on develop) | amd64, arm64, arm/v7 |
 
 Servers (Unraid, the Pi compose default) run `:develop`. A merge to
