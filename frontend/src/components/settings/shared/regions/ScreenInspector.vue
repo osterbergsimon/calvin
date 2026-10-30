@@ -11,6 +11,7 @@
           type="text"
           :value="screen.name"
           aria-label="Page name"
+          @focus="keepInView"
           @change="$emit('rename', $event.target.value)"
         />
       </label>
@@ -140,6 +141,15 @@ const isCustom = computed(
 );
 const atMax = computed(() => props.screen.layout.regions.length >= MAX_TOP_REGIONS);
 const hasOverride = computed(() => Boolean(props.screen.clockBar));
+
+// On a kiosk the on-screen keyboard can cover the field being edited; keep it
+// in view without scrolling the whole dialog to the top (§5).
+const keepInView = event => {
+  const el = event?.target;
+  if (el && typeof el.scrollIntoView === "function") {
+    el.scrollIntoView({ block: "nearest" });
+  }
+};
 
 // The resolved position ("top" | … | "between" | "between:N") already matches
 // the option values below verbatim, so no remapping is needed for selection.
