@@ -47,6 +47,29 @@ def agent_update_requested(overrides: dict | None) -> bool:
     return bool((overrides or {}).get(_UPDATE_FLAG_KEY))
 
 
+def public_overrides(overrides: dict | None) -> dict:
+    """Return an override layer safe to hand to the UI.
+
+    Host-internal agent keys never belong in a device setting, so they are
+    stripped before the layer leaves the server (CLV-36). Returns a new dict.
+    """
+    ov = dict(overrides or {})
+    ov.pop(_UPDATE_FLAG_KEY, None)
+    return ov
+
+
+def _normalized_viewport(viewport: dict | None) -> dict | None:
+    """Accept only a sane ``{w, h}`` pair of positive ints. Anything else is None."""
+    if not isinstance(viewport, dict):
+        return None
+    w, h = viewport.get("w"), viewport.get("h")
+    if not isinstance(w, int) or not isinstance(h, int):
+        return None
+    if w <= 0 or h <= 0 or w > 20000 or h > 20000:
+        return None
+    return {"w": w, "h": h}
+
+
 @retry_on_db_locked()
 async def record_kiosk(
     kiosk_id: str,
@@ -55,6 +78,7 @@ async def record_kiosk(
     agent_status: str | None = None,
     agent_message: str | None = None,
     available_version: str | None = None,
+    viewport: dict | None = None,
 ) -> None:
     """Upsert a kiosk's registry row. No-op when kiosk_id is empty/None."""
     if not kiosk_id:
@@ -67,6 +91,7 @@ async def record_kiosk(
     # It is free text from the kiosk; the column caps it at 255.
     if agent_message is not None and len(agent_message) > 255:
         agent_message = agent_message[:255]
+    viewport = _normalized_viewport(viewport)
 
     now = datetime.utcnow()
     existing = await KioskDB.objects.get_or_none(id=kiosk_id)
@@ -79,6 +104,7 @@ async def record_kiosk(
                 agent_version=agent_version,
                 agent_update_status=agent_status,
                 agent_update_message=agent_message,
+                viewport=viewport,
             )
             logger.info(f"Registered new kiosk: {kiosk_id!r} (hostname={hostname!r})")
             return
@@ -102,6 +128,8 @@ async def record_kiosk(
         existing.agent_update_status = agent_status
     if agent_message is not None:
         existing.agent_update_message = agent_message
+    if viewport is not None:
+        existing.viewport = viewport
     # Auto-clear the update flag only once the agent confirms it runs the AVAILABLE
     # (target) version — clearing on any reported version would cancel a just-issued
     # request before the agent ever sees it.
@@ -134,7 +162,11 @@ def _to_utc_iso(dt: datetime | None) -> str | None:
 
 
 async def list_kiosks() -> list[dict]:
-    """Return known kiosks, newest-seen first."""
+    """Return known kiosks, newest-seen first, with their public overrides.
+
+    Overrides and viewport ride along so the UI can name a screen, draw its
+    start-page thumbnail and preview it without one request per kiosk (CLV-36).
+    """
     rows = await KioskDB.objects.order_by("-last_seen").all()
     return [
         {
@@ -146,6 +178,8 @@ async def list_kiosks() -> list[dict]:
             "agentUpdateStatus": row.agent_update_status,
             "agentUpdateMessage": row.agent_update_message,
             "agentUpdateRequested": agent_update_requested(row.overrides),
+            "overrides": public_overrides(row.overrides),
+            "viewport": _normalized_viewport(row.viewport),
         }
         for row in rows
     ]

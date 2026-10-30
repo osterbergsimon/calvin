@@ -77,3 +77,16 @@ export function configPath() {
 export function configUrl() {
   return `/api${configPath()}`;
 }
+
+// Attach the kiosk's CSS viewport to its config fetch, so the server can record
+// the real screen shape for the layout editor's preview (CLV-36). Only kiosks
+// report; a plain browser has no screen entry. Returns the path unchanged when
+// the viewport is unavailable.
+export function withViewport(path) {
+  if (!getKioskId()) return path;
+  const w = Math.round(window.innerWidth);
+  const h = Math.round(window.innerHeight);
+  if (!(w > 0 && h > 0)) return path;
+  const sep = path.includes("?") ? "&" : "?";
+  return `${path}${sep}vw=${w}&vh=${h}`;
+}

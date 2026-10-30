@@ -126,8 +126,15 @@ async def get_kiosk_config(
     kagent: str | None = None,
     kstat: str | None = None,
     kmsg: str | None = None,
+    vw: int | None = None,
+    vh: int | None = None,
 ):
-    """Return a kiosk's effective (merged) config; records the kiosk + its agent report."""
+    """Return a kiosk's effective (merged) config; records the kiosk + its agent report.
+
+    ``vw``/``vh`` are the kiosk's CSS viewport (``window.innerWidth/innerHeight``,
+    reported at load and on resize) so the layout editor can preview a screen at
+    its real aspect ratio (CLV-36).
+    """
     _valid_id_or_400(kiosk_id)
     # Compute available version BEFORE record_kiosk so we can pass it in,
     # enabling auto-clear of the update flag when agent_version == available_version.
@@ -145,6 +152,7 @@ async def get_kiosk_config(
             agent_status=kstat,
             agent_message=kmsg,
             available_version=available,
+            viewport={"w": vw, "h": vh} if vw is not None and vh is not None else None,
         )
     except Exception as exc:
         logger.warning(f"Failed to record kiosk {kiosk_id!r}: {exc}")
