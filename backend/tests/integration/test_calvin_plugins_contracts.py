@@ -12,6 +12,11 @@ The test discovers calvin-plugins via:
 
 If neither resolves, the test is skipped — checkouts that don't include the
 plugins repo (e.g. minimal CI shards) are fine.
+
+An explicitly configured CALVIN_PLUGINS_DIR is different: it must resolve to a
+real directory, otherwise the test fails instead of skipping. The CI job that
+checks out the plugins repo relies on this, so a missing or mistyped checkout
+can never pass as a skip.
 """
 
 from __future__ import annotations
@@ -28,18 +33,31 @@ from app.plugins.definitions import CURRENT_PLUGIN_API_VERSION
 from app.plugins.loader import PluginLoader
 
 
-def _find_calvin_plugins_dir() -> Path | None:
-    env = os.environ.get("CALVIN_PLUGINS_DIR")
-    if env:
-        candidate = Path(env).expanduser().resolve()
-        return candidate if candidate.is_dir() else None
+def _resolve_plugins_dir(configured: str | None, repo_root: Path) -> Path | None:
+    """Resolve the calvin-plugins checkout, or None when it is not present.
+
+    ``configured`` is the raw CALVIN_PLUGINS_DIR value. When it is set it must
+    point at a directory — a missing path there is a configuration error, not
+    a reason to skip, so that CI cannot pass without the plugins checkout.
+    The implicit sibling lookup stays optional.
+    """
+    if configured:
+        candidate = Path(configured).expanduser().resolve()
+        if not candidate.is_dir():
+            raise RuntimeError(
+                f"CALVIN_PLUGINS_DIR={configured!r} is not a directory; "
+                "refusing to skip the plugin contract test"
+            )
+        return candidate
     # backend/tests/integration/this_file.py -> backend -> repo root -> ../calvin-plugins
-    repo_root = Path(__file__).resolve().parents[3]
     candidate = (repo_root.parent / "calvin-plugins").resolve()
     return candidate if candidate.is_dir() else None
 
 
-PLUGINS_DIR = _find_calvin_plugins_dir()
+PLUGINS_DIR = _resolve_plugins_dir(
+    os.environ.get("CALVIN_PLUGINS_DIR"),
+    Path(__file__).resolve().parents[3],
+)
 
 
 def _discover_plugin_modules() -> list[tuple[str, Path]]:
