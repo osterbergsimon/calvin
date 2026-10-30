@@ -12,7 +12,7 @@ import { mount, flushPromises } from "@vue/test-utils";
 import { ref } from "vue";
 
 const pluginsRef = ref([]);
-const availablePluginsRef = ref([]);
+const catalogPluginsRef = ref([]);
 const pluginInstallErrorRef = ref("");
 const catalogRepo = ref("https://github.com/osterbergsimon/calvin-plugins");
 
@@ -26,8 +26,8 @@ vi.mock("@/composables", () => ({
     plugins: pluginsRef,
     loadPlugins: mockLoadPlugins,
     togglePlugin: vi.fn().mockResolvedValue(undefined),
-    availablePlugins: availablePluginsRef,
-    enumeratePluginsFromGitHub: mockEnumerate,
+    catalogPlugins: catalogPluginsRef,
+    enumerateCatalogPlugins: mockEnumerate,
     installPluginFromGitHub: mockInstall,
     pluginInstallError: pluginInstallErrorRef,
   }),
@@ -113,12 +113,12 @@ const catalogIds = w => catalogTiles(w).map(tile => tile.attributes("data-catalo
 describe("provider picker catalog group", () => {
   beforeEach(() => {
     pluginsRef.value = [installedImage];
-    availablePluginsRef.value = [];
+    catalogPluginsRef.value = [];
     pluginInstallErrorRef.value = "";
     catalogRepo.value = "https://github.com/osterbergsimon/calvin-plugins";
     mockLoadPlugins.mockReset().mockResolvedValue(undefined);
     mockEnumerate.mockReset().mockImplementation(async () => {
-      availablePluginsRef.value = CATALOG.map(item => ({ ...item }));
+      catalogPluginsRef.value = CATALOG.map(item => ({ ...item }));
     });
     mockInstall.mockReset().mockResolvedValue([]);
     mockPush.mockClear();
@@ -138,7 +138,7 @@ describe("provider picker catalog group", () => {
 
   it("leaves the group out when the catalog cannot be reached", async () => {
     mockEnumerate.mockImplementation(async () => {
-      availablePluginsRef.value = [];
+      catalogPluginsRef.value = [];
       pluginInstallErrorRef.value = "Repository not found";
     });
 
