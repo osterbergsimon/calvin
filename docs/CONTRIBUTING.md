@@ -1,59 +1,27 @@
 # Contributing to Calvin
 
-Thank you for your interest in contributing to Calvin! This document provides guidelines and instructions for contributing.
+The contributing guide lives at the root of the repository, so GitHub, pull
+requests, and this site all point at one source of truth instead of two copies
+that drift apart.
 
-## Getting Started
+**→ [CONTRIBUTING.md](https://github.com/osterbergsimon/calvin/blob/develop/CONTRIBUTING.md)**
 
-1. **Fork the repository** on GitHub
-2. **Clone your fork** locally
-3. **Create a branch** for your changes
-4. **Make your changes** and test them
-5. **Submit a pull request**
+It covers:
 
-## Development Setup
+- development setup (Docker dev stack or the native toolchain)
+- the branch model — branch from `develop`, pull requests into `develop`,
+  releases promoted to `main`
+- conventional commit messages
+- the quality gates from the `Makefile` (`make lint`, `make format`,
+  `make type-check`, `make test`, `make test-scripts`) and the docs build
+- where plugin work belongs (the separate
+  [calvin-plugins](https://github.com/osterbergsimon/calvin-plugins) repository)
+- how pull requests are reviewed, and the house rules review will check
 
-See the [Development Setup Guide](setup/QUICKSTART_DEVELOP.md) for detailed instructions on setting up your development environment.
+## Related
 
-## Code Style
-
-### Backend (Python)
-
-- Use **Python 3.12+**
-- Follow **PEP 8** style guidelines
-- Use **ruff** for linting and formatting
-- Run `uv run ruff check .` and `uv run ruff format .` before committing
-
-### Frontend (Vue 3)
-
-- Use **Vue 3 Composition API**
-- Follow Vue style guide
-- Use **ESLint** for linting
-- Run `npm run lint` before committing
-- Run `npm run type-check` for the typed API layer (`src/api/`); `.vue` files are not covered yet
-
-## Testing
-
-- Write tests for new features
-- Ensure all tests pass before submitting
-- Run `uv run pytest` for backend tests
-- Run `npm run test` for frontend tests
-
-## Documentation
-
-- Update documentation when adding features
-- Follow the existing documentation structure
-- Use clear, concise language
-- Include examples where helpful
-
-## Pull Requests
-
-- Provide a clear description of changes
-- Reference any related issues
-- Ensure all tests pass
-- Update documentation as needed
-
-## Questions?
-
-If you have questions, please open an issue on GitHub.
-
-Thank you for contributing to Calvin!
+- [Code of Conduct](https://github.com/osterbergsimon/calvin/blob/develop/CODE_OF_CONDUCT.md)
+- [Security policy](https://github.com/osterbergsimon/calvin/blob/develop/SECURITY.md) —
+  report vulnerabilities privately, never in a public issue
+- [Development quickstart](setup/QUICKSTART_DEVELOP.md)
+- [Getting started](setup/GETTING_STARTED.md)
