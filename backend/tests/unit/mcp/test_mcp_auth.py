@@ -31,9 +31,8 @@ async def test_no_key_is_401(gateway):
 
 async def test_cookie_is_not_accepted(gateway):
     async with client_for(gateway) as client:
-        response = await client.post(
-            "/api/mcp", json=INIT, headers=HEADERS, cookies={"calvin_admin": "x"}
-        )
+        client.cookies.set("calvin_admin", "x")
+        response = await client.post("/api/mcp", json=INIT, headers=HEADERS)
     assert response.status_code == 401
 
 
