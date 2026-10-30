@@ -287,6 +287,14 @@ guess is wrong in Docker (it sees the container IP), so on Docker/Unraid set
 `PUBLIC_URL=http://<server-lan-ip>:8000` in `.env` (passed through by
 `docker/docker-compose.yml`) or the template's **Public URL** field.
 
+The served installer (`GET /api/kiosks/install.sh`) bakes the same address in,
+so behind a TLS-terminating reverse proxy set `PUBLIC_URL=https://<your-domain>`.
+Without it the app only sees the proxy's plain-HTTP request: it can use
+`X-Forwarded-Proto`/`X-Forwarded-Host` instead, but only from a peer listed in
+`CALVIN_TRUSTED_PROXIES` (comma-separated IPs/CIDRs, `*` for any; empty by
+default). Forwarded headers from any other client are ignored, so a kiosk
+cannot be pointed at an attacker-chosen URL.
+
 ### Security note
 
 Calvin's backend has no built-in authentication. Mode B exposes it on
