@@ -82,9 +82,7 @@
               aria-label="Preview orientation"
               @update:model-value="setAnyBrowserOrientation"
             />
-            <span class="sre-orient-badge" data-test="orientation-badge">{{
-              orientationBadge
-            }}</span>
+            <Tag class="sre-orient-badge" data-test="orientation-badge">{{ orientationBadge }}</Tag>
           </div>
         </div>
 
@@ -409,6 +407,7 @@ import DialogScrim from "@/components/ui/DialogScrim.vue";
 import IconButton from "@/components/ui/IconButton.vue";
 import SegmentedControl from "@/components/ui/SegmentedControl.vue";
 import SelectPill from "@/components/ui/SelectPill.vue";
+import Tag from "@/components/ui/Tag.vue";
 import { getKioskId } from "@/utils/kioskId";
 import ConfirmModal from "@/components/settings/shared/ConfirmModal.vue";
 import { findPlaceableRegion, placeKindInRegion, placeServiceInRegion } from "@/utils/placement";
@@ -1389,16 +1388,6 @@ onUnmounted(() => {
 .sre-preview-label {
   color: var(--ink-3);
 }
-.sre-orient-badge {
-  font-size: var(--fs-2xs);
-  padding: 0.15rem 0.5rem;
-  border-radius: var(--radius-pill);
-  border: 1px solid var(--line);
-  background: var(--bg-2);
-  color: var(--ink-2);
-  font-variant-numeric: tabular-nums;
-}
-
 .sre-body {
   display: grid;
   grid-template-columns: 1fr 340px;

@@ -133,14 +133,15 @@
                 >
                   {{ isOnline(k) ? "● Online" : "○ Offline" }}
                 </span>
-                <span
+                <Tag
                   v-if="isPending(k)"
                   class="screen-card__badge"
+                  tone="warn"
                   data-test="kiosk-pending-badge"
                   role="img"
                   :aria-label="`${k.id}: offline, hardware config not yet applied`"
                   title="Offline — this screen hasn't applied the current hardware config yet"
-                  >⚠</span
+                  >⚠</Tag
                 >
               </span>
               <span class="screen-card__id" data-test="screen-id">{{ k.id }}</span>
@@ -631,6 +632,7 @@ import {
 import SettingsSection from "@/components/settings/shell/SettingsSection.vue";
 import SettingRow from "@/components/settings/shell/SettingRow.vue";
 import SegmentedControl from "@/components/ui/SegmentedControl.vue";
+import Tag from "@/components/ui/Tag.vue";
 import ToggleSwitch from "@/components/ui/ToggleSwitch.vue";
 import SelectPill from "@/components/ui/SelectPill.vue";
 import DisplayScheduleGrid from "@/components/settings/shared/DisplayScheduleGrid.vue";
@@ -1419,10 +1421,6 @@ onUnmounted(() => {
 }
 .screen-card__status.is-offline {
   color: var(--ink-3);
-}
-.screen-card__badge {
-  font-size: var(--fs-xs);
-  color: var(--warn);
 }
 .screen-card__software {
   font-size: var(--fs-sm);

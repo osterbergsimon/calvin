@@ -3,7 +3,7 @@
     <!-- Header: identity + enable -->
     <div class="pc-head">
       <span class="pc-name">{{ plugin.name }}</span>
-      <span class="pc-badge">{{ kindLabel }}</span>
+      <Tag class="pc-badge">{{ kindLabel }}</Tag>
       <span v-if="plugin.version" class="pc-ver">v{{ plugin.version }}</span>
       <span class="pc-spacer" />
       <ToggleSwitch
@@ -128,6 +128,7 @@
 
 <script setup>
 import { computed } from "vue";
+import Tag from "@/components/ui/Tag.vue";
 import ToggleSwitch from "@/components/ui/ToggleSwitch.vue";
 import { pluginKindLabel } from "@/utils/pluginKind";
 import { isNewerVersion } from "@/utils/pluginVersions";
@@ -273,7 +274,7 @@ const handleCustomAction = action => emit("custom-action", props.plugin.id, acti
 .pc-card {
   background: var(--bg-2);
   border: 1px solid var(--line);
-  border-radius: 8px;
+  border-radius: var(--radius-sm);
   overflow: hidden;
   transition: border-color 0.15s;
 }
@@ -288,12 +289,12 @@ const handleCustomAction = action => emit("custom-action", props.plugin.id, acti
 .pc-head {
   display: flex;
   align-items: center;
-  gap: 0.5rem;
-  padding: 0.75rem 1.25rem;
+  gap: var(--space-sm);
+  padding: var(--space-lg) var(--space-2xl);
 }
 .pc-name {
   font-family: var(--font-ui);
-  font-size: 1rem;
+  font-size: var(--fs-base);
   font-weight: 500;
   color: var(--ink);
   min-width: 0;
@@ -302,19 +303,11 @@ const handleCustomAction = action => emit("custom-action", props.plugin.id, acti
   white-space: nowrap;
 }
 .pc-badge {
-  padding: 0.15rem 0.5rem;
-  border-radius: 4px;
-  font-size: 0.75rem;
-  font-family: var(--font-ui);
-  font-weight: 500;
-  background: var(--bg-1);
-  color: var(--ink-2);
-  border: 1px solid var(--line);
   flex-shrink: 0;
 }
 .pc-ver {
   font-family: var(--font-data);
-  font-size: 0.75rem;
+  font-size: var(--fs-2xs);
   color: var(--ink-3);
   flex-shrink: 0;
 }
@@ -327,13 +320,13 @@ const handleCustomAction = action => emit("custom-action", props.plugin.id, acti
   display: flex;
   align-items: center;
   justify-content: space-between;
-  gap: 0.75rem;
-  padding: 0 1.25rem 0.75rem;
+  gap: var(--space-lg);
+  padding: 0 var(--space-2xl) var(--space-lg);
   flex-wrap: wrap;
 }
 .pc-summary {
   font-family: var(--font-ui);
-  font-size: 0.85rem;
+  font-size: var(--fs-sm);
   color: var(--ink-3);
 }
 .pc-link {
@@ -343,7 +336,7 @@ const handleCustomAction = action => emit("custom-action", props.plugin.id, acti
   border: 0;
   border-bottom: 1px dotted currentColor;
   font-family: var(--font-ui);
-  font-size: 0.85rem;
+  font-size: var(--fs-sm);
   cursor: pointer;
 }
 .pc-link:hover {
@@ -356,21 +349,21 @@ const handleCustomAction = action => emit("custom-action", props.plugin.id, acti
 .pc-actions {
   display: flex;
   align-items: center;
-  gap: 0.5rem;
+  gap: var(--space-sm);
   margin-left: auto;
 }
 .pc-btn {
   display: inline-flex;
   align-items: center;
-  gap: 0.3rem;
-  padding: 0.4rem 0.85rem;
+  gap: var(--space-3xs);
+  padding: var(--space-xs) var(--space-lg);
   min-height: var(--touch-target);
   background: var(--bg-1);
   color: var(--ink);
   border: 1px solid var(--line);
-  border-radius: 6px;
+  border-radius: var(--radius-xs);
   font-family: var(--font-ui);
-  font-size: 0.85rem;
+  font-size: var(--fs-sm);
   font-weight: 500;
   cursor: pointer;
   transition:
@@ -402,7 +395,7 @@ const handleCustomAction = action => emit("custom-action", props.plugin.id, acti
   font-weight: 600;
 }
 .pc-btn--update:hover {
-  background: color-mix(in srgb, var(--focus), black 12%);
+  background: color-mix(in srgb, var(--focus) 88%, var(--ink));
   border-color: var(--focus);
 }
 .pc-btn--update:disabled {
@@ -422,14 +415,14 @@ const handleCustomAction = action => emit("custom-action", props.plugin.id, acti
 .pc-body {
   display: flex;
   flex-direction: column;
-  gap: 1.5rem;
-  padding: 1.25rem;
+  gap: var(--space-3xl);
+  padding: var(--space-2xl);
   border-top: 1px solid var(--line);
 }
 .pc-section-title {
-  margin: 0 0 1rem;
+  margin: 0 0 var(--space-xl);
   font-family: var(--font-ui);
-  font-size: 0.95rem;
+  font-size: var(--fs-md);
   font-weight: 600;
   color: var(--ink);
 }

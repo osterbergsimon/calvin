@@ -33,7 +33,7 @@
         @click="hintOpen = !hintOpen"
         @blur="hintOpen = false"
       >
-        !
+        <Tag count tone="warn">!</Tag>
       </button>
       <span class="kbt-hint" role="tooltip">{{ conflictHint }}</span>
     </template>
@@ -44,6 +44,7 @@
 import { computed, ref } from "vue";
 import { actionLabel } from "@/utils/keyboardActionsCatalog";
 import { formatKeyLabel } from "@/utils/keyCode";
+import Tag from "@/components/ui/Tag.vue";
 
 const props = defineProps({
   keyCode: { type: String, required: true },
@@ -124,22 +125,11 @@ const conflictHint = computed(() => {
    hover/focus reveal it for pointer & keyboard users (see below). */
 .kbt-conflict-badge {
   position: absolute;
-  top: 5px;
-  right: 6px;
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  width: 1rem;
-  height: 1rem;
+  top: var(--space-3xs);
+  right: var(--space-xs);
   padding: 0;
-  font-family: var(--font-data);
-  font-size: 0.7rem;
-  font-weight: 700;
-  line-height: 1;
-  color: var(--focus-ink);
-  background: var(--warn);
-  border: none;
-  border-radius: 50%;
+  background: transparent;
+  border: 0;
   cursor: help;
 }
 .kbt-conflict-badge:focus-visible {

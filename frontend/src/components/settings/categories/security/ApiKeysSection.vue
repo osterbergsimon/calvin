@@ -196,12 +196,14 @@
           data-test="api-key-row"
         >
           <template #label-extra>
-            <span
+            <Tag
               class="api-keys__chip"
-              :class="{ 'api-keys__chip--host': item.scope === 'host' }"
+              :tone="item.scope === 'host' ? 'err' : 'neutral'"
+              :icon="item.scope === 'host' ? mdiAlert : null"
               data-test="api-key-scope"
-              >{{ scopeChip(item.scope) }}</span
             >
+              {{ scopeChip(item.scope) }}
+            </Tag>
           </template>
           <template #description>
             <p class="setting-row__desc">
@@ -253,6 +255,8 @@
 
 <script setup>
 import { computed, nextTick, onMounted, onUnmounted, ref, watch } from "vue";
+import { mdiAlert } from "@mdi/js";
+import Tag from "@/components/ui/Tag.vue";
 import { useApiKeysStore } from "@/stores/apiKeys";
 import { useSystem } from "@/composables/useSystem";
 import { useTouchCapability } from "@/composables/useTouchCapability";
@@ -322,9 +326,7 @@ const copyLabel = computed(() =>
 
 const now = () => new Date();
 const scopeChip = value =>
-  value === "host"
-    ? "⚠ Host control"
-    : (scopeOptions.find(o => o.value === value)?.label ?? value);
+  value === "host" ? "Host control" : (scopeOptions.find(o => o.value === value)?.label ?? value);
 const isDisabled = option => option.value === "host" && hostUnavailable.value;
 
 watch(scope, () => {
@@ -669,17 +671,7 @@ async function revoke() {
 }
 
 .api-keys__chip {
-  margin-left: 0.5rem;
-  padding: 0.1rem 0.5rem;
-  font-size: var(--fs-xs);
-  font-weight: 500;
-  color: var(--ink-2);
-  border: 1px solid var(--line);
-  border-radius: 999px;
-}
-.api-keys__chip--host {
-  color: var(--err);
-  border-color: color-mix(in srgb, var(--err) 45%, var(--line));
+  margin-left: var(--space-sm);
 }
 .api-keys__prefix {
   font-family: var(--font-data);

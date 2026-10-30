@@ -29,7 +29,7 @@
         </div>
         <div class="theme-selection-info">
           <strong>{{ theme.name }}</strong>
-          <span v-if="theme.is_builtin" class="theme-badge-small">Built-in</span>
+          <Tag v-if="theme.is_builtin" class="theme-badge-small">Built-in</Tag>
         </div>
       </div>
     </div>
@@ -41,6 +41,7 @@
 
 <script setup>
 // import { computed } from "vue";
+import Tag from "@/components/ui/Tag.vue";
 
 defineProps({
   themes: {
@@ -71,13 +72,13 @@ const handleThemeSelect = themeId => {
 const getThemePreviewStyle = theme => {
   // Extract CSS variables from theme if available
   const vars = theme.variables || {};
-  const bgPrimary = vars["bg-1"] || "#ffffff";
-  const bgSecondary = vars["bg-2"] || "#f5f5f5";
-  const accentPrimary = vars.focus || "#e08a1e";
+  const bgPrimary = vars["bg-1"] || "var(--bg-1)";
+  const bgSecondary = vars["bg-2"] || "var(--bg-2)";
+  const accentPrimary = vars.focus || "var(--focus)";
 
   return {
     background: `linear-gradient(135deg, ${bgPrimary} 0%, ${bgSecondary} 50%, ${accentPrimary} 100%)`,
-    color: vars.ink || "#1b242b",
+    color: vars.ink || "var(--ink)",
   };
 };
 </script>
@@ -88,27 +89,27 @@ const getThemePreviewStyle = theme => {
 }
 
 .loading-state {
-  padding: 2rem;
+  padding: var(--space-3xl);
   text-align: center;
   color: var(--ink-2);
 }
 
 .theme-selection-grid {
   display: grid;
-  grid-template-columns: repeat(auto-fill, minmax(120px, 1fr));
-  gap: 1rem;
-  margin-top: 0.5rem;
+  grid-template-columns: repeat(auto-fill, minmax(7.5rem, 1fr));
+  gap: var(--space-xl);
+  margin-top: var(--space-sm);
 }
 
 .theme-selection-item {
   display: flex;
   flex-direction: column;
   align-items: center;
-  padding: 1rem;
+  padding: var(--space-xl);
   min-height: var(--touch-target);
   background: var(--bg-2);
   border: 2px solid var(--line);
-  border-radius: 8px;
+  border-radius: var(--radius-sm);
   cursor: pointer;
   transition: all 0.2s ease;
 }
@@ -134,9 +135,9 @@ const getThemePreviewStyle = theme => {
   position: relative;
   width: 100%;
   aspect-ratio: 16 / 9;
-  border-radius: 6px;
+  border-radius: var(--radius-xs);
   overflow: hidden;
-  margin-bottom: 0.5rem;
+  margin-bottom: var(--space-sm);
   background: var(--bg-1);
   border: 1px solid var(--line);
 }
@@ -154,8 +155,8 @@ const getThemePreviewStyle = theme => {
   display: flex;
   align-items: center;
   justify-content: center;
-  font-size: 2rem;
-  font-weight: bold;
+  font-size: var(--fs-xl);
+  font-weight: 600;
   color: var(--ink-2);
   background: linear-gradient(
     135deg,
@@ -168,16 +169,16 @@ const getThemePreviewStyle = theme => {
   position: absolute;
   top: 0.25rem;
   right: 0.25rem;
-  width: 1.5rem;
-  height: 1.5rem;
+  width: var(--space-3xl);
+  height: var(--space-3xl);
   background: var(--focus);
-  color: white;
-  border-radius: 50%;
+  color: var(--focus-ink);
+  border-radius: var(--radius-pill);
   display: flex;
   align-items: center;
   justify-content: center;
-  font-size: 0.875rem;
-  font-weight: bold;
+  font-size: var(--fs-control);
+  font-weight: 600;
   box-shadow: 0 2px 4px var(--shadow);
 }
 
@@ -188,23 +189,17 @@ const getThemePreviewStyle = theme => {
 
 .theme-selection-info strong {
   display: block;
-  font-size: 0.875rem;
+  font-size: var(--fs-control);
   color: var(--ink);
-  margin-bottom: 0.25rem;
+  margin-bottom: var(--space-3xs);
 }
 
 .theme-badge-small {
-  display: inline-block;
-  padding: 0.125rem 0.375rem;
-  background: var(--bg-2);
-  color: var(--ink-2);
-  border-radius: 4px;
-  font-size: 0.7rem;
-  margin-left: 0.25rem;
+  margin-left: var(--space-3xs);
 }
 
 .help-text {
-  font-size: 0.875rem;
+  font-size: var(--fs-control);
   color: var(--ink-2);
   line-height: 1.4;
 }

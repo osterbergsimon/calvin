@@ -17,7 +17,7 @@
             <span>{{ getSourceName(event.source) }}</span>
             <template v-if="event.all_day && !isMultiDay">
               <span class="event-detail__sep" aria-hidden="true">·</span>
-              <span class="event-detail__tag">all day</span>
+              <Tag class="event-detail__tag">all day</Tag>
             </template>
           </div>
         </div>
@@ -38,7 +38,7 @@
           </div>
         </div>
         <div class="event-detail__subwhen">
-          <span class="event-detail__tag">{{ durationLabel }}</span>
+          <Tag class="event-detail__tag">{{ durationLabel }}</Tag>
           <template v-if="!event.all_day">
             <span class="event-detail__sep" aria-hidden="true">·</span>
             <span>{{ formatTime(event.start) }} – {{ formatTime(event.end) }}</span>
@@ -51,7 +51,7 @@
             {{ formatTime(event.start) }}–{{ formatTime(event.end) }}
           </span>
           <span v-else class="event-detail__time">All day</span>
-          <span v-if="durationLabel" class="event-detail__tag">{{ durationLabel }}</span>
+          <Tag v-if="durationLabel" class="event-detail__tag">{{ durationLabel }}</Tag>
         </div>
         <div class="event-detail__subwhen">{{ formatFullDay(selectedDate || event.start) }}</div>
       </template>
@@ -110,6 +110,7 @@
 <script setup>
 import { computed } from "vue";
 import IconButton from "@/components/ui/IconButton.vue";
+import Tag from "@/components/ui/Tag.vue";
 import { useConfigStore } from "../stores/config";
 import { useCalendarStore } from "../stores/calendar";
 import { useEventHelpers } from "../composables/useEventHelpers";
@@ -312,16 +313,6 @@ const getSourceName = sourceId => {
 
 .event-detail__sep {
   color: var(--ink-3);
-}
-
-.event-detail__tag {
-  font-family: var(--font-data);
-  font-size: 0.62rem;
-  letter-spacing: 0.03em;
-  color: var(--ink-3);
-  border: 1px solid var(--line);
-  border-radius: 99px;
-  padding: 0.1rem 0.45rem;
 }
 
 /* When — single day */
