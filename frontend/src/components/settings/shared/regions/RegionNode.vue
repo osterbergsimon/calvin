@@ -20,6 +20,7 @@
           :selected-id="selectedId"
           :layout-dir="layoutDir"
           :coarse="coarse"
+          :narrow="narrow"
           @select="emit('select', $event)"
           @resize="emit('resize', $event)"
         />
@@ -37,9 +38,9 @@
       </template>
     </div>
     <div v-else class="sre-region-face">
-      <span class="sre-region-emoji">{{ emoji }}</span>
+      <span v-if="!narrow" class="sre-region-emoji">{{ emoji }}</span>
       <span class="sre-region-name">{{ title }}</span>
-      <span class="sre-region-size">{{ region.size }}%</span>
+      <span v-if="!narrow" class="sre-region-size">{{ region.size }}%</span>
     </div>
   </div>
 </template>
@@ -56,6 +57,8 @@ const props = defineProps({
   layoutDir: { type: String, required: true },
   // Coarse pointers get a 28px-across resizer hit area (§4).
   coarse: { type: Boolean, default: false },
+  // Under 320px the device only has room for the region name (§2).
+  narrow: { type: Boolean, default: false },
 });
 const emit = defineEmits(["select", "resize"]);
 
