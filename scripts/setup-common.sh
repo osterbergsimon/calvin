@@ -1017,7 +1017,8 @@ configure_display_session() {
     mkdir -p "$(dirname "${file}")"
     if [ "${stack}" = "wayland" ]; then
         cat > "${file}" <<WAYLAND_ENV_EOF
-# Calvin kiosk display session (stack: wayland). Written by setup-kiosk.sh.
+# Calvin kiosk display session (stack: wayland). Written by the Calvin setup
+# scripts (setup.sh for the all-in-one install, setup-kiosk.sh for a remote kiosk).
 # Sets the environment calvin-kiosk-remote.service and calvin-display-agent.service
 # need to reach the labwc session; there is no X authority file on Wayland.
 XDG_SESSION_TYPE=wayland
@@ -1027,7 +1028,8 @@ CALVIN_CHROMIUM_DISPLAY_FLAGS=${flags}
 WAYLAND_ENV_EOF
     else
         cat > "${file}" <<X11_ENV_EOF
-# Calvin kiosk display session (stack: x11). Written by setup-kiosk.sh.
+# Calvin kiosk display session (stack: x11). Written by the Calvin setup scripts
+# (setup.sh for the all-in-one install, setup-kiosk.sh for a remote kiosk).
 DISPLAY=:0
 XAUTHORITY=${home}/.Xauthority
 CALVIN_CHROMIUM_DISPLAY_FLAGS=${flags}
