@@ -83,7 +83,20 @@ export function useConfigForm(initialConfig = {}) {
         randomizeImages: response.randomizeImages ?? response.randomize_images ?? false,
         // UI
         showUI: response.showUI ?? response.show_ui ?? true,
+        displayName: response.displayName ?? response.display_name ?? "",
         modeIndicatorTimeout: response.modeIndicatorTimeout ?? response.mode_indicator_timeout ?? 5,
+        focusLightMode: response.focusLightMode ?? response.focus_light_mode ?? "interaction",
+        focusLightDimOthers:
+          response.focusLightDimOthers ?? response.focus_light_dim_others ?? true,
+        touchControls: response.touchControls ?? response.touch_controls ?? "auto",
+        touchControlSize: response.touchControlSize ?? response.touch_control_size ?? "medium",
+        tapAnywhereReveal: response.tapAnywhereReveal ?? response.tap_anywhere_reveal ?? false,
+        hotCornerPosition:
+          response.hotCornerPosition ?? response.hot_corner_position ?? "bottom-left",
+        hotCornerOpacity: response.hotCornerOpacity ?? response.hot_corner_opacity ?? 55,
+        hotCornerSize: response.hotCornerSize ?? response.hot_corner_size ?? 64,
+        hotCornerLongPressMs:
+          response.hotCornerLongPressMs ?? response.hot_corner_long_press_ms ?? 500,
         // Calendar
         timeFormat: response.timeFormat ?? response.time_format ?? "24h",
         weekStartDay: response.weekStartDay ?? response.week_start_day ?? 1,
